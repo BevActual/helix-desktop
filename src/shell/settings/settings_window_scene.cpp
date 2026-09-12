@@ -1494,7 +1494,13 @@ std::unique_ptr<Flex> SettingsWindow::buildBody(
 void SettingsWindow::refreshSettingsRegistry(const Config& cfg) {
   SettingsProfileWatch phaseProfileWatch;
 
-  const auto env = buildRegistryEnvironment();
+  auto env = buildRegistryEnvironment();
+  env.copyToClipboard = [this](std::string text) {
+    if (m_clipboardService != nullptr) {
+      (void)m_clipboardService->copyText(std::move(text));
+    }
+  };
+  env.requestRebuild = [this]() { requestContentRebuild(true); };
   logSettingsProfile("refreshRegistry registryEnvironment", phaseProfileWatch);
   phaseProfileWatch.reset();
   m_settingsRegistry = settings::buildSettingsRegistry(cfg, nullptr, nullptr, env);

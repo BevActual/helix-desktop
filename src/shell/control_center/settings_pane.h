@@ -12,8 +12,10 @@
 #include <unordered_set>
 #include <vector>
 
+class AsyncTextureCache;
 class AccountsService;
 class Button;
+class ClipboardService;
 class CompositorPlatform;
 class ConfigService;
 class DependencyService;
@@ -26,9 +28,18 @@ class Select;
 class Toggle;
 class UPowerService;
 
+namespace scripting {
+  class PluginManager;
+}
+
+namespace settings {
+  class HostedEditors;
+}
+
 struct SettingsPaneOptions {
   std::string section;
   std::unordered_set<std::string> includedGroups;
+  bool compact = false;
 };
 
 class SettingsPane {
@@ -37,8 +48,8 @@ public:
 
   [[nodiscard]] std::unique_ptr<Flex> create(float scale, float panelCardOpacity);
   [[nodiscard]] std::unique_ptr<Flex> createHeaderActions(float scale);
-  [[nodiscard]] std::unique_ptr<Flex> takeHost(std::unique_ptr<Flex> live, float scale, float panelCardOpacity);
-  [[nodiscard]] std::unique_ptr<Flex> createEmbedHeaderActions(std::unique_ptr<Flex> liveActions, float scale);
+  [[nodiscard]] std::unique_ptr<Flex> wrapLive(std::unique_ptr<Flex> live, float scale, float panelCardOpacity);
+  [[nodiscard]] std::unique_ptr<Flex> embedHeader(std::unique_ptr<Flex> liveActions, float scale);
 
   void onClose();
   void layout(Renderer& renderer, float contentWidth, float bodyHeight);
@@ -47,6 +58,7 @@ public:
   void setConfigureMode(bool show);
   [[nodiscard]] bool configureMode() const noexcept { return m_configureMode; }
   [[nodiscard]] const std::string& section() const noexcept { return m_selectedSection; }
+  void setSearchQuery(std::string query);
 
 private:
   void rebuildContent();
@@ -63,18 +75,25 @@ private:
   void clearSettingOverride(std::vector<std::string> path);
   void clearSettingOverrides(std::vector<std::vector<std::string>> paths);
   void openFullSettings() const;
+  void bindHostedEditors();
   void syncBarSelect();
   void applyConfigureVisibility();
 
   ConfigService* m_config = nullptr;
+  ClipboardService* m_clipboard = nullptr;
   CompositorPlatform* m_platform = nullptr;
   DependencyService* m_dependencies = nullptr;
   UPowerService* m_upower = nullptr;
   AccountsService* m_accounts = nullptr;
   IpcService* m_ipc = nullptr;
+  settings::HostedEditors* m_hostedEditors = nullptr;
+  scripting::PluginManager* m_pluginManager = nullptr;
+  AsyncTextureCache* m_asyncTextures = nullptr;
 
   std::string m_selectedSection;
   std::unordered_set<std::string> m_includedGroups;
+  bool m_compact = false;
+  std::string m_searchQuery;
   std::string m_selectedBarName;
   std::string m_statusMessage;
   bool m_statusIsError = false;
@@ -111,4 +130,5 @@ private:
   Flex* m_content = nullptr;
   Toggle* m_advancedToggle = nullptr;
   Button* m_openButton = nullptr;
+  Renderer* m_layoutRenderer = nullptr;
 };

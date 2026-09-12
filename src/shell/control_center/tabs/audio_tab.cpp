@@ -1951,16 +1951,18 @@ std::unique_ptr<Flex> AudioTab::create() {
     m_easyEffects->refreshActiveEffectsProfiles();
   }
 
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> AudioTab::createHeaderActions() {
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void AudioTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool AudioTab::configureMode() const { return m_settings->configureMode(); }
+
+void AudioTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {

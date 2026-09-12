@@ -40,6 +40,10 @@ namespace noctalia::theme {
 }
 namespace scripting {
   class ScriptApiContext;
+  class PluginManager;
+}
+namespace settings {
+  class HostedEditors;
 }
 
 struct ControlCenterServices {
@@ -77,6 +81,8 @@ struct ControlCenterServices {
   AccountsService* accounts = nullptr;
   ThumbnailService* thumbnails = nullptr;
   AsyncTextureCache* asyncTextures = nullptr;
+  scripting::PluginManager* pluginManager = nullptr;
+  settings::HostedEditors* hostedEditors = nullptr;
 
   [[nodiscard]] ShortcutServices shortcutServices() const {
     return {

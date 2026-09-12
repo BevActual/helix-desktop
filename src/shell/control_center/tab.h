@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <string_view>
 
 class Flex;
 class Label;
@@ -58,6 +59,10 @@ public:
   // the live view (for example `settings-toggle notifications`).
   virtual void setConfigureMode(bool show) { (void)show; }
   [[nodiscard]] virtual bool configureMode() const { return false; }
+
+  // Sidebar (or header) settings search. Empty keeps the page filter; non-empty
+  // searches the whole registry.
+  virtual void setSettingsSearchQuery(std::string_view query) { (void)query; }
 
   // Called when the panel closes. Null out all raw pointers to freed nodes.
   virtual void onClose() {}

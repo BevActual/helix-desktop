@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/screen_time_tab.h"
 
+#include "config/config_service.h"
 #include "i18n/i18n.h"
 #include "render/animation/animation.h"
 #include "render/animation/animation_manager.h"
@@ -17,6 +18,7 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
@@ -128,7 +130,7 @@ namespace {
 } // namespace
 
 ScreenTimeTab::ScreenTimeTab(ScreenTimeService* screenTime, const ControlCenterServices& services)
-    : m_screenTime(screenTime),
+    : m_screenTime(screenTime), m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "system", .includedGroups = {"screen-time"}}
       )) {}
@@ -217,15 +219,35 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
 
-  usageCard->addChild(
+  auto disabledRow = ui::row({
+      .out = &m_disabledRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+  });
+  disabledRow->addChild(
       ui::label({
           .out = &m_disabledLabel,
           .text = i18n::tr("control-center.screen-time.disabled"),
           .fontSize = Style::fontSizeBody * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
+          .flexGrow = 1.0F,
       })
   );
+  disabledRow->addChild(
+      ui::toggle({
+          .out = &m_enableToggle,
+          .checked = m_screenTime != nullptr && m_screenTime->enabled(),
+          .scale = scale,
+          .onChange =
+              [this](bool value) {
+                if (m_config != nullptr) {
+                  (void)m_config->setOverride({"shell", "screen_time_enabled"}, value);
+                }
+              },
+      })
+  );
+  usageCard->addChild(std::move(disabledRow));
 
   usageCard->addChild(
       ui::label({
@@ -491,16 +513,18 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
     m_lastSnapshotKey.clear();
     PanelManager::instance().requestUpdateOnly();
   });
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> ScreenTimeTab::createHeaderActions() {
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void ScreenTimeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool ScreenTimeTab::configureMode() const { return m_settings->configureMode(); }
+
+void ScreenTimeTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void ScreenTimeTab::cancelRangeSlide() {
   const bool wasAnimating = m_rangeSlideAnimId != 0;
@@ -612,6 +636,8 @@ void ScreenTimeTab::onClose() {
   m_detailTitle = nullptr;
   m_detailBackButton = nullptr;
   m_disabledLabel = nullptr;
+  m_disabledRow = nullptr;
+  m_enableToggle = nullptr;
   m_rangePicker = nullptr;
   m_chartPlotRow = nullptr;
   m_chartLabelRow = nullptr;
@@ -640,8 +666,15 @@ void ScreenTimeTab::setActive(bool active) {
 void ScreenTimeTab::syncEnabledUi() {
   const bool enabled = m_screenTime != nullptr && m_screenTime->enabled();
   const bool inDetail = !m_detailDayKey.empty();
+  if (m_disabledRow != nullptr) {
+    m_disabledRow->setVisible(!enabled);
+  }
   if (m_disabledLabel != nullptr) {
     m_disabledLabel->setVisible(!enabled);
+  }
+  if (m_enableToggle != nullptr) {
+    m_enableToggle->setVisible(!enabled);
+    m_enableToggle->setChecked(enabled);
   }
   const bool showUsage = enabled;
   if (m_rangePicker != nullptr) {

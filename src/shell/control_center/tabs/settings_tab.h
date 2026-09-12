@@ -5,6 +5,7 @@
 #include "shell/control_center/tab.h"
 
 #include <string>
+#include <string_view>
 #include <utility>
 
 class Flex;
@@ -18,6 +19,7 @@ public:
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   [[nodiscard]] bool configureMode() const override { return true; }
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;

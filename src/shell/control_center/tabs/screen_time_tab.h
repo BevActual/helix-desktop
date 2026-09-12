@@ -21,6 +21,8 @@ class Renderer;
 class ScreenTimeService;
 class ScrollView;
 class Segmented;
+class Toggle;
+class ConfigService;
 struct ControlCenterServices;
 
 class ScreenTimeTab : public Tab {
@@ -33,6 +35,7 @@ public:
   void setActive(bool active) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -53,6 +56,7 @@ private:
   [[nodiscard]] std::string resolveIconPath(const std::string& appKey) const;
 
   ScreenTimeService* m_screenTime = nullptr;
+  ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
   int m_rangeDays = 1;
@@ -69,7 +73,9 @@ private:
   Flex* m_root = nullptr;
   Flex* m_usageCard = nullptr;
   Flex* m_detailBar = nullptr;
+  Flex* m_disabledRow = nullptr;
   Label* m_disabledLabel = nullptr;
+  Toggle* m_enableToggle = nullptr;
   Label* m_detailTitle = nullptr;
   Button* m_detailBackButton = nullptr;
   Segmented* m_rangePicker = nullptr;

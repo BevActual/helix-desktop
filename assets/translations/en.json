@@ -286,14 +286,21 @@
     "display": {
       "disabled": "Disabled",
       "layout": "Arrangement",
-      "layout-hint": "Place one display next to another. Changes are not written to the niri config.",
+      "layout-hint": "Drag to another side. Arrows slide along the shared edge. niri keeps displays adjacent and non-overlapping.",
       "move": "Display to move",
+      "moving": "Moving {name}",
+      "moving-at": "Moving {name} · {x}, {y}",
       "no-displays": "No monitors available",
-      "place-bottom": "Place below the other display",
-      "place-left": "Place to the left of the other display",
-      "place-right": "Place to the right of the other display",
-      "place-top": "Place above the other display",
+      "nudge-down": "Slide down along the shared edge",
+      "nudge-left": "Slide left along the shared edge",
+      "nudge-right": "Slide right along the shared edge",
+      "nudge-up": "Slide up along the shared edge",
+      "place-bottom": "Place below",
+      "place-left": "Place to the left",
+      "place-right": "Place to the right",
+      "place-top": "Place above",
       "refresh-rate": "Refresh rate",
+      "relative-to": "Relative to",
       "rescan": "Rescan displays",
       "resolution": "Resolution",
       "rotation": "Rotation",
@@ -311,11 +318,19 @@
       "vrr": "Variable refresh rate"
     },
     "settings": {
-      "hint": "Change settings here. The plugin store, bar widget editors, and a few other tools still open the Settings window.",
+      "hint": "Change settings here. Search from any page, or open the Settings window for export and a few remaining tools.",
       "open": "Open Settings window",
       "configure": "Settings",
-      "plugins-hint": "Install, update, and configure plugins in the Settings window.",
-      "plugins-open": "Open plugin settings"
+      "plugins-hint": "Install, update, and configure plugins from this page.",
+      "plugins-open": "Open plugin store",
+      "search-placeholder": "Search settings"
+    },
+    "sidebar": {
+      "look": "Look",
+      "status": "Status",
+      "setup": "Setup",
+      "more": "More",
+      "more-hide": "Hide setup"
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
@@ -1325,6 +1340,7 @@
         "home": "Home",
         "hot-corners": "Hot Corners",
         "idle": "Idle",
+        "in-noctalia": "In Noctalia",
         "interface": "Interface",
         "keybinds": "Keybinds",
         "keyboard-layout": "Keyboard Layout",
@@ -1343,6 +1359,7 @@
         "navigation": "Navigation",
         "network": "Network",
         "night-light": "Night Light",
+        "niri": "Niri",
         "notifications": "Notifications",
         "osd": "OSD",
         "overview": "Overview",
@@ -2299,6 +2316,40 @@
         "validate": {
           "description": "Confirm selections, submit inputs, or activate the focused item",
           "label": "Confirm"
+        },
+        "niri": {
+          "actions": {
+            "brightness-down": { "label": "Decrease brightness" },
+            "brightness-up": { "label": "Increase brightness" },
+            "control-center": { "label": "Control Center" },
+            "launcher": { "label": "Launcher" },
+            "settings": { "label": "Settings" },
+            "volume-down": { "label": "Decrease volume" },
+            "volume-mute": { "label": "Toggle mute" },
+            "volume-up": { "label": "Increase volume" },
+            "window-switcher": { "label": "Window switcher" }
+          },
+          "bound": "Bound as {keys} · noctalia msg {command}",
+          "conflict": "Recommended {key} is already used by another niri bind",
+          "copied": "Copied niri bind to the clipboard",
+          "copied-missing": "Copied missing niri binds to the clipboard",
+          "copy-bind": "Copy",
+          "copy-missing": {
+            "button": "Copy missing",
+            "description": "Copy a binds { } block for recommended shortcuts that are not in your niri config yet",
+            "label": "Copy missing binds"
+          },
+          "install": {
+            "button": "Add to niri",
+            "description": "Write missing recommended binds to noctalia-binds.kdl and include it from config.kdl. Existing niri binds are left unchanged.",
+            "label": "Install recommended binds"
+          },
+          "install-failed": "Could not update the niri config",
+          "install-none": "All recommended niri binds are already present",
+          "install-ok": "Added {count} niri bind(s). niri reloads the config on its own.",
+          "missing": "Not in niri config · recommended {key}",
+          "none-missing": "All recommended niri binds are already present",
+          "title": "Niri keybinds"
         }
       },
       "lockscreen": {
@@ -2458,6 +2509,10 @@
         "home-session-button": {
           "description": "Show the session-actions button in the Home tab header",
           "label": "Show Header Session Button"
+        },
+        "control-center-show-setup": {
+          "description": "Show launcher, dock, and other setup pages in the Control Center sidebar. The More row also toggles this.",
+          "label": "Show Setup Pages"
         },
         "home-shortcuts": {
           "description": "Choose up to six shortcut buttons for the home tab",

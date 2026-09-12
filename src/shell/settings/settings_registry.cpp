@@ -1,5 +1,6 @@
 #include "shell/settings/settings_registry.h"
 
+#include "compositors/niri/niri_config_binds.h"
 #include "config/config_types.h"
 #include "config/schema/config_schema.h"
 #include "config/schema/ranges.h"
@@ -7,6 +8,7 @@
 #include "core/log.h"
 #include "core/process/process.h"
 #include "i18n/i18n.h"
+#include "notification/notifications.h"
 #include "shell/bar/widget_gesture.h"
 #include "shell/bar/widget_gesture_defaults.h"
 #include "shell/control_center/control_center_panel.h"
@@ -350,6 +352,117 @@ namespace settings {
           .advanced = advanced,
           .searchText = StringUtils::toLower(searchText),
       };
+    }
+
+    std::string joinKeys(const std::vector<std::string>& keys) {
+      std::string out;
+      for (const auto& key : keys) {
+        if (!out.empty()) {
+          out += ", ";
+        }
+        out += key;
+      }
+      return out;
+    }
+
+    void appendNiriKeybindEntries(std::vector<SettingEntry>& entries, const RegistryEnvironment& env) {
+      if (!env.niriOverviewTypeToLaunchSupported && !env.niriBackdropSupported) {
+        return;
+      }
+      const auto copy = env.copyToClipboard;
+      const auto rebuild = env.requestRebuild;
+      const auto scan = compositors::niri::scanConfig();
+      const auto statuses = compositors::niri::bindStatuses(scan);
+
+      auto copyText = [copy](std::string text, std::string_view toastKey) {
+        if (copy) {
+          copy(std::move(text));
+        }
+        notify::info("Noctalia", i18n::tr("settings.schema.keybinds.niri.title"), i18n::tr(std::string(toastKey)));
+      };
+
+      entries.push_back(makeEntry(
+          SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.copy-missing.label"),
+          i18n::tr("settings.schema.keybinds.niri.copy-missing.description"), {},
+          ButtonSetting{
+              .label = i18n::tr("settings.schema.keybinds.niri.copy-missing.button"),
+              .action =
+                  [copyText]() {
+                    const auto missing = compositors::niri::missingRecommended(compositors::niri::scanConfig());
+                    if (missing.empty()) {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.none-missing")
+                      );
+                      return;
+                    }
+                    copyText(compositors::niri::kdlBlock(missing), "settings.schema.keybinds.niri.copied-missing");
+                  },
+              .glyph = "copy",
+          },
+          "niri compositor ipc keybind spawn-sh launcher volume brightness"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.install.label"),
+          i18n::tr("settings.schema.keybinds.niri.install.description"), {},
+          ButtonSetting{
+              .label = i18n::tr("settings.schema.keybinds.niri.install.button"),
+              .action =
+                  [rebuild]() {
+                    const auto result = compositors::niri::installMissing();
+                    if (!result.ok) {
+                      notify::error(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
+                                               : result.error
+                      );
+                      return;
+                    }
+                    if (result.added == 0) {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.install-none")
+                      );
+                    } else {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.install-ok", "count", result.added)
+                      );
+                    }
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+              .glyph = "plus",
+          },
+          "niri compositor ipc keybind include noctalia-binds"
+      ));
+
+      for (const auto& status : statuses) {
+        const std::string id(status.recommended.id);
+        std::string subtitle;
+        if (!status.boundKeys.empty()) {
+          subtitle = i18n::tr(
+              "settings.schema.keybinds.niri.bound", "keys", joinKeys(status.boundKeys), "command",
+              std::string(status.recommended.ipcCommand)
+          );
+        } else if (status.keyConflict) {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.conflict", "key", std::string(status.recommended.key));
+        } else {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.missing", "key", std::string(status.recommended.key));
+        }
+        const std::string line = compositors::niri::kdlLine(status.recommended);
+        entries.push_back(makeEntry(
+            SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.actions." + id + ".label"),
+            std::move(subtitle), {},
+            ButtonSetting{
+                .label = i18n::tr("settings.schema.keybinds.niri.copy-bind"),
+                .action = [copyText, line]() { copyText(line, "settings.schema.keybinds.niri.copied"); },
+                .glyph = "copy",
+            },
+            "niri compositor ipc keybind " + std::string(status.recommended.ipcCommand)
+        ));
+      }
     }
 
   } // namespace
@@ -1436,6 +1549,12 @@ namespace settings {
         tr("settings.schema.panels.home-session-button.description"), {"control_center", "show_session_button"},
         ToggleSetting{cfg.controlCenter.showSessionButton}, "session button show hide"
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "navigation", tr("settings.schema.panels.control-center-show-setup.label"),
+        tr("settings.schema.panels.control-center-show-setup.description"),
+        {"control_center", "show_setup_tabs"}, ToggleSetting{cfg.controlCenter.showSetupTabs},
+        "setup more launcher dock desktop panels osd screenshot shell keybinds security hooks plugins"
+    ));
 
     // Desktop
     entries.push_back(makeEntry(
@@ -2109,8 +2228,9 @@ namespace settings {
     }
 
     // Keybinds
+    appendNiriKeybindEntries(entries, env);
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.validate.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.validate.label"),
         tr("settings.schema.keybinds.validate.description"), {"keybinds", "validate"},
         KeybindListSetting{
             .items = effectiveKeybindItems(cfg.keybinds.validate, KeybindAction::Validate), .maxItems = 4
@@ -2118,37 +2238,37 @@ namespace settings {
         "keybind shortcut hotkey enter accept submit confirm"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.cancel.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.cancel.label"),
         tr("settings.schema.keybinds.cancel.description"), {"keybinds", "cancel"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.cancel, KeybindAction::Cancel), .maxItems = 4},
         "keybind shortcut hotkey escape close dismiss"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.left.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.left.label"),
         tr("settings.schema.keybinds.left.description"), {"keybinds", "left"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.left, KeybindAction::Left), .maxItems = 4},
         "keybind shortcut hotkey arrow move"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.right.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.right.label"),
         tr("settings.schema.keybinds.right.description"), {"keybinds", "right"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.right, KeybindAction::Right), .maxItems = 4},
         "keybind shortcut hotkey arrow move"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.up.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.up.label"),
         tr("settings.schema.keybinds.up.description"), {"keybinds", "up"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.up, KeybindAction::Up), .maxItems = 4},
         "keybind shortcut hotkey arrow move"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.down.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.down.label"),
         tr("settings.schema.keybinds.down.description"), {"keybinds", "down"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.down, KeybindAction::Down), .maxItems = 4},
         "keybind shortcut hotkey arrow move"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.tab-previous.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.tab-previous.label"),
         tr("settings.schema.keybinds.tab-previous.description"), {"keybinds", "tab_previous"},
         KeybindListSetting{
             .items = effectiveKeybindItems(cfg.keybinds.tabPrevious, KeybindAction::TabPrevious), .maxItems = 4
@@ -2156,25 +2276,25 @@ namespace settings {
         "keybind shortcut hotkey shift tab focus pane"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.tab-next.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.tab-next.label"),
         tr("settings.schema.keybinds.tab-next.description"), {"keybinds", "tab_next"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.tabNext, KeybindAction::TabNext), .maxItems = 4},
         "keybind shortcut hotkey tab focus pane"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.copy.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.copy.label"),
         tr("settings.schema.keybinds.copy.description"), {"keybinds", "copy"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.copy, KeybindAction::Copy), .maxItems = 4},
         "keybind shortcut hotkey copy clipboard"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.save.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.save.label"),
         tr("settings.schema.keybinds.save.description"), {"keybinds", "save"},
         KeybindListSetting{.items = effectiveKeybindItems(cfg.keybinds.save, KeybindAction::Save), .maxItems = 4},
         "keybind shortcut hotkey save file"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Keybinds, "keybinds", tr("settings.schema.keybinds.delete.label"),
+        SettingsSection::Keybinds, "in-noctalia", tr("settings.schema.keybinds.delete.label"),
         tr("settings.schema.keybinds.delete.description"), {"keybinds", "delete"},
         KeybindListSetting{
             .items = effectiveKeybindItems(cfg.keybinds.deleteEntry, KeybindAction::Delete), .maxItems = 4

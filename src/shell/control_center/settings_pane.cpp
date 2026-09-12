@@ -22,6 +22,7 @@
 #include "shell/panel/panel_manager.h"
 #include "shell/profile/avatar_path.h"
 #include "shell/settings/font_family_catalog.h"
+#include "shell/settings/settings_hosted_editors.h"
 #include "shell/settings/settings_content.h"
 #include "shell/settings/settings_content_common.h"
 #include "system/battery_warning_monitor.h"
@@ -40,6 +41,7 @@
 #include "ui/palette.h"
 #include "ui/scroll_into_view.h"
 #include "util/string_utils.h"
+#include "wayland/clipboard_service.h"
 #include "wayland/wayland_connection.h"
 
 #include <algorithm>
@@ -121,9 +123,11 @@ namespace {
 } // namespace
 
 SettingsPane::SettingsPane(const ControlCenterServices& services, SettingsPaneOptions options)
-    : m_config(services.config), m_platform(services.platform), m_dependencies(services.dependencies),
-      m_upower(services.upower), m_accounts(services.accounts), m_ipc(services.ipc),
-      m_selectedSection(std::move(options.section)), m_includedGroups(std::move(options.includedGroups)) {
+    : m_config(services.config), m_clipboard(services.clipboard), m_platform(services.platform),
+      m_dependencies(services.dependencies), m_upower(services.upower), m_accounts(services.accounts),
+      m_ipc(services.ipc), m_hostedEditors(services.hostedEditors), m_pluginManager(services.pluginManager),
+      m_asyncTextures(services.asyncTextures), m_selectedSection(std::move(options.section)),
+      m_includedGroups(std::move(options.includedGroups)), m_compact(options.compact) {
   m_showAdvanced = m_config != nullptr ? m_config->config().shell.settingsShowAdvanced : true;
 }
 
@@ -148,7 +152,7 @@ std::unique_ptr<Flex> SettingsPane::create(float scale, float panelCardOpacity) 
       .out = &m_barSelectRow,
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
-      .visible = m_selectedSection == "bar",
+      .visible = !m_compact && m_selectedSection == "bar",
   });
   barRow->addChild(
       ui::label({
@@ -199,7 +203,7 @@ std::unique_ptr<Flex> SettingsPane::create(float scale, float panelCardOpacity) 
       .scrollbarVisible = true,
       .viewportPaddingH = 0.0F,
       .viewportPaddingV = 0.0F,
-      .flexGrow = 1.0F,
+      .flexGrow = m_compact ? 0.0F : 1.0F,
       .configure = [](ScrollView& scrollView) {
         scrollView.clearFill();
         scrollView.clearBorder();
@@ -257,7 +261,7 @@ std::unique_ptr<Flex> SettingsPane::createHeaderActions(float scale) {
   return row;
 }
 
-std::unique_ptr<Flex> SettingsPane::takeHost(std::unique_ptr<Flex> live, float scale, float panelCardOpacity) {
+std::unique_ptr<Flex> SettingsPane::wrapLive(std::unique_ptr<Flex> live, float scale, float panelCardOpacity) {
   auto host = ui::column({
       .out = &m_embedHost,
       .align = FlexAlign::Stretch,
@@ -275,7 +279,7 @@ std::unique_ptr<Flex> SettingsPane::takeHost(std::unique_ptr<Flex> live, float s
   return host;
 }
 
-std::unique_ptr<Flex> SettingsPane::createEmbedHeaderActions(std::unique_ptr<Flex> liveActions, float scale) {
+std::unique_ptr<Flex> SettingsPane::embedHeader(std::unique_ptr<Flex> liveActions, float scale) {
   auto row = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
@@ -318,10 +322,12 @@ void SettingsPane::onClose() {
   m_content = nullptr;
   m_advancedToggle = nullptr;
   m_openButton = nullptr;
+  m_layoutRenderer = nullptr;
   m_rebuildQueued = false;
 }
 
 void SettingsPane::layout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  m_layoutRenderer = &renderer;
   if (m_embedHost != nullptr) {
     m_embedHost->setSize(contentWidth, bodyHeight);
     m_embedHost->layout(renderer);
@@ -335,6 +341,7 @@ void SettingsPane::layout(Renderer& renderer, float contentWidth, float bodyHeig
 }
 
 bool SettingsPane::layoutEmbedded(Renderer& renderer, float contentWidth, float bodyHeight) {
+  m_layoutRenderer = &renderer;
   if (m_embedHost == nullptr) {
     return false;
   }
@@ -351,6 +358,16 @@ void SettingsPane::setConfigureMode(bool show) {
   m_configureMode = show;
   applyConfigureVisibility();
   PanelManager::instance().requestLayout();
+}
+
+void SettingsPane::setSearchQuery(std::string query) {
+  if (m_searchQuery == query) {
+    return;
+  }
+  m_searchQuery = std::move(query);
+  m_scrollState.offset = 0.0F;
+  syncBarSelect();
+  queueRebuild();
 }
 
 void SettingsPane::applyConfigureVisibility() {
@@ -427,7 +444,13 @@ void SettingsPane::fillContent(Flex& content) {
     m_selectedBarName = names.empty() ? std::string{} : names.front();
     selectedBar = settings::findBar(cfg, m_selectedBarName);
   }
-  const auto env = buildRegistryEnvironment();
+  auto env = buildRegistryEnvironment();
+  env.copyToClipboard = [this](std::string text) {
+    if (m_clipboard != nullptr) {
+      (void)m_clipboard->copyText(std::move(text));
+    }
+  };
+  env.requestRebuild = [this]() { queueRebuild(); };
   const auto registry = settings::buildSettingsRegistry(cfg, selectedBar, nullptr, env);
   (void)settings::addSettingsContentSections(content, registry, makeContentContext(cfg, selectedBar, nullptr));
 
@@ -451,7 +474,15 @@ void SettingsPane::fillContent(Flex& content) {
           .fontSize = Style::fontSizeBody * m_scale,
           .contentAlign = ButtonContentAlign::Start,
           .minHeight = Style::controlHeight * m_scale,
-          .onClick = [this]() { openFullSettings(); },
+          .onClick =
+              [this]() {
+                bindHostedEditors();
+                if (m_hostedEditors != nullptr) {
+                  m_hostedEditors->openPluginStore();
+                } else {
+                  openFullSettings();
+                }
+              },
       })
   );
   content.addChild(std::move(card));
@@ -598,13 +629,14 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
     const Config& cfg, const BarConfig* selectedBar, const BarMonitorOverride* selectedMonitorOverride
 ) {
   const auto openEditors = [this]() { openFullSettings(); };
+  const bool searching = !m_searchQuery.empty();
   return settings::SettingsContentContext{
       .config = cfg,
       .configService = m_config,
       .scale = m_scale,
-      .searchQuery = {},
-      .selectedSection = m_selectedSection,
-      .includedGroups = m_includedGroups,
+      .searchQuery = m_searchQuery,
+      .selectedSection = searching ? std::string_view{} : m_selectedSection,
+      .includedGroups = searching ? std::unordered_set<std::string>{} : m_includedGroups,
       .selectedBar = selectedBar,
       .selectedMonitorOverride = selectedMonitorOverride,
       .showAdvanced = m_showAdvanced,
@@ -634,7 +666,15 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
             }
           },
       .focusArea = [](InputArea* area) { PanelManager::instance().inputDispatcher().setFocus(area); },
-      .openBarWidgetAddPopup = [openEditors](const std::vector<std::string>&) { openEditors(); },
+      .openBarWidgetAddPopup =
+          [this, openEditors](const std::vector<std::string>& lanePath) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openBarWidgetAdd(lanePath);
+            } else {
+              openEditors();
+            }
+          },
       .openSearchPickerPopup = {},
       .setOverride =
           [this](std::vector<std::string> path, ConfigOverrideValue value) {
@@ -655,16 +695,82 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
             queueRebuild();
           },
       .renameWidgetInstance =
-          [openEditors](std::string, std::string, std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>>) {
-            openEditors();
+          [this, openEditors](
+              std::string oldName, std::string newName,
+              std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides
+          ) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr && m_hostedEditors->sheet() != nullptr) {
+              setSettingOverrides(std::move(overrides));
+              (void)oldName;
+              (void)newName;
+            } else {
+              openEditors();
+            }
           },
-      .openSessionActionEntryEditor = [openEditors](std::size_t) { openEditors(); },
-      .openIdleBehaviorEntryEditor = [openEditors](std::size_t) { openEditors(); },
-      .openIdleBehaviorCreateEditor = [openEditors]() { openEditors(); },
-      .openNotificationFilterEntryEditor = [openEditors](std::size_t) { openEditors(); },
-      .openNotificationFilterCreateEditor = [openEditors]() { openEditors(); },
-      .openWidgetInspectorEditor = [openEditors](std::vector<std::string>, std::string) { openEditors(); },
-      .openCapsuleGroupEditor = [openEditors](std::vector<std::string>, std::string) { openEditors(); },
+      .openSessionActionEntryEditor =
+          [this, openEditors](std::size_t index) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openSessionActionEntry(index);
+            } else {
+              openEditors();
+            }
+          },
+      .openIdleBehaviorEntryEditor =
+          [this, openEditors](std::size_t index) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openIdleBehaviorEntry(index);
+            } else {
+              openEditors();
+            }
+          },
+      .openIdleBehaviorCreateEditor =
+          [this, openEditors]() {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openIdleBehaviorCreate();
+            } else {
+              openEditors();
+            }
+          },
+      .openNotificationFilterEntryEditor =
+          [this, openEditors](std::size_t index) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openNotificationFilterEntry(index);
+            } else {
+              openEditors();
+            }
+          },
+      .openNotificationFilterCreateEditor =
+          [this, openEditors]() {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openNotificationFilterCreate();
+            } else {
+              openEditors();
+            }
+          },
+      .openWidgetInspectorEditor =
+          [this, openEditors](std::vector<std::string> lanePath, std::string widgetName) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openWidgetInspector(std::move(lanePath), std::move(widgetName));
+            } else {
+              openEditors();
+            }
+          },
+      .openCapsuleGroupEditor =
+          [this, openEditors](std::vector<std::string> lanePath, std::string groupId) {
+            bindHostedEditors();
+            if (m_hostedEditors != nullptr) {
+              m_hostedEditors->openCapsuleGroup(std::move(lanePath), std::move(groupId));
+            } else {
+              openEditors();
+            }
+          },
       .registerIdleLiveStatusLabel = {},
       .registerSessionActionSummaryLabel = {},
       .bindSessionActionsEditState = {},
@@ -777,6 +883,45 @@ void SettingsPane::openFullSettings() const {
   PanelManager::instance().openSettingsWindow(m_selectedSection);
 }
 
+void SettingsPane::bindHostedEditors() {
+  if (m_hostedEditors == nullptr || m_config == nullptr) {
+    return;
+  }
+  m_hostedEditors->bind(
+      settings::HostedEditorBindings{
+          .config = m_config,
+          .pluginManager = m_pluginManager,
+          .asyncTextures = m_asyncTextures,
+          .scale = [this]() { return m_scale; },
+          .renderer = [this]() -> Renderer* { return m_layoutRenderer; },
+          .makeContext =
+              [this]() {
+                const Config& cfg = m_config->config();
+                const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
+                return makeContentContext(cfg, selectedBar, nullptr);
+              },
+          .requestRebuild = [this]() { queueRebuild(); },
+          .setOverride =
+              [this](std::vector<std::string> path, ConfigOverrideValue value) {
+                setSettingOverride(std::move(path), std::move(value));
+              },
+          .setOverrides =
+              [this](std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides) {
+                setSettingOverrides(std::move(overrides));
+              },
+          .editingWidgetName = &m_editingWidgetName,
+          .editingCapsuleGroupId = &m_editingCapsuleGroupId,
+          .renamingWidgetName = &m_renamingWidgetName,
+          .pendingDeleteWidgetName = &m_pendingDeleteWidgetName,
+          .pendingDeleteWidgetSettingPath = &m_pendingDeleteWidgetSettingPath,
+          .selectedLaneWidgets = &m_selectedLaneWidgets,
+          .pendingGestureKey = &m_pendingGestureKey,
+          .pendingGestureVerb = &m_pendingGestureVerb,
+          .actionsExpandedFor = &m_actionsExpandedFor,
+      }
+  );
+}
+
 void SettingsPane::syncBarSelect() {
   if (m_barSelect == nullptr || m_config == nullptr) {
     return;
@@ -788,6 +933,6 @@ void SettingsPane::syncBarSelect() {
     m_barSelect->setSelectedIndexSilently(static_cast<std::size_t>(it - names.begin()));
   }
   if (m_barSelectRow != nullptr) {
-    m_barSelectRow->setVisible(m_selectedSection == "bar");
+    m_barSelectRow->setVisible(!m_compact && m_selectedSection == "bar" && m_searchQuery.empty());
   }
 }

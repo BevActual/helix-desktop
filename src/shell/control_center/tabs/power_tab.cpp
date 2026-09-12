@@ -153,7 +153,7 @@ std::unique_ptr<Flex> PowerTab::create() {
   m_root->addChild(std::move(scroll));
 
   if (m_settings != nullptr) {
-    return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+    return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
   }
   return tab;
 }
@@ -162,7 +162,7 @@ std::unique_ptr<Flex> PowerTab::createHeaderActions() {
   if (m_settings == nullptr) {
     return nullptr;
   }
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void PowerTab::setConfigureMode(bool show) {
@@ -172,6 +172,12 @@ void PowerTab::setConfigureMode(bool show) {
 }
 
 bool PowerTab::configureMode() const { return m_settings != nullptr && m_settings->configureMode(); }
+
+void PowerTab::setSettingsSearchQuery(std::string_view query) {
+  if (m_settings != nullptr) {
+    m_settings->setSearchQuery(std::string(query));
+  }
+}
 
 void PowerTab::buildChargingCard(Flex& root, float scale) {
   if (m_upower == nullptr) {

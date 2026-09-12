@@ -12,6 +12,7 @@
 #include "i18n/i18n.h"
 #include "idle/idle_manager.h"
 #include "render/core/async_texture_cache.h"
+#include "render/core/renderer.h"
 #include "render/render_context.h"
 #include "render/text/font_weight_catalog.h"
 #include "scripting/plugin_registry.h"
@@ -194,6 +195,7 @@ void SettingsWindow::initialize(
         }
       }
   );
+  m_hostedEditors.initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
 }
 
 void SettingsWindow::initializeDialogPresenter(
@@ -1253,3 +1255,75 @@ void SettingsWindow::onIdleLiveStatusChanged() {
 }
 
 void SettingsWindow::onSecondTick() { onIdleLiveStatusChanged(); }
+
+void SettingsWindow::bindHostedEditors() {
+  if (m_editorSheetModal == nullptr) {
+    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
+    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
+  }
+  m_hostedEditors.attachSheet(*m_editorSheetModal);
+  m_hostedEditors.bind(
+      settings::HostedEditorBindings{
+          .config = m_config,
+          .pluginManager = m_pluginManager,
+          .pluginFileCache = &m_pluginFileCache,
+          .asyncTextures = m_asyncTextures,
+          .scale = [this]() { return uiScale(); },
+          .renderer =
+              [this]() -> Renderer* {
+                return m_surface != nullptr ? &m_surface->renderTarget().renderer() : nullptr;
+              },
+          .makeContext =
+              [this]() {
+                const Config& cfg = m_config->config();
+                const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
+                const BarMonitorOverride* selectedMonitorOverride = nullptr;
+                if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
+                  selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
+                }
+                return makeContentContext(cfg, selectedBar, selectedMonitorOverride);
+              },
+          .requestRebuild = [this]() { requestContentRebuild(); },
+          .setOverride =
+              [this](std::vector<std::string> path, ConfigOverrideValue value) {
+                setSettingOverride(std::move(path), std::move(value));
+              },
+          .setOverrides =
+              [this](std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides) {
+                setSettingOverrides(std::move(overrides));
+              },
+          .dismissPopups =
+              [this]() {
+                if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
+                  m_widgetAddPopup->close();
+                }
+                if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
+                  m_searchPickerPopup->close();
+                }
+              },
+          .syncSessionActionSummary =
+              [this](std::size_t index, const SessionPanelActionConfig& row) {
+                syncSessionActionInlineSummary(index, row);
+              },
+          .sessionActionsEditState = &m_sessionActionsEditState,
+          .renameWidget =
+              [this](
+                  std::string oldName, std::string newName,
+                  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides
+              ) { renameWidgetInstance(std::move(oldName), std::move(newName), std::move(overrides)); },
+          .editingWidgetName = &m_editingWidgetName,
+          .editingCapsuleGroupId = &m_editingCapsuleGroupId,
+          .renamingWidgetName = &m_renamingWidgetName,
+          .pendingDeleteWidgetName = &m_pendingDeleteWidgetName,
+          .pendingDeleteWidgetSettingPath = &m_pendingDeleteWidgetSettingPath,
+          .selectedLaneWidgets = &m_selectedLaneWidgets,
+          .pendingGestureKey = &m_pendingGestureKey,
+          .pendingGestureVerb = &m_pendingGestureVerb,
+          .actionsExpandedFor = &m_actionsExpandedFor,
+          .editorFactory = &m_editorSheetFactory,
+          .editorListPath = &m_editorSheetListPath,
+          .pluginStoreOpen = &m_pluginStoreSheetOpen,
+          .pluginStoreScroll = &m_pluginStoreScrollState,
+      }
+  );
+}

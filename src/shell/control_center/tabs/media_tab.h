@@ -43,6 +43,7 @@ public:
   bool dismissTransientUi() override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;

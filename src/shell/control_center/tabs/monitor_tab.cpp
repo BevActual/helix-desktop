@@ -10,12 +10,16 @@
 #include "ui/builders.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/palette.h"
+#include "ui/style.h"
+
+#include "cursor-shape-v1-client-protocol.h"
 
 #include <algorithm>
 #include <cmath>
 #include <iterator>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -25,6 +29,9 @@ namespace {
 
   constexpr float kBrightnessSyncEpsilon = 0.005F;
   constexpr float kScaleSyncEpsilon = 0.02F;
+  constexpr float kLayoutMapMinHeight = 132.0F;
+  constexpr float kLayoutMapMaxHeight = 220.0F;
+  constexpr int kLayoutNudge = 32;
   constexpr auto kBrightnessCommitInterval = std::chrono::milliseconds(16);
   constexpr auto kBrightnessStateHoldoff = std::chrono::milliseconds(180);
   constexpr double kMinScale = 0.5;
@@ -172,6 +179,44 @@ namespace {
     return best;
   }
 
+  std::string layoutArrowTooltip(
+      display_config::LayoutDirection direction, const display_config::Output* moving,
+      const display_config::Output* reference
+  ) {
+    if (moving != nullptr && reference != nullptr) {
+      const auto adj = display_config::adjacency(*moving, *reference);
+      if (adj.has_value()) {
+        const bool horizontal =
+            *adj == display_config::LayoutDirection::Left || *adj == display_config::LayoutDirection::Right;
+        if (horizontal
+            && (direction == display_config::LayoutDirection::Top
+                || direction == display_config::LayoutDirection::Bottom)) {
+          return direction == display_config::LayoutDirection::Top
+              ? i18n::tr("control-center.display.nudge-up")
+              : i18n::tr("control-center.display.nudge-down");
+        }
+        if (!horizontal
+            && (direction == display_config::LayoutDirection::Left
+                || direction == display_config::LayoutDirection::Right)) {
+          return direction == display_config::LayoutDirection::Left
+              ? i18n::tr("control-center.display.nudge-left")
+              : i18n::tr("control-center.display.nudge-right");
+        }
+      }
+    }
+    switch (direction) {
+    case display_config::LayoutDirection::Top:
+      return i18n::tr("control-center.display.place-top");
+    case display_config::LayoutDirection::Bottom:
+      return i18n::tr("control-center.display.place-bottom");
+    case display_config::LayoutDirection::Left:
+      return i18n::tr("control-center.display.place-left");
+    case display_config::LayoutDirection::Right:
+      return i18n::tr("control-center.display.place-right");
+    }
+    return {};
+  }
+
   struct CardSource {
     std::string id;
     std::string label;
@@ -303,7 +348,7 @@ std::unique_ptr<Flex> MonitorTab::create() {
   tab->addChild(std::move(emptyState));
 
   syncStatusLabels();
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> MonitorTab::createHeaderActions() {
@@ -327,12 +372,14 @@ std::unique_ptr<Flex> MonitorTab::createHeaderActions() {
       })
   );
   syncHeaderActions();
-  return m_settings->createEmbedHeaderActions(std::move(live), scale);
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
 void MonitorTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool MonitorTab::configureMode() const { return m_settings->configureMode(); }
+
+void MonitorTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void MonitorTab::syncHeaderActions() {
   if (m_rescanButton == nullptr) {
@@ -379,14 +426,26 @@ void MonitorTab::onClose() {
   m_cardsScroll = nullptr;
   m_cardsLayout = nullptr;
   m_layoutSection = nullptr;
-  m_layoutSelect = nullptr;
+  m_layoutMap = nullptr;
+  m_layoutStatusLabel = nullptr;
+  m_layoutReferenceSelect = nullptr;
+  m_layoutPlaceTop = nullptr;
+  m_layoutPlaceLeft = nullptr;
+  m_layoutPlaceRight = nullptr;
+  m_layoutPlaceBottom = nullptr;
   m_rescanButton = nullptr;
   m_cards.clear();
-  m_layoutOutputNames.clear();
+  m_layoutTiles.clear();
+  m_layoutReferenceNames.clear();
+  m_layoutPressName.clear();
+  m_layoutDragging = false;
   m_lastDisplayListKey.clear();
 }
 
 bool MonitorTab::dragging() const noexcept {
+  if (m_layoutDragging) {
+    return true;
+  }
   for (const auto& card : m_cards) {
     if (card.slider != nullptr && card.slider->dragging()) {
       return true;
@@ -431,6 +490,7 @@ void MonitorTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
     }
   }
 
+  layoutArrangementMap(renderer);
   m_rootLayout->layout(renderer);
 }
 
@@ -503,8 +563,17 @@ void MonitorTab::doUpdate(Renderer& renderer) {
 
 void MonitorTab::rebuildLayoutSection(float scale) {
   m_layoutSection = nullptr;
-  m_layoutSelect = nullptr;
-  m_layoutOutputNames.clear();
+  m_layoutMap = nullptr;
+  m_layoutStatusLabel = nullptr;
+  m_layoutReferenceSelect = nullptr;
+  m_layoutPlaceTop = nullptr;
+  m_layoutPlaceLeft = nullptr;
+  m_layoutPlaceRight = nullptr;
+  m_layoutPlaceBottom = nullptr;
+  m_layoutTiles.clear();
+  m_layoutReferenceNames.clear();
+  m_layoutPressName.clear();
+  m_layoutDragging = false;
 
   if (m_cardsLayout == nullptr || m_displayConfig == nullptr || !m_displayConfig->available()) {
     return;
@@ -512,35 +581,27 @@ void MonitorTab::rebuildLayoutSection(float scale) {
 
   const auto& outputs = m_displayConfig->outputs();
   std::vector<std::string> names;
-  std::vector<std::string> labels;
   for (const auto& output : outputs) {
     if (!output.enabled) {
       continue;
     }
     names.push_back(output.name);
-    labels.push_back(display_config::displayLabel(output) + " · " + output.name);
   }
   if (names.size() < 2) {
     return;
   }
 
-  if (m_layoutMovingName.empty()
-      || std::ranges::find(names, m_layoutMovingName) == names.end()) {
+  if (m_layoutMovingName.empty() || std::ranges::find(names, m_layoutMovingName) == names.end()) {
     m_layoutMovingName = defaultMovingName(outputs);
   }
-  std::size_t selectedIndex = 0;
-  for (std::size_t index = 0; index < names.size(); ++index) {
-    if (names[index] == m_layoutMovingName) {
-      selectedIndex = index;
-      break;
-    }
-  }
+  m_layoutReferenceName = layoutReferenceName();
 
   auto section = ui::column({
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        applySectionCardStyle(card, scale, opacity);
-        card.setGap(Style::spaceMd * scale);
-      },
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& card) {
+            applySectionCardStyle(card, scale, opacity);
+            card.setGap(Style::spaceMd * scale);
+          },
   });
 
   section->addChild(
@@ -559,78 +620,416 @@ void MonitorTab::rebuildLayoutSection(float scale) {
       })
   );
 
-  auto movingSelect = ui::select({
-      .out = &m_layoutSelect,
-      .options = labels,
-      .selectedIndex = selectedIndex,
-      .surfaceOpacity = panelCardOpacity(),
-      .flexGrow = 1.0F,
-      .onSelectionChanged =
-          [this](std::size_t index, std::string_view /*text*/) {
-            if (index < m_layoutOutputNames.size()) {
-              m_layoutMovingName = m_layoutOutputNames[index];
-            }
-          },
-  });
-  section->addChild(labeledField(scale, i18n::tr("control-center.display.move"), std::move(movingSelect)));
-
-  const float buttonSize = Style::controlHeight * scale;
-  auto makeMoveButton = [this, scale, buttonSize](
-                            const char* glyph, display_config::LayoutDirection direction, const std::string& tooltip
+  const float buttonSize = Style::controlHeightSm * scale;
+  const auto* movingForArrows = m_displayConfig->findOutput(m_layoutMovingName);
+  const auto* referenceForArrows = m_displayConfig->findOutput(m_layoutReferenceName);
+  auto makeMoveButton = [this, scale, buttonSize, movingForArrows, referenceForArrows](
+                            const char* glyph, display_config::LayoutDirection direction, Button** out
                         ) {
     return ui::button({
+        .out = out,
         .glyph = glyph,
-        .tooltip = tooltip,
+        .tooltip = layoutArrowTooltip(direction, movingForArrows, referenceForArrows),
         .width = buttonSize,
         .height = buttonSize,
         .onClick = [this, direction]() { applyLayout(direction); },
         .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
     });
   };
-  auto makePad = [buttonSize]() {
-    return ui::row({.width = buttonSize, .height = buttonSize});
-  };
 
-  auto dpad = ui::column({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
-  dpad->addChild(
+  auto map = ui::column({
+      .out = &m_layoutMap,
+      .minHeight = kLayoutMapMinHeight * scale,
+      .fillWidth = true,
+      .clipChildren = true,
+      .configure =
+          [scale](Flex& host) {
+            host.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, 0.45F));
+            host.setRadius(Style::scaledRadiusMd(scale));
+          },
+  });
+
+  for (const auto& output : outputs) {
+    if (!output.enabled) {
+      continue;
+    }
+    LayoutTile tile;
+    tile.name = output.name;
+    const bool moving = output.name == m_layoutMovingName;
+    const bool reference = output.name == m_layoutReferenceName;
+    auto button = ui::button({
+        .out = &tile.button,
+        .text = output.name,
+        .fontSize = Style::fontSizeMini * scale,
+        .selected = moving,
+        .variant = moving ? ButtonVariant::TabActive
+                          : (reference ? ButtonVariant::Outline : ButtonVariant::Default),
+        .tooltip = display_config::displayLabel(output) + " · " + output.name,
+        .padding = Style::spaceXs * scale,
+        .participatesInLayout = false,
+        .onClick = [this, name = output.name]() { selectLayoutOutput(name); },
+        .onPress =
+            [this, name = output.name](float localX, float localY, bool pressed) {
+              if (pressed) {
+                beginLayoutPress(name, localX, localY);
+              } else {
+                finishLayoutPress(name);
+              }
+            },
+        .onPointerMotion =
+            [this, name = output.name](float localX, float localY) { updateLayoutDrag(name, localX, localY); },
+        .configure =
+            [scale](Button& tileButton) {
+              tileButton.setRadius(Style::scaledRadiusMd(scale));
+              tileButton.setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB);
+            },
+    });
+    map->addChild(std::move(button));
+    m_layoutTiles.push_back(std::move(tile));
+  }
+
+  auto padColumn = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * scale,
+      .flexGrow = 1.0F,
+  });
+  padColumn->addChild(
       ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::Center, .gap = Style::spaceSm * scale},
-          makePad(),
-          makeMoveButton(
-              "chevron-up", display_config::LayoutDirection::Top, i18n::tr("control-center.display.place-top")
-          ),
-          makePad()
+          {.align = FlexAlign::Center, .justify = FlexJustify::Center},
+          makeMoveButton("chevron-up", display_config::LayoutDirection::Top, &m_layoutPlaceTop)
       )
   );
-  dpad->addChild(
+  padColumn->addChild(std::move(map));
+  padColumn->addChild(
       ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::Center, .gap = Style::spaceSm * scale},
-          makeMoveButton(
-              "chevron-left", display_config::LayoutDirection::Left, i18n::tr("control-center.display.place-left")
-          ),
-          makePad(),
-          makeMoveButton(
-              "chevron-right", display_config::LayoutDirection::Right, i18n::tr("control-center.display.place-right")
-          )
+          {.align = FlexAlign::Center, .justify = FlexJustify::Center},
+          makeMoveButton("chevron-down", display_config::LayoutDirection::Bottom, &m_layoutPlaceBottom)
       )
   );
-  dpad->addChild(
-      ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::Center, .gap = Style::spaceSm * scale},
-          makePad(),
-          makeMoveButton(
-              "chevron-down", display_config::LayoutDirection::Bottom, i18n::tr("control-center.display.place-bottom")
-          ),
-          makePad()
-      )
-  );
+
   section->addChild(
-      ui::row({.align = FlexAlign::Center, .justify = FlexJustify::Center}, std::move(dpad))
+      ui::row(
+          {.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true},
+          makeMoveButton("chevron-left", display_config::LayoutDirection::Left, &m_layoutPlaceLeft),
+          std::move(padColumn),
+          makeMoveButton("chevron-right", display_config::LayoutDirection::Right, &m_layoutPlaceRight)
+      )
   );
 
-  m_layoutOutputNames = std::move(names);
+  const auto* movingOutput = m_displayConfig->findOutput(m_layoutMovingName);
+  const std::string movingLabel =
+      movingOutput != nullptr ? display_config::displayLabel(*movingOutput) : m_layoutMovingName;
+  section->addChild(
+      ui::label({
+          .out = &m_layoutStatusLabel,
+          .text = i18n::tr(
+              "control-center.display.moving-at", "name", movingLabel, "x",
+              movingOutput != nullptr ? movingOutput->x : 0, "y", movingOutput != nullptr ? movingOutput->y : 0
+          ),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+
+  if (names.size() > 2) {
+    std::vector<std::string> referenceLabels;
+    std::size_t referenceIndex = 0;
+    for (const auto& output : outputs) {
+      if (!output.enabled || output.name == m_layoutMovingName) {
+        continue;
+      }
+      if (output.name == m_layoutReferenceName) {
+        referenceIndex = referenceLabels.size();
+      }
+      m_layoutReferenceNames.push_back(output.name);
+      referenceLabels.push_back(display_config::displayLabel(output) + " · " + output.name);
+    }
+    auto referenceSelect = ui::select({
+        .out = &m_layoutReferenceSelect,
+        .options = std::move(referenceLabels),
+        .selectedIndex = referenceIndex,
+        .surfaceOpacity = panelCardOpacity(),
+        .flexGrow = 1.0F,
+        .onSelectionChanged =
+            [this](std::size_t index, std::string_view /*text*/) {
+              if (index < m_layoutReferenceNames.size()) {
+                m_layoutReferenceName = m_layoutReferenceNames[index];
+                syncLayoutSelection();
+              }
+            },
+    });
+    section->addChild(labeledField(scale, i18n::tr("control-center.display.relative-to"), std::move(referenceSelect)));
+  }
+
   m_layoutSection = section.get();
   m_cardsLayout->addChild(std::move(section));
+}
+
+void MonitorTab::layoutArrangementMap(Renderer& renderer) {
+  if (m_layoutDragging || m_layoutMap == nullptr || m_displayConfig == nullptr) {
+    return;
+  }
+
+  const float scale = contentScale();
+  const float pad = Style::spaceSm * scale;
+  const float mapWidth = m_layoutMap->width();
+  if (mapWidth < 8.0F) {
+    return;
+  }
+
+  int minX = std::numeric_limits<int>::max();
+  int minY = std::numeric_limits<int>::max();
+  int maxX = std::numeric_limits<int>::min();
+  int maxY = std::numeric_limits<int>::min();
+  bool any = false;
+  for (const auto& output : m_displayConfig->outputs()) {
+    if (!output.enabled) {
+      continue;
+    }
+    const auto size = display_config::logicalSize(output);
+    minX = std::min(minX, output.x);
+    minY = std::min(minY, output.y);
+    maxX = std::max(maxX, output.x + std::max(1, size.width));
+    maxY = std::max(maxY, output.y + std::max(1, size.height));
+    any = true;
+  }
+  if (!any) {
+    return;
+  }
+
+  const float boundsW = static_cast<float>(std::max(1, maxX - minX));
+  const float boundsH = static_cast<float>(std::max(1, maxY - minY));
+  const float desiredHeight =
+      std::clamp(mapWidth * (boundsH / boundsW), kLayoutMapMinHeight * scale, kLayoutMapMaxHeight * scale);
+  if (std::abs(m_layoutMap->minHeight() - desiredHeight) > 0.5F) {
+    m_layoutMap->setMinHeight(desiredHeight);
+  }
+
+  const float innerW = std::max(1.0F, mapWidth - pad * 2.0F);
+  const float innerH = std::max(1.0F, desiredHeight - pad * 2.0F);
+  const float fitScale = std::min(innerW / boundsW, innerH / boundsH);
+  if (fitScale <= 0.0F) {
+    return;
+  }
+
+  const float offsetX = pad + (innerW - boundsW * fitScale) * 0.5F;
+  const float offsetY = pad + (innerH - boundsH * fitScale) * 0.5F;
+  m_layoutMapScale = fitScale;
+  m_layoutMapOffsetX = offsetX;
+  m_layoutMapOffsetY = offsetY;
+  m_layoutOriginX = minX;
+  m_layoutOriginY = minY;
+
+  const std::string reference = layoutReferenceName();
+  for (auto& tile : m_layoutTiles) {
+    const auto* output = m_displayConfig->findOutput(tile.name);
+    if (output == nullptr || tile.button == nullptr) {
+      continue;
+    }
+    const auto size = display_config::logicalSize(*output);
+    const float tileW = std::max(1.0F, static_cast<float>(std::max(1, size.width)) * fitScale);
+    const float tileH = std::max(1.0F, static_cast<float>(std::max(1, size.height)) * fitScale);
+    const float tileX = offsetX + static_cast<float>(output->x - minX) * fitScale;
+    const float tileY = offsetY + static_cast<float>(output->y - minY) * fitScale;
+    tile.x = tileX;
+    tile.y = tileY;
+    tile.button->setMaxWidth(tileW);
+    tile.button->setMaxHeight(tileH);
+    tile.button->setSize(tileW, tileH);
+    tile.button->setPosition(tileX, tileY);
+    tile.button->setZIndex(tile.name == m_layoutMovingName ? 1 : 0);
+    if (tile.name == m_layoutMovingName) {
+      tile.button->setVariant(ButtonVariant::TabActive);
+    } else if (tile.name == reference) {
+      tile.button->setVariant(ButtonVariant::Outline);
+    } else {
+      tile.button->setVariant(ButtonVariant::Default);
+    }
+    tile.button->layout(renderer);
+  }
+}
+
+std::string MonitorTab::layoutReferenceName() const {
+  if (m_displayConfig == nullptr) {
+    return {};
+  }
+  if (!m_layoutReferenceName.empty() && m_layoutReferenceName != m_layoutMovingName) {
+    const auto* output = m_displayConfig->findOutput(m_layoutReferenceName);
+    if (output != nullptr && output->enabled) {
+      return m_layoutReferenceName;
+    }
+  }
+  const auto* reference = referenceOutput(m_displayConfig->outputs(), m_layoutMovingName);
+  return reference != nullptr ? reference->name : std::string{};
+}
+
+void MonitorTab::selectLayoutOutput(std::string name) {
+  if (name.empty()) {
+    return;
+  }
+  if (name != m_layoutMovingName) {
+    m_layoutMovingName = std::move(name);
+    if (m_layoutReferenceName == m_layoutMovingName) {
+      m_layoutReferenceName.clear();
+    }
+    m_layoutReferenceName = layoutReferenceName();
+  }
+  syncLayoutSelection();
+}
+
+void MonitorTab::syncLayoutSelection() {
+  const std::string reference = layoutReferenceName();
+  m_layoutReferenceName = reference;
+  for (auto& tile : m_layoutTiles) {
+    if (tile.button == nullptr) {
+      continue;
+    }
+    if (tile.name == m_layoutMovingName) {
+      tile.button->setVariant(ButtonVariant::TabActive);
+      tile.button->setZIndex(1);
+    } else if (tile.name == reference) {
+      tile.button->setVariant(ButtonVariant::Outline);
+      tile.button->setZIndex(0);
+    } else {
+      tile.button->setVariant(ButtonVariant::Default);
+      tile.button->setZIndex(0);
+    }
+  }
+
+  if (m_layoutStatusLabel != nullptr && m_displayConfig != nullptr) {
+    const auto* moving = m_displayConfig->findOutput(m_layoutMovingName);
+    const auto* referenceOutput = m_displayConfig->findOutput(reference);
+    const std::string label = moving != nullptr ? display_config::displayLabel(*moving) : m_layoutMovingName;
+    m_layoutStatusLabel->setText(
+        i18n::tr(
+            "control-center.display.moving-at", "name", label, "x", moving != nullptr ? moving->x : 0, "y",
+            moving != nullptr ? moving->y : 0
+        )
+    );
+    auto setArrow = [&](Button* button, display_config::LayoutDirection direction) {
+      if (button != nullptr) {
+        button->setTooltip(layoutArrowTooltip(direction, moving, referenceOutput));
+      }
+    };
+    setArrow(m_layoutPlaceTop, display_config::LayoutDirection::Top);
+    setArrow(m_layoutPlaceBottom, display_config::LayoutDirection::Bottom);
+    setArrow(m_layoutPlaceLeft, display_config::LayoutDirection::Left);
+    setArrow(m_layoutPlaceRight, display_config::LayoutDirection::Right);
+  }
+
+  if (m_layoutReferenceSelect == nullptr || m_displayConfig == nullptr) {
+    return;
+  }
+
+  m_layoutReferenceNames.clear();
+  std::vector<std::string> labels;
+  std::size_t selected = 0;
+  for (const auto& output : m_displayConfig->outputs()) {
+    if (!output.enabled || output.name == m_layoutMovingName) {
+      continue;
+    }
+    if (output.name == reference) {
+      selected = labels.size();
+    }
+    m_layoutReferenceNames.push_back(output.name);
+    labels.push_back(display_config::displayLabel(output) + " · " + output.name);
+  }
+  m_layoutReferenceSelect->setOptions(std::move(labels));
+  if (!m_layoutReferenceNames.empty()) {
+    m_layoutReferenceSelect->setSelectedIndexSilently(selected);
+  }
+}
+
+void MonitorTab::beginLayoutPress(const std::string& name, float localX, float localY) {
+  selectLayoutOutput(name);
+  m_layoutPressName = name;
+  m_layoutGrabX = localX;
+  m_layoutGrabY = localY;
+  m_layoutDragging = false;
+}
+
+void MonitorTab::updateLayoutDrag(const std::string& name, float localX, float localY) {
+  if (m_layoutPressName != name) {
+    return;
+  }
+  LayoutTile* tile = nullptr;
+  for (auto& entry : m_layoutTiles) {
+    if (entry.name == name) {
+      tile = &entry;
+      break;
+    }
+  }
+  if (tile == nullptr || tile->button == nullptr) {
+    return;
+  }
+
+  const float nextX = tile->button->x() + localX - m_layoutGrabX;
+  const float nextY = tile->button->y() + localY - m_layoutGrabY;
+  const float dx = nextX - tile->x;
+  const float dy = nextY - tile->y;
+  if (!m_layoutDragging) {
+    if ((dx * dx) + (dy * dy) < Style::dragStartThreshold * Style::dragStartThreshold) {
+      return;
+    }
+    m_layoutDragging = true;
+    tile->button->setZIndex(2);
+    tile->button->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRABBING);
+  }
+  tile->button->setPosition(nextX, nextY);
+}
+
+void MonitorTab::finishLayoutPress(const std::string& name) {
+  if (m_layoutPressName != name) {
+    return;
+  }
+  if (m_layoutDragging) {
+    applyLayoutDrag();
+  }
+  m_layoutDragging = false;
+  m_layoutPressName.clear();
+  for (auto& tile : m_layoutTiles) {
+    if (tile.button == nullptr) {
+      continue;
+    }
+    tile.button->setZIndex(tile.name == m_layoutMovingName ? 1 : 0);
+    tile.button->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB);
+  }
+}
+
+void MonitorTab::applyLayoutDrag() {
+  if (m_displayConfig == nullptr || m_layoutMapScale <= 0.0F) {
+    return;
+  }
+  LayoutTile* tile = nullptr;
+  for (auto& entry : m_layoutTiles) {
+    if (entry.name == m_layoutMovingName) {
+      tile = &entry;
+      break;
+    }
+  }
+  if (tile == nullptr || tile->button == nullptr) {
+    return;
+  }
+  const auto* output = m_displayConfig->findOutput(tile->name);
+  if (output == nullptr) {
+    return;
+  }
+
+  const int proposedX =
+      m_layoutOriginX + static_cast<int>(std::lround((tile->button->x() - m_layoutMapOffsetX) / m_layoutMapScale));
+  const int proposedY =
+      m_layoutOriginY + static_cast<int>(std::lround((tile->button->y() - m_layoutMapOffsetY) / m_layoutMapScale));
+  const auto snap = display_config::snapDragPosition(*output, m_displayConfig->outputs(), proposedX, proposedY);
+  if (!snap.has_value()) {
+    return;
+  }
+  m_layoutReferenceName = snap->referenceName;
+  if (snap->position.x == output->x && snap->position.y == output->y) {
+    return;
+  }
+  if (!m_displayConfig->setPosition(tile->name, snap->position.x, snap->position.y)) {
+    m_lastDisplayListKey.clear();
+  }
 }
 
 void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
@@ -655,7 +1054,14 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
   if (m_layoutSection != nullptr) {
     m_cardsLayout->removeChild(m_layoutSection);
     m_layoutSection = nullptr;
-    m_layoutSelect = nullptr;
+    m_layoutMap = nullptr;
+    m_layoutStatusLabel = nullptr;
+    m_layoutReferenceSelect = nullptr;
+    m_layoutPlaceTop = nullptr;
+    m_layoutPlaceLeft = nullptr;
+    m_layoutPlaceRight = nullptr;
+    m_layoutPlaceBottom = nullptr;
+    m_layoutTiles.clear();
   }
 
   const auto sources = collectCardSources(m_brightness, m_displayConfig);
@@ -1128,11 +1534,40 @@ void MonitorTab::applyLayout(display_config::LayoutDirection direction) {
   if (m_displayConfig == nullptr || m_layoutMovingName.empty()) {
     return;
   }
-  const auto* reference = referenceOutput(m_displayConfig->outputs(), m_layoutMovingName);
-  if (reference == nullptr) {
+  const std::string referenceName = layoutReferenceName();
+  if (referenceName.empty()) {
     return;
   }
-  if (!m_displayConfig->placeRelative(m_layoutMovingName, reference->name, direction)) {
+  const auto* moving = m_displayConfig->findOutput(m_layoutMovingName);
+  const auto* reference = m_displayConfig->findOutput(referenceName);
+  if (moving == nullptr || reference == nullptr) {
+    return;
+  }
+
+  const auto adj = display_config::adjacency(*moving, *reference);
+  if (adj.has_value()) {
+    const bool horizontal =
+        *adj == display_config::LayoutDirection::Left || *adj == display_config::LayoutDirection::Right;
+    const bool nudgeVertical = horizontal
+        && (direction == display_config::LayoutDirection::Top || direction == display_config::LayoutDirection::Bottom);
+    const bool nudgeHorizontal = !horizontal
+        && (direction == display_config::LayoutDirection::Left || direction == display_config::LayoutDirection::Right);
+    if (nudgeVertical || nudgeHorizontal) {
+      const int delta =
+          (direction == display_config::LayoutDirection::Top || direction == display_config::LayoutDirection::Left)
+          ? -kLayoutNudge
+          : kLayoutNudge;
+      const int proposedX = moving->x + (nudgeHorizontal ? delta : 0);
+      const int proposedY = moving->y + (nudgeVertical ? delta : 0);
+      const auto point = display_config::placeAdjacent(*moving, *reference, *adj, proposedX, proposedY);
+      if (!m_displayConfig->setPosition(m_layoutMovingName, point.x, point.y)) {
+        m_lastDisplayListKey.clear();
+      }
+      return;
+    }
+  }
+
+  if (!m_displayConfig->placeRelative(m_layoutMovingName, referenceName, direction)) {
     m_lastDisplayListKey.clear();
   }
 }

@@ -47,6 +47,7 @@ public:
   [[nodiscard]] bool dragging() const noexcept;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   struct DeviceVolumeCardState {

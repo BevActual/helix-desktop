@@ -497,16 +497,18 @@ std::unique_ptr<Flex> MediaTab::create() {
     });
   }
 
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> MediaTab::createHeaderActions() {
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void MediaTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool MediaTab::configureMode() const { return m_settings->configureMode(); }
+
+void MediaTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void MediaTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {

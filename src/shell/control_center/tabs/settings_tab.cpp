@@ -12,6 +12,8 @@ std::unique_ptr<Flex> SettingsTab::createHeaderActions() { return m_pane.createH
 
 void SettingsTab::onClose() { m_pane.onClose(); }
 
+void SettingsTab::setSettingsSearchQuery(std::string_view query) { m_pane.setSearchQuery(std::string(query)); }
+
 void SettingsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   m_pane.layout(renderer, contentWidth, bodyHeight);
 }

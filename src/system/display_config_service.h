@@ -39,7 +39,7 @@ public:
   void setChangeCallback(ChangeCallback callback);
 
 private:
-  bool apply(std::string_view name, const nlohmann::json& action);
+  bool apply(std::string_view name, const nlohmann::json& action, bool refreshAfter = true);
 
   CompositorPlatform& m_platform;
   std::vector<display_config::Output> m_outputs;

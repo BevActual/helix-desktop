@@ -404,16 +404,18 @@ std::unique_ptr<Flex> SystemTab::create() {
     tab->addChild(std::move(row));
   }
 
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> SystemTab::createHeaderActions() {
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void SystemTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool SystemTab::configureMode() const { return m_settings->configureMode(); }
+
+void SystemTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void SystemTab::setActive(bool active) {
   m_active = active;

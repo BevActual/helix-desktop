@@ -739,7 +739,7 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       )
   );
 
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
@@ -771,12 +771,16 @@ std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
-  return m_settings->createEmbedHeaderActions(std::move(live), scale);
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
 void NotificationsTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool NotificationsTab::configureMode() const { return m_settings->configureMode(); }
+
+void NotificationsTab::setSettingsSearchQuery(std::string_view query) {
+  m_settings->setSearchQuery(std::string(query));
+}
 
 void NotificationsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {

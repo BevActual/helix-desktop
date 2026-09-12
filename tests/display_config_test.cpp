@@ -118,6 +118,54 @@ int main() {
 
     const auto placed = display_config::snapPosition(outputs[1], outputs[0], display_config::LayoutDirection::Right);
     ok = expect(placed.x == 1552, "places HDMI to the right of the laptop") && ok;
+
+    const auto draggedRight =
+        display_config::snapDragPosition(outputs[1], outputs, 1600, 0);
+    ok = expect(draggedRight.has_value(), "drag-snap finds a neighbor") && ok;
+    ok = expect(
+             draggedRight.has_value() && draggedRight->referenceName == "eDP-1"
+                 && draggedRight->direction == display_config::LayoutDirection::Right && draggedRight->position.x == 1552
+                 && draggedRight->position.y == 0,
+             "drag-snap keeps HDMI top-aligned to the right of the laptop"
+         )
+        && ok;
+
+    const auto draggedBelow = display_config::snapDragPosition(outputs[1], outputs, 0, 2000);
+    ok = expect(
+             draggedBelow.has_value() && draggedBelow->direction == display_config::LayoutDirection::Bottom
+                 && draggedBelow->position.x == 0 && draggedBelow->position.y == 970,
+             "drag-snap places HDMI below the laptop"
+         )
+        && ok;
+
+    ok = expect(
+             display_config::isAdjacentOn(outputs[1], outputs[0], display_config::LayoutDirection::Right),
+             "parsed HDMI is already adjacent to the right of the laptop"
+         )
+        && ok;
+    ok = expect(!display_config::outputsOverlap(outputs[0], outputs[1]), "parsed outputs do not overlap") && ok;
+
+    const auto kept = display_config::placeAdjacent(
+        outputs[1], outputs[0], display_config::LayoutDirection::Right, outputs[1].x, outputs[1].y
+    );
+    ok = expect(
+             kept.x == 1552 && kept.y == 0,
+             "placeAdjacent keeps the current offset instead of recentering"
+         )
+        && ok;
+
+    auto nudged = outputs[1];
+    const auto slid = display_config::placeAdjacent(
+        nudged, outputs[0], display_config::LayoutDirection::Right, nudged.x, nudged.y - 40
+    );
+    ok = expect(slid.x == 1552 && slid.y < 0, "nudge up along the shared edge keeps HDMI adjacent") && ok;
+    nudged.x = slid.x;
+    nudged.y = slid.y;
+    ok = expect(
+             display_config::isAdjacentOn(nudged, outputs[0], display_config::LayoutDirection::Right),
+             "nudged HDMI stays on the right"
+         )
+        && ok;
   }
 
   const auto mode = display_config::modeAction(2560, 1600, 240.0);

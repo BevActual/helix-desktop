@@ -217,7 +217,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
 
   tab->addChild(std::move(eventsCard));
 
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
@@ -239,12 +239,14 @@ std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
-  return m_settings->createEmbedHeaderActions(std::move(live), scale);
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
 void CalendarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool CalendarTab::configureMode() const { return m_settings->configureMode(); }
+
+void CalendarTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void CalendarTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {

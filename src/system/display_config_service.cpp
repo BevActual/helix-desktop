@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <format>
+#include <utility>
 
 namespace {
 
@@ -105,7 +106,49 @@ bool DisplayConfigService::setTransform(std::string_view name, display_config::T
 }
 
 bool DisplayConfigService::setPosition(std::string_view name, int x, int y) {
-  return apply(name, display_config::positionAction(x, y));
+  std::vector<std::pair<std::string, display_config::Point>> others;
+  const display_config::Output* moving = nullptr;
+  for (const auto& output : m_outputs) {
+    if (!output.enabled) {
+      continue;
+    }
+    if (output.name == name) {
+      moving = &output;
+    } else {
+      others.push_back({output.name, {.x = output.x, .y = output.y}});
+    }
+  }
+  if (moving == nullptr) {
+    m_lastError = "display not found";
+    return false;
+  }
+
+  display_config::Output candidate = *moving;
+  candidate.x = x;
+  candidate.y = y;
+  for (const auto& output : m_outputs) {
+    if (!output.enabled || output.name == name) {
+      continue;
+    }
+    if (display_config::outputsOverlap(candidate, output)) {
+      m_lastError = "layout would overlap another display";
+      kLog.warn("{}: {} at {},{}", m_lastError, name, x, y);
+      return false;
+    }
+  }
+
+  std::ranges::sort(others, [](const auto& a, const auto& b) { return a.first < b.first; });
+  bool ok = true;
+  for (const auto& [outputName, point] : others) {
+    if (!apply(outputName, display_config::positionAction(point.x, point.y), false)) {
+      ok = false;
+    }
+  }
+  if (!apply(name, display_config::positionAction(x, y), false)) {
+    ok = false;
+  }
+  refresh();
+  return ok;
 }
 
 bool DisplayConfigService::setVrr(std::string_view name, bool enabled) {
@@ -129,13 +172,20 @@ bool DisplayConfigService::placeRelative(
     m_lastError = "display not found";
     return false;
   }
-  const auto point = display_config::snapPosition(*moving, *reference, direction, offset);
+  int proposedX = moving->x;
+  int proposedY = moving->y;
+  if (direction == display_config::LayoutDirection::Left || direction == display_config::LayoutDirection::Right) {
+    proposedY += offset;
+  } else {
+    proposedX += offset;
+  }
+  const auto point = display_config::placeAdjacent(*moving, *reference, direction, proposedX, proposedY);
   return setPosition(name, point.x, point.y);
 }
 
 void DisplayConfigService::setChangeCallback(ChangeCallback callback) { m_changeCallback = std::move(callback); }
 
-bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action) {
+bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action, bool refreshAfter) {
   if (!available()) {
     m_lastError = "niri display configuration is unavailable";
     return false;
@@ -159,6 +209,8 @@ bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& ac
   }
   m_lastError.clear();
   kLog.info("applied niri output change for {}", name);
-  refresh();
+  if (refreshAfter) {
+    refresh();
+  }
   return true;
 }

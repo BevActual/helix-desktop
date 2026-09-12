@@ -470,7 +470,7 @@ On split-pane surfaces (**Settings** and **Control Center**), `tab_next` / `tab_
 
 ### Recording from the GUI
 
-Open **Settings → Shell → Keybinds** to bind chords interactively. Actions are shown in a three-column grid. Each cell lists the current chord(s) for that action plus a trailing *"Click to add keybind"* slot. When you have not overridden an action in `settings.toml`, the GUI still shows the built-in defaults (the same chords Noctalia uses at runtime).
+Open **Settings → Keybinds** to bind chords interactively. In-shell actions are shown in a two-column grid. Each cell lists the current chord(s) for that action plus a trailing *"Click to add keybind"* slot. When you have not overridden an action in `settings.toml`, the GUI still shows the built-in defaults (the same chords Noctalia uses at runtime).
 
 - Click a slot (or focus it and press a `validate` chord) to start recording, then press the key combination. The recorder previews held modifiers (e.g. `Ctrl + Shift + …`) and commits as soon as a non-modifier key is pressed.
 - Press a modifier-only chord (no regular key) and click away to abort the recording without changing the binding.
@@ -479,6 +479,16 @@ Open **Settings → Shell → Keybinds** to bind chords interactively. Actions a
 - After you change a binding, **Override** and **Reset** appear below that action's list so the title and description keep the full column width.
 
 Chords recorded in the GUI are serialized as `ctrl+shift+Return`-style strings under `[keybinds]` in `~/.local/state/noctalia/settings.toml` and follow the same parsing rules as hand-written config.
+
+### Niri compositor binds
+
+On niri, **Settings → Keybinds** adds a **Niri** group above the in-shell actions. It reads `~/.config/niri/config.kdl` and included files (or `$NIRI_CONFIG`), then shows whether each recommended Noctalia shortcut is already bound.
+
+- **Copy** copies one `spawn-sh "noctalia msg …"` line.
+- **Copy missing** copies a `binds { }` block for shortcuts that are not in the niri config yet.
+- **Add to niri** writes those missing binds to `noctalia-binds.kdl` next to your niri config and appends `include "noctalia-binds.kdl"` to `config.kdl`. Existing binds are left unchanged; niri reloads the file on its own.
+
+This does not replace your niri `binds` block, and it will not create a new `config.kdl` if you do not already have one.
 
 ---
 

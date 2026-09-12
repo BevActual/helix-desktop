@@ -38,6 +38,7 @@ public:
   [[nodiscard]] bool dragging() const noexcept;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -46,6 +47,14 @@ private:
   void syncStatusLabels();
   void rebuildCards(Renderer& renderer);
   void rebuildLayoutSection(float scale);
+  void layoutArrangementMap(Renderer& renderer);
+  void selectLayoutOutput(std::string name);
+  void syncLayoutSelection();
+  void beginLayoutPress(const std::string& name, float localX, float localY);
+  void updateLayoutDrag(const std::string& name, float localX, float localY);
+  void finishLayoutPress(const std::string& name);
+  void applyLayoutDrag();
+  [[nodiscard]] std::string layoutReferenceName() const;
   void queueBrightness(const std::string& displayId, float value);
   void flushPendingBrightness(bool force = false);
   void queueScale(const std::string& displayId, double value);
@@ -89,13 +98,37 @@ private:
   Flex* m_emptyState = nullptr;
   ScrollView* m_cardsScroll = nullptr;
   Flex* m_cardsLayout = nullptr;
+  struct LayoutTile {
+    std::string name;
+    Button* button = nullptr;
+    float x = 0.0F;
+    float y = 0.0F;
+  };
+
   Flex* m_layoutSection = nullptr;
-  Select* m_layoutSelect = nullptr;
+  Flex* m_layoutMap = nullptr;
+  Label* m_layoutStatusLabel = nullptr;
+  Select* m_layoutReferenceSelect = nullptr;
+  Button* m_layoutPlaceTop = nullptr;
+  Button* m_layoutPlaceLeft = nullptr;
+  Button* m_layoutPlaceRight = nullptr;
+  Button* m_layoutPlaceBottom = nullptr;
   Button* m_rescanButton = nullptr;
   std::vector<DisplayCard> m_cards;
-  std::vector<std::string> m_layoutOutputNames;
+  std::vector<LayoutTile> m_layoutTiles;
+  std::vector<std::string> m_layoutReferenceNames;
   std::string m_layoutMovingName;
+  std::string m_layoutReferenceName;
+  std::string m_layoutPressName;
   std::string m_lastDisplayListKey;
+  float m_layoutGrabX = 0.0F;
+  float m_layoutGrabY = 0.0F;
+  float m_layoutMapScale = 1.0F;
+  float m_layoutMapOffsetX = 0.0F;
+  float m_layoutMapOffsetY = 0.0F;
+  int m_layoutOriginX = 0;
+  int m_layoutOriginY = 0;
+  bool m_layoutDragging = false;
 
   std::string m_pendingDisplayId;
   float m_pendingBrightness = -1.0F;

@@ -315,6 +315,8 @@ namespace settings {
     std::vector<SelectOption> fontFamilies;
     std::string shellAvatarPath;
     std::vector<std::string> keyboardLayoutNames;
+    std::function<void(std::string)> copyToClipboard;
+    std::function<void()> requestRebuild;
   };
 
   [[nodiscard]] const BarConfig* findBar(const Config& cfg, std::string_view name);

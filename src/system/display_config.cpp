@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <format>
 #include <limits>
 #include <utility>
@@ -226,6 +227,168 @@ namespace display_config {
       break;
     }
     return {.x = x, .y = y};
+  }
+
+  namespace {
+
+    constexpr int kAlignMagnet = 24;
+    constexpr long long kStaySideBias = 200LL * 200LL;
+
+    [[nodiscard]] bool rangesOverlap(int aStart, int aExtent, int bStart, int bExtent) noexcept {
+      return aStart < bStart + bExtent && bStart < aStart + aExtent;
+    }
+
+    [[nodiscard]] int clampEdgeOverlap(int proposed, int refStart, int refExtent, int movingExtent) {
+      const int minPos = refStart - movingExtent + 1;
+      const int maxPos = refStart + refExtent - 1;
+      if (minPos > maxPos) {
+        return refStart + ((refExtent - movingExtent) / 2);
+      }
+      return std::clamp(proposed, minPos, maxPos);
+    }
+
+    [[nodiscard]] int magnetAlign(int value, int beginning, int center, int end) {
+      int best = value;
+      int bestDist = kAlignMagnet + 1;
+      for (const int target : {beginning, center, end}) {
+        const int dist = std::abs(value - target);
+        if (dist < bestDist) {
+          best = target;
+          bestDist = dist;
+        }
+      }
+      return bestDist <= kAlignMagnet ? best : value;
+    }
+
+  } // namespace
+
+  bool outputsOverlap(const Output& a, const Output& b) noexcept {
+    const Size aSize = logicalSize(a);
+    const Size bSize = logicalSize(b);
+    return rangesOverlap(a.x, aSize.width, b.x, bSize.width)
+        && rangesOverlap(a.y, aSize.height, b.y, bSize.height);
+  }
+
+  bool isAdjacentOn(const Output& moving, const Output& reference, LayoutDirection direction) noexcept {
+    const Size size = logicalSize(moving);
+    const Size refSize = logicalSize(reference);
+    switch (direction) {
+    case LayoutDirection::Right:
+      return moving.x == reference.x + refSize.width
+          && rangesOverlap(moving.y, size.height, reference.y, refSize.height);
+    case LayoutDirection::Left:
+      return moving.x + size.width == reference.x
+          && rangesOverlap(moving.y, size.height, reference.y, refSize.height);
+    case LayoutDirection::Top:
+      return moving.y + size.height == reference.y
+          && rangesOverlap(moving.x, size.width, reference.x, refSize.width);
+    case LayoutDirection::Bottom:
+      return moving.y == reference.y + refSize.height
+          && rangesOverlap(moving.x, size.width, reference.x, refSize.width);
+    }
+    return false;
+  }
+
+  std::optional<LayoutDirection> adjacency(const Output& moving, const Output& reference) noexcept {
+    constexpr LayoutDirection kDirections[] = {
+        LayoutDirection::Left, LayoutDirection::Right, LayoutDirection::Top, LayoutDirection::Bottom,
+    };
+    for (const auto direction : kDirections) {
+      if (isAdjacentOn(moving, reference, direction)) {
+        return direction;
+      }
+    }
+    return std::nullopt;
+  }
+
+  Point placeAdjacent(
+      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
+  ) {
+    const Size size = logicalSize(moving);
+    const Size refSize = logicalSize(reference);
+    switch (direction) {
+    case LayoutDirection::Right:
+      return {
+          .x = reference.x + refSize.width,
+          .y = magnetAlign(
+              clampEdgeOverlap(proposedY, reference.y, refSize.height, size.height), reference.y,
+              reference.y + ((refSize.height - size.height) / 2), reference.y + refSize.height - size.height
+          ),
+      };
+    case LayoutDirection::Left:
+      return {
+          .x = reference.x - size.width,
+          .y = magnetAlign(
+              clampEdgeOverlap(proposedY, reference.y, refSize.height, size.height), reference.y,
+              reference.y + ((refSize.height - size.height) / 2), reference.y + refSize.height - size.height
+          ),
+      };
+    case LayoutDirection::Top:
+      return {
+          .x = magnetAlign(
+              clampEdgeOverlap(proposedX, reference.x, refSize.width, size.width), reference.x,
+              reference.x + ((refSize.width - size.width) / 2), reference.x + refSize.width - size.width
+          ),
+          .y = reference.y - size.height,
+      };
+    case LayoutDirection::Bottom:
+      return {
+          .x = magnetAlign(
+              clampEdgeOverlap(proposedX, reference.x, refSize.width, size.width), reference.x,
+              reference.x + ((refSize.width - size.width) / 2), reference.x + refSize.width - size.width
+          ),
+          .y = reference.y + refSize.height,
+      };
+    }
+    return {.x = proposedX, .y = proposedY};
+  }
+
+  std::optional<SnapResult>
+  snapDragPosition(const Output& moving, const std::vector<Output>& outputs, int proposedX, int proposedY) {
+    std::optional<SnapResult> best;
+    long long bestDist = std::numeric_limits<long long>::max();
+    constexpr LayoutDirection kDirections[] = {
+        LayoutDirection::Left, LayoutDirection::Right, LayoutDirection::Top, LayoutDirection::Bottom,
+    };
+    for (const auto& output : outputs) {
+      if (!output.enabled || output.name == moving.name) {
+        continue;
+      }
+      for (const auto direction : kDirections) {
+        const Point snapped = placeAdjacent(moving, output, direction, proposedX, proposedY);
+        Output candidate = moving;
+        candidate.x = snapped.x;
+        candidate.y = snapped.y;
+        bool overlapsOther = false;
+        for (const auto& other : outputs) {
+          if (!other.enabled || other.name == moving.name || other.name == output.name) {
+            continue;
+          }
+          if (outputsOverlap(candidate, other)) {
+            overlapsOther = true;
+            break;
+          }
+        }
+        if (overlapsOther) {
+          continue;
+        }
+        const long long dx = static_cast<long long>(snapped.x) - proposedX;
+        const long long dy = static_cast<long long>(snapped.y) - proposedY;
+        long long dist = dx * dx + dy * dy;
+        if (isAdjacentOn(moving, output, direction)) {
+          dist = dist > kStaySideBias ? dist - kStaySideBias : 0;
+        }
+        if (!best.has_value() || dist < bestDist) {
+          bestDist = dist;
+          best = SnapResult{
+              .position = snapped,
+              .referenceName = output.name,
+              .direction = direction,
+          };
+        }
+      }
+    }
+    return best;
   }
 
   std::vector<ResolutionChoice> resolutionChoices(const Output& output) {

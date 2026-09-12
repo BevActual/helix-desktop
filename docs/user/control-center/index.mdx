@@ -35,6 +35,7 @@ sidebar = "compact"
 # width = 700  # full-sidebar width in pixels (600–1200)
 # show_shortcut_labels = true  # text under Home shortcut icons
 # show_session_button = true   # session-actions button in the Home header
+# show_setup_tabs = false      # show launcher, dock, and other setup pages
 # hidden_tabs = ["monitor", "weather"]  # hide tabs you never use
 ```
 
@@ -45,7 +46,12 @@ sidebar = "compact"
 | `width` | int | `700` | Control Center width in pixels (`600`–`1200`). This is the full-sidebar width; the compact and no-sidebar modes scale down from it. |
 | `show_shortcut_labels` | bool | `true` | Show text labels under Home shortcut icons. When `false`, shortcuts are icon-only and glyphs scale with cell size. |
 | `show_session_button` | bool | `true` | Show the session-actions button in the Home tab header. |
+| `show_setup_tabs` | bool | `false` | Show setup pages (launcher, dock, plugins, and the rest of that group) in the sidebar. The **More** row also toggles this. Empty [`hidden_tabs`](#sidebar) still means every available tab can be shown; this only collapses the Setup group. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Settings → Control Center**. The Home tab cannot be hidden. |
+
+The full sidebar shows group captions: **Look** (appearance, wallpaper, bar), **Status** (media, audio, weather, and the other live pages), then **More**. Compact mode uses separators between those groups instead of captions. Setup pages stay hidden until you expand **More** (or set `show_setup_tabs = true`). Opening a setup page from IPC or `settings-toggle` still works while the group is collapsed; that tab stays visible until you leave it.
+
+Plugin Control Center tabs stay in **Status**, not behind **More**. User `hidden_tabs` still hide any tab in every group.
 
 ### Sidebar Tabs
 
@@ -57,19 +63,19 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons |
 | `appearance` | Appearance | Theme, palette, fonts, and the rest of appearance settings |
 | `wallpaper` | Wallpaper | Wallpaper directories, cycling, and per-monitor wallpaper |
-| `templates` | Templates | Color templates and community palettes |
-| `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides |
+| `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides. Widget add and inspector sheets stay in Control Center. |
 | `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
 | `audio` | Audio | Output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Per-display brightness plus, on niri, resolution, refresh rate, scale, rotation, VRR, and arrangement. Header gear opens brightness service settings. |
 | `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Header gear opens battery warnings and system monitor settings. |
+| `power` | Power | Battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
 | `network` | Network | Wi-Fi state, connection status, cellular controls, known wireless controls, and NetworkManager-backed actions |
 | `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, and pairing flows |
-| `weather` | Weather | Current conditions and forecast. Header gear opens location, weather, and night-light settings. |
+| `weather` | Weather | Current conditions and forecast, with location and units on the live view. Header gear opens night-light settings. |
 | `calendar` | Calendar | Month view and configured calendar account events. Header gear opens calendar format settings. |
 | `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Header gear opens daemon, toast, history, and filter settings. |
-| `screen-time` | Screen Time | Foreground app usage totals and charts. Header gear opens the screen-time enable toggle and reset. |
-| `power` | Power | Battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
+| `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
+| `templates` | Templates | Color templates and community palettes |
 | `launcher` | Launcher | Launcher appearance and providers |
 | `dock` | Dock | Dock placement and behavior |
 | `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
@@ -77,17 +83,17 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `osd` | OSD | On-screen display volume and brightness popups |
 | `screenshot` | Screenshot | Screenshot capture, annotation, and output |
 | `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
-| `keybinds` | Keybinds | Shell keybind actions |
+| `keybinds` | Keybinds | In-shell navigation chords, plus niri compositor shortcuts when running on niri |
 | `security` | Security | Lock screen and authentication |
 | `hooks` | Hooks | Startup and event hooks |
 | `niri` | Niri | niri-specific options. Shown only in a niri session. |
-| `plugins` | Plugins | Opens the Settings window for the plugin store and per-plugin settings |
-| `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
+| `plugins` | Plugins | Installed plugins and the in-panel plugin store |
+| `control-center` | Control Center | Control Center sidebar, width, shortcuts, setup pages, and hidden tabs |
 
 `niri` is listed only in a niri session. The Weather, System, Power, and Screen Time tabs stay available so you can turn those features on from the tab itself.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
-one list, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
+they appear in **Status** (not behind **More**), each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
 (`author/plugin:entry`). Hide any of them except Home via `hidden_tabs` or **Control Center → Control Center**.
 See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center-tabs).
 
@@ -115,7 +121,11 @@ The Audio tab groups PipeWire output, input, device, and stream controls. Use it
 
 ## Monitor
 
-The Monitor tab lists connected displays. Brightness sliders appear when Noctalia has a writable backlight (including DDC/CI when that is enabled). On niri, each display also gets resolution, refresh rate, scale, rotation, and optional VRR controls, plus an arrangement pad when two or more outputs are enabled.
+The Monitor tab lists connected displays. Brightness sliders appear when Noctalia has a writable backlight (including DDC/CI when that is enabled). On niri, each display also gets resolution, refresh rate, scale, rotation, and optional VRR controls, plus a visual arrangement map when two or more outputs are enabled.
+
+niri only keeps the cursor path between **adjacent, non-overlapping** outputs. A layout change that overlaps another display is rejected and niri auto-places that output to the far right, which jumps windows with it. The Monitor tab pins every enabled output's position on each change so niri does not auto-place the ones you did not move.
+
+Drag a display to another side. While two displays already share an edge, the arrows slide the selected one along that seam (and magnet to top, center, or bottom). Left/right still swap sides when the displays are stacked, and up/down swap sides when they sit next to each other. Pick **Relative to** when three or more are on.
 
 Those niri changes are temporary: they apply through compositor IPC and are forgotten when niri reloads its config. The header refresh button re-reads the current output state (and re-runs DDC/CI detect when that backend is enabled).
 
@@ -153,7 +163,7 @@ The Bluetooth tab shows adapter power state, paired devices, and connection cont
 
 ## Weather
 
-The Weather tab expands the Home weather summary into current conditions, forecast detail, and location/status information. It is hidden when `[weather].enabled = false`.
+The Weather tab expands the Home weather summary into current conditions and forecast detail. Location and units stay on the live view under the forecast. Night-light stays behind the header gear.
 
 Weather configuration is documented under [Weather](/noctalia/services/weather/).
 
@@ -188,6 +198,8 @@ The Notifications tab shows notification history and notification actions, inclu
 
 The Screen Time tab shows how long each application was in the foreground today. Noctalia tracks focus using the active `zwlr_foreign_toplevel` window, pauses tracking while its session lock is active, and stores daily totals under `$XDG_STATE_HOME/noctalia/screen_time.json` (about 14 days retained).
 
+When tracking is off, the tab shows a disabled banner with the enable toggle on that same live view.
+
 - **Range** toggle: today (hourly chart), last 3 days, or last 14 days (daily bars)
 - **Total** time for the selected range, with a stacked bar chart (hourly or per-day)
 - **Chart legend** as a horizontal row under the chart (chart colors only; app list uses neutral bars)
@@ -199,11 +211,15 @@ Reset stored history from the Screen Time tab header gear (**Screen Time** setti
 
 ## Settings
 
-Settings pages are Control Center tabs. Appearance, Bar, Wallpaper, and the rest of the editor sit in the sidebar next to Media and Weather. Domain options that belong with a live view are on that tab instead: header gear on Weather, Notifications, Power, System, Calendar, Audio, Monitor, Media, and Screen Time.
+Settings pages are Control Center tabs. Appearance, Wallpaper, and Bar sit under **Look**. Live status pages sit under **Status**. Launcher, dock, plugins, and the other setup pages stay behind **More** until you expand that group.
 
-The header Advanced toggle shows advanced settings. The header link still opens the Settings window for the plugin store, bar widget inspectors, and other editors that need that larger surface.
+Domain options that belong with a live view are on that tab: location and units on Weather, the enable toggle on Screen Time, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, and Screen Time for the longer forms.
 
-Open Appearance with `noctalia msg panel-toggle control-center settings`, the Home gear, or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab, settings view).
+Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). An empty query keeps that page’s filter. A non-empty query searches the whole settings registry (section headers still appear on matches) and opens Appearance if you were on Home or another non-settings page.
+
+The plugin store, session/idle editors, notification filters, and bar widget inspectors open as sheets in Control Center. The header Advanced toggle shows advanced settings. The header link still opens the Settings window for config export and anything that still needs that larger surface.
+
+Open Appearance with `noctalia msg panel-toggle control-center settings`, the Home gear, or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab, settings view). `settings-toggle` without a section still lands on Appearance.
 
 The Niri page is shown only when the session is running under niri.
 

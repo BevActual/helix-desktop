@@ -12,6 +12,7 @@
 #include "system/weather_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/scroll_view.h"
 
 #include <algorithm>
 #include <chrono>
@@ -40,7 +41,13 @@ namespace {
 
 WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services)
     : m_weather(weather), m_config(config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "location"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "location", .includedGroups = {"night-light"}}
+      )),
+      m_inlineSettings(std::make_unique<SettingsPane>(
+          services,
+          SettingsPaneOptions{.section = "location", .includedGroups = {"location", "weather"}, .compact = true}
+      )) {
   m_forecastRows.fill(nullptr);
   m_forecastSeparators.fill(nullptr);
   m_forecastIconSlots.fill(nullptr);
@@ -389,16 +396,44 @@ std::unique_ptr<Flex> WeatherTab::create() {
 
   forecastColumn->addChild(std::move(forecastRowsContainer));
   tab->addChild(std::move(forecastColumn));
-  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+
+  auto liveScroll = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* liveContent = liveScroll->content();
+  liveContent->setDirection(FlexDirection::Vertical);
+  liveContent->setAlign(FlexAlign::Stretch);
+  liveContent->setGap(Style::spaceMd * scale);
+  tab->setMinHeight(280.0F * scale);
+  liveContent->addChild(std::move(tab));
+
+  auto live = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  live->addChild(std::move(liveScroll));
+  live->addChild(m_inlineSettings->create(scale, panelCardOpacity()));
+  return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> WeatherTab::createHeaderActions() {
-  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void WeatherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
 bool WeatherTab::configureMode() const { return m_settings->configureMode(); }
+
+void WeatherTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void WeatherTab::cancelForecastSlide() {
   const bool wasAnimating = m_forecastSlideAnimId != 0;
@@ -518,7 +553,13 @@ void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
     }
   }
 
-  m_rootLayout->setSize(contentWidth, bodyHeight);
+  float liveWidth = contentWidth;
+  float liveHeight = bodyHeight;
+  if (m_liveScroll != nullptr) {
+    liveWidth = std::max(0.0F, m_liveScroll->width());
+    liveHeight = std::max(0.0F, m_liveScroll->height());
+  }
+  m_rootLayout->setSize(liveWidth, liveHeight);
   m_rootLayout->layout(renderer);
 
   const float leftColumnWidth = m_leftColumn != nullptr
@@ -708,7 +749,9 @@ void WeatherTab::showLocationPrompt(bool show) {
 
 void WeatherTab::onClose() {
   m_settings->onClose();
+  m_inlineSettings->onClose();
   m_rootLayout = nullptr;
+  m_liveScroll = nullptr;
   m_leftColumn = nullptr;
   m_currentCard = nullptr;
   m_glyphColumn = nullptr;

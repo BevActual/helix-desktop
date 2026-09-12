@@ -9,6 +9,7 @@
 #include "shell/settings/config_export_dialog_modal.h"
 #include "shell/settings/search_picker_popup.h"
 #include "shell/settings/settings_control_factory.h"
+#include "shell/settings/settings_hosted_editors.h"
 #include "shell/settings/settings_modal_host.h"
 #include "shell/settings/settings_registry.h"
 #include "shell/settings/settings_sheet_modal.h"
@@ -157,6 +158,7 @@ private:
   [[nodiscard]] settings::SettingsContentContext makeContentContext(
       const Config& cfg, const BarConfig* selectedBar, const BarMonitorOverride* selectedMonitorOverride
   );
+  void bindHostedEditors();
   [[nodiscard]] std::vector<std::vector<std::string>> currentPageResetPaths() const;
   [[nodiscard]] bool
   tryPatchSettingsRegistryValue(const std::vector<std::string>& path, const ConfigOverrideValue& value);
@@ -278,6 +280,7 @@ private:
   std::unique_ptr<settings::SearchPickerPopup> m_searchPickerPopup;
   InputDispatcher m_inputDispatcher;
   settings::SettingsModalHost m_modalHost;
+  settings::HostedEditors m_hostedEditors;
   std::unique_ptr<settings::SettingsDialogPresenter> m_dialogPresenter;
   std::unique_ptr<settings::SettingsSheetModal> m_editorSheetModal;
   std::unique_ptr<settings::SettingsControlFactory> m_editorSheetFactory;

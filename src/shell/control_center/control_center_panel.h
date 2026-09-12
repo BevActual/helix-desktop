@@ -4,6 +4,8 @@
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel.h"
+#include "shell/settings/settings_hosted_editors.h"
+#include "shell/settings/settings_modal_host.h"
 #include "ui/controls/scroll_view.h"
 
 #include <chrono>
@@ -13,12 +15,14 @@
 #include <string_view>
 #include <vector>
 
+class AsyncTextureCache;
 class Button;
 class CompositorPlatform;
 class ConfigService;
 class DependencyService;
 class Flex;
 class HttpClient;
+class Input;
 class InputArea;
 class Label;
 class MprisService;
@@ -30,6 +34,7 @@ class FileWatcher;
 
 namespace scripting {
   class ScriptApiContext;
+  class PluginManager;
 }
 
 class ControlCenterPanel : public Panel {
@@ -59,6 +64,8 @@ public:
   [[nodiscard]] PanelPlacement panelPlacement() const noexcept override;
   [[nodiscard]] bool showsSidebar() const noexcept { return m_showSidebar; }
 
+  enum class TabGroup : std::uint8_t { Home, Look, Status, Setup };
+
 private:
   void onPanelCardOpacityChanged(float opacity) override;
   void doLayout(Renderer& renderer, float width, float height) override;
@@ -72,6 +79,7 @@ private:
     Button* button = nullptr;
     Flex* container = nullptr;
     Flex* headerActions = nullptr;
+    TabGroup group = TabGroup::Status;
     bool hideable = true;
     bool plugin = false;
   };
@@ -96,8 +104,20 @@ private:
   void applyTabTransitionLayout();
   [[nodiscard]] int visibleTabOrdinal(std::string_view id) const;
   void syncTabVisibility();
+  void addSidebarTabButton(class RovingListNavHost& nav, TabSlot& slot, float scale);
+  void addSidebarGroupHeader(class RovingListNavHost& nav, TabGroup group, float scale);
+  void addSidebarMoreButton(class RovingListNavHost& nav, float scale);
+  void toggleSetupTabs();
+  void applySettingsSearch(std::string value);
+  void syncActiveTabSearch();
+  [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
+  [[nodiscard]] bool showSetupTabs() const;
+  [[nodiscard]] bool isSetupGroupVisible() const;
+  [[nodiscard]] bool hasUserVisibleSetupTab() const;
+  [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
   [[nodiscard]] bool isTabFeatureAvailable(std::string_view id) const;
   [[nodiscard]] bool isTabVisible(std::string_view id) const;
+  [[nodiscard]] bool isTabVisibleIgnoringSetup(std::string_view id) const;
   [[nodiscard]] bool isTabShown(std::string_view id) const;
   [[nodiscard]] std::string firstVisibleTab() const;
   [[nodiscard]] bool isDirectSectionOpenContext(std::string_view context) const;
@@ -118,6 +138,12 @@ private:
   ScrollViewState m_sidebarScrollState{};
   RovingListNavHost* m_sidebarNav = nullptr;
   InputArea* m_sidebarScrollArea = nullptr;
+  Node* m_lookHeader = nullptr;
+  Node* m_statusHeader = nullptr;
+  Node* m_setupHeader = nullptr;
+  Button* m_moreButton = nullptr;
+  Input* m_searchInput = nullptr;
+  std::string m_searchQuery;
   Flex* m_content = nullptr;
   InputArea* m_contentDismissArea = nullptr;
   Flex* m_contentHeader = nullptr;
@@ -139,4 +165,11 @@ private:
   int m_tabTransitionDirection = 1;
   bool m_tabTransitionActive = false;
   bool m_firstOpenAfterCreate = false;
+  bool m_modalAttached = false;
+  settings::SettingsModalHost m_modalHost;
+  std::unique_ptr<settings::HostedEditors> m_hostedEditors;
+  scripting::PluginManager* m_pluginManager = nullptr;
+  AsyncTextureCache* m_asyncTextures = nullptr;
+
+  void attachModalHost(Renderer& renderer, float width, float height);
 };

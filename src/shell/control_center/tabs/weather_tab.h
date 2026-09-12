@@ -15,6 +15,7 @@ class Glyph;
 class InputArea;
 class Label;
 class Separator;
+class ScrollView;
 class Segmented;
 class WeatherService;
 class ConfigService;
@@ -31,6 +32,7 @@ public:
   void onFrameTick(float deltaMs) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   enum class ForecastView : std::uint8_t {
@@ -60,7 +62,10 @@ private:
   WeatherService* m_weather = nullptr;
   ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_inlineSettings;
   Flex* m_rootLayout = nullptr;
+  ScrollView* m_liveScroll = nullptr;
+  ScrollViewState m_liveScrollState{};
   Flex* m_leftColumn = nullptr;
   Flex* m_currentCard = nullptr;
   Flex* m_glyphColumn = nullptr;

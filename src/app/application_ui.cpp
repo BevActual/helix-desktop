@@ -609,6 +609,7 @@ void Application::initPanelManagerAndPanels() {
           .accounts = m_accountsService.get(),
           .thumbnails = &m_thumbnailService,
           .asyncTextures = &m_asyncTextureCache,
+          .pluginManager = &m_pluginManager,
       })
   );
   {

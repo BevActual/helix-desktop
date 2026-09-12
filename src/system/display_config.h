@@ -72,6 +72,12 @@ namespace display_config {
     int y = 0;
   };
 
+  struct SnapResult {
+    Point position;
+    std::string referenceName;
+    LayoutDirection direction = LayoutDirection::Right;
+  };
+
   [[nodiscard]] bool isSideways(Transform transform) noexcept;
   [[nodiscard]] std::string_view jsonName(Transform transform) noexcept;
   [[nodiscard]] std::optional<Transform> parseTransform(std::string_view value);
@@ -83,6 +89,22 @@ namespace display_config {
   [[nodiscard]] Point snapPosition(
       const Output& moving, const Output& reference, LayoutDirection direction, int offset = 0
   );
+  // Place `moving` against `reference` on `direction`, keeping the proposed coordinate
+  // along the shared edge. niri treats overlapping rectangles as invalid and will
+  // auto-place the output to the right of everything else.
+  [[nodiscard]] Point placeAdjacent(
+      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
+  );
+  [[nodiscard]] bool outputsOverlap(const Output& a, const Output& b) noexcept;
+  [[nodiscard]] bool isAdjacentOn(
+      const Output& moving, const Output& reference, LayoutDirection direction
+  ) noexcept;
+  [[nodiscard]] std::optional<LayoutDirection>
+  adjacency(const Output& moving, const Output& reference) noexcept;
+  // Place `moving` against the nearest edge of another enabled output, keeping the
+  // proposed coordinate along that edge so a drag can top- or bottom-align.
+  [[nodiscard]] std::optional<SnapResult>
+  snapDragPosition(const Output& moving, const std::vector<Output>& outputs, int proposedX, int proposedY);
   [[nodiscard]] std::vector<ResolutionChoice> resolutionChoices(const Output& output);
   [[nodiscard]] std::vector<Mode> refreshChoices(const Output& output, int width, int height);
   [[nodiscard]] std::size_t selectedResolutionIndex(const Output& output, const std::vector<ResolutionChoice>& choices);

@@ -194,64 +194,6 @@ namespace {
 
   std::string trimInput(Input* input) { return input != nullptr ? StringUtils::trim(input->value()) : std::string{}; }
 
-  std::string sessionActionTitle(const SessionPanelActionConfig& row) {
-    return settings::sessionActionDisplayTitle(row);
-  }
-
-  std::string idleBehaviorTitle(const IdleBehaviorConfig& row) {
-    IdleBehaviorConfig norm = row;
-    normalizeIdleBehaviorAction(norm);
-    if (norm.action == "lock") {
-      return i18n::tr("settings.idle.behavior.kind.lock");
-    }
-    if (norm.action == "screen_off") {
-      return i18n::tr("settings.idle.behavior.kind.screen-off");
-    }
-    if (norm.action == "suspend") {
-      return i18n::tr("settings.idle.behavior.kind.suspend");
-    }
-    if (norm.action == "lock_and_suspend") {
-      return i18n::tr("settings.idle.behavior.kind.lock-and-suspend");
-    }
-    if (!StringUtils::trim(row.name).empty()) {
-      return row.name;
-    }
-    return i18n::tr("settings.idle.behavior.unnamed");
-  }
-
-  std::string notificationFilterTitle(const NotificationFilterConfig& row) {
-    if (!row.match.empty()) {
-      return row.match;
-    }
-    if (!StringUtils::trim(row.name).empty()) {
-      return row.name;
-    }
-    return i18n::tr("settings.notifications.filter.unnamed");
-  }
-
-  void normalizeIdleBehaviorNames(std::vector<IdleBehaviorConfig>& rows) {
-    std::vector<std::string> used;
-    used.reserve(rows.size());
-    for (auto& row : rows) {
-      std::string base = StringUtils::trim(row.name);
-      if (base.empty()) {
-        base = "idle-behavior";
-      }
-      for (char& ch : base) {
-        if (ch == '.' || ch == '[' || ch == ']') {
-          ch = '-';
-        }
-      }
-
-      std::string candidate = base;
-      for (int suffix = 2; std::ranges::contains(used, candidate); ++suffix) {
-        candidate = std::format("{}-{}", base, suffix);
-      }
-      row.name = candidate;
-      used.push_back(row.name);
-    }
-  }
-
   bool isBarWidgetListPath(const std::vector<std::string>& path) {
     if (path.size() < 3 || path.front() != "bar") {
       return false;
@@ -549,90 +491,8 @@ void SettingsWindow::openSessionActionEntryEditor(std::size_t index) {
       || m_config == nullptr) {
     return;
   }
-
-  const Config& cfg = m_config->config();
-  if (index >= cfg.shell.session.actions.size()) {
-    return;
-  }
-
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto rowState = std::make_shared<SessionPanelActionConfig>(cfg.shell.session.actions[index]);
-
-  const auto persist = [this, rowState, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    auto next = m_config->config().shell.session.actions;
-    if (index >= next.size()) {
-      return;
-    }
-    next[index] = *rowState;
-    if (m_sessionActionsEditState != nullptr && index < m_sessionActionsEditState->size()) {
-      (*m_sessionActionsEditState)[index] = *rowState;
-    }
-    syncSessionActionInlineSummary(index, *rowState);
-    setSettingOverride({"shell", "session", "actions"}, next);
-    if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-      m_editorSheetModal->setSheetTitle(sessionActionTitle(*rowState));
-      m_editorSheetModal->requestLayout();
-    }
-  };
-
-  const auto removeRow = [this, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    auto next = m_config->config().shell.session.actions;
-    if (index >= next.size()) {
-      return;
-    }
-    next.erase(next.begin() + static_cast<std::ptrdiff_t>(index));
-    setSettingOverride({"shell", "session", "actions"}, next);
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-    requestContentRebuild();
-  };
-
-  auto ctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  ctx.openSessionActionEntryEditor = {};
-  ctx.openIdleBehaviorEntryEditor = {};
-  ctx.closeHostedEditor = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-  };
-
-  const std::string sheetTitle = sessionActionTitle(*rowState);
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = sheetTitle,
-          .removeAction = removeRow,
-          .populateSheetBody =
-              [ctx, rowState, persist](Flex& body) mutable {
-                settings::buildSessionActionEntryDetailContent(body, ctx, *rowState, persist);
-              },
-          .scale = scale,
-      }
-  );
+  bindHostedEditors();
+  m_hostedEditors.openSessionActionEntry(index);
 }
 
 void SettingsWindow::openIdleBehaviorEntryEditor(std::size_t index) {
@@ -643,102 +503,8 @@ void SettingsWindow::openIdleBehaviorEntryEditor(std::size_t index) {
       || m_config == nullptr) {
     return;
   }
-
-  // Closing the previous hosted editor can commit focused fields via focus-loss callbacks.
-  // Do it before reading cfg/rowState so the new editor is built from the latest config.
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-
-  const Config& cfg = m_config->config();
-  if (index >= cfg.idle.behaviors.size()) {
-    return;
-  }
-
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto rowState = std::make_shared<IdleBehaviorConfig>(cfg.idle.behaviors[index]);
-  auto rowKey = std::make_shared<std::string>(rowState->name);
-  normalizeIdleBehaviorAction(*rowState);
-
-  const auto persist = [this, rowState, rowKey, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    normalizeIdleBehaviorAction(*rowState);
-    auto next = m_config->config().idle.behaviors;
-    auto target = std::ranges::find(next, *rowKey, &IdleBehaviorConfig::name);
-    if (target == next.end() && index < next.size()) {
-      target = next.begin() + static_cast<std::ptrdiff_t>(index);
-    }
-    if (target == next.end()) {
-      return;
-    }
-    const auto targetIndex = static_cast<std::size_t>(std::distance(next.begin(), target));
-    next[targetIndex] = *rowState;
-    normalizeIdleBehaviorNames(next);
-    *rowState = next[targetIndex];
-    *rowKey = rowState->name;
-    setSettingOverride({"idle", "behavior"}, next);
-    requestContentRebuild();
-    if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-      m_editorSheetModal->requestLayout();
-    }
-  };
-
-  const auto removeRow = [this, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    auto next = m_config->config().idle.behaviors;
-    if (index >= next.size()) {
-      return;
-    }
-    next.erase(next.begin() + static_cast<std::ptrdiff_t>(index));
-    normalizeIdleBehaviorNames(next);
-    setSettingOverride({"idle", "behavior"}, next);
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-    requestContentRebuild();
-  };
-
-  auto ctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  ctx.openSessionActionEntryEditor = {};
-  ctx.openIdleBehaviorEntryEditor = {};
-  ctx.closeHostedEditor = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-  };
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = idleBehaviorTitle(*rowState),
-          .removeAction = removeRow,
-          .populateSheetBody =
-              [ctx, rowState, persist](Flex& body) mutable {
-                settings::buildIdleBehaviorEntryDetailContent(body, ctx, *rowState, persist);
-              },
-          .scale = scale,
-      }
-  );
+  bindHostedEditors();
+  m_hostedEditors.openIdleBehaviorEntry(index);
 }
 
 void SettingsWindow::openIdleBehaviorCreateEditor() {
@@ -749,76 +515,8 @@ void SettingsWindow::openIdleBehaviorCreateEditor() {
       || m_config == nullptr) {
     return;
   }
-
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-
-  const Config& cfg = m_config->config();
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto rowState = std::make_shared<IdleBehaviorConfig>(IdleBehaviorConfig{
-      .name = "idle-behavior",
-      .enabled = false,
-      .timeoutSeconds = 600,
-      .action = "command",
-      .command = "",
-      .resumeCommand = "",
-  });
-
-  const auto persistDraft = [this]() {
-    if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-      m_editorSheetModal->requestLayout();
-    }
-  };
-
-  auto ctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  ctx.openSessionActionEntryEditor = {};
-  ctx.openIdleBehaviorEntryEditor = {};
-  ctx.afterIdleBehaviorApply = [this, rowState]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    normalizeIdleBehaviorAction(*rowState);
-    auto next = m_config->config().idle.behaviors;
-    next.push_back(*rowState);
-    normalizeIdleBehaviorNames(next);
-    setSettingOverride({"idle", "behavior"}, next);
-    requestContentRebuild();
-  };
-  ctx.closeHostedEditor = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-  };
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = idleBehaviorTitle(*rowState),
-          .removeAction = nullptr,
-          .populateSheetBody =
-              [ctx, rowState, persistDraft](Flex& body) mutable {
-                settings::buildIdleBehaviorEntryDetailContent(body, ctx, *rowState, persistDraft);
-              },
-          .scale = scale,
-      }
-  );
+  bindHostedEditors();
+  m_hostedEditors.openIdleBehaviorCreate();
 }
 
 void SettingsWindow::openNotificationFilterEntryEditor(std::size_t index) {
@@ -829,98 +527,8 @@ void SettingsWindow::openNotificationFilterEntryEditor(std::size_t index) {
       || m_config == nullptr) {
     return;
   }
-
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-
-  const Config& cfg = m_config->config();
-  if (index >= cfg.notification.filters.size()) {
-    return;
-  }
-
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto rowState = std::make_shared<NotificationFilterConfig>(cfg.notification.filters[index]);
-  auto rowKey = std::make_shared<std::string>(rowState->name);
-
-  const auto persist = [this, rowState, rowKey, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    auto next = m_config->config().notification.filters;
-    auto target = std::ranges::find(next, *rowKey, &NotificationFilterConfig::name);
-    if (target == next.end() && index < next.size()) {
-      target = next.begin() + static_cast<std::ptrdiff_t>(index);
-    }
-    if (target == next.end()) {
-      return;
-    }
-    const auto targetIndex = static_cast<std::size_t>(std::distance(next.begin(), target));
-    next[targetIndex] = *rowState;
-    normalizeNotificationFilterNames(next);
-    *rowState = next[targetIndex];
-    *rowKey = rowState->name;
-    setSettingOverride({"notification", "filter"}, next);
-    requestContentRebuild();
-    if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-      m_editorSheetModal->requestLayout();
-    }
-  };
-
-  const auto removeRow = [this, index]() {
-    if (m_config == nullptr) {
-      return;
-    }
-    auto next = m_config->config().notification.filters;
-    if (index >= next.size()) {
-      return;
-    }
-    next.erase(next.begin() + static_cast<std::ptrdiff_t>(index));
-    normalizeNotificationFilterNames(next);
-    setSettingOverride({"notification", "filter"}, next);
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-    requestContentRebuild();
-  };
-
-  auto ctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  ctx.openNotificationFilterEntryEditor = {};
-  ctx.afterNotificationFilterApply = [persist]() { persist(); };
-  ctx.closeHostedEditor = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-  };
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = notificationFilterTitle(*rowState),
-          .removeAction = removeRow,
-          .populateSheetBody =
-              [ctx, rowState, persist](Flex& body) mutable {
-                settings::buildNotificationFilterEntryDetailContent(body, ctx, *rowState, persist);
-              },
-          .scale = scale,
-      }
-  );
+  bindHostedEditors();
+  m_hostedEditors.openNotificationFilterEntry(index);
 }
 
 void SettingsWindow::openNotificationFilterCreateEditor() {
@@ -931,77 +539,8 @@ void SettingsWindow::openNotificationFilterCreateEditor() {
       || m_config == nullptr) {
     return;
   }
-
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-
-  const Config& cfg = m_config->config();
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto rowState = std::make_shared<NotificationFilterConfig>(NotificationFilterConfig{
-      .name = "filter",
-      .enabled = true,
-      .match = {},
-      .showToast = true,
-      .saveHistory = true,
-      .playSound = true,
-      .bypassDnd = false,
-      .allowPermanent = true,
-      .allowedUrgencies = {},
-  });
-
-  const auto persistDraft = [this]() {
-    if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-      m_editorSheetModal->requestLayout();
-    }
-  };
-
-  auto ctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  ctx.openNotificationFilterEntryEditor = {};
-  ctx.afterNotificationFilterApply = [this, rowState]() {
-    if (m_config == nullptr || rowState->match.empty()) {
-      return;
-    }
-    auto next = m_config->config().notification.filters;
-    next.push_back(*rowState);
-    normalizeNotificationFilterNames(next);
-    setSettingOverride({"notification", "filter"}, next);
-    requestContentRebuild();
-  };
-  ctx.closeHostedEditor = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->close();
-    }
-  };
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = i18n::tr("settings.notifications.filter.add-title"),
-          .removeAction = nullptr,
-          .populateSheetBody =
-              [ctx, rowState, persistDraft](Flex& body) mutable {
-                settings::buildNotificationFilterEntryDetailContent(body, ctx, *rowState, persistDraft);
-              },
-          .scale = scale,
-      }
-  );
+  bindHostedEditors();
+  m_hostedEditors.openNotificationFilterCreate();
 }
 
 void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accountId) {
@@ -1763,46 +1302,13 @@ void SettingsWindow::openBarWidgetEditorSheet(
 }
 
 void SettingsWindow::openWidgetInspectorEditor(std::vector<std::string> laneListPath, std::string widgetName) {
-  DeferredCall::callLater([this, laneListPath = std::move(laneListPath), widgetName = std::move(widgetName)]() mutable {
-    m_editingWidgetName = widgetName;
-    m_editingCapsuleGroupId.clear();
-    m_renamingWidgetName.clear();
-    m_pendingDeleteWidgetName.clear();
-    m_pendingDeleteWidgetSettingPath.clear();
-    m_editorSheetListPath = std::move(laneListPath);
-    std::string title = widgetName;
-    if (m_config != nullptr) {
-      const std::string display = settings::widgetReferenceInfo(m_config->config(), widgetName).title;
-      if (!display.empty()) {
-        title = display;
-      }
-    }
-    openBarWidgetEditorSheet(std::move(title), [this](Flex& body) {
-      if (m_editorSheetFactory == nullptr) {
-        return;
-      }
-      auto ctx = settings::makeBarWidgetEditorContext(*m_editorSheetFactory);
-      settings::buildWidgetInspectorBody(body, m_editorSheetListPath, ctx);
-    });
-  });
+  bindHostedEditors();
+  m_hostedEditors.openWidgetInspector(std::move(laneListPath), std::move(widgetName));
 }
 
 void SettingsWindow::openCapsuleGroupEditor(std::vector<std::string> laneListPath, std::string groupId) {
-  DeferredCall::callLater([this, laneListPath = std::move(laneListPath), groupId = std::move(groupId)]() mutable {
-    m_editingCapsuleGroupId = std::move(groupId);
-    m_editingWidgetName.clear();
-    m_renamingWidgetName.clear();
-    m_pendingDeleteWidgetName.clear();
-    m_pendingDeleteWidgetSettingPath.clear();
-    m_editorSheetListPath = std::move(laneListPath);
-    openBarWidgetEditorSheet(i18n::tr("settings.entities.widget.group.title"), [this](Flex& body) {
-      if (m_editorSheetFactory == nullptr) {
-        return;
-      }
-      auto ctx = settings::makeBarWidgetEditorContext(*m_editorSheetFactory);
-      settings::buildCapsuleGroupBody(body, m_editorSheetListPath, ctx);
-    });
-  });
+  bindHostedEditors();
+  m_hostedEditors.openCapsuleGroup(std::move(laneListPath), std::move(groupId));
 }
 
 void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConfig> existing) {
