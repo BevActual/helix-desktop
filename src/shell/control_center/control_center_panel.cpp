@@ -1,5 +1,10 @@
+#include "scripting/plugin_i18n.h"
+#include "scripting/plugin_manifest.h"
+#include "scripting/plugin_registry.h"
+#include "scripting/plugin_runtime_context.h"
 #include "shell/control_center/control_center_panel.h"
 
+#include "compositors/compositor_detect.h"
 #include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "core/deferred_call.h"
@@ -9,7 +14,20 @@
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
+#include "shell/control_center/plugin_control_center_tab.h"
+#include "shell/control_center/tabs/audio_tab.h"
+#include "shell/control_center/tabs/bluetooth_tab.h"
+#include "shell/control_center/tabs/calendar_tab.h"
+#include "shell/control_center/tabs/home_tab.h"
+#include "shell/control_center/tabs/media_tab.h"
+#include "shell/control_center/tabs/monitor_tab.h"
+#include "shell/control_center/tabs/network_tab.h"
+#include "shell/control_center/tabs/notifications_tab.h"
+#include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
+#include "shell/control_center/tabs/settings_tab.h"
+#include "shell/control_center/tabs/system_tab.h"
+#include "shell/control_center/tabs/weather_tab.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "system/dependency_service.h"
@@ -26,7 +44,10 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
+#include <unordered_map>
+#include <utility>
 #include <wayland-client-protocol.h>
 
 using namespace control_center;
@@ -34,45 +55,226 @@ using namespace control_center;
 namespace {
 
   constexpr auto kMprisRefreshMinInterval = std::chrono::milliseconds(750);
-  // Full-height cards need room for rounded-rect AA before the tab viewport clips them.
   constexpr float kTabViewportClipInset = 1.0F;
 
   float tabContentHeight(float viewportHeight) {
     return std::max(1.0F, std::floor(viewportHeight - kTabViewportClipInset));
   }
 
+  struct BuiltinTabSpec {
+    const char* id;
+    const char* titleKey;
+    const char* glyph;
+    bool hideable;
+  };
+
+  constexpr BuiltinTabSpec kBuiltinTabs[] = {
+      {"home", "control-center.tabs.home", "home", false},
+      {"appearance", "settings.navigation.sections.appearance", "adjustments-horizontal", true},
+      {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true},
+      {"templates", "settings.navigation.sections.templates", "color-swatch", true},
+      {"bar", "settings.navigation.sections.bar", "crop-3-2", true},
+      {"media", "control-center.tabs.media", "disc-filled", true},
+      {"audio", "control-center.tabs.audio", "volume", true},
+      {"monitor", "control-center.tabs.monitor", "device-desktop", true},
+      {"system", "control-center.tabs.system", "activity-heartbeat", true},
+      {"power", "control-center.tabs.power", "battery-charging-2", true},
+      {"network", "control-center.tabs.network", "wifi", true},
+      {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true},
+      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true},
+      {"calendar", "control-center.tabs.calendar", "calendar-event", true},
+      {"notifications", "control-center.tabs.notifications", "bell", true},
+      {"screen-time", "control-center.tabs.screen-time", "hourglass", true},
+      {"launcher", "settings.navigation.sections.launcher", "rocket", true},
+      {"dock", "settings.navigation.sections.dock", "layout-bottombar-inactive", true},
+      {"desktop", "settings.navigation.sections.desktop", "layout-board", true},
+      {"panels", "settings.navigation.sections.panels", "layout-bottombar", true},
+      {"osd", "settings.navigation.sections.osd", "message-circle", true},
+      {"screenshot", "settings.navigation.sections.screenshot", "screenshot", true},
+      {"shell", "settings.navigation.sections.shell", "app-window", true},
+      {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true},
+      {"security", "settings.navigation.sections.security", "shield-lock", true},
+      {"hooks", "settings.navigation.sections.hooks", "link", true},
+      {"niri", "settings.navigation.sections.niri", "niri", true},
+      {"plugins", "settings.navigation.sections.plugins", "puzzle", true},
+      {"control-center", "settings.navigation.sections.control-center", "adjustments", true},
+  };
+
+  struct PluginTabChrome {
+    std::string title;
+    std::string glyph;
+  };
+
+  PluginTabChrome pluginTabChrome(const scripting::ResolvedPluginEntry& resolved) {
+    PluginTabChrome chrome;
+    chrome.title = resolved.manifest != nullptr ? resolved.manifest->name : std::string{};
+    if (resolved.entry != nullptr && !resolved.entry->tabTitleKey.empty()) {
+      scripting::PluginTranslationCatalog catalog;
+      catalog.load(resolved.pluginDir);
+      if (catalog.has(resolved.entry->tabTitleKey)) {
+        chrome.title = catalog.translate(resolved.entry->tabTitleKey);
+      }
+    }
+    if (resolved.entry != nullptr && !resolved.entry->tabGlyph.empty()) {
+      chrome.glyph = resolved.entry->tabGlyph;
+    } else if (resolved.manifest != nullptr && !resolved.manifest->icon.empty()) {
+      chrome.glyph = resolved.manifest->icon;
+    } else {
+      chrome.glyph = "puzzle";
+    }
+    return chrome;
+  }
+
+  const BuiltinTabSpec* specById(std::string_view id) {
+    for (const auto& spec : kBuiltinTabs) {
+      if (id == spec.id) {
+        return &spec;
+      }
+    }
+    return nullptr;
+  }
+
+  std::string builtinTitle(const BuiltinTabSpec& spec) { return i18n::tr(spec.titleKey); }
+
+  constexpr std::string_view kSettingsTabPrefix = "settings:";
+
+  struct SettingsOpenTarget {
+    bool isSettings = false;
+    std::string section;
+  };
+
+  SettingsOpenTarget parseSettingsOpenContext(std::string_view context) {
+    if (context == "settings") {
+      return {.isSettings = true};
+    }
+    if (context.starts_with(kSettingsTabPrefix)) {
+      return {.isSettings = true, .section = std::string(context.substr(kSettingsTabPrefix.size()))};
+    }
+    return {};
+  }
+
+  bool isSettingsEditorTab(std::string_view id) {
+    return id == "appearance"
+        || id == "wallpaper"
+        || id == "templates"
+        || id == "bar"
+        || id == "launcher"
+        || id == "dock"
+        || id == "desktop"
+        || id == "panels"
+        || id == "osd"
+        || id == "screenshot"
+        || id == "shell"
+        || id == "keybinds"
+        || id == "security"
+        || id == "hooks"
+        || id == "niri"
+        || id == "plugins"
+        || id == "control-center";
+  }
+
+  bool isLiveSettingsHost(std::string_view id) {
+    return id == "weather"
+        || id == "notifications"
+        || id == "power"
+        || id == "system"
+        || id == "calendar"
+        || id == "audio"
+        || id == "monitor"
+        || id == "media"
+        || id == "screen-time";
+  }
+
+  std::string tabIdForSettingsSection(std::string_view section) {
+    if (section.empty()) {
+      return "appearance";
+    }
+    if (section == "location") {
+      return "weather";
+    }
+    if (section == "services") {
+      return "calendar";
+    }
+    return std::string(section);
+  }
+
 } // namespace
 
 ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
-  m_hasPowerServices = services.upower != nullptr || services.powerProfiles != nullptr;
-  WaylandConnection* wayland = services.platform != nullptr ? &services.platform->wayland() : nullptr;
   m_config = services.config;
   m_mpris = services.mpris;
   m_notificationManager = services.notifications;
   m_dependencies = services.dependencies;
-  m_tabs[tabIndex(TabId::Home)] = std::make_unique<HomeTab>(services);
-  m_tabs[tabIndex(TabId::Media)] = std::make_unique<MediaTab>(
-      services.mpris, services.httpClient, services.spectrum, services.config, wayland,
-      PanelManager::instance().renderContext()
+  m_scriptApi = services.scriptApi;
+  m_fileWatcher = services.fileWatcher;
+  m_httpClient = services.httpClient;
+  m_clipboard = services.clipboard;
+  m_platform = services.platform;
+  appendBuiltinSlots(services);
+}
+
+void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& services) {
+  WaylandConnection* wayland = services.platform != nullptr ? &services.platform->wayland() : nullptr;
+
+  auto add = [this](std::string_view id, std::unique_ptr<Tab> tab) {
+    const auto* spec = specById(id);
+    if (spec == nullptr) {
+      return;
+    }
+    TabSlot slot;
+    slot.id = spec->id;
+    slot.title = builtinTitle(*spec);
+    slot.glyph = spec->glyph;
+    slot.tab = std::move(tab);
+    slot.hideable = spec->hideable;
+    slot.plugin = false;
+    m_slots.push_back(std::move(slot));
+  };
+
+  add("home", std::make_unique<HomeTab>(services));
+  add("appearance", std::make_unique<SettingsTab>(services, "appearance"));
+  add("wallpaper", std::make_unique<SettingsTab>(services, "wallpaper"));
+  add("templates", std::make_unique<SettingsTab>(services, "templates"));
+  add("bar", std::make_unique<SettingsTab>(services, "bar"));
+  add(
+      "media",
+      std::make_unique<MediaTab>(
+          services.mpris, services.httpClient, services.spectrum, services.config, wayland,
+          PanelManager::instance().renderContext(), services
+      )
   );
-  m_tabs[tabIndex(TabId::Audio)] = std::make_unique<AudioTab>(
-      services.audio, services.easyEffects, services.mpris, services.config, wayland,
-      PanelManager::instance().renderContext()
+  add(
+      "audio",
+      std::make_unique<AudioTab>(
+          services.audio, services.easyEffects, services.mpris, services.config, wayland,
+          PanelManager::instance().renderContext(), services
+      )
   );
-  m_tabs[tabIndex(TabId::Weather)] = std::make_unique<WeatherTab>(services.weather, services.config);
-  m_tabs[tabIndex(TabId::Calendar)] = std::make_unique<CalendarTab>(services.config, services.calendar);
-  m_tabs[tabIndex(TabId::Notifications)] =
-      std::make_unique<NotificationsTab>(services.notifications, services.platform);
-  m_tabs[tabIndex(TabId::Network)] =
-      std::make_unique<NetworkTab>(services.network, services.networkSecrets, services.externalIp, services.modem);
-  m_tabs[tabIndex(TabId::Bluetooth)] = std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent);
-  m_tabs[tabIndex(TabId::Monitor)] = std::make_unique<MonitorTab>(services.brightness, services.config);
-  m_tabs[tabIndex(TabId::System)] = std::make_unique<SystemTab>(services.sysmon);
-  m_tabs[tabIndex(TabId::ScreenTime)] = std::make_unique<ScreenTimeTab>(services.screenTime);
-  m_tabs[tabIndex(TabId::Power)] = std::make_unique<PowerTab>(services.upower, services.powerProfiles);
-  m_tabButtons.fill(nullptr);
-  m_tabContainers.fill(nullptr);
-  m_tabHeaderActions.fill(nullptr);
+  add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
+  add("system", std::make_unique<SystemTab>(services.sysmon, services));
+  add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
+  add(
+      "network",
+      std::make_unique<NetworkTab>(services.network, services.networkSecrets, services.externalIp, services.modem)
+  );
+  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent));
+  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
+  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
+  add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
+  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
+  add("launcher", std::make_unique<SettingsTab>(services, "launcher"));
+  add("dock", std::make_unique<SettingsTab>(services, "dock"));
+  add("desktop", std::make_unique<SettingsTab>(services, "desktop"));
+  add("panels", std::make_unique<SettingsTab>(services, "panels"));
+  add("osd", std::make_unique<SettingsTab>(services, "osd"));
+  add("screenshot", std::make_unique<SettingsTab>(services, "screenshot"));
+  add("shell", std::make_unique<SettingsTab>(services, "shell"));
+  add("keybinds", std::make_unique<SettingsTab>(services, "keybinds"));
+  add("security", std::make_unique<SettingsTab>(services, "security"));
+  add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
+  add("niri", std::make_unique<SettingsTab>(services, "niri"));
+  add("plugins", std::make_unique<SettingsTab>(services, "plugins"));
+  add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
 }
 
 float ControlCenterPanel::preferredWidth() const {
@@ -94,8 +296,8 @@ PanelPlacement ControlCenterPanel::panelPlacement() const noexcept {
 }
 
 bool ControlCenterPanel::dismissTransientUi() {
-  const std::size_t activeIdx = tabIndex(m_activeTab);
-  return m_tabs[activeIdx] != nullptr && m_tabs[activeIdx]->dismissTransientUi();
+  const auto* slot = slotById(m_activeTabId);
+  return slot != nullptr && slot->tab != nullptr && slot->tab->dismissTransientUi();
 }
 
 void ControlCenterPanel::create() {
@@ -104,9 +306,21 @@ void ControlCenterPanel::create() {
   m_compact = sidebarMode == ControlCenterSidebarMode::Compact;
   m_showSidebar = sidebarMode != ControlCenterSidebarMode::None;
 
-  for (auto& tab : m_tabs) {
-    tab->setContentScale(scale);
-    tab->setPanelCardOpacity(panelCardOpacity());
+  rebuildPluginSlots();
+
+  for (auto& slot : m_slots) {
+    if (slot.tab != nullptr) {
+      slot.tab->setContentScale(scale);
+      slot.tab->setPanelCardOpacity(panelCardOpacity());
+    }
+    if (!slot.plugin) {
+      for (const auto& spec : kBuiltinTabs) {
+        if (slot.id == spec.id) {
+          slot.title = builtinTitle(spec);
+          break;
+        }
+      }
+    }
   }
 
   auto rootLayout = ui::row({
@@ -150,6 +364,7 @@ void ControlCenterPanel::create() {
         .fillWidth = false,
         .fillHeight = true,
         .width = sidebarScrollWidth,
+        .flexGrow = 1.0F,
         .configure = [](ScrollView& scrollView) {
           scrollView.clearFill();
           scrollView.clearBorder();
@@ -174,21 +389,21 @@ void ControlCenterPanel::create() {
     sidebarNav->setGap(Style::spaceXs * scale);
     m_sidebarNav = sidebarNav.get();
 
-    for (const auto& tab : kTabs) {
-      const std::size_t idx = tabIndex(tab.id);
-      const auto onClick = [this, id = tab.id]() {
+    for (auto& slot : m_slots) {
+      const std::string id = slot.id;
+      const auto onClick = [this, id]() {
         selectTab(id, true);
         PanelManager::instance().refresh();
       };
       sidebarNav->addChild(
           ui::button({
-              .out = &m_tabButtons[idx],
-              .text = m_compact ? std::optional<std::string>{} : std::optional<std::string>{i18n::tr(tab.titleKey)},
-              .glyph = tab.glyph,
+              .out = &slot.button,
+              .text = m_compact ? std::optional<std::string>{} : std::optional<std::string>{slot.title},
+              .glyph = slot.glyph,
               .glyphSize = 21.0F * scale,
               .contentAlign = m_compact ? ButtonContentAlign::Center : ButtonContentAlign::Start,
               .variant = ButtonVariant::Tab,
-              .tooltip = m_compact ? i18n::tr(tab.titleKey) : std::string{},
+              .tooltip = m_compact ? slot.title : std::string{},
               .minWidth = m_compact ? std::optional<float>{Style::controlHeightSm * scale} : std::optional<float>{},
               .minHeight = Style::controlHeightSm * scale,
               .paddingV = Style::spaceXs * scale,
@@ -205,7 +420,7 @@ void ControlCenterPanel::create() {
               },
           })
       );
-      sidebarNav->registerItem(m_tabButtons[idx], onClick);
+      sidebarNav->registerItem(slot.button, onClick);
     }
 
     if (sidebarScroll->content() != nullptr) {
@@ -232,8 +447,7 @@ void ControlCenterPanel::create() {
   dismissArea->setFocusable(false);
   dismissArea->setTabStop(false);
   dismissArea->setOnPress([this](const InputArea::PointerData&) {
-    const std::size_t activeIdx = tabIndex(m_activeTab);
-    if (m_tabs[activeIdx] != nullptr && m_tabs[activeIdx]->dismissTransientUi()) {
+    if (dismissTransientUi()) {
       PanelManager::instance().refresh();
     }
   });
@@ -263,9 +477,12 @@ void ControlCenterPanel::create() {
       .gap = Style::spaceSm * scale,
   });
 
-  for (std::size_t i = 0; i < kTabCount; ++i) {
-    auto actions = m_tabs[i]->createHeaderActions();
-    m_tabHeaderActions[i] = actions.get();
+  for (auto& slot : m_slots) {
+    if (slot.tab == nullptr) {
+      continue;
+    }
+    auto actions = slot.tab->createHeaderActions();
+    slot.headerActions = actions.get();
     if (actions != nullptr) {
       actions->setVisible(false);
       m_contentHeaderActions->addChild(std::move(actions));
@@ -292,12 +509,15 @@ void ControlCenterPanel::create() {
       .flexGrow = 1.0F,
   });
 
-  for (std::size_t i = 0; i < kTabCount; ++i) {
-    auto container = m_tabs[i]->create();
+  for (auto& slot : m_slots) {
+    if (slot.tab == nullptr) {
+      continue;
+    }
+    auto container = slot.tab->create();
     container->setFlexGrow(1.0F);
     container->setParticipatesInLayout(false);
     container->setVisible(false);
-    m_tabContainers[i] = container.get();
+    slot.container = container.get();
     m_tabBodies->addChild(std::move(container));
   }
 
@@ -311,13 +531,13 @@ void ControlCenterPanel::create() {
 
   syncTabVisibility();
   m_firstOpenAfterCreate = true;
-  selectTab(m_activeTab);
+  selectTab(m_activeTabId);
 }
 
 void ControlCenterPanel::onPanelCardOpacityChanged(float opacity) {
-  for (auto& tab : m_tabs) {
-    if (tab != nullptr) {
-      tab->setPanelCardOpacity(opacity);
+  for (auto& slot : m_slots) {
+    if (slot.tab != nullptr) {
+      slot.tab->setPanelCardOpacity(opacity);
     }
   }
   if (m_sidebar != nullptr) {
@@ -336,6 +556,14 @@ void ControlCenterPanel::doLayout(Renderer& renderer, float width, float height)
 
   m_rootLayout->setSize(width, height);
   m_rootLayout->layout(renderer);
+
+  if (!m_compact && m_showSidebar && m_sidebarScrollView != nullptr) {
+    const float widthBefore = m_sidebarScrollView->width();
+    layoutFullSidebarWidth(renderer);
+    if (std::abs(m_sidebarScrollView->width() - widthBefore) > 0.5F) {
+      m_rootLayout->layout(renderer);
+    }
+  }
 
   const float contentInnerWidth =
       std::max(0.0F, m_content->width() - (m_content->paddingLeft() + m_content->paddingRight()));
@@ -364,44 +592,42 @@ void ControlCenterPanel::doLayout(Renderer& renderer, float width, float height)
     m_contentTitle->setMaxWidth(titleWidth);
   }
 
-  for (auto* container : m_tabContainers) {
-    if (container != nullptr && container->visible()) {
-      container->setSize(bodyWidth, bodyContentHeight);
+  for (auto& slot : m_slots) {
+    if (slot.container != nullptr && slot.container->visible()) {
+      slot.container->setSize(bodyWidth, bodyContentHeight);
     }
   }
 
   layoutTabContainers(bodyWidth, bodyHeight);
 
-  const auto layoutTab = [this, bodyWidth, bodyContentHeight, &renderer](TabId tabId) {
-    const std::size_t idx = tabIndex(tabId);
-    if (m_tabs[idx] == nullptr || m_tabContainers[idx] == nullptr || !m_tabContainers[idx]->visible()) {
+  const auto layoutSlot = [this, bodyWidth, bodyContentHeight, &renderer](std::string_view id) {
+    auto* slot = slotById(id);
+    if (slot == nullptr || slot->tab == nullptr || slot->container == nullptr || !slot->container->visible()) {
       return;
     }
-    m_tabs[idx]->layout(renderer, bodyWidth, bodyContentHeight);
+    slot->tab->layout(renderer, bodyWidth, bodyContentHeight);
   };
 
   if (m_tabTransitionActive) {
-    layoutTab(m_tabTransitionOutgoing);
+    layoutSlot(m_tabTransitionOutgoingId);
   }
-  layoutTab(m_activeTab);
+  layoutSlot(m_activeTabId);
 }
 
 void ControlCenterPanel::doUpdate(Renderer& renderer) {
-  if (!isTabFeatureAvailable(m_activeTab) || (!m_activeTabForced && !isTabVisible(m_activeTab))) {
+  if (!isTabFeatureAvailable(m_activeTabId) || (!m_activeTabForced && !isTabVisible(m_activeTabId))) {
     selectTab(firstVisibleTab());
   } else {
     syncTabVisibility();
   }
-  const std::size_t activeIdx = tabIndex(m_activeTab);
-  if (m_tabs[activeIdx] != nullptr) {
-    m_tabs[activeIdx]->update(renderer);
+  if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
+    slot->tab->update(renderer);
   }
 }
 
 void ControlCenterPanel::onFrameTick(float deltaMs) {
-  const std::size_t activeIdx = tabIndex(m_activeTab);
-  if (m_tabs[activeIdx] != nullptr) {
-    m_tabs[activeIdx]->onFrameTick(deltaMs);
+  if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
+    slot->tab->onFrameTick(deltaMs);
   }
 }
 
@@ -411,11 +637,38 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   }
   const bool animateTabSwitch = !m_firstOpenAfterCreate;
   m_firstOpenAfterCreate = false;
-  selectTab(tabFromContext(context), animateTabSwitch);
+  const auto settingsTarget = parseSettingsOpenContext(context);
+  const std::string tabId = settingsTarget.isSettings ? tabIdForSettingsSection(settingsTarget.section)
+                                                     : (context.empty() ? "home" : std::string(context));
+  selectTab(tabId, animateTabSwitch);
+  if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+    if (settingsTarget.isSettings) {
+      slot->tab->setConfigureMode(true);
+    } else if (isLiveSettingsHost(tabId)) {
+      slot->tab->setConfigureMode(false);
+    }
+  }
 }
 
 bool ControlCenterPanel::isContextActive(std::string_view context) const {
-  return m_activeTab == tabFromContext(context);
+  const auto settingsTarget = parseSettingsOpenContext(context);
+  if (settingsTarget.isSettings) {
+    if (settingsTarget.section.empty()) {
+      return isSettingsEditorTab(m_activeTabId);
+    }
+    const std::string tabId = tabIdForSettingsSection(settingsTarget.section);
+    if (m_activeTabId != tabId) {
+      return false;
+    }
+    if (isLiveSettingsHost(tabId)) {
+      if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+        return slot->tab->configureMode();
+      }
+      return false;
+    }
+    return true;
+  }
+  return (context.empty() ? "home" : context) == m_activeTabId;
 }
 
 bool ControlCenterPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
@@ -441,11 +694,18 @@ void ControlCenterPanel::onClose() {
     m_tabTransitionAnimId = 0;
   }
   m_tabTransitionActive = false;
-  m_activeTab = TabId::Home;
-  for (auto& tab : m_tabs) {
-    tab->setActive(false);
-    tab->onClose();
+  m_activeTabId = "home";
+  m_activeTabForced = false;
+  for (auto& slot : m_slots) {
+    if (slot.tab != nullptr) {
+      slot.tab->setActive(false);
+      slot.tab->onClose();
+    }
+    slot.button = nullptr;
+    slot.container = nullptr;
+    slot.headerActions = nullptr;
   }
+  std::erase_if(m_slots, [](const TabSlot& slot) { return slot.plugin; });
   m_rootLayout = nullptr;
   m_sidebar = nullptr;
   m_sidebarScrollView = nullptr;
@@ -459,131 +719,114 @@ void ControlCenterPanel::onClose() {
   m_contentTitle = nullptr;
   m_closeButton = nullptr;
   m_tabBodies = nullptr;
-  m_tabButtons.fill(nullptr);
-  m_tabContainers.fill(nullptr);
-  m_tabHeaderActions.fill(nullptr);
   clearReleasedRoot();
 }
 
 bool ControlCenterPanel::deferExternalRefresh() const {
-  if (m_activeTab != TabId::Audio) {
+  if (m_activeTabId != "audio") {
     return false;
   }
-  const auto* audioTab = dynamic_cast<const AudioTab*>(m_tabs[tabIndex(TabId::Audio)].get());
+  const auto* slot = slotById("audio");
+  const auto* audioTab = slot != nullptr ? dynamic_cast<const AudioTab*>(slot->tab.get()) : nullptr;
   return audioTab != nullptr && audioTab->dragging();
 }
 
 bool ControlCenterPanel::deferPointerRelayout() const { return deferExternalRefresh(); }
 
-bool ControlCenterPanel::isTabFeatureAvailable(TabId tab) const {
-  if (m_config == nullptr) {
-    switch (tab) {
-    case TabId::ScreenTime:
-      return false;
-    case TabId::Power:
-      return m_hasPowerServices;
-    default:
-      return true;
-    }
+bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
+  if (id == "niri") {
+    return compositors::isNiri();
   }
-  const auto& cfg = m_config->config();
-  switch (tab) {
-  case TabId::Weather:
-    return cfg.weather.enabled;
-  case TabId::ScreenTime:
-    return cfg.shell.screenTimeEnabled;
-  case TabId::System:
-    return cfg.system.monitor.enabled;
-  case TabId::Power:
-    return m_hasPowerServices;
-  default:
-    return true;
-  }
+  return true;
 }
 
-bool ControlCenterPanel::isTabVisible(TabId tab) const {
-  if (!isTabFeatureAvailable(tab)) {
+bool ControlCenterPanel::isTabVisible(std::string_view id) const {
+  if (!isTabFeatureAvailable(id)) {
     return false;
   }
-  // Home is always shown so the panel never opens to an empty surface.
-  if (tab == TabId::Home || m_config == nullptr) {
+  const auto* slot = slotById(id);
+  if (slot == nullptr) {
+    return false;
+  }
+  if (!slot->hideable || m_config == nullptr) {
     return true;
   }
-  const auto& hidden = m_config->config().controlCenter.hiddenTabs;
-  return !std::ranges::contains(hidden, tabKey(tab));
+  return !std::ranges::contains(m_config->config().controlCenter.hiddenTabs, id);
 }
 
-bool ControlCenterPanel::isTabShown(TabId tab) const {
-  if (tab == m_activeTab && m_activeTabForced) {
-    return isTabFeatureAvailable(tab);
+bool ControlCenterPanel::isTabShown(std::string_view id) const {
+  if (id == m_activeTabId && m_activeTabForced) {
+    return isTabFeatureAvailable(id);
   }
-  return isTabVisible(tab);
+  return isTabVisible(id);
 }
 
 std::vector<ControlCenterPanel::TabCatalogEntry> ControlCenterPanel::hideableTabCatalog() {
   std::vector<TabCatalogEntry> out;
-  out.reserve(kTabCount - 1);
-  for (const auto& meta : kTabs) {
-    if (meta.id == TabId::Home) {
+  out.reserve(std::size(kBuiltinTabs) - 1);
+  for (const auto& spec : kBuiltinTabs) {
+    if (!spec.hideable) {
       continue;
     }
-    out.push_back({.key = meta.key, .titleKey = meta.titleKey});
+    out.push_back({.key = spec.id, .title = builtinTitle(spec)});
+  }
+  auto& registry = scripting::PluginRegistry::instance();
+  registry.ensureScanned();
+  for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
+    if (resolved.manifest == nullptr || resolved.entry == nullptr) {
+      continue;
+    }
+    const auto chrome = pluginTabChrome(resolved);
+    out.push_back({.key = resolved.fullId(), .title = chrome.title});
   }
   return out;
 }
 
-std::string_view ControlCenterPanel::tabKey(TabId tab) {
-  for (const auto& meta : kTabs) {
-    if (meta.id == tab) {
-      return meta.key;
+std::string ControlCenterPanel::firstVisibleTab() const {
+  for (const auto& slot : m_slots) {
+    if (isTabVisible(slot.id)) {
+      return slot.id;
     }
   }
-  return {};
-}
-
-ControlCenterPanel::TabId ControlCenterPanel::firstVisibleTab() const {
-  for (const auto& meta : kTabs) {
-    if (isTabVisible(meta.id)) {
-      return meta.id;
-    }
-  }
-  return TabId::Home;
+  return "home";
 }
 
 void ControlCenterPanel::syncTabVisibility() {
-  for (const auto& meta : kTabs) {
-    const std::size_t idx = tabIndex(meta.id);
-    const bool visible = isTabShown(meta.id);
-    if (m_tabButtons[idx] != nullptr) {
-      m_tabButtons[idx]->setVisible(visible);
+  for (auto& slot : m_slots) {
+    const bool visible = isTabShown(slot.id);
+    if (slot.button != nullptr) {
+      slot.button->setVisible(visible);
     }
     if (!visible) {
-      if (m_tabContainers[idx] != nullptr) {
-        m_tabContainers[idx]->setVisible(false);
+      if (slot.container != nullptr) {
+        slot.container->setVisible(false);
       }
-      if (m_tabHeaderActions[idx] != nullptr) {
-        m_tabHeaderActions[idx]->setVisible(false);
+      if (slot.headerActions != nullptr) {
+        slot.headerActions->setVisible(false);
       }
     }
   }
 }
 
-void ControlCenterPanel::updateTabChrome(TabId tab) {
-  for (const auto& meta : kTabs) {
-    const std::size_t idx = tabIndex(meta.id);
-    const bool tabEnabled = isTabShown(meta.id);
-    if (m_tabs[idx] != nullptr) {
-      m_tabs[idx]->setActive(tabEnabled && meta.id == tab);
+void ControlCenterPanel::updateTabChrome(std::string_view id) {
+  for (auto& slot : m_slots) {
+    const bool tabEnabled = isTabShown(slot.id);
+    const bool active = tabEnabled && slot.id == id;
+    if (slot.tab != nullptr) {
+      slot.tab->setActive(active);
+      if (!active) {
+        slot.tab->setConfigureMode(false);
+      }
     }
-    if (m_tabButtons[idx] != nullptr) {
-      m_tabButtons[idx]->setVisible(tabEnabled);
-      m_tabButtons[idx]->setVariant(meta.id == tab ? ButtonVariant::TabActive : ButtonVariant::Tab);
+    if (slot.button != nullptr) {
+      slot.button->setVisible(tabEnabled);
+      slot.button->setVariant(active ? ButtonVariant::TabActive : ButtonVariant::Tab);
     }
-    if (meta.id == tab && m_contentTitle != nullptr) {
-      m_contentTitle->setText(i18n::tr(meta.titleKey));
+    if (active && m_contentTitle != nullptr) {
+      m_contentTitle->setText(slot.title);
     }
-    if (m_tabHeaderActions[idx] != nullptr) {
-      m_tabHeaderActions[idx]->setVisible(tabEnabled && meta.id == tab);
+    if (slot.headerActions != nullptr) {
+      slot.headerActions->setVisible(active);
     }
   }
 
@@ -598,12 +841,10 @@ void ControlCenterPanel::updateTabChrome(TabId tab) {
   }
 }
 
-void ControlCenterPanel::applyTabContainerVisibility(TabId activeTab) {
-  for (const auto& meta : kTabs) {
-    const std::size_t idx = tabIndex(meta.id);
-    const bool tabEnabled = isTabShown(meta.id);
-    if (m_tabContainers[idx] != nullptr) {
-      m_tabContainers[idx]->setVisible(tabEnabled && meta.id == activeTab);
+void ControlCenterPanel::applyTabContainerVisibility(std::string_view activeId) {
+  for (auto& slot : m_slots) {
+    if (slot.container != nullptr) {
+      slot.container->setVisible(isTabShown(slot.id) && slot.id == activeId);
     }
   }
 }
@@ -611,8 +852,8 @@ void ControlCenterPanel::applyTabContainerVisibility(TabId activeTab) {
 void ControlCenterPanel::layoutTabContainers(float bodyWidth, float bodyHeight) {
   const float travel = bodyHeight > 0.0F ? bodyHeight : 0.0F;
   const float contentHeight = tabContentHeight(bodyHeight);
-  for (std::size_t i = 0; i < kTabCount; ++i) {
-    auto* container = m_tabContainers[i];
+  for (auto& slot : m_slots) {
+    auto* container = slot.container;
     if (container == nullptr || !container->visible()) {
       continue;
     }
@@ -621,13 +862,12 @@ void ControlCenterPanel::layoutTabContainers(float bodyWidth, float bodyHeight) 
 
     float offsetY = 0.0F;
     float opacity = 1.0F;
-    const auto tabId = static_cast<TabId>(i);
     if (m_tabTransitionActive && travel > 0.0F) {
       const auto direction = static_cast<float>(m_tabTransitionDirection);
-      if (tabId == m_tabTransitionOutgoing) {
+      if (slot.id == m_tabTransitionOutgoingId) {
         offsetY = -direction * travel * m_tabTransitionProgress;
         opacity = 1.0F - 0.3F * m_tabTransitionProgress;
-      } else if (tabId == m_activeTab) {
+      } else if (slot.id == m_activeTabId) {
         offsetY = direction * travel * (1.0F - m_tabTransitionProgress);
         opacity = 0.7F + 0.3F * m_tabTransitionProgress;
       }
@@ -636,7 +876,7 @@ void ControlCenterPanel::layoutTabContainers(float bodyWidth, float bodyHeight) 
     container->setPosition(0.0F, offsetY);
     container->setOpacity(opacity);
     if (m_tabTransitionActive) {
-      container->setZIndex(tabId == m_activeTab ? 1 : 0);
+      container->setZIndex(slot.id == m_activeTabId ? 1 : 0);
     } else {
       container->setZIndex(0);
     }
@@ -644,23 +884,23 @@ void ControlCenterPanel::layoutTabContainers(float bodyWidth, float bodyHeight) 
 }
 
 void ControlCenterPanel::resetTabContainerTransforms() {
-  for (auto* container : m_tabContainers) {
-    if (container == nullptr) {
+  for (auto& slot : m_slots) {
+    if (slot.container == nullptr) {
       continue;
     }
-    container->setPosition(0.0F, 0.0F);
-    container->setOpacity(1.0F);
-    container->setZIndex(0);
+    slot.container->setPosition(0.0F, 0.0F);
+    slot.container->setOpacity(1.0F);
+    slot.container->setZIndex(0);
   }
 }
 
-int ControlCenterPanel::visibleTabOrdinal(TabId tab) const {
+int ControlCenterPanel::visibleTabOrdinal(std::string_view id) const {
   int ordinal = 0;
-  for (const auto& meta : kTabs) {
-    if (!isTabShown(meta.id)) {
+  for (const auto& slot : m_slots) {
+    if (!isTabShown(slot.id)) {
       continue;
     }
-    if (meta.id == tab) {
+    if (slot.id == id) {
       return ordinal;
     }
     ++ordinal;
@@ -675,7 +915,7 @@ void ControlCenterPanel::applyTabTransitionLayout() {
   layoutTabContainers(m_tabBodies->width(), m_tabBodies->height());
 }
 
-void ControlCenterPanel::startTabTransition(TabId from, TabId to) {
+void ControlCenterPanel::startTabTransition(std::string_view from, std::string_view to) {
   if (m_animations == nullptr || m_tabBodies == nullptr) {
     applyTabContainerVisibility(to);
     resetTabContainerTransforms();
@@ -683,20 +923,18 @@ void ControlCenterPanel::startTabTransition(TabId from, TabId to) {
   }
 
   m_tabTransitionActive = true;
-  m_tabTransitionOutgoing = from;
+  m_tabTransitionOutgoingId = std::string(from);
   m_tabTransitionProgress = 0.0F;
 
   const int fromOrdinal = visibleTabOrdinal(from);
   const int toOrdinal = visibleTabOrdinal(to);
   m_tabTransitionDirection = toOrdinal >= fromOrdinal ? 1 : -1;
 
-  for (const auto& meta : kTabs) {
-    const std::size_t idx = tabIndex(meta.id);
-    if (m_tabContainers[idx] == nullptr || !isTabVisible(meta.id)) {
+  for (auto& slot : m_slots) {
+    if (slot.container == nullptr) {
       continue;
     }
-    const bool show = meta.id == from || meta.id == to;
-    m_tabContainers[idx]->setVisible(show);
+    slot.container->setVisible(slot.id == from || slot.id == to);
   }
 
   applyTabTransitionLayout();
@@ -724,22 +962,33 @@ void ControlCenterPanel::startTabTransition(TabId from, TabId to) {
 void ControlCenterPanel::finishTabTransition() {
   m_tabTransitionActive = false;
   resetTabContainerTransforms();
-  applyTabContainerVisibility(m_activeTab);
+  applyTabContainerVisibility(m_activeTabId);
 }
 
 void ControlCenterPanel::wireSidebarScroll(InputArea* area) {
   if (area == nullptr) {
     return;
   }
-  area->setOnAxis([this](const InputArea::PointerData& data) {
+  area->setOnAxisHandler([this](const InputArea::PointerData& data) {
     if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL) {
-      return;
+      return false;
+    }
+    if (m_sidebarScrollView != nullptr && m_sidebarScrollView->scrollable()) {
+      const float delta = data.scrollDelta(Style::scrollWheelStep);
+      if (data.axisSource == WL_POINTER_AXIS_SOURCE_FINGER) {
+        m_sidebarScrollView->setScrollOffset(m_sidebarScrollView->scrollOffset() + delta);
+      } else {
+        m_sidebarScrollView->scrollBy(delta);
+      }
+      PanelManager::instance().requestRedraw();
+      return true;
     }
     const float steps = data.scrollSteps();
     if (steps == 0.0F) {
-      return;
+      return false;
     }
     selectAdjacentVisibleTab(steps > 0.0F ? 1 : -1);
+    return true;
   });
 }
 
@@ -748,33 +997,41 @@ void ControlCenterPanel::selectAdjacentVisibleTab(int direction) {
     return;
   }
 
-  const int activeOrdinal = visibleTabOrdinal(m_activeTab);
-  const int targetOrdinal = activeOrdinal + direction;
-
-  int ordinal = 0;
-  for (const auto& meta : kTabs) {
-    if (!isTabShown(meta.id)) {
-      continue;
+  std::vector<std::string> visible;
+  for (const auto& slot : m_slots) {
+    if (isTabShown(slot.id)) {
+      visible.push_back(slot.id);
     }
-    if (ordinal == targetOrdinal) {
-      if (meta.id != m_activeTab) {
-        selectTab(meta.id, true);
-        PanelManager::instance().refresh();
-      }
-      return;
-    }
-    ++ordinal;
   }
+  if (visible.empty()) {
+    return;
+  }
+
+  int activeOrdinal = 0;
+  for (int i = 0; i < static_cast<int>(visible.size()); ++i) {
+    if (visible[static_cast<std::size_t>(i)] == m_activeTabId) {
+      activeOrdinal = i;
+      break;
+    }
+  }
+
+  const int targetOrdinal = activeOrdinal + direction;
+  if (targetOrdinal < 0 || targetOrdinal >= static_cast<int>(visible.size())) {
+    return;
+  }
+  selectTab(visible[static_cast<std::size_t>(targetOrdinal)], true);
+  PanelManager::instance().refresh();
 }
 
-void ControlCenterPanel::selectTab(TabId tab, bool animated) {
-  if (!isTabFeatureAvailable(tab)) {
-    tab = firstVisibleTab();
+void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
+  std::string target(id);
+  if (slotById(target) == nullptr || !isTabFeatureAvailable(target)) {
+    target = firstVisibleTab();
   }
-  m_activeTabForced = !isTabVisible(tab);
+  m_activeTabForced = !isTabVisible(target);
 
-  const TabId previousTab = m_activeTab;
-  const bool tabChanged = tab != previousTab;
+  const std::string previous = m_activeTabId;
+  const bool tabChanged = target != previous;
 
   if (m_tabTransitionAnimId != 0 && m_animations != nullptr) {
     m_animations->cancel(m_tabTransitionAnimId);
@@ -782,26 +1039,26 @@ void ControlCenterPanel::selectTab(TabId tab, bool animated) {
     finishTabTransition();
   }
 
-  m_activeTab = tab;
-  if (tab == TabId::Notifications && m_notificationManager != nullptr) {
+  m_activeTabId = target;
+  if (target == "notifications" && m_notificationManager != nullptr) {
     m_notificationManager->markNotificationHistorySeen();
   }
 
-  updateTabChrome(tab);
+  updateTabChrome(target);
 
   if (tabChanged && animated && m_animations != nullptr && m_tabBodies != nullptr) {
-    startTabTransition(previousTab, tab);
+    startTabTransition(previous, target);
   } else {
     m_tabTransitionActive = false;
-    applyTabContainerVisibility(tab);
+    applyTabContainerVisibility(target);
     resetTabContainerTransforms();
   }
 
-  scheduleMprisRefreshFor(tab);
+  scheduleMprisRefreshFor(target);
 }
 
-void ControlCenterPanel::scheduleMprisRefreshFor(TabId tab) {
-  if (m_mpris == nullptr || m_mprisRefreshScheduled || (tab != TabId::Home && tab != TabId::Media)) {
+void ControlCenterPanel::scheduleMprisRefreshFor(std::string_view id) {
+  if (m_mpris == nullptr || m_mprisRefreshScheduled || (id != "home" && id != "media")) {
     return;
   }
 
@@ -827,8 +1084,11 @@ bool ControlCenterPanel::isDirectSectionOpenContext(std::string_view context) co
   if (context.empty() || context == "home") {
     return false;
   }
-  for (const auto& tab : kTabs) {
-    if (tab.id != TabId::Home && context == tab.key) {
+  if (context == "settings" || context.find(':') != std::string_view::npos) {
+    return true;
+  }
+  for (const auto& spec : kBuiltinTabs) {
+    if (spec.hideable && context == spec.id) {
       return true;
     }
   }
@@ -843,17 +1103,6 @@ ControlCenterSidebarMode ControlCenterPanel::sidebarModeForOpen(std::string_view
   return isDirectSectionOpenContext(context) ? cc.sidebarSectionMode : cc.sidebarMode;
 }
 
-ControlCenterPanel::TabId ControlCenterPanel::tabFromContext(std::string_view context) const {
-  for (const auto& tab : kTabs) {
-    if (context == tab.key) {
-      return tab.id;
-    }
-  }
-  return TabId::Home;
-}
-
-std::size_t ControlCenterPanel::tabIndex(TabId id) { return static_cast<std::size_t>(id); }
-
 void ControlCenterPanel::layoutFullSidebarWidth(Renderer& renderer) {
   if (m_sidebarScrollView == nullptr || m_sidebarNav == nullptr) {
     return;
@@ -866,18 +1115,17 @@ void ControlCenterPanel::layoutFullSidebarWidth(Renderer& renderer) {
   const float glyphW = 21.0F * scale;
 
   float maxTabWidth = 0.0F;
-  for (const auto& meta : kTabs) {
-    if (!isTabVisible(meta.id)) {
+  for (const auto& slot : m_slots) {
+    if (!isTabVisible(slot.id)) {
       continue;
     }
-    const TextMetrics text = renderer.measureText(i18n::tr(meta.titleKey), fontSize, FontWeight::Bold);
+    const TextMetrics text = renderer.measureText(slot.title, fontSize, FontWeight::Bold);
     maxTabWidth = std::max(maxTabWidth, paddingH + glyphW + gap + text.width);
   }
 
   const float minWidth = Style::controlHeightSm * scale;
   const float contentWidth = std::max(minWidth, std::ceil(maxTabWidth));
 
-  // Scrollbar gutter lives inside the scroll viewport; reserve it only when the nav overflows.
   float targetWidth = contentWidth;
   const float scrollHeight = m_sidebarScrollView->height();
   if (scrollHeight > 0.0F) {
@@ -921,4 +1169,70 @@ void ControlCenterPanel::scrollFocusedInputIntoView(InputArea* area) {
     scrollNodeIntoScrollView(*scrollView, nullptr, *area, Style::spaceMd * contentScale());
     PanelManager::instance().requestLayout();
   }
+}
+
+void ControlCenterPanel::rebuildPluginSlots() {
+  const std::string previouslyActive = m_activeTabId;
+  std::erase_if(m_slots, [](const TabSlot& slot) { return slot.plugin; });
+  if (m_scriptApi == nullptr) {
+    if (slotById(previouslyActive) == nullptr) {
+      m_activeTabId = firstVisibleTab();
+    }
+    return;
+  }
+
+  auto& registry = scripting::PluginRegistry::instance();
+  registry.ensureScanned();
+  const auto& pluginSettings =
+      m_config != nullptr ? m_config->config().plugins.pluginSettings
+                          : std::unordered_map<std::string, std::unordered_map<std::string, WidgetSettingValue>>{};
+  static const std::unordered_map<std::string, WidgetSettingValue> kNoOverrides;
+
+  for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
+    if (resolved.entry == nullptr || resolved.manifest == nullptr) {
+      continue;
+    }
+    const auto psIt = pluginSettings.find(resolved.manifest->id);
+    const auto& overrides = psIt != pluginSettings.end() ? psIt->second : kNoOverrides;
+    auto seeded = scripting::seedEntrySettings(*resolved.entry, overrides);
+    scripting::mergePluginSettings(*resolved.manifest, overrides, seeded);
+
+    const auto chrome = pluginTabChrome(resolved);
+
+    TabSlot slot;
+    slot.id = resolved.fullId();
+    slot.title = chrome.title;
+    slot.glyph = chrome.glyph;
+    slot.hideable = true;
+    slot.plugin = true;
+    slot.tab = std::make_unique<PluginControlCenterTab>(scripting::PluginRuntimeContext{
+        .entryId = slot.id,
+        .sourcePath = resolved.sourcePath,
+        .pluginDir = resolved.pluginDir,
+        .settings = std::move(seeded),
+        .scriptApi = *m_scriptApi,
+        .fileWatcher = m_fileWatcher,
+        .httpClient = m_httpClient,
+        .clipboard = m_clipboard,
+        .platform = m_platform,
+    });
+    m_slots.push_back(std::move(slot));
+  }
+
+  if (slotById(previouslyActive) == nullptr) {
+    m_activeTabId = firstVisibleTab();
+  }
+}
+
+ControlCenterPanel::TabSlot* ControlCenterPanel::slotById(std::string_view id) {
+  return const_cast<TabSlot*>(std::as_const(*this).slotById(id));
+}
+
+const ControlCenterPanel::TabSlot* ControlCenterPanel::slotById(std::string_view id) const {
+  for (const auto& slot : m_slots) {
+    if (slot.id == id) {
+      return &slot;
+    }
+  }
+  return nullptr;
 }

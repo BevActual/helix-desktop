@@ -1,9 +1,11 @@
 #pragma once
 
 #include "core/frame_rate_limiter.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <chrono>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -12,16 +14,20 @@ class Glyph;
 class Graph;
 class Label;
 class SystemMonitorService;
+struct ControlCenterServices;
 
 class SystemTab : public Tab {
 public:
-  explicit SystemTab(SystemMonitorService* monitor);
+  SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services);
   ~SystemTab() override;
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setActive(bool active) override;
   void onFrameTick(float deltaMs) override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -34,6 +40,7 @@ private:
   [[nodiscard]] float scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const;
 
   SystemMonitorService* m_monitor;
+  std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
   bool m_statsRetained = false;
   bool m_graphInitialized = false;

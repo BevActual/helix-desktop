@@ -16,6 +16,7 @@ Pass a context to jump straight to a tab:
 ```sh
 noctalia msg panel-toggle control-center audio
 noctalia msg panel-open control-center system
+noctalia msg panel-toggle control-center author/plugin:displays
 ```
 
 ## Sidebar
@@ -54,21 +55,43 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
 | `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons |
-| `media` | Media | MPRIS players, playback controls, queue-style player switching, and artwork |
-| `audio` | Audio | Output/input volume, mute controls, devices, streams, and media-related audio controls |
-| `monitor` | Monitor | Brightness controls for displays that expose writable backlight devices |
-| `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details |
+| `appearance` | Appearance | Theme, palette, fonts, and the rest of appearance settings |
+| `wallpaper` | Wallpaper | Wallpaper directories, cycling, and per-monitor wallpaper |
+| `templates` | Templates | Color templates and community palettes |
+| `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides |
+| `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
+| `audio` | Audio | Output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
+| `monitor` | Monitor | Per-display brightness plus, on niri, resolution, refresh rate, scale, rotation, VRR, and arrangement. Header gear opens brightness service settings. |
+| `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Header gear opens battery warnings and system monitor settings. |
 | `network` | Network | Wi-Fi state, connection status, cellular controls, known wireless controls, and NetworkManager-backed actions |
 | `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, and pairing flows |
-| `weather` | Weather | Current conditions, forecast, location status, and weather service diagnostics |
-| `calendar` | Calendar | Month view and configured calendar account events |
-| `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup controls |
-| `screen-time` | Screen Time | Foreground app usage totals and charts for today, three days, or fourteen days |
-| `power` | Power | Battery charge and status, power profiles, battery health, and connected-device battery levels |
+| `weather` | Weather | Current conditions and forecast. Header gear opens location, weather, and night-light settings. |
+| `calendar` | Calendar | Month view and configured calendar account events. Header gear opens calendar format settings. |
+| `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Header gear opens daemon, toast, history, and filter settings. |
+| `screen-time` | Screen Time | Foreground app usage totals and charts. Header gear opens the screen-time enable toggle and reset. |
+| `power` | Power | Battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
+| `launcher` | Launcher | Launcher appearance and providers |
+| `dock` | Dock | Dock placement and behavior |
+| `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
+| `panels` | Panels | Shared panel placement and chrome |
+| `osd` | OSD | On-screen display volume and brightness popups |
+| `screenshot` | Screenshot | Screenshot capture, annotation, and output |
+| `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
+| `keybinds` | Keybinds | Shell keybind actions |
+| `security` | Security | Lock screen and authentication |
+| `hooks` | Hooks | Startup and event hooks |
+| `niri` | Niri | niri-specific options. Shown only in a niri session. |
+| `plugins` | Plugins | Opens the Settings window for the plugin store and per-plugin settings |
+| `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
 
-`weather`, `system`, and `screen-time` open only when their corresponding services are enabled; `power` opens only when UPower or `power-profiles-daemon` is available. Otherwise Noctalia falls back to the first visible tab.
+`niri` is listed only in a niri session. The Weather, System, Power, and Screen Time tabs stay available so you can turn those features on from the tab itself.
 
-Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"` for the brightness tab). Hidden tabs drop from both the sidebar and keyboard navigation.
+Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
+one list, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
+(`author/plugin:entry`). Hide any of them except Home via `hidden_tabs` or **Control Center → Control Center**.
+See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center-tabs).
+
+Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
 
 ## Home
 
@@ -92,7 +115,9 @@ The Audio tab groups PipeWire output, input, device, and stream controls. Use it
 
 ## Monitor
 
-The Monitor tab exposes brightness controls when Noctalia has a controllable backlight for the display. If no writable brightness device is available, the tab remains available but has no write controls to expose.
+The Monitor tab lists connected displays. Brightness sliders appear when Noctalia has a writable backlight (including DDC/CI when that is enabled). On niri, each display also gets resolution, refresh rate, scale, rotation, and optional VRR controls, plus an arrangement pad when two or more outputs are enabled.
+
+Those niri changes are temporary: they apply through compositor IPC and are forgotten when niri reloads its config. The header refresh button re-reads the current output state (and re-runs DDC/CI detect when that backend is enabled).
 
 ## System
 
@@ -170,7 +195,17 @@ The Screen Time tab shows how long each application was in the foreground today.
 
 Open it from the control center sidebar (`screen-time` context) or add a Home shortcut with `type = "screen_time"`.
 
-Reset stored history from **Settings → System → Screen Time → Reset Screen Time Data** (clears `screen_time.json` while Noctalia is running).
+Reset stored history from the Screen Time tab header gear (**Screen Time** settings) or the Settings window (**System → Screen Time → Reset Screen Time Data**). That clears `screen_time.json` while Noctalia is running.
+
+## Settings
+
+Settings pages are Control Center tabs. Appearance, Bar, Wallpaper, and the rest of the editor sit in the sidebar next to Media and Weather. Domain options that belong with a live view are on that tab instead: header gear on Weather, Notifications, Power, System, Calendar, Audio, Monitor, Media, and Screen Time.
+
+The header Advanced toggle shows advanced settings. The header link still opens the Settings window for the plugin store, bar widget inspectors, and other editors that need that larger surface.
+
+Open Appearance with `noctalia msg panel-toggle control-center settings`, the Home gear, or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab, settings view).
+
+The Niri page is shown only when the session is running under niri.
 
 ## Power
 

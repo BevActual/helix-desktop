@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render/animation/animation_manager.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "system/icon_resolver.h"
 
@@ -14,6 +15,7 @@
 
 class NotificationManager;
 class CompositorPlatform;
+struct ControlCenterServices;
 struct NotificationHistoryEntry;
 class Button;
 class Segmented;
@@ -23,12 +25,14 @@ class NotificationHistoryAdapter;
 
 class NotificationsTab : public Tab {
 public:
-  NotificationsTab(NotificationManager* notifications, CompositorPlatform* platform);
+  NotificationsTab(NotificationManager* notifications, CompositorPlatform* platform, const ControlCenterServices& services);
   ~NotificationsTab() override;
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   void onPanelCardOpacityChanged(float opacity) override;
@@ -53,6 +57,7 @@ private:
 
   NotificationManager* m_notifications = nullptr;
   CompositorPlatform* m_platform = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
   IconResolver m_iconResolver;
   std::unique_ptr<NotificationHistoryAdapter> m_adapter;
   std::vector<const NotificationHistoryEntry*> m_filtered;

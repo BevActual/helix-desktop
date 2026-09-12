@@ -6,6 +6,7 @@
 #include "render/core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_content.h"
 #include "system/app_identity.h"
@@ -126,7 +127,11 @@ namespace {
 
 } // namespace
 
-ScreenTimeTab::ScreenTimeTab(ScreenTimeService* screenTime) : m_screenTime(screenTime) {}
+ScreenTimeTab::ScreenTimeTab(ScreenTimeService* screenTime, const ControlCenterServices& services)
+    : m_screenTime(screenTime),
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "system", .includedGroups = {"screen-time"}}
+      )) {}
 
 std::unique_ptr<Flex> ScreenTimeTab::create() {
   const float scale = contentScale();
@@ -486,8 +491,16 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
     m_lastSnapshotKey.clear();
     PanelManager::instance().requestUpdateOnly();
   });
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
+
+std::unique_ptr<Flex> ScreenTimeTab::createHeaderActions() {
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void ScreenTimeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool ScreenTimeTab::configureMode() const { return m_settings->configureMode(); }
 
 void ScreenTimeTab::cancelRangeSlide() {
   const bool wasAnimating = m_rangeSlideAnimId != 0;
@@ -590,6 +603,7 @@ void ScreenTimeTab::beginRangeSlideIn() {
 }
 
 void ScreenTimeTab::onClose() {
+  m_settings->onClose();
   cancelRangeSlide();
   m_root = nullptr;
   m_scroll = nullptr;
@@ -651,6 +665,9 @@ void ScreenTimeTab::syncEnabledUi() {
 }
 
 void ScreenTimeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_root == nullptr) {
     return;
   }

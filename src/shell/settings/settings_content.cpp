@@ -1268,6 +1268,9 @@ namespace settings {
           && !settingEntryMatchesBarNavigation(entry, selectedBarName, selectedMonitorMatch)) {
         return false;
       }
+      if (!ctx.includedGroups.empty() && !ctx.includedGroups.contains(entry.group)) {
+        return false;
+      }
       if (!ctx.showAdvanced && entry.advanced) {
         return false;
       }

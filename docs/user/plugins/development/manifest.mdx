@@ -48,7 +48,8 @@ optional settings schema. The supported entry kinds:
 | Table | Kind | Runs |
 |-------|------|------|
 | `[[widget]]` | Bar widget | Placed on a bar; ticks + handles clicks/IPC |
-| `[[shortcut]]` | Control-center tile | A toggle tile in the control center |
+| `[[shortcut]]` | Control-center tile | A toggle tile on the Control Center Home tab |
+| `[[control_center_tab]]` | Control Center tab | A sidebar page in Control Center; declares its UI as a `ui.*` tree |
 | `[[launcher_provider]]` | Launcher provider | Answers launcher queries with results, behind a prefix |
 | `[[desktop_widget]]` | Desktop widget | A tile on the desktop; declares its UI as a `ui.*` tree |
 | `[[panel]]` | Panel | A pop-up surface; declares its UI as a `ui.*` tree, opened by id |
@@ -72,6 +73,30 @@ entry = "widget.luau"
 id    = "ticker"
 entry = "ticker.luau"
 ```
+
+### Control Center tabs
+
+A `[[control_center_tab]]` entry is a Control Center sidebar page, the same kind of entry as Home or Monitor:
+enable the plugin, and it joins the same list. Hide it from **Settings → Control Center** (it uses the
+full entry id in `[control_center].hidden_tabs`). Requires
+<PluginApiBadge feature="control-center-tab" />.
+
+```toml
+[[control_center_tab]]
+id        = "displays"
+entry     = "tab.luau"
+glyph     = "device-desktop"   # optional; defaults to the plugin icon, or "puzzle"
+title_key = "tab.displays"     # optional plugin translation key; otherwise the plugin name
+```
+
+The script draws the tab body with `controlCenterTab.render(ui.column{...})`. The host keeps the Control Center
+window, sidebar, and keyboard navigation. Open the tab with:
+
+```sh
+noctalia msg panel-toggle control-center me/hello:displays
+```
+
+Tab-specific options belong in a plugin-level `[[setting]]`, not `[[control_center_tab.setting]]`.
 
 ### Widget gesture defaults
 
@@ -107,8 +132,8 @@ resolve - reading an undeclared key logs a loud warning and returns `nil` (no si
 Settings come in two scopes:
 
 - **Plugin-level** - a `[[setting]]` block at the **manifest root**. One shared set for the whole plugin, edited under
-  **Settings → Plugins** (the gear on the plugin's row), and seeded into **every** entry - widget, shortcut, panel, and
-  service. Use this for configuration the service or panel needs.
+  **Settings → Plugins** (the gear on the plugin's row), and seeded into **every** entry - widget, shortcut, panel,
+  Control Center tab, and service. Use this for configuration the service, panel, or tab needs.
 - **Widget entry settings** - a `[[<entry>.setting]]` block under a `[[widget]]`. These are edited with the bar widget's
   own settings. Use this for widget presentation tweaks; they are not a second enabled plugin instance.
 - **Panel entry settings** - a `[[panel.setting]]` block under a `[[panel]]`. These also appear in **Settings → Plugins**

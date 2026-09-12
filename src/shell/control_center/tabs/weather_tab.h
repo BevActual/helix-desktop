@@ -2,10 +2,12 @@
 
 #include "render/animation/animation_manager.h"
 #include "render/core/render_styles.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <array>
 #include <cstdint>
+#include <memory>
 
 class EffectNode;
 class Flex;
@@ -17,14 +19,18 @@ class Segmented;
 class WeatherService;
 class ConfigService;
 struct WeatherSnapshot;
+struct ControlCenterServices;
 
 class WeatherTab : public Tab {
 public:
-  WeatherTab(WeatherService* weather, ConfigService* config);
+  WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void onFrameTick(float deltaMs) override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   enum class ForecastView : std::uint8_t {
@@ -53,6 +59,7 @@ private:
 
   WeatherService* m_weather = nullptr;
   ConfigService* m_config = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
   Flex* m_rootLayout = nullptr;
   Flex* m_leftColumn = nullptr;
   Flex* m_currentCard = nullptr;

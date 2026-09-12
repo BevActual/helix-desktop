@@ -1,0 +1,164 @@
+#include "system/display_config_service.h"
+
+#include "compositors/compositor_detect.h"
+#include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_runtime.h"
+#include "core/log.h"
+
+#include <algorithm>
+#include <format>
+
+namespace {
+
+  constexpr Logger kLog{"display_config"};
+  constexpr std::string_view kOutputsRequest = "\"Outputs\"\n";
+
+  [[nodiscard]] std::string outputFingerprint(const display_config::Output& output) {
+    return std::format(
+        "{};{};{};{}x{}@{};{:.4f};{};{},{};{};{};", output.name, output.enabled ? 1 : 0, output.vrrEnabled ? 1 : 0,
+        output.current.width, output.current.height, output.current.refreshMilliHz, output.scale,
+        static_cast<int>(output.transform), output.x, output.y, output.logicalWidth, output.logicalHeight
+    );
+  }
+
+} // namespace
+
+DisplayConfigService::DisplayConfigService(CompositorPlatform& platform) : m_platform(platform) {
+  if (available()) {
+    refresh();
+  }
+}
+
+bool DisplayConfigService::available() const noexcept {
+  return compositors::isNiri() && m_platform.niriRuntime().available();
+}
+
+const display_config::Output* DisplayConfigService::findOutput(std::string_view name) const {
+  const auto it = std::ranges::find_if(m_outputs, [&](const display_config::Output& output) {
+    return output.name == name;
+  });
+  if (it == m_outputs.end()) {
+    return nullptr;
+  }
+  return &*it;
+}
+
+std::size_t DisplayConfigService::enabledCount() const noexcept {
+  return static_cast<std::size_t>(std::ranges::count_if(m_outputs, [](const display_config::Output& output) {
+    return output.enabled;
+  }));
+}
+
+std::string DisplayConfigService::fingerprint() const {
+  std::string key;
+  for (const auto& output : m_outputs) {
+    key += outputFingerprint(output);
+  }
+  return key;
+}
+
+void DisplayConfigService::refresh() {
+  if (!available()) {
+    if (!m_outputs.empty()) {
+      m_outputs.clear();
+      if (m_changeCallback) {
+        m_changeCallback();
+      }
+    }
+    return;
+  }
+
+  const auto reply = m_platform.niriRuntime().requestJson(kOutputsRequest);
+  if (!reply.has_value()) {
+    m_lastError = "niri outputs query failed";
+    kLog.warn("{}", m_lastError);
+    return;
+  }
+  if (const auto error = display_config::parseError(*reply); !error.empty()) {
+    m_lastError = error;
+    kLog.warn("niri outputs query error: {}", m_lastError);
+    return;
+  }
+
+  auto next = display_config::parseOutputsReply(*reply);
+  if (next == m_outputs) {
+    return;
+  }
+  m_outputs = std::move(next);
+  m_lastError.clear();
+  if (m_changeCallback) {
+    m_changeCallback();
+  }
+}
+
+bool DisplayConfigService::setMode(std::string_view name, int width, int height, std::uint32_t refreshMilliHz) {
+  const double refreshHz = static_cast<double>(refreshMilliHz) / 1000.0;
+  return apply(name, display_config::modeAction(width, height, refreshHz));
+}
+
+bool DisplayConfigService::setScale(std::string_view name, double scale) {
+  return apply(name, display_config::scaleAction(scale));
+}
+
+bool DisplayConfigService::setTransform(std::string_view name, display_config::Transform transform) {
+  return apply(name, display_config::transformAction(transform));
+}
+
+bool DisplayConfigService::setPosition(std::string_view name, int x, int y) {
+  return apply(name, display_config::positionAction(x, y));
+}
+
+bool DisplayConfigService::setVrr(std::string_view name, bool enabled) {
+  return apply(name, display_config::vrrAction(enabled));
+}
+
+bool DisplayConfigService::setEnabled(std::string_view name, bool enabled) {
+  if (!enabled && enabledCount() <= 1) {
+    m_lastError = "cannot disable the last display";
+    return false;
+  }
+  return apply(name, display_config::powerAction(enabled));
+}
+
+bool DisplayConfigService::placeRelative(
+    std::string_view name, std::string_view referenceName, display_config::LayoutDirection direction, int offset
+) {
+  const auto* moving = findOutput(name);
+  const auto* reference = findOutput(referenceName);
+  if (moving == nullptr || reference == nullptr) {
+    m_lastError = "display not found";
+    return false;
+  }
+  const auto point = display_config::snapPosition(*moving, *reference, direction, offset);
+  return setPosition(name, point.x, point.y);
+}
+
+void DisplayConfigService::setChangeCallback(ChangeCallback callback) { m_changeCallback = std::move(callback); }
+
+bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action) {
+  if (!available()) {
+    m_lastError = "niri display configuration is unavailable";
+    return false;
+  }
+  const auto payload = display_config::outputRequestPayload(name, action);
+  const auto reply = m_platform.niriRuntime().requestJson(payload);
+  if (!reply.has_value()) {
+    m_lastError = "niri display request failed";
+    kLog.warn("{} ({})", m_lastError, payload);
+    return false;
+  }
+  if (const auto error = display_config::parseError(*reply); !error.empty()) {
+    m_lastError = error;
+    kLog.warn("niri display request error: {}", m_lastError);
+    return false;
+  }
+  if (!reply->contains("Ok")) {
+    m_lastError = "niri display request was rejected";
+    kLog.warn("{}: {}", m_lastError, reply->dump());
+    return false;
+  }
+  m_lastError.clear();
+  kLog.info("applied niri output change for {}", name);
+  refresh();
+  return true;
+}

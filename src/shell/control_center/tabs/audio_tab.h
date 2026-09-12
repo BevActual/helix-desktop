@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/timer_manager.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <chrono>
@@ -29,19 +30,23 @@ class Slider;
 class WaylandConnection;
 struct AudioNode;
 struct AudioState;
+struct ControlCenterServices;
 
 class AudioTab : public Tab {
 public:
   AudioTab(
       PipeWireService* audio, EasyEffectsService* easyEffects, MprisService* mpris, ConfigService* config,
-      WaylandConnection* wayland, RenderContext* renderContext
+      WaylandConnection* wayland, RenderContext* renderContext, const ControlCenterServices& services
   );
   ~AudioTab() override;
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   bool dismissTransientUi() override;
   [[nodiscard]] bool dragging() const noexcept;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   struct DeviceVolumeCardState {
@@ -95,6 +100,7 @@ private:
   ConfigService* m_config = nullptr;
   WaylandConnection* m_wayland = nullptr;
   RenderContext* m_renderContext = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
   Flex* m_deviceColumn = nullptr;

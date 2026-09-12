@@ -45,7 +45,11 @@ namespace scripting {
     };
 
     bool isObsoleteConfigReceiver(std::string_view receiver) noexcept {
-      return receiver == "barWidget" || receiver == "desktopWidget" || receiver == "panel" || receiver == "launcher";
+      return receiver == "barWidget"
+          || receiver == "desktopWidget"
+          || receiver == "panel"
+          || receiver == "launcher"
+          || receiver == "controlCenterTab";
     }
 
     // Walk Luau source, skipping comments and string bodies, and collect static

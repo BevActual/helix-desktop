@@ -1,10 +1,12 @@
 #pragma once
 
 #include "render/animation/animation_manager.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
 
 #include <array>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -19,14 +21,18 @@ class Renderer;
 class ScreenTimeService;
 class ScrollView;
 class Segmented;
+struct ControlCenterServices;
 
 class ScreenTimeTab : public Tab {
 public:
-  explicit ScreenTimeTab(ScreenTimeService* screenTime);
+  ScreenTimeTab(ScreenTimeService* screenTime, const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setActive(bool active) override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -47,6 +53,7 @@ private:
   [[nodiscard]] std::string resolveIconPath(const std::string& appKey) const;
 
   ScreenTimeService* m_screenTime = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
   int m_rangeDays = 1;
   std::string m_detailDayKey;

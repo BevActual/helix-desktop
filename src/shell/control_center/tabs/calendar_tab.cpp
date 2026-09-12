@@ -8,6 +8,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -46,7 +47,11 @@ namespace {
   }
 } // namespace
 
-CalendarTab::CalendarTab(ConfigService* config, CalendarService* calendar) : m_config(config), m_calendar(calendar) {}
+CalendarTab::CalendarTab(ConfigService* config, CalendarService* calendar, const ControlCenterServices& services)
+    : m_config(config), m_calendar(calendar),
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "services", .includedGroups = {"calendar"}}
+      )) {}
 
 std::unique_ptr<Flex> CalendarTab::create() {
   const float scale = contentScale();
@@ -212,7 +217,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
 
   tab->addChild(std::move(eventsCard));
 
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
@@ -220,7 +225,7 @@ std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
   if (m_config != nullptr) {
     m_showEventsCard = m_config->config().controlCenter.calendarTab.showEventsCard;
   }
-  return ui::row(
+  auto live = ui::row(
       {
           .align = FlexAlign::Center,
           .gap = Style::spaceSm * scale,
@@ -234,9 +239,17 @@ std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
+  return m_settings->createEmbedHeaderActions(std::move(live), scale);
 }
 
+void CalendarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool CalendarTab::configureMode() const { return m_settings->configureMode(); }
+
 void CalendarTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr || m_card == nullptr || m_calendarArea == nullptr) {
     return;
   }
@@ -333,6 +346,7 @@ void CalendarTab::focusToday() {
 }
 
 void CalendarTab::onClose() {
+  m_settings->onClose();
   m_eventFadeTimer.stop();
   cancelMonthSlide();
   m_rootLayout = nullptr;

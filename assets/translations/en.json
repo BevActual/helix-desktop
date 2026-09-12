@@ -285,9 +285,37 @@
     },
     "display": {
       "disabled": "Disabled",
+      "layout": "Arrangement",
+      "layout-hint": "Place one display next to another. Changes are not written to the niri config.",
+      "move": "Display to move",
       "no-displays": "No monitors available",
-      "rescan": "Rescan DDC/CI monitors",
-      "unknown-resolution": "Unknown resolution"
+      "place-bottom": "Place below the other display",
+      "place-left": "Place to the left of the other display",
+      "place-right": "Place to the right of the other display",
+      "place-top": "Place above the other display",
+      "refresh-rate": "Refresh rate",
+      "rescan": "Rescan displays",
+      "resolution": "Resolution",
+      "rotation": "Rotation",
+      "scale": "Scale",
+      "temporary": "On niri, mode and layout changes apply until the compositor reloads its config.",
+      "transform-180": "180°",
+      "transform-270": "270°",
+      "transform-90": "90°",
+      "transform-flipped": "Flipped",
+      "transform-flipped-180": "Flipped 180°",
+      "transform-flipped-270": "Flipped 270°",
+      "transform-flipped-90": "Flipped 90°",
+      "transform-normal": "Normal",
+      "unknown-resolution": "Unknown resolution",
+      "vrr": "Variable refresh rate"
+    },
+    "settings": {
+      "hint": "Change settings here. The plugin store, bar widget editors, and a few other tools still open the Settings window.",
+      "open": "Open Settings window",
+      "configure": "Settings",
+      "plugins-hint": "Install, update, and configure plugins in the Settings window.",
+      "plugins-open": "Open plugin settings"
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
@@ -480,6 +508,7 @@
       "notifications": "Notifications",
       "power": "Power",
       "screen-time": "Screen Time",
+      "settings": "Settings",
       "system": "System",
       "weather": "Weather"
     },

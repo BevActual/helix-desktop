@@ -1,6 +1,6 @@
 ---
 title: Declarative UI
-description: Render desktop widgets and panels with shared ui.* trees.
+description: Render desktop widgets, panels, and Control Center tabs with shared ui.* trees.
 sidebar:
   label: Declarative UI
   order: 4
@@ -8,7 +8,7 @@ sidebar:
 
 import PluginApiBadge from '../../../../../components/PluginApiBadge.astro';
 
-Desktop widgets, panels, and (optionally) bar widgets do not have to patch a fixed control. They can describe their UI
+Desktop widgets, panels, Control Center tabs, and (optionally) bar widgets do not have to patch a fixed control. They can describe their UI
 as a retained `ui.*` tree; Noctalia diffs each render against the previous tree and updates native controls in place.
 
 ## `desktopWidget.*` - declarative desktop widget UI {#desktopwidget--declarative-desktop-widget-ui}
@@ -33,6 +33,24 @@ end
 
 function ping()
   noctalia.notify("Desktop widget", "button clicked")
+end
+```
+
+## `controlCenterTab.*` - Control Center tab UI {#controlcentertab--control-center-tab-ui}
+
+A Control Center tab hands its tree to `controlCenterTab.render(tree)` <PluginApiBadge feature="control-center-tab" />.
+The vocabulary is the same as a panel: sliders, selects, buttons, and the rest of `ui.*`. The host keeps the Control
+Center chrome (sidebar, title, close button).
+
+`render(tree)` · `setWantsSecondTicks(bool)` · `setNeedsFrameTick(bool)`
+
+```lua
+function update()
+  controlCenterTab.setWantsSecondTicks(true)
+  controlCenterTab.render(ui.column({ gap = 10, align = "stretch" }, {
+    ui.label({ text = "Displays", fontSize = 16, fontWeight = "bold" }),
+    ui.slider({ min = 0.5, max = 3, step = 0.05, value = 1.5, onChange = "onScale" }),
+  }))
 end
 ```
 

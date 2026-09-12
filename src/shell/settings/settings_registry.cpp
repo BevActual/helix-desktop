@@ -1406,7 +1406,7 @@ namespace settings {
       tabs.options.reserve(catalog.size());
       tabs.selectedValues.reserve(catalog.size());
       for (const auto& tab : catalog) {
-        tabs.options.push_back(SelectOption{std::string(tab.key), tr(tab.titleKey)});
+        tabs.options.push_back(SelectOption{tab.key, tab.title});
         if (!std::ranges::contains(cfg.controlCenter.hiddenTabs, tab.key)) {
           tabs.selectedValues.emplace_back(tab.key);
         }
@@ -1415,7 +1415,7 @@ namespace settings {
       entries.push_back(makeEntry(
           SettingsSection::ControlCenter, "navigation", tr("settings.schema.panels.control-center-tabs.label"),
           tr("settings.schema.panels.control-center-tabs.description"), {"control_center", "hidden_tabs"},
-          std::move(tabs), "tabs sections visible hide show display brightness media audio network power"
+          std::move(tabs), "tabs sections visible hide show display brightness media audio network power plugin"
       ));
     }
     entries.push_back(makeEntry(

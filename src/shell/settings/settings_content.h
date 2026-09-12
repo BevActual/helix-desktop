@@ -43,6 +43,8 @@ namespace settings {
     float scale = 1.0F;
     std::string_view searchQuery;
     std::string_view selectedSection;
+    // When non-empty, only entries whose group is in this set are shown.
+    std::unordered_set<std::string> includedGroups;
     const BarConfig* selectedBar = nullptr;
     const BarMonitorOverride* selectedMonitorOverride = nullptr;
     bool showAdvanced = false;

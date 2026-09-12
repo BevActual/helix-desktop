@@ -9,6 +9,7 @@
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
 #include "system/desktop_entry.h"
@@ -1465,10 +1466,13 @@ namespace {
 
 AudioTab::AudioTab(
     PipeWireService* audio, EasyEffectsService* easyEffects, MprisService* mpris, ConfigService* config,
-    WaylandConnection* wayland, RenderContext* renderContext
+    WaylandConnection* wayland, RenderContext* renderContext, const ControlCenterServices& services
 )
     : m_audio(audio), m_easyEffects(easyEffects), m_mpris(mpris), m_config(config), m_wayland(wayland),
-      m_renderContext(renderContext) {}
+      m_renderContext(renderContext),
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "services", .includedGroups = {"audio"}}
+      )) {}
 
 AudioTab::~AudioTab() = default;
 
@@ -1947,10 +1951,21 @@ std::unique_ptr<Flex> AudioTab::create() {
     m_easyEffects->refreshActiveEffectsProfiles();
   }
 
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
 
+std::unique_ptr<Flex> AudioTab::createHeaderActions() {
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void AudioTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool AudioTab::configureMode() const { return m_settings->configureMode(); }
+
 void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr) {
     return;
   }
@@ -2070,6 +2085,7 @@ void AudioTab::doUpdate(Renderer& renderer) {
 }
 
 void AudioTab::onClose() {
+  m_settings->onClose();
   flushPendingVolumes(true);
   flushPendingProgramVolumes(true);
   m_outputDeviceVolume.volumeDebounceTimer.stop();

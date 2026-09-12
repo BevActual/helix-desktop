@@ -1,6 +1,7 @@
 #include "shell/control_center/tabs/system_tab.h"
 
 #include "i18n/i18n.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "system/distro_info.h"
 #include "system/format_units.h"
@@ -204,7 +205,15 @@ namespace {
 
 } // namespace
 
-SystemTab::SystemTab(SystemMonitorService* monitor) : m_monitor(monitor) {}
+SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services)
+    : m_monitor(monitor),
+      m_settings(std::make_unique<SettingsPane>(
+          services,
+          SettingsPaneOptions{
+              .section = "system",
+              .includedGroups = {"battery", "monitor", "monitor-polling", "monitor-thresholds"},
+          }
+      )) {}
 
 SystemTab::~SystemTab() { retainStats(false); }
 
@@ -395,8 +404,16 @@ std::unique_ptr<Flex> SystemTab::create() {
     tab->addChild(std::move(row));
   }
 
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
+
+std::unique_ptr<Flex> SystemTab::createHeaderActions() {
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void SystemTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool SystemTab::configureMode() const { return m_settings->configureMode(); }
 
 void SystemTab::setActive(bool active) {
   m_active = active;
@@ -429,6 +446,7 @@ void SystemTab::retainStats(bool retain) {
 }
 
 void SystemTab::onClose() {
+  m_settings->onClose();
   m_root = nullptr;
   m_cpuGraph = nullptr;
   m_ramGraph = nullptr;
@@ -516,6 +534,9 @@ void SystemTab::onFrameTick(float deltaMs) {
 }
 
 void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_root == nullptr) {
     return;
   }

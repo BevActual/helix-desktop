@@ -1,0 +1,144 @@
+#include "system/display_config.h"
+
+#include <cstdio>
+#include <nlohmann/json.hpp>
+#include <print>
+#include <string>
+
+namespace {
+
+  bool fail(const char* message) {
+    std::println(stderr, "display_config_test: {}", message);
+    return false;
+  }
+
+  bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
+
+  const char* kOutputsReply = R"({
+    "Ok": {
+      "Outputs": {
+        "HDMI-A-1": {
+          "name": "HDMI-A-1",
+          "make": "LG",
+          "model": "TV",
+          "serial": "123",
+          "modes": [
+            {"width": 3840, "height": 2160, "refresh_rate": 119880, "is_preferred": true},
+            {"width": 3840, "height": 2160, "refresh_rate": 60000, "is_preferred": false},
+            {"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": false}
+          ],
+          "current_mode": 0,
+          "vrr_supported": false,
+          "vrr_enabled": false,
+          "logical": {
+            "x": 1552,
+            "y": 0,
+            "width": 3840,
+            "height": 2160,
+            "scale": 1.0,
+            "transform": "Normal"
+          }
+        },
+        "eDP-1": {
+          "name": "eDP-1",
+          "make": "BOE",
+          "model": "Panel",
+          "serial": "abc",
+          "modes": [
+            {"width": 2560, "height": 1600, "refresh_rate": 240000, "is_preferred": true},
+            {"width": 2560, "height": 1600, "refresh_rate": 60000, "is_preferred": false}
+          ],
+          "current_mode": 0,
+          "vrr_supported": true,
+          "vrr_enabled": true,
+          "logical": {
+            "x": 0,
+            "y": 0,
+            "width": 1552,
+            "height": 970,
+            "scale": 1.65,
+            "transform": "Normal"
+          }
+        },
+        "DP-2": {
+          "name": "DP-2",
+          "make": "Unknown",
+          "model": "Unknown",
+          "modes": [
+            {"width": 1920, "height": 1080, "refresh_rate": 60000, "is_preferred": true}
+          ],
+          "current_mode": null,
+          "vrr_supported": false,
+          "vrr_enabled": false,
+          "logical": null
+        }
+      }
+    }
+  })";
+
+} // namespace
+
+int main() {
+  bool ok = true;
+
+  const auto outputs = display_config::parseOutputsReply(nlohmann::json::parse(kOutputsReply));
+  ok = expect(outputs.size() == 3, "parses three outputs") && ok;
+  if (outputs.size() == 3) {
+    ok = expect(outputs[0].name == "eDP-1", "sorts enabled outputs by x") && ok;
+    ok = expect(outputs[1].name == "HDMI-A-1", "places HDMI after laptop") && ok;
+    ok = expect(outputs[2].name == "DP-2" && !outputs[2].enabled, "keeps disabled outputs") && ok;
+    ok = expect(outputs[0].current.width == 2560 && outputs[0].current.refreshMilliHz == 240000, "reads current mode")
+        && ok;
+    ok = expect(outputs[0].scale > 1.6 && outputs[0].scale < 1.7, "reads fractional scale") && ok;
+    ok = expect(outputs[0].vrrSupported && outputs[0].vrrEnabled, "reads vrr flags") && ok;
+    ok = expect(display_config::displayLabel(outputs[0]) == "BOE Panel", "formats make+model label") && ok;
+  }
+
+  ok = expect(
+           display_config::parseError(nlohmann::json::parse(R"({"Err":"no such output"})")) == "no such output",
+           "parses Err string"
+       )
+      && ok;
+
+  const auto transform = display_config::parseTransform("flipped-90");
+  ok = expect(transform == display_config::Transform::Flipped90, "parses CLI transform names") && ok;
+  ok = expect(display_config::jsonName(display_config::Transform::Rotate90) == "90", "json transform name for 90")
+      && ok;
+  ok = expect(display_config::formatRefresh(240000) == "240 Hz", "formats whole-number refresh") && ok;
+  ok = expect(display_config::formatRefresh(119880) == "119.880 Hz", "formats fractional refresh") && ok;
+  ok = expect(display_config::formatScale(1.65) == "1.65×", "formats fractional scale") && ok;
+
+  if (!outputs.empty()) {
+    const auto resolutions = display_config::resolutionChoices(outputs[1]);
+    ok = expect(resolutions.size() == 2, "groups HDMI resolutions") && ok;
+    const auto refreshes = display_config::refreshChoices(outputs[1], 3840, 2160);
+    ok = expect(refreshes.size() == 2, "lists HDMI refresh rates for 4K") && ok;
+    const auto best = display_config::bestRefreshMilliHz(outputs[1], 1920, 1080);
+    ok = expect(best == 60000, "picks available refresh for 1080p") && ok;
+
+    const auto placed = display_config::snapPosition(outputs[1], outputs[0], display_config::LayoutDirection::Right);
+    ok = expect(placed.x == 1552, "places HDMI to the right of the laptop") && ok;
+  }
+
+  const auto mode = display_config::modeAction(2560, 1600, 240.0);
+  ok = expect(mode["Mode"]["mode"]["Specific"]["width"] == 2560, "mode action width") && ok;
+  ok = expect(mode["Mode"]["mode"]["Specific"]["refresh"] == 240.0, "mode action refresh Hz") && ok;
+
+  const auto scale = display_config::scaleAction(1.65);
+  ok = expect(scale["Scale"]["scale"]["Specific"] == 1.65, "scale action") && ok;
+
+  const auto off = display_config::powerAction(false);
+  ok = expect(off.is_string() && off.get<std::string>() == "Off", "power off is unit variant") && ok;
+
+  const auto request = display_config::outputRequest("eDP-1", display_config::transformAction(display_config::Transform::Rotate90));
+  ok = expect(request["Output"]["output"] == "eDP-1", "output request name") && ok;
+  ok = expect(request["Output"]["action"]["Transform"]["transform"] == "90", "transform action json") && ok;
+
+  const auto payload = display_config::outputRequestPayload("eDP-1", display_config::powerAction(true));
+  ok = expect(payload.ends_with('\n'), "request payload is newline-terminated") && ok;
+
+  const auto vrr = display_config::vrrAction(true);
+  ok = expect(vrr["Vrr"]["vrr"]["vrr"] == true && vrr["Vrr"]["vrr"]["on_demand"] == false, "vrr action") && ok;
+
+  return ok ? 0 : 1;
+}

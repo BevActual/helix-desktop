@@ -156,6 +156,14 @@ order = ["a", "b"]
     }
   }
 
+  context.patch = {};
+  ok = expect(
+           runLuau(state, "=cc-tab-render", "controlCenterTab.render(ui.label({ text = 'Displays' }))"),
+           "failed to render a Control Center tab tree"
+       )
+      && ok;
+  ok = expect(context.patch.uiTree.has_value(), "controlCenterTab.render should produce a UI tree") && ok;
+
   // `key` is lifted out of the props into the node's identity, and only a string
   // counts as one. It is read ahead of the other props now that it names the
   // node's handlers, so the outcome is pinned here.

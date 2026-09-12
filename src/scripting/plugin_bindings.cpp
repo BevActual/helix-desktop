@@ -564,7 +564,7 @@ namespace {
   }
 
   // render(tree) — replaces the entry's declarative control tree. Shared by
-  // barWidget.render, desktopWidget.render, and panel.render.
+  // barWidget.render, desktopWidget.render, panel.render, and controlCenterTab.render.
   int luau_ui_render(lua_State* L) {
     luaL_checktype(L, 1, LUA_TTABLE);
     auto* context = getContext(L);
@@ -586,7 +586,7 @@ namespace {
   }
 
   // setWantsSecondTicks(bool) / setNeedsFrameTick(bool) — shared by
-  // desktopWidget.* and panel.*.
+  // desktopWidget.*, panel.*, and controlCenterTab.*.
   int luau_ui_setWantsSecondTicks(lua_State* L) {
     const bool wants = lua_toboolean(L, 1) != 0;
     if (auto* context = getContext(L)) {
@@ -778,6 +778,14 @@ namespace {
       {nullptr, nullptr},
   };
 
+  // controlCenterTab.* — declarative UI tree for a [[control_center_tab]] entry.
+  const luaL_Reg kControlCenterTabLib[] = {
+      {"render", luau_ui_render},
+      {"setWantsSecondTicks", luau_ui_setWantsSecondTicks},
+      {"setNeedsFrameTick", luau_ui_setNeedsFrameTick},
+      {nullptr, nullptr},
+  };
+
   void pushTomlNode(lua_State* L, const toml::node& node) {
     luaL_checkstack(L, 4, "noctalia.getSetting");
     if (const auto* table = node.as_table()) {
@@ -881,6 +889,8 @@ namespace scripting {
     luaL_register(L, "desktopWidget", kDesktopWidgetLib);
     lua_pop(L, 1);
     luaL_register(L, "panel", kPanelLib);
+    lua_pop(L, 1);
+    luaL_register(L, "controlCenterTab", kControlCenterTabLib);
     lua_pop(L, 1);
   }
 

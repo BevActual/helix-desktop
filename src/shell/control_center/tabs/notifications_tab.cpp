@@ -11,6 +11,7 @@
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
 #include "shell/control_center/control_center_panel.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "time/time_format.h"
@@ -641,8 +642,11 @@ private:
   float m_fillOpacity = 1.0F;
 };
 
-NotificationsTab::NotificationsTab(NotificationManager* notifications, CompositorPlatform* platform)
-    : m_notifications(notifications), m_platform(platform) {}
+NotificationsTab::NotificationsTab(
+    NotificationManager* notifications, CompositorPlatform* platform, const ControlCenterServices& services
+)
+    : m_notifications(notifications), m_platform(platform),
+      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "notifications"})) {}
 
 NotificationsTab::~NotificationsTab() = default;
 
@@ -735,13 +739,13 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       )
   );
 
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
   const float scale = contentScale();
   const bool dndEnabled = m_notifications != nullptr && m_notifications->doNotDisturb();
-  return ui::row(
+  auto live = ui::row(
       {
           .align = FlexAlign::Center,
           .gap = Style::spaceSm * scale,
@@ -767,9 +771,17 @@ std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
+  return m_settings->createEmbedHeaderActions(std::move(live), scale);
 }
 
+void NotificationsTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool NotificationsTab::configureMode() const { return m_settings->configureMode(); }
+
 void NotificationsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_root == nullptr || m_filter == nullptr) {
     return;
   }
@@ -801,6 +813,7 @@ void NotificationsTab::doUpdate(Renderer& renderer) {
 }
 
 void NotificationsTab::onClose() {
+  m_settings->onClose();
   cancelFilterSlide();
   if (m_list != nullptr) {
     m_list->setAdapter(nullptr);

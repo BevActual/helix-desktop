@@ -10,6 +10,7 @@
 #include "pipewire/pipewire_spectrum.h"
 #include "render/core/renderer.h"
 #include "render/scene/node.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
@@ -72,10 +73,13 @@ namespace {
 
 MediaTab::MediaTab(
     MprisService* mpris, HttpClient* httpClient, PipeWireSpectrum* spectrum, ConfigService* config,
-    WaylandConnection* wayland, RenderContext* renderContext
+    WaylandConnection* wayland, RenderContext* renderContext, const ControlCenterServices& services
 )
     : m_mpris(mpris), m_httpClient(httpClient), m_spectrum(spectrum), m_config(config), m_wayland(wayland),
-      m_renderContext(renderContext) {}
+      m_renderContext(renderContext),
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "services", .includedGroups = {"media"}}
+      )) {}
 
 MediaTab::~MediaTab() { m_aliveGuard.reset(); }
 
@@ -493,10 +497,21 @@ std::unique_ptr<Flex> MediaTab::create() {
     });
   }
 
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
 
+std::unique_ptr<Flex> MediaTab::createHeaderActions() {
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void MediaTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool MediaTab::configureMode() const { return m_settings->configureMode(); }
+
 void MediaTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr || m_nowCard == nullptr || m_mediaStack == nullptr) {
     return;
   }
@@ -663,6 +678,7 @@ void MediaTab::setActive(bool active) {
 }
 
 void MediaTab::onClose() {
+  m_settings->onClose();
   m_progressTimer.stop();
   if (m_spectrum != nullptr) {
     if (m_spectrumListenerId != 0) {

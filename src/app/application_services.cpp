@@ -83,6 +83,7 @@
 #include "shell/wallpaper/wallpaper_paths.h"
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
+#include "system/display_config_service.h"
 #include "system/distro_info.h"
 #include "system/easyeffects_service.h"
 #include "system/keyboard_backlight_service.h"
@@ -1370,6 +1371,18 @@ void Application::initBrightnessAndPipewire() {
   } catch (const std::exception& e) {
     kLog.warn("brightness service disabled: {}", e.what());
     m_brightnessService.reset();
+  }
+
+  try {
+    m_displayConfigService = std::make_unique<DisplayConfigService>(m_compositorPlatform);
+    m_displayConfigService->setChangeCallback([this, shouldRefreshControlCenter]() {
+      if (shouldRefreshControlCenter()) {
+        m_panelManager.refresh();
+      }
+    });
+  } catch (const std::exception& e) {
+    kLog.warn("display config service disabled: {}", e.what());
+    m_displayConfigService.reset();
   }
 
   try {

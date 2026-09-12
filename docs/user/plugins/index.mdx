@@ -9,7 +9,7 @@ sidebar:
 import PluginApiRange from '../../../../components/PluginApiRange.astro';
 
 Plugins extend Noctalia with **bar widgets**, **desktop widgets**, **shell panels**, **control-center shortcuts**,
-**launcher providers**, and headless **background services** - all driven by trusted [Luau](https://luau.org) scripts
+**control-center tabs**, **launcher providers**, and headless **background services** - all driven by trusted [Luau](https://luau.org) scripts
 running in isolated VMs. A plugin is a directory containing a static
 `plugin.toml` manifest and one or more `.luau` entry scripts.
 
@@ -65,9 +65,12 @@ controls the global `[plugins].auto_update` mode: **All sources** (default), **O
 
 Enabling a plugin makes its entries available. Its **bar widget** then shows up in the Add-widget picker - add a widget
 instance just like any built-in widget (or configure one by hand with `type = "<author>/<plugin>:<entry>"`). A
-**control-center shortcut** is added from the control-center shortcuts settings, like any other shortcut. A **panel**
-opens with `noctalia msg panel-toggle <author>/<plugin>:<entry>` (or from a bar widget that runs the same command).
-Panel **placement** (attached/floating, screen position, open-near-click) is configured per panel entry under
+**control-center shortcut** is added from the control-center shortcuts settings, like any other shortcut. A
+**control-center tab** appears in the Control Center sidebar as soon as the plugin is enabled, in the same list as
+the built-in pages (hide it from **Settings → Control Center**, or open it with
+`noctalia msg panel-toggle control-center <author>/<plugin>:<entry>`).
+A **panel** opens with `noctalia msg panel-toggle <author>/<plugin>:<entry>` (or from a bar widget that runs the same
+command). Panel **placement** (attached/floating, screen position, open-near-click) is configured per panel entry under
 **Settings → Plugins**, same as built-in shell panels.
 
 ## Configuration

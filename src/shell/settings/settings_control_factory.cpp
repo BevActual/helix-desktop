@@ -451,6 +451,35 @@ namespace settings {
   ) {
     auto& ctx = m_ctx;
     const float scale = m_scale;
+    if (!ctx.openSearchPickerPopup) {
+      if (setting.onSelect) {
+        const auto selectedIndex = optionIndex(setting.options, setting.selectedValue);
+        return ui::select({
+            .options = optionLabels(setting.options),
+            .selectedIndex = selectedIndex,
+            .clearSelection = !selectedIndex.has_value(),
+            .fontSize = Style::fontSizeBody * scale,
+            .controlHeight = Style::controlHeight * scale,
+            .glyphSize = Style::fontSizeBody * scale,
+            .colorSwatchPreviews = optionSwatchPreviews(setting.options),
+            .width = 190.0F * scale,
+            .height = Style::controlHeight * scale,
+            .onSelectionChanged = [onSelect = setting.onSelect, options = setting.options](
+                                     std::size_t index, std::string_view /*label*/
+                                 ) {
+              if (index < options.size()) {
+                onSelect(options[index].value);
+              }
+            },
+        });
+      }
+      SelectSetting fallback{
+          .options = setting.options,
+          .selectedValue = setting.selectedValue,
+          .allowEmptySelection = setting.selectedValue.empty(),
+      };
+      return makeSelect(fallback, std::move(path));
+    }
     return ui::button({
         .text = optionLabel(setting.options, setting.selectedValue),
         .fontSize = Style::fontSizeBody * scale,

@@ -54,6 +54,11 @@ public:
   // Called when the tab becomes visible or hidden.
   virtual void setActive(bool active) { (void)active; }
 
+  // Live tabs that host a settings pane use this to show the editor instead of
+  // the live view (for example `settings-toggle notifications`).
+  virtual void setConfigureMode(bool show) { (void)show; }
+  [[nodiscard]] virtual bool configureMode() const { return false; }
+
   // Called when the panel closes. Null out all raw pointers to freed nodes.
   virtual void onClose() {}
 

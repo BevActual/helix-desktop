@@ -67,8 +67,8 @@ namespace scripting {
     [[nodiscard]] WidgetSettingValue defaultValue() const;
   };
 
-  // Entry types a plugin may declare. P0 routes only Widget to a surface; the rest
-  // are parsed and registered so the manifest format is forward-compatible.
+  // Entry types a plugin may declare. Each kind is routed to its host once the
+  // plugin is enabled (bar, desktop, panel, Control Center, launcher, or service).
   enum class PluginEntryKind : std::uint8_t {
     Widget,
     Panel,
@@ -76,6 +76,7 @@ namespace scripting {
     DesktopWidget,
     LauncherProvider,
     Service,
+    ControlCenterTab,
   };
 
   // A launcher result category, declared statically on a [[launcher_provider]]
@@ -141,6 +142,12 @@ namespace scripting {
     // the host, so the panel can drive its own key interactions. Verbatim spec strings:
     // the script is called back with the same text declared here.
     std::vector<std::string> panelCaptureKeys;
+
+    // Control Center sidebar tab (parsed only for ControlCenterTab entries).
+    // `tabGlyph` is a Tabler/Nerd-Font name; empty uses the plugin icon or "puzzle".
+    // `tabTitleKey` is a plugin translation key; empty uses the plugin display name.
+    std::string tabGlyph;
+    std::string tabTitleKey;
   };
 
   struct PluginManifest {

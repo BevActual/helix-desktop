@@ -20,7 +20,7 @@ These commands control shell state, logging, settings windows, the window switch
 | Open settings | <IpcCommand command="settings-open [context]" /> | Open or focus the graphical settings window, optionally at a specific section (e.g. `bar`). |
 | Open plugin settings | <IpcCommand command="settings-open-plugin noctalia/notes" /> | Open the settings window at an installed plugin's settings. The plugin must be enabled and expose settings. |
 | Close settings | <IpcCommand command="settings-close" /> | Close the graphical settings window. |
-| Toggle settings | <IpcCommand command="settings-toggle [context]" /> | Open or close the graphical settings window, optionally at a specific section. |
+| Toggle settings | <IpcCommand command="settings-toggle [context]" /> | Toggle Control Center on the matching settings page (Appearance when omitted), for example `bar` or `notifications`. Domain pages such as Notifications open the live tab in settings view. The Settings window stays available via `settings-open`. |
 
 Set `NOCTALIA_LOG_LEVEL` to `debug`, `info`, `warn`, or `error` before startup to choose the initial console log level. The default is `info`; the file log remains unfiltered.
 

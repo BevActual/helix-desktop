@@ -2,10 +2,12 @@
 
 #include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/controls/calendar_view.h"
 
 #include <limits>
+#include <memory>
 
 class Button;
 class CalendarService;
@@ -13,15 +15,18 @@ class ConfigService;
 class InputArea;
 class Label;
 class ScrollView;
+struct ControlCenterServices;
 
 class CalendarTab : public Tab {
 public:
-  explicit CalendarTab(ConfigService* config = nullptr, CalendarService* calendar = nullptr);
+  CalendarTab(ConfigService* config, CalendarService* calendar, const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void setActive(bool active) override;
   void onClose() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   void focusToday();
@@ -38,6 +43,7 @@ private:
 
   ConfigService* m_config = nullptr;
   CalendarService* m_calendar = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
   bool m_changeCallbackRegistered = false;
   bool m_eventsDirty = false;
   Flex* m_rootLayout = nullptr;

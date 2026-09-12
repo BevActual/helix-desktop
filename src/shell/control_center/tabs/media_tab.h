@@ -2,6 +2,7 @@
 
 #include "core/timer_manager.h"
 #include "dbus/mpris/mpris_service.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <chrono>
@@ -24,20 +25,24 @@ class Slider;
 class AudioVisualizer;
 class ConfigService;
 class WaylandConnection;
+struct ControlCenterServices;
 
 class MediaTab : public Tab {
 public:
   MediaTab(
       MprisService* mpris, HttpClient* httpClient, PipeWireSpectrum* spectrum, ConfigService* config,
-      WaylandConnection* wayland, RenderContext* renderContext
+      WaylandConnection* wayland, RenderContext* renderContext, const ControlCenterServices& services
   );
   ~MediaTab() override;
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onFrameTick(float deltaMs) override;
   void setActive(bool active) override;
   void onClose() override;
   bool dismissTransientUi() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -59,6 +64,7 @@ private:
   ConfigService* m_config = nullptr;
   WaylandConnection* m_wayland = nullptr;
   RenderContext* m_renderContext = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
   std::uint64_t m_spectrumListenerId = 0;
   bool m_active = false;
 

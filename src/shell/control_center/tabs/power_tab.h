@@ -1,8 +1,10 @@
 #pragma once
 
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -16,14 +18,18 @@ class Toggle;
 class UPowerService;
 class PowerProfilesService;
 class PowerTabTestAccess;
+struct ControlCenterServices;
 struct UPowerChargeLimitState;
 
 class PowerTab : public Tab {
 public:
-  PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles);
+  PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles, const ControlCenterServices* services = nullptr);
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
 
 private:
   friend class PowerTabTestAccess;
@@ -66,6 +72,7 @@ private:
 
   UPowerService* m_upower = nullptr;
   PowerProfilesService* m_powerProfiles = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_root = nullptr;
 

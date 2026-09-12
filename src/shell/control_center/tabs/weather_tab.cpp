@@ -6,6 +6,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/scene/effect_node.h"
 #include "render/scene/input_area.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_content.h"
 #include "system/weather_service.h"
@@ -37,7 +38,9 @@ namespace {
 
 } // namespace
 
-WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config) : m_weather(weather), m_config(config) {
+WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services)
+    : m_weather(weather), m_config(config),
+      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "location"})) {
   m_forecastRows.fill(nullptr);
   m_forecastSeparators.fill(nullptr);
   m_forecastIconSlots.fill(nullptr);
@@ -386,8 +389,16 @@ std::unique_ptr<Flex> WeatherTab::create() {
 
   forecastColumn->addChild(std::move(forecastRowsContainer));
   tab->addChild(std::move(forecastColumn));
-  return tab;
+  return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
 }
+
+std::unique_ptr<Flex> WeatherTab::createHeaderActions() {
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void WeatherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool WeatherTab::configureMode() const { return m_settings->configureMode(); }
 
 void WeatherTab::cancelForecastSlide() {
   const bool wasAnimating = m_forecastSlideAnimId != 0;
@@ -485,6 +496,9 @@ void WeatherTab::beginForecastSlideIn() {
 }
 
 void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr || m_currentText == nullptr || m_forecastColumn == nullptr) {
     return;
   }
@@ -693,6 +707,7 @@ void WeatherTab::showLocationPrompt(bool show) {
 }
 
 void WeatherTab::onClose() {
+  m_settings->onClose();
   m_rootLayout = nullptr;
   m_leftColumn = nullptr;
   m_currentCard = nullptr;

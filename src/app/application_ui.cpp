@@ -592,6 +592,7 @@ void Application::initPanelManagerAndPanels() {
           .bluetooth = m_bluetoothService.get(),
           .bluetoothAgent = m_bluetoothAgent.get(),
           .brightness = m_brightnessService.get(),
+          .displayConfig = m_displayConfigService.get(),
           .sysmon = m_systemMonitor.get(),
           .screenTime = &m_screenTimeService,
           .nightLight = &m_gammaService,

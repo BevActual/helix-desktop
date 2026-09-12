@@ -673,7 +673,10 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
       ui::button({
           .out = &m_settingsButton,
           .glyph = "settings",
-          .onClick = []() { PanelManager::instance().openSettingsWindow(); },
+          .onClick =
+              []() {
+                PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = "settings"});
+              },
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       }),
       ui::button({

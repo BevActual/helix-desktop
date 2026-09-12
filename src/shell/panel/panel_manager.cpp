@@ -435,16 +435,16 @@ void PanelManager::closeSettingsWindow() {
 }
 
 void PanelManager::toggleSettingsWindow(std::string context) {
-  if (isOpen() && !m_closing) {
-    closePanel();
+  closeSettingsWindow();
+  std::string ccContext = "settings";
+  if (!context.empty() && context != "settings") {
+    if (context.starts_with("settings:")) {
+      ccContext = std::move(context);
+    } else {
+      ccContext = "settings:" + context;
+    }
   }
-  if (m_toggleSettingsWindow) {
-    m_toggleSettingsWindow(std::move(context));
-    return;
-  }
-  if (m_openSettingsWindow) {
-    m_openSettingsWindow(std::move(context));
-  }
+  togglePanel("control-center", PanelOpenRequest{.context = ccContext});
 }
 
 void PanelManager::setAttachedPanelGeometryCallback(

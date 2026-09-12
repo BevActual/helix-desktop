@@ -1192,8 +1192,8 @@ int main() {
   const auto overlayLayer = scripting::parsePluginManifest(overlayLayerPath, &error);
   ok = expect(overlayLayer.has_value(), error.empty() ? "a valid layer should parse" : error.c_str()) && ok;
   if (overlayLayer.has_value() && !overlayLayer->entries.empty()) {
+    ok = expectEq(overlayLayer->entries.front().panelLayerDefault, "overlay", "overlay layer should parse") && ok;
     const auto& entry = overlayLayer->entries.front();
-    ok = expectEq(entry.panelLayerDefault, "overlay", "layer default should parse") && ok;
     const auto layerField = std::ranges::find(entry.settings, "panel_layer", &scripting::ManifestField::key);
     ok = expect(layerField != entry.settings.end(), "panel layer setting should be injected") && ok;
     if (layerField != entry.settings.end()) {
@@ -1202,6 +1202,56 @@ int main() {
     const auto settings = scripting::seedEntrySettings(entry, {{"panel_layer", std::string("top")}});
     const auto shellConfig = scripting::resolvePluginPanelShellConfig(entry, settings);
     ok = expectEq(shellConfig.layer, "top", "user layer override should win") && ok;
+  }
+
+  const auto oldApiTabPath = root / "old-api-cc-tab/plugin.toml";
+  ok = writeManifest(
+           oldApiTabPath,
+           "id = \"me/old-api-cc-tab\"\n"
+           "name = \"Old API CC Tab\"\n"
+           "plugin_api = 30\n"
+           "[[control_center_tab]]\n"
+           "id = \"displays\"\n"
+           "entry = \"tab.luau\"\n"
+       )
+      && ok;
+  error.clear();
+  ok = expect(
+           !scripting::parsePluginManifest(oldApiTabPath, &error).has_value(),
+           "control_center_tab should require its plugin API level"
+       )
+      && ok;
+  ok = expectEq(
+           error, "entry 'displays': control_center_tab requires plugin_api >= 31",
+           "control_center_tab api gate error"
+       )
+      && ok;
+
+  const auto ccTabPath = root / "cc-tab/plugin.toml";
+  ok = writeManifest(
+           ccTabPath,
+           "id = \"me/cc-tab\"\n"
+           "name = \"CC Tab\"\n"
+           "plugin_api = 31\n"
+           "icon = \"device-desktop\"\n"
+           "[[control_center_tab]]\n"
+           "id = \"displays\"\n"
+           "entry = \"tab.luau\"\n"
+           "glyph = \"device-desktop\"\n"
+           "title_key = \"tab.displays\"\n"
+       )
+      && ok;
+  error.clear();
+  const auto ccTab = scripting::parsePluginManifest(ccTabPath, &error);
+  ok = expect(ccTab.has_value(), error.empty() ? "a valid control_center_tab should parse" : error.c_str()) && ok;
+  if (ccTab.has_value() && !ccTab->entries.empty()) {
+    const auto& entry = ccTab->entries.front();
+    ok = expect(entry.kind == scripting::PluginEntryKind::ControlCenterTab, "entry kind should be ControlCenterTab")
+        && ok;
+    ok = expectEq(entry.id, "displays", "control_center_tab id should parse") && ok;
+    ok = expectEq(entry.entry, "tab.luau", "control_center_tab entry should parse") && ok;
+    ok = expectEq(entry.tabGlyph, "device-desktop", "control_center_tab glyph should parse") && ok;
+    ok = expectEq(entry.tabTitleKey, "tab.displays", "control_center_tab title_key should parse") && ok;
   }
 
   // A [[widget]] entry can declare bar gesture defaults, kept as raw strings: the gesture

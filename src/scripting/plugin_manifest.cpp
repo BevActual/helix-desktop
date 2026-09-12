@@ -52,13 +52,14 @@ namespace scripting {
     }
 
     // Each entry kind paired with its TOML array-table name.
-    constexpr std::array<std::pair<PluginEntryKind, std::string_view>, 6> kEntryKinds{{
+    constexpr std::array<std::pair<PluginEntryKind, std::string_view>, 7> kEntryKinds{{
         {PluginEntryKind::Widget, "widget"},
         {PluginEntryKind::Panel, "panel"},
         {PluginEntryKind::Shortcut, "shortcut"},
         {PluginEntryKind::DesktopWidget, "desktop_widget"},
         {PluginEntryKind::LauncherProvider, "launcher_provider"},
         {PluginEntryKind::Service, "service"},
+        {PluginEntryKind::ControlCenterTab, "control_center_tab"},
     }};
 
     ManifestFieldType parseFieldType(std::string_view type) {
@@ -624,6 +625,21 @@ namespace scripting {
               entry.widgetActions.emplace_back(std::string(gestureKey.str()), *action);
             }
           }
+        }
+        if (kind == PluginEntryKind::ControlCenterTab) {
+          if (manifest.pluginApiVersion < kControlCenterTabPluginApiVersion) {
+            error = "entry '"
+                + entry.id
+                + "': control_center_tab requires plugin_api >= "
+                + std::to_string(kControlCenterTabPluginApiVersion);
+            return false;
+          }
+          if (entry.entry.empty()) {
+            error = "control_center_tab entry '" + entry.id + "': entry is required";
+            return false;
+          }
+          entry.tabGlyph = tableString(*entryTable, "glyph");
+          entry.tabTitleKey = tableString(*entryTable, "title_key");
         }
         if (kind == PluginEntryKind::LauncherProvider) {
           entry.launcherPrefix = tableString(*entryTable, "prefix");

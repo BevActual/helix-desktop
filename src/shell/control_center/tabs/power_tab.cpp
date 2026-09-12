@@ -4,6 +4,7 @@
 #include "dbus/upower/upower_service.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "shell/control_center/control_center_services.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/toggle.h"
@@ -112,8 +113,12 @@ bool PowerTab::shouldShowChargeLimit(const UPowerChargeLimitState& state) noexce
   return hasNumericThreshold || firmwareManaged || chargeLimitControlState(state).visible;
 }
 
-PowerTab::PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles)
-    : m_upower(upower), m_powerProfiles(powerProfiles) {}
+PowerTab::PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles, const ControlCenterServices* services)
+    : m_upower(upower), m_powerProfiles(powerProfiles) {
+  if (services != nullptr) {
+    m_settings = std::make_unique<SettingsPane>(*services, SettingsPaneOptions{.section = "power"});
+  }
+}
 
 std::unique_ptr<Flex> PowerTab::create() {
   const float scale = contentScale();
@@ -147,8 +152,26 @@ std::unique_ptr<Flex> PowerTab::create() {
 
   m_root->addChild(std::move(scroll));
 
+  if (m_settings != nullptr) {
+    return m_settings->takeHost(std::move(tab), contentScale(), panelCardOpacity());
+  }
   return tab;
 }
+
+std::unique_ptr<Flex> PowerTab::createHeaderActions() {
+  if (m_settings == nullptr) {
+    return nullptr;
+  }
+  return m_settings->createEmbedHeaderActions(nullptr, contentScale());
+}
+
+void PowerTab::setConfigureMode(bool show) {
+  if (m_settings != nullptr) {
+    m_settings->setConfigureMode(show);
+  }
+}
+
+bool PowerTab::configureMode() const { return m_settings != nullptr && m_settings->configureMode(); }
 
 void PowerTab::buildChargingCard(Flex& root, float scale) {
   if (m_upower == nullptr) {
@@ -396,6 +419,9 @@ void PowerTab::buildPeripheralsCard(Flex& root, float scale) {
 }
 
 void PowerTab::onClose() {
+  if (m_settings != nullptr) {
+    m_settings->onClose();
+  }
   m_root = nullptr;
   m_statusCard = nullptr;
   m_statusGlyph = nullptr;
@@ -424,6 +450,9 @@ void PowerTab::onClose() {
 }
 
 void PowerTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_root == nullptr) {
     return;
   }
