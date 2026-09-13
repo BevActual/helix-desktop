@@ -21,7 +21,7 @@ namespace settings {
 
   class SettingsControlFactory;
 
-  // Data + actions for the Plugins settings section. Populated by SettingsWindow
+  // Data + actions for the Plugins settings section. Populated by SettingsPane
   // from the PluginManager; the section is fully custom (no registry entries).
   struct SettingsPluginsContext {
     float scale = 1.0F;

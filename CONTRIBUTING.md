@@ -215,7 +215,7 @@ src/
     polkit/         Polkit prompt panel
     screen_corners/ Screen corner overlays
     session/        Session panel and action runners
-    settings/       Settings window, setting controls, registries, popups
+    settings/       Settings editors, setting controls, registries, sheets
     setup_wizard/   First-run setup wizard
     surface/        Shared shell surface geometry and shadow helpers
     switcher/       Window switcher UI

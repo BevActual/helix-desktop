@@ -93,7 +93,7 @@ namespace noctalia::config {
 
       std::println("Settings controls");
       std::println("Unit: one SettingEntry row/control. Dropdown options are not counted.");
-      std::println("Runtime action buttons inserted by SettingsWindow are not counted.");
+      std::println("Runtime action buttons inserted by Control Center are not counted.");
 
       std::println();
       std::println("Other totals");

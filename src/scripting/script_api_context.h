@@ -180,7 +180,7 @@ namespace scripting {
       }
     }
 
-    // Opens the settings window at a plugin's settings. Wired to PanelManager in Application;
+    // Opens Control Center at a plugin's settings. Wired to PanelManager in Application;
     // main thread only.
     void setOpenPluginSettingsHook(std::function<void(const std::string&)> hook) {
       m_openPluginSettingsHook = std::move(hook);

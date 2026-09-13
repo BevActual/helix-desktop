@@ -286,15 +286,15 @@
     "display": {
       "disabled": "Disabled",
       "layout": "Arrangement",
-      "layout-hint": "Drag to another side. Arrows slide along the shared edge. niri keeps displays adjacent and non-overlapping.",
+      "layout-hint": "Drag to another side. Arrows slide along the shared edge (32px, Ctrl 8px, Shift 1px). niri keeps displays adjacent and non-overlapping.",
       "move": "Display to move",
       "moving": "Moving {name}",
       "moving-at": "Moving {name} · {x}, {y}",
       "no-displays": "No monitors available",
-      "nudge-down": "Slide down along the shared edge",
-      "nudge-left": "Slide left along the shared edge",
-      "nudge-right": "Slide right along the shared edge",
-      "nudge-up": "Slide up along the shared edge",
+      "nudge-down": "Slide down along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-left": "Slide left along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-right": "Slide right along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-up": "Slide up along the shared edge (Ctrl 8px, Shift 1px)",
       "place-bottom": "Place below",
       "place-left": "Place to the left",
       "place-right": "Place to the right",
@@ -305,7 +305,7 @@
       "resolution": "Resolution",
       "rotation": "Rotation",
       "scale": "Scale",
-      "temporary": "On niri, mode and layout changes apply until the compositor reloads its config.",
+      "temporary": "Temporary · niri will forget this on reload. Save to niri to persist.",
       "transform-180": "180°",
       "transform-270": "270°",
       "transform-90": "90°",
@@ -315,11 +315,17 @@
       "transform-flipped-90": "Flipped 90°",
       "transform-normal": "Normal",
       "unknown-resolution": "Unknown resolution",
-      "vrr": "Variable refresh rate"
+      "vrr": "Variable refresh rate",
+      "save-to-niri": "Save layout to niri",
+      "save-title": "Niri display layout",
+      "save-ok": "Wrote noctalia-outputs.kdl. niri reloads the config on its own.",
+      "save-failed": "Could not update the niri config",
+      "saved": "Saved in noctalia-outputs.kdl",
+      "layout-error": "Display layout"
     },
     "settings": {
-      "hint": "Change settings here. Search from any page, or open the Settings window for export and a few remaining tools.",
-      "open": "Open Settings window",
+      "hint": "Change settings here. Search from any page, or use the menu on a settings page for export and a support report.",
+      "open": "Open settings",
       "configure": "Settings",
       "plugins-hint": "Install, update, and configure plugins from this page.",
       "plugins-open": "Open plugin store",
@@ -328,9 +334,7 @@
     "sidebar": {
       "look": "Look",
       "status": "Status",
-      "setup": "Setup",
-      "more": "More",
-      "more-hide": "Hide setup"
+      "setup": "Setup"
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
@@ -1116,6 +1120,7 @@
         "label": "Monitor: {name}",
         "management": "Monitor Override",
         "match-placeholder": "Monitor match",
+        "base": "All monitors",
         "new": "Monitor Override",
         "rename": "Rename",
         "rename-save": "Save"
@@ -1377,12 +1382,14 @@
         "screenshot-output": "Output",
         "security": "Security",
         "session-panel": "Session Panel",
+        "setup": "Setup",
         "shape": "Shape",
         "system": "System",
         "theme": "Theme",
         "toasts": "Toasts",
         "transition": "Transition",
         "user": "User",
+        "wallhaven": "Wallhaven",
         "wallpaper": "Wallpaper",
         "weather": "Weather",
         "widget-list": "Widget List",
@@ -1746,7 +1753,7 @@
           "label": "Button Borders"
         },
         "card-borders": {
-          "description": "Draw outlines around section cards inside panels and the settings window",
+          "description": "Draw outlines around section cards inside panels",
           "label": "Card Borders"
         },
         "community-palette": {
@@ -2321,8 +2328,12 @@
           "actions": {
             "brightness-down": { "label": "Decrease brightness" },
             "brightness-up": { "label": "Increase brightness" },
+            "clipboard": { "label": "Clipboard" },
             "control-center": { "label": "Control Center" },
             "launcher": { "label": "Launcher" },
+            "lock": { "label": "Lock session" },
+            "night-light": { "label": "Night light" },
+            "screenshot-region": { "label": "Screenshot region" },
             "settings": { "label": "Settings" },
             "volume-down": { "label": "Decrease volume" },
             "volume-mute": { "label": "Toggle mute" },
@@ -2349,7 +2360,8 @@
           "install-ok": "Added {count} niri bind(s). niri reloads the config on its own.",
           "missing": "Not in niri config · recommended {key}",
           "none-missing": "All recommended niri binds are already present",
-          "title": "Niri keybinds"
+          "title": "Niri keybinds",
+          "updated": "Updated noctalia-binds.kdl. niri reloads the config on its own."
         }
       },
       "lockscreen": {
@@ -2398,6 +2410,52 @@
           "button": "Toggle Editor",
           "description": "Add, move, and resize widgets on the lock screen",
           "label": "Lockscreen Widget Editor"
+        }
+      },
+      "niri": {
+        "setup": {
+          "copied": "Copied niri setup snippet to the clipboard",
+          "copied-missing": "Copied missing niri setup snippets to the clipboard",
+          "copy-missing": {
+            "button": "Copy missing",
+            "description": "Copy recommended niri setup snippets that are not in your config yet",
+            "label": "Copy missing setup"
+          },
+          "install": {
+            "button": "Add to niri",
+            "description": "Write missing setup snippets to noctalia-setup.kdl and include it from config.kdl. Existing niri config is left unchanged.",
+            "label": "Install recommended setup"
+          },
+          "install-failed": "Could not update the niri config",
+          "install-none": "All recommended niri setup snippets are already present",
+          "install-ok": "Added {count} niri setup snippet(s). niri reloads the config on its own.",
+          "items": {
+            "autostart": {
+              "description": "Start Noctalia when niri starts",
+              "label": "Autostart Noctalia"
+            },
+            "backdrop": {
+              "description": "Place the Noctalia backdrop layer in niri overview",
+              "label": "Backdrop layer-rule"
+            },
+            "lid-close": {
+              "description": "Lock and suspend when the laptop lid closes",
+              "label": "Lid close lock and suspend"
+            },
+            "window-rule": {
+              "description": "Float a Noctalia xdg-toplevel, if one is shown",
+              "label": "Settings window rule"
+            },
+            "xdg-activation": {
+              "description": "Allow notification actions and window activation from Noctalia",
+              "label": "XDG activation"
+            }
+          },
+          "missing": "Not in niri config",
+          "none-missing": "All recommended niri setup snippets are already present",
+          "optional": "Optional",
+          "present": "Found in niri config",
+          "title": "Niri setup"
         }
       },
       "notifications": {
@@ -2509,10 +2567,6 @@
         "home-session-button": {
           "description": "Show the session-actions button in the Home tab header",
           "label": "Show Header Session Button"
-        },
-        "control-center-show-setup": {
-          "description": "Show launcher, dock, and other setup pages in the Control Center sidebar. The More row also toggles this.",
-          "label": "Show Setup Pages"
         },
         "home-shortcuts": {
           "description": "Choose up to six shortcut buttons for the home tab",
@@ -3243,7 +3297,7 @@
           "label": "Show Cursor"
         },
         "settings-window-translucent": {
-          "description": "Make the Settings background translucent for compositor effects",
+          "description": "Unused. Settings now live in Control Center.",
           "label": "Settings Translucent Background"
         },
         "show-location": {
@@ -3361,6 +3415,11 @@
           "description": "Open the wallpaper picker panel",
           "label": "Wallpaper Panel"
         },
+        "choose": {
+          "button": "Browse…",
+          "description": "Pick an image file to apply to all monitors",
+          "label": "Choose Wallpaper"
+        },
         "per-monitor-directories": {
           "description": "Use separate wallpaper folders for each monitor",
           "label": "Per-Monitor Directories"
@@ -3376,6 +3435,15 @@
         "transitions": {
           "description": "Effects available when changing wallpaper (one is picked at random per change)",
           "label": "Transition Effects"
+        },
+        "wallhaven-api-key": {
+          "description": "Optional Wallhaven API key for higher rate limits and NSFW results",
+          "label": "Wallhaven API Key"
+        },
+        "wallhaven-download-dir": {
+          "description": "Optional folder for Wallhaven downloads; empty uses your wallpaper directory",
+          "label": "Wallhaven Download Directory",
+          "placeholder": "Wallpaper directory"
         }
       }
     },
@@ -3763,23 +3831,23 @@
             "label": "Session action"
           },
           "settings-close": {
-            "description": "Close the settings window",
+            "description": "Close Control Center if it is open on a settings page",
             "label": "Close settings"
           },
           "settings-open": {
-            "description": "Open the settings window, or focus it if already open, optionally at a specific section",
+            "description": "Open Control Center on a settings page, optionally at a specific section",
             "label": "Open settings"
           },
           "settings-open-plugin": {
-            "description": "Open the settings window at a plugin's settings (e.g. noctalia/notes)",
+            "description": "Open Control Center at a plugin's settings (e.g. noctalia/notes)",
             "label": "Open plugin settings"
           },
           "settings-open-widget": {
-            "description": "Open the settings window at a bar widget; from a widget gesture, targets that widget",
+            "description": "Open Control Center at a bar widget; from a widget gesture, targets that widget",
             "label": "Open widget settings"
           },
           "settings-toggle": {
-            "description": "Toggle the settings window, optionally at a specific section",
+            "description": "Toggle Control Center on a settings page, optionally at a specific section",
             "label": "Toggle settings"
           },
           "status": {
@@ -4769,6 +4837,8 @@
     "panel": {
       "all-monitors": "ALL",
       "choose-color": "Choose wallpaper color",
+      "choose-file": "Choose wallpaper image",
+      "choose-file-title": "Choose wallpaper",
       "close": "Close wallpaper panel",
       "color-title": "Wallpaper color",
       "favorite-current": "Add current wallpaper to favorites",
@@ -4783,7 +4853,48 @@
       "sort-name-desc": "Sort by name (Z-A)",
       "sort-random": "Sort by random (shuffle)",
       "title": "Wallpaper",
-      "unfavorite-current": "Remove current wallpaper from favorites"
+      "unfavorite-current": "Remove current wallpaper from favorites",
+      "wallhaven": {
+        "applied": "Wallpaper applied",
+        "applying": "Downloading…",
+        "category-anime": "Anime",
+        "category-general": "General",
+        "category-people": "People",
+        "clear-resolution": "Clear",
+        "download-failed": "Download failed",
+        "empty": "No wallpapers found.",
+        "error": "Request failed",
+        "filter-aspect-ratio": "Aspect Ratio",
+        "filter-categories": "Categories",
+        "filter-purity": "Purity",
+        "filter-resolution": "Resolution",
+        "filter-sort": "Sort",
+        "library": "Library",
+        "offline": "Wallhaven needs network access. Turn off offline mode in Settings → Shell.",
+        "page": "Page {page} / {pages}",
+        "purity-nsfw": "NSFW",
+        "purity-sfw": "SFW",
+        "purity-sketchy": "Sketchy",
+        "ratio-any": "Any",
+        "ratio-portrait": "All Portrait",
+        "ratio-wide": "All Wide",
+        "resolution-height": "Height",
+        "resolution-mode-atleast": "At Least",
+        "resolution-mode-exact": "Exact",
+        "resolution-width": "Width",
+        "search": "Search",
+        "search-placeholder": "Search tags (e.g. nature, city night)",
+        "sort-asc": "Ascending",
+        "sort-date-added": "Date Added",
+        "sort-desc": "Descending",
+        "sort-favorites": "Favorites",
+        "sort-hot": "Hot",
+        "sort-random": "Random",
+        "sort-relevance": "Relevance",
+        "sort-toplist": "Toplist",
+        "sort-views": "Views",
+        "title": "Wallhaven"
+      }
     }
   },
   "weather": {

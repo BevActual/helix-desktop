@@ -12,6 +12,12 @@ import option3 from '../../assets/niri-overview/option3-v5.png';
 
 Add the following settings to your Niri configuration file (usually located at `~/.config/niri/config.kdl`).
 
+**Settings → Niri → Setup** can copy missing snippets or write them to `noctalia-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body.
+
+## Display layout
+
+Control Center → Monitor can arrange niri outputs live. Those IPC positions are forgotten when niri reloads unless you click **Save to niri**, which writes `noctalia-outputs.kdl` next to your config and appends `include "noctalia-outputs.kdl"`.
+
 ## Autostart Noctalia
 
 ```kdl
@@ -31,14 +37,6 @@ window-rule {
   clip-to-geometry true
 }
 
-// Floating Noctalia settings window.
-window-rule {
-  match app-id="dev.noctalia.Noctalia"
-  open-floating true
-  default-column-width { fixed 1080; }
-  default-window-height { fixed 920; }
-}
-
 debug {
   // Allows notification actions and window activation from Noctalia.
   honor-xdg-activation-with-invalid-serial
@@ -49,7 +47,7 @@ debug {
 
 Both `spawn-sh` and `spawn` are usable to run Noctalia keybinds.
 
-Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds → Niri** to copy missing lines or install them into `noctalia-binds.kdl`:
+Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds → Niri** to record Super/Mod chords, copy missing lines, or install them into `noctalia-binds.kdl`:
 
 ```kdl
 binds {
@@ -59,6 +57,10 @@ binds {
     Mod+Comma { spawn-sh "noctalia msg settings-toggle"; }
     Alt+Tab { spawn-sh "noctalia msg window-switcher"; }
     // Niri has a built-in window switcher you might want to try it to see which one you prefer.
+    Mod+Escape { spawn-sh "noctalia msg session lock"; }
+    Print { spawn-sh "noctalia msg screenshot-region"; }
+    Mod+V { spawn-sh "noctalia msg panel-toggle clipboard"; }
+    Mod+Shift+N { spawn-sh "noctalia msg nightlight-toggle"; }
 
     // Audio & Brightness
     XF86AudioRaiseVolume { spawn-sh "noctalia msg volume-up"; }

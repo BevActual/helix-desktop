@@ -1,6 +1,8 @@
 #pragma once
 
 #include "shell/control_center/shortcut_services.h"
+#include "shell/settings/settings_runtime.h"
+#include "ui/signal.h"
 
 class AccountsService;
 class AsyncTextureCache;
@@ -34,6 +36,7 @@ class UPowerService;
 class Wallpaper;
 class WeatherService;
 class GammaService;
+class WallpaperScanner;
 
 namespace noctalia::theme {
   class ThemeService;
@@ -44,6 +47,7 @@ namespace scripting {
 }
 namespace settings {
   class HostedEditors;
+  class SettingsModalHost;
 }
 
 struct ControlCenterServices {
@@ -80,9 +84,13 @@ struct ControlCenterServices {
   ClipboardService* clipboard = nullptr;
   AccountsService* accounts = nullptr;
   ThumbnailService* thumbnails = nullptr;
+  WallpaperScanner* wallpaperScanner = nullptr;
   AsyncTextureCache* asyncTextures = nullptr;
   scripting::PluginManager* pluginManager = nullptr;
   settings::HostedEditors* hostedEditors = nullptr;
+  settings::SettingsModalHost* modalHost = nullptr;
+  Signal<>* settingsInvalidated = nullptr;
+  settings::RuntimeActions settingsActions;
 
   [[nodiscard]] ShortcutServices shortcutServices() const {
     return {

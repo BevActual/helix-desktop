@@ -10,8 +10,11 @@
 #include "ui/style.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
 #include <cmath>
 #include <format>
+#include <ranges>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
 
@@ -613,6 +616,25 @@ namespace settings {
     return i18n::tr(
         "settings.notifications.filter.summary", "match", matchLabel, "flags", StringUtils::join(parts, ", ")
     );
+  }
+
+  std::vector<std::string> barWidgetLanePath(const Config& cfg, const std::string& barName, const std::string& widgetName) {
+    std::string_view lane = "center";
+    for (const auto& bar : cfg.bars) {
+      if (bar.name != barName) {
+        continue;
+      }
+      const auto inLane = [&](const std::vector<std::string>& widgets) {
+        return std::ranges::contains(widgets, widgetName);
+      };
+      if (inLane(bar.startWidgets)) {
+        lane = "start";
+      } else if (inLane(bar.endWidgets)) {
+        lane = "end";
+      }
+      break;
+    }
+    return {"bar", barName, std::string(lane)};
   }
 
 } // namespace settings

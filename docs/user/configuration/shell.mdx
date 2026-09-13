@@ -43,8 +43,8 @@ niri_overview_type_to_launch_enabled = false # niri-only type-to-launch from ove
 polkit_agent          = false           # register Noctalia's native polkit authentication agent
 password_style        = "default"       # default | random
 avatar_path           = "~/Pictures/avatar.png"
-settings_show_advanced = true           # show advanced settings by default in Settings
-settings_window_translucent = false     # translucent Settings window background
+settings_show_advanced = true           # show advanced settings by default
+# settings_window_translucent is unused; settings live in Control Center
 show_location         = true            # show weather location text in shell UI
 launch_apps_as_systemd_services = false # launch apps as transient systemd services (needs Noctalia to be a user unit)
 launch_apps_custom_command = ""         # wrap launched apps; $CMD is replaced with the app command
@@ -198,8 +198,8 @@ Notes:
 - `polkit_agent` controls registration on `org.freedesktop.PolicyKit1`. Keep disabled if another desktop agent handles auth prompts. When enabled, `shell.panel.polkit_placement` and `polkit_position` control whether the auth prompt attaches to the bar or floats (default: `polkit_placement = "floating"` with `polkit_position = "center"`).
 - Notification daemon ownership moved out of `[shell]`: use `[notification].enable_daemon` in [Services](/noctalia/services/notifications/).
 - `password_style`: `default` uses `circle-filled`; `random` cycles through multiple filled glyph shapes on polkit and lock screen inputs.
-- `settings_show_advanced`: when `true`, Settings opens with advanced entries visible.
-- `settings_window_translucent`: when `true`, the Settings window background is drawn translucent. Compositor blur or other effects can be applied via compositor window rules.
+- `settings_show_advanced`: when `true`, settings pages open with advanced entries visible.
+- `settings_window_translucent`: unused. Settings live in Control Center; this key is kept so existing configs still load.
 - `show_location`: when `false`, weather location text/coordinates are hidden in shell surfaces.
 - `app_icon_colorize` and `app_icon_color`: global application icon tinting for the dock, system tray (bar and drawer), taskbar, active-window widget, and launcher panel results. See [App icon colorization](#app-icon-colorization). Bar `launcher` / `control-center` widgets can optionally tint `custom_image` via `custom_image_colorize` using the widget **Color** setting (Presentation group in the widget editor).
 - `lang`: empty follows `$LC_ALL`, `$LC_MESSAGES`, then `$LANG`. Values may be BCP-47 tags (`pt-BR`, `zh-Hans`) or POSIX locale names (`pt_BR.UTF-8`, `zh_CN.UTF-8`). Chinese region locales infer script before matching catalogs, so `zh_CN` and `zh_SG` match `zh-Hans`, while `zh_TW`, `zh_HK`, and `zh_MO` match `zh-Hant`. When a right-to-left catalog is loaded, Noctalia mirrors text, controls, grids, scrollbars, and directional icons automatically. Bar `start`/`center`/`end` lanes and dock item order remain on their configured physical sides. If no matching catalog loads and Noctalia falls back to English, the UI remains left-to-right.
@@ -216,7 +216,7 @@ Notes:
 - `button_borders`: when `true` (default), buttons use the outline defined by their built-in or custom style. Set it to `false` for borderless buttons throughout the shell. Other controls, cards, panels, and explicitly configured raw borders are unaffected. Toggle in **Settings → Appearance → Borders**.
 - `input_borders`: when `true` (default), text fields and select/dropdown triggers draw a resting outline. Set it to `false` to drop the resting border; the focus ring still appears while an input is focused. Toggle in **Settings → Appearance → Borders**.
 - `popup_borders`: when `true` (default), popups and dropdowns (context menus, select dropdowns, and tray/dock menus) draw a subtle outline that separates them from the surface they float over. Set it to `false` for borderless popups. Centered dialogs always retain their outline because they use the same background color as their parent surface. Toggle in **Settings → Appearance → Borders**.
-- `card_borders`: when `true` (default), section cards draw an outline wherever they render - control center tabs, launcher and clipboard preview panes, setup wizard steps, and the settings window. Set it to `false` for flat, borderless cards. A panel's own outline is controlled by `shell.panel.borders`. Toggle in **Settings → Appearance → Borders**.
+- `card_borders`: when `true` (default), section cards draw an outline wherever they render - control center tabs, launcher and clipboard preview panes, and setup wizard steps. Set it to `false` for flat, borderless cards. A panel's own outline is controlled by `shell.panel.borders`. Toggle in **Settings → Appearance → Borders**.
 - `popup_shadows`: when `true` (default), popups and dropdowns cast the global `[shell.shadow]` drop shadow. Set it to `false` to disable popup shadows only; other surfaces keep their own `shadow` toggles. Toggle in **Settings → Appearance → Effects**.
 - `launch_apps_as_systemd_services`: when `true`, apps launched from the launcher, dock, and taskbar run as transient systemd services (`systemd-run --user`, unit `app-<desktop-id>@<uuid>.service`) so they survive a shell restart and get their own cgroup. This only applies when Noctalia itself runs under the systemd user manager - as a user unit, or started through uwsm. If it was started as a plain child of the compositor session, the option is ignored (apps launch directly, a warning is logged, and the toggle is disabled in **Settings → Shell → General**); launching apps into the user manager from a session-scoped shell would move them out of the login session and can break them.
 - `launch_apps_custom_command`: when non-empty, wraps every app launched from the launcher, dock, and taskbar. The literal `$CMD` is replaced with the app's own command - e.g. `uwsm-app -- $CMD` or `gamemoderun $CMD`. Mutually exclusive with `launch_apps_as_systemd_services`; when both are set and the systemd launcher is in effect, the systemd service wins and the custom command is ignored. When the systemd launcher is ignored for the reason above, the custom command applies as usual. This is the v5 replacement for the old Launcher **custom launch prefix**; it is not a terminal-only setting.
@@ -474,7 +474,7 @@ Open **Settings → Keybinds** to bind chords interactively. In-shell actions ar
 
 - Click a slot (or focus it and press a `validate` chord) to start recording, then press the key combination. The recorder previews held modifiers (e.g. `Ctrl + Shift + …`) and commits as soon as a non-modifier key is pressed.
 - Press a modifier-only chord (no regular key) and click away to abort the recording without changing the binding.
-- Pressing **Super / Windows** - either alone or as a modifier - cancels the recording and surfaces a transient toast explaining that compositor-reserved keys cannot be bound. Click the slot again to retry with a different chord.
+- For in-shell actions, pressing **Super / Windows** - either alone or as a modifier - cancels the recording and surfaces a transient toast explaining that compositor-reserved keys cannot be bound. Click the slot again to retry with a different chord.
 - Use the **×** next to a row to remove that specific binding. Removing every binding clears the GUI override and restores the built-in default for that action.
 - After you change a binding, **Override** and **Reset** appear below that action's list so the title and description keep the full column width.
 
@@ -485,6 +485,7 @@ Chords recorded in the GUI are serialized as `ctrl+shift+Return`-style strings u
 On niri, **Settings → Keybinds** adds a **Niri** group above the in-shell actions. It reads `~/.config/niri/config.kdl` and included files (or `$NIRI_CONFIG`), then shows whether each recommended Noctalia shortcut is already bound.
 
 - **Copy** copies one `spawn-sh "noctalia msg …"` line.
+- Record a chord on a Niri row to write it into `noctalia-binds.kdl` (Super is stored as niri `Mod`). Binds that exist only in your `binds { }` stay copy-only.
 - **Copy missing** copies a `binds { }` block for shortcuts that are not in the niri config yet.
 - **Add to niri** writes those missing binds to `noctalia-binds.kdl` next to your niri config and appends `include "noctalia-binds.kdl"` to `config.kdl`. Existing binds are left unchanged; niri reloads the file on its own.
 

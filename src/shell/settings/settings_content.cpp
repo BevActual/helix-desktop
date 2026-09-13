@@ -1213,6 +1213,39 @@ namespace settings {
                   .radius = Style::scaledRadiusMd(scale),
                   .onClick = control.action,
               });
+            } else if constexpr (std::is_same_v<T, ExternalKeybindSetting>) {
+              auto row = ui::row({
+                  .align = FlexAlign::Center,
+                  .gap = Style::spaceXs * scale,
+              });
+              row->addChild(
+                  ui::keybindRecorder({
+                      .chord = control.chord,
+                      .scale = scale,
+                      .enabled = control.enabled,
+                      .unsetPlaceholder = i18n::tr("settings.controls.keybind.unset-placeholder"),
+                      .recordingPlaceholder = i18n::tr("settings.controls.keybind.recording-placeholder"),
+                      .allowSuper = control.allowSuper,
+                      .onCommit = control.onCommit,
+                  })
+              );
+              if (!control.copy.label.empty() || !control.copy.glyph.empty()) {
+                row->addChild(
+                    ui::button({
+                        .text = control.copy.label,
+                        .glyph = control.copy.glyph.empty() ? "copy" : control.copy.glyph,
+                        .fontSize = Style::fontSizeCaption * scale,
+                        .glyphSize = Style::fontSizeCaption * scale,
+                        .variant = control.copy.variant,
+                        .minHeight = Style::controlHeightSm * scale,
+                        .paddingV = Style::spaceXs * scale,
+                        .paddingH = Style::spaceSm * scale,
+                        .radius = Style::scaledRadiusMd(scale),
+                        .onClick = control.copy.action,
+                    })
+                );
+              }
+              return row;
             } else if constexpr (std::is_same_v<T, ColorSpecPickerSetting>) {
               return makeColorSpecPicker(control, entry.path);
             } else if constexpr (std::is_same_v<T, GestureActionSetting>) {

@@ -1,10 +1,14 @@
 #include "compositors/niri/niri_config_binds.h"
 
+#include "core/input/key_chord.h"
+#include "core/input/key_modifiers.h"
+
 #include <filesystem>
 #include <fstream>
 #include <print>
 #include <string>
 #include <unistd.h>
+#include <xkbcommon/xkbcommon-keysyms.h>
 
 namespace {
 
@@ -91,6 +95,28 @@ int main() {
 
   const auto again = compositors::niri::installMissingInto(config);
   ok = expect(again.ok && again.added == 0, "second install is a no-op") && ok;
+
+  KeyChord superSpace{.sym = XKB_KEY_space, .modifiers = KeyMod::Super};
+  ok = expect(compositors::niri::niriKeyFromChord(superSpace) == "Mod+Space", "maps Super to niri Mod") && ok;
+  const auto parsedChord = compositors::niri::niriKeyToChord("Mod+Comma");
+  ok = expect(parsedChord.has_value() && (parsedChord->modifiers & KeyMod::Super) != 0, "parses niri Mod as Super")
+      && ok;
+
+  const auto changed = compositors::niri::setRecommendedKeyInto(config, "launcher", "Mod+D");
+  ok = expect(changed.ok, "rewrites an owned bind key") && ok;
+  const auto afterChange = compositors::niri::scanConfigFile(config);
+  bool launcherModD = false;
+  for (const auto& status : compositors::niri::bindStatuses(afterChange)) {
+    if (status.recommended.id == "launcher") {
+      for (const auto& key : status.boundKeys) {
+        if (key == "Mod+D") {
+          launcherModD = true;
+        }
+      }
+      ok = expect(status.inOwnedInclude, "launcher bind is in the owned include") && ok;
+    }
+  }
+  ok = expect(launcherModD, "launcher chord changed to Mod+D") && ok;
 
   std::filesystem::remove_all(dir);
   return ok ? 0 : 1;

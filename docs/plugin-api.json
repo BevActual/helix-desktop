@@ -75,7 +75,7 @@
     "level": 15,
     "noctaliaVersion": "v5.0.0-beta.6",
     "feature": "open-settings",
-    "introduced": "`noctalia.openSettings()`, opening the settings window at the plugin's own settings."
+    "introduced": "`noctalia.openSettings()`, opening Control Center at the plugin's own settings."
   },
   {
     "level": 16,

@@ -8,10 +8,12 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
 class AsyncTextureCache;
+class CalendarService;
 class ConfigService;
 class Renderer;
 class Flex;
@@ -46,6 +48,10 @@ namespace settings {
     )>
         renameWidget;
     std::function<void(const std::string& id, bool enable, const scripting::CatalogEntry*)> onPluginToggled;
+    std::function<void(std::string, bool)> setHostStatus;
+    std::function<bool()> showAdvanced;
+    std::function<std::string()> requestActivationToken;
+    CalendarService* calendar = nullptr;
     std::string* editingWidgetName = nullptr;
     std::string* editingCapsuleGroupId = nullptr;
     std::string* renamingWidgetName = nullptr;
@@ -83,6 +89,12 @@ namespace settings {
     void openWidgetInspector(std::vector<std::string> lanePath, std::string widgetName);
     void openCapsuleGroup(std::vector<std::string> lanePath, std::string groupId);
     void openPluginStore();
+    void openPluginSettings(std::string pluginId);
+    void openPluginSource(std::optional<PluginSourceConfig> existing = std::nullopt);
+    void openCalendarAccount(std::optional<std::string> accountId);
+    void openCommunityTemplateStore();
+    void openSearchPicker(SearchPickerOpenRequest request);
+    void invalidatePluginSource(const std::string& sourceName);
     void close();
 
   private:
@@ -92,6 +104,9 @@ namespace settings {
     void openBarWidgetEditorSheet(
         std::string title, std::function<void(Flex&)> populate, std::function<void()> removeAction = nullptr
     );
+    void showStatus(std::string message, bool error);
+    void markWriteError(std::string message);
+    void markWriteSuccess(bool closeSheet);
 
     SettingsModalHost* m_host = nullptr;
     std::function<void()> m_dismissSelect;

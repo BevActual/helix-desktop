@@ -20,6 +20,7 @@ public:
   void onClose() override;
   [[nodiscard]] bool configureMode() const override { return true; }
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override { return &m_pane; }
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;

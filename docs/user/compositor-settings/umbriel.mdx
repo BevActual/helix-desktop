@@ -44,22 +44,16 @@ Adjust these values to match your preferred appearance. The full list of options
 
 ## Window Rules
 
-Use a `window_rule` to configure Noctalia's settings window as floating with a predictable size. Umbriel combines matching rules in file order, so add this to your existing rules or to a dedicated included file:
+Settings live in Control Center (a layer-shell panel), so Noctalia no longer opens an xdg-toplevel that needs a floating window rule. Umbriel still combines matching rules in file order; see Umbriel's [Window Rules](/umbriel/window-rules/) reference for placement, workspace, opacity, blur, and focus options.
+
+A typical global blur rule still applies to other windows:
 
 ```toml
 # Blur all windows
 [[window_rule]]
 blur = true
 blur_optimized = true
-
-# Float Noctalia's settings window
-[[window_rule]]
-match.app_id = "^dev.noctalia.Noctalia$"
-default_floating = true
-default_size = [1020, 900]
 ```
-
-`match.app_id` is an ECMAScript regular expression. The `^` and `$` anchors make this rule apply only to Noctalia's settings window. See Umbriel's [Window Rules](/umbriel/window-rules/) reference for placement, workspace, opacity, blur, and focus options.
 
 ## Layer Rules and Blur
 

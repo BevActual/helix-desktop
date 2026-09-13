@@ -1,60 +1,50 @@
+#include "shell/settings/settings_hosted_editors.h"
+
 #include "calendar/calendar_discovery_state.h"
 #include "calendar/calendar_service.h"
 #include "calendar/vdir_reader.h"
-#include "config/atomic_file.h"
 #include "config/config_service.h"
-#include "config/config_types.h"
 #include "core/deferred_call.h"
 #include "i18n/i18n.h"
-#include "net/url_open.h"
-#include "notification/notification_filter.h"
-#include "render/render_context.h"
+#include "render/core/renderer.h"
 #include "render/scene/input_area.h"
-#include "scripting/plugin_catalog.h"
 #include "scripting/plugin_registry.h"
-#include "shell/settings/bar_widget_editor.h"
 #include "shell/settings/color_spec_picker.h"
-#include "shell/settings/plugin_store_content.h"
-#include "shell/settings/settings_content.h"
 #include "shell/settings/settings_content_common.h"
 #include "shell/settings/settings_content_plugins.h"
 #include "shell/settings/settings_control_factory.h"
-#include "shell/settings/settings_window.h"
 #include "shell/settings/template_store_content.h"
-#include "shell/settings/widget_settings_registry.h"
 #include "theme/community_templates.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
-#include "ui/controls/context_menu.h"
-#include "ui/controls/context_menu_popup.h"
 #include "ui/controls/flex.h"
+#include "ui/controls/input.h"
+#include "ui/controls/search_picker.h"
 #include "ui/controls/segmented.h"
-#include "ui/dialogs/file_dialog.h"
-#include "ui/popup_parent.h"
+#include "ui/controls/toggle.h"
+#include "ui/palette.h"
+#include "ui/style.h"
 #include "util/file_utils.h"
-#include "util/string_utils.h"
-#include "wayland/toplevel_surface.h"
-#include "wayland/wayland_connection.h"
 #include "wayland/wayland_seat.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <format>
 #include <memory>
 #include <optional>
+#include <ranges>
 #include <string>
-#include <thread>
+#include <string_view>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
-namespace {
+namespace settings {
+  namespace {
 
-  constexpr std::int32_t kActionSupportReport = 1;
-  constexpr std::int32_t kActionExportConfig = 2;
-  constexpr std::string_view kCalendarDiscoveryOwner = "calendar_discovery";
+    constexpr std::string_view kCalendarDiscoveryOwner = "calendar_discovery";
 
   std::string calendarCredentialError(CalendarService::CredentialOperationResult result) {
     switch (result) {
@@ -77,17 +67,6 @@ namespace {
       return {};
     }
     return i18n::tr("settings.calendar-accounts.secret-service-error");
-  }
-
-  XdgPopupParent popupParentFor(ToplevelSurface& surface, wl_output* output, std::uint32_t serial) {
-    return XdgPopupParent{
-        .xdgSurface = surface.xdgSurface(),
-        .wlSurface = surface.wlSurface(),
-        .output = output,
-        .serial = serial,
-        .width = surface.width(),
-        .height = surface.height(),
-    };
   }
 
   struct PluginSourceDraft {
@@ -194,375 +173,18 @@ namespace {
 
   std::string trimInput(Input* input) { return input != nullptr ? StringUtils::trim(input->value()) : std::string{}; }
 
-  bool isBarWidgetListPath(const std::vector<std::string>& path) {
-    if (path.size() < 3 || path.front() != "bar") {
-      return false;
-    }
-    const auto& key = path.back();
-    return key == "start" || key == "center" || key == "end";
+  } // namespace
+
+void HostedEditors::openCalendarAccount(std::optional<std::string> accountId) {
+  if (m_b.config == nullptr) {
+    return;
   }
-
-  std::vector<std::string> barWidgetItemsForPath(const Config& cfg, const std::vector<std::string>& path) {
-    if (!isBarWidgetListPath(path) || path.size() < 3) {
-      return {};
-    }
-
-    const auto* bar = settings::findBar(cfg, path[1]);
-    if (bar == nullptr) {
-      return {};
-    }
-
-    const auto& lane = path.back();
-    if (path.size() >= 5 && path[2] == "monitor") {
-      const auto* ovr = settings::findMonitorOverride(*bar, path[3]);
-      if (ovr != nullptr) {
-        if (lane == "start") {
-          return ovr->startWidgets.value_or(bar->startWidgets);
-        }
-        if (lane == "center") {
-          return ovr->centerWidgets.value_or(bar->centerWidgets);
-        }
-        if (lane == "end") {
-          return ovr->endWidgets.value_or(bar->endWidgets);
-        }
-      }
-    }
-
-    if (lane == "start") {
-      return bar->startWidgets;
-    }
-    if (lane == "center") {
-      return bar->centerWidgets;
-    }
-    if (lane == "end") {
-      return bar->endWidgets;
-    }
-    return {};
-  }
-
-} // namespace
-
-void SettingsWindow::openActionsMenu() {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_actionsMenuButton == nullptr
-      || m_surface->xdgSurface() == nullptr) {
+  prepareOpen();
+  if (m_sheet == nullptr) {
     return;
   }
 
-  if (m_actionsMenuPopup == nullptr) {
-    m_actionsMenuPopup = std::make_unique<ContextMenuPopup>(*m_wayland, *m_renderContext);
-    m_actionsMenuPopup->setOnActivate([this](const ContextMenuControlEntry& entry) {
-      switch (entry.id) {
-      case kActionSupportReport:
-        if (m_actionsMenuPopup != nullptr) {
-          m_actionsMenuPopup->close();
-        }
-        DeferredCall::callLater([this]() { saveSupportReport(); });
-        break;
-      case kActionExportConfig:
-        if (m_actionsMenuPopup != nullptr) {
-          m_actionsMenuPopup->close();
-        }
-        DeferredCall::callLater([this]() { openConfigExportDialog(); });
-        break;
-      default:
-        break;
-      }
-    });
-  } else if (m_actionsMenuPopup->isOpen()) {
-    m_actionsMenuPopup->close();
-    return;
-  }
-
-  std::vector<ContextMenuControlEntry> entries;
-  entries.push_back(
-      {.id = kActionSupportReport,
-       .label = i18n::tr("settings.window.support-report"),
-       .enabled = true,
-       .separator = false,
-       .hasSubmenu = false}
-  );
-  entries.push_back(
-      {.id = kActionExportConfig,
-       .label = i18n::tr("settings.window.export-config"),
-       .enabled = true,
-       .separator = false,
-       .hasSubmenu = false}
-  );
-
-  float anchorAbsX = 0.0F;
-  float anchorAbsY = 0.0F;
-  Node::absolutePosition(m_actionsMenuButton, anchorAbsX, anchorAbsY);
-
-  const float scale = uiScale();
-  wl_output* output = m_wayland->lastPointerOutput();
-  if (output == nullptr) {
-    output = m_output;
-  }
-
-  if (m_config != nullptr) {
-    m_actionsMenuPopup->setShadowConfig(m_config->config().shell.shadow);
-  }
-  m_actionsMenuPopup->open(
-      ContextMenuPopupRequest{
-          .entries = std::move(entries),
-          .minMenuWidth = 220.0F * scale,
-          .maxMenuWidth = Style::menuAutoMaxWidth * scale,
-          .maxVisible = 8,
-          .anchor =
-              PopupAnchorRect{
-                  .x = static_cast<std::int32_t>(anchorAbsX),
-                  .y = static_cast<std::int32_t>(anchorAbsY),
-                  .width = static_cast<std::int32_t>(m_actionsMenuButton->width()),
-                  .height = static_cast<std::int32_t>(m_actionsMenuButton->height()),
-              },
-          .parent = PopupSurfaceParent{
-              .xdgSurface = m_surface->xdgSurface(),
-              .output = output,
-          },
-      }
-  );
-}
-
-void SettingsWindow::openConfigExportDialog() {
-  if (m_surface == nullptr || m_config == nullptr) {
-    return;
-  }
-
-  if (m_configExportDialogModal == nullptr) {
-    m_configExportDialogModal = std::make_unique<settings::ConfigExportDialogModal>();
-    m_configExportDialogModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-
-  m_configExportDialogModal->open(
-      settings::ConfigExportDialogRequest{
-          .scale = uiScale(),
-          .callback = [this](settings::ConfigExportMode mode) { saveConfigExport(mode); },
-      }
-  );
-}
-
-void SettingsWindow::openBarWidgetAddPopup(const std::vector<std::string>& lanePath) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-
-  if (m_widgetAddPopup == nullptr) {
-    m_widgetAddPopup = std::make_unique<settings::WidgetAddPopup>();
-    m_widgetAddPopup->initialize(*m_wayland, *m_config, *m_renderContext);
-    m_widgetAddPopup->setOnSelect([this](
-                                      const std::vector<std::string>& selectedLanePath, const std::string& value,
-                                      const std::string& newInstanceType, const std::string& newInstanceId,
-                                      const std::vector<std::pair<std::string, std::string>>& initialSettings
-                                  ) {
-      if (value.empty() || m_config == nullptr) {
-        return;
-      }
-
-      const Config& activeConfig = m_config->config();
-      auto laneItems = barWidgetItemsForPath(activeConfig, selectedLanePath);
-
-      m_pendingDeleteWidgetName.clear();
-      m_pendingDeleteWidgetSettingPath.clear();
-      m_renamingWidgetName.clear();
-      m_editingWidgetName.clear();
-
-      if (!newInstanceType.empty() && !newInstanceId.empty()) {
-        laneItems.push_back(newInstanceId);
-        std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides = {
-            {{"widget", newInstanceId, "type"}, newInstanceType},
-        };
-        for (const auto& [key, settingValue] : initialSettings) {
-          overrides.push_back({{"widget", newInstanceId, key}, settingValue});
-        }
-        overrides.emplace_back(selectedLanePath, laneItems);
-        setSettingOverrides(overrides);
-        return;
-      }
-
-      laneItems.push_back(value);
-      setSettingOverride(selectedLanePath, laneItems);
-    });
-  }
-
-  wl_output* output = m_wayland->lastPointerOutput();
-  if (output == nullptr) {
-    output = m_output;
-  }
-
-  m_widgetAddPopup->open(
-      settings::WidgetAddPopupRequest{
-          .parent = popupParentFor(*m_surface, output, m_wayland->lastInputSerial()),
-          .lanePath = lanePath,
-          .config = m_config->config(),
-          .scale = uiScale(),
-      }
-  );
-}
-
-void SettingsWindow::openSearchPickerPopup(settings::SearchPickerOpenRequest request) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr
-      || request.options.empty()) {
-    return;
-  }
-
-  if (m_searchPickerPopup == nullptr) {
-    m_searchPickerPopup = std::make_unique<settings::SearchPickerPopup>();
-    m_searchPickerPopup->initialize(*m_wayland, *m_config, *m_renderContext);
-  }
-
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-
-  m_searchPickerPopup->setOnSelect([this, settingPath = request.settingPath, selectedValue = request.selectedValue,
-                                    onSelect = request.onSelect](const std::string& value) {
-    if (value == selectedValue) {
-      return;
-    }
-    if (onSelect) {
-      onSelect(value);
-      return;
-    }
-    if (value.empty()) {
-      clearSettingOverride(settingPath);
-      return;
-    }
-    setSettingOverride(settingPath, value);
-  });
-
-  std::vector<SearchPickerOption> pickerOptions;
-  pickerOptions.reserve(request.options.size());
-  for (const auto& opt : request.options) {
-    pickerOptions.push_back(
-        SearchPickerOption{
-            .value = opt.value,
-            .label = opt.label,
-            .description = opt.description,
-            .enabled = true,
-            .icon = {},
-            .preview = opt.preview,
-        }
-    );
-  }
-
-  wl_output* output = m_wayland->lastPointerOutput();
-  if (output == nullptr) {
-    output = m_output;
-  }
-
-  XdgPopupParent parent = popupParentFor(*m_surface, output, m_wayland->lastInputSerial());
-
-  m_searchPickerPopup->open(
-      settings::SearchPickerPopupRequest{
-          .parent = parent,
-          .title = std::move(request.title),
-          .options = std::move(pickerOptions),
-          .selectedValue = std::move(request.selectedValue),
-          .placeholder = std::move(request.placeholder),
-          .emptyText = std::move(request.emptyText),
-          .scale = uiScale(),
-      }
-  );
-}
-
-void SettingsWindow::openSessionActionEntryEditor(std::size_t index) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-  bindHostedEditors();
-  m_hostedEditors.openSessionActionEntry(index);
-}
-
-void SettingsWindow::openIdleBehaviorEntryEditor(std::size_t index) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-  bindHostedEditors();
-  m_hostedEditors.openIdleBehaviorEntry(index);
-}
-
-void SettingsWindow::openIdleBehaviorCreateEditor() {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-  bindHostedEditors();
-  m_hostedEditors.openIdleBehaviorCreate();
-}
-
-void SettingsWindow::openNotificationFilterEntryEditor(std::size_t index) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-  bindHostedEditors();
-  m_hostedEditors.openNotificationFilterEntry(index);
-}
-
-void SettingsWindow::openNotificationFilterCreateEditor() {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-  bindHostedEditors();
-  m_hostedEditors.openNotificationFilterCreate();
-}
-
-void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accountId) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
-
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  const Config& cfg = m_config->config();
+  const Config& cfg = m_b.config->config();
   auto draft = std::make_shared<CalendarAccountDraft>();
   if (accountId.has_value()) {
     const CalendarConfig::Account* account = findCalendarAccount(cfg, *accountId);
@@ -590,20 +212,15 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
       draft->provider = CalendarAccountProvider::Vdir;
       draft->path = account->path;
       const std::string rawDiscovery =
-          m_config->stateString(kCalendarDiscoveryOwner, account->id + "_calendars").value_or(std::string{});
+          m_b.config->stateString(kCalendarDiscoveryOwner, account->id + "_calendars").value_or(std::string{});
       draft->discoveredCalendars = calendar::parseCalendarSources(rawDiscovery);
     } else {
       draft->provider =
           account->provider == "custom" ? CalendarAccountProvider::CustomCalDav : CalendarAccountProvider::ICloud;
       const std::string rawDiscovery =
-          m_config->stateString(kCalendarDiscoveryOwner, account->id + "_calendars").value_or(std::string{});
+          m_b.config->stateString(kCalendarDiscoveryOwner, account->id + "_calendars").value_or(std::string{});
       draft->discoveredCalendars = calendar::parseCalendarSources(rawDiscovery);
     }
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
   }
 
   const float scale = uiScale();
@@ -611,30 +228,30 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                                             : i18n::tr("settings.calendar-accounts.edit-title");
 
   std::function<void()> removeAccount;
-  if (!draft->creating && m_config->isOverrideOnlyCalendarAccount(draft->id)) {
+  if (!draft->creating && m_b.config->isOverrideOnlyCalendarAccount(draft->id)) {
     removeAccount = [this, draft, accountId = draft->id]() {
-      if (m_config == nullptr || m_calendarService == nullptr) {
+      if (m_b.config == nullptr || m_b.calendar == nullptr) {
         return;
       }
       if (draft->credentialOperationInFlight) {
         return;
       }
       draft->credentialOperationInFlight = true;
-      m_calendarService->deleteAccount(
-          accountId, [this, accountId]() { return m_config->deleteCalendarAccountOverride(accountId); },
+      m_b.calendar->deleteAccount(
+          accountId, [this, accountId]() { return m_b.config->deleteCalendarAccountOverride(accountId); },
           [this, draft, accountId](CalendarService::CredentialOperationResult result) {
             draft->credentialOperationInFlight = false;
             if (result != CalendarService::CredentialOperationResult::Success) {
               const std::string message = result == CalendarService::CredentialOperationResult::ConfigError
                   ? i18n::tr("settings.calendar-accounts.delete-error")
                   : calendarCredentialError(result);
-              markSettingsWriteError(message);
+              markWriteError(message);
               return;
             }
-            (void)m_config->setStateString(kCalendarDiscoveryOwner, accountId + "_calendars", "");
-            markSettingsWriteSuccess(true);
-            if (m_editorSheetModal != nullptr) {
-              m_editorSheetModal->close();
+            (void)m_b.config->setStateString(kCalendarDiscoveryOwner, accountId + "_calendars", "");
+            markWriteSuccess(true);
+            if (m_sheet != nullptr) {
+              m_sheet->close();
             }
           }
       );
@@ -642,7 +259,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
   }
 
   auto populateSheetBody = [this, draft, scale](Flex& body) mutable {
-    if (m_config != nullptr && m_config->config().shell.offlineMode) {
+    if (m_b.config != nullptr && m_b.config->config().shell.offlineMode) {
       body.addChild(
           settings::makeOfflineModeNotice(scale, i18n::tr("settings.window.offline-mode-notice.calendar-account"))
       );
@@ -729,8 +346,8 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
               } else if (provider == CalendarAccountProvider::Vdir && isDefaultId) {
                 draft->id = "local_calendar";
               }
-              if (m_editorSheetModal != nullptr) {
-                m_editorSheetModal->rebuildBody();
+              if (m_sheet != nullptr) {
+                m_sheet->rebuildBody();
               }
             },
         })
@@ -792,8 +409,8 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                 draft->passwordFile.clear();
                 draft->passwordInvalid = false;
                 draft->passwordFileInvalid = false;
-                if (m_editorSheetModal != nullptr) {
-                  m_editorSheetModal->rebuildBody();
+                if (m_sheet != nullptr) {
+                  m_sheet->rebuildBody();
                 }
               },
           })
@@ -970,8 +587,8 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
                 .onChange = [this, draft, sourceId = source.id](bool on) {
                   draft->calendars =
                       calendar::setCalendarSourceChecked(draft->discoveredCalendars, draft->calendars, sourceId, on);
-                  if (m_editorSheetModal != nullptr) {
-                    m_editorSheetModal->rebuildBody();
+                  if (m_sheet != nullptr) {
+                    m_sheet->rebuildBody();
                   }
                 },
             })
@@ -984,7 +601,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
 
     const auto persistAccount = [this, draft, idInput, nameInput, usernameInput, passwordInput, passwordFileInput,
                                  serverInput, pathInput](bool closeAfter, bool connectAfter) {
-      if (m_config == nullptr) {
+      if (m_b.config == nullptr) {
         return;
       }
       if (draft->credentialOperationInFlight) {
@@ -1014,7 +631,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
       if (!validCalendarAccountId(draft->id)) {
         draft->idInvalid = true;
       }
-      if (draft->creating && calendarAccountIdExists(m_config->config(), draft->id)) {
+      if (draft->creating && calendarAccountIdExists(m_b.config->config(), draft->id)) {
         draft->idInvalid = true;
       }
 
@@ -1047,7 +664,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
           || draft->passwordFileInvalid
           || draft->serverUrlInvalid
           || draft->pathInvalid) {
-        showTransientStatus(i18n::tr("settings.calendar-accounts.invalid"), true);
+        showStatus(i18n::tr("settings.calendar-accounts.invalid"), true);
         return;
       }
 
@@ -1108,31 +725,29 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
       }
 
       std::string connectActivationToken;
-      if (connectAfter) {
-        if (m_wayland != nullptr && m_surface != nullptr) {
-          connectActivationToken = m_wayland->requestActivationToken(m_surface->wlSurface());
-        }
+      if (connectAfter && m_b.requestActivationToken) {
+        connectActivationToken = m_b.requestActivationToken();
       }
 
       if (!caldav) {
-        if (!m_config->mutateOverrides(overrides, staleKeys, nullptr)) {
-          markSettingsWriteError(i18n::tr("settings.calendar-accounts.save-error"));
+        if (!m_b.config->mutateOverrides(overrides, staleKeys, nullptr)) {
+          markWriteError(i18n::tr("settings.calendar-accounts.save-error"));
           return;
         }
-        markSettingsWriteSuccess(closeAfter);
-        if (connectAfter && m_calendarService != nullptr) {
+        markWriteSuccess(closeAfter);
+        if (connectAfter && m_b.calendar != nullptr) {
           DeferredCall::callLater([this, accountId = draft->id, activationToken = std::move(connectActivationToken)]() {
-            m_calendarService->connectGoogleAccount(accountId, activationToken);
+            m_b.calendar->connectGoogleAccount(accountId, activationToken);
           });
         }
-        if (closeAfter && m_editorSheetModal != nullptr) {
-          m_editorSheetModal->close();
+        if (closeAfter && m_sheet != nullptr) {
+          m_sheet->close();
         }
         return;
       }
 
-      if (m_calendarService == nullptr) {
-        markSettingsWriteError(i18n::tr("settings.calendar-accounts.secret-service-error"));
+      if (m_b.calendar == nullptr) {
+        markWriteError(i18n::tr("settings.calendar-accounts.secret-service-error"));
         return;
       }
       std::string password = std::move(draft->password);
@@ -1141,29 +756,29 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
         passwordInput->setValue("");
       }
       draft->credentialOperationInFlight = true;
-      m_calendarService->saveCalDavAccount(
+      m_b.calendar->saveCalDavAccount(
           draft->id, draft->credentialSource, draft->passwordFile, std::move(password),
           [this, overrides = std::move(overrides), staleKeys = std::move(staleKeys)]() mutable {
-            return m_config->mutateOverrides(overrides, staleKeys, nullptr);
+            return m_b.config->mutateOverrides(overrides, staleKeys, nullptr);
           },
           [this, draft, closeAfter](CalendarService::CredentialOperationResult result) {
             draft->credentialOperationInFlight = false;
             if (result == CalendarService::CredentialOperationResult::MissingCredential) {
               draft->passwordInvalid = true;
-              showTransientStatus(i18n::tr("settings.calendar-accounts.invalid"), true);
-              if (m_editorSheetModal != nullptr) {
-                m_editorSheetModal->rebuildBody();
+              showStatus(i18n::tr("settings.calendar-accounts.invalid"), true);
+              if (m_sheet != nullptr) {
+                m_sheet->rebuildBody();
               }
               return;
             }
             if (result != CalendarService::CredentialOperationResult::Success) {
-              markSettingsWriteError(calendarCredentialError(result));
+              markWriteError(calendarCredentialError(result));
               return;
             }
-            m_calendarService->requestRefresh();
-            markSettingsWriteSuccess(closeAfter);
-            if (closeAfter && m_editorSheetModal != nullptr) {
-              m_editorSheetModal->close();
+            m_b.calendar->requestRefresh();
+            markWriteSuccess(closeAfter);
+            if (closeAfter && m_sheet != nullptr) {
+              m_sheet->close();
             }
           }
       );
@@ -1182,8 +797,8 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
             .paddingH = Style::spaceMd * scale,
             .radius = Style::scaledRadiusMd(scale),
             .onClick = [this]() {
-              if (m_editorSheetModal != nullptr) {
-                m_editorSheetModal->close();
+              if (m_sheet != nullptr) {
+                m_sheet->close();
               }
             },
         })
@@ -1217,7 +832,7 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
     body.addChild(std::move(actions));
   };
 
-  m_editorSheetModal->open(
+  m_sheet->open(
       settings::SettingsSheetRequest{
           .sheetTitle = title,
           .removeAction = removeAccount,
@@ -1227,93 +842,10 @@ void SettingsWindow::openCalendarAccountEditor(std::optional<std::string> accoun
   );
 }
 
-void SettingsWindow::openBarWidgetEditorSheet(
-    std::string title, std::function<void(Flex&)> populate, std::function<void()> removeAction
-) {
-  if (m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr
-      || m_config == nullptr) {
-    return;
-  }
 
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-  if (m_widgetAddPopup != nullptr && m_widgetAddPopup->isOpen()) {
-    m_widgetAddPopup->close();
-  }
-  if (m_searchPickerPopup != nullptr && m_searchPickerPopup->isOpen()) {
-    m_searchPickerPopup->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-  }
-
-  const Config& cfg = m_config->config();
-  const float scale = uiScale();
-  const BarConfig* selectedBar = settings::findBar(cfg, m_selectedBarName);
-  const BarMonitorOverride* selectedMonitorOverride = nullptr;
-  if (selectedBar != nullptr && !m_selectedMonitorOverride.empty()) {
-    selectedMonitorOverride = settings::findMonitorOverride(*selectedBar, m_selectedMonitorOverride);
-  }
-
-  auto sctx = makeContentContext(cfg, selectedBar, selectedMonitorOverride);
-  // In the sheet, "rebuild" means re-run the body in place; "close" tears the sheet down.
-  sctx.requestRebuild = [this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->rebuildBody();
-    }
-  };
-  sctx.closeHostedEditor = [this]() { DeferredCall::callLater([this]() { closeWidgetInspectorPopup(); }); };
-  // A rename changes the edited widget's id: apply it, then retitle and rebuild the sheet.
-  sctx.renameWidgetInstance =
-      [this](
-          std::string oldName, std::string newName,
-          std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> referenceOverrides
-      ) {
-        std::string updatedTitle = newName;
-        renameWidgetInstance(std::move(oldName), std::move(newName), std::move(referenceOverrides));
-        if (m_config != nullptr) {
-          const std::string display = settings::widgetReferenceInfo(m_config->config(), updatedTitle).title;
-          if (!display.empty()) {
-            updatedTitle = display;
-          }
-        }
-        if (m_editorSheetModal != nullptr) {
-          m_editorSheetModal->setSheetTitle(updatedTitle);
-          m_editorSheetModal->rebuildBody();
-        }
-      };
-
-  m_editorSheetFactory = std::make_unique<settings::SettingsControlFactory>(sctx);
-
-  m_editorSheetModal->open(
-      settings::SettingsSheetRequest{
-          .sheetTitle = std::move(title),
-          .removeAction = std::move(removeAction),
-          .populateSheetBody = std::move(populate),
-          .scale = scale,
-      }
-  );
-}
-
-void SettingsWindow::openWidgetInspectorEditor(std::vector<std::string> laneListPath, std::string widgetName) {
-  bindHostedEditors();
-  m_hostedEditors.openWidgetInspector(std::move(laneListPath), std::move(widgetName));
-}
-
-void SettingsWindow::openCapsuleGroupEditor(std::vector<std::string> laneListPath, std::string groupId) {
-  bindHostedEditors();
-  m_hostedEditors.openCapsuleGroup(std::move(laneListPath), std::move(groupId));
-}
-
-void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConfig> existing) {
+void HostedEditors::openPluginSource(std::optional<PluginSourceConfig> existing) {
   DeferredCall::callLater([this, existing = std::move(existing)]() {
-    if (m_config == nullptr || m_pluginManager == nullptr) {
+    if (m_b.config == nullptr || m_b.pluginManager == nullptr) {
       return;
     }
 
@@ -1333,17 +865,17 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
     std::function<void()> removeAction;
     if (draft->editing && !isDefaultPluginSourceName(draft->name)) {
       removeAction = [this, name = draft->name]() {
-        if (m_pluginManager == nullptr) {
+        if (m_b.pluginManager == nullptr) {
           return;
         }
-        m_pluginManager->removeSource(name);
-        markPluginListDirty();
-        markSettingsWriteSuccess(false);
+        m_b.pluginManager->removeSource(name);
+        if (m_b.onPluginToggled) { m_b.onPluginToggled({}, false, nullptr); };
+        markWriteSuccess(false);
         DeferredCall::callLater([this]() {
-          if (m_editorSheetModal != nullptr) {
-            m_editorSheetModal->close();
+          if (m_sheet != nullptr) {
+            m_sheet->close();
           }
-          requestSceneRebuild();
+          if (m_b.requestRebuild) { m_b.requestRebuild(); };
         });
       };
     }
@@ -1396,8 +928,8 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                       [this, draft](std::size_t index) {
                         draft->kind = index == 1 ? PluginSourceKind::Path : PluginSourceKind::Git;
                         draft->error.clear();
-                        if (m_editorSheetModal != nullptr) {
-                          m_editorSheetModal->rebuildBody();
+                        if (m_sheet != nullptr) {
+                          m_sheet->rebuildBody();
                         }
                       },
                   .configure =
@@ -1458,8 +990,8 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                   .fontSize = Style::fontSizeCaption * scale,
                   .variant = ButtonVariant::Default,
                   .onClick = [this]() {
-                    if (m_editorSheetModal != nullptr) {
-                      m_editorSheetModal->close();
+                    if (m_sheet != nullptr) {
+                      m_sheet->close();
                     }
                   },
               })
@@ -1473,7 +1005,7 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                   .glyphSize = Style::fontSizeBody * scale,
                   .variant = ButtonVariant::Primary,
                   .onClick = [this, draft, nameInput, locationInput]() {
-                    if (m_config == nullptr || m_pluginManager == nullptr) {
+                    if (m_b.config == nullptr || m_b.pluginManager == nullptr) {
                       return;
                     }
                     draft->name = StringUtils::trim(nameInput != nullptr ? nameInput->value() : draft->name);
@@ -1486,7 +1018,7 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                     if (!isValidPluginSourceName(draft->name)) {
                       draft->nameInvalid = true;
                       draft->error = i18n::tr("settings.plugins.sources.errors.invalid-name");
-                    } else if (!draft->editing && pluginSourceNameExists(m_config->config(), draft->name)) {
+                    } else if (!draft->editing && pluginSourceNameExists(m_b.config->config(), draft->name)) {
                       draft->nameInvalid = true;
                       draft->error = i18n::tr("settings.plugins.sources.errors.duplicate-name");
                     } else if (draft->location.empty()) {
@@ -1495,13 +1027,13 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                     }
 
                     if (!draft->error.empty()) {
-                      if (m_editorSheetModal != nullptr) {
-                        m_editorSheetModal->rebuildBody();
+                      if (m_sheet != nullptr) {
+                        m_sheet->rebuildBody();
                       }
                       return;
                     }
 
-                    m_pluginManager->addSource(
+                    m_b.pluginManager->addSource(
                         PluginSourceConfig{
                             .kind = draft->kind,
                             .name = draft->name,
@@ -1509,13 +1041,13 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
                             .enabled = draft->enabled,
                         }
                     );
-                    markPluginListDirty();
-                    markSettingsWriteSuccess(false);
+                    if (m_b.onPluginToggled) { m_b.onPluginToggled({}, false, nullptr); };
+                    markWriteSuccess(false);
                     DeferredCall::callLater([this]() {
-                      if (m_editorSheetModal != nullptr) {
-                        m_editorSheetModal->close();
+                      if (m_sheet != nullptr) {
+                        m_sheet->close();
                       }
-                      requestSceneRebuild();
+                      if (m_b.requestRebuild) { m_b.requestRebuild(); };
                     });
                   },
               })
@@ -1527,9 +1059,10 @@ void SettingsWindow::openPluginSourceCreateEditor(std::optional<PluginSourceConf
   });
 }
 
-void SettingsWindow::openPluginSettingsEditor(std::string pluginId) {
+
+void HostedEditors::openPluginSettings(std::string pluginId) {
   DeferredCall::callLater([this, pluginId = std::move(pluginId)]() mutable {
-    if (m_config == nullptr) {
+    if (m_b.config == nullptr) {
       return;
     }
     const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
@@ -1537,16 +1070,27 @@ void SettingsWindow::openPluginSettingsEditor(std::string pluginId) {
       return;
     }
 
-    m_editingWidgetName.clear();
-    m_editingCapsuleGroupId.clear();
-    m_renamingWidgetName.clear();
-    m_pendingDeleteWidgetName.clear();
-    m_pendingDeleteWidgetSettingPath.clear();
-    m_editorSheetListPath.clear();
+    if (m_b.editingWidgetName != nullptr) {
+      m_b.editingWidgetName->clear();
+    }
+    if (m_b.editingCapsuleGroupId != nullptr) {
+      m_b.editingCapsuleGroupId->clear();
+    }
+    if (m_b.renamingWidgetName != nullptr) {
+      m_b.renamingWidgetName->clear();
+    }
+    if (m_b.pendingDeleteWidgetName != nullptr) {
+      m_b.pendingDeleteWidgetName->clear();
+    }
+    if (m_b.pendingDeleteWidgetSettingPath != nullptr) {
+      m_b.pendingDeleteWidgetSettingPath->clear();
+    }
+    m_listPath.clear();
 
     const std::string title = manifest->name.empty() ? pluginId : manifest->name;
     openBarWidgetEditorSheet(title, [this, pluginId](Flex& body) {
-      if (m_config == nullptr || m_editorSheetFactory == nullptr) {
+      SettingsControlFactory* factory = m_b.editorFactory != nullptr ? m_b.editorFactory->get() : m_factory.get();
+      if (m_b.config == nullptr || factory == nullptr) {
         return;
       }
       const auto* currentManifest = scripting::PluginRegistry::instance().findManifest(pluginId);
@@ -1554,289 +1098,66 @@ void SettingsWindow::openPluginSettingsEditor(std::string pluginId) {
         return;
       }
       settings::buildPluginSettingsEditor(
-          body, m_config->config(), *m_editorSheetFactory, pluginId, *currentManifest, m_showAdvanced, uiScale()
+          body, m_b.config->config(), *factory, pluginId, *currentManifest,
+          m_b.showAdvanced ? m_b.showAdvanced() : true, uiScale()
       );
     });
   });
 }
 
-void SettingsWindow::openPluginStore() {
-  if (m_config == nullptr || m_pluginManager == nullptr) {
+
+void HostedEditors::openCommunityTemplateStore() {
+  if (m_b.config == nullptr) {
     return;
   }
-  // Refresh the browsable catalog off the UI thread (throttled) and read it there too:
-  // discoverCatalog clones on first browse and lazy-fetches catalog blobs from the
-  // blobless clone, both network-bound. Only the sheet build runs on the main thread.
-  auto* manager = m_pluginManager;
-  PluginsConfig pluginsSnapshot = m_config->config().plugins;
-  std::thread([this, manager, pluginsSnapshot = std::move(pluginsSnapshot)]() mutable {
-    manager->fetchStaleCatalogs(pluginsSnapshot);
-
-    std::vector<settings::StoreCatalogEntry> catalog;
-    for (const auto& source : pluginsSnapshot.sources) {
-      if (!source.enabled) {
-        continue;
-      }
-      auto result = scripting::discoverCatalog(source, scripting::CatalogAccess::Network);
-      if (!result.ok) {
-        continue;
-      }
-      for (auto& entry : result.entries) {
-        catalog.push_back(
-            settings::StoreCatalogEntry{
-                .entry = std::move(entry),
-                .source = source.name,
-                .sourceConfig = source,
-            }
-        );
-      }
-    }
-
-    DeferredCall::callLater([this, catalog = std::move(catalog)]() mutable {
-      if (m_wayland == nullptr
-          || m_renderContext == nullptr
-          || m_surface == nullptr
-          || m_surface->xdgSurface() == nullptr
-          || m_config == nullptr
-          || m_pluginManager == nullptr) {
-        return;
-      }
-
-      if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-        m_editorSheetModal->close();
-      }
-
-      const float scale = uiScale();
-
-      auto catalogLookup = std::make_shared<std::unordered_map<std::string, scripting::CatalogEntry>>();
-      for (const auto& entry : catalog) {
-        catalogLookup->emplace(entry.entry.id, entry.entry);
-      }
-
-      auto storeContent = std::make_shared<settings::PluginStoreContent>(
-          std::move(catalog), m_config,
-          settings::PluginStoreCallbacks{
-              .setEnabled =
-                  [this, catalogLookup](std::string id, bool enable) {
-                    if (m_pluginManager == nullptr) {
-                      return;
-                    }
-                    if (enable) {
-                      (void)m_pluginManager->enable(id);
-                      ++m_pluginListRefreshGeneration;
-                      m_pluginListDirty = false;
-                      auto existing = std::ranges::find_if(m_pluginList, [&](const auto& p) { return p.id == id; });
-                      if (existing != m_pluginList.end()) {
-                        existing->enabled = true;
-                      } else {
-                        scripting::PluginStatus placeholder{.id = id, .name = id, .enabled = true};
-                        if (auto it = catalogLookup->find(id); it != catalogLookup->end()) {
-                          placeholder.name = it->second.name;
-                          placeholder.version = it->second.version;
-                          placeholder.icon = it->second.icon;
-                          placeholder.description = it->second.description;
-                        }
-                        m_pluginList.push_back(std::move(placeholder));
-                      }
-                    } else {
-                      m_pluginManager->disable(id);
-                      m_pluginListDirty = true;
-                    }
-                    // Keep the store open, rebuild the sheet body so Add swaps to the install spinner.
-                    requestContentRebuild(
-                        /*refreshRegistry=*/false, /*refreshFilterRow=*/false, /*rebuildEditorSheet=*/true
-                    );
-                  },
-              .isEnabling = [this](
-                                const std::string& id
-                            ) { return m_pluginManager != nullptr && m_pluginManager->isEnabling(id); },
-              .isInstalled = [this](
-                                 const std::string& id
-                             ) { return m_pluginManager != nullptr && m_pluginManager->isMaterialized(id); },
-              .scale = scale,
-          },
-          &m_pluginFileCache, &m_pluginStoreScrollState
-      );
-
-      m_pluginFileCache.setOnReady([storeContent](
-                                       const std::string& pluginId, const std::string& filename, const std::string& path
-                                   ) { storeContent->onFileReady(pluginId, filename, path); });
-
-      if (m_editorSheetModal == nullptr) {
-        m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-        m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
-      }
-
-      storeContent->setOnRebuildNeeded([this]() {
-        if (m_editorSheetModal != nullptr) {
-          m_editorSheetModal->rebuildBody();
-        }
-      });
-
-      m_editorSheetModal->open(
-          settings::SettingsSheetRequest{
-              .sheetTitle = i18n::tr("settings.plugins.store.title"),
-              .removeAction = nullptr,
-              .createLeadingAction = [storeContent, scale]() -> std::unique_ptr<Node> {
-                if (!storeContent->isDetailView()) {
-                  return nullptr;
-                }
-                return ui::button({
-                    .glyph = Style::rtl() ? "chevron-right" : "chevron-left",
-                    .glyphSize = Style::fontSizeBody * scale,
-                    .variant = ButtonVariant::Ghost,
-                    .tooltip = i18n::tr("settings.plugins.store.back-to-catalog"),
-                    .minWidth = Style::controlHeightSm * scale,
-                    .minHeight = Style::controlHeightSm * scale,
-                    .padding = Style::spaceXs * scale,
-                    .radius = Style::scaledRadiusMd(scale),
-                    .onClick = [storeContent]() { storeContent->closeDetail(); },
-                });
-              },
-              .createHeaderAction = [storeContent, scale]() -> std::unique_ptr<Node> {
-                const auto pageUrl = storeContent->detailPageUrl();
-                const auto sourceUrl = storeContent->detailSourceUrl();
-                if (!pageUrl.has_value() && !sourceUrl.has_value()) {
-                  return nullptr;
-                }
-                auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
-                if (pageUrl.has_value()) {
-                  actions->addChild(
-                      ui::button({
-                          .glyph = "external-link",
-                          .glyphSize = Style::fontSizeBody * scale,
-                          .variant = ButtonVariant::Ghost,
-                          .tooltip = i18n::tr("settings.plugins.store.open-page"),
-                          .minWidth = Style::controlHeightSm * scale,
-                          .minHeight = Style::controlHeightSm * scale,
-                          .padding = Style::spaceXs * scale,
-                          .radius = Style::scaledRadiusMd(scale),
-                          .onClick = [url = *pageUrl]() { (void)net::openInBrowser(url); },
-                      })
-                  );
-                }
-                if (sourceUrl.has_value()) {
-                  actions->addChild(
-                      ui::button({
-                          .glyph = "brand-git",
-                          .glyphSize = Style::fontSizeBody * scale,
-                          .variant = ButtonVariant::Ghost,
-                          .tooltip = i18n::tr("settings.plugins.store.open-source"),
-                          .minWidth = Style::controlHeightSm * scale,
-                          .minHeight = Style::controlHeightSm * scale,
-                          .padding = Style::spaceXs * scale,
-                          .radius = Style::scaledRadiusMd(scale),
-                          .onClick = [url = *sourceUrl]() { (void)net::openInBrowser(url); },
-                      })
-                  );
-                }
-                return actions;
-              },
-              .populateSheetBody =
-                  [storeContent, this, scale](Flex& body) {
-                    if (m_renderContext == nullptr) {
-                      return;
-                    }
-                    if (m_config != nullptr && m_config->config().shell.offlineMode) {
-                      body.addChild(
-                          settings::makeOfflineModeNotice(
-                              scale, i18n::tr("settings.window.offline-mode-notice.plugin-store")
-                          )
-                      );
-                    }
-                    storeContent->populateBody(body, m_surface->renderTarget().renderer(), m_asyncTextures);
-                  },
-              .scale = scale,
-              .minWidth = 800.0F,
-              .maxWidth = 1100.0F,
-              .parentFraction = 0.85F,
-              .fillParentHeight = true,
-              .scrollableBody = false,
-              .onCloseRequested = [storeContent]() -> bool {
-                if (storeContent->isDetailView()) {
-                  storeContent->closeDetail();
-                  return true;
-                }
-                return false;
-              },
-              .preDispatchKeyboard =
-                  [storeContent, this](const KeyboardEvent& event) {
-                    InputArea* focused = m_editorSheetModal != nullptr ? m_editorSheetModal->focusedArea() : nullptr;
-                    return storeContent->handleKeyEvent(
-                        event.sym, event.modifiers, event.pressed, event.preedit, focused
-                    );
-                  },
-              .onClosed =
-                  [storeContent, this]() {
-                    storeContent->detachGrid();
-                    m_pluginFileCache.setOnReady(nullptr);
-                    m_pluginStoreSheetOpen = false;
-                  },
-          }
-      );
-      m_pluginStoreSheetOpen = m_editorSheetModal->isOpen();
-    });
-  }).detach();
-}
-
-void SettingsWindow::openCommunityTemplateStore() {
-  if (m_config == nullptr
-      || m_wayland == nullptr
-      || m_renderContext == nullptr
-      || m_surface == nullptr
-      || m_surface->xdgSurface() == nullptr) {
+  prepareOpen();
+  if (m_sheet == nullptr) {
     return;
-  }
-
-  if (m_editorSheetModal != nullptr && m_editorSheetModal->isOpen()) {
-    m_editorSheetModal->close();
-  }
-
-  if (m_editorSheetModal == nullptr) {
-    m_editorSheetModal = std::make_unique<settings::SettingsSheetModal>();
-    m_editorSheetModal->initialize(m_modalHost, [this]() { dismissOpenSelectDropdown(); });
   }
 
   const float scale = uiScale();
   auto catalog = noctalia::theme::CommunityTemplateService::availableTemplates();
   std::unordered_set<std::string> selectedIds(
-      m_config->config().theme.templates.communityIds.begin(), m_config->config().theme.templates.communityIds.end()
+      m_b.config->config().theme.templates.communityIds.begin(), m_b.config->config().theme.templates.communityIds.end()
   );
 
   auto storeContent = std::make_shared<settings::TemplateStoreContent>(
-      std::move(catalog), std::move(selectedIds), m_config,
+      std::move(catalog), std::move(selectedIds), m_b.config,
       settings::TemplateStoreCallbacks{
-          .setSelected = [this](
-                             std::vector<std::string> ids
-                         ) { setSettingOverride({"theme", "templates", "community_ids"}, std::move(ids)); },
+          .setSelected = [this](std::vector<std::string> ids) {
+            if (m_b.setOverride) {
+              m_b.setOverride({"theme", "templates", "community_ids"}, std::move(ids));
+            }
+          },
           .scale = scale,
       }
   );
 
   storeContent->setOnRebuildNeeded([this]() {
-    if (m_editorSheetModal != nullptr) {
-      m_editorSheetModal->rebuildBody();
+    if (m_sheet != nullptr) {
+      m_sheet->rebuildBody();
     }
   });
 
-  m_editorSheetModal->open(
+  m_sheet->open(
       settings::SettingsSheetRequest{
           .sheetTitle = i18n::tr("settings.templates.store.title"),
           .removeAction = nullptr,
           .createHeaderAction = nullptr,
           .populateSheetBody =
               [storeContent, this, scale](Flex& body) {
-                if (m_renderContext == nullptr) {
+                Renderer* renderer = m_b.renderer ? m_b.renderer() : nullptr;
+                if (renderer == nullptr) {
                   return;
                 }
-                if (m_config != nullptr && m_config->config().shell.offlineMode) {
+                if (m_b.config != nullptr && m_b.config->config().shell.offlineMode) {
                   body.addChild(
                       settings::makeOfflineModeNotice(
                           scale, i18n::tr("settings.window.offline-mode-notice.template-store")
                       )
                   );
                 }
-                storeContent->populateBody(body, m_surface->renderTarget().renderer());
+                storeContent->populateBody(body, *renderer);
               },
           .scale = scale,
           .minWidth = 720.0F,
@@ -1846,105 +1167,118 @@ void SettingsWindow::openCommunityTemplateStore() {
           .scrollableBody = false,
           .preDispatchKeyboard =
               [storeContent, this](const KeyboardEvent& event) {
-                InputArea* focused = m_editorSheetModal != nullptr ? m_editorSheetModal->focusedArea() : nullptr;
+                InputArea* focused = m_sheet != nullptr ? m_sheet->focusedArea() : nullptr;
                 return storeContent->handleKeyEvent(event.sym, event.modifiers, event.pressed, event.preedit, focused);
               },
       }
   );
 }
 
-void SettingsWindow::closeWidgetInspectorPopup() {
-  if (m_editorSheetModal != nullptr) {
-    m_editorSheetModal->close();
-  }
-  m_editorSheetFactory.reset();
-  m_editingWidgetName.clear();
-  m_editingCapsuleGroupId.clear();
-  requestContentRebuild();
-}
 
-void SettingsWindow::saveSupportReport() {
-  if (m_config == nullptr) {
-    return;
-  }
 
-  FileDialogOptions options;
-  options.mode = FileDialogMode::Save;
-  options.defaultFilename = "noctalia-support-report.toml";
-  options.title = i18n::tr("settings.window.support-report-title");
-  options.extensions = {".toml"};
-
-  const bool opened = FileDialog::open(std::move(options), [this](std::optional<std::filesystem::path> result) {
-    if (!result.has_value() || m_config == nullptr) {
+  void HostedEditors::showStatus(std::string message, bool error) {
+    if (m_sheet != nullptr && m_sheet->isOpen()) {
+      m_sheet->setStatusMessage(std::move(message), error);
       return;
     }
-
-    auto path = *result;
-    if (path.extension().empty()) {
-      path += ".toml";
+    if (m_b.setHostStatus) {
+      m_b.setHostStatus(std::move(message), error);
     }
-
-    const std::string content = m_config->buildSupportReport();
-    if (!writeTextFileAtomic(path, content)) {
-      m_statusMessage = i18n::tr("settings.errors.support-report");
-      m_statusIsError = true;
-      requestSceneRebuild();
-      return;
-    }
-
-    m_statusMessage = i18n::tr("settings.window.support-report-saved");
-    m_statusIsError = false;
-    requestSceneRebuild();
-  });
-
-  if (!opened) {
-    m_statusMessage = i18n::tr("settings.errors.support-report");
-    m_statusIsError = true;
-    requestSceneRebuild();
-  }
-}
-
-void SettingsWindow::saveConfigExport(settings::ConfigExportMode mode) {
-  if (m_config == nullptr) {
-    return;
   }
 
-  const bool fullEffective = mode == settings::ConfigExportMode::FullEffective;
+  void HostedEditors::markWriteError(std::string message) { showStatus(std::move(message), true); }
 
-  FileDialogOptions options;
-  options.mode = FileDialogMode::Save;
-  options.defaultFilename = fullEffective ? "noctalia-full-config.toml" : "noctalia-config.toml";
-  options.title = fullEffective ? i18n::tr("settings.export-config.full-effective-save-title")
-                                : i18n::tr("settings.export-config.merged-user-save-title");
-  options.extensions = {".toml"};
-
-  const bool opened = FileDialog::open(std::move(options), [this, mode](std::optional<std::filesystem::path> result) {
-    if (!result.has_value() || m_config == nullptr) {
-      return;
+  void HostedEditors::markWriteSuccess(bool closeSheet) {
+    if (m_sheet != nullptr && m_sheet->isOpen()) {
+      m_sheet->clearStatusMessage();
     }
-
-    auto path = *result;
-    if (path.extension().empty()) {
-      path += ".toml";
+    if (m_b.setHostStatus) {
+      m_b.setHostStatus({}, false);
     }
-
-    const std::string content = mode == settings::ConfigExportMode::FullEffective ? m_config->buildEffectiveConfig()
-                                                                                  : m_config->buildMergedUserConfig();
-    if (!writeTextFileAtomic(path, content)) {
-      m_statusMessage = i18n::tr("settings.errors.export-config");
-      m_statusIsError = true;
-      requestSceneRebuild();
-      return;
+    if (closeSheet && m_sheet != nullptr) {
+      m_sheet->close();
     }
-
-    m_statusMessage = i18n::tr("settings.window.export-config-saved");
-    m_statusIsError = false;
-    requestSceneRebuild();
-  });
-
-  if (!opened) {
-    m_statusMessage = i18n::tr("settings.errors.export-config");
-    m_statusIsError = true;
-    requestSceneRebuild();
+    if (m_b.requestRebuild) {
+      m_b.requestRebuild();
+    }
   }
-}
+
+  void HostedEditors::invalidatePluginSource(const std::string& sourceName) {
+    m_fileCache.invalidateSource(sourceName);
+    if (m_b.pluginFileCache != nullptr) {
+      m_b.pluginFileCache->invalidateSource(sourceName);
+    }
+  }
+
+  void HostedEditors::openSearchPicker(SearchPickerOpenRequest request) {
+    if (m_b.config == nullptr || request.options.empty()) {
+      return;
+    }
+    prepareOpen();
+    if (m_sheet == nullptr) {
+      return;
+    }
+    const float scale = uiScale();
+    auto selected = std::make_shared<std::string>(request.selectedValue);
+    auto settingPath = request.settingPath;
+    auto onSelect = request.onSelect;
+    auto options = std::move(request.options);
+    m_sheet->open(
+        SettingsSheetRequest{
+            .sheetTitle = std::move(request.title),
+            .populateSheetBody =
+                [this, options = std::move(options), selected, settingPath, onSelect, placeholder = request.placeholder,
+                 emptyText = request.emptyText, scale](Flex& body) {
+                  auto picker = std::make_unique<SearchPicker>();
+                  std::vector<SearchPickerOption> pickerOptions;
+                  pickerOptions.reserve(options.size());
+                  for (const auto& opt : options) {
+                    pickerOptions.push_back(
+                        SearchPickerOption{
+                            .value = opt.value,
+                            .label = opt.label,
+                            .description = opt.description,
+                            .enabled = true,
+                            .icon = {},
+                            .preview = opt.preview,
+                        }
+                    );
+                  }
+                  picker->setOptions(std::move(pickerOptions));
+                  picker->setPlaceholder(placeholder);
+                  picker->setEmptyText(emptyText);
+                  picker->setSelectedValue(*selected);
+                  picker->setOnActivated([this, settingPath, selected, onSelect](const SearchPickerOption& option) {
+                    if (option.value == *selected) {
+                      close();
+                      return;
+                    }
+                    if (onSelect) {
+                      onSelect(option.value);
+                    } else if (option.value.empty()) {
+                      if (m_b.makeContext) {
+                        auto ctx = m_b.makeContext();
+                        if (ctx.clearOverride) {
+                          ctx.clearOverride(settingPath);
+                        }
+                      }
+                    } else if (m_b.setOverride) {
+                      m_b.setOverride(settingPath, option.value);
+                    }
+                    close();
+                  });
+                  picker->setOnCancel([this]() { close(); });
+                  picker->setFlexGrow(1.0F);
+                  body.addChild(std::move(picker));
+                },
+            .scale = scale,
+            .minWidth = 520.0F,
+            .maxWidth = 720.0F,
+            .parentFraction = 0.7F,
+            .fillParentHeight = true,
+            .scrollableBody = false,
+        }
+    );
+  }
+
+} // namespace settings

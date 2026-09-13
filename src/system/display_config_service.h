@@ -3,6 +3,7 @@
 #include "system/display_config.h"
 
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,6 +15,7 @@ public:
   using ChangeCallback = std::function<void()>;
 
   explicit DisplayConfigService(CompositorPlatform& platform);
+  ~DisplayConfigService();
 
   DisplayConfigService(const DisplayConfigService&) = delete;
   DisplayConfigService& operator=(const DisplayConfigService&) = delete;
@@ -37,12 +39,18 @@ public:
   );
 
   void setChangeCallback(ChangeCallback callback);
+  void setConfigLoadedCallback(ChangeCallback callback);
 
 private:
+  class EventBridge;
+
   bool apply(std::string_view name, const nlohmann::json& action, bool refreshAfter = true);
+  void onNiriConfigLoaded();
 
   CompositorPlatform& m_platform;
   std::vector<display_config::Output> m_outputs;
   std::string m_lastError;
   ChangeCallback m_changeCallback;
+  ChangeCallback m_configLoadedCallback;
+  std::unique_ptr<EventBridge> m_eventBridge;
 };

@@ -151,7 +151,7 @@ namespace settings {
     constexpr std::string_view kGestureActionsGroup = "actions";
 
     // The actions group is long (one row per bindable gesture) and most widgets never need it, so it
-    // starts folded. The open state lives on the settings window keyed by widget name: editing a
+    // starts folded. The open state lives on the settings host keyed by widget name: editing a
     // binding rebuilds the scene, and a local flag would fold the group back up on every edit.
     std::unique_ptr<Node> makeGestureActionsSection(
         const BarWidgetEditorContext& ctx, const std::string& widgetName, std::unique_ptr<Node> body, bool withSeparator

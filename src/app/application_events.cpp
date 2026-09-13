@@ -72,7 +72,6 @@ void Application::recoverGraphicsAfterReset() {
     m_backdrop.onGpuResourcesInvalidated();
     m_lockScreen.onGpuResourcesInvalidated();
     m_trayMenu.requestLayout();
-    m_settingsWindow.requestRedraw();
     m_screenCorners.requestRedraw();
     requestAllSurfacesRedraw();
     m_graphicsRecoveryAttempts = 0;

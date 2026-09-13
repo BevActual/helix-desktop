@@ -13,6 +13,7 @@
 class BrightnessService;
 class Button;
 class ConfigService;
+class CompositorPlatform;
 class DisplayConfigService;
 class Flex;
 class Glyph;
@@ -63,10 +64,13 @@ private:
   void applyRefresh(const std::string& displayId, std::size_t index);
   void applyTransform(const std::string& displayId, std::size_t index);
   void applyLayout(display_config::LayoutDirection direction);
+  [[nodiscard]] int layoutNudgePx() const;
+  void reportLayoutError();
 
   BrightnessService* m_brightness = nullptr;
   ConfigService* m_configService = nullptr;
   DisplayConfigService* m_displayConfig = nullptr;
+  CompositorPlatform* m_platform = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
 
   struct DisplayCard {
@@ -114,6 +118,7 @@ private:
   Button* m_layoutPlaceRight = nullptr;
   Button* m_layoutPlaceBottom = nullptr;
   Button* m_rescanButton = nullptr;
+  Button* m_saveButton = nullptr;
   std::vector<DisplayCard> m_cards;
   std::vector<LayoutTile> m_layoutTiles;
   std::vector<std::string> m_layoutReferenceNames;

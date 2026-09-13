@@ -385,10 +385,6 @@ void PanelManager::initialize(CompositorPlatform& platform, ConfigService* confi
   m_persistentHost.initialize(platform, config, renderContext);
 }
 
-void PanelManager::setOpenSettingsWindowCallback(std::function<void(std::string)> callback) {
-  m_openSettingsWindow = std::move(callback);
-}
-
 void PanelManager::setOpenWidgetSettingsCallback(std::function<void(std::string, std::string)> callback) {
   m_openWidgetSettings = std::move(callback);
 }
@@ -397,45 +393,11 @@ void PanelManager::setOpenPluginSettingsCallback(std::function<bool(std::string)
   m_openPluginSettings = std::move(callback);
 }
 
-void PanelManager::setCloseSettingsWindowCallback(std::function<void()> callback) {
-  m_closeSettingsWindow = std::move(callback);
-}
-
-void PanelManager::setToggleSettingsWindowCallback(std::function<void(std::string)> callback) {
-  m_toggleSettingsWindow = std::move(callback);
-}
-
 void PanelManager::setCloseDesktopWidgetsEditorCallback(std::function<void()> callback) {
   m_closeDesktopWidgetsEditor = std::move(callback);
 }
 
 void PanelManager::openSettingsWindow(std::string context) {
-  if (isOpen() && !m_closing) {
-    closePanel();
-  }
-  if (m_openSettingsWindow) {
-    m_openSettingsWindow(std::move(context));
-  }
-}
-
-bool PanelManager::openPluginSettings(const std::string& pluginId) {
-  if (!m_openPluginSettings) {
-    return false;
-  }
-  if (isOpen() && !m_closing) {
-    closePanel();
-  }
-  return m_openPluginSettings(pluginId);
-}
-
-void PanelManager::closeSettingsWindow() {
-  if (m_closeSettingsWindow) {
-    m_closeSettingsWindow();
-  }
-}
-
-void PanelManager::toggleSettingsWindow(std::string context) {
-  closeSettingsWindow();
   std::string ccContext = "settings";
   if (!context.empty() && context != "settings") {
     if (context.starts_with("settings:")) {
@@ -444,7 +406,39 @@ void PanelManager::toggleSettingsWindow(std::string context) {
       ccContext = "settings:" + context;
     }
   }
-  togglePanel("control-center", PanelOpenRequest{.context = ccContext});
+  if (isOpenPanel("control-center") && m_activePanel != nullptr) {
+    m_activePanel->onOpen(ccContext);
+    return;
+  }
+  openPanel("control-center", PanelOpenRequest{.context = std::move(ccContext)});
+}
+
+bool PanelManager::openPluginSettings(const std::string& pluginId) {
+  if (!m_openPluginSettings) {
+    return false;
+  }
+  if (isOpen() && !isOpenPanel("control-center") && !m_closing) {
+    closePanel();
+  }
+  return m_openPluginSettings(pluginId);
+}
+
+void PanelManager::closeSettingsWindow() {
+  if (isOpenPanel("control-center")) {
+    closePanel();
+  }
+}
+
+void PanelManager::toggleSettingsWindow(std::string context) {
+  std::string ccContext = "settings";
+  if (!context.empty() && context != "settings") {
+    if (context.starts_with("settings:")) {
+      ccContext = std::move(context);
+    } else {
+      ccContext = "settings:" + context;
+    }
+  }
+  togglePanel("control-center", PanelOpenRequest{.context = std::move(ccContext)});
 }
 
 void PanelManager::setAttachedPanelGeometryCallback(
@@ -2949,9 +2943,9 @@ void PanelManager::registerIpc(IpcService& ipc) {
     }
 
     if (!m_openWidgetSettings) {
-      return "error: settings window unavailable\n";
+      return "error: settings unavailable\n";
     }
-    if (isOpen()) {
+    if (isOpen() && !isOpenPanel("control-center") && !m_closing) {
       closePanel();
     }
     m_openWidgetSettings(std::move(barName), std::move(widgetName));
@@ -2969,7 +2963,7 @@ void PanelManager::registerIpc(IpcService& ipc) {
     }
 
     if (!m_openPluginSettings) {
-      return "error: settings window unavailable\n";
+      return "error: settings unavailable\n";
     }
     if (!openPluginSettings(pluginId)) {
       return std::format("error: plugin \"{}\" is not enabled or has no settings\n", pluginId);

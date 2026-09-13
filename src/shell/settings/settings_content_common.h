@@ -83,4 +83,7 @@ namespace settings {
   [[nodiscard]] std::string idleBehaviorRowSummary(const IdleBehaviorConfig& row);
   [[nodiscard]] std::string notificationFilterRowSummary(const NotificationFilterConfig& filter);
 
+  [[nodiscard]] std::vector<std::string>
+  barWidgetLanePath(const Config& cfg, const std::string& barName, const std::string& widgetName);
+
 } // namespace settings

@@ -505,6 +505,13 @@ struct WallpaperAutomationConfig {
   bool operator==(const WallpaperAutomationConfig&) const = default;
 };
 
+struct WallpaperWallhavenConfig {
+  std::string apiKey;
+  std::string downloadDir;
+
+  bool operator==(const WallpaperWallhavenConfig&) const = default;
+};
+
 struct WallpaperConfig {
   bool enabled = true;
   WallpaperFillMode fillMode = WallpaperFillMode::Crop;
@@ -520,6 +527,7 @@ struct WallpaperConfig {
   std::string directoryDark;  // empty = directory
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
+  WallpaperWallhavenConfig wallhaven;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
 
   bool operator==(const WallpaperConfig&) const = default;
@@ -1587,7 +1595,6 @@ struct ControlCenterConfig {
   std::int32_t width = kDefaultWidth; // full-sidebar logical width; compact/none modes scale down from this
   bool showShortcutLabels = true;
   bool showSessionButton = true;
-  bool showSetupTabs = false;
   CalendarTabConfig calendarTab;
   bool operator==(const ControlCenterConfig&) const = default;
 };

@@ -47,7 +47,8 @@ public:
   WallpaperScanner(const WallpaperScanner&) = delete;
   WallpaperScanner& operator=(const WallpaperScanner&) = delete;
 
-  void setOnComplete(CompletionCallback callback) { m_onComplete = std::move(callback); }
+  void addOnComplete(const void* owner, CompletionCallback callback);
+  void removeOnComplete(const void* owner);
 
   // Ensures (dir, flatten) is cached and fresh against the directory's mtime.
   // Returns true when a fresh cached result already exists (nothing queued);
@@ -105,5 +106,5 @@ private:
   // Main-thread state.
   std::unordered_map<CacheKey, WallpaperScanResult, CacheKeyHash> m_cache;
   std::unordered_set<CacheKey, CacheKeyHash> m_pending;
-  CompletionCallback m_onComplete;
+  std::vector<std::pair<const void*, CompletionCallback>> m_listeners;
 };

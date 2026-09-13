@@ -2,11 +2,14 @@
 
 #include "compositors/compositor_detect.h"
 #include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_event_handler.h"
 #include "compositors/niri/niri_runtime.h"
 #include "core/log.h"
 
 #include <algorithm>
 #include <format>
+#include <memory>
+#include <nlohmann/json.hpp>
 #include <utility>
 
 namespace {
@@ -24,9 +27,38 @@ namespace {
 
 } // namespace
 
+class DisplayConfigService::EventBridge : public compositors::niri::NiriEventHandler {
+public:
+  EventBridge(compositors::niri::NiriRuntime& runtime, DisplayConfigService& service)
+      : compositors::niri::NiriEventHandler(runtime), m_service(service) {}
+
+  void handleEvent(std::string_view key, const nlohmann::json& /*value*/) override {
+    if (key == "ConfigLoaded") {
+      m_service.onNiriConfigLoaded();
+    }
+  }
+
+  void handleStreamReset() override { m_service.refresh(); }
+
+private:
+  DisplayConfigService& m_service;
+};
+
 DisplayConfigService::DisplayConfigService(CompositorPlatform& platform) : m_platform(platform) {
+  if (compositors::isNiri()) {
+    m_eventBridge = std::make_unique<EventBridge>(m_platform.niriRuntime(), *this);
+  }
   if (available()) {
     refresh();
+  }
+}
+
+DisplayConfigService::~DisplayConfigService() = default;
+
+void DisplayConfigService::onNiriConfigLoaded() {
+  refresh();
+  if (m_configLoadedCallback) {
+    m_configLoadedCallback();
   }
 }
 
@@ -184,6 +216,10 @@ bool DisplayConfigService::placeRelative(
 }
 
 void DisplayConfigService::setChangeCallback(ChangeCallback callback) { m_changeCallback = std::move(callback); }
+
+void DisplayConfigService::setConfigLoadedCallback(ChangeCallback callback) {
+  m_configLoadedCallback = std::move(callback);
+}
 
 bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action, bool refreshAfter) {
   if (!available()) {

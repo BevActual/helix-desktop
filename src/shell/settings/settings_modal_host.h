@@ -35,8 +35,8 @@ namespace settings {
     float windowMargin = 24.0F;
   };
 
-  // Owns an in-scene stack of modal dialogs above the Settings content. The stack uses the
-  // Settings window's InputDispatcher, so it remains part of the toplevel when focus changes.
+  // Owns an in-scene stack of modal dialogs above settings content. The stack uses the
+  // host panel's InputDispatcher, so it remains part of the panel when focus changes.
   class SettingsModalHost {
   public:
     using ModalId = std::uint64_t;

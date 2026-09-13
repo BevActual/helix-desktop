@@ -80,6 +80,7 @@ namespace display_config {
 
   [[nodiscard]] bool isSideways(Transform transform) noexcept;
   [[nodiscard]] std::string_view jsonName(Transform transform) noexcept;
+  [[nodiscard]] std::string_view kdlName(Transform transform) noexcept;
   [[nodiscard]] std::optional<Transform> parseTransform(std::string_view value);
   [[nodiscard]] std::string formatRefresh(std::uint32_t refreshMilliHz);
   [[nodiscard]] std::string formatResolution(int width, int height);

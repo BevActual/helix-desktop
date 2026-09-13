@@ -721,7 +721,7 @@ namespace {
     return 0;
   }
 
-  // openSettings() — open the settings window at this plugin's own settings. The plugin id comes
+  // openSettings() — open Control Center at this plugin's own settings. The plugin id comes
   // from the host, so a plugin can only ever open its own page.
   int luau_openSettings(lua_State* L) {
     if (auto* host = hostForState(L)) {

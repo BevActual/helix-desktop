@@ -51,7 +51,7 @@ namespace noctalia::cli {
       "settings-count",
       "Count Settings UI controls",
       "Counts one Settings UI row/control per SettingEntry: toggles, sliders, lists,\n"
-      "and pickers. Dropdown options and SettingsWindow-only action buttons are not\n"
+      "and pickers. Dropdown options and Control Center action buttons are not\n"
       "counted separately.",
       {},
       {},

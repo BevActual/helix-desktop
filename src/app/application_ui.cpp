@@ -70,6 +70,8 @@
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
+#include "shell/settings/settings_content_plugins.h"
+#include "shell/settings/settings_runtime.h"
 #include "shell/setup_wizard/setup_wizard_panel.h"
 #include "shell/test/test_panel.h"
 #include "shell/tooltip/tooltip_manager.h"
@@ -133,66 +135,6 @@ void Application::initUiRenderSurfacesAndSettings() {
   m_renderContext.setTextBaseDirection(i18n::Service::instance().rtl());
   m_wallpaper.initialize(m_wayland, &m_configService, &m_renderContext, &m_sharedTextureCache, &m_themeService);
   m_backdrop.initialize(m_wayland, &m_configService, &m_sharedTextureCache, &m_glShared);
-  m_settingsWindow.initialize(
-      m_wayland, &m_configService, &m_renderContext, &m_dependencyService, m_upowerService.get(), &m_idleManager,
-      &m_compositorPlatform, m_accountsService.get()
-  );
-  m_settingsWindow.setPluginManager(&m_pluginManager);
-  m_settingsWindow.setIpcService(&m_ipcService);
-  m_settingsWindow.setAsyncTextureCache(&m_asyncTextureCache);
-  m_settingsWindow.setOpenDesktopWidgetEditor([this]() {
-    if (m_lockscreenWidgetsController.isEditing()) {
-      m_lockscreenWidgetsController.exitEdit();
-    }
-    const bool wasEditing = m_desktopWidgetsController.isEditing();
-    m_desktopWidgetsController.toggleEdit();
-    if (!wasEditing && m_desktopWidgetsController.isEditing()) {
-      notify::info(
-          "Noctalia", i18n::tr("notifications.internal.desktop-widgets-editor"),
-          i18n::tr("notifications.internal.desktop-widgets-editor-enabled")
-      );
-    }
-  });
-  m_settingsWindow.setOpenLockscreenWidgetEditor([this]() {
-    if (!m_configService.isLockScreenEnabled()) {
-      return;
-    }
-    if (m_lockScreen.isActive()) {
-      notify::info(
-          "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
-          i18n::tr("notifications.internal.lockscreen-widgets-editor-blocked-locked")
-      );
-      return;
-    }
-    if (m_desktopWidgetsController.isEditing()) {
-      m_desktopWidgetsController.exitEdit();
-    }
-    const bool wasEditing = m_lockscreenWidgetsController.isEditing();
-    m_lockscreenWidgetsController.toggleEdit();
-    if (!wasEditing && m_lockscreenWidgetsController.isEditing()) {
-      notify::info(
-          "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
-          i18n::tr("notifications.internal.lockscreen-widgets-editor-enabled")
-      );
-    }
-  });
-  m_settingsWindow.setSyncGreeterAppearance([this]() { performGreeterSync(); });
-  m_settingsWindow.setSaveWallpaperPaletteAsCustom([this]() {
-    std::string paletteName;
-    std::string error;
-    if (!m_themeService.saveWallpaperPaletteAsCustom(&paletteName, &error)) {
-      m_settingsWindow.markSettingsWriteError(
-          error.empty() ? i18n::tr("settings.errors.export-wallpaper-palette") : std::move(error)
-      );
-      return;
-    }
-    m_settingsWindow.onExternalOptionsChanged();
-    m_settingsWindow.markSettingsWriteSuccess(true);
-    notify::info(
-        "Noctalia", i18n::tr("notifications.internal.wallpaper-palette-export"),
-        i18n::tr("notifications.internal.wallpaper-palette-export-success", "name", paletteName)
-    );
-  });
 }
 
 void Application::performGreeterSync(bool quiet) {
@@ -222,7 +164,9 @@ void Application::performGreeterSync(bool quiet) {
             "Noctalia", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
         );
       } else {
-        m_settingsWindow.markSettingsWriteError(i18n::tr("settings.errors.sync-greeter"));
+        notify::error(
+            "Noctalia", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
+        );
       }
     });
   };
@@ -242,7 +186,9 @@ void Application::performGreeterSync(bool quiet) {
           "Noctalia", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
       );
     } else {
-      m_settingsWindow.markSettingsWriteError(i18n::tr("settings.errors.sync-greeter"));
+      notify::error(
+          "Noctalia", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
+      );
     }
     return;
   }
@@ -293,7 +239,8 @@ void Application::performGreeterSync(bool quiet) {
                                  : "notifications.internal.greeter-sync-timeout-manual-pkexec"
             )
         );
-        m_settingsWindow.markSettingsWriteError(
+        notify::error(
+            "Noctalia", i18n::tr("notifications.internal.greeter-sync"),
             i18n::tr(
                 inSessionPolkit  ? "settings.errors.sync-greeter-timeout"
                     : legacySync ? "settings.errors.sync-greeter-timeout-manual"
@@ -431,8 +378,6 @@ void Application::initInputDispatch() {
     if (m_trayMenu.onPointerEvent(event)) {
       return;
     }
-    if (m_settingsWindow.onPointerEvent(event))
-      return;
     if (m_bar.onPointerEvent(event))
       return;
     if (m_dock.onPointerEvent(event))
@@ -485,10 +430,6 @@ void Application::initInputDispatch() {
       m_desktopWidgetsController.onKeyboardEvent(event);
       return;
     }
-    if (m_settingsWindow.ownsKeyboardSurface(m_wayland.lastKeyboardSurface())) {
-      m_settingsWindow.onKeyboardEvent(event);
-      return;
-    }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {
       return;
     }
@@ -505,48 +446,16 @@ void Application::initInputDispatch() {
 void Application::initPanelManagerAndPanels() {
   // Panel manager must be before bar so widgets can access PanelManager::instance()
   m_panelManager.initialize(m_compositorPlatform, &m_configService, &m_renderContext);
-  m_panelManager.setOpenSettingsWindowCallback([this](std::string context) {
-    m_settingsWindow.open(std::move(context));
-  });
-  m_panelManager.setCloseSettingsWindowCallback([this]() { m_settingsWindow.close(); });
-  m_panelManager.setToggleSettingsWindowCallback([this](std::string context) {
-    if (m_settingsWindow.isOpen()) {
-      m_settingsWindow.close();
-      return;
-    }
-    m_settingsWindow.open(std::move(context));
-  });
   m_panelManager.setCloseDesktopWidgetsEditorCallback([this]() {
     if (m_desktopWidgetsController.isEditing()) {
       m_desktopWidgetsController.exitEdit();
     }
   });
-  m_settingsWindow.setOpenWallpaperPanel([this]() {
-    wl_output* output = m_compositorPlatform.preferredInteractiveOutput(std::chrono::milliseconds(1200));
-    m_panelManager.openPanel("wallpaper", PanelOpenRequest{.output = output});
-  });
-  m_settingsWindow.setCalendarService(&m_calendarService);
   m_calendarService.setCredentialChangeCallback([this]() {
-    m_settingsWindow.onExternalOptionsChanged();
+    m_settingsInvalidated.emit();
     retrySecretServiceConsumers();
   });
-  m_settingsWindow.setClipboardService(&m_clipboardService);
-  m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsWindow.onExternalOptionsChanged(); });
-  m_settingsWindow.setResetEncryptedStorage([this]() {
-    const bool clipboardCleared = m_clipboardService.clearEncryptedPersistenceForRecovery();
-    const bool calendarCleared = m_calendarService.clearEncryptedCacheForRecovery();
-    if (!clipboardCleared || !calendarCleared) {
-      m_settingsWindow.showTransientStatus(i18n::tr("settings.storage-recovery.error-delete"), true);
-      m_settingsWindow.onExternalOptionsChanged();
-      return;
-    }
-    m_storageKeyProvider.resetAfterEncryptedDataCleared([this](bool success) {
-      m_settingsWindow.showTransientStatus(
-          i18n::tr(success ? "settings.storage-recovery.success" : "settings.storage-recovery.error-key"), !success
-      );
-      m_settingsWindow.onExternalOptionsChanged();
-    });
-  });
+  m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsInvalidated.emit(); });
   auto clipboardPanel = std::make_unique<ClipboardPanel>(&m_clipboardService, &m_configService, &m_asyncTextureCache);
   clipboardPanel->setActivateCallback([this](const ClipboardEntry& entry) {
     const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;
@@ -572,10 +481,111 @@ void Application::initPanelManagerAndPanels() {
   syncClipboardService();
   m_panelManager.registerPanel("session", std::make_unique<SessionPanel>(&m_configService, m_sessionActionRunner));
   m_panelManager.registerPanel("test", std::make_unique<TestPanel>());
-  m_panelManager.registerPanel(
-      "control-center",
-      std::make_unique<ControlCenterPanel>(ControlCenterServices{
-          .notifications = &m_notificationManager,
+  settings::RuntimeActions settingsActions{
+      .resetEncryptedStorage =
+          [this]() {
+            const bool clipboardCleared = m_clipboardService.clearEncryptedPersistenceForRecovery();
+            const bool calendarCleared = m_calendarService.clearEncryptedCacheForRecovery();
+            if (!clipboardCleared || !calendarCleared) {
+              notify::error(
+                  "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                  i18n::tr("settings.storage-recovery.error-delete")
+              );
+              m_settingsInvalidated.emit();
+              return;
+            }
+            m_storageKeyProvider.resetAfterEncryptedDataCleared([this](bool success) {
+              if (success) {
+                notify::info(
+                    "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                    i18n::tr("settings.storage-recovery.success")
+                );
+              } else {
+                notify::error(
+                    "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                    i18n::tr("settings.storage-recovery.error-key")
+                );
+              }
+              m_settingsInvalidated.emit();
+            });
+          },
+      .syncGreeterAppearance = [this]() { performGreeterSync(); },
+      .resetLauncherUsage =
+          [this]() {
+            if (m_launcherPanel != nullptr) {
+              m_launcherPanel->clearUsage();
+            }
+            notify::info(
+                "Noctalia", i18n::tr("notifications.internal.launcher-usage-reset"),
+                i18n::tr("notifications.internal.launcher-usage-reset-success")
+            );
+          },
+      .resetScreenTime =
+          [this]() {
+            m_screenTimeService.clearAll();
+            notify::info(
+                "Noctalia", i18n::tr("notifications.internal.screen-time-reset"),
+                i18n::tr("notifications.internal.screen-time-reset-success")
+            );
+          },
+      .saveWallpaperPaletteAsCustom =
+          [this]() {
+            std::string paletteName;
+            std::string error;
+            if (!m_themeService.saveWallpaperPaletteAsCustom(&paletteName, &error)) {
+              notify::error(
+                  "Noctalia", i18n::tr("notifications.internal.wallpaper-palette-export"),
+                  error.empty() ? i18n::tr("settings.errors.export-wallpaper-palette") : std::move(error)
+              );
+              return;
+            }
+            m_settingsInvalidated.emit();
+            notify::info(
+                "Noctalia", i18n::tr("notifications.internal.wallpaper-palette-export"),
+                i18n::tr("notifications.internal.wallpaper-palette-export-success", "name", paletteName)
+            );
+          },
+      .openDesktopWidgetEditor =
+          [this]() {
+            if (m_lockscreenWidgetsController.isEditing()) {
+              m_lockscreenWidgetsController.exitEdit();
+            }
+            const bool wasEditing = m_desktopWidgetsController.isEditing();
+            m_desktopWidgetsController.toggleEdit();
+            if (!wasEditing && m_desktopWidgetsController.isEditing()) {
+              notify::info(
+                  "Noctalia", i18n::tr("notifications.internal.desktop-widgets-editor"),
+                  i18n::tr("notifications.internal.desktop-widgets-editor-enabled")
+              );
+            }
+          },
+      .openLockscreenWidgetEditor =
+          [this]() {
+            if (!m_configService.isLockScreenEnabled()) {
+              return;
+            }
+            if (m_lockScreen.isActive()) {
+              notify::info(
+                  "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
+                  i18n::tr("notifications.internal.lockscreen-widgets-editor-blocked-locked")
+              );
+              return;
+            }
+            if (m_desktopWidgetsController.isEditing()) {
+              m_desktopWidgetsController.exitEdit();
+            }
+            const bool wasEditing = m_lockscreenWidgetsController.isEditing();
+            m_lockscreenWidgetsController.toggleEdit();
+            if (!wasEditing && m_lockscreenWidgetsController.isEditing()) {
+              notify::info(
+                  "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
+                  i18n::tr("notifications.internal.lockscreen-widgets-editor-enabled")
+              );
+            }
+          },
+  };
+  auto controlCenter = std::make_unique<ControlCenterPanel>(ControlCenterServices{
+      .notifications = &m_notificationManager,
           .audio = m_pipewireService.get(),
           .easyEffects = m_easyEffectsService.get(),
           .mpris = m_mprisService.get(),
@@ -608,10 +618,14 @@ void Application::initPanelManagerAndPanels() {
           .clipboard = &m_clipboardService,
           .accounts = m_accountsService.get(),
           .thumbnails = &m_thumbnailService,
+          .wallpaperScanner = &m_wallpaperScanner,
           .asyncTextures = &m_asyncTextureCache,
           .pluginManager = &m_pluginManager,
-      })
-  );
+          .settingsInvalidated = &m_settingsInvalidated,
+          .settingsActions = std::move(settingsActions),
+      });
+  m_controlCenter = controlCenter.get();
+  m_panelManager.registerPanel("control-center", std::move(controlCenter));
   {
     auto launcherPanel = std::make_unique<LauncherPanel>(&m_configService, &m_asyncTextureCache);
     launcherPanel->addProvider(std::make_unique<AppProvider>(&m_configService, &m_compositorPlatform));
@@ -644,22 +658,6 @@ void Application::initPanelManagerAndPanels() {
       },
       "launcher-usage"
   );
-  m_settingsWindow.setResetLauncherUsage([this]() {
-    if (m_launcherPanel != nullptr) {
-      m_launcherPanel->clearUsage();
-    }
-    notify::info(
-        "Noctalia", i18n::tr("notifications.internal.launcher-usage-reset"),
-        i18n::tr("notifications.internal.launcher-usage-reset-success")
-    );
-  });
-  m_settingsWindow.setResetScreenTime([this]() {
-    m_screenTimeService.clearAll();
-    notify::info(
-        "Noctalia", i18n::tr("notifications.internal.screen-time-reset"),
-        i18n::tr("notifications.internal.screen-time-reset-success")
-    );
-  });
   reloadPluginLauncherProviders();
   reloadDmenuProviders();
   reloadPluginPanels();
@@ -702,7 +700,7 @@ void Application::initPanelManagerAndPanels() {
   m_panelManager.registerPanel(
       "wallpaper",
       std::make_unique<WallpaperPanel>(
-          &m_wayland, &m_configService, &m_thumbnailService, &m_wallpaperScanner, &m_themeService
+          &m_wayland, &m_configService, &m_thumbnailService, &m_wallpaperScanner, &m_themeService, &m_httpClient
       )
   );
   m_panelManager.registerPanel("tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService));
@@ -777,9 +775,6 @@ void Application::initNotificationAndOsd() {
         return runIdleAction(action);
       }
   );
-  m_idleManager.setLiveIdleChangeCallback([this]() {
-    DeferredCall::callLater([this]() { m_settingsWindow.onIdleLiveStatusChanged(); });
-  });
   m_idleManager.reload(m_configService.config().idle);
   try {
     m_screenSaverService = std::make_unique<ScreenSaverService>(m_systemBus.get());
@@ -868,10 +863,21 @@ void Application::initBarDockAndLayout() {
   });
   m_idleInhibitor.setAnchorSurfacesProvider([this]() { return m_bar.caffeineAnchorSurfaces(); });
   m_panelManager.setOpenWidgetSettingsCallback([this](std::string barName, std::string widgetName) {
-    m_settingsWindow.openToBarWidget(std::move(barName), std::move(widgetName));
+    if (m_controlCenter != nullptr) {
+      m_controlCenter->queueBarWidget(std::move(barName), std::move(widgetName));
+    }
+    m_panelManager.openSettingsWindow("bar");
   });
   m_panelManager.setOpenPluginSettingsCallback([this](std::string pluginId) {
-    return m_settingsWindow.openToPlugin(std::move(pluginId));
+    const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
+    if (manifest == nullptr || !settings::pluginHasSettings(*manifest)) {
+      return false;
+    }
+    if (m_controlCenter != nullptr) {
+      m_controlCenter->queuePluginSettings(std::move(pluginId));
+    }
+    m_panelManager.openSettingsWindow("plugins");
+    return true;
   });
   m_panelManager.setAttachedPanelGeometryCallback(
       [this](wl_output* output, std::string_view barName, std::optional<AttachedPanelGeometry> geometry) {
@@ -939,22 +945,15 @@ void Application::initBarDockAndLayout() {
         );
       }
   );
-  m_layerPopupHosts.registerHost(
-      [this](wl_surface* surface) { return m_settingsWindow.popupParentContextForSurface(surface); }, {}, {},
-      [this]() { return m_settingsWindow.fallbackPopupParentContext(); }
-  );
 
   m_colorPickerDialogPopup.initialize(m_wayland, m_configService, m_renderContext, m_layerPopupHosts);
 
   m_glyphPickerDialogPopup.initialize(m_wayland, m_configService, m_renderContext, m_layerPopupHosts);
 
   m_fileDialogPopup.initialize(m_wayland, m_configService, m_renderContext, m_layerPopupHosts, m_thumbnailService);
-  m_settingsWindow.initializeDialogPresenter(
-      m_colorPickerDialogPopup, m_glyphPickerDialogPopup, m_fileDialogPopup, m_thumbnailService
-  );
-  ColorPickerDialog::setPresenter(m_settingsWindow.colorPickerDialogPresenter());
-  GlyphPickerDialog::setPresenter(m_settingsWindow.glyphPickerDialogPresenter());
-  FileDialog::setPresenter(m_settingsWindow.fileDialogPresenter());
+  ColorPickerDialog::setPresenter(&m_colorPickerDialogPopup);
+  GlyphPickerDialog::setPresenter(&m_glyphPickerDialogPopup);
+  FileDialog::setPresenter(&m_fileDialogPopup);
 }
 
 void Application::initWidgetControllersAndCallbacks() {
@@ -1002,17 +1001,32 @@ void Application::initWidgetControllersAndCallbacks() {
       .widgets = desktopWidgetServices,
       .lockscreenWidgets = &m_lockscreenWidgetsController,
   });
-  m_desktopWidgetsController.setOnEnterEditCallback([this]() { m_settingsWindow.closeForWidgetEditor(); });
-  m_lockscreenWidgetsController.setOnEnterEditCallback([this]() { m_settingsWindow.closeForWidgetEditor(); });
-  const auto restoreSettingsAfterWidgetEditor = [this]() {
+  m_desktopWidgetsController.setOnEnterEditCallback([this]() {
+    if (m_panelManager.isOpenPanel("control-center")) {
+      m_restoreControlCenterAfterWidgetEditor = true;
+      m_panelManager.closePanel();
+    }
+  });
+  m_lockscreenWidgetsController.setOnEnterEditCallback([this]() {
+    if (m_panelManager.isOpenPanel("control-center")) {
+      m_restoreControlCenterAfterWidgetEditor = true;
+      m_panelManager.closePanel();
+    }
+  });
+  const auto restoreControlCenterAfterWidgetEditor = [this]() {
     DeferredCall::callLater([this]() {
-      if (!m_desktopWidgetsController.isEditing() && !m_lockscreenWidgetsController.isEditing()) {
-        m_settingsWindow.reopenAfterWidgetEditor();
+      if (!m_restoreControlCenterAfterWidgetEditor) {
+        return;
       }
+      if (m_desktopWidgetsController.isEditing() || m_lockscreenWidgetsController.isEditing()) {
+        return;
+      }
+      m_restoreControlCenterAfterWidgetEditor = false;
+      m_panelManager.openPanel("control-center", PanelOpenRequest{.context = "settings"});
     });
   };
-  m_desktopWidgetsController.setOnExitEditCallback(restoreSettingsAfterWidgetEditor);
-  m_lockscreenWidgetsController.setOnExitEditCallback(restoreSettingsAfterWidgetEditor);
+  m_desktopWidgetsController.setOnExitEditCallback(restoreControlCenterAfterWidgetEditor);
+  m_lockscreenWidgetsController.setOnExitEditCallback(restoreControlCenterAfterWidgetEditor);
   m_iconThemePollSource.setChangeCallback([this]() { onIconThemeChanged(); });
 
   std::string lastShellFontFamily = m_configService.config().shell.fontFamily;
@@ -1036,7 +1050,6 @@ void Application::initWidgetControllersAndCallbacks() {
         m_osdOverlay.requestLayout();
         m_trayMenu.onFontChanged();
         m_backdrop.onFontChanged();
-        m_settingsWindow.onFontChanged();
         m_colorPickerDialogPopup.requestLayout();
         m_glyphPickerDialogPopup.requestLayout();
         m_fileDialogPopup.requestLayout();
@@ -1066,7 +1079,6 @@ void Application::initWidgetControllersAndCallbacks() {
         m_osdOverlay.requestLayout();
         m_trayMenu.onFontChanged();
         m_backdrop.onFontChanged();
-        m_settingsWindow.onFontChanged();
         m_colorPickerDialogPopup.requestLayout();
         m_glyphPickerDialogPopup.requestLayout();
         m_fileDialogPopup.requestLayout();
@@ -1083,7 +1095,6 @@ void Application::initWidgetControllersAndCallbacks() {
       m_bar.onSecondTick();
       m_desktopWidgetsController.onSecondTick();
       m_lockscreenWidgetsController.onSecondTick();
-      m_settingsWindow.onSecondTick();
       if (m_configService.config().osd.kinds.keyboardLayout) {
         m_keyboardLayoutOsd.onLayoutChanged(m_compositorPlatform, m_configService.config());
       }

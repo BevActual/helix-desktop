@@ -147,6 +147,8 @@ void KeybindRecorder::setOnCommit(std::function<void(KeyChord)> callback) { m_on
 
 void KeybindRecorder::setModifierPolicy(ModifierPolicy policy) { m_modifierPolicy = policy; }
 
+void KeybindRecorder::setAllowSuper(bool allow) { m_allowSuper = allow; }
+
 void KeybindRecorder::setTabFocusKey(std::string key) {
   if (m_inputArea != nullptr) {
     m_inputArea->setTabFocusKey(std::move(key));
@@ -179,7 +181,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
   }
 
   // Must run before the modifier-preview branch so a bare Super press is also caught.
-  if ((modifiers & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym)) {
+  if (!m_allowSuper && ((modifiers & KeyMod::Super) != 0 || KeySymbol::isSuperModifier(sym))) {
     notify::error(
         i18n::tr("notifications.internal.keybind-app"), i18n::tr("notifications.internal.keybind-invalid-title"),
         i18n::tr("notifications.internal.keybind-invalid-super")
@@ -232,7 +234,7 @@ void KeybindRecorder::handleKeyDown(std::uint32_t sym, std::uint32_t modifiers) 
     return;
   }
 
-  const std::uint32_t cleanModifiers = modifiers & ~KeyMod::Super;
+  const std::uint32_t cleanModifiers = m_allowSuper ? modifiers : (modifiers & ~KeyMod::Super);
   KeyChord chord{.sym = sym, .modifiers = cleanModifiers};
   m_chord = chord;
   if (m_onCommit) {
@@ -288,6 +290,9 @@ void KeybindRecorder::refreshLabel() {
       }
       if ((preview.modifiers & KeyMod::Shift) != 0) {
         text += "Shift + ";
+      }
+      if ((preview.modifiers & KeyMod::Super) != 0) {
+        text += "Super + ";
       }
       text += "…";
       m_label->setText(text);

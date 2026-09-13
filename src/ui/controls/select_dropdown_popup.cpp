@@ -99,7 +99,7 @@ void SelectDropdownPopup::openSelectDropdown(const DropdownRequest& request, Dro
                   .width = request.anchorWidth,
                   .height = request.anchorHeight,
               },
-          // parent.wlSurface stays null: select parents (panels, settings window) are already
+          // parent.wlSurface stays null: select parents (panels) are already
           // keyboard OnDemand; the bar-style interactivity flip must not touch them. The parent
           // surface is passed only for pointer-capture mapping (scrollbar drags).
           .parent =

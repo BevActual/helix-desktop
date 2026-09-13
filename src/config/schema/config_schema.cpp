@@ -487,7 +487,6 @@ namespace noctalia::config::schema {
         field(&ControlCenterConfig::width, "width", kControlCenterWidthRange),
         field(&ControlCenterConfig::showShortcutLabels, "show_shortcut_labels"),
         field(&ControlCenterConfig::showSessionButton, "show_session_button"),
-        field(&ControlCenterConfig::showSetupTabs, "show_setup_tabs"),
         field(&ControlCenterConfig::hiddenTabs, "hidden_tabs"),
         subTable(&ControlCenterConfig::calendarTab, "calendar", calendarTabSchema()),
         arrayOf<ControlCenterConfig, ShortcutConfig>(
@@ -783,6 +782,14 @@ namespace noctalia::config::schema {
             tbl.insert_or_assign(key, std::move(arr));
           }
       );
+    }
+
+    const Schema<WallpaperWallhavenConfig>& wallpaperWallhavenSchema() {
+      static const Schema<WallpaperWallhavenConfig> s = {
+          field(&WallpaperWallhavenConfig::apiKey, "api_key"),
+          pathStringField(&WallpaperWallhavenConfig::downloadDir, "download_dir"),
+      };
+      return s;
     }
 
     const Schema<WallpaperAutomationConfig>& wallpaperAutomationSchema() {
@@ -1619,6 +1626,7 @@ namespace noctalia::config::schema {
         pathStringField(&WallpaperConfig::directoryDark, "directory_dark"),
         field(&WallpaperConfig::perMonitorDirectories, "per_monitor_directories"),
         subTable(&WallpaperConfig::automation, "automation", wallpaperAutomationSchema()),
+        subTable(&WallpaperConfig::wallhaven, "wallhaven", wallpaperWallhavenSchema()),
         namedMap<WallpaperConfig, WallpaperMonitorOverride>(
             &WallpaperConfig::monitorOverrides, "monitor", wallpaperMonitorSchema(),
             [](WallpaperMonitorOverride& o, std::string_view name) { o.match = std::string(name); },

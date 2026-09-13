@@ -1,7 +1,11 @@
 #include "shell/control_center/tabs/monitor_tab.h"
 
+#include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_config_outputs.h"
 #include "config/config_service.h"
+#include "core/input/key_modifiers.h"
 #include "i18n/i18n.h"
+#include "notification/notifications.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
@@ -11,6 +15,7 @@
 #include "ui/controls/scroll_view.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "wayland/wayland_connection.h"
 
 #include "cursor-shape-v1-client-protocol.h"
 
@@ -32,6 +37,8 @@ namespace {
   constexpr float kLayoutMapMinHeight = 132.0F;
   constexpr float kLayoutMapMaxHeight = 220.0F;
   constexpr int kLayoutNudge = 32;
+  constexpr int kLayoutNudgeMedium = 8;
+  constexpr int kLayoutNudgeFine = 1;
   constexpr auto kBrightnessCommitInterval = std::chrono::milliseconds(16);
   constexpr auto kBrightnessStateHoldoff = std::chrono::milliseconds(180);
   constexpr double kMinScale = 0.5;
@@ -283,6 +290,7 @@ MonitorTab::MonitorTab(
     const ControlCenterServices& services
 )
     : m_brightness(brightness), m_configService(config), m_displayConfig(displayConfig),
+      m_platform(services.platform),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "services", .includedGroups = {"brightness"}}
       )) {}
@@ -356,6 +364,31 @@ std::unique_ptr<Flex> MonitorTab::createHeaderActions() {
   auto live = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
       ui::button({
+          .out = &m_saveButton,
+          .glyph = "device-floppy",
+          .tooltip = i18n::tr("control-center.display.save-to-niri"),
+          .onClick =
+              [this]() {
+                if (m_displayConfig == nullptr) {
+                  return;
+                }
+                const auto result = compositors::niri::saveOutputs(m_displayConfig->outputs());
+                if (!result.ok) {
+                  notify::error(
+                      "Noctalia", i18n::tr("control-center.display.save-title"),
+                      result.error.empty() ? i18n::tr("control-center.display.save-failed") : result.error
+                  );
+                  return;
+                }
+                notify::info(
+                    "Noctalia", i18n::tr("control-center.display.save-title"),
+                    i18n::tr("control-center.display.save-ok")
+                );
+                syncStatusLabels();
+              },
+          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+      }),
+      ui::button({
           .out = &m_rescanButton,
           .glyph = "refresh",
           .tooltip = i18n::tr("control-center.display.rescan"),
@@ -382,18 +415,26 @@ bool MonitorTab::configureMode() const { return m_settings->configureMode(); }
 void MonitorTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
 void MonitorTab::syncHeaderActions() {
-  if (m_rescanButton == nullptr) {
-    return;
-  }
-  const bool ddc = m_configService != nullptr && m_configService->config().brightness.enableDdcutil;
   const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
-  m_rescanButton->setVisible(ddc || niri);
+  if (m_rescanButton != nullptr) {
+    const bool ddc = m_configService != nullptr && m_configService->config().brightness.enableDdcutil;
+    m_rescanButton->setVisible(ddc || niri);
+  }
+  if (m_saveButton != nullptr) {
+    m_saveButton->setVisible(niri);
+  }
 }
 
 void MonitorTab::syncStatusLabels() {
   const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
   if (m_noteLabel != nullptr) {
     m_noteLabel->setVisible(niri);
+    if (niri && m_displayConfig != nullptr) {
+      const bool saved = compositors::niri::savedLayoutMatches(m_displayConfig->outputs());
+      m_noteLabel->setText(
+          saved ? i18n::tr("control-center.display.saved") : i18n::tr("control-center.display.temporary")
+      );
+    }
   }
   if (m_errorLabel != nullptr) {
     const std::string error = m_displayConfig != nullptr ? m_displayConfig->lastError() : std::string{};
@@ -434,6 +475,7 @@ void MonitorTab::onClose() {
   m_layoutPlaceRight = nullptr;
   m_layoutPlaceBottom = nullptr;
   m_rescanButton = nullptr;
+  m_saveButton = nullptr;
   m_cards.clear();
   m_layoutTiles.clear();
   m_layoutReferenceNames.clear();
@@ -1029,6 +1071,7 @@ void MonitorTab::applyLayoutDrag() {
   }
   if (!m_displayConfig->setPosition(tile->name, snap->position.x, snap->position.y)) {
     m_lastDisplayListKey.clear();
+    reportLayoutError();
   }
 }
 
@@ -1555,13 +1598,14 @@ void MonitorTab::applyLayout(display_config::LayoutDirection direction) {
     if (nudgeVertical || nudgeHorizontal) {
       const int delta =
           (direction == display_config::LayoutDirection::Top || direction == display_config::LayoutDirection::Left)
-          ? -kLayoutNudge
-          : kLayoutNudge;
+          ? -layoutNudgePx()
+          : layoutNudgePx();
       const int proposedX = moving->x + (nudgeHorizontal ? delta : 0);
       const int proposedY = moving->y + (nudgeVertical ? delta : 0);
       const auto point = display_config::placeAdjacent(*moving, *reference, *adj, proposedX, proposedY);
       if (!m_displayConfig->setPosition(m_layoutMovingName, point.x, point.y)) {
         m_lastDisplayListKey.clear();
+        reportLayoutError();
       }
       return;
     }
@@ -1569,5 +1613,32 @@ void MonitorTab::applyLayout(display_config::LayoutDirection direction) {
 
   if (!m_displayConfig->placeRelative(m_layoutMovingName, referenceName, direction)) {
     m_lastDisplayListKey.clear();
+    reportLayoutError();
   }
+}
+
+int MonitorTab::layoutNudgePx() const {
+  if (m_platform == nullptr) {
+    return kLayoutNudge;
+  }
+  const auto modifiers = m_platform->wayland().keyboardModifiers();
+  if ((modifiers & KeyMod::Shift) != 0) {
+    return kLayoutNudgeFine;
+  }
+  if ((modifiers & KeyMod::Ctrl) != 0) {
+    return kLayoutNudgeMedium;
+  }
+  return kLayoutNudge;
+}
+
+void MonitorTab::reportLayoutError() {
+  if (m_displayConfig == nullptr) {
+    return;
+  }
+  const std::string error = m_displayConfig->lastError();
+  if (error.empty()) {
+    return;
+  }
+  notify::error("Noctalia", i18n::tr("control-center.display.layout-error"), error);
+  syncStatusLabels();
 }

@@ -130,6 +130,28 @@ namespace display_config {
     return "Normal";
   }
 
+  std::string_view kdlName(Transform transform) noexcept {
+    switch (transform) {
+    case Transform::Normal:
+      return "normal";
+    case Transform::Rotate90:
+      return "90";
+    case Transform::Rotate180:
+      return "180";
+    case Transform::Rotate270:
+      return "270";
+    case Transform::Flipped:
+      return "flipped";
+    case Transform::Flipped90:
+      return "flipped-90";
+    case Transform::Flipped180:
+      return "flipped-180";
+    case Transform::Flipped270:
+      return "flipped-270";
+    }
+    return "normal";
+  }
+
   std::optional<Transform> parseTransform(std::string_view value) {
     const auto normalized = StringUtils::trim(value);
     if (normalized == "Normal" || normalized == "normal") {
@@ -232,7 +254,7 @@ namespace display_config {
   namespace {
 
     constexpr int kAlignMagnet = 24;
-    constexpr long long kStaySideBias = 200LL * 200LL;
+    constexpr long long kStaySideBias = 480LL * 480LL;
 
     [[nodiscard]] bool rangesOverlap(int aStart, int aExtent, int bStart, int bExtent) noexcept {
       return aStart < bStart + bExtent && bStart < aStart + aExtent;

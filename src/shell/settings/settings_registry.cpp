@@ -1,6 +1,7 @@
 #include "shell/settings/settings_registry.h"
 
 #include "compositors/niri/niri_config_binds.h"
+#include "compositors/niri/niri_config_setup.h"
 #include "config/config_types.h"
 #include "config/schema/config_schema.h"
 #include "config/schema/ranges.h"
@@ -400,7 +401,7 @@ namespace settings {
                   },
               .glyph = "copy",
           },
-          "niri compositor ipc keybind spawn-sh launcher volume brightness"
+          "niri compositor ipc keybind spawn-sh launcher volume brightness lock screenshot clipboard"
       ));
       entries.push_back(makeEntry(
           SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.install.label"),
@@ -451,16 +452,142 @@ namespace settings {
         } else {
           subtitle = i18n::tr("settings.schema.keybinds.niri.missing", "key", std::string(status.recommended.key));
         }
+        const bool userOnly = !status.boundKeys.empty() && !status.inOwnedInclude;
+        const std::string displayKey =
+            !status.boundKeys.empty() ? status.boundKeys.front() : std::string(status.recommended.key);
+        const auto chord = compositors::niri::niriKeyToChord(displayKey);
         const std::string line = compositors::niri::kdlLine(status.recommended);
         entries.push_back(makeEntry(
             SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.actions." + id + ".label"),
             std::move(subtitle), {},
-            ButtonSetting{
-                .label = i18n::tr("settings.schema.keybinds.niri.copy-bind"),
-                .action = [copyText, line]() { copyText(line, "settings.schema.keybinds.niri.copied"); },
-                .glyph = "copy",
+            ExternalKeybindSetting{
+                .chord = chord,
+                .allowSuper = true,
+                .enabled = !userOnly && !status.keyConflict,
+                .onCommit =
+                    [rebuild, id](KeyChord recorded) {
+                      const std::string key = compositors::niri::niriKeyFromChord(recorded);
+                      const auto result = compositors::niri::setRecommendedKey(id, key);
+                      if (!result.ok) {
+                        notify::error(
+                            "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                            result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
+                                                 : result.error
+                        );
+                        return;
+                      }
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.updated")
+                      );
+                      if (rebuild) {
+                        rebuild();
+                      }
+                    },
+                .copy =
+                    ButtonSetting{
+                        .label = i18n::tr("settings.schema.keybinds.niri.copy-bind"),
+                        .action = [copyText, line]() { copyText(line, "settings.schema.keybinds.niri.copied"); },
+                        .glyph = "copy",
+                    },
             },
             "niri compositor ipc keybind " + std::string(status.recommended.ipcCommand)
+        ));
+      }
+    }
+
+    void appendNiriSetupEntries(std::vector<SettingEntry>& entries, const RegistryEnvironment& env, const Config& cfg) {
+      if (!env.niriOverviewTypeToLaunchSupported && !env.niriBackdropSupported) {
+        return;
+      }
+      const auto copy = env.copyToClipboard;
+      const auto rebuild = env.requestRebuild;
+      const bool backdrop = cfg.backdrop.enabled;
+      const auto scan = compositors::niri::scanSetup(backdrop);
+
+      auto copyText = [copy](std::string text, std::string_view toastKey) {
+        if (copy) {
+          copy(std::move(text));
+        }
+        notify::info("Noctalia", i18n::tr("settings.schema.niri.setup.title"), i18n::tr(std::string(toastKey)));
+      };
+
+      entries.push_back(makeEntry(
+          SettingsSection::Niri, "setup", i18n::tr("settings.schema.niri.setup.copy-missing.label"),
+          i18n::tr("settings.schema.niri.setup.copy-missing.description"), {},
+          ButtonSetting{
+              .label = i18n::tr("settings.schema.niri.setup.copy-missing.button"),
+              .action =
+                  [copyText, backdrop]() {
+                    const auto missing = compositors::niri::missingSetup(compositors::niri::scanSetup(backdrop));
+                    if (missing.empty()) {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          i18n::tr("settings.schema.niri.setup.none-missing")
+                      );
+                      return;
+                    }
+                    copyText(compositors::niri::kdlBlock(missing), "settings.schema.niri.setup.copied-missing");
+                  },
+              .glyph = "copy",
+          },
+          "niri setup autostart layer-rule include noctalia-setup"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Niri, "setup", i18n::tr("settings.schema.niri.setup.install.label"),
+          i18n::tr("settings.schema.niri.setup.install.description"), {},
+          ButtonSetting{
+              .label = i18n::tr("settings.schema.niri.setup.install.button"),
+              .action =
+                  [rebuild, backdrop]() {
+                    const auto result = compositors::niri::installSetup(backdrop);
+                    if (!result.ok) {
+                      notify::error(
+                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          result.error.empty() ? i18n::tr("settings.schema.niri.setup.install-failed")
+                                               : result.error
+                      );
+                      return;
+                    }
+                    if (result.added == 0) {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          i18n::tr("settings.schema.niri.setup.install-none")
+                      );
+                    } else {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          i18n::tr("settings.schema.niri.setup.install-ok", "count", result.added)
+                      );
+                    }
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+              .glyph = "plus",
+          },
+          "niri setup install include noctalia-setup"
+      ));
+
+      for (const auto& status : scan.items) {
+        const std::string id(status.item.id);
+        const std::string subtitle = status.present
+            ? i18n::tr("settings.schema.niri.setup.present")
+            : (status.item.optional ? i18n::tr("settings.schema.niri.setup.optional")
+                                   : i18n::tr("settings.schema.niri.setup.missing"));
+        const std::string kdl(status.item.kdl);
+        entries.push_back(makeEntry(
+            SettingsSection::Niri, "setup", i18n::tr("settings.schema.niri.setup.items." + id + ".label"),
+            subtitle.empty()
+                ? i18n::tr("settings.schema.niri.setup.items." + id + ".description")
+                : i18n::tr("settings.schema.niri.setup.items." + id + ".description") + " · " + subtitle,
+            {},
+            ButtonSetting{
+                .label = i18n::tr("settings.schema.keybinds.niri.copy-bind"),
+                .action = [copyText, kdl]() { copyText(kdl, "settings.schema.niri.setup.copied"); },
+                .glyph = "copy",
+            },
+            "niri setup " + id
         ));
       }
     }
@@ -800,6 +927,24 @@ namespace settings {
         SettingsSection::Wallpaper, "directories", tr("settings.schema.wallpaper.per-monitor-directories.label"),
         tr("settings.schema.wallpaper.per-monitor-directories.description"), {"wallpaper", "per_monitor_directories"},
         ToggleSetting{cfg.wallpaper.perMonitorDirectories}, "per display folder"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "wallhaven", tr("settings.schema.wallpaper.wallhaven-api-key.label"),
+        tr("settings.schema.wallpaper.wallhaven-api-key.description"), {"wallpaper", "wallhaven", "api_key"},
+        TextSetting{.value = cfg.wallpaper.wallhaven.apiKey, .placeholder = "", .browseFileExtensions = {}},
+        "wallhaven api key nsfw rate limit"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "wallhaven", tr("settings.schema.wallpaper.wallhaven-download-dir.label"),
+        tr("settings.schema.wallpaper.wallhaven-download-dir.description"),
+        {"wallpaper", "wallhaven", "download_dir"},
+        TextSetting{
+            .value = cfg.wallpaper.wallhaven.downloadDir,
+            .placeholder = tr("settings.schema.wallpaper.wallhaven-download-dir.placeholder"),
+            .browseMode = TextSettingBrowseMode::SelectFolder,
+            .browseFileExtensions = {}
+        },
+        "wallhaven download folder path"
     ));
     for (const auto& outputOpt : env.availableOutputs) {
       const std::string& connector = outputOpt.value;
@@ -1549,12 +1694,6 @@ namespace settings {
         tr("settings.schema.panels.home-session-button.description"), {"control_center", "show_session_button"},
         ToggleSetting{cfg.controlCenter.showSessionButton}, "session button show hide"
     ));
-    entries.push_back(makeEntry(
-        SettingsSection::ControlCenter, "navigation", tr("settings.schema.panels.control-center-show-setup.label"),
-        tr("settings.schema.panels.control-center-show-setup.description"),
-        {"control_center", "show_setup_tabs"}, ToggleSetting{cfg.controlCenter.showSetupTabs},
-        "setup more launcher dock desktop panels osd screenshot shell keybinds security hooks plugins"
-    ));
 
     // Desktop
     entries.push_back(makeEntry(
@@ -1817,6 +1956,11 @@ namespace settings {
           },
           "greeter sync pkexec run0 ghostty terminal sudo polkit wrapper"
       ));
+      entries.push_back(makeEntry(
+          SettingsSection::Security, "greeter", tr("settings.schema.shell.greeter-sync-auto.label"),
+          tr("settings.schema.shell.greeter-sync-auto.description"), {"shell", "greeter_sync", "auto_sync"},
+          ToggleSetting{cfg.shell.greeterSync.autoSync}, "greeter sync auto automatic"
+      ));
     }
     // Shell
     entries.push_back(makeEntry(
@@ -1829,11 +1973,6 @@ namespace settings {
             .browseFileExtensions = DirectoryScanner::imageExtensionFilter(true)
         },
         "image picture"
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::Shell, "general", tr("settings.schema.shell.settings-window-translucent.label"),
-        tr("settings.schema.shell.settings-window-translucent.description"), {"shell", "settings_window_translucent"},
-        ToggleSetting{cfg.shell.settingsWindowTranslucent}, "settings window background transparency translucent"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Shell, "general", tr("settings.schema.shell.time-format.label"),
@@ -2304,6 +2443,7 @@ namespace settings {
 
     // Niri-specific integrations
     if (env.niriOverviewTypeToLaunchSupported || env.niriBackdropSupported) {
+      appendNiriSetupEntries(entries, env, cfg);
       if (env.niriOverviewTypeToLaunchSupported) {
         entries.push_back(makeEntry(
             SettingsSection::Niri, "overview", tr("settings.schema.shell.niri-overview-type-to-launch.label"),
@@ -3758,7 +3898,8 @@ namespace settings {
           }
         };
         for (const auto& entry : entries) {
-          if (!std::holds_alternative<ButtonSetting>(entry.control)) {
+          if (!std::holds_alternative<ButtonSetting>(entry.control)
+              && !std::holds_alternative<ExternalKeybindSetting>(entry.control)) {
             verify(entry.path, "override");
           }
         }

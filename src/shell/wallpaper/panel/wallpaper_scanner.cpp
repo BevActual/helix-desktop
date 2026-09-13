@@ -139,6 +139,17 @@ WallpaperScanner::~WallpaperScanner() {
   }
 }
 
+void WallpaperScanner::addOnComplete(const void* owner, CompletionCallback callback) {
+  removeOnComplete(owner);
+  if (callback) {
+    m_listeners.emplace_back(owner, std::move(callback));
+  }
+}
+
+void WallpaperScanner::removeOnComplete(const void* owner) {
+  std::erase_if(m_listeners, [owner](const auto& listener) { return listener.first == owner; });
+}
+
 bool WallpaperScanner::requestScan(const std::filesystem::path& dir, bool flatten) {
   CacheKey key{dir.string(), flatten};
 
@@ -220,8 +231,10 @@ void WallpaperScanner::dispatch(const std::vector<pollfd>& fds, std::size_t star
     m_cache.insert_or_assign(std::move(key), std::move(result));
   }
 
-  if (m_onComplete) {
-    m_onComplete();
+  for (const auto& listener : m_listeners) {
+    if (listener.second) {
+      listener.second();
+    }
   }
 }
 

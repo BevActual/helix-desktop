@@ -19,7 +19,7 @@ enum class ModifierPolicy : std::uint8_t {
   Forbidden, // Modifiers are rejected; only bare keys are accepted.
 };
 
-// Records a KeyChord from live keyboard input. Rejects any chord involving Super.
+// Records a KeyChord from live keyboard input. Super is rejected unless allowSuper is set.
 class KeybindRecorder : public Flex {
 public:
   KeybindRecorder();
@@ -33,6 +33,7 @@ public:
   void setRecordingPlaceholder(std::string_view text);
   void setOnCommit(std::function<void(KeyChord)> callback);
   void setModifierPolicy(ModifierPolicy policy);
+  void setAllowSuper(bool allow);
   void setTabFocusKey(std::string key);
 
   [[nodiscard]] bool isRecording() const noexcept { return m_recording; }
@@ -65,5 +66,6 @@ private:
   bool m_recording = false;
   bool m_enabled = true;
   ModifierPolicy m_modifierPolicy = ModifierPolicy::Required;
+  bool m_allowSuper = false;
   VisualState m_visualState = VisualState::Idle;
 };

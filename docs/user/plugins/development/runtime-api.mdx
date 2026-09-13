@@ -40,7 +40,7 @@ effective configuration. For example, `noctalia.getSetting("shell.offline_mode")
 | `noctalia.setWallpaperMask(connector, { path, wallpaperPath })` | nothing | Applies a source-aligned grayscale occlusion mask to every desktop-widget surface on the output. Requires <PluginApiBadge feature="wallpaper-mask" />. |
 | `noctalia.setWallpaperMask(connector, nil)` | nothing | Clears this plugin runtime's mask from the output. Requires <PluginApiBadge feature="wallpaper-mask" />. |
 | `noctalia.togglePanel("author/plugin:panel")` | nothing | Opens or closes a plugin panel by full entry id. |
-| `noctalia.openSettings()` | nothing | Opens the settings window at this plugin's own settings, closing any open panel. Requires <PluginApiBadge feature="open-settings" />. |
+| `noctalia.openSettings()` | nothing | Opens Control Center at this plugin's own settings, closing any other open panel. Requires <PluginApiBadge feature="open-settings" />. |
 
 `outputs()` uses the DRM connector name in `name`; that is the same connector string expected by compositor tools such
 as `mpvpaper`. A `[[service]]` may also define `onOutputsChanged()`, which Noctalia calls whenever the output set or

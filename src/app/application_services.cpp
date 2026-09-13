@@ -523,7 +523,7 @@ void Application::initStyleThemeAndWayland() {
     // A refreshed catalog may carry a new md5 for the selected palette; re-resolve
     // so a stale cached palette gets re-downloaded and faded in.
     m_themeService.onConfigReload();
-    m_settingsWindow.onExternalOptionsChanged();
+    m_settingsInvalidated.emit();
   });
   m_communityPaletteService.sync();
   m_configService.addReloadCallback(
@@ -537,7 +537,7 @@ void Application::initStyleThemeAndWayland() {
   m_communityTemplateService.setReadyCallback([this]() {
     if (m_configService.config().theme.templates.enableCommunityTemplates) {
       m_themeService.onConfigReload();
-      m_settingsWindow.onExternalOptionsChanged();
+      m_settingsInvalidated.emit();
     }
   });
   m_communityTemplateService.sync(m_configService.config().theme.templates);
@@ -927,7 +927,6 @@ void Application::initAuxServicesAndHooks() {
     m_lockScreen.onThemeChanged();
     m_trayMenu.onThemeChanged();
     m_backdrop.onThemeChanged();
-    m_settingsWindow.onThemeChanged();
     scheduleGreeterAutoSync();
   });
 
@@ -1104,7 +1103,7 @@ void Application::initSystemBusServices() {
       m_accountsService = std::make_unique<AccountsService>(*m_systemBus);
       m_accountsService->setChangeCallback([this]() {
         m_panelManager.refresh();
-        m_settingsWindow.onExternalOptionsChanged();
+        m_settingsInvalidated.emit();
       });
       kLog.info("accounts service active for uid {}", m_accountsService->sessionUid());
     } catch (const std::exception& e) {
@@ -1159,7 +1158,7 @@ void Application::initSystemBusServices() {
         }
         m_bar.refresh();
         if (change.deviceCatalogChanged) {
-          m_settingsWindow.onExternalOptionsChanged();
+          m_settingsInvalidated.emit();
         }
         if (shouldRefreshControlCenter()) {
           m_panelManager.refresh();
@@ -1380,6 +1379,7 @@ void Application::initBrightnessAndPipewire() {
         m_panelManager.refresh();
       }
     });
+    m_displayConfigService->setConfigLoadedCallback([this]() { m_settingsInvalidated.emit(); });
   } catch (const std::exception& e) {
     kLog.warn("display config service disabled: {}", e.what());
     m_displayConfigService.reset();

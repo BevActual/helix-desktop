@@ -54,7 +54,6 @@
 #include "shell/panel/panel_manager.h"
 #include "shell/screen_corners/screen_corners.h"
 #include "shell/session/session_action_runner.h"
-#include "shell/settings/settings_window.h"
 #include "shell/switcher/window_switcher.h"
 #include "shell/tray/tray_menu.h"
 #include "shell/wallpaper/panel/wallpaper_scanner.h"
@@ -82,6 +81,7 @@
 #include "ui/dialogs/file_dialog_popup.h"
 #include "ui/dialogs/glyph_picker_dialog_popup.h"
 #include "ui/dialogs/layer_popup_host.h"
+#include "ui/signal.h"
 #include "wayland/clipboard_poll_source.h"
 #include "wayland/clipboard_service.h"
 #include "wayland/key_repeat_poll_source.h"
@@ -103,6 +103,7 @@ namespace sdbus {
 }
 
 class LauncherPanel;
+class ControlCenterPanel;
 class AccountsService;
 class BluetoothAgent;
 class BluetoothService;
@@ -342,7 +343,9 @@ private:
   TrayMenu m_trayMenu;
   Wallpaper m_wallpaper;
   Backdrop m_backdrop;
-  SettingsWindow m_settingsWindow;
+  Signal<> m_settingsInvalidated;
+  ControlCenterPanel* m_controlCenter = nullptr;
+  bool m_restoreControlCenterAfterWidgetEditor = false;
   LayerPopupHostRegistry m_layerPopupHosts;
   ColorPickerDialogPopup m_colorPickerDialogPopup;
   GlyphPickerDialogPopup m_glyphPickerDialogPopup;

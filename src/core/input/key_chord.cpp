@@ -187,6 +187,9 @@ std::string keyChordDisplayLabel(const KeyChord& chord) {
   if ((chord.modifiers & KeyMod::Shift) != 0) {
     appendPart("Shift");
   }
+  if ((chord.modifiers & KeyMod::Super) != 0) {
+    appendPart("Super");
+  }
   appendPart(keyName);
   return out;
 }

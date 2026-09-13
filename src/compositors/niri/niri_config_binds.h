@@ -1,5 +1,8 @@
 #pragma once
 
+#include "compositors/niri/niri_config_files.h"
+#include "core/input/key_chord.h"
+
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -27,6 +30,7 @@ namespace compositors::niri {
     RecommendedBind recommended;
     std::vector<std::string> boundKeys;
     bool keyConflict = false;
+    bool inOwnedInclude = false;
   };
 
   struct ConfigScan {
@@ -44,7 +48,6 @@ namespace compositors::niri {
     std::string error;
   };
 
-  [[nodiscard]] std::filesystem::path configPath();
   [[nodiscard]] std::filesystem::path bindsIncludePath();
   [[nodiscard]] std::span<const RecommendedBind> recommendedBinds();
 
@@ -52,8 +55,9 @@ namespace compositors::niri {
   [[nodiscard]] std::string kdlBlock(const std::vector<RecommendedBind>& binds);
   [[nodiscard]] std::optional<std::string> ipcCommandFromAction(std::string_view action);
   [[nodiscard]] std::vector<ParsedBind> parseBinds(std::string_view kdl);
-  [[nodiscard]] std::vector<std::filesystem::path>
-  parseIncludes(std::string_view kdl, const std::filesystem::path& fromFile);
+
+  [[nodiscard]] std::string niriKeyFromChord(const KeyChord& chord);
+  [[nodiscard]] std::optional<KeyChord> niriKeyToChord(std::string_view key);
 
   [[nodiscard]] ConfigScan scanConfig();
   [[nodiscard]] ConfigScan scanConfigFile(const std::filesystem::path& path);
@@ -62,5 +66,9 @@ namespace compositors::niri {
 
   InstallResult installMissing();
   InstallResult installMissingInto(const std::filesystem::path& configFile);
+  InstallResult setRecommendedKey(std::string_view id, std::string_view niriKey);
+  InstallResult setRecommendedKeyInto(
+      const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey
+  );
 
 } // namespace compositors::niri

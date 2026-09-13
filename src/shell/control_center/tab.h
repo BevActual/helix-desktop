@@ -62,9 +62,11 @@ public:
 
   // Sidebar (or header) settings search. Empty keeps the page filter; non-empty
   // searches the whole registry.
-  virtual void setSettingsSearchQuery(std::string_view query) { (void)query; }
+    virtual void setSettingsSearchQuery(std::string_view query) { (void)query; }
 
-  // Called when the panel closes. Null out all raw pointers to freed nodes.
+    [[nodiscard]] virtual class SettingsPane* settingsPane() { return nullptr; }
+
+    // Called when the panel closes. Null out all raw pointers to freed nodes.
   virtual void onClose() {}
 
   // Allows a tab to close transient UI (menus/popovers) when external empty

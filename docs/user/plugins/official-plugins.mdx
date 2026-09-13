@@ -122,16 +122,15 @@ device updates.
 
 <PluginMeta icon="photo" id="noctalia/wallhaven" />
 
-Browse [Wallhaven](https://wallhaven.cc), download a wallpaper into your configured wallpaper directory, and apply it
-to all monitors. A **panel** browser (`browser`) with tag search, category/purity/sort filters, and a thumbnail grid,
-plus a bar **widget** (`wallhaven`) that toggles the panel. The browser panel defaults to **attached** at the bar;
-placement is configurable under **Settings → Plugins** (floating + screen position, open-near-click, etc.).
+Wallhaven browsing is built into the wallpaper picker. Open **Wallpaper**, switch to **Wallhaven**, or run
+`noctalia msg panel-toggle wallpaper wallhaven`. API key and download directory live under **Settings → Wallpaper**.
 
-Requires network access (`[shell].offline_mode` must be off). NSFW results require a Wallhaven API key (plugin setting).
+The official plugin remains available as a separate panel if you still have it enabled. New setups should use the
+built-in Wallpaper page.
 
 | Command | Effect |
 |---------|--------|
-| <IpcCommand command="panel-toggle noctalia/wallhaven:browser" /> | open or close the Wallhaven browser |
+| <IpcCommand command="panel-toggle wallpaper wallhaven" /> | open the wallpaper picker on Wallhaven |
 
 ---
 

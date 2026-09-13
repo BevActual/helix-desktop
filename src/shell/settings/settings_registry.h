@@ -256,6 +256,14 @@ namespace settings {
     ButtonVariant variant = ButtonVariant::Default;
   };
 
+  struct ExternalKeybindSetting {
+    std::optional<KeyChord> chord;
+    bool allowSuper = false;
+    bool enabled = true;
+    std::function<void(KeyChord)> onCommit;
+    ButtonSetting copy;
+  };
+
   struct ColorSpecPickerSetting {
     std::vector<ColorRole> roles;
     std::string selectedValue;
@@ -276,7 +284,7 @@ namespace settings {
       ToggleSetting, SelectSetting, SliderSetting, RangeSliderSetting, TextSetting, OptionalNumberSetting,
       OptionalStepperSetting, StepperSetting, ListSetting, StringMapSetting, ShortcutListSetting, KeybindListSetting,
       SessionPanelActionsSetting, IdleBehaviorsSetting, NotificationFiltersSetting, MultiSelectSetting,
-      TemplateGridSetting, ButtonSetting, ColorSpecPickerSetting, SearchPickerSetting, GestureActionSetting>;
+      TemplateGridSetting, ButtonSetting, ExternalKeybindSetting, ColorSpecPickerSetting, SearchPickerSetting, GestureActionSetting>;
 
   // Visibility predicate, evaluated against the same Config the registry was built from
   // (the registry rebuilds on every config change). Capture snapshot values or read the

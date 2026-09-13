@@ -646,10 +646,12 @@ namespace noctalia::cli {
     };
     inline constexpr Command session{"session", "Run a built-in session action", {}, {},
                                      {},        kMsgSessionPositionals,          {}, false};
-    inline constexpr Command settingsClose{"settings-close", "Close the settings window", {}, {}, {}, {}, {}, false};
+    inline constexpr Command settingsClose{
+        "settings-close", "Close Control Center if it is open on a settings page", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command settingsOpen{
         "settings-open",
-        "Open the settings window, or focus it if already open, optionally at a specific section",
+        "Open Control Center on a settings page, optionally at a specific section",
         {},
         {},
         {},
@@ -659,7 +661,7 @@ namespace noctalia::cli {
     };
     inline constexpr Command settingsOpenPlugin{
         "settings-open-plugin",
-        "Open the settings window at a plugin's settings (e.g. noctalia/notes)",
+        "Open Control Center at a plugin's settings (e.g. noctalia/notes)",
         {},
         {},
         {},
@@ -669,7 +671,7 @@ namespace noctalia::cli {
     };
     inline constexpr Command settingsOpenWidget{
         "settings-open-widget",
-        "Open the settings window at a bar widget; from a widget gesture, targets that widget",
+        "Open Control Center at a bar widget; from a widget gesture, targets that widget",
         {},
         {},
         {},
@@ -679,7 +681,7 @@ namespace noctalia::cli {
     };
     inline constexpr Command settingsToggle{
         "settings-toggle",
-        "Toggle the settings window, optionally at a specific section",
+        "Toggle Control Center on a settings page, optionally at a specific section",
         {},
         {},
         {},

@@ -1,6 +1,7 @@
 #include "application.h"
 
 #include "app/main_loop.h"
+#include "ui/controls/select_dropdown_popup.h"
 #include "compositors/compositor_detect.h"
 #include "config/config_types.h"
 #include "core/build_info.h"
@@ -185,7 +186,6 @@ Application::~Application() {
   ColorPickerDialog::setPresenter(nullptr);
   GlyphPickerDialog::setPresenter(nullptr);
   FileDialog::setPresenter(nullptr);
-  m_settingsWindow.shutdownDialogPresenter();
   // m_systemMonitor is declared after the plugin hosts, so it is destroyed first; drop the script
   // API's pointer to it here, while both are still alive, or a plugin that used noctalia.cpuCores
   // releases its reference through a dangling pointer as its host is torn down.
@@ -229,7 +229,7 @@ void Application::run(std::function<void()> startupReadyCallback) {
         m_pluginServiceHost.refresh(m_configService.config().plugins.pluginSettings);
         reloadPluginLauncherProviders();
         reloadPluginPanels();
-        m_settingsWindow.onPluginsChanged();
+        m_settingsInvalidated.emit();
       }
     });
     // Plugins materialized after the bar was built (first-run clone/export) or a git
@@ -241,13 +241,15 @@ void Application::run(std::function<void()> startupReadyCallback) {
       m_bar.reload();
       reloadPluginLauncherProviders();
       reloadPluginPanels();
-      m_settingsWindow.onPluginsChanged();
+      m_settingsInvalidated.emit();
     });
     // A git-source enable exports on a worker thread; redraw the plugins list so the
     // row swaps between its spinner and toggle as the export starts and finishes.
-    m_pluginManager.setOnEnablingChanged([this]() { m_settingsWindow.onPluginsChanged(); });
+    m_pluginManager.setOnEnablingChanged([this]() { m_settingsInvalidated.emit(); });
     m_pluginManager.setOnSourceUpdated([this](const std::string& sourceName) {
-      m_settingsWindow.invalidatePluginSourceCache(sourceName);
+      if (m_controlCenter != nullptr) {
+        m_controlCenter->invalidatePluginSource(sourceName);
+      }
     });
     m_pluginManager.setOnEnabled([this](std::string_view pluginId) { m_pluginServiceHost.enablePlugin(pluginId); });
   });

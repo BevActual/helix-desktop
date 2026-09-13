@@ -562,6 +562,7 @@ namespace ui {
     std::optional<std::string> unsetPlaceholder = std::nullopt;
     std::optional<std::string> recordingPlaceholder = std::nullopt;
     std::optional<ModifierPolicy> modifierPolicy = std::nullopt;
+    std::optional<bool> allowSuper = std::nullopt;
     std::optional<float> width = std::nullopt;
     std::optional<float> height = std::nullopt;
     std::optional<float> flexGrow = std::nullopt;

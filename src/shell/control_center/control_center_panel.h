@@ -64,6 +64,10 @@ public:
   [[nodiscard]] PanelPlacement panelPlacement() const noexcept override;
   [[nodiscard]] bool showsSidebar() const noexcept { return m_showSidebar; }
 
+  void queuePluginSettings(std::string pluginId);
+  void queueBarWidget(std::string barName, std::string widgetName);
+  void invalidatePluginSource(const std::string& sourceName);
+
   enum class TabGroup : std::uint8_t { Home, Look, Status, Setup };
 
 private:
@@ -106,18 +110,12 @@ private:
   void syncTabVisibility();
   void addSidebarTabButton(class RovingListNavHost& nav, TabSlot& slot, float scale);
   void addSidebarGroupHeader(class RovingListNavHost& nav, TabGroup group, float scale);
-  void addSidebarMoreButton(class RovingListNavHost& nav, float scale);
-  void toggleSetupTabs();
   void applySettingsSearch(std::string value);
   void syncActiveTabSearch();
   [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
-  [[nodiscard]] bool showSetupTabs() const;
-  [[nodiscard]] bool isSetupGroupVisible() const;
-  [[nodiscard]] bool hasUserVisibleSetupTab() const;
   [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
   [[nodiscard]] bool isTabFeatureAvailable(std::string_view id) const;
   [[nodiscard]] bool isTabVisible(std::string_view id) const;
-  [[nodiscard]] bool isTabVisibleIgnoringSetup(std::string_view id) const;
   [[nodiscard]] bool isTabShown(std::string_view id) const;
   [[nodiscard]] std::string firstVisibleTab() const;
   [[nodiscard]] bool isDirectSectionOpenContext(std::string_view context) const;
@@ -141,7 +139,6 @@ private:
   Node* m_lookHeader = nullptr;
   Node* m_statusHeader = nullptr;
   Node* m_setupHeader = nullptr;
-  Button* m_moreButton = nullptr;
   Input* m_searchInput = nullptr;
   std::string m_searchQuery;
   Flex* m_content = nullptr;
@@ -172,4 +169,9 @@ private:
   AsyncTextureCache* m_asyncTextures = nullptr;
 
   void attachModalHost(Renderer& renderer, float width, float height);
+  void maybeOpenPendingEditor();
+
+  std::string m_pendingOpenPluginSettingsId;
+  std::string m_pendingOpenBarName;
+  std::string m_pendingOpenWidgetInspectorName;
 };

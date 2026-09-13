@@ -7,7 +7,7 @@ sidebar:
 
 import IpcCommand from '../../../../components/IpcCommand.astro';
 
-These commands control shell state, logging, settings windows, the window switcher, and session actions.
+These commands control shell state, logging, settings, the window switcher, and session actions.
 
 ## General
 
@@ -17,10 +17,10 @@ These commands control shell state, logging, settings windows, the window switch
 | Show log level | <IpcCommand command="log-level-status" /> | Print the current console log level. |
 | Set log level | <IpcCommand command="log-level-set debug" /> | Set the console log level for the running session. Use `debug`, `info`, `warn`, or `error`. |
 | Reload config | <IpcCommand command="config-reload" /> | Reload the merged Noctalia config stack immediately. |
-| Open settings | <IpcCommand command="settings-open [context]" /> | Open or focus the graphical settings window, optionally at a specific section (e.g. `bar`). |
-| Open plugin settings | <IpcCommand command="settings-open-plugin noctalia/notes" /> | Open the settings window at an installed plugin's settings. The plugin must be enabled and expose settings. |
-| Close settings | <IpcCommand command="settings-close" /> | Close the graphical settings window. |
-| Toggle settings | <IpcCommand command="settings-toggle [context]" /> | Toggle Control Center on the matching settings page (Appearance when omitted), for example `bar` or `notifications`. Domain pages such as Notifications open the live tab in settings view. The Settings window stays available via `settings-open`. |
+| Open settings | <IpcCommand command="settings-open [context]" /> | Open Control Center on that settings page, or focus it if already open (e.g. `bar`). |
+| Open plugin settings | <IpcCommand command="settings-open-plugin noctalia/notes" /> | Open Control Center at an installed plugin's settings sheet. The plugin must be enabled and expose settings. |
+| Close settings | <IpcCommand command="settings-close" /> | Close Control Center if it is the open panel. |
+| Toggle settings | <IpcCommand command="settings-toggle [context]" /> | Toggle Control Center on the matching settings page (Appearance when omitted), for example `bar`, `notifications`, or `wallpaper`. Domain pages such as Notifications and Wallpaper open the live tab in settings view. |
 
 Set `NOCTALIA_LOG_LEVEL` to `debug`, `info`, `warn`, or `error` before startup to choose the initial console log level. The default is `info`; the file log remains unfiltered.
 

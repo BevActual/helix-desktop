@@ -1047,6 +1047,9 @@ namespace ui {
     if (props.modifierPolicy.has_value()) {
       control->setModifierPolicy(*props.modifierPolicy);
     }
+    if (props.allowSuper.has_value()) {
+      control->setAllowSuper(*props.allowSuper);
+    }
     if (props.enabled.has_value()) {
       control->setEnabled(*props.enabled);
     }
