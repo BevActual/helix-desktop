@@ -3046,10 +3046,6 @@
           "description": "Zeige den Mauszeiger in Screenshots an",
           "label": "Cursor anzeigen"
         },
-        "settings-window-translucent": {
-          "description": "Mache den Einstellungs-Hintergrund transluzent für Compositor-Effekte",
-          "label": "Transluzenter Einstellungs-Hintergrund"
-        },
         "show-location": {
           "description": "Zeige den Standortnamen in Wetter-Widgets an",
           "label": "Standort anzeigen"

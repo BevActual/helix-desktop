@@ -76,6 +76,7 @@
       "confirm-region": "{copy} to copy · {save} to save · Enter or Space for defaults · {cancel} to cancel · Drag to reselect",
       "fullscreen": "Full screen",
       "overlay-alloc-failed": "Could not display the screenshot overlay (GPU out of video memory?)",
+      "pick-color-hint": "Click to copy a color · {cancel} to cancel",
       "region": "Select region"
     },
     "widgets": {
@@ -252,6 +253,7 @@
       "address": "Address",
       "auto-reconnect": "Auto-reconnect",
       "bluetooth": "Bluetooth",
+      "copy-address": "Copy address",
       "enter-code": "Enter code",
       "no-devices": "No devices found. Start scanning to discover nearby Bluetooth devices.",
       "off": "Bluetooth is off",
@@ -324,11 +326,7 @@
       "layout-error": "Display layout"
     },
     "settings": {
-      "hint": "Change settings here. Search from any page, or use the menu on a settings page for export and a support report.",
-      "open": "Open settings",
       "configure": "Settings",
-      "plugins-hint": "Install, update, and configure plugins from this page.",
-      "plugins-open": "Open plugin store",
       "search-placeholder": "Search settings"
     },
     "sidebar": {
@@ -406,7 +404,36 @@
       "wifi": "Wi-Fi",
       "wifi-off": "Wi-Fi is off",
       "wifi-on": "Wi-Fi is on",
-      "wired-connection": "Wired connection"
+      "wired-connection": "Wired connection",
+      "copy-ip": "Copy IP",
+      "ip-copied": "IPv4 address copied",
+      "dns": "DNS {servers}",
+      "dns-automatic": "Automatic",
+      "dns-google": "Google",
+      "dns-cloudflare": "Cloudflare",
+      "dns-nextdns": "NextDNS",
+      "dns-custom": "Custom",
+      "dns-custom-placeholder": "1.1.1.1, 1.0.0.1",
+      "dns-nextdns-placeholder": "NextDNS config ID (optional)",
+      "dns-apply": "Apply DNS",
+      "dns-applied": "DNS updated",
+      "dns-requires-connection": "Connect to a network to change DNS",
+      "dns-requires-networkmanager": "DNS overrides need NetworkManager",
+      "dns-invalid": "Enter valid IPv4 or IPv6 addresses",
+      "ping": "Ping",
+      "ping-running": "Pinging…",
+      "ping-result": "Ping {ms} ms",
+      "ping-failed": "Ping failed",
+      "speed-test": "Speed test",
+      "speed-test-running": "Measuring download…",
+      "speed-test-result": "{mbps} Mbps",
+      "speed-test-failed": "Speed test failed",
+      "share-wifi": "Share Wi-Fi",
+      "hide-wifi-qr": "Hide QR code",
+      "share-wifi-copied": "Join code copied. Scan the QR code or paste it into another device.",
+      "share-wifi-password-missing": "Join code copied without the stored password. Enter it on the other device after scanning.",
+      "share-wifi-enterprise": "Enterprise Wi-Fi cannot include a password in a QR code.",
+      "throughput": "↓ {down}  •  ↑ {up}"
     },
     "notifications": {
       "clear-all": "Clear all notifications",
@@ -488,10 +515,16 @@
         "scheduled-night": "Running"
       },
       "notification": "DND",
+      "pick-color": "Pick Color",
+      "ocr": "Scan Text",
+      "scan-qr": "Scan QR",
       "power-profile": "Power",
       "screen-time": "Screen Time",
+      "screenshot": "Screenshot",
+      "screen-recorder": "Recorder",
       "session": "Session",
       "system": "System",
+      "tailscale": "Tailscale",
       "wallpaper": "Wallpaper",
       "weather": "Weather",
       "wifi": "Wi-Fi"
@@ -513,6 +546,7 @@
       "tooltips": {
         "load": "Load average over 1 / 5 / 15 minutes"
       },
+      "copy-info": "Copy system info",
       "unknown": "unknown",
       "uptime-prefix": "Up {uptime} · {osAge}"
     },
@@ -520,6 +554,7 @@
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
+      "clipboard": "Clipboard",
       "home": "Home",
       "media": "Media",
       "monitor": "Monitor",
@@ -527,9 +562,94 @@
       "notifications": "Notifications",
       "power": "Power",
       "screen-time": "Screen Time",
+      "screenshot": "Screenshot",
+      "screen-record": "Screen Record",
       "settings": "Settings",
       "system": "System",
+      "tailscale": "Tailscale",
       "weather": "Weather"
+    },
+    "screenshot": {
+      "annotate": "Annotate",
+      "capture": "Capture",
+      "countdown": "Capturing in {seconds}s",
+      "delay-3s": "3s",
+      "delay-5s": "5s",
+      "delay-none": "Now",
+      "fullscreen": "Fullscreen",
+      "hint": "Control Center closes first so the overlay can take the screen.",
+      "open-folder": "Open screenshot folder",
+      "open-folder-failed": "Could not open the screenshot folder.",
+      "pick-color": "Pick color",
+      "ocr": "Scan text",
+      "ocr-copied": "Text copied",
+      "ocr-empty": "No text found in that region.",
+      "ocr-failed": "Could not read text from the screen.",
+      "ocr-missing": "Install tesseract to copy text from the screen.",
+      "pick-display": "Pick display",
+      "region": "Select region",
+      "region-too-small": "The selected region is too small.",
+      "scan-qr": "Scan QR",
+      "qr-copied": "QR code copied",
+      "qr-empty": "No QR code found in that region.",
+      "qr-failed": "Could not scan a QR code.",
+      "qr-missing": "Install zbar (zbarimg) to scan QR codes."
+    },
+    "screen-record": {
+      "audio": "Include system audio",
+      "countdown": "Starting in {seconds}s",
+      "backend-gsr": "Using gpu-screen-recorder",
+      "backend-gsr-flatpak": "Using gpu-screen-recorder (Flatpak)",
+      "backend-wf": "Using wf-recorder",
+      "failed": "Recording failed",
+      "hint": "Control Center closes first so it is not in the video. Install gpu-screen-recorder or wf-recorder if recording is unavailable.",
+      "launch-failed": "Failed to start the recorder",
+      "missing-backend": "Install gpu-screen-recorder or wf-recorder to record the screen.",
+      "open-folder": "Open recordings folder",
+      "open-folder-failed": "Could not open the recordings folder.",
+      "record": "Record",
+      "region-too-small": "The selected region is too small.",
+      "saved": "Recording saved",
+      "source-focused": "Focused",
+      "source-portal": "Portal",
+      "source-region": "Region",
+      "start": "Start recording",
+      "stop": "Stop recording",
+      "stopped-early": "Recording stopped without writing a file.",
+      "stopping": "Stopping…"
+    },
+    "tailscale": {
+      "advertise-exit": "Advertise exit node",
+      "allow-lan": "Allow LAN while using an exit node",
+      "busy": "Working…",
+      "connect": "Connect",
+      "copy-ip": "Copy IP",
+      "disconnect": "Disconnect",
+      "dns": "Accept DNS",
+      "exit-node": "Exit node",
+      "exit-none": "None",
+      "filter": "Filter peers…",
+      "login": "Log in",
+      "missing": "Install Tailscale to manage this machine from Control Center.",
+      "offline": "Offline",
+      "online": "Online",
+      "open-admin": "Open admin console",
+      "peer-offline": "{name} went offline",
+      "peer-online": "{name} came online",
+      "peers": "Devices",
+      "peers-empty": "No other devices on this tailnet.",
+      "peers-none": "No matching devices.",
+      "preferences": "Network",
+      "refresh": "Refresh",
+      "routes": "Accept routes",
+      "shields": "Shields up",
+      "ssh": "Tailscale SSH",
+      "status-failed": "Could not read Tailscale status.",
+      "command-failed": "The Tailscale command failed.",
+      "needs-operator": "Tailscale needs administrator approval, or run: sudo tailscale set --operator={user}",
+      "stopped": "Stopped",
+      "title": "Tailscale",
+      "use-exit": "Use as exit"
     },
     "weather": {
       "daily": {
@@ -1323,6 +1443,7 @@
         "background": "Background",
         "battery": "Battery",
         "behavior": "Behavior",
+        "bluetooth": "Bluetooth",
         "borders": "Borders",
         "brightness": "Brightness",
         "built-in": "Built-In",
@@ -1332,7 +1453,9 @@
         "community": "Community",
         "control-center": "Control Center",
         "dead-zone": "Dead Zone",
+        "devices": "Devices",
         "directories": "Directories",
+        "discovery": "Discovery",
         "display": "Display",
         "effects": "Effects",
         "filtering": "Filtering",
@@ -1380,6 +1503,7 @@
         "screenshot-annotation": "Annotation",
         "screenshot-capture": "Capture",
         "screenshot-output": "Output",
+        "screen-record": "Recording",
         "security": "Security",
         "session-panel": "Session Panel",
         "setup": "Setup",
@@ -1392,6 +1516,7 @@
         "wallhaven": "Wallhaven",
         "wallpaper": "Wallpaper",
         "weather": "Weather",
+        "wifi": "Wi-Fi",
         "widget-list": "Widget List",
         "widgets": "Widgets",
         "window-switcher": "Window Switcher"
@@ -1401,6 +1526,7 @@
         "appearance": "Appearance",
         "backdrop": "Backdrop",
         "bar": "Bar",
+        "bluetooth": "Bluetooth",
         "control-center": "Control Center",
         "desktop": "Desktop",
         "dock": "Dock",
@@ -1408,6 +1534,7 @@
         "keybinds": "Keybinds",
         "launcher": "Launcher",
         "location": "Location",
+        "network": "Network",
         "niri": "Niri",
         "notifications": "Notifications",
         "osd": "OSD",
@@ -1416,10 +1543,12 @@
         "popups": "Popups",
         "power": "Power",
         "screenshot": "Screenshot",
+        "screen-record": "Screen Record",
         "security": "Security",
         "services": "Services",
         "shell": "Shell",
         "system": "System",
+        "tailscale": "Tailscale",
         "templates": "Templates",
         "wallpaper": "Wallpaper"
       }
@@ -1622,6 +1751,12 @@
           "imperial": "Imperial",
           "metric": "Metric"
         }
+      },
+      "wifi-band": {
+        "all": "All bands",
+        "ghz24": "2.4 GHz",
+        "ghz5": "5 GHz",
+        "ghz6": "6 GHz"
       }
     },
     "plugins": {
@@ -2192,6 +2327,16 @@
           "label": "Show Running"
         }
       },
+      "bluetooth": {
+        "discovery-seconds": {
+          "description": "How long Rescan keeps adapter discovery running",
+          "label": "Discovery Duration"
+        },
+        "hide-unnamed": {
+          "description": "Hide devices that only advertise a Bluetooth address",
+          "label": "Hide Unnamed Devices"
+        }
+      },
       "hooks": {
         "command-placeholder": "shell command or script path",
         "events": {
@@ -2412,6 +2557,16 @@
           "label": "Lockscreen Widget Editor"
         }
       },
+      "network": {
+        "hidden-ssids": {
+          "description": "SSIDs to omit from the available networks list",
+          "label": "Ignored SSIDs"
+        },
+        "wifi-band": {
+          "description": "Show only access points on the selected radio band. Networks with no reported frequency stay visible when All is selected.",
+          "label": "Wi-Fi Band"
+        }
+      },
       "niri": {
         "setup": {
           "copied": "Copied niri setup snippet to the clipboard",
@@ -2441,10 +2596,6 @@
             "lid-close": {
               "description": "Lock and suspend when the laptop lid closes",
               "label": "Lid close lock and suspend"
-            },
-            "window-rule": {
-              "description": "Float a Noctalia xdg-toplevel, if one is shown",
-              "label": "Settings window rule"
             },
             "xdg-activation": {
               "description": "Allow notification actions and window activation from Noctalia",
@@ -3044,11 +3195,11 @@
           "label": "Clipboard Auto-Paste"
         },
         "clipboard-confirm-clear-history": {
-          "description": "Ask before clearing clipboard history or deleting an unpinned entry from the panel; when off, those actions apply immediately (pinned entries still ask before delete)",
+          "description": "Ask before clearing clipboard history or deleting an unpinned entry from the history tab; when off, those actions apply immediately (pinned entries still ask before delete)",
           "label": "Confirm Clear History"
         },
         "clipboard-enabled": {
-          "description": "Enable clipboard history, the clipboard panel, and copy/paste integration",
+          "description": "Enable clipboard history, the Control Center clipboard tab, and copy/paste integration",
           "label": "Clipboard"
         },
         "clipboard-history-max-entries": {
@@ -3296,9 +3447,22 @@
           "description": "Include the mouse pointer in screenshots",
           "label": "Show Cursor"
         },
-        "settings-window-translucent": {
-          "description": "Unused. Settings now live in Control Center.",
-          "label": "Settings Translucent Background"
+        "screen-record-audio": {
+          "description": "Record desktop audio with the video when the backend supports it",
+          "label": "Record Audio"
+        },
+        "screen-record-directory": {
+          "description": "Folder for saved recordings; leave empty to use ~/Videos/Recordings",
+          "label": "Output Directory",
+          "placeholder": "~/Videos/Recordings"
+        },
+        "screen-record-filename-pattern": {
+          "description": "strftime pattern without extension (.mp4 is added); use %s for unix epoch",
+          "label": "Filename Pattern"
+        },
+        "screen-record-show-cursor": {
+          "description": "Include the mouse pointer when the backend can record it",
+          "label": "Show Cursor"
         },
         "show-location": {
           "description": "Show location name in weather widgets",
@@ -3330,6 +3494,21 @@
         "battery-warning-threshold": {
           "description": "System battery percentage at or below which the shell sends a low-battery notification and battery widgets use their warning color (0 disables)",
           "label": "Battery Warning Threshold"
+        }
+      },
+      "tailscale": {
+        "admin-url": {
+          "description": "Admin console URL opened from the Tailscale tab. Leave empty to use Tailscale's default, or the login URL when this machine needs authentication.",
+          "label": "Admin Console URL",
+          "placeholder": "https://login.tailscale.com/admin"
+        },
+        "notify-on-peer-change": {
+          "description": "Show a notification when a peer comes online or goes offline",
+          "label": "Notify on Peer Changes"
+        },
+        "refresh-interval": {
+          "description": "How often to poll Tailscale status while the shell is running",
+          "label": "Refresh Interval"
         }
       },
       "templates": {
@@ -3822,9 +4001,21 @@
             "description": "Capture the focused monitor by default, pick interactively with pick, or all outputs with all",
             "label": "Fullscreen screenshot"
           },
+          "screenshot-ocr": {
+            "description": "Select a region and copy recognized text to the clipboard",
+            "label": "Scan screenshot text"
+          },
+          "screenshot-pick-color": {
+            "description": "Freeze the screen and copy the color under the click",
+            "label": "Pick screen color"
+          },
           "screenshot-region": {
             "description": "Start an interactive region screenshot",
             "label": "Region screenshot"
+          },
+          "screenshot-scan-qr": {
+            "description": "Select a region and copy a QR code or barcode to the clipboard",
+            "label": "Scan screenshot QR"
           },
           "session": {
             "description": "Run a built-in session action",

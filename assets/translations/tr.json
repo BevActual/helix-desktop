@@ -3011,10 +3011,6 @@
           "description": "Ekran alıntılarına fare imlecini dahil et",
           "label": "İmleci Göster"
         },
-        "settings-window-translucent": {
-          "description": "Görüntü sunucusu efektleri için Ayarlar arka planını yarı saydam yap",
-          "label": "Yarı Saydam Ayarlar Arka Planı"
-        },
         "show-location": {
           "description": "Konum ismini hava durumu bileşenlerinde göster",
           "label": "Konumu Göster"

@@ -47,7 +47,7 @@ sidebar = "compact"
 | `show_session_button` | bool | `true` | Show the session-actions button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Settings → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Look** (appearance, wallpaper, templates, bar), **Status** (media, audio, weather, and the other live pages), then **Setup** (desktop, dock, launcher, and the other setup pages). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Look** (appearance, wallpaper, templates, bar), **Status** (media, audio, weather, screenshot, screen record, and the other live pages), then **Setup** (desktop, dock, launcher, and the other setup pages). Compact mode uses separators between those groups instead of captions.
 
 Plugin Control Center tabs stay in **Status**. User `hidden_tabs` still hide any tab in every group.
 
@@ -58,7 +58,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons |
+| `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons. Header gear opens Home shortcuts, labels, and the session-button setting. |
 | `appearance` | Appearance | Theme, palette, fonts, and the rest of appearance settings |
 | `wallpaper` | Wallpaper | Library, Wallhaven, and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, and Wallhaven API settings. |
 | `templates` | Templates | Color templates and community palettes |
@@ -66,21 +66,24 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
 | `audio` | Audio | Output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Per-display brightness plus, on niri, resolution, refresh rate, scale, rotation, VRR, and arrangement. Header gear opens brightness service settings. |
-| `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Header gear opens battery warnings and system monitor settings. |
+| `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
 | `power` | Power | Battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
-| `network` | Network | Wi-Fi state, connection status, cellular controls, known wireless controls, and NetworkManager-backed actions |
-| `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, and pairing flows |
+| `network` | Network | Wi-Fi, cellular, VPN, ping/throughput, copy IP, speed test, and Wi-Fi QR. Header gear opens band filter and ignored SSIDs. |
+| `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, copy address, and pairing flows. Header gear opens unnamed-device filter and discovery duration. |
 | `weather` | Weather | Current conditions and forecast, with location and units on the live view. Header gear opens night-light settings. |
 | `calendar` | Calendar | Month view and configured calendar account events. Header gear opens calendar format settings. |
 | `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Header gear opens daemon, toast, history, and filter settings. |
 | `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
+| `screenshot` | Screenshot | Region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR on the live view, plus a capture delay and open-folder action. Header gear opens capture, annotation, and output settings. |
+| `screen-record` | Screen Record | Start/stop recording, elapsed time, a source picker for the installed backends, delay, audio, and open-folder. Header gear opens directory, filename, audio, and cursor settings. |
+| `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Header gear opens history size, auto-paste, and image-action settings. |
+| `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
 | `dock` | Dock | Dock placement and behavior |
 | `panels` | Panels | Shared panel placement and chrome |
 | `launcher` | Launcher | Launcher appearance and providers |
 | `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
 | `osd` | OSD | On-screen display volume and brightness popups |
-| `screenshot` | Screenshot | Screenshot capture, annotation, and output |
 | `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
 | `keybinds` | Keybinds | In-shell navigation chords, plus niri compositor shortcuts when running on niri |
 | `security` | Security | Lock screen and authentication |
@@ -88,7 +91,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `niri` | Niri | niri-specific options. Shown only in a niri session. |
 | `plugins` | Plugins | Installed plugins and the in-panel plugin store |
 
-`niri` is listed only in a niri session. The Weather, System, Power, and Screen Time tabs stay available so you can turn those features on from the tab itself.
+`niri` is listed only in a niri session. The Weather, System, Power, Screen Time, and Tailscale tabs stay available so you can turn those features on from the tab itself.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -106,6 +109,8 @@ Click the avatar in the user card to pick a custom image. Noctalia saves the sel
 When AccountsService is available, Noctalia also writes the selected avatar to `org.freedesktop.Accounts` as your user's `IconFile`. That is what Noctalia Greeter reads for the login user list. On distros where this is not enabled by default, install and enable **accountsservice** (usually the `accounts-daemon` service) if you want the same avatar in both the shell and the greeter.
 
 The shortcut buttons are configured separately; see [Control Center shortcuts](/noctalia/control-center/shortcuts/).
+
+Header gear opens Home shortcut buttons, shortcut labels, and the session-button setting. Layout, sidebar mode, width, and hidden tabs stay on the dedicated Setup page (`noctalia msg settings-toggle control-center`). `noctalia msg settings-toggle` with no section still opens Appearance.
 
 Set `show_session_button = false` under `[control_center]` to hide the session-actions button in the Home tab header. This does not affect Home shortcuts configured with `type = "session"` or session widgets on the bar.
 
@@ -135,7 +140,7 @@ Live niri changes apply through compositor IPC. Use the header **Save to niri** 
 
 ## System
 
-The System tab summarizes the machine and live resource usage. It shows distribution/kernel details, board/CPU/GPU information, uptime, install age, load averages, memory and swap, and graphs driven by the shared system monitor service.
+The System tab summarizes the machine and live resource usage. It shows distribution/kernel details, board/CPU/GPU information, uptime, install age, load averages, memory and swap, and graphs driven by the shared system monitor service. The header copy button places that summary on the clipboard.
 
 System monitor sampling is configured globally under `[system.monitor]`; see [System monitor](/noctalia/services/system-monitor/).
 
@@ -144,6 +149,22 @@ System monitor sampling is configured globally under `[system.monitor]`; see [Sy
 The Network tab uses the configured network backend to show wireless state and connection details. It is the destination for Wi-Fi shortcuts and network-related right-click actions.
 
 The current connection line lists the IPv4 address, signal strength, radio band, and external IP. The band (`2.4 GHz`, `5 GHz`, `6 GHz`, or `60 GHz`) is shown only when the backend reports the connection frequency: NetworkManager and wpa_supplicant do, iwd does not.
+
+The current connection card also shows live throughput (when the system monitor is running), the nameservers from `/etc/resolv.conf`, and a DNS picker for the active NetworkManager connection: **Automatic** (DHCP), **Google**, **Cloudflare**, **NextDNS**, or **Custom**. Presets apply immediately. NextDNS can take an optional config ID; Custom takes a comma-separated list of IPv4/IPv6 addresses and an Apply button. Changing DNS updates the connection profile and reapplies it; Noctalia does not write `/etc/resolv.conf`. iwd and wpa_supplicant backends cannot set DNS from here.
+
+The current connection card also has tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
+
+Header gear opens Network settings: Wi-Fi band filter and ignored SSIDs. Dual-band networks are listed once (the strongest BSS), so a 5 GHz filter hides a network whose strongest copy is on 2.4 GHz. iwd access points have no frequency and stay visible only when the band filter is **All**.
+
+`[control_center.network]` holds those Network tab options:
+
+```toml
+[control_center.network]
+wifi_band = "all"       # all | 2.4 | 5 | 6
+hidden_ssids = []
+nextdns_id = ""
+custom_dns = ""
+```
 
 ### Enterprise Wi-Fi (802.1X)
 
@@ -163,7 +184,52 @@ Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for m
 
 ## Bluetooth
 
-The Bluetooth tab shows adapter power state, paired devices, and connection controls. It is backed by Noctalia's Bluetooth service and agent.
+The Bluetooth tab shows adapter power state, paired devices, and connection controls. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
+
+```toml
+[control_center.bluetooth]
+hide_unnamed = false
+discovery_seconds = 10
+```
+
+## Screenshot
+
+The Screenshot tab's live view starts a region capture, fullscreen capture, a display picker, a screen color picker, an annotation overlay, or a text/QR scan. Choose **Now**, **3s**, or **5s** before a capture if you need time to hide Control Center chrome; the countdown stays on the tab, then Control Center closes so the overlay can take the screen. **Scan text** needs [`tesseract`](https://github.com/tesseract-ocr/tesseract); **Scan QR** needs `zbarimg` from [ZBar](https://github.com/mchehab/zbar). Both copy the result to the clipboard. **Open screenshot folder** launches the configured save directory. Color pick follows the pointer with a magnifier, swatch, and `#RRGGBB` value, then copies on click. Header gear opens the existing screenshot capture, annotation, and output settings.
+
+## Screen Record {#screen-record}
+
+The Screen Record tab starts and stops a recording without the official plugin. Control Center closes first so it is not in the video. **Focused** records the active monitor. **Region** is shown when `wf-recorder` is installed and uses the same overlay as screenshots. **Portal** is shown when `gpu-screen-recorder` is installed and opens the desktop portal picker. Use the delay control (Now / 3s / 5s) when you need Control Center fully gone before capture starts. Elapsed time stays visible at `00:00` until a recording is running; the backend line always names the tool in use, or tells you to install one. Header gear opens `[shell.screen_record]` for the save folder, filename pattern, audio, and cursor.
+
+Install `gpu-screen-recorder` (native or Flatpak `com.dec05eba.gpu_screen_recorder`) and/or `wf-recorder`. The built-in recorder does not include a replay buffer or codec controls; those stay in the [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder), which can remain enabled independently.
+
+## Clipboard
+
+The Clipboard tab is the clipboard history view: filter, pin, copy, delete, and preview text or images. Header gear opens `[shell]` clipboard settings (history, auto-paste, and the image action). The bar widget, the Home clipboard shortcut, and `noctalia msg panel-toggle clipboard` open this tab.
+
+## Tailscale
+
+The Tailscale tab talks to the local `tailscale` CLI. Connect and disconnect this machine, copy its tailnet addresses, open the admin console, and toggle shields, subnet routes, SSH, DNS, advertising an exit node, and LAN access while using an exit node. Pick an exit node from the dropdown, or use a peer as an exit from the device list. Mullvad exit nodes stay in the exit picker and are omitted from the peer list.
+
+Connect, disconnect, and preference writes need Tailscale operator access. If this user is not the operator, Noctalia asks for an administrator password (via `pkexec` and the built-in Polkit prompt) and retries. To skip that prompt later, run `sudo tailscale set --operator=$USER` once.
+
+The tab stays visible when `tailscale` is not installed, with a message to install it. Header gear opens `[tailscale]` for poll interval, optional peer online/offline toasts, and an admin URL override. Daemon prefs are applied with `tailscale set` and are not stored in `settings.toml`.
+
+The community plugin's bar widget and `panel-toggle davemhammer/tailscale:manager` keep working. If that plugin later registers a Control Center tab, the built-in page replaces it.
+
+```toml
+[tailscale]
+refresh_interval_seconds = 10
+notify_on_peer_change = false
+# admin_url = ""
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `refresh_interval_seconds` | int | `10` | How often to poll `tailscale status` (3–120). |
+| `notify_on_peer_change` | bool | `false` | Toast when a tailnet peer comes online or goes offline. |
+| `admin_url` | string | `""` | Admin console URL. Empty uses Tailscale's default, or the login URL when this machine needs authentication. |
+
+IPC: `tailscale-up`, `tailscale-down`, `tailscale-toggle`, and `tailscale-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#tailscale).
 
 ## Weather
 
@@ -217,13 +283,13 @@ Reset stored history from the Screen Time tab header gear (**Screen Time** setti
 
 Settings pages are Control Center tabs. Appearance, Wallpaper, Templates, and Bar sit under **Look**. Live status pages sit under **Status**. Desktop, dock, launcher, plugins, and the other setup pages sit under **Setup**.
 
-Domain options that belong with a live view are on that tab: the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, the enable toggle on Screen Time, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, and Screen Time for the longer forms.
+Domain options that belong with a live view are on that tab: the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Screenshot and Screen Record, Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Screenshot, Screen Record, and Screen Time for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). An empty query keeps that page’s filter. A non-empty query searches the whole settings registry (section headers still appear on matches) and opens Appearance if you were on Home or another non-settings page.
 
 The plugin store, session/idle editors, notification filters, calendar accounts, community templates, and bar widget inspectors open as sheets in Control Center. The header Advanced toggle shows advanced settings. The ⋮ menu on a settings page exports config and saves a support report.
 
-Open Appearance with `noctalia msg panel-toggle control-center settings`, the Home gear, or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab, settings view). `settings-toggle` without a section still lands on Appearance.
+Open Appearance with `noctalia msg panel-toggle control-center settings` or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab, settings view). `settings-toggle` without a section still lands on Appearance.
 
 The Niri page is shown only when the session is running under niri.
 

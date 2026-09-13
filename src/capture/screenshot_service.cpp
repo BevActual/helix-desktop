@@ -8,6 +8,8 @@
 #include "core/input/key_chord.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
+#include "core/process/process.h"
+#include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
 #include "notification/notification.h"
 #include "notification/notification_manager.h"
@@ -139,7 +141,25 @@ namespace {
   }
 
   [[nodiscard]] bool hasAnyOutput(const ScreenshotService::OutputOptions& options) {
-    return options.saveToFile || options.copyToClipboard || (options.pipeToCommand && !options.pipeCommand.empty());
+    return options.saveToFile || options.copyToClipboard || (options.pipeToCommand && !options.pipeCommand.empty())
+        || options.scan.has_value();
+  }
+
+  [[nodiscard]] std::filesystem::path scanTempPngPath() {
+    const char* runtime = std::getenv("XDG_RUNTIME_DIR");
+    const std::filesystem::path dir =
+        runtime != nullptr && runtime[0] != '\0' ? std::filesystem::path(runtime) : std::filesystem::temp_directory_path();
+    return dir / std::format("noctalia-scan-{}.png", ::getpid());
+  }
+
+  [[nodiscard]] std::string scanPreview(std::string_view text) {
+    constexpr std::size_t kMax = 160;
+    if (text.size() <= kMax) {
+      return std::string(text);
+    }
+    std::string preview(text.substr(0, 157));
+    preview += "...";
+    return preview;
   }
 
   [[nodiscard]] bool needsScreenshotPath(const ScreenshotService::OutputOptions& options) {
@@ -618,7 +638,7 @@ ScreenshotService::ScreenshotService(
     : m_wayland(wayland), m_platform(platform), m_notifications(notifications), m_configService(configService),
       m_clipboard(clipboard), m_capture(wayland) {}
 
-ScreenshotService::~ScreenshotService() = default;
+ScreenshotService::~ScreenshotService() { cancelPendingRegionPick(); }
 
 void ScreenshotService::rememberRegion(const LogicalRect& region) {
   if (region.width < 2 || region.height < 2) {
@@ -779,6 +799,59 @@ void ScreenshotService::registerIpc(IpcService& ipc, const ConfigService& config
     return "ok\n";
   });
 
+  ipc.bind(noctalia::cli::msg::screenshotPickColor, [this](const std::string& /*args*/) -> std::string {
+    if (!available()) {
+      return "error: screen capture is not available on this compositor\n";
+    }
+    if (overlayBusy()) {
+      return "error: a screenshot overlay is already active\n";
+    }
+    auto* renderContext = PanelManager::instance().renderContext();
+    if (renderContext == nullptr) {
+      return "error: render context unavailable\n";
+    }
+    beginColorPick(*renderContext);
+    return "ok\n";
+  });
+
+  ipc.bind(noctalia::cli::msg::screenshotOcr, [this](const std::string& /*args*/) -> std::string {
+    if (!available()) {
+      return "error: screen capture is not available on this compositor\n";
+    }
+    if (overlayBusy()) {
+      return "error: a screenshot overlay is already active\n";
+    }
+    if (!hasOcr()) {
+      notifyError(i18n::tr("control-center.screenshot.ocr-missing"));
+      return "error: tesseract is not installed\n";
+    }
+    auto* renderContext = PanelManager::instance().renderContext();
+    if (renderContext == nullptr) {
+      return "error: render context unavailable\n";
+    }
+    beginOcr(*renderContext);
+    return "ok\n";
+  });
+
+  ipc.bind(noctalia::cli::msg::screenshotScanQr, [this](const std::string& /*args*/) -> std::string {
+    if (!available()) {
+      return "error: screen capture is not available on this compositor\n";
+    }
+    if (overlayBusy()) {
+      return "error: a screenshot overlay is already active\n";
+    }
+    if (!hasQrScan()) {
+      notifyError(i18n::tr("control-center.screenshot.qr-missing"));
+      return "error: zbarimg is not installed\n";
+    }
+    auto* renderContext = PanelManager::instance().renderContext();
+    if (renderContext == nullptr) {
+      return "error: render context unavailable\n";
+    }
+    beginQrScan(*renderContext);
+    return "ok\n";
+  });
+
   // The live annotator draws over running apps, so it opens without screencopy;
   // only its Freeze action needs capture support. With a path it edits that image instead.
   ipc.bind(noctalia::cli::msg::annotate, [this, &ipc, &configService](const std::string& args) -> std::string {
@@ -853,6 +926,7 @@ void ScreenshotService::captureFullscreenInteractive(RenderContext& renderContex
 }
 
 void ScreenshotService::beginRegionCapture(RenderContext& renderContext, const OutputOptions& options) {
+  cancelPendingRegionPick();
   if (!available()) {
     notifyError("Screen capture is not available on this compositor");
     return;
@@ -885,6 +959,7 @@ void ScreenshotService::beginRegionCapture(RenderContext& renderContext, const O
 }
 
 void ScreenshotService::beginFullscreenCapture(RenderContext& renderContext, const OutputOptions& options) {
+  cancelPendingRegionPick();
   if (!available()) {
     notifyError("Screen capture is not available on this compositor");
     return;
@@ -916,6 +991,141 @@ void ScreenshotService::beginFullscreenCapture(RenderContext& renderContext, con
   startFullscreenOverlay(renderContext);
 }
 
+void ScreenshotService::beginColorPick(RenderContext& renderContext) {
+  cancelPendingRegionPick();
+  if (!available()) {
+    notifyError("Screen capture is not available on this compositor");
+    return;
+  }
+  if (m_annotationOverlay != nullptr && m_annotationOverlay->isActive()) {
+    notifyError("An annotation overlay is already active");
+    return;
+  }
+  if (m_regionOverlay != nullptr && m_regionOverlay->isActive()) {
+    m_regionOverlay->cancel();
+  }
+  if (m_freezeCaptureActive) {
+    abortFreezeCapture("Screenshot cancelled");
+  }
+
+  m_regionOutputOptions = {};
+  m_regionOutputOptions.showCursor = false;
+  m_regionRenderContext = &renderContext;
+  m_regionFullscreenPick = false;
+  m_freezeTarget = FreezeTarget::ColorPick;
+  DeferredCall::callLater([this]() { beginFreezeCapture(); });
+}
+
+bool ScreenshotService::hasOcr() const { return process::commandExists("tesseract"); }
+
+bool ScreenshotService::hasQrScan() const { return process::commandExists("zbarimg"); }
+
+void ScreenshotService::beginOcr(RenderContext& renderContext) { beginScan(renderContext, ScanKind::Ocr); }
+
+void ScreenshotService::beginQrScan(RenderContext& renderContext) { beginScan(renderContext, ScanKind::Qr); }
+
+void ScreenshotService::beginScan(RenderContext& renderContext, ScanKind kind) {
+  beginRegionPick(renderContext, [this, kind](std::optional<LogicalRect> region) {
+    if (!region.has_value()) {
+      return;
+    }
+    if (region->width < 2 || region->height < 2) {
+      notifyError(i18n::tr("control-center.screenshot.region-too-small"));
+      return;
+    }
+    OutputOptions options{};
+    options.scan = kind;
+    captureGlobalRegion(*region, options);
+  });
+}
+
+void ScreenshotService::startTextScan(ScreencopyImage image, ScanKind kind) {
+  ++m_scanGeneration;
+  const auto generation = m_scanGeneration;
+
+  std::string encodeError;
+  std::vector<std::uint8_t> png = encodePng(image.rgba.data(), image.width, image.height, &encodeError);
+  if (png.empty()) {
+    kLog.warn("scan encode failed: {}", encodeError);
+    notifyError(
+        kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-failed")
+                               : i18n::tr("control-center.screenshot.qr-failed")
+    );
+    return;
+  }
+
+  const std::filesystem::path path = scanTempPngPath();
+  {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    out.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
+    if (!out) {
+      kLog.warn("scan write failed: {}", path.string());
+      notifyError(
+          kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-failed")
+                                 : i18n::tr("control-center.screenshot.qr-failed")
+      );
+      return;
+    }
+  }
+
+  std::vector<std::string> args;
+  if (kind == ScanKind::Ocr) {
+    args = {"tesseract", path.string(), "stdout"};
+  } else {
+    args = {"zbarimg", "--quiet", "--raw", path.string()};
+  }
+
+  const bool started = process::runAsync(
+      args,
+      process::RunCallbacks{
+          .onExit =
+              [this, generation, kind, path](process::RunResult result) {
+                DeferredCall::callLater([this, generation, kind, path, result = std::move(result)]() mutable {
+                  std::error_code ec;
+                  std::filesystem::remove(path, ec);
+                  if (generation != m_scanGeneration) {
+                    return;
+                  }
+                  std::string text = StringUtils::trim(result.out);
+                  if (text.empty()) {
+                    notifyError(
+                        kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-empty")
+                                               : i18n::tr("control-center.screenshot.qr-empty")
+                    );
+                    return;
+                  }
+                  if (m_clipboard == nullptr || !m_clipboard->copyText(text)) {
+                    notifyError(
+                        kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-failed")
+                                               : i18n::tr("control-center.screenshot.qr-failed")
+                    );
+                    return;
+                  }
+                  m_notifications.addInternal(
+                      "Noctalia",
+                      kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-copied")
+                                             : i18n::tr("control-center.screenshot.qr-copied"),
+                      scanPreview(text)
+                  );
+                });
+              },
+      },
+      process::RunOptions{
+          .timeout = std::chrono::seconds{20},
+          .maxOutputBytes = 256 * 1024,
+      }
+  );
+  if (started) {
+    return;
+  }
+  std::error_code ec;
+  std::filesystem::remove(path, ec);
+  notifyError(
+      kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-failed")
+                             : i18n::tr("control-center.screenshot.qr-failed")
+  );
+}
+
 void ScreenshotService::ensureRegionOverlay() {
   if (m_regionRenderContext == nullptr) {
     return;
@@ -932,11 +1142,38 @@ void ScreenshotService::ensureRegionOverlay() {
   m_regionOverlay->setFailureCallback([this](const std::string& message) {
     m_frozenScreenshots.clear();
     m_regionFullscreenPick = false;
+    if (m_regionPickCallback) {
+      finishRegionPick(std::nullopt);
+      return;
+    }
     notifyError(message);
+  });
+  m_regionOverlay->setColorPickCallback([this](std::optional<std::string> hex) {
+    m_frozenScreenshots.clear();
+    if (m_regionOverlay != nullptr) {
+      m_regionOverlay->setFrozenScreenshots({});
+    }
+    if (!hex.has_value()) {
+      return;
+    }
+    if (m_clipboard == nullptr || !m_clipboard->copyText(*hex)) {
+      notifyError("Failed to copy color");
+      return;
+    }
+    m_notifications.addInternal("Noctalia", "Color copied", *hex);
   });
 
   m_regionOverlay->setCompleteCallback(
       [this](std::optional<LogicalRect> region, wl_output* output, capture::ConfirmAction action) {
+        if (m_regionPickCallback) {
+          if (m_regionOverlay != nullptr) {
+            m_regionOverlay->setFrozenScreenshots({});
+          }
+          m_frozenScreenshots.clear();
+          m_regionFullscreenPick = false;
+          finishRegionPick(region);
+          return;
+        }
         if (!region.has_value()) {
           if (m_regionOverlay != nullptr) {
             if (auto abandoned = m_regionOverlay->takeAbandonedRegion();
@@ -1111,6 +1348,10 @@ void ScreenshotService::finishFreezeCapture() {
 
   ensureRegionOverlay();
   m_regionOverlay->setFrozenScreenshots(std::move(m_frozenScreenshots));
+  if (target == FreezeTarget::ColorPick) {
+    m_regionOverlay->begin(true, false, false, std::nullopt, true);
+    return;
+  }
   const std::optional<LogicalRect> initial =
       (!m_regionFullscreenPick && m_regionOutputOptions.rememberLastRegion) ? loadRememberedRegion() : std::nullopt;
   m_regionOverlay->begin(
@@ -1138,7 +1379,49 @@ void ScreenshotService::cancelRegionCapture() {
   }
   if (m_regionOverlay != nullptr && m_regionOverlay->isActive()) {
     m_regionOverlay->cancelSelection();
+    return;
   }
+  cancelPendingRegionPick();
+}
+
+void ScreenshotService::cancelPendingRegionPick() {
+  if (!m_regionPickCallback) {
+    return;
+  }
+  finishRegionPick(std::nullopt);
+}
+
+void ScreenshotService::finishRegionPick(std::optional<LogicalRect> region) {
+  auto callback = std::move(m_regionPickCallback);
+  m_regionPickCallback = {};
+  if (callback) {
+    callback(std::move(region));
+  }
+}
+
+void ScreenshotService::beginRegionPick(RenderContext& renderContext, RegionPickCallback callback) {
+  cancelPendingRegionPick();
+  if (m_annotationOverlay != nullptr && m_annotationOverlay->isActive()) {
+    if (callback) {
+      callback(std::nullopt);
+    }
+    return;
+  }
+  if (m_freezeCaptureActive) {
+    if (callback) {
+      callback(std::nullopt);
+    }
+    return;
+  }
+  if (m_regionOverlay != nullptr && m_regionOverlay->isActive()) {
+    m_regionOverlay->cancel();
+  }
+
+  m_regionPickCallback = std::move(callback);
+  m_regionOutputOptions = {};
+  m_regionRenderContext = &renderContext;
+  m_regionFullscreenPick = false;
+  startRegionOverlay(renderContext);
 }
 
 capture::AnnotationToolState ScreenshotService::loadAnnotationToolState() const {
@@ -1284,6 +1567,7 @@ void ScreenshotService::ensureAnnotationOverlay() {
 }
 
 void ScreenshotService::beginAnnotation(RenderContext& renderContext, const OutputOptions& options, bool freezeFirst) {
+  cancelPendingRegionPick();
   m_regionRenderContext = &renderContext;
   m_regionOutputOptions = options;
   m_regionFullscreenPick = false;
@@ -1752,6 +2036,10 @@ void ScreenshotService::cancelAllOutputsBatch() {
 void ScreenshotService::deliverCaptureResult(
     capture::ScreenshotImage image, const OutputOptions& options, std::optional<std::filesystem::path> destPath
 ) {
+  if (options.scan.has_value()) {
+    startTextScan(std::move(image.image), *options.scan);
+    return;
+  }
   if (options.annotate && image.image.width > 0 && image.image.height > 0) {
     beginImageAnnotation(std::move(image), options, std::move(destPath));
     return;

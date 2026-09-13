@@ -30,11 +30,16 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <cstdio>
 #include <functional>
 #include <linux/input-event-codes.h>
 #include <memory>
+#include <optional>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace capture {
   namespace {
@@ -47,6 +52,19 @@ namespace capture {
     constexpr float kDimensionPaddingY = 4.0F;
     constexpr float kSelectionBorderWidth = 2.0F;
     constexpr float kDimOpacity = 0.65F;
+    constexpr float kColorSwatchSize = 16.0F;
+    constexpr int kMagnifierRadius = 5;
+    constexpr int kMagnifierScale = 8;
+    constexpr int kMagnifierSrc = kMagnifierRadius * 2 + 1;
+    constexpr int kMagnifierDst = kMagnifierSrc * kMagnifierScale;
+
+    struct SampledPixel {
+      std::string hex;
+      Color color;
+      std::uint8_t r = 0;
+      std::uint8_t g = 0;
+      std::uint8_t b = 0;
+    };
 
     [[nodiscard]] capture::DragMode hitTestSelection(double x, double y, double x0, double y0, double x1, double y1) {
       constexpr double kHandleMargin = 15.0; // Hitbox size in pixels
@@ -147,6 +165,128 @@ namespace capture {
       return nullptr;
     }
 
+    [[nodiscard]] std::optional<std::pair<int, int>>
+    pixelCoordAtLocal(const ScreencopyImage& image, int logicalWidth, int logicalHeight, double localX, double localY) {
+      if (image.width <= 0 || image.height <= 0 || logicalWidth <= 0 || logicalHeight <= 0 || image.rgba.size() < 4) {
+        return std::nullopt;
+      }
+      const int pixelX = std::clamp(
+          static_cast<int>(std::floor(localX * static_cast<double>(image.width) / static_cast<double>(logicalWidth))), 0,
+          image.width - 1
+      );
+      int pixelY = std::clamp(
+          static_cast<int>(std::floor(localY * static_cast<double>(image.height) / static_cast<double>(logicalHeight))),
+          0, image.height - 1
+      );
+      if (image.yInvert) {
+        pixelY = image.height - 1 - pixelY;
+      }
+      return std::pair<int, int>{pixelX, pixelY};
+    }
+
+    [[nodiscard]] std::optional<SampledPixel> samplePixel(const ScreencopyImage& image, int pixelX, int pixelY) {
+      if (pixelX < 0 || pixelY < 0 || pixelX >= image.width || pixelY >= image.height) {
+        return std::nullopt;
+      }
+      const std::size_t index =
+          (static_cast<std::size_t>(pixelY) * static_cast<std::size_t>(image.width) + static_cast<std::size_t>(pixelX))
+          * 4U;
+      if (index + 2 >= image.rgba.size()) {
+        return std::nullopt;
+      }
+      const std::uint8_t r = image.rgba[index];
+      const std::uint8_t g = image.rgba[index + 1];
+      const std::uint8_t b = image.rgba[index + 2];
+      char buf[8];
+      std::snprintf(buf, sizeof(buf), "#%02X%02X%02X", r, g, b);
+      return SampledPixel{
+          .hex = std::string(buf),
+          .color = rgba(colorByte(r), colorByte(g), colorByte(b)),
+          .r = r,
+          .g = g,
+          .b = b,
+      };
+    }
+
+    [[nodiscard]] std::optional<SampledPixel>
+    pixelAtLocal(const ScreencopyImage& image, int logicalWidth, int logicalHeight, double localX, double localY) {
+      const auto coord = pixelCoordAtLocal(image, logicalWidth, logicalHeight, localX, localY);
+      if (!coord.has_value()) {
+        return std::nullopt;
+      }
+      return samplePixel(image, coord->first, coord->second);
+    }
+
+    void fillMagnifier(
+        const ScreencopyImage& image, int logicalWidth, int logicalHeight, double localX, double localY,
+        std::vector<std::uint8_t>& out
+    ) {
+      out.assign(static_cast<std::size_t>(kMagnifierDst) * static_cast<std::size_t>(kMagnifierDst) * 4U, 0);
+      const auto coord = pixelCoordAtLocal(image, logicalWidth, logicalHeight, localX, localY);
+      if (!coord.has_value()) {
+        return;
+      }
+      std::uint8_t centerR = 0;
+      std::uint8_t centerG = 0;
+      std::uint8_t centerB = 0;
+      for (int dy = -kMagnifierRadius; dy <= kMagnifierRadius; ++dy) {
+        for (int dx = -kMagnifierRadius; dx <= kMagnifierRadius; ++dx) {
+          const int px = std::clamp(coord->first + dx, 0, image.width - 1);
+          const int py = std::clamp(coord->second + dy, 0, image.height - 1);
+          const auto sample = samplePixel(image, px, py);
+          const std::uint8_t r = sample.has_value() ? sample->r : 0;
+          const std::uint8_t g = sample.has_value() ? sample->g : 0;
+          const std::uint8_t b = sample.has_value() ? sample->b : 0;
+          if (dx == 0 && dy == 0) {
+            centerR = r;
+            centerG = g;
+            centerB = b;
+          }
+          const int dstX0 = (dx + kMagnifierRadius) * kMagnifierScale;
+          const int dstY0 = (dy + kMagnifierRadius) * kMagnifierScale;
+          for (int sy = 0; sy < kMagnifierScale; ++sy) {
+            for (int sx = 0; sx < kMagnifierScale; ++sx) {
+              const std::size_t index =
+                  (static_cast<std::size_t>(dstY0 + sy) * static_cast<std::size_t>(kMagnifierDst)
+                   + static_cast<std::size_t>(dstX0 + sx))
+                  * 4U;
+              out[index] = r;
+              out[index + 1] = g;
+              out[index + 2] = b;
+              out[index + 3] = 255;
+            }
+          }
+        }
+      }
+      const bool light = static_cast<int>(centerR) + static_cast<int>(centerG) + static_cast<int>(centerB) > 382;
+      const std::uint8_t outline = light ? 0 : 255;
+      const int origin = kMagnifierRadius * kMagnifierScale;
+      const int last = origin + kMagnifierScale - 1;
+      const auto setPx = [&out, outline](int x, int y) {
+        const std::size_t index =
+            (static_cast<std::size_t>(y) * static_cast<std::size_t>(kMagnifierDst) + static_cast<std::size_t>(x)) * 4U;
+        out[index] = outline;
+        out[index + 1] = outline;
+        out[index + 2] = outline;
+        out[index + 3] = 255;
+      };
+      for (int i = 0; i < kMagnifierScale; ++i) {
+        setPx(origin + i, origin);
+        setPx(origin + i, last);
+        setPx(origin, origin + i);
+        setPx(last, origin + i);
+      }
+    }
+
+    [[nodiscard]] std::optional<std::string>
+    hexAtLocal(const ScreencopyImage& image, int logicalWidth, int logicalHeight, double localX, double localY) {
+      const auto sample = pixelAtLocal(image, logicalWidth, logicalHeight, localX, localY);
+      if (!sample.has_value()) {
+        return std::nullopt;
+      }
+      return sample->hex;
+    }
+
     [[nodiscard]] wl_output* outputAtGlobalPoint(const WaylandConnection& wayland, double globalX, double globalY) {
       for (const auto& out : wayland.outputs()) {
         if (out.output == nullptr || out.logicalWidth <= 0 || out.logicalHeight <= 0) {
@@ -239,6 +379,10 @@ namespace capture {
     Box* selection = nullptr;
     Box* dimensionsBadge = nullptr;
     Label* dimensionsLabel = nullptr;
+    Flex* colorPreview = nullptr;
+    Image* colorMagnifier = nullptr;
+    Box* colorSwatch = nullptr;
+    Label* colorHexLabel = nullptr;
     Flex* confirmHint = nullptr;
     Label* confirmHintLabel = nullptr;
     AnimationManager animations;
@@ -256,6 +400,8 @@ namespace capture {
   }
 
   void ScreenshotRegionOverlay::setCompleteCallback(CompleteCallback callback) { m_onComplete = std::move(callback); }
+
+  void ScreenshotRegionOverlay::setColorPickCallback(ColorPickCallback callback) { m_onColorPick = std::move(callback); }
 
   void ScreenshotRegionOverlay::setFailureCallback(FailureCallback callback) { m_onFailure = std::move(callback); }
 
@@ -278,7 +424,8 @@ namespace capture {
   }
 
   void ScreenshotRegionOverlay::begin(
-      bool freezeScreen, bool fullscreenPick, bool confirmRegion, std::optional<LogicalRect> initialRegion
+      bool freezeScreen, bool fullscreenPick, bool confirmRegion, std::optional<LogicalRect> initialRegion,
+      bool colorPick
   ) {
     if (m_wayland == nullptr || m_renderContext == nullptr) {
       return;
@@ -286,12 +433,14 @@ namespace capture {
     destroySurfaces();
     m_abandonedRegion.reset();
     m_freezeScreen = freezeScreen;
-    m_fullscreenPick = fullscreenPick;
-    m_confirmRegion = confirmRegion && !fullscreenPick;
+    m_colorPick = colorPick;
+    m_fullscreenPick = fullscreenPick && !colorPick;
+    m_confirmRegion = confirmRegion && !fullscreenPick && !colorPick;
     m_confirming = false;
     m_active = true;
     m_dragging = false;
-    if (!fullscreenPick && initialRegion.has_value() && initialRegion->width >= 2 && initialRegion->height >= 2) {
+    if (!fullscreenPick && !colorPick && initialRegion.has_value() && initialRegion->width >= 2
+        && initialRegion->height >= 2) {
       m_startGlobalX = static_cast<double>(initialRegion->x);
       m_startGlobalY = static_cast<double>(initialRegion->y);
       m_currentGlobalX = static_cast<double>(initialRegion->x + initialRegion->width);
@@ -316,6 +465,7 @@ namespace capture {
     m_confirming = false;
     m_freezeScreen = false;
     m_fullscreenPick = false;
+    m_colorPick = false;
     m_confirmRegion = false;
     m_frozenScreenshots.clear();
     destroySurfaces();
@@ -327,6 +477,13 @@ namespace capture {
     }
     DeferredCall::callLater([this]() {
       if (!m_active) {
+        return;
+      }
+      if (m_colorPick) {
+        cancel();
+        if (m_onColorPick) {
+          m_onColorPick(std::nullopt);
+        }
         return;
       }
       m_abandonedRegion = selectionRectIfValid();
@@ -341,8 +498,8 @@ namespace capture {
     return std::exchange(m_abandonedRegion, std::nullopt);
   }
 
-  std::optional<LogicalRect> ScreenshotRegionOverlay::selectionRectIfValid() const {
-    if (m_fullscreenPick) {
+    std::optional<LogicalRect> ScreenshotRegionOverlay::selectionRectIfValid() const {
+    if (m_fullscreenPick || m_colorPick) {
       return std::nullopt;
     }
     const int globalX0 = static_cast<int>(std::floor(std::min(m_startGlobalX, m_currentGlobalX)));
@@ -491,7 +648,36 @@ namespace capture {
         .focusable = true,
     });
 
-    if (m_fullscreenPick) {
+    if (m_colorPick) {
+      input->setOnClick([this, surfaceOutput = inst.output](const InputArea::PointerData& data) {
+        if (data.pressed || data.button != BTN_LEFT) {
+          return;
+        }
+        const auto* surfaceOut = findOutput(*m_wayland, surfaceOutput);
+        if (surfaceOut == nullptr) {
+          return;
+        }
+        const double globalX = static_cast<double>(surfaceOut->logicalX) + static_cast<double>(data.localX);
+        const double globalY = static_cast<double>(surfaceOut->logicalY) + static_cast<double>(data.localY);
+        wl_output* picked = outputAtGlobalPoint(*m_wayland, globalX, globalY);
+        if (picked == nullptr) {
+          picked = surfaceOutput;
+        }
+        const auto* pickedOut = findOutput(*m_wayland, picked);
+        const auto* frozen = frozenImageForOutput(m_frozenScreenshots, picked);
+        if (pickedOut == nullptr || frozen == nullptr) {
+          return;
+        }
+        const double localX = globalX - static_cast<double>(pickedOut->logicalX);
+        const double localY = globalY - static_cast<double>(pickedOut->logicalY);
+        const auto hex = hexAtLocal(*frozen, pickedOut->logicalWidth, pickedOut->logicalHeight, localX, localY);
+        DeferredCall::callLater([this, hex]() { completeColorPick(hex); });
+      });
+      input->setOnMotion([this, instPtr = &inst](const InputArea::PointerData& data) {
+        updateColorPickPreview(*instPtr, static_cast<double>(data.localX), static_cast<double>(data.localY));
+      });
+      input->setOnLeave([this]() { hideColorPickPreviews(); });
+    } else if (m_fullscreenPick) {
       input->setOnClick([this, surfaceOutput = inst.output](const InputArea::PointerData& data) {
         if (data.pressed || data.button != BTN_LEFT) {
           return;
@@ -699,24 +885,23 @@ namespace capture {
       inst.backdrop = static_cast<Image*>(input->addChild(std::move(backdrop)));
     }
 
-    // Dim the screen with four strips that frame the selected region. The
-    // region itself stays fully transparent so it shows real colors and never
-    // tints the captured pixels.
-    auto makeDimStrip = [&]() {
-      auto strip = ui::box({
-          // Fixed black scrim so it darkens under every theme.
-          .fill = fixedColorSpec(rgba(0.0F, 0.0F, 0.0F, 1.0F)),
-          .width = 0.0F,
-          .height = 0.0F,
-          .opacity = kDimOpacity,
-          .configure = [](Box& box) { box.setPosition(0.0F, 0.0F); },
-      });
-      return static_cast<Box*>(input->addChild(std::move(strip)));
-    };
-    inst.dimTop = makeDimStrip();
-    inst.dimBottom = makeDimStrip();
-    inst.dimLeft = makeDimStrip();
-    inst.dimRight = makeDimStrip();
+    if (!m_colorPick) {
+      auto makeDimStrip = [&]() {
+        auto strip = ui::box({
+            // Fixed black scrim so it darkens under every theme.
+            .fill = fixedColorSpec(rgba(0.0F, 0.0F, 0.0F, 1.0F)),
+            .width = 0.0F,
+            .height = 0.0F,
+            .opacity = kDimOpacity,
+            .configure = [](Box& box) { box.setPosition(0.0F, 0.0F); },
+        });
+        return static_cast<Box*>(input->addChild(std::move(strip)));
+      };
+      inst.dimTop = makeDimStrip();
+      inst.dimBottom = makeDimStrip();
+      inst.dimLeft = makeDimStrip();
+      inst.dimRight = makeDimStrip();
+    }
 
     Color border = colorForRole(ColorRole::Primary);
     border.a = 1.0F;
@@ -741,7 +926,7 @@ namespace capture {
         .color = fixedColorSpec(border),
     });
 
-    if (!m_fullscreenPick) {
+    if (!m_fullscreenPick && !m_colorPick) {
       inst.dimensionsLabel = static_cast<Label*>(dimensionsBadge->addChild(std::move(dimensionsLabel)));
       inst.selection = static_cast<Box*>(input->addChild(std::move(selection)));
       inst.dimensionsBadge = static_cast<Box*>(input->addChild(std::move(dimensionsBadge)));
@@ -757,6 +942,66 @@ namespace capture {
       inst.sceneRoot->addChild(std::move(pickerBar));
       pickerBarPtr->layout(renderer);
       pickerBarPtr->setPosition((w - pickerBarPtr->width()) * 0.5F, Style::spaceMd);
+    } else if (m_colorPick) {
+      auto hintBar = buildConfirmHintBar(inst.confirmHintLabel);
+      if (inst.confirmHintLabel != nullptr) {
+        inst.confirmHintLabel->setText(
+            i18n::tr("bar.screenshot.pick-color-hint", "cancel", m_cancelKeybindLabel)
+        );
+      }
+      Flex* hintPtr = hintBar.get();
+      inst.confirmHint = hintBar.get();
+      inst.sceneRoot->addChild(std::move(hintBar));
+      hintPtr->layout(renderer);
+      hintPtr->setPosition((w - hintPtr->width()) * 0.5F, Style::spaceMd);
+
+      auto preview = ui::column({
+          .out = &inst.colorPreview,
+          .align = FlexAlign::Center,
+          .gap = Style::spaceXs,
+          .paddingV = kDimensionPaddingY,
+          .paddingH = kDimensionPaddingX,
+          .fill = fixedColorSpec(badgeFill),
+          .radius = Style::radiusSm,
+          .border = colorSpecFromRole(ColorRole::Outline),
+          .borderWidth = 1.0F,
+          .visible = false,
+          .configure = [](Flex& row) { row.setHitTestVisible(false); },
+      });
+      preview->addChild(
+          ui::image({
+              .out = &inst.colorMagnifier,
+              .fit = ImageFit::Stretch,
+              .width = static_cast<float>(kMagnifierDst),
+              .height = static_cast<float>(kMagnifierDst),
+              .configure = [](Image& image) { image.setHitTestVisible(false); },
+          })
+      );
+      auto hexRow = ui::row({
+          .align = FlexAlign::Center,
+          .gap = Style::spaceXs,
+      });
+      hexRow->addChild(
+          ui::box({
+              .out = &inst.colorSwatch,
+              .fill = fixedColorSpec(rgba(0.0F, 0.0F, 0.0F)),
+              .border = colorSpecFromRole(ColorRole::Outline),
+              .borderWidth = 1.0F,
+              .radius = Style::radiusSm,
+              .width = kColorSwatchSize,
+              .height = kColorSwatchSize,
+          })
+      );
+      hexRow->addChild(
+          ui::label({
+              .out = &inst.colorHexLabel,
+              .fontSize = kDimensionFontSize,
+              .fontWeight = FontWeight::Bold,
+              .color = colorSpecFromRole(ColorRole::OnSurface),
+          })
+      );
+      preview->addChild(std::move(hexRow));
+      inst.sceneRoot->addChild(std::move(preview));
     } else if (m_confirmRegion) {
       auto hintBar = buildConfirmHintBar(inst.confirmHintLabel);
       inst.confirmHint = hintBar.get();
@@ -894,6 +1139,86 @@ namespace capture {
     return true;
   }
 
+  void ScreenshotRegionOverlay::hideColorPickPreviews() {
+    for (auto& inst : m_instances) {
+      if (inst == nullptr || inst->colorPreview == nullptr) {
+        continue;
+      }
+      inst->colorPreview->setVisible(false);
+      if (inst->surface != nullptr) {
+        inst->surface->requestRedraw();
+      }
+    }
+  }
+
+  void ScreenshotRegionOverlay::updateColorPickPreview(Instance& instance, double localX, double localY) {
+    if (!m_colorPick || m_wayland == nullptr || instance.colorPreview == nullptr || instance.surface == nullptr) {
+      return;
+    }
+    const auto* surfaceOut = findOutput(*m_wayland, instance.output);
+    if (surfaceOut == nullptr) {
+      hideColorPickPreviews();
+      return;
+    }
+    const double globalX = static_cast<double>(surfaceOut->logicalX) + localX;
+    const double globalY = static_cast<double>(surfaceOut->logicalY) + localY;
+    wl_output* picked = outputAtGlobalPoint(*m_wayland, globalX, globalY);
+    if (picked == nullptr) {
+      picked = instance.output;
+    }
+    const auto* pickedOut = findOutput(*m_wayland, picked);
+    const auto* frozen = frozenImageForOutput(m_frozenScreenshots, picked);
+    if (pickedOut == nullptr || frozen == nullptr) {
+      instance.colorPreview->setVisible(false);
+      instance.surface->requestRedraw();
+      return;
+    }
+    const double sampleX = globalX - static_cast<double>(pickedOut->logicalX);
+    const double sampleY = globalY - static_cast<double>(pickedOut->logicalY);
+    const auto sample = pixelAtLocal(*frozen, pickedOut->logicalWidth, pickedOut->logicalHeight, sampleX, sampleY);
+    if (!sample.has_value()) {
+      instance.colorPreview->setVisible(false);
+      instance.surface->requestRedraw();
+      return;
+    }
+    if (instance.colorSwatch != nullptr) {
+      instance.colorSwatch->setFill(sample->color);
+    }
+    if (instance.colorHexLabel != nullptr) {
+      instance.colorHexLabel->setText(sample->hex);
+    }
+    Renderer& renderer = instance.surface->renderTarget().renderer();
+    if (instance.colorMagnifier != nullptr) {
+      fillMagnifier(
+          *frozen, pickedOut->logicalWidth, pickedOut->logicalHeight, sampleX, sampleY, m_magnifierRgba
+      );
+      (void)instance.colorMagnifier->setSourceRaw(
+          renderer, m_magnifierRgba.data(), m_magnifierRgba.size(), kMagnifierDst, kMagnifierDst, kMagnifierDst * 4,
+          PixmapFormat::RGBA, false
+      );
+    }
+    instance.colorPreview->layout(renderer);
+    const auto surfaceW = static_cast<float>(instance.surface->width());
+    const auto surfaceH = static_cast<float>(instance.surface->height());
+    const float badgeW = instance.colorPreview->width();
+    const float badgeH = instance.colorPreview->height();
+    float badgeX = static_cast<float>(localX) + kDimensionCursorOffsetX;
+    float badgeY = static_cast<float>(localY) + kDimensionCursorOffsetY;
+    badgeX = std::clamp(badgeX, 0.0F, std::max(0.0F, surfaceW - badgeW));
+    badgeY = std::clamp(badgeY, 0.0F, std::max(0.0F, surfaceH - badgeH));
+    instance.colorPreview->setPosition(badgeX, badgeY);
+    instance.colorPreview->setVisible(true);
+    for (auto& other : m_instances) {
+      if (other != nullptr && other.get() != &instance && other->colorPreview != nullptr) {
+        other->colorPreview->setVisible(false);
+        if (other->surface != nullptr) {
+          other->surface->requestRedraw();
+        }
+      }
+    }
+    instance.surface->requestRedraw();
+  }
+
   void ScreenshotRegionOverlay::abortWithError(const std::string& message) {
     if (!m_active) {
       return;
@@ -912,6 +1237,9 @@ namespace capture {
   }
 
   void ScreenshotRegionOverlay::updateSelectionVisuals() {
+    if (m_colorPick) {
+      return;
+    }
     // Lay out the four dim strips so they cover the surface except for the hole
     // rect (surface-local). An empty hole dims the whole surface.
     const auto layoutDimFrame = [](Instance& inst, float surfaceW, float surfaceH, float hx0, float hy0, float hx1,
@@ -1197,6 +1525,20 @@ namespace capture {
     };
     if (m_onComplete) {
       m_onComplete(region, output, ConfirmAction::None);
+    }
+  }
+
+  void ScreenshotRegionOverlay::completeColorPick(std::optional<std::string> hex) {
+    if (!m_active) {
+      if (m_onColorPick) {
+        m_onColorPick(std::nullopt);
+      }
+      return;
+    }
+    m_active = false;
+    destroySurfaces();
+    if (m_onColorPick) {
+      m_onColorPick(std::move(hex));
     }
   }
 

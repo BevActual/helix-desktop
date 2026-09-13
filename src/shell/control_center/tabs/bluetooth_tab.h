@@ -3,31 +3,40 @@
 #include "core/timer_manager.h"
 #include "dbus/bluetooth/bluetooth_agent.h"
 #include "dbus/bluetooth/bluetooth_service.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
+#include <chrono>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 class BluetoothDeviceRow;
 class Button;
+class ClipboardService;
+class ConfigService;
 class Flex;
 class Input;
 class Label;
 class ScrollView;
 class Spinner;
 class Toggle;
+struct ControlCenterServices;
 
 class BluetoothTab : public Tab {
 public:
-  BluetoothTab(BluetoothService* service, BluetoothAgent* agent);
+  BluetoothTab(BluetoothService* service, BluetoothAgent* agent, const ControlCenterServices& services);
   ~BluetoothTab() override;
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setActive(bool active) override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -55,9 +64,14 @@ private:
   // Pushes live metric values into the existing rows. Returns true if any changed.
   bool syncDeviceRows();
   [[nodiscard]] std::string structureKey(const std::vector<BluetoothDeviceInfo>& devices) const;
+  [[nodiscard]] std::chrono::seconds discoveryTimeout() const;
+  void applyDeviceFilters(std::vector<BluetoothDeviceInfo>& devices) const;
 
   BluetoothService* m_service = nullptr;
   BluetoothAgent* m_agent = nullptr;
+  ConfigService* m_config = nullptr;
+  ClipboardService* m_clipboard = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
 

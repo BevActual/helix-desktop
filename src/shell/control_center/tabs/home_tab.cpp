@@ -164,7 +164,10 @@ HomeTab::HomeTab(const ControlCenterServices& services)
     : m_mpris(services.mpris), m_httpClient(services.httpClient), m_weather(services.weather),
       m_config(services.config), m_accounts(services.accounts), m_wallpaper(services.wallpaper),
       m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures),
-      m_services(services.shortcutServices()) {
+      m_services(services.shortcutServices()),
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "control-center", .includedGroups = {"home"}}
+      )) {
   if (m_thumbnails != nullptr) {
     m_thumbnailPendingSub = m_thumbnails->subscribePendingUpload([this]() {
       if (m_wallpaperBg == nullptr) {
@@ -663,22 +666,13 @@ std::unique_ptr<Flex> HomeTab::create() {
   }
   tab->addChild(std::move(bottomRow));
 
-  return tab;
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> HomeTab::createHeaderActions() {
   const float scale = contentScale();
-  auto row = ui::row(
+  auto live = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      ui::button({
-          .out = &m_settingsButton,
-          .glyph = "settings",
-          .onClick =
-              []() {
-                PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = "settings"});
-              },
-          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
-      }),
       ui::button({
           .out = &m_sessionButton,
           .glyph = "shutdown",
@@ -687,10 +681,19 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
       })
   );
   syncHeaderActions();
-  return row;
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
+void HomeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool HomeTab::configureMode() const { return m_settings->configureMode(); }
+
+void HomeTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
+
 void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr) {
     return;
   }
@@ -1213,6 +1216,9 @@ void HomeTab::syncHeaderActions() {
 }
 
 void HomeTab::doUpdate(Renderer& renderer) {
+  if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
   syncHeaderActions();
   if (!m_active) {
     m_progressTimer.stop();
@@ -1290,6 +1296,9 @@ void HomeTab::setActive(bool active) {
 }
 
 void HomeTab::onClose() {
+  if (m_settings != nullptr) {
+    m_settings->onClose();
+  }
   m_progressTimer.stop();
   m_clockTimer.stop();
   m_rootLayout = nullptr;
@@ -1307,7 +1316,6 @@ void HomeTab::onClose() {
   m_userHost = nullptr;
   m_userUptime = nullptr;
   m_userVersion = nullptr;
-  m_settingsButton = nullptr;
   m_sessionButton = nullptr;
   m_userCardKeyboardArea = nullptr;
   m_userCardArea = nullptr;

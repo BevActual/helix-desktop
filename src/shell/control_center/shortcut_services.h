@@ -13,6 +13,8 @@ class IpcService;
 class NotificationManager;
 class PipeWireService;
 class PowerProfilesService;
+class ScreenRecorderService;
+class TailscaleService;
 class WeatherService;
 class HttpClient;
 class ClipboardService;
@@ -39,6 +41,8 @@ struct ShortcutServices {
   DependencyService* dependencies = nullptr;
   CompositorPlatform* platform = nullptr;
   IpcService* ipc = nullptr;
+  ScreenRecorderService* screenRecorder = nullptr;
+  TailscaleService* tailscale = nullptr;
   // Plugin shortcut runtime dependencies.
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;

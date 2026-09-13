@@ -1,22 +1,38 @@
 #include "shell/control_center/tabs/network_tab.h"
 
+#include "config/config_service.h"
+#include "config/config_types.h"
 #include "core/ui_phase.h"
 #include "dbus/modem/modem_manager_service.h"
 #include "dbus/network/external_ip_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/network_display.h"
 #include "i18n/i18n.h"
+#include "net/http_client.h"
 #include "render/core/renderer.h"
+#include "render/core/texture_manager.h"
 #include "render/scene/input_area.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
+#include "system/format_units.h"
+#include "system/system_monitor_service.h"
 #include "ui/builders.h"
+#include "ui/controls/image.h"
+#include "ui/controls/input.h"
+#include "ui/controls/segmented.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "util/qr_code.h"
+#include "util/string_utils.h"
+#include "wayland/clipboard_service.h"
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cstddef>
+#include <cstdio>
+#include <fstream>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -189,6 +205,122 @@ namespace {
   }
 
   std::string percentText(std::uint8_t percent) { return std::to_string(static_cast<int>(percent)) + "%"; }
+
+  std::string_view trimView(std::string_view text) {
+    const auto begin = text.find_first_not_of(" \t\r");
+    if (begin == std::string_view::npos) {
+      return {};
+    }
+    const auto end = text.find_last_not_of(" \t\r");
+    return text.substr(begin, end - begin + 1);
+  }
+
+  bool ssidEqualsIgnoreCase(std::string_view left, std::string_view right) {
+    return std::ranges::equal(left, right, [](unsigned char a, unsigned char b) {
+      return std::tolower(a) == std::tolower(b);
+    });
+  }
+
+  bool ssidIsHidden(std::string_view ssid, const std::vector<std::string>& hidden) {
+    return std::ranges::any_of(hidden, [&](const std::string& item) { return ssidEqualsIgnoreCase(ssid, item); });
+  }
+
+  bool matchesWifiBand(std::uint32_t frequencyMhz, WifiBandFilter filter) {
+    const auto band = network_display::wifiFrequencyBand(frequencyMhz);
+    switch (filter) {
+    case WifiBandFilter::All:
+      return true;
+    case WifiBandFilter::Ghz24:
+      return band == network_display::WifiRadioBand::Ghz24;
+    case WifiBandFilter::Ghz5:
+      return band == network_display::WifiRadioBand::Ghz5;
+    case WifiBandFilter::Ghz6:
+      return band == network_display::WifiRadioBand::Ghz6;
+    }
+    return true;
+  }
+
+  std::string currentDnsText() {
+    std::ifstream in("/etc/resolv.conf");
+    if (!in) {
+      return {};
+    }
+    std::vector<std::string> nameservers;
+    std::string line;
+    while (std::getline(in, line)) {
+      const std::string_view trimmed = trimView(line);
+      if (trimmed.empty() || trimmed.front() == '#') {
+        continue;
+      }
+      constexpr std::string_view kPrefix = "nameserver";
+      if (!trimmed.starts_with(kPrefix)) {
+        continue;
+      }
+      const std::string_view rest = trimView(trimmed.substr(kPrefix.size()));
+      if (!rest.empty()) {
+        nameservers.emplace_back(rest);
+      }
+    }
+    if (nameservers.empty()) {
+      return {};
+    }
+    std::string joined;
+    for (std::size_t i = 0; i < nameservers.size(); ++i) {
+      if (i > 0) {
+        joined += ", ";
+      }
+      joined += nameservers[i];
+    }
+    return i18n::tr("control-center.network.dns", "servers", joined);
+  }
+
+  std::string escapeWifiField(std::string_view value) {
+    std::string out;
+    out.reserve(value.size());
+    for (const char c : value) {
+      if (c == '\\' || c == ';' || c == ',' || c == ':') {
+        out.push_back('\\');
+      }
+      out.push_back(c);
+    }
+    return out;
+  }
+
+  std::string wifiJoinPayload(
+      const NetworkState& state, bool secured, const std::optional<std::string>& psk
+  ) {
+    std::string payload = "WIFI:T:";
+    payload += secured ? "WPA" : "nopass";
+    payload += ";S:";
+    payload += escapeWifiField(state.ssid);
+    payload += ';';
+    if (secured && psk.has_value() && !psk->empty()) {
+      payload += "P:";
+      payload += escapeWifiField(*psk);
+      payload += ';';
+    } else if (secured) {
+      payload += "P:;";
+    }
+    payload += ';';
+    return payload;
+  }
+
+  struct WifiShareKind {
+    bool secured = true;
+    bool enterprise = false;
+  };
+
+  WifiShareKind wifiShareKind(const NetworkState& state, const std::vector<AccessPointInfo>& aps) {
+    WifiShareKind kind;
+    for (const auto& ap : aps) {
+      if (ap.active && ap.ssid == state.ssid) {
+        kind.secured = ap.secured;
+        kind.enterprise = ap.isEnterprise();
+        return kind;
+      }
+    }
+    return kind;
+  }
 
   std::unique_ptr<Flex> makeWifiBucketHeaderRow(const std::string& title, float scale) {
     auto row = ui::row({
@@ -599,10 +731,11 @@ private:
   Label* m_detail = nullptr;
 };
 
-NetworkTab::NetworkTab(
-    INetworkService* network, NetworkSecretAgent* secrets, ExternalIpService* externalIp, ModemManagerService* modem
-)
-    : m_network(network), m_secrets(secrets), m_externalIpService(externalIp), m_modem(modem) {
+NetworkTab::NetworkTab(const ControlCenterServices& services)
+    : m_network(services.network), m_secrets(services.networkSecrets), m_externalIpService(services.externalIp),
+      m_modem(services.modem), m_config(services.config), m_http(services.httpClient), m_sysmon(services.sysmon),
+      m_clipboard(services.clipboard),
+      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "network"})) {
   if (m_secrets != nullptr) {
     m_secrets->setRequestCallback([this](const NetworkSecretAgent::SecretRequest& request) {
       showPasswordPrompt(request);
@@ -612,6 +745,8 @@ NetworkTab::NetworkTab(
 }
 
 NetworkTab::~NetworkTab() {
+  cancelSpeedTest();
+  ++m_pingGeneration;
   if (m_secrets != nullptr) {
     m_secrets->setRequestCallback(nullptr);
     m_secrets->cancelSecret();
@@ -621,11 +756,23 @@ NetworkTab::~NetworkTab() {
 std::unique_ptr<Flex> NetworkTab::create() {
   const float scale = contentScale();
 
-  auto tab = ui::column({
-      .out = &m_rootLayout,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
+  auto liveScroll = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
   });
+  m_rootLayout = liveScroll->content();
+  m_rootLayout->setDirection(FlexDirection::Vertical);
+  m_rootLayout->setAlign(FlexAlign::Stretch);
+  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto currentCard = ui::column({
       .out = &m_currentCard,
@@ -670,8 +817,170 @@ std::unique_ptr<Flex> NetworkTab::create() {
       })
   );
   currentCard->addChild(std::move(connRow));
+  currentCard->addChild(
+      ui::label({
+          .out = &m_throughputLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  currentCard->addChild(
+      ui::label({
+          .out = &m_dnsLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  currentCard->addChild(
+      ui::segmented({
+          .out = &m_dnsProfilePicker,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {.label = i18n::tr("control-center.network.dns-automatic")},
+                  {.label = i18n::tr("control-center.network.dns-google")},
+                  {.label = i18n::tr("control-center.network.dns-cloudflare")},
+                  {.label = i18n::tr("control-center.network.dns-nextdns")},
+                  {.label = i18n::tr("control-center.network.dns-custom")},
+              },
+          .selectedIndex = static_cast<std::size_t>(m_dnsProfile),
+          .fontSize = Style::fontSizeCaption,
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .surfaceRole = ColorRole::Surface,
+          .equalSegmentWidths = true,
+          .onChange =
+              [this](std::size_t index) {
+                if (m_dnsSyncing || index > static_cast<std::size_t>(DnsProfile::Custom)) {
+                  return;
+                }
+                m_dnsProfile = static_cast<DnsProfile>(index);
+                syncDnsPicker();
+                if (m_dnsProfile == DnsProfile::Custom) {
+                  if (m_dnsCustomInput != nullptr && m_dnsCustomInput->value().empty()) {
+                    if (m_config != nullptr && !m_config->config().controlCenter.networkTab.customDns.empty()) {
+                      m_dnsCustomInput->setValue(m_config->config().controlCenter.networkTab.customDns);
+                    }
+                  }
+                  PanelManager::instance().requestLayout();
+                  return;
+                }
+                applySelectedDnsProfile();
+              },
+      })
+  );
+  currentCard->addChild(
+      ui::row(
+          {.out = &m_dnsNextDnsRow,
+           .align = FlexAlign::Center,
+           .gap = Style::spaceSm * scale,
+           .visible = false},
+          ui::input({
+              .out = &m_dnsNextDnsInput,
+              .placeholder = i18n::tr("control-center.network.dns-nextdns-placeholder"),
+              .surfaceOpacity = panelCardOpacity(),
+              .flexGrow = 1.0F,
+              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
+          })
+      )
+  );
+  currentCard->addChild(
+      ui::row(
+          {.out = &m_dnsCustomRow,
+           .align = FlexAlign::Center,
+           .gap = Style::spaceSm * scale,
+           .visible = false},
+          ui::input({
+              .out = &m_dnsCustomInput,
+              .placeholder = i18n::tr("control-center.network.dns-custom-placeholder"),
+              .surfaceOpacity = panelCardOpacity(),
+              .flexGrow = 1.0F,
+              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
+          }),
+          ui::button({
+              .out = &m_dnsApplyButton,
+              .text = i18n::tr("control-center.network.dns-apply"),
+              .onClick = [this]() { applySelectedDnsProfile(); },
+          })
+      )
+  );
+  currentCard->addChild(
+      ui::row(
+          {.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale},
+          ui::button({
+              .out = &m_pingButton,
+              .text = i18n::tr("control-center.network.ping"),
+              .glyph = "activity-heartbeat",
+              .variant = ButtonVariant::Ghost,
+              .onClick = [this]() { startPing(); },
+          }),
+          ui::button({
+              .out = &m_speedButton,
+              .text = i18n::tr("control-center.network.speed-test"),
+              .glyph = "arrow-down",
+              .variant = ButtonVariant::Ghost,
+              .onClick = [this]() { startSpeedTest(); },
+          }),
+          ui::button({
+              .out = &m_copyIpButton,
+              .text = i18n::tr("control-center.network.copy-ip"),
+              .glyph = "copy",
+              .variant = ButtonVariant::Ghost,
+              .onClick = [this]() { copyIpv4(); },
+          }),
+          ui::button({
+              .out = &m_shareButton,
+              .text = i18n::tr("control-center.network.share-wifi"),
+              .glyph = "qrcode",
+              .onClick = [this]() { shareWifi(); },
+          })
+      )
+  );
+  currentCard->addChild(
+      ui::label({
+          .out = &m_toolsStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  auto qrBlock = ui::column({
+      .out = &m_qrBlock,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+  });
+  qrBlock->addChild(
+      ui::row(
+          {.align = FlexAlign::Start, .gap = Style::spaceSm * scale},
+          ui::image({
+              .out = &m_qrImage,
+              .fit = ImageFit::Contain,
+              .width = 180.0F * scale,
+              .height = 180.0F * scale,
+          }),
+          ui::button({
+              .out = &m_qrCloseButton,
+              .glyph = "x",
+              .glyphSize = Style::baseGlyphSize * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.hide-wifi-qr"),
+              .minWidth = Style::controlHeightSm * scale,
+              .minHeight = Style::controlHeightSm * scale,
+              .padding = Style::spaceXs * scale,
+              .onClick = [this]() { hideWifiQr(); },
+          })
+      )
+  );
+  qrBlock->addChild(
+      ui::label({
+          .out = &m_qrHint,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  currentCard->addChild(std::move(qrBlock));
 
-  tab->addChild(std::move(currentCard));
+  m_rootLayout->addChild(std::move(currentCard));
 
   auto passwordCard = ui::column({
       .out = &m_passwordCard,
@@ -836,30 +1145,45 @@ std::unique_ptr<Flex> NetworkTab::create() {
   );
 
   passwordCard->addChild(std::move(inputRow));
-  tab->addChild(std::move(passwordCard));
+  m_rootLayout->addChild(std::move(passwordCard));
 
-  auto listScroll = ui::scrollView({
-      .out = &m_listScroll,
-      .contentScale = contentScale(),
-      .scrollbarVisible = true,
-      .viewportPaddingH = 0.0F,
-      .viewportPaddingV = 0.0F,
-      .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
+  auto list = ui::column({
+      .out = &m_list,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
   });
-  m_list = listScroll->content();
-  m_list->setDirection(FlexDirection::Vertical);
-  m_list->setAlign(FlexAlign::Stretch);
-  m_list->setGap(Style::spaceMd * scale);
+  m_rootLayout->addChild(std::move(list));
 
-  tab->addChild(std::move(listScroll));
-  return tab;
+  auto live = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
+  });
+  live->addChild(std::move(liveScroll));
+  if (m_config != nullptr) {
+    const auto& networkTab = m_config->config().controlCenter.networkTab;
+    if (m_dnsNextDnsInput != nullptr && !networkTab.nextDnsId.empty()) {
+      m_dnsNextDnsInput->setValue(networkTab.nextDnsId);
+    }
+    if (m_dnsCustomInput != nullptr && !networkTab.customDns.empty()) {
+      m_dnsCustomInput->setValue(networkTab.customDns);
+    }
+  }
+  syncDnsPicker();
+  return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> NetworkTab::createHeaderActions() { return nullptr; }
+std::unique_ptr<Flex> NetworkTab::createHeaderActions() {
+  return m_settings->embedHeader(nullptr, contentScale());
+}
+
+void NetworkTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool NetworkTab::configureMode() const { return m_settings->configureMode(); }
+
+void NetworkTab::setSettingsSearchQuery(std::string_view query) {
+  m_settings->setSearchQuery(std::string(query));
+}
 
 void NetworkTab::setActive(bool active) {
   if (m_active == active) {
@@ -868,40 +1192,81 @@ void NetworkTab::setActive(bool active) {
   m_active = active;
   if (m_active && m_network != nullptr) {
     m_network->requestScan();
+    refreshDnsOverride();
+  } else {
+    ++m_pingGeneration;
+    m_pingRunning = false;
+    ++m_shareGeneration;
+    m_shareRunning = false;
+    ++m_dnsGeneration;
+    m_dnsRunning = false;
+    cancelSpeedTest();
   }
 }
 
 void NetworkTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_rootLayout == nullptr) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  m_rootLayout->setSize(contentWidth, bodyHeight);
-  m_rootLayout->layout(renderer);
+  if (m_liveScroll == nullptr) {
+    return;
+  }
+  m_liveScroll->setSize(contentWidth, bodyHeight);
+  m_liveScroll->layout(renderer);
   syncPasswordCard();
   rebuildApList(renderer);
   syncApRows();
   syncCellularCard();
   syncCurrentCard();
-  m_rootLayout->layout(renderer);
+  uploadQr(renderer);
+  m_liveScroll->layout(renderer);
 }
 
 void NetworkTab::doUpdate(Renderer& renderer) {
+  if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
   syncPasswordCard();
   rebuildApList(renderer);
-  // A signal percent's text changes its width, so the list has to be laid out again.
   bool listChanged = syncApRows();
   listChanged = syncCellularCard() || listChanged;
-  if (listChanged && m_list != nullptr) {
-    m_list->layout(renderer);
+  if (listChanged && m_liveScroll != nullptr) {
+    m_liveScroll->layout(renderer);
   }
   syncCurrentCard();
+  uploadQr(renderer);
 }
 
 void NetworkTab::onClose() {
+  if (m_settings != nullptr) {
+    m_settings->onClose();
+  }
+  ++m_pingGeneration;
+  m_pingRunning = false;
+  ++m_shareGeneration;
+  m_shareRunning = false;
+  cancelSpeedTest();
   m_rootLayout = nullptr;
   m_currentCard = nullptr;
   m_currentTitle = nullptr;
   m_currentDetail = nullptr;
+  m_throughputLabel = nullptr;
+  m_dnsLabel = nullptr;
+  m_dnsProfilePicker = nullptr;
+  m_dnsNextDnsRow = nullptr;
+  m_dnsCustomRow = nullptr;
+  m_dnsNextDnsInput = nullptr;
+  m_dnsCustomInput = nullptr;
+  m_dnsApplyButton = nullptr;
+  m_toolsStatus = nullptr;
+  m_pingButton = nullptr;
+  m_speedButton = nullptr;
+  m_copyIpButton = nullptr;
+  m_shareButton = nullptr;
+  m_qrBlock = nullptr;
+  m_qrImage = nullptr;
+  m_qrCloseButton = nullptr;
+  m_qrHint = nullptr;
   m_passwordCard = nullptr;
   m_passwordTitle = nullptr;
   m_passwordInput = nullptr;
@@ -915,7 +1280,7 @@ void NetworkTab::onClose() {
   m_caCertInput = nullptr;
   m_domainMatchInput = nullptr;
   m_credentialError = nullptr;
-  m_listScroll = nullptr;
+  m_liveScroll = nullptr;
   m_list = nullptr;
   m_rescanButton = nullptr;
   m_wifiToggle = nullptr;
@@ -937,6 +1302,11 @@ void NetworkTab::onClose() {
   m_wifiToggleWriteComplete = false;
   m_wifiToggleTargetObserved = false;
   ++m_wifiToggleRequestGeneration;
+  m_qrVisible = false;
+  m_qrDirty = false;
+  ++m_dnsGeneration;
+  m_dnsRunning = false;
+  m_dnsConnectionKey.clear();
 }
 
 void NetworkTab::syncPasswordCard() {
@@ -1158,6 +1528,53 @@ void NetworkTab::syncCurrentCard() {
       m_scanSpinner->stop();
     }
   }
+  if (m_throughputLabel != nullptr) {
+    if (m_sysmon != nullptr && m_sysmon->isRunning() && s.connected) {
+      const double rx = m_sysmon->netRxBytesPerSec(s.interfaceName);
+      const double tx = m_sysmon->netTxBytesPerSec(s.interfaceName);
+      m_throughputLabel->setVisible(true);
+      m_throughputLabel->setText(i18n::tr(
+          "control-center.network.throughput", "down", FormatUnits::formatDecimalBytesPerSecond(rx), "up",
+          FormatUnits::formatDecimalBytesPerSecond(tx)
+      ));
+    } else {
+      m_throughputLabel->setVisible(false);
+    }
+  }
+  if (m_dnsLabel != nullptr) {
+    const std::string dns = currentDnsText();
+    m_dnsLabel->setVisible(!dns.empty());
+    if (!dns.empty()) {
+      m_dnsLabel->setText(dns);
+    }
+  }
+  std::string connectionKey;
+  connectionKey += s.interfaceName;
+  connectionKey += '|';
+  connectionKey += s.ssid;
+  connectionKey += '|';
+  connectionKey += s.connected ? '1' : '0';
+  if (connectionKey != m_dnsConnectionKey) {
+    m_dnsConnectionKey = std::move(connectionKey);
+    refreshDnsOverride();
+  }
+  syncDnsPicker();
+  const bool wifiConnected = s.connected && s.kind == NetworkConnectivity::Wireless && !s.ssid.empty();
+  if (m_copyIpButton != nullptr) {
+    m_copyIpButton->setEnabled(s.connected && !s.ipv4.empty());
+  }
+  if (m_shareButton != nullptr) {
+    m_shareButton->setEnabled(wifiConnected && !m_shareRunning);
+  }
+  if (m_speedButton != nullptr) {
+    m_speedButton->setEnabled(s.connected && !m_speedRunning);
+  }
+  if (m_pingButton != nullptr) {
+    m_pingButton->setEnabled(s.connected && !m_pingRunning);
+  }
+  if (!wifiConnected) {
+    hideWifiQr();
+  }
 }
 
 void NetworkTab::beginPendingAction(bool wasConnected) {
@@ -1240,6 +1657,16 @@ NetworkTab::structureKey(const std::vector<AccessPointInfo>& aps, const std::vec
   key += wirelessEnabled ? '1' : '0';
   key += "\nscan:";
   key += scanning ? '1' : '0';
+  if (m_config != nullptr) {
+    const auto& networkTab = m_config->config().controlCenter.networkTab;
+    key += "\nband:";
+    key += std::to_string(static_cast<int>(networkTab.wifiBand));
+    key += "\nhidden:\n";
+    for (const auto& ssid : networkTab.hiddenSsids) {
+      key += ssid;
+      key.push_back('\n');
+    }
+  }
   // Cellular rows live-sync their state/signal, so only the structural
   // identity (which modems exist) belongs to the key.
   key += "\ncellular:\n";
@@ -1256,10 +1683,10 @@ NetworkTab::structureKey(const std::vector<AccessPointInfo>& aps, const std::vec
 
 void NetworkTab::rebuildApList(Renderer& renderer) {
   uiAssertNotRendering("NetworkTab::rebuildApList");
-  if (m_list == nullptr || m_listScroll == nullptr) {
+  if (m_list == nullptr || m_liveScroll == nullptr) {
     return;
   }
-  const float listWidth = m_listScroll->contentViewportWidth();
+  const float listWidth = m_liveScroll->contentViewportWidth();
   if (listWidth <= 0.0F) {
     return;
   }
@@ -1267,6 +1694,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
   std::vector<AccessPointInfo> aps;
   if (m_network != nullptr) {
     aps = sortedAccessPoints(m_network->accessPoints());
+    applyAccessPointFilters(aps);
   }
   const auto& vpns = m_network != nullptr ? m_network->vpnConnections() : std::vector<VpnConnectionInfo>{};
   const std::string nextStructure = structureKey(aps, vpns);
@@ -1511,7 +1939,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
       // rebuildApList() builds structure only and must not drive animations.
     }
   }
-  m_list->layout(renderer);
+  m_liveScroll->layout(renderer);
 }
 
 bool NetworkTab::syncApRows() {
@@ -1606,5 +2034,396 @@ void NetworkTab::requestCellularEnabled(bool enabled) {
 void NetworkTab::onPanelCardOpacityChanged(float opacity) {
   if (m_passwordInput != nullptr) {
     m_passwordInput->setSurfaceOpacity(opacity);
+  }
+  if (m_dnsCustomInput != nullptr) {
+    m_dnsCustomInput->setSurfaceOpacity(opacity);
+  }
+  if (m_dnsNextDnsInput != nullptr) {
+    m_dnsNextDnsInput->setSurfaceOpacity(opacity);
+  }
+}
+
+void NetworkTab::applyAccessPointFilters(std::vector<AccessPointInfo>& aps) const {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto& networkTab = m_config->config().controlCenter.networkTab;
+  std::erase_if(aps, [&](const AccessPointInfo& ap) {
+    if (ssidIsHidden(ap.ssid, networkTab.hiddenSsids)) {
+      return true;
+    }
+    return !matchesWifiBand(ap.frequencyMhz, networkTab.wifiBand);
+  });
+}
+
+void NetworkTab::startPing() {
+  if (m_http == nullptr || m_network == nullptr || !m_network->state().connected) {
+    if (m_toolsStatus != nullptr) {
+      m_toolsStatus->setText({});
+    }
+    m_pingRunning = false;
+    return;
+  }
+  const std::uint64_t generation = ++m_pingGeneration;
+  m_pingRunning = true;
+  if (m_pingButton != nullptr) {
+    m_pingButton->setEnabled(false);
+  }
+  if (m_toolsStatus != nullptr) {
+    m_toolsStatus->setText(i18n::tr("control-center.network.ping-running"));
+  }
+  PanelManager::instance().requestRedraw();
+  const auto started = std::chrono::steady_clock::now();
+  HttpRequest req;
+  req.url = "https://1.1.1.1/cdn-cgi/trace";
+  req.freshConnection = true;
+  m_http->request(std::move(req), [this, generation, started](HttpResponse response) {
+    if (generation != m_pingGeneration) {
+      return;
+    }
+    m_pingRunning = false;
+    if (m_pingButton != nullptr) {
+      m_pingButton->setEnabled(m_network != nullptr && m_network->state().connected);
+    }
+    if (m_toolsStatus == nullptr) {
+      return;
+    }
+    if (!response.transportOk || response.status < 200 || response.status >= 300) {
+      m_toolsStatus->setText(i18n::tr("control-center.network.ping-failed"));
+      PanelManager::instance().requestRedraw();
+      return;
+    }
+    const auto elapsed = std::chrono::steady_clock::now() - started;
+    const int ms = static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count());
+    m_toolsStatus->setText(i18n::tr("control-center.network.ping-result", "ms", std::to_string(ms)));
+    PanelManager::instance().requestRedraw();
+  });
+}
+
+void NetworkTab::cancelSpeedTest() {
+  ++m_speedGeneration;
+  if (m_http != nullptr && m_speedStream != 0) {
+    m_http->cancelStream(m_speedStream);
+    m_speedStream = 0;
+  }
+  m_speedRunning = false;
+  m_speedBytes = 0;
+  if (m_speedButton != nullptr) {
+    m_speedButton->setEnabled(m_network != nullptr && m_network->state().connected);
+  }
+}
+
+void NetworkTab::startSpeedTest() {
+  if (m_http == nullptr || m_speedRunning || m_network == nullptr || !m_network->state().connected) {
+    return;
+  }
+  cancelSpeedTest();
+  const std::uint64_t generation = ++m_speedGeneration;
+  m_speedRunning = true;
+  m_speedBytes = 0;
+  m_speedStarted = std::chrono::steady_clock::now();
+  if (m_speedButton != nullptr) {
+    m_speedButton->setEnabled(false);
+  }
+  if (m_toolsStatus != nullptr) {
+    m_toolsStatus->setText(i18n::tr("control-center.network.speed-test-running"));
+  }
+  HttpRequest req;
+  req.url = "https://speed.cloudflare.com/__down?bytes=2500000";
+  req.freshConnection = true;
+  m_speedStream = m_http->startStream(
+      std::move(req),
+      [this, generation](std::string_view chunk) {
+        if (generation != m_speedGeneration) {
+          return;
+        }
+        m_speedBytes += chunk.size();
+      },
+      [this, generation](HttpStreamResult result) {
+        if (generation != m_speedGeneration) {
+          return;
+        }
+        m_speedStream = 0;
+        m_speedRunning = false;
+        if (m_speedButton != nullptr) {
+          m_speedButton->setEnabled(m_network != nullptr && m_network->state().connected);
+        }
+        if (m_toolsStatus == nullptr) {
+          return;
+        }
+        const auto elapsed = std::chrono::steady_clock::now() - m_speedStarted;
+        const double seconds = std::chrono::duration<double>(elapsed).count();
+        if (!result.transportOk || result.status < 200 || result.status >= 300 || m_speedBytes == 0 || seconds <= 0.0) {
+          m_toolsStatus->setText(i18n::tr("control-center.network.speed-test-failed"));
+        } else {
+          const double mbps = (static_cast<double>(m_speedBytes) * 8.0 / 1'000'000.0) / seconds;
+          char buffer[32];
+          std::snprintf(buffer, sizeof(buffer), "%.1f", mbps);
+          m_toolsStatus->setText(i18n::tr("control-center.network.speed-test-result", "mbps", buffer));
+        }
+        PanelManager::instance().requestRedraw();
+      }
+  );
+}
+
+void NetworkTab::copyIpv4() {
+  if (m_network == nullptr || m_clipboard == nullptr) {
+    return;
+  }
+  const std::string& ipv4 = m_network->state().ipv4;
+  if (ipv4.empty()) {
+    return;
+  }
+  (void)m_clipboard->copyText(ipv4);
+  if (m_toolsStatus != nullptr) {
+    m_toolsStatus->setText(i18n::tr("control-center.network.ip-copied"));
+  }
+  PanelManager::instance().requestRedraw();
+}
+
+void NetworkTab::shareWifi() {
+  if (m_qrVisible) {
+    hideWifiQr();
+    return;
+  }
+  if (m_network == nullptr || m_shareRunning) {
+    return;
+  }
+  const NetworkState state = m_network->state();
+  if (!state.connected || state.kind != NetworkConnectivity::Wireless || state.ssid.empty()) {
+    return;
+  }
+  const WifiShareKind kind = wifiShareKind(state, m_network->accessPoints());
+  if (kind.enterprise) {
+    applyWifiShare(
+        wifiJoinPayload(state, true, std::nullopt), i18n::tr("control-center.network.share-wifi-enterprise")
+    );
+    return;
+  }
+  if (!kind.secured) {
+    applyWifiShare(wifiJoinPayload(state, false, std::nullopt), i18n::tr("control-center.network.share-wifi-copied"));
+    return;
+  }
+
+  const std::uint64_t generation = ++m_shareGeneration;
+  m_shareRunning = true;
+  if (m_shareButton != nullptr) {
+    m_shareButton->setEnabled(false);
+  }
+  m_network->requestActiveWifiPsk([this, generation, state](std::optional<std::string> psk) {
+    if (generation != m_shareGeneration) {
+      return;
+    }
+    m_shareRunning = false;
+    if (m_shareButton != nullptr) {
+      m_shareButton->setEnabled(
+          m_network != nullptr && m_network->state().connected && m_network->state().kind == NetworkConnectivity::Wireless
+          && !m_network->state().ssid.empty()
+      );
+    }
+    const char* hintKey = psk.has_value() ? "control-center.network.share-wifi-copied"
+                                        : "control-center.network.share-wifi-password-missing";
+    applyWifiShare(wifiJoinPayload(state, true, psk), i18n::tr(hintKey));
+  });
+}
+
+void NetworkTab::hideWifiQr() {
+  if (!m_qrVisible) {
+    return;
+  }
+  m_qrVisible = false;
+  if (m_qrBlock != nullptr) {
+    m_qrBlock->setVisible(false);
+  }
+  if (m_shareButton != nullptr) {
+    m_shareButton->setSelected(false);
+    m_shareButton->setText(i18n::tr("control-center.network.share-wifi"));
+  }
+  PanelManager::instance().requestLayout();
+}
+
+void NetworkTab::applyWifiShare(const std::string& payload, const std::string& hint) {
+  if (m_clipboard != nullptr) {
+    (void)m_clipboard->copyText(payload);
+  }
+  m_qrVisible = true;
+  if (m_qrBlock != nullptr) {
+    m_qrBlock->setVisible(true);
+  }
+  if (auto bitmap = qr_code::encodeRgba(payload, 6)) {
+    m_qrBitmap = std::move(*bitmap);
+    m_qrDirty = true;
+  }
+  if (m_qrHint != nullptr) {
+    m_qrHint->setText(hint);
+  }
+  if (m_shareButton != nullptr) {
+    m_shareButton->setSelected(true);
+    m_shareButton->setText(i18n::tr("control-center.network.hide-wifi-qr"));
+  }
+  if (m_toolsStatus != nullptr) {
+    m_toolsStatus->setText(hint);
+  }
+  PanelManager::instance().requestLayout();
+}
+
+void NetworkTab::uploadQr(Renderer& renderer) {
+  if (!m_qrDirty || m_qrImage == nullptr || m_qrBitmap.rgba.empty() || m_qrBitmap.pixels <= 0) {
+    return;
+  }
+  const int pixels = m_qrBitmap.pixels;
+  const std::size_t size = m_qrBitmap.rgba.size();
+  (void)m_qrImage->setSourceRaw(
+      renderer, m_qrBitmap.rgba.data(), size, pixels, pixels, pixels * 4, PixmapFormat::RGBA, false
+  );
+  m_qrDirty = false;
+}
+
+void NetworkTab::syncDnsPicker() {
+  const bool supported = m_network != nullptr && m_network->supportsDnsOverride();
+  const bool connected = m_network != nullptr && m_network->state().connected;
+  const bool enabled = supported && connected && !m_dnsRunning;
+  if (m_dnsProfilePicker != nullptr) {
+    m_dnsProfilePicker->setEnabled(enabled);
+    m_dnsSyncing = true;
+    m_dnsProfilePicker->setSelectedIndex(static_cast<std::size_t>(m_dnsProfile));
+    m_dnsSyncing = false;
+  }
+  const bool showNextDns = m_dnsProfile == DnsProfile::NextDns;
+  const bool showCustom = m_dnsProfile == DnsProfile::Custom;
+  if (m_dnsNextDnsRow != nullptr) {
+    m_dnsNextDnsRow->setVisible(showNextDns);
+  }
+  if (m_dnsCustomRow != nullptr) {
+    m_dnsCustomRow->setVisible(showCustom);
+  }
+  if (m_dnsNextDnsInput != nullptr) {
+    m_dnsNextDnsInput->setEnabled(enabled);
+  }
+  if (m_dnsCustomInput != nullptr) {
+    m_dnsCustomInput->setEnabled(enabled);
+  }
+  if (m_dnsApplyButton != nullptr) {
+    m_dnsApplyButton->setEnabled(enabled);
+  }
+}
+
+void NetworkTab::refreshDnsOverride() {
+  if (m_network == nullptr || !m_network->supportsDnsOverride()) {
+    m_dnsProfile = DnsProfile::Automatic;
+    syncDnsPicker();
+    return;
+  }
+  const std::uint64_t generation = ++m_dnsGeneration;
+  m_network->requestActiveDnsOverride([this, generation](DnsOverride override) {
+    if (generation != m_dnsGeneration) {
+      return;
+    }
+    m_dnsProfile = override.profile;
+    if (m_dnsNextDnsInput != nullptr && !override.nextDnsId.empty()) {
+      m_dnsNextDnsInput->setValue(override.nextDnsId);
+    }
+    if (m_dnsCustomInput != nullptr && override.profile == DnsProfile::Custom && !override.servers.empty()) {
+      std::string joined;
+      for (std::size_t i = 0; i < override.servers.size(); ++i) {
+        if (i > 0) {
+          joined += ", ";
+        }
+        joined += override.servers[i];
+      }
+      m_dnsCustomInput->setValue(joined);
+    }
+    syncDnsPicker();
+    PanelManager::instance().requestLayout();
+  });
+}
+
+void NetworkTab::applySelectedDnsProfile() {
+  if (m_network == nullptr || !m_network->supportsDnsOverride()) {
+    if (m_toolsStatus != nullptr) {
+      m_toolsStatus->setText(i18n::tr("control-center.network.dns-requires-networkmanager"));
+    }
+    return;
+  }
+  if (!m_network->state().connected) {
+    if (m_toolsStatus != nullptr) {
+      m_toolsStatus->setText(i18n::tr("control-center.network.dns-requires-connection"));
+    }
+    return;
+  }
+
+  DnsOverride override;
+  override.profile = m_dnsProfile;
+  if (m_dnsProfile == DnsProfile::NextDns) {
+    override.nextDnsId = m_dnsNextDnsInput != nullptr ? StringUtils::trim(m_dnsNextDnsInput->value()) : std::string{};
+    if (!dns_override::validNextDnsId(override.nextDnsId)) {
+      if (m_toolsStatus != nullptr) {
+        m_toolsStatus->setText(i18n::tr("control-center.network.dns-invalid"));
+      }
+      return;
+    }
+  } else if (m_dnsProfile == DnsProfile::Custom) {
+    const std::string text = m_dnsCustomInput != nullptr ? m_dnsCustomInput->value() : std::string{};
+    std::vector<ParsedDnsServer> parsed;
+    if (!dns_override::parseServerList(text, parsed)) {
+      if (m_toolsStatus != nullptr) {
+        m_toolsStatus->setText(i18n::tr("control-center.network.dns-invalid"));
+      }
+      return;
+    }
+    override.servers.reserve(parsed.size());
+    for (const auto& server : parsed) {
+      override.servers.push_back(dns_override::formatServer(server));
+    }
+  }
+  applyDnsOverride(override);
+}
+
+void NetworkTab::applyDnsOverride(const DnsOverride& override) {
+  if (m_network == nullptr) {
+    return;
+  }
+  const std::uint64_t generation = ++m_dnsGeneration;
+  m_dnsRunning = true;
+  syncDnsPicker();
+  m_network->setDnsOverride(override, [this, generation](bool success, std::string message) {
+    if (generation != m_dnsGeneration) {
+      return;
+    }
+    m_dnsRunning = false;
+    syncDnsPicker();
+    if (m_toolsStatus != nullptr) {
+      if (success) {
+        m_toolsStatus->setText(i18n::tr("control-center.network.dns-applied"));
+      } else if (!message.empty()) {
+        m_toolsStatus->setText(message);
+      } else {
+        m_toolsStatus->setText(i18n::tr("control-center.network.dns-invalid"));
+      }
+    }
+    if (success) {
+      persistDnsFields();
+      refreshDnsOverride();
+    }
+    PanelManager::instance().requestLayout();
+  });
+}
+
+void NetworkTab::persistDnsFields() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto& networkTab = m_config->config().controlCenter.networkTab;
+  if (m_dnsProfile == DnsProfile::NextDns && m_dnsNextDnsInput != nullptr) {
+    const std::string id = StringUtils::trim(m_dnsNextDnsInput->value());
+    if (id != networkTab.nextDnsId) {
+      (void)m_config->setOverride({"control_center", "network", "nextdns_id"}, id);
+    }
+  }
+  if (m_dnsProfile == DnsProfile::Custom && m_dnsCustomInput != nullptr) {
+    const std::string custom = StringUtils::trim(m_dnsCustomInput->value());
+    if (custom != networkTab.customDns) {
+      (void)m_config->setOverride({"control_center", "network", "custom_dns"}, custom);
+    }
   }
 }

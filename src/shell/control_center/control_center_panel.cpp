@@ -10,6 +10,7 @@
 #include "core/deferred_call.h"
 #include "dbus/mpris/mpris_service.h"
 #include "i18n/i18n.h"
+#include "net/tailscale_service.h"
 #include "notification/notification_manager.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
@@ -18,6 +19,7 @@
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
+#include "shell/control_center/tabs/clipboard_tab.h"
 #include "shell/control_center/tabs/home_tab.h"
 #include "shell/control_center/tabs/media_tab.h"
 #include "shell/control_center/tabs/monitor_tab.h"
@@ -25,10 +27,14 @@
 #include "shell/control_center/tabs/notifications_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
+#include "shell/control_center/tabs/screenshot_tab.h"
+#include "shell/control_center/tabs/screen_record_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/system_tab.h"
+#include "shell/control_center/tabs/tailscale_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
 #include "shell/control_center/tabs/weather_tab.h"
+#include "shell/wallpaper/wallhaven_client.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/settings/settings_content_plugins.h"
@@ -93,17 +99,20 @@ namespace {
       {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
+      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Status},
       {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
       {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
+      {"screenshot", "settings.navigation.sections.screenshot", "screenshot", true, TabGroup::Status},
+      {"screen-record", "control-center.tabs.screen-record", "video", true, TabGroup::Status},
+      {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Status},
       {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Setup},
       {"dock", "settings.navigation.sections.dock", "layout-bottombar-inactive", true, TabGroup::Setup},
       {"panels", "settings.navigation.sections.panels", "layout-bottombar", true, TabGroup::Setup},
       {"launcher", "settings.navigation.sections.launcher", "rocket", true, TabGroup::Setup},
       {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::Setup},
       {"osd", "settings.navigation.sections.osd", "message-circle", true, TabGroup::Setup},
-      {"screenshot", "settings.navigation.sections.screenshot", "screenshot", true, TabGroup::Setup},
       {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Setup},
       {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true, TabGroup::Setup},
       {"security", "settings.navigation.sections.security", "shield-lock", true, TabGroup::Setup},
@@ -130,6 +139,12 @@ namespace {
     std::string title;
     std::string glyph;
   };
+
+  bool isSupersededPluginControlCenterTab(const scripting::ResolvedPluginEntry& resolved) {
+    return resolved.manifest != nullptr
+        && (resolved.manifest->id == wallpaper::wallhaven::kPluginId
+            || resolved.manifest->id == tailscale::kPluginId);
+  }
 
   PluginTabChrome pluginTabChrome(const scripting::ResolvedPluginEntry& resolved) {
     PluginTabChrome chrome;
@@ -188,7 +203,6 @@ namespace {
         || id == "desktop"
         || id == "panels"
         || id == "osd"
-        || id == "screenshot"
         || id == "shell"
         || id == "keybinds"
         || id == "security"
@@ -208,7 +222,14 @@ namespace {
         || id == "monitor"
         || id == "wallpaper"
         || id == "media"
-        || id == "screen-time";
+        || id == "screen-time"
+        || id == "network"
+        || id == "bluetooth"
+        || id == "screenshot"
+        || id == "screen-record"
+        || id == "clipboard"
+        || id == "tailscale"
+        || id == "home";
   }
 
   std::string tabIdForSettingsSection(std::string_view section) {
@@ -267,6 +288,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("home", std::make_unique<HomeTab>(services));
   add("appearance", std::make_unique<SettingsTab>(services, "appearance"));
   add("wallpaper", std::make_unique<WallpaperTab>(services));
+  add("templates", std::make_unique<SettingsTab>(services, "templates"));
   add("bar", std::make_unique<SettingsTab>(services, "bar"));
   add(
       "media",
@@ -285,29 +307,28 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
   add("system", std::make_unique<SystemTab>(services.sysmon, services));
   add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
-  add(
-      "network",
-      std::make_unique<NetworkTab>(services.network, services.networkSecrets, services.externalIp, services.modem)
-  );
-  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent));
+  add("network", std::make_unique<NetworkTab>(services));
+  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
+  add("tailscale", std::make_unique<TailscaleTab>(services));
   add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
   add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
-  add("templates", std::make_unique<SettingsTab>(services, "templates"));
-  add("launcher", std::make_unique<SettingsTab>(services, "launcher"));
-  add("dock", std::make_unique<SettingsTab>(services, "dock"));
+  add("screenshot", std::make_unique<ScreenshotTab>(services));
+  add("screen-record", std::make_unique<ScreenRecordTab>(services));
+  add("clipboard", std::make_unique<ClipboardTab>(services));
   add("desktop", std::make_unique<SettingsTab>(services, "desktop"));
+  add("dock", std::make_unique<SettingsTab>(services, "dock"));
   add("panels", std::make_unique<SettingsTab>(services, "panels"));
+  add("launcher", std::make_unique<SettingsTab>(services, "launcher"));
+  add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
   add("osd", std::make_unique<SettingsTab>(services, "osd"));
-  add("screenshot", std::make_unique<SettingsTab>(services, "screenshot"));
   add("shell", std::make_unique<SettingsTab>(services, "shell"));
   add("keybinds", std::make_unique<SettingsTab>(services, "keybinds"));
   add("security", std::make_unique<SettingsTab>(services, "security"));
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
   add("plugins", std::make_unique<SettingsTab>(services, "plugins"));
-  add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
 }
 
 float ControlCenterPanel::preferredWidth() const {
@@ -884,7 +905,7 @@ std::vector<ControlCenterPanel::TabCatalogEntry> ControlCenterPanel::hideableTab
   auto& registry = scripting::PluginRegistry::instance();
   registry.ensureScanned();
   for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
-    if (resolved.manifest == nullptr || resolved.entry == nullptr) {
+    if (resolved.manifest == nullptr || resolved.entry == nullptr || isSupersededPluginControlCenterTab(resolved)) {
       continue;
     }
     const auto chrome = pluginTabChrome(resolved);
@@ -1453,7 +1474,7 @@ void ControlCenterPanel::rebuildPluginSlots() {
 
   std::vector<TabSlot> pluginSlots;
   for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
-    if (resolved.entry == nullptr || resolved.manifest == nullptr) {
+    if (resolved.entry == nullptr || resolved.manifest == nullptr || isSupersededPluginControlCenterTab(resolved)) {
       continue;
     }
     const auto psIt = pluginSettings.find(resolved.manifest->id);

@@ -282,9 +282,6 @@ namespace {
     if (panelId == "launcher") {
       return pc.launcherPosition;
     }
-    if (panelId == "clipboard") {
-      return pc.clipboardPosition;
-    }
     if (panelId == "wallpaper") {
       return pc.wallpaperPosition;
     }
@@ -298,8 +295,7 @@ namespace {
   }
 
   [[nodiscard]] bool usesConfiguredFloatingLayer(std::string_view panelId) {
-    return panelId == "clipboard"
-        || panelId == "control-center"
+    return panelId == "control-center"
         || panelId == "launcher"
         || panelId == "session"
         || panelId == "setup-wizard"
@@ -331,9 +327,6 @@ namespace {
     }
     if (panelId == "launcher") {
       return !pinned(pc.launcherPlacement, pc.launcherPosition) && pc.openNearClickLauncher;
-    }
-    if (panelId == "clipboard") {
-      return !pinned(pc.clipboardPlacement, pc.clipboardPosition) && pc.openNearClickClipboard;
     }
     if (panelId == "wallpaper") {
       return !pinned(pc.wallpaperPlacement, pc.wallpaperPosition) && pc.openNearClickWallpaper;
@@ -397,7 +390,7 @@ void PanelManager::setCloseDesktopWidgetsEditorCallback(std::function<void()> ca
   m_closeDesktopWidgetsEditor = std::move(callback);
 }
 
-void PanelManager::openSettingsWindow(std::string context) {
+void PanelManager::openSettings(std::string context) {
   std::string ccContext = "settings";
   if (!context.empty() && context != "settings") {
     if (context.starts_with("settings:")) {
@@ -423,13 +416,13 @@ bool PanelManager::openPluginSettings(const std::string& pluginId) {
   return m_openPluginSettings(pluginId);
 }
 
-void PanelManager::closeSettingsWindow() {
+void PanelManager::closeSettings() {
   if (isOpenPanel("control-center")) {
     closePanel();
   }
 }
 
-void PanelManager::toggleSettingsWindow(std::string context) {
+void PanelManager::toggleSettings(std::string context) {
   std::string ccContext = "settings";
   if (!context.empty() && context != "settings") {
     if (context.starts_with("settings:")) {
@@ -517,6 +510,11 @@ void PanelManager::unregisterPanel(const std::string& id) {
 }
 
 void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "clipboard") {
+    request.context = "clipboard";
+    openPanel("control-center", request);
+    return;
+  }
   if (m_inTransition) {
     return;
   }
@@ -1526,6 +1524,11 @@ void PanelManager::destroyPanel() {
 }
 
 void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "clipboard") {
+    request.context = "clipboard";
+    togglePanel("control-center", request);
+    return;
+  }
   if (m_persistentHost.hasPanel(panelId)) {
     if (m_persistentHost.isOpen(panelId)) {
       m_persistentHost.close(panelId);
@@ -1558,6 +1561,10 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
 }
 
 void PanelManager::togglePanel(const std::string& panelId) {
+  if (panelId == "clipboard") {
+    togglePanel("control-center", PanelOpenRequest{.context = "clipboard"});
+    return;
+  }
   if (m_persistentHost.hasPanel(panelId)) {
     if (m_persistentHost.isOpen(panelId)) {
       m_persistentHost.close(panelId);
@@ -1689,6 +1696,9 @@ bool PanelManager::onPointerEvent(const PointerEvent& event) {
 bool PanelManager::isOpen() const noexcept { return m_surface != nullptr && m_activePanel != nullptr; }
 
 bool PanelManager::isOpenPanel(std::string_view panelId) const noexcept {
+  if (panelId == "clipboard") {
+    return isOpen() && m_activePanelId == "control-center" && isActivePanelContext("clipboard");
+  }
   if (m_persistentHost.hasPanel(panelId)) {
     return m_persistentHost.isOpen(panelId);
   }
@@ -2846,14 +2856,23 @@ void PanelManager::registerIpc(IpcService& ipc) {
     return error;
   };
 
+  auto resolveClipboardPanelAlias = [](std::string& panelId, std::string& context) {
+    if (panelId != "clipboard") {
+      return;
+    }
+    panelId = "control-center";
+    context = "clipboard";
+  };
+
   ipc.bind(
       noctalia::cli::msg::panelToggle,
-      [this, parseOpenArgs, unknownPanelError](const std::string& args) -> std::string {
+      [this, parseOpenArgs, unknownPanelError, resolveClipboardPanelAlias](const std::string& args) -> std::string {
         std::string panelId;
         std::string context;
         if (auto error = parseOpenArgs(args, "panel-toggle", panelId, context)) {
           return *error;
         }
+        resolveClipboardPanelAlias(panelId, context);
         if (!m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)) {
           return unknownPanelError(panelId);
         }
@@ -2868,12 +2887,14 @@ void PanelManager::registerIpc(IpcService& ipc) {
   );
 
   ipc.bind(
-      noctalia::cli::msg::panelOpen, [this, parseOpenArgs, unknownPanelError](const std::string& args) -> std::string {
+      noctalia::cli::msg::panelOpen,
+      [this, parseOpenArgs, unknownPanelError, resolveClipboardPanelAlias](const std::string& args) -> std::string {
         std::string panelId;
         std::string context;
         if (auto error = parseOpenArgs(args, "panel-open", panelId, context)) {
           return *error;
         }
+        resolveClipboardPanelAlias(panelId, context);
         if (!m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)) {
           return unknownPanelError(panelId);
         }
@@ -2897,7 +2918,8 @@ void PanelManager::registerIpc(IpcService& ipc) {
     if (!panelId.empty() && StringUtils::splitWhitespace(panelId).size() != 1) {
       return "error: panel-close accepts at most one panel id\n";
     }
-    if (!panelId.empty() && !m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)) {
+    if (!panelId.empty() && !m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)
+        && panelId != "clipboard") {
       return unknownPanelError(panelId);
     }
 
@@ -2919,7 +2941,7 @@ void PanelManager::registerIpc(IpcService& ipc) {
   };
 
   ipc.bind(noctalia::cli::msg::settingsOpen, [this](const std::string& args) -> std::string {
-    openSettingsWindow(std::string(StringUtils::trimLeftView(args)));
+    openSettings(std::string(StringUtils::trimLeftView(args)));
     return "ok\n";
   });
 
@@ -2975,12 +2997,12 @@ void PanelManager::registerIpc(IpcService& ipc) {
     if (auto error = rejectSettingsArgs(args, "settings-close")) {
       return *error;
     }
-    closeSettingsWindow();
+    closeSettings();
     return "ok\n";
   });
 
   ipc.bind(noctalia::cli::msg::settingsToggle, [this](const std::string& args) -> std::string {
-    toggleSettingsWindow(std::string(StringUtils::trimLeftView(args)));
+    toggleSettings(std::string(StringUtils::trimLeftView(args)));
     return "ok\n";
   });
 }

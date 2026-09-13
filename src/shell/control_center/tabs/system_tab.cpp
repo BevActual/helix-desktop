@@ -2,6 +2,7 @@
 
 #include "i18n/i18n.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "system/distro_info.h"
 #include "system/format_units.h"
@@ -10,6 +11,7 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/graph.h"
+#include "wayland/clipboard_service.h"
 
 #include <algorithm>
 #include <format>
@@ -206,7 +208,7 @@ namespace {
 } // namespace
 
 SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services)
-    : m_monitor(monitor),
+    : m_monitor(monitor), m_clipboard(services.clipboard),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
@@ -408,7 +410,18 @@ std::unique_ptr<Flex> SystemTab::create() {
 }
 
 std::unique_ptr<Flex> SystemTab::createHeaderActions() {
-  return m_settings->embedHeader(nullptr, contentScale());
+  const float scale = contentScale();
+  auto live = ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
+      ui::button({
+          .glyph = "copy",
+          .enabled = m_clipboard != nullptr,
+          .tooltip = i18n::tr("control-center.system.copy-info"),
+          .onClick = [this]() { copySystemInfo(); },
+          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+      })
+  );
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
 void SystemTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -951,4 +964,30 @@ float SystemTab::scrollProgressForSample(std::chrono::steady_clock::time_point s
   const auto elapsed = std::chrono::steady_clock::now() - sampledAt;
   const auto clamped = std::clamp(elapsed, std::chrono::steady_clock::duration::zero(), sampleInterval);
   return std::chrono::duration<float>(clamped).count() / std::chrono::duration<float>(sampleInterval).count();
+}
+
+std::string SystemTab::systemInfoText() const {
+  std::string text;
+  text += cpuModelName();
+  text += '\n';
+  text += gpuLabel();
+  text += '\n';
+  text += distroLabel();
+  text += '\n';
+  text += kernelLabel();
+  text += '\n';
+  text += compositorLabel();
+  text += '\n';
+  const auto uptime = systemUptime();
+  const std::string uptimeText =
+      uptime.has_value() ? formatDuration(*uptime) : i18n::tr("control-center.system.unknown");
+  text += i18n::tr("control-center.system.uptime-prefix", "uptime", uptimeText, "osAge", osAgeLabel());
+  return text;
+}
+
+void SystemTab::copySystemInfo() {
+  if (m_clipboard == nullptr) {
+    return;
+  }
+  (void)m_clipboard->copyText(systemInfoText());
 }

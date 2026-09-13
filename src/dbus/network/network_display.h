@@ -15,9 +15,19 @@ namespace network_display {
   // on every scan update.
   [[nodiscard]] int wifiSignalBand(std::uint8_t signal) noexcept;
 
-  // Radio band of an operating frequency: "2.4 GHz", "5 GHz", "6 GHz" or "60 GHz".
-  // nullptr when the frequency is 0 (backends such as iwd never report one) or
-  // falls outside those bands — 802.11y 3.6 GHz and S1G 900 MHz have no label here.
+  enum class WifiRadioBand : std::uint8_t {
+    Unknown = 0,
+    Ghz24 = 1,
+    Ghz5 = 2,
+    Ghz6 = 3,
+    Ghz60 = 4,
+  };
+
+  // Radio band of an operating frequency. Unknown when the frequency is 0
+  // (backends such as iwd never report one) or falls outside the bands below.
+  [[nodiscard]] WifiRadioBand wifiFrequencyBand(std::uint32_t frequencyMhz) noexcept;
+
+  // "2.4 GHz", "5 GHz", "6 GHz" or "60 GHz". nullptr when wifiFrequencyBand is Unknown.
   [[nodiscard]] const char* wifiFrequencyBandLabel(std::uint32_t frequencyMhz) noexcept;
 
   // Cellular (ModemManager) glyphs, banded the same way as wifi.

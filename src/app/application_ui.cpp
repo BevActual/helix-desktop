@@ -61,7 +61,6 @@
 #include "scripting/plugin_panel_shell.h"
 #include "scripting/plugin_registry.h"
 #include "scripting/plugin_runtime_context.h"
-#include "shell/clipboard/clipboard_panel.h"
 #include "shell/clipboard/clipboard_paste.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
@@ -456,28 +455,6 @@ void Application::initPanelManagerAndPanels() {
     retrySecretServiceConsumers();
   });
   m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsInvalidated.emit(); });
-  auto clipboardPanel = std::make_unique<ClipboardPanel>(&m_clipboardService, &m_configService, &m_asyncTextureCache);
-  clipboardPanel->setActivateCallback([this](const ClipboardEntry& entry) {
-    const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;
-    if (mode == ClipboardAutoPasteMode::Off) {
-      m_panelManager.close();
-      return;
-    }
-    // Auto-paste injects a keystroke into whatever holds keyboard focus. The animated close keeps
-    // the panel surface (and its keyboard focus) alive for the duration of the reveal animation, so
-    // the keys would land on the closing panel instead of the target window. Close without animation
-    // so focus returns to the toplevel before we paste, mirroring the launcher's app-launch close.
-    m_panelManager.closePanel(false);
-    const bool isImage = entry.isImage();
-    m_clipboardAutoPasteTimer.stop();
-    m_clipboardAutoPasteTimer.start(std::chrono::milliseconds(Style::animFast + 30), [this, isImage]() {
-      DeferredCall::callLater([this, isImage]() {
-        const ClipboardAutoPasteMode activeMode = m_configService.config().shell.clipboardAutoPaste;
-        (void)clipboard_paste::pasteEntry(isImage, activeMode, m_virtualKeyboardService);
-      });
-    });
-  });
-  m_panelManager.registerPanel("clipboard", std::move(clipboardPanel));
   syncClipboardService();
   m_panelManager.registerPanel("session", std::make_unique<SessionPanel>(&m_configService, m_sessionActionRunner));
   m_panelManager.registerPanel("test", std::make_unique<TestPanel>());
@@ -616,11 +593,25 @@ void Application::initPanelManagerAndPanels() {
           .scriptApi = &m_scriptApi,
           .fileWatcher = &m_fileWatcher,
           .clipboard = &m_clipboardService,
+          .scheduleClipboardAutoPaste =
+              [this](bool isImage) {
+                m_clipboardAutoPasteTimer.stop();
+                m_clipboardAutoPasteTimer.start(
+                    std::chrono::milliseconds(Style::animFast + 30), [this, isImage]() {
+                      DeferredCall::callLater([this, isImage]() {
+                        const ClipboardAutoPasteMode activeMode = m_configService.config().shell.clipboardAutoPaste;
+                        (void)clipboard_paste::pasteEntry(isImage, activeMode, m_virtualKeyboardService);
+                      });
+                    }
+                );
+              },
           .accounts = m_accountsService.get(),
           .thumbnails = &m_thumbnailService,
           .wallpaperScanner = &m_wallpaperScanner,
           .asyncTextures = &m_asyncTextureCache,
           .pluginManager = &m_pluginManager,
+          .screenRecorder = &m_screenRecorder,
+          .tailscale = &m_tailscaleService,
           .settingsInvalidated = &m_settingsInvalidated,
           .settingsActions = std::move(settingsActions),
       });
@@ -866,7 +857,7 @@ void Application::initBarDockAndLayout() {
     if (m_controlCenter != nullptr) {
       m_controlCenter->queueBarWidget(std::move(barName), std::move(widgetName));
     }
-    m_panelManager.openSettingsWindow("bar");
+    m_panelManager.openSettings("bar");
   });
   m_panelManager.setOpenPluginSettingsCallback([this](std::string pluginId) {
     const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
@@ -876,7 +867,7 @@ void Application::initBarDockAndLayout() {
     if (m_controlCenter != nullptr) {
       m_controlCenter->queuePluginSettings(std::move(pluginId));
     }
-    m_panelManager.openSettingsWindow("plugins");
+    m_panelManager.openSettings("plugins");
     return true;
   });
   m_panelManager.setAttachedPanelGeometryCallback(

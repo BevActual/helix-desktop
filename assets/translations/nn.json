@@ -3006,10 +3006,6 @@
           "description": "Ha med peikaren i skjermbilete",
           "label": "Vis peikaren"
         },
-        "settings-window-translucent": {
-          "description": "Gjer bakgrunnen i Innstillingar gjennomsynleg til kompositorverknader",
-          "label": "Gjennomsynleg bakgrunn i instillingar"
-        },
         "show-location": {
           "description": "Vis stadnamn i vêrnøytlane",
           "label": "Vis stad"

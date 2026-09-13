@@ -20,11 +20,10 @@ niri_overview_type_to_launch_enabled = false # opt in to type-to-launch from nir
 polkit_agent          = false
 password_style        = "default"    # default | random
 settings_show_advanced = true        # show advanced settings by default
-# settings_window_translucent is unused; settings live in Control Center
 show_location         = true         # hide weather location text in shell UI when false
 # app_icon_colorize   = false        # recolor application icons across the shell
 # app_icon_color      = "on_surface" # ColorSpec role or #hex when colorize is enabled
-clipboard_enabled     = true         # false disables clipboard panel, history, and compositor clipboard hooks
+clipboard_enabled     = true         # false disables clipboard history (Control Center tab); live copy/paste still works
 clipboard_history_max_entries = 100 # unpinned history cap (10–10000); pinned entries are extra
 # A Wayland selection is served by the app that owns it, so it dies when that app exits.
 # With this on, the shell claims it back so the item stays pasteable. Caveat: a password
@@ -42,6 +41,12 @@ shared_gl_context     = true         # startup-only; false isolates GPU contexts
 
 [shell.screenshot]
 close_on_copy = true                # close the annotation editor after Copy or Ctrl+C succeeds
+
+[shell.screen_record]
+# directory         = ""        # empty = ~/Videos/Recordings
+# filename_pattern   = ""        # empty = recording_%Y%m%d_%H%M%S
+# audio              = true     # capture desktop audio when the backend supports it
+# show_cursor        = true      # include the pointer when gpu-screen-recorder is used
 
 [shell.privacy]
 mic_filter_regex = ""                # microphone app names to ignore in privacy indicators and OSD
@@ -61,15 +66,12 @@ transparency_mode     = "solid"     # solid | soft | glass; controls floating-pa
 borders               = true        # panel shell outline and in-panel section cards
 shadow                = true        # cast the global [shell.shadow] from panel surfaces
 launcher_placement       = "floating" # attached | floating
-clipboard_placement      = "floating" # attached | floating
 control_center_placement = "attached" # attached | floating
 wallpaper_placement      = "attached" # attached | floating
 session_placement        = "attached" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
-clipboard_position       = "center"   # auto | center | top_left | … (floating only)
 open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
-open_near_click_clipboard      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_wallpaper      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_session        = false # for attached/floating placement, follow the bar click instead of bar-center
 
@@ -254,6 +256,16 @@ event_time_format           = "%H:%M"       # time format used for events
 show_events_card            = true
 show_week_numbers           = false         # ISO 8601 week numbers in the month grid
 
+[control_center.network]
+wifi_band     = "all"                    # all | 2.4 | 5 | 6
+hidden_ssids  = []                       # SSIDs omitted from the available list
+nextdns_id    = ""                     # optional NextDNS config ID used by the Network tab
+custom_dns    = ""                     # last custom DNS server list (comma-separated)
+
+[control_center.bluetooth]
+hide_unnamed        = false
+discovery_seconds   = 10                # 5-60; how long Rescan keeps discovery running
+
 # ── Weather ───────────────────────────────────────────────────────────────────
 
 [weather]
@@ -262,6 +274,11 @@ refresh_minutes = 30
 unit            = "celsius"         # celsius | fahrenheit
 effects         = true              # visual weather effects
 # Weather uses the coordinates resolved by [location] (see below).
+
+[tailscale]
+refresh_interval_seconds = 10   # 3–120; how often to poll `tailscale status`
+notify_on_peer_change = false    # toast when a peer comes online or goes offline
+# admin_url = ""                  # override the admin console URL (empty = Tailscale admin)
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
@@ -473,6 +490,10 @@ enabled = false
 # type = "notification"
 # [[control_center.shortcuts]]
 # type = "wallpaper"
+# [[control_center.shortcuts]]
+# type = "screenshot"
+# [[control_center.shortcuts]]
+# type = "pick_color"
 # [[control_center.shortcuts]]
 # type = "screen_recorder"
 # [[control_center.shortcuts]]

@@ -1,6 +1,6 @@
 ---
 title: Media & UI
-description: IPC commands for notifications, clipboard, media, wallpaper, theme, and screenshots.
+description: IPC commands for notifications, clipboard, media, wallpaper, theme, screenshots, screen recording, and Tailscale.
 sidebar:
   order: 3
 ---
@@ -54,7 +54,7 @@ Supported JSON fields:
 
 | Action | Command | Description |
 |--------|---------|-------------|
-| Clear clipboard history | <IpcCommand command="clipboard-clear" /> | Clear clipboard history without opening the panel. Pinned entries survive, so with nothing pinned this clears everything. Does not ask for confirmation. The live selection is untouched; pasting still works until something else is copied. |
+| Clear clipboard history | <IpcCommand command="clipboard-clear" /> | Clear clipboard history without opening the Clipboard tab. Pinned entries survive, so with nothing pinned this clears everything. Does not ask for confirmation. The live selection is untouched; pasting still works until something else is copied. |
 | Copy text to clipboard | <IpcCommand command="clipboard-copy <text>" /> | Set the clipboard selection to `<text>`. Everything after the verb is the payload, so spaces and newlines are kept verbatim. Payloads are capped at 64 KiB by the IPC transport. |
 | Print clipboard text | <IpcCommand command="clipboard-text" /> | Print the most recent clipboard text on stdout with no trailing newline. Pinned entries and images are skipped, so this matches what pasting into a Noctalia input would insert. Prints nothing when the history holds no text. |
 
@@ -120,6 +120,9 @@ Requires compositor support for `wlr-screencopy-unstable-v1`. Uses the global `[
 | Fullscreen (specific output) | <IpcCommand command="screenshot-fullscreen DP-2" /> | Capture one output without the picker. Pass the Wayland connector name (e.g. `DP-1`, `HDMI-A-1`) or a word-boundary match in the output description. |
 | Fullscreen (all monitors) | <IpcCommand command="screenshot-fullscreen all" /> | One combined desktop PNG spanning every monitor. |
 | Annotate a frozen screen | <IpcCommand command="screenshot-annotate" /> | Freeze every monitor and open the annotation editor over the frozen image. **Copy** and **Save** deliver the annotated PNG; **`[keybinds].cancel`** closes without delivering. |
+| Pick a screen color | <IpcCommand command="screenshot-pick-color" /> | Freeze every monitor, then click a pixel to copy its `#RRGGBB` value. Hover shows a magnifier, swatch, and hex. **`[keybinds].cancel`** dismisses without copying. |
+| Scan text | <IpcCommand command="screenshot-ocr" /> | Drag a region, then copy OCR text (`tesseract`) to the clipboard. |
+| Scan QR | <IpcCommand command="screenshot-scan-qr" /> | Drag a region, then copy a QR code or barcode (`zbarimg`) to the clipboard. |
 | Annotate the live screen | <IpcCommand command="annotate" /> | Transparent drawing overlay for presentations. Apps keep updating behind the ink; **`F`** freezes the screen under it and reveals Blur, Crop, Copy, and Save. |
 | Annotate an image file | <IpcCommand command="annotate ~/Pictures/shot.png" /> | Open an image from disk in the editor instead of the screen. No screencopy support needed. |
 
@@ -140,3 +143,30 @@ Captured images have an inset **Outline** color-role border to distinguish the c
 The toolbar carries a grab handle on its left edge: drag it to move the bar out of the way. Each output's position is remembered independently for later sessions and clamped to that output. Moving one toolbar does not reposition the others. Every control has a tooltip naming its shortcut. **S**, **M**, and **L** set the current tool's size to half, one, or twice its default weight, and the adjustments button next to them reveals the fine stepper (`-`, the current pixel size, `+`) for anything in between; fine values are kept, not snapped back to the nearest preset.
 
 The live color is the swatch carrying a check mark, and the shape-fill button shows a struck-through paint roller while fill is off. Size and color are per tool, so each remembers its own weight and color. While a text caret is open, changing size or color restyles the text under the caret instead of only the next one, and touching any other control (a tool, undo, freeze, export) commits that text first.
+
+## Screen recording {#screen-recording}
+
+Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatpak `com.dec05eba.gpu_screen_recorder`) and falls back to `wf-recorder`. Settings live under [`[shell.screen_record]`](/noctalia/configuration/shell/#shell-settings). This is independent of the [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder).
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Start recording | <IpcCommand command="screen-record-start" /> | Record the focused monitor. |
+| Start (portal) | <IpcCommand command="screen-record-start portal" /> | Open the desktop portal picker (`gpu-screen-recorder` only). |
+| Start (region) | <IpcCommand command="screen-record-start region" /> | Drag a region, then record it (`wf-recorder` only). |
+| Stop recording | <IpcCommand command="screen-record-stop" /> | Stop and save the current recording. |
+| Toggle recording | <IpcCommand command="screen-record-toggle" /> | Start or stop. Optional source: `focused`, `portal`, or `region`. |
+
+Control Center closes before a recording starts so it is not in the video. Stop sends `SIGINT` so the encoder can finish the file.
+
+## Tailscale {#tailscale}
+
+Built-in Tailscale control uses the local `tailscale` CLI. Settings live under [`[tailscale]`](/noctalia/control-center/#tailscale). The community plugin's bar widget and panel stay independent.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Connect | <IpcCommand command="tailscale-up" /> | Bring this machine online (`tailscale up`). |
+| Disconnect | <IpcCommand command="tailscale-down" /> | Disconnect (`tailscale down`). |
+| Toggle | <IpcCommand command="tailscale-toggle" /> | Connect or disconnect. |
+| Status | <IpcCommand command="tailscale-status" /> | Print `running`, `stopped`, or `not-installed`. |
+
+`tailscale-status` prints `not-installed` when the CLI is missing. When connected it includes hostname, IPv4, and the selected exit node. Connect and disconnect may prompt for an administrator password unless this user is the Tailscale operator (`sudo tailscale set --operator=$USER`).

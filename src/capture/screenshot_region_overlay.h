@@ -2,6 +2,7 @@
 
 #include "capture/screenshot_image.h"
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -32,6 +33,7 @@ namespace capture {
   class ScreenshotRegionOverlay {
   public:
     using CompleteCallback = std::function<void(std::optional<LogicalRect>, wl_output* output, ConfirmAction action)>;
+    using ColorPickCallback = std::function<void(std::optional<std::string> hex)>;
     using FailureCallback = std::function<void(const std::string& message)>;
 
     ScreenshotRegionOverlay();
@@ -39,13 +41,14 @@ namespace capture {
 
     void initialize(WaylandConnection& wayland, RenderContext* renderContext);
     void setCompleteCallback(CompleteCallback callback);
+    void setColorPickCallback(ColorPickCallback callback);
     void setFailureCallback(FailureCallback callback);
     void setConfirmKeybindLabels(std::string copyLabel, std::string saveLabel, std::string cancelLabel);
     void setFrozenScreenshots(std::vector<FrozenScreenshot> screenshots);
     [[nodiscard]] std::vector<FrozenScreenshot> takeFrozenScreenshots();
     void begin(
         bool freezeScreen, bool fullscreenPick = false, bool confirmRegion = false,
-        std::optional<LogicalRect> initialRegion = std::nullopt
+        std::optional<LogicalRect> initialRegion = std::nullopt, bool colorPick = false
     );
     void cancel();
     void cancelSelection();
@@ -76,14 +79,19 @@ namespace capture {
     void completeSelection();
     void confirmPendingSelection(ConfirmAction action = ConfirmAction::None);
     void completeFullscreenPick(wl_output* output);
+    void completeColorPick(std::optional<std::string> hex);
+    void updateColorPickPreview(Instance& instance, double localX, double localY);
+    void hideColorPickPreviews();
     [[nodiscard]] std::optional<LogicalRect> selectionRectIfValid() const;
 
     WaylandConnection* m_wayland = nullptr;
     RenderContext* m_renderContext = nullptr;
     CompleteCallback m_onComplete;
+    ColorPickCallback m_onColorPick;
     FailureCallback m_onFailure;
     std::vector<std::unique_ptr<Instance>> m_instances;
     std::vector<FrozenScreenshot> m_frozenScreenshots;
+    std::vector<std::uint8_t> m_magnifierRgba;
     std::optional<LogicalRect> m_abandonedRegion;
     std::string m_copyKeybindLabel;
     std::string m_saveKeybindLabel;
@@ -91,6 +99,7 @@ namespace capture {
     bool m_active = false;
     bool m_freezeScreen = false;
     bool m_fullscreenPick = false;
+    bool m_colorPick = false;
     bool m_confirmRegion = false;
     bool m_confirming = false;
     bool m_dragging = false;

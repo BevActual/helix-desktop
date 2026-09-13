@@ -62,8 +62,6 @@
 #include "scripting/plugin_panel_shell.h"
 #include "scripting/plugin_registry.h"
 #include "scripting/plugin_runtime_context.h"
-#include "shell/clipboard/clipboard_panel.h"
-#include "shell/clipboard/clipboard_paste.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
@@ -779,6 +777,8 @@ void Application::initIpc() {
     );
   }
   m_screenshotService.registerIpc(m_ipcService, m_configService);
+  m_screenRecorder.registerIpc(m_ipcService);
+  m_tailscaleService.registerIpc(m_ipcService);
   m_windowSwitcher.registerIpc(m_ipcService);
   for (const noctalia::cli::Command& command : noctalia::cli::kMsgCmd.subcommands) {
     if (!m_ipcService.hasHandler(command.name))

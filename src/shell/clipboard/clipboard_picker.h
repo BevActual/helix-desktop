@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/timer_manager.h"
-#include "shell/panel/panel.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +9,7 @@
 #include <string>
 #include <vector>
 
+class AnimationManager;
 class Button;
 class AsyncTextureCache;
 class ClipboardService;
@@ -25,27 +25,39 @@ class ClipboardListAdapter;
 class VirtualGridView;
 struct ClipboardEntry;
 
-class ClipboardPanel : public Panel {
+class ClipboardPicker {
 public:
-  ClipboardPanel(ClipboardService* clipboard, ConfigService* config, AsyncTextureCache* asyncTextures);
-  ~ClipboardPanel() override;
+  struct Options {
+    bool showTitle = true;
+    bool showCloseButton = true;
+    bool closeHostWhenEmpty = true;
+  };
+
+  ClipboardPicker(ClipboardService* clipboard, ConfigService* config, AsyncTextureCache* asyncTextures, Options options);
+  ~ClipboardPicker();
+
+  ClipboardPicker(const ClipboardPicker&) = delete;
+  ClipboardPicker& operator=(const ClipboardPicker&) = delete;
+
   void setActivateCallback(std::function<void(const ClipboardEntry&)> callback);
+  void setCloseCallback(std::function<void()> callback);
 
-  void create() override;
-  void onOpen(std::string_view context) override;
-  void onClose() override;
+  void setContentScale(float scale) noexcept { m_contentScale = scale; }
+  void setPanelCardOpacity(float opacity);
+  void setAnimationManager(AnimationManager* mgr) noexcept { m_animations = mgr; }
 
-  [[nodiscard]] float preferredWidth() const override { return scaled(720.0F); }
-  [[nodiscard]] float preferredHeight() const override { return scaled(560.0F); }
-  [[nodiscard]] LayerShellKeyboard keyboardMode() const override { return LayerShellKeyboard::Exclusive; }
-  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
-  [[nodiscard]] InputArea* initialFocusArea() const override;
-  [[nodiscard]] PanelPlacement panelPlacement() const noexcept override;
+  [[nodiscard]] std::unique_ptr<Flex> create();
+  void onOpen(std::string_view context);
+  void onClose();
+  void layout(Renderer& renderer, float width, float height);
+  void update(Renderer& renderer);
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit);
+  [[nodiscard]] InputArea* initialFocusArea() const;
 
 private:
-  void doLayout(Renderer& renderer, float width, float height) override;
-  void doUpdate(Renderer& renderer) override;
-  void onPanelCardOpacityChanged(float opacity) override;
+  [[nodiscard]] float contentScale() const noexcept { return m_contentScale; }
+  [[nodiscard]] float panelCardOpacity() const noexcept { return m_panelCardOpacity; }
+  void requestHostClose();
   void schedulePreviewPayloadRefresh(bool debounced);
   void updateListState();
   void updatePreviewActions();
@@ -71,10 +83,15 @@ private:
   void onFilterChanged(const std::string& text);
   [[nodiscard]] std::size_t selectedHistoryIndex() const;
 
+  Options m_options;
   ClipboardService* m_clipboard = nullptr;
   std::function<void(const ClipboardEntry&)> m_activateCallback;
+  std::function<void()> m_closeCallback;
   ConfigService* m_config = nullptr;
   AsyncTextureCache* m_asyncTextures = nullptr;
+  AnimationManager* m_animations = nullptr;
+  float m_contentScale = 1.0F;
+  float m_panelCardOpacity = 1.0F;
 
   InputArea* m_focusArea = nullptr;
   Flex* m_rootLayout = nullptr;

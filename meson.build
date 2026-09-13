@@ -187,6 +187,17 @@ mcu_dep = declare_dependency(
   include_directories: include_directories('third_party/material_color_utilities', is_system: true),
 )
 
+_qrcodegen_lib = static_library('qrcodegen',
+  files('third_party/qrcodegen/qrcodegen.cpp'),
+  include_directories: include_directories('third_party/qrcodegen', is_system: true),
+  cpp_args: ['-w'],
+  override_options: ['warning_level=0'],
+)
+qrcodegen_dep = declare_dependency(
+  link_whole: _qrcodegen_lib,
+  include_directories: include_directories('third_party/qrcodegen', is_system: true),
+)
+
 # ── System: stb_image_resize2 and stb_image_write (header-only) ─────────────────────────────────
 if not cc.has_header('stb/stb_image_resize2.h')
   error('stb/stb_image_resize2.h not found')
@@ -521,6 +532,7 @@ _noctalia_sources = files(
   'src/net/http_client.cpp',
   'src/net/uri.cpp',
   'src/net/url_open.cpp',
+  'src/net/tailscale_service.cpp',
   'src/notification/notification_manager.cpp',
   'src/notification/notification_filter.cpp',
   'src/notification/notification_display_name.cpp',
@@ -636,8 +648,9 @@ _noctalia_sources = files(
   'src/shell/desktop/widgets/desktop_volume_widget.cpp',
   'src/shell/desktop/widgets/plugin_desktop_widget.cpp',
   'src/shell/desktop/widgets/desktop_weather_widget.cpp',
-  'src/shell/clipboard/clipboard_panel.cpp',
+  'src/shell/clipboard/clipboard_picker.cpp',
   'src/shell/control_center/tabs/calendar_tab.cpp',
+  'src/shell/control_center/tabs/clipboard_tab.cpp',
   'src/shell/control_center/tabs/audio_tab.cpp',
   'src/shell/control_center/tabs/bluetooth_tab.cpp',
   'src/shell/control_center/control_center_panel.cpp',
@@ -647,6 +660,8 @@ _noctalia_sources = files(
   'src/shell/control_center/tabs/notifications_tab.cpp',
   'src/shell/control_center/tabs/power_tab.cpp',
   'src/shell/control_center/tabs/screen_time_tab.cpp',
+  'src/shell/control_center/tabs/screenshot_tab.cpp',
+  'src/shell/control_center/tabs/screen_record_tab.cpp',
   'src/shell/control_center/settings_pane.cpp',
   'src/shell/control_center/tabs/settings_tab.cpp',
   'src/shell/control_center/tabs/home_tab.cpp',
@@ -654,6 +669,7 @@ _noctalia_sources = files(
   'src/shell/control_center/plugin_shortcut.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
   'src/shell/control_center/tabs/system_tab.cpp',
+  'src/shell/control_center/tabs/tailscale_tab.cpp',
   'src/shell/control_center/tabs/wallpaper_tab.cpp',
   'src/shell/control_center/tab.cpp',
   'src/shell/control_center/tabs/weather_tab.cpp',
@@ -846,6 +862,7 @@ _noctalia_sources = files(
   'src/capture/screenshot_capture.cpp',
   'src/capture/screenshot_image.cpp',
   'src/capture/screenshot_service.cpp',
+  'src/capture/screen_recorder_service.cpp',
   'src/capture/screenshot_region_overlay.cpp',
   'src/capture/annotation_document.cpp',
   'src/capture/annotation_raster.cpp',
@@ -920,6 +937,7 @@ _noctalia_sources = files(
   'src/util/checksum.cpp',
   'src/util/clamp.cpp',
   'src/util/fuzzy_match.cpp',
+  'src/util/qr_code.cpp',
   'src/wayland/clipboard_service.cpp',
   'src/wayland/text_input_service.cpp',
   'src/wayland/virtual_keyboard_service.cpp',
@@ -1084,6 +1102,7 @@ _noctalia_dependencies = _noctalia_system_dependencies + [
   fzy_dep,
   mcu_dep,
   luau_dep,
+  qrcodegen_dep,
 ]
 
 _noctalia_test_dependencies = _noctalia_system_dependencies + [

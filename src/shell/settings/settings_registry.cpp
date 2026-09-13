@@ -86,7 +86,7 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 22> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 26> kSettingsSections{{
         {SettingsSection::Appearance, "appearance", "adjustments-horizontal"},
         {SettingsSection::Wallpaper, "wallpaper", "paint"},
         {SettingsSection::Templates, "templates", "color-swatch"},
@@ -98,11 +98,15 @@ namespace settings {
         {SettingsSection::Notifications, "notifications", "bell"},
         {SettingsSection::Osd, "osd", "message-circle"},
         {SettingsSection::Screenshot, "screenshot", "screenshot"},
+        {SettingsSection::ScreenRecord, "screen-record", "video"},
         {SettingsSection::Shell, "shell", "app-window"},
         {SettingsSection::Keybinds, "keybinds", "keyboard"},
         {SettingsSection::Security, "security", "shield-lock"},
         {SettingsSection::System, "system", "activity-heartbeat"},
         {SettingsSection::Services, "services", "stack-2"},
+        {SettingsSection::Network, "network", "wifi"},
+        {SettingsSection::Bluetooth, "bluetooth", "bluetooth"},
+        {SettingsSection::Tailscale, "tailscale", "circles"},
         {SettingsSection::Location, "location", "map-pin"},
         {SettingsSection::Power, "power", "bolt"},
         {SettingsSection::Hooks, "hooks", "link"},
@@ -1573,22 +1577,6 @@ namespace settings {
       ));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Panels, "clipboard", tr("settings.schema.panels.placement-clipboard.label"),
-        tr("settings.schema.panels.placement-clipboard.description"), {"shell", "panel", "clipboard_placement"},
-        asSegmented(enumSelect(kPanelPlacements, cfg.shell.panel.clipboardPlacement)),
-        "attached floating bar panel position"
-    ));
-    entries.push_back(panelPositionEntry(
-        SettingsSection::Panels, "clipboard", "clipboard", "settings.schema.panels.position-clipboard.label",
-        "settings.schema.panels.position-clipboard.description", cfg.shell.panel.clipboardPosition,
-        &ShellConfig::PanelConfig::clipboardPlacement
-    ));
-    entries.push_back(panelBarAlignmentEntry(
-        SettingsSection::Panels, "clipboard", "clipboard", "settings.schema.panels.open-near-click-clipboard.label",
-        "settings.schema.panels.open-near-click-clipboard.description", cfg.shell.panel.openNearClickClipboard,
-        &ShellConfig::PanelConfig::clipboardPlacement, &ShellConfig::PanelConfig::clipboardPosition
-    ));
-    entries.push_back(makeEntry(
         SettingsSection::Panels, "polkit", tr("settings.schema.panels.placement-polkit.label"),
         tr("settings.schema.panels.placement-polkit.description"), {"shell", "panel", "polkit_placement"},
         asSegmented(enumSelect(kPanelPlacements, cfg.shell.panel.polkitPlacement)),
@@ -1682,7 +1670,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg), .maxItems = 6
         },
-        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard"
+        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
@@ -2185,6 +2173,45 @@ namespace settings {
           "screenshot capture run pipe command stdin png"
       );
       e.visibleWhen = [](const Config& c) { return c.shell.screenshot.pipeToCommand; };
+      entries.push_back(std::move(e));
+    }
+    entries.push_back(makeEntry(
+        SettingsSection::ScreenRecord, "screen-record", tr("settings.schema.shell.screen-record-audio.label"),
+        tr("settings.schema.shell.screen-record-audio.description"), {"shell", "screen_record", "audio"},
+        ToggleSetting{cfg.shell.screenRecord.audio}, "screen record recording audio microphone speakers"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ScreenRecord, "screen-record", tr("settings.schema.shell.screen-record-show-cursor.label"),
+        tr("settings.schema.shell.screen-record-show-cursor.description"), {"shell", "screen_record", "show_cursor"},
+        ToggleSetting{cfg.shell.screenRecord.showCursor}, "screen record recording cursor pointer mouse"
+    ));
+    {
+      auto e = makeEntry(
+          SettingsSection::ScreenRecord, "screen-record", tr("settings.schema.shell.screen-record-directory.label"),
+          tr("settings.schema.shell.screen-record-directory.description"), {"shell", "screen_record", "directory"},
+          TextSetting{
+              .value = cfg.shell.screenRecord.directory,
+              .placeholder = tr("settings.schema.shell.screen-record-directory.placeholder"),
+              .browseMode = TextSettingBrowseMode::SelectFolder,
+              .browseFileExtensions = {}
+          },
+          "screen record recording directory folder save location videos"
+      );
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
+          SettingsSection::ScreenRecord, "screen-record",
+          tr("settings.schema.shell.screen-record-filename-pattern.label"),
+          tr("settings.schema.shell.screen-record-filename-pattern.description"),
+          {"shell", "screen_record", "filename_pattern"},
+          TextSetting{
+              .value = cfg.shell.screenRecord.filenamePattern,
+              .placeholder = "recording_%Y%m%d_%H%M%S",
+              .browseFileExtensions = {}
+          },
+          "screen record recording filename pattern strftime", true
+      );
       entries.push_back(std::move(e));
     }
     entries.push_back(makeEntry(
@@ -2968,6 +2995,68 @@ namespace settings {
         SettingsSection::Services, "media", tr("settings.schema.services.mpris-blacklist.label"),
         tr("settings.schema.services.mpris-blacklist.description"), {"shell", "mpris", "blacklist"},
         ListSetting{.items = cfg.shell.mpris.blacklist}, "mpris media player dbus session blacklist"
+    ));
+
+    entries.push_back(makeEntry(
+        SettingsSection::Network, "wifi", tr("settings.schema.network.wifi-band.label"),
+        tr("settings.schema.network.wifi-band.description"), {"control_center", "network", "wifi_band"},
+        asSegmented(enumSelect(kWifiBandFilters, cfg.controlCenter.networkTab.wifiBand)),
+        "wifi band 2.4 5 6 ghz filter scan"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Network, "wifi", tr("settings.schema.network.hidden-ssids.label"),
+        tr("settings.schema.network.hidden-ssids.description"), {"control_center", "network", "hidden_ssids"},
+        ListSetting{.items = cfg.controlCenter.networkTab.hiddenSsids}, "wifi ssid ignore hide blocklist"
+    ));
+
+    entries.push_back(makeEntry(
+        SettingsSection::Bluetooth, "devices", tr("settings.schema.bluetooth.hide-unnamed.label"),
+        tr("settings.schema.bluetooth.hide-unnamed.description"), {"control_center", "bluetooth", "hide_unnamed"},
+        ToggleSetting{cfg.controlCenter.bluetoothTab.hideUnnamed}, "bluetooth unnamed unknown devices hide"
+    ));
+    {
+      auto e = makeEntry(
+          SettingsSection::Bluetooth, "discovery", tr("settings.schema.bluetooth.discovery-seconds.label"),
+          tr("settings.schema.bluetooth.discovery-seconds.description"),
+          {"control_center", "bluetooth", "discovery_seconds"},
+          StepperSetting{
+              .value = static_cast<int>(cfg.controlCenter.bluetoothTab.discoverySeconds),
+              .minValue = static_cast<int>(noctalia::config::schema::kBluetoothDiscoverySecondsRange.min.value()),
+              .maxValue = static_cast<int>(noctalia::config::schema::kBluetoothDiscoverySecondsRange.max.value()),
+              .step = static_cast<int>(noctalia::config::schema::kBluetoothDiscoverySecondsRange.step.value()),
+              .valueSuffix = "s",
+          },
+          "bluetooth scan discovery timeout seconds"
+      );
+      entries.push_back(std::move(e));
+    }
+
+    entries.push_back(makeEntry(
+        SettingsSection::Tailscale, "general", tr("settings.schema.tailscale.refresh-interval.label"),
+        tr("settings.schema.tailscale.refresh-interval.description"), {"tailscale", "refresh_interval_seconds"},
+        StepperSetting{
+            .value = static_cast<int>(cfg.tailscale.refreshIntervalSeconds),
+            .minValue = static_cast<int>(noctalia::config::schema::kTailscaleRefreshSecondsRange.min.value()),
+            .maxValue = static_cast<int>(noctalia::config::schema::kTailscaleRefreshSecondsRange.max.value()),
+            .step = static_cast<int>(noctalia::config::schema::kTailscaleRefreshSecondsRange.step.value()),
+            .valueSuffix = "s",
+        },
+        "tailscale status poll refresh interval seconds"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Tailscale, "general", tr("settings.schema.tailscale.notify-on-peer-change.label"),
+        tr("settings.schema.tailscale.notify-on-peer-change.description"), {"tailscale", "notify_on_peer_change"},
+        ToggleSetting{cfg.tailscale.notifyOnPeerChange}, "tailscale peer online offline notification toast"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Tailscale, "general", tr("settings.schema.tailscale.admin-url.label"),
+        tr("settings.schema.tailscale.admin-url.description"), {"tailscale", "admin_url"},
+        TextSetting{
+            .value = cfg.tailscale.adminUrl,
+            .placeholder = tr("settings.schema.tailscale.admin-url.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "tailscale admin console url login"
     ));
 
     // Power

@@ -13,6 +13,7 @@ class Flex;
 class Glyph;
 class Graph;
 class Label;
+class ClipboardService;
 class SystemMonitorService;
 struct ControlCenterServices;
 
@@ -38,9 +39,12 @@ private:
   void updateGraphs(Renderer& renderer);
   void syncLabels();
   void updateGpuVisibility();
+  void copySystemInfo();
+  [[nodiscard]] std::string systemInfoText() const;
   [[nodiscard]] float scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const;
 
   SystemMonitorService* m_monitor;
+  ClipboardService* m_clipboard = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
   bool m_statsRetained = false;

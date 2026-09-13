@@ -3025,9 +3025,6 @@
           "description": "스크린샷에 마우스 포인터 포함",
           "label": "커서 표시"
         },
-        "settings-window-translucent": {
-          "label": "투명 배경 설정"
-        },
         "show-location": {
           "description": "날씨 위젯에 위치 이름 표시",
           "label": "위치 표시"

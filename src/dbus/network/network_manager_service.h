@@ -77,6 +77,10 @@ public:
   // Whether any saved connection matches the SSID (uses cached snapshot refreshed on every refresh()).
   [[nodiscard]] bool hasSavedConnection(const std::string& ssid) const override;
   [[nodiscard]] bool supportsSecretAgent() const noexcept override { return true; }
+  void requestActiveWifiPsk(WifiPskCallback callback) override;
+  [[nodiscard]] bool supportsDnsOverride() const noexcept override { return true; }
+  void requestActiveDnsOverride(DnsOverrideQueryCallback callback) override;
+  void setDnsOverride(const DnsOverride& override, DnsOverrideCallback onComplete = {}) override;
 
 private:
   void refreshAccessPoints(std::function<void()> onComplete);

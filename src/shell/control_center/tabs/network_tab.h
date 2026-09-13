@@ -1,10 +1,14 @@
 #pragma once
 
 #include "core/timer_manager.h"
+#include "dbus/network/dns_override.h"
 #include "dbus/network/enterprise_credentials.h"
 #include "dbus/network/network_secret_agent.h"
 #include "dbus/network/network_types.h"
+#include "net/http_client.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
+#include "util/qr_code.h"
 
 #include <chrono>
 #include <cstdint>
@@ -17,28 +21,36 @@
 class AccessPointRow;
 class Button;
 class CellularRow;
+class ClipboardService;
+class ConfigService;
 class ExternalIpService;
 class Flex;
+class HttpClient;
+class Image;
 class Input;
 class Label;
 class ModemManagerService;
 class ScrollView;
+class Segmented;
 class Select;
 class Spinner;
+class SystemMonitorService;
 class Toggle;
 class INetworkService;
+struct ControlCenterServices;
 
 class NetworkTab : public Tab {
 public:
-  NetworkTab(
-      INetworkService* network, NetworkSecretAgent* secrets, ExternalIpService* externalIp, ModemManagerService* modem
-  );
+  explicit NetworkTab(const ControlCenterServices& services);
   ~NetworkTab() override;
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void setActive(bool active) override;
   void onClose() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -50,12 +62,8 @@ private:
   void requestWirelessEnabled(bool enabled);
   void handleWirelessEnabledCompletion(std::uint64_t generation, bool success);
   void rebuildApList(Renderer& renderer);
-  // Pushes live signal values into the existing rows. Returns true if any changed.
   bool syncApRows();
-  // Same for the cellular rows and the cellular toggle. Returns true if any changed.
   bool syncCellularCard();
-  // GNOME-style mobile-data semantics when the network backend owns a saved gsm
-  // connection (toggle reflects cellularActive); otherwise raw modem power.
   [[nodiscard]] bool cellularToggleChecked() const;
   [[nodiscard]] bool cellularToggleDisplayChecked() const;
   void requestCellularEnabled(bool enabled);
@@ -65,33 +73,63 @@ private:
   void submitPasswordPrompt(const std::string& value);
   void cancelPasswordPrompt();
   void clearPasswordPrompt();
-  // Reads the enterprise form back out. Password comes from the shared field.
   [[nodiscard]] network_enterprise::EnterpriseCredentials
   collectEnterpriseCredentials(const std::string& password) const;
-  // Shows a message inside the credential card; empty hides the row. The prompt
-  // stays open so the user can correct what is wrong.
   void setCredentialError(const std::string& message);
-  // Reason this access point cannot be joined with a password, empty when it can.
   [[nodiscard]] std::string enterpriseBlockReason(const AccessPointInfo& ap) const;
   [[nodiscard]] std::string
   structureKey(const std::vector<AccessPointInfo>& aps, const std::vector<VpnConnectionInfo>& vpns) const;
+  void applyAccessPointFilters(std::vector<AccessPointInfo>& aps) const;
+  void startPing();
+  void startSpeedTest();
+  void cancelSpeedTest();
+  void copyIpv4();
+  void shareWifi();
+  void hideWifiQr();
+  void applyWifiShare(const std::string& payload, const std::string& hint);
+  void uploadQr(Renderer& renderer);
+  void refreshDnsOverride();
+  void applySelectedDnsProfile();
+  void applyDnsOverride(const DnsOverride& override);
+  void syncDnsPicker();
+  void persistDnsFields();
 
   INetworkService* m_network = nullptr;
   NetworkSecretAgent* m_secrets = nullptr;
   ExternalIpService* m_externalIpService = nullptr;
   ModemManagerService* m_modem = nullptr;
+  ConfigService* m_config = nullptr;
+  HttpClient* m_http = nullptr;
+  SystemMonitorService* m_sysmon = nullptr;
+  ClipboardService* m_clipboard = nullptr;
+  std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
   Flex* m_currentCard = nullptr;
   Label* m_currentTitle = nullptr;
   Label* m_currentDetail = nullptr;
+  Label* m_throughputLabel = nullptr;
+  Label* m_dnsLabel = nullptr;
+  Segmented* m_dnsProfilePicker = nullptr;
+  Flex* m_dnsNextDnsRow = nullptr;
+  Flex* m_dnsCustomRow = nullptr;
+  Input* m_dnsNextDnsInput = nullptr;
+  Input* m_dnsCustomInput = nullptr;
+  Button* m_dnsApplyButton = nullptr;
+  Label* m_toolsStatus = nullptr;
+  Button* m_pingButton = nullptr;
+  Button* m_speedButton = nullptr;
+  Button* m_copyIpButton = nullptr;
+  Button* m_shareButton = nullptr;
+  Flex* m_qrBlock = nullptr;
+  Image* m_qrImage = nullptr;
+  Button* m_qrCloseButton = nullptr;
+  Label* m_qrHint = nullptr;
   Flex* m_passwordCard = nullptr;
   Label* m_passwordTitle = nullptr;
   Input* m_passwordInput = nullptr;
   Button* m_passwordRevealButton = nullptr;
   bool m_passwordRevealed = false;
-  // 802.1X form. Hidden for pre-shared-key networks, which keep the single
-  // password field below it.
   Flex* m_enterpriseFields = nullptr;
   Select* m_eapSelect = nullptr;
   Select* m_phase2Select = nullptr;
@@ -100,7 +138,8 @@ private:
   Input* m_caCertInput = nullptr;
   Input* m_domainMatchInput = nullptr;
   Label* m_credentialError = nullptr;
-  ScrollView* m_listScroll = nullptr;
+  ScrollView* m_liveScroll = nullptr;
+  ScrollViewState m_liveScrollState{};
   Flex* m_list = nullptr;
 
   Button* m_rescanButton = nullptr;
@@ -124,8 +163,6 @@ private:
   std::optional<AccessPointInfo> m_pendingAccessPoint;
   bool m_active = false;
 
-  // Connect/disconnect stays disabled from click until the state flips (or a
-  // timeout), so a click on stale state cannot fire the inverse action.
   bool m_actionPending = false;
   bool m_actionPendingConnected = false;
   std::chrono::steady_clock::time_point m_actionPendingSince;
@@ -136,15 +173,29 @@ private:
   bool m_wifiToggleTargetObserved = false;
   std::uint64_t m_wifiToggleRequestGeneration = 0;
 
-  // A cellular request is only observable once ModemManager and NM have walked
-  // the modem through enable/registration, so the switch shows the requested
-  // position until then. It stays clickable: a second click just retargets.
   bool m_cellularTogglePending = false;
   bool m_cellularToggleTarget = false;
   std::chrono::steady_clock::time_point m_cellularTogglePendingSince;
 
   Timer m_actionPendingTimer;
   Timer m_cellularTogglePendingTimer;
+  bool m_pingRunning = false;
+  std::uint64_t m_pingGeneration = 0;
+  std::uint64_t m_speedGeneration = 0;
+  std::uint64_t m_shareGeneration = 0;
+  bool m_shareRunning = false;
+  HttpClient::StreamId m_speedStream = 0;
+  std::size_t m_speedBytes = 0;
+  std::chrono::steady_clock::time_point m_speedStarted;
+  bool m_speedRunning = false;
+  qr_code::Bitmap m_qrBitmap;
+  bool m_qrDirty = false;
+  bool m_qrVisible = false;
+  DnsProfile m_dnsProfile = DnsProfile::Automatic;
+  bool m_dnsSyncing = false;
+  bool m_dnsRunning = false;
+  std::uint64_t m_dnsGeneration = 0;
+  std::string m_dnsConnectionKey;
 
   static constexpr std::chrono::seconds kActionPendingTimeout = std::chrono::seconds(6);
   static constexpr std::chrono::seconds kCellularPendingTimeout = std::chrono::seconds(25);

@@ -1,17 +1,25 @@
 #include "dbus/network/network_manager_service.h"
 
 #include "core/log.h"
+#include "dbus/network/dns_override.h"
 #include "dbus/network/network_manager_security.h"
 #include "dbus/system_bus.h"
 #include "system/rfkill_helper.h"
 
 #include <algorithm>
 #include <array>
+#include <arpa/inet.h>
 #include <cstdio>
+#include <cstring>
 #include <map>
+#include <memory>
+#include <netinet/in.h>
+#include <optional>
 #include <sdbus-c++/IProxy.h>
 #include <sdbus-c++/Types.h>
 #include <set>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -78,6 +86,141 @@ namespace {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%u.%u.%u.%u", bytes[0], bytes[1], bytes[2], bytes[3]);
     return std::string(buf);
+  }
+
+  std::uint32_t ipv4ToUint(std::string_view host) {
+    in_addr addr{};
+    const std::string text(host);
+    if (inet_pton(AF_INET, text.c_str(), &addr) != 1) {
+      return 0;
+    }
+    return addr.s_addr;
+  }
+
+  std::vector<std::uint8_t> ipv6ToBytes(std::string_view host) {
+    in6_addr addr{};
+    const std::string text(host);
+    if (inet_pton(AF_INET6, text.c_str(), &addr) != 1) {
+      return {};
+    }
+    return {addr.s6_addr, addr.s6_addr + 16};
+  }
+
+  std::string ipv6FromBytes(const std::vector<std::uint8_t>& bytes) {
+    if (bytes.size() != 16) {
+      return {};
+    }
+    in6_addr addr{};
+    std::memcpy(addr.s6_addr, bytes.data(), 16);
+    char buf[INET6_ADDRSTRLEN]{};
+    if (inet_ntop(AF_INET6, &addr, buf, sizeof(buf)) == nullptr) {
+      return {};
+    }
+    return buf;
+  }
+
+  bool variantBool(const VariantMap& setting, std::string_view key, bool fallback) {
+    const auto it = setting.find(std::string(key));
+    if (it == setting.end()) {
+      return fallback;
+    }
+    try {
+      return it->second.get<bool>();
+    } catch (const sdbus::Error&) {
+      return fallback;
+    }
+  }
+
+  std::vector<std::string> dnsDataFromSetting(const VariantMap& setting, bool ipv6) {
+    if (auto it = setting.find("dns-data"); it != setting.end()) {
+      try {
+        return it->second.get<std::vector<std::string>>();
+      } catch (const sdbus::Error&) {
+      }
+    }
+    std::vector<std::string> out;
+    if (auto it = setting.find("dns"); it != setting.end()) {
+      if (!ipv6) {
+        try {
+          for (const auto addr : it->second.get<std::vector<std::uint32_t>>()) {
+            std::string text = ipv4FromUint(addr);
+            if (!text.empty()) {
+              out.push_back(std::move(text));
+            }
+          }
+        } catch (const sdbus::Error&) {
+        }
+      } else {
+        try {
+          for (const auto& bytes : it->second.get<std::vector<std::vector<std::uint8_t>>>()) {
+            std::string text = ipv6FromBytes(bytes);
+            if (!text.empty()) {
+              out.push_back(std::move(text));
+            }
+          }
+        } catch (const sdbus::Error&) {
+        }
+      }
+    }
+    return out;
+  }
+
+  DnsOverride dnsOverrideFromSettings(const ConnectionSettings& cfg) {
+    std::vector<std::string> servers;
+    bool ignoreAutoDns = false;
+    if (auto ipv4 = cfg.find("ipv4"); ipv4 != cfg.end()) {
+      ignoreAutoDns = variantBool(ipv4->second, "ignore-auto-dns", false);
+      auto v4 = dnsDataFromSetting(ipv4->second, false);
+      servers.insert(servers.end(), v4.begin(), v4.end());
+    }
+    if (auto ipv6 = cfg.find("ipv6"); ipv6 != cfg.end()) {
+      ignoreAutoDns = ignoreAutoDns || variantBool(ipv6->second, "ignore-auto-dns", false);
+      auto v6 = dnsDataFromSetting(ipv6->second, true);
+      servers.insert(servers.end(), v6.begin(), v6.end());
+    }
+    return dns_override::classify(ignoreAutoDns, servers);
+  }
+
+  ConnectionSettings dnsSettingsFromOverride(const DnsOverride& override) {
+    ConnectionSettings settings;
+    auto& ipv4 = settings["ipv4"];
+    auto& ipv6 = settings["ipv6"];
+    std::vector<std::string> servers = override.servers;
+    if (override.profile != DnsProfile::Custom && override.profile != DnsProfile::Automatic) {
+      servers = dns_override::serversFor(override.profile, override.nextDnsId);
+    }
+    const bool automatic = override.profile == DnsProfile::Automatic;
+    ipv4["ignore-auto-dns"] = sdbus::Variant{!automatic};
+    ipv6["ignore-auto-dns"] = sdbus::Variant{!automatic};
+    std::vector<std::uint32_t> v4Dns;
+    std::vector<std::string> v4Data;
+    std::vector<std::vector<std::uint8_t>> v6Dns;
+    std::vector<std::string> v6Data;
+    if (!automatic) {
+      for (const auto& server : servers) {
+        auto parsed = dns_override::parseServer(server);
+        if (!parsed.has_value()) {
+          continue;
+        }
+        const std::string formatted = dns_override::formatServer(*parsed);
+        if (parsed->ipv6) {
+          v6Data.push_back(formatted);
+          if (auto bytes = ipv6ToBytes(parsed->host); !bytes.empty()) {
+            v6Dns.push_back(std::move(bytes));
+          }
+        } else {
+          v4Data.push_back(formatted);
+          if (const auto addr = ipv4ToUint(parsed->host); addr != 0U) {
+            v4Dns.push_back(addr);
+          }
+        }
+      }
+    }
+    ipv4["dns"] = sdbus::Variant{v4Dns};
+    ipv4["dns-data"] = sdbus::Variant{v4Data};
+    ipv6["dns"] = sdbus::Variant{v6Dns};
+    ipv6["dns-data"] = sdbus::Variant{v6Data};
+    return settings;
   }
 
   // Tracks in-flight async refresh operations so we only emit state changes after all complete.
@@ -1214,6 +1357,297 @@ bool NetworkManagerService::hasSavedConnection(const std::string& ssid) const {
   return std::ranges::contains(m_savedSsids, ssid);
 }
 
+void NetworkManagerService::requestActiveWifiPsk(WifiPskCallback callback) {
+  if (!callback) {
+    return;
+  }
+
+  auto finish = std::make_shared<WifiPskCallback>(std::move(callback));
+  auto done = [finish](std::optional<std::string> psk) {
+    if (*finish) {
+      (*finish)(std::move(psk));
+      *finish = nullptr;
+    }
+  };
+
+  if (!m_state.connected || m_state.kind != NetworkConnectivity::Wireless || m_activeConnectionPath.empty()
+      || m_activeConnectionPath == "/") {
+    done(std::nullopt);
+    return;
+  }
+
+  const std::weak_ptr<int> lifetimeToken = m_lifetimeToken;
+  try {
+    auto active = std::shared_ptr<sdbus::IProxy>(
+        sdbus::createProxy(m_bus.connection(), kNmBusName, sdbus::ObjectPath{m_activeConnectionPath})
+    );
+    active->callMethodAsync("Get")
+        .onInterface(kPropertiesInterface)
+        .withArguments(kNmActiveConnectionInterface, "Connection")
+        .uponReplyInvoke([this, lifetimeToken, done, active](
+                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
+                         ) {
+          if (lifetimeToken.expired()) {
+            return;
+          }
+          if (err.has_value()) {
+            kLog.debug("active wifi psk: Connection property failed: {}", err->what());
+            done(std::nullopt);
+            return;
+          }
+
+          sdbus::ObjectPath profilePath;
+          try {
+            profilePath = connectionValue.get<sdbus::ObjectPath>();
+          } catch (const sdbus::Error&) {
+            done(std::nullopt);
+            return;
+          }
+          if (profilePath.empty() || profilePath == "/") {
+            done(std::nullopt);
+            return;
+          }
+
+          try {
+            auto profile =
+                std::shared_ptr<sdbus::IProxy>(sdbus::createProxy(m_bus.connection(), kNmBusName, profilePath));
+            profile->callMethodAsync("GetSecrets")
+                .onInterface(kNmSettingsConnectionInterface)
+                .withArguments("802-11-wireless-security")
+                .uponReplyInvoke([lifetimeToken, done, profile](
+                                     std::optional<sdbus::Error> secretsErr, ConnectionSettings secrets
+                                 ) {
+                  if (lifetimeToken.expired()) {
+                    return;
+                  }
+                  if (secretsErr.has_value()) {
+                    kLog.debug("active wifi psk: GetSecrets failed: {}", secretsErr->what());
+                    done(std::nullopt);
+                    return;
+                  }
+
+                  std::optional<std::string> psk;
+                  if (auto setting = secrets.find("802-11-wireless-security"); setting != secrets.end()) {
+                    auto keyIt = setting->second.find("psk");
+                    if (keyIt == setting->second.end()) {
+                      keyIt = setting->second.find("wep-key0");
+                    }
+                    if (keyIt != setting->second.end()) {
+                      try {
+                        auto value = keyIt->second.get<std::string>();
+                        if (!value.empty()) {
+                          psk = std::move(value);
+                        }
+                      } catch (const sdbus::Error&) {
+                      }
+                    }
+                  }
+                  done(std::move(psk));
+                });
+          } catch (const sdbus::Error& e) {
+            kLog.debug("active wifi psk: profile proxy failed: {}", e.what());
+            done(std::nullopt);
+          }
+        });
+  } catch (const sdbus::Error& e) {
+    kLog.debug("active wifi psk: active proxy failed: {}", e.what());
+    done(std::nullopt);
+  }
+}
+
+void NetworkManagerService::requestActiveDnsOverride(DnsOverrideQueryCallback callback) {
+  if (!callback) {
+    return;
+  }
+  auto finish = std::make_shared<DnsOverrideQueryCallback>(std::move(callback));
+  auto done = [finish](DnsOverride override) {
+    if (*finish) {
+      (*finish)(std::move(override));
+      *finish = nullptr;
+    }
+  };
+
+  if (!m_state.connected || m_activeConnectionPath.empty() || m_activeConnectionPath == "/") {
+    done(DnsOverride{});
+    return;
+  }
+
+  const std::weak_ptr<int> lifetimeToken = m_lifetimeToken;
+  try {
+    auto active = std::shared_ptr<sdbus::IProxy>(
+        sdbus::createProxy(m_bus.connection(), kNmBusName, sdbus::ObjectPath{m_activeConnectionPath})
+    );
+    active->callMethodAsync("Get")
+        .onInterface(kPropertiesInterface)
+        .withArguments(kNmActiveConnectionInterface, "Connection")
+        .uponReplyInvoke([this, lifetimeToken, done, active](
+                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
+                         ) {
+          if (lifetimeToken.expired()) {
+            return;
+          }
+          if (err.has_value()) {
+            kLog.debug("dns override: Connection property failed: {}", err->what());
+            done(DnsOverride{});
+            return;
+          }
+          sdbus::ObjectPath profilePath;
+          try {
+            profilePath = connectionValue.get<sdbus::ObjectPath>();
+          } catch (const sdbus::Error&) {
+            done(DnsOverride{});
+            return;
+          }
+          if (profilePath.empty() || profilePath == "/") {
+            done(DnsOverride{});
+            return;
+          }
+          try {
+            auto profile =
+                std::shared_ptr<sdbus::IProxy>(sdbus::createProxy(m_bus.connection(), kNmBusName, profilePath));
+            profile->callMethodAsync("GetSettings")
+                .onInterface(kNmSettingsConnectionInterface)
+                .uponReplyInvoke([lifetimeToken, done, profile](
+                                     std::optional<sdbus::Error> settingsErr, ConnectionSettings cfg
+                                 ) {
+                  if (lifetimeToken.expired()) {
+                    return;
+                  }
+                  if (settingsErr.has_value()) {
+                    kLog.debug("dns override: GetSettings failed: {}", settingsErr->what());
+                    done(DnsOverride{});
+                    return;
+                  }
+                  done(dnsOverrideFromSettings(cfg));
+                });
+          } catch (const sdbus::Error& e) {
+            kLog.debug("dns override: profile proxy failed: {}", e.what());
+            done(DnsOverride{});
+          }
+        });
+  } catch (const sdbus::Error& e) {
+    kLog.debug("dns override: active proxy failed: {}", e.what());
+    done(DnsOverride{});
+  }
+}
+
+void NetworkManagerService::setDnsOverride(const DnsOverride& override, DnsOverrideCallback onComplete) {
+  auto finish = std::make_shared<DnsOverrideCallback>(std::move(onComplete));
+  auto done = [finish](bool ok, std::string message) {
+    if (*finish) {
+      (*finish)(ok, std::move(message));
+      *finish = nullptr;
+    }
+  };
+
+  if (!m_state.connected || m_activeConnectionPath.empty() || m_activeConnectionPath == "/"
+      || m_activeDevicePath.empty() || m_activeDevicePath == "/") {
+    done(false, "Connect to a network before changing DNS");
+    return;
+  }
+
+  if (override.profile == DnsProfile::Custom) {
+    if (override.servers.empty()) {
+      done(false, "Enter at least one DNS server address");
+      return;
+    }
+    for (const auto& server : override.servers) {
+      if (!dns_override::parseServer(server).has_value()) {
+        done(false, "Enter valid IPv4 or IPv6 DNS addresses");
+        return;
+      }
+    }
+  }
+  if (override.profile == DnsProfile::NextDns && !dns_override::validNextDnsId(override.nextDnsId)) {
+    done(false, "NextDNS config ID can only contain letters, numbers, hyphens, and underscores");
+    return;
+  }
+
+  const ConnectionSettings settings = dnsSettingsFromOverride(override);
+  const VariantMap args;
+  const std::string devicePath = m_activeDevicePath;
+  const std::weak_ptr<int> lifetimeToken = m_lifetimeToken;
+
+  try {
+    auto active = std::shared_ptr<sdbus::IProxy>(
+        sdbus::createProxy(m_bus.connection(), kNmBusName, sdbus::ObjectPath{m_activeConnectionPath})
+    );
+    active->callMethodAsync("Get")
+        .onInterface(kPropertiesInterface)
+        .withArguments(kNmActiveConnectionInterface, "Connection")
+        .uponReplyInvoke([this, lifetimeToken, done, active, settings, args, devicePath](
+                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
+                         ) {
+          if (lifetimeToken.expired()) {
+            return;
+          }
+          if (err.has_value()) {
+            done(false, err->what());
+            return;
+          }
+          sdbus::ObjectPath profilePath;
+          try {
+            profilePath = connectionValue.get<sdbus::ObjectPath>();
+          } catch (const sdbus::Error&) {
+            done(false, "Active connection has no profile");
+            return;
+          }
+          if (profilePath.empty() || profilePath == "/") {
+            done(false, "Active connection has no profile");
+            return;
+          }
+          try {
+            auto profile =
+                std::shared_ptr<sdbus::IProxy>(sdbus::createProxy(m_bus.connection(), kNmBusName, profilePath));
+            profile->callMethodAsync("Update2")
+                .onInterface(kNmSettingsConnectionInterface)
+                .withArguments(settings, k_nmSettingsUpdate2FlagToDisk, args)
+                .uponReplyInvoke([this, lifetimeToken, done, profile, devicePath](
+                                     std::optional<sdbus::Error> updateErr, VariantMap /*result*/
+                                 ) {
+                  if (lifetimeToken.expired()) {
+                    return;
+                  }
+                  if (updateErr.has_value()) {
+                    kLog.warn("dns override Update2 failed: {}", updateErr->what());
+                    done(false, updateErr->what());
+                    return;
+                  }
+                  try {
+                    auto device = std::shared_ptr<sdbus::IProxy>(
+                        sdbus::createProxy(m_bus.connection(), kNmBusName, sdbus::ObjectPath{devicePath})
+                    );
+                    const ConnectionSettings empty;
+                    device->callMethodAsync("Reapply")
+                        .onInterface(kNmDeviceInterface)
+                        .withArguments(empty, std::uint64_t{0}, std::uint32_t{0})
+                        .uponReplyInvoke([this, lifetimeToken, done, device](std::optional<sdbus::Error> reapplyErr) {
+                          if (lifetimeToken.expired()) {
+                            return;
+                          }
+                          if (reapplyErr.has_value()) {
+                            kLog.warn("dns override Reapply failed: {}", reapplyErr->what());
+                            done(false, reapplyErr->what());
+                            return;
+                          }
+                          kLog.info("dns override applied");
+                          refresh();
+                          done(true, {});
+                        });
+                  } catch (const sdbus::Error& e) {
+                    kLog.warn("dns override Reapply dispatch failed: {}", e.what());
+                    done(false, e.what());
+                  }
+                });
+          } catch (const sdbus::Error& e) {
+            done(false, e.what());
+          }
+        });
+  } catch (const sdbus::Error& e) {
+    done(false, e.what());
+  }
+}
+
 void NetworkManagerService::refreshSavedConnections(std::function<void()> onComplete) {
   const std::weak_ptr<int> lifetimeToken = m_lifetimeToken;
   try {
@@ -1862,6 +2296,12 @@ void NetworkManagerService::refreshAccessPoints(std::function<void()> onComplete
                                           info.secured =
                                               (wpaFlags != k_nm80211ApSecNone) || (rsnFlags != k_nm80211ApSecNone);
                                           info.keyManagement = network_manager_security::keyManagementFor(rsnFlags);
+                                          if (auto freqIt = properties.find("Frequency"); freqIt != properties.end()) {
+                                            try {
+                                              info.frequencyMhz = freqIt->second.get<std::uint32_t>();
+                                            } catch (const sdbus::Error&) {
+                                            }
+                                          }
                                           if (!info.ssid.empty()) {
                                             apState->aps.push_back(std::move(info));
                                           }
@@ -1949,6 +2389,7 @@ void NetworkManagerService::finishRefreshAccessPoints(
       it->devicePath = ap.devicePath;
       it->secured = ap.secured;
       it->keyManagement = ap.keyManagement;
+      it->frequencyMhz = ap.frequencyMhz;
     }
   }
   std::ranges::sort(deduped, [](const AccessPointInfo& a, const AccessPointInfo& b) {

@@ -334,6 +334,7 @@ location = "https://example.invalid/bad"
     Config c;
     c.audio = AudioConfig{true, true, 0.73F, "change.ogg", "notify.ogg"};
     c.weather = WeatherConfig{false, false, 17, "imperial"};
+    c.tailscale = TailscaleConfig{15, true, "https://example.invalid/admin"};
     c.osd.position = "bottom_left";
     c.osd.positionVertical = "top_right";
     c.osd.orientation = "vertical";
@@ -418,6 +419,10 @@ location = "https://example.invalid/bad"
     c.controlCenter.sidebarSectionMode = ControlCenterSidebarMode::None;
     c.controlCenter.calendarTab.showEventsCard = false;
     c.controlCenter.calendarTab.showWeekNumbers = true;
+    c.controlCenter.networkTab.wifiBand = WifiBandFilter::Ghz5;
+    c.controlCenter.networkTab.hiddenSsids = {"HiddenNet"};
+    c.controlCenter.bluetoothTab.hideUnnamed = true;
+    c.controlCenter.bluetoothTab.discoverySeconds = 20;
     c.controlCenter.shortcuts = {{"wifi"}, {"bluetooth"}};
     c.calendar.enabled = true;
     c.calendar.refreshMinutes = 30;
@@ -479,7 +484,6 @@ location = "https://example.invalid/bad"
     c.storage.keySource = StorageKeySource::File;
     c.storage.keyFile = "/run/agenix/noctalia-storage-key";
     c.shell.avatarPath = "/home/u/face.png";
-    c.shell.settingsWindowTranslucent = true;
     c.shell.animation.speed = 1.5F;
     c.shell.shadow.direction = ShadowDirection::UpLeft;
     c.shell.panel.transparencyMode = PanelTransparencyMode::Glass;
@@ -505,6 +509,8 @@ location = "https://example.invalid/bad"
     c.shell.mpris.blacklist = {"firefox"};
     c.shell.screenshot.directory = "/shots";
     c.shell.screenshot.pipeToCommand = true;
+    c.shell.screenRecord.directory = "/recordings";
+    c.shell.screenRecord.audio = false;
     c.shell.session.actions = {
         SessionPanelActionConfig{
             "lock",

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <expected>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -27,6 +28,8 @@ struct wl_output;
 
 class ScreenshotService {
 public:
+  enum class ScanKind : std::uint8_t { Ocr, Qr };
+
   struct OutputOptions {
     bool saveToFile = true;
     bool copyToClipboard = false;
@@ -36,6 +39,7 @@ public:
     bool rememberLastRegion = false;
     bool showCursor = false;
     bool annotate = false;
+    std::optional<ScanKind> scan;
     std::string pipeCommand;
     std::string directory;
     std::string filenamePattern;
@@ -53,6 +57,14 @@ public:
   void captureFullscreenInteractive(RenderContext& renderContext, const OutputOptions& options);
   void beginRegionCapture(RenderContext& renderContext, const OutputOptions& options);
   void beginFullscreenCapture(RenderContext& renderContext, const OutputOptions& options);
+  void beginColorPick(RenderContext& renderContext);
+  [[nodiscard]] bool hasOcr() const;
+  [[nodiscard]] bool hasQrScan() const;
+  void beginOcr(RenderContext& renderContext);
+  void beginQrScan(RenderContext& renderContext);
+  // Interactive region overlay without capturing a PNG. Used by screen recording.
+  using RegionPickCallback = std::function<void(std::optional<LogicalRect>)>;
+  void beginRegionPick(RenderContext& renderContext, RegionPickCallback callback);
   // freezeFirst selects the frozen annotator (screenshot-annotate); otherwise the overlay
   // starts transparent over the running desktop (annotate).
   void beginAnnotation(RenderContext& renderContext, const OutputOptions& options, bool freezeFirst);
@@ -109,7 +121,7 @@ private:
     std::size_t next = 0;
   };
 
-  enum class FreezeTarget : std::uint8_t { Region, Annotation };
+  enum class FreezeTarget : std::uint8_t { Region, Annotation, ColorPick };
 
   struct FreezeRequest {
     wl_output* output = nullptr;
@@ -135,6 +147,8 @@ private:
   void finishFreezeCapture();
   void abortFreezeCapture(const std::string& message);
   void cancelRegionCapture();
+  void cancelPendingRegionPick();
+  void finishRegionPick(std::optional<LogicalRect> region);
   void ensureAnnotationOverlay();
   void beginImageAnnotation(
       capture::ScreenshotImage image, const OutputOptions& options, std::optional<std::filesystem::path> destPath
@@ -166,6 +180,8 @@ private:
   );
   bool
   finishDelivery(ScreencopyImage image, const OutputOptions& options, std::optional<std::filesystem::path> destPath);
+  void beginScan(RenderContext& renderContext, ScanKind kind);
+  void startTextScan(ScreencopyImage image, ScanKind kind);
   void onCaptureComplete(
       std::optional<capture::ScreenshotImage> image, const std::string& error, OutputOptions options,
       std::optional<std::filesystem::path> destPath
@@ -192,10 +208,12 @@ private:
   OutputOptions m_regionOutputOptions{};
   RenderContext* m_regionRenderContext = nullptr;
   bool m_regionFullscreenPick = false;
+  RegionPickCallback m_regionPickCallback;
   std::vector<capture::FrozenScreenshot> m_frozenScreenshots;
   std::unique_ptr<capture::AnnotationOverlay> m_annotationOverlay;
   std::vector<FreezeRequest> m_pendingFreezeCaptures;
   std::optional<PendingDelivery> m_pendingDelivery;
   FreezeTarget m_freezeTarget = FreezeTarget::Region;
   bool m_freezeCaptureActive = false;
+  std::uint64_t m_scanGeneration = 0;
 };

@@ -3129,10 +3129,6 @@
           "description": "Includi il puntatore del mouse negli screenshot",
           "label": "Mostra cursore"
         },
-        "settings-window-translucent": {
-          "description": "Rendi traslucido lo sfondo delle Impostazioni per gli effetti del compositor",
-          "label": "Impostazioni Sfondo traslucido"
-        },
         "show-location": {
           "description": "Mostra il nome della posizione nei widget meteo",
           "label": "Mostra posizione"

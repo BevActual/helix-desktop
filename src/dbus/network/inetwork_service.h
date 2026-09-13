@@ -1,9 +1,11 @@
 #pragma once
 
+#include "dbus/network/dns_override.h"
 #include "dbus/network/enterprise_credentials.h"
 #include "dbus/network/network_types.h"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -55,5 +57,29 @@ public:
   virtual void forgetSsid(const std::string& ssid) = 0;
   [[nodiscard]] virtual bool hasSavedConnection(const std::string& ssid) const = 0;
   [[nodiscard]] virtual bool supportsSecretAgent() const noexcept { return false; }
+
+  // Stored PSK (or WEP key) for the active Wi-Fi profile. NetworkManager can
+  // return it via GetSecrets; other backends call back with nullopt.
+  using WifiPskCallback = std::function<void(std::optional<std::string> psk)>;
+  virtual void requestActiveWifiPsk(WifiPskCallback callback) {
+    if (callback) {
+      callback(std::nullopt);
+    }
+  }
+
+  using DnsOverrideCallback = std::function<void(bool success, std::string message)>;
+  using DnsOverrideQueryCallback = std::function<void(DnsOverride override)>;
+  [[nodiscard]] virtual bool supportsDnsOverride() const noexcept { return false; }
+  virtual void requestActiveDnsOverride(DnsOverrideQueryCallback callback) {
+    if (callback) {
+      callback(DnsOverride{});
+    }
+  }
+  virtual void setDnsOverride(const DnsOverride& /*override*/, DnsOverrideCallback onComplete = {}) {
+    if (onComplete) {
+      onComplete(false, "DNS override requires NetworkManager");
+    }
+  }
+
   void registerIpc(IpcService& ipc, WirelessFeedbackCallback wirelessFeedback = {});
 };

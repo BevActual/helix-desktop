@@ -321,6 +321,9 @@ namespace settings {
     case SettingsSection::Services:
     case SettingsSection::Location:
       return true;
+    case SettingsSection::Network:
+    case SettingsSection::Bluetooth:
+    case SettingsSection::Tailscale:
     case SettingsSection::Wallpaper:
     case SettingsSection::Desktop:
     case SettingsSection::Dock:
@@ -329,6 +332,7 @@ namespace settings {
     case SettingsSection::Notifications:
     case SettingsSection::Osd:
     case SettingsSection::Screenshot:
+    case SettingsSection::ScreenRecord:
     case SettingsSection::Shell:
     case SettingsSection::Keybinds:
     case SettingsSection::System:
@@ -356,6 +360,9 @@ namespace settings {
       return i18n::tr("settings.window.offline-mode-notice.services");
     case SettingsSection::Location:
       return i18n::tr("settings.window.offline-mode-notice.location");
+    case SettingsSection::Network:
+    case SettingsSection::Bluetooth:
+    case SettingsSection::Tailscale:
     case SettingsSection::Wallpaper:
     case SettingsSection::Desktop:
     case SettingsSection::Dock:
@@ -364,6 +371,7 @@ namespace settings {
     case SettingsSection::Notifications:
     case SettingsSection::Osd:
     case SettingsSection::Screenshot:
+    case SettingsSection::ScreenRecord:
     case SettingsSection::Shell:
     case SettingsSection::Keybinds:
     case SettingsSection::System:

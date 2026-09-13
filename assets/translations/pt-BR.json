@@ -3129,10 +3129,6 @@
           "description": "Incluir o ponteiro do mouse nas capturas de tela",
           "label": "Mostrar Cursor"
         },
-        "settings-window-translucent": {
-          "description": "Torne o fundo das Configurações transparente para efeitos dos compositores",
-          "label": "Fundo Transparente das Configurações"
-        },
         "show-location": {
           "description": "Exibe o nome do local nos widgets de previsão do tempo",
           "label": "Mostrar Localização"

@@ -299,6 +299,9 @@ namespace {
 
   // Bar tooltips stay suppressed while any panel opened from the bar is alive.
   void suppressTooltipForOpenPanel(std::string_view panelId) {
+    if (panelId == "clipboard") {
+      panelId = "control-center";
+    }
     TooltipManager::instance().suppressBarTooltipsForPanel(panelId);
   }
 

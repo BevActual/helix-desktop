@@ -4,6 +4,7 @@
 #include "core/timer_manager.h"
 #include "render/core/thumbnail_service.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/control_center/settings_pane.h"
 #include "shell/control_center/shortcut_services.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -12,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 #include <vector>
 
@@ -53,6 +55,9 @@ public:
   void onFrameTick(float deltaMs) override;
   void setActive(bool active) override;
   void onClose() override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
+  void setSettingsSearchQuery(std::string_view query) override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -94,6 +99,7 @@ private:
   ThumbnailService* m_thumbnails = nullptr;
   AsyncTextureCache* m_asyncTextures = nullptr;
   ShortcutServices m_services;
+  std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
 
   Flex* m_rootLayout = nullptr;
@@ -113,7 +119,6 @@ private:
   Label* m_userHost = nullptr;
   Label* m_userUptime = nullptr;
   Label* m_userVersion = nullptr;
-  Button* m_settingsButton = nullptr;
   Button* m_sessionButton = nullptr;
   InputArea* m_userCardKeyboardArea = nullptr;
   InputArea* m_userCardArea = nullptr;

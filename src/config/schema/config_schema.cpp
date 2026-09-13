@@ -40,6 +40,15 @@ namespace noctalia::config::schema {
     return s;
   }
 
+  const Schema<TailscaleConfig>& tailscaleSchema() {
+    static const Schema<TailscaleConfig> s = {
+        field(&TailscaleConfig::refreshIntervalSeconds, "refresh_interval_seconds", kTailscaleRefreshSecondsRange),
+        field(&TailscaleConfig::notifyOnPeerChange, "notify_on_peer_change"),
+        field(&TailscaleConfig::adminUrl, "admin_url"),
+    };
+    return s;
+  }
+
   const Schema<OsdKindsConfig>& osdKindsSchema() {
     static const Schema<OsdKindsConfig> s = {
         field(&OsdKindsConfig::volume, "volume"),
@@ -478,6 +487,27 @@ namespace noctalia::config::schema {
       };
       return s;
     }
+
+    const Schema<ControlCenterConfig::NetworkTabConfig>& networkTabSchema() {
+      static const Schema<ControlCenterConfig::NetworkTabConfig> s = {
+          enumField(&ControlCenterConfig::NetworkTabConfig::wifiBand, "wifi_band", kWifiBandFilters),
+          field(&ControlCenterConfig::NetworkTabConfig::hiddenSsids, "hidden_ssids"),
+          field(&ControlCenterConfig::NetworkTabConfig::nextDnsId, "nextdns_id"),
+          field(&ControlCenterConfig::NetworkTabConfig::customDns, "custom_dns"),
+      };
+      return s;
+    }
+
+    const Schema<ControlCenterConfig::BluetoothTabConfig>& bluetoothTabSchema() {
+      static const Schema<ControlCenterConfig::BluetoothTabConfig> s = {
+          field(&ControlCenterConfig::BluetoothTabConfig::hideUnnamed, "hide_unnamed"),
+          field(
+              &ControlCenterConfig::BluetoothTabConfig::discoverySeconds, "discovery_seconds",
+              kBluetoothDiscoverySecondsRange
+          ),
+      };
+      return s;
+    }
   } // namespace
 
   const Schema<ControlCenterConfig>& controlCenterSchema() {
@@ -489,6 +519,8 @@ namespace noctalia::config::schema {
         field(&ControlCenterConfig::showSessionButton, "show_session_button"),
         field(&ControlCenterConfig::hiddenTabs, "hidden_tabs"),
         subTable(&ControlCenterConfig::calendarTab, "calendar", calendarTabSchema()),
+        subTable(&ControlCenterConfig::networkTab, "network", networkTabSchema()),
+        subTable(&ControlCenterConfig::bluetoothTab, "bluetooth", bluetoothTabSchema()),
         arrayOf<ControlCenterConfig, ShortcutConfig>(
             &ControlCenterConfig::shortcuts, "shortcuts", shortcutSchema(),
             [](const ShortcutConfig& sc) { return !sc.type.empty(); }
@@ -1443,6 +1475,16 @@ namespace noctalia::config::schema {
       return s;
     }
 
+    const Schema<ShellConfig::ScreenRecordConfig>& shellScreenRecordSchema() {
+      static const Schema<ShellConfig::ScreenRecordConfig> s = {
+          field(&ShellConfig::ScreenRecordConfig::audio, "audio"),
+          field(&ShellConfig::ScreenRecordConfig::showCursor, "show_cursor"),
+          field(&ShellConfig::ScreenRecordConfig::directory, "directory"),
+          field(&ShellConfig::ScreenRecordConfig::filenamePattern, "filename_pattern"),
+      };
+      return s;
+    }
+
     const Schema<ShellConfig::PrivacyConfig>& shellPrivacySchema() {
       static const Schema<ShellConfig::PrivacyConfig> s = {
           field(&ShellConfig::PrivacyConfig::micFilterRegex, "mic_filter_regex"),
@@ -1576,7 +1618,6 @@ namespace noctalia::config::schema {
         field(&ShellConfig::polkitAgent, "polkit_agent"),
         enumField(&ShellConfig::passwordMaskStyle, "password_style", kPasswordMaskStyles),
         field(&ShellConfig::settingsShowAdvanced, "settings_show_advanced"),
-        field(&ShellConfig::settingsWindowTranslucent, "settings_window_translucent"),
         field(&ShellConfig::showLocation, "show_location"),
         field(&ShellConfig::appIconColorize, "app_icon_colorize"),
         colorSpecField(&ShellConfig::appIconColor, "app_icon_color", /*alwaysEmit=*/false),
@@ -1603,6 +1644,7 @@ namespace noctalia::config::schema {
         subTable(&ShellConfig::screenCorners, "screen_corners", shellScreenCornersSchema()),
         subTable(&ShellConfig::mpris, "mpris", shellMprisSchema()),
         subTable(&ShellConfig::screenshot, "screenshot", shellScreenshotSchema()),
+        subTable(&ShellConfig::screenRecord, "screen_record", shellScreenRecordSchema()),
         subTable(&ShellConfig::privacy, "privacy", shellPrivacySchema()),
         subTable(&ShellConfig::session, "session", shellSessionSchema()),
         subTable(&ShellConfig::greeterSync, "greeter_sync", shellGreeterSyncSchema()),

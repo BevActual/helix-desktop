@@ -290,6 +290,21 @@ std::unique_ptr<Flex> SettingsPane::create(float scale, float panelCardOpacity) 
       })
   );
 
+  // Compact panes sit inside a live tab's own scroll. An inner ScrollView with
+  // height 0 treats that as "use natural height" and paints over the host.
+  if (m_compact) {
+    auto content = ui::column({
+        .out = &m_content,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceMd * scale,
+        .flexGrow = 0.0F,
+    });
+    rebuildContent();
+    tab->addChild(std::move(content));
+    m_scroll = nullptr;
+    return tab;
+  }
+
   auto scroll = ui::scrollView({
       .out = &m_scroll,
       .state = &m_scrollState,
@@ -297,7 +312,7 @@ std::unique_ptr<Flex> SettingsPane::create(float scale, float panelCardOpacity) 
       .scrollbarVisible = true,
       .viewportPaddingH = 0.0F,
       .viewportPaddingV = 0.0F,
-      .flexGrow = m_compact ? 0.0F : 1.0F,
+      .flexGrow = 1.0F,
       .configure = [](ScrollView& scrollView) {
         scrollView.clearFill();
         scrollView.clearBorder();
@@ -855,7 +870,7 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
       .scale = m_scale,
       .searchQuery = m_searchQuery,
       .selectedSection = searching ? std::string_view{} : m_selectedSection,
-      .includedGroups = searching ? std::unordered_set<std::string>{} : m_includedGroups,
+      .includedGroups = (searching && !m_compact) ? std::unordered_set<std::string>{} : m_includedGroups,
       .selectedBar = selectedBar,
       .selectedMonitorOverride = selectedMonitorOverride,
       .showAdvanced = m_showAdvanced,

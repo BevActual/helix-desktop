@@ -3018,10 +3018,6 @@
           "description": "Inclou el punter del ratolí a les captures de pantalla",
           "label": "Mostra el cursor"
         },
-        "settings-window-translucent": {
-          "description": "Fa translúcid el fons de Configuració per als efectes del compositor",
-          "label": "Fons translúcid de la configuració"
-        },
         "show-location": {
           "description": "Mostra el nom de la ubicació als widgets del temps",
           "label": "Mostra la ubicació"

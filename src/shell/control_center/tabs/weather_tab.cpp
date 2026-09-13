@@ -414,14 +414,14 @@ std::unique_ptr<Flex> WeatherTab::create() {
   liveContent->setGap(Style::spaceMd * scale);
   tab->setMinHeight(280.0F * scale);
   liveContent->addChild(std::move(tab));
+  liveContent->addChild(m_inlineSettings->create(scale, panelCardOpacity()));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
+      .gap = 0.0F,
       .flexGrow = 1.0F,
   });
   live->addChild(std::move(liveScroll));
-  live->addChild(m_inlineSettings->create(scale, panelCardOpacity()));
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
@@ -433,7 +433,13 @@ void WeatherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show
 
 bool WeatherTab::configureMode() const { return m_settings->configureMode(); }
 
-void WeatherTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
+void WeatherTab::setSettingsSearchQuery(std::string_view query) {
+  const std::string q(query);
+  m_settings->setSearchQuery(q);
+  if (m_inlineSettings != nullptr) {
+    m_inlineSettings->setSearchQuery(q);
+  }
+}
 
 void WeatherTab::cancelForecastSlide() {
   const bool wasAnimating = m_forecastSlideAnimId != 0;
@@ -559,6 +565,9 @@ void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
     liveWidth = std::max(0.0F, m_liveScroll->width());
     liveHeight = std::max(0.0F, m_liveScroll->height());
   }
+  // Pin the forecast to the scroll viewport so location/units sit under it in
+  // the same scroll instead of painting over the cards.
+  m_rootLayout->setMinHeight(liveHeight);
   m_rootLayout->setSize(liveWidth, liveHeight);
   m_rootLayout->layout(renderer);
 
@@ -691,6 +700,10 @@ void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
 
   if (m_effectNode != nullptr && m_currentCard != nullptr) {
     m_effectNode->setFrameSize(m_currentCard->width(), m_currentCard->height());
+  }
+
+  if (m_liveScroll != nullptr) {
+    m_liveScroll->layout(renderer);
   }
 
   for (std::size_t i = 0; i < kForecastRowCount; ++i) {

@@ -1,4 +1,4 @@
-#include "shell/clipboard/clipboard_panel.h"
+#include "shell/clipboard/clipboard_picker.h"
 
 #include "config/config_service.h"
 #include "core/deferred_call.h"
@@ -13,10 +13,11 @@
 #include "render/core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
-#include "shell/control_center/tab.h"
+#include "render/animation/animation_manager.h"
 #include "shell/panel/panel_manager.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/flex.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
@@ -529,20 +530,38 @@ private:
   std::function<void(std::size_t)> m_onActivate;
 };
 
-ClipboardPanel::ClipboardPanel(ClipboardService* clipboard, ConfigService* config, AsyncTextureCache* asyncTextures)
-    : m_clipboard(clipboard), m_config(config), m_asyncTextures(asyncTextures) {}
+ClipboardPicker::ClipboardPicker(
+    ClipboardService* clipboard, ConfigService* config, AsyncTextureCache* asyncTextures, Options options
+)
+    : m_options(options), m_clipboard(clipboard), m_config(config), m_asyncTextures(asyncTextures) {}
 
-ClipboardPanel::~ClipboardPanel() = default;
+ClipboardPicker::~ClipboardPicker() = default;
 
-PanelPlacement ClipboardPanel::panelPlacement() const noexcept {
-  return m_config != nullptr ? m_config->config().shell.panel.clipboardPlacement : PanelPlacement::Floating;
-}
-
-void ClipboardPanel::setActivateCallback(std::function<void(const ClipboardEntry&)> callback) {
+void ClipboardPicker::setActivateCallback(std::function<void(const ClipboardEntry&)> callback) {
   m_activateCallback = std::move(callback);
 }
 
-void ClipboardPanel::create() {
+void ClipboardPicker::setCloseCallback(std::function<void()> callback) {
+  m_closeCallback = std::move(callback);
+}
+
+void ClipboardPicker::setPanelCardOpacity(float opacity) {
+  m_panelCardOpacity = opacity;
+  if (m_previewScrollView != nullptr) {
+    m_previewScrollView->setCardStyle(contentScale(), opacity);
+  }
+  if (m_filterInput != nullptr) {
+    m_filterInput->setSurfaceOpacity(opacity);
+  }
+}
+
+void ClipboardPicker::requestHostClose() {
+  if (m_closeCallback) {
+    m_closeCallback();
+  }
+}
+
+std::unique_ptr<Flex> ClipboardPicker::create() {
   const float scale = contentScale();
   auto rootLayout = ui::column({
       .out = &m_rootLayout,
@@ -588,6 +607,8 @@ void ClipboardPanel::create() {
           .fontSize = Style::fontSizeTitle * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::Primary),
+          .visible = m_options.showTitle,
+          .participatesInLayout = m_options.showTitle,
       }),
       makeCompactIconButton(&m_clearHistoryButton, "trash", ButtonVariant::Destructive, scale, [this]() {
         requestClearUnpinnedHistory();
@@ -713,9 +734,10 @@ void ClipboardPanel::create() {
       makeCompactIconButton(
           &m_deleteEntryButton, "trash", ButtonVariant::Destructive, scale, [this]() { requestDeleteSelectedEntry(); }
       ),
-      makeCompactIconButton(&m_closeButton, "close", ButtonVariant::Default, scale, []() {
-        PanelManager::instance().close();
-      })
+      makeCompactIconButton(
+          &m_closeButton, "close", ButtonVariant::Default, scale, [this]() { requestHostClose(); },
+          m_options.showCloseButton, m_options.showCloseButton
+      )
   );
 
   auto previewHeader = ui::row(
@@ -798,15 +820,14 @@ void ClipboardPanel::create() {
   contentRow->addChild(std::move(preview));
   rootLayout->addChild(std::move(contentRow));
 
-  setRoot(std::move(rootLayout));
   if (m_animations != nullptr) {
-    root()->setAnimationManager(m_animations);
+    rootLayout->setAnimationManager(m_animations);
   }
-
   schedulePreviewPayloadRefresh(false);
+  return rootLayout;
 }
 
-void ClipboardPanel::doLayout(Renderer& renderer, float width, float height) {
+void ClipboardPicker::layout(Renderer& renderer, float width, float height) {
   if (m_rootLayout == nullptr
       || m_sidebar == nullptr
       || m_previewCard == nullptr
@@ -855,7 +876,7 @@ void ClipboardPanel::doLayout(Renderer& renderer, float width, float height) {
   }
 }
 
-void ClipboardPanel::doUpdate(Renderer& renderer) {
+void ClipboardPicker::update(Renderer& renderer) {
   updatePreviewActions();
 
   if (m_clipboard == nullptr || m_lastWidth <= 0.0F) {
@@ -891,7 +912,7 @@ void ClipboardPanel::doUpdate(Renderer& renderer) {
   }
 }
 
-void ClipboardPanel::onOpen(std::string_view /*context*/) {
+void ClipboardPicker::onOpen(std::string_view /*context*/) {
   m_selectedIndex = 0;
   m_previewPayloadIndex = static_cast<std::size_t>(-1);
   m_pendingPreviewPayloadIndex = static_cast<std::size_t>(-1);
@@ -918,7 +939,7 @@ void ClipboardPanel::onOpen(std::string_view /*context*/) {
   schedulePreviewPayloadRefresh(false);
 }
 
-void ClipboardPanel::onClose() {
+void ClipboardPicker::onClose() {
   resetDeleteConfirmation();
   resetClearConfirmation();
   if (m_listGrid != nullptr) {
@@ -955,7 +976,6 @@ void ClipboardPanel::onClose() {
   m_filterDebounceTimer.stop();
   m_pendingFilterQuery.clear();
   m_filterQuery.clear();
-  clearReleasedRoot();
   m_lastWidth = 0.0F;
   m_lastHeight = 0.0F;
   m_pendingScrollToSelected = false;
@@ -968,11 +988,11 @@ void ClipboardPanel::onClose() {
   }
 }
 
-InputArea* ClipboardPanel::initialFocusArea() const {
+InputArea* ClipboardPicker::initialFocusArea() const {
   return m_filterInput != nullptr ? m_filterInput->inputArea() : m_focusArea;
 }
 
-bool ClipboardPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+bool ClipboardPicker::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
   if (!pressed || preedit) {
     return false;
   }
@@ -986,16 +1006,7 @@ bool ClipboardPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers,
   return handleKeyEvent(sym, modifiers);
 }
 
-void ClipboardPanel::onPanelCardOpacityChanged(float opacity) {
-  if (m_previewScrollView != nullptr) {
-    m_previewScrollView->setCardStyle(contentScale(), opacity);
-  }
-  if (m_filterInput != nullptr) {
-    m_filterInput->setSurfaceOpacity(opacity);
-  }
-}
-
-void ClipboardPanel::schedulePreviewPayloadRefresh(bool debounced) {
+void ClipboardPicker::schedulePreviewPayloadRefresh(bool debounced) {
   const std::size_t historyIndex = selectedHistoryIndex();
   if (m_clipboard == nullptr || historyIndex == static_cast<std::size_t>(-1)) {
     m_previewPayloadDebounceTimer.stop();
@@ -1030,7 +1041,7 @@ void ClipboardPanel::schedulePreviewPayloadRefresh(bool debounced) {
   });
 }
 
-void ClipboardPanel::updateListState() {
+void ClipboardPicker::updateListState() {
   const auto& history = m_clipboard != nullptr ? m_clipboard->history() : std::deque<ClipboardEntry>{};
   const bool empty = history.empty() || m_filteredIndices.empty();
   const bool hasHistory = !history.empty();
@@ -1081,7 +1092,7 @@ void ClipboardPanel::updateListState() {
   }
 }
 
-void ClipboardPanel::updatePreviewActions() {
+void ClipboardPicker::updatePreviewActions() {
   bool hasSelection = false;
   bool showImageAction = false;
   bool pinned = false;
@@ -1129,8 +1140,8 @@ void ClipboardPanel::updatePreviewActions() {
   }
 }
 
-void ClipboardPanel::rebuildPreview(Renderer& renderer, float width, float height) {
-  uiAssertNotRendering("ClipboardPanel::rebuildPreview");
+void ClipboardPicker::rebuildPreview(Renderer& renderer, float width, float height) {
+  uiAssertNotRendering("ClipboardPicker::rebuildPreview");
   if (m_previewContent == nullptr || m_previewTitle == nullptr || m_previewMeta == nullptr) {
     return;
   }
@@ -1299,14 +1310,14 @@ void ClipboardPanel::rebuildPreview(Renderer& renderer, float width, float heigh
   m_lastPreviewHeight = height;
 }
 
-std::size_t ClipboardPanel::selectedHistoryIndex() const {
+std::size_t ClipboardPicker::selectedHistoryIndex() const {
   if (m_selectedIndex >= m_filteredIndices.size()) {
     return static_cast<std::size_t>(-1);
   }
   return m_filteredIndices[m_selectedIndex];
 }
 
-void ClipboardPanel::applyFilter() {
+void ClipboardPicker::applyFilter() {
   m_filteredIndices.clear();
   if (m_clipboard == nullptr) {
     return;
@@ -1336,7 +1347,7 @@ void ClipboardPanel::applyFilter() {
   }
 }
 
-void ClipboardPanel::onFilterChanged(const std::string& text) {
+void ClipboardPicker::onFilterChanged(const std::string& text) {
   if (text == m_pendingFilterQuery && text == m_filterQuery) {
     return;
   }
@@ -1364,7 +1375,7 @@ void ClipboardPanel::onFilterChanged(const std::string& text) {
   m_filterDebounceTimer.start(kFilterDebounceInterval, commit);
 }
 
-void ClipboardPanel::selectIndex(std::size_t index) {
+void ClipboardPicker::selectIndex(std::size_t index) {
   if (m_clipboard == nullptr || index >= m_filteredIndices.size()) {
     return;
   }
@@ -1381,7 +1392,7 @@ void ClipboardPanel::selectIndex(std::size_t index) {
   PanelManager::instance().refresh();
 }
 
-void ClipboardPanel::requestDeleteSelectedEntry() {
+void ClipboardPicker::requestDeleteSelectedEntry() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1413,7 +1424,7 @@ void ClipboardPanel::requestDeleteSelectedEntry() {
   PanelManager::instance().refresh();
 }
 
-void ClipboardPanel::performDeleteSelectedEntry() {
+void ClipboardPicker::performDeleteSelectedEntry() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1449,7 +1460,7 @@ void ClipboardPanel::performDeleteSelectedEntry() {
   PanelManager::instance().refresh();
 }
 
-void ClipboardPanel::deleteSelectedEntry() {
+void ClipboardPicker::deleteSelectedEntry() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1467,7 +1478,7 @@ void ClipboardPanel::deleteSelectedEntry() {
   performDeleteSelectedEntry();
 }
 
-void ClipboardPanel::selectByStorageId(std::string storageId) {
+void ClipboardPicker::selectByStorageId(std::string storageId) {
   applyFilter();
 
   std::size_t newSelected = 0;
@@ -1492,7 +1503,7 @@ void ClipboardPanel::selectByStorageId(std::string storageId) {
   schedulePreviewPayloadRefresh(false);
 }
 
-void ClipboardPanel::togglePinSelected() {
+void ClipboardPicker::togglePinSelected() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1519,7 +1530,7 @@ void ClipboardPanel::togglePinSelected() {
   PanelManager::instance().refresh();
 }
 
-void ClipboardPanel::requestClearUnpinnedHistory() {
+void ClipboardPicker::requestClearUnpinnedHistory() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1550,7 +1561,7 @@ void ClipboardPanel::requestClearUnpinnedHistory() {
   PanelManager::instance().refresh();
 }
 
-void ClipboardPanel::performClearUnpinnedHistory() {
+void ClipboardPicker::performClearUnpinnedHistory() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1577,14 +1588,14 @@ void ClipboardPanel::performClearUnpinnedHistory() {
   }
   schedulePreviewPayloadRefresh(false);
   m_pendingScrollToSelected = true;
-  if (m_clipboard->history().empty()) {
-    PanelManager::instance().close();
+  if (m_clipboard->history().empty() && m_options.closeHostWhenEmpty) {
+    requestHostClose();
   } else {
     PanelManager::instance().refresh();
   }
 }
 
-void ClipboardPanel::performClearAllHistory() {
+void ClipboardPicker::performClearAllHistory() {
   if (m_clipboard == nullptr || m_clipboard->history().empty()) {
     return;
   }
@@ -1600,32 +1611,32 @@ void ClipboardPanel::performClearAllHistory() {
   }
   schedulePreviewPayloadRefresh(false);
   m_pendingScrollToSelected = false;
-  if (m_clipboard->history().empty()) {
-    PanelManager::instance().close();
+  if (m_clipboard->history().empty() && m_options.closeHostWhenEmpty) {
+    requestHostClose();
   } else {
     PanelManager::instance().refresh();
   }
 }
 
-void ClipboardPanel::clearUnpinnedHistory() {
+void ClipboardPicker::clearUnpinnedHistory() {
   if (!m_clearConfirm) {
     return;
   }
   performClearUnpinnedHistory();
 }
 
-void ClipboardPanel::clearAllHistory() {
+void ClipboardPicker::clearAllHistory() {
   if (!m_clearConfirm) {
     return;
   }
   performClearAllHistory();
 }
 
-void ClipboardPanel::resetDeleteConfirmation() { m_deleteConfirmStorageId.clear(); }
+void ClipboardPicker::resetDeleteConfirmation() { m_deleteConfirmStorageId.clear(); }
 
-void ClipboardPanel::resetClearConfirmation() { m_clearConfirm = false; }
+void ClipboardPicker::resetClearConfirmation() { m_clearConfirm = false; }
 
-void ClipboardPanel::runImageAction() {
+void ClipboardPicker::runImageAction() {
   if (m_clipboard == nullptr || m_config == nullptr) {
     return;
   }
@@ -1656,10 +1667,10 @@ void ClipboardPanel::runImageAction() {
     kLog.warn("clipboard image action failed to launch: {}", configuredCommand);
     return;
   }
-  PanelManager::instance().close();
+  requestHostClose();
 }
 
-void ClipboardPanel::activateSelected() {
+void ClipboardPicker::activateSelected() {
   if (m_clipboard == nullptr) {
     return;
   }
@@ -1687,7 +1698,7 @@ void ClipboardPanel::activateSelected() {
   }
 }
 
-bool ClipboardPanel::handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers) {
+bool ClipboardPicker::handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers) {
   if (m_clipboard == nullptr || m_filteredIndices.empty()) {
     return false;
   }
@@ -1739,7 +1750,7 @@ bool ClipboardPanel::handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers) 
   return false;
 }
 
-void ClipboardPanel::scrollToSelected() {
+void ClipboardPicker::scrollToSelected() {
   if (m_listGrid == nullptr || m_selectedIndex >= m_filteredIndices.size()) {
     return;
   }

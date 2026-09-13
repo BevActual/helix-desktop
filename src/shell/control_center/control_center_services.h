@@ -4,6 +4,8 @@
 #include "shell/settings/settings_runtime.h"
 #include "ui/signal.h"
 
+#include <functional>
+
 class AccountsService;
 class AsyncTextureCache;
 class BluetoothAgent;
@@ -29,8 +31,10 @@ class NotificationManager;
 class PipeWireService;
 class PipeWireSpectrum;
 class PowerProfilesService;
+class ScreenRecorderService;
 class ScreenTimeService;
 class SystemMonitorService;
+class TailscaleService;
 class ThumbnailService;
 class UPowerService;
 class Wallpaper;
@@ -82,11 +86,14 @@ struct ControlCenterServices {
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;
   ClipboardService* clipboard = nullptr;
+  std::function<void(bool isImage)> scheduleClipboardAutoPaste;
   AccountsService* accounts = nullptr;
   ThumbnailService* thumbnails = nullptr;
   WallpaperScanner* wallpaperScanner = nullptr;
   AsyncTextureCache* asyncTextures = nullptr;
   scripting::PluginManager* pluginManager = nullptr;
+  ScreenRecorderService* screenRecorder = nullptr;
+  TailscaleService* tailscale = nullptr;
   settings::HostedEditors* hostedEditors = nullptr;
   settings::SettingsModalHost* modalHost = nullptr;
   Signal<>* settingsInvalidated = nullptr;
@@ -108,6 +115,8 @@ struct ControlCenterServices {
         .dependencies = dependencies,
         .platform = platform,
         .ipc = ipc,
+        .screenRecorder = screenRecorder,
+        .tailscale = tailscale,
         .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,

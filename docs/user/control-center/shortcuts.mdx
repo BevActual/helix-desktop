@@ -61,10 +61,15 @@ show_shortcut_labels = false
 | `system` | System | Open system tab | Open system tab |
 | `screen_time` | Screen Time | Open screen time tab | Open screen time tab |
 | `keyboard_layout` | Current layout | Cycle keyboard layout | - |
-| `screen_recorder` | Recorder | Toggle recording | Toggle replay buffer |
+| `screen_recorder` | Recorder | Toggle recording | Open screen record tab |
 | `wallpaper` | Wallpaper | Open wallpaper panel | - |
 | `session` | Session | Open session panel | - |
-| `clipboard` | Clipboard | Open clipboard panel | - |
+| `clipboard` | Clipboard | Open clipboard tab | Open clipboard tab |
+| `screenshot` | Screenshot | Start region capture | Open screenshot tab |
+| `pick_color` | Pick Color | Pick a screen color onto the clipboard | Open screenshot tab |
+| `ocr` | Scan Text | Select a region and copy recognized text | Open screenshot tab |
+| `scan_qr` | Scan QR | Select a region and copy a QR code | Open screenshot tab |
+| `tailscale` | Tailscale | Toggle connection | Open tailscale tab |
 
 ## Dynamic Shortcuts
 
@@ -72,7 +77,9 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 `weather` is available only when `[weather].enabled = true`. `system` is available only when `[system.monitor].enabled = true`. `screen_time` is available only when `[shell].screen_time_enabled = true`.
 
-`screen_recorder` requires the official [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder) to be enabled; without it the shortcut stays disabled.
+`screen_recorder` is a built-in shortcut for the shell recorder (`screen-record-toggle`). While a recording is running the tile highlights, switches to a stop icon, and shows elapsed time. The official [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder) still exposes its own shortcut as `noctalia/screen_recorder:toggle` when enabled, including replay-buffer actions.
+
+`tailscale` toggles this machine's Tailscale connection. Right-click opens the Tailscale tab. The tile is disabled when the `tailscale` CLI is not installed. The community plugin's bar widget and panel remain available.
 
 ## Related IPC
 
@@ -82,4 +89,6 @@ Many shortcut buttons trigger the same canonical IPC commands documented elsewhe
 - [Media & UI -> Notifications](/noctalia/ipc/media-and-ui/#notifications) for DND
 - [Media & UI -> Media](/noctalia/ipc/media-and-ui/#media) for media controls
 - [Media & UI -> Theme](/noctalia/ipc/media-and-ui/#theme) for dark mode
-- [Shell -> Session](/noctalia/ipc/shell/#session) for session actions
+- [Media & UI -> Screenshots](/noctalia/ipc/media-and-ui/#screenshots) for region capture, color pick, OCR, and QR scan
+- [Media & UI -> Screen recording](/noctalia/ipc/media-and-ui/#screen-recording) for start, stop, and toggle
+- [Media & UI -> Tailscale](/noctalia/ipc/media-and-ui/#tailscale) for connect, disconnect, toggle, and status

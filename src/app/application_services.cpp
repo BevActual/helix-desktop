@@ -66,8 +66,6 @@
 #include "scripting/plugin_registry.h"
 #include "scripting/plugin_runtime_context.h"
 #include "scripting/script_runtime.h"
-#include "shell/clipboard/clipboard_panel.h"
-#include "shell/clipboard/clipboard_paste.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
@@ -319,15 +317,19 @@ void Application::syncPolkitAgent() {
   if (m_systemBus == nullptr) {
     m_polkitPollSource.reset();
     m_polkitAgent.reset();
+    m_polkitAgentReady = false;
+    flushPolkitReadyWaiters(false);
     return;
   }
 
-  if (!m_configService.config().shell.polkitAgent) {
+  if (!m_configService.config().shell.polkitAgent && !m_polkitAgentForced) {
     if (m_polkitAgent != nullptr) {
       kLog.info("polkit agent disabled by config");
     }
     m_polkitPollSource.reset();
     m_polkitAgent.reset();
+    m_polkitAgentReady = false;
+    flushPolkitReadyWaiters(false);
     return;
   }
 
@@ -340,19 +342,26 @@ void Application::syncPolkitAgent() {
       kLog.warn("polkit agent disabled: {} is not running", kPolkitAuthorityBusName);
       m_polkitPollSource.reset();
       m_polkitAgent.reset();
+      m_polkitAgentReady = false;
+      flushPolkitReadyWaiters(false);
       return;
     }
   } catch (const std::exception& e) {
     kLog.warn("polkit agent disabled: failed to query {} owner: {}", kPolkitAuthorityBusName, e.what());
     m_polkitPollSource.reset();
     m_polkitAgent.reset();
+    m_polkitAgentReady = false;
+    flushPolkitReadyWaiters(false);
     return;
   }
 
+  m_polkitAgentReady = false;
   m_polkitAgent = std::make_unique<PolkitAgent>(*m_systemBus);
   m_polkitAgent->setReadyCallback([this](bool ok, const std::string& error) {
     if (!ok) {
       kLog.warn("polkit agent disabled: {}", error);
+      m_polkitAgentReady = false;
+      flushPolkitReadyWaiters(false);
       DeferredCall::callLater([this, error]() {
         if (polkit_session::isNoSessionForPidError(error)) {
           notify::error(
@@ -365,7 +374,9 @@ void Application::syncPolkitAgent() {
       });
       return;
     }
+    m_polkitAgentReady = true;
     kLog.info("polkit authentication agent active");
+    flushPolkitReadyWaiters(true);
   });
   m_polkitAgent->setStateCallback([this]() {
     if (m_polkitAgent == nullptr) {
@@ -401,6 +412,35 @@ void Application::syncPolkitAgent() {
   m_polkitAgent->start();
 }
 
+void Application::flushPolkitReadyWaiters(bool ok) {
+  auto waiters = std::move(m_polkitReadyWaiters);
+  m_polkitReadyWaiters.clear();
+  for (auto& waiter : waiters) {
+    if (waiter) {
+      waiter(ok);
+    }
+  }
+}
+
+void Application::ensurePolkitAgent(std::function<void(bool ok)> onReady) {
+  if (!onReady) {
+    return;
+  }
+  if (m_polkitAgent != nullptr && m_polkitAgentReady) {
+    onReady(true);
+    return;
+  }
+  m_polkitReadyWaiters.push_back(std::move(onReady));
+  m_polkitAgentForced = true;
+  if (m_polkitAgent != nullptr) {
+    return;
+  }
+  syncPolkitAgent();
+  if (m_polkitAgent == nullptr) {
+    flushPolkitReadyWaiters(false);
+  }
+}
+
 void Application::syncScreenTimeService() {
   m_screenTimeService.setEnabled(m_configService.config().shell.screenTimeEnabled);
 }
@@ -424,9 +464,6 @@ void Application::syncClipboardService() {
   );
 
   if (!enabled) {
-    if (m_panelManager.isOpenPanel("clipboard")) {
-      m_panelManager.close();
-    }
     kLog.info("clipboard history disabled by config (live copy/paste still active)");
   }
 
@@ -1556,6 +1593,14 @@ void Application::initSessionBusServices() {
   m_locationService.initialize();
   m_weatherService.initialize();
   m_calendarService.initialize();
+  m_tailscaleService.setAuthPrep([this](std::function<void()> resume) {
+    ensurePolkitAgent([resume = std::move(resume)](bool /*ok*/) {
+      if (resume) {
+        resume();
+      }
+    });
+  });
+  m_tailscaleService.start();
 
   // LocationService is the single source of "where am I": push its resolved coordinates to the
   // weather service, night light, and theme auto mode. Manual latitude/longitude and fixed

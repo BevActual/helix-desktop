@@ -16,6 +16,8 @@ struct AccessPointInfo {
   // enum rather than parallel bools so contradictory states cannot be built.
   network_manager_security::KeyManagement keyManagement = network_manager_security::KeyManagement::Psk;
   bool active = false;
+  // Operating frequency of this BSS. 0 when the backend does not report one (iwd).
+  std::uint32_t frequencyMhz = 0;
 
   [[nodiscard]] bool isEnterprise() const noexcept { return network_manager_security::isEnterprise(keyManagement); }
 

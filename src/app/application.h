@@ -5,6 +5,7 @@
 #include "calendar/calendar_poll_source.h"
 #include "calendar/calendar_service.h"
 #include "capture/screenshot_service.h"
+#include "capture/screen_recorder_service.h"
 #include "compositors/compositor_platform.h"
 #include "compositors/workspace_alert_service.h"
 #include "config/config_poll_source.h"
@@ -22,6 +23,7 @@
 #include "ipc/ipc_service.h"
 #include "launcher/dmenu_ipc.h"
 #include "net/http_client.h"
+#include "net/tailscale_service.h"
 #include "net/http_client_poll_source.h"
 #include "notification/notification_manager.h"
 #include "render/core/async_texture_cache.h"
@@ -204,6 +206,8 @@ private:
   void retrySecretServiceConsumers();
   void scheduleNotificationShellRefresh();
   void syncPolkitAgent();
+  void ensurePolkitAgent(std::function<void(bool ok)> onReady);
+  void flushPolkitReadyWaiters(bool ok);
   [[nodiscard]] bool likelySupportsInSessionPolkit() const noexcept;
   void syncClipboardService();
   void syncStorageKeyProvider();
@@ -268,6 +272,10 @@ private:
   ScreenshotService m_screenshotService{
       m_wayland, m_compositorPlatform, m_configService, m_notificationManager, &m_clipboardService
   };
+  ScreenRecorderService m_screenRecorder{
+      m_compositorPlatform, m_configService, m_notificationManager, m_screenshotService
+  };
+  TailscaleService m_tailscaleService{m_configService};
   std::unique_ptr<MprisService> m_mprisService;
   std::unique_ptr<PowerProfilesService> m_powerProfilesService;
   std::unique_ptr<INetworkService> m_networkService;
@@ -281,6 +289,9 @@ private:
   std::unique_ptr<ModemManagerService> m_modemManagerService;
   Timer m_bluetoothResumeTimer;
   std::unique_ptr<PolkitAgent> m_polkitAgent;
+  bool m_polkitAgentForced = false;
+  bool m_polkitAgentReady = false;
+  std::vector<std::function<void(bool)>> m_polkitReadyWaiters;
   std::optional<bool> m_notificationDaemonEnabled;
   bool m_notificationDaemonInitFailed = false;
   bool m_notificationShellRefreshScheduled = false;

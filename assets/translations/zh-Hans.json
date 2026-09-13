@@ -3129,10 +3129,6 @@
           "description": "在截图中包含鼠标指针",
           "label": "显示光标"
         },
-        "settings-window-translucent": {
-          "description": "将设置窗口背景设为半透明，以增强合成器效果",
-          "label": "设置窗口半透明背景"
-        },
         "show-location": {
           "description": "在天气小组件中显示位置",
           "label": "显示位置"

@@ -1066,6 +1066,15 @@ struct ShellConfig {
     bool operator==(const ScreenshotConfig&) const = default;
   };
 
+  struct ScreenRecordConfig {
+    bool audio = true;
+    bool showCursor = true;
+    std::string directory;       // empty = ~/Videos/Recordings
+    std::string filenamePattern; // empty = recording_%Y%m%d_%H%M%S
+
+    bool operator==(const ScreenRecordConfig&) const = default;
+  };
+
   struct PrivacyConfig {
     std::string micFilterRegex;
     std::string camFilterRegex;
@@ -1104,20 +1113,20 @@ struct ShellConfig {
   AnimationConfig animation;
   std::string avatarPath;
   bool settingsShowAdvanced = true;
-  bool settingsWindowTranslucent = false;
   bool showLocation = true;
   bool appIconColorize = false;
   std::optional<ColorSpec> appIconColor;
   bool launchAppsAsSystemdServices = false;
   std::string launchAppsCustomCommand;
-  /// When false, disables Wayland clipboard integration (history panel, data-control binding, Input paste/copy hooks).
+  /// When false, disables clipboard history (Control Center tab, bar/control-center shortcuts).
   bool clipboardEnabled = true;
   /// When true, the shell takes over the selection once the application that copied it exits, so the last copied item
   /// stays pasteable. Independent of history retention: this keeps the live clipboard, not the stored history.
   bool clipboardKeepFromClosedApps = true;
   /// Maximum unpinned clipboard history entries retained (pinned entries are exempt).
   int clipboardHistoryMaxEntries = static_cast<int>(noctalia::config::kClipboardHistoryDefaultEntries);
-  /// When true, clearing clipboard history or deleting unpinned entries from the panel asks for confirmation first.
+  /// When true, clearing clipboard history or deleting unpinned entries from the Control Center
+  /// tab asks for confirmation first.
   bool clipboardConfirmClearHistory = true;
   /// Disables per-app tracking and Control Center usage UI.
   bool screenTimeEnabled = false;
@@ -1133,6 +1142,7 @@ struct ShellConfig {
   ScreenCornersConfig screenCorners;
   MprisConfig mpris;
   ScreenshotConfig screenshot;
+  ScreenRecordConfig screenRecord;
   PrivacyConfig privacy;
   ShellSessionConfig session;
   ShellGreeterSyncConfig greeterSync;
@@ -1147,6 +1157,14 @@ struct WeatherConfig {
   std::string unit = "metric";
 
   bool operator==(const WeatherConfig&) const = default;
+};
+
+struct TailscaleConfig {
+  std::int32_t refreshIntervalSeconds = 10;
+  bool notifyOnPeerChange = false;
+  std::string adminUrl;
+
+  bool operator==(const TailscaleConfig&) const = default;
 };
 
 struct StorageConfig {
@@ -1495,6 +1513,20 @@ constexpr EnumOption<ControlCenterSidebarMode> kControlCenterSidebarModes[] = {
     {ControlCenterSidebarMode::None, "none", "settings.options.control-center.sidebar.none"},
 };
 
+enum class WifiBandFilter : std::uint8_t {
+  All = 0,
+  Ghz24 = 1,
+  Ghz5 = 2,
+  Ghz6 = 3,
+};
+
+constexpr EnumOption<WifiBandFilter> kWifiBandFilters[] = {
+    {WifiBandFilter::All, "all", "settings.options.wifi-band.all"},
+    {WifiBandFilter::Ghz24, "2.4", "settings.options.wifi-band.ghz24"},
+    {WifiBandFilter::Ghz5, "5", "settings.options.wifi-band.ghz5"},
+    {WifiBandFilter::Ghz6, "6", "settings.options.wifi-band.ghz6"},
+};
+
 struct ThemeConfig {
   struct TemplateColorConfig {
     std::string name;
@@ -1588,6 +1620,20 @@ struct ControlCenterConfig {
     bool operator==(const CalendarTabConfig&) const = default;
   };
 
+  struct NetworkTabConfig {
+    WifiBandFilter wifiBand = WifiBandFilter::All;
+    std::vector<std::string> hiddenSsids;
+    std::string nextDnsId;
+    std::string customDns;
+    bool operator==(const NetworkTabConfig&) const = default;
+  };
+
+  struct BluetoothTabConfig {
+    bool hideUnnamed = false;
+    std::int32_t discoverySeconds = 10;
+    bool operator==(const BluetoothTabConfig&) const = default;
+  };
+
   std::vector<ShortcutConfig> shortcuts;
   std::vector<std::string> hiddenTabs; // tab keys (built-in or plugin entry ids) the user has hidden; empty = all available shown
   ControlCenterSidebarMode sidebarMode = ControlCenterSidebarMode::Compact;
@@ -1596,6 +1642,8 @@ struct ControlCenterConfig {
   bool showShortcutLabels = true;
   bool showSessionButton = true;
   CalendarTabConfig calendarTab;
+  NetworkTabConfig networkTab;
+  BluetoothTabConfig bluetoothTab;
   bool operator==(const ControlCenterConfig&) const = default;
 };
 
@@ -1701,6 +1749,7 @@ struct Config {
   OsdConfig osd;
   NotificationConfig notification;
   WeatherConfig weather;
+  TailscaleConfig tailscale;
   CalendarConfig calendar;
   SystemConfig system;
   AudioConfig audio;
@@ -1732,6 +1781,7 @@ struct ConfigChangeSet {
   bool osd = true;
   bool notification = true;
   bool weather = true;
+  bool tailscale = true;
   bool calendar = true;
   bool system = true;
   bool audio = true;
@@ -1762,6 +1812,7 @@ struct ConfigChangeSet {
         || osd
         || notification
         || weather
+        || tailscale
         || calendar
         || system
         || audio

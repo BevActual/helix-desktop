@@ -1,13 +1,16 @@
 #include "shell/control_center/tabs/bluetooth_tab.h"
 
+#include "config/config_service.h"
 #include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/collapsible.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "wayland/clipboard_service.h"
 
 #include <algorithm>
 #include <chrono>
@@ -22,9 +25,6 @@ using namespace control_center;
 namespace {
 
   constexpr float kRowMinHeight = Style::controlHeightLg;
-
-  // Bounds an explicit Rescan: BlueZ discovery is stopped again when this window elapses.
-  constexpr auto kDiscoveryTimeout = std::chrono::seconds(10);
 
   const char* glyphFor(BluetoothDeviceKind kind) {
     switch (kind) {
@@ -139,8 +139,8 @@ namespace {
 
 class BluetoothDeviceRow : public Collapsible {
 public:
-  BluetoothDeviceRow(BluetoothDeviceInfo device, BluetoothService* service, float scale)
-      : m_device(std::move(device)), m_service(service) {
+  BluetoothDeviceRow(BluetoothDeviceInfo device, BluetoothService* service, ClipboardService* clipboard, float scale)
+      : m_device(std::move(device)), m_service(service), m_clipboard(clipboard) {
     setScale(scale);
     setRadius(Style::scaledRadiusMd(scale));
     setFill(colorSpecFromRole(ColorRole::Surface));
@@ -304,7 +304,23 @@ public:
                 {.text = m_device.address,
                  .fontSize = Style::fontSizeCaption * scale,
                  .color = colorSpecFromRole(ColorRole::OnSurface)}
-            )
+            ),
+            ui::button({
+                .glyph = "copy",
+                .glyphSize = Style::fontSizeCaption * scale,
+                .enabled = m_clipboard != nullptr && !m_device.address.empty(),
+                .variant = ButtonVariant::Ghost,
+                .tooltip = i18n::tr("control-center.bluetooth.copy-address"),
+                .minWidth = Style::controlHeightSm * scale,
+                .minHeight = Style::controlHeightSm * scale,
+                .padding = Style::spaceXs * scale,
+                .onClick = [this]() {
+                  if (m_clipboard != nullptr && !m_device.address.empty()) {
+                    (void)m_clipboard->copyText(m_device.address);
+                    PanelManager::instance().requestRedraw();
+                  }
+                },
+            })
         )
     );
 
@@ -338,12 +354,15 @@ public:
 private:
   BluetoothDeviceInfo m_device;
   BluetoothService* m_service = nullptr;
+  ClipboardService* m_clipboard = nullptr;
   Spinner* m_connectingSpinner = nullptr;
   Label* m_batteryValue = nullptr;
   Label* m_signalValue = nullptr;
 };
 
-BluetoothTab::BluetoothTab(BluetoothService* service, BluetoothAgent* agent) : m_service(service), m_agent(agent) {}
+BluetoothTab::BluetoothTab(BluetoothService* service, BluetoothAgent* agent, const ControlCenterServices& services)
+    : m_service(service), m_agent(agent), m_config(services.config), m_clipboard(services.clipboard),
+      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "bluetooth"})) {}
 
 BluetoothTab::~BluetoothTab() = default;
 
@@ -493,12 +512,25 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   m_list->setGap(Style::spaceMd * scale);
 
   tab->addChild(std::move(listScroll));
-  return tab;
+  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> BluetoothTab::createHeaderActions() { return nullptr; }
+std::unique_ptr<Flex> BluetoothTab::createHeaderActions() {
+  return m_settings->embedHeader(nullptr, contentScale());
+}
+
+void BluetoothTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool BluetoothTab::configureMode() const { return m_settings->configureMode(); }
+
+void BluetoothTab::setSettingsSearchQuery(std::string_view query) {
+  m_settings->setSearchQuery(std::string(query));
+}
 
 void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr) {
     return;
   }
@@ -512,6 +544,9 @@ void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
 }
 
 void BluetoothTab::doUpdate(Renderer& renderer) {
+  if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
   syncDiscoveryLease();
   syncPairingCard();
   rebuildDeviceList(renderer);
@@ -529,6 +564,9 @@ void BluetoothTab::setActive(bool active) {
 }
 
 void BluetoothTab::onClose() {
+  if (m_settings != nullptr) {
+    m_settings->onClose();
+  }
   stopRequestedDiscovery();
   m_rootLayout = nullptr;
   m_pairingCard = nullptr;
@@ -725,6 +763,10 @@ std::string BluetoothTab::structureKey(const std::vector<BluetoothDeviceInfo>& d
     key += d.hasRssi ? '1' : '0';
     key.push_back('\n');
   }
+  if (m_config != nullptr) {
+    key += "hide:";
+    key += m_config->config().controlCenter.bluetoothTab.hideUnnamed ? '1' : '0';
+  }
   return key;
 }
 
@@ -754,6 +796,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
   std::vector<BluetoothDeviceInfo> devices;
   if (m_service != nullptr) {
     devices = sortedDevices(m_service->devices());
+    applyDeviceFilters(devices);
   }
   const std::string nextKey = structureKey(devices);
   const bool structureChanged = nextKey != m_lastStructureKey;
@@ -848,7 +891,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
                 m_discoveryLease = DiscoveryLease::Pending;
                 m_service->startDiscovery();
               }
-              m_discoveryTimer.start(kDiscoveryTimeout, [this]() { stopRequestedDiscovery(); });
+              m_discoveryTimer.start(discoveryTimeout(), [this]() { stopRequestedDiscovery(); });
             },
         })
     );
@@ -952,7 +995,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
       currentBucket = bucket;
       first = false;
     }
-    auto row = std::make_unique<BluetoothDeviceRow>(device, m_service, scale);
+    auto row = std::make_unique<BluetoothDeviceRow>(device, m_service, m_clipboard, scale);
     auto* rowPtr = row.get();
     bucketCard->addChild(std::move(row));
     rowPtr->setExpandedImmediate(expandedPaths.contains(device.path));
@@ -966,4 +1009,21 @@ void BluetoothTab::onPanelCardOpacityChanged(float opacity) {
   if (m_pairingInput != nullptr) {
     m_pairingInput->setSurfaceOpacity(opacity);
   }
+}
+
+std::chrono::seconds BluetoothTab::discoveryTimeout() const {
+  std::int32_t seconds = 10;
+  if (m_config != nullptr) {
+    seconds = m_config->config().controlCenter.bluetoothTab.discoverySeconds;
+  }
+  return std::chrono::seconds{std::clamp(seconds, 5, 60)};
+}
+
+void BluetoothTab::applyDeviceFilters(std::vector<BluetoothDeviceInfo>& devices) const {
+  if (m_config == nullptr || !m_config->config().controlCenter.bluetoothTab.hideUnnamed) {
+    return;
+  }
+  std::erase_if(devices, [](const BluetoothDeviceInfo& device) {
+    return device.alias.empty() || device.alias == device.address;
+  });
 }

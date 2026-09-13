@@ -76,6 +76,7 @@ namespace noctalia::cli {
                                                                                       "false", "1",   "0"};
   inline constexpr std::array<std::string_view, 2> kMsgPowerCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenshotFullscreenModeChoices{"pick", "monitor", "all"};
+  inline constexpr std::array<std::string_view, 3> kMsgScreenRecordSourceChoices{"focused", "portal", "region"};
   inline constexpr std::array<std::string_view, 6> kMsgSessionActionChoices{"lock",   "suspend", "lock-and-suspend",
                                                                             "logout", "reboot",  "shutdown"};
   inline constexpr std::array<std::string_view, 2> kMsgTaskbarCycleDirectionChoices{"next", "prev"};
@@ -189,6 +190,12 @@ namespace noctalia::cli {
   };
   inline constexpr std::array kMsgScreenshotFullscreenPositionals{
       Positional{"mode", {}, kMsgScreenshotFullscreenModeChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordStartPositionals{
+      Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordTogglePositionals{
+      Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
   };
   inline constexpr std::array kMsgSessionPositionals{
       Positional{"action", {}, kMsgSessionActionChoices, true, false, false},
@@ -628,6 +635,29 @@ namespace noctalia::cli {
         {},          kMsgPowerSetPositionals,
         {},          false
     };
+    inline constexpr Command screenRecordStart{
+        "screen-record-start",
+        "Start screen recording of the focused output, a region, or a portal picker",
+        {},
+        {},
+        {},
+        kMsgScreenRecordStartPositionals,
+        {},
+        false
+    };
+    inline constexpr Command screenRecordStop{
+        "screen-record-stop", "Stop the current screen recording", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenRecordToggle{
+        "screen-record-toggle",
+        "Start or stop screen recording (optional source: focused, portal, or region)",
+        {},
+        {},
+        {},
+        kMsgScreenRecordTogglePositionals,
+        {},
+        false
+    };
     inline constexpr Command screenshotAnnotate{
         "screenshot-annotate", "Freeze the screen and annotate it, then copy or save", {}, {}, {}, {}, {}, false
     };
@@ -640,6 +670,15 @@ namespace noctalia::cli {
         kMsgScreenshotFullscreenPositionals,
         {},
         false
+    };
+    inline constexpr Command screenshotPickColor{
+        "screenshot-pick-color", "Freeze the screen and copy the color under the click", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenshotOcr{
+        "screenshot-ocr", "Select a region and copy recognized text to the clipboard", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenshotScanQr{
+        "screenshot-scan-qr", "Select a region and copy a QR code or barcode to the clipboard", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command screenshotRegion{
         "screenshot-region", "Start an interactive region screenshot", {}, {}, {}, {}, {}, false
@@ -690,6 +729,18 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command status{"status", "Print current state as JSON", {}, {}, {}, {}, {}, false};
+    inline constexpr Command tailscaleDown{
+        "tailscale-down", "Disconnect this machine from the Tailscale network", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleStatus{
+        "tailscale-status", "Print Tailscale connection status", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleToggle{
+        "tailscale-toggle", "Connect or disconnect this machine from Tailscale", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleUp{
+        "tailscale-up", "Connect this machine to the Tailscale network", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
         "Step to the adjacent task or workspace group in the invoking taskbar",
@@ -909,9 +960,15 @@ namespace noctalia::cli {
       msg::plugins,
       msg::powerCycle,
       msg::powerSet,
+      msg::screenRecordStart,
+      msg::screenRecordStop,
+      msg::screenRecordToggle,
       msg::screenshotAnnotate,
       msg::screenshotFullscreen,
+      msg::screenshotOcr,
+      msg::screenshotPickColor,
       msg::screenshotRegion,
+      msg::screenshotScanQr,
       msg::session,
       msg::settingsClose,
       msg::settingsOpen,
@@ -919,6 +976,10 @@ namespace noctalia::cli {
       msg::settingsOpenWidget,
       msg::settingsToggle,
       msg::status,
+      msg::tailscaleDown,
+      msg::tailscaleStatus,
+      msg::tailscaleToggle,
+      msg::tailscaleUp,
       msg::taskbarCycle,
       msg::templatesApply,
       msg::themeModeGet,

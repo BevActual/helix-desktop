@@ -1,5 +1,6 @@
 #include "shell/control_center/shortcut_registry.h"
 
+#include "capture/screen_recorder_service.h"
 #include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "dbus/bluetooth/bluetooth_service.h"
@@ -9,8 +10,11 @@
 #include "dbus/power/power_profiles_service.h"
 #include "i18n/i18n.h"
 #include "idle/idle_inhibitor.h"
+#include "ipc/ipc_service.h"
+#include "net/tailscale_service.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
+#include "core/process/process.h"
 #include "scripting/plugin_manifest.h"
 #include "scripting/plugin_registry.h"
 #include "scripting/plugin_runtime_context.h"
@@ -448,7 +452,126 @@ namespace {
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.clipboard"); }
     std::string_view iconOn() const override { return "clipboard"; }
     std::string_view iconOff() const override { return "clipboard"; }
-    void onClick() override { PanelManager::instance().togglePanel("clipboard"); }
+    void onClick() override { openTab("clipboard"); }
+    void onRightClick() override { openTab("clipboard"); }
+  };
+
+  void runCapture(IpcService* ipc, const char* command) {
+    PanelManager::instance().closePanel();
+    if (ipc != nullptr) {
+      (void)ipc->execute(command);
+    }
+  }
+
+  class ScreenshotShortcut final : public Shortcut {
+  public:
+    explicit ScreenshotShortcut(IpcService* ipc) : m_ipc(ipc) {}
+    std::string_view id() const override { return "screenshot"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screenshot"); }
+    std::string_view iconOn() const override { return "crop"; }
+    std::string_view iconOff() const override { return "crop"; }
+    void onClick() override { runCapture(m_ipc, "screenshot-region"); }
+    void onRightClick() override { openTab("screenshot"); }
+
+  private:
+    IpcService* m_ipc = nullptr;
+  };
+
+  class ColorPickShortcut final : public Shortcut {
+  public:
+    explicit ColorPickShortcut(IpcService* ipc) : m_ipc(ipc) {}
+    std::string_view id() const override { return "pick_color"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.pick-color"); }
+    std::string_view iconOn() const override { return "color-picker"; }
+    std::string_view iconOff() const override { return "color-picker"; }
+    void onClick() override { runCapture(m_ipc, "screenshot-pick-color"); }
+    void onRightClick() override { openTab("screenshot"); }
+
+  private:
+    IpcService* m_ipc = nullptr;
+  };
+
+  class OcrShortcut final : public Shortcut {
+  public:
+    explicit OcrShortcut(IpcService* ipc) : m_ipc(ipc) {}
+    std::string_view id() const override { return "ocr"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.ocr"); }
+    std::string_view iconOn() const override { return "text-recognition"; }
+    std::string_view iconOff() const override { return "text-recognition"; }
+    bool enabled() const override { return process::commandExists("tesseract"); }
+    void onClick() override { runCapture(m_ipc, "screenshot-ocr"); }
+    void onRightClick() override { openTab("screenshot"); }
+
+  private:
+    IpcService* m_ipc = nullptr;
+  };
+
+  class QrScanShortcut final : public Shortcut {
+  public:
+    explicit QrScanShortcut(IpcService* ipc) : m_ipc(ipc) {}
+    std::string_view id() const override { return "scan_qr"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.scan-qr"); }
+    std::string_view iconOn() const override { return "qrcode"; }
+    std::string_view iconOff() const override { return "qrcode"; }
+    bool enabled() const override { return process::commandExists("zbarimg"); }
+    void onClick() override { runCapture(m_ipc, "screenshot-scan-qr"); }
+    void onRightClick() override { openTab("screenshot"); }
+
+  private:
+    IpcService* m_ipc = nullptr;
+  };
+
+  class ScreenRecordShortcut final : public Shortcut {
+  public:
+    explicit ScreenRecordShortcut(ScreenRecorderService* recorder) : m_recorder(recorder) {}
+    std::string_view id() const override { return "screen_recorder"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screen-recorder"); }
+    std::string displayLabel() const override {
+      if (m_recorder != nullptr && m_recorder->isRecording()) {
+        return m_recorder->elapsedLabel();
+      }
+      return defaultLabel();
+    }
+    std::string_view iconOn() const override { return "player-stop"; }
+    std::string_view iconOff() const override { return "video"; }
+    bool isToggle() const override { return true; }
+    bool enabled() const override {
+      return m_recorder != nullptr && (m_recorder->available() || m_recorder->isRecording());
+    }
+    bool active() const override { return m_recorder != nullptr && m_recorder->isRecording(); }
+    void onClick() override {
+      PanelManager::instance().closePanel();
+      if (m_recorder != nullptr) {
+        (void)m_recorder->toggle(ScreenRecorderService::Source::Focused);
+      }
+    }
+    void onRightClick() override { openTab("screen-record"); }
+
+  private:
+    ScreenRecorderService* m_recorder = nullptr;
+  };
+
+  class TailscaleShortcut final : public Shortcut {
+  public:
+    explicit TailscaleShortcut(TailscaleService* service) : m_service(service) {}
+    std::string_view id() const override { return "tailscale"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.tailscale"); }
+    std::string_view iconOn() const override { return "circles"; }
+    std::string_view iconOff() const override { return "circles"; }
+    bool isToggle() const override { return true; }
+    bool enabled() const override {
+      return m_service != nullptr && (m_service->installed() || m_service->running());
+    }
+    bool active() const override { return m_service != nullptr && m_service->running(); }
+    void onClick() override {
+      if (m_service != nullptr) {
+        m_service->toggle();
+      }
+    }
+    void onRightClick() override { openTab("tailscale"); }
+
+  private:
+    TailscaleService* m_service = nullptr;
   };
 
   using ShortcutCreator = std::unique_ptr<Shortcut> (*)(const ShortcutServices& services);
@@ -541,6 +664,30 @@ namespace {
           .type = "clipboard",
           .labelKey = "control-center.shortcuts.clipboard",
           .isAvailable = [](const Config& config) { return config.shell.clipboardEnabled; },
+      }),
+      builtinShortcut<ScreenshotShortcut, &ShortcutServices::ipc>({
+          .type = "screenshot",
+          .labelKey = "control-center.shortcuts.screenshot",
+      }),
+      builtinShortcut<ColorPickShortcut, &ShortcutServices::ipc>({
+          .type = "pick_color",
+          .labelKey = "control-center.shortcuts.pick-color",
+      }),
+      builtinShortcut<OcrShortcut, &ShortcutServices::ipc>({
+          .type = "ocr",
+          .labelKey = "control-center.shortcuts.ocr",
+      }),
+      builtinShortcut<QrScanShortcut, &ShortcutServices::ipc>({
+          .type = "scan_qr",
+          .labelKey = "control-center.shortcuts.scan-qr",
+      }),
+      builtinShortcut<ScreenRecordShortcut, &ShortcutServices::screenRecorder>({
+          .type = "screen_recorder",
+          .labelKey = "control-center.shortcuts.screen-recorder",
+      }),
+      builtinShortcut<TailscaleShortcut, &ShortcutServices::tailscale>({
+          .type = "tailscale",
+          .labelKey = "control-center.shortcuts.tailscale",
       }),
   });
 

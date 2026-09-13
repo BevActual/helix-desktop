@@ -53,6 +53,9 @@ be installed, natively or as the Flatpak). The recording logic lives in a headle
 session, so it works with **no bar widget placed** - the widget and control-center shortcut are thin clients. Options
 (codec, quality, output folder, replay buffer, …) are plugin-level settings, edited under **Settings → Plugins**.
 
+Noctalia also has a built-in recorder under **Control Center → Screen Record** and `screen-record-toggle`. It does not
+replace this plugin: replay buffer, codecs, and quality stay here, and both can be enabled at the same time.
+
 The service is a singleton, so address it with **`all`**:
 
 | Command | Effect |
@@ -125,8 +128,8 @@ device updates.
 Wallhaven browsing is built into the wallpaper picker. Open **Wallpaper**, switch to **Wallhaven**, or run
 `noctalia msg panel-toggle wallpaper wallhaven`. API key and download directory live under **Settings → Wallpaper**.
 
-The official plugin remains available as a separate panel if you still have it enabled. New setups should use the
-built-in Wallpaper page.
+The plugin's Control Center tab is no longer listed. If the plugin is still enabled, its separate panel, bar widget,
+and shortcut remain. New setups should use the built-in Wallpaper page.
 
 | Command | Effect |
 |---------|--------|

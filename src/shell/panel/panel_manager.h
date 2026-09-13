@@ -66,13 +66,13 @@ public:
   // Returns false when the plugin is unknown, disabled, or exposes no settings.
   void setOpenPluginSettingsCallback(std::function<bool(std::string pluginId)> callback);
   void setCloseDesktopWidgetsEditorCallback(std::function<void()> callback);
-  void openSettingsWindow(std::string context = "");
+  void openSettings(std::string context = "");
   // Closes any other open panel, then opens Control Center at the plugin's settings.
   // False when Control Center is unavailable, or the plugin is unknown, disabled, or
   // exposes no settings.
   [[nodiscard]] bool openPluginSettings(const std::string& pluginId);
-  void closeSettingsWindow();
-  void toggleSettingsWindow(std::string context = "");
+  void closeSettings();
+  void toggleSettings(std::string context = "");
   void setAttachedPanelGeometryCallback(
       std::function<void(wl_output*, std::string_view, std::optional<AttachedPanelGeometry>)> callback
   );
@@ -96,6 +96,7 @@ public:
   // retire plugin-backed panels on a plugin enable/disable/reload.
   void unregisterPanel(const std::string& id);
 
+  // "clipboard" is a compat alias for Control Center's clipboard tab (existing panel-toggle clipboard binds).
   void openPanel(const std::string& panelId, PanelOpenRequest request = {});
   void closePanel(bool animateClose = true);
   void togglePanel(const std::string& panelId, PanelOpenRequest request);

@@ -3046,10 +3046,6 @@
           "description": "כלול את סמן העכבר בצילומי מסך",
           "label": "הצג סמן"
         },
-        "settings-window-translucent": {
-          "description": "הפוך את הרקע של ההגדרות לשקוף עבור אפקטים של ה-compositor",
-          "label": "רקע שקוף להגדרות"
-        },
         "show-location": {
           "description": "הצג את שם המיקום בווידג'טים של מזג האוויר",
           "label": "הצג מיקום"
