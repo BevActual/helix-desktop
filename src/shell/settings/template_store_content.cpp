@@ -45,6 +45,7 @@ namespace settings {
       void setCatalog(const std::vector<noctalia::theme::AvailableTemplate>* catalog) { m_catalog = catalog; }
       void setSelectedIds(const std::unordered_set<std::string>* ids) { m_selectedIds = ids; }
       void setOnEditUser(std::function<void(std::string)> cb) { m_onEditUser = std::move(cb); }
+      void setApplyErrorForId(std::function<std::string(std::string_view)> cb) { m_applyErrorForId = std::move(cb); }
 
       [[nodiscard]] std::size_t itemCount() const override { return m_indices != nullptr ? m_indices->size() : 0; }
 
@@ -65,6 +66,10 @@ namespace settings {
         m_tilesByIndex[index] = t;
         const auto& entry = (*m_catalog)[(*m_indices)[index]];
         const bool enabled = m_selectedIds != nullptr && m_selectedIds->contains(entry.id);
+        std::string applyError;
+        if (enabled && m_applyErrorForId) {
+          applyError = m_applyErrorForId(entry.id);
+        }
         t->bind(
             entry.displayName, entry.category, enabled, selected, hovered,
             [this, index](bool nextEnabled) {
@@ -72,7 +77,7 @@ namespace settings {
                 m_content->setEnabledAtFilteredIndex(index, nextEnabled);
               }
             },
-            static_cast<bool>(m_onEditUser)
+            static_cast<bool>(m_onEditUser), applyError
         );
       }
 
@@ -80,7 +85,18 @@ namespace settings {
         if (m_indices == nullptr || m_catalog == nullptr || index >= m_indices->size()) {
           return {};
         }
-        return noctalia::theme::formatTemplateTooltip((*m_catalog)[(*m_indices)[index]]);
+        const auto& entry = (*m_catalog)[(*m_indices)[index]];
+        std::string tooltip = noctalia::theme::formatTemplateTooltip(entry);
+        if (m_applyErrorForId) {
+          const std::string error = m_applyErrorForId(entry.id);
+          if (!error.empty()) {
+            if (!tooltip.empty()) {
+              tooltip += '\n';
+            }
+            tooltip += error;
+          }
+        }
+        return tooltip;
       }
 
       void onActivate(std::size_t index) override {
@@ -127,6 +143,7 @@ namespace settings {
       const std::vector<noctalia::theme::AvailableTemplate>* m_catalog = nullptr;
       const std::unordered_set<std::string>* m_selectedIds = nullptr;
       std::function<void(std::string)> m_onEditUser;
+      std::function<std::string(std::string_view)> m_applyErrorForId;
       std::unordered_map<std::size_t, TemplateStoreTile*> m_tilesByIndex;
     };
 
@@ -509,6 +526,7 @@ namespace settings {
     adapterPtr->setCatalog(&m_catalog);
     adapterPtr->setSelectedIds(&m_selectedIds);
     adapterPtr->setOnEditUser(m_callbacks.onEditUser);
+    adapterPtr->setApplyErrorForId(m_callbacks.applyErrorForId);
     m_adapter = std::move(adapter);
 
     // Intrinsic height of the same card layout as built-in templates (padding + checkbox/text).

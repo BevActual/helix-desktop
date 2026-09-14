@@ -44,6 +44,7 @@ namespace noctalia::theme {
       std::shared_ptr<const toml::table> configTable;
       HookRunner* hookRunner = nullptr;
       std::uint64_t generation = 0;
+      std::function<void(std::string id, std::string error)> onError;
     };
 
     explicit TemplateEngine(ThemeData themeData);

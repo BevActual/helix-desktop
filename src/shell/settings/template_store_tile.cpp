@@ -73,12 +73,13 @@ namespace settings {
 
   void TemplateStoreTile::bind(
       std::string_view name, std::string_view category, bool enabled, bool selected, bool hovered,
-      std::function<void(bool enabled)> onToggle, bool showEdit
+      std::function<void(bool enabled)> onToggle, bool showEdit, std::string_view applyError
   ) {
     m_nameLabel->setText(std::string(name));
-    m_categoryLabel->setText(std::string(category));
+    const bool failed = enabled && !applyError.empty();
+    m_categoryLabel->setText(failed ? i18n::tr("control-center.templates.apply-failed") : std::string(category));
 
-    const bool hasCategory = !category.empty();
+    const bool hasCategory = failed || !category.empty();
     m_categoryLabel->setVisible(hasCategory);
     m_categoryLabel->setParticipatesInLayout(hasCategory);
 

@@ -10,6 +10,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 
 class Button;
 class ConfigService;
@@ -20,6 +21,10 @@ class Segmented;
 class Toggle;
 struct ControlCenterServices;
 struct DesktopEntry;
+
+namespace noctalia::theme {
+  class TemplateApplyService;
+}
 
 class TemplatesTab : public Tab {
 public:
@@ -59,6 +64,7 @@ private:
 
   ConfigService* m_config = nullptr;
   std::function<void()> m_applyTemplates;
+  noctalia::theme::TemplateApplyService* m_templateApply = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
   std::unique_ptr<settings::TemplateStoreContent> m_store;
@@ -81,4 +87,5 @@ private:
   Source m_liveSource = Source::Community;
   float m_storeScale = 0.0F;
   std::string m_catalogKey;
+  std::unordered_map<std::string, std::string> m_applyFailures;
 };

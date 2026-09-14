@@ -18,7 +18,7 @@ namespace settings {
 
     void bind(
         std::string_view name, std::string_view category, bool enabled, bool selected, bool hovered,
-        std::function<void(bool enabled)> onToggle, bool showEdit = false
+        std::function<void(bool enabled)> onToggle, bool showEdit = false, std::string_view applyError = {}
     );
 
     [[nodiscard]] bool hitTestEdit(float localX, float localY) const;

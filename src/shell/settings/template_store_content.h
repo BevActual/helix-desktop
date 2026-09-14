@@ -40,6 +40,7 @@ namespace settings {
     std::string emptyCatalogText;
     // When set, user-template tiles show a trailing edit control that opens this callback.
     std::function<void(std::string id)> onEditUser;
+    std::function<std::string(std::string_view id)> applyErrorForId;
   };
 
   class TemplateStoreContent {

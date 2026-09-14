@@ -188,6 +188,16 @@ namespace noctalia::theme {
     m_afterApplyCallback = std::move(callback);
   }
 
+  void TemplateApplyService::setFailuresChangedCallback(std::function<void()> callback) const {
+    std::scoped_lock lock(m_mutex);
+    m_failuresChangedCallback = std::move(callback);
+  }
+
+  std::unordered_map<std::string, std::string> TemplateApplyService::lastFailures() const {
+    std::scoped_lock lock(m_mutex);
+    return m_failures;
+  }
+
   void TemplateApplyService::apply(
       const GeneratedPalette& palette, std::string_view defaultMode, bool force, bool paletteChanged
   ) const {
@@ -283,6 +293,14 @@ namespace noctalia::theme {
 
   void TemplateApplyService::applyRequest(const ApplyRequest& request) const {
     HookRunner& hookRunner = *m_hookRunner;
+    {
+      std::scoped_lock lock(m_mutex);
+      m_collectingGeneration = request.generation;
+      m_collectingFailures.clear();
+    }
+    hookRunner.setOnFailure([this, generation = request.generation](std::string id, std::string error) {
+      recordFailure(std::move(id), std::move(error), generation);
+    });
 
     // Hooks from superseded generations must not outlive them: drop the queued ones and
     // wait out the ones already running. A started hook cannot be cancelled safely, so
@@ -300,6 +318,9 @@ namespace noctalia::theme {
     options.configTable = request.configTable;
     options.hookRunner = &hookRunner;
     options.generation = request.generation;
+    options.onError = [this, generation = request.generation](std::string id, std::string error) {
+      recordFailure(std::move(id), std::move(error), generation);
+    };
 
     TemplateEngine engine(TemplateEngine::makeThemeData(request.palette), options);
 
@@ -318,6 +339,7 @@ namespace noctalia::theme {
       const std::filesystem::path builtinConfig = builtinTemplateConfigPath();
       if (!builtinEngine.processConfigFile(builtinConfig)) {
         kLog.warn("failed to apply built-in templates from {}", builtinConfig.string());
+        recordFailure("builtin", "failed to apply built-in templates", request.generation);
       }
     }
 
@@ -335,11 +357,13 @@ namespace noctalia::theme {
         const std::filesystem::path communityConfig = communityTemplateConfigPath(id);
         if (!std::filesystem::exists(communityConfig)) {
           kLog.warn("community template '{}' is not cached yet", id);
+          recordFailure(id, "community template is not downloaded yet", request.generation);
           continue;
         }
         TemplateEngine communityEngine(TemplateEngine::makeThemeData(request.palette), options);
         if (!communityEngine.processConfigFile(communityConfig)) {
           kLog.warn("failed to apply community template '{}' from {}", id, communityConfig.string());
+          recordFailure(id, "failed to apply community template", request.generation);
         }
       }
     }
@@ -396,6 +420,32 @@ namespace noctalia::theme {
         kStateOwner, kAppliedBuiltinIdsKey,
         StringUtils::join({m_appliedBuiltinIds.begin(), m_appliedBuiltinIds.end()}, " ")
     );
+  }
+
+  void TemplateApplyService::recordFailure(std::string id, std::string error, std::uint64_t generation) const {
+    if (id.empty() || error.empty()) {
+      return;
+    }
+    std::scoped_lock lock(m_mutex);
+    if (generation != m_collectingGeneration) {
+      return;
+    }
+    m_collectingFailures.insert_or_assign(std::move(id), std::move(error));
+  }
+
+  void TemplateApplyService::publishFailures(std::uint64_t generation) const {
+    std::function<void()> callback;
+    {
+      std::scoped_lock lock(m_mutex);
+      if (generation != m_collectingGeneration) {
+        return;
+      }
+      m_failures = m_collectingFailures;
+      callback = m_failuresChangedCallback;
+    }
+    if (callback) {
+      DeferredCall::callLater(std::move(callback));
+    }
   }
 
   std::vector<std::string> TemplateApplyService::undoBuiltinTemplates(const ApplyRequest& request) const {
@@ -509,6 +559,7 @@ namespace noctalia::theme {
       // applyRequest() waits its hooks out before touching anything.
       if (!requestSuperseded(request.generation)) {
         m_hookRunner->waitIdle();
+        publishFailures(request.generation);
       }
 
       std::function<void()> afterApplyCallback;

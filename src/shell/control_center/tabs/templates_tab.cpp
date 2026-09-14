@@ -12,6 +12,7 @@
 #include "shell/settings/settings_content_common.h"
 #include "shell/settings/template_store_content.h"
 #include "system/desktop_entry.h"
+#include "theme/template_apply_service.h"
 #include "theme/adw_gtk3.h"
 #include "theme/builtin_templates.h"
 #include "theme/community_templates.h"
@@ -35,6 +36,7 @@
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -236,6 +238,7 @@ std::size_t TemplatesTab::indexFromSource(Source source) noexcept {
 TemplatesTab::TemplatesTab(const ControlCenterServices& services)
     : m_config(services.config),
       m_applyTemplates(services.settingsActions.applyTemplates),
+      m_templateApply(services.templateApply),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "templates", .includedGroups = {"built-in", "community"}}
       )) {
@@ -444,20 +447,48 @@ void TemplatesTab::syncLiveControls() {
   setShown(m_enableLabel, !userSource);
   setShown(m_enable, !userSource);
   const auto& templates = m_config->config().theme.templates;
+  m_applyFailures = m_templateApply != nullptr ? m_templateApply->lastFailures() : std::unordered_map<std::string, std::string>{};
   const bool gtkMissingTheme = m_sourceKind == Source::Builtin && enabled
       && noctalia::theme::gtkTemplatesEnabled(templates) && !noctalia::theme::adwGtk3ThemePresent();
-  if (m_hint != nullptr) {
-    const char* key = "control-center.templates.disabled-builtin";
-    if (gtkMissingTheme) {
-      key = "control-center.templates.gtk-missing-theme";
+  std::size_t applyFailureCount = 0;
+  if (enabled) {
+    const auto countIf = [&](const std::string& id) {
+      if (m_applyFailures.contains(id)) {
+        ++applyFailureCount;
+      }
+    };
+    if (m_sourceKind == Source::Builtin) {
+      for (const auto& id : templates.builtinIds) {
+        countIf(id);
+      }
     } else if (m_sourceKind == Source::Community) {
-      key = "control-center.templates.disabled-community";
-    } else if (userSource) {
-      key = "control-center.templates.disabled-user";
+      for (const auto& id : templates.communityIds) {
+        countIf(id);
+      }
+    } else {
+      for (const auto& entry : templates.userTemplates) {
+        if (entry.enabled) {
+          countIf(entry.id);
+        }
+      }
     }
-    m_hint->setText(i18n::tr(key));
   }
-  const bool showHint = gtkMissingTheme || !enabled
+  if (m_hint != nullptr) {
+    if (gtkMissingTheme) {
+      m_hint->setText(i18n::tr("control-center.templates.gtk-missing-theme"));
+    } else if (applyFailureCount > 0) {
+      m_hint->setText(
+          i18n::tr("control-center.templates.apply-failures", "count", std::to_string(applyFailureCount))
+      );
+    } else if (m_sourceKind == Source::Community) {
+      m_hint->setText(i18n::tr("control-center.templates.disabled-community"));
+    } else if (userSource) {
+      m_hint->setText(i18n::tr("control-center.templates.disabled-user"));
+    } else {
+      m_hint->setText(i18n::tr("control-center.templates.disabled-builtin"));
+    }
+  }
+  const bool showHint = gtkMissingTheme || applyFailureCount > 0 || !enabled
       || (userSource && templates.userTemplates.empty());
   setShown(m_hint, showHint);
   setShown(m_storeHost, enabled);
@@ -596,6 +627,11 @@ void TemplatesTab::ensureStore() {
                         }
                     }
                   : nullptr,
+          .applyErrorForId =
+              [this](std::string_view id) {
+                const auto it = m_applyFailures.find(std::string(id));
+                return it == m_applyFailures.end() ? std::string{} : it->second;
+              },
       }
   );
   m_store->setOnRebuildNeeded([this]() { invalidateStore(false); });
@@ -638,11 +674,17 @@ bool TemplatesTab::sourceEnabled() const {
 }
 
 std::string TemplatesTab::catalogKey() const {
+  std::string key;
   if (m_sourceKind == Source::Builtin) {
-    return "builtin";
-  }
-  std::string key = m_sourceKind == Source::User ? "user\n" : "community\n";
-  if (m_sourceKind == Source::User) {
+    key = "builtin\n";
+    if (m_config != nullptr) {
+      for (const auto& id : m_config->config().theme.templates.builtinIds) {
+        key += id;
+        key += '\n';
+      }
+    }
+  } else if (m_sourceKind == Source::User) {
+    key = "user\n";
     if (m_config != nullptr) {
       for (const auto& entry : m_config->config().theme.templates.userTemplates) {
         key += entry.id;
@@ -660,10 +702,24 @@ std::string TemplatesTab::catalogKey() const {
         key += '\n';
       }
     }
-    return key;
+  } else {
+    key = "community\n";
+    for (const auto& entry : noctalia::theme::CommunityTemplateService::availableTemplates()) {
+      key += entry.id;
+      key += '\n';
+    }
   }
-  for (const auto& entry : noctalia::theme::CommunityTemplateService::availableTemplates()) {
-    key += entry.id;
+  key += "failures\n";
+  std::vector<std::string> failedIds;
+  failedIds.reserve(m_applyFailures.size());
+  for (const auto& [id, error] : m_applyFailures) {
+    failedIds.push_back(id);
+  }
+  std::ranges::sort(failedIds);
+  for (const auto& id : failedIds) {
+    key += id;
+    key += '\t';
+    key += m_applyFailures.at(id);
     key += '\n';
   }
   return key;

@@ -582,6 +582,7 @@ void Application::initPanelManagerAndPanels() {
           .screenTime = &m_screenTimeService,
           .nightLight = &m_gammaService,
           .theme = &m_themeService,
+          .templateApply = &m_templateApplyService,
           .idleInhibitor = &m_idleInhibitor,
           .session = &m_sessionActionRunner,
           .dependencies = &m_dependencyService,

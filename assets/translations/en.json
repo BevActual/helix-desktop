@@ -729,6 +729,8 @@
       "empty-user": "No user templates yet. Use + to create one from an installed app.",
       "enable": "Enable",
       "gtk-missing-theme": "GTK 3 and GTK 4 templates are on, but adw-gtk3 is not installed. Install package adw-gtk3-theme so GTK apps follow this palette.",
+      "apply-failed": "Apply failed",
+      "apply-failures": "{count} templates failed to apply. Turn unused ones off, or hover a tile for the error.",
       "input-path": "Template file",
       "new": "New template from an app",
       "new-tooltip": "Create or enable a template for an installed app",

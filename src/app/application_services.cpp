@@ -683,6 +683,7 @@ void Application::initStyleThemeAndWayland() {
       m_hookManager.fire(HookKind::ColorsChanged);
     }
   });
+  m_templateApplyService.setFailuresChangedCallback([this]() { m_settingsInvalidated.emit(); });
 
   m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{},
                                       lastGeneratedPalette = std::optional<noctalia::theme::GeneratedPalette>{},

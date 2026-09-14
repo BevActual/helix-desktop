@@ -54,6 +54,22 @@ namespace {
     std::filesystem::remove(sentinel);
   }
 
+  void test_reports_failed_hooks_with_template_id() {
+    std::string failedId;
+    std::string error;
+    {
+      noctalia::theme::HookRunner runner(1);
+      runner.setOnFailure([&](std::string id, std::string message) {
+        failedId = std::move(id);
+        error = std::move(message);
+      });
+      runner.enqueue("false", /*generation=*/1, "cava");
+      runner.waitIdle();
+    }
+    assert(failedId == "cava");
+    assert(!error.empty());
+  }
+
   void test_invalidate_drops_queued_hooks() {
     const auto sentinel = sentinelPath("invalidate");
     std::filesystem::remove(sentinel);
@@ -98,6 +114,7 @@ namespace {
 int main() {
   test_runs_every_enqueued_hook();
   test_drops_hooks_from_superseded_generations();
+  test_reports_failed_hooks_with_template_id();
   test_invalidate_drops_queued_hooks();
   test_shutdown_drops_backlog_and_awaits_running();
   return 0;

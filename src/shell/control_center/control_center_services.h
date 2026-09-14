@@ -45,6 +45,7 @@ class WallpaperScanner;
 
 namespace noctalia::theme {
   class ThemeService;
+  class TemplateApplyService;
 }
 namespace scripting {
   class ScriptApiContext;
@@ -78,6 +79,7 @@ struct ControlCenterServices {
   ScreenTimeService* screenTime = nullptr;
   GammaService* nightLight = nullptr;
   noctalia::theme::ThemeService* theme = nullptr;
+  noctalia::theme::TemplateApplyService* templateApply = nullptr;
   IdleInhibitor* idleInhibitor = nullptr;
   SessionActionRunner* session = nullptr;
   DependencyService* dependencies = nullptr;

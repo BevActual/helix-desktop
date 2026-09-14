@@ -14,6 +14,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 class ConfigService;
@@ -40,8 +41,10 @@ namespace noctalia::theme {
     ) const;
     // The notification handler. Sticky: set once.
     void setAfterApplyCallback(std::function<void(std::string_view appliedMode, bool paletteChanged)> callback) const;
+    void setFailuresChangedCallback(std::function<void()> callback) const;
     void registerIpc(IpcService& ipc);
     [[nodiscard]] bool reapplyLast() const;
+    [[nodiscard]] std::unordered_map<std::string, std::string> lastFailures() const;
 
   private:
     struct ApplyRequest {
@@ -65,6 +68,8 @@ namespace noctalia::theme {
     // Clears ids whose undo hook has run from the applied/owed sets. Main thread only.
     void forgetAppliedBuiltinIds(const std::vector<std::string>& ids) const;
     void persistAppliedBuiltinIds() const;
+    void recordFailure(std::string id, std::string error, std::uint64_t generation) const;
+    void publishFailures(std::uint64_t generation) const;
     // Runs the undo hooks of request.undoBuiltinIds and returns the ids it resolved.
     [[nodiscard]] std::vector<std::string> undoBuiltinTemplates(const ApplyRequest& request) const;
     void applyRequest(const ApplyRequest& request) const;
@@ -87,6 +92,10 @@ namespace noctalia::theme {
     mutable bool m_shutdown = false;
     mutable bool m_inFlight = false;
     mutable std::function<void(std::string_view appliedMode, bool paletteChanged)> m_afterApplyCallback;
+    mutable std::function<void()> m_failuresChangedCallback;
+    mutable std::unordered_map<std::string, std::string> m_failures;
+    mutable std::unordered_map<std::string, std::string> m_collectingFailures;
+    mutable std::uint64_t m_collectingGeneration = 0;
     // A palette change has been reported to apply() and not yet passed on to the handler.
     mutable bool m_paletteChangedOwed = false;
     mutable std::unique_ptr<HookRunner> m_hookRunner;
