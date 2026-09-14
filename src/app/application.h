@@ -215,6 +215,8 @@ private:
   void performGreeterSync(bool quiet = false);
   void launchGreeterSync(bool quiet);
   void scheduleGreeterAutoSync();
+  void performShellUpgrade();
+  void launchShellUpgrade();
   bool runShellCommandBlocking(const std::string& command);
   bool runIdleAction(const IdleActionRequest& action);
   void onIconThemeChanged();

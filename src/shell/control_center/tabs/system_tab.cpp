@@ -209,7 +209,8 @@ namespace {
 } // namespace
 
 SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services)
-    : m_monitor(monitor), m_clipboard(services.clipboard),
+    : m_monitor(monitor), m_clipboard(services.clipboard), m_upgradeShell(services.upgradeShell),
+      m_upgradeAvailable(services.upgradeAvailable), m_upgradeBusy(services.upgradeBusy),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
@@ -344,10 +345,42 @@ std::unique_ptr<Flex> SystemTab::create() {
     });
     static constexpr const char* kSystemGlyphs[] = {"cpu-usage",        "video",      "device-desktop",
                                                     "layers-intersect", "app-window", "clock"};
-    makeInfoCard(
+    auto* systemCard = makeInfoCard(
         *row, i18n::tr("control-center.system.titles.system"), sc, 1.0F, panelCardOpacity(), m_systemLines,
         kSystemLines, kSystemGlyphs
     );
+    if (m_upgradeAvailable && m_upgradeAvailable()) {
+      const float controlHeight = Style::controlHeight * sc;
+      systemCard->addChild(
+          ui::label({
+              .text = i18n::tr("control-center.system.upgrade-description"),
+              .fontSize = Style::fontSizeCaption * sc,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              .maxLines = 3,
+          })
+      );
+      systemCard->addChild(
+          ui::button({
+              .out = &m_upgradeButton,
+              .text = i18n::tr("control-center.system.upgrade"),
+              .glyph = "refresh",
+              .fontSize = Style::fontSizeBody * sc,
+              .contentAlign = ButtonContentAlign::Start,
+              .variant = ButtonVariant::Default,
+              .minHeight = controlHeight,
+              .paddingV = Style::spaceSm * sc,
+              .paddingH = Style::spaceMd * sc,
+              .radius = Style::scaledRadiusMd(sc),
+              .flexGrow = 1.0F,
+              .onClick =
+                  [this]() {
+                    if (m_upgradeShell) {
+                      m_upgradeShell();
+                    }
+                  },
+          })
+      );
+    }
 
     auto* resourcesCard = makeInfoCard(
         *row, i18n::tr("control-center.system.titles.resources"), sc, 1.0F, panelCardOpacity(), nullptr, 0, nullptr
@@ -495,6 +528,7 @@ void SystemTab::onClose() {
   m_rxLabel = nullptr;
   m_txIcon = nullptr;
   m_txLabel = nullptr;
+  m_upgradeButton = nullptr;
   for (auto& l : m_systemLines)
     l = nullptr;
   for (auto& l : m_resourcesLines)
@@ -592,7 +626,19 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
 }
 
 void SystemTab::doUpdate(Renderer& renderer) {
-  if (!m_active || m_monitor == nullptr) {
+  if (!m_active) {
+    return;
+  }
+
+  if (m_upgradeButton != nullptr) {
+    const bool busy = m_upgradeBusy && m_upgradeBusy();
+    m_upgradeButton->setEnabled(!busy);
+    m_upgradeButton->setText(
+        i18n::tr(busy ? "control-center.system.upgrade-busy" : "control-center.system.upgrade")
+    );
+  }
+
+  if (m_monitor == nullptr) {
     return;
   }
 

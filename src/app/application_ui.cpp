@@ -64,6 +64,7 @@
 #include "shell/clipboard/clipboard_paste.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
+#include "system/fedora_upgrade_launcher.h"
 #include "shell/launcher/launcher_panel.h"
 #include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
@@ -242,6 +243,58 @@ void Application::scheduleGreeterAutoSync() {
   }
   m_greeterAutoSyncTimer.stop();
   m_greeterAutoSyncTimer.start(std::chrono::milliseconds(1000), [this]() { performGreeterSync(true); });
+}
+
+void Application::performShellUpgrade() {
+  if (!noctalia::fedora_upgrade::available()) {
+    return;
+  }
+  ensurePolkitAgent([this](bool /*ok*/) { launchShellUpgrade(); });
+}
+
+void Application::launchShellUpgrade() {
+  const auto complete = [this](bool success, std::string error) {
+    DeferredCall::callLater([this, success, error = std::move(error)]() {
+      m_settingsInvalidated.emit();
+      if (success) {
+        notify::info(
+            "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+            i18n::tr("notifications.internal.shell-upgrade-success")
+        );
+        return;
+      }
+      constexpr std::size_t kMaxError = 280;
+      std::string body = i18n::tr("notifications.internal.shell-upgrade-failed");
+      if (!error.empty()) {
+        const std::string detail =
+            error.size() <= kMaxError ? error : error.substr(error.size() - kMaxError);
+        body += '\n';
+        body += detail;
+      }
+      notify::error("Noctalia", i18n::tr("notifications.internal.shell-upgrade"), std::move(body));
+    });
+  };
+
+  const auto launch = noctalia::fedora_upgrade::start(complete);
+  if (launch == noctalia::fedora_upgrade::Launch::Busy) {
+    notify::info(
+        "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+        i18n::tr("notifications.internal.shell-upgrade-busy")
+    );
+    return;
+  }
+  if (launch == noctalia::fedora_upgrade::Launch::Failed) {
+    notify::error(
+        "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+        i18n::tr("notifications.internal.shell-upgrade-failed")
+    );
+    return;
+  }
+  m_settingsInvalidated.emit();
+  notify::info(
+      "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+      i18n::tr("notifications.internal.shell-upgrade-started")
+  );
 }
 
 void Application::initLockScreenAndSession() {
@@ -612,6 +665,10 @@ void Application::initPanelManagerAndPanels() {
           .pluginManager = &m_pluginManager,
           .screenRecorder = &m_screenRecorder,
           .tailscale = &m_tailscaleService,
+          .upgradeShell = [this]() { performShellUpgrade(); },
+          .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },
+          .upgradeBusy = []() { return noctalia::fedora_upgrade::busy(); },
+          .ensurePolkit = [this](std::function<void(bool)> onReady) { ensurePolkitAgent(std::move(onReady)); },
           .settingsInvalidated = &m_settingsInvalidated,
           .settingsActions = std::move(settingsActions),
       });

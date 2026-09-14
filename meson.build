@@ -669,6 +669,7 @@ _noctalia_sources = files(
   'src/shell/control_center/plugin_control_center_tab.cpp',
   'src/shell/control_center/plugin_shortcut.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
+  'src/shell/control_center/tabs/packages_tab.cpp',
   'src/shell/control_center/tabs/system_tab.cpp',
   'src/shell/control_center/tabs/tailscale_tab.cpp',
   'src/shell/control_center/tabs/appearance_tab.cpp',
@@ -851,6 +852,10 @@ _noctalia_sources = files(
   'src/system/keyboard_backlight_service.cpp',
   'src/system/lock_keys_service.cpp',
   'src/system/distro_info.cpp',
+  'src/system/fedora_upgrade.cpp',
+  'src/system/fedora_upgrade_launcher.cpp',
+  'src/system/package_kit_service.cpp',
+  'src/system/package_spec.cpp',
   'src/system/disk_mounts.cpp',
   'src/system/format_units.cpp',
   'src/system/hardware_info.cpp',
@@ -1116,10 +1121,13 @@ _noctalia_test_dependencies = _noctalia_system_dependencies + [
   _luau_selective_dep,
 ]
 
+noctalia_system_upgrade_path = join_paths(get_option('prefix'), get_option('libexecdir'), 'noctalia-system-upgrade')
+
 _noctalia_compile_definitions = [
   '-DNOCTALIA_INSTALL_PREFIX="' + get_option('prefix') + '"',
   '-DNOCTALIA_INSTALL_DATADIR="' + get_option('datadir') + '"',
   '-DNOCTALIA_VERSION="' + meson.project_version() + '"',
+  '-DNOCTALIA_SYSTEM_UPGRADE_PATH="' + noctalia_system_upgrade_path + '"',
 ] + jemalloc_cpp_args
 
 _noctalia_cpp_args = [
@@ -1168,6 +1176,27 @@ install_data(
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
 )
 
+executable('noctalia-system-upgrade',
+  sources: files(
+    'src/system/fedora_upgrade.cpp',
+    'src/system/fedora_upgrade_main.cpp',
+  ),
+  include_directories: include_directories('src'),
+  cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers', '-Wpedantic', '-Wconversion', '-Wshadow'],
+  install: true,
+  install_dir: get_option('libexecdir'),
+)
+
+noctalia_upgrade_policy_conf = configuration_data()
+noctalia_upgrade_policy_conf.set('HELPER_PATH', noctalia_system_upgrade_path)
+configure_file(
+  input: 'assets/polkit/dev.noctalia.Noctalia.upgrade.policy.in',
+  output: 'dev.noctalia.Noctalia.upgrade.policy',
+  configuration: noctalia_upgrade_policy_conf,
+  install: true,
+  install_dir: get_option('datadir') / 'polkit-1' / 'actions',
+)
+
 if build_tests
   _cpp_test_names = [
     'adw_gtk3',
@@ -1212,6 +1241,7 @@ if build_tests
     'enterprise_credentials',
     'event_link',
     'fcitx_status',
+    'fedora_upgrade',
     'freedesktop_key_file',
     'google_client_calendar_list',
     'greeter_appearance_sync',
@@ -1250,6 +1280,7 @@ if build_tests
     'notification_filter',
     'notification_history_dismiss',
     'notification_history_utf8',
+    'package_spec',
     'path_browse',
     'plugin_bindings',
     'plugin_catalog',

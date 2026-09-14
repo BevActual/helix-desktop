@@ -27,6 +27,7 @@
 #include "shell/control_center/tabs/monitor_tab.h"
 #include "shell/control_center/tabs/network_tab.h"
 #include "shell/control_center/tabs/notifications_tab.h"
+#include "shell/control_center/tabs/packages_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
 #include "shell/control_center/tabs/screenshot_tab.h"
@@ -45,6 +46,7 @@
 #include "wayland/wayland_seat.h"
 #include "system/dependency_service.h"
 #include "system/easyeffects_service.h"
+#include "system/package_kit_service.h"
 #include "system/screen_time_service.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -99,6 +101,7 @@ namespace {
       {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Status},
       {"monitor", "control-center.tabs.monitor", "device-desktop", true, TabGroup::Status},
       {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::Status},
+      {"packages", "control-center.tabs.packages", "package", true, TabGroup::Status},
       {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
@@ -218,6 +221,7 @@ namespace {
         || id == "notifications"
         || id == "power"
         || id == "system"
+        || id == "packages"
         || id == "calendar"
         || id == "audio"
         || id == "monitor"
@@ -309,6 +313,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   );
   add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
   add("system", std::make_unique<SystemTab>(services.sysmon, services));
+  add("packages", std::make_unique<PackagesTab>(services));
   add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
   add("network", std::make_unique<NetworkTab>(services));
   add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
@@ -871,6 +876,9 @@ bool ControlCenterPanel::deferPointerRelayout() const { return deferExternalRefr
 bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
   if (id == "niri") {
     return compositors::isNiri();
+  }
+  if (id == "packages") {
+    return noctalia::packages::tabAvailable();
   }
   return true;
 }

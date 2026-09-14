@@ -98,6 +98,10 @@ struct ControlCenterServices {
   scripting::PluginManager* pluginManager = nullptr;
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
+  std::function<void()> upgradeShell;
+  std::function<bool()> upgradeAvailable;
+  std::function<bool()> upgradeBusy;
+  std::function<void(std::function<void(bool)>)> ensurePolkit;
   settings::HostedEditors* hostedEditors = nullptr;
   settings::SettingsModalHost* modalHost = nullptr;
   Signal<>* settingsInvalidated = nullptr;

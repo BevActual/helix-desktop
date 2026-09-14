@@ -5,6 +5,7 @@
 #include "shell/control_center/tab.h"
 
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -13,6 +14,7 @@ class Flex;
 class Glyph;
 class Graph;
 class Label;
+class Button;
 class ClipboardService;
 class SystemMonitorService;
 struct ControlCenterServices;
@@ -45,6 +47,9 @@ private:
 
   SystemMonitorService* m_monitor;
   ClipboardService* m_clipboard = nullptr;
+  std::function<void()> m_upgradeShell;
+  std::function<bool()> m_upgradeAvailable;
+  std::function<bool()> m_upgradeBusy;
   std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
   bool m_statsRetained = false;
@@ -76,6 +81,8 @@ private:
   Flex* m_ramLegend = nullptr;
   Flex* m_gpuLegend = nullptr;
   Flex* m_netLegend = nullptr;
+
+  Button* m_upgradeButton = nullptr;
 
   Glyph* m_cpuPctIcon = nullptr;
   Label* m_cpuPctLabel = nullptr;
