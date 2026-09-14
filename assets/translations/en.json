@@ -230,6 +230,30 @@
     }
   },
   "control-center": {
+    "appearance": {
+      "auto-apps-dark-until": "Apps: Dark until {time}",
+      "auto-apps-light-until": "Apps: Light until {time}",
+      "auto-dark-until": "Dark until {time}",
+      "auto-light-until": "Light until {time}",
+      "auto-needs-location": "Auto needs a location. Set one on Weather.",
+      "auto-shell-dark-until": "Shell: Dark until {time}",
+      "auto-shell-light-until": "Shell: Light until {time}",
+      "choose-palette": "Choose a palette",
+      "community-empty": "No community palettes are available yet.",
+      "custom-empty": "No custom palettes in the palettes folder yet.",
+      "error": "Error",
+      "export-saved": "Saved as {name}",
+      "open-folder-failed": "Could not open the palettes folder.",
+      "open-palettes-folder": "Open palettes folder",
+      "outline": "Outline",
+      "palette": "Current palette",
+      "palette-hint": "These roles update with the active palette.",
+      "primary": "Primary",
+      "secondary": "Secondary",
+      "surface": "Surface",
+      "tertiary": "Tertiary",
+      "type": "Type"
+    },
     "audio": {
       "application-volumes": "Application Volumes",
       "choose-effects-profile": "Choose a profile",
@@ -685,6 +709,31 @@
       "title": "Tailscale",
       "use-exit": "Use as exit"
     },
+    "templates": {
+      "apply-tooltip": "Reapply enabled templates for the current palette",
+      "create-failed": "Could not create that user template.",
+      "disabled-builtin": "Turn on built-in templates to browse the bundled catalog and apply them on each theme change.",
+      "disabled-community": "Turn on community templates to download the catalog and apply them on each theme change.",
+      "disabled-user": "Pick an installed app to create a user template. If Noctalia already has one, that catalog entry is enabled instead.",
+      "edit-title": "Edit {id}",
+      "edit-tooltip": "Edit output path and post-hook",
+      "empty-user": "No user templates yet. Use + to create one from an installed app.",
+      "enable": "Enable",
+      "input-path": "Template file",
+      "new": "New template from an app",
+      "new-tooltip": "Create or enable a template for an installed app",
+      "open-folder-failed": "Could not open the templates folder.",
+      "open-folder-tooltip": "Open the user templates folder",
+      "open-input": "Open template file",
+      "open-input-failed": "Could not open the template file.",
+      "output-path": "Output path",
+      "output-path-placeholder": "$XDG_CONFIG_HOME/my-app/theme.css",
+      "output-required": "Set an output path the app will actually read.",
+      "post-hook": "Post-hook",
+      "post-hook-placeholder": "my-app --reload-theme",
+      "save": "Save",
+      "search-app": "Search applications…"
+    },
     "weather": {
       "daily": {
         "tooltip": {
@@ -1071,6 +1120,9 @@
       "screen-time-reset": "Screen Time",
       "screen-time-reset-success": "Usage history cleared.",
       "session-bus-unavailable": "Session bus unavailable",
+      "templates-apply": "Templates",
+      "templates-apply-pending": "Theme palette has not been resolved yet.",
+      "templates-apply-success": "Enabled templates were reapplied for the current palette.",
       "wallpaper-palette-export": "Custom Palette",
       "wallpaper-palette-export-success": "Saved \"{name}\" and switched palette source to custom."
     }
@@ -1420,6 +1472,7 @@
       "reset-page": "Failed to reset some settings.",
       "support-report": "Failed to save support report.",
       "sync-greeter": "Could not sync appearance to Noctalia Greeter.",
+      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
       "sync-greeter-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
       "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
       "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
@@ -1470,6 +1523,7 @@
     "navigation": {
       "groups": {
         "accessibility": "Accessibility",
+        "apps": "Apps",
         "audio": "Audio",
         "authentication": "Authentication",
         "automation": "Automation",
@@ -1543,6 +1597,7 @@
         "session-panel": "Session Panel",
         "setup": "Setup",
         "shape": "Shape",
+        "store": "Store",
         "system": "System",
         "theme": "Theme",
         "toasts": "Toasts",

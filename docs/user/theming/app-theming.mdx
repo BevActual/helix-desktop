@@ -48,7 +48,7 @@ enable_community_templates = true
 community_ids              = []        # opt-in; fetched from api.noctalia.dev/templates
 ```
 
-`community_ids` selects which community templates run. In **Settings → Templates**, enable community templates and use **Browse Templates** to search and filter the catalog (by category or enabled-only). Metadata and files are stored in `~/.local/state/noctalia/community-templates/` (honoring `NOCTALIA_STATE_HOME`, then `XDG_STATE_HOME`).
+`community_ids` selects which community templates run. In **Control Center → Templates**, enable community templates and browse the catalog (search, category, or enabled-only). Metadata and files are stored in `~/.local/state/noctalia/community-templates/` (honoring `NOCTALIA_STATE_HOME`, then `XDG_STATE_HOME`).
 
 Cached community template files are treated as editable local copies. Sync updates files only while their content still matches the last Noctalia-written md5; local edits are preserved until you delete the edited cached file.
 
@@ -56,7 +56,9 @@ Community template discovery and updates require network access unless the selec
 
 ## User Templates
 
-User templates are declared directly in Noctalia config:
+User templates can be created from **Control Center → Templates**: header **+**, pick an installed app. Matching built-in or community templates are enabled instead of duplicated. Otherwise Noctalia writes a starter file under `~/.config/noctalia/templates/` and registers `[theme.templates.user.<id>]`. A sheet sets `output_path` (the file the app reads) and an optional `post_hook`. User tiles keep a gear for those fields; the header folder button opens the templates directory. Header **Apply** rerenders enabled templates for the current palette.
+
+You can still declare them directly in config:
 
 ```toml
 [theme.templates.user.my_app]

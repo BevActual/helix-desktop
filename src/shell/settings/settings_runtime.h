@@ -23,6 +23,7 @@ namespace settings {
     std::function<void()> retryClipboardPersistence;
     std::function<void()> resetEncryptedStorage;
     std::function<void()> syncGreeterAppearance;
+    std::function<void()> applyTemplates;
     std::function<void()> resetLauncherUsage;
     std::function<void()> resetScreenTime;
     std::function<void()> saveWallpaperPaletteAsCustom;

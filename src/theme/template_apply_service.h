@@ -41,6 +41,7 @@ namespace noctalia::theme {
     // The notification handler. Sticky: set once.
     void setAfterApplyCallback(std::function<void(std::string_view appliedMode, bool paletteChanged)> callback) const;
     void registerIpc(IpcService& ipc);
+    [[nodiscard]] bool reapplyLast() const;
 
   private:
     struct ApplyRequest {
@@ -56,7 +57,6 @@ namespace noctalia::theme {
       std::uint64_t generation = 0;
     };
 
-    [[nodiscard]] bool reapplyLast() const;
     [[nodiscard]] ApplyRequest makeRequest(const GeneratedPalette& palette, std::string_view defaultMode) const;
     [[nodiscard]] static bool sameInputs(const ApplyRequest& a, const ApplyRequest& b);
     // Diffs the enabled built-in template ids against the ids Noctalia has applied (persisted

@@ -213,6 +213,7 @@ private:
   void syncStorageKeyProvider();
   void syncScreenTimeService();
   void performGreeterSync(bool quiet = false);
+  void launchGreeterSync(bool quiet);
   void scheduleGreeterAutoSync();
   bool runShellCommandBlocking(const std::string& command);
   bool runIdleAction(const IdleActionRequest& action);

@@ -6,6 +6,7 @@
 #include "theme/palette.h"
 #include "ui/palette.h"
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -43,6 +44,15 @@ namespace noctalia::theme {
     [[nodiscard]] std::string_view resolvedShellMode() const noexcept;
     // The resolved [theme].mode, which drives apps.
     [[nodiscard]] std::string_view resolvedMode() const noexcept;
+
+    // Schedule used to resolve Auto theme/shell mode. `ready` is false until
+    // location (or a custom sunrise/sunset) is available.
+    struct AutoSchedule {
+      bool night = false;
+      bool ready = false;
+      std::chrono::system_clock::time_point nextBoundary{};
+    };
+    [[nodiscard]] AutoSchedule autoSchedule() const;
 
     void setChangeCallback(ChangeCallback callback);
     void setResolvedCallback(ResolvedCallback callback);

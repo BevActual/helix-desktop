@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/timer_manager.h"
 #include "ui/controls/color_swatch_preview.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/virtual_list_view.h"
@@ -72,7 +71,6 @@ private:
   std::string m_selectedValue;
   std::size_t m_highlightedVisibleIndex = 0;
   std::uint64_t m_revision = 0;
-  Timer m_filterDebounceTimer;
   std::function<void(const SearchPickerOption&)> m_onActivated;
   std::function<void()> m_onCancel;
   bool m_enabled = true;

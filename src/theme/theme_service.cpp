@@ -330,6 +330,22 @@ namespace noctalia::theme {
 
   std::string_view ThemeService::resolvedMode() const noexcept { return m_isLightMode ? "light" : "dark"; }
 
+  ThemeService::AutoSchedule ThemeService::autoSchedule() const {
+    const auto& loc = m_config.config().location;
+    if (!day_night_schedule::isManualMode(loc)) {
+      const auto coords = day_night_schedule::resolveCoordinates(loc, m_autoLatitude, m_autoLongitude);
+      if (!coords.latitude.has_value() || !coords.longitude.has_value()) {
+        return {};
+      }
+    }
+    const auto eval = day_night_schedule::evaluate(loc, m_autoLatitude, m_autoLongitude);
+    return AutoSchedule{
+        .night = eval.night,
+        .ready = true,
+        .nextBoundary = std::chrono::system_clock::now() + eval.untilBoundary,
+    };
+  }
+
   void ThemeService::setChangeCallback(ChangeCallback callback) { m_changeCallback = std::move(callback); }
 
   void ThemeService::setResolvedCallback(ResolvedCallback callback) { m_resolvedCallback = std::move(callback); }

@@ -37,6 +37,7 @@ namespace settings {
     // Fired when the sheet actually closes (its hosting modal popped), before the sheet body nodes
     // are destroyed. Use it to capture state that outlives the sheet, e.g. scroll position.
     std::function<void()> onClosed;
+    std::function<InputArea*()> initialFocusArea;
   };
 
   // Surface-independent retained content for a Settings editor sheet. Hosts own the surrounding
@@ -55,6 +56,7 @@ namespace settings {
     void clearStatusMessage();
 
     [[nodiscard]] bool preDispatchKeyboard(const KeyboardEvent& event) const;
+    [[nodiscard]] InputArea* initialFocusArea() const;
     [[nodiscard]] float naturalHeight(Renderer& renderer, float width) const;
     void arrange(Renderer& renderer, float width, float height);
 
@@ -76,6 +78,7 @@ namespace settings {
     std::function<bool()> m_onCloseRequested;
     std::function<bool(const KeyboardEvent&)> m_preDispatchKeyboard;
     std::function<void()> m_onClosed;
+    std::function<InputArea*()> m_initialFocusArea;
     std::string m_title;
     Label* m_titleLabel = nullptr;
     std::string m_statusMessage;

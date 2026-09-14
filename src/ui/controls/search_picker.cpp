@@ -18,7 +18,6 @@ namespace {
 
   constexpr float kDefaultWidth = 320.0F;
   constexpr float kDefaultHeight = 360.0F;
-  constexpr auto kFilterDebounceInterval = std::chrono::milliseconds(120);
 
   class SearchPickerRow : public Flex {
   public:
@@ -153,7 +152,7 @@ SearchPicker::SearchPicker() {
                   return;
                 }
                 m_filter = value;
-                m_filterDebounceTimer.start(kFilterDebounceInterval, [this]() { applyFilter(); });
+                applyFilter();
               },
           .onKeyEvent =
               [this](std::uint32_t sym, std::uint32_t modifiers) {
@@ -229,7 +228,6 @@ void SearchPicker::setSelectedValue(std::string_view value) {
 }
 
 void SearchPicker::setFilter(std::string_view filter) {
-  m_filterDebounceTimer.stop();
   m_filter = std::string(filter);
   if (m_input != nullptr) {
     m_input->setValue(m_filter);
@@ -445,5 +443,17 @@ void SearchPicker::notifyHighlightedChanged(std::size_t previous, std::size_t ne
 
 double SearchPicker::matchScore(const SearchPickerOption& option, std::string_view query) const {
   const std::string haystack = option.label + " " + option.value + " " + option.description;
-  return FuzzyMatch::score(query, haystack);
+  const auto tokens = StringUtils::splitWhitespace(query);
+  if (tokens.empty()) {
+    return 0.0;
+  }
+  double total = 0.0;
+  for (const auto& token : tokens) {
+    const double score = FuzzyMatch::score(token, haystack);
+    if (!FuzzyMatch::isMatch(score)) {
+      return FuzzyMatch::noMatchScore;
+    }
+    total += score;
+  }
+  return total;
 }

@@ -5,11 +5,13 @@
 #include "calendar/vdir_reader.h"
 #include "config/config_service.h"
 #include "core/deferred_call.h"
+#include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "scripting/plugin_registry.h"
 #include "shell/settings/color_spec_picker.h"
+#include "shell/settings/path_browse.h"
 #include "shell/settings/settings_content_common.h"
 #include "shell/settings/settings_content_plugins.h"
 #include "shell/settings/settings_control_factory.h"
@@ -19,9 +21,11 @@
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/input.h"
+#include "ui/controls/label.h"
 #include "ui/controls/search_picker.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
+#include "ui/dialogs/file_dialog.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/file_utils.h"
@@ -29,6 +33,7 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <format>
@@ -79,6 +84,34 @@ namespace settings {
     bool locationInvalid = false;
     std::string error;
   };
+
+  struct UserTemplateDraft {
+    std::string id;
+    std::string inputPath;
+    std::vector<std::string> outputPaths;
+    std::string postHook;
+    bool outputInvalid = false;
+  };
+
+  [[nodiscard]] std::string expandTemplatePath(const std::string& raw) {
+    return FileUtils::expandUserPath(FileUtils::expandXdgBaseDir(raw)).string();
+  }
+
+  [[nodiscard]] std::string collapseXdgPath(std::string path) {
+    static constexpr std::array<std::string_view, 4> kTokens = {
+        "$XDG_CONFIG_HOME",
+        "$XDG_DATA_HOME",
+        "$XDG_STATE_HOME",
+        "$XDG_CACHE_HOME",
+    };
+    for (const std::string_view token : kTokens) {
+      const std::string expanded = FileUtils::expandXdgBaseDir(std::string(token));
+      if (path.starts_with(expanded) && (path.size() == expanded.size() || path[expanded.size()] == '/')) {
+        return std::string(token) + path.substr(expanded.size());
+      }
+    }
+    return path;
+  }
 
   enum class CalendarAccountProvider : std::uint8_t {
     ICloud,
@@ -1106,6 +1139,270 @@ void HostedEditors::openPluginSettings(std::string pluginId) {
 }
 
 
+void HostedEditors::openUserTemplateEditor(std::string id) {
+  if (m_b.config == nullptr || id.empty()) {
+    return;
+  }
+  const ThemeConfig::UserTemplateConfig* found = nullptr;
+  for (const auto& entry : m_b.config->config().theme.templates.userTemplates) {
+    if (entry.id == id) {
+      found = &entry;
+      break;
+    }
+  }
+  if (found == nullptr) {
+    return;
+  }
+
+  prepareOpen();
+  if (m_sheet == nullptr) {
+    return;
+  }
+
+  auto draft = std::make_shared<UserTemplateDraft>();
+  draft->id = found->id;
+  draft->inputPath = found->inputPath;
+  draft->outputPaths = found->outputPaths;
+  draft->postHook = found->postHook;
+
+  const float scale = uiScale();
+  std::function<void()> removeTemplate = [this, id = draft->id]() {
+    if (m_b.config == nullptr) {
+      return;
+    }
+    if (!m_b.config->clearOverride({"theme", "templates", "user", id})) {
+      markWriteError(i18n::tr("settings.errors.write"));
+      return;
+    }
+    markWriteSuccess(true);
+  };
+
+  m_sheet->open(
+      settings::SettingsSheetRequest{
+          .sheetTitle = i18n::tr("control-center.templates.edit-title", "id", draft->id),
+          .removeAction = std::move(removeTemplate),
+          .populateSheetBody =
+              [this, draft, scale](Flex& body) {
+                auto addField = [scale](Flex& parent, const std::string& label, std::unique_ptr<Node> control) {
+                  auto field = ui::column({
+                      .align = FlexAlign::Stretch,
+                      .gap = Style::spaceXs * scale,
+                  });
+                  field->addChild(
+                      ui::label({
+                          .text = label,
+                          .fontSize = Style::fontSizeCaption * scale,
+                          .fontWeight = FontWeight::Medium,
+                          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                      })
+                  );
+                  field->addChild(std::move(control));
+                  parent.addChild(std::move(field));
+                };
+
+                if (!draft->inputPath.empty()) {
+                  auto inputRow = ui::row({
+                      .align = FlexAlign::Center,
+                      .gap = Style::spaceSm * scale,
+                  });
+                  inputRow->addChild(
+                      ui::label({
+                          .text = FileUtils::xdgPathForDisplay(draft->inputPath),
+                          .fontSize = Style::fontSizeBody * scale,
+                          .color = colorSpecFromRole(ColorRole::OnSurface),
+                          .maxLines = 2,
+                          .ellipsize = TextEllipsize::End,
+                          .flexGrow = 1.0F,
+                      })
+                  );
+                  inputRow->addChild(
+                      ui::button({
+                          .glyph = "file-text",
+                          .glyphSize = Style::fontSizeBody * scale,
+                          .contentAlign = ButtonContentAlign::Center,
+                          .variant = ButtonVariant::Default,
+                          .tooltip = i18n::tr("control-center.templates.open-input"),
+                          .minWidth = Style::controlHeight * scale,
+                          .minHeight = Style::controlHeight * scale,
+                          .paddingV = Style::spaceXs * scale,
+                          .paddingH = Style::spaceSm * scale,
+                          .radius = Style::scaledRadiusMd(scale),
+                          .onClick =
+                              [this, draft]() {
+                                const std::string path = expandTemplatePath(draft->inputPath);
+                                if (path.empty() || !process::commandExists("xdg-open")) {
+                                  markWriteError(i18n::tr("control-center.templates.open-input-failed"));
+                                  return;
+                                }
+                                (void)process::runAsync(std::vector<std::string>{"xdg-open", path});
+                              },
+                      })
+                  );
+                  addField(body, i18n::tr("control-center.templates.input-path"), std::move(inputRow));
+                }
+
+                Input* outputInput = nullptr;
+                auto outputRow = ui::row({
+                    .align = FlexAlign::Center,
+                    .gap = Style::spaceSm * scale,
+                });
+                outputRow->addChild(
+                    ui::input({
+                        .out = &outputInput,
+                        .value = draft->outputPaths.empty() ? std::string{} : draft->outputPaths.front(),
+                        .placeholder = i18n::tr("control-center.templates.output-path-placeholder"),
+                        .invalid = draft->outputInvalid,
+                        .flexGrow = 1.0F,
+                        .onChange =
+                            [draft](const std::string& value) {
+                              if (draft->outputPaths.empty()) {
+                                draft->outputPaths.push_back(value);
+                              } else {
+                                draft->outputPaths.front() = value;
+                              }
+                              draft->outputInvalid = false;
+                            },
+                    })
+                );
+                outputRow->addChild(
+                    ui::button({
+                        .glyph = "file-text",
+                        .glyphSize = Style::fontSizeBody * scale,
+                        .contentAlign = ButtonContentAlign::Center,
+                        .variant = ButtonVariant::Default,
+                        .minWidth = Style::controlHeight * scale,
+                        .minHeight = Style::controlHeight * scale,
+                        .paddingV = Style::spaceXs * scale,
+                        .paddingH = Style::spaceSm * scale,
+                        .radius = Style::scaledRadiusMd(scale),
+                        .onClick =
+                            [outputInput, draft]() {
+                              if (outputInput == nullptr) {
+                                return;
+                              }
+                              FileDialogOptions options;
+                              options.mode = FileDialogMode::Save;
+                              options.defaultViewMode = FileDialogViewMode::List;
+                              options.title = i18n::tr("settings.controls.path-browse.file-title");
+                              const std::string current = outputInput->value();
+                              const std::string expanded = expandTemplatePath(current);
+                              applyPathDialogStartValue(
+                                  options, expanded.empty() ? current : expanded, PathBrowseKind::File
+                              );
+                              (void)FileDialog::open(
+                                  std::move(options), [outputInput, draft](std::optional<std::filesystem::path> picked) {
+                                    if (!picked.has_value() || outputInput == nullptr) {
+                                      return;
+                                    }
+                                    const std::string stored = collapseXdgPath(picked->string());
+                                    if (draft->outputPaths.empty()) {
+                                      draft->outputPaths.push_back(stored);
+                                    } else {
+                                      draft->outputPaths.front() = stored;
+                                    }
+                                    draft->outputInvalid = false;
+                                    outputInput->setInvalid(false);
+                                    outputInput->setValue(stored);
+                                  }
+                              );
+                            },
+                    })
+                );
+                addField(body, i18n::tr("control-center.templates.output-path"), std::move(outputRow));
+
+                Input* hookInput = nullptr;
+                addField(
+                    body, i18n::tr("control-center.templates.post-hook"),
+                    ui::input({
+                        .out = &hookInput,
+                        .value = draft->postHook,
+                        .placeholder = i18n::tr("control-center.templates.post-hook-placeholder"),
+                        .onChange = [draft](const std::string& value) { draft->postHook = value; },
+                    })
+                );
+
+                auto actions = ui::row({
+                    .align = FlexAlign::Center,
+                    .justify = FlexJustify::End,
+                    .gap = Style::spaceSm * scale,
+                });
+                actions->addChild(
+                    ui::button({
+                        .text = i18n::tr("common.actions.cancel"),
+                        .contentAlign = ButtonContentAlign::Center,
+                        .variant = ButtonVariant::Secondary,
+                        .minHeight = Style::controlHeight * scale,
+                        .paddingH = Style::spaceMd * scale,
+                        .radius = Style::scaledRadiusMd(scale),
+                        .onClick =
+                            [this]() {
+                              if (m_sheet != nullptr) {
+                                m_sheet->close();
+                              }
+                            },
+                    })
+                );
+                actions->addChild(
+                    ui::button({
+                        .text = i18n::tr("control-center.templates.save"),
+                        .glyph = "device-floppy",
+                        .contentAlign = ButtonContentAlign::Center,
+                        .variant = ButtonVariant::Primary,
+                        .minHeight = Style::controlHeight * scale,
+                        .paddingH = Style::spaceMd * scale,
+                        .radius = Style::scaledRadiusMd(scale),
+                        .onClick =
+                            [this, draft, outputInput, hookInput]() {
+                              if (m_b.config == nullptr) {
+                                return;
+                              }
+                              std::string output =
+                                  StringUtils::trim(outputInput != nullptr ? outputInput->value() : std::string{});
+                              if (output.empty() && !draft->outputPaths.empty()) {
+                                output = StringUtils::trim(draft->outputPaths.front());
+                              }
+                              if (output.empty()) {
+                                draft->outputInvalid = true;
+                                if (outputInput != nullptr) {
+                                  outputInput->setInvalid(true);
+                                }
+                                markWriteError(i18n::tr("control-center.templates.output-required"));
+                                return;
+                              }
+                              std::vector<std::string> outputs = draft->outputPaths;
+                              if (outputs.empty()) {
+                                outputs.push_back(output);
+                              } else {
+                                outputs.front() = output;
+                              }
+                              const std::string postHook =
+                                  StringUtils::trim(hookInput != nullptr ? hookInput->value() : draft->postHook);
+                              if (m_b.setOverrides) {
+                                m_b.setOverrides(
+                                    {
+                                        {{"theme", "templates", "user", draft->id, "output_path"}, outputs},
+                                        {{"theme", "templates", "user", draft->id, "post_hook"}, postHook},
+                                    }
+                                );
+                              } else {
+                                (void)m_b.config->setOverrides(
+                                    {
+                                        {{"theme", "templates", "user", draft->id, "output_path"}, outputs},
+                                        {{"theme", "templates", "user", draft->id, "post_hook"}, postHook},
+                                    }
+                                );
+                              }
+                              markWriteSuccess(true);
+                            },
+                    })
+                );
+                body.addChild(std::move(actions));
+              },
+          .scale = scale,
+      }
+  );
+}
+
 void HostedEditors::openCommunityTemplateStore() {
   if (m_b.config == nullptr) {
     return;
@@ -1223,13 +1520,13 @@ void HostedEditors::openCommunityTemplateStore() {
     auto settingPath = request.settingPath;
     auto onSelect = request.onSelect;
     auto options = std::move(request.options);
+    auto pickerHolder = std::make_shared<SearchPicker*>();
     m_sheet->open(
         SettingsSheetRequest{
             .sheetTitle = std::move(request.title),
             .populateSheetBody =
                 [this, options = std::move(options), selected, settingPath, onSelect, placeholder = request.placeholder,
-                 emptyText = request.emptyText, scale](Flex& body) {
-                  auto picker = std::make_unique<SearchPicker>();
+                 emptyText = request.emptyText, pickerHolder](Flex& body) {
                   std::vector<SearchPickerOption> pickerOptions;
                   pickerOptions.reserve(options.size());
                   for (const auto& opt : options) {
@@ -1244,32 +1541,44 @@ void HostedEditors::openCommunityTemplateStore() {
                         }
                     );
                   }
-                  picker->setOptions(std::move(pickerOptions));
-                  picker->setPlaceholder(placeholder);
-                  picker->setEmptyText(emptyText);
-                  picker->setSelectedValue(*selected);
-                  picker->setOnActivated([this, settingPath, selected, onSelect](const SearchPickerOption& option) {
-                    if (option.value == *selected) {
-                      close();
-                      return;
-                    }
-                    if (onSelect) {
-                      onSelect(option.value);
-                    } else if (option.value.empty()) {
-                      if (m_b.makeContext) {
-                        auto ctx = m_b.makeContext();
-                        if (ctx.clearOverride) {
-                          ctx.clearOverride(settingPath);
-                        }
-                      }
-                    } else if (m_b.setOverride) {
-                      m_b.setOverride(settingPath, option.value);
-                    }
-                    close();
-                  });
-                  picker->setOnCancel([this]() { close(); });
-                  picker->setFlexGrow(1.0F);
-                  body.addChild(std::move(picker));
+                  body.addChild(
+                      ui::searchPicker({
+                          .out = pickerHolder.get(),
+                          .placeholder = placeholder,
+                          .emptyText = emptyText,
+                          .selectedValue = *selected,
+                          .options = std::move(pickerOptions),
+                          .flexGrow = 1.0F,
+                          .onActivated =
+                              [this, settingPath, selected, onSelect](const SearchPickerOption& option) {
+                                if (option.value == *selected) {
+                                  close();
+                                  return;
+                                }
+                                if (onSelect) {
+                                  onSelect(option.value);
+                                } else if (option.value.empty()) {
+                                  if (m_b.makeContext) {
+                                    auto ctx = m_b.makeContext();
+                                    if (ctx.clearOverride) {
+                                      ctx.clearOverride(settingPath);
+                                    }
+                                  }
+                                } else if (m_b.setOverride) {
+                                  m_b.setOverride(settingPath, option.value);
+                                }
+                                close();
+                              },
+                          .onCancel = [this]() { close(); },
+                          .configure =
+                              [](SearchPicker& picker) {
+                                picker.clearFill();
+                                picker.clearBorder();
+                                picker.setRadius(0.0F);
+                                picker.setPadding(0.0F);
+                              },
+                      })
+                  );
                 },
             .scale = scale,
             .minWidth = 520.0F,
@@ -1277,6 +1586,10 @@ void HostedEditors::openCommunityTemplateStore() {
             .parentFraction = 0.7F,
             .fillParentHeight = true,
             .scrollableBody = false,
+            .initialFocusArea =
+                [pickerHolder]() -> InputArea* {
+                  return *pickerHolder != nullptr ? (*pickerHolder)->filterInputArea() : nullptr;
+                },
         }
     );
   }

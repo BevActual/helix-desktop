@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <string_view>
 
 class CompositorPlatform;
@@ -35,7 +36,7 @@ namespace greeter {
     StagedOnly,
   };
 
-  using SyncCompletion = std::function<void(bool success)>;
+  using SyncCompletion = std::function<void(bool success, std::string error)>;
 
   // True when noctalia-greeter and the privileged apply helper are installed.
   [[nodiscard]] bool appearanceSyncAvailable(const ShellGreeterSyncConfig& greeterSync) noexcept;

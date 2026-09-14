@@ -787,21 +787,26 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "interface", tr("settings.schema.appearance.font-family.label"),
+          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.font-family.label"),
           tr("settings.schema.appearance.font-family.description"), {"shell", "font_family"},
           std::move(fontFamilyControl), "typeface"
       ));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "interface", tr("settings.schema.appearance.language.label"),
-        tr("settings.schema.appearance.language.description"), {"shell", "lang"}, languageSelect(cfg.shell.lang),
-        "locale translation", true
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::Appearance, "interface", tr("settings.schema.appearance.corner-roundness.label"),
+        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.corner-roundness.label"),
         tr("settings.schema.appearance.corner-roundness.description"), {"shell", "corner_radius_scale"},
         sliderFor(cfg.shell.cornerRadiusScale, noctalia::config::schema::kCornerRadiusScaleRange, false),
         "rounded corners radius"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.ui-scale.label"),
+        tr("settings.schema.appearance.ui-scale.description"), {"accessibility", "ui_scale"},
+        sliderFor(cfg.accessibility.uiScale, noctalia::config::schema::kScaleRange, false), "size scale text panels"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Appearance, "interface", tr("settings.schema.appearance.language.label"),
+        tr("settings.schema.appearance.language.description"), {"shell", "lang"}, languageSelect(cfg.shell.lang),
+        "locale translation", true
     ));
     entries.push_back(makeEntry(
         SettingsSection::Appearance, "interface", tr("settings.schema.appearance.app-icon-colorize.label"),
@@ -822,11 +827,6 @@ namespace settings {
       e.visibleWhen = colorizeOn;
       entries.push_back(std::move(e));
     }
-    entries.push_back(makeEntry(
-        SettingsSection::Appearance, "accessibility", tr("settings.schema.appearance.ui-scale.label"),
-        tr("settings.schema.appearance.ui-scale.description"), {"accessibility", "ui_scale"},
-        sliderFor(cfg.accessibility.uiScale, noctalia::config::schema::kScaleRange, false), "size scale text panels"
-    ));
     entries.push_back(makeEntry(
         SettingsSection::Appearance, "accessibility", tr("settings.schema.accessibility.high-contrast.label"),
         tr("settings.schema.accessibility.high-contrast.description"), {"accessibility", "high_contrast"},
@@ -1115,7 +1115,7 @@ namespace settings {
         );
       }
       auto e = makeEntry(
-          SettingsSection::Templates, "built-in", tr("settings.schema.templates.builtin-ids.label"),
+          SettingsSection::Templates, "apps", tr("settings.schema.templates.builtin-ids.label"),
           tr("settings.schema.templates.builtin-ids.description"), {"theme", "templates", "builtin_ids"},
           TemplateGridSetting{
               .options = std::move(templateOptions),
@@ -1136,7 +1136,7 @@ namespace settings {
     {
       const std::size_t enabledCount = cfg.theme.templates.communityIds.size();
       auto e = makeEntry(
-          SettingsSection::Templates, "community", tr("settings.schema.templates.community-ids.label"),
+          SettingsSection::Templates, "store", tr("settings.schema.templates.community-ids.label"),
           enabledCount == 0 ? tr("settings.schema.templates.community-ids.description")
                             : tr("settings.templates.store.enabled-count", "count", std::to_string(enabledCount)),
           {},

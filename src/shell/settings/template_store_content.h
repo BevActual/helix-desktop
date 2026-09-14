@@ -34,6 +34,12 @@ namespace settings {
     // Called with catalog-ordered enabled ids whenever the selection changes.
     std::function<void(std::vector<std::string> ids)> setSelected;
     float scale = 1.0F;
+    // Sheet bodies keep default padding; Control Center embeds the store flush.
+    bool inset = true;
+    // When the catalog has no entries. Empty uses the community-store empty copy.
+    std::string emptyCatalogText;
+    // When set, user-template tiles show a trailing edit control that opens this callback.
+    std::function<void(std::string id)> onEditUser;
   };
 
   class TemplateStoreContent {

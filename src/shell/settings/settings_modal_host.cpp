@@ -251,9 +251,13 @@ namespace settings {
     m_impl->settingsContent = nullptr;
   }
 
-  void SettingsModalHost::resize(float width, float height) {
-    if (m_impl->stackRoot != nullptr) {
-      m_impl->stackRoot->setSize(width, height);
+  void SettingsModalHost::resize(Renderer& renderer, float width, float height) {
+    if (m_impl->stackRoot == nullptr) {
+      return;
+    }
+    m_impl->stackRoot->setSize(width, height);
+    if (!m_impl->entries.empty()) {
+      m_impl->stackRoot->layout(renderer);
     }
   }
 

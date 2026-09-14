@@ -1,6 +1,8 @@
 #include "shell/settings/template_store_tile.h"
 
+#include "i18n/i18n.h"
 #include "ui/builders.h"
+#include "ui/controls/button.h"
 #include "ui/controls/checkbox.h"
 #include "ui/controls/label.h"
 #include "ui/palette.h"
@@ -50,11 +52,28 @@ namespace settings {
         })
     );
     addChild(std::move(text));
+
+    addChild(
+        ui::button({
+            .out = &m_editButton,
+            .glyph = "settings",
+            .glyphSize = Style::fontSizeBody * scale,
+            .contentAlign = ButtonContentAlign::Center,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr("control-center.templates.edit-tooltip"),
+            .minWidth = Style::controlHeightSm * scale,
+            .minHeight = Style::controlHeightSm * scale,
+            .padding = Style::spaceXs * scale,
+            .radius = Style::scaledRadiusMd(scale),
+            .visible = false,
+            .participatesInLayout = false,
+        })
+    );
   }
 
   void TemplateStoreTile::bind(
       std::string_view name, std::string_view category, bool enabled, bool selected, bool hovered,
-      std::function<void(bool enabled)> onToggle
+      std::function<void(bool enabled)> onToggle, bool showEdit
   ) {
     m_nameLabel->setText(std::string(name));
     m_categoryLabel->setText(std::string(category));
@@ -77,6 +96,29 @@ namespace settings {
       });
     }
 
+    if (m_editButton != nullptr) {
+      m_editButton->setVisible(showEdit);
+      m_editButton->setParticipatesInLayout(showEdit);
+      m_editButton->setHoveredVisual(false);
+      if (showEdit) {
+        Button::ButtonPalette palette = Button::defaultPalette(ButtonVariant::Ghost);
+        if (enabled) {
+          palette.normal.label = colorSpecFromRole(ColorRole::OnPrimary);
+          palette.hover = {
+              .bg = colorSpecFromRole(ColorRole::OnPrimary, 0.18F),
+              .border = clearColorSpec(),
+              .label = colorSpecFromRole(ColorRole::OnPrimary),
+          };
+          palette.pressed = {
+              .bg = colorSpecFromRole(ColorRole::OnPrimary, 0.28F),
+              .border = clearColorSpec(),
+              .label = colorSpecFromRole(ColorRole::OnPrimary),
+          };
+        }
+        m_editButton->setCustomPalette(std::move(palette));
+      }
+    }
+
     // Same palette as built-in template Button::ButtonPalette (normal / hover).
     const float borderWidth = Style::borderWidth * m_scale;
     if (enabled) {
@@ -95,6 +137,22 @@ namespace settings {
       m_nameLabel->setColor(colorSpecFromRole(ColorRole::OnSurface));
       m_categoryLabel->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
     }
+  }
+
+  bool TemplateStoreTile::hitTestEdit(float localX, float localY) const {
+    if (m_editButton == nullptr || !m_editButton->visible()) {
+      return false;
+    }
+    const float x = m_editButton->x();
+    const float y = m_editButton->y();
+    return localX >= x && localX < x + m_editButton->width() && localY >= y && localY < y + m_editButton->height();
+  }
+
+  void TemplateStoreTile::setEditHovered(bool hovered) {
+    if (m_editButton == nullptr || !m_editButton->visible()) {
+      return;
+    }
+    m_editButton->setHoveredVisual(hovered);
   }
 
 } // namespace settings

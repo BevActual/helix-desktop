@@ -35,6 +35,7 @@ namespace settings {
     m_onCloseRequested = std::move(request.onCloseRequested);
     m_preDispatchKeyboard = std::move(request.preDispatchKeyboard);
     m_onClosed = std::move(request.onClosed);
+    m_initialFocusArea = std::move(request.initialFocusArea);
     m_title = std::move(request.sheetTitle);
     m_removeAction = std::move(request.removeAction);
     m_createLeadingAction = std::move(request.createLeadingAction);
@@ -186,6 +187,7 @@ namespace settings {
     m_onCloseRequested = nullptr;
     m_preDispatchKeyboard = nullptr;
     m_onClosed = nullptr;
+    m_initialFocusArea = nullptr;
     m_closeAction = nullptr;
     m_dismissSelectDropdown = nullptr;
   }
@@ -221,6 +223,10 @@ namespace settings {
 
   bool SettingsSheet::preDispatchKeyboard(const KeyboardEvent& event) const {
     return m_preDispatchKeyboard && m_preDispatchKeyboard(event);
+  }
+
+  InputArea* SettingsSheet::initialFocusArea() const {
+    return m_initialFocusArea ? m_initialFocusArea() : nullptr;
   }
 
   float SettingsSheet::naturalHeight(Renderer& renderer, float width) const {

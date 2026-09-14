@@ -16,6 +16,7 @@
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "shell/control_center/plugin_control_center_tab.h"
+#include "shell/control_center/tabs/appearance_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
@@ -33,6 +34,7 @@
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/system_tab.h"
 #include "shell/control_center/tabs/tailscale_tab.h"
+#include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
 #include "shell/control_center/tabs/weather_tab.h"
 #include "shell/wallpaper/wallhaven_client.h"
@@ -196,9 +198,7 @@ namespace {
   }
 
   bool isSettingsEditorTab(std::string_view id) {
-    return id == "appearance"
-        || id == "templates"
-        || id == "bar"
+    return id == "bar"
         || id == "launcher"
         || id == "dock"
         || id == "desktop"
@@ -213,7 +213,8 @@ namespace {
   }
 
   bool isLiveSettingsHost(std::string_view id) {
-    return id == "weather"
+    return id == "appearance"
+        || id == "weather"
         || id == "notifications"
         || id == "power"
         || id == "system"
@@ -221,6 +222,7 @@ namespace {
         || id == "audio"
         || id == "monitor"
         || id == "wallpaper"
+        || id == "templates"
         || id == "keybinds"
         || id == "media"
         || id == "screen-time"
@@ -287,9 +289,9 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   };
 
   add("home", std::make_unique<HomeTab>(services));
-  add("appearance", std::make_unique<SettingsTab>(services, "appearance"));
+  add("appearance", std::make_unique<AppearanceTab>(services));
   add("wallpaper", std::make_unique<WallpaperTab>(services));
-  add("templates", std::make_unique<SettingsTab>(services, "templates"));
+  add("templates", std::make_unique<TemplatesTab>(services));
   add("bar", std::make_unique<SettingsTab>(services, "bar"));
   add(
       "media",
@@ -675,7 +677,7 @@ void ControlCenterPanel::attachModalHost(Renderer& renderer, float width, float 
     m_modalHost.attach(*sceneRoot, m_content, renderer, width, height);
     m_modalAttached = true;
   } else {
-    m_modalHost.resize(width, height);
+    m_modalHost.resize(renderer, width, height);
   }
   if (m_hostedEditors != nullptr) {
     m_hostedEditors->setLayoutRenderer(&renderer);
@@ -713,7 +715,7 @@ void ControlCenterPanel::onOpen(std::string_view context) {
                                                      : (context.empty() ? "home" : std::string(context));
   selectTab(tabId, animateTabSwitch);
   if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
-    if (settingsTarget.isSettings) {
+    if (settingsTarget.isSettings && tabId != "appearance") {
       slot->tab->setConfigureMode(true);
     } else if (isLiveSettingsHost(tabId)) {
       slot->tab->setConfigureMode(false);
@@ -768,7 +770,7 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
   const auto settingsTarget = parseSettingsOpenContext(context);
   if (settingsTarget.isSettings) {
     if (settingsTarget.section.empty()) {
-      return isSettingsEditorTab(m_activeTabId);
+      return isSettingsEditorTab(m_activeTabId) || m_activeTabId == "appearance";
     }
     const std::string tabId = tabIdForSettingsSection(settingsTarget.section);
     if (m_activeTabId != tabId) {
@@ -1361,6 +1363,9 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
             && slot->tab->configureMode());
     if (!stayOnTab) {
       selectTab("appearance", false);
+      if (auto* appearance = slotById("appearance"); appearance != nullptr && appearance->tab != nullptr) {
+        appearance->tab->setConfigureMode(true);
+      }
     } else if (isLiveSettingsHost(m_activeTabId) && slot != nullptr && slot->tab != nullptr) {
       slot->tab->setConfigureMode(true);
     }

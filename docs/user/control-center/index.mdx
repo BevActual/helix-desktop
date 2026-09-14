@@ -59,9 +59,9 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
 | `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
-| `appearance` | Appearance | Theme, palette, fonts, and the rest of appearance settings |
+| `appearance` | Appearance | Theme mode, shell mode, Auto schedule status, palette source and picker, current-palette swatches, font, UI scale, and roundness. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. When Noctalia Greeter is installed, Sync Now and Auto-Sync copy wallpaper, colors, and monitors to the login screen. Header gear opens language, icon tint, high contrast, motion, borders, and shadows. |
 | `wallpaper` | Wallpaper | Library, Wallhaven, Video, and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, and Wallhaven API settings. |
-| `templates` | Templates | Color templates and community palettes |
+| `templates` | Templates | Built-in, community, and user app-theme catalogs. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
 | `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides. Widget add and inspector sheets stay in Control Center. |
 | `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
 | `audio` | Audio | Privacy capture list, output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
@@ -119,6 +119,16 @@ Set `show_session_button = false` under `[control_center]` to hide the session-a
 The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source for the official Video Wallpaper plugin, and a folder button to choose any image. Select a monitor (or **ALL**), then click a tile to apply it. Favorites, fill color, and theme-from-wallpaper controls stay on the picker.
 
 Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, and the Wallhaven API key. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`.
+
+## Templates
+
+The Templates tab browses app-theme templates the same way Wallpaper browses images. Switch **Built-In**, **Community**, and **User**, turn a catalog on, then search, filter by category, and toggle templates in the grid. Enabling a template applies it on each theme change. Header **Apply** rerenders every enabled template for the current palette (`noctalia msg templates-apply`).
+
+The header **+** button picks an installed application. If a built-in or community template matches that app, Noctalia enables it. Otherwise it scaffolds a user template under `~/.config/noctalia/templates/` and opens the starter file so you can map tokens to the app's theme format. A sheet then asks for the `output_path` the application actually reads, plus an optional `post_hook`. On the User catalog, each tile's gear edits those fields or deletes the GUI-created entry (starter files stay on disk). The header folder button opens that templates directory.
+
+Palettes stay on **Appearance**.
+
+Header gear opens the built-in and community catalog enable switches. `noctalia msg settings-toggle templates` opens that settings view. Community catalog search from a settings search still offers **Browse Templates** as a sheet.
 
 ## Keybinds
 
@@ -295,7 +305,7 @@ Reset stored history from the Screen Time tab header gear (**Screen Time** setti
 
 Settings pages are Control Center tabs. Appearance, Wallpaper, Templates, and Bar sit under **Look**. Live status pages sit under **Status**. Desktop, dock, launcher, plugins, and the other setup pages sit under **Setup**.
 
-Domain options that belong with a live view are on that tab: the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Screenshot and Screen Record, Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Screenshot, Screen Record, and Screen Time for the longer forms.
+Domain options that belong with a live view are on that tab: theme, palette, font, UI scale, roundness, and greeter sync on Appearance (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Screenshot and Screen Record, Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Screenshot, Screen Record, and Screen Time for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). An empty query keeps that page’s filter. A non-empty query searches the whole settings registry (section headers still appear on matches) and opens Appearance if you were on Home or another non-settings page.
 

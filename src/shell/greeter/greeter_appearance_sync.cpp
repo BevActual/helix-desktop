@@ -971,9 +971,9 @@ namespace greeter {
     GreeterSyncLease syncLease;
 
     const auto completion = std::make_shared<SyncCompletion>(std::move(onComplete));
-    const auto finish = [completion](bool success) {
+    const auto finish = [completion](bool success, std::string error = {}) {
       if (completion && *completion) {
-        (*completion)(success);
+        (*completion)(success, std::move(error));
       }
     };
 
@@ -1105,14 +1105,14 @@ namespace greeter {
         } else {
           kLog.warn("greeter sync failed with exit code {}", result.exitCode);
         }
-        finish(false);
+        finish(false, result.err);
         return;
       }
       kLog.info(
           "synced shell {} to greeter",
           mode == GreeterSyncMode::Constrained ? "appearance" : "appearance and session actions"
       );
-      finish(true);
+      finish(true, {});
     };
     if (!launchPrivilegedApplyHelper(greeterSync, helper, staging, stateDirectory, mode, std::move(callbacks))) {
       return GreeterSyncLaunch::Failed;

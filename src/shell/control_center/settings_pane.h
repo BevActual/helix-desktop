@@ -68,6 +68,8 @@ public:
   [[nodiscard]] bool configureMode() const noexcept { return m_configureMode; }
   [[nodiscard]] const std::string& section() const noexcept { return m_selectedSection; }
   void setSearchQuery(std::string query);
+  void openSearchPicker(settings::SearchPickerOpenRequest request);
+  void openUserTemplateEditor(std::string id);
   void setIncludedGroups(std::unordered_set<std::string> groups);
   void onExternalChanged();
   void openPluginSettings(std::string pluginId);

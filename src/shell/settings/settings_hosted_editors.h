@@ -92,6 +92,7 @@ namespace settings {
     void openPluginSettings(std::string pluginId);
     void openPluginSource(std::optional<PluginSourceConfig> existing = std::nullopt);
     void openCalendarAccount(std::optional<std::string> accountId);
+    void openUserTemplateEditor(std::string id);
     void openCommunityTemplateStore();
     void openSearchPicker(SearchPickerOpenRequest request);
     void invalidatePluginSource(const std::string& sourceName);

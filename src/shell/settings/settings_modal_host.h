@@ -52,7 +52,7 @@ namespace settings {
     );
     void attach(Node& sceneRoot, Node* settingsContent, Renderer& renderer, float width, float height);
     void detach();
-    void resize(float width, float height);
+    void resize(Renderer& renderer, float width, float height);
 
     [[nodiscard]] std::optional<ModalId> push(SettingsModalRequest request);
     void rebuildTop();

@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 
+class Button;
 class Checkbox;
 class Label;
 
@@ -17,14 +18,18 @@ namespace settings {
 
     void bind(
         std::string_view name, std::string_view category, bool enabled, bool selected, bool hovered,
-        std::function<void(bool enabled)> onToggle
+        std::function<void(bool enabled)> onToggle, bool showEdit = false
     );
+
+    [[nodiscard]] bool hitTestEdit(float localX, float localY) const;
+    void setEditHovered(bool hovered);
 
   private:
     float m_scale;
     Checkbox* m_checkbox = nullptr;
     Label* m_nameLabel = nullptr;
     Label* m_categoryLabel = nullptr;
+    Button* m_editButton = nullptr;
   };
 
 } // namespace settings

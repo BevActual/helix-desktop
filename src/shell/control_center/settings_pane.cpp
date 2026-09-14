@@ -1204,6 +1204,20 @@ void SettingsPane::onExternalChanged() {
   queueRebuild();
 }
 
+void SettingsPane::openSearchPicker(settings::SearchPickerOpenRequest request) {
+  bindHostedEditors();
+  if (m_hostedEditors != nullptr) {
+    m_hostedEditors->openSearchPicker(std::move(request));
+  }
+}
+
+void SettingsPane::openUserTemplateEditor(std::string id) {
+  bindHostedEditors();
+  if (m_hostedEditors != nullptr) {
+    m_hostedEditors->openUserTemplateEditor(std::move(id));
+  }
+}
+
 void SettingsPane::setIncludedGroups(std::unordered_set<std::string> groups) {
   if (m_includedGroups == groups) {
     return;

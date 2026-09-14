@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <cctype>
 #include <set>
+#include <unordered_map>
 
 namespace settings {
 
@@ -43,6 +44,7 @@ namespace settings {
       void setFilteredIndices(const std::vector<std::size_t>* indices) { m_indices = indices; }
       void setCatalog(const std::vector<noctalia::theme::AvailableTemplate>* catalog) { m_catalog = catalog; }
       void setSelectedIds(const std::unordered_set<std::string>* ids) { m_selectedIds = ids; }
+      void setOnEditUser(std::function<void(std::string)> cb) { m_onEditUser = std::move(cb); }
 
       [[nodiscard]] std::size_t itemCount() const override { return m_indices != nullptr ? m_indices->size() : 0; }
 
@@ -53,13 +55,25 @@ namespace settings {
           return;
         }
         auto* t = static_cast<TemplateStoreTile*>(&tile);
+        for (auto it = m_tilesByIndex.begin(); it != m_tilesByIndex.end();) {
+          if (it->second == t) {
+            it = m_tilesByIndex.erase(it);
+          } else {
+            ++it;
+          }
+        }
+        m_tilesByIndex[index] = t;
         const auto& entry = (*m_catalog)[(*m_indices)[index]];
         const bool enabled = m_selectedIds != nullptr && m_selectedIds->contains(entry.id);
-        t->bind(entry.displayName, entry.category, enabled, selected, hovered, [this, index](bool nextEnabled) {
-          if (m_content != nullptr) {
-            m_content->setEnabledAtFilteredIndex(index, nextEnabled);
-          }
-        });
+        t->bind(
+            entry.displayName, entry.category, enabled, selected, hovered,
+            [this, index](bool nextEnabled) {
+              if (m_content != nullptr) {
+                m_content->setEnabledAtFilteredIndex(index, nextEnabled);
+              }
+            },
+            static_cast<bool>(m_onEditUser)
+        );
       }
 
       [[nodiscard]] std::string itemTooltip(std::size_t index) const override {
@@ -75,12 +89,45 @@ namespace settings {
         }
       }
 
+      [[nodiscard]] bool overlayHitTest(
+          std::size_t index, float cellLocalX, float cellLocalY, float /*cellWidth*/, float /*cellHeight*/
+      ) const override {
+        if (!m_onEditUser) {
+          return false;
+        }
+        const auto it = m_tilesByIndex.find(index);
+        if (it == m_tilesByIndex.end() || it->second == nullptr) {
+          return false;
+        }
+        return it->second->hitTestEdit(cellLocalX, cellLocalY);
+      }
+
+      void applyOverlayHover(Node& tile, bool hovered) override {
+        static_cast<TemplateStoreTile*>(&tile)->setEditHovered(hovered);
+      }
+
+      bool onPointerPress(
+          std::size_t index, float cellLocalX, float cellLocalY, float /*cellWidth*/, float /*cellHeight*/
+      ) override {
+        if (!m_onEditUser || m_indices == nullptr || m_catalog == nullptr || index >= m_indices->size()) {
+          return false;
+        }
+        const auto it = m_tilesByIndex.find(index);
+        if (it == m_tilesByIndex.end() || it->second == nullptr || !it->second->hitTestEdit(cellLocalX, cellLocalY)) {
+          return false;
+        }
+        m_onEditUser((*m_catalog)[(*m_indices)[index]].id);
+        return true;
+      }
+
     private:
       float m_scale;
       TemplateStoreContent* m_content = nullptr;
       const std::vector<std::size_t>* m_indices = nullptr;
       const std::vector<noctalia::theme::AvailableTemplate>* m_catalog = nullptr;
       const std::unordered_set<std::string>* m_selectedIds = nullptr;
+      std::function<void(std::string)> m_onEditUser;
+      std::unordered_map<std::size_t, TemplateStoreTile*> m_tilesByIndex;
     };
 
   } // namespace
@@ -328,7 +375,7 @@ namespace settings {
     body.setDirection(FlexDirection::Vertical);
     body.setAlign(FlexAlign::Stretch);
     body.setGap(Style::spaceSm * scale);
-    body.setPadding(Style::spaceMd * scale);
+    body.setPadding(m_callbacks.inset ? Style::spaceMd * scale : 0.0F);
 
     body.addChild(
         ui::input({
@@ -461,11 +508,12 @@ namespace settings {
     adapterPtr->setFilteredIndices(&m_filteredIndices);
     adapterPtr->setCatalog(&m_catalog);
     adapterPtr->setSelectedIds(&m_selectedIds);
+    adapterPtr->setOnEditUser(m_callbacks.onEditUser);
     m_adapter = std::move(adapter);
 
     // Intrinsic height of the same card layout as built-in templates (padding + checkbox/text).
     auto probe = std::make_unique<TemplateStoreTile>(scale);
-    probe->bind("Mg", "category", false, false, false, {});
+    probe->bind("Mg", "category", false, false, false, {}, static_cast<bool>(m_callbacks.onEditUser));
     const float cardHeight = std::ceil(probe->measure(renderer, LayoutConstraints{}).height);
     // Floor above checkbox+tight padding — two caption lines need more than controlHeightSm alone.
     const float minCardHeight = (Style::controlHeightSm + Style::spaceSm * 2.0F) * scale;
@@ -496,8 +544,11 @@ namespace settings {
     if (m_filteredIndices.empty()) {
       body.addChild(
           ui::label({
-              .text = m_catalog.empty() ? i18n::tr("settings.schema.templates.community-ids.empty")
-                                        : i18n::tr("settings.templates.store.empty"),
+              .text = m_catalog.empty()
+                  ? (m_callbacks.emptyCatalogText.empty()
+                         ? i18n::tr("settings.schema.templates.community-ids.empty")
+                         : m_callbacks.emptyCatalogText)
+                  : i18n::tr("settings.templates.store.empty"),
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           })
