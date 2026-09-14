@@ -5,6 +5,7 @@
 #include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
+#include "config/schema/ranges.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "i18n/i18n.h"
@@ -16,6 +17,7 @@
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
 #include <cerrno>
 #include <csignal>
 #include <cstdlib>
@@ -31,6 +33,7 @@ namespace {
   constexpr auto kPollInterval = std::chrono::milliseconds(500);
   constexpr auto kStopTick = std::chrono::milliseconds(200);
   constexpr int kStopMaxTicks = 25;
+  constexpr auto kReplaySaveSettle = std::chrono::milliseconds(800);
   constexpr const char* kFlatpakGsrId = "com.dec05eba.gpu_screen_recorder";
 
   [[nodiscard]] std::string defaultFilenamePattern() { return kDefaultFilenamePattern; }
@@ -80,6 +83,7 @@ ScreenRecorderService::ScreenRecorderService(
 ScreenRecorderService::~ScreenRecorderService() {
   m_pollTimer.stop();
   m_stopTimer.stop();
+  m_saveTimer.stop();
   if (m_pid > 0) {
     sendSignal(SIGINT);
   }
@@ -122,6 +126,19 @@ bool ScreenRecorderService::isRecording() const noexcept {
 
 bool ScreenRecorderService::isStopping() const noexcept { return m_state == State::Stopping; }
 
+bool ScreenRecorderService::isReplaying() const noexcept {
+  return m_state == State::Replaying || m_state == State::StoppingReplay;
+}
+
+bool ScreenRecorderService::isReplayStopping() const noexcept { return m_state == State::StoppingReplay; }
+
+int ScreenRecorderService::replayDurationSeconds() const {
+  const auto& range = noctalia::config::schema::kScreenRecordReplayDurationRange;
+  const int minValue = static_cast<int>(range.min.value_or(2));
+  const int maxValue = static_cast<int>(range.max.value_or(600));
+  return std::clamp(static_cast<int>(m_config.config().shell.screenRecord.replayDuration), minValue, maxValue);
+}
+
 std::chrono::seconds ScreenRecorderService::elapsed() const {
   if (m_state == State::Idle) {
     return std::chrono::seconds{0};
@@ -162,6 +179,14 @@ std::optional<ScreenRecorderService::Source> ScreenRecorderService::parseSource(
   return std::nullopt;
 }
 
+std::optional<ScreenRecorderService::Source> ScreenRecorderService::parseReplaySource(std::string_view token) {
+  const auto source = parseSource(token);
+  if (!source.has_value() || *source == Source::Region) {
+    return std::nullopt;
+  }
+  return source;
+}
+
 void ScreenRecorderService::notifyChanged() {
   if (m_onChange) {
     m_onChange();
@@ -172,6 +197,12 @@ void ScreenRecorderService::notifyChanged() {
 void ScreenRecorderService::notifySaved() {
   m_notifications.addInternal(
       "Noctalia", i18n::tr("control-center.screen-record.saved"), m_outputPath.string()
+  );
+}
+
+void ScreenRecorderService::notifyReplaySaved() {
+  m_notifications.addInternal(
+      "Noctalia", i18n::tr("control-center.screen-record.replay-saved"), outputDirectory().string()
   );
 }
 
@@ -211,6 +242,13 @@ bool ScreenRecorderService::audioEnabled() const { return m_config.config().shel
 
 bool ScreenRecorderService::showCursor() const { return m_config.config().shell.screenRecord.showCursor; }
 
+std::vector<std::string> ScreenRecorderService::gsrCommand() const {
+  if (process::commandExists("gpu-screen-recorder")) {
+    return {"gpu-screen-recorder"};
+  }
+  return {"flatpak", "run", "--command=gpu-screen-recorder", kFlatpakGsrId};
+}
+
 bool ScreenRecorderService::processAlive() const {
   if (m_pid <= 0) {
     return false;
@@ -230,7 +268,9 @@ void ScreenRecorderService::sendSignal(int sig) {
   }
 }
 
-bool ScreenRecorderService::launch(const std::vector<std::string>& args, const std::filesystem::path& output) {
+bool ScreenRecorderService::launch(
+    const std::vector<std::string>& args, const std::filesystem::path& output, State nextState
+) {
   const auto pid = process::launchDetachedTracked(args);
   if (!pid.has_value()) {
     kLog.warn("failed to launch recorder");
@@ -239,26 +279,37 @@ bool ScreenRecorderService::launch(const std::vector<std::string>& args, const s
   m_pid = *pid;
   m_outputPath = output;
   m_startedAt = std::chrono::steady_clock::now();
-  m_state = State::Recording;
+  m_state = nextState;
   startPolling();
   notifyChanged();
-  kLog.info("recording started pid={} output={}", m_pid, output.string());
+  kLog.info(
+      "{} started pid={} output={}", nextState == State::Replaying ? "replay" : "recording", m_pid, output.string()
+  );
   return true;
 }
 
 bool ScreenRecorderService::launchGsr(const std::string& window, const std::filesystem::path& output) {
-  std::vector<std::string> args;
-  if (process::commandExists("gpu-screen-recorder")) {
-    args.push_back("gpu-screen-recorder");
-  } else {
-    args.insert(args.end(), {"flatpak", "run", "--command=gpu-screen-recorder", kFlatpakGsrId});
-  }
+  auto args = gsrCommand();
   args.insert(args.end(), {"-w", window, "-f", "60", "-k", "h264"});
   if (audioEnabled()) {
     args.insert(args.end(), {"-a", "default_output"});
   }
   args.insert(args.end(), {"-cursor", showCursor() ? "yes" : "no", "-v", "no", "-o", output.string()});
-  return launch(args, output);
+  return launch(args, output, State::Recording);
+}
+
+bool ScreenRecorderService::launchGsrReplay(const std::string& window, const std::filesystem::path& directory) {
+  auto args = gsrCommand();
+  args.insert(args.end(), {"-w", window, "-c", "mp4", "-f", "60", "-k", "h264"});
+  if (audioEnabled()) {
+    args.insert(args.end(), {"-a", "default_output"});
+  }
+  args.insert(
+      args.end(),
+      {"-cursor", showCursor() ? "yes" : "no", "-r", std::to_string(replayDurationSeconds()), "-v", "no", "-o",
+       directory.string()}
+  );
+  return launch(args, directory, State::Replaying);
 }
 
 bool ScreenRecorderService::launchWf(
@@ -278,7 +329,7 @@ bool ScreenRecorderService::launchWf(
   if (audioEnabled()) {
     args.emplace_back("-a");
   }
-  return launch(args, output);
+  return launch(args, output, State::Recording);
 }
 
 void ScreenRecorderService::startPolling() {
@@ -287,6 +338,15 @@ void ScreenRecorderService::startPolling() {
 }
 
 void ScreenRecorderService::onProcessCheck() {
+  if (m_state == State::Replaying) {
+    if (processAlive()) {
+      notifyChanged();
+      return;
+    }
+    kLog.warn("replay process exited unexpectedly");
+    finalizeReplay();
+    return;
+  }
   if (m_state != State::Recording) {
     return;
   }
@@ -324,9 +384,37 @@ void ScreenRecorderService::requestStop() {
   notifyChanged();
 }
 
+void ScreenRecorderService::requestStopReplay() {
+  if (m_state != State::Replaying) {
+    return;
+  }
+  m_state = State::StoppingReplay;
+  m_pollTimer.stop();
+  m_saveTimer.stop();
+  sendSignal(SIGINT);
+  m_stopWaitTicks = 0;
+  m_stopTimer.stop();
+  m_stopTimer.startRepeating(kStopTick, [this]() {
+    ++m_stopWaitTicks;
+    if (!processAlive()) {
+      m_stopTimer.stop();
+      finalizeReplay();
+      return;
+    }
+    if (m_stopWaitTicks >= kStopMaxTicks) {
+      kLog.warn("replay process did not exit after SIGINT, sending SIGKILL");
+      sendSignal(SIGKILL);
+      m_stopTimer.stop();
+      finalizeReplay();
+    }
+  });
+  notifyChanged();
+}
+
 void ScreenRecorderService::finalize(bool expectFile) {
   m_pollTimer.stop();
   m_stopTimer.stop();
+  m_saveTimer.stop();
   m_pid = -1;
   m_state = State::Idle;
   const auto path = m_outputPath;
@@ -338,7 +426,19 @@ void ScreenRecorderService::finalize(bool expectFile) {
   notifyChanged();
 }
 
+void ScreenRecorderService::finalizeReplay() {
+  m_pollTimer.stop();
+  m_stopTimer.stop();
+  m_saveTimer.stop();
+  m_pid = -1;
+  m_state = State::Idle;
+  notifyChanged();
+}
+
 std::string ScreenRecorderService::start(Source source) {
+  if (isReplaying()) {
+    return "error: a replay buffer is already running\n";
+  }
   if (m_state != State::Idle) {
     return "error: a recording is already in progress\n";
   }
@@ -412,21 +512,100 @@ std::string ScreenRecorderService::start(Source source) {
 }
 
 std::string ScreenRecorderService::stop() {
-  if (m_state == State::Idle) {
+  if (m_state == State::Idle || m_state == State::Stopping || m_state == State::StoppingReplay) {
     return "ok\n";
   }
-  if (m_state == State::Stopping) {
-    return "ok\n";
+  if (m_state == State::Replaying) {
+    return "error: a replay buffer is running; use screen-record-replay-stop\n";
   }
   requestStop();
   return "ok\n";
 }
 
 std::string ScreenRecorderService::toggle(Source source) {
+  if (isReplaying()) {
+    return "error: a replay buffer is already running\n";
+  }
   if (m_state != State::Idle) {
     return stop();
   }
   return start(source);
+}
+
+std::string ScreenRecorderService::startReplay(Source source) {
+  if (isRecording()) {
+    return "error: a recording is already in progress\n";
+  }
+  if (m_state != State::Idle) {
+    return "error: a replay buffer is already running\n";
+  }
+  if (!hasGpuScreenRecorder()) {
+    return "error: replay buffer requires gpu-screen-recorder\n";
+  }
+  if (source == Source::Region) {
+    return "error: replay source must be focused or portal\n";
+  }
+  if (source == Source::Portal && !process::desktopPortalAvailable()) {
+    return "error: xdg-desktop-portal is not running\n";
+  }
+
+  std::error_code ec;
+  const auto dir = outputDirectory();
+  if (!std::filesystem::create_directories(dir, ec) && ec) {
+    return "error: could not create the recordings folder\n";
+  }
+
+  PanelManager::instance().closePanel();
+
+  if (source == Source::Portal) {
+    if (!launchGsrReplay("portal", dir)) {
+      return "error: failed to start gpu-screen-recorder replay\n";
+    }
+    return "ok\n";
+  }
+
+  const std::string monitor = focusedOutputName();
+  if (monitor.empty()) {
+    return "error: no focused monitor to record\n";
+  }
+  if (!launchGsrReplay(monitor, dir)) {
+    return "error: failed to start gpu-screen-recorder replay\n";
+  }
+  return "ok\n";
+}
+
+std::string ScreenRecorderService::stopReplay() {
+  if (m_state == State::Idle || m_state == State::StoppingReplay) {
+    return "ok\n";
+  }
+  if (m_state != State::Replaying) {
+    return "error: replay buffer is not running\n";
+  }
+  requestStopReplay();
+  return "ok\n";
+}
+
+std::string ScreenRecorderService::saveReplay() {
+  if (m_state != State::Replaying) {
+    return "error: replay buffer is not running\n";
+  }
+  sendSignal(SIGUSR1);
+  m_saveTimer.stop();
+  m_saveTimer.start(kReplaySaveSettle, [this]() {
+    notifyReplaySaved();
+    notifyChanged();
+  });
+  return "ok\n";
+}
+
+std::string ScreenRecorderService::toggleReplay(Source source) {
+  if (isRecording()) {
+    return "error: a recording is already in progress\n";
+  }
+  if (m_state != State::Idle) {
+    return stopReplay();
+  }
+  return startReplay(source);
 }
 
 void ScreenRecorderService::registerIpc(IpcService& ipc) {
@@ -444,5 +623,25 @@ void ScreenRecorderService::registerIpc(IpcService& ipc) {
       return "error: source must be focused, portal, or region\n";
     }
     return toggle(*source);
+  });
+  ipc.bind(noctalia::cli::msg::screenRecordReplayStart, [this](const std::string& args) -> std::string {
+    const auto source = parseReplaySource(args);
+    if (!source.has_value()) {
+      return "error: source must be focused or portal\n";
+    }
+    return startReplay(*source);
+  });
+  ipc.bind(noctalia::cli::msg::screenRecordReplayStop, [this](const std::string& /*args*/) -> std::string {
+    return stopReplay();
+  });
+  ipc.bind(noctalia::cli::msg::screenRecordReplaySave, [this](const std::string& /*args*/) -> std::string {
+    return saveReplay();
+  });
+  ipc.bind(noctalia::cli::msg::screenRecordReplayToggle, [this](const std::string& args) -> std::string {
+    const auto source = parseReplaySource(args);
+    if (!source.has_value()) {
+      return "error: source must be focused or portal\n";
+    }
+    return toggleReplay(*source);
   });
 }

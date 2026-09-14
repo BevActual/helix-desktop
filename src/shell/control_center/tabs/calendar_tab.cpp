@@ -19,11 +19,18 @@
 #include "ui/controls/calendar_view.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/scroll_view.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <memory>
+#include <ranges>
+#include <string>
+#include <string_view>
+#include <unordered_set>
+#include <vector>
 #include <wayland-client-protocol.h>
 
 namespace {
@@ -44,6 +51,80 @@ namespace {
   std::string formatShellDate(const ConfigService* config) {
     const char* format = config != nullptr ? config->config().shell.dateFormat.c_str() : "%A, %x";
     return formatLocalTime(format);
+  }
+
+  [[nodiscard]] std::string timezoneDisplayName(std::string_view tzName) {
+    std::string name(tzName);
+    if (const auto slash = name.rfind('/'); slash != std::string::npos) {
+      name = name.substr(slash + 1);
+    }
+    std::replace(name.begin(), name.end(), '_', ' ');
+    return name;
+  }
+
+  [[nodiscard]] std::string timezoneTimeText(const ConfigService* config, std::string_view tzName) {
+    const char* format = config != nullptr ? config->config().shell.timeFormat.c_str() : "{:%H:%M}";
+    return formatTimezoneTime(format, tzName);
+  }
+
+  [[nodiscard]] std::string timezoneListKey(const std::vector<std::string>& timezones) {
+    std::string key;
+    key.reserve(timezones.size() * 24);
+    for (const auto& zone : timezones) {
+      key += zone;
+      key.push_back('\n');
+    }
+    return key;
+  }
+
+  [[nodiscard]] SearchPickerOption makeTimezoneOption(std::string name) {
+    SearchPickerOption option;
+    option.value = std::move(name);
+    option.label = timezoneDisplayName(option.value);
+    if (option.label != option.value) {
+      option.description = option.value;
+    }
+    return option;
+  }
+
+  [[nodiscard]] const std::vector<SearchPickerOption>& timezoneCatalog() {
+    static const std::vector<SearchPickerOption> catalog = [] {
+      std::vector<SearchPickerOption> options;
+      std::unordered_set<std::string> seen;
+      try {
+        const auto& db = std::chrono::get_tzdb();
+        options.reserve(db.zones.size() + db.links.size());
+        for (const auto& zone : db.zones) {
+          std::string name(zone.name());
+          if (!seen.insert(name).second) {
+            continue;
+          }
+          options.push_back(makeTimezoneOption(std::move(name)));
+        }
+        for (const auto& link : db.links) {
+          std::string name(link.name());
+          if (!seen.insert(name).second) {
+            continue;
+          }
+          options.push_back(makeTimezoneOption(std::move(name)));
+        }
+      } catch (...) {
+      }
+      return options;
+    }();
+    return catalog;
+  }
+
+  [[nodiscard]] std::vector<SearchPickerOption> availableTimezoneOptions(const std::vector<std::string>& selected) {
+    std::vector<SearchPickerOption> options;
+    const auto& catalog = timezoneCatalog();
+    options.reserve(catalog.size());
+    for (const auto& option : catalog) {
+      if (!std::ranges::contains(selected, option.value)) {
+        options.push_back(option);
+      }
+    }
+    return options;
   }
 } // namespace
 
@@ -193,7 +274,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
   auto eventsCard = ui::column(
       {.out = &m_eventsCard,
        .gap = Style::spaceSm * scale,
-       .flexGrow = 2.0F,
+       .flexGrow = 1.0F,
        .configure = [scale, opacity = panelCardOpacity()](
                         Flex& card
                     ) { control_center::applySectionCardStyle(card, scale, opacity); }},
@@ -215,7 +296,14 @@ std::unique_ptr<Flex> CalendarTab::create() {
   );
   eventsCard->setVisible(m_showEventsCard);
 
-  tab->addChild(std::move(eventsCard));
+  auto side = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 2.0F,
+  });
+  buildWorldClockCard(*side, scale);
+  side->addChild(std::move(eventsCard));
+  tab->addChild(std::move(side));
 
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
@@ -240,6 +328,194 @@ std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
       })
   );
   return m_settings->embedHeader(std::move(live), scale);
+}
+
+void CalendarTab::buildWorldClockCard(Flex& parent, float scale) {
+  auto card = ui::column({
+      .out = &m_worldClockCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { control_center::applySectionCardStyle(section, scale, opacity); },
+  });
+  card->addChild(control_center::makeCardHeaderRow(i18n::tr("control-center.calendar.world-clock.title"), scale));
+  card->addChild(
+      ui::column({
+          .out = &m_timezoneList,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      })
+  );
+  card->addChild(
+      ui::label({
+          .out = &m_timezoneError,
+          .text = "",
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::Error),
+          .visible = false,
+      })
+  );
+  card->addChild(
+      ui::searchPicker({
+          .out = &m_timezonePicker,
+          .placeholder = i18n::tr("control-center.calendar.world-clock.placeholder"),
+          .emptyText = i18n::tr("control-center.calendar.world-clock.empty"),
+          .height = Style::controlHeight * 6.5F * scale,
+          .onActivated =
+              [this](const SearchPickerOption& option) {
+                if (!option.value.empty()) {
+                  addTimezone(option.value);
+                }
+              },
+          .configure =
+              [](SearchPicker& picker) {
+                picker.clearFill();
+                picker.clearBorder();
+                picker.setRadius(0.0F);
+                picker.setPadding(0.0F);
+              },
+      })
+  );
+  parent.addChild(std::move(card));
+  rebuildWorldClock();
+  syncTimezonePicker();
+}
+
+void CalendarTab::rebuildWorldClock() {
+  if (m_timezoneList == nullptr) {
+    return;
+  }
+  const std::vector<std::string> timezones =
+      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
+  const std::string key = timezoneListKey(timezones);
+  if (key == m_lastTimezoneKey) {
+    return;
+  }
+
+  uiAssertNotRendering("CalendarTab::rebuildWorldClock");
+  while (!m_timezoneList->children().empty()) {
+    m_timezoneList->removeChild(m_timezoneList->children().front().get());
+  }
+  m_timezoneRows.clear();
+
+  const float scale = contentScale();
+  for (const auto& zone : timezones) {
+    TimezoneRow row;
+    row.zone = zone;
+    auto item = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .minHeight = Style::controlHeightSm * scale,
+    });
+    item->addChild(
+        ui::label({
+            .text = timezoneDisplayName(zone),
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .flexGrow = 1.0F,
+        })
+    );
+    item->addChild(
+        ui::label({
+            .out = &row.timeLabel,
+            .text = timezoneTimeText(m_config, zone),
+            .fontSize = Style::fontSizeBody * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    const std::size_t index = m_timezoneRows.size();
+    item->addChild(
+        ui::button({
+            .glyph = "trash",
+            .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr("control-center.calendar.world-clock.remove"),
+            .minWidth = Style::controlHeightSm * scale,
+            .minHeight = Style::controlHeightSm * scale,
+            .padding = Style::spaceXs * scale,
+            .onClick = [this, index]() { removeTimezone(index); },
+        })
+    );
+    m_timezoneRows.push_back(row);
+    m_timezoneList->addChild(std::move(item));
+  }
+
+  m_lastTimezoneKey = key;
+  syncTimezonePicker();
+}
+
+void CalendarTab::syncTimezonePicker() {
+  if (m_timezonePicker == nullptr) {
+    return;
+  }
+  const std::vector<std::string> timezones =
+      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
+  m_timezonePicker->setOptions(availableTimezoneOptions(timezones));
+}
+
+void CalendarTab::syncWorldClockTimes() {
+  for (auto& row : m_timezoneRows) {
+    if (row.timeLabel != nullptr) {
+      row.timeLabel->setText(timezoneTimeText(m_config, row.zone));
+    }
+  }
+}
+
+void CalendarTab::addTimezone(std::string_view raw) {
+  const std::string zone = StringUtils::trim(raw);
+  if (zone.empty()) {
+    return;
+  }
+  if (!isValidTimezone(zone)) {
+    setTimezoneError(i18n::tr("control-center.calendar.world-clock.invalid"));
+    return;
+  }
+
+  std::vector<std::string> timezones =
+      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
+  if (std::ranges::contains(timezones, zone)) {
+    setTimezoneError({});
+    if (m_timezonePicker != nullptr) {
+      m_timezonePicker->setFilter("");
+    }
+    return;
+  }
+
+  timezones.push_back(zone);
+  persistTimezones(timezones);
+  setTimezoneError({});
+  rebuildWorldClock();
+  if (m_timezonePicker != nullptr) {
+    m_timezonePicker->setFilter("");
+  }
+  PanelManager::instance().refresh();
+}
+
+void CalendarTab::removeTimezone(std::size_t index) {
+  std::vector<std::string> timezones =
+      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
+  if (index >= timezones.size()) {
+    return;
+  }
+  timezones.erase(timezones.begin() + static_cast<std::ptrdiff_t>(index));
+  persistTimezones(timezones);
+  rebuildWorldClock();
+  PanelManager::instance().refresh();
+}
+
+void CalendarTab::persistTimezones(const std::vector<std::string>& timezones) {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"control_center", "calendar", "timezones"}, timezones);
+}
+
+void CalendarTab::setTimezoneError(std::string_view message) {
+  if (m_timezoneError == nullptr) {
+    return;
+  }
+  m_timezoneError->setText(std::string(message));
+  m_timezoneError->setVisible(!message.empty());
 }
 
 void CalendarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -319,11 +595,14 @@ void CalendarTab::doUpdate(Renderer& renderer) {
   if (m_todayLabel != nullptr) {
     m_todayLabel->setText(formatShellDate(m_config));
   }
+  rebuildWorldClock();
+  syncWorldClockTimes();
 }
 
 void CalendarTab::setActive(bool active) {
   if (!active) {
     m_eventFadeTimer.stop();
+    m_clockTimer.stop();
     return;
   }
   focusToday();
@@ -332,6 +611,9 @@ void CalendarTab::setActive(bool active) {
       m_eventsDirty = true;
       PanelManager::instance().refresh();
     });
+  }
+  if (!m_clockTimer.active()) {
+    m_clockTimer.startRepeating(std::chrono::milliseconds(1000), [this]() { PanelManager::instance().refresh(); });
   }
 }
 
@@ -350,6 +632,7 @@ void CalendarTab::focusToday() {
 void CalendarTab::onClose() {
   m_settings->onClose();
   m_eventFadeTimer.stop();
+  m_clockTimer.stop();
   cancelMonthSlide();
   m_rootLayout = nullptr;
   m_calendarArea = nullptr;
@@ -368,6 +651,12 @@ void CalendarTab::onClose() {
   m_eventsCard = nullptr;
   m_eventsTitle = nullptr;
   m_eventsScroll = nullptr;
+  m_worldClockCard = nullptr;
+  m_timezoneList = nullptr;
+  m_timezoneError = nullptr;
+  m_timezonePicker = nullptr;
+  m_timezoneRows.clear();
+  m_lastTimezoneKey.clear();
   m_eventListState.linkOverlays.clear();
   m_selectedYear = std::numeric_limits<int>::min();
   m_selectedMonth = -1;

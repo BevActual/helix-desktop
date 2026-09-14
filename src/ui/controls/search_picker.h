@@ -32,6 +32,7 @@ public:
   void setPlaceholder(std::string_view placeholder);
   void setEmptyText(std::string_view text);
   void setSelectedValue(std::string_view value);
+  void setFilter(std::string_view filter);
   void setOnActivated(std::function<void(const SearchPickerOption&)> callback);
   void setOnCancel(std::function<void()> callback);
 

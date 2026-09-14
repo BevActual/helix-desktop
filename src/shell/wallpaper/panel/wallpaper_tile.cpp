@@ -1,6 +1,7 @@
 #include "shell/wallpaper/panel/wallpaper_tile.h"
 
 #include "config/config_types.h"
+#include "core/files/directory_scanner.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "render/animation/animation_manager.h"
 #include "render/core/renderer.h"
@@ -312,7 +313,9 @@ void WallpaperTile::setEntry(const WallpaperEntry& entry, Renderer& renderer) {
     m_starGlyph->setVisible(!entry.isDir);
   }
 
-  if (entry.isDir) {
+  const bool videoPlaceholder =
+      !entry.isDir && DirectoryScanner::isVideoPath(entry.absPath) && !DirectoryScanner::isImagePath(entry.absPath);
+  if (entry.isDir || videoPlaceholder) {
     m_thumb->clear(renderer);
     m_thumb->setVisible(false);
     m_loadingThumbnail = false;
@@ -320,6 +323,7 @@ void WallpaperTile::setEntry(const WallpaperEntry& entry, Renderer& renderer) {
       m_thumbHost->setFill(clearColorSpec());
     }
     if (m_folderGlyph != nullptr) {
+      m_folderGlyph->setGlyph(entry.isDir ? "folder" : "movie");
       m_folderGlyph->setVisible(true);
     }
     if (m_loadingGlyph != nullptr) {

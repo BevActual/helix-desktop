@@ -41,9 +41,6 @@ namespace {
 
 WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services)
     : m_weather(weather), m_config(config),
-      m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "location", .includedGroups = {"night-light"}}
-      )),
       m_inlineSettings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{.section = "location", .includedGroups = {"location", "weather"}, .compact = true}
@@ -417,27 +414,18 @@ std::unique_ptr<Flex> WeatherTab::create() {
   liveContent->addChild(m_inlineSettings->create(scale, panelCardOpacity()));
 
   auto live = ui::column({
+      .out = &m_liveRoot,
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
   });
   live->addChild(std::move(liveScroll));
-  return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
+  return live;
 }
-
-std::unique_ptr<Flex> WeatherTab::createHeaderActions() {
-  return m_settings->embedHeader(nullptr, contentScale());
-}
-
-void WeatherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
-
-bool WeatherTab::configureMode() const { return m_settings->configureMode(); }
 
 void WeatherTab::setSettingsSearchQuery(std::string_view query) {
-  const std::string q(query);
-  m_settings->setSearchQuery(q);
   if (m_inlineSettings != nullptr) {
-    m_inlineSettings->setSearchQuery(q);
+    m_inlineSettings->setSearchQuery(std::string(query));
   }
 }
 
@@ -537,9 +525,6 @@ void WeatherTab::beginForecastSlideIn() {
 }
 
 void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
-    return;
-  }
   if (m_rootLayout == nullptr || m_currentText == nullptr || m_forecastColumn == nullptr) {
     return;
   }
@@ -557,6 +542,13 @@ void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
       label->setMaxWidth(0.0F);
       label->setMinWidth(0.0F);
     }
+  }
+
+  // Size to the tab body first; otherwise the scroll keeps its intrinsic min
+  // width and the forecast collapses into a strip.
+  if (m_liveRoot != nullptr) {
+    m_liveRoot->setSize(contentWidth, bodyHeight);
+    m_liveRoot->layout(renderer);
   }
 
   float liveWidth = contentWidth;
@@ -761,8 +753,8 @@ void WeatherTab::showLocationPrompt(bool show) {
 }
 
 void WeatherTab::onClose() {
-  m_settings->onClose();
   m_inlineSettings->onClose();
+  m_liveRoot = nullptr;
   m_rootLayout = nullptr;
   m_liveScroll = nullptr;
   m_leftColumn = nullptr;

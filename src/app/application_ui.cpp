@@ -585,6 +585,7 @@ void Application::initPanelManagerAndPanels() {
           .nightLight = &m_gammaService,
           .theme = &m_themeService,
           .idleInhibitor = &m_idleInhibitor,
+          .session = &m_sessionActionRunner,
           .dependencies = &m_dependencyService,
           .platform = &m_compositorPlatform,
           .ipc = &m_ipcService,

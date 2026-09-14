@@ -18,6 +18,7 @@ class Button;
 class ContextMenuPopup;
 class EasyEffectsService;
 class Flex;
+class Glyph;
 class Label;
 class MprisService;
 class Node;
@@ -84,6 +85,9 @@ private:
   std::unique_ptr<Flex> createDeviceVolumeCard(DeviceVolumeCardSpec card);
   void rebuildLists(Renderer& renderer);
   void rebuildProgramVolumes(Renderer& renderer);
+  void populatePrivacyCard(float scale);
+  void rebuildPrivacyCard(Renderer& renderer);
+  void syncPrivacyMute();
   void syncValueLabelWidths(Renderer& renderer);
   void syncProgramVolumeRows();
   void queueProgramSinkVolume(std::uint32_t id, float value);
@@ -104,6 +108,11 @@ private:
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_privacyCard = nullptr;
+  Flex* m_privacyList = nullptr;
+  Label* m_privacyIdle = nullptr;
+  Button* m_privacyMuteButton = nullptr;
+  std::string m_lastPrivacyKey;
   Flex* m_deviceColumn = nullptr;
   Flex* m_outputCard = nullptr;
   Flex* m_inputCard = nullptr;

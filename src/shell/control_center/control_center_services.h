@@ -33,6 +33,7 @@ class PipeWireSpectrum;
 class PowerProfilesService;
 class ScreenRecorderService;
 class ScreenTimeService;
+class SessionActionRunner;
 class SystemMonitorService;
 class TailscaleService;
 class ThumbnailService;
@@ -78,6 +79,7 @@ struct ControlCenterServices {
   GammaService* nightLight = nullptr;
   noctalia::theme::ThemeService* theme = nullptr;
   IdleInhibitor* idleInhibitor = nullptr;
+  SessionActionRunner* session = nullptr;
   DependencyService* dependencies = nullptr;
   CompositorPlatform* platform = nullptr;
   IpcService* ipc = nullptr;

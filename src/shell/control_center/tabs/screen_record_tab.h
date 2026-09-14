@@ -4,14 +4,17 @@
 #include "core/timer_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
+#include "ui/signal.h"
 
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
 class Button;
 class ConfigService;
+class Flex;
 class Label;
 class Segmented;
 class Toggle;
@@ -23,6 +26,7 @@ public:
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
+  void setActive(bool active) override;
   void onClose() override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
@@ -30,18 +34,29 @@ public:
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
+  void buildRecordCard(Flex& root, float scale);
+  void buildReplayCard(Flex& root, float scale);
+  void buildRecentCard(Flex& root, float scale);
   void syncUi();
+  void syncReplayUi();
   void startElapsedTimer();
   void requestStart();
   void tickCountdown();
   void cancelCountdown();
   void openRecordingsFolder();
+  void openRecentFile(const std::string& path);
+  void rebuildRecentFiles();
+  void requestReplayStart();
+  void requestReplayStop();
+  void requestReplaySave();
   [[nodiscard]] ScreenRecorderService::Source selectedSource() const noexcept;
+  [[nodiscard]] ScreenRecorderService::Source replaySource() const noexcept;
   [[nodiscard]] int delaySeconds() const noexcept;
 
   ScreenRecorderService* m_recorder = nullptr;
   ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  Signal<>::ScopedConnection m_settingsInvalidatedConn;
   Flex* m_rootLayout = nullptr;
   Segmented* m_source = nullptr;
   Segmented* m_delay = nullptr;
@@ -50,6 +65,12 @@ private:
   Label* m_status = nullptr;
   Label* m_elapsed = nullptr;
   Label* m_backend = nullptr;
+  Label* m_replayHint = nullptr;
+  Button* m_replayStartButton = nullptr;
+  Button* m_replaySaveButton = nullptr;
+  Label* m_replayStatus = nullptr;
+  Flex* m_recentList = nullptr;
+  Label* m_recentEmpty = nullptr;
   Timer m_elapsedTimer;
   Timer m_delayTimer;
   std::vector<ScreenRecorderService::Source> m_sources;
@@ -57,4 +78,5 @@ private:
   std::size_t m_delayIndex = 0;
   bool m_pendingStart = false;
   int m_countdownLeft = 0;
+  std::string m_lastRecentKey;
 };

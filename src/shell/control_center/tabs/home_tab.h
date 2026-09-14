@@ -114,6 +114,7 @@ private:
 
   Label* m_timeLabel = nullptr;
   Label* m_dateLabel = nullptr;
+  Flex* m_weatherRow = nullptr;
   Glyph* m_weatherGlyph = nullptr;
   Label* m_weatherLine = nullptr;
   Label* m_userHost = nullptr;
@@ -124,6 +125,7 @@ private:
   InputArea* m_userCardArea = nullptr;
   InputArea* m_mediaCardArea = nullptr;
   InputArea* m_dateTimeCardArea = nullptr;
+  InputArea* m_weatherCardArea = nullptr;
   // Survives onClose() so the oversized-source warning fires once per session.
   std::string m_sizeCheckedAvatarPath;
 

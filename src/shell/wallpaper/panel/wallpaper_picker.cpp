@@ -15,6 +15,7 @@
 #include "render/core/thumbnail_service.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
+#include "scripting/plugin_state_store.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "shell/wallpaper/panel/wallpaper_tile.h"
@@ -38,12 +39,16 @@
 #include "util/string_utils.h"
 #include "wayland/wayland_connection.h"
 
+#include <nlohmann/json.hpp>
+
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <random>
+#include <ranges>
 #include <string_view>
 #include <system_error>
 #include <unordered_set>
@@ -208,6 +213,8 @@ namespace {
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
   }
+
+  constexpr std::string_view kMpvpaperPluginId = "noctalia/mpvpaper";
 
   [[nodiscard]] int caseInsensitiveNameOrder(std::string_view a, std::string_view b) {
     return StringUtils::naturalCaseInsensitiveCompare(a, b);
@@ -399,9 +406,7 @@ WallpaperPicker::WallpaperPicker(
       m_sortMode = sortModeFromState(*sort);
     }
     if (const std::optional<std::string> source = m_config->stateString("wallpaper_panel", "source")) {
-      if (*source == "wallhaven") {
-        m_browseSource = BrowseSource::Wallhaven;
-      }
+      m_browseSource = browseSourceFromState(*source);
     }
   }
   if (m_scanner != nullptr) {
@@ -476,14 +481,13 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
               std::vector<ui::SegmentedOption>{
                   {.label = i18n::tr("wallpaper.panel.wallhaven.library")},
                   {.label = i18n::tr("wallpaper.panel.wallhaven.title")},
+                  {.label = i18n::tr("wallpaper.panel.video.title")},
               },
-          .selectedIndex = m_browseSource == BrowseSource::Wallhaven ? std::size_t{1} : std::size_t{0},
+          .selectedIndex = browseSourceIndex(m_browseSource),
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
-          .onChange = [this](std::size_t index) {
-            setBrowseSource(index == 1 ? BrowseSource::Wallhaven : BrowseSource::Library, true);
-          },
+          .onChange = [this](std::size_t index) { setBrowseSource(browseSourceFromIndex(index), true); },
       })
   );
 
@@ -512,7 +516,11 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                     return;
                   }
                   m_filterQuery = m_pendingFilterQuery;
-                  applyFilter();
+                  if (m_browseSource == BrowseSource::Video) {
+                    refreshVideoEntries();
+                  } else {
+                    applyFilter();
+                  }
                   resetSelection();
                   rebindGrid();
                   syncBrowseChrome();
@@ -645,6 +653,22 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
 
   toolbar->addChild(
       ui::button({
+          .out = &m_videoClearButton,
+          .glyph = "player-stop",
+          .glyphSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("wallpaper.panel.video.clear-tooltip"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .visible = false,
+          .onClick = [this]() { clearVideoWallpaper(); },
+      })
+  );
+
+  toolbar->addChild(
+      ui::button({
           .out = &m_refreshButton,
           .glyph = "refresh",
           .glyphSize = Style::fontSizeBody * scale,
@@ -657,6 +681,15 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
           .onClick = [this]() {
             if (m_browseSource == BrowseSource::Wallhaven) {
               fetchWallhaven(false);
+              return;
+            }
+            if (m_browseSource == BrowseSource::Video) {
+              refreshVideoEntries();
+              resetSelection();
+              rebindGrid();
+              syncBrowseChrome();
+              m_dirty = true;
+              PanelManager::instance().refresh();
               return;
             }
             if (m_scanner != nullptr) {
@@ -1093,6 +1126,12 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       }
       return;
     }
+    if (m_browseSource == BrowseSource::Video) {
+      if (!entry.isDir) {
+        applyVideoPath(entry.absPath.string());
+      }
+      return;
+    }
     if (entry.isDir) {
       navigateInto(entry.absPath);
     } else {
@@ -1174,6 +1213,39 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
               .text = i18n::tr("wallpaper.panel.loading"),
               .fontSize = Style::fontSizeBody * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          })
+      )
+  );
+
+  root->addChild(
+      ui::column(
+          {
+              .out = &m_videoStatusBox,
+              .align = FlexAlign::Center,
+              .justify = FlexJustify::Center,
+              .gap = Style::spaceMd * scale,
+              .fillWidth = true,
+              .flexGrow = 1.0F,
+              .visible = false,
+          },
+          ui::label({
+              .out = &m_videoStatusLabel,
+              .text = i18n::tr("wallpaper.panel.video.plugin-missing"),
+              .fontSize = Style::fontSizeBody * scale,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              .textAlign = TextAlign::Center,
+          }),
+          ui::button({
+              .out = &m_videoPluginsButton,
+              .text = i18n::tr("wallpaper.panel.video.open-plugins"),
+              .glyph = "puzzle",
+              .variant = ButtonVariant::Secondary,
+              .minHeight = Style::controlHeight * scale,
+              .paddingH = Style::spaceMd * scale,
+              .onClick =
+                  []() {
+                    PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = "plugins"});
+                  },
           })
       )
   );
@@ -1302,9 +1374,14 @@ void WallpaperPicker::onOpen(std::string_view context) {
     if (m_config != nullptr) {
       (void)m_config->setStateString("wallpaper_panel", "source", "wallhaven");
     }
+  } else if (context == "video" || context == "mpvpaper") {
+    m_browseSource = BrowseSource::Video;
+    if (m_config != nullptr) {
+      (void)m_config->setStateString("wallpaper_panel", "source", "video");
+    }
   }
   if (m_sourceSegmented != nullptr) {
-    m_sourceSegmented->setSelectedIndex(m_browseSource == BrowseSource::Wallhaven ? 1 : 0);
+    m_sourceSegmented->setSelectedIndex(browseSourceIndex(m_browseSource));
   }
   if (m_browseSource == BrowseSource::Wallhaven) {
     if (m_filterInput != nullptr) {
@@ -1373,6 +1450,7 @@ void WallpaperPicker::onClose() {
   m_refreshButton = nullptr;
   m_fileButton = nullptr;
   m_colorButton = nullptr;
+  m_videoClearButton = nullptr;
   m_closeButton = nullptr;
   m_wallhavenFilters = nullptr;
   m_wallhavenCatGeneral = nullptr;
@@ -1398,6 +1476,9 @@ void WallpaperPicker::onClose() {
   m_grid = nullptr;
   m_loadingBox = nullptr;
   m_spinner = nullptr;
+  m_videoStatusBox = nullptr;
+  m_videoStatusLabel = nullptr;
+  m_videoPluginsButton = nullptr;
   m_scanPending = false;
 
   m_lastWidth = 0.0F;
@@ -1567,7 +1648,7 @@ std::string WallpaperPicker::displayNameForWallpaperPath(std::string_view path) 
 }
 
 void WallpaperPicker::syncBrowseChrome() {
-  if (m_browseSource == BrowseSource::Wallhaven) {
+  if (m_browseSource == BrowseSource::Wallhaven || m_browseSource == BrowseSource::Video) {
     setShown(m_backButton, false);
   } else if (m_backButton != nullptr) {
     m_backButton->setVisible(!m_navStack.empty());
@@ -1780,6 +1861,11 @@ void WallpaperPicker::refreshVisibleEntries() {
     syncLoadingState();
     return;
   }
+  if (m_browseSource == BrowseSource::Video) {
+    refreshVideoEntries();
+    syncLoadingState();
+    return;
+  }
   refreshScan();
   applyFilter();
   syncLoadingState();
@@ -1787,7 +1873,7 @@ void WallpaperPicker::refreshVisibleEntries() {
 
 void WallpaperPicker::onScanComplete() {
   // The scanner outlives the panel's UI; ignore late results after teardown.
-  if (m_rootLayout == nullptr || m_browseSource == BrowseSource::Wallhaven) {
+  if (m_rootLayout == nullptr || m_browseSource != BrowseSource::Library) {
     return;
   }
   const auto dir = activeDirectoryForSelection();
@@ -1802,13 +1888,15 @@ void WallpaperPicker::onScanComplete() {
 }
 
 void WallpaperPicker::syncLoadingState() {
-  const bool loading =
-      m_browseSource == BrowseSource::Wallhaven ? m_wallhavenLoading : m_scanPending;
+  const bool videoStatusVisible = m_videoStatusBox != nullptr && m_videoStatusBox->visible();
+  const bool loading = m_browseSource == BrowseSource::Wallhaven ? m_wallhavenLoading
+      : m_browseSource == BrowseSource::Library                    ? m_scanPending
+                                                                  : false;
   if (m_loadingBox != nullptr) {
     m_loadingBox->setVisible(loading);
   }
   if (m_grid != nullptr) {
-    m_grid->setVisible(!loading);
+    m_grid->setVisible(!loading && !videoStatusVisible);
   }
   if (m_spinner != nullptr) {
     if (loading) {
@@ -1822,6 +1910,10 @@ void WallpaperPicker::syncLoadingState() {
 void WallpaperPicker::applyFilter() {
   if (m_browseSource == BrowseSource::Wallhaven) {
     bindWallhavenGrid();
+    return;
+  }
+  if (m_browseSource == BrowseSource::Video) {
+    refreshVideoEntries();
     return;
   }
   m_visibleEntries.clear();
@@ -1908,6 +2000,7 @@ void WallpaperPicker::applyWallpaperPath(const std::string& path, const Wallpape
     return;
   }
 
+  clearVideoWallpaper();
   const auto& choice = m_monitorChoices[m_selectedMonitorIndex];
   const std::optional<std::string> connector =
       choice.connector.empty() ? std::optional<std::string>{} : std::optional<std::string>{choice.connector};
@@ -1985,6 +2078,12 @@ void WallpaperPicker::activateSelectedEntry() {
     }
     return;
   }
+  if (m_browseSource == BrowseSource::Video) {
+    if (!entry.isDir) {
+      applyVideoPath(entry.absPath.string());
+    }
+    return;
+  }
   if (entry.isDir) {
     navigateInto(entry.absPath);
   } else {
@@ -2059,7 +2158,7 @@ bool WallpaperPicker::handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers)
 
 void WallpaperPicker::syncBackButton() {
   uiAssertNotRendering("WallpaperPicker::syncBackButton");
-  if (m_browseSource == BrowseSource::Wallhaven) {
+  if (m_browseSource == BrowseSource::Wallhaven || m_browseSource == BrowseSource::Video) {
     setShown(m_backButton, false);
     return;
   }
@@ -2375,15 +2474,13 @@ void WallpaperPicker::pickWallpaperFile() {
 void WallpaperPicker::setBrowseSource(BrowseSource source, bool fetchIfNeeded) {
   m_browseSource = source;
   if (m_config != nullptr) {
-    (void)m_config->setStateString(
-        "wallpaper_panel", "source", source == BrowseSource::Wallhaven ? "wallhaven" : "library"
-    );
+    (void)m_config->setStateString("wallpaper_panel", "source", std::string(browseSourceStateValue(source)));
   }
   if (m_sourceSegmented != nullptr) {
-    m_sourceSegmented->setSelectedIndex(source == BrowseSource::Wallhaven ? 1 : 0);
+    m_sourceSegmented->setSelectedIndex(browseSourceIndex(source));
   }
   if (m_adapter != nullptr) {
-    m_adapter->setStarsEnabled(source != BrowseSource::Wallhaven);
+    m_adapter->setStarsEnabled(source == BrowseSource::Library);
   }
   resetSelection();
   if (source == BrowseSource::Wallhaven) {
@@ -2411,26 +2508,206 @@ void WallpaperPicker::setBrowseSource(BrowseSource source, bool fetchIfNeeded) {
 }
 
 void WallpaperPicker::syncSourceChrome() {
+  const bool library = m_browseSource == BrowseSource::Library;
   const bool wallhaven = m_browseSource == BrowseSource::Wallhaven;
+  const bool video = m_browseSource == BrowseSource::Video;
   if (m_title != nullptr) {
-    m_title->setText(i18n::tr(wallhaven ? "wallpaper.panel.wallhaven.title" : "wallpaper.panel.title"));
+    const char* titleKey = wallhaven ? "wallpaper.panel.wallhaven.title"
+        : video                      ? "wallpaper.panel.video.title"
+                                     : "wallpaper.panel.title";
+    m_title->setText(i18n::tr(titleKey));
   }
   if (m_filterInput != nullptr) {
-    m_filterInput->setPlaceholder(
-        i18n::tr(wallhaven ? "wallpaper.panel.wallhaven.search-placeholder" : "wallpaper.panel.filter-placeholder")
-    );
+    const char* placeholderKey = wallhaven ? "wallpaper.panel.wallhaven.search-placeholder"
+        : video                               ? "wallpaper.panel.video.filter-placeholder"
+                                              : "wallpaper.panel.filter-placeholder";
+    m_filterInput->setPlaceholder(i18n::tr(placeholderKey));
   }
-  setShown(m_flattenLabel, !wallhaven);
-  setShown(m_flattenToggle, !wallhaven);
-  setShown(m_colorButton, !wallhaven);
-  setShown(m_sortButton, !wallhaven);
+  setShown(m_flattenLabel, library);
+  setShown(m_flattenToggle, library);
+  setShown(m_colorButton, library);
+  setShown(m_sortButton, library);
+  setShown(m_fileButton, !video);
+  setShown(m_favoritesOptionsColumn, library);
+  setShown(m_videoClearButton, video && mpvpaperPluginEnabled());
   setShown(m_wallhavenFilters, wallhaven);
   setShown(m_wallhavenPager, wallhaven);
   if (m_adapter != nullptr) {
-    m_adapter->setStarsEnabled(!wallhaven);
+    m_adapter->setStarsEnabled(library);
   }
+  syncVideoStatus();
   syncWallhavenFilters();
   syncWallhavenPager();
+}
+
+std::size_t WallpaperPicker::browseSourceIndex(BrowseSource source) {
+  switch (source) {
+  case BrowseSource::Wallhaven:
+    return 1;
+  case BrowseSource::Video:
+    return 2;
+  case BrowseSource::Library:
+    return 0;
+  }
+  return 0;
+}
+
+WallpaperPicker::BrowseSource WallpaperPicker::browseSourceFromIndex(std::size_t index) {
+  if (index == 1) {
+    return BrowseSource::Wallhaven;
+  }
+  if (index == 2) {
+    return BrowseSource::Video;
+  }
+  return BrowseSource::Library;
+}
+
+std::string_view WallpaperPicker::browseSourceStateValue(BrowseSource source) {
+  switch (source) {
+  case BrowseSource::Wallhaven:
+    return "wallhaven";
+  case BrowseSource::Video:
+    return "video";
+  case BrowseSource::Library:
+    return "library";
+  }
+  return "library";
+}
+
+WallpaperPicker::BrowseSource WallpaperPicker::browseSourceFromState(std::string_view value) {
+  if (value == "wallhaven") {
+    return BrowseSource::Wallhaven;
+  }
+  if (value == "video" || value == "mpvpaper") {
+    return BrowseSource::Video;
+  }
+  return BrowseSource::Library;
+}
+
+bool WallpaperPicker::mpvpaperPluginEnabled() const {
+  if (m_config == nullptr) {
+    return false;
+  }
+  return std::ranges::contains(m_config->config().plugins.enabled, std::string(kMpvpaperPluginId));
+}
+
+std::filesystem::path WallpaperPicker::videoDirectory() const {
+  if (m_config != nullptr) {
+    const auto settingsIt = m_config->config().plugins.pluginSettings.find(std::string(kMpvpaperPluginId));
+    if (settingsIt != m_config->config().plugins.pluginSettings.end()) {
+      const auto dirIt = settingsIt->second.find("video_directory");
+      if (dirIt != settingsIt->second.end()) {
+        if (const auto dir = noctalia::config::widgetSettingValueAs<std::string>(dirIt->second)) {
+          if (!dir->empty()) {
+            return FileUtils::expandUserPath(*dir);
+          }
+        }
+      }
+    }
+  }
+  const char* home = std::getenv("HOME");
+  if (home != nullptr && home[0] != '\0') {
+    return std::filesystem::path(home) / "Videos";
+  }
+  return {};
+}
+
+void WallpaperPicker::sendMpvpaperCommand(std::string_view action, std::string connector, std::string path) {
+  nlohmann::json payload = {{"action", action}, {"nonce", ++m_mpvpaperNonce}};
+  if (!connector.empty()) {
+    payload["connector"] = std::move(connector);
+  }
+  if (!path.empty()) {
+    payload["path"] = std::move(path);
+  }
+  scripting::PluginStateStore::instance().set(std::string(kMpvpaperPluginId), "command", payload.dump());
+}
+
+void WallpaperPicker::applyVideoPath(const std::string& path) {
+  if (!mpvpaperPluginEnabled() || path.empty() || m_selectedMonitorIndex >= m_monitorChoices.size()) {
+    return;
+  }
+  const auto& choice = m_monitorChoices[m_selectedMonitorIndex];
+  const std::string connector = choice.connector.empty() ? "*" : choice.connector;
+  sendMpvpaperCommand("set", connector, path);
+  kLog.info("applied video wallpaper {} to {}", path, connector);
+}
+
+void WallpaperPicker::clearVideoWallpaper() {
+  if (!mpvpaperPluginEnabled() || m_selectedMonitorIndex >= m_monitorChoices.size()) {
+    return;
+  }
+  const auto& choice = m_monitorChoices[m_selectedMonitorIndex];
+  if (choice.connector.empty()) {
+    sendMpvpaperCommand("clear-all", {}, {});
+  } else {
+    sendMpvpaperCommand("clear", choice.connector, {});
+  }
+}
+
+void WallpaperPicker::syncVideoStatus() {
+  if (m_videoStatusBox == nullptr) {
+    return;
+  }
+  if (m_browseSource != BrowseSource::Video) {
+    m_videoStatusBox->setVisible(false);
+    if (m_videoPluginsButton != nullptr) {
+      m_videoPluginsButton->setVisible(false);
+    }
+    return;
+  }
+
+  const bool pluginEnabled = mpvpaperPluginEnabled();
+  const bool empty = m_visibleEntries.empty();
+  const bool showStatus = !pluginEnabled || empty;
+  m_videoStatusBox->setVisible(showStatus);
+  if (m_videoStatusLabel != nullptr) {
+    m_videoStatusLabel->setText(
+        i18n::tr(pluginEnabled ? "wallpaper.panel.video.empty" : "wallpaper.panel.video.plugin-missing")
+    );
+  }
+  if (m_videoPluginsButton != nullptr) {
+    m_videoPluginsButton->setVisible(!pluginEnabled);
+  }
+}
+
+void WallpaperPicker::refreshVideoEntries() {
+  m_visibleEntries.clear();
+  m_pinnedFavoriteCount = 0;
+  if (!mpvpaperPluginEnabled()) {
+    if (m_selectedVisibleIndex >= m_visibleEntries.size()) {
+      m_selectedVisibleIndex = kNoVisibleSelection;
+    }
+    syncVideoStatus();
+    return;
+  }
+
+  DirectoryScanner scanner;
+  const auto files = scanner.scan(
+      videoDirectory(), DirectoryScanner::videoExtensionFilter(), false, FileDialogSortField::Name,
+      FileDialogSortOrder::Ascending
+  );
+  const std::string needle = StringUtils::toLower(m_filterQuery);
+  m_visibleEntries.reserve(files.size());
+  for (const auto& file : files) {
+    if (file.isDir) {
+      continue;
+    }
+    if (!needle.empty() && !StringUtils::toLower(file.name).contains(needle)) {
+      continue;
+    }
+    WallpaperEntry entry;
+    entry.name = file.name;
+    entry.absPath = file.absPath;
+    entry.isDir = false;
+    entry.mtime = file.mtime;
+    entry.hasMtime = true;
+    m_visibleEntries.push_back(std::move(entry));
+  }
+  if (m_selectedVisibleIndex >= m_visibleEntries.size()) {
+    m_selectedVisibleIndex = kNoVisibleSelection;
+  }
+  syncVideoStatus();
 }
 
 void WallpaperPicker::syncWallhavenFilters() {

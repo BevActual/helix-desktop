@@ -2,14 +2,18 @@
 
 #include "capture/screen_recorder_service.h"
 #include "config/config_service.h"
+#include "core/files/directory_scanner.h"
 #include "core/process/process.h"
+#include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
+#include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
@@ -25,6 +29,8 @@
 using namespace control_center;
 
 namespace {
+
+  constexpr std::size_t kRecentFileLimit = 5;
 
   [[nodiscard]] std::filesystem::path recordingsDirectory(const Config& config) {
     if (config.shell.screenRecord.directory.empty()) {
@@ -51,7 +57,16 @@ ScreenRecordTab::ScreenRecordTab(const ControlCenterServices& services)
     : m_recorder(services.screenRecorder), m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "screen-record"})) {
   if (m_recorder != nullptr) {
-    m_recorder->setChangeCallback([this]() { syncUi(); });
+    m_recorder->setChangeCallback([this]() {
+      syncUi();
+      rebuildRecentFiles();
+    });
+  }
+  if (services.settingsInvalidated != nullptr) {
+    m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() {
+      syncUi();
+      rebuildRecentFiles();
+    });
   }
 }
 
@@ -61,9 +76,36 @@ std::unique_ptr<Flex> ScreenRecordTab::create() {
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
   });
 
+  auto scroll = ui::scrollView({
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* content = scroll->content();
+  content->setDirection(FlexDirection::Vertical);
+  content->setAlign(FlexAlign::Stretch);
+  content->setGap(Style::spaceMd * scale);
+
+  buildRecordCard(*content, scale);
+  buildReplayCard(*content, scale);
+  buildRecentCard(*content, scale);
+
+  live->addChild(std::move(scroll));
+  auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
+  syncUi();
+  rebuildRecentFiles();
+  return wrapped;
+}
+
+void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
   auto card = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
@@ -206,10 +248,90 @@ std::unique_ptr<Flex> ScreenRecordTab::create() {
       })
   );
 
-  live->addChild(std::move(card));
-  auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
-  syncUi();
-  return wrapped;
+  root.addChild(std::move(card));
+}
+
+void ScreenRecordTab::buildReplayCard(Flex& root, float scale) {
+  auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
+  });
+  addTitle(*card, i18n::tr("control-center.screen-record.replay"), scale);
+  card->addChild(
+      ui::label({
+          .out = &m_replayHint,
+          .text = i18n::tr("control-center.screen-record.replay-unavailable"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  card->addChild(
+      ui::button({
+          .out = &m_replayStartButton,
+          .text = i18n::tr("control-center.screen-record.replay-start"),
+          .glyph = "history",
+          .variant = ButtonVariant::Primary,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .onClick =
+              [this]() {
+                if (m_recorder != nullptr && m_recorder->isReplaying()) {
+                  requestReplayStop();
+                  return;
+                }
+                requestReplayStart();
+              },
+      })
+  );
+  card->addChild(
+      ui::button({
+          .out = &m_replaySaveButton,
+          .text = i18n::tr("control-center.screen-record.replay-save"),
+          .glyph = "device-floppy",
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .onClick = [this]() { requestReplaySave(); },
+      })
+  );
+  card->addChild(
+      ui::label({
+          .out = &m_replayStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  root.addChild(std::move(card));
+}
+
+void ScreenRecordTab::buildRecentCard(Flex& root, float scale) {
+  auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
+  });
+  addTitle(*card, i18n::tr("control-center.screen-record.recent"), scale);
+  card->addChild(
+      ui::label({
+          .out = &m_recentEmpty,
+          .text = i18n::tr("control-center.screen-record.recent-empty"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  card->addChild(
+      ui::column({
+          .out = &m_recentList,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      })
+  );
+  root.addChild(std::move(card));
 }
 
 std::unique_ptr<Flex> ScreenRecordTab::createHeaderActions() {
@@ -222,6 +344,13 @@ bool ScreenRecordTab::configureMode() const { return m_settings->configureMode()
 
 void ScreenRecordTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
+}
+
+void ScreenRecordTab::setActive(bool active) {
+  if (active) {
+    rebuildRecentFiles();
+    syncUi();
+  }
 }
 
 void ScreenRecordTab::onClose() {
@@ -238,6 +367,13 @@ void ScreenRecordTab::onClose() {
   m_status = nullptr;
   m_elapsed = nullptr;
   m_backend = nullptr;
+  m_replayHint = nullptr;
+  m_replayStartButton = nullptr;
+  m_replaySaveButton = nullptr;
+  m_replayStatus = nullptr;
+  m_recentList = nullptr;
+  m_recentEmpty = nullptr;
+  m_lastRecentKey.clear();
 }
 
 void ScreenRecordTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -253,6 +389,13 @@ void ScreenRecordTab::doLayout(Renderer& renderer, float contentWidth, float bod
 
 ScreenRecorderService::Source ScreenRecordTab::selectedSource() const noexcept { return m_selectedSource; }
 
+ScreenRecorderService::Source ScreenRecordTab::replaySource() const noexcept {
+  if (m_selectedSource == ScreenRecorderService::Source::Portal) {
+    return ScreenRecorderService::Source::Portal;
+  }
+  return ScreenRecorderService::Source::Focused;
+}
+
 int ScreenRecordTab::delaySeconds() const noexcept {
   if (m_delayIndex == 1) {
     return 3;
@@ -263,8 +406,29 @@ int ScreenRecordTab::delaySeconds() const noexcept {
   return 0;
 }
 
+void ScreenRecordTab::requestReplayStart() {
+  if (m_recorder == nullptr || m_recorder->isReplaying() || m_recorder->isRecording()) {
+    return;
+  }
+  (void)m_recorder->startReplay(replaySource());
+}
+
+void ScreenRecordTab::requestReplayStop() {
+  if (m_recorder == nullptr || !m_recorder->isReplaying()) {
+    return;
+  }
+  (void)m_recorder->stopReplay();
+}
+
+void ScreenRecordTab::requestReplaySave() {
+  if (m_recorder == nullptr || !m_recorder->isReplaying() || m_recorder->isReplayStopping()) {
+    return;
+  }
+  (void)m_recorder->saveReplay();
+}
+
 void ScreenRecordTab::requestStart() {
-  if (m_recorder == nullptr || m_recorder->isRecording()) {
+  if (m_recorder == nullptr || m_recorder->isRecording() || m_recorder->isReplaying()) {
     return;
   }
   const int delay = delaySeconds();
@@ -286,7 +450,7 @@ void ScreenRecordTab::tickCountdown() {
   }
   if (m_countdownLeft <= 1) {
     cancelCountdown();
-    if (m_recorder != nullptr && !m_recorder->isRecording()) {
+    if (m_recorder != nullptr && !m_recorder->isRecording() && !m_recorder->isReplaying()) {
       (void)m_recorder->start(selectedSource());
     }
     return;
@@ -308,14 +472,66 @@ void ScreenRecordTab::startElapsedTimer() {
   m_elapsedTimer.startRepeating(std::chrono::seconds{1}, [this]() { syncUi(); });
 }
 
+void ScreenRecordTab::syncReplayUi() {
+  const bool hasGsr = m_recorder != nullptr && m_recorder->hasGpuScreenRecorder();
+  const bool recording = m_recorder != nullptr && m_recorder->isRecording();
+  const bool replaying = m_recorder != nullptr && m_recorder->isReplaying();
+  const bool stoppingReplay = m_recorder != nullptr && m_recorder->isReplayStopping();
+  const bool counting = m_pendingStart && m_countdownLeft > 0;
+  const int duration = m_recorder != nullptr ? m_recorder->replayDurationSeconds() : 30;
+  const bool canStart = hasGsr && !replaying && !recording && !counting;
+
+  if (m_replayHint != nullptr) {
+    if (!hasGsr) {
+      m_replayHint->setText(i18n::tr("control-center.screen-record.replay-unavailable"));
+    } else {
+      m_replayHint->setText(
+          i18n::tr("control-center.screen-record.replay-hint", "seconds", std::to_string(duration))
+      );
+    }
+  }
+  if (m_replayStartButton != nullptr) {
+    m_replayStartButton->setEnabled(canStart || replaying);
+    if (replaying) {
+      m_replayStartButton->setText(
+          stoppingReplay ? i18n::tr("control-center.screen-record.stopping")
+                         : i18n::tr("control-center.screen-record.replay-stop")
+      );
+      m_replayStartButton->setGlyph("player-stop");
+      m_replayStartButton->setVariant(ButtonVariant::Destructive);
+    } else {
+      m_replayStartButton->setText(i18n::tr("control-center.screen-record.replay-start"));
+      m_replayStartButton->setGlyph("history");
+      m_replayStartButton->setVariant(ButtonVariant::Primary);
+    }
+  }
+  if (m_replaySaveButton != nullptr) {
+    m_replaySaveButton->setEnabled(replaying && !stoppingReplay);
+  }
+  if (m_replayStatus != nullptr) {
+    if (!hasGsr) {
+      m_replayStatus->setText({});
+    } else if (replaying && m_recorder != nullptr) {
+      m_replayStatus->setText(
+          i18n::tr("control-center.screen-record.replay-active") + " · " + m_recorder->elapsedLabel()
+      );
+    } else if (recording) {
+      m_replayStatus->setText(i18n::tr("control-center.screen-record.replay-busy"));
+    } else {
+      m_replayStatus->setText({});
+    }
+  }
+}
+
 void ScreenRecordTab::syncUi() {
   const bool recording = m_recorder != nullptr && m_recorder->isRecording();
   const bool stopping = m_recorder != nullptr && m_recorder->isStopping();
+  const bool replaying = m_recorder != nullptr && m_recorder->isReplaying();
   const bool available = m_recorder != nullptr && m_recorder->available();
   const bool counting = m_pendingStart && m_countdownLeft > 0;
 
-  if (recording) {
-    if (m_pendingStart) {
+  if (recording || replaying) {
+    if (recording && m_pendingStart) {
       cancelCountdown();
     }
     startElapsedTimer();
@@ -324,19 +540,19 @@ void ScreenRecordTab::syncUi() {
   }
 
   if (m_source != nullptr) {
-    m_source->setEnabled(!recording && !counting);
+    m_source->setEnabled(!recording && !counting && !replaying);
   }
   if (m_delay != nullptr) {
-    m_delay->setEnabled(!recording && !counting);
+    m_delay->setEnabled(!recording && !counting && !replaying);
   }
   if (m_audio != nullptr) {
-    m_audio->setEnabled(!recording && !counting);
-    if (m_config != nullptr && !recording) {
+    m_audio->setEnabled(!recording && !counting && !replaying);
+    if (m_config != nullptr && !recording && !replaying) {
       m_audio->setCheckedImmediate(m_config->config().shell.screenRecord.audio);
     }
   }
   if (m_recordButton != nullptr) {
-    m_recordButton->setEnabled((available || recording) && !counting);
+    m_recordButton->setEnabled((available || recording) && !counting && !replaying);
     if (recording) {
       m_recordButton->setText(
           stopping ? i18n::tr("control-center.screen-record.stopping")
@@ -351,7 +567,9 @@ void ScreenRecordTab::syncUi() {
     }
   }
   if (m_elapsed != nullptr) {
-    m_elapsed->setText(m_recorder != nullptr ? m_recorder->elapsedLabel() : std::string{"00:00"});
+    m_elapsed->setText(
+        recording && m_recorder != nullptr ? m_recorder->elapsedLabel() : std::string{"00:00"}
+    );
   }
   if (m_backend != nullptr) {
     m_backend->setText(m_recorder != nullptr ? m_recorder->backendDescription() : std::string{});
@@ -367,7 +585,81 @@ void ScreenRecordTab::syncUi() {
       m_status->setText({});
     }
   }
+  syncReplayUi();
   PanelManager::instance().requestRedraw();
+}
+
+void ScreenRecordTab::rebuildRecentFiles() {
+  if (m_recentList == nullptr || m_recentEmpty == nullptr || m_config == nullptr) {
+    return;
+  }
+
+  DirectoryScanner scanner;
+  const auto entries = scanner.scan(
+      recordingsDirectory(m_config->config()), {".mp4"}, false, FileDialogSortField::Modified,
+      FileDialogSortOrder::Descending
+  );
+
+  std::string key;
+  std::size_t shown = 0;
+  for (const auto& entry : entries) {
+    if (entry.isDir) {
+      continue;
+    }
+    key += entry.absPath.string();
+    key.push_back('\n');
+    if (++shown >= kRecentFileLimit) {
+      break;
+    }
+  }
+  if (key == m_lastRecentKey) {
+    return;
+  }
+
+  uiAssertNotRendering("ScreenRecordTab::rebuildRecentFiles");
+  while (!m_recentList->children().empty()) {
+    m_recentList->removeChild(m_recentList->children().front().get());
+  }
+
+  const float scale = contentScale();
+  shown = 0;
+  for (const auto& entry : entries) {
+    if (entry.isDir) {
+      continue;
+    }
+    const std::string path = entry.absPath.string();
+    m_recentList->addChild(
+        ui::button({
+            .text = entry.name,
+            .glyph = "video",
+            .contentAlign = ButtonContentAlign::Start,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = formatFileTime(entry.mtime),
+            .minHeight = Style::controlHeight * scale,
+            .paddingH = Style::spaceMd * scale,
+            .onClick = [this, path]() { openRecentFile(path); },
+        })
+    );
+    if (++shown >= kRecentFileLimit) {
+      break;
+    }
+  }
+
+  m_recentEmpty->setVisible(shown == 0);
+  m_recentList->setVisible(shown > 0);
+  m_lastRecentKey = std::move(key);
+  PanelManager::instance().requestLayout();
+}
+
+void ScreenRecordTab::openRecentFile(const std::string& path) {
+  if (!process::commandExists("xdg-open")) {
+    if (m_status != nullptr) {
+      m_status->setText(i18n::tr("control-center.screen-record.open-folder-failed"));
+      PanelManager::instance().requestRedraw();
+    }
+    return;
+  }
+  (void)process::runAsync(std::vector<std::string>{"xdg-open", path});
 }
 
 void ScreenRecordTab::openRecordingsFolder() {

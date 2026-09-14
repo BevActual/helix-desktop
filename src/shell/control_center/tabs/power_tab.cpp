@@ -1,12 +1,18 @@
 #include "shell/control_center/tabs/power_tab.h"
 
+#include "config/config_service.h"
 #include "dbus/power/power_profiles_service.h"
 #include "dbus/upower/upower_service.h"
 #include "i18n/i18n.h"
+#include "idle/idle_inhibitor.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/panel/panel_manager.h"
+#include "shell/session/session_action_meta.h"
+#include "shell/session/session_action_runner.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/button.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 
@@ -17,6 +23,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 using namespace control_center;
 
@@ -116,6 +123,9 @@ bool PowerTab::shouldShowChargeLimit(const UPowerChargeLimitState& state) noexce
 PowerTab::PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles, const ControlCenterServices* services)
     : m_upower(upower), m_powerProfiles(powerProfiles) {
   if (services != nullptr) {
+    m_config = services->config;
+    m_idleInhibitor = services->idleInhibitor;
+    m_session = services->session;
     m_settings = std::make_unique<SettingsPane>(*services, SettingsPaneOptions{.section = "power"});
   }
 }
@@ -144,6 +154,7 @@ std::unique_ptr<Flex> PowerTab::create() {
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
 
+  buildSessionCard(*content, scale);
   buildStatusCard(*content, scale);
   buildProfilesCard(*content, scale);
   buildChargingCard(*content, scale);
@@ -177,6 +188,196 @@ void PowerTab::setSettingsSearchQuery(std::string_view query) {
   if (m_settings != nullptr) {
     m_settings->setSearchQuery(std::string(query));
   }
+}
+
+void PowerTab::buildSessionCard(Flex& root, float scale) {
+  if (m_session == nullptr && m_idleInhibitor == nullptr) {
+    return;
+  }
+
+  auto card = ui::column({
+      .out = &m_sessionCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
+  });
+  card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.session"), scale));
+
+  auto actions = ui::row({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale});
+  actions->addChild(
+      ui::button({
+          .out = &m_lockButton,
+          .text = i18n::tr("session.actions.lock"),
+          .glyph = session_action::defaultGlyph("lock"),
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .flexGrow = 1.0F,
+          .onClick =
+              [this]() {
+                PanelManager::instance().close();
+                if (m_session != nullptr) {
+                  (void)m_session->lock();
+                }
+              },
+      })
+  );
+  actions->addChild(
+      ui::button({
+          .out = &m_suspendButton,
+          .text = i18n::tr("session.actions.suspend"),
+          .glyph = session_action::defaultGlyph("suspend"),
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .flexGrow = 1.0F,
+          .onClick = [this]() { runSessionAction("suspend"); },
+      })
+  );
+  card->addChild(std::move(actions));
+
+  auto powerActions = ui::row({
+      .out = &m_powerActionsRow,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  powerActions->addChild(
+      ui::button({
+          .out = &m_logoutButton,
+          .text = i18n::tr("session.actions.logout"),
+          .glyph = session_action::defaultGlyph("logout"),
+          .variant = ButtonVariant::Ghost,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .flexGrow = 1.0F,
+          .onClick = [this]() { runSessionAction("logout"); },
+      })
+  );
+  powerActions->addChild(
+      ui::button({
+          .out = &m_rebootButton,
+          .text = i18n::tr("session.actions.reboot"),
+          .glyph = session_action::defaultGlyph("reboot"),
+          .variant = ButtonVariant::Destructive,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .flexGrow = 1.0F,
+          .onClick = [this]() { runSessionAction("reboot"); },
+      })
+  );
+  powerActions->addChild(
+      ui::button({
+          .out = &m_shutdownButton,
+          .text = i18n::tr("session.actions.shutdown"),
+          .glyph = session_action::defaultGlyph("shutdown"),
+          .variant = ButtonVariant::Destructive,
+          .minHeight = Style::controlHeight * scale,
+          .paddingH = Style::spaceMd * scale,
+          .flexGrow = 1.0F,
+          .onClick = [this]() { runSessionAction("shutdown"); },
+      })
+  );
+  card->addChild(std::move(powerActions));
+
+  auto caffeine = ui::row({
+      .out = &m_caffeineRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = Style::controlHeightSm * scale,
+      .visible = false,
+  });
+  caffeine->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.shortcuts.caffeine"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  caffeine->addChild(
+      ui::toggle({
+          .out = &m_caffeineToggle,
+          .checkedImmediate = false,
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange =
+              [this](bool checked) {
+                if (m_syncingCaffeine || m_idleInhibitor == nullptr) {
+                  return;
+                }
+                m_idleInhibitor->setEnabled(checked);
+              },
+      })
+  );
+  card->addChild(std::move(caffeine));
+  root.addChild(std::move(card));
+  syncSessionCard();
+}
+
+void PowerTab::syncSessionCard() {
+  const bool lockEnabled = m_config != nullptr && m_config->isLockScreenEnabled();
+  if (m_lockButton != nullptr) {
+    m_lockButton->setVisible(m_session != nullptr && lockEnabled);
+  }
+  if (m_suspendButton != nullptr) {
+    m_suspendButton->setVisible(m_session != nullptr);
+  }
+
+  const auto actionEnabled = [this](std::string_view action) {
+    if (m_session == nullptr || m_config == nullptr) {
+      return false;
+    }
+    for (const auto& cfg : m_config->config().shell.session.actions) {
+      if (cfg.action == action) {
+        return cfg.enabled;
+      }
+    }
+    return true;
+  };
+  if (m_logoutButton != nullptr) {
+    m_logoutButton->setVisible(actionEnabled("logout"));
+  }
+  if (m_rebootButton != nullptr) {
+    m_rebootButton->setVisible(actionEnabled("reboot"));
+  }
+  if (m_shutdownButton != nullptr) {
+    m_shutdownButton->setVisible(actionEnabled("shutdown"));
+  }
+  if (m_powerActionsRow != nullptr) {
+    m_powerActionsRow->setVisible(
+        actionEnabled("logout") || actionEnabled("reboot") || actionEnabled("shutdown")
+    );
+  }
+
+  const bool caffeineAvailable = m_idleInhibitor != nullptr && m_idleInhibitor->available();
+  if (m_caffeineRow != nullptr) {
+    m_caffeineRow->setVisible(caffeineAvailable);
+  }
+  if (m_caffeineToggle != nullptr && caffeineAvailable) {
+    m_syncingCaffeine = true;
+    m_caffeineToggle->setCheckedImmediate(m_idleInhibitor->enabled());
+    m_syncingCaffeine = false;
+  }
+}
+
+void PowerTab::runSessionAction(std::string_view action) {
+  PanelManager::instance().close();
+  if (m_session == nullptr) {
+    return;
+  }
+  if (m_config != nullptr) {
+    for (const auto& cfg : m_config->config().shell.session.actions) {
+      if (cfg.enabled && cfg.action == action) {
+        m_session->invoke(cfg);
+        return;
+      }
+    }
+  }
+  SessionPanelActionConfig cfg;
+  cfg.action = std::string(action);
+  m_session->invoke(cfg);
 }
 
 void PowerTab::buildChargingCard(Flex& root, float scale) {
@@ -429,6 +630,15 @@ void PowerTab::onClose() {
     m_settings->onClose();
   }
   m_root = nullptr;
+  m_sessionCard = nullptr;
+  m_lockButton = nullptr;
+  m_suspendButton = nullptr;
+  m_logoutButton = nullptr;
+  m_rebootButton = nullptr;
+  m_shutdownButton = nullptr;
+  m_powerActionsRow = nullptr;
+  m_caffeineToggle = nullptr;
+  m_caffeineRow = nullptr;
   m_statusCard = nullptr;
   m_statusGlyph = nullptr;
   m_percentLabel = nullptr;
@@ -469,6 +679,7 @@ void PowerTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
 }
 
 void PowerTab::doUpdate(Renderer& /*renderer*/) {
+  syncSessionCard();
   syncBatteryStatus();
   rebuildChargeLimits();
   syncPowerProfiles();

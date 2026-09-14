@@ -33,11 +33,13 @@ public:
   ) const;
 
   [[nodiscard]] static bool isImagePath(const std::filesystem::path& path);
+  [[nodiscard]] static bool isVideoPath(const std::filesystem::path& path);
 
   // Extension filter for FileDialogOptions::extensions and
   // TextSetting::browseFileExtensions. `includeSvg` adds ".svg" for pickers
   // that also accept vector art.
   [[nodiscard]] static std::vector<std::string> imageExtensionFilter(bool includeSvg);
+  [[nodiscard]] static std::vector<std::string> videoExtensionFilter();
 
 private:
   [[nodiscard]] static bool

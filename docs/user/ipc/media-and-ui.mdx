@@ -146,7 +146,7 @@ The live color is the swatch carrying a check mark, and the shape-fill button sh
 
 ## Screen recording {#screen-recording}
 
-Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatpak `com.dec05eba.gpu_screen_recorder`) and falls back to `wf-recorder`. Settings live under [`[shell.screen_record]`](/noctalia/configuration/shell/#shell-settings). This is independent of the [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder).
+Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatpak `com.dec05eba.gpu_screen_recorder`) and falls back to `wf-recorder`. Replay buffer start/stop/save also uses `gpu-screen-recorder` (`-r`). Settings live under [`[shell.screen_record]`](/noctalia/configuration/shell/#shell-settings), including `replay_duration`. This is independent of the [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder).
 
 | Action | Command | Description |
 |--------|---------|-------------|
@@ -155,8 +155,13 @@ Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatp
 | Start (region) | <IpcCommand command="screen-record-start region" /> | Drag a region, then record it (`wf-recorder` only). |
 | Stop recording | <IpcCommand command="screen-record-stop" /> | Stop and save the current recording. |
 | Toggle recording | <IpcCommand command="screen-record-toggle" /> | Start or stop. Optional source: `focused`, `portal`, or `region`. |
+| Start replay buffer | <IpcCommand command="screen-record-replay-start" /> | Start the replay buffer on the focused monitor. |
+| Start replay (portal) | <IpcCommand command="screen-record-replay-start portal" /> | Start the replay buffer with the desktop portal picker. |
+| Stop replay buffer | <IpcCommand command="screen-record-replay-stop" /> | Stop the replay buffer without saving. |
+| Save replay | <IpcCommand command="screen-record-replay-save" /> | Write the last N seconds without stopping the buffer. |
+| Toggle replay | <IpcCommand command="screen-record-replay-toggle" /> | Start or stop the replay buffer. Optional source: `focused` or `portal`. |
 
-Control Center closes before a recording starts so it is not in the video. Stop sends `SIGINT` so the encoder can finish the file.
+Control Center closes before a recording or replay buffer starts so it is not in the video. Stop recording sends `SIGINT` so the encoder can finish the file. Save replay sends `SIGUSR1`. Record and replay cannot run at the same time.
 
 ## Tailscale {#tailscale}
 

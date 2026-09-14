@@ -228,6 +228,15 @@ void SearchPicker::setSelectedValue(std::string_view value) {
   }
 }
 
+void SearchPicker::setFilter(std::string_view filter) {
+  m_filterDebounceTimer.stop();
+  m_filter = std::string(filter);
+  if (m_input != nullptr) {
+    m_input->setValue(m_filter);
+  }
+  applyFilter();
+}
+
 void SearchPicker::setOnActivated(std::function<void(const SearchPickerOption&)> callback) {
   m_onActivated = std::move(callback);
 }

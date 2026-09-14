@@ -494,7 +494,9 @@ std::unique_ptr<Flex> HomeTab::create() {
               .color = colorSpecFromRole(ColorRole::OnSurface),
           }),
           ui::row(
-              {.align = FlexAlign::Center, .gap = Style::spaceXs * scale},
+              {.out = &m_weatherRow,
+               .align = FlexAlign::Center,
+               .gap = Style::spaceXs * scale},
               ui::glyph({
                   .out = &m_weatherGlyph,
                   .glyph = "weather-cloud-sun",
@@ -511,8 +513,15 @@ std::unique_ptr<Flex> HomeTab::create() {
       )
   );
 
-  // Clicking anywhere on the clock/weather card opens the weather tab.
-  m_dateTimeCardArea = addCardOverlay(*m_dateTimeCard, []() { openControlCenterTab("weather"); });
+  // Date and time open Calendar; the weather line keeps Weather.
+  m_dateTimeCardArea = addCardOverlay(*m_dateTimeCard, []() { openControlCenterTab("calendar"); });
+  m_weatherCardArea = addCardOverlay(
+      *m_dateTimeCard, []() { openControlCenterTab("weather"); },
+      {.keyboardFocus = false, .pointerHitTest = true}
+  );
+  if (m_weatherCardArea != nullptr) {
+    m_weatherCardArea->setZIndex(4);
+  }
 
   leftColumn->addChild(std::move(mediaCard));
   leftColumn->addChild(std::move(dateTimeCard));
@@ -986,6 +995,20 @@ void HomeTab::layoutCardOverlays() {
   cover(m_dateTimeCard, m_dateTimeCardArea);
   cover(m_userCard, m_userCardKeyboardArea);
 
+  if (m_dateTimeCard != nullptr && m_weatherRow != nullptr && m_weatherCardArea != nullptr) {
+    float wx = 0.0F;
+    float wy = 0.0F;
+    float cx = 0.0F;
+    float cy = 0.0F;
+    Node::absolutePosition(m_weatherRow, wx, wy);
+    Node::absolutePosition(m_dateTimeCard, cx, cy);
+    const float pad = Style::spaceXs * contentScale();
+    m_weatherCardArea->setPosition(std::max(0.0F, wx - cx - pad), std::max(0.0F, wy - cy - pad));
+    m_weatherCardArea->setSize(
+        m_weatherRow->width() + pad * 2.0F, m_weatherRow->height() + pad * 2.0F
+    );
+  }
+
   // The pointer overlay must not swallow the avatar's own click, so start it just past the
   // avatar's right edge; the avatar (a nested InputArea) keeps the carved-out left region.
   if (m_userCard != nullptr && m_userCardArea != nullptr) {
@@ -1311,6 +1334,7 @@ void HomeTab::onClose() {
   m_userAvatar = nullptr;
   m_timeLabel = nullptr;
   m_dateLabel = nullptr;
+  m_weatherRow = nullptr;
   m_weatherGlyph = nullptr;
   m_weatherLine = nullptr;
   m_userHost = nullptr;
@@ -1321,6 +1345,7 @@ void HomeTab::onClose() {
   m_userCardArea = nullptr;
   m_mediaCardArea = nullptr;
   m_dateTimeCardArea = nullptr;
+  m_weatherCardArea = nullptr;
   // The crisp fade animation is tagged with the m_wallpaperBg node as owner, so
   // it is cancelled automatically when the node tree is destroyed on close.
   m_wallpaperCrispAnimId = 0;

@@ -40,26 +40,35 @@ public:
   [[nodiscard]] std::vector<Source> availableSources() const;
   [[nodiscard]] bool isRecording() const noexcept;
   [[nodiscard]] bool isStopping() const noexcept;
+  [[nodiscard]] bool isReplaying() const noexcept;
+  [[nodiscard]] bool isReplayStopping() const noexcept;
   [[nodiscard]] std::chrono::seconds elapsed() const;
   [[nodiscard]] std::string elapsedLabel() const;
   [[nodiscard]] std::filesystem::path outputPath() const;
   [[nodiscard]] std::string backendDescription() const;
+  [[nodiscard]] int replayDurationSeconds() const;
 
   void setChangeCallback(ChangeCallback callback);
 
   [[nodiscard]] std::string start(Source source);
   [[nodiscard]] std::string stop();
   [[nodiscard]] std::string toggle(Source source);
+  [[nodiscard]] std::string startReplay(Source source);
+  [[nodiscard]] std::string stopReplay();
+  [[nodiscard]] std::string saveReplay();
+  [[nodiscard]] std::string toggleReplay(Source source);
 
   void registerIpc(IpcService& ipc);
 
   [[nodiscard]] static std::optional<Source> parseSource(std::string_view token);
+  [[nodiscard]] static std::optional<Source> parseReplaySource(std::string_view token);
 
 private:
-  enum class State : std::uint8_t { Idle, Recording, Stopping };
+  enum class State : std::uint8_t { Idle, Recording, Stopping, Replaying, StoppingReplay };
 
   void notifyChanged();
   void notifySaved();
+  void notifyReplaySaved();
   void notifyFailed(const std::string& message);
   [[nodiscard]] std::filesystem::path outputDirectory() const;
   [[nodiscard]] std::filesystem::path makeOutputPath() const;
@@ -67,8 +76,10 @@ private:
   [[nodiscard]] bool audioEnabled() const;
   [[nodiscard]] bool showCursor() const;
   [[nodiscard]] bool processAlive() const;
-  bool launch(const std::vector<std::string>& args, const std::filesystem::path& output);
+  [[nodiscard]] std::vector<std::string> gsrCommand() const;
+  bool launch(const std::vector<std::string>& args, const std::filesystem::path& output, State nextState);
   bool launchGsr(const std::string& window, const std::filesystem::path& output);
+  bool launchGsrReplay(const std::string& window, const std::filesystem::path& directory);
   bool launchWf(
       const std::optional<std::string>& outputName, const std::optional<LogicalRect>& region,
       const std::filesystem::path& output
@@ -76,7 +87,9 @@ private:
   void startPolling();
   void onProcessCheck();
   void requestStop();
+  void requestStopReplay();
   void finalize(bool expectFile);
+  void finalizeReplay();
   void sendSignal(int sig);
 
   CompositorPlatform& m_platform;
@@ -90,5 +103,6 @@ private:
   std::chrono::steady_clock::time_point m_startedAt{};
   Timer m_pollTimer;
   Timer m_stopTimer;
+  Timer m_saveTimer;
   int m_stopWaitTicks = 0;
 };

@@ -8,12 +8,16 @@
 #include <string>
 #include <vector>
 
+class Button;
+class ConfigService;
 class Flex;
 class Glyph;
+class IdleInhibitor;
 class Label;
 class ProgressBar;
 class Renderer;
 class Segmented;
+class SessionActionRunner;
 class Toggle;
 class UPowerService;
 class PowerProfilesService;
@@ -59,6 +63,9 @@ private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
 
+  void buildSessionCard(Flex& root, float scale);
+  void syncSessionCard();
+  void runSessionAction(std::string_view action);
   void buildStatusCard(Flex& root, float scale);
   void buildChargingCard(Flex& root, float scale);
   void buildProfilesCard(Flex& root, float scale);
@@ -73,9 +80,23 @@ private:
 
   UPowerService* m_upower = nullptr;
   PowerProfilesService* m_powerProfiles = nullptr;
+  ConfigService* m_config = nullptr;
+  IdleInhibitor* m_idleInhibitor = nullptr;
+  SessionActionRunner* m_session = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_root = nullptr;
+
+  Flex* m_sessionCard = nullptr;
+  Button* m_lockButton = nullptr;
+  Button* m_suspendButton = nullptr;
+  Button* m_logoutButton = nullptr;
+  Button* m_rebootButton = nullptr;
+  Button* m_shutdownButton = nullptr;
+  Flex* m_powerActionsRow = nullptr;
+  Toggle* m_caffeineToggle = nullptr;
+  Flex* m_caffeineRow = nullptr;
+  bool m_syncingCaffeine = false;
 
   // Battery status
   Flex* m_statusCard = nullptr;

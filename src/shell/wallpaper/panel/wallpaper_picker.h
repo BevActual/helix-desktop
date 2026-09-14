@@ -135,10 +135,21 @@ private:
   [[nodiscard]] std::optional<Color> selectedFillColor() const;
   [[nodiscard]] static std::string displayNameForWallpaperPath(std::string_view path);
 
-  enum class BrowseSource : std::uint8_t { Library, Wallhaven };
+  enum class BrowseSource : std::uint8_t { Library, Wallhaven, Video };
 
   void setBrowseSource(BrowseSource source, bool fetchIfNeeded);
   void syncSourceChrome();
+  void refreshVideoEntries();
+  void applyVideoPath(const std::string& path);
+  void clearVideoWallpaper();
+  void sendMpvpaperCommand(std::string_view action, std::string connector, std::string path);
+  void syncVideoStatus();
+  [[nodiscard]] bool mpvpaperPluginEnabled() const;
+  [[nodiscard]] std::filesystem::path videoDirectory() const;
+  [[nodiscard]] static std::size_t browseSourceIndex(BrowseSource source);
+  [[nodiscard]] static BrowseSource browseSourceFromIndex(std::size_t index);
+  [[nodiscard]] static std::string_view browseSourceStateValue(BrowseSource source);
+  [[nodiscard]] static BrowseSource browseSourceFromState(std::string_view value);
   void fetchWallhaven(bool resetPage);
   void applyWallhavenItem(std::string_view id);
   void queueWallhavenThumbs();
@@ -182,6 +193,7 @@ private:
   Button* m_refreshButton = nullptr;
   Button* m_fileButton = nullptr;
   Button* m_colorButton = nullptr;
+  Button* m_videoClearButton = nullptr;
   Button* m_closeButton = nullptr;
   Flex* m_wallhavenFilters = nullptr;
   Button* m_wallhavenCatGeneral = nullptr;
@@ -204,6 +216,9 @@ private:
   VirtualGridView* m_grid = nullptr;
   Flex* m_loadingBox = nullptr;
   Spinner* m_spinner = nullptr;
+  Flex* m_videoStatusBox = nullptr;
+  Label* m_videoStatusLabel = nullptr;
+  Button* m_videoPluginsButton = nullptr;
   std::unique_ptr<WallpaperGridAdapter> m_adapter;
 
   std::vector<MonitorChoice> m_monitorChoices;
@@ -226,6 +241,7 @@ private:
   static constexpr std::size_t kNoVisibleSelection = std::numeric_limits<std::size_t>::max();
   std::size_t m_selectedVisibleIndex = kNoVisibleSelection;
   BrowseSource m_browseSource = BrowseSource::Library;
+  std::uint64_t m_mpvpaperNonce = 0;
   wallpaper::wallhaven::SearchQuery m_wallhavenQuery;
   std::vector<wallpaper::wallhaven::Item> m_wallhavenItems;
   int m_wallhavenTotalPages = 1;

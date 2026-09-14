@@ -1071,6 +1071,7 @@ struct ShellConfig {
     bool showCursor = true;
     std::string directory;       // empty = ~/Videos/Recordings
     std::string filenamePattern; // empty = recording_%Y%m%d_%H%M%S
+    std::int32_t replayDuration = 30; // seconds, gpu-screen-recorder replay buffer
 
     bool operator==(const ScreenRecordConfig&) const = default;
   };
@@ -1617,6 +1618,7 @@ struct ControlCenterConfig {
   struct CalendarTabConfig {
     bool showEventsCard = true;
     bool showWeekNumbers = false;
+    std::vector<std::string> timezones;
     bool operator==(const CalendarTabConfig&) const = default;
   };
 

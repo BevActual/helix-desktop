@@ -1,14 +1,19 @@
 #include "shell/control_center/tabs/screenshot_tab.h"
 
 #include "config/config_service.h"
+#include "core/files/directory_scanner.h"
 #include "core/process/process.h"
+#include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
+#include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
+#include "ui/controls/label.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/style.h"
 #include "util/file_utils.h"
 
@@ -29,6 +34,8 @@ namespace {
     return FileUtils::expandUserPath(config.shell.screenshot.directory);
   }
 
+  constexpr std::size_t kRecentFileLimit = 5;
+
 } // namespace
 
 ScreenshotTab::ScreenshotTab(const ControlCenterServices& services)
@@ -41,8 +48,23 @@ std::unique_ptr<Flex> ScreenshotTab::create() {
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
   });
+
+  auto scroll = ui::scrollView({
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* content = scroll->content();
+  content->setDirection(FlexDirection::Vertical);
+  content->setAlign(FlexAlign::Stretch);
+  content->setGap(Style::spaceMd * scale);
 
   auto card = ui::column({
       .align = FlexAlign::Stretch,
@@ -151,7 +173,34 @@ std::unique_ptr<Flex> ScreenshotTab::create() {
       })
   );
 
-  live->addChild(std::move(card));
+  content->addChild(std::move(card));
+
+  auto recentCard = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
+  });
+  addTitle(*recentCard, i18n::tr("control-center.screenshot.recent"), scale);
+  recentCard->addChild(
+      ui::label({
+          .out = &m_recentEmpty,
+          .text = i18n::tr("control-center.screenshot.recent-empty"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  recentCard->addChild(
+      ui::column({
+          .out = &m_recentList,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      })
+  );
+  content->addChild(std::move(recentCard));
+  live->addChild(std::move(scroll));
+  rebuildRecentFiles();
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
@@ -167,6 +216,12 @@ void ScreenshotTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
 }
 
+void ScreenshotTab::setActive(bool active) {
+  if (active) {
+    rebuildRecentFiles();
+  }
+}
+
 void ScreenshotTab::onClose() {
   cancelCountdown();
   if (m_settings != nullptr) {
@@ -175,7 +230,10 @@ void ScreenshotTab::onClose() {
   m_rootLayout = nullptr;
   m_delay = nullptr;
   m_status = nullptr;
+  m_recentList = nullptr;
+  m_recentEmpty = nullptr;
   m_captureButtons.clear();
+  m_lastRecentKey.clear();
 }
 
 void ScreenshotTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -264,6 +322,79 @@ void ScreenshotTab::runCapture(const char* command) {
   if (m_ipc != nullptr && command != nullptr) {
     (void)m_ipc->execute(command);
   }
+}
+
+void ScreenshotTab::rebuildRecentFiles() {
+  if (m_recentList == nullptr || m_recentEmpty == nullptr || m_config == nullptr) {
+    return;
+  }
+
+  DirectoryScanner scanner;
+  const auto entries = scanner.scan(
+      screenshotOutputDirectory(m_config->config()), {".png"}, false, FileDialogSortField::Modified,
+      FileDialogSortOrder::Descending
+  );
+
+  std::string key;
+  std::size_t shown = 0;
+  for (const auto& entry : entries) {
+    if (entry.isDir) {
+      continue;
+    }
+    key += entry.absPath.string();
+    key.push_back('\n');
+    if (++shown >= kRecentFileLimit) {
+      break;
+    }
+  }
+  if (key == m_lastRecentKey) {
+    return;
+  }
+
+  uiAssertNotRendering("ScreenshotTab::rebuildRecentFiles");
+  while (!m_recentList->children().empty()) {
+    m_recentList->removeChild(m_recentList->children().front().get());
+  }
+
+  const float scale = contentScale();
+  shown = 0;
+  for (const auto& entry : entries) {
+    if (entry.isDir) {
+      continue;
+    }
+    const std::string path = entry.absPath.string();
+    m_recentList->addChild(
+        ui::button({
+            .text = entry.name,
+            .glyph = "photo",
+            .contentAlign = ButtonContentAlign::Start,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = formatFileTime(entry.mtime),
+            .minHeight = Style::controlHeight * scale,
+            .paddingH = Style::spaceMd * scale,
+            .onClick = [this, path]() { openRecentFile(path); },
+        })
+    );
+    if (++shown >= kRecentFileLimit) {
+      break;
+    }
+  }
+
+  m_recentEmpty->setVisible(shown == 0);
+  m_recentList->setVisible(shown > 0);
+  m_lastRecentKey = std::move(key);
+  PanelManager::instance().requestLayout();
+}
+
+void ScreenshotTab::openRecentFile(const std::string& path) {
+  if (!process::commandExists("xdg-open")) {
+    if (m_status != nullptr) {
+      m_status->setText(i18n::tr("control-center.screenshot.open-folder-failed"));
+      PanelManager::instance().requestRedraw();
+    }
+    return;
+  }
+  (void)process::runAsync(std::vector<std::string>{"xdg-open", path});
 }
 
 void ScreenshotTab::openScreenshotFolder() {

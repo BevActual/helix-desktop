@@ -77,6 +77,7 @@ namespace noctalia::cli {
   inline constexpr std::array<std::string_view, 2> kMsgPowerCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenshotFullscreenModeChoices{"pick", "monitor", "all"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenRecordSourceChoices{"focused", "portal", "region"};
+  inline constexpr std::array<std::string_view, 2> kMsgScreenRecordReplaySourceChoices{"focused", "portal"};
   inline constexpr std::array<std::string_view, 6> kMsgSessionActionChoices{"lock",   "suspend", "lock-and-suspend",
                                                                             "logout", "reboot",  "shutdown"};
   inline constexpr std::array<std::string_view, 2> kMsgTaskbarCycleDirectionChoices{"next", "prev"};
@@ -196,6 +197,12 @@ namespace noctalia::cli {
   };
   inline constexpr std::array kMsgScreenRecordTogglePositionals{
       Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordReplayStartPositionals{
+      Positional{"source", {}, kMsgScreenRecordReplaySourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordReplayTogglePositionals{
+      Positional{"source", {}, kMsgScreenRecordReplaySourceChoices, false, false, false},
   };
   inline constexpr std::array kMsgSessionPositionals{
       Positional{"action", {}, kMsgSessionActionChoices, true, false, false},
@@ -658,6 +665,32 @@ namespace noctalia::cli {
         {},
         false
     };
+    inline constexpr Command screenRecordReplayStart{
+        "screen-record-replay-start",
+        "Start the gpu-screen-recorder replay buffer on the focused output or portal picker",
+        {},
+        {},
+        {},
+        kMsgScreenRecordReplayStartPositionals,
+        {},
+        false
+    };
+    inline constexpr Command screenRecordReplayStop{
+        "screen-record-replay-stop", "Stop the replay buffer without saving", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenRecordReplaySave{
+        "screen-record-replay-save", "Save the last N seconds from the running replay buffer", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenRecordReplayToggle{
+        "screen-record-replay-toggle",
+        "Start or stop the replay buffer (optional source: focused or portal)",
+        {},
+        {},
+        {},
+        kMsgScreenRecordReplayTogglePositionals,
+        {},
+        false
+    };
     inline constexpr Command screenshotAnnotate{
         "screenshot-annotate", "Freeze the screen and annotate it, then copy or save", {}, {}, {}, {}, {}, false
     };
@@ -960,6 +993,10 @@ namespace noctalia::cli {
       msg::plugins,
       msg::powerCycle,
       msg::powerSet,
+      msg::screenRecordReplaySave,
+      msg::screenRecordReplayStart,
+      msg::screenRecordReplayStop,
+      msg::screenRecordReplayToggle,
       msg::screenRecordStart,
       msg::screenRecordStop,
       msg::screenRecordToggle,

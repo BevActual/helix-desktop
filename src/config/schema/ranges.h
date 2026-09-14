@@ -22,6 +22,7 @@ namespace noctalia::config::schema {
   inline constexpr Range<std::int64_t> kTailscaleRefreshSecondsRange{3, 120, 1};
   inline constexpr Range<std::int64_t> kScreenCornersSizeRange{1, 100, 1};
   inline constexpr Range<std::int64_t> kHotCornersDelayMsRange{0, 2000, 50};
+  inline constexpr Range<std::int64_t> kScreenRecordReplayDurationRange{2, 600, 5};
   inline constexpr Range<std::int64_t> kClipboardHistoryMaxEntriesRange{
       noctalia::config::kClipboardHistoryMinEntries,
       noctalia::config::kClipboardHistoryMaxEntries,

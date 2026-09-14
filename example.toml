@@ -47,6 +47,7 @@ close_on_copy = true                # close the annotation editor after Copy or 
 # filename_pattern   = ""        # empty = recording_%Y%m%d_%H%M%S
 # audio              = true     # capture desktop audio when the backend supports it
 # show_cursor        = true      # include the pointer when gpu-screen-recorder is used
+# replay_duration    = 30        # seconds kept in the gpu-screen-recorder replay buffer
 
 [shell.privacy]
 mic_filter_regex = ""                # microphone app names to ignore in privacy indicators and OSD

@@ -16,6 +16,7 @@ class ConfigService;
 class CompositorPlatform;
 class DisplayConfigService;
 class Flex;
+class GammaService;
 class Glyph;
 class Label;
 class Renderer;
@@ -47,6 +48,11 @@ private:
   void syncHeaderActions();
   void syncStatusLabels();
   void rebuildCards(Renderer& renderer);
+  void buildNightLightCard(Flex& parent, float scale);
+  void syncNightLight();
+  void persistNightLightEnabled(bool enabled);
+  void persistNightLightForce(bool enabled);
+  void commitNightLightTemperatures(bool fromDaySlider);
   void rebuildLayoutSection(float scale);
   void layoutArrangementMap(Renderer& renderer);
   void selectLayoutOutput(std::string name);
@@ -71,6 +77,7 @@ private:
   ConfigService* m_configService = nullptr;
   DisplayConfigService* m_displayConfig = nullptr;
   CompositorPlatform* m_platform = nullptr;
+  GammaService* m_nightLight = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
 
   struct DisplayCard {
@@ -99,6 +106,14 @@ private:
   Flex* m_rootLayout = nullptr;
   Label* m_noteLabel = nullptr;
   Label* m_errorLabel = nullptr;
+  Flex* m_nightLightCard = nullptr;
+  Label* m_nightLightStatus = nullptr;
+  Toggle* m_nightLightEnabled = nullptr;
+  Toggle* m_nightLightForce = nullptr;
+  Slider* m_nightLightDaySlider = nullptr;
+  Label* m_nightLightDayValue = nullptr;
+  Slider* m_nightLightNightSlider = nullptr;
+  Label* m_nightLightNightValue = nullptr;
   Flex* m_emptyState = nullptr;
   ScrollView* m_cardsScroll = nullptr;
   Flex* m_cardsLayout = nullptr;
@@ -146,5 +161,6 @@ private:
   Timer m_scaleDebounceTimer;
   bool m_syncingSlider = false;
   bool m_syncingConfig = false;
+  bool m_syncingNightLight = false;
   bool m_active = false;
 };

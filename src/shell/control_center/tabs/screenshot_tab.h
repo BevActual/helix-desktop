@@ -5,6 +5,7 @@
 #include "shell/control_center/tab.h"
 
 #include <memory>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -21,6 +22,7 @@ public:
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
+  void setActive(bool active) override;
   void onClose() override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
@@ -34,6 +36,8 @@ private:
   void cancelCountdown();
   void syncCountdownUi();
   void openScreenshotFolder();
+  void openRecentFile(const std::string& path);
+  void rebuildRecentFiles();
   [[nodiscard]] int delaySeconds() const noexcept;
 
   struct CaptureButton {
@@ -47,9 +51,12 @@ private:
   Flex* m_rootLayout = nullptr;
   Segmented* m_delay = nullptr;
   Label* m_status = nullptr;
+  Flex* m_recentList = nullptr;
+  Label* m_recentEmpty = nullptr;
   std::vector<CaptureButton> m_captureButtons;
   Timer m_delayTimer;
   const char* m_pendingCommand = nullptr;
   int m_countdownLeft = 0;
   std::size_t m_delayIndex = 0;
+  std::string m_lastRecentKey;
 };

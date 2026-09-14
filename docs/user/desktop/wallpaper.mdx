@@ -63,8 +63,7 @@ An empty global `wallpaper.directory` resolves to the standard XDG Pictures dire
 The wallpaper picker lives on Control Center's **Wallpaper** tab (`noctalia msg panel-toggle control-center wallpaper`)
 and in the dedicated wallpaper panel (`noctalia msg panel-toggle wallpaper`). Both list images from the resolved
 browse folder as a grid of thumbnails and highlight the wallpaper currently applied to the selected monitor. Use
-the folder button to open a file picker and choose any image, even outside that folder. Use the **Library /
-Wallhaven** control to switch between local files and [Wallhaven](https://wallhaven.cc). In the **ALL** monitor
+the folder button to open a file picker and choose any image, even outside that folder. Use the **Library / Wallhaven / Video** control to switch between local files, [Wallhaven](https://wallhaven.cc), and video wallpapers. In the **ALL** monitor
 view, the highlight follows the default wallpaper path. Theme-aware directories (`directory_light` /
 `directory_dark`) are used when the shell is in Light or Dark mode; **Auto** mode falls back to `directory`.
 Missing per-mode paths fall back to `directory`.
@@ -91,6 +90,16 @@ noctalia msg panel-toggle wallpaper wallhaven
 ```
 
 Requires network access (`[shell].offline_mode` must be off). NSFW results require an API key. An existing `[plugin_settings."noctalia/wallhaven"]` API key or download directory is still read if the built-in keys are empty.
+
+## Video
+
+The wallpaper picker can apply videos through the official [Video Wallpaper](/noctalia/plugins/official-plugins/#mpvpaper) plugin (`noctalia/mpvpaper`). Enable the plugin, then switch the picker to **Video** or:
+
+```sh
+noctalia msg panel-toggle wallpaper video
+```
+
+The grid lists `mp4`, `webm`, `mkv`, `mov`, and `gif` files from the plugin's video directory (`~/Videos` when that setting is empty). Clicking a file tells the plugin to run `mpvpaper`. Applying a still wallpaper or using **Stop** on the Video source clears the video on the selected monitor (or all monitors when **ALL** is selected).
 
 The launcher's wallpaper provider and **automatic rotation** use the same browse-folder resolution so they stay aligned with the picker. When automation runs with `per_monitor_directories = true`, each monitor picks independently from its own resolved folder.
 

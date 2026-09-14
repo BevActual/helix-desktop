@@ -8,6 +8,8 @@
 
 #include <limits>
 #include <memory>
+#include <string>
+#include <vector>
 
 class Button;
 class CalendarService;
@@ -15,6 +17,7 @@ class ConfigService;
 class InputArea;
 class Label;
 class ScrollView;
+class SearchPicker;
 struct ControlCenterServices;
 
 class CalendarTab : public Tab {
@@ -41,6 +44,14 @@ private:
   void rebuild();
   void rebuildEventList(float scale);
   void toggleEventsCard();
+  void buildWorldClockCard(Flex& parent, float scale);
+  void rebuildWorldClock();
+  void syncWorldClockTimes();
+  void syncTimezonePicker();
+  void addTimezone(std::string_view raw);
+  void removeTimezone(std::size_t index);
+  void persistTimezones(const std::vector<std::string>& timezones);
+  void setTimezoneError(std::string_view message);
 
   ConfigService* m_config = nullptr;
   CalendarService* m_calendar = nullptr;
@@ -64,6 +75,16 @@ private:
   Flex* m_eventsCard = nullptr;
   Label* m_eventsTitle = nullptr;
   ScrollView* m_eventsScroll = nullptr;
+  Flex* m_worldClockCard = nullptr;
+  Flex* m_timezoneList = nullptr;
+  Label* m_timezoneError = nullptr;
+  SearchPicker* m_timezonePicker = nullptr;
+  struct TimezoneRow {
+    std::string zone;
+    Label* timeLabel = nullptr;
+  };
+  std::vector<TimezoneRow> m_timezoneRows;
+  std::string m_lastTimezoneKey;
   calendar_view::EventListState m_eventListState;
   int m_selectedYear = std::numeric_limits<int>::min();
   int m_selectedMonth = -1;
@@ -83,4 +104,5 @@ private:
   bool m_showEventsCard = true;
   bool m_showWeekNumbers = false;
   Timer m_eventFadeTimer;
+  Timer m_clockTimer;
 };

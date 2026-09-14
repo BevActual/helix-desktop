@@ -3,6 +3,7 @@
 #include "compositors/compositor_platform.h"
 #include "compositors/niri/niri_config_outputs.h"
 #include "config/config_service.h"
+#include "config/config_types.h"
 #include "core/input/key_modifiers.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
@@ -11,8 +12,11 @@
 #include "shell/panel/panel_button_style.h"
 #include "system/brightness_service.h"
 #include "system/display_config_service.h"
+#include "system/gamma_service.h"
 #include "ui/builders.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/slider.h"
+#include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "wayland/wayland_connection.h"
@@ -21,6 +25,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <format>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -283,6 +289,21 @@ namespace {
     );
   }
 
+  [[nodiscard]] std::string kelvinLabel(std::int32_t kelvin) { return std::format("{} K", kelvin); }
+
+  [[nodiscard]] std::string nightLightStatusText(const GammaService* nightLight) {
+    if (nightLight == nullptr) {
+      return i18n::tr("osd.nightlight.off");
+    }
+    if (nightLight->forceEnabled()) {
+      return i18n::tr("osd.nightlight.forced");
+    }
+    if (!nightLight->enabled()) {
+      return i18n::tr("osd.nightlight.off");
+    }
+    return i18n::tr(nightLight->active() ? "osd.nightlight.running" : "osd.nightlight.scheduled");
+  }
+
 } // namespace
 
 MonitorTab::MonitorTab(
@@ -290,7 +311,7 @@ MonitorTab::MonitorTab(
     const ControlCenterServices& services
 )
     : m_brightness(brightness), m_configService(config), m_displayConfig(displayConfig),
-      m_platform(services.platform),
+      m_platform(services.platform), m_nightLight(services.nightLight),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "services", .includedGroups = {"brightness"}}
       )) {}
@@ -322,6 +343,8 @@ std::unique_ptr<Flex> MonitorTab::create() {
           .visible = false,
       })
   );
+
+  buildNightLightCard(*tab, scale);
 
   auto cardsScroll = ui::scrollView({
       .out = &m_cardsScroll,
@@ -476,6 +499,14 @@ void MonitorTab::onClose() {
   m_layoutPlaceBottom = nullptr;
   m_rescanButton = nullptr;
   m_saveButton = nullptr;
+  m_nightLightCard = nullptr;
+  m_nightLightStatus = nullptr;
+  m_nightLightEnabled = nullptr;
+  m_nightLightForce = nullptr;
+  m_nightLightDaySlider = nullptr;
+  m_nightLightDayValue = nullptr;
+  m_nightLightNightSlider = nullptr;
+  m_nightLightNightValue = nullptr;
   m_cards.clear();
   m_layoutTiles.clear();
   m_layoutReferenceNames.clear();
@@ -495,6 +526,12 @@ bool MonitorTab::dragging() const noexcept {
     if (card.scaleSlider != nullptr && card.scaleSlider->dragging()) {
       return true;
     }
+  }
+  if (m_nightLightDaySlider != nullptr && m_nightLightDaySlider->dragging()) {
+    return true;
+  }
+  if (m_nightLightNightSlider != nullptr && m_nightLightNightSlider->dragging()) {
+    return true;
   }
   return false;
 }
@@ -540,6 +577,7 @@ void MonitorTab::doUpdate(Renderer& renderer) {
   rebuildCards(renderer);
   syncHeaderActions();
   syncStatusLabels();
+  syncNightLight();
 
   if (m_brightness == nullptr) {
     return;
@@ -1073,6 +1111,224 @@ void MonitorTab::applyLayoutDrag() {
     m_lastDisplayListKey.clear();
     reportLayoutError();
   }
+}
+
+void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
+  auto card = ui::column({
+      .out = &m_nightLightCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+  });
+  card->addChild(makeCardHeaderRow(i18n::tr("settings.schema.services.night-light.label"), scale));
+  card->addChild(
+      ui::label({
+          .out = &m_nightLightStatus,
+          .text = nightLightStatusText(m_nightLight),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+
+  auto addToggle = [&](Toggle** out, const std::string& label, std::function<void(bool)> onChange) {
+    auto row = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .minHeight = Style::controlHeightSm * scale,
+    });
+    row->addChild(
+        ui::label({
+            .text = label,
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .flexGrow = 1.0F,
+        })
+    );
+    row->addChild(
+        ui::toggle({
+            .out = out,
+            .checkedImmediate = false,
+            .toggleSize = ToggleSize::Medium,
+            .scale = scale,
+            .onChange = std::move(onChange),
+        })
+    );
+    card->addChild(std::move(row));
+  };
+
+  addToggle(
+      &m_nightLightEnabled, i18n::tr("settings.schema.services.night-light.label"),
+      [this](bool checked) {
+        if (!m_syncingNightLight) {
+          persistNightLightEnabled(checked);
+        }
+      }
+  );
+  addToggle(
+      &m_nightLightForce, i18n::tr("settings.schema.services.force-night-light.label"),
+      [this](bool checked) {
+        if (!m_syncingNightLight) {
+          persistNightLightForce(checked);
+        }
+      }
+  );
+
+  auto addTempSlider = [&](Slider** sliderOut, Label** valueOut, const std::string& label, bool daySlider) {
+    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    header->addChild(
+        ui::label({
+            .text = label,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .flexGrow = 1.0F,
+        })
+    );
+    header->addChild(
+        ui::label({
+            .out = valueOut,
+            .text = kelvinLabel(daySlider ? NightLightConfig::kTemperatureMax : NightLightConfig::kTemperatureMin),
+            .fontSize = Style::fontSizeCaption * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    card->addChild(std::move(header));
+    card->addChild(
+        ui::slider({
+            .out = sliderOut,
+            .minValue = static_cast<double>(NightLightConfig::kTemperatureMin),
+            .maxValue = static_cast<double>(NightLightConfig::kTemperatureMax),
+            .step = static_cast<double>(NightLightConfig::kTemperatureGap),
+            .value = static_cast<double>(
+                daySlider ? NightLightConfig::kTemperatureMax : NightLightConfig::kTemperatureMin
+            ),
+            .trackHeight = Style::sliderTrackHeight * scale,
+            .thumbSize = Style::sliderThumbSize * scale,
+            .controlHeight = Style::controlHeight * scale,
+            .flexGrow = 1.0F,
+            .onValueChanged =
+                [this, valueOut](double value) {
+                  if (valueOut != nullptr && *valueOut != nullptr) {
+                    (*valueOut)->setText(kelvinLabel(static_cast<std::int32_t>(std::lround(value))));
+                  }
+                },
+            .onDragEnd = [this, daySlider]() { commitNightLightTemperatures(daySlider); },
+        })
+    );
+  };
+
+  addTempSlider(
+      &m_nightLightDaySlider, &m_nightLightDayValue, i18n::tr("settings.schema.services.day-temperature.label"), true
+  );
+  addTempSlider(
+      &m_nightLightNightSlider, &m_nightLightNightValue, i18n::tr("settings.schema.services.night-temperature.label"),
+      false
+  );
+
+  parent.addChild(std::move(card));
+  syncNightLight();
+}
+
+void MonitorTab::syncNightLight() {
+  const bool available = m_platform != nullptr && m_platform->hasGammaControl();
+  if (m_nightLightCard != nullptr) {
+    m_nightLightCard->setVisible(available);
+  }
+  if (!available) {
+    return;
+  }
+
+  const bool enabled = m_nightLight != nullptr && m_nightLight->enabled();
+  const bool forced = m_nightLight != nullptr && m_nightLight->forceEnabled();
+  const bool controlsOn = enabled || forced;
+  const NightLightConfig nightlight =
+      m_configService != nullptr ? m_configService->config().nightlight : NightLightConfig{};
+
+  m_syncingNightLight = true;
+  if (m_nightLightStatus != nullptr) {
+    m_nightLightStatus->setText(nightLightStatusText(m_nightLight));
+  }
+  if (m_nightLightEnabled != nullptr) {
+    m_nightLightEnabled->setCheckedImmediate(enabled);
+  }
+  if (m_nightLightForce != nullptr) {
+    m_nightLightForce->setCheckedImmediate(forced);
+    m_nightLightForce->setEnabled(controlsOn || enabled);
+  }
+
+  const auto day = static_cast<double>(nightlight.dayTemperature);
+  const auto night = static_cast<double>(nightlight.nightTemperature);
+  if (m_nightLightDaySlider != nullptr && !m_nightLightDaySlider->dragging()) {
+    m_nightLightDaySlider->setEnabled(controlsOn);
+    m_nightLightDaySlider->setValue(day);
+  }
+  if (m_nightLightNightSlider != nullptr && !m_nightLightNightSlider->dragging()) {
+    m_nightLightNightSlider->setEnabled(controlsOn);
+    m_nightLightNightSlider->setValue(night);
+  }
+  if (m_nightLightDayValue != nullptr) {
+    m_nightLightDayValue->setText(kelvinLabel(nightlight.dayTemperature));
+  }
+  if (m_nightLightNightValue != nullptr) {
+    m_nightLightNightValue->setText(kelvinLabel(nightlight.nightTemperature));
+  }
+  m_syncingNightLight = false;
+}
+
+void MonitorTab::persistNightLightEnabled(bool enabled) {
+  if (m_nightLight != nullptr) {
+    m_nightLight->setEnabled(enabled);
+  }
+  if (m_configService != nullptr) {
+    (void)m_configService->setOverride({"nightlight", "enabled"}, enabled);
+  }
+  syncNightLight();
+}
+
+void MonitorTab::persistNightLightForce(bool enabled) {
+  if (m_nightLight != nullptr) {
+    m_nightLight->setForceEnabled(enabled);
+  }
+  if (m_configService != nullptr) {
+    (void)m_configService->setOverride({"nightlight", "force"}, enabled);
+  }
+  syncNightLight();
+}
+
+void MonitorTab::commitNightLightTemperatures(bool fromDaySlider) {
+  if (m_syncingNightLight || m_configService == nullptr || m_nightLightDaySlider == nullptr
+      || m_nightLightNightSlider == nullptr) {
+    return;
+  }
+
+  std::int32_t day = std::clamp(
+      static_cast<std::int32_t>(std::lround(m_nightLightDaySlider->value())), NightLightConfig::kTemperatureMin,
+      NightLightConfig::kTemperatureMax
+  );
+  std::int32_t night = std::clamp(
+      static_cast<std::int32_t>(std::lround(m_nightLightNightSlider->value())), NightLightConfig::kTemperatureMin,
+      NightLightConfig::kTemperatureMax
+  );
+  if (day - NightLightConfig::kTemperatureGap < night) {
+    if (fromDaySlider) {
+      night = std::max(NightLightConfig::kTemperatureMin, day - NightLightConfig::kTemperatureGap);
+      if (night + NightLightConfig::kTemperatureGap > day) {
+        day = std::min(NightLightConfig::kTemperatureMax, night + NightLightConfig::kTemperatureGap);
+      }
+    } else {
+      day = std::min(NightLightConfig::kTemperatureMax, night + NightLightConfig::kTemperatureGap);
+      if (day - NightLightConfig::kTemperatureGap < night) {
+        night = std::max(NightLightConfig::kTemperatureMin, day - NightLightConfig::kTemperatureGap);
+      }
+    }
+  }
+
+  (void)m_configService->setOverrides({
+      {{"nightlight", "temperature_day"}, static_cast<std::int64_t>(day)},
+      {{"nightlight", "temperature_night"}, static_cast<std::int64_t>(night)},
+  });
 }
 
 void MonitorTab::rebuildCards(Renderer& /*renderer*/) {

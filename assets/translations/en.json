@@ -245,8 +245,12 @@
       "no-output-devices-body": "No playback sinks are currently available.",
       "no-output-selected": "No output device selected",
       "output-device-prefix": "Output",
+      "mute-microphone": "Mute microphone",
+      "privacy": "Privacy",
+      "privacy-idle": "No apps are using the microphone, camera, or screen share.",
       "unavailable-body": "PipeWire is not active.",
-      "unavailable-title": "Audio unavailable"
+      "unavailable-title": "Audio unavailable",
+      "unmute-microphone": "Unmute microphone"
     },
     "bluetooth": {
       "accept": "Accept",
@@ -283,7 +287,15 @@
       "events": "Events",
       "no-events": "No events.",
       "today": "Today",
-      "toggle-events-card": "Toggle events card"
+      "toggle-events-card": "Toggle events card",
+      "world-clock": {
+        "add": "Add timezone",
+        "empty": "No matching timezones",
+        "invalid": "Unknown IANA timezone.",
+        "placeholder": "Search timezones…",
+        "remove": "Remove timezone",
+        "title": "World Clock"
+      }
     },
     "display": {
       "disabled": "Disabled",
@@ -474,6 +486,7 @@
       "performance-inhibited": "Performance unavailable",
       "peripherals": "Connected Devices",
       "power-profile": "Power Profile",
+      "session": "Session",
       "time-to-empty": "{time} remaining",
       "time-to-full": "{time} until full",
       "unknown-device": "Unknown device"
@@ -589,6 +602,8 @@
       "pick-display": "Pick display",
       "region": "Select region",
       "region-too-small": "The selected region is too small.",
+      "recent": "Recent screenshots",
+      "recent-empty": "No screenshots in the save folder yet.",
       "scan-qr": "Scan QR",
       "qr-copied": "QR code copied",
       "qr-empty": "No QR code found in that region.",
@@ -609,6 +624,17 @@
       "open-folder-failed": "Could not open the recordings folder.",
       "record": "Record",
       "region-too-small": "The selected region is too small.",
+      "replay": "Replay buffer",
+      "replay-active": "Replay buffer running",
+      "replay-busy": "A recording is already running.",
+      "replay-hint": "Keeps the last {seconds}s. Save writes that buffer to a file.",
+      "replay-save": "Save replay",
+      "replay-saved": "Replay saved",
+      "replay-start": "Start replay buffer",
+      "replay-stop": "Stop replay buffer",
+      "replay-unavailable": "Install gpu-screen-recorder to use the replay buffer.",
+      "recent": "Recent recordings",
+      "recent-empty": "No recordings in the save folder yet.",
       "saved": "Recording saved",
       "source-focused": "Focused",
       "source-portal": "Portal",
@@ -2978,6 +3004,10 @@
           "description-unavailable": "No Secret Service provider is available; calendar events remain available for this session only",
           "label": "Calendar Event Storage"
         },
+        "calendar-timezones": {
+          "description": "IANA timezones shown on the Calendar tab world clock (for example America/Los_Angeles)",
+          "label": "World Clock"
+        },
         "calendar-week-numbers": {
           "description": "Show ISO 8601 week numbers alongside the calendar grid",
           "label": "Week Numbers"
@@ -3459,6 +3489,10 @@
         "screen-record-filename-pattern": {
           "description": "strftime pattern without extension (.mp4 is added); use %s for unix epoch",
           "label": "Filename Pattern"
+        },
+        "screen-record-replay-duration": {
+          "description": "How many seconds the replay buffer keeps. Save writes that window to a file.",
+          "label": "Replay Buffer Duration"
         },
         "screen-record-show-cursor": {
           "description": "Include the mouse pointer when the backend can record it",
@@ -5045,6 +5079,14 @@
       "sort-random": "Sort by random (shuffle)",
       "title": "Wallpaper",
       "unfavorite-current": "Remove current wallpaper from favorites",
+      "video": {
+        "clear-tooltip": "Stop the video wallpaper on the selected monitor",
+        "empty": "No videos in this folder.",
+        "filter-placeholder": "Filter videos…",
+        "open-plugins": "Open Plugins",
+        "plugin-missing": "Enable the official Video Wallpaper plugin to apply video wallpapers.",
+        "title": "Video"
+      },
       "wallhaven": {
         "applied": "Wallpaper applied",
         "applying": "Downloading…",

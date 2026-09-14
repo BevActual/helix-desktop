@@ -2215,6 +2215,20 @@ namespace settings {
       entries.push_back(std::move(e));
     }
     entries.push_back(makeEntry(
+        SettingsSection::ScreenRecord, "screen-record",
+        tr("settings.schema.shell.screen-record-replay-duration.label"),
+        tr("settings.schema.shell.screen-record-replay-duration.description"),
+        {"shell", "screen_record", "replay_duration"},
+        StepperSetting{
+            .value = cfg.shell.screenRecord.replayDuration,
+            .minValue = static_cast<int>(noctalia::config::schema::kScreenRecordReplayDurationRange.min.value()),
+            .maxValue = static_cast<int>(noctalia::config::schema::kScreenRecordReplayDurationRange.max.value()),
+            .step = static_cast<int>(noctalia::config::schema::kScreenRecordReplayDurationRange.step.value()),
+            .valueSuffix = "s"
+        },
+        "screen record replay buffer duration seconds"
+    ));
+    entries.push_back(makeEntry(
         SettingsSection::Shell, "window-switcher", tr("settings.schema.shell.window-switcher-mru.label"),
         tr("settings.schema.shell.window-switcher-mru.description"), {"shell", "window_switcher", "mru"},
         ToggleSetting{cfg.shell.windowSwitcher.mru}, "window switcher alt tab mru most recently used"
@@ -2925,6 +2939,11 @@ namespace settings {
         tr("settings.schema.services.calendar-week-numbers.description"),
         {"control_center", "calendar", "show_week_numbers"},
         ToggleSetting{cfg.controlCenter.calendarTab.showWeekNumbers}, "calendar week numbers iso"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Services, "calendar", tr("settings.schema.services.calendar-timezones.label"),
+        tr("settings.schema.services.calendar-timezones.description"), {"control_center", "calendar", "timezones"},
+        ListSetting{.items = cfg.controlCenter.calendarTab.timezones}, "calendar world clock timezone iana"
     ));
     // Sync cadence belongs with the accounts it drives; the account rows are injected right after it.
     {

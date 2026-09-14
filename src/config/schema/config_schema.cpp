@@ -484,6 +484,7 @@ namespace noctalia::config::schema {
       static const Schema<ControlCenterConfig::CalendarTabConfig> s = {
           field(&ControlCenterConfig::CalendarTabConfig::showEventsCard, "show_events_card"),
           field(&ControlCenterConfig::CalendarTabConfig::showWeekNumbers, "show_week_numbers"),
+          field(&ControlCenterConfig::CalendarTabConfig::timezones, "timezones"),
       };
       return s;
     }
@@ -1481,6 +1482,7 @@ namespace noctalia::config::schema {
           field(&ShellConfig::ScreenRecordConfig::showCursor, "show_cursor"),
           field(&ShellConfig::ScreenRecordConfig::directory, "directory"),
           field(&ShellConfig::ScreenRecordConfig::filenamePattern, "filename_pattern"),
+          field(&ShellConfig::ScreenRecordConfig::replayDuration, "replay_duration", kScreenRecordReplayDurationRange),
       };
       return s;
     }
