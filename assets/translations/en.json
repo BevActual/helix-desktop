@@ -1,4 +1,8 @@
 {
+  "brand": {
+    "name": "Helix Shell",
+    "version": "Helix Shell · Noctalia {version}"
+  },
   "auth": {
     "fingerprint": {
       "disconnected": "Fingerprint reader disconnected",
@@ -397,7 +401,7 @@
     },
     "keybinds": {
       "copy-missing-tooltip": "Copy missing niri binds",
-      "in-noctalia-hint": "These chords navigate Noctalia panels. Super/Mod is reserved for the compositor.",
+      "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
       "install-tooltip": "Add missing recommended binds to niri",
       "niri-hint": "Record a chord to write it into noctalia-binds.kdl. Copy or add missing binds from the header. Existing binds in your niri config stay unchanged.",
       "open-folder-failed": "Could not open the niri config folder.",
@@ -1116,7 +1120,7 @@
       "greeter-sync-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
       "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
       "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
-      "keybind-app": "Noctalia",
+      "keybind-app": "Helix Shell",
       "keybind-invalid-modifier": "This shortcut accepts a single key without modifiers.",
       "keybind-invalid-printable": "Printable keys (letters, numbers, symbols) require a modifier such as Ctrl or Alt.",
       "keybind-invalid-super": "The Super/Windows key cannot be used in shell keybinds.",
@@ -1568,7 +1572,7 @@
         "home": "Home",
         "hot-corners": "Hot Corners",
         "idle": "Idle",
-        "in-noctalia": "In Noctalia",
+        "in-noctalia": "In Helix Shell",
         "interface": "Interface",
         "keybinds": "Keybinds",
         "keyboard-layout": "Keyboard Layout",
@@ -1931,7 +1935,7 @@
         "update": "Update source"
       },
       "store": {
-        "add": "Add to Noctalia",
+        "add": "Add to Helix Shell",
         "back-to-catalog": "Back to the plugin catalog",
         "categories": "Categories",
         "category-all": "All",
@@ -2047,7 +2051,7 @@
           "label": "Pure Black"
         },
         "shell-theme-mode": {
-          "description": "Pin Noctalia's own light or dark mode; Follow keeps it in sync with Theme Mode",
+          "description": "Pin Helix Shell's own light or dark mode; Follow keeps it in sync with Theme Mode",
           "label": "Shell Theme Mode"
         },
         "theme-mode": {
@@ -2692,11 +2696,11 @@
           "install-ok": "Added {count} niri setup snippet(s). niri reloads the config on its own.",
           "items": {
             "autostart": {
-              "description": "Start Noctalia when niri starts",
-              "label": "Autostart Noctalia"
+              "description": "Start Helix Shell when niri starts",
+              "label": "Autostart Helix Shell"
             },
             "backdrop": {
-              "description": "Place the Noctalia backdrop layer in niri overview",
+              "description": "Place the Helix Shell backdrop layer in niri overview",
               "label": "Backdrop layer-rule"
             },
             "lid-close": {
@@ -4988,7 +4992,7 @@
       "export-config-saved": "Config export saved.",
       "filter-overridden": "Overridden",
       "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Noctalia is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
-      "native-title": "Noctalia Settings",
+      "native-title": "Helix Shell Settings",
       "no-results": "No settings found",
       "no-results-hint": "Try a different setting name or config key.",
       "offline-mode-notice": {
@@ -5024,7 +5028,7 @@
     "no-wallpaper-selected": "No wallpaper selected",
     "select-wallpaper": "Select Wallpaper",
     "subtitle": "A few quick choices to get you started.",
-    "title": "Welcome to Noctalia",
+    "title": "Welcome to Helix Shell",
     "wallpaper": "Wallpaper",
     "wallpaper-scheme": "Wallpaper Scheme"
   },

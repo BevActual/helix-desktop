@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/system_tab.h"
 
+#include "core/build_info.h"
 #include "i18n/i18n.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
@@ -968,6 +969,8 @@ float SystemTab::scrollProgressForSample(std::chrono::steady_clock::time_point s
 
 std::string SystemTab::systemInfoText() const {
   std::string text;
+  text += i18n::tr("brand.version", "version", noctalia::build_info::displayVersion());
+  text += '\n';
   text += cpuModelName();
   text += '\n';
   text += gpuLabel();
