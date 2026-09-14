@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core/timer_manager.h"
+#include "shell/control_center/recent_captures.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
@@ -14,6 +15,7 @@ class ConfigService;
 class IpcService;
 class Label;
 class Segmented;
+class ThumbnailService;
 struct ControlCenterServices;
 
 class ScreenshotTab : public Tab {
@@ -30,6 +32,7 @@ public:
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
+  void doUpdate(Renderer& renderer) override;
   void requestCapture(const char* command);
   void runCapture(const char* command);
   void tickCountdown();
@@ -37,7 +40,9 @@ private:
   void syncCountdownUi();
   void openScreenshotFolder();
   void openRecentFile(const std::string& path);
+  void annotateRecentFile(const std::string& path);
   void rebuildRecentFiles();
+  void bindRecentGallery();
   [[nodiscard]] int delaySeconds() const noexcept;
 
   struct CaptureButton {
@@ -47,7 +52,9 @@ private:
 
   IpcService* m_ipc = nullptr;
   ConfigService* m_config = nullptr;
+  ThumbnailService* m_thumbnails = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  control_center::RecentCaptureGallery m_recents;
   Flex* m_rootLayout = nullptr;
   Segmented* m_delay = nullptr;
   Label* m_status = nullptr;
@@ -58,5 +65,4 @@ private:
   const char* m_pendingCommand = nullptr;
   int m_countdownLeft = 0;
   std::size_t m_delayIndex = 0;
-  std::string m_lastRecentKey;
 };

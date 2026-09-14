@@ -62,8 +62,9 @@ show_shortcut_labels = false
 | `screen_time` | Screen Time | Open screen time tab | Open screen time tab |
 | `keyboard_layout` | Current layout | Cycle keyboard layout | - |
 | `screen_recorder` | Recorder | Toggle recording | Open screen record tab |
+| `screen_replay` | Replay | Toggle the replay buffer | Save replay while the buffer is running; otherwise open screen record tab |
 | `wallpaper` | Wallpaper | Open wallpaper panel | - |
-| `session` | Session | Open session panel | - |
+| `session` | Session | Open the Power tab | - |
 | `clipboard` | Clipboard | Open clipboard tab | Open clipboard tab |
 | `screenshot` | Screenshot | Start region capture | Open screenshot tab |
 | `pick_color` | Pick Color | Pick a screen color onto the clipboard | Open screenshot tab |
@@ -77,7 +78,7 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 `weather` is available only when `[weather].enabled = true`. `system` is available only when `[system.monitor].enabled = true`. `screen_time` is available only when `[shell].screen_time_enabled = true`.
 
-`screen_recorder` is a built-in shortcut for the shell recorder (`screen-record-toggle`). While a recording is running the tile highlights, switches to a stop icon, and shows elapsed time. The official [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder) still exposes its own shortcut as `noctalia/screen_recorder:toggle` when enabled, including replay-buffer actions.
+`screen_recorder` is a built-in shortcut for the shell recorder (`screen-record-toggle`). While a recording is running the tile highlights, switches to a stop icon, and shows elapsed time. `screen_replay` does the same for the built-in replay buffer (`screen-record-replay-toggle`) and needs `gpu-screen-recorder`. Right-click saves the last N seconds without stopping the buffer; if the buffer is not running, right-click opens Screen Record. Record and replay tiles disable each other while the other is running. The official [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder) still exposes its own shortcut as `noctalia/screen_recorder:toggle` when enabled.
 
 `tailscale` toggles this machine's Tailscale connection. Right-click opens the Tailscale tab. The tile is disabled when the `tailscale` CLI is not installed. The community plugin's bar widget and panel remain available.
 

@@ -2,14 +2,11 @@
 
 #include "capture/screen_recorder_service.h"
 #include "config/config_service.h"
-#include "core/files/directory_scanner.h"
 #include "core/process/process.h"
-#include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
-#include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
@@ -23,14 +20,13 @@
 #include <chrono>
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <system_error>
 #include <vector>
 
 using namespace control_center;
 
 namespace {
-
-  constexpr std::size_t kRecentFileLimit = 5;
 
   [[nodiscard]] std::filesystem::path recordingsDirectory(const Config& config) {
     if (config.shell.screenRecord.directory.empty()) {
@@ -54,7 +50,7 @@ namespace {
 } // namespace
 
 ScreenRecordTab::ScreenRecordTab(const ControlCenterServices& services)
-    : m_recorder(services.screenRecorder), m_config(services.config),
+    : m_recorder(services.screenRecorder), m_config(services.config), m_thumbnails(services.thumbnails),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "screen-record"})) {
   if (m_recorder != nullptr) {
     m_recorder->setChangeCallback([this]() {
@@ -100,6 +96,7 @@ std::unique_ptr<Flex> ScreenRecordTab::create() {
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
+  bindRecentGallery();
   syncUi();
   rebuildRecentFiles();
   return wrapped;
@@ -373,7 +370,7 @@ void ScreenRecordTab::onClose() {
   m_replayStatus = nullptr;
   m_recentList = nullptr;
   m_recentEmpty = nullptr;
-  m_lastRecentKey.clear();
+  m_recents.onClose();
 }
 
 void ScreenRecordTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -385,6 +382,13 @@ void ScreenRecordTab::doLayout(Renderer& renderer, float contentWidth, float bod
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
+}
+
+void ScreenRecordTab::doUpdate(Renderer& renderer) {
+  if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
+  m_recents.update(renderer);
 }
 
 ScreenRecorderService::Source ScreenRecordTab::selectedSource() const noexcept { return m_selectedSource; }
@@ -589,66 +593,30 @@ void ScreenRecordTab::syncUi() {
   PanelManager::instance().requestRedraw();
 }
 
+void ScreenRecordTab::bindRecentGallery() {
+  m_recents.bind({
+      .list = m_recentList,
+      .empty = m_recentEmpty,
+      .thumbnails = m_thumbnails,
+      .scale = contentScale(),
+      .kind = RecentCaptureKind::Videos,
+      .showAnnotate = false,
+      .onOpen = [this](const std::string& path) { openRecentFile(path); },
+      .onStatus =
+          [this](std::string_view message) {
+            if (m_status != nullptr) {
+              m_status->setText(std::string(message));
+              PanelManager::instance().requestRedraw();
+            }
+          },
+  });
+}
+
 void ScreenRecordTab::rebuildRecentFiles() {
-  if (m_recentList == nullptr || m_recentEmpty == nullptr || m_config == nullptr) {
+  if (m_config == nullptr) {
     return;
   }
-
-  DirectoryScanner scanner;
-  const auto entries = scanner.scan(
-      recordingsDirectory(m_config->config()), {".mp4"}, false, FileDialogSortField::Modified,
-      FileDialogSortOrder::Descending
-  );
-
-  std::string key;
-  std::size_t shown = 0;
-  for (const auto& entry : entries) {
-    if (entry.isDir) {
-      continue;
-    }
-    key += entry.absPath.string();
-    key.push_back('\n');
-    if (++shown >= kRecentFileLimit) {
-      break;
-    }
-  }
-  if (key == m_lastRecentKey) {
-    return;
-  }
-
-  uiAssertNotRendering("ScreenRecordTab::rebuildRecentFiles");
-  while (!m_recentList->children().empty()) {
-    m_recentList->removeChild(m_recentList->children().front().get());
-  }
-
-  const float scale = contentScale();
-  shown = 0;
-  for (const auto& entry : entries) {
-    if (entry.isDir) {
-      continue;
-    }
-    const std::string path = entry.absPath.string();
-    m_recentList->addChild(
-        ui::button({
-            .text = entry.name,
-            .glyph = "video",
-            .contentAlign = ButtonContentAlign::Start,
-            .variant = ButtonVariant::Ghost,
-            .tooltip = formatFileTime(entry.mtime),
-            .minHeight = Style::controlHeight * scale,
-            .paddingH = Style::spaceMd * scale,
-            .onClick = [this, path]() { openRecentFile(path); },
-        })
-    );
-    if (++shown >= kRecentFileLimit) {
-      break;
-    }
-  }
-
-  m_recentEmpty->setVisible(shown == 0);
-  m_recentList->setVisible(shown > 0);
-  m_lastRecentKey = std::move(key);
-  PanelManager::instance().requestLayout();
+  m_recents.rebuild(recordingsDirectory(m_config->config()));
 }
 
 void ScreenRecordTab::openRecentFile(const std::string& path) {

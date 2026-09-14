@@ -567,6 +567,7 @@
       "screen-time": "Screen Time",
       "screenshot": "Screenshot",
       "screen-recorder": "Recorder",
+      "screen-replay": "Replay",
       "session": "Session",
       "system": "System",
       "tailscale": "Tailscale",
@@ -613,6 +614,11 @@
       "system": "System",
       "tailscale": "Tailscale",
       "weather": "Weather"
+    },
+    "captures": {
+      "delete": "Delete",
+      "delete-again": "Click again to delete",
+      "delete-failed": "Could not delete that file."
     },
     "screenshot": {
       "annotate": "Annotate",
@@ -2810,7 +2816,7 @@
           "label": "Floating Offset"
         },
         "home-session-button": {
-          "description": "Show the session-actions button in the Home tab header",
+          "description": "Show the Power tab button in the Home tab header",
           "label": "Show Header Session Button"
         },
         "home-shortcuts": {
@@ -5150,9 +5156,11 @@
       "video": {
         "clear-tooltip": "Stop the video wallpaper on the selected monitor",
         "empty": "No videos in this folder.",
+        "enable": "Enable Video Wallpaper",
+        "enabling": "Enabling Video Wallpaper…",
         "filter-placeholder": "Filter videos…",
-        "open-plugins": "Open Plugins",
-        "plugin-missing": "Enable the official Video Wallpaper plugin to apply video wallpapers.",
+        "mpvpaper-missing": "Install mpvpaper to apply video wallpapers.",
+        "plugin-missing": "Enable Video Wallpaper to apply videos from this folder.",
         "title": "Video"
       },
       "wallhaven": {

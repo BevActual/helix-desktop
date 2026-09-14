@@ -38,6 +38,9 @@ class WaylandConnection;
 namespace noctalia::theme {
   class ThemeService;
 }
+namespace scripting {
+  class PluginManager;
+}
 
 class WallpaperPicker {
 public:
@@ -56,7 +59,8 @@ public:
 
   WallpaperPicker(
       WaylandConnection* wayland, ConfigService* config, ThumbnailService* thumbnails, WallpaperScanner* scanner,
-      noctalia::theme::ThemeService* themeService, HttpClient* httpClient, Options options
+      noctalia::theme::ThemeService* themeService, HttpClient* httpClient, Options options,
+      scripting::PluginManager* pluginManager = nullptr
   );
   ~WallpaperPicker();
 
@@ -144,7 +148,10 @@ private:
   void clearVideoWallpaper();
   void sendMpvpaperCommand(std::string_view action, std::string connector, std::string path);
   void syncVideoStatus();
+  void requestEnableMpvpaper();
   [[nodiscard]] bool mpvpaperPluginEnabled() const;
+  [[nodiscard]] bool mpvpaperEnabling() const;
+  [[nodiscard]] bool mpvpaperBinaryAvailable() const;
   [[nodiscard]] std::filesystem::path videoDirectory() const;
   [[nodiscard]] static std::size_t browseSourceIndex(BrowseSource source);
   [[nodiscard]] static BrowseSource browseSourceFromIndex(std::size_t index);
@@ -169,6 +176,7 @@ private:
   WallpaperScanner* m_scanner = nullptr;
   noctalia::theme::ThemeService* m_themeService = nullptr;
   HttpClient* m_http = nullptr;
+  scripting::PluginManager* m_pluginManager = nullptr;
   AnimationManager* m_animations = nullptr;
   float m_contentScale = 1.0F;
   float m_panelCardOpacity = 1.0F;
@@ -218,7 +226,7 @@ private:
   Spinner* m_spinner = nullptr;
   Flex* m_videoStatusBox = nullptr;
   Label* m_videoStatusLabel = nullptr;
-  Button* m_videoPluginsButton = nullptr;
+  Button* m_videoEnableButton = nullptr;
   std::unique_ptr<WallpaperGridAdapter> m_adapter;
 
   std::vector<MonitorChoice> m_monitorChoices;
@@ -242,6 +250,7 @@ private:
   std::size_t m_selectedVisibleIndex = kNoVisibleSelection;
   BrowseSource m_browseSource = BrowseSource::Library;
   std::uint64_t m_mpvpaperNonce = 0;
+  bool m_mpvpaperWasEnabling = false;
   wallpaper::wallhaven::SearchQuery m_wallhavenQuery;
   std::vector<wallpaper::wallhaven::Item> m_wallhavenItems;
   int m_wallhavenTotalPages = 1;

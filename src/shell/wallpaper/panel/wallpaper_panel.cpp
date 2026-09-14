@@ -7,9 +7,11 @@
 
 WallpaperPanel::WallpaperPanel(
     WaylandConnection* wayland, ConfigService* config, ThumbnailService* thumbnails, WallpaperScanner* scanner,
-    noctalia::theme::ThemeService* themeService, HttpClient* httpClient
+    noctalia::theme::ThemeService* themeService, HttpClient* httpClient, scripting::PluginManager* pluginManager
 )
-    : m_config(config), m_picker(wayland, config, thumbnails, scanner, themeService, httpClient, WallpaperPicker::Options()) {}
+    : m_config(config),
+      m_picker(wayland, config, thumbnails, scanner, themeService, httpClient, WallpaperPicker::Options(), pluginManager) {
+}
 
 PanelPlacement WallpaperPanel::panelPlacement() const noexcept {
   return m_config == nullptr ? PanelPlacement::Attached : m_config->config().shell.panel.wallpaperPlacement;

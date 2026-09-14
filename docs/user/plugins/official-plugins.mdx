@@ -171,9 +171,10 @@ cache, and per-output state; threshold, feather, and automatic generation are pl
 
 Animated and video wallpapers via [mpvpaper](https://github.com/GhostNaN/mpvpaper). A headless **service**
 supervises one `mpvpaper` instance per output. Video browsing is on the built-in wallpaper picker: open **Wallpaper**,
-switch to **Video**, or run `noctalia msg panel-toggle wallpaper video`. Enable this official plugin first; the picker
-then scans `[plugin_settings."noctalia/mpvpaper"].video_directory` (empty uses `~/Videos`) and applying a video asks
-the plugin to run mpvpaper. Choosing a still wallpaper clears the video on the selected monitor(s).
+switch to **Video**, or run `noctalia msg panel-toggle wallpaper video`. If this plugin is off, the Video source can
+enable it in place. The picker then scans `[plugin_settings."noctalia/mpvpaper"].video_directory` (empty uses `~/Videos`)
+and applying a video asks the plugin to run mpvpaper. Choosing a still wallpaper clears the video on the selected
+monitor(s).
 
 The plugin **panel**, bar **widget**, and shortcut remain. When a video is assigned to an output, Noctalia drops its
 own wallpaper surface there so the video shows through - the bar and dock still draw above it. Assignments persist

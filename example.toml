@@ -498,6 +498,8 @@ enabled = false
 # [[control_center.shortcuts]]
 # type = "screen_recorder"
 # [[control_center.shortcuts]]
+# type = "screen_replay"
+# [[control_center.shortcuts]]
 # type = "session"
 
 # ── Hooks ─────────────────────────────────────────────────────────────────────

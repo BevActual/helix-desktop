@@ -1,15 +1,12 @@
 #include "shell/control_center/tabs/screenshot_tab.h"
 
 #include "config/config_service.h"
-#include "core/files/directory_scanner.h"
 #include "core/process/process.h"
-#include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
-#include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
@@ -21,7 +18,9 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <vector>
 
 using namespace control_center;
 
@@ -34,12 +33,10 @@ namespace {
     return FileUtils::expandUserPath(config.shell.screenshot.directory);
   }
 
-  constexpr std::size_t kRecentFileLimit = 5;
-
 } // namespace
 
 ScreenshotTab::ScreenshotTab(const ControlCenterServices& services)
-    : m_ipc(services.ipc), m_config(services.config),
+    : m_ipc(services.ipc), m_config(services.config), m_thumbnails(services.thumbnails),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "screenshot"})) {}
 
 std::unique_ptr<Flex> ScreenshotTab::create() {
@@ -200,6 +197,7 @@ std::unique_ptr<Flex> ScreenshotTab::create() {
   );
   content->addChild(std::move(recentCard));
   live->addChild(std::move(scroll));
+  bindRecentGallery();
   rebuildRecentFiles();
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
@@ -233,7 +231,7 @@ void ScreenshotTab::onClose() {
   m_recentList = nullptr;
   m_recentEmpty = nullptr;
   m_captureButtons.clear();
-  m_lastRecentKey.clear();
+  m_recents.onClose();
 }
 
 void ScreenshotTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -245,6 +243,13 @@ void ScreenshotTab::doLayout(Renderer& renderer, float contentWidth, float bodyH
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
+}
+
+void ScreenshotTab::doUpdate(Renderer& renderer) {
+  if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
+  m_recents.update(renderer);
 }
 
 int ScreenshotTab::delaySeconds() const noexcept {
@@ -324,66 +329,31 @@ void ScreenshotTab::runCapture(const char* command) {
   }
 }
 
+void ScreenshotTab::bindRecentGallery() {
+  m_recents.bind({
+      .list = m_recentList,
+      .empty = m_recentEmpty,
+      .thumbnails = m_thumbnails,
+      .scale = contentScale(),
+      .kind = RecentCaptureKind::Images,
+      .showAnnotate = true,
+      .onOpen = [this](const std::string& path) { openRecentFile(path); },
+      .onAnnotate = [this](const std::string& path) { annotateRecentFile(path); },
+      .onStatus =
+          [this](std::string_view message) {
+            if (m_status != nullptr) {
+              m_status->setText(std::string(message));
+              PanelManager::instance().requestRedraw();
+            }
+          },
+  });
+}
+
 void ScreenshotTab::rebuildRecentFiles() {
-  if (m_recentList == nullptr || m_recentEmpty == nullptr || m_config == nullptr) {
+  if (m_config == nullptr) {
     return;
   }
-
-  DirectoryScanner scanner;
-  const auto entries = scanner.scan(
-      screenshotOutputDirectory(m_config->config()), {".png"}, false, FileDialogSortField::Modified,
-      FileDialogSortOrder::Descending
-  );
-
-  std::string key;
-  std::size_t shown = 0;
-  for (const auto& entry : entries) {
-    if (entry.isDir) {
-      continue;
-    }
-    key += entry.absPath.string();
-    key.push_back('\n');
-    if (++shown >= kRecentFileLimit) {
-      break;
-    }
-  }
-  if (key == m_lastRecentKey) {
-    return;
-  }
-
-  uiAssertNotRendering("ScreenshotTab::rebuildRecentFiles");
-  while (!m_recentList->children().empty()) {
-    m_recentList->removeChild(m_recentList->children().front().get());
-  }
-
-  const float scale = contentScale();
-  shown = 0;
-  for (const auto& entry : entries) {
-    if (entry.isDir) {
-      continue;
-    }
-    const std::string path = entry.absPath.string();
-    m_recentList->addChild(
-        ui::button({
-            .text = entry.name,
-            .glyph = "photo",
-            .contentAlign = ButtonContentAlign::Start,
-            .variant = ButtonVariant::Ghost,
-            .tooltip = formatFileTime(entry.mtime),
-            .minHeight = Style::controlHeight * scale,
-            .paddingH = Style::spaceMd * scale,
-            .onClick = [this, path]() { openRecentFile(path); },
-        })
-    );
-    if (++shown >= kRecentFileLimit) {
-      break;
-    }
-  }
-
-  m_recentEmpty->setVisible(shown == 0);
-  m_recentList->setVisible(shown > 0);
-  m_lastRecentKey = std::move(key);
-  PanelManager::instance().requestLayout();
+  m_recents.rebuild(screenshotOutputDirectory(m_config->config()));
 }
 
 void ScreenshotTab::openRecentFile(const std::string& path) {
@@ -395,6 +365,13 @@ void ScreenshotTab::openRecentFile(const std::string& path) {
     return;
   }
   (void)process::runAsync(std::vector<std::string>{"xdg-open", path});
+}
+
+void ScreenshotTab::annotateRecentFile(const std::string& path) {
+  PanelManager::instance().closePanel();
+  if (m_ipc != nullptr) {
+    (void)m_ipc->execute("annotate " + path);
+  }
 }
 
 void ScreenshotTab::openScreenshotFolder() {

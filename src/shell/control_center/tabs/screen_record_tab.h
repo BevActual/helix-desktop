@@ -2,6 +2,7 @@
 
 #include "capture/screen_recorder_service.h"
 #include "core/timer_manager.h"
+#include "shell/control_center/recent_captures.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -17,6 +18,7 @@ class ConfigService;
 class Flex;
 class Label;
 class Segmented;
+class ThumbnailService;
 class Toggle;
 struct ControlCenterServices;
 
@@ -34,6 +36,7 @@ public:
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
+  void doUpdate(Renderer& renderer) override;
   void buildRecordCard(Flex& root, float scale);
   void buildReplayCard(Flex& root, float scale);
   void buildRecentCard(Flex& root, float scale);
@@ -46,6 +49,7 @@ private:
   void openRecordingsFolder();
   void openRecentFile(const std::string& path);
   void rebuildRecentFiles();
+  void bindRecentGallery();
   void requestReplayStart();
   void requestReplayStop();
   void requestReplaySave();
@@ -55,7 +59,9 @@ private:
 
   ScreenRecorderService* m_recorder = nullptr;
   ConfigService* m_config = nullptr;
+  ThumbnailService* m_thumbnails = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  control_center::RecentCaptureGallery m_recents;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
   Flex* m_rootLayout = nullptr;
   Segmented* m_source = nullptr;
@@ -78,5 +84,4 @@ private:
   std::size_t m_delayIndex = 0;
   bool m_pendingStart = false;
   int m_countdownLeft = 0;
-  std::string m_lastRecentKey;
 };

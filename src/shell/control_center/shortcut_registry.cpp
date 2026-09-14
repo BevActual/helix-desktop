@@ -443,7 +443,7 @@ namespace {
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.session"); }
     std::string_view iconOn() const override { return "shutdown"; }
     std::string_view iconOff() const override { return "shutdown"; }
-    void onClick() override { PanelManager::instance().togglePanel("session"); }
+    void onClick() override { openTab("power"); }
   };
 
   class ClipboardShortcut final : public Shortcut {
@@ -536,7 +536,8 @@ namespace {
     std::string_view iconOff() const override { return "video"; }
     bool isToggle() const override { return true; }
     bool enabled() const override {
-      return m_recorder != nullptr && (m_recorder->available() || m_recorder->isRecording());
+      return m_recorder != nullptr
+          && (m_recorder->isRecording() || (m_recorder->available() && !m_recorder->isReplaying()));
     }
     bool active() const override { return m_recorder != nullptr && m_recorder->isRecording(); }
     void onClick() override {
@@ -546,6 +547,44 @@ namespace {
       }
     }
     void onRightClick() override { openTab("screen-record"); }
+
+  private:
+    ScreenRecorderService* m_recorder = nullptr;
+  };
+
+  class ScreenReplayShortcut final : public Shortcut {
+  public:
+    explicit ScreenReplayShortcut(ScreenRecorderService* recorder) : m_recorder(recorder) {}
+    std::string_view id() const override { return "screen_replay"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screen-replay"); }
+    std::string displayLabel() const override {
+      if (m_recorder != nullptr && m_recorder->isReplaying()) {
+        return m_recorder->elapsedLabel();
+      }
+      return defaultLabel();
+    }
+    std::string_view iconOn() const override { return "player-stop"; }
+    std::string_view iconOff() const override { return "history"; }
+    bool isToggle() const override { return true; }
+    bool enabled() const override {
+      return m_recorder != nullptr
+          && (m_recorder->isReplaying()
+              || (m_recorder->hasGpuScreenRecorder() && !m_recorder->isRecording()));
+    }
+    bool active() const override { return m_recorder != nullptr && m_recorder->isReplaying(); }
+    void onClick() override {
+      PanelManager::instance().closePanel();
+      if (m_recorder != nullptr) {
+        (void)m_recorder->toggleReplay(ScreenRecorderService::Source::Focused);
+      }
+    }
+    void onRightClick() override {
+      if (m_recorder != nullptr && m_recorder->isReplaying() && !m_recorder->isReplayStopping()) {
+        (void)m_recorder->saveReplay();
+        return;
+      }
+      openTab("screen-record");
+    }
 
   private:
     ScreenRecorderService* m_recorder = nullptr;
@@ -684,6 +723,10 @@ namespace {
       builtinShortcut<ScreenRecordShortcut, &ShortcutServices::screenRecorder>({
           .type = "screen_recorder",
           .labelKey = "control-center.shortcuts.screen-recorder",
+      }),
+      builtinShortcut<ScreenReplayShortcut, &ShortcutServices::screenRecorder>({
+          .type = "screen_replay",
+          .labelKey = "control-center.shortcuts.screen-replay",
       }),
       builtinShortcut<TailscaleShortcut, &ShortcutServices::tailscale>({
           .type = "tailscale",

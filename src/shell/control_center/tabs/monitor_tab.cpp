@@ -322,29 +322,9 @@ std::unique_ptr<Flex> MonitorTab::create() {
   auto tab = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
   });
-
-  tab->addChild(
-      ui::label({
-          .out = &m_noteLabel,
-          .text = i18n::tr("control-center.display.temporary"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
-      })
-  );
-  tab->addChild(
-      ui::label({
-          .out = &m_errorLabel,
-          .text = "",
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::Error),
-          .visible = false,
-      })
-  );
-
-  buildNightLightCard(*tab, scale);
 
   auto cardsScroll = ui::scrollView({
       .out = &m_cardsScroll,
@@ -362,21 +342,41 @@ std::unique_ptr<Flex> MonitorTab::create() {
   m_cardsLayout->setDirection(FlexDirection::Vertical);
   m_cardsLayout->setAlign(FlexAlign::Stretch);
   m_cardsLayout->setGap(Style::spaceMd * scale);
-  tab->addChild(std::move(cardsScroll));
 
-  auto emptyState = ui::column(
+  m_cardsLayout->addChild(
+      ui::label({
+          .out = &m_noteLabel,
+          .text = i18n::tr("control-center.display.temporary"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .visible = false,
+      })
+  );
+  m_cardsLayout->addChild(
+      ui::label({
+          .out = &m_errorLabel,
+          .text = "",
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::Error),
+          .visible = false,
+      })
+  );
+
+  buildNightLightCard(*m_cardsLayout, scale);
+
+  m_cardsLayout->addChild(ui::column(
       {.out = &m_emptyState,
        .align = FlexAlign::Center,
        .justify = FlexJustify::Center,
-       .flexGrow = 1.0F,
        .visible = false},
       ui::label({
           .text = i18n::tr("control-center.display.no-displays"),
           .fontSize = Style::fontSizeBody * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
-  );
-  tab->addChild(std::move(emptyState));
+  ));
+
+  tab->addChild(std::move(cardsScroll));
 
   syncStatusLabels();
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
@@ -1367,9 +1367,6 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
   const bool empty = sources.empty();
   if (m_emptyState != nullptr) {
     m_emptyState->setVisible(empty);
-  }
-  if (m_cardsScroll != nullptr) {
-    m_cardsScroll->setVisible(!empty);
   }
   if (empty) {
     return;
