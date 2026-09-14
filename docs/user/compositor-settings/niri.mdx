@@ -59,7 +59,10 @@ binds {
     // Niri has a built-in window switcher you might want to try it to see which one you prefer.
     Mod+Escape { spawn-sh "noctalia msg session lock"; }
     Print { spawn-sh "noctalia msg screenshot-region"; }
+    Shift+Print { spawn-sh "noctalia msg screenshot-fullscreen"; }
     Mod+V { spawn-sh "noctalia msg panel-toggle clipboard"; }
+    Mod+W { spawn-sh "noctalia msg panel-toggle wallpaper"; }
+    Mod+Shift+P { spawn-sh "noctalia msg panel-toggle session"; }
     Mod+Shift+N { spawn-sh "noctalia msg nightlight-toggle"; }
 
     // Audio & Brightness

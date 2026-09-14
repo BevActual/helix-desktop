@@ -21,6 +21,7 @@
 #include "shell/control_center/tabs/calendar_tab.h"
 #include "shell/control_center/tabs/clipboard_tab.h"
 #include "shell/control_center/tabs/home_tab.h"
+#include "shell/control_center/tabs/keybinds_tab.h"
 #include "shell/control_center/tabs/media_tab.h"
 #include "shell/control_center/tabs/monitor_tab.h"
 #include "shell/control_center/tabs/network_tab.h"
@@ -204,7 +205,6 @@ namespace {
         || id == "panels"
         || id == "osd"
         || id == "shell"
-        || id == "keybinds"
         || id == "security"
         || id == "hooks"
         || id == "niri"
@@ -221,6 +221,7 @@ namespace {
         || id == "audio"
         || id == "monitor"
         || id == "wallpaper"
+        || id == "keybinds"
         || id == "media"
         || id == "screen-time"
         || id == "network"
@@ -324,7 +325,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
   add("osd", std::make_unique<SettingsTab>(services, "osd"));
   add("shell", std::make_unique<SettingsTab>(services, "shell"));
-  add("keybinds", std::make_unique<SettingsTab>(services, "keybinds"));
+  add("keybinds", std::make_unique<KeybindsTab>(services));
   add("security", std::make_unique<SettingsTab>(services, "security"));
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));

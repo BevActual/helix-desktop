@@ -1204,6 +1204,14 @@ void SettingsPane::onExternalChanged() {
   queueRebuild();
 }
 
+void SettingsPane::setIncludedGroups(std::unordered_set<std::string> groups) {
+  if (m_includedGroups == groups) {
+    return;
+  }
+  m_includedGroups = std::move(groups);
+  queueRebuild();
+}
+
 void SettingsPane::openPluginSettings(std::string pluginId) {
   bindHostedEditors();
   if (m_hostedEditors != nullptr) {

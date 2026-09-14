@@ -475,7 +475,7 @@ On split-pane surfaces (**Settings** and **Control Center**), `tab_next` / `tab_
 
 ### Recording from the GUI
 
-Open **Settings → Keybinds** to bind chords interactively. In-shell actions are shown in a two-column grid. Each cell lists the current chord(s) for that action plus a trailing *"Click to add keybind"* slot. When you have not overridden an action in `settings.toml`, the GUI still shows the built-in defaults (the same chords Noctalia uses at runtime).
+Open **Control Center → Keybinds** (or **Settings → Keybinds**) to bind chords interactively. In-shell actions are shown in a two-column grid. Each cell lists the current chord(s) for that action plus a trailing *"Click to add keybind"* slot. When you have not overridden an action in `settings.toml`, the GUI still shows the built-in defaults (the same chords Noctalia uses at runtime). If a recorded chord is already used by another in-shell action, the card warns; the save is not blocked.
 
 - Click a slot (or focus it and press a `validate` chord) to start recording, then press the key combination. The recorder previews held modifiers (e.g. `Ctrl + Shift + …`) and commits as soon as a non-modifier key is pressed.
 - Press a modifier-only chord (no regular key) and click away to abort the recording without changing the binding.
@@ -487,7 +487,7 @@ Chords recorded in the GUI are serialized as `ctrl+shift+Return`-style strings u
 
 ### Niri compositor binds
 
-On niri, **Settings → Keybinds** adds a **Niri** group above the in-shell actions. It reads `~/.config/niri/config.kdl` and included files (or `$NIRI_CONFIG`), then shows whether each recommended Noctalia shortcut is already bound.
+On niri, **Control Center → Keybinds** adds a **Niri** source next to **In Noctalia**. It reads `~/.config/niri/config.kdl` and included files (or `$NIRI_CONFIG`), then shows whether each recommended Noctalia shortcut is already bound. Copy missing / Add to niri live on the header (and again behind header gear).
 
 - **Copy** copies one `spawn-sh "noctalia msg …"` line.
 - Record a chord on a Niri row to write it into `noctalia-binds.kdl` (Super is stored as niri `Mod`). Binds that exist only in your `binds { }` stay copy-only.

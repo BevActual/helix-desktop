@@ -670,6 +670,7 @@ _noctalia_sources = files(
   'src/shell/control_center/shortcut_registry.cpp',
   'src/shell/control_center/tabs/system_tab.cpp',
   'src/shell/control_center/tabs/tailscale_tab.cpp',
+  'src/shell/control_center/tabs/keybinds_tab.cpp',
   'src/shell/control_center/tabs/wallpaper_tab.cpp',
   'src/shell/control_center/tab.cpp',
   'src/shell/control_center/tabs/weather_tab.cpp',

@@ -387,7 +387,7 @@ namespace settings {
       };
 
       entries.push_back(makeEntry(
-          SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.copy-missing.label"),
+          SettingsSection::Keybinds, "niri-actions", i18n::tr("settings.schema.keybinds.niri.copy-missing.label"),
           i18n::tr("settings.schema.keybinds.niri.copy-missing.description"), {},
           ButtonSetting{
               .label = i18n::tr("settings.schema.keybinds.niri.copy-missing.button"),
@@ -408,7 +408,7 @@ namespace settings {
           "niri compositor ipc keybind spawn-sh launcher volume brightness lock screenshot clipboard"
       ));
       entries.push_back(makeEntry(
-          SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.install.label"),
+          SettingsSection::Keybinds, "niri-actions", i18n::tr("settings.schema.keybinds.niri.install.label"),
           i18n::tr("settings.schema.keybinds.niri.install.description"), {},
           ButtonSetting{
               .label = i18n::tr("settings.schema.keybinds.niri.install.button"),

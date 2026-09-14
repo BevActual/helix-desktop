@@ -368,6 +368,14 @@
         "fetching": "Fetching forecast…"
       }
     },
+    "keybinds": {
+      "copy-missing-tooltip": "Copy missing niri binds",
+      "in-noctalia-hint": "These chords navigate Noctalia panels. Super/Mod is reserved for the compositor.",
+      "install-tooltip": "Add missing recommended binds to niri",
+      "niri-hint": "Record a chord to write it into noctalia-binds.kdl. Copy or add missing binds from the header. Existing binds in your niri config stay unchanged.",
+      "open-folder-failed": "Could not open the niri config folder.",
+      "open-folder-tooltip": "Open the niri config folder"
+    },
     "media": {
       "active-player": "Active player",
       "nothing-playing": "Nothing Playing",
@@ -1514,6 +1522,7 @@
         "network": "Network",
         "night-light": "Night Light",
         "niri": "Niri",
+        "niri-actions": "Niri actions",
         "notifications": "Notifications",
         "osd": "OSD",
         "overview": "Overview",
@@ -2495,6 +2504,7 @@
           "description": "Confirm selections, submit inputs, or activate the focused item",
           "label": "Confirm"
         },
+        "duplicate": "Also bound for {actions}",
         "niri": {
           "actions": {
             "brightness-down": { "label": "Decrease brightness" },
@@ -2504,11 +2514,14 @@
             "launcher": { "label": "Launcher" },
             "lock": { "label": "Lock session" },
             "night-light": { "label": "Night light" },
+            "screenshot-fullscreen": { "label": "Screenshot fullscreen" },
             "screenshot-region": { "label": "Screenshot region" },
+            "session": { "label": "Session" },
             "settings": { "label": "Settings" },
             "volume-down": { "label": "Decrease volume" },
             "volume-mute": { "label": "Toggle mute" },
             "volume-up": { "label": "Increase volume" },
+            "wallpaper": { "label": "Wallpaper" },
             "window-switcher": { "label": "Window switcher" }
           },
           "bound": "Bound as {keys} · noctalia msg {command}",

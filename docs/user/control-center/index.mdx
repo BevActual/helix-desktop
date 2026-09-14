@@ -85,7 +85,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
 | `osd` | OSD | On-screen display volume and brightness popups |
 | `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
-| `keybinds` | Keybinds | In-shell navigation chords, plus niri compositor shortcuts when running on niri |
+| `keybinds` | Keybinds | Live In-Noctalia chord recorders, plus niri compositor shortcuts when running on niri. Header gear opens Copy missing / Add to niri. |
 | `security` | Security | Lock screen and authentication |
 | `hooks` | Hooks | Startup and event hooks |
 | `niri` | Niri | niri-specific options. Shown only in a niri session. |
@@ -119,6 +119,14 @@ Set `show_session_button = false` under `[control_center]` to hide the session-a
 The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source for the official Video Wallpaper plugin, and a folder button to choose any image. Select a monitor (or **ALL**), then click a tile to apply it. Favorites, fill color, and theme-from-wallpaper controls stay on the picker.
 
 Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, and the Wallhaven API key. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`.
+
+## Keybinds
+
+The Keybinds tab records in-shell navigation chords on the live page. Switch **In Noctalia** and **Niri** when running on niri. In-Noctalia is a two-column grid of recorders; if two actions share a chord, the card warns without blocking the save. Super/Mod cannot be bound for in-shell actions.
+
+On niri, the Niri source lists recommended compositor shortcuts. Record a chord to write it into `noctalia-binds.kdl`. Header **Copy**, **Add**, and **folder** copy missing binds, install them into `noctalia-binds.kdl` (plus an `include` in `config.kdl`), or open the niri config directory. Existing `binds { }` entries are left unchanged.
+
+Header gear repeats Copy missing / Add to niri. `noctalia msg settings-toggle keybinds` opens that settings view.
 
 ## Media
 

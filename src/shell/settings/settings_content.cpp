@@ -2,6 +2,7 @@
 
 #include "config/config_service.h"
 #include "config/config_types.h"
+#include "core/input/key_chord.h"
 #include "i18n/i18n.h"
 #include "notification/notification_filter.h"
 #include "shell/settings/bar_widget_editor.h"
@@ -22,6 +23,7 @@
 #include "ui/style.h"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -41,6 +43,144 @@ namespace settings {
 
     bool isDockLauncherIconPath(const std::vector<std::string>& path) {
       return path.size() == 2 && path[0] == "dock" && path[1] == "launcher_icon";
+    }
+
+    [[nodiscard]] const std::vector<KeyChord>& keybindItems(const KeybindsConfig& keybinds, KeybindAction action) {
+      switch (action) {
+      case KeybindAction::Validate:
+        return keybinds.validate;
+      case KeybindAction::Cancel:
+        return keybinds.cancel;
+      case KeybindAction::Left:
+        return keybinds.left;
+      case KeybindAction::Right:
+        return keybinds.right;
+      case KeybindAction::Up:
+        return keybinds.up;
+      case KeybindAction::Down:
+        return keybinds.down;
+      case KeybindAction::TabNext:
+        return keybinds.tabNext;
+      case KeybindAction::TabPrevious:
+        return keybinds.tabPrevious;
+      case KeybindAction::Delete:
+        return keybinds.deleteEntry;
+      case KeybindAction::Copy:
+        return keybinds.copy;
+      case KeybindAction::Save:
+        return keybinds.save;
+      }
+      return keybinds.validate;
+    }
+
+    [[nodiscard]] std::vector<KeyChord> effectiveKeybindItems(const KeybindsConfig& keybinds, KeybindAction action) {
+      const std::vector<KeyChord>& configured = keybindItems(keybinds, action);
+      if (!configured.empty()) {
+        return configured;
+      }
+      return defaultKeybindSet(action);
+    }
+
+    [[nodiscard]] std::optional<KeybindAction> keybindActionFromPath(const std::vector<std::string>& path) {
+      if (path.size() != 2 || path[0] != "keybinds") {
+        return std::nullopt;
+      }
+      const std::string& key = path[1];
+      if (key == "validate") {
+        return KeybindAction::Validate;
+      }
+      if (key == "cancel") {
+        return KeybindAction::Cancel;
+      }
+      if (key == "left") {
+        return KeybindAction::Left;
+      }
+      if (key == "right") {
+        return KeybindAction::Right;
+      }
+      if (key == "up") {
+        return KeybindAction::Up;
+      }
+      if (key == "down") {
+        return KeybindAction::Down;
+      }
+      if (key == "tab_next") {
+        return KeybindAction::TabNext;
+      }
+      if (key == "tab_previous") {
+        return KeybindAction::TabPrevious;
+      }
+      if (key == "copy") {
+        return KeybindAction::Copy;
+      }
+      if (key == "save") {
+        return KeybindAction::Save;
+      }
+      if (key == "delete") {
+        return KeybindAction::Delete;
+      }
+      return std::nullopt;
+    }
+
+    [[nodiscard]] const char* keybindActionLabelKey(KeybindAction action) {
+      switch (action) {
+      case KeybindAction::Validate:
+        return "settings.schema.keybinds.validate.label";
+      case KeybindAction::Cancel:
+        return "settings.schema.keybinds.cancel.label";
+      case KeybindAction::Left:
+        return "settings.schema.keybinds.left.label";
+      case KeybindAction::Right:
+        return "settings.schema.keybinds.right.label";
+      case KeybindAction::Up:
+        return "settings.schema.keybinds.up.label";
+      case KeybindAction::Down:
+        return "settings.schema.keybinds.down.label";
+      case KeybindAction::TabNext:
+        return "settings.schema.keybinds.tab-next.label";
+      case KeybindAction::TabPrevious:
+        return "settings.schema.keybinds.tab-previous.label";
+      case KeybindAction::Delete:
+        return "settings.schema.keybinds.delete.label";
+      case KeybindAction::Copy:
+        return "settings.schema.keybinds.copy.label";
+      case KeybindAction::Save:
+        return "settings.schema.keybinds.save.label";
+      }
+      return "settings.schema.keybinds.validate.label";
+    }
+
+    [[nodiscard]] std::string duplicateKeybindWarning(const KeybindsConfig& keybinds, KeybindAction self) {
+      static constexpr std::array<KeybindAction, 11> kActions = {
+          KeybindAction::Validate,    KeybindAction::Cancel, KeybindAction::Left,   KeybindAction::Right,
+          KeybindAction::Up,          KeybindAction::Down,  KeybindAction::TabNext, KeybindAction::TabPrevious,
+          KeybindAction::Delete,      KeybindAction::Copy,  KeybindAction::Save,
+      };
+      const auto items = effectiveKeybindItems(keybinds, self);
+      std::vector<std::string> others;
+      for (const KeybindAction action : kActions) {
+        if (action == self) {
+          continue;
+        }
+        const auto theirs = effectiveKeybindItems(keybinds, action);
+        const bool overlap = std::ranges::any_of(items, [&](const KeyChord& chord) {
+          return std::ranges::find(theirs, chord) != theirs.end();
+        });
+        if (overlap) {
+          others.push_back(i18n::tr(keybindActionLabelKey(action)));
+        }
+      }
+      if (others.empty()) {
+        return {};
+      }
+      std::string joined;
+      for (std::size_t i = 0; i < others.size(); ++i) {
+        if (i > 0) {
+          joined += ", ";
+        }
+        joined += others[i];
+      }
+      return i18n::tr("settings.schema.keybinds.duplicate", "actions", joined);
     }
 
     void addIdleLiveStatusPanel(Flex& section, SettingsContentContext& ctx, float scale) {
@@ -728,6 +868,20 @@ namespace settings {
       }
 
       block->addChild(std::move(list));
+
+      if (const auto action = keybindActionFromPath(entry.path)) {
+        const std::string warning = duplicateKeybindWarning(ctx.config.keybinds, *action);
+        if (!warning.empty()) {
+          block->addChild(
+              ui::label({
+                  .text = warning,
+                  .fontSize = Style::fontSizeCaption * scale,
+                  .color = colorSpecFromRole(ColorRole::Error),
+                  .maxLines = 3,
+              })
+          );
+        }
+      }
 
       if (overridden) {
         block->addChild(factory.makeOverrideResetActions(entry.path));
