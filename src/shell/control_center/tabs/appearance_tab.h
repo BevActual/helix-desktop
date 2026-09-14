@@ -58,12 +58,15 @@ private:
   void openPalettePicker();
   void openCustomPalettesFolder();
   void exportWallpaperPalette();
+  void syncGtkFollow();
+  void enableGtkTemplates();
   [[nodiscard]] PaletteSource selectedPaletteSource() const;
   [[nodiscard]] std::string paletteValueForSource(PaletteSource source) const;
 
   ConfigService* m_config = nullptr;
   noctalia::theme::ThemeService* m_theme = nullptr;
   std::function<void()> m_syncGreeter;
+  std::function<void()> m_applyTemplates;
   std::unique_ptr<SettingsPane> m_settings;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
@@ -87,6 +90,8 @@ private:
   Flex* m_greeterCard = nullptr;
   Toggle* m_greeterAutoSync = nullptr;
   Button* m_greeterSyncButton = nullptr;
+  Label* m_gtkFollowHint = nullptr;
+  Button* m_gtkFollowButton = nullptr;
 
   std::vector<std::string> m_paletteValues;
   bool m_syncing = false;

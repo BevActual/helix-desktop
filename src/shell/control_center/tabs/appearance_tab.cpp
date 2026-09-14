@@ -10,6 +10,7 @@
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/settings/font_family_catalog.h"
+#include "theme/adw_gtk3.h"
 #include "theme/builtin_palettes.h"
 #include "theme/community_palettes.h"
 #include "theme/custom_palettes.h"
@@ -242,6 +243,7 @@ namespace {
 AppearanceTab::AppearanceTab(const ControlCenterServices& services)
     : m_config(services.config), m_theme(services.theme),
       m_syncGreeter(services.settingsActions.syncGreeterAppearance),
+      m_applyTemplates(services.settingsActions.applyTemplates),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
@@ -495,6 +497,33 @@ std::unique_ptr<Flex> AppearanceTab::create() {
       })
   );
   themeCard->addChild(std::move(pureBlackRow));
+  themeCard->addChild(
+      ui::label({
+          .out = &m_gtkFollowHint,
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 4,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  themeCard->addChild(
+      ui::button({
+          .out = &m_gtkFollowButton,
+          .text = i18n::tr("control-center.appearance.gtk-follow-enable"),
+          .fontSize = Style::fontSizeBody * scale,
+          .contentAlign = ButtonContentAlign::Start,
+          .variant = ButtonVariant::Default,
+          .minHeight = controlHeight,
+          .paddingV = Style::spaceSm * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .flexGrow = 1.0F,
+          .visible = false,
+          .participatesInLayout = false,
+          .onClick = [this]() { enableGtkTemplates(); },
+      })
+  );
   content->addChild(std::move(themeCard));
 
   auto typeCard = ui::column({
@@ -705,6 +734,8 @@ void AppearanceTab::onClose() {
   m_greeterCard = nullptr;
   m_greeterAutoSync = nullptr;
   m_greeterSyncButton = nullptr;
+  m_gtkFollowHint = nullptr;
+  m_gtkFollowButton = nullptr;
 }
 
 void AppearanceTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -787,6 +818,7 @@ void AppearanceTab::syncLiveControls() {
     m_roundnessValue->setText(multiplierLabel(shell.cornerRadiusScale));
   }
   syncGreeterCard();
+  syncGtkFollow();
   m_syncing = false;
 }
 
@@ -1126,6 +1158,54 @@ void AppearanceTab::exportWallpaperPalette() {
     setShown(m_exportStatus, true);
   }
   PanelManager::instance().refresh();
+}
+
+void AppearanceTab::syncGtkFollow() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const bool gtkOn = noctalia::theme::gtkTemplatesEnabled(m_config->config().theme.templates);
+  const bool themePresent = noctalia::theme::adwGtk3ThemePresent();
+  if (!gtkOn) {
+    if (m_gtkFollowHint != nullptr) {
+      m_gtkFollowHint->setText(i18n::tr("control-center.appearance.gtk-follow-off"));
+    }
+    setShown(m_gtkFollowHint, true);
+    setShown(m_gtkFollowButton, true);
+    return;
+  }
+  setShown(m_gtkFollowButton, false);
+  if (!themePresent) {
+    if (m_gtkFollowHint != nullptr) {
+      m_gtkFollowHint->setText(i18n::tr("control-center.appearance.gtk-follow-missing-theme"));
+    }
+    setShown(m_gtkFollowHint, true);
+    return;
+  }
+  setShown(m_gtkFollowHint, false);
+}
+
+void AppearanceTab::enableGtkTemplates() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto& current = m_config->config().theme.templates;
+  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides;
+  if (!current.enableBuiltinTemplates) {
+    overrides.push_back({{"theme", "templates", "enable_builtin_templates"}, true});
+  }
+  auto ids = current.builtinIds;
+  const bool idsChanged = noctalia::theme::appendGtkTemplateIds(ids);
+  if (idsChanged) {
+    overrides.push_back({{"theme", "templates", "builtin_ids"}, std::move(ids)});
+  }
+  if (!overrides.empty()) {
+    (void)m_config->setOverrides(std::move(overrides));
+  }
+  if (m_applyTemplates) {
+    m_applyTemplates();
+  }
+  syncGtkFollow();
 }
 
 PaletteSource AppearanceTab::selectedPaletteSource() const {

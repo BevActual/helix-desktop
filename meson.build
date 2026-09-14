@@ -1009,6 +1009,7 @@ _noctalia_sources = files(
   'src/theme/custom_schemes.cpp',
   'src/theme/builtin_palettes.cpp',
   'src/theme/builtin_templates.cpp',
+  'src/theme/adw_gtk3.cpp',
   'src/theme/community_palettes.cpp',
   'src/theme/community_templates.cpp',
   'src/theme/custom_palettes.cpp',
@@ -1169,6 +1170,7 @@ install_data(
 
 if build_tests
   _cpp_test_names = [
+    'adw_gtk3',
     'annotation_document',
     'annotation_raster',
     'animation_manager',

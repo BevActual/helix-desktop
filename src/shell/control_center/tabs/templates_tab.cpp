@@ -12,6 +12,7 @@
 #include "shell/settings/settings_content_common.h"
 #include "shell/settings/template_store_content.h"
 #include "system/desktop_entry.h"
+#include "theme/adw_gtk3.h"
 #include "theme/builtin_templates.h"
 #include "theme/community_templates.h"
 #include "ui/builders.h"
@@ -442,16 +443,22 @@ void TemplatesTab::syncLiveControls() {
   }
   setShown(m_enableLabel, !userSource);
   setShown(m_enable, !userSource);
+  const auto& templates = m_config->config().theme.templates;
+  const bool gtkMissingTheme = m_sourceKind == Source::Builtin && enabled
+      && noctalia::theme::gtkTemplatesEnabled(templates) && !noctalia::theme::adwGtk3ThemePresent();
   if (m_hint != nullptr) {
     const char* key = "control-center.templates.disabled-builtin";
-    if (m_sourceKind == Source::Community) {
+    if (gtkMissingTheme) {
+      key = "control-center.templates.gtk-missing-theme";
+    } else if (m_sourceKind == Source::Community) {
       key = "control-center.templates.disabled-community";
     } else if (userSource) {
       key = "control-center.templates.disabled-user";
     }
     m_hint->setText(i18n::tr(key));
   }
-  const bool showHint = !enabled || (userSource && m_config->config().theme.templates.userTemplates.empty());
+  const bool showHint = gtkMissingTheme || !enabled
+      || (userSource && templates.userTemplates.empty());
   setShown(m_hint, showHint);
   setShown(m_storeHost, enabled);
   setShown(m_folderButton, userSource);
