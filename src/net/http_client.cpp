@@ -292,7 +292,7 @@ void HttpClient::post(std::string_view url, std::string body, std::string_view c
 }
 
 void HttpClient::request(HttpRequest req, ResponseCallback cb) {
-  if (m_offlineMode) {
+  if (m_offlineMode && !req.allowWhenOffline) {
     kLog.warn("request skipped in offline mode url={}", urlForLog(req.url));
     deferResponse(std::move(cb));
     return;

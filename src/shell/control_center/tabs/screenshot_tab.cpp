@@ -6,6 +6,7 @@
 #include "ipc/ipc_service.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -14,6 +15,7 @@
 #include "ui/style.h"
 #include "util/file_utils.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <optional>
@@ -36,10 +38,9 @@ namespace {
 } // namespace
 
 ScreenshotTab::ScreenshotTab(const ControlCenterServices& services)
-    : m_ipc(services.ipc), m_config(services.config), m_thumbnails(services.thumbnails),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "screenshot"})) {}
+    : m_ipc(services.ipc), m_config(services.config), m_thumbnails(services.thumbnails) {}
 
-std::unique_ptr<Flex> ScreenshotTab::create() {
+std::unique_ptr<Flex> ScreenshotTab::createLiveBody() {
   const float scale = contentScale();
 
   auto live = ui::column({
@@ -199,19 +200,11 @@ std::unique_ptr<Flex> ScreenshotTab::create() {
   live->addChild(std::move(scroll));
   bindRecentGallery();
   rebuildRecentFiles();
-  return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
+  return live;
 }
 
-std::unique_ptr<Flex> ScreenshotTab::createHeaderActions() {
-  return m_settings->embedHeader(nullptr, contentScale());
-}
-
-void ScreenshotTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
-
-bool ScreenshotTab::configureMode() const { return m_settings->configureMode(); }
-
-void ScreenshotTab::setSettingsSearchQuery(std::string_view query) {
-  m_settings->setSearchQuery(std::string(query));
+void ScreenshotTab::setPanelCardOpacity(float opacity) noexcept {
+  m_panelCardOpacity = std::clamp(opacity, 0.0F, 1.0F);
 }
 
 void ScreenshotTab::setActive(bool active) {
@@ -222,9 +215,6 @@ void ScreenshotTab::setActive(bool active) {
 
 void ScreenshotTab::onClose() {
   cancelCountdown();
-  if (m_settings != nullptr) {
-    m_settings->onClose();
-  }
   m_rootLayout = nullptr;
   m_delay = nullptr;
   m_status = nullptr;
@@ -234,21 +224,7 @@ void ScreenshotTab::onClose() {
   m_recents.onClose();
 }
 
-void ScreenshotTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
-    return;
-  }
-  if (m_rootLayout == nullptr) {
-    return;
-  }
-  m_rootLayout->setSize(contentWidth, bodyHeight);
-  m_rootLayout->layout(renderer);
-}
-
-void ScreenshotTab::doUpdate(Renderer& renderer) {
-  if (m_settings != nullptr && m_settings->configureMode()) {
-    return;
-  }
+void ScreenshotTab::updateContent(Renderer& renderer) {
   m_recents.update(renderer);
 }
 

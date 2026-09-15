@@ -509,6 +509,28 @@ namespace noctalia::config::schema {
       };
       return s;
     }
+
+    const Schema<ControlCenterConfig::AiUsageTabConfig>& aiUsageTabSchema() {
+      static const Schema<ControlCenterConfig::AiUsageTabConfig> s = {
+          field(
+              &ControlCenterConfig::AiUsageTabConfig::refreshSeconds, "refresh_seconds", kAiUsageRefreshSecondsRange
+          ),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::claude, "claude", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::codex, "codex", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::gemini, "gemini", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::qwen, "qwen", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::copilot, "copilot", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::cursor, "cursor", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::deepseek, "deepseek", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::ollama, "ollama", kAiUsageProviderModes),
+          field(
+              &ControlCenterConfig::AiUsageTabConfig::geminiDailyLimit, "gemini_daily_limit", kAiUsageDailyLimitRange
+          ),
+          field(&ControlCenterConfig::AiUsageTabConfig::qwenDailyLimit, "qwen_daily_limit", kAiUsageDailyLimitRange),
+          field(&ControlCenterConfig::AiUsageTabConfig::ollamaHost, "ollama_host"),
+      };
+      return s;
+    }
   } // namespace
 
   const Schema<ControlCenterConfig>& controlCenterSchema() {
@@ -522,6 +544,7 @@ namespace noctalia::config::schema {
         subTable(&ControlCenterConfig::calendarTab, "calendar", calendarTabSchema()),
         subTable(&ControlCenterConfig::networkTab, "network", networkTabSchema()),
         subTable(&ControlCenterConfig::bluetoothTab, "bluetooth", bluetoothTabSchema()),
+        subTable(&ControlCenterConfig::aiUsage, "ai_usage", aiUsageTabSchema()),
         arrayOf<ControlCenterConfig, ShortcutConfig>(
             &ControlCenterConfig::shortcuts, "shortcuts", shortcutSchema(),
             [](const ShortcutConfig& sc) { return !sc.type.empty(); }

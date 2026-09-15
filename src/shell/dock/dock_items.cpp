@@ -9,6 +9,7 @@
 #include "shell/dock/dock_geometry.h"
 #include "shell/dock/dock_instance.h"
 #include "shell/dock/dock_model.h"
+#include "shell/dock/pinned_apps.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "system/icon_resolver.h"
 #include "system/internal_app_metadata.h"
@@ -300,6 +301,9 @@ namespace {
   }
 
   [[nodiscard]] std::string dockItemTooltipText(const DesktopEntry& entry) {
+    if (shell::dock::pinned_apps::isUnresolved(entry)) {
+      return i18n::tr("dock.missing-app-tooltip", "id", entry.id);
+    }
     if (!entry.name.empty()) {
       return entry.name;
     }

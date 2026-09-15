@@ -21,12 +21,20 @@
 #include "shell/panel/panel_manager.h"
 #include "shell/profile/avatar_path.h"
 #include "shell/wallpaper/wallpaper.h"
+#include "capture/screen_recorder_service.h"
+#include "idle/idle_inhibitor.h"
 #include "system/distro_info.h"
+#include "system/gamma_service.h"
+#include "system/package_kit_service.h"
 #include "system/weather_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/button.h"
 #include "ui/controls/grid_view.h"
 #include "ui/dialogs/file_dialog.h"
+#include "ui/palette.h"
+#include "ui/style.h"
+#include "render/scene/node.h"
 
 #include <algorithm>
 #include <cmath>
@@ -105,6 +113,35 @@ namespace {
 
   void openControlCenterTab(std::string_view tab) {
     PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = tab});
+  }
+
+  void setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return;
+    }
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+  }
+
+  std::unique_ptr<Button> makeStatusChip(
+      Button** out, float scale, float surfaceOpacity, std::function<void()> onClick
+  ) {
+    return ui::button({
+        .out = out,
+        .fontSize = Style::fontSizeCaption * scale,
+        .glyphSize = Style::fontSizeBody * scale,
+        .contentAlign = ButtonContentAlign::Center,
+        .variant = ButtonVariant::Outline,
+        .surfaceOpacity = surfaceOpacity,
+        .minHeight = Style::controlHeightSm * scale,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = Style::spaceSm * scale,
+        .gap = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusLg(scale),
+        .visible = false,
+        .participatesInLayout = false,
+        .onClick = std::move(onClick),
+    });
   }
 
   std::string formatShellTime(const ConfigService* config) {
@@ -214,8 +251,9 @@ std::unique_ptr<Flex> HomeTab::create() {
   auto userCard = ui::column({
       .out = &m_userCard,
       .justify = FlexJustify::Center,
-      .fillHeight = true,
-      .flexGrow = 1.0F,
+      .fillHeight = false,
+      .clipChildren = true,
+      .flexGrow = 0.0F,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeCardStyle(card, scale, opacity); },
   });
 
@@ -370,11 +408,37 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   tab->addChild(std::move(userCard));
 
+  auto statusStrip = ui::row({
+      .out = &m_statusStrip,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = Style::controlHeightSm * scale,
+      .fillWidth = true,
+      .flexGrow = 0.0F,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  const float chipOpacity = panelCardOpacity();
+  statusStrip->addChild(makeStatusChip(&m_statusUpdates, scale, chipOpacity, []() {
+    openControlCenterTab("packages");
+  }));
+  statusStrip->addChild(makeStatusChip(&m_statusCapture, scale, chipOpacity, []() {
+    openControlCenterTab("screen-record");
+  }));
+  statusStrip->addChild(makeStatusChip(&m_statusNightLight, scale, chipOpacity, []() {
+    openControlCenterTab("monitor");
+  }));
+  statusStrip->addChild(makeStatusChip(&m_statusCaffeine, scale, chipOpacity, []() {
+    openControlCenterTab("power");
+  }));
+  tab->addChild(std::move(statusStrip));
+
   auto bottomRow = ui::row({
       .out = &m_bottomRow,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
       .fillWidth = true,
+      .flexGrow = 1.0F,
   });
 
   auto leftColumn = ui::column({
@@ -722,8 +786,31 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     m_userMain->setMinHeight(userMainHeight);
     m_userMain->setSize(m_userMain->width(), userMainHeight);
   }
+
+  // Chips must be shown before this pass measures the column, otherwise the
+  // wallpaper card eats the leftover and the strip paints on top of it.
+  syncStatusStrip();
+
+  const float scale = contentScale();
+  const float userCardHeight = homeAvatarSize(scale) + 2.0F * Style::spaceMd * scale;
+  const bool statusVisible = m_statusStrip != nullptr && m_statusStrip->visible();
+  const float statusHeight = statusVisible ? Style::controlHeightSm * scale : 0.0F;
+  if (m_statusStrip != nullptr) {
+    m_statusStrip->setParticipatesInLayout(statusVisible);
+    m_statusStrip->setFlexGrow(0.0F);
+    m_statusStrip->setMinHeight(statusHeight);
+  }
+  if (m_userCard != nullptr) {
+    m_userCard->setFlexGrow(0.0F);
+    m_userCard->setFillHeight(false);
+    m_userCard->setMinHeight(userCardHeight);
+    m_userCard->setMaxHeight(userCardHeight);
+  }
+  if (m_bottomRow != nullptr) {
+    m_bottomRow->setFlexGrow(1.0F);
+  }
+
   if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
-    const float scale = contentScale();
     const float bottomRowGap = m_bottomRow != nullptr ? m_bottomRow->gap() : 0.0F;
     const bool stacked = m_shortcutPads.size() <= kHomeStackedShortcutMax;
     const std::size_t cols = stacked ? 1U : kHomeShortcutGridColumns;
@@ -742,7 +829,11 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     // the media/clock column.
     const float userCardReserve = homeAvatarSize(scale) + 2.0F * (Style::spaceSm + Style::spaceXs) * scale;
     const float rootGap = m_rootLayout->gap();
-    const float availForGrid = std::max(1.0F, bodyHeight - userCardReserve - rootGap);
+    float statusReserve = 0.0F;
+    if (m_statusStrip != nullptr && m_statusStrip->visible()) {
+      statusReserve = std::max(m_statusStrip->minHeight(), Style::controlHeightSm * scale) + rootGap;
+    }
+    const float availForGrid = std::max(1.0F, bodyHeight - userCardReserve - rootGap - statusReserve);
     const float maxCellSide =
         std::max(1.0F, (availForGrid - static_cast<float>(rows - 1) * rowGap - padV) / static_cast<float>(rows));
     const float maxGridWidth = static_cast<float>(cols) * (maxCellSide / kHomeShortcutSquareTrim)
@@ -767,7 +858,6 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
 
   // Cap shortcut labels to the button's content width after cells are sized (avoids elide from grid math mismatch).
   if (!m_shortcutPads.empty() && m_shortcutsGrid != nullptr) {
-    const float scale = contentScale();
     for (auto& pad : m_shortcutPads) {
       if (pad.label == nullptr) {
         continue;
@@ -846,7 +936,6 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   }
 
   if (m_userAvatar != nullptr && m_userMain != nullptr) {
-    const float scale = contentScale();
     const float minAvatar = homeAvatarSize(scale);
     const float desiredAvatar = std::max(minAvatar, m_userMain->height());
     if (std::abs(m_userAvatar->width() - desiredAvatar) > 0.5F) {
@@ -861,7 +950,6 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   // Lock the shortcuts grid height to its square-cell natural size so it does not vary
   // when the media or clock cards change. The leftColumn stretches to match this height.
   if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
-    const float scale = contentScale();
     const float gridW = m_shortcutsGrid->width();
     const float innerGridW = std::max(1.0F, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
     const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
@@ -1240,6 +1328,85 @@ void HomeTab::syncHeaderActions() {
   }
 }
 
+void HomeTab::syncStatusStrip() {
+  const auto applyChip = [](Button* button, bool show, std::string_view text, std::string_view glyph,
+                            ButtonVariant variant) {
+    if (button == nullptr) {
+      return false;
+    }
+    const bool wasShown = button->visible();
+    setShown(button, show);
+    if (show) {
+      button->setText(text);
+      button->setGlyph(glyph);
+      button->setVariant(variant);
+    }
+    return wasShown != show;
+  };
+
+  bool layoutDirty = false;
+  const std::size_t updates = noctalia::packages::pendingUpdateCount();
+  layoutDirty = applyChip(
+                    m_statusUpdates, updates > 0,
+                    i18n::tr("control-center.home.status.updates", "count", std::to_string(updates)), "package",
+                    ButtonVariant::Outline
+                )
+      || layoutDirty;
+
+  auto* recorder = m_services.screenRecorder;
+  const bool recording =
+      recorder != nullptr
+      && (recorder->isRecording() || recorder->isStopping() || recorder->isReplaying() || recorder->isReplayStopping());
+  if (recording) {
+    const bool replay = recorder->isReplaying() || recorder->isReplayStopping();
+    const char* key =
+        replay ? "control-center.home.status.replay" : "control-center.home.status.recording";
+    layoutDirty = applyChip(
+                      m_statusCapture, true,
+                      i18n::tr(key, "elapsed", recorder->elapsedLabel()), replay ? "history" : "player-stop",
+                      ButtonVariant::Primary
+                  )
+        || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusCapture, false, {}, "video", ButtonVariant::Outline) || layoutDirty;
+  }
+
+  auto* nightLight = m_services.nightLight;
+  const bool nightOn =
+      nightLight != nullptr && (nightLight->forceEnabled() || nightLight->active());
+  layoutDirty = applyChip(
+                    m_statusNightLight, nightOn, i18n::tr("control-center.home.status.night-light"),
+                    nightLight != nullptr && nightLight->forceEnabled() ? "nightlight-forced" : "nightlight-on",
+                    ButtonVariant::Outline
+                )
+      || layoutDirty;
+
+  auto* caffeine = m_services.idleInhibitor;
+  const bool caffeineOn = caffeine != nullptr && caffeine->available() && caffeine->enabled();
+  layoutDirty = applyChip(
+                    m_statusCaffeine, caffeineOn, i18n::tr("control-center.home.status.caffeine"), "caffeine-on",
+                    ButtonVariant::Outline
+                )
+      || layoutDirty;
+
+  const bool any = (m_statusUpdates != nullptr && m_statusUpdates->visible())
+      || (m_statusCapture != nullptr && m_statusCapture->visible())
+      || (m_statusNightLight != nullptr && m_statusNightLight->visible())
+      || (m_statusCaffeine != nullptr && m_statusCaffeine->visible());
+  if (m_statusStrip != nullptr) {
+    const bool wasShown = m_statusStrip->visible();
+    setShown(m_statusStrip, any);
+    m_statusStrip->setMinHeight(any ? Style::controlHeightSm * contentScale() : 0.0F);
+    layoutDirty = layoutDirty || wasShown != any;
+  }
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+  if (layoutDirty || any) {
+    PanelManager::instance().requestRedraw();
+  }
+}
+
 void HomeTab::doUpdate(Renderer& renderer) {
   if (m_settings != nullptr && m_settings->configureMode()) {
     return;
@@ -1312,6 +1479,7 @@ void HomeTab::setActive(bool active) {
       if (m_dateLabel != nullptr) {
         changed = m_dateLabel->setText(formatShellDate(m_config)) || changed;
       }
+      syncStatusStrip();
       if (changed) {
         PanelManager::instance().requestLayout();
         PanelManager::instance().requestRedraw();
@@ -1327,6 +1495,7 @@ void HomeTab::onClose() {
   m_progressTimer.stop();
   m_clockTimer.stop();
   m_rootLayout = nullptr;
+  m_statusStrip = nullptr;
   m_bottomRow = nullptr;
   m_dateTimeCard = nullptr;
   m_mediaCard = nullptr;
@@ -1343,6 +1512,10 @@ void HomeTab::onClose() {
   m_userUptime = nullptr;
   m_userVersion = nullptr;
   m_sessionButton = nullptr;
+  m_statusUpdates = nullptr;
+  m_statusCapture = nullptr;
+  m_statusNightLight = nullptr;
+  m_statusCaffeine = nullptr;
   m_userCardKeyboardArea = nullptr;
   m_userCardArea = nullptr;
   m_mediaCardArea = nullptr;
@@ -1439,6 +1612,7 @@ void HomeTab::syncScaledFonts() {
 void HomeTab::sync(Renderer& renderer) {
   syncScaledFonts();
   syncShortcuts();
+  syncStatusStrip();
 
   if (m_timeLabel != nullptr) {
     m_timeLabel->setText(formatShellTime(m_config));

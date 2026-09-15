@@ -77,6 +77,7 @@ namespace calendar_view {
     float scale = 1.0F;
     std::string_view dateFormat;
     std::string_view timeFormat;
+    std::string_view emptyText;
     std::string fontFamily;
     EventListState* state = nullptr;
     std::function<void()> requestRedraw;

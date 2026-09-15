@@ -1,7 +1,10 @@
 #include "shell/dock/pinned_apps.h"
 
 #include "core/log.h"
+#include "i18n/i18n.h"
+#include "notification/notifications.h"
 #include "system/internal_app_metadata.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
 
@@ -13,8 +16,9 @@ namespace shell::dock::pinned_apps {
     [[nodiscard]] DesktopEntry placeholderEntry(std::string_view pinnedId) {
       DesktopEntry placeholder;
       placeholder.id = std::string(pinnedId);
-      placeholder.name = std::string(pinnedId);
-      placeholder.nameLower = std::string(pinnedId);
+      placeholder.name = i18n::tr("dock.missing-app");
+      placeholder.nameLower = StringUtils::toLower(placeholder.name);
+      placeholder.comment = std::string(pinnedId);
       return placeholder;
     }
 
@@ -55,6 +59,16 @@ namespace shell::dock::pinned_apps {
     }
 
     return resolved;
+  }
+
+  bool isUnresolved(const DesktopEntry& entry) noexcept {
+    return entry.exec.empty() && entry.path.empty() && !entry.dbusActivatable;
+  }
+
+  void notifyUnresolved(const DesktopEntry& entry) {
+    notify::error(
+        "Noctalia", i18n::tr("dock.missing-app"), i18n::tr("dock.missing-app-body", "id", entry.id)
+    );
   }
 
 } // namespace shell::dock::pinned_apps

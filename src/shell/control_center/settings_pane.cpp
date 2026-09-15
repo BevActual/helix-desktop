@@ -474,6 +474,15 @@ void SettingsPane::setConfigureMode(bool show) {
   PanelManager::instance().requestLayout();
 }
 
+void SettingsPane::setSection(std::string section) {
+  if (m_selectedSection == section) {
+    return;
+  }
+  m_selectedSection = std::move(section);
+  m_scrollState.offset = 0.0F;
+  queueRebuild();
+}
+
 void SettingsPane::setSearchQuery(std::string query) {
   if (m_searchQuery == query) {
     return;
@@ -1298,13 +1307,15 @@ settings::RuntimeActions SettingsPane::makeRuntimeActions() {
   if (m_clipboard != nullptr) {
     actions.retryClipboardPersistence = [this]() { m_clipboard->retryPersistence(); };
   }
-  actions.openCalendarAccount = [this](std::optional<std::string> accountId) {
-    bindHostedEditors();
-    if (m_hostedEditors != nullptr) {
-      m_hostedEditors->openCalendarAccount(std::move(accountId));
-    }
-  };
+  actions.openCalendarAccount = [this](std::optional<std::string> accountId) { openCalendarAccount(std::move(accountId)); };
   return actions;
+}
+
+void SettingsPane::openCalendarAccount(std::optional<std::string> accountId) {
+  bindHostedEditors();
+  if (m_hostedEditors != nullptr) {
+    m_hostedEditors->openCalendarAccount(std::move(accountId));
+  }
 }
 
 void SettingsPane::markPluginListDirty() {

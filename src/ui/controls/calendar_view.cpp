@@ -533,7 +533,8 @@ namespace calendar_view {
     if (!hasEvents) {
       content->addChild(
           ui::label({
-              .text = i18n::tr("control-center.calendar.no-events"),
+              .text = options.emptyText.empty() ? i18n::tr("control-center.calendar.no-events")
+                                                : std::string(options.emptyText),
               .fontSize = Style::fontSizeBody * options.scale,
               .fontFamily = options.fontFamily,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),

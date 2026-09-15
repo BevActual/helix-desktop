@@ -580,8 +580,12 @@ void NotificationToast::onOutputChange() {
 }
 
 void NotificationToast::hideDndSuppressed() {
-  std::erase_if(m_pendingAdds, [](const Notification& pending) {
-    return pending.dndPolicy == NotificationDndPolicy::Respect;
+  std::erase_if(m_pendingAdds, [this](const Notification& pending) {
+    if (pending.dndPolicy != NotificationDndPolicy::Respect) {
+      return false;
+    }
+    m_deferredForDnd.insert(pending.id);
+    return true;
   });
 
   for (std::size_t index = m_entries.size(); index-- > 0;) {
@@ -599,8 +603,45 @@ void NotificationToast::hideDndSuppressed() {
     }
 
     const uint32_t notificationId = entry.notificationId;
+    m_deferredForDnd.insert(notificationId);
     finishRemoval(notificationId);
   }
+}
+
+void NotificationToast::replayDeferredForDnd() {
+  if (m_notifications == nullptr || m_notifications->doNotDisturb() || m_deferredForDnd.empty()) {
+    return;
+  }
+
+  std::unordered_set<uint32_t> alreadyQueued;
+  alreadyQueued.reserve(m_entries.size() + m_pendingAdds.size());
+  for (const auto& entry : m_entries) {
+    if (!entry.exiting) {
+      alreadyQueued.insert(entry.notificationId);
+    }
+  }
+  for (const auto& pending : m_pendingAdds) {
+    alreadyQueued.insert(pending.id);
+  }
+
+  const std::vector<uint32_t> expired = m_notifications->expiredIds();
+  const std::unordered_set<uint32_t> expiredSet(expired.begin(), expired.end());
+
+  std::vector<Notification> replay;
+  replay.reserve(m_deferredForDnd.size());
+  for (const auto& notification : m_notifications->all()) {
+    if (!m_deferredForDnd.contains(notification.id) || alreadyQueued.contains(notification.id)
+        || expiredSet.contains(notification.id) || notification.dndPolicy != NotificationDndPolicy::Respect) {
+      continue;
+    }
+    replay.push_back(notification);
+  }
+  m_deferredForDnd.clear();
+  if (replay.empty()) {
+    return;
+  }
+  m_pendingAdds.insert(m_pendingAdds.end(), replay.begin(), replay.end());
+  schedulePendingAdds();
 }
 
 void NotificationToast::requestLayout() {
@@ -629,6 +670,7 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
     if (m_notifications != nullptr
         && m_notifications->doNotDisturb()
         && n.dndPolicy == NotificationDndPolicy::Respect) {
+      m_deferredForDnd.insert(n.id);
       break;
     }
     m_pendingAdds.push_back(n);
@@ -830,6 +872,7 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
     break;
   }
   case NotificationEvent::Closed:
+    m_deferredForDnd.erase(n.id);
     std::erase_if(m_pendingAdds, [id = n.id](const Notification& pending) { return pending.id == id; });
     removePopup(n.id);
     break;
@@ -855,6 +898,8 @@ void NotificationToast::flushPendingAdds() {
   for (const auto& n : pending) {
     if (!dndEnabled || n.dndPolicy != NotificationDndPolicy::Respect) {
       addPopup(n);
+    } else {
+      m_deferredForDnd.insert(n.id);
     }
   }
 }

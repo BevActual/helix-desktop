@@ -45,6 +45,7 @@ public:
   void onConfigReload();
   void onOutputChange();
   void hideDndSuppressed();
+  void replayDeferredForDnd();
   void requestLayout();
   void requestRedraw();
 
@@ -201,6 +202,7 @@ private:
 
   std::vector<PopupEntry> m_entries;
   std::vector<Notification> m_pendingAdds;
+  std::unordered_set<uint32_t> m_deferredForDnd;
   bool m_pendingAddsScheduled = false;
   std::vector<std::unique_ptr<Instance>> m_instances;
   int m_callbackToken = -1;

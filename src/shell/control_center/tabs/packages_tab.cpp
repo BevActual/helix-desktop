@@ -22,6 +22,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <ranges>
 #include <utility>
 
 using namespace control_center;
@@ -105,10 +106,13 @@ namespace {
 
 PackagesTab::PackagesTab(const ControlCenterServices& services)
     : m_ensurePolkit(services.ensurePolkit), m_config(services.config) {
+  rebuildKindOrder();
   if (m_config != nullptr) {
     if (const std::optional<std::string> source = m_config->stateString("packages_tab", "source")) {
       if (*source == "flatpak" && noctalia::packages::flatpakAvailable()) {
         m_kind = noctalia::packages::Kind::Flatpak;
+      } else if (*source == "firmware" && noctalia::packages::firmwareAvailable()) {
+        m_kind = noctalia::packages::Kind::Firmware;
       }
     }
   }
@@ -131,14 +135,23 @@ std::unique_ptr<Flex> PackagesTab::create() {
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
+  rebuildKindOrder();
+  std::vector<ui::SegmentedOption> kindOptions;
+  kindOptions.reserve(m_kindOrder.size());
+  for (const auto kind : m_kindOrder) {
+    const char* key = "control-center.packages.source-fedora";
+    if (kind == noctalia::packages::Kind::Flatpak) {
+      key = "control-center.packages.source-flatpak";
+    } else if (kind == noctalia::packages::Kind::Firmware) {
+      key = "control-center.packages.source-firmware";
+    }
+    kindOptions.push_back({.label = i18n::tr(key)});
+  }
+  const bool showKindSwitch = m_kindOrder.size() > 1;
   searchCard->addChild(
       ui::segmented({
           .out = &m_kindSwitch,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.packages.source-fedora")},
-                  {.label = i18n::tr("control-center.packages.source-flatpak")},
-              },
+          .options = std::move(kindOptions),
           .selectedIndex = indexFromKind(m_kind),
           .fontSize = Style::fontSizeCaption,
           .scale = scale,
@@ -146,8 +159,8 @@ std::unique_ptr<Flex> PackagesTab::create() {
           .surfaceOpacity = panelCardOpacity(),
           .surfaceRole = ColorRole::Surface,
           .equalSegmentWidths = true,
-          .visible = noctalia::packages::flatpakAvailable(),
-          .participatesInLayout = noctalia::packages::flatpakAvailable(),
+          .visible = showKindSwitch,
+          .participatesInLayout = showKindSwitch,
           .onChange = [this](std::size_t index) { applyKind(index); },
       })
   );
@@ -325,6 +338,8 @@ void PackagesTab::onClose() {
   m_installedCache = {};
   m_flatpakUpdatesCache = {};
   m_flatpakInstalledCache = {};
+  m_firmwareUpdatesCache = {};
+  m_firmwareInstalledCache = {};
   m_totalHits = 0;
   m_filterIndex = 0;
   m_loadedOnce = false;
@@ -443,31 +458,79 @@ PackagesTab::View PackagesTab::viewFromIndex(std::size_t index) {
   return View::Updates;
 }
 
-std::size_t PackagesTab::indexFromKind(noctalia::packages::Kind kind) {
-  return kind == noctalia::packages::Kind::Flatpak ? 1 : 0;
+std::size_t PackagesTab::indexFromKind(noctalia::packages::Kind kind) const {
+  for (std::size_t i = 0; i < m_kindOrder.size(); ++i) {
+    if (m_kindOrder[i] == kind) {
+      return i;
+    }
+  }
+  return 0;
 }
 
-noctalia::packages::Kind PackagesTab::kindFromIndex(std::size_t index) {
-  return index == 1 ? noctalia::packages::Kind::Flatpak : noctalia::packages::Kind::Fedora;
+noctalia::packages::Kind PackagesTab::kindFromIndex(std::size_t index) const {
+  if (index < m_kindOrder.size()) {
+    return m_kindOrder[index];
+  }
+  return noctalia::packages::Kind::Fedora;
 }
 
 noctalia::packages::Kind PackagesTab::currentKind() const { return m_kind; }
 
+void PackagesTab::rebuildKindOrder() {
+  m_kindOrder.clear();
+  m_kindOrder.push_back(noctalia::packages::Kind::Fedora);
+  if (noctalia::packages::flatpakAvailable()) {
+    m_kindOrder.push_back(noctalia::packages::Kind::Flatpak);
+  }
+  if (noctalia::packages::firmwareAvailable()) {
+    m_kindOrder.push_back(noctalia::packages::Kind::Firmware);
+  }
+  if (std::ranges::find(m_kindOrder, m_kind) == m_kindOrder.end()) {
+    m_kind = noctalia::packages::Kind::Fedora;
+  }
+}
+
+const char* PackagesTab::unavailableKey() const {
+  if (m_kind == noctalia::packages::Kind::Flatpak) {
+    return "control-center.packages.unavailable-flatpak";
+  }
+  if (m_kind == noctalia::packages::Kind::Firmware) {
+    return "control-center.packages.unavailable-firmware";
+  }
+  return "control-center.packages.unavailable";
+}
+
 PackagesTab::ViewCache& PackagesTab::updatesCache() {
-  return m_kind == noctalia::packages::Kind::Flatpak ? m_flatpakUpdatesCache : m_updatesCache;
+  if (m_kind == noctalia::packages::Kind::Flatpak) {
+    return m_flatpakUpdatesCache;
+  }
+  if (m_kind == noctalia::packages::Kind::Firmware) {
+    return m_firmwareUpdatesCache;
+  }
+  return m_updatesCache;
 }
 
 PackagesTab::ViewCache& PackagesTab::installedCache() {
-  return m_kind == noctalia::packages::Kind::Flatpak ? m_flatpakInstalledCache : m_installedCache;
+  if (m_kind == noctalia::packages::Kind::Flatpak) {
+    return m_flatpakInstalledCache;
+  }
+  if (m_kind == noctalia::packages::Kind::Firmware) {
+    return m_firmwareInstalledCache;
+  }
+  return m_installedCache;
 }
 
 void PackagesTab::persistKind() {
   if (m_config == nullptr) {
     return;
   }
-  (void)m_config->setStateString(
-      "packages_tab", "source", m_kind == noctalia::packages::Kind::Flatpak ? "flatpak" : "fedora"
-  );
+  const char* source = "fedora";
+  if (m_kind == noctalia::packages::Kind::Flatpak) {
+    source = "flatpak";
+  } else if (m_kind == noctalia::packages::Kind::Firmware) {
+    source = "firmware";
+  }
+  (void)m_config->setStateString("packages_tab", "source", source);
 }
 
 void PackagesTab::applyKind(std::size_t index) {
@@ -486,6 +549,10 @@ void PackagesTab::applyKind(std::size_t index) {
     m_filter->setSelectedIndex(0);
   }
   clearPendingRemove();
+  if (m_kind == noctalia::packages::Kind::Firmware && m_view == View::Search) {
+    showView(View::Updates, false);
+    return;
+  }
   if (m_view == View::Search) {
     m_hits.clear();
     m_totalHits = 0;
@@ -497,7 +564,11 @@ void PackagesTab::applyView(std::size_t index) {
   if (m_viewSyncing) {
     return;
   }
-  showView(viewFromIndex(index), false);
+  View view = viewFromIndex(index);
+  if (m_kind == noctalia::packages::Kind::Firmware && view == View::Search) {
+    view = View::Updates;
+  }
+  showView(view, false);
 }
 
 void PackagesTab::showView(View view, bool forceReload) {
@@ -563,6 +634,8 @@ void PackagesTab::invalidateCaches() {
   m_installedCache = {};
   m_flatpakUpdatesCache = {};
   m_flatpakInstalledCache = {};
+  m_firmwareUpdatesCache = {};
+  m_firmwareInstalledCache = {};
 }
 
 void PackagesTab::applySearchField(bool force) {
@@ -648,8 +721,7 @@ void PackagesTab::searchFromInput() {
       )) {
     --m_generation;
     setStatus(i18n::tr(
-        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
-                                                    : "control-center.packages.unavailable"
+        unavailableKey()
     ));
     syncBusy();
   }
@@ -681,8 +753,7 @@ void PackagesTab::loadUpdates() {
       )) {
     --m_generation;
     setStatus(i18n::tr(
-        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
-                                                    : "control-center.packages.unavailable"
+        unavailableKey()
     ));
     syncBusy();
   }
@@ -714,8 +785,7 @@ void PackagesTab::loadInstalled() {
       )) {
     --m_generation;
     setStatus(i18n::tr(
-        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
-                                                    : "control-center.packages.unavailable"
+        unavailableKey()
     ));
     syncBusy();
   }
@@ -861,8 +931,7 @@ void PackagesTab::launchAction(
       )) {
     --m_generation;
     setStatus(
-        m_kind == noctalia::packages::Kind::Flatpak ? i18n::tr("control-center.packages.unavailable-flatpak")
-                                                    : i18n::tr("control-center.packages.unavailable")
+        i18n::tr(unavailableKey())
     );
     syncBusy();
     PanelManager::instance().refresh();
@@ -939,8 +1008,7 @@ void PackagesTab::launchUpdateAll() {
   if (!launched) {
     --m_generation;
     setStatus(
-        m_kind == noctalia::packages::Kind::Flatpak ? i18n::tr("control-center.packages.unavailable-flatpak")
-                                                    : i18n::tr("control-center.packages.unavailable")
+        i18n::tr(unavailableKey())
     );
     syncBusy();
     PanelManager::instance().refresh();
@@ -1194,7 +1262,8 @@ void PackagesTab::rebuildResults() {
       };
 
       if (hit.state == noctalia::packages::PackageState::Installed) {
-        if (!noctalia::packages::isProtectedPackage(hit.name)) {
+        if (m_kind != noctalia::packages::Kind::Firmware
+            && !noctalia::packages::isProtectedPackage(hit.name)) {
           addAction(noctalia::packages::Action::Remove, "control-center.packages.remove", ButtonVariant::Destructive);
         }
       } else if (hit.state == noctalia::packages::PackageState::Update) {

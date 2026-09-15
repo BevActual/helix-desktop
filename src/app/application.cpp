@@ -175,6 +175,8 @@ Application::Application()
   m_notificationManager.setStateCallback([this]() {
     if (m_notificationManager.doNotDisturb()) {
       m_notificationToast.hideDndSuppressed();
+    } else {
+      m_notificationToast.replayDeferredForDnd();
     }
     scheduleNotificationShellRefresh();
   });

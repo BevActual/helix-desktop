@@ -17,9 +17,11 @@ namespace noctalia::packages {
     Other,
   };
 
-  enum class Kind : std::uint8_t { Fedora, Flatpak };
+  enum class Kind : std::uint8_t { Fedora, Flatpak, Firmware };
 
   enum class FlatpakListKind : std::uint8_t { Installed, Updates };
+
+  enum class FwupdListKind : std::uint8_t { Installed, Updates };
 
   struct PackageHit {
     std::string name;
@@ -42,6 +44,7 @@ namespace noctalia::packages {
 
   [[nodiscard]] bool isValidRpmName(std::string_view name);
   [[nodiscard]] bool isValidFlatpakAppId(std::string_view id);
+  [[nodiscard]] bool isValidFwupdDeviceId(std::string_view id);
   [[nodiscard]] bool hasSafeSearchChars(std::string_view query);
   [[nodiscard]] bool isSafeSearchQuery(std::string_view query);
   [[nodiscard]] bool isProtectedPackage(std::string_view name);
@@ -49,6 +52,7 @@ namespace noctalia::packages {
   [[nodiscard]] std::optional<PackageHit> parseFlatpakListLine(std::string_view line, FlatpakListKind kind);
   [[nodiscard]] std::vector<PackageHit> parseFlatpakListOutput(std::string_view text, FlatpakListKind kind);
   [[nodiscard]] std::vector<PackageHit> parseFlatpakSearchJson(std::string_view text);
+  [[nodiscard]] std::vector<PackageHit> parseFwupdDevicesJson(std::string_view text, FwupdListKind kind);
   [[nodiscard]] PackageState stateFromInfo(std::string_view info);
   [[nodiscard]] std::optional<PackageHit> parsePkconLine(std::string_view line);
   [[nodiscard]] std::vector<PackageHit> parsePkconOutput(std::string_view text);

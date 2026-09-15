@@ -47,7 +47,7 @@ sidebar = "compact"
 | `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Settings → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Look** (appearance, wallpaper, templates, bar), **Status** (media, audio, weather, screenshot, screen record, and the other live pages), then **Setup** (desktop, dock, launcher, and the other setup pages). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Look** (appearance, wallpaper, templates, bar), **Status** (media, audio, weather, capture, and the other live pages), then **Setup** (desktop, dock, launcher, and the other setup pages). Compact mode uses separators between those groups instead of captions.
 
 Plugin Control Center tabs stay in **Status**. User `hidden_tabs` still hide any tab in every group.
 
@@ -58,7 +58,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
+| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine), media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
 | `appearance` | Appearance | Theme mode, shell mode, Auto schedule status, palette source and picker, current-palette swatches, font, UI scale, and roundness. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. When Noctalia Greeter is installed, Sync Now and Auto-Sync copy wallpaper, colors, and monitors to the login screen. Header gear opens language, icon tint, high contrast, motion, borders, and shadows. |
 | `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, and Daily source settings. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
@@ -71,11 +71,11 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `network` | Network | Wi-Fi, cellular, VPN, ping/throughput, copy IP, speed test, and Wi-Fi QR. Header gear opens band filter and ignored SSIDs. |
 | `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, copy address, and pairing flows. Header gear opens unnamed-device filter and discovery duration. |
 | `weather` | Weather | Current conditions and forecast, with location and units on the live view. |
-| `calendar` | Calendar | Month view, world clock, and configured calendar account events. Header gear opens calendar format settings. |
+| `calendar` | Calendar | Month view, world clock, calendar accounts (add/edit/reconnect), and events. Header gear opens calendar format settings. |
 | `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Header gear opens daemon, toast, history, and filter settings. |
 | `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
-| `screenshot` | Screenshot | Region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR on the live view, plus a capture delay, recent files with thumbnails (open, annotate, delete), and open-folder action. Header gear opens capture, annotation, and output settings. |
-| `screen-record` | Screen Record | Start/stop recording, elapsed time, a source picker for the installed backends, delay, audio, recent files (open, delete), and open-folder. Replay buffer start/stop/save uses gpu-screen-recorder. Header gear opens directory, filename, audio, cursor, and replay duration. |
+| `ai` | AI | Rate-limit meters and Open actions for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, and DeepSeek, plus local Ollama status, models, and start/stop. `ai-usage` still opens this tab. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. |
+| `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, audio, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
@@ -90,6 +90,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `hooks` | Hooks | Startup and event hooks |
 | `niri` | Niri | niri-specific options. Shown only in a niri session. |
 | `plugins` | Plugins | Installed plugins and the in-panel plugin store |
+| `packages` | Packages | Fedora, Flatpak, and firmware (`fwupd`) updates, search, and installs. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
 `niri` is listed only in a niri session. The Weather, System, Power, Screen Time, and Tailscale tabs stay available so you can turn those features on from the tab itself.
 
@@ -103,6 +104,8 @@ Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (
 ## Home
 
 The Home tab is the default Control Center landing view. It combines frequently checked status with a compact shortcut grid.
+
+When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), and caffeine/idle-inhibit on (opens Power). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
 
 Click the date or time to open **Calendar** (including the world-clock card). Click the weather line to open **Weather**. Click the avatar in the user card to pick a custom image. Noctalia saves the selected path as `[shell].avatar_path`.
 
@@ -210,13 +213,17 @@ hide_unnamed = false
 discovery_seconds = 10
 ```
 
-## Screenshot
+## Capture {#capture}
 
-The Screenshot tab's live view starts a region capture, fullscreen capture, a display picker, a screen color picker, an annotation overlay, or a text/QR scan. Choose **Now**, **3s**, or **5s** before a capture if you need time to hide Control Center chrome; the countdown stays on the tab, then Control Center closes so the overlay can take the screen. **Scan text** needs [`tesseract`](https://github.com/tesseract-ocr/tesseract); **Scan QR** needs `zbarimg` from [ZBar](https://github.com/mchehab/zbar). Both copy the result to the clipboard. Recent PNG files from the save folder appear under **Recent screenshots** with thumbnails; click a name to open it, **Annotate** to draw on that still, or trash (click twice) to delete it. **Open screenshot folder** launches the configured save directory. Color pick follows the pointer with a magnifier, swatch, and `#RRGGBB` value, then copies on click. Header gear opens the existing screenshot capture, annotation, and output settings.
+The Capture tab combines screenshots and screen recording in one Status page with **Screenshot | Record** segments. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching segment. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
 
-## Screen Record {#screen-record}
+### Screenshot {#screenshot}
 
-The Screen Record tab starts and stops a recording without the official plugin. Control Center closes first so it is not in the video. **Focused** records the active monitor. **Region** is shown when `wf-recorder` is installed and uses the same overlay as screenshots. **Portal** is shown when `gpu-screen-recorder` is installed and opens the desktop portal picker. Use the delay control (Now / 3s / 5s) when you need Control Center fully gone before capture starts. Elapsed time stays visible at `00:00` until a recording is running; the backend line always names the tool in use, or tells you to install one. Recent `.mp4` files from the save folder appear under **Recent recordings**; click a name to open one, or trash (click twice) to delete it. Header gear opens `[shell.screen_record]` for the save folder, filename pattern, audio, cursor, and replay duration.
+The Screenshot segment starts a region capture, fullscreen capture, a display picker, a screen color picker, an annotation overlay, or a text/QR scan. Choose **Now**, **3s**, or **5s** before a capture if you need time to hide Control Center chrome; the countdown stays on the tab, then Control Center closes so the overlay can take the screen. **Scan text** needs [`tesseract`](https://github.com/tesseract-ocr/tesseract); **Scan QR** needs `zbarimg` from [ZBar](https://github.com/mchehab/zbar). Both copy the result to the clipboard. Recent PNG files from the save folder appear under **Recent screenshots** with thumbnails; click a name to open it, **Annotate** to draw on that still, or trash (click twice) to delete it. **Open screenshot folder** launches the configured save directory. Color pick follows the pointer with a magnifier, swatch, and `#RRGGBB` value, then copies on click. Header gear opens the existing screenshot capture, annotation, and output settings.
+
+### Screen Record {#screen-record}
+
+The Record segment starts and stops a recording without the official plugin. Control Center closes first so it is not in the video. **Focused** records the active monitor. **Region** is shown when `wf-recorder` is installed and uses the same overlay as screenshots. **Portal** is shown when `gpu-screen-recorder` is installed and opens the desktop portal picker. Use the delay control (Now / 3s / 5s) when you need Control Center fully gone before capture starts. Elapsed time stays visible at `00:00` until a recording is running; the backend line always names the tool in use, or tells you to install one. Recent `.mp4` files from the save folder appear under **Recent recordings**; click a name to open one, or trash (click twice) to delete it. Header gear opens `[shell.screen_record]` for the save folder, filename pattern, audio, cursor, and replay duration.
 
 A **Replay buffer** card starts `gpu-screen-recorder` in replay mode (`-r`) the same way Record starts a capture. Start the buffer, then **Save replay** writes the last N seconds without stopping it. **Stop replay buffer** ends the process without saving. Replay needs `gpu-screen-recorder` (native or Flatpak `com.dec05eba.gpu_screen_recorder`); region source is not used for replay. Record and replay cannot run at the same time.
 
@@ -259,7 +266,7 @@ Weather configuration is documented under [Weather](/noctalia/services/weather/)
 
 ## Calendar
 
-The Calendar tab shows the month view, a world clock of extra IANA timezones, and events from configured calendar accounts. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
+The Calendar tab shows the month view, a world clock of extra IANA timezones, accounts (add, edit, reconnect), and events from those accounts. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
 
 Right-click a day to launch the application registered for the `text/calendar` MIME type. The Calendar panel closes
 after a successful launch.
@@ -301,13 +308,42 @@ Open it from the control center sidebar (`screen-time` context) or add a Home sh
 
 Reset stored history from the Screen Time tab header gear (**Screen Time** settings) or **System → Screen Time → Reset Screen Time Data**. That clears `screen_time.json` while Noctalia is running.
 
+## AI
+
+The AI tab shows coding assistants and local inference on this machine. Assistants follow the same local data sources as the community [AI Usage Tracker](https://github.com/JakubSx01/ai-usage-tracker) plugin: each provider is auto-detected from sign-in files or an installed app/CLI, then queried with your existing credentials. **Open** launches the matching desktop entry, or a terminal for CLI tools.
+
+| Provider | Detected from | Data |
+|----------|---------------|------|
+| Claude Code | `~/.claude/.credentials.json` or `claude` | Anthropic OAuth usage (5 h and 7 day windows) |
+| Cursor | Cursor `state.vscdb` + `sqlite3`, or the Cursor app | `cursor.com/api/usage` premium request quota |
+| Codex | `~/.codex/sessions` or `codex` | `rate_limits` from the newest session `.jsonl` |
+| Gemini CLI | `~/.gemini` or `gemini` | Today's prompts vs a configurable daily quota |
+| Qwen Code | `~/.qwen` or `qwen` | Today's prompts vs a configurable daily quota |
+| GitHub Copilot | `~/.config/github-copilot` + `gh` | Copilot quota snapshots |
+| DeepSeek | `$DEEPSEEK_API_KEY` | Prepaid balance (no percentage) |
+
+**Ollama** appears when the `ollama` CLI is on `PATH` (or always-on in settings). The card shows running/stopped, installed models, and which are loaded. Start uses `systemctl --user start ollama`, then `ollama serve` if that unit is missing. Stop uses the user unit (and a serve process Noctalia started). A remote `ollama_host` lists models only.
+
+Tokens stay on this machine except for requests to that provider's own API. A failed refresh keeps the last good numbers. Open the tab with `noctalia msg panel-toggle control-center ai` (`ai-usage` is an alias). Header gear is `[control_center.ai_usage]`:
+
+```toml
+[control_center.ai_usage]
+refresh_seconds = 120          # 30–900
+claude = "auto"                # auto | on | off
+cursor = "auto"
+ollama = "auto"
+# ollama_host = "127.0.0.1:11434"
+# gemini_daily_limit = 1000
+# qwen_daily_limit = 2000
+```
+
 ## Settings
 
 Settings pages are Control Center tabs. Appearance, Wallpaper, Templates, and Bar sit under **Look**. Live status pages sit under **Status**. Desktop, dock, launcher, plugins, and the other setup pages sit under **Setup**.
 
-Domain options that belong with a live view are on that tab: theme, palette, font, UI scale, roundness, and greeter sync on Appearance (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Screenshot and Screen Record, Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Screenshot, Screen Record, and Screen Time for the longer forms.
+Domain options that belong with a live view are on that tab: theme, palette, font, UI scale, roundness, and greeter sync on Appearance (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
 
-Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). An empty query keeps that page’s filter. A non-empty query searches the whole settings registry (section headers still appear on matches) and opens Appearance if you were on Home or another non-settings page.
+Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the whole settings registry (section headers still appear on matches) and open Appearance if you were on Home or another non-settings page.
 
 The plugin store, session/idle editors, notification filters, calendar accounts, community templates, and bar widget inspectors open as sheets in Control Center. The header Advanced toggle shows advanced settings. The ⋮ menu on a settings page exports config and saves a support report.
 

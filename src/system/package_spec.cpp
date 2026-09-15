@@ -139,6 +139,19 @@ namespace noctalia::packages {
     return dots >= 1 && !start;
   }
 
+  bool isValidFwupdDeviceId(std::string_view id) {
+    if (id.size() < 8 || id.size() > 64) {
+      return false;
+    }
+    for (const char ch : id) {
+      const auto uchar = static_cast<unsigned char>(ch);
+      if (std::isxdigit(uchar) == 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   std::string preferredFlatpakRemote(std::string_view remotes) {
     std::string best;
     std::size_t start = 0;
@@ -441,6 +454,116 @@ namespace noctalia::packages {
       }
       hit.info = "Available";
       hit.state = PackageState::Available;
+      hits.push_back(std::move(hit));
+    }
+    return hits;
+  }
+
+  namespace {
+
+    std::string stripHtml(std::string_view text) {
+      std::string out;
+      out.reserve(text.size());
+      bool inTag = false;
+      for (const char ch : text) {
+        if (ch == '<') {
+          inTag = true;
+          continue;
+        }
+        if (ch == '>') {
+          inTag = false;
+          out.push_back(' ');
+          continue;
+        }
+        if (!inTag) {
+          out.push_back(ch);
+        }
+      }
+      return out;
+    }
+
+    bool deviceHasFlag(const nlohmann::json& device, std::string_view flag) {
+      if (!device.contains("Flags") || !device["Flags"].is_array()) {
+        return false;
+      }
+      for (const auto& entry : device["Flags"]) {
+        if (entry.is_string() && entry.get<std::string>() == flag) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    std::string jsonString(const nlohmann::json& object, const char* key) {
+      if (!object.contains(key) || !object[key].is_string()) {
+        return {};
+      }
+      return object[key].get<std::string>();
+    }
+
+  } // namespace
+
+  std::vector<PackageHit> parseFwupdDevicesJson(std::string_view text, FwupdListKind kind) {
+    std::vector<PackageHit> hits;
+    auto jsonText = std::string(text);
+    if (const auto start = jsonText.find('{'); start != std::string::npos && start > 0) {
+      jsonText.erase(0, start);
+    }
+    const auto json = nlohmann::json::parse(jsonText, nullptr, false);
+    if (!json.is_object() || !json.contains("Devices") || !json["Devices"].is_array()) {
+      return hits;
+    }
+    for (const auto& device : json["Devices"]) {
+      if (!device.is_object()) {
+        continue;
+      }
+      PackageHit hit;
+      hit.name = jsonString(device, "DeviceId");
+      if (!isValidFwupdDeviceId(hit.name)) {
+        continue;
+      }
+      if (kind == FwupdListKind::Installed) {
+        if (!deviceHasFlag(device, "updatable")) {
+          continue;
+        }
+        hit.version = jsonString(device, "Version");
+        if (hit.version.empty()) {
+          continue;
+        }
+        hit.title = compactSummary(jsonString(device, "Name"));
+        hit.summary = compactSummary(jsonString(device, "Summary"));
+        hit.repo = jsonString(device, "Vendor");
+        hit.info = "Installed";
+        hit.state = PackageState::Installed;
+      } else {
+        if (!device.contains("Releases") || !device["Releases"].is_array() || device["Releases"].empty()) {
+          continue;
+        }
+        const auto& release = device["Releases"].front();
+        if (!release.is_object()) {
+          continue;
+        }
+        hit.title = compactSummary(jsonString(device, "Name"));
+        hit.version = jsonString(release, "Version");
+        if (hit.version.empty()) {
+          hit.version = jsonString(device, "Version");
+        }
+        hit.release = jsonString(device, "Version");
+        std::string summary = jsonString(release, "Summary");
+        if (summary.empty()) {
+          summary = jsonString(device, "Summary");
+        }
+        if (summary.empty()) {
+          summary = stripHtml(jsonString(release, "Description"));
+        }
+        hit.summary = compactSummary(summary);
+        hit.repo = jsonString(release, "RemoteId");
+        if (hit.repo.empty()) {
+          hit.repo = jsonString(device, "Vendor");
+        }
+        hit.info = "Update";
+        hit.state = PackageState::Update;
+      }
       hits.push_back(std::move(hit));
     }
     return hits;

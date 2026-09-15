@@ -1765,6 +1765,68 @@ namespace settings {
         tr("settings.schema.panels.home-session-button.description"), {"control_center", "show_session_button"},
         ToggleSetting{cfg.controlCenter.showSessionButton}, "session button show hide"
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.refresh-seconds.label"),
+        tr("settings.schema.ai-usage.refresh-seconds.description"), {"control_center", "ai_usage", "refresh_seconds"},
+        StepperSetting{
+            .value = static_cast<int>(cfg.controlCenter.aiUsage.refreshSeconds),
+            .minValue = static_cast<int>(noctalia::config::schema::kAiUsageRefreshSecondsRange.min.value()),
+            .maxValue = static_cast<int>(noctalia::config::schema::kAiUsageRefreshSecondsRange.max.value()),
+            .step = static_cast<int>(noctalia::config::schema::kAiUsageRefreshSecondsRange.step.value()),
+            .valueSuffix = "s",
+        },
+        "ai usage refresh interval seconds poll claude cursor"
+    ));
+    const auto providerMode = [&](AiUsageProviderMode mode, const char* key, const char* labelKey, const char* tags) {
+      entries.push_back(makeEntry(
+          SettingsSection::ControlCenter, "ai-usage", tr(labelKey),
+          tr("settings.schema.ai-usage.provider-mode.description"), {"control_center", "ai_usage", key},
+          asSegmented(enumSelect(kAiUsageProviderModes, mode)), tags
+      ));
+    };
+    providerMode(
+        cfg.controlCenter.aiUsage.claude, "claude", "settings.schema.ai-usage.claude.label",
+        "ai claude anthropic code"
+    );
+    providerMode(cfg.controlCenter.aiUsage.codex, "codex", "settings.schema.ai-usage.codex.label", "ai openai codex");
+    providerMode(
+        cfg.controlCenter.aiUsage.gemini, "gemini", "settings.schema.ai-usage.gemini.label", "ai gemini google"
+    );
+    providerMode(cfg.controlCenter.aiUsage.qwen, "qwen", "settings.schema.ai-usage.qwen.label", "ai qwen");
+    providerMode(
+        cfg.controlCenter.aiUsage.copilot, "copilot", "settings.schema.ai-usage.copilot.label", "ai github copilot"
+    );
+    providerMode(cfg.controlCenter.aiUsage.cursor, "cursor", "settings.schema.ai-usage.cursor.label", "ai cursor");
+    providerMode(
+        cfg.controlCenter.aiUsage.deepseek, "deepseek", "settings.schema.ai-usage.deepseek.label", "ai deepseek"
+    );
+    providerMode(
+        cfg.controlCenter.aiUsage.ollama, "ollama", "settings.schema.ai-usage.ollama.label", "ai ollama local models"
+    );
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.gemini-daily-limit.label"),
+        tr("settings.schema.ai-usage.gemini-daily-limit.description"),
+        {"control_center", "ai_usage", "gemini_daily_limit"},
+        sliderFor(cfg.controlCenter.aiUsage.geminiDailyLimit, noctalia::config::schema::kAiUsageDailyLimitRange, true),
+        "ai gemini quota daily requests"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.qwen-daily-limit.label"),
+        tr("settings.schema.ai-usage.qwen-daily-limit.description"),
+        {"control_center", "ai_usage", "qwen_daily_limit"},
+        sliderFor(cfg.controlCenter.aiUsage.qwenDailyLimit, noctalia::config::schema::kAiUsageDailyLimitRange, true),
+        "ai qwen quota daily requests"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.ollama-host.label"),
+        tr("settings.schema.ai-usage.ollama-host.description"), {"control_center", "ai_usage", "ollama_host"},
+        TextSetting{
+            .value = cfg.controlCenter.aiUsage.ollamaHost,
+            .placeholder = tr("settings.schema.ai-usage.ollama-host.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "ai ollama host url local"
+    ));
 
     // Desktop
     entries.push_back(makeEntry(

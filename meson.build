@@ -661,7 +661,9 @@ _noctalia_sources = files(
   'src/shell/control_center/tabs/notifications_tab.cpp',
   'src/shell/control_center/tabs/power_tab.cpp',
   'src/shell/control_center/tabs/screen_time_tab.cpp',
+  'src/shell/control_center/tabs/ai_usage_tab.cpp',
   'src/shell/control_center/recent_captures.cpp',
+  'src/shell/control_center/tabs/capture_tab.cpp',
   'src/shell/control_center/tabs/screenshot_tab.cpp',
   'src/shell/control_center/tabs/screen_record_tab.cpp',
   'src/shell/control_center/settings_pane.cpp',
@@ -885,6 +887,8 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/screenshot_widget.cpp',
   'src/system/rfkill_helper.cpp',
   'src/system/screen_time_service.cpp',
+  'src/system/ai_usage.cpp',
+  'src/system/ai_usage_service.cpp',
   'src/system/cpu_stat.cpp',
   'src/system/cpu_freq.cpp',
   'src/system/cpu_temp_sensor.cpp',
@@ -1206,6 +1210,7 @@ configure_file(
 if build_tests
   _cpp_test_names = [
     'adw_gtk3',
+    'ai_usage_parse',
     'annotation_document',
     'annotation_raster',
     'animation_manager',

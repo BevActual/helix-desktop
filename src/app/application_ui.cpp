@@ -641,6 +641,7 @@ void Application::initPanelManagerAndPanels() {
           .displayConfig = m_displayConfigService.get(),
           .sysmon = m_systemMonitor.get(),
           .screenTime = &m_screenTimeService,
+          .aiUsage = &m_aiUsageService,
           .nightLight = &m_gammaService,
           .theme = &m_themeService,
           .templateApply = &m_templateApplyService,

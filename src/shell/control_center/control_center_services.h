@@ -8,6 +8,7 @@
 
 class AccountsService;
 class AsyncTextureCache;
+class AiUsageService;
 class BluetoothAgent;
 class BluetoothService;
 class BrightnessService;
@@ -78,6 +79,7 @@ struct ControlCenterServices {
   DisplayConfigService* displayConfig = nullptr;
   SystemMonitorService* sysmon = nullptr;
   ScreenTimeService* screenTime = nullptr;
+  AiUsageService* aiUsage = nullptr;
   GammaService* nightLight = nullptr;
   noctalia::theme::ThemeService* theme = nullptr;
   noctalia::theme::TemplateApplyService* templateApply = nullptr;

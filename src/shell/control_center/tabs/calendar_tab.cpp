@@ -19,6 +19,7 @@
 #include "ui/controls/calendar_view.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/toggle.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
@@ -26,6 +27,7 @@
 #include <cmath>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -125,6 +127,53 @@ namespace {
       }
     }
     return options;
+  }
+
+  [[nodiscard]] bool isManagedCalendarAccount(const CalendarConfig::Account& account) {
+    return account.type == "google" || account.type == "caldav" || account.type == "ics" || account.type == "vdir";
+  }
+
+  [[nodiscard]] std::string calendarAccountTypeLabel(const CalendarConfig::Account& account) {
+    if (account.type == "google") {
+      return i18n::tr("settings.calendar-accounts.provider.google");
+    }
+    if (account.type == "ics") {
+      return i18n::tr("settings.calendar-accounts.provider.ics");
+    }
+    if (account.type == "vdir") {
+      return i18n::tr("settings.calendar-accounts.provider.vdir");
+    }
+    if (account.provider == "custom") {
+      return i18n::tr("settings.calendar-accounts.provider.custom");
+    }
+    return i18n::tr("settings.calendar-accounts.provider.icloud");
+  }
+
+  [[nodiscard]] std::string calendarAccountsKey(const CalendarConfig& calendar, CalendarService* service) {
+    std::string key;
+    key += calendar.enabled ? '1' : '0';
+    key.push_back('\n');
+    for (const auto& account : calendar.accounts) {
+      if (!isManagedCalendarAccount(account)) {
+        continue;
+      }
+      key += account.id;
+      key.push_back('\t');
+      key += account.type;
+      key.push_back('\t');
+      key += account.displayName;
+      key.push_back('\t');
+      key += account.provider;
+      if (service != nullptr && account.type == "google") {
+        if (service->googleAccountCredentialLocked(account.id)) {
+          key += "\tlocked";
+        } else if (service->googleAccountNeedsReconnect(account.id)) {
+          key += "\treconnect";
+        }
+      }
+      key.push_back('\n');
+    }
+    return key;
   }
 } // namespace
 
@@ -301,6 +350,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .gap = Style::spaceMd * scale,
       .flexGrow = 2.0F,
   });
+  buildAccountsCard(*side, scale);
   buildWorldClockCard(*side, scale);
   side->addChild(std::move(eventsCard));
   tab->addChild(std::move(side));
@@ -328,6 +378,209 @@ std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
       })
   );
   return m_settings->embedHeader(std::move(live), scale);
+}
+
+void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
+  auto card = ui::column({
+      .out = &m_accountsCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { control_center::applySectionCardStyle(section, scale, opacity); },
+  });
+
+  auto header = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = Style::controlHeightSm * scale,
+  });
+  header->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.calendar.accounts.title"),
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  header->addChild(
+      ui::button({
+          .glyph = "plus",
+          .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.calendar.accounts.add"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .onClick = [this]() { openAccount(std::nullopt); },
+      })
+  );
+  card->addChild(std::move(header));
+
+  auto disabledRow = ui::row({
+      .out = &m_accountsDisabledRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+  });
+  disabledRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.calendar.accounts.disabled"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .flexGrow = 1.0F,
+      })
+  );
+  disabledRow->addChild(
+      ui::toggle({
+          .out = &m_accountsEnableToggle,
+          .checked = m_calendar != nullptr && m_calendar->enabled(),
+          .scale = scale,
+          .onChange = [this](bool value) { setCalendarEnabled(value); },
+      })
+  );
+  card->addChild(std::move(disabledRow));
+
+  card->addChild(
+      ui::label({
+          .out = &m_accountsEmpty,
+          .text = i18n::tr("control-center.calendar.accounts.empty"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .visible = false,
+      })
+  );
+  card->addChild(
+      ui::column({
+          .out = &m_accountsList,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      })
+  );
+  parent.addChild(std::move(card));
+  rebuildAccounts();
+  syncAccounts();
+}
+
+void CalendarTab::rebuildAccounts() {
+  if (m_accountsList == nullptr || m_config == nullptr) {
+    return;
+  }
+  const auto& calendar = m_config->config().calendar;
+  const std::string key = calendarAccountsKey(calendar, m_calendar);
+  if (key == m_lastAccountsKey) {
+    return;
+  }
+
+  uiAssertNotRendering("CalendarTab::rebuildAccounts");
+  while (!m_accountsList->children().empty()) {
+    m_accountsList->removeChild(m_accountsList->children().front().get());
+  }
+
+  const float scale = contentScale();
+  std::size_t shown = 0;
+  for (const auto& account : calendar.accounts) {
+    if (!isManagedCalendarAccount(account)) {
+      continue;
+    }
+    ++shown;
+    const bool credentialLocked =
+        account.type == "google" && m_calendar != nullptr && m_calendar->googleAccountCredentialLocked(account.id);
+    const bool reconnectRequired =
+        account.type == "google" && m_calendar != nullptr && m_calendar->googleAccountNeedsReconnect(account.id);
+    const std::string_view statusKey = credentialLocked ? "settings.schema.services.calendar-edit.description-locked"
+        : reconnectRequired                             ? "settings.schema.services.calendar-edit.description-reconnect"
+                                                        : "";
+    const std::string_view buttonKey = credentialLocked ? "settings.schema.services.calendar-edit.button-retry"
+        : reconnectRequired                             ? "settings.schema.services.calendar-edit.button-reconnect"
+                                                        : "settings.schema.services.calendar-edit.button";
+    const std::string glyph = credentialLocked ? "key" : reconnectRequired ? "brand-google" : "edit";
+
+    auto item = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * 0.5F * scale,
+    });
+    auto row = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .minHeight = Style::controlHeightSm * scale,
+    });
+    auto text = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = 0.0F,
+        .flexGrow = 1.0F,
+    });
+    text->addChild(
+        ui::label({
+            .text = account.displayName.empty() ? account.id : account.displayName,
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 1,
+        })
+    );
+    text->addChild(
+        ui::label({
+            .text = statusKey.empty() ? calendarAccountTypeLabel(account) : i18n::tr(statusKey),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(credentialLocked || reconnectRequired ? ColorRole::Error : ColorRole::OnSurfaceVariant),
+            .maxLines = 2,
+        })
+    );
+    row->addChild(std::move(text));
+    row->addChild(
+        ui::button({
+            .text = i18n::tr(buttonKey),
+            .glyph = glyph,
+            .fontSize = Style::fontSizeCaption * scale,
+            .variant = credentialLocked ? ButtonVariant::Secondary : ButtonVariant::Outline,
+            .minHeight = Style::controlHeightSm * scale,
+            .paddingV = Style::spaceXs * scale,
+            .paddingH = Style::spaceSm * scale,
+            .onClick =
+                [this, id = account.id, credentialLocked]() {
+                  if (credentialLocked && m_calendar != nullptr) {
+                    m_calendar->requestRefresh();
+                    return;
+                  }
+                  openAccount(id);
+                },
+        })
+    );
+    item->addChild(std::move(row));
+    m_accountsList->addChild(std::move(item));
+  }
+
+  m_lastAccountsKey = key;
+  if (m_accountsEmpty != nullptr) {
+    m_accountsEmpty->setVisible(shown == 0);
+  }
+  syncAccounts();
+}
+
+void CalendarTab::syncAccounts() {
+  const bool enabled = m_calendar != nullptr && m_calendar->enabled();
+  if (m_accountsDisabledRow != nullptr) {
+    m_accountsDisabledRow->setVisible(!enabled);
+    m_accountsDisabledRow->setParticipatesInLayout(!enabled);
+  }
+  if (m_accountsEnableToggle != nullptr) {
+    m_accountsEnableToggle->setChecked(enabled);
+  }
+}
+
+void CalendarTab::openAccount(std::optional<std::string> accountId) {
+  if (m_settings != nullptr) {
+    m_settings->openCalendarAccount(std::move(accountId));
+  }
+}
+
+void CalendarTab::setCalendarEnabled(bool enabled) {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"calendar", "enabled"}, enabled);
+  m_lastAccountsKey.clear();
+  rebuildAccounts();
+  PanelManager::instance().refresh();
 }
 
 void CalendarTab::buildWorldClockCard(Flex& parent, float scale) {
@@ -597,6 +850,7 @@ void CalendarTab::doUpdate(Renderer& renderer) {
   }
   rebuildWorldClock();
   syncWorldClockTimes();
+  rebuildAccounts();
 }
 
 void CalendarTab::setActive(bool active) {
@@ -651,12 +905,18 @@ void CalendarTab::onClose() {
   m_eventsCard = nullptr;
   m_eventsTitle = nullptr;
   m_eventsScroll = nullptr;
+  m_accountsCard = nullptr;
+  m_accountsDisabledRow = nullptr;
+  m_accountsList = nullptr;
+  m_accountsEmpty = nullptr;
+  m_accountsEnableToggle = nullptr;
   m_worldClockCard = nullptr;
   m_timezoneList = nullptr;
   m_timezoneError = nullptr;
   m_timezonePicker = nullptr;
   m_timezoneRows.clear();
   m_lastTimezoneKey.clear();
+  m_lastAccountsKey.clear();
   m_eventListState.linkOverlays.clear();
   m_selectedYear = std::numeric_limits<int>::min();
   m_selectedMonth = -1;
@@ -906,6 +1166,13 @@ void CalendarTab::rebuildEventList(float scale) {
     return;
   }
   const auto& calendarConfig = m_config->config().calendar;
+  const bool hasAccount = std::ranges::any_of(calendarConfig.accounts, isManagedCalendarAccount);
+  std::string emptyText;
+  if (!calendarConfig.enabled) {
+    emptyText = i18n::tr("control-center.calendar.accounts.disabled-events");
+  } else if (!hasAccount) {
+    emptyText = i18n::tr("control-center.calendar.accounts.empty");
+  }
   calendar_view::rebuildEventList({
       .scroll = *m_eventsScroll,
       .title = m_eventsTitle,
@@ -914,6 +1181,7 @@ void CalendarTab::rebuildEventList(float scale) {
       .scale = scale,
       .dateFormat = calendarConfig.eventDateFormat,
       .timeFormat = calendarConfig.eventTimeFormat,
+      .emptyText = emptyText,
       .state = &m_eventListState,
       .requestRedraw = []() { PanelManager::instance().requestRedraw(); },
   });

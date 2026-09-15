@@ -8,7 +8,9 @@
 
 #include <limits>
 #include <memory>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class Button;
@@ -18,6 +20,7 @@ class InputArea;
 class Label;
 class ScrollView;
 class SearchPicker;
+class Toggle;
 struct ControlCenterServices;
 
 class CalendarTab : public Tab {
@@ -44,6 +47,11 @@ private:
   void rebuild();
   void rebuildEventList(float scale);
   void toggleEventsCard();
+  void buildAccountsCard(Flex& parent, float scale);
+  void rebuildAccounts();
+  void syncAccounts();
+  void openAccount(std::optional<std::string> accountId);
+  void setCalendarEnabled(bool enabled);
   void buildWorldClockCard(Flex& parent, float scale);
   void rebuildWorldClock();
   void syncWorldClockTimes();
@@ -75,6 +83,11 @@ private:
   Flex* m_eventsCard = nullptr;
   Label* m_eventsTitle = nullptr;
   ScrollView* m_eventsScroll = nullptr;
+  Flex* m_accountsCard = nullptr;
+  Flex* m_accountsDisabledRow = nullptr;
+  Flex* m_accountsList = nullptr;
+  Label* m_accountsEmpty = nullptr;
+  Toggle* m_accountsEnableToggle = nullptr;
   Flex* m_worldClockCard = nullptr;
   Flex* m_timezoneList = nullptr;
   Label* m_timezoneError = nullptr;
@@ -85,6 +98,7 @@ private:
   };
   std::vector<TimezoneRow> m_timezoneRows;
   std::string m_lastTimezoneKey;
+  std::string m_lastAccountsKey;
   calendar_view::EventListState m_eventListState;
   int m_selectedYear = std::numeric_limits<int>::min();
   int m_selectedMonth = -1;

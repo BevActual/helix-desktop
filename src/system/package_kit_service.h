@@ -24,6 +24,7 @@ namespace noctalia::packages {
 
   [[nodiscard]] bool backendAvailable();
   [[nodiscard]] bool flatpakAvailable();
+  [[nodiscard]] bool firmwareAvailable();
   [[nodiscard]] bool tabAvailable();
   [[nodiscard]] bool busy() noexcept;
   void cancelCurrent();

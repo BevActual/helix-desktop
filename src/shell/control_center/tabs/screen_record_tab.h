@@ -3,8 +3,6 @@
 #include "capture/screen_recorder_service.h"
 #include "core/timer_manager.h"
 #include "shell/control_center/recent_captures.h"
-#include "shell/control_center/settings_pane.h"
-#include "shell/control_center/tab.h"
 #include "ui/signal.h"
 
 #include <cstddef>
@@ -17,26 +15,25 @@ class Button;
 class ConfigService;
 class Flex;
 class Label;
+class Renderer;
 class Segmented;
 class ThumbnailService;
 class Toggle;
 struct ControlCenterServices;
 
-class ScreenRecordTab : public Tab {
+class ScreenRecordTab {
 public:
   explicit ScreenRecordTab(const ControlCenterServices& services);
 
-  std::unique_ptr<Flex> create() override;
-  std::unique_ptr<Flex> createHeaderActions() override;
-  void setActive(bool active) override;
-  void onClose() override;
-  void setConfigureMode(bool show) override;
-  [[nodiscard]] bool configureMode() const override;
-  void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
+  void setActive(bool active);
+  void onClose();
+  void updateContent(Renderer& renderer);
+  void cancelCountdown();
+  void setContentScale(float scale) noexcept { m_contentScale = scale; }
+  void setPanelCardOpacity(float opacity) noexcept;
 
 private:
-  void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
-  void doUpdate(Renderer& renderer) override;
   void buildRecordCard(Flex& root, float scale);
   void buildReplayCard(Flex& root, float scale);
   void buildRecentCard(Flex& root, float scale);
@@ -45,7 +42,6 @@ private:
   void startElapsedTimer();
   void requestStart();
   void tickCountdown();
-  void cancelCountdown();
   void openRecordingsFolder();
   void openRecentFile(const std::string& path);
   void rebuildRecentFiles();
@@ -56,11 +52,12 @@ private:
   [[nodiscard]] ScreenRecorderService::Source selectedSource() const noexcept;
   [[nodiscard]] ScreenRecorderService::Source replaySource() const noexcept;
   [[nodiscard]] int delaySeconds() const noexcept;
+  [[nodiscard]] float contentScale() const noexcept { return m_contentScale; }
+  [[nodiscard]] float panelCardOpacity() const noexcept { return m_panelCardOpacity; }
 
   ScreenRecorderService* m_recorder = nullptr;
   ConfigService* m_config = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
-  std::unique_ptr<SettingsPane> m_settings;
   control_center::RecentCaptureGallery m_recents;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
   Flex* m_rootLayout = nullptr;
@@ -84,4 +81,6 @@ private:
   std::size_t m_delayIndex = 0;
   bool m_pendingStart = false;
   int m_countdownLeft = 0;
+  float m_contentScale = 1.0F;
+  float m_panelCardOpacity = 1.0F;
 };

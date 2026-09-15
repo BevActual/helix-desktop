@@ -21,7 +21,13 @@ int main() {
   ok = expect(tabSearchScore("network", "Network", "wi-fi") > 0, "wi-fi alias") && ok;
   ok = expect(tabSearchScore("packages", "Packages", "updates") > 0, "updates alias") && ok;
   ok = expect(tabSearchScore("notifications", "Notifications", "dnd") > 0, "dnd alias") && ok;
-  ok = expect(tabSearchScore("screen-record", "Screen Record", "screen record") > 0, "spaced id") && ok;
+  ok = expect(tabSearchScore("capture", "Capture", "recording") > 0, "recording alias") && ok;
+  ok = expect(tabSearchScore("capture", "Capture", "screenshot") > 0, "screenshot alias") && ok;
+  ok = expect(tabSearchScore("calendar", "Calendar", "accounts") > 0, "calendar accounts alias") && ok;
+  ok = expect(tabSearchScore("ai", "AI", "claude") > 0, "ai claude alias") && ok;
+  ok = expect(tabSearchScore("ai", "AI", "ollama") > 0, "ai ollama alias") && ok;
+  ok = expect(tabSearchScore("ai", "AI", "ai-usage") > 0, "ai-usage alias") && ok;
+  ok = expect(tabSearchScore("weather", "Weather", "location") > 0, "weather location alias") && ok;
   ok = expect(tabSearchScore("plugins", "Plugins", "plugin") > 0, "plugin prefix") && ok;
   ok = expect(tabSearchScore("network", "Network", "w") == 0, "one char") && ok;
   ok = expect(tabSearchScore("home", "Home", "wifi") == 0, "home misses wifi") && ok;

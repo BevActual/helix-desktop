@@ -26,5 +26,6 @@ noctalia msg notification-clear-history
 ```
 
 Enabling DND immediately hides visible toast popups and suppresses new external notification toasts. Hidden and
-suppressed notifications remain in history/control center. Disabling DND allows new toast popups but does not replay
-the hidden or suppressed popups. Internal Noctalia notifications are not stored in history.
+suppressed notifications remain in history/control center. Disabling DND replays those toasts if they are still
+active and have not expired. Notifications filtered with `show_toast = false`, expired while DND was on, or sent
+with a DND-bypass policy are not replayed. Internal Noctalia notifications are not stored in history.

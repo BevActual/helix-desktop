@@ -87,6 +87,7 @@ private:
   void syncScaledFonts();
   void syncShortcuts();
   void syncHeaderActions();
+  void syncStatusStrip();
   bool resizeMediaArtToCard();
   void onPanelCardOpacityChanged(float opacity) override;
 
@@ -103,6 +104,7 @@ private:
   bool m_active = false;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_statusStrip = nullptr;
   Flex* m_bottomRow = nullptr;
   Flex* m_dateTimeCard = nullptr;
   Flex* m_mediaCard = nullptr;
@@ -121,6 +123,10 @@ private:
   Label* m_userUptime = nullptr;
   Label* m_userVersion = nullptr;
   Button* m_sessionButton = nullptr;
+  Button* m_statusUpdates = nullptr;
+  Button* m_statusCapture = nullptr;
+  Button* m_statusNightLight = nullptr;
+  Button* m_statusCaffeine = nullptr;
   InputArea* m_userCardKeyboardArea = nullptr;
   InputArea* m_userCardArea = nullptr;
   InputArea* m_mediaCardArea = nullptr;

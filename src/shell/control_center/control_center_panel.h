@@ -117,7 +117,6 @@ private:
   void syncActiveTabSearch();
   [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
   [[nodiscard]] bool isTabSearchActive() const;
-  [[nodiscard]] bool shouldPassSettingsSearch() const;
   [[nodiscard]] std::string bestTabSearchId() const;
   [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
   [[nodiscard]] bool groupHasEligibleTab(TabGroup group) const;

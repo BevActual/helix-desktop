@@ -583,7 +583,14 @@ void TaskbarWidget::setEntryPinned(const DesktopEntry& entry, bool pinned) {
 
 void TaskbarWidget::launchDesktopEntry(const TaskModel& task) {
   auto entry = desktopEntryForTask(task);
-  if (!entry.has_value() || entry->exec.empty()) {
+  if (!entry.has_value()) {
+    return;
+  }
+  if (shell::dock::pinned_apps::isUnresolved(*entry)) {
+    shell::dock::pinned_apps::notifyUnresolved(*entry);
+    return;
+  }
+  if (entry->exec.empty()) {
     return;
   }
   auto& platform = m_platform;
@@ -664,7 +671,9 @@ void TaskbarWidget::applyPinnedMerge(std::vector<TaskModel>& tasks) {
     tile.appId = entry.id;
     tile.appIdLower = tile.idLower;
     tile.iconPath = resolveIconPath(entry.id, entry.icon);
-    tile.title = entry.name;
+    tile.title = shell::dock::pinned_apps::isUnresolved(entry)
+        ? i18n::tr("dock.missing-app-tooltip", "id", entry.id)
+        : entry.name;
 
     if (matching.empty()) {
       tile.running = false;

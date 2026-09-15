@@ -78,6 +78,8 @@ private:
   void restoreOrLoad(View view, bool forceReload);
   void clearPendingRemove();
   void invalidateCaches();
+  void rebuildKindOrder();
+  [[nodiscard]] const char* unavailableKey() const;
   [[nodiscard]] std::string currentQuery() const;
   [[nodiscard]] bool matchesName(const noctalia::packages::PackageHit& hit) const;
   [[nodiscard]] bool matchesFilter(const noctalia::packages::PackageHit& hit) const;
@@ -89,8 +91,8 @@ private:
   [[nodiscard]] ViewCache& installedCache();
   [[nodiscard]] static std::size_t indexFromView(View view);
   [[nodiscard]] static View viewFromIndex(std::size_t index);
-  [[nodiscard]] static std::size_t indexFromKind(noctalia::packages::Kind kind);
-  [[nodiscard]] static noctalia::packages::Kind kindFromIndex(std::size_t index);
+  [[nodiscard]] std::size_t indexFromKind(noctalia::packages::Kind kind) const;
+  [[nodiscard]] noctalia::packages::Kind kindFromIndex(std::size_t index) const;
 
   std::function<void(std::function<void(bool)>)> m_ensurePolkit;
   ConfigService* m_config = nullptr;
@@ -113,6 +115,9 @@ private:
   ViewCache m_installedCache;
   ViewCache m_flatpakUpdatesCache;
   ViewCache m_flatpakInstalledCache;
+  ViewCache m_firmwareUpdatesCache;
+  ViewCache m_firmwareInstalledCache;
+  std::vector<noctalia::packages::Kind> m_kindOrder;
   std::optional<std::string> m_issuedQuery;
   std::optional<std::string> m_pendingRemove;
   std::uint64_t m_generation = 0;

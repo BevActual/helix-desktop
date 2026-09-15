@@ -157,5 +157,41 @@ int main() {
   ok = expect(searchedAlt.size() == 1 && searchedAlt[0].name == "org.mozilla.firefox", "search application key") && ok;
   ok = expect(parseFlatpakSearchJson(R"([{"application_id":"bad"}])").empty(), "search invalid id") && ok;
 
+  ok = expect(isValidFwupdDeviceId("362301da643102b9f38477387e2193e57abaa590"), "fwupd id") && ok;
+  ok = expect(!isValidFwupdDeviceId("short"), "fwupd short") && ok;
+  ok = expect(!isValidFwupdDeviceId("362301da643102b9f38477387e2193e57abaa59g"), "fwupd nonhex") && ok;
+  ok = expect(!isValidFwupdDeviceId("../etc/passwd"), "fwupd path") && ok;
+
+  const auto fwUpdates = parseFwupdDevicesJson(
+      R"({"Devices":[{"Name":"UEFI dbx","DeviceId":"362301da643102b9f38477387e2193e57abaa590","Summary":"UEFI revocation database","Vendor":"Microsoft","Version":"20260402","Flags":["updatable","supported"],"Releases":[{"Name":"Secure Boot dbx","Summary":"Forbidden Signature Database","Version":"20260707","RemoteId":"lvfs","Description":"<p>Updates dbx.</p>"}]}]})",
+      FwupdListKind::Updates
+  );
+  ok = expect(fwUpdates.size() == 1 && fwUpdates[0].name == "362301da643102b9f38477387e2193e57abaa590", "fwupd update id")
+      && ok;
+  ok = expect(
+           fwUpdates.size() == 1 && fwUpdates[0].title == "UEFI dbx" && fwUpdates[0].version == "20260707"
+               && fwUpdates[0].state == PackageState::Update && fwUpdates[0].repo == "lvfs",
+           "fwupd update fields"
+       )
+      && ok;
+  ok = expect(
+           fwUpdates.size() == 1 && fwUpdates[0].summary.starts_with("Forbidden"), "fwupd update summary"
+       )
+      && ok;
+
+  const auto fwInstalled = parseFwupdDevicesJson(
+      R"({"Devices":[{"Name":"Touchpad","DeviceId":"9ec2f35557ba426df27002d8b03f67b0d4d2e7a3","Summary":"Touch Controller","Vendor":"Goodix","Version":"0.68223","Flags":["updatable"]},{"Name":"Hub","DeviceId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Flags":["internal"]}]})",
+      FwupdListKind::Installed
+  );
+  ok = expect(fwInstalled.size() == 1 && fwInstalled[0].name == "9ec2f35557ba426df27002d8b03f67b0d4d2e7a3", "fwupd installed")
+      && ok;
+  ok = expect(
+           fwInstalled.size() == 1 && fwInstalled[0].title == "Touchpad" && fwInstalled[0].version == "0.68223"
+               && fwInstalled[0].state == PackageState::Installed,
+           "fwupd installed fields"
+       )
+      && ok;
+  ok = expect(parseFwupdDevicesJson(R"({"Devices":[]})", FwupdListKind::Updates).empty(), "fwupd empty") && ok;
+
   return ok ? 0 : 1;
 }

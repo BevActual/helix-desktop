@@ -23,9 +23,11 @@ namespace noctalia::packages {
     constexpr std::string_view kPkcon = "pkcon";
     constexpr int kPkconNothingUseful = 5;
     constexpr std::string_view kFlatpak = "flatpak";
+    constexpr std::string_view kFwupdmgr = "fwupdmgr";
     std::atomic<bool> g_busy{false};
     std::atomic<std::size_t> g_pendingRpmCount{0};
     std::atomic<std::size_t> g_pendingFlatpakCount{0};
+    std::atomic<std::size_t> g_pendingFirmwareCount{0};
     std::shared_ptr<std::atomic<bool>> g_cancelFlag;
 
     enum class ParseMode : std::uint8_t {
@@ -34,6 +36,8 @@ namespace noctalia::packages {
       FlatpakInstalled,
       FlatpakUpdates,
       FlatpakSearch,
+      FwupdInstalled,
+      FwupdUpdates,
       None,
     };
 
@@ -164,6 +168,10 @@ namespace noctalia::packages {
         return parseFlatpakListOutput(text, FlatpakListKind::Updates);
       case ParseMode::FlatpakSearch:
         return parseFlatpakSearchJson(text);
+      case ParseMode::FwupdInstalled:
+        return parseFwupdDevicesJson(text, FwupdListKind::Installed);
+      case ParseMode::FwupdUpdates:
+        return parseFwupdDevicesJson(text, FwupdListKind::Updates);
       case ParseMode::None:
         return {};
       }
@@ -260,6 +268,15 @@ namespace noctalia::packages {
       );
     }
 
+    bool launchFwupd(
+        std::vector<std::string> args, process::RunOptions options, CommandCompletion onComplete,
+        ProgressCallback onProgress, ParseMode parse
+    ) {
+      return launchTracked(
+          std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), parse, false, "fwupdmgr"
+      );
+    }
+
     void appendFlatpakScope(std::vector<std::string>& args, std::string_view installation) {
       if (installation == "system") {
         args.emplace_back("--system");
@@ -268,14 +285,41 @@ namespace noctalia::packages {
       }
     }
 
+    void finishFirmwareRefresh(std::function<void()> onComplete) {
+      if (!process::commandExists(kFwupdmgr.data())) {
+        g_pendingFirmwareCount.store(0, std::memory_order_release);
+        if (onComplete) {
+          onComplete();
+        }
+        return;
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::seconds(45);
+      options.maxOutputBytes = 2U << 20;
+      if (!launchFwupd(
+              {std::string(kFwupdmgr), "get-updates", "--json"}, std::move(options),
+              [onComplete = std::move(onComplete)](CommandResult result) {
+                if (result.success && !result.cancelled) {
+                  g_pendingFirmwareCount.store(dedupeByName(std::move(result.hits)).size(), std::memory_order_release);
+                }
+                if (onComplete) {
+                  onComplete();
+                }
+              },
+              {}, ParseMode::FwupdUpdates
+          )) {
+        if (onComplete) {
+          onComplete();
+        }
+      }
+    }
+
     void finishPendingRefresh(std::function<void()> onComplete, bool fedoraOk) {
       if (!process::commandExists(kFlatpak.data())) {
         if (fedoraOk) {
           g_pendingFlatpakCount.store(0, std::memory_order_release);
         }
-        if (onComplete) {
-          onComplete();
-        }
+        finishFirmwareRefresh(std::move(onComplete));
         return;
       }
       process::RunOptions options;
@@ -289,15 +333,11 @@ namespace noctalia::packages {
                 if (result.success && !result.cancelled) {
                   g_pendingFlatpakCount.store(dedupeByName(std::move(result.hits)).size(), std::memory_order_release);
                 }
-                if (onComplete) {
-                  onComplete();
-                }
+                finishFirmwareRefresh(std::move(onComplete));
               },
               {}, ParseMode::FlatpakUpdates
           )) {
-        if (onComplete) {
-          onComplete();
-        }
+        finishFirmwareRefresh(std::move(onComplete));
       }
     }
 
@@ -306,6 +346,8 @@ namespace noctalia::packages {
   bool backendAvailable() { return process::commandExists(kPkcon.data()); }
 
   bool flatpakAvailable() { return process::commandExists(kFlatpak.data()); }
+
+  bool firmwareAvailable() { return process::commandExists(kFwupdmgr.data()); }
 
   bool tabAvailable() {
     if (!backendAvailable()) {
@@ -321,12 +363,15 @@ namespace noctalia::packages {
 
   std::size_t pendingUpdateCount() noexcept {
     return g_pendingRpmCount.load(std::memory_order_acquire)
-        + g_pendingFlatpakCount.load(std::memory_order_acquire);
+        + g_pendingFlatpakCount.load(std::memory_order_acquire)
+        + g_pendingFirmwareCount.load(std::memory_order_acquire);
   }
 
   void notePendingUpdates(Kind kind, std::size_t count) noexcept {
     if (kind == Kind::Flatpak) {
       g_pendingFlatpakCount.store(count, std::memory_order_release);
+    } else if (kind == Kind::Firmware) {
+      g_pendingFirmwareCount.store(count, std::memory_order_release);
     } else {
       g_pendingRpmCount.store(count, std::memory_order_release);
     }
@@ -336,6 +381,7 @@ namespace noctalia::packages {
     if (!tabAvailable()) {
       g_pendingRpmCount.store(0, std::memory_order_release);
       g_pendingFlatpakCount.store(0, std::memory_order_release);
+      g_pendingFirmwareCount.store(0, std::memory_order_release);
       if (onComplete) {
         onComplete();
       }
@@ -370,6 +416,9 @@ namespace noctalia::packages {
     if (!isSafeSearchQuery(query)) {
       return false;
     }
+    if (kind == Kind::Firmware) {
+      return false;
+    }
     if (kind == Kind::Flatpak) {
       if (!flatpakAvailable()) {
         return false;
@@ -395,6 +444,18 @@ namespace noctalia::packages {
   }
 
   bool listUpdates(CommandCompletion onComplete, Kind kind) {
+    if (kind == Kind::Firmware) {
+      if (!firmwareAvailable()) {
+        return false;
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::seconds(45);
+      options.maxOutputBytes = 2U << 20;
+      return launchFwupd(
+          {std::string(kFwupdmgr), "get-updates", "--json"}, std::move(options), std::move(onComplete), {},
+          ParseMode::FwupdUpdates
+      );
+    }
     if (kind == Kind::Flatpak) {
       if (!flatpakAvailable()) {
         return false;
@@ -421,6 +482,18 @@ namespace noctalia::packages {
   }
 
   bool listInstalled(CommandCompletion onComplete, Kind kind) {
+    if (kind == Kind::Firmware) {
+      if (!firmwareAvailable()) {
+        return false;
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::seconds(30);
+      options.maxOutputBytes = 4U << 20;
+      return launchFwupd(
+          {std::string(kFwupdmgr), "get-devices", "--json"}, std::move(options), std::move(onComplete), {},
+          ParseMode::FwupdInstalled
+      );
+    }
     if (kind == Kind::Flatpak) {
       if (!flatpakAvailable()) {
         return false;
@@ -456,6 +529,26 @@ namespace noctalia::packages {
   bool updatePackages(
       std::vector<std::string> names, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind
   ) {
+    if (kind == Kind::Firmware) {
+      if (!firmwareAvailable()) {
+        return false;
+      }
+      std::vector<std::string> args = {
+          std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check"
+      };
+      for (auto& name : names) {
+        if (!isValidFwupdDeviceId(name)) {
+          return false;
+        }
+        args.push_back(std::move(name));
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::minutes(20);
+      options.maxOutputBytes = 1U << 20;
+      return launchFwupd(
+          std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
+      );
+    }
     if (kind == Kind::Flatpak) {
       if (!flatpakAvailable()) {
         return false;
@@ -496,6 +589,18 @@ namespace noctalia::packages {
       Action action, std::string name, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind,
       std::string installation, std::string remotes
   ) {
+    if (kind == Kind::Firmware) {
+      if (action != Action::Update || !isValidFwupdDeviceId(name) || !firmwareAvailable()) {
+        return false;
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::minutes(20);
+      options.maxOutputBytes = 1U << 20;
+      return launchFwupd(
+          {std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check", std::move(name)}, std::move(options),
+          std::move(onComplete), std::move(onProgress), ParseMode::None
+      );
+    }
     if (kind == Kind::Flatpak) {
       if (!isValidFlatpakAppId(name) || !flatpakAvailable()) {
         return false;

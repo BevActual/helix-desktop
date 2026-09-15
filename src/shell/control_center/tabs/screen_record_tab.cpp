@@ -6,6 +6,7 @@
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -17,6 +18,7 @@
 #include "ui/style.h"
 #include "util/file_utils.h"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -50,8 +52,7 @@ namespace {
 } // namespace
 
 ScreenRecordTab::ScreenRecordTab(const ControlCenterServices& services)
-    : m_recorder(services.screenRecorder), m_config(services.config), m_thumbnails(services.thumbnails),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "screen-record"})) {
+    : m_recorder(services.screenRecorder), m_config(services.config), m_thumbnails(services.thumbnails) {
   if (m_recorder != nullptr) {
     m_recorder->setChangeCallback([this]() {
       syncUi();
@@ -66,7 +67,7 @@ ScreenRecordTab::ScreenRecordTab(const ControlCenterServices& services)
   }
 }
 
-std::unique_ptr<Flex> ScreenRecordTab::create() {
+std::unique_ptr<Flex> ScreenRecordTab::createLiveBody() {
   const float scale = contentScale();
 
   auto live = ui::column({
@@ -95,11 +96,14 @@ std::unique_ptr<Flex> ScreenRecordTab::create() {
   buildRecentCard(*content, scale);
 
   live->addChild(std::move(scroll));
-  auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
   bindRecentGallery();
   syncUi();
   rebuildRecentFiles();
-  return wrapped;
+  return live;
+}
+
+void ScreenRecordTab::setPanelCardOpacity(float opacity) noexcept {
+  m_panelCardOpacity = std::clamp(opacity, 0.0F, 1.0F);
 }
 
 void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
@@ -331,18 +335,6 @@ void ScreenRecordTab::buildRecentCard(Flex& root, float scale) {
   root.addChild(std::move(card));
 }
 
-std::unique_ptr<Flex> ScreenRecordTab::createHeaderActions() {
-  return m_settings->embedHeader(nullptr, contentScale());
-}
-
-void ScreenRecordTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
-
-bool ScreenRecordTab::configureMode() const { return m_settings->configureMode(); }
-
-void ScreenRecordTab::setSettingsSearchQuery(std::string_view query) {
-  m_settings->setSearchQuery(std::string(query));
-}
-
 void ScreenRecordTab::setActive(bool active) {
   if (active) {
     rebuildRecentFiles();
@@ -353,9 +345,6 @@ void ScreenRecordTab::setActive(bool active) {
 void ScreenRecordTab::onClose() {
   m_elapsedTimer.stop();
   cancelCountdown();
-  if (m_settings != nullptr) {
-    m_settings->onClose();
-  }
   m_rootLayout = nullptr;
   m_source = nullptr;
   m_delay = nullptr;
@@ -373,21 +362,7 @@ void ScreenRecordTab::onClose() {
   m_recents.onClose();
 }
 
-void ScreenRecordTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
-    return;
-  }
-  if (m_rootLayout == nullptr) {
-    return;
-  }
-  m_rootLayout->setSize(contentWidth, bodyHeight);
-  m_rootLayout->layout(renderer);
-}
-
-void ScreenRecordTab::doUpdate(Renderer& renderer) {
-  if (m_settings != nullptr && m_settings->configureMode()) {
-    return;
-  }
+void ScreenRecordTab::updateContent(Renderer& renderer) {
   m_recents.update(renderer);
 }
 

@@ -8,6 +8,8 @@
 #include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "core/deferred_call.h"
+#include "core/input/key_modifiers.h"
+#include "core/input/key_symbols.h"
 #include "dbus/mpris/mpris_service.h"
 #include "i18n/i18n.h"
 #include "net/tailscale_service.h"
@@ -18,6 +20,7 @@
 #include "shell/control_center/plugin_control_center_tab.h"
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/appearance_tab.h"
+#include "shell/control_center/tabs/ai_usage_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
@@ -28,12 +31,11 @@
 #include "shell/control_center/tabs/monitor_tab.h"
 #include "shell/control_center/tabs/network_tab.h"
 #include "shell/control_center/tabs/notifications_tab.h"
+#include "shell/control_center/tabs/capture_tab.h"
 #include "shell/control_center/tabs/packages_tab.h"
 #include "shell/control_center/tabs/plugins_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
-#include "shell/control_center/tabs/screenshot_tab.h"
-#include "shell/control_center/tabs/screen_record_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/system_tab.h"
 #include "shell/control_center/tabs/tailscale_tab.h"
@@ -115,8 +117,8 @@ namespace {
       {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
-      {"screenshot", "settings.navigation.sections.screenshot", "screenshot", true, TabGroup::Status},
-      {"screen-record", "control-center.tabs.screen-record", "video", true, TabGroup::Status},
+      {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Status},
+      {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Status},
       {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Status},
       {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Setup},
       {"dock", "settings.navigation.sections.dock", "layout-bottombar-inactive", true, TabGroup::Setup},
@@ -235,10 +237,10 @@ namespace {
         || id == "keybinds"
         || id == "media"
         || id == "screen-time"
+        || id == "ai"
         || id == "network"
         || id == "bluetooth"
-        || id == "screenshot"
-        || id == "screen-record"
+        || id == "capture"
         || id == "clipboard"
         || id == "tailscale"
         || id == "plugins"
@@ -255,7 +257,70 @@ namespace {
     if (section == "services") {
       return "calendar";
     }
+    if (section == "screenshot" || section == "screen-record") {
+      return "capture";
+    }
+    if (section == "ai-usage") {
+      return "ai";
+    }
     return std::string(section);
+  }
+
+  [[nodiscard]] std::string resolveOpenTabId(std::string_view context) {
+    if (context.empty() || context == "home") {
+      return "home";
+    }
+    if (context == "screenshot" || context == "screen-record" || context == "capture") {
+      return "capture";
+    }
+    if (context == "ai" || context == "ai-usage") {
+      return "ai";
+    }
+    if (context == "wallpaper"
+        || context.starts_with("wallpaper ")
+        || context == "daily"
+        || context == "bing"
+        || context == "nasa") {
+      return "wallpaper";
+    }
+    return std::string(context);
+  }
+
+  [[nodiscard]] std::string wallpaperPickerContext(std::string_view context) {
+    constexpr std::string_view kPrefix = "wallpaper ";
+    if (context.starts_with(kPrefix)) {
+      return StringUtils::trim(context.substr(kPrefix.size()));
+    }
+    if (context == "daily" || context == "bing" || context == "nasa") {
+      return std::string(context);
+    }
+    return {};
+  }
+
+  [[nodiscard]] bool wallpaperContextMatches(WallpaperPicker::BrowseSource source, std::string_view context) {
+    if (context.empty()) {
+      return true;
+    }
+    if (context == "wallhaven") {
+      return source == WallpaperPicker::BrowseSource::Wallhaven;
+    }
+    if (context == "video" || context == "mpvpaper") {
+      return source == WallpaperPicker::BrowseSource::Video;
+    }
+    if (context == "daily" || context == "bing" || context == "nasa") {
+      return source == WallpaperPicker::BrowseSource::Daily;
+    }
+    return true;
+  }
+
+  [[nodiscard]] std::optional<CaptureTab::View> captureViewForContext(std::string_view context) {
+    if (context == "screenshot") {
+      return CaptureTab::View::Screenshot;
+    }
+    if (context == "screen-record") {
+      return CaptureTab::View::Record;
+    }
+    return std::nullopt;
   }
 
 } // namespace
@@ -328,8 +393,8 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
-  add("screenshot", std::make_unique<ScreenshotTab>(services));
-  add("screen-record", std::make_unique<ScreenRecordTab>(services));
+  add("ai", std::make_unique<AiUsageTab>(services));
+  add("capture", std::make_unique<CaptureTab>(services));
   add("clipboard", std::make_unique<ClipboardTab>(services));
   add("desktop", std::make_unique<SettingsTab>(services, "desktop"));
   add("dock", std::make_unique<SettingsTab>(services, "dock"));
@@ -724,8 +789,15 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   const bool animateTabSwitch = !m_firstOpenAfterCreate;
   m_firstOpenAfterCreate = false;
   const auto settingsTarget = parseSettingsOpenContext(context);
-  const std::string tabId = settingsTarget.isSettings ? tabIdForSettingsSection(settingsTarget.section)
-                                                     : (context.empty() ? "home" : std::string(context));
+  std::string tabId;
+  std::optional<CaptureTab::View> captureView;
+  if (settingsTarget.isSettings) {
+    tabId = tabIdForSettingsSection(settingsTarget.section);
+    captureView = captureViewForContext(settingsTarget.section);
+  } else {
+    tabId = resolveOpenTabId(context);
+    captureView = captureViewForContext(context);
+  }
   m_setupCollapsed = true;
   if (const auto* slot = slotById(tabId); slot != nullptr && slot->group == TabGroup::Setup) {
     m_setupCollapsed = false;
@@ -733,6 +805,12 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   syncSetupToggle();
   selectTab(tabId, animateTabSwitch);
   if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+    if (auto* capture = dynamic_cast<CaptureTab*>(slot->tab.get()); capture != nullptr && captureView.has_value()) {
+      capture->applyOpenView(*captureView);
+    }
+    if (auto* wallpaper = dynamic_cast<WallpaperTab*>(slot->tab.get()); wallpaper != nullptr) {
+      wallpaper->applyOpenContext(wallpaperPickerContext(context));
+    }
     if (settingsTarget.isSettings && tabId != "appearance") {
       slot->tab->setConfigureMode(true);
     } else if (isLiveSettingsHost(tabId)) {
@@ -796,13 +874,49 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
     }
     if (isLiveSettingsHost(tabId)) {
       if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
-        return slot->tab->configureMode();
+        if (!slot->tab->configureMode()) {
+          return false;
+        }
+        if (tabId == "capture") {
+          if (const auto* pane = slot->tab->settingsPane(); pane != nullptr) {
+            return pane->section() == settingsTarget.section;
+          }
+          return false;
+        }
+        return true;
       }
       return false;
     }
     return true;
   }
-  return (context.empty() ? "home" : context) == m_activeTabId;
+  const std::string requested = context.empty() ? "home" : std::string(context);
+  const std::string tabId = resolveOpenTabId(requested);
+  if (m_activeTabId != tabId) {
+    return false;
+  }
+  if (tabId == "wallpaper") {
+    if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+      if (slot->tab->configureMode()) {
+        return false;
+      }
+      if (const auto* wallpaper = dynamic_cast<const WallpaperTab*>(slot->tab.get())) {
+        return wallpaperContextMatches(wallpaper->browseSource(), wallpaperPickerContext(requested));
+      }
+    }
+  }
+  if (tabId == "capture") {
+    if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+      if (slot->tab->configureMode()) {
+        return false;
+      }
+      if (const auto* capture = dynamic_cast<const CaptureTab*>(slot->tab.get())) {
+        if (const auto view = captureViewForContext(requested)) {
+          return capture->currentView() == *view;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 bool ControlCenterPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
@@ -817,6 +931,20 @@ bool ControlCenterPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifi
   if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
     if (slot->tab->handleGlobalKey(sym, modifiers, pressed, preedit)) {
       return true;
+    }
+  }
+  if (pressed && !preedit && m_searchInput != nullptr && !m_modalHost.isOpen()) {
+    auto& dispatcher = PanelManager::instance().inputDispatcher();
+    const InputArea* const focused = dispatcher.focusedArea();
+    const bool textInputFocused = focused != nullptr && focused->textInputClient() != nullptr;
+    if (!textInputFocused) {
+      const bool slash = modifiers == 0 && sym == XKB_KEY_slash;
+      const bool ctrlF = (modifiers & KeyMod::Ctrl) != 0 && (modifiers & ~KeyMod::Ctrl) == 0
+          && (sym == XKB_KEY_f || sym == XKB_KEY_F);
+      if ((slash || ctrlF) && m_searchInput->inputArea() != nullptr) {
+        dispatcher.setFocus(m_searchInput->inputArea());
+        return true;
+      }
     }
   }
   if (!m_showSidebar || m_sidebarNav == nullptr || m_sidebarScrollView == nullptr || m_content == nullptr) {
@@ -913,7 +1041,18 @@ bool ControlCenterPanel::isTabVisible(std::string_view id) const {
   if (!slot->hideable || m_config == nullptr) {
     return true;
   }
-  return !std::ranges::contains(m_config->config().controlCenter.hiddenTabs, id);
+  const auto& hidden = m_config->config().controlCenter.hiddenTabs;
+  if (std::ranges::contains(hidden, id)) {
+    return false;
+  }
+  if (id == "ai" && std::ranges::contains(hidden, "ai-usage")) {
+    return false;
+  }
+  if (id == "capture"
+      && (std::ranges::contains(hidden, "screenshot") || std::ranges::contains(hidden, "screen-record"))) {
+    return false;
+  }
+  return true;
 }
 
 bool ControlCenterPanel::isTabShown(std::string_view id) const {
@@ -1508,7 +1647,7 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
 void ControlCenterPanel::syncActiveTabSearch() {
   auto* slot = slotById(m_activeTabId);
   if (slot != nullptr && slot->tab != nullptr) {
-    slot->tab->setSettingsSearchQuery(shouldPassSettingsSearch() ? m_searchQuery : std::string{});
+    slot->tab->setSettingsSearchQuery(m_searchQuery);
   }
 }
 
@@ -1525,17 +1664,6 @@ bool ControlCenterPanel::isTabSearchActive() const {
     }
   }
   return false;
-}
-
-bool ControlCenterPanel::shouldPassSettingsSearch() const {
-  if (m_searchQuery.empty() || !isTabSearchActive()) {
-    return true;
-  }
-  if (isSettingsEditorTab(m_activeTabId)) {
-    return true;
-  }
-  const auto* slot = slotById(m_activeTabId);
-  return isLiveSettingsHost(m_activeTabId) && slot != nullptr && slot->tab != nullptr && slot->tab->configureMode();
 }
 
 std::string ControlCenterPanel::bestTabSearchId() const {

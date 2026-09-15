@@ -219,7 +219,9 @@
       "text-title": "Text Clipboard Entry",
       "truncated": "… truncated"
     },
-    "title": "Clipboard"
+    "title": "Clipboard",
+    "auto-paste-unavailable-title": "Could not paste",
+    "auto-paste-unavailable-body": "Auto-paste needs a Wayland virtual keyboard. The item is still copied."
   },
   "common": {
     "actions": {
@@ -260,6 +262,56 @@
       "surface": "Surface",
       "tertiary": "Tertiary",
       "type": "Type"
+    },
+    "ai-usage": {
+      "as-of": "As of {time}",
+      "balance-only": "Prepaid balance — no rate-limit windows.",
+      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, set DEEPSEEK_API_KEY, or install Ollama.",
+      "now": "now",
+      "ollama": {
+        "absent": "Ollama is not installed",
+        "disabled": "Disabled",
+        "error": "Could not reach Ollama",
+        "loaded": "loaded",
+        "more": "+{count} more",
+        "running": "Running",
+        "start": "Start",
+        "stop": "Stop",
+        "stopped": "Stopped",
+        "title": "Ollama"
+      },
+      "open": "Open",
+      "providers": {
+        "claude": "Claude Code",
+        "codex": "Codex",
+        "copilot": "GitHub Copilot",
+        "cursor": "Cursor",
+        "deepseek": "DeepSeek",
+        "gemini": "Gemini CLI",
+        "qwen": "Qwen Code"
+      },
+      "refresh": "Refresh",
+      "resets-in": "resets in {time}",
+      "status": {
+        "absent": "Not installed",
+        "disabled": "Disabled",
+        "expired": "Session expired — sign in again",
+        "http-error": "Could not reach the usage API",
+        "no-auth": "Not signed in",
+        "no-credentials": "No credentials — sign in with claude",
+        "no-data": "No usage data yet",
+        "stale": "Showing last known values",
+        "unsupported": "This plan has no request quota to show"
+      },
+      "updated-at": "Updated {time}",
+      "windows": {
+        "chat": "Chat",
+        "completions": "Completions",
+        "day": "Today",
+        "premium": "Premium requests",
+        "session": "Session (5 h)",
+        "weekly": "Week (7 days)"
+      }
     },
     "audio": {
       "application-volumes": "Application Volumes",
@@ -314,6 +366,13 @@
       "visible": "Discoverable by nearby devices"
     },
     "calendar": {
+      "accounts": {
+        "add": "Add calendar account",
+        "disabled": "Calendar sync is off",
+        "disabled-events": "Turn on Calendar to sync events.",
+        "empty": "Add an account to see events here.",
+        "title": "Accounts"
+      },
       "all-day": "All day",
       "events": "Events",
       "no-events": "No events.",
@@ -393,6 +452,13 @@
         "unknown-track": "Unknown track"
       },
       "select-avatar": "Select Avatar",
+      "status": {
+        "caffeine": "Caffeine on",
+        "night-light": "Night Light on",
+        "recording": "Recording {elapsed}",
+        "replay": "Replay {elapsed}",
+        "updates": "{count} updates waiting"
+      },
       "unknown": "unknown",
       "uptime": "Uptime – {uptime}",
       "weather": {
@@ -657,11 +723,13 @@
       "showing-limited": "Showing {shown} of {total}",
       "source-fedora": "Fedora",
       "source-flatpak": "Flatpak",
+      "source-firmware": "Firmware",
       "state-available": "Available",
       "state-installed": "Installed",
       "title": "Packages",
       "unavailable": "PackageKit is not available.",
       "unavailable-flatpak": "Flatpak is not available.",
+      "unavailable-firmware": "fwupd is not available.",
       "update": "Update",
       "update-all": "Update all",
       "update-all-ok": "All listed updates finished.",
@@ -674,6 +742,8 @@
       "working": "Working on {name}…"
     },
     "tabs": {
+      "ai": "AI",
+      "ai-usage": "AI",
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
@@ -685,6 +755,7 @@
       "notifications": "Notifications",
       "packages": "Packages",
       "power": "Power",
+      "capture": "Capture",
       "screen-time": "Screen Time",
       "screenshot": "Screenshot",
       "screen-record": "Screen Record",
@@ -692,6 +763,10 @@
       "system": "System",
       "tailscale": "Tailscale",
       "weather": "Weather"
+    },
+    "capture": {
+      "screenshot": "Screenshot",
+      "record": "Record"
     },
     "captures": {
       "delete": "Delete",
@@ -1044,7 +1119,10 @@
       "close": "Close",
       "close-all": "Close All"
     },
-    "launcher": "Launcher"
+    "launcher": "Launcher",
+    "missing-app": "Missing app",
+    "missing-app-body": "{id} is no longer installed. Unpin it or install the app again.",
+    "missing-app-tooltip": "Missing app · {id}"
   },
   "internal-apps": {
     "settings": {
@@ -1615,6 +1693,7 @@
     "navigation": {
       "groups": {
         "accessibility": "Accessibility",
+        "ai-usage": "AI",
         "apps": "Apps",
         "audio": "Audio",
         "authentication": "Authentication",
@@ -1790,6 +1869,13 @@
           "compact": "Compact",
           "full": "Full",
           "none": "None"
+        }
+      },
+      "ai-usage": {
+        "provider-mode": {
+          "auto": "Auto-detect",
+          "off": "Off",
+          "on": "Always on"
         }
       },
       "dock-launcher-position": {
@@ -3705,6 +3791,52 @@
         "battery-warning-threshold": {
           "description": "System battery percentage at or below which the shell sends a low-battery notification and battery widgets use their warning color (0 disables)",
           "label": "Battery Warning Threshold"
+        }
+      },
+      "ai-usage": {
+        "claude": {
+          "label": "Claude Code"
+        },
+        "codex": {
+          "label": "Codex"
+        },
+        "copilot": {
+          "label": "GitHub Copilot"
+        },
+        "cursor": {
+          "label": "Cursor"
+        },
+        "deepseek": {
+          "label": "DeepSeek"
+        },
+        "gemini": {
+          "label": "Gemini CLI"
+        },
+        "ollama": {
+          "label": "Ollama"
+        },
+        "ollama-host": {
+          "description": "Ollama HTTP endpoint. Empty uses OLLAMA_HOST or 127.0.0.1:11434.",
+          "label": "Ollama Host",
+          "placeholder": "127.0.0.1:11434"
+        },
+        "gemini-daily-limit": {
+          "description": "Requests per day on your Gemini plan (1000 on the free tier). Used to compute today's percentage.",
+          "label": "Gemini Daily Request Quota"
+        },
+        "provider-mode": {
+          "description": "Auto shows a provider only when its local data source exists. Always on keeps the row even when missing."
+        },
+        "qwen": {
+          "label": "Qwen Code"
+        },
+        "qwen-daily-limit": {
+          "description": "Requests per day on your Qwen plan (2000 on the free OAuth tier). Used to compute today's percentage.",
+          "label": "Qwen Daily Request Quota"
+        },
+        "refresh-seconds": {
+          "description": "How often usage is refreshed while the shell is running",
+          "label": "Refresh Interval"
         }
       },
       "tailscale": {

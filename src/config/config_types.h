@@ -1568,6 +1568,18 @@ constexpr EnumOption<ControlCenterSidebarMode> kControlCenterSidebarModes[] = {
     {ControlCenterSidebarMode::None, "none", "settings.options.control-center.sidebar.none"},
 };
 
+enum class AiUsageProviderMode : std::uint8_t {
+  Auto = 0,
+  On = 1,
+  Off = 2,
+};
+
+constexpr EnumOption<AiUsageProviderMode> kAiUsageProviderModes[] = {
+    {AiUsageProviderMode::Auto, "auto", "settings.options.ai-usage.provider-mode.auto"},
+    {AiUsageProviderMode::On, "on", "settings.options.ai-usage.provider-mode.on"},
+    {AiUsageProviderMode::Off, "off", "settings.options.ai-usage.provider-mode.off"},
+};
+
 enum class WifiBandFilter : std::uint8_t {
   All = 0,
   Ghz24 = 1,
@@ -1690,6 +1702,22 @@ struct ControlCenterConfig {
     bool operator==(const BluetoothTabConfig&) const = default;
   };
 
+  struct AiUsageTabConfig {
+    std::int32_t refreshSeconds = 120;
+    AiUsageProviderMode claude = AiUsageProviderMode::Auto;
+    AiUsageProviderMode codex = AiUsageProviderMode::Auto;
+    AiUsageProviderMode gemini = AiUsageProviderMode::Auto;
+    AiUsageProviderMode qwen = AiUsageProviderMode::Auto;
+    AiUsageProviderMode copilot = AiUsageProviderMode::Auto;
+    AiUsageProviderMode cursor = AiUsageProviderMode::Auto;
+    AiUsageProviderMode deepseek = AiUsageProviderMode::Auto;
+    AiUsageProviderMode ollama = AiUsageProviderMode::Auto;
+    std::int32_t geminiDailyLimit = 1000;
+    std::int32_t qwenDailyLimit = 2000;
+    std::string ollamaHost;
+    bool operator==(const AiUsageTabConfig&) const = default;
+  };
+
   std::vector<ShortcutConfig> shortcuts;
   std::vector<std::string> hiddenTabs; // tab keys (built-in or plugin entry ids) the user has hidden; empty = all available shown
   ControlCenterSidebarMode sidebarMode = ControlCenterSidebarMode::Compact;
@@ -1700,6 +1728,7 @@ struct ControlCenterConfig {
   CalendarTabConfig calendarTab;
   NetworkTabConfig networkTab;
   BluetoothTabConfig bluetoothTab;
+  AiUsageTabConfig aiUsage;
   bool operator==(const ControlCenterConfig&) const = default;
 };
 

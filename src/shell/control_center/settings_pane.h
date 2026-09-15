@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -68,7 +69,9 @@ public:
   void setConfigureMode(bool show);
   [[nodiscard]] bool configureMode() const noexcept { return m_configureMode; }
   [[nodiscard]] const std::string& section() const noexcept { return m_selectedSection; }
+  void setSection(std::string section);
   void setSearchQuery(std::string query);
+  void openCalendarAccount(std::optional<std::string> accountId);
   void openSearchPicker(settings::SearchPickerOpenRequest request);
   void openUserTemplateEditor(std::string id);
   void setIncludedGroups(std::unordered_set<std::string> groups);

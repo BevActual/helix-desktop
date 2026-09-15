@@ -1160,6 +1160,10 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
   );
 
   if (windows.empty()) {
+    if (shell::dock::pinned_apps::isUnresolved(action.entry)) {
+      shell::dock::pinned_apps::notifyUnresolved(action.entry);
+      return;
+    }
     m_pendingLaunchFocus = PendingLaunchFocus{
         .idLower = action.windowLookupIdLower,
         .wmClassLower = action.windowLookupWmClassLower,

@@ -2,8 +2,6 @@
 
 #include "core/timer_manager.h"
 #include "shell/control_center/recent_captures.h"
-#include "shell/control_center/settings_pane.h"
-#include "shell/control_center/tab.h"
 
 #include <memory>
 #include <string>
@@ -12,31 +10,30 @@
 
 class Button;
 class ConfigService;
+class Flex;
 class IpcService;
 class Label;
+class Renderer;
 class Segmented;
 class ThumbnailService;
 struct ControlCenterServices;
 
-class ScreenshotTab : public Tab {
+class ScreenshotTab {
 public:
   explicit ScreenshotTab(const ControlCenterServices& services);
 
-  std::unique_ptr<Flex> create() override;
-  std::unique_ptr<Flex> createHeaderActions() override;
-  void setActive(bool active) override;
-  void onClose() override;
-  void setConfigureMode(bool show) override;
-  [[nodiscard]] bool configureMode() const override;
-  void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
+  void setActive(bool active);
+  void onClose();
+  void updateContent(Renderer& renderer);
+  void cancelCountdown();
+  void setContentScale(float scale) noexcept { m_contentScale = scale; }
+  void setPanelCardOpacity(float opacity) noexcept;
 
 private:
-  void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
-  void doUpdate(Renderer& renderer) override;
   void requestCapture(const char* command);
   void runCapture(const char* command);
   void tickCountdown();
-  void cancelCountdown();
   void syncCountdownUi();
   void openScreenshotFolder();
   void openRecentFile(const std::string& path);
@@ -44,6 +41,8 @@ private:
   void rebuildRecentFiles();
   void bindRecentGallery();
   [[nodiscard]] int delaySeconds() const noexcept;
+  [[nodiscard]] float contentScale() const noexcept { return m_contentScale; }
+  [[nodiscard]] float panelCardOpacity() const noexcept { return m_panelCardOpacity; }
 
   struct CaptureButton {
     Button* button = nullptr;
@@ -53,7 +52,6 @@ private:
   IpcService* m_ipc = nullptr;
   ConfigService* m_config = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
-  std::unique_ptr<SettingsPane> m_settings;
   control_center::RecentCaptureGallery m_recents;
   Flex* m_rootLayout = nullptr;
   Segmented* m_delay = nullptr;
@@ -65,4 +63,6 @@ private:
   const char* m_pendingCommand = nullptr;
   int m_countdownLeft = 0;
   std::size_t m_delayIndex = 0;
+  float m_contentScale = 1.0F;
+  float m_panelCardOpacity = 1.0F;
 };

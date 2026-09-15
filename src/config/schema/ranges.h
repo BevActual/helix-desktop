@@ -19,6 +19,8 @@ namespace noctalia::config::schema {
   inline constexpr Range<float> kCornerRadiusScaleRange{0.0F, 2.0F, 0.05F};
   inline constexpr Range<std::int64_t> kControlCenterWidthRange{600, 1200, 10};
   inline constexpr Range<std::int64_t> kBluetoothDiscoverySecondsRange{5, 60, 5};
+  inline constexpr Range<std::int64_t> kAiUsageRefreshSecondsRange{30, 900, 30};
+  inline constexpr Range<std::int64_t> kAiUsageDailyLimitRange{10, 100000, 10};
   inline constexpr Range<std::int64_t> kTailscaleRefreshSecondsRange{3, 120, 1};
   inline constexpr Range<std::int64_t> kScreenCornersSizeRange{1, 100, 1};
   inline constexpr Range<std::int64_t> kHotCornersDelayMsRange{0, 2000, 50};

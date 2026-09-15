@@ -2,8 +2,11 @@
 
 #include "config/config_types.h"
 #include "core/log.h"
+#include "i18n/i18n.h"
+#include "notification/notifications.h"
 #include "wayland/virtual_keyboard_service.h"
 
+#include <chrono>
 #include <optional>
 
 namespace clipboard_paste {
@@ -40,6 +43,15 @@ namespace clipboard_paste {
     }
 
     kLog.warn("clipboard auto-paste failed: Wayland virtual keyboard unavailable");
+    static std::chrono::steady_clock::time_point lastNotice{};
+    const auto now = std::chrono::steady_clock::now();
+    if (lastNotice.time_since_epoch().count() == 0 || now - lastNotice >= std::chrono::seconds(8)) {
+      lastNotice = now;
+      notify::error(
+          "Noctalia", i18n::tr("clipboard.auto-paste-unavailable-title"),
+          i18n::tr("clipboard.auto-paste-unavailable-body")
+      );
+    }
     return false;
   }
 
