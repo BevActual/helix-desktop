@@ -427,6 +427,13 @@
       "saved": "Saved in noctalia-outputs.kdl",
       "layout-error": "Display layout"
     },
+    "dock": {
+      "auto-hide": "Auto-hide",
+      "enable": "Show dock",
+      "pinned": "Pinned apps",
+      "position": "Position",
+      "show-running": "Show running apps"
+    },
     "settings": {
       "configure": "Settings",
       "search-placeholder": "Search pages and settings"
@@ -5482,7 +5489,8 @@
       "current-label": "Current",
       "favorite-current": "Add current wallpaper to favorites",
       "filter-placeholder": "Filter…",
-      "flatten": "Flatten",
+      "flatten-disable": "Group wallpapers by folder",
+      "flatten-enable": "Show nested folders in one list",
       "loading": "Loading wallpapers…",
       "lock-clear": "Use the desktop wallpaper on the lock screen",
       "lock-set": "Use this wallpaper on the lock screen",
@@ -5539,12 +5547,14 @@
         "ratio-any": "Any",
         "ratio-portrait": "All Portrait",
         "ratio-wide": "All Wide",
+        "resolution-from-monitor": "Use this monitor's resolution",
         "resolution-height": "Height",
         "resolution-mode-atleast": "At Least",
         "resolution-mode-exact": "Exact",
         "resolution-width": "Width",
         "search": "Search",
-        "search-placeholder": "Search tags (e.g. nature, city night)",
+        "search-placeholder": "Tags or a Wallhaven link…",
+        "search-tooltip": "Search tags (exclude with -tag), or paste a wallpaper / search URL. Searches as you type.",
         "sort-asc": "Ascending",
         "sort-date-added": "Date Added",
         "sort-desc": "Descending",

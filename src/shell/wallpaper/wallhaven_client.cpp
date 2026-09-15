@@ -4,9 +4,14 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <ranges>
 #include <system_error>
 
 namespace wallpaper::wallhaven {
@@ -16,6 +21,67 @@ namespace wallpaper::wallhaven {
         "",     "wide",  "portrait", "16x9", "16x10", "21x9", "32x9", "48x9",
         "9x16", "10x16", "9x18",     "1x1",  "3x2",   "4x3",  "5x4",
     };
+
+    [[nodiscard]] bool isWallhavenIdChar(char ch) {
+      return std::isalnum(static_cast<unsigned char>(ch)) != 0;
+    }
+
+    [[nodiscard]] std::optional<std::string> wallpaperIdFromText(std::string_view text) {
+      constexpr std::string_view kPath = "wallhaven.cc/w/";
+      if (const auto pos = text.find(kPath); pos != std::string_view::npos) {
+        const std::size_t start = pos + kPath.size();
+        std::size_t end = start;
+        while (end < text.size() && isWallhavenIdChar(text[end])) {
+          ++end;
+        }
+        if (end - start >= 4) {
+          return std::string(text.substr(start, end - start));
+        }
+      }
+
+      constexpr std::string_view kFile = "wallhaven-";
+      if (const auto pos = text.find(kFile); pos != std::string_view::npos) {
+        const std::size_t start = pos + kFile.size();
+        std::size_t end = start;
+        while (end < text.size() && isWallhavenIdChar(text[end])) {
+          ++end;
+        }
+        if (end - start >= 4) {
+          return std::string(text.substr(start, end - start));
+        }
+      }
+      return std::nullopt;
+    }
+
+    [[nodiscard]] std::optional<std::string> queryParamValue(std::string_view text, std::string_view key) {
+      const std::string needleQ = "?" + std::string(key) + "=";
+      const std::string needleA = "&" + std::string(key) + "=";
+      std::size_t pos = text.find(needleQ);
+      if (pos == std::string_view::npos) {
+        pos = text.find(needleA);
+      }
+      if (pos == std::string_view::npos) {
+        return std::nullopt;
+      }
+      const std::size_t start = pos + key.size() + 2;
+      const std::size_t end = std::min(text.find_first_of("&#", start), text.size());
+      const std::string formEncoded = StringUtils::replaceAll(text.substr(start, end - start), "+", " ");
+      return StringUtils::urlDecode(formEncoded);
+    }
+
+    [[nodiscard]] std::string collapseSearchTokens(std::string_view text) {
+      const std::string commasAsSpaces = StringUtils::replaceAll(text, ",", " ");
+      const auto parts = StringUtils::splitWhitespace(commasAsSpaces);
+      if (parts.empty()) {
+        return {};
+      }
+      std::string out = parts.front();
+      for (std::size_t i = 1; i < parts.size(); ++i) {
+        out += ' ';
+        out += parts[i];
+      }
+      return out;
+    }
 
     [[nodiscard]] std::optional<int> parsePositiveInt(std::string_view text) {
       const std::string trimmed = StringUtils::trim(text);
@@ -53,7 +119,7 @@ namespace wallpaper::wallhaven {
     }
 
     [[nodiscard]] bool relevanceWithoutQuery(const SearchQuery& query) {
-      return query.sort == Sort::Relevance && StringUtils::trim(query.tags).empty();
+      return query.sort == Sort::Relevance && normalizeSearchQuery(query.tags).empty();
     }
 
     [[nodiscard]] std::string jsonString(const nlohmann::json& obj, std::string_view key) {
@@ -65,6 +131,29 @@ namespace wallpaper::wallhaven {
     }
 
   } // namespace
+
+  std::string normalizeSearchQuery(std::string_view raw) {
+    std::string text = StringUtils::trim(raw);
+    if (text.empty()) {
+      return {};
+    }
+
+    const bool looksLikeLink = text.find("://") != std::string::npos || text.find("wallhaven.cc") != std::string::npos;
+    if (looksLikeLink) {
+      if (const auto id = wallpaperIdFromText(text)) {
+        return "id:" + *id;
+      }
+      if (const auto query = queryParamValue(text, "q")) {
+        text = StringUtils::trim(*query);
+      }
+    } else if (text.starts_with("wallhaven-") || text.find("/wallhaven-") != std::string::npos) {
+      if (const auto id = wallpaperIdFromText(text)) {
+        return "id:" + *id;
+      }
+    }
+
+    return collapseSearchTokens(text);
+  }
 
   std::string categoriesParam(const SearchQuery& query) {
     std::string value;
@@ -170,7 +259,7 @@ namespace wallpaper::wallhaven {
     url += "&order=";
     url += orderParam(query.order);
 
-    const std::string tags = StringUtils::trim(query.tags);
+    const std::string tags = normalizeSearchQuery(query.tags);
     if (!tags.empty()) {
       url += "&q=";
       url += StringUtils::urlEncode(tags);
@@ -236,6 +325,8 @@ namespace wallpaper::wallhaven {
       const auto thumbsIt = entry.find("thumbs");
       if (thumbsIt != entry.end() && thumbsIt->is_object()) {
         item.thumbLarge = jsonString(*thumbsIt, "large");
+        item.thumbOriginal = jsonString(*thumbsIt, "original");
+        item.thumbSmall = jsonString(*thumbsIt, "small");
       }
       if (item.id.empty() || item.path.empty()) {
         continue;
@@ -275,6 +366,23 @@ namespace wallpaper::wallhaven {
       }
     }
     return filtered;
+  }
+
+  std::vector<std::string> thumbDownloadUrls(const Item& item) {
+    std::vector<std::string> urls;
+    const auto add = [&](const std::string& url) {
+      if (url.empty()) {
+        return;
+      }
+      if (std::ranges::find(urls, url) != urls.end()) {
+        return;
+      }
+      urls.push_back(url);
+    };
+    add(item.thumbLarge);
+    add(item.thumbOriginal);
+    add(item.thumbSmall);
+    return urls;
   }
 
   std::string fileExtension(const Item& item) {

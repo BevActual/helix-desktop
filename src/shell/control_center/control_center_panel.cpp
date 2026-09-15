@@ -19,8 +19,10 @@
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "shell/control_center/plugin_control_center_tab.h"
+#include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/appearance_tab.h"
+#include "shell/control_center/tabs/dock_tab.h"
 #include "shell/control_center/tabs/ai_usage_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
@@ -49,6 +51,7 @@
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/settings/settings_content_plugins.h"
+#include "shell/settings/settings_registry.h"
 #include "shell/panel/panel_manager.h"
 #include "wayland/wayland_seat.h"
 #include "system/dependency_service.h"
@@ -214,7 +217,6 @@ namespace {
   bool isSettingsEditorTab(std::string_view id) {
     return id == "bar"
         || id == "launcher"
-        || id == "dock"
         || id == "desktop"
         || id == "panels"
         || id == "osd"
@@ -248,26 +250,8 @@ namespace {
         || id == "tailscale"
         || id == "localsend"
         || id == "plugins"
-        || id == "home";
-  }
-
-  std::string tabIdForSettingsSection(std::string_view section) {
-    if (section.empty()) {
-      return "appearance";
-    }
-    if (section == "location") {
-      return "weather";
-    }
-    if (section == "services") {
-      return "calendar";
-    }
-    if (section == "screenshot" || section == "screen-record") {
-      return "capture";
-    }
-    if (section == "ai-usage") {
-      return "ai";
-    }
-    return std::string(section);
+        || id == "home"
+        || id == "dock";
   }
 
   [[nodiscard]] std::string resolveOpenTabId(std::string_view context) {
@@ -402,7 +386,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("capture", std::make_unique<CaptureTab>(services));
   add("clipboard", std::make_unique<ClipboardTab>(services));
   add("desktop", std::make_unique<SettingsTab>(services, "desktop"));
-  add("dock", std::make_unique<SettingsTab>(services, "dock"));
+  add("dock", std::make_unique<DockTab>(services));
   add("panels", std::make_unique<SettingsTab>(services, "panels"));
   add("launcher", std::make_unique<SettingsTab>(services, "launcher"));
   add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
@@ -1630,18 +1614,36 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     }
   } else if (searching) {
     auto* slot = slotById(m_activeTabId);
-    const bool stayOnTab = isSettingsEditorTab(m_activeTabId)
-        || (isLiveSettingsHost(m_activeTabId)
-            && slot != nullptr
-            && slot->tab != nullptr
-            && slot->tab->configureMode());
-    if (!stayOnTab) {
-      selectTab("appearance", false);
-      if (auto* appearance = slotById("appearance"); appearance != nullptr && appearance->tab != nullptr) {
-        appearance->tab->setConfigureMode(true);
+    const bool hasSettingsPane = isSettingsEditorTab(m_activeTabId)
+        || isLiveSettingsHost(m_activeTabId)
+        || (slot != nullptr && slot->tab != nullptr && slot->tab->settingsPane() != nullptr);
+
+    std::vector<std::string> currentSections;
+    if (m_activeTabId == "capture") {
+      currentSections = {"screenshot", "screen-record"};
+    } else if (slot != nullptr && slot->tab != nullptr) {
+      if (const auto* pane = slot->tab->settingsPane(); pane != nullptr && !pane->section().empty()) {
+        currentSections.push_back(pane->section());
       }
-    } else if (isLiveSettingsHost(m_activeTabId) && slot != nullptr && slot->tab != nullptr) {
-      slot->tab->setConfigureMode(true);
+    }
+
+    std::vector<settings::SettingEntry> registry;
+    if (m_config != nullptr) {
+      const Config& cfg = m_config->config();
+      const BarConfig* bar = cfg.bars.empty() ? nullptr : &cfg.bars.front();
+      registry = settings::buildSettingsRegistry(cfg, bar);
+    }
+
+    const auto target = resolveSettingsSearchTarget(
+        m_activeTabId, hasSettingsPane, currentSections, registry, m_searchQuery
+    );
+    if (!target.stayOnCurrent) {
+      selectTab(target.tabId, false);
+    }
+    if (target.configureMode) {
+      if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
+        active->tab->setConfigureMode(true);
+      }
     }
   }
   syncTabVisibility();

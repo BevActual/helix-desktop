@@ -52,6 +52,8 @@ namespace wallpaper::wallhaven {
     std::string resolution;
     std::string purity;
     std::string thumbLarge;
+    std::string thumbOriginal;
+    std::string thumbSmall;
   };
 
   struct SearchResponse {
@@ -60,6 +62,7 @@ namespace wallpaper::wallhaven {
     std::string error;
   };
 
+  [[nodiscard]] std::string normalizeSearchQuery(std::string_view raw);
   [[nodiscard]] std::string categoriesParam(const SearchQuery& query);
   [[nodiscard]] std::string purityParam(const SearchQuery& query, bool nsfwAllowed);
   [[nodiscard]] std::string_view sortParam(Sort sort);
@@ -71,6 +74,7 @@ namespace wallpaper::wallhaven {
   [[nodiscard]] std::string buildSearchUrl(const SearchQuery& query, bool nsfwAllowed);
   [[nodiscard]] SearchResponse parseSearchBody(std::string_view body);
   [[nodiscard]] std::vector<Item> filterByAspectRatio(std::vector<Item> items, std::size_t aspectRatioIndex);
+  [[nodiscard]] std::vector<std::string> thumbDownloadUrls(const Item& item);
   [[nodiscard]] std::string fileExtension(const Item& item);
   [[nodiscard]] std::filesystem::path thumbCacheDir();
   [[nodiscard]] std::filesystem::path thumbCachePath(std::string_view id);

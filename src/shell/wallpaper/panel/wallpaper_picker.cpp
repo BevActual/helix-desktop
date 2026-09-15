@@ -72,10 +72,12 @@ namespace {
 
   constexpr Logger kLog("wp-panel");
   constexpr auto kFilterDebounceInterval = std::chrono::milliseconds(120);
+  constexpr auto kWallhavenSearchDebounceInterval = std::chrono::milliseconds(400);
   constexpr float kMinTileWidth = 180.0F;
   constexpr float kCurrentThumbWidth = 88.0F;
   constexpr float kCurrentThumbHeight = 52.0F;
   constexpr float kMonitorSelectMinWidth = 136.0F;
+  constexpr float kFilterMinWidth = 160.0F;
   constexpr float kFavoriteSelectMinWidth = 168.0F;
   constexpr float kFavoritesMetaRowGap = Style::spaceSm;
   constexpr float kTileAspect = 0.78F; // height / width, leaves room for label under widescreen thumb
@@ -269,6 +271,11 @@ namespace {
       return wallpaperDirectoriesEquivalent(favoriteFile.parent_path(), activeDir);
     }
     return wallpaperPathInsideDirectory(favoriteFile, activeDir);
+  }
+
+  [[nodiscard]] bool thumbCacheFileReady(const std::filesystem::path& dest) {
+    std::error_code ec;
+    return std::filesystem::is_regular_file(dest, ec) && std::filesystem::file_size(dest, ec) > 0;
   }
 
 } // namespace
@@ -465,9 +472,30 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       .gap = Style::spaceSm * scale,
   });
 
+  const auto iconButton = [scale](
+                              Button** out, std::string_view glyph, std::string tooltip, ButtonVariant variant,
+                              std::function<void()> onClick, bool visible = true
+                          ) {
+    return ui::button({
+        .out = out,
+        .glyph = std::string(glyph),
+        .glyphSize = Style::fontSizeBody * scale,
+        .variant = variant,
+        .tooltip = std::move(tooltip),
+        .minWidth = Style::controlHeightSm * scale,
+        .minHeight = Style::controlHeightSm * scale,
+        .padding = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .visible = visible,
+        .participatesInLayout = visible,
+        .onClick = std::move(onClick),
+    });
+  };
+
   auto toolbar = ui::row({
       .out = &m_toolbar,
       .align = FlexAlign::Center,
+      .wrap = true,
       .gap = Style::spaceSm * scale,
       .fillWidth = true,
   });
@@ -477,7 +505,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
         ui::label({
             .out = &m_title,
             .text = i18n::tr("wallpaper.panel.title"),
-            .fontSize = Style::fontSizeTitle * scale,
+            .fontSize = Style::fontSizeBody * scale,
             .fontWeight = FontWeight::Bold,
             .color = colorSpecFromRole(ColorRole::Primary),
         })
@@ -503,19 +531,47 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
   );
 
   toolbar->addChild(
+      ui::segmented({
+          .out = &m_dailyProviderSegmented,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {.label = i18n::tr("wallpaper.panel.daily.bing")},
+                  {.label = i18n::tr("wallpaper.panel.daily.nasa")},
+              },
+          .selectedIndex = dailyProvider() == WallpaperDailyProvider::Nasa ? std::size_t{1} : std::size_t{0},
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .visible = m_browseSource == BrowseSource::Daily,
+          .participatesInLayout = m_browseSource == BrowseSource::Daily,
+          .onChange =
+              [this](std::size_t index) {
+                persistDailyProvider(index == 1 ? WallpaperDailyProvider::Nasa : WallpaperDailyProvider::Bing);
+                fetchDaily(true);
+              },
+      })
+  );
+
+  toolbar->addChild(
       ui::input({
           .out = &m_filterInput,
           .placeholder = i18n::tr("wallpaper.panel.filter-placeholder"),
           .fontSize = Style::fontSizeBody * scale,
           .controlHeight = Style::controlHeightSm * scale,
           .horizontalPadding = Style::spaceMd * scale,
+          .clearButtonEnabled = true,
+          .minLayoutWidth = kFilterMinWidth * scale,
           .surfaceOpacity = panelCardOpacity(),
-          .width = 210.0F * scale,
           .height = 0.0F,
+          .flexGrow = 1.0F,
           .onChange =
               [this](const std::string& text) {
                 if (m_browseSource == BrowseSource::Wallhaven) {
+                  if (text == m_wallhavenQuery.tags) {
+                    return;
+                  }
                   m_wallhavenQuery.tags = text;
+                  m_filterDebounceTimer.start(kWallhavenSearchDebounceInterval, [this]() { commitWallhavenSearch(); });
                   return;
                 }
                 if (text == m_pendingFilterQuery) {
@@ -545,200 +601,111 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
               [this](const std::string& text) {
                 if (m_browseSource == BrowseSource::Wallhaven) {
                   m_wallhavenQuery.tags = text;
-                  fetchWallhaven(true);
+                  commitWallhavenSearch();
                 }
               },
           .onKeyEvent = [this](std::uint32_t sym, std::uint32_t modifiers) { return handleKeyEvent(sym, modifiers); },
       })
   );
 
-  toolbar->addChild(
+  toolbar->addChild(iconButton(
+      &m_fileButton, "folder-open", i18n::tr("wallpaper.panel.choose-file"), ButtonVariant::Default,
+      [this]() { pickWallpaperFile(); }, m_browseSource != BrowseSource::Video
+  ));
+  toolbar->addChild(iconButton(
+      &m_videoClearButton, "player-stop", i18n::tr("wallpaper.panel.video.clear-tooltip"), ButtonVariant::Default,
+      [this]() { clearVideoWallpaper(); }, m_browseSource == BrowseSource::Video
+  ));
+  toolbar->addChild(iconButton(
+      &m_refreshButton, "refresh", i18n::tr("wallpaper.panel.refresh"), ButtonVariant::Default, [this]() {
+        if (m_browseSource == BrowseSource::Wallhaven) {
+          fetchWallhaven(false);
+          return;
+        }
+        if (m_browseSource == BrowseSource::Daily) {
+          fetchDaily(true);
+          return;
+        }
+        if (m_browseSource == BrowseSource::Video) {
+          refreshVideoEntries();
+          resetSelection();
+          rebindGrid();
+          syncBrowseChrome();
+          m_dirty = true;
+          PanelManager::instance().refresh();
+          return;
+        }
+        if (m_scanner != nullptr) {
+          m_scanner->invalidate();
+        }
+        refreshVisibleEntries();
+        resetSelection();
+        rebindGrid();
+        syncBrowseChrome();
+        m_dirty = true;
+        PanelManager::instance().refresh();
+      }
+  ));
+
+  if (m_showCloseButton) {
+    toolbar->addChild(iconButton(
+        &m_closeButton, "close", i18n::tr("wallpaper.panel.close"), ButtonVariant::Default,
+        []() { PanelManager::instance().close(); }
+    ));
+  }
+
+  root->addChild(std::move(toolbar));
+
+  auto tools = ui::row({
+      .out = &m_toolsRow,
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .visible = m_browseSource == BrowseSource::Library,
+      .participatesInLayout = m_browseSource == BrowseSource::Library,
+  });
+  tools->addChild(iconButton(
+      &m_backButton, "arrow-big-up", i18n::tr("wallpaper.panel.navigate-up"), ButtonVariant::Secondary,
+      [this]() { navigateUp(); }, false
+  ));
+  tools->addChild(
       ui::button({
-          .out = &m_backButton,
-          .glyph = "arrow-big-up",
+          .out = &m_flattenButton,
+          .glyph = "layers-intersect",
           .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Secondary,
-          .tooltip = i18n::tr("wallpaper.panel.navigate-up"),
+          .selected = m_flatten,
+          .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr(m_flatten ? "wallpaper.panel.flatten-disable" : "wallpaper.panel.flatten-enable"),
           .minWidth = Style::controlHeightSm * scale,
           .minHeight = Style::controlHeightSm * scale,
           .padding = Style::spaceXs * scale,
           .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { navigateUp(); },
-      })
-  );
-
-  toolbar->addChild(ui::spacer());
-
-  toolbar->addChild(
-      ui::label({
-          .out = &m_flattenLabel,
-          .text = i18n::tr("wallpaper.panel.flatten"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-
-  toolbar->addChild(
-      ui::toggle({
-          .out = &m_flattenToggle,
-          .checked = m_flatten,
-          .onChange = [this](bool checked) {
-            m_flatten = checked;
-            if (m_config != nullptr) {
-              (void)m_config->setStateBool("wallpaper_panel", "flatten", checked);
-            }
-            refreshVisibleEntries();
-            resetSelection();
-            rebindGrid();
-            syncBrowseChrome();
-            m_dirty = true;
-            PanelManager::instance().refresh();
-          },
-      })
-  );
-
-  toolbar->addChild(
-      ui::select({
-          .out = &m_monitorSelect,
-          .fontSize = Style::fontSizeBody * scale,
-          .controlHeight = Style::controlHeightSm * scale,
-          .surfaceOpacity = panelCardOpacity(),
-          .onSelectionChanged =
-              [this](std::size_t idx, std::string_view) {
-                m_selectedMonitorIndex = idx;
-                m_navStack.clear();
+          .onClick =
+              [this]() {
+                m_flatten = !m_flatten;
+                if (m_config != nullptr) {
+                  (void)m_config->setStateBool("wallpaper_panel", "flatten", m_flatten);
+                }
+                syncFlattenButton();
                 refreshVisibleEntries();
                 resetSelection();
                 rebindGrid();
-                syncBackButton();
                 syncBrowseChrome();
                 m_dirty = true;
                 PanelManager::instance().refresh();
               },
-          .configure = [scale](Select& select) { select.setMinWidth(kMonitorSelectMinWidth * scale); },
       })
   );
-
-  toolbar->addChild(
-      ui::button({
-          .out = &m_fileButton,
-          .glyph = "folder-open",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr("wallpaper.panel.choose-file"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { pickWallpaperFile(); },
-      })
-  );
-
-  toolbar->addChild(
-      ui::button({
-          .out = &m_colorButton,
-          .glyph = "color-picker",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr("wallpaper.panel.choose-color"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { applyColorWallpaper(); },
-      })
-  );
-
-  toolbar->addChild(
-      ui::button({
-          .out = &m_sortButton,
-          .glyph = std::string(sortModeGlyph(m_sortMode)),
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr(sortModeTooltipKey(m_sortMode)),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { cycleSortMode(); },
-      })
-  );
-
-  toolbar->addChild(
-      ui::button({
-          .out = &m_videoClearButton,
-          .glyph = "player-stop",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr("wallpaper.panel.video.clear-tooltip"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .visible = false,
-          .onClick = [this]() { clearVideoWallpaper(); },
-      })
-  );
-
-  toolbar->addChild(
-      ui::button({
-          .out = &m_refreshButton,
-          .glyph = "refresh",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr("wallpaper.panel.refresh"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() {
-            if (m_browseSource == BrowseSource::Wallhaven) {
-              fetchWallhaven(false);
-              return;
-            }
-            if (m_browseSource == BrowseSource::Daily) {
-              fetchDaily(true);
-              return;
-            }
-            if (m_browseSource == BrowseSource::Video) {
-              refreshVideoEntries();
-              resetSelection();
-              rebindGrid();
-              syncBrowseChrome();
-              m_dirty = true;
-              PanelManager::instance().refresh();
-              return;
-            }
-            if (m_scanner != nullptr) {
-              m_scanner->invalidate();
-            }
-            refreshVisibleEntries();
-            resetSelection();
-            rebindGrid();
-            syncBrowseChrome();
-            m_dirty = true;
-            PanelManager::instance().refresh();
-          },
-      })
-  );
-
-  if (m_showCloseButton) {
-    toolbar->addChild(
-        ui::button({
-            .out = &m_closeButton,
-            .glyph = "close",
-            .glyphSize = Style::fontSizeBody * scale,
-            .tooltip = i18n::tr("wallpaper.panel.close"),
-            .minWidth = Style::controlHeightSm * scale,
-            .minHeight = Style::controlHeightSm * scale,
-            .padding = Style::spaceXs * scale,
-            .radius = Style::scaledRadiusMd(scale),
-            .onClick = []() { PanelManager::instance().close(); },
-        })
-    );
-  }
-
-  root->addChild(std::move(toolbar));
+  tools->addChild(iconButton(
+      &m_sortButton, sortModeGlyph(m_sortMode), i18n::tr(sortModeTooltipKey(m_sortMode)), ButtonVariant::Default,
+      [this]() { cycleSortMode(); }
+  ));
+  tools->addChild(iconButton(
+      &m_colorButton, "color-picker", i18n::tr("wallpaper.panel.choose-color"), ButtonVariant::Default,
+      [this]() { applyColorWallpaper(); }
+  ));
+  root->addChild(std::move(tools));
 
   const float thumbRadius = Style::scaledRadiusMd(scale);
   const float thumbW = kCurrentThumbWidth * scale;
@@ -747,6 +714,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
   auto currentStrip = ui::row({
       .out = &m_currentStrip,
       .align = FlexAlign::Center,
+      .wrap = true,
       .gap = Style::spaceMd * scale,
       .paddingV = Style::spaceXs * scale,
       .paddingH = Style::spaceSm * scale,
@@ -815,6 +783,27 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       })
   );
   currentStrip->addChild(std::move(currentInfo));
+  currentStrip->addChild(
+      ui::select({
+          .out = &m_monitorSelect,
+          .fontSize = Style::fontSizeBody * scale,
+          .controlHeight = Style::controlHeightSm * scale,
+          .surfaceOpacity = panelCardOpacity(),
+          .onSelectionChanged =
+              [this](std::size_t idx, std::string_view) {
+                m_selectedMonitorIndex = idx;
+                m_navStack.clear();
+                refreshVisibleEntries();
+                resetSelection();
+                rebindGrid();
+                syncBackButton();
+                syncBrowseChrome();
+                m_dirty = true;
+                PanelManager::instance().refresh();
+              },
+          .configure = [scale](Select& select) { select.setMinWidth(kMonitorSelectMinWidth * scale); },
+      })
+  );
   currentStrip->addChild(
       ui::button({
           .out = &m_favoriteCurrentButton,
@@ -994,7 +983,6 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       .fillWidth = true,
   });
   auto categories = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
-  categories->addChild(wallhavenCaption("wallpaper.panel.wallhaven.filter-categories"));
   categories->addChild(wallhavenChip(
       &m_wallhavenCatGeneral, "wallpaper.panel.wallhaven.category-general",
       [this]() { toggleWallhavenFlag(m_wallhavenQuery.categoryGeneral, m_wallhavenQuery.categoryAnime, m_wallhavenQuery.categoryPeople); }
@@ -1010,7 +998,6 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
   filterRow1->addChild(std::move(categories));
 
   auto purity = ui::row({.align = FlexAlign::Center, .gap = Style::spaceXs * scale});
-  purity->addChild(wallhavenCaption("wallpaper.panel.wallhaven.filter-purity"));
   purity->addChild(wallhavenChip(
       &m_wallhavenPuritySfw, "wallpaper.panel.wallhaven.purity-sfw",
       [this]() { toggleWallhavenFlag(m_wallhavenQuery.puritySfw, m_wallhavenQuery.puritySketchy, m_wallhavenQuery.purityNsfw); }
@@ -1052,6 +1039,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
           .flexGrow = 1.0F,
           .onSelectionChanged =
               [this](std::size_t index, std::string_view) {
+                m_wallhavenSortManual = true;
                 m_wallhavenQuery.sort = static_cast<wallpaper::wallhaven::Sort>(index);
                 fetchWallhaven(true);
               },
@@ -1163,6 +1151,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                 m_wallhavenQuery.resolutionWidth = StringUtils::trim(text);
                 fetchWallhaven(true);
               },
+          .submitOnFocusLoss = true,
       })
   );
   resolution->addChild(
@@ -1186,17 +1175,33 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                 m_wallhavenQuery.resolutionHeight = StringUtils::trim(text);
                 fetchWallhaven(true);
               },
+          .submitOnFocusLoss = true,
+      })
+  );
+  resolution->addChild(
+      ui::button({
+          .out = &m_wallhavenResFromMonitor,
+          .glyph = "dimensions",
+          .glyphSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Outline,
+          .tooltip = i18n::tr("wallpaper.panel.wallhaven.resolution-from-monitor"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick = [this]() { applyMonitorResolutionFilter(); },
       })
   );
   resolution->addChild(
       ui::button({
           .out = &m_wallhavenClearRes,
-          .text = i18n::tr("wallpaper.panel.wallhaven.clear-resolution"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .controlHeight = Style::controlHeightSm * scale,
+          .glyph = "x",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Destructive,
-          .paddingV = Style::spaceXs * scale,
-          .paddingH = Style::spaceSm * scale,
+          .tooltip = i18n::tr("wallpaper.panel.wallhaven.clear-resolution"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
           .radius = Style::scaledRadiusMd(scale),
           .onClick =
               [this]() {
@@ -1219,35 +1224,6 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
   filterRow2->addChild(std::move(resolution));
   wallhavenFilters->addChild(std::move(filterRow2));
   root->addChild(std::move(wallhavenFilters));
-
-  auto dailyFilters = ui::row({
-      .out = &m_dailyFilters,
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .fillWidth = true,
-      .visible = false,
-      .participatesInLayout = false,
-  });
-  dailyFilters->addChild(
-      ui::segmented({
-          .out = &m_dailyProviderSegmented,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("wallpaper.panel.daily.bing")},
-                  {.label = i18n::tr("wallpaper.panel.daily.nasa")},
-              },
-          .selectedIndex = dailyProvider() == WallpaperDailyProvider::Nasa ? std::size_t{1} : std::size_t{0},
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .onChange =
-              [this](std::size_t index) {
-                persistDailyProvider(index == 1 ? WallpaperDailyProvider::Nasa : WallpaperDailyProvider::Bing);
-                fetchDaily(true);
-              },
-      })
-  );
-  root->addChild(std::move(dailyFilters));
 
   // ── Body: virtualized scrolling grid ──────────────────────────────────
   m_adapter = std::make_unique<WallpaperGridAdapter>(scale);
@@ -1494,13 +1470,12 @@ void WallpaperPicker::update(Renderer& renderer) {
   if (m_thumbnailRefreshPending && m_thumbnails != nullptr) {
     const bool changed = m_thumbnails->uploadPending(renderer.textureManager());
     m_thumbnailRefreshPending = false;
-    if (changed) {
-      if (m_adapter != nullptr) {
-        m_adapter->setRenderer(&renderer);
-        m_adapter->refreshVisibleThumbnails(renderer);
-      }
-      bindCurrentThumbnail(renderer);
+    if (m_adapter != nullptr) {
+      m_adapter->setRenderer(&renderer);
+      m_adapter->refreshVisibleThumbnails(renderer);
     }
+    bindCurrentThumbnail(renderer);
+    (void)changed;
   }
 }
 
@@ -1541,8 +1516,8 @@ void WallpaperPicker::onOpen(std::string_view context) {
       m_filterInput->setValue("");
     }
   }
-  if (m_flattenToggle != nullptr) {
-    m_flattenToggle->setCheckedImmediate(m_flatten);
+  if (m_flattenButton != nullptr) {
+    syncFlattenButton();
   }
   m_navStack.clear();
   populateMonitorChoices();
@@ -1593,6 +1568,7 @@ void WallpaperPicker::onClose() {
 
   m_rootLayout = nullptr;
   m_toolbar = nullptr;
+  m_toolsRow = nullptr;
   m_currentStrip = nullptr;
   m_currentThumbHost = nullptr;
   m_currentThumb = nullptr;
@@ -1607,15 +1583,13 @@ void WallpaperPicker::onClose() {
   m_monitorSelect = nullptr;
   m_favoriteCurrentButton = nullptr;
   m_filterInput = nullptr;
-  m_flattenToggle = nullptr;
-  m_flattenLabel = nullptr;
+  m_flattenButton = nullptr;
   m_sortButton = nullptr;
   m_refreshButton = nullptr;
   m_fileButton = nullptr;
   m_colorButton = nullptr;
   m_videoClearButton = nullptr;
   m_closeButton = nullptr;
-  m_dailyFilters = nullptr;
   m_dailyProviderSegmented = nullptr;
   m_wallhavenFilters = nullptr;
   m_wallhavenCatGeneral = nullptr;
@@ -1631,6 +1605,7 @@ void WallpaperPicker::onClose() {
   m_wallhavenResWidth = nullptr;
   m_wallhavenResHeight = nullptr;
   m_wallhavenClearRes = nullptr;
+  m_wallhavenResFromMonitor = nullptr;
   m_wallhavenPager = nullptr;
   m_wallhavenPrev = nullptr;
   m_wallhavenNext = nullptr;
@@ -1812,12 +1787,10 @@ std::string WallpaperPicker::displayNameForWallpaperPath(std::string_view path) 
 }
 
 void WallpaperPicker::syncBrowseChrome() {
-  if (m_browseSource == BrowseSource::Wallhaven
-      || m_browseSource == BrowseSource::Video
-      || m_browseSource == BrowseSource::Daily) {
+  if (m_browseSource != BrowseSource::Library) {
     setShown(m_backButton, false);
   } else if (m_backButton != nullptr) {
-    m_backButton->setVisible(!m_navStack.empty());
+    setShown(m_backButton, !m_navStack.empty());
   }
   syncCurrentStrip();
   syncThemeControls();
@@ -1879,12 +1852,7 @@ void WallpaperPicker::syncCurrentStrip() {
   const bool lockActive = lockscreenUsesCurrent();
 
   if (m_currentCaption != nullptr) {
-    std::string caption = i18n::tr("wallpaper.panel.current-label");
-    if (m_selectedMonitorIndex < m_monitorChoices.size() && !m_monitorChoices[m_selectedMonitorIndex].label.empty()) {
-      caption += " · ";
-      caption += m_monitorChoices[m_selectedMonitorIndex].label;
-    }
-    m_currentCaption->setText(caption);
+    m_currentCaption->setText(i18n::tr("wallpaper.panel.current-label"));
   }
   if (m_currentName != nullptr) {
     m_currentName->setText(hasCurrent ? displayNameForWallpaperPath(current) : i18n::tr("wallpaper.panel.current-empty"));
@@ -2530,7 +2498,7 @@ bool WallpaperPicker::handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers)
 
 void WallpaperPicker::syncBackButton() {
   uiAssertNotRendering("WallpaperPicker::syncBackButton");
-  if (m_browseSource == BrowseSource::Wallhaven || m_browseSource == BrowseSource::Video) {
+  if (m_browseSource != BrowseSource::Library) {
     setShown(m_backButton, false);
     return;
   }
@@ -2539,7 +2507,7 @@ void WallpaperPicker::syncBackButton() {
   }
   const bool canNavigateUp = !m_navStack.empty();
   m_backButton->setEnabled(canNavigateUp);
-  m_backButton->setVisible(canNavigateUp);
+  setShown(m_backButton, canNavigateUp);
 }
 
 void WallpaperPicker::navigateInto(const std::filesystem::path& dir) {
@@ -2629,6 +2597,29 @@ const char* WallpaperPicker::sortModeTooltipKey(SortMode mode) {
   default:
     return "wallpaper.panel.sort-name-asc";
   }
+}
+
+void WallpaperPicker::syncFlattenButton() {
+  if (m_flattenButton == nullptr) {
+    return;
+  }
+  m_flattenButton->setSelected(m_flatten);
+  m_flattenButton->setTooltip(
+      i18n::tr(m_flatten ? "wallpaper.panel.flatten-disable" : "wallpaper.panel.flatten-enable")
+  );
+
+  if (!m_flattenButton->hovered()) {
+    return;
+  }
+  InputArea* area = m_flattenButton->inputArea();
+  if (area == nullptr || !area->hasTooltip()) {
+    return;
+  }
+  const auto parentCtx = PanelManager::instance().fallbackPopupParentContext();
+  if (!parentCtx.has_value() || parentCtx->layerSurface == nullptr || parentCtx->output == nullptr) {
+    return;
+  }
+  TooltipManager::instance().onHoverChange(area, parentCtx->layerSurface, parentCtx->output);
 }
 
 void WallpaperPicker::syncSortButtonGlyph() {
@@ -2844,6 +2835,7 @@ void WallpaperPicker::pickWallpaperFile() {
 }
 
 void WallpaperPicker::setBrowseSource(BrowseSource source, bool fetchIfNeeded) {
+  m_filterDebounceTimer.stop();
   m_browseSource = source;
   if (m_config != nullptr) {
     (void)m_config->setStateString("wallpaper_panel", "source", std::string(browseSourceStateValue(source)));
@@ -2874,10 +2866,6 @@ void WallpaperPicker::setBrowseSource(BrowseSource source, bool fetchIfNeeded) {
       bindDailyGrid();
     }
   } else {
-    m_filterDebounceTimer.stop();
-    if (m_filterInput != nullptr) {
-      m_filterInput->setValue(m_filterQuery);
-    }
     refreshVisibleEntries();
     rebindGrid(true);
   }
@@ -2893,35 +2881,33 @@ void WallpaperPicker::syncSourceChrome() {
   const bool wallhaven = m_browseSource == BrowseSource::Wallhaven;
   const bool video = m_browseSource == BrowseSource::Video;
   const bool daily = m_browseSource == BrowseSource::Daily;
-  if (m_title != nullptr) {
-    const char* titleKey = wallhaven ? "wallpaper.panel.wallhaven.title"
-        : video                      ? "wallpaper.panel.video.title"
-        : daily                      ? "wallpaper.panel.daily.title"
-                                     : "wallpaper.panel.title";
-    m_title->setText(i18n::tr(titleKey));
-  }
   if (m_filterInput != nullptr) {
     const char* placeholderKey = wallhaven ? "wallpaper.panel.wallhaven.search-placeholder"
         : video                               ? "wallpaper.panel.video.filter-placeholder"
         : daily                               ? "wallpaper.panel.daily.filter-placeholder"
                                               : "wallpaper.panel.filter-placeholder";
     m_filterInput->setPlaceholder(i18n::tr(placeholderKey));
+    if (InputArea* area = m_filterInput->inputArea(); area != nullptr) {
+      if (wallhaven) {
+        area->setTooltip(i18n::tr("wallpaper.panel.wallhaven.search-tooltip"));
+      } else {
+        area->clearTooltip();
+      }
+    }
   }
-  setShown(m_flattenLabel, library);
-  setShown(m_flattenToggle, library);
-  setShown(m_colorButton, library);
-  setShown(m_sortButton, library);
+  setShown(m_toolsRow, library);
+  setShown(m_dailyProviderSegmented, daily);
   setShown(m_fileButton, !video);
   setShown(m_videoClearButton, video);
   setShown(m_wallhavenFilters, wallhaven);
   setShown(m_wallhavenPager, wallhaven);
-  setShown(m_dailyFilters, daily);
   if (m_dailyProviderSegmented != nullptr) {
     m_dailyProviderSegmented->setSelectedIndex(dailyProvider() == WallpaperDailyProvider::Nasa ? 1 : 0);
   }
   if (m_adapter != nullptr) {
     m_adapter->setStarsEnabled(library);
   }
+  syncFlattenButton();
   syncVideoStatus();
   syncDailyChrome();
   syncWallhavenFilters();
@@ -3100,6 +3086,9 @@ void WallpaperPicker::syncWallhavenFilters() {
         i18n::tr(desc ? "wallpaper.panel.wallhaven.sort-desc" : "wallpaper.panel.wallhaven.sort-asc")
     );
   }
+  if (m_wallhavenResFromMonitor != nullptr) {
+    m_wallhavenResFromMonitor->setEnabled(selectedMonitorPixelSize().has_value());
+  }
 }
 
 void WallpaperPicker::syncWallhavenPager() {
@@ -3150,6 +3139,94 @@ void WallpaperPicker::bindWallhavenGrid() {
   }
   rebindGrid();
   syncWallhavenPager();
+}
+
+void WallpaperPicker::commitWallhavenSearch() {
+  m_filterDebounceTimer.stop();
+  if (m_browseSource != BrowseSource::Wallhaven) {
+    return;
+  }
+  const std::string normalized = wallpaper::wallhaven::normalizeSearchQuery(m_wallhavenQuery.tags);
+  m_wallhavenQuery.tags = normalized;
+  if (m_filterInput != nullptr && m_filterInput->value() != normalized) {
+    m_filterInput->setValue(normalized);
+  }
+  syncWallhavenSearchSort();
+  fetchWallhaven(true);
+}
+
+void WallpaperPicker::syncWallhavenSearchSort() {
+  const bool hasQuery = !wallpaper::wallhaven::normalizeSearchQuery(m_wallhavenQuery.tags).empty();
+  if (!hasQuery) {
+    m_wallhavenSortManual = false;
+    if (m_wallhavenQuery.sort == wallpaper::wallhaven::Sort::Relevance) {
+      m_wallhavenQuery.sort = wallpaper::wallhaven::Sort::DateAdded;
+    }
+  } else if (!m_wallhavenSortManual && m_wallhavenQuery.sort == wallpaper::wallhaven::Sort::DateAdded) {
+    m_wallhavenQuery.sort = wallpaper::wallhaven::Sort::Relevance;
+  }
+  if (m_wallhavenSortSelect != nullptr) {
+    m_wallhavenSortSelect->setSelectedIndexSilently(static_cast<std::size_t>(m_wallhavenQuery.sort));
+  }
+}
+
+std::optional<std::pair<int, int>> WallpaperPicker::selectedMonitorPixelSize() const {
+  if (m_wayland == nullptr) {
+    return std::nullopt;
+  }
+
+  const auto sizeOf = [](const WaylandOutput& out) -> std::optional<std::pair<int, int>> {
+    if (out.width <= 0 || out.height <= 0) {
+      return std::nullopt;
+    }
+    return std::pair{out.width, out.height};
+  };
+
+  if (m_selectedMonitorIndex == 0 || m_selectedMonitorIndex >= m_monitorChoices.size()
+      || m_monitorChoices[m_selectedMonitorIndex].connector.empty()) {
+    std::optional<std::pair<int, int>> best;
+    long bestArea = 0;
+    for (const auto& out : m_wayland->outputs()) {
+      const auto size = sizeOf(out);
+      if (!size.has_value()) {
+        continue;
+      }
+      const long area = static_cast<long>(size->first) * static_cast<long>(size->second);
+      if (!best.has_value() || area > bestArea) {
+        best = size;
+        bestArea = area;
+      }
+    }
+    return best;
+  }
+
+  const std::string& connector = m_monitorChoices[m_selectedMonitorIndex].connector;
+  for (const auto& out : m_wayland->outputs()) {
+    if (out.connectorName == connector) {
+      return sizeOf(out);
+    }
+  }
+  return std::nullopt;
+}
+
+void WallpaperPicker::applyMonitorResolutionFilter() {
+  const auto size = selectedMonitorPixelSize();
+  if (!size.has_value()) {
+    return;
+  }
+  m_wallhavenQuery.resolutionMode = wallpaper::wallhaven::ResolutionMode::AtLeast;
+  m_wallhavenQuery.resolutionWidth = std::to_string(size->first);
+  m_wallhavenQuery.resolutionHeight = std::to_string(size->second);
+  if (m_wallhavenResolutionMode != nullptr) {
+    m_wallhavenResolutionMode->setSelectedIndexSilently(0);
+  }
+  if (m_wallhavenResWidth != nullptr) {
+    m_wallhavenResWidth->setValue(m_wallhavenQuery.resolutionWidth);
+  }
+  if (m_wallhavenResHeight != nullptr) {
+    m_wallhavenResHeight->setValue(m_wallhavenQuery.resolutionHeight);
+  }
+  fetchWallhaven(true);
 }
 
 void WallpaperPicker::fetchWallhaven(bool resetPage) {
@@ -3247,11 +3324,14 @@ void WallpaperPicker::queueWallhavenThumbs() {
   }
   for (const auto& item : m_wallhavenItems) {
     const auto dest = wallpaper::wallhaven::thumbCachePath(item.id);
-    if (dest.empty() || item.thumbLarge.empty()) {
+    if (dest.empty() || wallpaper::wallhaven::thumbDownloadUrls(item).empty()) {
       continue;
     }
-    if (std::filesystem::is_regular_file(dest, ec)) {
+    if (thumbCacheFileReady(dest)) {
       continue;
+    }
+    if (std::filesystem::exists(dest, ec)) {
+      std::filesystem::remove(dest, ec);
     }
     m_wallhavenThumbQueue.push_back(item.id);
   }
@@ -3264,19 +3344,22 @@ void WallpaperPicker::pumpWallhavenThumbs() {
     const std::string id = std::move(m_wallhavenThumbQueue.front());
     m_wallhavenThumbQueue.erase(m_wallhavenThumbQueue.begin());
     const auto* item = wallhavenItemById(id);
-    if (item == nullptr || item->thumbLarge.empty()) {
+    if (item == nullptr) {
       continue;
     }
+    auto urls = wallpaper::wallhaven::thumbDownloadUrls(*item);
     const auto dest = wallpaper::wallhaven::thumbCachePath(id);
-    if (dest.empty()) {
+    if (dest.empty() || urls.empty()) {
       continue;
     }
     ++m_wallhavenThumbActive;
-    m_http->download(item->thumbLarge, dest, [this, id](bool ok) {
+    m_http->download(std::move(urls), dest, [this, id](bool ok) {
       --m_wallhavenThumbActive;
-      if (ok && m_rootLayout != nullptr && m_browseSource == BrowseSource::Wallhaven) {
-        rebindGrid();
-        m_dirty = true;
+      if (m_rootLayout != nullptr && m_browseSource == BrowseSource::Wallhaven) {
+        if (!ok) {
+          kLog.warn("wallhaven thumb download failed id={}", id);
+        }
+        m_thumbnailRefreshPending = true;
         PanelManager::instance().requestUpdateOnly();
       }
       pumpWallhavenThumbs();
@@ -3534,8 +3617,11 @@ void WallpaperPicker::queueDailyThumbs() {
     if (dest.empty() || item.thumbUrl.empty()) {
       continue;
     }
-    if (std::filesystem::is_regular_file(dest, ec)) {
+    if (thumbCacheFileReady(dest)) {
       continue;
+    }
+    if (std::filesystem::exists(dest, ec)) {
+      std::filesystem::remove(dest, ec);
     }
     m_dailyThumbQueue.push_back(item.id);
   }
@@ -3558,9 +3644,11 @@ void WallpaperPicker::pumpDailyThumbs() {
     ++m_dailyThumbActive;
     m_http->download(item->thumbUrl, dest, [this, id](bool ok) {
       --m_dailyThumbActive;
-      if (ok && m_rootLayout != nullptr && m_browseSource == BrowseSource::Daily) {
-        rebindGrid();
-        m_dirty = true;
+      if (m_rootLayout != nullptr && m_browseSource == BrowseSource::Daily) {
+        if (!ok) {
+          kLog.warn("daily thumb download failed id={}", id);
+        }
+        m_thumbnailRefreshPending = true;
         PanelManager::instance().requestUpdateOnly();
       }
       pumpDailyThumbs();

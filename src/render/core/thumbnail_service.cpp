@@ -281,8 +281,15 @@ TextureHandle ThumbnailService::acquire(const std::string& path, int targetPx) {
   const RequestKey key{.path = path, .targetPx = targetPx};
   CacheEntry& entry = m_entries[key];
   ++entry.refCount;
-  if (entry.handle.id != 0 || entry.failed) {
+  if (entry.handle.id != 0) {
     return entry.handle;
+  }
+  if (entry.failed) {
+    std::error_code ec;
+    if (!std::filesystem::is_regular_file(path, ec) || std::filesystem::file_size(path, ec) == 0) {
+      return {};
+    }
+    entry.failed = false;
   }
 
   enqueueDecodeIfNeeded(key);

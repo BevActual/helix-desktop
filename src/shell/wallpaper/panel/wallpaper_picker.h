@@ -17,6 +17,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 class AnimationManager;
@@ -34,7 +35,6 @@ class Renderer;
 class Segmented;
 class Select;
 class Spinner;
-class Toggle;
 class VideoWallpaperService;
 class VirtualGridView;
 class WallpaperGridAdapter;
@@ -123,6 +123,7 @@ private:
   void sortVisibleEntries();
   void reseedRandomSort();
   void syncSortButtonGlyph();
+  void syncFlattenButton();
   void cycleSortMode();
   void setSortMode(SortMode mode);
   [[nodiscard]] static SortMode sortModeFromState(std::string_view value);
@@ -165,6 +166,10 @@ private:
   [[nodiscard]] static std::string_view browseSourceStateValue(BrowseSource source);
   [[nodiscard]] static BrowseSource browseSourceFromState(std::string_view value);
   void fetchWallhaven(bool resetPage);
+  void commitWallhavenSearch();
+  void syncWallhavenSearchSort();
+  void applyMonitorResolutionFilter();
+  [[nodiscard]] std::optional<std::pair<int, int>> selectedMonitorPixelSize() const;
   void applyWallhavenItem(std::string_view id);
   void queueWallhavenThumbs();
   void pumpWallhavenThumbs();
@@ -206,6 +211,7 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Flex* m_toolbar = nullptr;
+  Flex* m_toolsRow = nullptr;
   Flex* m_currentStrip = nullptr;
   Box* m_currentThumbHost = nullptr;
   Image* m_currentThumb = nullptr;
@@ -223,15 +229,13 @@ private:
   Select* m_monitorSelect = nullptr;
   Input* m_filterInput = nullptr;
   Button* m_favoriteCurrentButton = nullptr;
-  Toggle* m_flattenToggle = nullptr;
-  Label* m_flattenLabel = nullptr;
+  Button* m_flattenButton = nullptr;
   Button* m_sortButton = nullptr;
   Button* m_refreshButton = nullptr;
   Button* m_fileButton = nullptr;
   Button* m_colorButton = nullptr;
   Button* m_videoClearButton = nullptr;
   Button* m_closeButton = nullptr;
-  Flex* m_dailyFilters = nullptr;
   Segmented* m_dailyProviderSegmented = nullptr;
   Flex* m_wallhavenFilters = nullptr;
   Button* m_wallhavenCatGeneral = nullptr;
@@ -247,6 +251,7 @@ private:
   Input* m_wallhavenResWidth = nullptr;
   Input* m_wallhavenResHeight = nullptr;
   Button* m_wallhavenClearRes = nullptr;
+  Button* m_wallhavenResFromMonitor = nullptr;
   Flex* m_wallhavenPager = nullptr;
   Button* m_wallhavenPrev = nullptr;
   Button* m_wallhavenNext = nullptr;
@@ -289,6 +294,7 @@ private:
   std::string m_wallhavenSelectedId;
   int m_wallhavenThumbActive = 0;
   std::vector<std::string> m_wallhavenThumbQueue;
+  bool m_wallhavenSortManual = false;
   std::vector<wallpaper::daily::Item> m_dailyItems;
   std::uint64_t m_dailySearchGeneration = 0;
   std::uint64_t m_dailyApplyGeneration = 0;

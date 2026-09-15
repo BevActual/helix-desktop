@@ -40,8 +40,23 @@ int main() {
   query.tags = " mountains ";
   ok = expect(apiPage(query) == 1, "relevance with tags uses the requested page") && ok;
 
+  ok = expect(normalizeSearchQuery(" nature,  city night ") == "nature city night", "commas become tag separators")
+      && ok;
+  ok = expect(normalizeSearchQuery("+nature -city") == "+nature -city", "keeps include/exclude prefixes") && ok;
+  ok = expect(
+      normalizeSearchQuery("https://wallhaven.cc/w/l81zwp") == "id:l81zwp", "wallpaper URLs become id queries"
+  ) && ok;
+  ok = expect(
+      normalizeSearchQuery("https://www.wallhaven.cc/w/abc12/?ref=1") == "id:abc12", "strips URL extras from wallpaper ids"
+  ) && ok;
+  ok = expect(
+      normalizeSearchQuery("https://wallhaven.cc/search?q=nature+city&categories=111") == "nature city",
+      "search URLs keep the q parameter"
+  ) && ok;
+  ok = expect(normalizeSearchQuery("wallhaven-l81zwp.jpg") == "id:l81zwp", "download filenames become id queries") && ok;
+
   query = {};
-  query.tags = "city night";
+  query.tags = "city, night";
   query.resolutionWidth = "2560";
   query.resolutionHeight = "1440";
   query.aspectRatioIndex = 3;
@@ -76,6 +91,8 @@ int main() {
   ok = expect(parsed.error.empty(), "parses a search payload") && ok;
   ok = expect(parsed.lastPage == 7, "reads last_page") && ok;
   ok = expect(parsed.items.size() == 2, "reads wallpaper rows") && ok;
+  ok = expect(parsed.items[0].thumbLarge.find("abc12.jpg") != std::string::npos, "reads large thumb") && ok;
+  ok = expect(thumbDownloadUrls(parsed.items[0]).size() == 1, "thumb urls include the large preview") && ok;
   ok = expect(fileExtension(parsed.items[0]) == ".png", "png file type uses .png") && ok;
   ok = expect(downloadPath("/tmp", parsed.items[0]).filename() == "wallhaven-abc12.png", "download name includes id")
       && ok;

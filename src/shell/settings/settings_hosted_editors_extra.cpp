@@ -1551,25 +1551,42 @@ void HostedEditors::openCommunityTemplateStore() {
                           .flexGrow = 1.0F,
                           .onActivated =
                               [this, settingPath, selected, onSelect](const SearchPickerOption& option) {
-                                if (option.value == *selected) {
-                                  close();
-                                  return;
-                                }
-                                if (onSelect) {
-                                  onSelect(option.value);
-                                } else if (option.value.empty()) {
-                                  if (m_b.makeContext) {
-                                    auto ctx = m_b.makeContext();
-                                    if (ctx.clearOverride) {
-                                      ctx.clearOverride(settingPath);
+                                const std::string value = option.value;
+                                const bool unchanged = value == *selected;
+                                // Close after the click returns. Popping the sheet here destroys
+                                // SearchPicker while onActivate is still on the stack.
+                                DeferredCall::callLater(
+                                    [this, settingPath, onSelect, value, unchanged]() {
+                                      if (m_sheet == nullptr) {
+                                        return;
+                                      }
+                                      close();
+                                      if (unchanged) {
+                                        return;
+                                      }
+                                      if (onSelect) {
+                                        onSelect(value);
+                                      } else if (value.empty()) {
+                                        if (m_b.makeContext) {
+                                          auto ctx = m_b.makeContext();
+                                          if (ctx.clearOverride) {
+                                            ctx.clearOverride(settingPath);
+                                          }
+                                        }
+                                      } else if (m_b.setOverride) {
+                                        m_b.setOverride(settingPath, value);
+                                      }
                                     }
-                                  }
-                                } else if (m_b.setOverride) {
-                                  m_b.setOverride(settingPath, option.value);
-                                }
-                                close();
+                                );
                               },
-                          .onCancel = [this]() { close(); },
+                          .onCancel =
+                              [this]() {
+                                DeferredCall::callLater([this]() {
+                                  if (m_sheet != nullptr) {
+                                    close();
+                                  }
+                                });
+                              },
                           .configure =
                               [](SearchPicker& picker) {
                                 picker.clearFill();

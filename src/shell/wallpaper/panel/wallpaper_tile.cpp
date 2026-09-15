@@ -305,6 +305,7 @@ void WallpaperTile::setEntry(const WallpaperEntry& entry, Renderer& renderer) {
   m_entry = entry;
   m_hasEntry = true;
   m_missingFile = false;
+  m_loadingThumbnail = false;
   setVisible(true);
 
   m_label->setText(entry.name);
@@ -365,13 +366,15 @@ void WallpaperTile::setEntry(const WallpaperEntry& entry, Renderer& renderer) {
   m_thumbPath = pathString;
 
   std::error_code ec;
-  if (!pathString.empty() && !std::filesystem::exists(entry.absPath, ec)) {
-    m_missingFile = true;
+  const bool fileReady = !pathString.empty() && std::filesystem::is_regular_file(entry.absPath, ec)
+      && std::filesystem::file_size(entry.absPath, ec) > 0;
+  if (!pathString.empty() && !fileReady) {
     m_thumb->clear(renderer);
     m_thumb->setVisible(false);
+    m_loadingThumbnail = true;
     if (m_loadingGlyph != nullptr) {
       m_loadingGlyph->setVisible(true);
-      m_loadingGlyph->setGlyph("photo-off");
+      m_loadingGlyph->setGlyph("hourglass-empty");
     }
     applyVisualState();
     layoutThumbOverlays();
@@ -421,6 +424,22 @@ void WallpaperTile::refreshThumbnail(Renderer& renderer) {
     m_thumb->clear(renderer);
     return;
   }
+
+  std::error_code ec;
+  const bool fileReady =
+      std::filesystem::is_regular_file(m_thumbPath, ec) && std::filesystem::file_size(m_thumbPath, ec) > 0;
+  if (!fileReady) {
+    m_loadingThumbnail = true;
+    m_thumb->clear(renderer);
+    m_thumb->setVisible(false);
+    if (m_loadingGlyph != nullptr) {
+      m_loadingGlyph->setVisible(true);
+      m_loadingGlyph->setGlyph("hourglass-empty");
+    }
+    return;
+  }
+
+  m_missingFile = false;
 
   // Decode the thumbnail at the tile's physical display size so it stays crisp
   // under ui_scale / fractional scaling instead of upscaling the 192px default.
