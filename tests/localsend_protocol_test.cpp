@@ -1,7 +1,10 @@
 #include "net/localsend_protocol.h"
 
+#include <filesystem>
+#include <fstream>
 #include <print>
 #include <string>
+#include <system_error>
 
 namespace {
 
@@ -64,6 +67,24 @@ int main() {
   ok = expect(!isLocalSendApiPath("/api/localsend/v2/upload", "/info"), "route mismatch") && ok;
   ok = expect(peerKey("1.2.3.4", 53317, "fp") == "fp", "fingerprint key") && ok;
   ok = expect(peerKey("1.2.3.4", 9, "") == "1.2.3.4:9", "ip port key") && ok;
+
+  {
+    const auto root = std::filesystem::temp_directory_path() / "noctalia-localsend-collect-test";
+    std::error_code ec;
+    std::filesystem::remove_all(root, ec);
+    std::filesystem::create_directories(root / "sub" / "deep" / "deeper", ec);
+    std::ofstream(root / "a.txt") << "a";
+    std::ofstream(root / ".hidden") << "h";
+    std::ofstream(root / "sub" / "b.txt") << "b";
+    std::ofstream(root / "sub" / "deep" / "c.txt") << "c";
+    std::ofstream(root / "sub" / "deep" / "deeper" / "d.txt") << "d";
+    const auto collected = collectSendFiles(root);
+    ok = expect(collected.files.size() == 3, "collect depth and hidden") && ok;
+    ok = expect(!collected.truncated, "collect not truncated") && ok;
+    const auto single = collectSendFiles(root / "a.txt");
+    ok = expect(single.files.size() == 1 && single.files.front().filename() == "a.txt", "collect file") && ok;
+    std::filesystem::remove_all(root, ec);
+  }
 
   return ok ? 0 : 1;
 }

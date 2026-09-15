@@ -45,6 +45,7 @@ class Wallpaper;
 class WeatherService;
 class GammaService;
 class WallpaperScanner;
+class DesktopWidgetsController;
 
 namespace noctalia::theme {
   class ThemeService;
@@ -104,6 +105,7 @@ struct ControlCenterServices {
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
   LocalSendService* localSend = nullptr;
+  DesktopWidgetsController* desktopWidgets = nullptr;
   std::function<void()> upgradeShell;
   std::function<bool()> upgradeAvailable;
   std::function<bool()> upgradeBusy;

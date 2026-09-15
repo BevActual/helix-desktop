@@ -27,6 +27,7 @@
 #include "system/gamma_service.h"
 #include "system/package_kit_service.h"
 #include "system/weather_service.h"
+#include "net/localsend_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -430,6 +431,9 @@ std::unique_ptr<Flex> HomeTab::create() {
   }));
   statusStrip->addChild(makeStatusChip(&m_statusCaffeine, scale, chipOpacity, []() {
     openControlCenterTab("power");
+  }));
+  statusStrip->addChild(makeStatusChip(&m_statusLocalSend, scale, chipOpacity, []() {
+    openControlCenterTab("localsend");
   }));
   tab->addChild(std::move(statusStrip));
 
@@ -1389,10 +1393,24 @@ void HomeTab::syncStatusStrip() {
                 )
       || layoutDirty;
 
+  auto* localSend = m_services.localSend;
+  const bool incoming = localSend != nullptr && localSend->snapshot().incoming.has_value();
+  if (incoming) {
+    layoutDirty = applyChip(
+                      m_statusLocalSend, true,
+                      i18n::tr("control-center.home.status.localsend", "name", localSend->snapshot().incoming->alias),
+                      "share", ButtonVariant::Primary
+                  )
+        || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusLocalSend, false, {}, "share", ButtonVariant::Outline) || layoutDirty;
+  }
+
   const bool any = (m_statusUpdates != nullptr && m_statusUpdates->visible())
       || (m_statusCapture != nullptr && m_statusCapture->visible())
       || (m_statusNightLight != nullptr && m_statusNightLight->visible())
-      || (m_statusCaffeine != nullptr && m_statusCaffeine->visible());
+      || (m_statusCaffeine != nullptr && m_statusCaffeine->visible())
+      || (m_statusLocalSend != nullptr && m_statusLocalSend->visible());
   if (m_statusStrip != nullptr) {
     const bool wasShown = m_statusStrip->visible();
     setShown(m_statusStrip, any);
@@ -1516,6 +1534,7 @@ void HomeTab::onClose() {
   m_statusCapture = nullptr;
   m_statusNightLight = nullptr;
   m_statusCaffeine = nullptr;
+  m_statusLocalSend = nullptr;
   m_userCardKeyboardArea = nullptr;
   m_userCardArea = nullptr;
   m_mediaCardArea = nullptr;

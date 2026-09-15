@@ -22,6 +22,8 @@ namespace control_center {
         {"clipboard", "paste clips cliphist"},
         {"control-center", "cc"},
         {"keybinds", "binds shortcuts keyboard hotkeys"},
+        {"desktop", "widgets clock hot-corners corners"},
+        {"dock", "taskbar pinned"},
         {"launcher", "runner app-launcher"},
         {"media", "mpris player music now-playing"},
         {"monitor", "display displays brightness night-light nightlight gamma"},

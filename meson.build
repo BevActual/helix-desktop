@@ -659,6 +659,8 @@ _noctalia_sources = files(
   'src/shell/control_center/tab_search.cpp',
   'src/shell/control_center/settings_search_target.cpp',
   'src/shell/control_center/tabs/dock_tab.cpp',
+  'src/shell/control_center/tabs/desktop_tab.cpp',
+  'src/shell/control_center/tabs/launcher_tab.cpp',
   'src/shell/control_center/tabs/monitor_tab.cpp',
   'src/shell/control_center/tabs/media_tab.cpp',
   'src/shell/control_center/tabs/network_tab.cpp',

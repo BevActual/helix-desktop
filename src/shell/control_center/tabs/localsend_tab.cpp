@@ -159,6 +159,17 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       })
   );
 
+  auto historyCard = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
+  });
+  addTitle(*historyCard, i18n::tr("control-center.localsend.history"), scale);
+  historyCard->addChild(ui::column({.out = &m_historyList, .align = FlexAlign::Stretch, .gap = Style::spaceXs * scale}));
+  m_rootLayout->addChild(std::move(historyCard));
+
   auto peersCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
@@ -234,9 +245,11 @@ void LocalSendTab::onClose() {
   m_acceptButton = nullptr;
   m_rejectButton = nullptr;
   m_transfer = nullptr;
+  m_historyList = nullptr;
   m_peerList = nullptr;
   m_liveScroll = nullptr;
   m_peerSignature.clear();
+  m_historySignature.clear();
 }
 
 void LocalSendTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -260,7 +273,25 @@ void LocalSendTab::sendFileTo(const std::string& peerKey) {
         if (!path || m_service == nullptr) {
           return;
         }
-        m_service->sendFiles(peerKey, {*path}, m_pinText);
+        m_service->sendPath(peerKey, *path, m_pinText);
+      }
+  );
+}
+
+void LocalSendTab::sendFolderTo(const std::string& peerKey) {
+  if (m_service == nullptr) {
+    return;
+  }
+  (void)FileDialog::open(
+      FileDialogOptions{
+          .mode = FileDialogMode::SelectFolder,
+          .title = i18n::tr("control-center.localsend.send-folder"),
+      },
+      [this, peerKey](std::optional<std::filesystem::path> path) {
+        if (!path || m_service == nullptr) {
+          return;
+        }
+        m_service->sendPath(peerKey, *path, m_pinText);
       }
   );
 }
@@ -317,6 +348,22 @@ void LocalSendTab::syncUi() {
     } else if (snap.transfer->failed) {
       m_transfer->setVisible(true);
       m_transfer->setText(snap.transfer->error);
+    } else if (snap.transfer->incoming) {
+      m_transfer->setVisible(true);
+      m_transfer->setText(
+          i18n::tr(
+              "control-center.localsend.progress-receive", "index", snap.transfer->fileIndex, "count",
+              snap.transfer->fileCount, "file", snap.transfer->label, "name", snap.transfer->peerAlias
+          )
+      );
+    } else if (snap.transfer->fileCount > 0) {
+      m_transfer->setVisible(true);
+      m_transfer->setText(
+          i18n::tr(
+              "control-center.localsend.progress-send", "index", snap.transfer->fileIndex, "count",
+              snap.transfer->fileCount, "file", snap.transfer->label, "name", snap.transfer->peerAlias
+          )
+      );
     } else {
       m_transfer->setVisible(true);
       m_transfer->setText(
@@ -324,6 +371,7 @@ void LocalSendTab::syncUi() {
       );
     }
   }
+  rebuildHistory();
   rebuildPeers();
   m_syncing = false;
 }
@@ -384,6 +432,13 @@ void LocalSendTab::rebuildPeers() {
     );
     actions->addChild(
         ui::button({
+            .text = i18n::tr("control-center.localsend.send-folder"),
+            .glyph = "folder",
+            .onClick = [this, key = peer.key]() { sendFolderTo(key); },
+        })
+    );
+    actions->addChild(
+        ui::button({
             .text = i18n::tr("control-center.localsend.send-clipboard"),
             .glyph = "clipboard",
             .onClick = [this, key = peer.key]() { sendClipboardTo(key); },
@@ -391,5 +446,51 @@ void LocalSendTab::rebuildPeers() {
     );
     row->addChild(std::move(actions));
     m_peerList->addChild(std::move(row));
+  }
+}
+
+void LocalSendTab::rebuildHistory() {
+  if (m_historyList == nullptr || m_service == nullptr) {
+    return;
+  }
+  const auto& snap = m_service->snapshot();
+  std::string signature;
+  for (const auto& item : snap.history) {
+    signature += item.alias;
+    signature += item.label;
+    signature += item.incoming ? "i" : "o";
+    signature += item.failed ? "f" : "ok";
+    signature += "|";
+  }
+  if (signature == m_historySignature && !m_historyList->children().empty()) {
+    return;
+  }
+  m_historySignature = std::move(signature);
+  while (!m_historyList->children().empty()) {
+    m_historyList->removeChild(m_historyList->children().front().get());
+  }
+  const float scale = contentScale();
+  if (snap.history.empty()) {
+    m_historyList->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.localsend.history-empty"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        })
+    );
+    return;
+  }
+  for (const auto& item : snap.history) {
+    const char* key = item.failed
+        ? (item.incoming ? "control-center.localsend.history-failed-receive"
+                         : "control-center.localsend.history-failed-send")
+        : (item.incoming ? "control-center.localsend.history-received" : "control-center.localsend.history-sent");
+    m_historyList->addChild(
+        ui::label({
+            .text = i18n::tr(key, "name", item.alias, "file", item.label),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(item.failed ? ColorRole::Error : ColorRole::OnSurfaceVariant),
+        })
+    );
   }
 }

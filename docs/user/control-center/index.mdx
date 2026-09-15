@@ -58,7 +58,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine), media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
+| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine, incoming LocalSend), media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
 | `appearance` | Appearance | Theme mode, shell mode, Auto schedule status, palette source and picker, current-palette swatches, font, UI scale, and roundness. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. When Noctalia Greeter is installed, Sync Now and Auto-Sync copy wallpaper, colors, and monitors to the login screen. Header gear opens language, icon tint, high contrast, motion, borders, and shadows. |
 | `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, and Daily source settings. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
@@ -78,11 +78,11 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, audio, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
-| `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, and send a file or clipboard text. Header gear opens receive folder, auto-accept, and port. |
-| `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
+| `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Header gear opens receive folder, auto-accept, and port. |
+| `desktop` | Desktop | Desktop widgets on/off, widget count, edit mode, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Header gear opens monitors, layer, size, shape, and magnification. |
 | `panels` | Panels | Shared panel placement and chrome |
-| `launcher` | Launcher | Launcher appearance and providers |
+| `launcher` | Launcher | Open launcher, appearance toggles, unprefixed providers, and pinned apps. Header gear opens placement, prefixes, auto-paste, and currency. |
 | `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
 | `osd` | OSD | On-screen display volume and brightness popups |
 | `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
@@ -106,7 +106,7 @@ Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (
 
 The Home tab is the default Control Center landing view. It combines frequently checked status with a compact shortcut grid.
 
-When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), and caffeine/idle-inhibit on (opens Power). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
+When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), caffeine/idle-inhibit on (opens Power), and an incoming LocalSend transfer waiting to be accepted (opens LocalSend). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
 
 Click the date or time to open **Calendar** (including the world-clock card). Click the weather line to open **Weather**. Click the avatar in the user card to pick a custom image. Noctalia saves the selected path as `[shell].avatar_path`.
 
@@ -261,7 +261,7 @@ IPC: `tailscale-up`, `tailscale-down`, `tailscale-toggle`, and `tailscale-status
 
 ## LocalSend
 
-The LocalSend tab is a native LocalSend peer: it announces this machine on the LAN (`224.0.0.167:53317` by default) and speaks the HTTP REST API so nearby LocalSend apps can send files here. Turn nearby sharing on from the live view. Incoming transfers wait for **Accept** or **Decline** unless auto-accept is on. Send a file or the clipboard to a discovered device; if that device requires a PIN, enter it in the field on this tab first.
+The LocalSend tab is a native LocalSend peer: it announces this machine on the LAN (`224.0.0.167:53317` by default) and speaks the HTTP REST API so nearby LocalSend apps can send files here. Turn nearby sharing on from the live view. Incoming transfers wait for **Accept** or **Decline** unless auto-accept is on; Home also shows a status chip while a transfer is waiting. Send a file, a folder (up to 64 files, three folders deep, hidden names skipped), or the clipboard to a discovered device. The live view shows file-of-file progress and a recent history list for this session. If that device requires a PIN, enter it in the field on this tab first.
 
 This machine advertises `http` so receive does not need a TLS certificate. Sending still talks HTTPS when the other device requires it. If another LocalSend app already bound TCP port 53317, this tab can still send; receiving stays blocked until that port is free or you pick a different port in settings.
 
@@ -373,7 +373,7 @@ ollama = "auto"
 
 Settings pages are Control Center tabs. Appearance, Wallpaper, Templates, and Bar sit under **Look**. Live status pages sit under **Status**. Desktop, dock, launcher, plugins, and the other setup pages sit under **Setup**.
 
-Domain options that belong with a live view are on that tab: theme, palette, font, UI scale, roundness, and greeter sync on Appearance (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
+Domain options that belong with a live view are on that tab: theme, palette, font, UI scale, roundness, and greeter sync on Appearance (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location and units on Weather, night light on Monitor, lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners and launcher appearance/pins on those Setup tabs (header gear for the longer forms), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the settings registry on the current tab’s gear sheet when that section matches. If it does not, Control Center opens the best matching section in gear mode instead of always dumping onto Appearance.
 

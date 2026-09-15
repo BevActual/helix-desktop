@@ -432,6 +432,66 @@ namespace {
   }
 } // namespace
 
+std::string LocalSendService::filesLabel(std::size_t count, std::string_view singleName) const {
+  if (count <= 1) {
+    return std::string(singleName);
+  }
+  return i18n::tr("control-center.localsend.files-count", "count", count);
+}
+
+void LocalSendService::pushHistory(LocalSendHistoryItem item) {
+  m_snapshot.history.insert(m_snapshot.history.begin(), std::move(item));
+  constexpr std::size_t kMaxHistory = 8;
+  if (m_snapshot.history.size() > kMaxHistory) {
+    m_snapshot.history.resize(kMaxHistory);
+  }
+}
+
+void LocalSendService::noteIncomingProgress(const std::string& fileId) {
+  if (m_impl->session.sessionId.empty()) {
+    return;
+  }
+  std::size_t done = 0;
+  for (const auto& [id, received] : m_impl->session.received) {
+    if (received) {
+      ++done;
+    }
+  }
+  std::string name;
+  auto fileIt = m_impl->session.files.find(fileId);
+  if (fileIt != m_impl->session.files.end()) {
+    name = fileIt->second.fileName;
+  }
+  m_snapshot.transfer = LocalSendTransfer{
+      .label = name,
+      .peerAlias = m_impl->session.alias,
+      .incoming = true,
+      .fileIndex = done + 1,
+      .fileCount = m_impl->session.files.size(),
+  };
+  if (m_changeCallback) {
+    m_changeCallback();
+  }
+}
+
+void LocalSendService::sendPath(std::string peerKey, std::filesystem::path path, std::string pin) {
+  const auto collected = localsend::collectSendFiles(path);
+  if (collected.files.empty()) {
+    m_snapshot.transfer = LocalSendTransfer{
+        .label = {},
+        .peerAlias = {},
+        .incoming = false,
+        .failed = true,
+        .error = i18n::tr("control-center.localsend.folder-empty"),
+    };
+    if (m_changeCallback) {
+      m_changeCallback();
+    }
+    return;
+  }
+  sendFiles(std::move(peerKey), std::move(collected.files), std::move(pin));
+}
+
 void LocalSendService::sendFiles(std::string peerKey, std::vector<std::filesystem::path> paths, std::string pin) {
   if (paths.empty()) {
     return;
@@ -471,10 +531,11 @@ void LocalSendService::sendFiles(std::string peerKey, std::vector<std::filesyste
 
   m_snapshot.busy = true;
   m_snapshot.transfer = LocalSendTransfer{
-      .label = existing.size() == 1 ? existing.front().filename().string()
-                                    : i18n::tr("control-center.localsend.files-count", "count", existing.size()),
+      .label = filesLabel(existing.size(), existing.front().filename().string()),
       .peerAlias = peer.alias,
       .incoming = false,
+      .fileIndex = 1,
+      .fileCount = existing.size(),
   };
   if (m_changeCallback) {
     m_changeCallback();
@@ -500,6 +561,17 @@ void LocalSendService::noteIncomingFileDone(const std::string& fileId) {
         i18n::tr("control-center.localsend.received", "name", m_impl->session.alias)
     );
   }
+  const std::string label = filesLabel(
+      m_impl->session.files.size(),
+      m_impl->session.files.empty() ? std::string{} : m_impl->session.files.begin()->second.fileName
+  );
+  pushHistory(LocalSendHistoryItem{
+      .alias = m_impl->session.alias,
+      .label = label,
+      .incoming = true,
+      .failed = false,
+  });
+  m_snapshot.transfer.reset();
   m_impl->session = {};
 }
 
@@ -511,6 +583,12 @@ void LocalSendService::finishSendFailure(std::string error, std::uint64_t genera
   if (m_snapshot.transfer) {
     m_snapshot.transfer->failed = true;
     m_snapshot.transfer->error = std::move(error);
+    pushHistory(LocalSendHistoryItem{
+        .alias = m_snapshot.transfer->peerAlias,
+        .label = m_snapshot.transfer->label,
+        .incoming = false,
+        .failed = true,
+    });
   }
   if (m_changeCallback) {
     m_changeCallback();
@@ -591,6 +669,15 @@ void LocalSendService::uploadRemaining(
     return;
   }
   if (index >= request.files.size()) {
+    const std::string label = filesLabel(
+        request.files.size(), request.files.empty() ? std::string{} : request.files.front().fileName
+    );
+    pushHistory(LocalSendHistoryItem{
+        .alias = peer.alias,
+        .label = label,
+        .incoming = false,
+        .failed = false,
+    });
     m_snapshot.busy = false;
     m_snapshot.transfer.reset();
     m_notifications.addInternal(
@@ -603,6 +690,14 @@ void LocalSendService::uploadRemaining(
     return;
   }
   const auto& file = request.files[index];
+  if (m_snapshot.transfer) {
+    m_snapshot.transfer->fileIndex = index + 1;
+    m_snapshot.transfer->fileCount = request.files.size();
+    m_snapshot.transfer->label = file.fileName;
+    if (m_changeCallback) {
+      m_changeCallback();
+    }
+  }
   const auto tokenIt = prepared.fileTokens.find(file.id);
   if (tokenIt == prepared.fileTokens.end()) {
     uploadRemaining(peer, std::move(request), std::move(paths), std::move(prepared), std::move(protocol), index + 1, generation);
@@ -992,6 +1087,7 @@ void LocalSendService::dispatch(const std::vector<pollfd>& fds, std::size_t star
           queueEmpty(conn, 500);
           return;
         }
+        noteIncomingProgress(params.fileId);
         const auto leftover = conn.in.size() > conn.headerEnd ? conn.in.size() - conn.headerEnd : 0;
         if (leftover > 0) {
           const auto wrote = std::fwrite(conn.in.data() + conn.headerEnd, 1, leftover, conn.uploadFile);

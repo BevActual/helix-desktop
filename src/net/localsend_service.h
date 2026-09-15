@@ -48,6 +48,15 @@ struct LocalSendTransfer {
   bool incoming = false;
   bool failed = false;
   std::string error;
+  std::size_t fileIndex = 0;
+  std::size_t fileCount = 0;
+};
+
+struct LocalSendHistoryItem {
+  std::string alias;
+  std::string label;
+  bool incoming = true;
+  bool failed = false;
 };
 
 struct LocalSendSnapshot {
@@ -63,6 +72,7 @@ struct LocalSendSnapshot {
   std::vector<LocalSendPeer> peers;
   std::optional<LocalSendIncoming> incoming;
   std::optional<LocalSendTransfer> transfer;
+  std::vector<LocalSendHistoryItem> history;
 };
 
 class LocalSendService : public PollSource {
@@ -84,6 +94,7 @@ public:
   void announce();
   void setEnabled(bool enabled);
   void sendFiles(std::string peerKey, std::vector<std::filesystem::path> paths, std::string pin = {});
+  void sendPath(std::string peerKey, std::filesystem::path path, std::string pin = {});
   void sendText(std::string peerKey, std::string text, std::string pin = {});
   void acceptIncoming();
   void rejectIncoming();
@@ -108,6 +119,9 @@ private:
   );
   void finishSendFailure(std::string error, std::uint64_t generation);
   void noteIncomingFileDone(const std::string& fileId);
+  void pushHistory(LocalSendHistoryItem item);
+  void noteIncomingProgress(const std::string& fileId);
+  [[nodiscard]] std::string filesLabel(std::size_t count, std::string_view singleName) const;
 
   ConfigService& m_config;
   HttpClient& m_http;

@@ -36,7 +36,9 @@ private:
   void syncUi();
   void rebuildPeers();
   void sendFileTo(const std::string& peerKey);
+  void sendFolderTo(const std::string& peerKey);
   void sendClipboardTo(const std::string& peerKey);
+  void rebuildHistory();
 
   LocalSendService* m_service = nullptr;
   ClipboardService* m_clipboard = nullptr;
@@ -53,10 +55,12 @@ private:
   Button* m_acceptButton = nullptr;
   Button* m_rejectButton = nullptr;
   Label* m_transfer = nullptr;
+  Flex* m_historyList = nullptr;
   Flex* m_peerList = nullptr;
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};
   std::string m_pinText;
   std::string m_peerSignature;
+  std::string m_historySignature;
   bool m_syncing = false;
 };

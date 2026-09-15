@@ -23,6 +23,8 @@
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/appearance_tab.h"
 #include "shell/control_center/tabs/dock_tab.h"
+#include "shell/control_center/tabs/desktop_tab.h"
+#include "shell/control_center/tabs/launcher_tab.h"
 #include "shell/control_center/tabs/ai_usage_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
@@ -216,8 +218,6 @@ namespace {
 
   bool isSettingsEditorTab(std::string_view id) {
     return id == "bar"
-        || id == "launcher"
-        || id == "desktop"
         || id == "panels"
         || id == "osd"
         || id == "shell"
@@ -251,7 +251,9 @@ namespace {
         || id == "localsend"
         || id == "plugins"
         || id == "home"
-        || id == "dock";
+        || id == "desktop"
+        || id == "dock"
+        || id == "launcher";
   }
 
   [[nodiscard]] std::string resolveOpenTabId(std::string_view context) {
@@ -385,10 +387,10 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("ai", std::make_unique<AiUsageTab>(services));
   add("capture", std::make_unique<CaptureTab>(services));
   add("clipboard", std::make_unique<ClipboardTab>(services));
-  add("desktop", std::make_unique<SettingsTab>(services, "desktop"));
+  add("desktop", std::make_unique<DesktopTab>(services));
   add("dock", std::make_unique<DockTab>(services));
   add("panels", std::make_unique<SettingsTab>(services, "panels"));
-  add("launcher", std::make_unique<SettingsTab>(services, "launcher"));
+  add("launcher", std::make_unique<LauncherTab>(services));
   add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
   add("osd", std::make_unique<SettingsTab>(services, "osd"));
   add("shell", std::make_unique<SettingsTab>(services, "shell"));

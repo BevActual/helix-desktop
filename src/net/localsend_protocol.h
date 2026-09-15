@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cstddef>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -59,10 +61,21 @@ namespace localsend {
   [[nodiscard]] std::optional<PrepareUploadResponse> parsePrepareUploadResponseJson(std::string_view jsonText);
   [[nodiscard]] std::string serializePrepareUploadResponseJson(const PrepareUploadResponse& response);
 
+  inline constexpr std::size_t kMaxSendFiles = 64;
+  inline constexpr int kMaxSendDepth = 3;
+
+  struct CollectSendFilesResult {
+    std::vector<std::filesystem::path> files;
+    bool truncated = false;
+  };
+
   [[nodiscard]] QueryParams parseQuery(std::string_view query);
   [[nodiscard]] std::string mimeFromFileName(std::string_view fileName);
   [[nodiscard]] std::string sanitizeFileName(std::string_view fileName);
   [[nodiscard]] std::string peerKey(std::string_view ip, int port, std::string_view fingerprint);
   [[nodiscard]] bool isLocalSendApiPath(std::string_view path, std::string_view route);
+  [[nodiscard]] CollectSendFilesResult collectSendFiles(
+      const std::filesystem::path& root, std::size_t maxFiles = kMaxSendFiles, int maxDepth = kMaxSendDepth
+  );
 
 } // namespace localsend

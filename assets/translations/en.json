@@ -434,6 +434,16 @@
       "position": "Position",
       "show-running": "Show running apps"
     },
+    "desktop": {
+      "corners": "Corners",
+      "edit": "Edit widgets",
+      "widget-count": "{count} widget",
+      "widget-count-plural": "{count} widgets"
+    },
+    "launcher": {
+      "open": "Open launcher",
+      "providers": "Providers in unprefixed search"
+    },
     "settings": {
       "configure": "Settings",
       "search-placeholder": "Search pages and settings"
@@ -461,6 +471,7 @@
       "select-avatar": "Select Avatar",
       "status": {
         "caffeine": "Caffeine on",
+        "localsend": "Incoming from {name}",
         "night-light": "Night Light on",
         "recording": "Recording {elapsed}",
         "replay": "Replay {elapsed}",
@@ -885,6 +896,13 @@
       "disabled-hint": "Turn it on to appear to LocalSend apps on this network and receive files.",
       "enable": "Nearby sharing",
       "files-count": "{count} files",
+      "folder-empty": "That folder has no files to send.",
+      "history": "Recent",
+      "history-empty": "No transfers yet this session.",
+      "history-failed-receive": "Could not receive {file} from {name}",
+      "history-failed-send": "Could not send {file} to {name}",
+      "history-received": "Received {file} from {name}",
+      "history-sent": "Sent {file} to {name}",
       "incoming": "{name} wants to send files",
       "incoming-title": "Incoming",
       "nearby": "Nearby devices",
@@ -892,11 +910,14 @@
       "peer-gone": "That device is no longer nearby.",
       "pin-required": "That device requires a PIN. Enter it above and send again.",
       "port-busy": "Port 53317 is in use, so this machine cannot receive. Sending still works.",
+      "progress-receive": "Receiving {index} of {count} · {file} from {name}",
+      "progress-send": "Sending {index} of {count} · {file} to {name}",
       "received": "Received files from {name}",
       "rejected": "The other device declined the transfer.",
       "send-clipboard": "Send clipboard",
       "send-failed": "Could not send.",
       "send-file": "Send file",
+      "send-folder": "Send folder",
       "sending": "Sending {file} to {name}…",
       "sent": "Sent to {name}",
       "their-pin": "Their PIN, if required",

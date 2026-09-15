@@ -127,6 +127,7 @@ private:
   Button* m_statusCapture = nullptr;
   Button* m_statusNightLight = nullptr;
   Button* m_statusCaffeine = nullptr;
+  Button* m_statusLocalSend = nullptr;
   InputArea* m_userCardKeyboardArea = nullptr;
   InputArea* m_userCardArea = nullptr;
   InputArea* m_mediaCardArea = nullptr;

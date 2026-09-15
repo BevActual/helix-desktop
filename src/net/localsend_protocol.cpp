@@ -5,9 +5,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 
 namespace localsend {
@@ -368,6 +370,69 @@ namespace localsend {
       return path.substr(prefix.size()) == route;
     };
     return matches(kApiPrefixV2) || matches(kApiPrefixV1);
+  }
+
+  namespace {
+
+    [[nodiscard]] bool isHiddenName(const std::filesystem::path& path) {
+      const auto name = path.filename().string();
+      return name.empty() || name.starts_with('.');
+    }
+
+    void collectFromDir(
+        CollectSendFilesResult& result, const std::filesystem::path& dir, int depth, std::size_t maxFiles, int maxDepth
+    ) {
+      if (result.truncated) {
+        return;
+      }
+      std::error_code itEc;
+      for (const auto& entry : std::filesystem::directory_iterator(
+               dir, std::filesystem::directory_options::skip_permission_denied, itEc
+           )) {
+        if (itEc) {
+          return;
+        }
+        if (result.files.size() >= maxFiles) {
+          result.truncated = true;
+          return;
+        }
+        const auto path = entry.path();
+        if (isHiddenName(path)) {
+          continue;
+        }
+        std::error_code typeEc;
+        if (entry.is_regular_file(typeEc) && !typeEc) {
+          result.files.push_back(path);
+          continue;
+        }
+        if (depth < maxDepth && entry.is_directory(typeEc) && !typeEc) {
+          collectFromDir(result, path, depth + 1, maxFiles, maxDepth);
+        }
+      }
+    }
+
+  } // namespace
+
+  CollectSendFilesResult collectSendFiles(const std::filesystem::path& root, std::size_t maxFiles, int maxDepth) {
+    CollectSendFilesResult result;
+    if (maxFiles == 0 || maxDepth < 1) {
+      return result;
+    }
+    std::error_code ec;
+    if (std::filesystem::is_regular_file(root, ec) && !ec) {
+      result.files.push_back(root);
+      return result;
+    }
+    if (!std::filesystem::is_directory(root, ec) || ec) {
+      return result;
+    }
+    collectFromDir(result, root, 1, maxFiles, maxDepth);
+    std::ranges::sort(result.files);
+    if (result.files.size() > maxFiles) {
+      result.files.resize(maxFiles);
+      result.truncated = true;
+    }
+    return result;
   }
 
 } // namespace localsend
