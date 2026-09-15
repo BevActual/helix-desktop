@@ -26,6 +26,8 @@ namespace settings {
   struct SettingsPluginsContext {
     float scale = 1.0F;
     std::string_view selectedSection;
+    // Empty means render every group. Live Plugins uses {"plugins"}; gear uses {"sources"}.
+    std::unordered_set<std::string> includedGroups;
     std::vector<scripting::PluginStatus> plugins;
     std::vector<PluginSourceConfig> sources;
     bool searchActive = false;

@@ -47,6 +47,7 @@ public:
   // its Background surface is torn down so the external surface shows through. Runtime-only
   // (not persisted) — it clears on restart and is re-asserted by the owner.
   void setOutputExternallyManaged(const std::string& connector, bool managed);
+  void setVideoWallpaperService(class VideoWallpaperService* service) noexcept { m_videoWallpaper = service; }
   [[nodiscard]] std::vector<WallpaperChange> onStateChange();
   void onSecondTick();
   void onGpuResourcesInvalidated();
@@ -136,4 +137,5 @@ private:
   Signal<> m_changed;
   std::vector<std::unique_ptr<WallpaperInstance>> m_instances;
   std::unordered_set<std::string> m_externallyManagedOutputs;
+  class VideoWallpaperService* m_videoWallpaper = nullptr;
 };

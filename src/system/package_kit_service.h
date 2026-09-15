@@ -23,20 +23,27 @@ namespace noctalia::packages {
   using ProgressCallback = std::function<void(PkconProgress progress)>;
 
   [[nodiscard]] bool backendAvailable();
+  [[nodiscard]] bool flatpakAvailable();
   [[nodiscard]] bool tabAvailable();
   [[nodiscard]] bool busy() noexcept;
   void cancelCurrent();
 
   // Worker-thread completion. Query/name must already be validated.
-  [[nodiscard]] bool search(std::string query, CommandCompletion onComplete);
-  [[nodiscard]] bool listUpdates(CommandCompletion onComplete);
-  [[nodiscard]] bool listInstalled(CommandCompletion onComplete);
-  [[nodiscard]] bool updateAll(CommandCompletion onComplete, ProgressCallback onProgress = {});
+  [[nodiscard]] bool search(std::string query, CommandCompletion onComplete, Kind kind = Kind::Fedora);
+  [[nodiscard]] bool listUpdates(CommandCompletion onComplete, Kind kind = Kind::Fedora);
+  [[nodiscard]] bool listInstalled(CommandCompletion onComplete, Kind kind = Kind::Fedora);
+  [[nodiscard]] bool updateAll(CommandCompletion onComplete, ProgressCallback onProgress = {}, Kind kind = Kind::Fedora);
   [[nodiscard]] bool updatePackages(
-      std::vector<std::string> names, CommandCompletion onComplete, ProgressCallback onProgress = {}
+      std::vector<std::string> names, CommandCompletion onComplete, ProgressCallback onProgress = {},
+      Kind kind = Kind::Fedora
   );
   [[nodiscard]] bool mutate(
-      Action action, std::string name, CommandCompletion onComplete, ProgressCallback onProgress = {}
+      Action action, std::string name, CommandCompletion onComplete, ProgressCallback onProgress = {},
+      Kind kind = Kind::Fedora, std::string installation = {}, std::string remotes = {}
   );
+
+  [[nodiscard]] std::size_t pendingUpdateCount() noexcept;
+  void notePendingUpdates(Kind kind, std::size_t count) noexcept;
+  [[nodiscard]] bool refreshPendingUpdateCount(std::function<void()> onComplete = {});
 
 } // namespace noctalia::packages

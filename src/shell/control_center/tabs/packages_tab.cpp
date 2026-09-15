@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/packages_tab.h"
 
+#include "config/config_service.h"
 #include "core/deferred_call.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
@@ -60,7 +61,15 @@ namespace {
       text += " · ";
       text += hit.repo;
     }
+    if (!hit.installation.empty()) {
+      text += " · ";
+      text += hit.installation;
+    }
     return text;
+  }
+
+  std::string displayName(const noctalia::packages::PackageHit& hit) {
+    return hit.title.empty() ? hit.name : hit.title;
   }
 
   std::string fullDetailLabel(const noctalia::packages::PackageHit& hit) {
@@ -85,12 +94,25 @@ namespace {
       text += " · ";
       text += hit.repo;
     }
+    if (!hit.installation.empty()) {
+      text += " · ";
+      text += hit.installation;
+    }
     return text;
   }
 
 } // namespace
 
-PackagesTab::PackagesTab(const ControlCenterServices& services) : m_ensurePolkit(services.ensurePolkit) {}
+PackagesTab::PackagesTab(const ControlCenterServices& services)
+    : m_ensurePolkit(services.ensurePolkit), m_config(services.config) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> source = m_config->stateString("packages_tab", "source")) {
+      if (*source == "flatpak" && noctalia::packages::flatpakAvailable()) {
+        m_kind = noctalia::packages::Kind::Flatpak;
+      }
+    }
+  }
+}
 
 std::unique_ptr<Flex> PackagesTab::create() {
   const float scale = contentScale();
@@ -109,6 +131,26 @@ std::unique_ptr<Flex> PackagesTab::create() {
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
+  searchCard->addChild(
+      ui::segmented({
+          .out = &m_kindSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {.label = i18n::tr("control-center.packages.source-fedora")},
+                  {.label = i18n::tr("control-center.packages.source-flatpak")},
+              },
+          .selectedIndex = indexFromKind(m_kind),
+          .fontSize = Style::fontSizeCaption,
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .surfaceRole = ColorRole::Surface,
+          .equalSegmentWidths = true,
+          .visible = noctalia::packages::flatpakAvailable(),
+          .participatesInLayout = noctalia::packages::flatpakAvailable(),
+          .onChange = [this](std::size_t index) { applyKind(index); },
+      })
+  );
   searchCard->addChild(
       ui::segmented({
           .out = &m_viewSwitch,
@@ -272,6 +314,7 @@ void PackagesTab::onClose() {
   m_cancelButton = nullptr;
   m_updateAll = nullptr;
   m_status = nullptr;
+  m_kindSwitch = nullptr;
   m_viewSwitch = nullptr;
   m_filter = nullptr;
   m_scroll = nullptr;
@@ -280,11 +323,14 @@ void PackagesTab::onClose() {
   m_hits.clear();
   m_updatesCache = {};
   m_installedCache = {};
+  m_flatpakUpdatesCache = {};
+  m_flatpakInstalledCache = {};
   m_totalHits = 0;
   m_filterIndex = 0;
   m_loadedOnce = false;
   m_rerunAfterBusy = false;
   m_viewSyncing = false;
+  m_kindSyncing = false;
   m_view = View::Updates;
   m_pendingRemove.reset();
   m_issuedQuery.reset();
@@ -322,6 +368,9 @@ void PackagesTab::doLayout(Renderer& renderer, float contentWidth, float bodyHei
     const float actionWidth = row.action != nullptr ? row.action->width() : 0.0F;
     const float nameMax = std::max(1.0F, contentWidth - actionWidth - gap - cardPad);
     row.name->setMaxWidth(nameMax);
+    if (row.summary != nullptr) {
+      row.summary->setMaxWidth(std::max(1.0F, contentWidth - cardPad));
+    }
     if (row.version != nullptr) {
       row.version->setMaxWidth(std::max(1.0F, contentWidth - cardPad));
     }
@@ -394,6 +443,56 @@ PackagesTab::View PackagesTab::viewFromIndex(std::size_t index) {
   return View::Updates;
 }
 
+std::size_t PackagesTab::indexFromKind(noctalia::packages::Kind kind) {
+  return kind == noctalia::packages::Kind::Flatpak ? 1 : 0;
+}
+
+noctalia::packages::Kind PackagesTab::kindFromIndex(std::size_t index) {
+  return index == 1 ? noctalia::packages::Kind::Flatpak : noctalia::packages::Kind::Fedora;
+}
+
+noctalia::packages::Kind PackagesTab::currentKind() const { return m_kind; }
+
+PackagesTab::ViewCache& PackagesTab::updatesCache() {
+  return m_kind == noctalia::packages::Kind::Flatpak ? m_flatpakUpdatesCache : m_updatesCache;
+}
+
+PackagesTab::ViewCache& PackagesTab::installedCache() {
+  return m_kind == noctalia::packages::Kind::Flatpak ? m_flatpakInstalledCache : m_installedCache;
+}
+
+void PackagesTab::persistKind() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString(
+      "packages_tab", "source", m_kind == noctalia::packages::Kind::Flatpak ? "flatpak" : "fedora"
+  );
+}
+
+void PackagesTab::applyKind(std::size_t index) {
+  if (m_kindSyncing) {
+    return;
+  }
+  const auto next = kindFromIndex(index);
+  if (next == m_kind) {
+    return;
+  }
+  m_kind = next;
+  persistKind();
+  m_issuedQuery.reset();
+  m_filterIndex = 0;
+  if (m_filter != nullptr) {
+    m_filter->setSelectedIndex(0);
+  }
+  clearPendingRemove();
+  if (m_view == View::Search) {
+    m_hits.clear();
+    m_totalHits = 0;
+  }
+  restoreOrLoad(m_view, false);
+}
+
 void PackagesTab::applyView(std::size_t index) {
   if (m_viewSyncing) {
     return;
@@ -409,6 +508,11 @@ void PackagesTab::showView(View view, bool forceReload) {
     m_viewSwitch->setSelectedIndex(indexFromView(m_view));
     m_viewSyncing = false;
   }
+  if (m_kindSwitch != nullptr) {
+    m_kindSyncing = true;
+    m_kindSwitch->setSelectedIndex(indexFromKind(m_kind));
+    m_kindSyncing = false;
+  }
   if (viewChanged) {
     m_filterIndex = 0;
     if (m_filter != nullptr) {
@@ -423,9 +527,9 @@ void PackagesTab::showView(View view, bool forceReload) {
   }
   if (forceReload) {
     if (m_view == View::Installed) {
-      m_installedCache = {};
+      installedCache() = {};
     } else if (m_view == View::Updates) {
-      m_updatesCache = {};
+      updatesCache() = {};
     }
   }
   syncPlaceholder();
@@ -437,7 +541,7 @@ void PackagesTab::restoreOrLoad(View view, bool forceReload) {
     applySearchField(forceReload);
     return;
   }
-  ViewCache& cache = view == View::Installed ? m_installedCache : m_updatesCache;
+  ViewCache& cache = view == View::Installed ? installedCache() : updatesCache();
   if (cache.loaded) {
     m_hits = cache.hits;
     m_totalHits = cache.hits.size();
@@ -457,6 +561,8 @@ void PackagesTab::restoreOrLoad(View view, bool forceReload) {
 void PackagesTab::invalidateCaches() {
   m_updatesCache = {};
   m_installedCache = {};
+  m_flatpakUpdatesCache = {};
+  m_flatpakInstalledCache = {};
 }
 
 void PackagesTab::applySearchField(bool force) {
@@ -531,13 +637,20 @@ void PackagesTab::searchFromInput() {
   const auto generation = ++m_generation;
   setStatus(i18n::tr("control-center.packages.searching"));
   syncBusy();
-  if (!noctalia::packages::search(query, [this, generation](noctalia::packages::CommandResult result) {
-        DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
-          finishQuery(generation, std::move(result), View::Search);
-        });
-      })) {
+  if (!noctalia::packages::search(
+          query,
+          [this, generation](noctalia::packages::CommandResult result) {
+            DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
+              finishQuery(generation, std::move(result), View::Search);
+            });
+          },
+          m_kind
+      )) {
     --m_generation;
-    setStatus(i18n::tr("control-center.packages.unavailable"));
+    setStatus(i18n::tr(
+        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
+                                                    : "control-center.packages.unavailable"
+    ));
     syncBusy();
   }
 }
@@ -558,13 +671,19 @@ void PackagesTab::loadUpdates() {
   const auto generation = ++m_generation;
   setStatus(i18n::tr("control-center.packages.loading-updates"));
   syncBusy();
-  if (!noctalia::packages::listUpdates([this, generation](noctalia::packages::CommandResult result) {
-        DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
-          finishQuery(generation, std::move(result), View::Updates);
-        });
-      })) {
+  if (!noctalia::packages::listUpdates(
+          [this, generation](noctalia::packages::CommandResult result) {
+            DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
+              finishQuery(generation, std::move(result), View::Updates);
+            });
+          },
+          m_kind
+      )) {
     --m_generation;
-    setStatus(i18n::tr("control-center.packages.unavailable"));
+    setStatus(i18n::tr(
+        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
+                                                    : "control-center.packages.unavailable"
+    ));
     syncBusy();
   }
 }
@@ -585,13 +704,19 @@ void PackagesTab::loadInstalled() {
   const auto generation = ++m_generation;
   setStatus(i18n::tr("control-center.packages.loading-installed"));
   syncBusy();
-  if (!noctalia::packages::listInstalled([this, generation](noctalia::packages::CommandResult result) {
-        DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
-          finishQuery(generation, std::move(result), View::Installed);
-        });
-      })) {
+  if (!noctalia::packages::listInstalled(
+          [this, generation](noctalia::packages::CommandResult result) {
+            DeferredCall::callLater([this, generation, result = std::move(result)]() mutable {
+              finishQuery(generation, std::move(result), View::Installed);
+            });
+          },
+          m_kind
+      )) {
     --m_generation;
-    setStatus(i18n::tr("control-center.packages.unavailable"));
+    setStatus(i18n::tr(
+        m_kind == noctalia::packages::Kind::Flatpak ? "control-center.packages.unavailable-flatpak"
+                                                    : "control-center.packages.unavailable"
+    ));
     syncBusy();
   }
 }
@@ -622,11 +747,12 @@ void PackagesTab::finishQuery(std::uint64_t generation, noctalia::packages::Comm
   auto hits = noctalia::packages::dedupeByName(std::move(result.hits));
   noctalia::packages::sortHits(hits);
   if (view == View::Updates) {
-    m_updatesCache.hits = hits;
-    m_updatesCache.loaded = true;
+    updatesCache().hits = hits;
+    updatesCache().loaded = true;
+    noctalia::packages::notePendingUpdates(m_kind, hits.size());
   } else if (view == View::Installed) {
-    m_installedCache.hits = hits;
-    m_installedCache.loaded = true;
+    installedCache().hits = hits;
+    installedCache().loaded = true;
   }
   if (view != m_view) {
     syncBusy();
@@ -645,7 +771,9 @@ void PackagesTab::finishQuery(std::uint64_t generation, noctalia::packages::Comm
   }
 }
 
-void PackagesTab::runAction(noctalia::packages::Action action, std::string name) {
+void PackagesTab::runAction(
+    noctalia::packages::Action action, std::string name, std::string installation, std::string remotes
+) {
   if (action == noctalia::packages::Action::Remove && noctalia::packages::isProtectedPackage(name)) {
     notify::error(
         "Noctalia", i18n::tr("control-center.packages.title"), i18n::tr("control-center.packages.protected")
@@ -671,21 +799,24 @@ void PackagesTab::runAction(noctalia::packages::Action action, std::string name)
     m_removeConfirmTimer.stop();
     m_pendingRemove.reset();
   }
-  if (m_ensurePolkit) {
-    m_ensurePolkit([this, action, name = std::move(name)](bool ok) {
+  if (m_ensurePolkit && !skipPolkit(action, installation)) {
+    m_ensurePolkit([this, action, name = std::move(name), installation = std::move(installation),
+                    remotes = std::move(remotes)](bool ok) {
       if (!ok) {
         setStatus(i18n::tr("control-center.packages.cancelled"));
         PanelManager::instance().refresh();
         return;
       }
-      launchAction(action, name);
+      launchAction(action, name, installation, remotes);
     });
     return;
   }
-  launchAction(action, std::move(name));
+  launchAction(action, std::move(name), std::move(installation), std::move(remotes));
 }
 
-void PackagesTab::launchAction(noctalia::packages::Action action, std::string name) {
+void PackagesTab::launchAction(
+    noctalia::packages::Action action, std::string name, std::string installation, std::string remotes
+) {
   if (noctalia::packages::busy()) {
     setStatus(i18n::tr("control-center.packages.busy"));
     return;
@@ -695,7 +826,8 @@ void PackagesTab::launchAction(noctalia::packages::Action action, std::string na
   syncBusy();
   PanelManager::instance().refresh();
   if (!noctalia::packages::mutate(
-          action, name, [this, generation, name](noctalia::packages::CommandResult result) {
+          action, name,
+          [this, generation, name](noctalia::packages::CommandResult result) {
             DeferredCall::callLater([this, generation, name, result = std::move(result)]() mutable {
               if (generation != m_generation) {
                 return;
@@ -725,10 +857,13 @@ void PackagesTab::launchAction(noctalia::packages::Action action, std::string na
               PanelManager::instance().refresh();
             });
           },
-          progressSink(generation)
+          progressSink(generation), m_kind, std::move(installation), std::move(remotes)
       )) {
     --m_generation;
-    setStatus(i18n::tr("control-center.packages.unavailable"));
+    setStatus(
+        m_kind == noctalia::packages::Kind::Flatpak ? i18n::tr("control-center.packages.unavailable-flatpak")
+                                                    : i18n::tr("control-center.packages.unavailable")
+    );
     syncBusy();
     PanelManager::instance().refresh();
   }
@@ -789,7 +924,7 @@ void PackagesTab::launchUpdateAll() {
   };
   bool launched = false;
   if (m_filterIndex == 0) {
-    launched = noctalia::packages::updateAll(onComplete, progressSink(generation));
+    launched = noctalia::packages::updateAll(onComplete, progressSink(generation), m_kind);
   } else {
     std::vector<std::string> names;
     for (const auto* hit : visibleHits()) {
@@ -797,11 +932,16 @@ void PackagesTab::launchUpdateAll() {
         names.push_back(hit->name);
       }
     }
-    launched = noctalia::packages::updatePackages(std::move(names), onComplete, progressSink(generation));
+    launched = noctalia::packages::updatePackages(
+        std::move(names), onComplete, progressSink(generation), m_kind
+    );
   }
   if (!launched) {
     --m_generation;
-    setStatus(i18n::tr("control-center.packages.unavailable"));
+    setStatus(
+        m_kind == noctalia::packages::Kind::Flatpak ? i18n::tr("control-center.packages.unavailable-flatpak")
+                                                    : i18n::tr("control-center.packages.unavailable")
+    );
     syncBusy();
     PanelManager::instance().refresh();
   }
@@ -812,7 +952,19 @@ bool PackagesTab::matchesName(const noctalia::packages::PackageHit& hit) const {
   if (query.empty() || m_view == View::Search) {
     return true;
   }
-  return StringUtils::containsInsensitive(hit.name, query);
+  return StringUtils::containsInsensitive(hit.name, query)
+      || StringUtils::containsInsensitive(hit.title, query)
+      || StringUtils::containsInsensitive(hit.summary, query);
+}
+
+bool PackagesTab::skipPolkit(noctalia::packages::Action action, std::string_view installation) const {
+  if (m_kind != noctalia::packages::Kind::Flatpak) {
+    return false;
+  }
+  if (action == noctalia::packages::Action::Install) {
+    return true;
+  }
+  return installation != "system";
 }
 
 bool PackagesTab::matchesFilter(const noctalia::packages::PackageHit& hit) const {
@@ -897,7 +1049,7 @@ void PackagesTab::syncFilterControl() {
   if (m_filter == nullptr) {
     return;
   }
-  const bool show = m_view == View::Updates && !m_hits.empty();
+  const bool show = m_view == View::Updates && m_kind == noctalia::packages::Kind::Fedora && !m_hits.empty();
   m_filter->setVisible(show);
   m_filter->setParticipatesInLayout(show);
 }
@@ -959,28 +1111,16 @@ void PackagesTab::rebuildResults() {
   });
 
   if (hits.empty()) {
-    const bool busy = noctalia::packages::busy();
-    if (!busy) {
-      const char* emptyKey = "control-center.packages.empty";
-      if (m_hits.empty()) {
-        if (m_view == View::Updates) {
-          emptyKey = "control-center.packages.no-updates";
-        } else if (m_view == View::Installed) {
-          emptyKey = "control-center.packages.no-installed";
-        } else {
-          emptyKey = currentQuery().empty() ? "control-center.packages.hint-search" : "control-center.packages.empty";
-        }
-      } else {
-        emptyKey = "control-center.packages.filter-empty";
-      }
+    if (!noctalia::packages::busy() && !m_hits.empty()) {
       card->addChild(
           ui::label({
-              .text = i18n::tr(emptyKey),
+              .text = i18n::tr("control-center.packages.filter-empty"),
               .fontSize = Style::fontSizeBody * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .maxLines = 3,
           })
       );
+      m_results->addChild(std::move(card));
     }
   } else {
     for (std::size_t index = 0; index < hits.size(); ++index) {
@@ -999,6 +1139,8 @@ void PackagesTab::rebuildResults() {
       }
       ResultRow row;
       row.packageName = hit.name;
+      row.installation = hit.installation;
+      row.remotes = hit.repo;
       auto item = ui::column({
           .align = FlexAlign::Stretch,
           .gap = Style::spaceXs * scale,
@@ -1012,18 +1154,26 @@ void PackagesTab::rebuildResults() {
       header->addChild(
           ui::label({
               .out = &row.name,
-              .text = hit.name,
+              .text = displayName(hit),
               .fontSize = Style::fontSizeBody * scale,
               .fontWeight = FontWeight::Bold,
               .color = colorSpecFromRole(ColorRole::OnSurface),
               .maxLines = 1,
               .ellipsize = TextEllipsize::End,
               .flexGrow = 1.0F,
+              .configure =
+                  [tip = hit.name, titled = !hit.title.empty()](Label& label) {
+                    if (titled) {
+                      label.setTooltip(tip);
+                    }
+                  },
           })
       );
 
       const auto addAction = [&](noctalia::packages::Action action, const char* key, ButtonVariant variant) {
         const std::string name = hit.name;
+        const std::string installation = hit.installation;
+        const std::string remotes = hit.repo;
         header->addChild(
             ui::button({
                 .out = &row.action,
@@ -1036,7 +1186,9 @@ void PackagesTab::rebuildResults() {
                 .paddingV = Style::spaceXs * scale,
                 .paddingH = Style::spaceSm * scale,
                 .radius = Style::scaledRadiusMd(scale),
-                .onClick = [this, action, name]() { runAction(action, name); },
+                .onClick = [this, action, name, installation, remotes]() {
+                  runAction(action, name, installation, remotes);
+                },
             })
         );
       };
@@ -1051,6 +1203,19 @@ void PackagesTab::rebuildResults() {
         addAction(noctalia::packages::Action::Install, "control-center.packages.install", ButtonVariant::Default);
       }
       item->addChild(std::move(header));
+      if (!hit.summary.empty()) {
+        item->addChild(
+            ui::label({
+                .out = &row.summary,
+                .text = hit.summary,
+                .fontSize = Style::fontSizeCaption * scale,
+                .color = colorSpecFromRole(ColorRole::OnSurface),
+                .maxLines = 1,
+                .ellipsize = TextEllipsize::End,
+                .configure = [tip = hit.summary](Label& label) { label.setTooltip(tip); },
+            })
+        );
+      }
       item->addChild(
           ui::label({
               .out = &row.version,
@@ -1065,9 +1230,9 @@ void PackagesTab::rebuildResults() {
       card->addChild(std::move(item));
       m_rows.push_back(row);
     }
+    m_results->addChild(std::move(card));
   }
 
-  m_results->addChild(std::move(card));
   syncFilterControl();
   syncUpdateAllBar();
 }
@@ -1106,6 +1271,9 @@ void PackagesTab::syncBusy() {
   }
   if (m_viewSwitch != nullptr) {
     m_viewSwitch->setEnabled(idle);
+  }
+  if (m_kindSwitch != nullptr) {
+    m_kindSwitch->setEnabled(idle);
   }
   if (m_filter != nullptr) {
     m_filter->setEnabled(idle);

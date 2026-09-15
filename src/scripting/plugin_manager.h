@@ -123,10 +123,11 @@ namespace scripting {
 
     // Throttled `git fetch` of the enabled git sources in `plugins`, so the settings
     // browser / store show newly published plugins on open without waiting for the
-    // 6h auto-update. A source fetched within the throttle window is skipped. Blocking
-    // git/IO — call off the UI thread with a main-thread config snapshot. Only advances
-    // FETCH_HEAD (browsable catalog); it never advances HEAD or exports files.
-    void fetchStaleCatalogs(const PluginsConfig& plugins);
+    // 6h auto-update. A source fetched within the throttle window is skipped unless
+    // `force` is true. Blocking git/IO — call off the UI thread with a main-thread
+    // config snapshot. Only advances FETCH_HEAD (browsable catalog); it never
+    // advances HEAD or exports files.
+    void fetchStaleCatalogs(const PluginsConfig& plugins, bool force = false);
 
     // Update enabled git sources scoped by the background auto-update mode
     // (None = nothing, Official = only the built-in official source, All = every

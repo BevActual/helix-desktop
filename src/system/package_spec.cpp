@@ -3,7 +3,11 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <nlohmann/json.hpp>
+#include <string>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace noctalia::packages {
 
@@ -104,6 +108,61 @@ namespace noctalia::packages {
       }
     }
     return true;
+  }
+
+  bool isValidFlatpakAppId(std::string_view id) {
+    if (id.size() < 3 || id.size() > 255) {
+      return false;
+    }
+    if (id.contains('/') || id.contains('\\') || id.contains("..")) {
+      return false;
+    }
+    bool start = true;
+    std::size_t dots = 0;
+    for (const char ch : id) {
+      if (start) {
+        if (std::isalnum(static_cast<unsigned char>(ch)) == 0) {
+          return false;
+        }
+        start = false;
+        continue;
+      }
+      if (ch == '.') {
+        ++dots;
+        start = true;
+        continue;
+      }
+      if (std::isalnum(static_cast<unsigned char>(ch)) == 0 && ch != '_' && ch != '-') {
+        return false;
+      }
+    }
+    return dots >= 1 && !start;
+  }
+
+  std::string preferredFlatpakRemote(std::string_view remotes) {
+    std::string best;
+    std::size_t start = 0;
+    while (start <= remotes.size()) {
+      const auto end = remotes.find(',', start);
+      auto token = remotes.substr(start, end == std::string_view::npos ? remotes.size() - start : end - start);
+      while (!token.empty() && std::isspace(static_cast<unsigned char>(token.front())) != 0) {
+        token.remove_prefix(1);
+      }
+      while (!token.empty() && std::isspace(static_cast<unsigned char>(token.back())) != 0) {
+        token.remove_suffix(1);
+      }
+      if (!token.empty() && best.empty()) {
+        best = std::string(token);
+      }
+      if (token == "flathub") {
+        return "flathub";
+      }
+      if (end == std::string_view::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+    return best;
   }
 
   bool hasSafeSearchChars(std::string_view query) {
@@ -224,6 +283,234 @@ namespace noctalia::packages {
       start = end + 1;
     }
     return hits;
+  }
+
+  std::optional<PackageHit> parseRpmInstalledLine(std::string_view line) {
+    line = trim(line);
+    if (line.empty()) {
+      return std::nullopt;
+    }
+
+    std::array<std::string_view, 5> fields{};
+    std::size_t field = 0;
+    std::size_t start = 0;
+    while (field < fields.size()) {
+      const auto end = line.find('\t', start);
+      if (end == std::string_view::npos) {
+        return std::nullopt;
+      }
+      fields[field] = line.substr(start, end - start);
+      start = end + 1;
+      ++field;
+    }
+    const auto summary = line.substr(start);
+
+    PackageHit hit;
+    hit.name = std::string(trim(fields[0]));
+    const auto epoch = trim(fields[1]);
+    if (!epoch.empty() && epoch != "0" && epoch != "(none)") {
+      hit.epoch = std::string(epoch);
+    }
+    hit.version = std::string(trim(fields[2]));
+    hit.release = std::string(trim(fields[3]));
+    hit.arch = std::string(trim(fields[4]));
+    hit.summary = compactSummary(summary);
+    hit.info = "Installed";
+    hit.state = PackageState::Installed;
+    if (!isValidRpmName(hit.name) || hit.version.empty() || hit.release.empty() || hit.arch.empty()) {
+      return std::nullopt;
+    }
+    return hit;
+  }
+
+  std::vector<PackageHit> parseRpmInstalledOutput(std::string_view text) {
+    std::vector<PackageHit> hits;
+    std::size_t start = 0;
+    while (start <= text.size()) {
+      const auto end = text.find('\n', start);
+      const auto line = text.substr(start, end == std::string_view::npos ? text.size() - start : end - start);
+      if (auto hit = parseRpmInstalledLine(line)) {
+        hits.push_back(std::move(*hit));
+      }
+      if (end == std::string_view::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+    return hits;
+  }
+
+  std::optional<PackageHit> parseFlatpakListLine(std::string_view line, FlatpakListKind kind) {
+    line = trim(line);
+    if (line.empty()) {
+      return std::nullopt;
+    }
+    const std::size_t expected = kind == FlatpakListKind::Installed ? 6 : 5;
+    std::vector<std::string_view> fields;
+    std::size_t start = 0;
+    while (fields.size() + 1 < expected) {
+      const auto end = line.find('\t', start);
+      if (end == std::string_view::npos) {
+        return std::nullopt;
+      }
+      fields.push_back(line.substr(start, end - start));
+      start = end + 1;
+    }
+    fields.push_back(line.substr(start));
+    if (fields.size() != expected) {
+      return std::nullopt;
+    }
+
+    PackageHit hit;
+    hit.name = std::string(trim(fields[0]));
+    if (!isValidFlatpakAppId(hit.name)) {
+      return std::nullopt;
+    }
+    hit.title = compactSummary(fields[1]);
+    if (kind == FlatpakListKind::Installed) {
+      hit.version = std::string(trim(fields[2]));
+      hit.release = std::string(trim(fields[3]));
+      hit.repo = std::string(trim(fields[4]));
+      hit.installation = std::string(trim(fields[5]));
+      hit.info = "Installed";
+      hit.state = PackageState::Installed;
+      if (!hit.title.empty()) {
+        hit.summary = hit.title;
+      }
+    } else {
+      hit.summary = compactSummary(fields[2]);
+      hit.version = std::string(trim(fields[3]));
+      hit.repo = std::string(trim(fields[4]));
+      hit.info = "Update";
+      hit.state = PackageState::Update;
+    }
+    return hit;
+  }
+
+  std::vector<PackageHit> parseFlatpakListOutput(std::string_view text, FlatpakListKind kind) {
+    std::vector<PackageHit> hits;
+    std::size_t start = 0;
+    while (start <= text.size()) {
+      const auto end = text.find('\n', start);
+      const auto line = text.substr(start, end == std::string_view::npos ? text.size() - start : end - start);
+      if (auto hit = parseFlatpakListLine(line, kind)) {
+        hits.push_back(std::move(*hit));
+      }
+      if (end == std::string_view::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+    return hits;
+  }
+
+  std::vector<PackageHit> parseFlatpakSearchJson(std::string_view text) {
+    std::vector<PackageHit> hits;
+    auto jsonText = std::string(text);
+    if (const auto start = jsonText.find('['); start != std::string::npos && start > 0) {
+      jsonText.erase(0, start);
+    }
+    const auto json = nlohmann::json::parse(jsonText, nullptr, false);
+    if (!json.is_array()) {
+      return hits;
+    }
+    for (const auto& row : json) {
+      if (!row.is_object()) {
+        continue;
+      }
+      PackageHit hit;
+      if (row.contains("application_id") && row["application_id"].is_string()) {
+        hit.name = row["application_id"].get<std::string>();
+      } else if (row.contains("application") && row["application"].is_string()) {
+        hit.name = row["application"].get<std::string>();
+      }
+      if (!isValidFlatpakAppId(hit.name)) {
+        continue;
+      }
+      if (row.contains("name") && row["name"].is_string()) {
+        hit.title = compactSummary(row["name"].get<std::string>());
+      }
+      if (row.contains("description") && row["description"].is_string()) {
+        hit.summary = compactSummary(row["description"].get<std::string>());
+      }
+      if (row.contains("version") && row["version"].is_string()) {
+        hit.version = row["version"].get<std::string>();
+      }
+      if (row.contains("remotes") && row["remotes"].is_string()) {
+        hit.repo = row["remotes"].get<std::string>();
+      }
+      hit.info = "Available";
+      hit.state = PackageState::Available;
+      hits.push_back(std::move(hit));
+    }
+    return hits;
+  }
+
+  std::string compactSummary(std::string_view text) {
+    std::string out;
+    out.reserve(std::min(text.size(), std::size_t{240}));
+    bool pendingSpace = false;
+    for (const char ch : text) {
+      if (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r') {
+        pendingSpace = true;
+        continue;
+      }
+      if (pendingSpace && !out.empty()) {
+        out.push_back(' ');
+      }
+      pendingSpace = false;
+      out.push_back(ch);
+      if (out.size() >= 240) {
+        break;
+      }
+    }
+    return out;
+  }
+
+  std::optional<std::pair<std::string, std::string>> parseNameSummaryLine(std::string_view line, char separator) {
+    line = trim(line);
+    if (line.empty()) {
+      return std::nullopt;
+    }
+    const auto split = line.find(separator);
+    if (split == std::string_view::npos || split == 0 || split + 1 >= line.size()) {
+      return std::nullopt;
+    }
+    const auto name = trim(line.substr(0, split));
+    const auto summary = compactSummary(line.substr(split + 1));
+    if (!isValidRpmName(name) || summary.empty()) {
+      return std::nullopt;
+    }
+    return std::pair<std::string, std::string>{std::string(name), std::move(summary)};
+  }
+
+  std::unordered_map<std::string, std::string> parseNameSummaryOutput(std::string_view text, char separator) {
+    std::unordered_map<std::string, std::string> summaries;
+    std::size_t start = 0;
+    while (start <= text.size()) {
+      const auto end = text.find('\n', start);
+      const auto line = text.substr(start, end == std::string_view::npos ? text.size() - start : end - start);
+      if (auto row = parseNameSummaryLine(line, separator)) {
+        summaries.emplace(std::move(row->first), std::move(row->second));
+      }
+      if (end == std::string_view::npos) {
+        break;
+      }
+      start = end + 1;
+    }
+    return summaries;
+  }
+
+  void applySummaryMap(std::vector<PackageHit>& hits, const std::unordered_map<std::string, std::string>& summaries) {
+    for (auto& hit : hits) {
+      if (!hit.summary.empty()) {
+        continue;
+      }
+      const auto it = summaries.find(hit.name);
+      if (it != summaries.end()) {
+        hit.summary = it->second;
+      }
+    }
   }
 
   std::vector<PackageHit> dedupeByName(std::vector<PackageHit> hits) {

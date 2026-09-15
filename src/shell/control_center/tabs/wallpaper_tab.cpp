@@ -12,7 +12,7 @@ WallpaperTab::WallpaperTab(const ControlCenterServices& services)
     : m_picker(
           services.platform != nullptr ? &services.platform->wayland() : nullptr, services.config, services.thumbnails,
           services.wallpaperScanner, services.theme, services.httpClient,
-          WallpaperPicker::Options{.showTitle = false, .showCloseButton = false}, services.pluginManager
+          WallpaperPicker::Options{.showTitle = false, .showCloseButton = false}, services.videoWallpaper
       ),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "wallpaper"})) {}
 

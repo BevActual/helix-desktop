@@ -16,6 +16,7 @@
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "shell/control_center/plugin_control_center_tab.h"
+#include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/appearance_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
@@ -28,6 +29,7 @@
 #include "shell/control_center/tabs/network_tab.h"
 #include "shell/control_center/tabs/notifications_tab.h"
 #include "shell/control_center/tabs/packages_tab.h"
+#include "shell/control_center/tabs/plugins_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
 #include "shell/control_center/tabs/screenshot_tab.h"
@@ -38,6 +40,7 @@
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
 #include "shell/control_center/tabs/weather_tab.h"
+#include "shell/wallpaper/video_wallpaper.h"
 #include "shell/wallpaper/wallhaven_client.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -57,6 +60,8 @@
 #include "ui/controls/separator.h"
 #include "ui/scroll_into_view.h"
 #include "ui/split_pane_focus.h"
+#include "ui/style.h"
+#include "util/string_utils.h"
 
 #include <algorithm>
 #include <chrono>
@@ -149,6 +154,7 @@ namespace {
   bool isSupersededPluginControlCenterTab(const scripting::ResolvedPluginEntry& resolved) {
     return resolved.manifest != nullptr
         && (resolved.manifest->id == wallpaper::wallhaven::kPluginId
+            || resolved.manifest->id == wallpaper::video::kPluginId
             || resolved.manifest->id == tailscale::kPluginId);
   }
 
@@ -211,7 +217,6 @@ namespace {
         || id == "security"
         || id == "hooks"
         || id == "niri"
-        || id == "plugins"
         || id == "control-center";
   }
 
@@ -236,6 +241,7 @@ namespace {
         || id == "screen-record"
         || id == "clipboard"
         || id == "tailscale"
+        || id == "plugins"
         || id == "home";
   }
 
@@ -336,7 +342,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("security", std::make_unique<SettingsTab>(services, "security"));
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
-  add("plugins", std::make_unique<SettingsTab>(services, "plugins"));
+  add("plugins", std::make_unique<PluginsTab>(services));
 }
 
 float ControlCenterPanel::preferredWidth() const {
@@ -458,6 +464,7 @@ void ControlCenterPanel::create() {
     m_lookHeader = nullptr;
     m_statusHeader = nullptr;
     m_setupHeader = nullptr;
+    m_setupToggle = nullptr;
 
     TabGroup lastHeader = TabGroup::Home;
     for (auto& slot : m_slots) {
@@ -695,6 +702,7 @@ void ControlCenterPanel::doUpdate(Renderer& renderer) {
   } else {
     syncTabVisibility();
   }
+  syncPackagesBadge();
   if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
     slot->tab->update(renderer);
   }
@@ -718,6 +726,11 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   const auto settingsTarget = parseSettingsOpenContext(context);
   const std::string tabId = settingsTarget.isSettings ? tabIdForSettingsSection(settingsTarget.section)
                                                      : (context.empty() ? "home" : std::string(context));
+  m_setupCollapsed = true;
+  if (const auto* slot = slotById(tabId); slot != nullptr && slot->group == TabGroup::Setup) {
+    m_setupCollapsed = false;
+  }
+  syncSetupToggle();
   selectTab(tabId, animateTabSwitch);
   if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
     if (settingsTarget.isSettings && tabId != "appearance") {
@@ -801,6 +814,11 @@ bool ControlCenterPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifi
   if (m_modalHost.onKeyboardEvent(event)) {
     return true;
   }
+  if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
+    if (slot->tab->handleGlobalKey(sym, modifiers, pressed, preedit)) {
+      return true;
+    }
+  }
   if (!m_showSidebar || m_sidebarNav == nullptr || m_sidebarScrollView == nullptr || m_content == nullptr) {
     return false;
   }
@@ -844,6 +862,7 @@ void ControlCenterPanel::onClose() {
   m_lookHeader = nullptr;
   m_statusHeader = nullptr;
   m_setupHeader = nullptr;
+  m_setupToggle = nullptr;
   m_searchInput = nullptr;
   m_searchQuery.clear();
   m_content = nullptr;
@@ -899,9 +918,23 @@ bool ControlCenterPanel::isTabVisible(std::string_view id) const {
 
 bool ControlCenterPanel::isTabShown(std::string_view id) const {
   if (id == m_activeTabId && m_activeTabForced) {
-    return isTabFeatureAvailable(id);
+    if (!isTabFeatureAvailable(id)) {
+      return false;
+    }
+  } else if (!isTabVisible(id)) {
+    return false;
   }
-  return isTabVisible(id);
+  const auto* slot = slotById(id);
+  if (slot == nullptr) {
+    return false;
+  }
+  if (isTabSearchActive()) {
+    return control_center::tabSearchMatches(slot->id, slot->title, m_searchQuery);
+  }
+  if (m_setupCollapsed && id != m_activeTabId && slot->group == TabGroup::Setup) {
+    return false;
+  }
+  return true;
 }
 
 std::vector<ControlCenterPanel::TabCatalogEntry> ControlCenterPanel::hideableTabCatalog() {
@@ -943,6 +976,15 @@ bool ControlCenterPanel::groupHasShownTab(TabGroup group) const {
   return false;
 }
 
+bool ControlCenterPanel::groupHasEligibleTab(TabGroup group) const {
+  for (const auto& slot : m_slots) {
+    if (slot.group == group && isTabVisible(slot.id)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void ControlCenterPanel::addSidebarGroupHeader(RovingListNavHost& nav, TabGroup group, float scale) {
   Node** out = nullptr;
   switch (group) {
@@ -956,6 +998,37 @@ void ControlCenterPanel::addSidebarGroupHeader(RovingListNavHost& nav, TabGroup 
     out = &m_setupHeader;
     break;
   case TabGroup::Home:
+    return;
+  }
+
+  if (group == TabGroup::Setup) {
+    nav.addChild(
+        ui::button({
+            .out = &m_setupToggle,
+            .text = m_compact ? std::optional<std::string>{} : std::optional<std::string>{groupCaption(group)},
+            .glyph = m_setupCollapsed ? "chevron-right" : "chevron-down",
+            .glyphSize = (m_compact ? 21.0F : Style::fontSizeCaption) * scale,
+            .contentAlign = m_compact ? ButtonContentAlign::Center : ButtonContentAlign::Start,
+            .variant = ButtonVariant::Tab,
+            .tooltip = i18n::tr(m_setupCollapsed ? "control-center.sidebar.setup-show" : "control-center.sidebar.setup-hide"),
+            .minWidth = m_compact ? std::optional<float>{Style::controlHeightSm * scale} : std::optional<float>{},
+            .minHeight = Style::controlHeightSm * scale,
+            .paddingV = Style::spaceXs * scale,
+            .paddingH = (m_compact ? Style::spaceXs : Style::spaceSm) * scale,
+            .gap = Style::spaceSm * scale,
+            .radius = Style::scaledRadiusLg(scale),
+            .onClick = [this]() { toggleSetupCollapsed(); },
+            .configure =
+                [this, scale](Button& button) {
+                  if (button.label() != nullptr) {
+                    button.label()->setFontWeight(FontWeight::Bold);
+                    button.label()->setFontSize(Style::fontSizeCaption * scale);
+                  }
+                  wireSidebarScroll(button.inputArea());
+                },
+        })
+    );
+    m_setupHeader = m_setupToggle;
     return;
   }
 
@@ -1018,6 +1091,42 @@ void ControlCenterPanel::addSidebarTabButton(RovingListNavHost& nav, TabSlot& sl
   nav.registerItem(slot.button, onClick);
 }
 
+void ControlCenterPanel::toggleSetupCollapsed() {
+  m_setupCollapsed = !m_setupCollapsed;
+  syncSetupToggle();
+  syncTabVisibility();
+  PanelManager::instance().requestLayout();
+  PanelManager::instance().refresh();
+}
+
+void ControlCenterPanel::syncSetupToggle() {
+  if (m_setupToggle == nullptr) {
+    return;
+  }
+  m_setupToggle->setGlyph(m_setupCollapsed ? "chevron-right" : "chevron-down");
+  m_setupToggle->setTooltip(
+      i18n::tr(m_setupCollapsed ? "control-center.sidebar.setup-show" : "control-center.sidebar.setup-hide")
+  );
+}
+
+void ControlCenterPanel::syncPackagesBadge() {
+  auto* slot = slotById("packages");
+  if (slot == nullptr || slot->button == nullptr) {
+    return;
+  }
+  const std::size_t count = noctalia::packages::pendingUpdateCount();
+  if (count == 0) {
+    slot->button->setBadge("");
+    slot->button->setTooltip(m_compact ? slot->title : std::string{});
+    return;
+  }
+  const std::string badge = count > 99 ? std::string("99+") : std::to_string(count);
+  slot->button->setBadge(badge);
+  slot->button->setBadgeFontSize(Style::fontSizeCaption * contentScale());
+  const std::string waiting = i18n::tr("control-center.packages.updates-waiting", "count", std::to_string(count));
+  slot->button->setTooltip(m_compact ? slot->title + " · " + waiting : waiting);
+}
+
 void ControlCenterPanel::syncTabVisibility() {
   for (auto& slot : m_slots) {
     const bool visible = isTabShown(slot.id);
@@ -1043,7 +1152,9 @@ void ControlCenterPanel::syncTabVisibility() {
   };
   setHeaderVisible(m_lookHeader, groupHasShownTab(TabGroup::Look));
   setHeaderVisible(m_statusHeader, groupHasShownTab(TabGroup::Status));
-  setHeaderVisible(m_setupHeader, groupHasShownTab(TabGroup::Setup));
+  setHeaderVisible(
+      m_setupHeader, isTabSearchActive() ? groupHasShownTab(TabGroup::Setup) : groupHasEligibleTab(TabGroup::Setup)
+  );
 }
 
 void ControlCenterPanel::updateTabChrome(std::string_view id) {
@@ -1278,6 +1389,12 @@ void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
   }
 
   m_activeTabId = target;
+  if (m_searchQuery.empty()) {
+    if (const auto* slot = slotById(target); slot != nullptr && slot->group == TabGroup::Setup && m_setupCollapsed) {
+      m_setupCollapsed = false;
+      syncSetupToggle();
+    }
+  }
   if (target == "notifications" && m_notificationManager != nullptr) {
     m_notificationManager->markNotificationHistorySeen();
   }
@@ -1362,7 +1479,12 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
   }
   m_searchQuery = std::move(value);
   const bool searching = !m_searchQuery.empty();
-  if (searching) {
+  if (searching && isTabSearchActive()) {
+    const std::string best = bestTabSearchId();
+    if (!best.empty() && best != m_activeTabId) {
+      selectTab(best, false);
+    }
+  } else if (searching) {
     auto* slot = slotById(m_activeTabId);
     const bool stayOnTab = isSettingsEditorTab(m_activeTabId)
         || (isLiveSettingsHost(m_activeTabId)
@@ -1378,6 +1500,7 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
       slot->tab->setConfigureMode(true);
     }
   }
+  syncTabVisibility();
   syncActiveTabSearch();
   PanelManager::instance().requestLayout();
 }
@@ -1385,8 +1508,50 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
 void ControlCenterPanel::syncActiveTabSearch() {
   auto* slot = slotById(m_activeTabId);
   if (slot != nullptr && slot->tab != nullptr) {
-    slot->tab->setSettingsSearchQuery(m_searchQuery);
+    slot->tab->setSettingsSearchQuery(shouldPassSettingsSearch() ? m_searchQuery : std::string{});
   }
+}
+
+bool ControlCenterPanel::isTabSearchActive() const {
+  if (StringUtils::trim(m_searchQuery).size() < 2) {
+    return false;
+  }
+  for (const auto& slot : m_slots) {
+    if (!isTabVisible(slot.id) && !(slot.id == m_activeTabId && m_activeTabForced)) {
+      continue;
+    }
+    if (control_center::tabSearchMatches(slot.id, slot.title, m_searchQuery)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool ControlCenterPanel::shouldPassSettingsSearch() const {
+  if (m_searchQuery.empty() || !isTabSearchActive()) {
+    return true;
+  }
+  if (isSettingsEditorTab(m_activeTabId)) {
+    return true;
+  }
+  const auto* slot = slotById(m_activeTabId);
+  return isLiveSettingsHost(m_activeTabId) && slot != nullptr && slot->tab != nullptr && slot->tab->configureMode();
+}
+
+std::string ControlCenterPanel::bestTabSearchId() const {
+  int bestScore = 0;
+  std::string bestId;
+  for (const auto& slot : m_slots) {
+    if (!isTabVisible(slot.id) && !(slot.id == m_activeTabId && m_activeTabForced)) {
+      continue;
+    }
+    const int score = control_center::tabSearchScore(slot.id, slot.title, m_searchQuery);
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = slot.id;
+    }
+  }
+  return bestId;
 }
 
 void ControlCenterPanel::layoutFullSidebarWidth(Renderer& renderer) {

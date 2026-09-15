@@ -48,6 +48,7 @@ struct SettingsPaneOptions {
   std::string section;
   std::unordered_set<std::string> includedGroups;
   bool compact = false;
+  std::function<void()> openStore;
 };
 
 class SettingsPane {
@@ -127,6 +128,7 @@ private:
   CalendarService* m_calendar = nullptr;
   settings::SettingsModalHost* m_modalHost = nullptr;
   settings::RuntimeActions m_actions;
+  std::function<void()> m_openStore;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   std::string m_selectedSection;

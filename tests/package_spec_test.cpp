@@ -95,5 +95,67 @@ int main() {
   ok = expect(progress.percent == 45, "percent value") && ok;
   ok = expect(!applyPkconProgressLine("Installed    helix-1-1.fc44.x86_64 (fedora)", progress), "package line") && ok;
 
+  ok = expect(compactSummary("  GNU  Image\nManipulation  ") == "GNU Image Manipulation", "compact summary") && ok;
+  const auto rpmRow = parseNameSummaryLine("bash\tThe GNU Bourne Again shell", '\t');
+  ok = expect(rpmRow && rpmRow->first == "bash" && rpmRow->second == "The GNU Bourne Again shell", "rpm summary") && ok;
+  const auto dnfRow = parseNameSummaryLine("helix|A post-modern modal text editor written in Rust", '|');
+  ok = expect(dnfRow && dnfRow->first == "helix", "dnf name") && ok;
+  ok = expect(!parseNameSummaryLine("bad;name|nope", '|'), "invalid summary name") && ok;
+
+  auto withSummary = parsePkconOutput("Available    helix-25.07.1-11.fc44.x86_64 (updates)\n");
+  applySummaryMap(withSummary, parseNameSummaryOutput("helix|A post-modern modal text editor written in Rust\n", '|'));
+  ok = expect(withSummary.size() == 1 && withSummary[0].summary.starts_with("A post-modern"), "apply summary") && ok;
+
+  const auto rpmInstalled = parseRpmInstalledLine("bash\t0\t5.3.0\t2.fc44\tx86_64\tThe GNU Bourne Again shell");
+  ok = expect(rpmInstalled && rpmInstalled->name == "bash" && rpmInstalled->epoch.empty(), "rpm name") && ok;
+  ok = expect(rpmInstalled && rpmInstalled->version == "5.3.0" && rpmInstalled->release == "2.fc44", "rpm version")
+      && ok;
+  ok = expect(rpmInstalled && rpmInstalled->arch == "x86_64" && rpmInstalled->state == PackageState::Installed, "rpm arch")
+      && ok;
+  ok = expect(rpmInstalled && rpmInstalled->summary.starts_with("The GNU Bourne"), "rpm summary") && ok;
+
+  const auto rpmEpoch = parseRpmInstalledLine("vim-data\t2\t9.2.1061\t1.fc44\tnoarch\tVi IMproved extra files");
+  ok = expect(rpmEpoch && rpmEpoch->name == "vim-data" && rpmEpoch->epoch == "2", "rpm epoch") && ok;
+  ok = expect(!parseRpmInstalledLine("Transaction: Searching"), "rpm junk") && ok;
+  ok = expect(parseRpmInstalledOutput("bash\t0\t5.3.0\t2.fc44\tx86_64\tThe GNU Bourne Again shell\n").size() == 1, "rpm one")
+      && ok;
+
+  ok = expect(isValidFlatpakAppId("org.gnome.Calculator"), "flatpak id") && ok;
+  ok = expect(isValidFlatpakAppId("com.github.user.App-Name"), "flatpak hyphen") && ok;
+  ok = expect(!isValidFlatpakAppId("org"), "flatpak one component") && ok;
+  ok = expect(!isValidFlatpakAppId("org.gnome."), "flatpak trailing dot") && ok;
+  ok = expect(!isValidFlatpakAppId("../etc"), "flatpak path") && ok;
+  ok = expect(preferredFlatpakRemote("fedora, flathub") == "flathub", "prefer flathub") && ok;
+  ok = expect(preferredFlatpakRemote("fedora") == "fedora", "first remote") && ok;
+  ok = expect(preferredFlatpakRemote("").empty(), "empty remotes") && ok;
+
+  const auto flatpakInstalled = parseFlatpakListLine(
+      "org.gnome.Calculator\tCalculator\t49.1.2\tstable\tflathub\tuser", FlatpakListKind::Installed
+  );
+  ok = expect(flatpakInstalled && flatpakInstalled->name == "org.gnome.Calculator", "flatpak app id") && ok;
+  ok = expect(flatpakInstalled && flatpakInstalled->title == "Calculator" && flatpakInstalled->version == "49.1.2", "flatpak title")
+      && ok;
+  ok = expect(flatpakInstalled && flatpakInstalled->repo == "flathub" && flatpakInstalled->installation == "user", "flatpak origin")
+      && ok;
+  ok = expect(flatpakInstalled && flatpakInstalled->state == PackageState::Installed, "flatpak installed state") && ok;
+
+  const auto flatpakUpdate = parseFlatpakListLine(
+      "org.gnome.Calculator\tCalculator\tPerform arithmetic\t49.2\tflathub", FlatpakListKind::Updates
+  );
+  ok = expect(flatpakUpdate && flatpakUpdate->state == PackageState::Update && flatpakUpdate->summary.starts_with("Perform"), "flatpak update")
+      && ok;
+  ok = expect(!parseFlatpakListLine("runtime/org.freedesktop.Platform\tPlatform\t25.08\tstable\tflathub\tuser", FlatpakListKind::Installed), "runtime skipped")
+      && ok;
+
+  const auto searched = parseFlatpakSearchJson(
+      R"([{"application_id":"org.gnome.Calculator","name":"Calculator","description":"Perform arithmetic","version":"49.0","remotes":"flathub,fedora"}])"
+  );
+  ok = expect(searched.size() == 1 && searched[0].name == "org.gnome.Calculator", "search id") && ok;
+  ok = expect(searched.size() == 1 && searched[0].title == "Calculator" && searched[0].repo == "flathub,fedora", "search title")
+      && ok;
+  const auto searchedAlt = parseFlatpakSearchJson(R"([{"application":"org.mozilla.firefox","name":"Firefox"}])");
+  ok = expect(searchedAlt.size() == 1 && searchedAlt[0].name == "org.mozilla.firefox", "search application key") && ok;
+  ok = expect(parseFlatpakSearchJson(R"([{"application_id":"bad"}])").empty(), "search invalid id") && ok;
+
   return ok ? 0 : 1;
 }

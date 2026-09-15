@@ -926,7 +926,7 @@ namespace scripting {
     }).detach();
   }
 
-  void PluginManager::fetchStaleCatalogs(const PluginsConfig& plugins) {
+  void PluginManager::fetchStaleCatalogs(const PluginsConfig& plugins, bool force) {
     // Newly published plugins only become browsable after a fetch advances FETCH_HEAD;
     // throttle so repeated store opens don't hit the network every time.
     constexpr auto kThrottle = std::chrono::minutes(15);
@@ -939,7 +939,7 @@ namespace scripting {
       {
         const std::scoped_lock lock(m_browseFetchMutex);
         const auto it = m_lastBrowseFetch.find(source.name);
-        if (it != m_lastBrowseFetch.end() && now - it->second < kThrottle) {
+        if (!force && it != m_lastBrowseFetch.end() && now - it->second < kThrottle) {
           continue;
         }
         m_lastBrowseFetch[source.name] = now;

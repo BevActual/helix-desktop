@@ -27,9 +27,13 @@ public:
   WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
+  std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void onFrameTick(float deltaMs) override;
   void setSettingsSearchQuery(std::string_view query) override;
+  void setConfigureMode(bool show) override;
+  [[nodiscard]] bool configureMode() const override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
   enum class ForecastView : std::uint8_t {
@@ -58,7 +62,7 @@ private:
 
   WeatherService* m_weather = nullptr;
   ConfigService* m_config = nullptr;
-  std::unique_ptr<SettingsPane> m_inlineSettings;
+  std::unique_ptr<SettingsPane> m_settings;
   Flex* m_liveRoot = nullptr;
   Flex* m_rootLayout = nullptr;
   ScrollView* m_liveScroll = nullptr;

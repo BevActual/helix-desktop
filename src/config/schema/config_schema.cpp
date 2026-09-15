@@ -825,6 +825,17 @@ namespace noctalia::config::schema {
       return s;
     }
 
+    const Schema<WallpaperVideoConfig>& wallpaperVideoSchema() {
+      static const Schema<WallpaperVideoConfig> s = {
+          pathStringField(&WallpaperVideoConfig::directory, "directory"),
+          field(&WallpaperVideoConfig::mute, "mute"),
+          field(&WallpaperVideoConfig::hardwareDecode, "hardware_decode"),
+          enumField(&WallpaperVideoConfig::autoPause, "auto_pause", kWallpaperVideoAutoPauseModes),
+          field(&WallpaperVideoConfig::mpvOptions, "mpv_options"),
+      };
+      return s;
+    }
+
     const Schema<WallpaperAutomationConfig>& wallpaperAutomationSchema() {
       static const Schema<WallpaperAutomationConfig> s = {
           field(&WallpaperAutomationConfig::enabled, "enabled"),
@@ -1671,6 +1682,7 @@ namespace noctalia::config::schema {
         field(&WallpaperConfig::perMonitorDirectories, "per_monitor_directories"),
         subTable(&WallpaperConfig::automation, "automation", wallpaperAutomationSchema()),
         subTable(&WallpaperConfig::wallhaven, "wallhaven", wallpaperWallhavenSchema()),
+        subTable(&WallpaperConfig::video, "video", wallpaperVideoSchema()),
         namedMap<WallpaperConfig, WallpaperMonitorOverride>(
             &WallpaperConfig::monitorOverrides, "monitor", wallpaperMonitorSchema(),
             [](WallpaperMonitorOverride& o, std::string_view name) { o.match = std::string(name); },

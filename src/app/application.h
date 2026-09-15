@@ -59,6 +59,7 @@
 #include "shell/switcher/window_switcher.h"
 #include "shell/tray/tray_menu.h"
 #include "shell/wallpaper/panel/wallpaper_scanner.h"
+#include "shell/wallpaper/video_wallpaper_service.h"
 #include "shell/wallpaper/wallpaper.h"
 #include "system/battery_warning_monitor.h"
 #include "system/dependency_service.h"
@@ -196,6 +197,7 @@ private:
   // When [plugins].auto_update is on, pull git sources per the configured mode. Run once at
   // startup and on a 6h repeating timer so long-lived sessions pick up new plugin versions.
   void runPluginAutoUpdate();
+  void refreshPackageUpdates();
   void startTrayService();
   void syncNotificationDaemon();
   void installNotificationBusNameWatch();
@@ -356,6 +358,7 @@ private:
   ScreenCorners m_screenCorners;
   TrayMenu m_trayMenu;
   Wallpaper m_wallpaper;
+  VideoWallpaperService m_videoWallpaper{m_configService, m_wallpaper, m_wayland};
   Backdrop m_backdrop;
   Signal<> m_settingsInvalidated;
   ControlCenterPanel* m_controlCenter = nullptr;
@@ -403,6 +406,7 @@ private:
   Timer m_clipboardAutoPasteTimer;
   Timer m_launcherAutoPasteTimer;
   Timer m_pluginAutoUpdateTimer;
+  Timer m_packageUpdateTimer;
   Timer m_graphicsRecoveryTimer;
   std::uint64_t m_greeterSyncGeneration = 0;
   int m_graphicsRecoveryAttempts = 0;

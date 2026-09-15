@@ -13,6 +13,7 @@
 #include "render/core/render_styles.h"
 #include "render/core/shared_texture_cache.h"
 #include "render/render_context.h"
+#include "shell/wallpaper/video_wallpaper_service.h"
 #include "shell/wallpaper/wallpaper_geometry.h"
 #include "shell/wallpaper/wallpaper_instance.h"
 #include "shell/wallpaper/wallpaper_paths.h"
@@ -604,6 +605,9 @@ bool Wallpaper::isConnectorKnown(std::string_view connector) const {
 }
 
 void Wallpaper::applyResolvedWallpaper(const std::optional<std::string>& connector, const std::string& resolvedPath) {
+  if (m_videoWallpaper != nullptr) {
+    m_videoWallpaper->clear(connector);
+  }
   const WaylandOutput* output = nullptr;
   if (connector.has_value() && m_wayland != nullptr) {
     for (const auto& out : m_wayland->outputs()) {

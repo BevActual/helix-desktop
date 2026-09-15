@@ -65,6 +65,7 @@
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "system/fedora_upgrade_launcher.h"
+#include "system/package_kit_service.h"
 #include "shell/launcher/launcher_panel.h"
 #include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
@@ -134,6 +135,7 @@ void Application::initUiRenderSurfacesAndSettings() {
   Style::setRtl(i18n::Service::instance().rtl());
   m_renderContext.setTextBaseDirection(i18n::Service::instance().rtl());
   m_wallpaper.initialize(m_wayland, &m_configService, &m_renderContext, &m_sharedTextureCache, &m_themeService);
+  m_videoWallpaper.start();
   m_backdrop.initialize(m_wayland, &m_configService, &m_sharedTextureCache, &m_glShared);
 }
 
@@ -243,6 +245,12 @@ void Application::scheduleGreeterAutoSync() {
   }
   m_greeterAutoSyncTimer.stop();
   m_greeterAutoSyncTimer.start(std::chrono::milliseconds(1000), [this]() { performGreeterSync(true); });
+}
+
+void Application::refreshPackageUpdates() {
+  (void)noctalia::packages::refreshPendingUpdateCount([]() {
+    DeferredCall::callLater([]() { PanelManager::instance().refresh(); });
+  });
 }
 
 void Application::performShellUpgrade() {
@@ -663,6 +671,7 @@ void Application::initPanelManagerAndPanels() {
           .wallpaperScanner = &m_wallpaperScanner,
           .asyncTextures = &m_asyncTextureCache,
           .pluginManager = &m_pluginManager,
+          .videoWallpaper = &m_videoWallpaper,
           .screenRecorder = &m_screenRecorder,
           .tailscale = &m_tailscaleService,
           .upgradeShell = [this]() { performShellUpgrade(); },
@@ -674,6 +683,12 @@ void Application::initPanelManagerAndPanels() {
       });
   m_controlCenter = controlCenter.get();
   m_panelManager.registerPanel("control-center", std::move(controlCenter));
+  if (noctalia::packages::tabAvailable()) {
+    m_packageUpdateTimer.start(std::chrono::seconds(20), [this]() {
+      refreshPackageUpdates();
+      m_packageUpdateTimer.startRepeating(std::chrono::minutes(30), [this]() { refreshPackageUpdates(); });
+    });
+  }
   {
     auto launcherPanel = std::make_unique<LauncherPanel>(&m_configService, &m_asyncTextureCache);
     launcherPanel->addProvider(std::make_unique<AppProvider>(&m_configService, &m_compositorPlatform));
@@ -749,7 +764,7 @@ void Application::initPanelManagerAndPanels() {
       "wallpaper",
       std::make_unique<WallpaperPanel>(
           &m_wayland, &m_configService, &m_thumbnailService, &m_wallpaperScanner, &m_themeService, &m_httpClient,
-          &m_pluginManager
+          &m_videoWallpaper
       )
   );
   m_panelManager.registerPanel("tray-drawer", std::make_unique<TrayDrawerPanel>(m_trayService.get(), &m_configService));

@@ -5,7 +5,6 @@
 #include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
-#include "core/process/process.h"
 #include "core/random.h"
 #include "core/ui_phase.h"
 #include "cursor-shape-v1-client-protocol.h"
@@ -16,11 +15,11 @@
 #include "render/core/thumbnail_service.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
-#include "scripting/plugin_manager.h"
-#include "scripting/plugin_state_store.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "shell/wallpaper/panel/wallpaper_tile.h"
+#include "shell/wallpaper/video_wallpaper.h"
+#include "shell/wallpaper/video_wallpaper_service.h"
 #include "shell/wallpaper/wallhaven_client.h"
 #include "shell/wallpaper/wallpaper_paths.h"
 #include "theme/builtin_palettes.h"
@@ -40,8 +39,6 @@
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 #include "wayland/wayland_connection.h"
-
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <cctype>
@@ -215,8 +212,6 @@ namespace {
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
   }
-
-  constexpr std::string_view kMpvpaperPluginId = "noctalia/mpvpaper";
 
   [[nodiscard]] int caseInsensitiveNameOrder(std::string_view a, std::string_view b) {
     return StringUtils::naturalCaseInsensitiveCompare(a, b);
@@ -399,10 +394,10 @@ private:
 WallpaperPicker::WallpaperPicker(
     WaylandConnection* wayland, ConfigService* config, ThumbnailService* thumbnails, WallpaperScanner* scanner,
     noctalia::theme::ThemeService* themeService, HttpClient* httpClient, Options options,
-    scripting::PluginManager* pluginManager
+    VideoWallpaperService* videoWallpaper
 )
     : m_wayland(wayland), m_config(config), m_thumbnails(thumbnails), m_scanner(scanner), m_themeService(themeService),
-      m_http(httpClient), m_pluginManager(pluginManager), m_showTitle(options.showTitle),
+      m_http(httpClient), m_videoWallpaper(videoWallpaper), m_showTitle(options.showTitle),
       m_showCloseButton(options.showCloseButton) {
   if (m_config != nullptr) {
     m_flatten = m_config->stateBool("wallpaper_panel", "flatten").value_or(false);
@@ -1234,19 +1229,10 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
           },
           ui::label({
               .out = &m_videoStatusLabel,
-              .text = i18n::tr("wallpaper.panel.video.plugin-missing"),
+              .text = i18n::tr("wallpaper.panel.video.mpvpaper-missing"),
               .fontSize = Style::fontSizeBody * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .textAlign = TextAlign::Center,
-          }),
-          ui::button({
-              .out = &m_videoEnableButton,
-              .text = i18n::tr("wallpaper.panel.video.enable"),
-              .glyph = "movie",
-              .variant = ButtonVariant::Primary,
-              .minHeight = Style::controlHeight * scale,
-              .paddingH = Style::spaceMd * scale,
-              .onClick = [this]() { requestEnableMpvpaper(); },
           })
       )
   );
@@ -1356,21 +1342,6 @@ void WallpaperPicker::layout(Renderer& renderer, float width, float height) {
 void WallpaperPicker::update(Renderer& renderer) {
   if (m_rootLayout == nullptr) {
     return;
-  }
-
-  if (m_browseSource == BrowseSource::Video) {
-    const bool enabling = mpvpaperEnabling();
-    if (m_mpvpaperWasEnabling && !enabling) {
-      refreshVisibleEntries();
-      rebindGrid();
-      syncSourceChrome();
-      syncBrowseChrome();
-      m_dirty = true;
-      PanelManager::instance().requestRedraw();
-    } else if (enabling) {
-      syncVideoStatus();
-    }
-    m_mpvpaperWasEnabling = enabling;
   }
 
   if (m_thumbnailRefreshPending && m_thumbnails != nullptr) {
@@ -1494,7 +1465,6 @@ void WallpaperPicker::onClose() {
   m_spinner = nullptr;
   m_videoStatusBox = nullptr;
   m_videoStatusLabel = nullptr;
-  m_videoEnableButton = nullptr;
   m_scanPending = false;
 
   m_lastWidth = 0.0F;
@@ -2545,7 +2515,7 @@ void WallpaperPicker::syncSourceChrome() {
   setShown(m_sortButton, library);
   setShown(m_fileButton, !video);
   setShown(m_favoritesOptionsColumn, library);
-  setShown(m_videoClearButton, video && mpvpaperPluginEnabled());
+  setShown(m_videoClearButton, video);
   setShown(m_wallhavenFilters, wallhaven);
   setShown(m_wallhavenPager, wallhaven);
   if (m_adapter != nullptr) {
@@ -2600,80 +2570,37 @@ WallpaperPicker::BrowseSource WallpaperPicker::browseSourceFromState(std::string
   return BrowseSource::Library;
 }
 
-bool WallpaperPicker::mpvpaperPluginEnabled() const {
-  if (m_config == nullptr) {
-    return false;
-  }
-  return std::ranges::contains(m_config->config().plugins.enabled, std::string(kMpvpaperPluginId));
-}
-
-bool WallpaperPicker::mpvpaperEnabling() const {
-  return m_pluginManager != nullptr && m_pluginManager->isEnabling(kMpvpaperPluginId);
-}
-
-bool WallpaperPicker::mpvpaperBinaryAvailable() const { return process::commandExists("mpvpaper"); }
-
-void WallpaperPicker::requestEnableMpvpaper() {
-  if (m_pluginManager == nullptr || mpvpaperPluginEnabled() || mpvpaperEnabling()) {
-    return;
-  }
-  m_mpvpaperWasEnabling = true;
-  (void)m_pluginManager->enable(kMpvpaperPluginId);
-  syncVideoStatus();
-  PanelManager::instance().requestRedraw();
-}
+bool WallpaperPicker::mpvpaperBinaryAvailable() const { return wallpaper::video::binaryAvailable(); }
 
 std::filesystem::path WallpaperPicker::videoDirectory() const {
+  if (m_videoWallpaper != nullptr) {
+    return m_videoWallpaper->directory();
+  }
   if (m_config != nullptr) {
-    const auto settingsIt = m_config->config().plugins.pluginSettings.find(std::string(kMpvpaperPluginId));
-    if (settingsIt != m_config->config().plugins.pluginSettings.end()) {
-      const auto dirIt = settingsIt->second.find("video_directory");
-      if (dirIt != settingsIt->second.end()) {
-        if (const auto dir = noctalia::config::widgetSettingValueAs<std::string>(dirIt->second)) {
-          if (!dir->empty()) {
-            return FileUtils::expandUserPath(*dir);
-          }
-        }
-      }
-    }
+    return wallpaper::video::resolveDirectory(m_config->config().wallpaper.video.directory);
   }
-  const char* home = std::getenv("HOME");
-  if (home != nullptr && home[0] != '\0') {
-    return std::filesystem::path(home) / "Videos";
-  }
-  return {};
-}
-
-void WallpaperPicker::sendMpvpaperCommand(std::string_view action, std::string connector, std::string path) {
-  nlohmann::json payload = {{"action", action}, {"nonce", ++m_mpvpaperNonce}};
-  if (!connector.empty()) {
-    payload["connector"] = std::move(connector);
-  }
-  if (!path.empty()) {
-    payload["path"] = std::move(path);
-  }
-  scripting::PluginStateStore::instance().set(std::string(kMpvpaperPluginId), "command", payload.dump());
+  return wallpaper::video::resolveDirectory({});
 }
 
 void WallpaperPicker::applyVideoPath(const std::string& path) {
-  if (!mpvpaperPluginEnabled() || path.empty() || m_selectedMonitorIndex >= m_monitorChoices.size()) {
+  if (m_videoWallpaper == nullptr || path.empty() || m_selectedMonitorIndex >= m_monitorChoices.size()) {
     return;
   }
   const auto& choice = m_monitorChoices[m_selectedMonitorIndex];
-  const std::string connector = choice.connector.empty() ? "*" : choice.connector;
-  sendMpvpaperCommand("set", connector, path);
-  kLog.info("applied video wallpaper {} to {}", path, connector);
+  const std::string connector = choice.connector.empty() ? std::string(wallpaper::video::kWildcardConnector)
+                                                          : choice.connector;
+  m_videoWallpaper->set(connector, path);
 }
 
 void WallpaperPicker::clearVideoWallpaper() {
-  if (!mpvpaperPluginEnabled() || m_selectedMonitorIndex >= m_monitorChoices.size()) {
+  if (m_videoWallpaper == nullptr || m_selectedMonitorIndex >= m_monitorChoices.size()) {
     return;
   }
   const auto& choice = m_monitorChoices[m_selectedMonitorIndex];
   if (choice.connector.empty()) {
-    sendMpvpaperCommand("clear-all", {}, {});
+    m_videoWallpaper->clearAll();
   } else {
-    sendMpvpaperCommand("clear", choice.connector, {});
+    m_videoWallpaper->clear(choice.connector);
   }
 }
 
@@ -2683,36 +2610,16 @@ void WallpaperPicker::syncVideoStatus() {
   }
   if (m_browseSource != BrowseSource::Video) {
     m_videoStatusBox->setVisible(false);
-    if (m_videoEnableButton != nullptr) {
-      m_videoEnableButton->setVisible(false);
-    }
     return;
   }
 
-  const bool pluginEnabled = mpvpaperPluginEnabled();
-  const bool enabling = mpvpaperEnabling();
   const bool hasBinary = mpvpaperBinaryAvailable();
   const bool empty = m_visibleEntries.empty();
-  const bool needsPlugin = !pluginEnabled;
-  const bool needsBinary = pluginEnabled && !enabling && !hasBinary;
-  const bool showStatus = needsPlugin || needsBinary || empty;
+  const bool showStatus = !hasBinary || empty;
   m_videoStatusBox->setVisible(showStatus);
   if (m_videoStatusLabel != nullptr) {
-    if (enabling) {
-      m_videoStatusLabel->setText(i18n::tr("wallpaper.panel.video.enabling"));
-    } else if (needsPlugin) {
-      m_videoStatusLabel->setText(i18n::tr("wallpaper.panel.video.plugin-missing"));
-    } else if (needsBinary) {
-      m_videoStatusLabel->setText(i18n::tr("wallpaper.panel.video.mpvpaper-missing"));
-    } else {
-      m_videoStatusLabel->setText(i18n::tr("wallpaper.panel.video.empty"));
-    }
-  }
-  if (m_videoEnableButton != nullptr) {
-    m_videoEnableButton->setVisible(needsPlugin && m_pluginManager != nullptr);
-    m_videoEnableButton->setEnabled(!enabling);
-    m_videoEnableButton->setText(
-        enabling ? i18n::tr("wallpaper.panel.video.enabling") : i18n::tr("wallpaper.panel.video.enable")
+    m_videoStatusLabel->setText(
+        !hasBinary ? i18n::tr("wallpaper.panel.video.mpvpaper-missing") : i18n::tr("wallpaper.panel.video.empty")
     );
   }
 }
@@ -2720,7 +2627,7 @@ void WallpaperPicker::syncVideoStatus() {
 void WallpaperPicker::refreshVideoEntries() {
   m_visibleEntries.clear();
   m_pinnedFavoriteCount = 0;
-  if (!mpvpaperPluginEnabled()) {
+  if (!mpvpaperBinaryAvailable()) {
     if (m_selectedVisibleIndex >= m_visibleEntries.size()) {
       m_selectedVisibleIndex = kNoVisibleSelection;
     }

@@ -7,6 +7,7 @@
 #include "render/scene/effect_node.h"
 #include "render/scene/input_area.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_content.h"
 #include "system/weather_service.h"
@@ -41,9 +42,8 @@ namespace {
 
 WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services)
     : m_weather(weather), m_config(config),
-      m_inlineSettings(std::make_unique<SettingsPane>(
-          services,
-          SettingsPaneOptions{.section = "location", .includedGroups = {"location", "weather"}, .compact = true}
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "location", .includedGroups = {"location", "weather"}}
       )) {
   m_forecastRows.fill(nullptr);
   m_forecastSeparators.fill(nullptr);
@@ -411,7 +411,6 @@ std::unique_ptr<Flex> WeatherTab::create() {
   liveContent->setGap(Style::spaceMd * scale);
   tab->setMinHeight(280.0F * scale);
   liveContent->addChild(std::move(tab));
-  liveContent->addChild(m_inlineSettings->create(scale, panelCardOpacity()));
 
   auto live = ui::column({
       .out = &m_liveRoot,
@@ -420,12 +419,22 @@ std::unique_ptr<Flex> WeatherTab::create() {
       .flexGrow = 1.0F,
   });
   live->addChild(std::move(liveScroll));
-  return live;
+  return m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
 }
 
+std::unique_ptr<Flex> WeatherTab::createHeaderActions() {
+  return m_settings->embedHeader(nullptr, contentScale());
+}
+
+void WeatherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+
+bool WeatherTab::configureMode() const { return m_settings->configureMode(); }
+
+SettingsPane* WeatherTab::settingsPane() { return m_settings.get(); }
+
 void WeatherTab::setSettingsSearchQuery(std::string_view query) {
-  if (m_inlineSettings != nullptr) {
-    m_inlineSettings->setSearchQuery(std::string(query));
+  if (m_settings != nullptr) {
+    m_settings->setSearchQuery(std::string(query));
   }
 }
 
@@ -525,6 +534,9 @@ void WeatherTab::beginForecastSlideIn() {
 }
 
 void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+  if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
+    return;
+  }
   if (m_rootLayout == nullptr || m_currentText == nullptr || m_forecastColumn == nullptr) {
     return;
   }
@@ -753,7 +765,7 @@ void WeatherTab::showLocationPrompt(bool show) {
 }
 
 void WeatherTab::onClose() {
-  m_inlineSettings->onClose();
+  m_settings->onClose();
   m_liveRoot = nullptr;
   m_rootLayout = nullptr;
   m_liveScroll = nullptr;

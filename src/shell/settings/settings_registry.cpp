@@ -950,6 +950,39 @@ namespace settings {
         },
         "wallhaven download folder path"
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-directory.label"),
+        tr("settings.schema.wallpaper.video-directory.description"), {"wallpaper", "video", "directory"},
+        TextSetting{
+            .value = cfg.wallpaper.video.directory,
+            .placeholder = tr("settings.schema.wallpaper.video-directory.placeholder"),
+            .browseMode = TextSettingBrowseMode::SelectFolder,
+            .browseFileExtensions = {}
+        },
+        "video wallpaper folder path mpvpaper"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-mute.label"),
+        tr("settings.schema.wallpaper.video-mute.description"), {"wallpaper", "video", "mute"},
+        ToggleSetting{cfg.wallpaper.video.mute}, "mute audio video wallpaper"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-hardware-decode.label"),
+        tr("settings.schema.wallpaper.video-hardware-decode.description"), {"wallpaper", "video", "hardware_decode"},
+        ToggleSetting{cfg.wallpaper.video.hardwareDecode}, "hardware decode gpu video wallpaper"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-auto-pause.label"),
+        tr("settings.schema.wallpaper.video-auto-pause.description"), {"wallpaper", "video", "auto_pause"},
+        enumSelect(kWallpaperVideoAutoPauseModes, cfg.wallpaper.video.autoPause),
+        "auto pause fullscreen maximized window cover video wallpaper"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-mpv-options.label"),
+        tr("settings.schema.wallpaper.video-mpv-options.description"), {"wallpaper", "video", "mpv_options"},
+        TextSetting{.value = cfg.wallpaper.video.mpvOptions, .placeholder = "", .browseFileExtensions = {}},
+        "mpv extra options video wallpaper"
+    ));
     for (const auto& outputOpt : env.availableOutputs) {
       const std::string& connector = outputOpt.value;
       if (connector.empty()) {

@@ -130,8 +130,7 @@ device updates.
 Wallhaven browsing is built into the wallpaper picker. Open **Wallpaper**, switch to **Wallhaven**, or run
 `noctalia msg panel-toggle wallpaper wallhaven`. API key and download directory live under **Settings → Wallpaper**.
 
-The plugin's Control Center tab is no longer listed. If the plugin is still enabled, its separate panel, bar widget,
-and shortcut remain. New setups should use the built-in Wallpaper page.
+The plugin is no longer required. Its Control Center tab is not listed.
 
 | Command | Effect |
 |---------|--------|
@@ -169,16 +168,14 @@ cache, and per-output state; threshold, feather, and automatic generation are pl
 
 <PluginMeta icon="movie" id="noctalia/mpvpaper" />
 
-Animated and video wallpapers via [mpvpaper](https://github.com/GhostNaN/mpvpaper). A headless **service**
-supervises one `mpvpaper` instance per output. Video browsing is on the built-in wallpaper picker: open **Wallpaper**,
-switch to **Video**, or run `noctalia msg panel-toggle wallpaper video`. If this plugin is off, the Video source can
-enable it in place. The picker then scans `[plugin_settings."noctalia/mpvpaper"].video_directory` (empty uses `~/Videos`)
-and applying a video asks the plugin to run mpvpaper. Choosing a still wallpaper clears the video on the selected
-monitor(s).
+Animated and video wallpapers via [mpvpaper](https://github.com/GhostNaN/mpvpaper) are built into the wallpaper
+picker. Open **Wallpaper**, switch to **Video**, or run `noctalia msg panel-toggle wallpaper video`. Settings live
+under **Settings → Wallpaper**. The picker scans `[wallpaper.video].directory` (empty uses `~/Videos`) and
+applying a video runs `mpvpaper` on that output. Choosing a still wallpaper or **Stop** restores Helix Shell's
+wallpaper surface.
 
-The plugin **panel**, bar **widget**, and shortcut remain. When a video is assigned to an output, Noctalia drops its
-own wallpaper surface there so the video shows through - the bar and dock still draw above it. Assignments persist
-across restarts.
+The plugin is no longer required. When a video is assigned to an output, Helix Shell drops its own wallpaper surface
+there so the video shows through - the bar and dock still draw above it. Assignments persist across restarts.
 
 Requires the external `mpvpaper` command (which pulls in `mpv`; `mpv` also renders the picker thumbnails). Works on
 `wlr-layer-shell` compositors (Niri, Hyprland, Sway, Mango). Supported files: `mp4`, `webm`, `mkv`, `mov`, `gif`.
@@ -186,7 +183,6 @@ Requires the external `mpvpaper` command (which pulls in `mpv`; `mpv` also rende
 | Command | Effect |
 |---------|--------|
 | <IpcCommand command="panel-toggle wallpaper video" /> | open the wallpaper picker on Video |
-| <IpcCommand command="panel-toggle noctalia/mpvpaper:picker" /> | open or close the plugin's own video picker |
 
 ---
 

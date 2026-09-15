@@ -783,6 +783,7 @@ void Application::reconcileOutputSurfaces() {
   // output set, so re-running it is safe. initialize() only wires dependencies.
   m_backdrop.onOutputChange();
   m_wallpaper.onOutputChange();
+  m_videoWallpaper.onOutputChange();
   m_bar.onOutputChange();
   m_dock.onOutputChange();
   m_desktopWidgetsController.onOutputChange();
@@ -912,6 +913,7 @@ void Application::initAuxServicesAndHooks() {
   m_configService.addReloadCallback([this]() {
     m_gammaService.reload(m_configService.config().nightlight, m_configService.config().location);
   });
+  m_configService.addReloadCallback([this]() { m_videoWallpaper.onConfigChanged(); });
 
   // Register all wallpaper consumers in the single-callback slot.
   m_configService.setWallpaperChangeCallback([this]() {

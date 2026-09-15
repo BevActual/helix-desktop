@@ -38,6 +38,7 @@ class SystemMonitorService;
 class TailscaleService;
 class ThumbnailService;
 class UPowerService;
+class VideoWallpaperService;
 class Wallpaper;
 class WeatherService;
 class GammaService;
@@ -96,6 +97,7 @@ struct ControlCenterServices {
   WallpaperScanner* wallpaperScanner = nullptr;
   AsyncTextureCache* asyncTextures = nullptr;
   scripting::PluginManager* pluginManager = nullptr;
+  VideoWallpaperService* videoWallpaper = nullptr;
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
   std::function<void()> upgradeShell;

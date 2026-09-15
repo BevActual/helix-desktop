@@ -7,10 +7,10 @@
 
 WallpaperPanel::WallpaperPanel(
     WaylandConnection* wayland, ConfigService* config, ThumbnailService* thumbnails, WallpaperScanner* scanner,
-    noctalia::theme::ThemeService* themeService, HttpClient* httpClient, scripting::PluginManager* pluginManager
+    noctalia::theme::ThemeService* themeService, HttpClient* httpClient, VideoWallpaperService* videoWallpaper
 )
     : m_config(config),
-      m_picker(wayland, config, thumbnails, scanner, themeService, httpClient, WallpaperPicker::Options(), pluginManager) {
+      m_picker(wayland, config, thumbnails, scanner, themeService, httpClient, WallpaperPicker::Options(), videoWallpaper) {
 }
 
 PanelPlacement WallpaperPanel::panelPlacement() const noexcept {

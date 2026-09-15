@@ -370,12 +370,14 @@
     },
     "settings": {
       "configure": "Settings",
-      "search-placeholder": "Search settings"
+      "search-placeholder": "Search pages and settings"
     },
     "sidebar": {
       "look": "Look",
       "status": "Status",
-      "setup": "Setup"
+      "setup": "Setup",
+      "setup-hide": "Hide Setup",
+      "setup-show": "Show Setup"
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
@@ -406,6 +408,15 @@
       "niri-hint": "Record a chord to write it into noctalia-binds.kdl. Copy or add missing binds from the header. Existing binds in your niri config stay unchanged.",
       "open-folder-failed": "Could not open the niri config folder.",
       "open-folder-tooltip": "Open the niri config folder"
+    },
+    "plugins": {
+      "installed": "Installed",
+      "loading-store": "Loading the plugin catalog…",
+      "refresh-tooltip": "Refresh plugins",
+      "store": "Store",
+      "store-empty": "No plugins in the enabled sources.",
+      "store-failed": "Could not load {sources}.",
+      "store-partial": "Loaded with errors from {sources}."
     },
     "media": {
       "active-player": "Active player",
@@ -625,7 +636,7 @@
       "filter-updates-placeholder": "Filter updates",
       "hint": "Available package updates from Fedora.",
       "hint-installed": "Installed packages on this system.",
-      "hint-search": "Type at least two characters to search Fedora packages.",
+      "hint-search": "Type at least two characters to search names and descriptions.",
       "install": "Install",
       "loading-installed": "Loading installed packages…",
       "loading-updates": "Looking for updates…",
@@ -644,15 +655,19 @@
       "search-placeholder": "Search packages",
       "searching": "Searching…",
       "showing-limited": "Showing {shown} of {total}",
+      "source-fedora": "Fedora",
+      "source-flatpak": "Flatpak",
       "state-available": "Available",
       "state-installed": "Installed",
       "title": "Packages",
       "unavailable": "PackageKit is not available.",
+      "unavailable-flatpak": "Flatpak is not available.",
       "update": "Update",
       "update-all": "Update all",
       "update-all-ok": "All listed updates finished.",
       "update-count": "Update {count}",
       "updates": "Refresh updates",
+      "updates-waiting": "{count} updates",
       "view-installed": "Installed",
       "view-search": "Search",
       "view-updates": "Updates",
@@ -1680,6 +1695,7 @@
         "toasts": "Toasts",
         "transition": "Transition",
         "user": "User",
+        "video": "Video",
         "wallhaven": "Wallhaven",
         "wallpaper": "Wallpaper",
         "weather": "Weather",
@@ -1911,6 +1927,13 @@
           "stripes": "Stripes",
           "wipe": "Wipe",
           "zoom": "Zoom"
+        },
+        "video": {
+          "auto-pause": {
+            "full": "Fullscreen",
+            "max": "Maximized",
+            "off": "Off"
+          }
         }
       },
       "weather": {
@@ -3802,6 +3825,27 @@
           "description": "Optional folder for Wallhaven downloads; empty uses your wallpaper directory",
           "label": "Wallhaven Download Directory",
           "placeholder": "Wallpaper directory"
+        },
+        "video-auto-pause": {
+          "description": "Pause playback when a window covers the wallpaper",
+          "label": "Auto Pause"
+        },
+        "video-directory": {
+          "description": "Folder scanned for video wallpapers; empty uses ~/Videos",
+          "label": "Video Directory",
+          "placeholder": "~/Videos"
+        },
+        "video-hardware-decode": {
+          "description": "Use hardware decoding in mpv",
+          "label": "Hardware Decode"
+        },
+        "video-mpv-options": {
+          "description": "Extra space-separated mpv options passed to mpvpaper",
+          "label": "mpv Options"
+        },
+        "video-mute": {
+          "description": "Start video wallpapers muted",
+          "label": "Mute"
         }
       }
     },
@@ -5227,11 +5271,8 @@
       "video": {
         "clear-tooltip": "Stop the video wallpaper on the selected monitor",
         "empty": "No videos in this folder.",
-        "enable": "Enable Video Wallpaper",
-        "enabling": "Enabling Video Wallpaper…",
         "filter-placeholder": "Filter videos…",
         "mpvpaper-missing": "Install mpvpaper to apply video wallpapers.",
-        "plugin-missing": "Enable Video Wallpaper to apply videos from this folder.",
         "title": "Video"
       },
       "wallhaven": {

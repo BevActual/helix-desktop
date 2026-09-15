@@ -2,11 +2,17 @@
 
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
+#include "system/package_kit_service.h"
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
+#include <algorithm>
 #include <memory>
+
+namespace {
+  constexpr float kDotBaseSize = 6.0F;
+}
 
 ControlCenterWidget::ControlCenterWidget(wl_output* /*output*/, Options options)
     : m_barGlyphId(std::move(options.glyph)),
@@ -28,7 +34,19 @@ void ControlCenterWidget::create() {
     );
   }
 
+  const float dotSize = kDotBaseSize * m_contentScale;
+  m_dot = area->addChild(
+      ui::box({
+          .fill = colorSpecFromRole(ColorRole::Primary),
+          .radius = dotSize * 0.5F,
+          .width = dotSize,
+          .height = dotSize,
+          .visible = false,
+      })
+  );
+
   setRoot(std::move(area));
+  refreshUpdateDot();
 }
 
 void ControlCenterWidget::doLayout(Renderer& renderer, float /*containerWidth*/, float /*containerHeight*/) {
@@ -47,5 +65,23 @@ void ControlCenterWidget::doLayout(Renderer& renderer, float /*containerWidth*/,
     m_glyph->setColor(widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)));
     m_glyph->measure(renderer);
     node->setSize(m_glyph->width(), m_glyph->height());
+  }
+
+  if (m_dot != nullptr) {
+    const float dotSize = kDotBaseSize * m_contentScale;
+    m_dot->setPosition(std::max(0.0F, node->width() - dotSize), 0.0F);
+  }
+}
+
+void ControlCenterWidget::doUpdate(Renderer& /*renderer*/) { refreshUpdateDot(); }
+
+void ControlCenterWidget::refreshUpdateDot() {
+  const bool hasUpdates = noctalia::packages::pendingUpdateCount() > 0;
+  if (hasUpdates == m_hasUpdates) {
+    return;
+  }
+  m_hasUpdates = hasUpdates;
+  if (m_dot != nullptr) {
+    m_dot->setVisible(hasUpdates);
   }
 }

@@ -3,6 +3,7 @@
 #include "core/ui_phase.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -72,6 +73,16 @@ public:
   // Allows a tab to close transient UI (menus/popovers) when external empty
   // chrome areas are clicked.
   virtual bool dismissTransientUi() { return false; }
+
+  [[nodiscard]] virtual bool handleGlobalKey(
+      std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit
+  ) {
+    (void)sym;
+    (void)modifiers;
+    (void)pressed;
+    (void)preedit;
+    return false;
+  }
 
   void setContentScale(float scale) noexcept { m_contentScale = scale; }
   void setPanelCardOpacity(float opacity) noexcept {

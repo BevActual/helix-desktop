@@ -1,0 +1,112 @@
+#include "shell/control_center/tab_search.h"
+
+#include "util/string_utils.h"
+
+#include <algorithm>
+#include <string>
+#include <string_view>
+
+namespace control_center {
+  namespace {
+
+    struct AliasRow {
+      std::string_view id;
+      std::string_view aliases;
+    };
+
+    constexpr AliasRow kAliases[] = {
+        {"appearance", "theme color palette colours colors look"},
+        {"audio", "sound volume mic microphone speaker"},
+        {"bluetooth", "bt"},
+        {"calendar", "clock clocks timezone timezones world-clock date"},
+        {"clipboard", "paste clips cliphist"},
+        {"control-center", "cc"},
+        {"keybinds", "binds shortcuts keyboard hotkeys"},
+        {"launcher", "runner app-launcher"},
+        {"media", "mpris player music now-playing"},
+        {"monitor", "display displays brightness night-light nightlight gamma"},
+        {"network", "wifi wi-fi wireless internet ethernet"},
+        {"notifications", "notify notification dnd do-not-disturb"},
+        {"packages", "package packages updates rpm dnf pkcon store"},
+        {"plugins", "plugin extension extensions addons"},
+        {"power", "battery batteries sleep suspend lock caffeine idle"},
+        {"screen-record", "record recorder recording"},
+        {"screen-time", "screentime usage"},
+        {"screenshot", "capture screen-shot shot"},
+        {"system", "resources cpu memory ram disk"},
+        {"tailscale", "vpn tailnet"},
+        {"templates", "template rice rices"},
+        {"wallpaper", "background wallpapers"},
+        {"weather", "forecast temperature"},
+    };
+
+    std::string fold(std::string_view text) { return StringUtils::toLower(text); }
+
+    std::string idVariants(std::string_view id) {
+      std::string out = fold(id);
+      for (char& ch : out) {
+        if (ch == '-' || ch == '_' || ch == ':' || ch == '/') {
+          ch = ' ';
+        }
+      }
+      return out;
+    }
+
+    int fieldScore(std::string_view haystack, std::string_view query) {
+      if (haystack.empty() || query.empty()) {
+        return 0;
+      }
+      if (haystack == query) {
+        return 100;
+      }
+      if (haystack.starts_with(query)) {
+        return 80;
+      }
+      if (haystack.find(query) != std::string_view::npos) {
+        return 50;
+      }
+      return 0;
+    }
+
+    int aliasScore(std::string_view id, std::string_view query) {
+      for (const auto& row : kAliases) {
+        if (row.id != id) {
+          continue;
+        }
+        int best = 0;
+        std::size_t start = 0;
+        const auto aliases = fold(row.aliases);
+        while (start <= aliases.size()) {
+          const auto end = aliases.find(' ', start);
+          const auto token = std::string_view(aliases).substr(
+              start, end == std::string_view::npos ? aliases.size() - start : end - start
+          );
+          best = std::max(best, fieldScore(token, query));
+          if (end == std::string_view::npos) {
+            break;
+          }
+          start = end + 1;
+        }
+        return best;
+      }
+      return 0;
+    }
+
+  } // namespace
+
+  int tabSearchScore(std::string_view id, std::string_view title, std::string_view query) {
+    const std::string needle = fold(StringUtils::trim(query));
+    if (needle.size() < 2) {
+      return 0;
+    }
+    const std::string titleFold = fold(title);
+    const std::string idFold = fold(id);
+    const std::string idSpaced = idVariants(id);
+    int best = fieldScore(titleFold, needle);
+    best = std::max(best, fieldScore(idFold, needle));
+    best = std::max(best, fieldScore(idSpaced, needle));
+    best = std::max(best, aliasScore(id, needle));
+    return best;
+  }
+
+} // namespace control_center

@@ -480,6 +480,12 @@ enum class WallpaperTransition : std::uint8_t {
   Honeycomb = 5,
 };
 
+enum class WallpaperVideoAutoPause : std::uint8_t {
+  Off = 0,
+  Max = 1,
+  Full = 2,
+};
+
 struct WallpaperMonitorOverride {
   std::string match;
   std::optional<bool> enabled;
@@ -512,6 +518,16 @@ struct WallpaperWallhavenConfig {
   bool operator==(const WallpaperWallhavenConfig&) const = default;
 };
 
+struct WallpaperVideoConfig {
+  std::string directory; // empty = ~/Videos
+  bool mute = true;
+  bool hardwareDecode = true;
+  WallpaperVideoAutoPause autoPause = WallpaperVideoAutoPause::Full;
+  std::string mpvOptions;
+
+  bool operator==(const WallpaperVideoConfig&) const = default;
+};
+
 struct WallpaperConfig {
   bool enabled = true;
   WallpaperFillMode fillMode = WallpaperFillMode::Crop;
@@ -528,6 +544,7 @@ struct WallpaperConfig {
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
   WallpaperWallhavenConfig wallhaven;
+  WallpaperVideoConfig video;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
 
   bool operator==(const WallpaperConfig&) const = default;
@@ -920,6 +937,12 @@ constexpr EnumOption<WallpaperTransition> kWallpaperTransitions[] = {
     {WallpaperTransition::Stripes, "stripes", "settings.options.wallpaper.transition.stripes"},
     {WallpaperTransition::Wipe, "wipe", "settings.options.wallpaper.transition.wipe"},
     {WallpaperTransition::Zoom, "zoom", "settings.options.wallpaper.transition.zoom"},
+};
+
+constexpr EnumOption<WallpaperVideoAutoPause> kWallpaperVideoAutoPauseModes[] = {
+    {WallpaperVideoAutoPause::Off, "off", "settings.options.wallpaper.video.auto-pause.off"},
+    {WallpaperVideoAutoPause::Max, "max", "settings.options.wallpaper.video.auto-pause.max"},
+    {WallpaperVideoAutoPause::Full, "full", "settings.options.wallpaper.video.auto-pause.full"},
 };
 
 // One config-driven dmenu-style launcher entry. The provider runs `command`, splits

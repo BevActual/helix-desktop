@@ -110,10 +110,17 @@ private:
   void syncTabVisibility();
   void addSidebarTabButton(class RovingListNavHost& nav, TabSlot& slot, float scale);
   void addSidebarGroupHeader(class RovingListNavHost& nav, TabGroup group, float scale);
+  void toggleSetupCollapsed();
+  void syncSetupToggle();
+  void syncPackagesBadge();
   void applySettingsSearch(std::string value);
   void syncActiveTabSearch();
   [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
+  [[nodiscard]] bool isTabSearchActive() const;
+  [[nodiscard]] bool shouldPassSettingsSearch() const;
+  [[nodiscard]] std::string bestTabSearchId() const;
   [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
+  [[nodiscard]] bool groupHasEligibleTab(TabGroup group) const;
   [[nodiscard]] bool isTabFeatureAvailable(std::string_view id) const;
   [[nodiscard]] bool isTabVisible(std::string_view id) const;
   [[nodiscard]] bool isTabShown(std::string_view id) const;
@@ -139,6 +146,7 @@ private:
   Node* m_lookHeader = nullptr;
   Node* m_statusHeader = nullptr;
   Node* m_setupHeader = nullptr;
+  Button* m_setupToggle = nullptr;
   Input* m_searchInput = nullptr;
   std::string m_searchQuery;
   Flex* m_content = nullptr;
@@ -162,6 +170,7 @@ private:
   int m_tabTransitionDirection = 1;
   bool m_tabTransitionActive = false;
   bool m_firstOpenAfterCreate = false;
+  bool m_setupCollapsed = true;
   bool m_modalAttached = false;
   settings::SettingsModalHost m_modalHost;
   std::unique_ptr<settings::HostedEditors> m_hostedEditors;

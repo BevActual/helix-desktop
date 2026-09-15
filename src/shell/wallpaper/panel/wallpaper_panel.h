@@ -6,14 +6,12 @@
 class ConfigService;
 class HttpClient;
 class ThumbnailService;
+class VideoWallpaperService;
 class WallpaperScanner;
 class WaylandConnection;
 
 namespace noctalia::theme {
   class ThemeService;
-}
-namespace scripting {
-  class PluginManager;
 }
 
 class WallpaperPanel : public Panel {
@@ -21,7 +19,7 @@ public:
   WallpaperPanel(
       WaylandConnection* wayland, ConfigService* config, ThumbnailService* thumbnails, WallpaperScanner* scanner,
       noctalia::theme::ThemeService* themeService = nullptr, HttpClient* httpClient = nullptr,
-      scripting::PluginManager* pluginManager = nullptr
+      VideoWallpaperService* videoWallpaper = nullptr
   );
 
   void create() override;

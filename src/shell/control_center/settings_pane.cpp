@@ -61,6 +61,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -143,7 +144,8 @@ SettingsPane::SettingsPane(const ControlCenterServices& services, SettingsPaneOp
       m_dependencies(services.dependencies), m_upower(services.upower), m_accounts(services.accounts),
       m_ipc(services.ipc), m_hostedEditors(services.hostedEditors), m_pluginManager(services.pluginManager),
       m_asyncTextures(services.asyncTextures), m_calendar(services.calendar), m_modalHost(services.modalHost),
-      m_actions(services.settingsActions), m_selectedSection(std::move(options.section)),
+      m_actions(services.settingsActions), m_openStore(std::move(options.openStore)),
+      m_selectedSection(std::move(options.section)),
       m_includedGroups(std::move(options.includedGroups)), m_compact(options.compact) {
   m_showAdvanced = m_config != nullptr ? m_config->config().shell.settingsShowAdvanced : true;
   if (services.settingsInvalidated != nullptr) {
@@ -611,6 +613,8 @@ void SettingsPane::fillContent(Flex& content) {
       settings::SettingsPluginsContext{
           .scale = m_scale,
           .selectedSection = m_selectedSection,
+          .includedGroups = (!m_searchQuery.empty() && !m_compact) ? std::unordered_set<std::string>{}
+                                                                    : m_includedGroups,
           .plugins = m_pluginList,
           .sources = cfg.plugins.sources,
           .searchActive = !m_searchQuery.empty(),
@@ -702,12 +706,18 @@ void SettingsPane::fillContent(Flex& content) {
                 }
               },
           .openStore =
-              [this]() {
-                bindHostedEditors();
-                if (m_hostedEditors != nullptr) {
-                  m_hostedEditors->openPluginStore();
-                }
-              },
+              m_openStore
+                  ? m_openStore
+                  : (m_includedGroups.empty()
+                         ? std::function<void()>{
+                               [this]() {
+                                 bindHostedEditors();
+                                 if (m_hostedEditors != nullptr) {
+                                   m_hostedEditors->openPluginStore();
+                                 }
+                               }
+                           }
+                         : nullptr),
           .pendingDeletePluginId = m_pendingDeletePluginId,
           .requestDeleteConfirm =
               [this](std::string id) {
