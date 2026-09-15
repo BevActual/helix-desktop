@@ -86,7 +86,7 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 26> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 27> kSettingsSections{{
         {SettingsSection::Appearance, "appearance", "adjustments-horizontal"},
         {SettingsSection::Wallpaper, "wallpaper", "paint"},
         {SettingsSection::Templates, "templates", "color-swatch"},
@@ -107,6 +107,7 @@ namespace settings {
         {SettingsSection::Network, "network", "wifi"},
         {SettingsSection::Bluetooth, "bluetooth", "bluetooth"},
         {SettingsSection::Tailscale, "tailscale", "circles"},
+        {SettingsSection::LocalSend, "localsend", "share"},
         {SettingsSection::Location, "location", "map-pin"},
         {SettingsSection::Power, "power", "bolt"},
         {SettingsSection::Hooks, "hooks", "link"},
@@ -1753,7 +1754,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg), .maxItems = 6
         },
-        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale"
+        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
@@ -3222,6 +3223,66 @@ namespace settings {
         },
         "tailscale admin console url login"
     ));
+
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.enabled.label"),
+        tr("settings.schema.localsend.enabled.description"), {"localsend", "enabled"},
+        ToggleSetting{cfg.localsend.enabled}, "localsend nearby share receive send enable"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.alias.label"),
+        tr("settings.schema.localsend.alias.description"), {"localsend", "alias"},
+        TextSetting{
+            .value = cfg.localsend.alias,
+            .placeholder = tr("settings.schema.localsend.alias.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "localsend device name alias nearby share"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.pin.label"),
+        tr("settings.schema.localsend.pin.description"), {"localsend", "pin"},
+        TextSetting{
+            .value = cfg.localsend.pin,
+            .placeholder = tr("settings.schema.localsend.pin.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "localsend pin password receive protect"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.download-dir.label"),
+        tr("settings.schema.localsend.download-dir.description"), {"localsend", "download_dir"},
+        TextSetting{
+            .value = cfg.localsend.downloadDir,
+            .placeholder = "~/Downloads",
+            .browseMode = TextSettingBrowseMode::SelectFolder,
+        },
+        "localsend download folder receive directory"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.auto-accept.label"),
+        tr("settings.schema.localsend.auto-accept.description"), {"localsend", "auto_accept"},
+        ToggleSetting{cfg.localsend.autoAccept}, "localsend auto accept incoming files"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::LocalSend, "general", tr("settings.schema.localsend.notify-on-receive.label"),
+        tr("settings.schema.localsend.notify-on-receive.description"), {"localsend", "notify_on_receive"},
+        ToggleSetting{cfg.localsend.notifyOnReceive}, "localsend notification toast receive incoming"
+    ));
+    {
+      auto e = makeEntry(
+          SettingsSection::LocalSend, "general", tr("settings.schema.localsend.port.label"),
+          tr("settings.schema.localsend.port.description"), {"localsend", "port"},
+          StepperSetting{
+              .value = static_cast<int>(cfg.localsend.port),
+              .minValue = static_cast<int>(noctalia::config::schema::kLocalSendPortRange.min.value()),
+              .maxValue = static_cast<int>(noctalia::config::schema::kLocalSendPortRange.max.value()),
+              .step = static_cast<int>(noctalia::config::schema::kLocalSendPortRange.step.value()),
+          },
+          "localsend port 53317 multicast http"
+      );
+      entries.push_back(std::move(e));
+    }
 
     // Power
     entries.push_back(makeEntry(

@@ -873,6 +873,7 @@ ConfigChangeSet computeConfigChangeSet(const Config& prev, const Config& next) {
       .notification = !(prev.notification == next.notification),
       .weather = !(prev.weather == next.weather),
       .tailscale = !(prev.tailscale == next.tailscale),
+      .localsend = !(prev.localsend == next.localsend),
       .calendar = !(prev.calendar == next.calendar),
       .system = !(prev.system == next.system),
       .audio = !(prev.audio == next.audio),

@@ -655,6 +655,7 @@
       "session": "Session",
       "system": "System",
       "tailscale": "Tailscale",
+      "localsend": "LocalSend",
       "wallpaper": "Wallpaper",
       "weather": "Weather",
       "wifi": "Wi-Fi"
@@ -762,6 +763,7 @@
       "settings": "Settings",
       "system": "System",
       "tailscale": "Tailscale",
+      "localsend": "LocalSend",
       "weather": "Weather"
     },
     "capture": {
@@ -867,6 +869,31 @@
       "stopped": "Stopped",
       "title": "Tailscale",
       "use-exit": "Use as exit"
+    },
+    "localsend": {
+      "accept": "Accept",
+      "announce": "Find nearby devices",
+      "decline": "Decline",
+      "disabled": "Nearby sharing is off",
+      "disabled-hint": "Turn it on to appear to LocalSend apps on this network and receive files.",
+      "enable": "Nearby sharing",
+      "files-count": "{count} files",
+      "incoming": "{name} wants to send files",
+      "incoming-title": "Incoming",
+      "nearby": "Nearby devices",
+      "nearby-empty": "No devices yet. Open LocalSend on the other device, then tap refresh.",
+      "peer-gone": "That device is no longer nearby.",
+      "pin-required": "That device requires a PIN. Enter it above and send again.",
+      "port-busy": "Port 53317 is in use, so this machine cannot receive. Sending still works.",
+      "received": "Received files from {name}",
+      "rejected": "The other device declined the transfer.",
+      "send-clipboard": "Send clipboard",
+      "send-failed": "Could not send.",
+      "send-file": "Send file",
+      "sending": "Sending {file} to {name}…",
+      "sent": "Sent to {name}",
+      "their-pin": "Their PIN, if required",
+      "title": "LocalSend"
     },
     "templates": {
       "apply-tooltip": "Reapply enabled templates for the current palette",
@@ -1812,6 +1839,7 @@
         "shell": "Shell",
         "system": "System",
         "tailscale": "Tailscale",
+        "localsend": "LocalSend",
         "templates": "Templates",
         "wallpaper": "Wallpaper"
       }
@@ -3852,6 +3880,38 @@
         "refresh-interval": {
           "description": "How often to poll Tailscale status while the shell is running",
           "label": "Refresh Interval"
+        }
+      },
+      "localsend": {
+        "alias": {
+          "description": "Name shown to other LocalSend devices. Leave empty to use this machine's hostname.",
+          "label": "Device Name",
+          "placeholder": "Hostname"
+        },
+        "auto-accept": {
+          "description": "Accept incoming files without asking. Only enable on a trusted network.",
+          "label": "Auto-Accept Incoming"
+        },
+        "download-dir": {
+          "description": "Folder for received files. Empty uses ~/Downloads.",
+          "label": "Receive Folder"
+        },
+        "enabled": {
+          "description": "Advertise this machine on the local network and accept LocalSend transfers.",
+          "label": "Nearby Sharing"
+        },
+        "notify-on-receive": {
+          "description": "Show a notification when someone sends files to this machine.",
+          "label": "Notify on Receive"
+        },
+        "pin": {
+          "description": "Optional PIN other devices must enter before sending files here.",
+          "label": "Receive PIN",
+          "placeholder": "Optional"
+        },
+        "port": {
+          "description": "TCP and UDP port for LocalSend (default 53317). Change only if that port is already taken.",
+          "label": "Port"
         }
       },
       "templates": {

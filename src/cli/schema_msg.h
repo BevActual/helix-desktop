@@ -774,6 +774,15 @@ namespace noctalia::cli {
     inline constexpr Command tailscaleUp{
         "tailscale-up", "Connect this machine to the Tailscale network", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command localsendAnnounce{
+        "localsend-announce", "Broadcast this machine on the LocalSend network", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command localsendStatus{
+        "localsend-status", "Print LocalSend listen state and nearby peer count", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command localsendToggle{
+        "localsend-toggle", "Enable or disable LocalSend nearby sharing", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
         "Step to the adjacent task or workspace group in the invoking taskbar",
@@ -960,6 +969,9 @@ namespace noctalia::cli {
       msg::keyboardBacklightToggle,
       msg::keyboardBacklightUp,
       msg::keyboardLayoutCycle,
+      msg::localsendAnnounce,
+      msg::localsendStatus,
+      msg::localsendToggle,
       msg::lockscreenWidgetsEdit,
       msg::lockscreenWidgetsExit,
       msg::lockscreenWidgetsToggleEdit,

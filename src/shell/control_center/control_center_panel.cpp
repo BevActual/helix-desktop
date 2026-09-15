@@ -12,6 +12,7 @@
 #include "core/input/key_symbols.h"
 #include "dbus/mpris/mpris_service.h"
 #include "i18n/i18n.h"
+#include "net/localsend_service.h"
 #include "net/tailscale_service.h"
 #include "notification/notification_manager.h"
 #include "render/core/renderer.h"
@@ -38,6 +39,7 @@
 #include "shell/control_center/tabs/screen_time_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/system_tab.h"
+#include "shell/control_center/tabs/localsend_tab.h"
 #include "shell/control_center/tabs/tailscale_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
@@ -113,6 +115,7 @@ namespace {
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
       {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Status},
+      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Status},
       {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
       {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
@@ -243,6 +246,7 @@ namespace {
         || id == "capture"
         || id == "clipboard"
         || id == "tailscale"
+        || id == "localsend"
         || id == "plugins"
         || id == "home";
   }
@@ -389,6 +393,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("network", std::make_unique<NetworkTab>(services));
   add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
   add("tailscale", std::make_unique<TailscaleTab>(services));
+  add("localsend", std::make_unique<LocalSendTab>(services));
   add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
   add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));

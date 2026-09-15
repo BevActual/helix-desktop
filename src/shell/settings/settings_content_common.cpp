@@ -324,6 +324,7 @@ namespace settings {
     case SettingsSection::Network:
     case SettingsSection::Bluetooth:
     case SettingsSection::Tailscale:
+    case SettingsSection::LocalSend:
     case SettingsSection::Wallpaper:
     case SettingsSection::Desktop:
     case SettingsSection::Dock:
@@ -363,6 +364,7 @@ namespace settings {
     case SettingsSection::Network:
     case SettingsSection::Bluetooth:
     case SettingsSection::Tailscale:
+    case SettingsSection::LocalSend:
     case SettingsSection::Wallpaper:
     case SettingsSection::Desktop:
     case SettingsSection::Dock:

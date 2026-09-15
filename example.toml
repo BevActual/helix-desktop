@@ -302,6 +302,15 @@ refresh_interval_seconds = 10   # 3–120; how often to poll `tailscale status`
 notify_on_peer_change = false    # toast when a peer comes online or goes offline
 # admin_url = ""                  # override the admin console URL (empty = Tailscale admin)
 
+[localsend]
+enabled = true
+# alias = ""                      # empty = machine hostname
+# pin = ""                        # optional PIN required to send files to this machine
+# download_dir = "~/Downloads"    # incoming files
+auto_accept = false
+notify_on_receive = true
+port = 53317                      # TCP/UDP LocalSend port
+
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
 [audio]

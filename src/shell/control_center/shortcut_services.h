@@ -15,6 +15,7 @@ class PipeWireService;
 class PowerProfilesService;
 class ScreenRecorderService;
 class TailscaleService;
+class LocalSendService;
 class WeatherService;
 class HttpClient;
 class ClipboardService;
@@ -43,6 +44,7 @@ struct ShortcutServices {
   IpcService* ipc = nullptr;
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
+  LocalSendService* localSend = nullptr;
   // Plugin shortcut runtime dependencies.
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;

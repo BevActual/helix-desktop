@@ -44,6 +44,7 @@ namespace settings {
     Network,
     Bluetooth,
     Tailscale,
+    LocalSend,
     Location,
     Power,
     Hooks,

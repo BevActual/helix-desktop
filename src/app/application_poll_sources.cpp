@@ -59,6 +59,7 @@ std::vector<PollSource*> Application::currentPollSources() {
   sources.push_back(&m_ipcPollSource);
   sources.push_back(&m_dmenuIpc);
   sources.push_back(&m_httpClientPollSource);
+  sources.push_back(&m_localSendService);
   sources.push_back(&m_locationPollSource);
   sources.push_back(&m_weatherPollSource);
   sources.push_back(&m_calendarPollSource);

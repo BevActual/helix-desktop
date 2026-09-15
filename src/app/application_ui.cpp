@@ -675,6 +675,7 @@ void Application::initPanelManagerAndPanels() {
           .videoWallpaper = &m_videoWallpaper,
           .screenRecorder = &m_screenRecorder,
           .tailscale = &m_tailscaleService,
+          .localSend = &m_localSendService,
           .upgradeShell = [this]() { performShellUpgrade(); },
           .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },
           .upgradeBusy = []() { return noctalia::fedora_upgrade::busy(); },

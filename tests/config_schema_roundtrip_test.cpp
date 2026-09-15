@@ -335,6 +335,7 @@ location = "https://example.invalid/bad"
     c.audio = AudioConfig{true, true, 0.73F, "change.ogg", "notify.ogg"};
     c.weather = WeatherConfig{false, false, 17, "imperial"};
     c.tailscale = TailscaleConfig{15, true, "https://example.invalid/admin"};
+    c.localsend = LocalSendConfig{false, "Studio", "2468", "~/Downloads/LocalSend", true, false, 53318};
     c.osd.position = "bottom_left";
     c.osd.positionVertical = "top_right";
     c.osd.orientation = "vertical";

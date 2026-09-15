@@ -1604,6 +1604,7 @@ void Application::initSessionBusServices() {
     });
   });
   m_tailscaleService.start();
+  m_localSendService.start();
   m_aiUsageService.start();
 
   // LocationService is the single source of "where am I": push its resolved coordinates to the

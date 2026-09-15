@@ -1222,6 +1222,18 @@ struct TailscaleConfig {
   bool operator==(const TailscaleConfig&) const = default;
 };
 
+struct LocalSendConfig {
+  bool enabled = true;
+  std::string alias;
+  std::string pin;
+  std::string downloadDir;
+  bool autoAccept = false;
+  bool notifyOnReceive = true;
+  std::int32_t port = 53317;
+
+  bool operator==(const LocalSendConfig&) const = default;
+};
+
 struct StorageConfig {
   StorageKeySource keySource = StorageKeySource::SecretService;
   std::string keyFile;
@@ -1835,6 +1847,7 @@ struct Config {
   NotificationConfig notification;
   WeatherConfig weather;
   TailscaleConfig tailscale;
+  LocalSendConfig localsend;
   CalendarConfig calendar;
   SystemConfig system;
   AudioConfig audio;
@@ -1867,6 +1880,7 @@ struct ConfigChangeSet {
   bool notification = true;
   bool weather = true;
   bool tailscale = true;
+  bool localsend = true;
   bool calendar = true;
   bool system = true;
   bool audio = true;
@@ -1898,6 +1912,7 @@ struct ConfigChangeSet {
         || notification
         || weather
         || tailscale
+        || localsend
         || calendar
         || system
         || audio

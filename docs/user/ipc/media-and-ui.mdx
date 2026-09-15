@@ -175,3 +175,15 @@ Built-in Tailscale control uses the local `tailscale` CLI. Settings live under [
 | Status | <IpcCommand command="tailscale-status" /> | Print `running`, `stopped`, or `not-installed`. |
 
 `tailscale-status` prints `not-installed` when the CLI is missing. When connected it includes hostname, IPv4, and the selected exit node. Connect and disconnect may prompt for an administrator password unless this user is the Tailscale operator (`sudo tailscale set --operator=$USER`).
+
+## LocalSend {#localsend}
+
+Built-in LocalSend nearby sharing uses the LocalSend protocol on the LAN. Settings live under [`[localsend]`](/noctalia/control-center/#localsend).
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Toggle | <IpcCommand command="localsend-toggle" /> | Enable or disable nearby sharing and persist `[localsend].enabled`. |
+| Status | <IpcCommand command="localsend-status" /> | Print `disabled`, `listening`, or `receive-blocked`, plus alias, port, and nearby peer count. |
+| Announce | <IpcCommand command="localsend-announce" /> | Broadcast this machine on the LocalSend multicast group now. |
+
+`receive-blocked` means nearby sharing is on but TCP port 53317 (or the configured port) is already in use, so this machine can still send. Open Control Center on the LocalSend tab with `noctalia msg panel-toggle control-center localsend`.

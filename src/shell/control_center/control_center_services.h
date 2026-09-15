@@ -37,6 +37,7 @@ class ScreenTimeService;
 class SessionActionRunner;
 class SystemMonitorService;
 class TailscaleService;
+class LocalSendService;
 class ThumbnailService;
 class UPowerService;
 class VideoWallpaperService;
@@ -102,6 +103,7 @@ struct ControlCenterServices {
   VideoWallpaperService* videoWallpaper = nullptr;
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
+  LocalSendService* localSend = nullptr;
   std::function<void()> upgradeShell;
   std::function<bool()> upgradeAvailable;
   std::function<bool()> upgradeBusy;
@@ -129,6 +131,7 @@ struct ControlCenterServices {
         .ipc = ipc,
         .screenRecorder = screenRecorder,
         .tailscale = tailscale,
+        .localSend = localSend,
         .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,

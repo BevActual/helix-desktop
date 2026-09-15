@@ -10,6 +10,7 @@ namespace noctalia::config::schema {
   const Schema<AudioConfig>& audioSchema();
   const Schema<WeatherConfig>& weatherSchema();
   const Schema<TailscaleConfig>& tailscaleSchema();
+  const Schema<LocalSendConfig>& localsendSchema();
   const Schema<StorageConfig>& storageSchema();
   const Schema<OsdConfig>& osdSchema();
   const Schema<BackdropConfig>& backdropSchema();

@@ -35,6 +35,7 @@ namespace control_center {
         {"ai", "ai-usage ai llm tokens quota claude cursor copilot codex gemini ollama"},
         {"system", "resources cpu memory ram disk"},
         {"tailscale", "vpn tailnet"},
+        {"localsend", "nearby share airdrop send files"},
         {"templates", "template rice rices"},
         {"wallpaper", "background wallpapers"},
         {"weather", "forecast temperature location"},

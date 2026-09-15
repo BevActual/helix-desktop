@@ -78,6 +78,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, audio, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
+| `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, and send a file or clipboard text. Header gear opens receive folder, auto-accept, and port. |
 | `desktop` | Desktop | Desktop clock, widgets, and desktop behavior |
 | `dock` | Dock | Dock placement and behavior |
 | `panels` | Panels | Shared panel placement and chrome |
@@ -92,7 +93,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `plugins` | Plugins | Installed plugins and the in-panel plugin store |
 | `packages` | Packages | Fedora, Flatpak, and firmware (`fwupd`) updates, search, and installs. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` is listed only in a niri session. The Weather, System, Power, Screen Time, and Tailscale tabs stay available so you can turn those features on from the tab itself.
+`niri` is listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, and LocalSend tabs stay available so you can turn those features on from the tab itself.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -257,6 +258,37 @@ notify_on_peer_change = false
 | `admin_url` | string | `""` | Admin console URL. Empty uses Tailscale's default, or the login URL when this machine needs authentication. |
 
 IPC: `tailscale-up`, `tailscale-down`, `tailscale-toggle`, and `tailscale-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#tailscale).
+
+## LocalSend
+
+The LocalSend tab is a native LocalSend peer: it announces this machine on the LAN (`224.0.0.167:53317` by default) and speaks the HTTP REST API so nearby LocalSend apps can send files here. Turn nearby sharing on from the live view. Incoming transfers wait for **Accept** or **Decline** unless auto-accept is on. Send a file or the clipboard to a discovered device; if that device requires a PIN, enter it in the field on this tab first.
+
+This machine advertises `http` so receive does not need a TLS certificate. Sending still talks HTTPS when the other device requires it. If another LocalSend app already bound TCP port 53317, this tab can still send; receiving stays blocked until that port is free or you pick a different port in settings.
+
+Header gear opens `[localsend]` for the device name, receive PIN, download folder, auto-accept, receive toasts, and port.
+
+```toml
+[localsend]
+enabled = true
+# alias = ""
+# pin = ""
+# download_dir = "~/Downloads"
+auto_accept = false
+notify_on_receive = true
+port = 53317
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | bool | `true` | Advertise on the LAN and accept LocalSend transfers. |
+| `alias` | string | `""` | Name shown to other devices. Empty uses this machine's hostname. |
+| `pin` | string | `""` | Optional PIN other devices must enter before sending files here. |
+| `download_dir` | string | `""` | Folder for received files. Empty uses `~/Downloads`. |
+| `auto_accept` | bool | `false` | Accept incoming files without asking. |
+| `notify_on_receive` | bool | `true` | Toast when someone offers or finishes sending files here. |
+| `port` | int | `53317` | TCP and UDP LocalSend port (`1024`–`65535`). |
+
+IPC: `localsend-toggle`, `localsend-status`, and `localsend-announce`. See [Media & UI](/noctalia/ipc/media-and-ui/#localsend).
 
 ## Weather
 

@@ -26,6 +26,8 @@ struct HttpRequest {
                                   // keep-alive connection answers via the old path
   std::string basicUsername;
   std::string basicPassword;
+  std::filesystem::path uploadPath; // when set, POST this file instead of `body`
+  long timeoutSeconds = 30;         // 0 disables the overall transfer timeout
 };
 
 struct HttpResponse {
@@ -124,6 +126,7 @@ private:
     std::string basicUsername;
     std::string basicPassword;
     std::string response;
+    FILE* uploadFile = nullptr;
     std::array<char, CURL_ERROR_SIZE> errorBuffer{};
   };
 

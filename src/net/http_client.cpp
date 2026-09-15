@@ -87,6 +87,14 @@ namespace {
     }
     return bytes;
   }
+
+  std::size_t readUploadFile(char* ptr, std::size_t size, std::size_t nmemb, void* userdata) {
+    auto* file = static_cast<FILE*>(userdata);
+    if (file == nullptr || ptr == nullptr) {
+      return 0;
+    }
+    return std::fread(ptr, 1, size * nmemb, file);
+  }
 } // namespace
 
 void HttpClient::applyCommonOptions(CURL* easy) {
@@ -124,6 +132,9 @@ HttpClient::~HttpClient() {
     curl_easy_cleanup(easy);
     if (req.headers != nullptr) {
       curl_slist_free_all(req.headers);
+    }
+    if (req.uploadFile != nullptr) {
+      std::fclose(req.uploadFile);
     }
   }
   for (auto& [easy, stream] : m_streamTransfers) {
@@ -186,6 +197,10 @@ void HttpClient::download(std::string_view url, const std::filesystem::path& des
   curl_easy_setopt(easy, CURLOPT_FAILONERROR, 1L);
   curl_easy_setopt(easy, CURLOPT_TIMEOUT, 30L);
   curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 10L);
+  if (urlStr.find("wallhaven.cc") != std::string::npos) {
+    curl_easy_setopt(easy, CURLOPT_REFERER, "https://wallhaven.cc/");
+    curl_easy_setopt(easy, CURLOPT_USERAGENT, "Noctalia");
+  }
 
   Transfer transfer{};
   transfer.destPath = destPath;
@@ -315,12 +330,49 @@ void HttpClient::request(HttpRequest req, ResponseCallback cb) {
     transfer.headers = curl_slist_append(transfer.headers, header.c_str());
   }
 
+  FILE* uploadFile = nullptr;
+  curl_off_t uploadSize = 0;
+  if (!req.uploadPath.empty()) {
+    uploadFile = std::fopen(req.uploadPath.c_str(), "rb");
+    if (uploadFile == nullptr) {
+      kLog.warn("request failed to open upload file {} url={}", req.uploadPath.string(), urlForLog(req.url));
+      if (transfer.headers != nullptr) {
+        curl_slist_free_all(transfer.headers);
+      }
+      curl_easy_cleanup(easy);
+      deferResponse(std::move(transfer.callback));
+      return;
+    }
+    if (std::fseek(uploadFile, 0, SEEK_END) != 0) {
+      std::fclose(uploadFile);
+      kLog.warn("request failed to size upload file {} url={}", req.uploadPath.string(), urlForLog(req.url));
+      if (transfer.headers != nullptr) {
+        curl_slist_free_all(transfer.headers);
+      }
+      curl_easy_cleanup(easy);
+      deferResponse(std::move(transfer.callback));
+      return;
+    }
+    uploadSize = static_cast<curl_off_t>(std::ftell(uploadFile));
+    if (uploadSize < 0 || std::fseek(uploadFile, 0, SEEK_SET) != 0) {
+      std::fclose(uploadFile);
+      kLog.warn("request failed to rewind upload file {} url={}", req.uploadPath.string(), urlForLog(req.url));
+      if (transfer.headers != nullptr) {
+        curl_slist_free_all(transfer.headers);
+      }
+      curl_easy_cleanup(easy);
+      deferResponse(std::move(transfer.callback));
+      return;
+    }
+  }
+
   m_requestTransfers[easy] = std::move(transfer);
   RequestTransfer& stored = m_requestTransfers[easy];
+  stored.uploadFile = uploadFile;
 
   applyCommonOptions(easy);
   curl_easy_setopt(easy, CURLOPT_URL, stored.url.c_str());
-  curl_easy_setopt(easy, CURLOPT_TIMEOUT, 30L);
+  curl_easy_setopt(easy, CURLOPT_TIMEOUT, req.timeoutSeconds);
   curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 10L);
   if (req.allowInsecureTls) {
     curl_easy_setopt(easy, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -350,7 +402,11 @@ void HttpClient::request(HttpRequest req, ResponseCallback cb) {
   if (stored.headers != nullptr) {
     curl_easy_setopt(easy, CURLOPT_HTTPHEADER, stored.headers);
   }
-  if (!stored.body.empty()) {
+  if (stored.uploadFile != nullptr) {
+    curl_easy_setopt(easy, CURLOPT_READFUNCTION, readUploadFile);
+    curl_easy_setopt(easy, CURLOPT_READDATA, stored.uploadFile);
+    curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE_LARGE, uploadSize);
+  } else if (!stored.body.empty()) {
     curl_easy_setopt(easy, CURLOPT_POSTFIELDSIZE, static_cast<long>(stored.body.size()));
     curl_easy_setopt(easy, CURLOPT_POSTFIELDS, stored.body.c_str());
   }
@@ -365,6 +421,9 @@ void HttpClient::request(HttpRequest req, ResponseCallback cb) {
     curl_easy_cleanup(easy);
     if (failed.headers != nullptr) {
       curl_slist_free_all(failed.headers);
+    }
+    if (failed.uploadFile != nullptr) {
+      std::fclose(failed.uploadFile);
     }
     kLog.warn(
         "request failed to add curl handle url={} error={}", urlForLog(failed.url), curl_multi_strerror(addResult)
@@ -690,6 +749,10 @@ void HttpClient::finishRequestTransfer(CURL* easy, CURLcode result) {
 
   if (transfer.headers != nullptr) {
     curl_slist_free_all(transfer.headers);
+  }
+  if (transfer.uploadFile != nullptr) {
+    std::fclose(transfer.uploadFile);
+    transfer.uploadFile = nullptr;
   }
 
   HttpResponse response;

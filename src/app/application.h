@@ -23,6 +23,7 @@
 #include "ipc/ipc_service.h"
 #include "launcher/dmenu_ipc.h"
 #include "net/http_client.h"
+#include "net/localsend_service.h"
 #include "net/tailscale_service.h"
 #include "net/http_client_poll_source.h"
 #include "notification/notification_manager.h"
@@ -283,6 +284,7 @@ private:
       m_compositorPlatform, m_configService, m_notificationManager, m_screenshotService
   };
   TailscaleService m_tailscaleService{m_configService};
+  LocalSendService m_localSendService{m_configService, m_httpClient, m_notificationManager};
   std::unique_ptr<MprisService> m_mprisService;
   std::unique_ptr<PowerProfilesService> m_powerProfilesService;
   std::unique_ptr<INetworkService> m_networkService;

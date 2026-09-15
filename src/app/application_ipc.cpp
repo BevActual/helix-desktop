@@ -779,6 +779,7 @@ void Application::initIpc() {
   m_screenshotService.registerIpc(m_ipcService, m_configService);
   m_screenRecorder.registerIpc(m_ipcService);
   m_tailscaleService.registerIpc(m_ipcService);
+  m_localSendService.registerIpc(m_ipcService);
   m_windowSwitcher.registerIpc(m_ipcService);
   for (const noctalia::cli::Command& command : noctalia::cli::kMsgCmd.subcommands) {
     if (!m_ipcService.hasHandler(command.name))

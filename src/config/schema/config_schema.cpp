@@ -49,6 +49,19 @@ namespace noctalia::config::schema {
     return s;
   }
 
+  const Schema<LocalSendConfig>& localsendSchema() {
+    static const Schema<LocalSendConfig> s = {
+        field(&LocalSendConfig::enabled, "enabled"),
+        field(&LocalSendConfig::alias, "alias"),
+        field(&LocalSendConfig::pin, "pin"),
+        field(&LocalSendConfig::downloadDir, "download_dir"),
+        field(&LocalSendConfig::autoAccept, "auto_accept"),
+        field(&LocalSendConfig::notifyOnReceive, "notify_on_receive"),
+        field(&LocalSendConfig::port, "port", kLocalSendPortRange),
+    };
+    return s;
+  }
+
   const Schema<OsdKindsConfig>& osdKindsSchema() {
     static const Schema<OsdKindsConfig> s = {
         field(&OsdKindsConfig::volume, "volume"),

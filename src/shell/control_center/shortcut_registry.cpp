@@ -11,6 +11,7 @@
 #include "i18n/i18n.h"
 #include "idle/idle_inhibitor.h"
 #include "ipc/ipc_service.h"
+#include "net/localsend_service.h"
 #include "net/tailscale_service.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
@@ -613,6 +614,34 @@ namespace {
     TailscaleService* m_service = nullptr;
   };
 
+  class LocalSendShortcut final : public Shortcut {
+  public:
+    LocalSendShortcut(LocalSendService* service, ConfigService* config) : m_service(service), m_config(config) {}
+    std::string_view id() const override { return "localsend"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.localsend"); }
+    std::string_view iconOn() const override { return "share"; }
+    std::string_view iconOff() const override { return "share"; }
+    bool isToggle() const override { return true; }
+    bool enabled() const override { return m_service != nullptr; }
+    bool active() const override { return m_service != nullptr && m_service->enabled(); }
+    void onClick() override {
+      if (m_service == nullptr) {
+        return;
+      }
+      const bool next = !m_service->enabled();
+      if (m_config != nullptr) {
+        (void)m_config->setOverride({"localsend", "enabled"}, next);
+      } else {
+        m_service->setEnabled(next);
+      }
+    }
+    void onRightClick() override { openTab("localsend"); }
+
+  private:
+    LocalSendService* m_service = nullptr;
+    ConfigService* m_config = nullptr;
+  };
+
   using ShortcutCreator = std::unique_ptr<Shortcut> (*)(const ShortcutServices& services);
   using ShortcutAvailability = bool (*)(const Config& config);
 
@@ -731,6 +760,10 @@ namespace {
       builtinShortcut<TailscaleShortcut, &ShortcutServices::tailscale>({
           .type = "tailscale",
           .labelKey = "control-center.shortcuts.tailscale",
+      }),
+      builtinShortcut<LocalSendShortcut, &ShortcutServices::localSend, &ShortcutServices::config>({
+          .type = "localsend",
+          .labelKey = "control-center.shortcuts.localsend",
       }),
   });
 
