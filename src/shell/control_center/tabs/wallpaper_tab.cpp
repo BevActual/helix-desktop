@@ -47,6 +47,15 @@ void WallpaperTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
 }
 
+void WallpaperTab::applyOpenContext(std::string_view context) {
+  if (context.empty()) {
+    return;
+  }
+  m_picker.onOpen(context);
+}
+
+WallpaperPicker::BrowseSource WallpaperTab::browseSource() const noexcept { return m_picker.browseSource(); }
+
 void WallpaperTab::onPanelCardOpacityChanged(float opacity) { m_picker.setPanelCardOpacity(opacity); }
 
 void WallpaperTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {

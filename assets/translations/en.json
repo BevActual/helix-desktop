@@ -1696,6 +1696,7 @@
         "transition": "Transition",
         "user": "User",
         "video": "Video",
+        "daily": "Daily",
         "wallhaven": "Wallhaven",
         "wallpaper": "Wallpaper",
         "weather": "Weather",
@@ -1919,6 +1920,14 @@
         "order": {
           "alphabetical": "Alphabetical",
           "random": "Random"
+        },
+        "source": {
+          "daily": "Daily",
+          "folder": "Folder"
+        },
+        "daily": {
+          "bing": "Bing",
+          "nasa": "NASA"
         },
         "transition": {
           "disc": "Disc",
@@ -3751,6 +3760,10 @@
           "description": "Search nested folders for wallpapers",
           "label": "Include Subfolders"
         },
+        "automation-source": {
+          "description": "Rotate images from your wallpaper folder, or apply today's Bing or NASA picture once a day",
+          "label": "Rotation Source"
+        },
         "directory": {
           "description": "Folder containing wallpapers; leave empty to use the standard XDG Pictures directory",
           "label": "Wallpaper Directory"
@@ -3800,6 +3813,24 @@
           "button": "Browse…",
           "description": "Pick an image file to apply to all monitors",
           "label": "Choose Wallpaper"
+        },
+        "daily-bing-market": {
+          "description": "Bing locale for daily wallpapers (for example en-US). Empty uses en-US",
+          "label": "Bing Market",
+          "placeholder": "en-US"
+        },
+        "daily-download-dir": {
+          "description": "Optional folder for Bing and NASA downloads; empty uses your wallpaper directory",
+          "label": "Daily Download Directory",
+          "placeholder": "Wallpaper directory"
+        },
+        "daily-nasa-api-key": {
+          "description": "Optional NASA API key for APOD. Empty uses NASA_API_KEY or DEMO_KEY",
+          "label": "NASA API Key"
+        },
+        "daily-provider": {
+          "description": "Source used by the Daily picker and by daily automatic rotation",
+          "label": "Daily Source"
         },
         "per-monitor-directories": {
           "description": "Use separate wallpaper folders for each monitor",
@@ -5255,10 +5286,15 @@
       "choose-file-title": "Choose wallpaper",
       "close": "Close wallpaper panel",
       "color-title": "Wallpaper color",
+      "current-empty": "No wallpaper applied",
+      "current-label": "Current",
       "favorite-current": "Add current wallpaper to favorites",
       "filter-placeholder": "Filter…",
       "flatten": "Flatten",
       "loading": "Loading wallpapers…",
+      "lock-clear": "Use the desktop wallpaper on the lock screen",
+      "lock-set": "Use this wallpaper on the lock screen",
+      "lock-unavailable": "Apply a wallpaper before setting the lock screen",
       "navigate-up": "Go to parent folder",
       "refresh": "Refresh wallpapers",
       "sort-date-asc": "Sort by date (oldest first)",
@@ -5274,6 +5310,18 @@
         "filter-placeholder": "Filter videos…",
         "mpvpaper-missing": "Install mpvpaper to apply video wallpapers.",
         "title": "Video"
+      },
+      "daily": {
+        "applied": "Wallpaper applied",
+        "applying": "Downloading…",
+        "bing": "Bing",
+        "download-failed": "Download failed",
+        "empty": "No daily wallpapers found.",
+        "error": "Request failed",
+        "filter-placeholder": "Filter titles…",
+        "nasa": "NASA",
+        "offline": "Daily wallpapers need network access. Turn off offline mode in Settings → Shell.",
+        "title": "Daily"
       },
       "wallhaven": {
         "applied": "Wallpaper applied",

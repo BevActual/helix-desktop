@@ -132,9 +132,16 @@ path = ""                            # optional initial/default wallpaper path
 
 [wallpaper.automation]
 enabled                    = false
-interval_seconds           = 1800    # seconds between changes
-order                      = "random" # random | alphabetical
+source                     = "folder"  # folder | daily
+interval_seconds           = 1800    # seconds between changes (folder source)
+order                      = "random" # random | alphabetical (folder source)
 recursive                  = true    # include subdirectories when picking random wallpapers
+
+[wallpaper.daily]
+provider     = "bing"                 # bing | nasa
+# nasa_api_key = ""                   # optional; else $NASA_API_KEY, else DEMO_KEY
+# download_dir = ""                   # empty uses the wallpaper directory
+# bing_market  = ""                   # empty uses en-US
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
 

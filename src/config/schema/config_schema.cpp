@@ -825,6 +825,16 @@ namespace noctalia::config::schema {
       return s;
     }
 
+    const Schema<WallpaperDailyConfig>& wallpaperDailySchema() {
+      static const Schema<WallpaperDailyConfig> s = {
+          enumField(&WallpaperDailyConfig::provider, "provider", kWallpaperDailyProviders),
+          field(&WallpaperDailyConfig::nasaApiKey, "nasa_api_key"),
+          pathStringField(&WallpaperDailyConfig::downloadDir, "download_dir"),
+          field(&WallpaperDailyConfig::bingMarket, "bing_market"),
+      };
+      return s;
+    }
+
     const Schema<WallpaperVideoConfig>& wallpaperVideoSchema() {
       static const Schema<WallpaperVideoConfig> s = {
           pathStringField(&WallpaperVideoConfig::directory, "directory"),
@@ -840,6 +850,7 @@ namespace noctalia::config::schema {
       static const Schema<WallpaperAutomationConfig> s = {
           field(&WallpaperAutomationConfig::enabled, "enabled"),
           field(&WallpaperAutomationConfig::intervalSeconds, "interval_seconds", kWallpaperAutomationIntervalRange),
+          enumField(&WallpaperAutomationConfig::source, "source", kWallpaperAutomationSources),
           // order accepts case-insensitive random|alphabetical.
           custom<WallpaperAutomationConfig>(
               "order",
@@ -1682,6 +1693,7 @@ namespace noctalia::config::schema {
         field(&WallpaperConfig::perMonitorDirectories, "per_monitor_directories"),
         subTable(&WallpaperConfig::automation, "automation", wallpaperAutomationSchema()),
         subTable(&WallpaperConfig::wallhaven, "wallhaven", wallpaperWallhavenSchema()),
+        subTable(&WallpaperConfig::daily, "daily", wallpaperDailySchema()),
         subTable(&WallpaperConfig::video, "video", wallpaperVideoSchema()),
         namedMap<WallpaperConfig, WallpaperMonitorOverride>(
             &WallpaperConfig::monitorOverrides, "monitor", wallpaperMonitorSchema(),

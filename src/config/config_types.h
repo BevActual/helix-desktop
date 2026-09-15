@@ -497,15 +497,26 @@ struct WallpaperMonitorOverride {
   bool operator==(const WallpaperMonitorOverride&) const = default;
 };
 
+enum class WallpaperDailyProvider : std::uint8_t {
+  Bing = 0,
+  Nasa = 1,
+};
+
 struct WallpaperAutomationConfig {
   enum class Order : std::uint8_t {
     Random = 0,
     Alphabetical = 1,
   };
 
+  enum class Source : std::uint8_t {
+    Folder = 0,
+    Daily = 1,
+  };
+
   bool enabled = false;
   std::int32_t intervalSeconds = 1800;
   Order order = Order::Random;
+  Source source = Source::Folder;
   bool recursive = true;
 
   bool operator==(const WallpaperAutomationConfig&) const = default;
@@ -516,6 +527,15 @@ struct WallpaperWallhavenConfig {
   std::string downloadDir;
 
   bool operator==(const WallpaperWallhavenConfig&) const = default;
+};
+
+struct WallpaperDailyConfig {
+  WallpaperDailyProvider provider = WallpaperDailyProvider::Bing;
+  std::string nasaApiKey;
+  std::string downloadDir;
+  std::string bingMarket; // empty = en-US
+
+  bool operator==(const WallpaperDailyConfig&) const = default;
 };
 
 struct WallpaperVideoConfig {
@@ -544,6 +564,7 @@ struct WallpaperConfig {
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
   WallpaperWallhavenConfig wallhaven;
+  WallpaperDailyConfig daily;
   WallpaperVideoConfig video;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
 
@@ -928,6 +949,16 @@ constexpr EnumOption<WallpaperFillMode> kWallpaperFillModes[] = {
 constexpr EnumOption<WallpaperAutomationConfig::Order> kWallpaperAutomationOrders[] = {
     {WallpaperAutomationConfig::Order::Random, "random", "settings.options.wallpaper.order.random"},
     {WallpaperAutomationConfig::Order::Alphabetical, "alphabetical", "settings.options.wallpaper.order.alphabetical"},
+};
+
+constexpr EnumOption<WallpaperAutomationConfig::Source> kWallpaperAutomationSources[] = {
+    {WallpaperAutomationConfig::Source::Folder, "folder", "settings.options.wallpaper.source.folder"},
+    {WallpaperAutomationConfig::Source::Daily, "daily", "settings.options.wallpaper.source.daily"},
+};
+
+constexpr EnumOption<WallpaperDailyProvider> kWallpaperDailyProviders[] = {
+    {WallpaperDailyProvider::Bing, "bing", "settings.options.wallpaper.daily.bing"},
+    {WallpaperDailyProvider::Nasa, "nasa", "settings.options.wallpaper.daily.nasa"},
 };
 
 constexpr EnumOption<WallpaperTransition> kWallpaperTransitions[] = {

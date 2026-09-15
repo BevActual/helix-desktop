@@ -17,6 +17,7 @@
 #include "render/scene/node.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_manager.h"
+#include "shell/wallpaper/daily_wallpaper.h"
 #include "shell/wallpaper/panel/wallpaper_tile.h"
 #include "shell/wallpaper/video_wallpaper.h"
 #include "shell/wallpaper/video_wallpaper_service.h"
@@ -27,7 +28,10 @@
 #include "theme/custom_palettes.h"
 #include "theme/theme_service.h"
 #include "ui/builders.h"
+#include "ui/controls/box.h"
 #include "ui/controls/button.h"
+#include "ui/controls/glyph.h"
+#include "ui/controls/image.h"
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/select.h"
@@ -43,6 +47,7 @@
 #include <algorithm>
 #include <cctype>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <memory>
@@ -68,6 +73,8 @@ namespace {
   constexpr Logger kLog("wp-panel");
   constexpr auto kFilterDebounceInterval = std::chrono::milliseconds(120);
   constexpr float kMinTileWidth = 180.0F;
+  constexpr float kCurrentThumbWidth = 88.0F;
+  constexpr float kCurrentThumbHeight = 52.0F;
   constexpr float kMonitorSelectMinWidth = 136.0F;
   constexpr float kFavoriteSelectMinWidth = 168.0F;
   constexpr float kFavoritesMetaRowGap = Style::spaceSm;
@@ -414,6 +421,7 @@ WallpaperPicker::WallpaperPicker(
 }
 
 WallpaperPicker::~WallpaperPicker() {
+  releaseCurrentThumbnail();
   if (m_scanner != nullptr) {
     m_scanner->removeOnComplete(this);
   }
@@ -433,6 +441,9 @@ void WallpaperPicker::setPanelCardOpacity(float opacity) {
   }
   if (m_sourceSegmented != nullptr) {
     m_sourceSegmented->setSurfaceOpacity(clamped);
+  }
+  if (m_dailyProviderSegmented != nullptr) {
+    m_dailyProviderSegmented->setSurfaceOpacity(clamped);
   }
   if (m_favoriteThemeSegmented != nullptr) {
     m_favoriteThemeSegmented->setSurfaceOpacity(clamped);
@@ -481,6 +492,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                   {.label = i18n::tr("wallpaper.panel.wallhaven.library")},
                   {.label = i18n::tr("wallpaper.panel.wallhaven.title")},
                   {.label = i18n::tr("wallpaper.panel.video.title")},
+                  {.label = i18n::tr("wallpaper.panel.daily.title")},
               },
           .selectedIndex = browseSourceIndex(m_browseSource),
           .scale = scale,
@@ -517,6 +529,8 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                   m_filterQuery = m_pendingFilterQuery;
                   if (m_browseSource == BrowseSource::Video) {
                     refreshVideoEntries();
+                  } else if (m_browseSource == BrowseSource::Daily) {
+                    bindDailyGrid();
                   } else {
                     applyFilter();
                   }
@@ -682,6 +696,10 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
               fetchWallhaven(false);
               return;
             }
+            if (m_browseSource == BrowseSource::Daily) {
+              fetchDaily(true);
+              return;
+            }
             if (m_browseSource == BrowseSource::Video) {
               refreshVideoEntries();
               resetSelection();
@@ -722,6 +740,111 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
 
   root->addChild(std::move(toolbar));
 
+  const float thumbRadius = Style::scaledRadiusMd(scale);
+  const float thumbW = kCurrentThumbWidth * scale;
+  const float thumbH = kCurrentThumbHeight * scale;
+
+  auto currentStrip = ui::row({
+      .out = &m_currentStrip,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceMd * scale,
+      .paddingV = Style::spaceXs * scale,
+      .paddingH = Style::spaceSm * scale,
+      .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F),
+      .radius = Style::scaledRadiusMd(scale),
+      .fillWidth = true,
+  });
+  currentStrip->addChild(
+      ui::box({
+          .out = &m_currentThumbHost,
+          .fill = colorSpecFromRole(ColorRole::Surface),
+          .radius = thumbRadius,
+          .width = thumbW,
+          .height = thumbH,
+          .configure =
+              [thumbRadius](Box& box) {
+                box.setRadius(thumbRadius);
+                box.setClipChildren(true);
+              },
+      })
+  );
+  if (m_currentThumbHost != nullptr) {
+    m_currentThumbHost->addChild(
+        ui::image({
+            .out = &m_currentThumb,
+            .fit = ImageFit::Cover,
+            .radius = thumbRadius,
+            .participatesInLayout = false,
+        })
+    );
+    m_currentThumbHost->addChild(
+        ui::glyph({
+            .out = &m_currentThumbPlaceholder,
+            .glyph = "photo",
+            .glyphSize = std::min(thumbW, thumbH) * 0.42F,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .participatesInLayout = false,
+        })
+    );
+  }
+
+  auto currentInfo = ui::column({
+      .align = FlexAlign::Start,
+      .gap = Style::spaceXs * scale * 0.5F,
+      .flexGrow = 1.0F,
+  });
+  currentInfo->addChild(
+      ui::label({
+          .out = &m_currentCaption,
+          .text = i18n::tr("wallpaper.panel.current-label"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+      })
+  );
+  currentInfo->addChild(
+      ui::label({
+          .out = &m_currentName,
+          .text = i18n::tr("wallpaper.panel.current-empty"),
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Medium,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .flexGrow = 1.0F,
+      })
+  );
+  currentStrip->addChild(std::move(currentInfo));
+  currentStrip->addChild(
+      ui::button({
+          .out = &m_favoriteCurrentButton,
+          .glyph = "star",
+          .glyphSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("wallpaper.panel.favorite-current"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick = [this]() { toggleFavoriteForPath(currentWallpaperPathForSelection()); },
+      })
+  );
+  currentStrip->addChild(
+      ui::button({
+          .out = &m_lockscreenButton,
+          .glyph = "lock-open",
+          .glyphSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("wallpaper.panel.lock-set"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick = [this]() { toggleLockscreenWallpaper(); },
+      })
+  );
+  root->addChild(std::move(currentStrip));
+
   const float favoritesControlHeight = Style::controlHeightSm * scale;
   const float favoritesLabelFontSize = Style::fontSizeCaption * scale;
 
@@ -730,6 +853,8 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       .align = FlexAlign::Center,
       .gap = kFavoritesMetaRowGap * scale,
       .fillWidth = true,
+      .visible = false,
+      .participatesInLayout = false,
   });
 
   // Only offer palette sources that actually have palettes; Community/Custom are empty
@@ -801,21 +926,6 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
                 PanelManager::instance().refresh();
               },
           .configure = [scale](Select& select) { select.setMinWidth(kFavoriteSelectMinWidth * scale); },
-      })
-  );
-
-  favoritesOptions->addChild(
-      ui::button({
-          .out = &m_favoriteCurrentButton,
-          .glyph = "star",
-          .glyphSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Default,
-          .tooltip = i18n::tr("wallpaper.panel.favorite-current"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .onClick = [this]() { toggleFavoriteForPath(currentWallpaperPathForSelection()); },
       })
   );
 
@@ -1110,6 +1220,35 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
   wallhavenFilters->addChild(std::move(filterRow2));
   root->addChild(std::move(wallhavenFilters));
 
+  auto dailyFilters = ui::row({
+      .out = &m_dailyFilters,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  dailyFilters->addChild(
+      ui::segmented({
+          .out = &m_dailyProviderSegmented,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {.label = i18n::tr("wallpaper.panel.daily.bing")},
+                  {.label = i18n::tr("wallpaper.panel.daily.nasa")},
+              },
+          .selectedIndex = dailyProvider() == WallpaperDailyProvider::Nasa ? std::size_t{1} : std::size_t{0},
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange =
+              [this](std::size_t index) {
+                persistDailyProvider(index == 1 ? WallpaperDailyProvider::Nasa : WallpaperDailyProvider::Bing);
+                fetchDaily(true);
+              },
+      })
+  );
+  root->addChild(std::move(dailyFilters));
+
   // ── Body: virtualized scrolling grid ──────────────────────────────────
   m_adapter = std::make_unique<WallpaperGridAdapter>(scale);
   m_adapter->setThumbnailService(m_thumbnails);
@@ -1122,6 +1261,12 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
           applyWallhavenItem(item.id);
           return;
         }
+      }
+      return;
+    }
+    if (m_browseSource == BrowseSource::Daily) {
+      if (const auto* item = dailyItemByThumbPath(entry.absPath); item != nullptr) {
+        applyDailyItem(item->id);
       }
       return;
     }
@@ -1336,6 +1481,8 @@ void WallpaperPicker::layout(Renderer& renderer, float width, float height) {
 
   m_rootLayout->setSize(width, height);
   m_rootLayout->layout(renderer);
+  layoutCurrentThumb(renderer);
+  bindCurrentThumbnail(renderer);
   m_dirty = false;
 }
 
@@ -1347,9 +1494,12 @@ void WallpaperPicker::update(Renderer& renderer) {
   if (m_thumbnailRefreshPending && m_thumbnails != nullptr) {
     const bool changed = m_thumbnails->uploadPending(renderer.textureManager());
     m_thumbnailRefreshPending = false;
-    if (changed && m_adapter != nullptr) {
-      m_adapter->setRenderer(&renderer);
-      m_adapter->refreshVisibleThumbnails(renderer);
+    if (changed) {
+      if (m_adapter != nullptr) {
+        m_adapter->setRenderer(&renderer);
+        m_adapter->refreshVisibleThumbnails(renderer);
+      }
+      bindCurrentThumbnail(renderer);
     }
   }
 }
@@ -1365,6 +1515,16 @@ void WallpaperPicker::onOpen(std::string_view context) {
     m_browseSource = BrowseSource::Video;
     if (m_config != nullptr) {
       (void)m_config->setStateString("wallpaper_panel", "source", "video");
+    }
+  } else if (context == "daily" || context == "bing" || context == "nasa") {
+    m_browseSource = BrowseSource::Daily;
+    if (m_config != nullptr) {
+      (void)m_config->setStateString("wallpaper_panel", "source", "daily");
+    }
+    if (context == "bing") {
+      persistDailyProvider(WallpaperDailyProvider::Bing);
+    } else if (context == "nasa") {
+      persistDailyProvider(WallpaperDailyProvider::Nasa);
     }
   }
   if (m_sourceSegmented != nullptr) {
@@ -1390,6 +1550,8 @@ void WallpaperPicker::onOpen(std::string_view context) {
   reseedRandomSort();
   if (m_browseSource == BrowseSource::Wallhaven) {
     fetchWallhaven(m_wallhavenItems.empty());
+  } else if (m_browseSource == BrowseSource::Daily) {
+    fetchDaily(m_dailyItems.empty());
   } else {
     refreshVisibleEntries();
     resetSelection();
@@ -1411,8 +1573,15 @@ void WallpaperPicker::onClose() {
   m_wallhavenApplying = false;
   m_wallhavenThumbActive = 0;
   m_wallhavenThumbQueue.clear();
+  ++m_dailySearchGeneration;
+  ++m_dailyApplyGeneration;
+  m_dailyLoading = false;
+  m_dailyApplying = false;
+  m_dailyThumbActive = 0;
+  m_dailyThumbQueue.clear();
 
   m_visibleEntries.clear();
+  releaseCurrentThumbnail();
 
   // Detach adapter from grid before either is destroyed; the pool tiles were
   // minted by the adapter.
@@ -1424,6 +1593,13 @@ void WallpaperPicker::onClose() {
 
   m_rootLayout = nullptr;
   m_toolbar = nullptr;
+  m_currentStrip = nullptr;
+  m_currentThumbHost = nullptr;
+  m_currentThumb = nullptr;
+  m_currentThumbPlaceholder = nullptr;
+  m_currentCaption = nullptr;
+  m_currentName = nullptr;
+  m_lockscreenButton = nullptr;
   m_favoritesOptionsColumn = nullptr;
   m_title = nullptr;
   m_sourceSegmented = nullptr;
@@ -1439,6 +1615,8 @@ void WallpaperPicker::onClose() {
   m_colorButton = nullptr;
   m_videoClearButton = nullptr;
   m_closeButton = nullptr;
+  m_dailyFilters = nullptr;
+  m_dailyProviderSegmented = nullptr;
   m_wallhavenFilters = nullptr;
   m_wallhavenCatGeneral = nullptr;
   m_wallhavenCatAnime = nullptr;
@@ -1634,21 +1812,221 @@ std::string WallpaperPicker::displayNameForWallpaperPath(std::string_view path) 
 }
 
 void WallpaperPicker::syncBrowseChrome() {
-  if (m_browseSource == BrowseSource::Wallhaven || m_browseSource == BrowseSource::Video) {
+  if (m_browseSource == BrowseSource::Wallhaven
+      || m_browseSource == BrowseSource::Video
+      || m_browseSource == BrowseSource::Daily) {
     setShown(m_backButton, false);
   } else if (m_backButton != nullptr) {
     m_backButton->setVisible(!m_navStack.empty());
   }
-  if (m_favoriteCurrentButton != nullptr && m_config != nullptr) {
-    const std::string current = currentWallpaperPathForSelection();
-    const bool favorite = !current.empty() && m_config->isWallpaperFavorite(current);
-    m_favoriteCurrentButton->setEnabled(!current.empty());
+  syncCurrentStrip();
+  syncThemeControls();
+}
+
+bool WallpaperPicker::currentIsFavorite() const {
+  if (m_config == nullptr) {
+    return false;
+  }
+  const std::string current = currentWallpaperPathForSelection();
+  return !current.empty() && m_config->isWallpaperFavorite(current);
+}
+
+bool WallpaperPicker::lockscreenUsesCurrent() const {
+  if (m_config == nullptr) {
+    return false;
+  }
+  const std::string current = currentWallpaperPathForSelection();
+  const std::string lockPath = m_config->config().lockscreen.wallpaper;
+  if (current.empty() || lockPath.empty()) {
+    return false;
+  }
+  return FileUtils::normalizeWallpaperPath(current) == FileUtils::normalizeWallpaperPath(lockPath);
+}
+
+std::string WallpaperPicker::themeFavoritePath() const {
+  if (m_config == nullptr) {
+    return {};
+  }
+  const std::string current = currentWallpaperPathForSelection();
+  if (!current.empty() && m_config->isWallpaperFavorite(current)) {
+    return current;
+  }
+  return {};
+}
+
+void WallpaperPicker::toggleLockscreenWallpaper() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const std::string current = currentWallpaperPathForSelection();
+  if (current.empty()) {
+    return;
+  }
+  if (lockscreenUsesCurrent()) {
+    (void)m_config->setOverride({"lockscreen", "wallpaper"}, std::string{});
+  } else {
+    (void)m_config->setOverride({"lockscreen", "wallpaper"}, current);
+  }
+  syncCurrentStrip();
+  m_dirty = true;
+  PanelManager::instance().refresh();
+}
+
+void WallpaperPicker::syncCurrentStrip() {
+  const std::string current = currentWallpaperPathForSelection();
+  const bool hasCurrent = !current.empty();
+  const bool favorite = currentIsFavorite();
+  const bool lockActive = lockscreenUsesCurrent();
+
+  if (m_currentCaption != nullptr) {
+    std::string caption = i18n::tr("wallpaper.panel.current-label");
+    if (m_selectedMonitorIndex < m_monitorChoices.size() && !m_monitorChoices[m_selectedMonitorIndex].label.empty()) {
+      caption += " · ";
+      caption += m_monitorChoices[m_selectedMonitorIndex].label;
+    }
+    m_currentCaption->setText(caption);
+  }
+  if (m_currentName != nullptr) {
+    m_currentName->setText(hasCurrent ? displayNameForWallpaperPath(current) : i18n::tr("wallpaper.panel.current-empty"));
+  }
+  if (m_favoriteCurrentButton != nullptr) {
+    m_favoriteCurrentButton->setEnabled(hasCurrent);
     m_favoriteCurrentButton->setGlyph(favorite ? "star-filled" : "star");
     m_favoriteCurrentButton->setTooltip(
         i18n::tr(favorite ? "wallpaper.panel.unfavorite-current" : "wallpaper.panel.favorite-current")
     );
   }
-  syncThemeControls();
+  if (m_lockscreenButton != nullptr) {
+    m_lockscreenButton->setEnabled(hasCurrent);
+    m_lockscreenButton->setGlyph(lockActive ? "lock" : "lock-open");
+    if (!hasCurrent) {
+      m_lockscreenButton->setTooltip(i18n::tr("wallpaper.panel.lock-unavailable"));
+    } else {
+      m_lockscreenButton->setTooltip(
+          i18n::tr(lockActive ? "wallpaper.panel.lock-clear" : "wallpaper.panel.lock-set")
+      );
+    }
+  }
+
+  const bool showThemeRow = m_browseSource == BrowseSource::Library && favorite;
+  setShown(m_favoritesOptionsColumn, showThemeRow);
+}
+
+void WallpaperPicker::layoutCurrentThumb(Renderer& renderer) {
+  if (m_currentThumbHost == nullptr) {
+    return;
+  }
+  const float w = m_currentThumbHost->width();
+  const float h = m_currentThumbHost->height();
+  if (m_currentThumb != nullptr) {
+    m_currentThumb->setPosition(0.0F, 0.0F);
+    m_currentThumb->setFrameSize(w, h);
+  }
+  if (m_currentThumbPlaceholder != nullptr) {
+    m_currentThumbPlaceholder->measure(renderer);
+    const float glyphW =
+        m_currentThumbPlaceholder->width() > 0.0F ? m_currentThumbPlaceholder->width() : std::min(w, h) * 0.42F;
+    const float glyphH =
+        m_currentThumbPlaceholder->height() > 0.0F ? m_currentThumbPlaceholder->height() : glyphW;
+    m_currentThumbPlaceholder->setPosition(std::round((w - glyphW) * 0.5F), std::round((h - glyphH) * 0.5F));
+  }
+}
+
+void WallpaperPicker::releaseCurrentThumbnail() {
+  if (m_thumbnails != nullptr && !m_currentThumbPath.empty() && m_currentThumbTargetPx > 0) {
+    m_thumbnails->release(m_currentThumbPath, m_currentThumbTargetPx);
+  }
+  m_currentThumbPath.clear();
+  m_currentThumbTargetPx = 0;
+}
+
+void WallpaperPicker::bindCurrentThumbnail(Renderer& renderer) {
+  if (m_currentThumbHost == nullptr || m_currentThumb == nullptr) {
+    return;
+  }
+
+  const std::string current = currentWallpaperPathForSelection();
+  const float hostW = m_currentThumbHost->width();
+  const float hostH = m_currentThumbHost->height();
+  const int targetPx = (hostW > 0.0F && hostH > 0.0F)
+      ? static_cast<int>(std::lround(std::max(hostW, hostH) * std::max(1.0F, renderer.renderScale())))
+      : 0;
+
+  auto showPlaceholder = [&](const char* glyph) {
+    if (m_currentThumbPlaceholder != nullptr) {
+      m_currentThumbPlaceholder->setGlyph(glyph);
+      m_currentThumbPlaceholder->setVisible(true);
+    }
+    m_currentThumb->clear(renderer);
+    m_currentThumb->setVisible(false);
+    m_currentThumbHost->setFill(colorSpecFromRole(ColorRole::Surface));
+  };
+
+  if (current.empty()) {
+    releaseCurrentThumbnail();
+    showPlaceholder("photo");
+    layoutCurrentThumb(renderer);
+    return;
+  }
+
+  Color colorFill;
+  if (parseColorWallpaperPath(current, colorFill)) {
+    releaseCurrentThumbnail();
+    if (m_currentThumbPlaceholder != nullptr) {
+      m_currentThumbPlaceholder->setVisible(false);
+    }
+    m_currentThumb->clear(renderer);
+    m_currentThumb->setVisible(false);
+    m_currentThumbHost->setFill(fixedColorSpec(colorFill));
+    layoutCurrentThumb(renderer);
+    return;
+  }
+
+  std::error_code ec;
+  if (!std::filesystem::exists(std::filesystem::path(current), ec)) {
+    releaseCurrentThumbnail();
+    showPlaceholder("photo-off");
+    layoutCurrentThumb(renderer);
+    return;
+  }
+
+  m_currentThumbHost->setFill(colorSpecFromRole(ColorRole::Surface));
+  if (m_currentThumbPlaceholder != nullptr) {
+    m_currentThumbPlaceholder->setVisible(false);
+  }
+  m_currentThumb->setVisible(true);
+
+  if (m_thumbnails == nullptr || targetPx <= 0) {
+    m_currentThumb->clear(renderer);
+    layoutCurrentThumb(renderer);
+    return;
+  }
+
+  if (m_currentThumbPath != current || m_currentThumbTargetPx != targetPx) {
+    if (!m_currentThumbPath.empty() && m_currentThumbTargetPx > 0) {
+      m_thumbnails->release(m_currentThumbPath, m_currentThumbTargetPx);
+    }
+    m_currentThumbPath = current;
+    m_currentThumbTargetPx = targetPx;
+    (void)m_thumbnails->acquire(m_currentThumbPath, m_currentThumbTargetPx);
+  }
+
+  const TextureHandle handle = m_thumbnails->peek(m_currentThumbPath, m_currentThumbTargetPx);
+  if (handle.id != 0) {
+    m_currentThumb->setExternalTexture(renderer, handle);
+    m_currentThumb->setVisible(true);
+    if (m_currentThumbPlaceholder != nullptr) {
+      m_currentThumbPlaceholder->setVisible(false);
+    }
+  } else {
+    m_currentThumb->clear(renderer);
+    m_currentThumb->setVisible(false);
+    if (m_currentThumbPlaceholder != nullptr) {
+      m_currentThumbPlaceholder->setGlyph("hourglass-empty");
+      m_currentThumbPlaceholder->setVisible(true);
+    }
+  }
+  layoutCurrentThumb(renderer);
 }
 
 std::string WallpaperPicker::selectedWallpaperPath() const {
@@ -1773,11 +2151,10 @@ std::size_t WallpaperPicker::segmentForPaletteSource(PaletteSource source) const
 }
 
 WallpaperFavorite WallpaperPicker::activeThemeSettings() const {
-  // A selected favorite wallpaper's saved preset is the source of truth; otherwise the live global theme is.
   WallpaperFavorite theme =
       (m_config != nullptr) ? wallpaperFavoriteFromTheme(m_config->config().theme) : WallpaperFavorite{};
   if (m_config != nullptr) {
-    if (const std::string path = selectedWallpaperPath(); !path.empty()) {
+    if (const std::string path = themeFavoritePath(); !path.empty()) {
       if (const WallpaperFavorite* favorite = m_config->wallpaperFavorite(path); favorite != nullptr) {
         theme = *favorite;
       }
@@ -1790,23 +2167,16 @@ void WallpaperPicker::applyThemeFromControls() {
   if (m_config == nullptr) {
     return;
   }
-  const WallpaperFavorite theme = themeFromControls();
-  const std::string path = selectedWallpaperPath();
-
-  if (!path.empty() && m_config->isWallpaperFavorite(path)) {
-    // Edit the selected wallpaper's favorite preset and apply it live (also re-asserts the wallpaper).
-    m_config->setWallpaperFavoriteThemeMode(path, theme.themeMode);
-    m_config->setWallpaperFavoritePaletteSource(path, theme.paletteSource);
-    m_config->setWallpaperFavoritePaletteSelection(path, paletteSelectionValue(theme));
-    applyWallpaperPath(path, &theme);
+  const std::string path = themeFavoritePath();
+  if (path.empty() || !m_config->isWallpaperFavorite(path)) {
     return;
   }
 
-  // No favorite target, so behave like Control Center settings and change the global theme only.
-  m_config->setThemeMode(theme.themeMode);
-  if (theme.paletteSource.has_value()) {
-    (void)m_config->setThemeColorScheme(*theme.paletteSource, paletteSelectionValue(theme));
-  }
+  const WallpaperFavorite theme = themeFromControls();
+  m_config->setWallpaperFavoriteThemeMode(path, theme.themeMode);
+  m_config->setWallpaperFavoritePaletteSource(path, theme.paletteSource);
+  m_config->setWallpaperFavoritePaletteSelection(path, paletteSelectionValue(theme));
+  applyWallpaperPath(path, &theme);
 }
 
 void WallpaperPicker::syncThemeControls() {
@@ -1847,6 +2217,11 @@ void WallpaperPicker::refreshVisibleEntries() {
     syncLoadingState();
     return;
   }
+  if (m_browseSource == BrowseSource::Daily) {
+    bindDailyGrid();
+    syncLoadingState();
+    return;
+  }
   if (m_browseSource == BrowseSource::Video) {
     refreshVideoEntries();
     syncLoadingState();
@@ -1876,8 +2251,9 @@ void WallpaperPicker::onScanComplete() {
 void WallpaperPicker::syncLoadingState() {
   const bool videoStatusVisible = m_videoStatusBox != nullptr && m_videoStatusBox->visible();
   const bool loading = m_browseSource == BrowseSource::Wallhaven ? m_wallhavenLoading
-      : m_browseSource == BrowseSource::Library                    ? m_scanPending
-                                                                  : false;
+      : m_browseSource == BrowseSource::Daily                    ? m_dailyLoading
+      : m_browseSource == BrowseSource::Library                  ? m_scanPending
+                                                                : false;
   if (m_loadingBox != nullptr) {
     m_loadingBox->setVisible(loading);
   }
@@ -1896,6 +2272,10 @@ void WallpaperPicker::syncLoadingState() {
 void WallpaperPicker::applyFilter() {
   if (m_browseSource == BrowseSource::Wallhaven) {
     bindWallhavenGrid();
+    return;
+  }
+  if (m_browseSource == BrowseSource::Daily) {
+    bindDailyGrid();
     return;
   }
   if (m_browseSource == BrowseSource::Video) {
@@ -2061,6 +2441,12 @@ void WallpaperPicker::activateSelectedEntry() {
         applyWallhavenItem(item.id);
         return;
       }
+    }
+    return;
+  }
+  if (m_browseSource == BrowseSource::Daily) {
+    if (const auto* item = dailyItemByThumbPath(entry.absPath); item != nullptr) {
+      applyDailyItem(item->id);
     }
     return;
   }
@@ -2478,6 +2864,15 @@ void WallpaperPicker::setBrowseSource(BrowseSource source, bool fetchIfNeeded) {
     } else {
       bindWallhavenGrid();
     }
+  } else if (source == BrowseSource::Daily) {
+    if (m_filterInput != nullptr) {
+      m_filterInput->setValue(m_filterQuery);
+    }
+    if (fetchIfNeeded) {
+      fetchDaily(m_dailyItems.empty());
+    } else {
+      bindDailyGrid();
+    }
   } else {
     m_filterDebounceTimer.stop();
     if (m_filterInput != nullptr) {
@@ -2497,15 +2892,18 @@ void WallpaperPicker::syncSourceChrome() {
   const bool library = m_browseSource == BrowseSource::Library;
   const bool wallhaven = m_browseSource == BrowseSource::Wallhaven;
   const bool video = m_browseSource == BrowseSource::Video;
+  const bool daily = m_browseSource == BrowseSource::Daily;
   if (m_title != nullptr) {
     const char* titleKey = wallhaven ? "wallpaper.panel.wallhaven.title"
         : video                      ? "wallpaper.panel.video.title"
+        : daily                      ? "wallpaper.panel.daily.title"
                                      : "wallpaper.panel.title";
     m_title->setText(i18n::tr(titleKey));
   }
   if (m_filterInput != nullptr) {
     const char* placeholderKey = wallhaven ? "wallpaper.panel.wallhaven.search-placeholder"
         : video                               ? "wallpaper.panel.video.filter-placeholder"
+        : daily                               ? "wallpaper.panel.daily.filter-placeholder"
                                               : "wallpaper.panel.filter-placeholder";
     m_filterInput->setPlaceholder(i18n::tr(placeholderKey));
   }
@@ -2514,16 +2912,21 @@ void WallpaperPicker::syncSourceChrome() {
   setShown(m_colorButton, library);
   setShown(m_sortButton, library);
   setShown(m_fileButton, !video);
-  setShown(m_favoritesOptionsColumn, library);
   setShown(m_videoClearButton, video);
   setShown(m_wallhavenFilters, wallhaven);
   setShown(m_wallhavenPager, wallhaven);
+  setShown(m_dailyFilters, daily);
+  if (m_dailyProviderSegmented != nullptr) {
+    m_dailyProviderSegmented->setSelectedIndex(dailyProvider() == WallpaperDailyProvider::Nasa ? 1 : 0);
+  }
   if (m_adapter != nullptr) {
     m_adapter->setStarsEnabled(library);
   }
   syncVideoStatus();
+  syncDailyChrome();
   syncWallhavenFilters();
   syncWallhavenPager();
+  syncCurrentStrip();
 }
 
 std::size_t WallpaperPicker::browseSourceIndex(BrowseSource source) {
@@ -2532,6 +2935,8 @@ std::size_t WallpaperPicker::browseSourceIndex(BrowseSource source) {
     return 1;
   case BrowseSource::Video:
     return 2;
+  case BrowseSource::Daily:
+    return 3;
   case BrowseSource::Library:
     return 0;
   }
@@ -2545,6 +2950,9 @@ WallpaperPicker::BrowseSource WallpaperPicker::browseSourceFromIndex(std::size_t
   if (index == 2) {
     return BrowseSource::Video;
   }
+  if (index == 3) {
+    return BrowseSource::Daily;
+  }
   return BrowseSource::Library;
 }
 
@@ -2554,6 +2962,8 @@ std::string_view WallpaperPicker::browseSourceStateValue(BrowseSource source) {
     return "wallhaven";
   case BrowseSource::Video:
     return "video";
+  case BrowseSource::Daily:
+    return "daily";
   case BrowseSource::Library:
     return "library";
   }
@@ -2566,6 +2976,9 @@ WallpaperPicker::BrowseSource WallpaperPicker::browseSourceFromState(std::string
   }
   if (value == "video" || value == "mpvpaper") {
     return BrowseSource::Video;
+  }
+  if (value == "daily" || value == "bing" || value == "nasa") {
+    return BrowseSource::Daily;
   }
   return BrowseSource::Library;
 }
@@ -2606,6 +3019,9 @@ void WallpaperPicker::clearVideoWallpaper() {
 
 void WallpaperPicker::syncVideoStatus() {
   if (m_videoStatusBox == nullptr) {
+    return;
+  }
+  if (m_browseSource == BrowseSource::Daily) {
     return;
   }
   if (m_browseSource != BrowseSource::Video) {
@@ -2961,6 +3377,304 @@ std::filesystem::path WallpaperPicker::wallhavenDownloadDirectory() const {
 const wallpaper::wallhaven::Item* WallpaperPicker::wallhavenItemById(std::string_view id) const {
   for (const auto& item : m_wallhavenItems) {
     if (item.id == id) {
+      return &item;
+    }
+  }
+  return nullptr;
+}
+
+void WallpaperPicker::syncDailyChrome() {
+  if (m_videoStatusBox == nullptr) {
+    return;
+  }
+  if (m_browseSource != BrowseSource::Daily) {
+    if (m_browseSource != BrowseSource::Video) {
+      m_videoStatusBox->setVisible(false);
+    }
+    return;
+  }
+
+  std::string status;
+  if (m_config != nullptr && m_config->config().shell.offlineMode) {
+    status = i18n::tr("wallpaper.panel.daily.offline");
+  } else if (m_dailyApplying) {
+    status = i18n::tr("wallpaper.panel.daily.applying");
+  } else if (!m_dailyError.empty()) {
+    status = m_dailyError;
+  } else if (m_dailyItems.empty() && !m_dailyLoading) {
+    status = i18n::tr("wallpaper.panel.daily.empty");
+  }
+
+  const bool showStatus = !status.empty() && !m_dailyLoading;
+  m_videoStatusBox->setVisible(showStatus);
+  if (m_videoStatusLabel != nullptr && showStatus) {
+    m_videoStatusLabel->setText(status);
+  }
+}
+
+void WallpaperPicker::bindDailyGrid() {
+  m_visibleEntries.clear();
+  m_pinnedFavoriteCount = 0;
+  const std::string needle = StringUtils::toLower(m_filterQuery);
+  m_visibleEntries.reserve(m_dailyItems.size());
+  for (const auto& item : m_dailyItems) {
+    const std::string title = item.title.empty() ? item.date : item.title;
+    if (!needle.empty()
+        && !StringUtils::toLower(title).contains(needle)
+        && !StringUtils::toLower(item.copyright).contains(needle)
+        && !StringUtils::toLower(item.date).contains(needle)) {
+      continue;
+    }
+    WallpaperEntry entry;
+    entry.name = title;
+    entry.absPath = wallpaper::daily::thumbCachePath(item.id);
+    entry.isDir = false;
+    m_visibleEntries.push_back(std::move(entry));
+  }
+  if (m_selectedVisibleIndex >= m_visibleEntries.size()) {
+    m_selectedVisibleIndex = kNoVisibleSelection;
+  }
+  rebindGrid();
+  syncDailyChrome();
+}
+
+void WallpaperPicker::fetchDaily(bool force) {
+  if (!force && !m_dailyItems.empty()) {
+    bindDailyGrid();
+    syncLoadingState();
+    m_dirty = true;
+    PanelManager::instance().refresh();
+    return;
+  }
+
+  if (m_config != nullptr && m_config->config().shell.offlineMode) {
+    m_dailyLoading = false;
+    m_dailyError = i18n::tr("wallpaper.panel.daily.offline");
+    m_dailyItems.clear();
+    bindDailyGrid();
+    syncLoadingState();
+    m_dirty = true;
+    PanelManager::instance().refresh();
+    return;
+  }
+  if (m_http == nullptr) {
+    m_dailyError = i18n::tr("wallpaper.panel.daily.error");
+    m_dailyItems.clear();
+    bindDailyGrid();
+    return;
+  }
+
+  m_dailyLoading = true;
+  m_dailyError.clear();
+  const std::uint64_t generation = ++m_dailySearchGeneration;
+  syncDailyChrome();
+  syncLoadingState();
+  m_dirty = true;
+  PanelManager::instance().refresh();
+
+  const WallpaperDailyProvider provider = dailyProvider();
+  const std::string today = wallpaper::daily::localTodayDate();
+  HttpRequest req;
+  req.followRedirects = true;
+  req.headers.emplace_back("Accept: application/json");
+  if (provider == WallpaperDailyProvider::Nasa) {
+    const std::string start = wallpaper::daily::addDaysToDate(today, -wallpaper::daily::kNasaLookbackDays);
+    req.url = wallpaper::daily::buildNasaApodUrl(dailyNasaApiKey(), start, today);
+  } else {
+    req.url = wallpaper::daily::buildBingArchiveUrl(dailyBingMarket());
+  }
+
+  m_http->request(std::move(req), [this, generation](HttpResponse response) {
+    if (generation != m_dailySearchGeneration || m_rootLayout == nullptr) {
+      return;
+    }
+    m_dailyLoading = false;
+    if (!response.transportOk || response.status < 200 || response.status >= 300) {
+      m_dailyError = i18n::tr("wallpaper.panel.daily.error");
+      m_dailyItems.clear();
+      bindDailyGrid();
+      syncLoadingState();
+      m_dirty = true;
+      PanelManager::instance().refresh();
+      return;
+    }
+
+    auto parsed = dailyProvider() == WallpaperDailyProvider::Nasa
+        ? wallpaper::daily::parseNasaApodBody(response.body)
+        : wallpaper::daily::parseBingArchiveBody(response.body);
+    if (!parsed.error.empty()) {
+      m_dailyError = i18n::tr("wallpaper.panel.daily.error");
+      m_dailyItems.clear();
+      bindDailyGrid();
+      syncLoadingState();
+      m_dirty = true;
+      PanelManager::instance().refresh();
+      return;
+    }
+
+    m_dailyItems = wallpaper::daily::limitGridItems(std::move(parsed.items));
+    m_dailyError.clear();
+    bindDailyGrid();
+    syncLoadingState();
+    queueDailyThumbs();
+    m_dirty = true;
+    PanelManager::instance().refresh();
+  });
+}
+
+void WallpaperPicker::queueDailyThumbs() {
+  m_dailyThumbQueue.clear();
+  std::error_code ec;
+  const auto cacheDir = wallpaper::daily::thumbCacheDir();
+  if (!cacheDir.empty()) {
+    std::filesystem::create_directories(cacheDir, ec);
+  }
+  for (const auto& item : m_dailyItems) {
+    const auto dest = wallpaper::daily::thumbCachePath(item.id);
+    if (dest.empty() || item.thumbUrl.empty()) {
+      continue;
+    }
+    if (std::filesystem::is_regular_file(dest, ec)) {
+      continue;
+    }
+    m_dailyThumbQueue.push_back(item.id);
+  }
+  pumpDailyThumbs();
+}
+
+void WallpaperPicker::pumpDailyThumbs() {
+  constexpr int kMaxConcurrent = 6;
+  while (m_dailyThumbActive < kMaxConcurrent && !m_dailyThumbQueue.empty() && m_http != nullptr) {
+    const std::string id = std::move(m_dailyThumbQueue.front());
+    m_dailyThumbQueue.erase(m_dailyThumbQueue.begin());
+    const auto* item = dailyItemById(id);
+    if (item == nullptr || item->thumbUrl.empty()) {
+      continue;
+    }
+    const auto dest = wallpaper::daily::thumbCachePath(id);
+    if (dest.empty()) {
+      continue;
+    }
+    ++m_dailyThumbActive;
+    m_http->download(item->thumbUrl, dest, [this, id](bool ok) {
+      --m_dailyThumbActive;
+      if (ok && m_rootLayout != nullptr && m_browseSource == BrowseSource::Daily) {
+        rebindGrid();
+        m_dirty = true;
+        PanelManager::instance().requestUpdateOnly();
+      }
+      pumpDailyThumbs();
+    });
+  }
+}
+
+void WallpaperPicker::applyDailyItem(std::string_view id) {
+  if (m_dailyApplying || m_http == nullptr) {
+    return;
+  }
+  const auto* item = dailyItemById(id);
+  if (item == nullptr || wallpaper::daily::downloadUrls(*item).empty()) {
+    notify::error("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
+    return;
+  }
+
+  m_dailyApplying = true;
+  m_dailySelectedId = std::string(id);
+  const std::uint64_t generation = ++m_dailyApplyGeneration;
+  syncDailyChrome();
+  m_dirty = true;
+  PanelManager::instance().refresh();
+
+  const auto destDir = dailyDownloadDirectory();
+  std::error_code ec;
+  std::filesystem::create_directories(destDir, ec);
+  if (ec) {
+    m_dailyApplying = false;
+    syncDailyChrome();
+    notify::error("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
+    PanelManager::instance().refresh();
+    return;
+  }
+
+  const auto dest = wallpaper::daily::downloadPath(destDir, *item);
+  if (std::filesystem::is_regular_file(dest, ec)) {
+    m_dailyApplying = false;
+    applyWallpaperPath(dest.string(), favoriteThemeToApply(dest.string()));
+    syncDailyChrome();
+    notify::info("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
+    kLog.info("applied daily wallpaper {}", dest.string());
+    PanelManager::instance().refresh();
+    return;
+  }
+
+  auto urls = wallpaper::daily::downloadUrls(*item);
+  m_http->download(std::move(urls), dest, [this, generation, dest](bool ok) {
+    if (generation != m_dailyApplyGeneration) {
+      return;
+    }
+    m_dailyApplying = false;
+    if (!ok) {
+      syncDailyChrome();
+      notify::error(
+          "Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed")
+      );
+      PanelManager::instance().refresh();
+      return;
+    }
+    applyWallpaperPath(dest.string(), favoriteThemeToApply(dest.string()));
+    syncDailyChrome();
+    notify::info("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
+    kLog.info("applied daily wallpaper {}", dest.string());
+    PanelManager::instance().refresh();
+  });
+}
+
+void WallpaperPicker::persistDailyProvider(WallpaperDailyProvider provider) {
+  if (m_config == nullptr) {
+    return;
+  }
+  if (m_config->config().wallpaper.daily.provider == provider) {
+    return;
+  }
+  const std::string_view key = enumToKey(kWallpaperDailyProviders, provider);
+  (void)m_config->setOverride({"wallpaper", "daily", "provider"}, std::string(key));
+}
+
+WallpaperDailyProvider WallpaperPicker::dailyProvider() const {
+  if (m_config == nullptr) {
+    return WallpaperDailyProvider::Bing;
+  }
+  return m_config->config().wallpaper.daily.provider;
+}
+
+std::string WallpaperPicker::dailyNasaApiKey() const {
+  const char* env = std::getenv("NASA_API_KEY");
+  const std::string configured = m_config == nullptr ? std::string{} : m_config->config().wallpaper.daily.nasaApiKey;
+  return wallpaper::daily::resolveNasaApiKey(configured, env == nullptr ? "" : env);
+}
+
+std::string WallpaperPicker::dailyBingMarket() const {
+  if (m_config == nullptr) {
+    return wallpaper::daily::resolveBingMarket({});
+  }
+  return wallpaper::daily::resolveBingMarket(m_config->config().wallpaper.daily.bingMarket);
+}
+
+std::filesystem::path WallpaperPicker::dailyDownloadDirectory() const {
+  std::string configured;
+  if (m_config != nullptr) {
+    configured = m_config->config().wallpaper.daily.downloadDir;
+  }
+  return wallpaper::daily::resolveDownloadDir(configured, rootDirectoryForSelection().string());
+}
+
+const wallpaper::daily::Item* WallpaperPicker::dailyItemById(std::string_view id) const {
+  return wallpaper::daily::itemById(m_dailyItems, id);
+}
+
+const wallpaper::daily::Item* WallpaperPicker::dailyItemByThumbPath(const std::filesystem::path& path) const {
+  for (const auto& item : m_dailyItems) {
+    if (wallpaper::daily::thumbCachePath(item.id) == path) {
       return &item;
     }
   }

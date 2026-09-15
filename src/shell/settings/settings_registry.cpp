@@ -951,6 +951,39 @@ namespace settings {
         "wallhaven download folder path"
     ));
     entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "daily", tr("settings.schema.wallpaper.daily-provider.label"),
+        tr("settings.schema.wallpaper.daily-provider.description"), {"wallpaper", "daily", "provider"},
+        asSegmented(enumSelect(kWallpaperDailyProviders, cfg.wallpaper.daily.provider)),
+        "bing nasa apod daily wallpaper"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "daily", tr("settings.schema.wallpaper.daily-bing-market.label"),
+        tr("settings.schema.wallpaper.daily-bing-market.description"), {"wallpaper", "daily", "bing_market"},
+        TextSetting{
+            .value = cfg.wallpaper.daily.bingMarket,
+            .placeholder = tr("settings.schema.wallpaper.daily-bing-market.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "bing market locale region"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "daily", tr("settings.schema.wallpaper.daily-nasa-api-key.label"),
+        tr("settings.schema.wallpaper.daily-nasa-api-key.description"), {"wallpaper", "daily", "nasa_api_key"},
+        TextSetting{.value = cfg.wallpaper.daily.nasaApiKey, .placeholder = "", .browseFileExtensions = {}},
+        "nasa apod api key demo"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Wallpaper, "daily", tr("settings.schema.wallpaper.daily-download-dir.label"),
+        tr("settings.schema.wallpaper.daily-download-dir.description"), {"wallpaper", "daily", "download_dir"},
+        TextSetting{
+            .value = cfg.wallpaper.daily.downloadDir,
+            .placeholder = tr("settings.schema.wallpaper.daily-download-dir.placeholder"),
+            .browseMode = TextSettingBrowseMode::SelectFolder,
+            .browseFileExtensions = {}
+        },
+        "daily wallpaper download folder path bing nasa"
+    ));
+    entries.push_back(makeEntry(
         SettingsSection::Wallpaper, "video", tr("settings.schema.wallpaper.video-directory.label"),
         tr("settings.schema.wallpaper.video-directory.description"), {"wallpaper", "video", "directory"},
         TextSetting{
@@ -1100,28 +1133,45 @@ namespace settings {
         ToggleSetting{cfg.wallpaper.automation.enabled}, "rotate slideshow"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-interval.label"),
-        tr("settings.schema.wallpaper.automation-interval.description"),
-        {"wallpaper", "automation", "interval_seconds"},
-        StepperSetting{
-            .value = cfg.wallpaper.automation.intervalSeconds,
-            .minValue = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.min.value()),
-            .maxValue = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.max.value()),
-            .step = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.step.value()),
-            .valueSuffix = "s",
-        },
-        "rotate slideshow"
+        SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-source.label"),
+        tr("settings.schema.wallpaper.automation-source.description"), {"wallpaper", "automation", "source"},
+        asSegmented(enumSelect(kWallpaperAutomationSources, cfg.wallpaper.automation.source)),
+        "folder daily bing nasa rotate"
     ));
-    entries.push_back(makeEntry(
-        SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-order.label"),
-        tr("settings.schema.wallpaper.automation-order.description"), {"wallpaper", "automation", "order"},
-        asSegmented(enumSelect(kWallpaperAutomationOrders, cfg.wallpaper.automation.order)), "rotate slideshow"
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-recursive.label"),
-        tr("settings.schema.wallpaper.automation-recursive.description"), {"wallpaper", "automation", "recursive"},
-        ToggleSetting{cfg.wallpaper.automation.recursive}, "subdirectories", true
-    ));
+    {
+      const auto folderAutomationOn = SettingVisibility{
+          [](const Config& c) { return c.wallpaper.automation.source == WallpaperAutomationConfig::Source::Folder; }
+      };
+      auto interval = makeEntry(
+          SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-interval.label"),
+          tr("settings.schema.wallpaper.automation-interval.description"),
+          {"wallpaper", "automation", "interval_seconds"},
+          StepperSetting{
+              .value = cfg.wallpaper.automation.intervalSeconds,
+              .minValue = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.min.value()),
+              .maxValue = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.max.value()),
+              .step = static_cast<int>(noctalia::config::schema::kWallpaperAutomationIntervalRange.step.value()),
+              .valueSuffix = "s",
+          },
+          "rotate slideshow"
+      );
+      interval.visibleWhen = folderAutomationOn;
+      entries.push_back(std::move(interval));
+      auto order = makeEntry(
+          SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-order.label"),
+          tr("settings.schema.wallpaper.automation-order.description"), {"wallpaper", "automation", "order"},
+          asSegmented(enumSelect(kWallpaperAutomationOrders, cfg.wallpaper.automation.order)), "rotate slideshow"
+      );
+      order.visibleWhen = folderAutomationOn;
+      entries.push_back(std::move(order));
+      auto recursive = makeEntry(
+          SettingsSection::Wallpaper, "automation", tr("settings.schema.wallpaper.automation-recursive.label"),
+          tr("settings.schema.wallpaper.automation-recursive.description"), {"wallpaper", "automation", "recursive"},
+          ToggleSetting{cfg.wallpaper.automation.recursive}, "subdirectories", true
+      );
+      recursive.visibleWhen = folderAutomationOn;
+      entries.push_back(std::move(recursive));
+    }
 
     // Templates
     const auto builtInTemplatesOn =

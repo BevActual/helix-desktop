@@ -60,7 +60,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 |---------|-----|---------------|
 | `home` | Home | User card, media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
 | `appearance` | Appearance | Theme mode, shell mode, Auto schedule status, palette source and picker, current-palette swatches, font, UI scale, and roundness. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. When Noctalia Greeter is installed, Sync Now and Auto-Sync copy wallpaper, colors, and monitors to the login screen. Header gear opens language, icon tint, high contrast, motion, borders, and shadows. |
-| `wallpaper` | Wallpaper | Library, Wallhaven, Video, and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, and Wallhaven API settings. |
+| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, and Daily source settings. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
 | `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides. Widget add and inspector sheets stay in Control Center. |
 | `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
@@ -116,9 +116,9 @@ Set `show_session_button = false` under `[control_center]` to hide the Power but
 
 ## Wallpaper
 
-The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source, and a folder button to choose any image. Select a monitor (or **ALL**), then click a tile to apply it. Favorites, fill color, and theme-from-wallpaper controls stay on the picker. Video runs `mpvpaper` directly; `mpvpaper` must be installed.
+The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source, a Daily Bing/NASA source, and a folder button to choose any image. Select a monitor (or **ALL**), then click a tile to apply it. The Current strip shows the applied wallpaper, with star and lock-screen actions. Theme-from-wallpaper controls appear when that wallpaper is starred. Video runs `mpvpaper` directly; `mpvpaper` must be installed.
 
-Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, and the Wallhaven API key. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`.
+Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, the Wallhaven API key, and Daily source. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`. `noctalia msg panel-toggle wallpaper daily` (or `bing` / `nasa`) opens Daily on that panel; `noctalia msg panel-toggle control-center wallpaper daily` does the same in Control Center.
 
 ## Templates
 

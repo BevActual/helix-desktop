@@ -20,6 +20,8 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  void applyOpenContext(std::string_view context);
+  [[nodiscard]] WallpaperPicker::BrowseSource browseSource() const noexcept;
 
 private:
   void onPanelCardOpacityChanged(float opacity) override;

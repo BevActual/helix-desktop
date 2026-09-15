@@ -33,6 +33,7 @@ path = "/home/user/Wallpapers/default.png"
 enabled                      = false
 interval_seconds             = 1800
 order                        = "random" # random | alphabetical
+source                       = "folder" # folder | daily
 recursive                    = true     # scan subdirectories when selecting random wallpapers
 
 # Per-monitor overrides - same match rules as bar monitor overrides
@@ -63,17 +64,17 @@ An empty global `wallpaper.directory` resolves to the standard XDG Pictures dire
 The wallpaper picker lives on Control Center's **Wallpaper** tab (`noctalia msg panel-toggle control-center wallpaper`)
 and in the dedicated wallpaper panel (`noctalia msg panel-toggle wallpaper`). Both list images from the resolved
 browse folder as a grid of thumbnails and highlight the wallpaper currently applied to the selected monitor. Use
-the folder button to open a file picker and choose any image, even outside that folder. Use the **Library / Wallhaven / Video** control to switch between local files, [Wallhaven](https://wallhaven.cc), and video wallpapers. In the **ALL** monitor
+the folder button to open a file picker and choose any image, even outside that folder. Use the **Library / Wallhaven / Video / Daily** control to switch between local files, [Wallhaven](https://wallhaven.cc), video wallpapers, and today's Bing or NASA picture. A **Current** strip under the toolbar shows the wallpaper applied to the selected monitor (or the default path in the **ALL** view), with star and lock-screen actions. In the **ALL** monitor
 view, the highlight follows the default wallpaper path. Theme-aware directories (`directory_light` /
 `directory_dark`) are used when the shell is in Light or Dark mode; **Auto** mode falls back to `directory`.
 Missing per-mode paths fall back to `directory`.
 
 Header gear on the Control Center tab (or `noctalia msg settings-toggle wallpaper`) opens fill mode, directories,
-automation, and Wallhaven API settings.
+automation, Wallhaven API, and Daily source settings.
 
 When `per_monitor_directories` is **true**, each connected monitor can define its own `directory` / `directory_light` / `directory_dark` under `[wallpaper.monitor.<name>]`. The picker and automatic rotation resolve the folder per-monitor, so selecting a monitor in the panel toolbar switches to that monitor's override (falling back to the global folder if unset). When **false**, all monitors share the global directories regardless of which monitor is selected in the panel.
 
-Selecting a monitor in the panel toolbar switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers.
+Selecting a monitor in the panel toolbar switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers. The lock button on the Current strip writes `[lockscreen].wallpaper` to that same path; press it again to clear the custom lock image and follow the desktop wallpaper per output. Desktop capture still takes priority when `[lockscreen].blurred_desktop` is on.
 
 ## Wallhaven
 
@@ -90,6 +91,36 @@ noctalia msg panel-toggle wallpaper wallhaven
 ```
 
 Requires network access (`[shell].offline_mode` must be off). NSFW results require an API key. An existing `[plugin_settings."noctalia/wallhaven"]` API key or download directory is still read if the built-in keys are empty.
+
+## Daily
+
+The wallpaper picker can fetch recent stills from [Bing's daily homepage](https://www.bing.com) or [NASA Astronomy Picture of the Day](https://apod.nasa.gov). Switch the picker to **Daily**, or:
+
+```sh
+noctalia msg panel-toggle wallpaper daily
+noctalia msg panel-toggle wallpaper bing
+noctalia msg panel-toggle wallpaper nasa
+```
+
+```toml
+[wallpaper.daily]
+provider     = "bing"     # bing | nasa
+# nasa_api_key = ""       # optional; else $NASA_API_KEY, else NASA DEMO_KEY
+# download_dir = ""       # empty uses the resolved wallpaper directory
+# bing_market  = ""       # empty uses en-US
+```
+
+The grid shows about eight recent images. Clicking a tile downloads it (Bing tries UHD, then the standard file) into your wallpaper folder and applies it to the selected monitor(s). NASA days that are videos are skipped. Requires network access (`[shell].offline_mode` must be off). NASA's public `DEMO_KEY` is rate-limited; set `nasa_api_key` or `NASA_API_KEY` if requests start failing.
+
+To apply today's picture automatically at shell startup and once per local calendar day, set automation `source = "daily"` (interval, order, and recursive apply only to folder rotation):
+
+```toml
+[wallpaper.automation]
+enabled = true
+source  = "daily"
+```
+
+`wallpaper-next`, `wallpaper-previous`, and `wallpaper-random` still walk the local wallpaper folder.
 
 ## Video
 
@@ -122,9 +153,10 @@ Monitor overrides may also set `fill_color`.
 
 By default, the first wallpaper on each output appears immediately with no transition. Set `transition_on_startup = true` to fade (or wipe, etc.) in from a black screen at shell startup, matching v4 behavior. Later wallpaper changes always use the configured transition pool.
 
-When automation is enabled, Noctalia picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
+When automation is enabled and `source = "folder"` (the default), Noctalia picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
 `order = "random"` chooses a random image each cycle.
 `order = "alphabetical"` sorts paths case-insensitively and advances to the next image each cycle (wrapping at the end).
+When `source = "daily"`, automation applies today's Bing or NASA still instead (see [Daily](#daily)); the interval is ignored.
 
 ## Favorites
 
@@ -148,7 +180,7 @@ palette_source = "builtin"
 builtin_palette = "Noctalia"
 ```
 
-The **Theme** and **Colors** row is always available under the toolbar. When no favorited image is selected, those controls persist a live global theme override, the same as changing theme mode or palette source in Settings. When the selected image is already a favorite, adjusting the controls also saves the favorite preset and re-applies that wallpaper with the updated settings.
+The **Theme** and **Colors** row appears under the Current strip only while the applied wallpaper is starred. Changing those controls updates that favorite's theme preset and re-applies the wallpaper. Theme mode and palette for non-favorites stay on Appearance.
 
 Starring an image wallpaper bookmarks the path only, except when that image is the wallpaper currently applied to the selected monitor: the favorite is saved with the active `theme_mode`, `palette_source`, and palette selection so re-applying it restores the look you already have. Declarative `color:#RRGGBB` favorites use the same stored theme fields when present. Clicking a favorite applies the wallpaper together with its stored theme settings.
 

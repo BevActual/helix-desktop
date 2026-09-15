@@ -48,6 +48,7 @@ public:
   // (not persisted) — it clears on restart and is re-asserted by the owner.
   void setOutputExternallyManaged(const std::string& connector, bool managed);
   void setVideoWallpaperService(class VideoWallpaperService* service) noexcept { m_videoWallpaper = service; }
+  void setDailyWallpaperService(class DailyWallpaperService* service) noexcept { m_dailyWallpaper = service; }
   [[nodiscard]] std::vector<WallpaperChange> onStateChange();
   void onSecondTick();
   void onGpuResourcesInvalidated();
@@ -138,4 +139,5 @@ private:
   std::vector<std::unique_ptr<WallpaperInstance>> m_instances;
   std::unordered_set<std::string> m_externallyManagedOutputs;
   class VideoWallpaperService* m_videoWallpaper = nullptr;
+  class DailyWallpaperService* m_dailyWallpaper = nullptr;
 };

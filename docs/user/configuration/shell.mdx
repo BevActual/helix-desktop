@@ -401,7 +401,7 @@ When the lock screen is enabled, **`lock_before_suspend`** (default `true`) lock
 
 When enabled and `wlr-screencopy` is available, Noctalia can capture the desktop **before** the session lock engages and use that snapshot as the lock screen background instead of the wallpaper. Desktop capture is disabled by default.
 
-Configure under **`[lockscreen]`** in TOML, or use **Settings → Security → Lock Screen**. The **Desktop capture** toggle appears only when your compositor supports screencopy. Use **Wallpaper** to pick a custom lock screen image (empty uses the desktop wallpaper per output).
+Configure under **`[lockscreen]`** in TOML, or use **Settings → Security → Lock Screen**. The **Desktop capture** toggle appears only when your compositor supports screencopy. Use **Wallpaper** to pick a custom lock screen image (empty uses the desktop wallpaper per output). The wallpaper picker lock button writes the same `[lockscreen].wallpaper` key.
 
 ```toml
 [lockscreen]

@@ -13,6 +13,7 @@
 #include "render/core/render_styles.h"
 #include "render/core/shared_texture_cache.h"
 #include "render/render_context.h"
+#include "shell/wallpaper/daily_wallpaper_service.h"
 #include "shell/wallpaper/video_wallpaper_service.h"
 #include "shell/wallpaper/wallpaper_geometry.h"
 #include "shell/wallpaper/wallpaper_instance.h"
@@ -912,6 +913,15 @@ void Wallpaper::applyStartupAutomation(std::int64_t secondStamp) {
     return;
   }
 
+  if (automation.source == WallpaperAutomationConfig::Source::Daily) {
+    if (m_dailyWallpaper != nullptr) {
+      m_dailyWallpaper->ensureTodayApplied();
+    }
+    m_lastAutomationSecondStamp = secondStamp;
+    m_lastAutomationSwitchSecond = secondStamp;
+    return;
+  }
+
   const auto& outputs = m_wayland->outputs();
   const ThemeMode mode = directoryThemeMode();
   bool attempted = false;
@@ -1008,6 +1018,13 @@ void Wallpaper::runAutomation(std::int64_t secondStamp) {
   const auto& wallpaper = m_config->config().wallpaper;
   const auto& automation = wallpaper.automation;
   if (!automation.enabled || m_instances.empty() || !automationAllowed()) {
+    return;
+  }
+
+  if (automation.source == WallpaperAutomationConfig::Source::Daily) {
+    if (m_dailyWallpaper != nullptr) {
+      m_dailyWallpaper->ensureTodayApplied();
+    }
     return;
   }
 

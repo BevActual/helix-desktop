@@ -59,6 +59,7 @@
 #include "shell/switcher/window_switcher.h"
 #include "shell/tray/tray_menu.h"
 #include "shell/wallpaper/panel/wallpaper_scanner.h"
+#include "shell/wallpaper/daily_wallpaper_service.h"
 #include "shell/wallpaper/video_wallpaper_service.h"
 #include "shell/wallpaper/wallpaper.h"
 #include "system/battery_warning_monitor.h"
@@ -359,6 +360,7 @@ private:
   TrayMenu m_trayMenu;
   Wallpaper m_wallpaper;
   VideoWallpaperService m_videoWallpaper{m_configService, m_wallpaper, m_wayland};
+  DailyWallpaperService m_dailyWallpaper{m_configService, m_httpClient, m_wallpaper};
   Backdrop m_backdrop;
   Signal<> m_settingsInvalidated;
   ControlCenterPanel* m_controlCenter = nullptr;
