@@ -344,14 +344,14 @@ namespace settings {
 
     if (actions.saveWallpaperPaletteAsCustom && cfg.theme.source == PaletteSource::Wallpaper) {
       auto it = insertAfter(registry, [](const SettingEntry& e) {
-        return e.section == SettingsSection::Appearance
+        return e.section == SettingsSection::Theme
             && e.group == "theme"
             && e.path == std::vector<std::string>{"theme", "wallpaper_scheme"};
       });
       registry.insert(
           it,
           SettingEntry{
-              .section = SettingsSection::Appearance,
+              .section = SettingsSection::Theme,
               .group = "theme",
               .title = i18n::tr("settings.schema.appearance.export-wallpaper-palette.label"),
               .subtitle = i18n::tr("settings.schema.appearance.export-wallpaper-palette.description"),

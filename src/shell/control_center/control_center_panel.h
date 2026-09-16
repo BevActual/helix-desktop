@@ -68,7 +68,7 @@ public:
   void queueBarWidget(std::string barName, std::string widgetName);
   void invalidatePluginSource(const std::string& sourceName);
 
-  enum class TabGroup : std::uint8_t { Home, Look, Status, Setup };
+  enum class TabGroup : std::uint8_t { Home, Appearance, Layout, Status, Services, Behavior, Advanced };
 
 private:
   void onPanelCardOpacityChanged(float opacity) override;
@@ -110,8 +110,6 @@ private:
   void syncTabVisibility();
   void addSidebarTabButton(class RovingListNavHost& nav, TabSlot& slot, float scale);
   void addSidebarGroupHeader(class RovingListNavHost& nav, TabGroup group, float scale);
-  void toggleSetupCollapsed();
-  void syncSetupToggle();
   void syncPackagesBadge();
   void applySettingsSearch(std::string value);
   void syncActiveTabSearch();
@@ -119,7 +117,6 @@ private:
   [[nodiscard]] bool isTabSearchActive() const;
   [[nodiscard]] std::string bestTabSearchId() const;
   [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
-  [[nodiscard]] bool groupHasEligibleTab(TabGroup group) const;
   [[nodiscard]] bool isTabFeatureAvailable(std::string_view id) const;
   [[nodiscard]] bool isTabVisible(std::string_view id) const;
   [[nodiscard]] bool isTabShown(std::string_view id) const;
@@ -142,10 +139,12 @@ private:
   ScrollViewState m_sidebarScrollState{};
   RovingListNavHost* m_sidebarNav = nullptr;
   InputArea* m_sidebarScrollArea = nullptr;
-  Node* m_lookHeader = nullptr;
+  Node* m_appearanceHeader = nullptr;
+  Node* m_layoutHeader = nullptr;
   Node* m_statusHeader = nullptr;
-  Node* m_setupHeader = nullptr;
-  Button* m_setupToggle = nullptr;
+  Node* m_servicesHeader = nullptr;
+  Node* m_behaviorHeader = nullptr;
+  Node* m_advancedHeader = nullptr;
   Input* m_searchInput = nullptr;
   std::string m_searchQuery;
   Flex* m_content = nullptr;
@@ -169,7 +168,6 @@ private:
   int m_tabTransitionDirection = 1;
   bool m_tabTransitionActive = false;
   bool m_firstOpenAfterCreate = false;
-  bool m_setupCollapsed = true;
   bool m_modalAttached = false;
   settings::SettingsModalHost m_modalHost;
   std::unique_ptr<settings::HostedEditors> m_hostedEditors;

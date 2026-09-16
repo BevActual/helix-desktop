@@ -157,6 +157,10 @@ builtin = "Noctalia"                # Ayu | Catppuccin | Dracula | Eldritch | Gr
 pure_black_dark = false             # anchor dark surfaces to true black (OLED); applies to
                                     # every palette source, not just wallpaper-generated ones
 
+[theme.niri_layout]                 # sync niri's own window focus-ring/border to this palette
+focus_ring = false                  # writes niri's managed noctalia-layout.kdl include; requires niri
+border     = false
+
 [theme.templates]
 enable_builtin_templates            = true
 builtin_ids                = []     # opt-in; list ids with: noctalia theme --list-templates

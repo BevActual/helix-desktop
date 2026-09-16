@@ -81,6 +81,7 @@
 #include "shell/wallpaper/wallpaper_paths.h"
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
+#include "system/camera_service.h"
 #include "system/display_config_service.h"
 #include "system/distro_info.h"
 #include "system/easyeffects_service.h"
@@ -504,6 +505,7 @@ void Application::initServices() {
   initAuxServicesAndHooks();
   initSystemBusServices();
   initBrightnessAndPipewire();
+  initCamera();
   initSessionBusServices();
 }
 
@@ -1518,6 +1520,8 @@ void Application::initBrightnessAndPipewire() {
     }
   });
 }
+
+void Application::initCamera() { m_cameraService = std::make_unique<CameraService>(); }
 
 void Application::initSessionBusServices() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };

@@ -115,6 +115,8 @@ class BluetoothAgent;
 class BluetoothService;
 class BrightnessPollSource;
 class BrightnessService;
+class CameraPollSource;
+class CameraService;
 class DisplayConfigService;
 class KeyboardBacklightService;
 class DebugService;
@@ -176,6 +178,7 @@ private:
   void initAuxServicesAndHooks();
   void initSystemBusServices();
   void initBrightnessAndPipewire();
+  void initCamera();
   void initSessionBusServices();
   void initUi();
   // Sub-phases of initUi(), called in order.
@@ -310,6 +313,7 @@ private:
   std::optional<bool> m_prevBluetoothPoweredForEvents;
   std::optional<std::string> m_prevPowerProfileActiveForEvents;
   std::unique_ptr<BrightnessService> m_brightnessService;
+  std::unique_ptr<CameraService> m_cameraService;
   std::unique_ptr<DisplayConfigService> m_displayConfigService;
   std::unique_ptr<KeyboardBacklightService> m_keyboardBacklightService;
   std::unique_ptr<TrayService> m_trayService;
@@ -391,6 +395,7 @@ private:
   KeyboardLayoutPollSource m_keyboardLayoutPollSource{m_compositorPlatform};
   LockKeysPollSource m_lockKeysPollSource{m_lockKeysService};
   std::unique_ptr<BrightnessPollSource> m_brightnessPollSource;
+  std::unique_ptr<CameraPollSource> m_cameraPollSource;
   std::unique_ptr<PipeWirePollSource> m_pipewirePollSource;
   std::unique_ptr<PipeWireSpectrumPollSource> m_pipewireSpectrumPollSource;
   std::unique_ptr<PolkitPollSource> m_polkitPollSource;

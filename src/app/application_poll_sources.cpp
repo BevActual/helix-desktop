@@ -9,6 +9,7 @@
 #include "pipewire/pipewire_spectrum_poll_source.h"
 #include "pipewire/wireplumber_mixer.h"
 #include "system/brightness_poll_source.h"
+#include "system/camera_poll_source.h"
 
 std::vector<PollSource*> Application::currentPollSources() {
   std::vector<PollSource*> sources;
@@ -54,6 +55,9 @@ std::vector<PollSource*> Application::currentPollSources() {
   }
   if (m_brightnessPollSource != nullptr) {
     sources.push_back(m_brightnessPollSource.get());
+  }
+  if (m_cameraPollSource != nullptr) {
+    sources.push_back(m_cameraPollSource.get());
   }
   sources.push_back(&m_fileWatchPollSource);
   sources.push_back(&m_ipcPollSource);
@@ -111,6 +115,13 @@ std::vector<PollSource*> Application::buildPollSources() {
     }
   } else {
     m_brightnessPollSource.reset();
+  }
+  if (m_cameraService != nullptr) {
+    if (m_cameraPollSource == nullptr) {
+      m_cameraPollSource = std::make_unique<CameraPollSource>(*m_cameraService);
+    }
+  } else {
+    m_cameraPollSource.reset();
   }
   return currentPollSources();
 }

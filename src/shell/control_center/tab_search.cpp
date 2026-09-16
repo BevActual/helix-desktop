@@ -15,7 +15,10 @@ namespace control_center {
     };
 
     constexpr AliasRow kAliases[] = {
-        {"appearance", "theme color palette colours colors look"},
+        {"theme", "appearance color palette colours colors look"},
+        {"type", "font typeface typography"},
+        {"scale", "size ui-scale zoom interface-scale"},
+        {"roundness", "corners rounded radius border-radius"},
         {"audio", "sound volume mic microphone speaker"},
         {"bluetooth", "bt"},
         {"calendar", "clock clocks timezone timezones world-clock date accounts caldav google ical ics vdir"},

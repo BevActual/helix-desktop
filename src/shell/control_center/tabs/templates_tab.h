@@ -57,6 +57,10 @@ private:
   void applyNow();
   void openTemplatesFolder();
   void persistSource();
+  void syncGtkFollow();
+  void enableGtkTemplates();
+  void applyGreeterAutoSync(bool enabled);
+  void syncGreeterCard();
   [[nodiscard]] bool sourceEnabled() const;
   [[nodiscard]] std::string catalogKey() const;
   [[nodiscard]] static Source sourceFromIndex(std::size_t index) noexcept;
@@ -64,6 +68,7 @@ private:
 
   ConfigService* m_config = nullptr;
   std::function<void()> m_applyTemplates;
+  std::function<void()> m_syncGreeter;
   noctalia::theme::TemplateApplyService* m_templateApply = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
@@ -78,6 +83,11 @@ private:
   Button* m_applyButton = nullptr;
   Button* m_folderButton = nullptr;
   Button* m_newButton = nullptr;
+  Label* m_gtkFollowHint = nullptr;
+  Button* m_gtkFollowButton = nullptr;
+  Flex* m_greeterCard = nullptr;
+  Toggle* m_greeterAutoSync = nullptr;
+  Button* m_greeterSyncButton = nullptr;
 
   Source m_sourceKind = Source::Builtin;
   bool m_syncing = false;

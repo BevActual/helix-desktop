@@ -12,6 +12,7 @@ class AiUsageService;
 class BluetoothAgent;
 class BluetoothService;
 class BrightnessService;
+class CameraService;
 class DisplayConfigService;
 class CalendarService;
 class ClipboardService;
@@ -78,6 +79,7 @@ struct ControlCenterServices {
   BluetoothService* bluetooth = nullptr;
   BluetoothAgent* bluetoothAgent = nullptr;
   BrightnessService* brightness = nullptr;
+  CameraService* camera = nullptr;
   DisplayConfigService* displayConfig = nullptr;
   SystemMonitorService* sysmon = nullptr;
   ScreenTimeService* screenTime = nullptr;

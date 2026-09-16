@@ -1,16 +1,14 @@
-#include "shell/control_center/tabs/appearance_tab.h"
+#include "shell/control_center/tabs/theme_tab.h"
 
+#include "compositors/niri/niri_layout_theme.h"
 #include "config/config_service.h"
-#include "config/schema/ranges.h"
 #include "core/process/process.h"
 #include "i18n/i18n.h"
+#include "notification/notifications.h"
 #include "render/core/color.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
-#include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/panel/panel_manager.h"
-#include "shell/settings/font_family_catalog.h"
-#include "theme/adw_gtk3.h"
 #include "theme/builtin_palettes.h"
 #include "theme/community_palettes.h"
 #include "theme/custom_palettes.h"
@@ -22,11 +20,11 @@
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/select.h"
 #include "ui/controls/segmented.h"
-#include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
@@ -236,18 +234,19 @@ namespace {
     return catalog;
   }
 
-  [[nodiscard]] std::string multiplierLabel(double value) { return std::format("{:.2f}×", value); }
+  [[nodiscard]] std::string colorHex(const Color& color) {
+    const auto channel = [](float v) { return static_cast<int>(std::clamp(v, 0.0F, 1.0F) * 255.0F); };
+    return std::format("#{:02x}{:02x}{:02x}", channel(color.r), channel(color.g), channel(color.b));
+  }
 
 } // namespace
 
-AppearanceTab::AppearanceTab(const ControlCenterServices& services)
+ThemeTab::ThemeTab(const ControlCenterServices& services)
     : m_config(services.config), m_theme(services.theme),
-      m_syncGreeter(services.settingsActions.syncGreeterAppearance),
-      m_applyTemplates(services.settingsActions.applyTemplates),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
-              .section = "appearance",
+              .section = "theme",
               .includedGroups = {"interface", "accessibility", "motion", "borders", "effects"},
           }
       )) {
@@ -256,7 +255,7 @@ AppearanceTab::AppearanceTab(const ControlCenterServices& services)
   }
 }
 
-std::unique_ptr<Flex> AppearanceTab::create() {
+std::unique_ptr<Flex> ThemeTab::create() {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const float controlHeight = Style::controlHeight * scale;
@@ -497,208 +496,59 @@ std::unique_ptr<Flex> AppearanceTab::create() {
       })
   );
   themeCard->addChild(std::move(pureBlackRow));
-  themeCard->addChild(
-      ui::label({
-          .out = &m_gtkFollowHint,
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
-  themeCard->addChild(
-      ui::button({
-          .out = &m_gtkFollowButton,
-          .text = i18n::tr("control-center.appearance.gtk-follow-enable"),
-          .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
-          .minHeight = controlHeight,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
-          .visible = false,
-          .participatesInLayout = false,
-          .onClick = [this]() { enableGtkTemplates(); },
-      })
-  );
   content->addChild(std::move(themeCard));
 
-  auto typeCard = ui::column({
+  auto niriCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*typeCard, i18n::tr("control-center.appearance.type"), scale);
-
-  addCaption(*typeCard, i18n::tr("settings.schema.appearance.font-family.label"));
-  typeCard->addChild(
-      ui::button({
-          .out = &m_fontButton,
-          .text = "sans-serif",
-          .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
-          .minHeight = controlHeight,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
-          .onClick = [this]() { openFontPicker(); },
-      })
-  );
-
-  auto scaleHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  scaleHeader->addChild(
+  addTitle(*niriCard, i18n::tr("control-center.theme.niri-title"), scale);
+  niriCard->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.appearance.ui-scale.label"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  scaleHeader->addChild(
-      ui::label({
-          .out = &m_uiScaleValue,
-          .text = multiplierLabel(1.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  typeCard->addChild(std::move(scaleHeader));
-  typeCard->addChild(
-      ui::slider({
-          .out = &m_uiScale,
-          .minValue = noctalia::config::schema::kScaleRange.min.value_or(0.5F),
-          .maxValue = noctalia::config::schema::kScaleRange.max.value_or(2.5F),
-          .step = noctalia::config::schema::kScaleRange.step.value_or(0.05F),
-          .value = 1.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_uiScaleValue != nullptr) {
-                  m_uiScaleValue->setText(multiplierLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitUiScale(); },
-      })
-  );
-
-  auto roundnessHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  roundnessHeader->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.corner-roundness.label"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  roundnessHeader->addChild(
-      ui::label({
-          .out = &m_roundnessValue,
-          .text = multiplierLabel(1.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  typeCard->addChild(std::move(roundnessHeader));
-  typeCard->addChild(
-      ui::slider({
-          .out = &m_roundness,
-          .minValue = noctalia::config::schema::kCornerRadiusScaleRange.min.value_or(0.0F),
-          .maxValue = noctalia::config::schema::kCornerRadiusScaleRange.max.value_or(2.0F),
-          .step = noctalia::config::schema::kCornerRadiusScaleRange.step.value_or(0.05F),
-          .value = 1.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_roundnessValue != nullptr) {
-                  m_roundnessValue->setText(multiplierLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitRoundness(); },
-      })
-  );
-  content->addChild(std::move(typeCard));
-
-  auto greeterCard = ui::column({
-      .out = &m_greeterCard,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = false,
-      .participatesInLayout = false,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*greeterCard, i18n::tr("settings.navigation.groups.greeter"), scale);
-  greeterCard->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.shell.sync-greeter.description"),
+          .text = i18n::tr("control-center.theme.niri-description"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 3,
       })
   );
-
-  auto greeterAutoRow = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  greeterAutoRow->addChild(
+  auto focusRingRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  focusRingRow->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.shell.greeter-sync-auto.label"),
+          .text = i18n::tr("control-center.theme.niri-focus-ring"),
           .fontSize = Style::fontSizeBody * scale,
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .flexGrow = 1.0F,
       })
   );
-  greeterAutoRow->addChild(
+  focusRingRow->addChild(
       ui::toggle({
-          .out = &m_greeterAutoSync,
+          .out = &m_niriFocusRing,
           .scale = scale,
-          .onChange = [this](bool enabled) { applyGreeterAutoSync(enabled); },
+          .onChange = [this](bool enabled) { applyNiriFocusRing(enabled); },
       })
   );
-  greeterCard->addChild(std::move(greeterAutoRow));
-  greeterCard->addChild(
-      ui::button({
-          .out = &m_greeterSyncButton,
-          .text = i18n::tr("settings.schema.shell.sync-greeter.button"),
-          .glyph = "refresh",
+  niriCard->addChild(std::move(focusRingRow));
+
+  auto borderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  borderRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.theme.niri-border"),
           .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
-          .minHeight = controlHeight,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
+          .color = colorSpecFromRole(ColorRole::OnSurface),
           .flexGrow = 1.0F,
-          .onClick =
-              [this]() {
-                if (m_syncGreeter) {
-                  m_syncGreeter();
-                }
-              },
       })
   );
-  content->addChild(std::move(greeterCard));
+  borderRow->addChild(
+      ui::toggle({
+          .out = &m_niriBorder,
+          .scale = scale,
+          .onChange = [this](bool enabled) { applyNiriBorder(enabled); },
+      })
+  );
+  niriCard->addChild(std::move(borderRow));
+  content->addChild(std::move(niriCard));
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
@@ -706,11 +556,11 @@ std::unique_ptr<Flex> AppearanceTab::create() {
   return wrapped;
 }
 
-std::unique_ptr<Flex> AppearanceTab::createHeaderActions() {
+std::unique_ptr<Flex> ThemeTab::createHeaderActions() {
   return m_settings->embedHeader(nullptr, contentScale());
 }
 
-void AppearanceTab::onClose() {
+void ThemeTab::onClose() {
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
@@ -726,32 +576,24 @@ void AppearanceTab::onClose() {
   m_exportButton = nullptr;
   m_exportStatus = nullptr;
   m_pureBlack = nullptr;
-  m_fontButton = nullptr;
-  m_uiScale = nullptr;
-  m_uiScaleValue = nullptr;
-  m_roundness = nullptr;
-  m_roundnessValue = nullptr;
-  m_greeterCard = nullptr;
-  m_greeterAutoSync = nullptr;
-  m_greeterSyncButton = nullptr;
-  m_gtkFollowHint = nullptr;
-  m_gtkFollowButton = nullptr;
+  m_niriFocusRing = nullptr;
+  m_niriBorder = nullptr;
 }
 
-void AppearanceTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+void ThemeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
 
-bool AppearanceTab::configureMode() const { return m_settings->configureMode(); }
+bool ThemeTab::configureMode() const { return m_settings->configureMode(); }
 
-void AppearanceTab::setSettingsSearchQuery(std::string_view query) {
+void ThemeTab::setSettingsSearchQuery(std::string_view query) {
   if (!query.empty()) {
     m_settings->setConfigureMode(true);
   }
   m_settings->setSearchQuery(std::string(query));
 }
 
-SettingsPane* AppearanceTab::settingsPane() { return m_settings.get(); }
+SettingsPane* ThemeTab::settingsPane() { return m_settings.get(); }
 
-void AppearanceTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
+void ThemeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
@@ -762,7 +604,7 @@ void AppearanceTab::doLayout(Renderer& renderer, float contentWidth, float bodyH
   m_rootLayout->layout(renderer);
 }
 
-void AppearanceTab::doUpdate(Renderer& renderer) {
+void ThemeTab::doUpdate(Renderer& renderer) {
   (void)renderer;
   if (m_settings != nullptr && m_settings->configureMode()) {
     return;
@@ -775,13 +617,12 @@ void AppearanceTab::doUpdate(Renderer& renderer) {
   }
 }
 
-void AppearanceTab::syncLiveControls() {
+void ThemeTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
   }
 
   const ThemeConfig& theme = m_config->config().theme;
-  const ShellConfig& shell = m_config->config().shell;
   m_syncing = true;
   if (m_themeMode != nullptr) {
     m_themeMode->setSelectedIndex(themeModeIndex(theme.mode));
@@ -803,37 +644,17 @@ void AppearanceTab::syncLiveControls() {
   if (m_pureBlack != nullptr) {
     m_pureBlack->setCheckedImmediate(theme.pureBlackDark);
   }
-  syncFontButton();
-  const float uiScale = m_config->config().accessibility.uiScale;
-  if (m_uiScale != nullptr) {
-    m_uiScale->setValue(uiScale);
+  if (m_niriFocusRing != nullptr) {
+    m_niriFocusRing->setCheckedImmediate(theme.niriLayout.focusRing);
   }
-  if (m_uiScaleValue != nullptr) {
-    m_uiScaleValue->setText(multiplierLabel(uiScale));
+  if (m_niriBorder != nullptr) {
+    m_niriBorder->setCheckedImmediate(theme.niriLayout.border);
   }
-  if (m_roundness != nullptr) {
-    m_roundness->setValue(shell.cornerRadiusScale);
-  }
-  if (m_roundnessValue != nullptr) {
-    m_roundnessValue->setText(multiplierLabel(shell.cornerRadiusScale));
-  }
-  syncGreeterCard();
-  syncGtkFollow();
   m_syncing = false;
+  syncNiriLayoutTheme();
 }
 
-void AppearanceTab::syncFontButton() {
-  if (m_fontButton == nullptr || m_config == nullptr) {
-    return;
-  }
-  const std::string& family = m_config->config().shell.fontFamily;
-  m_fontButton->setText(family.empty() ? "sans-serif" : family);
-  if (Label* label = m_fontButton->label(); label != nullptr) {
-    label->setFontFamily(family);
-  }
-}
-
-void AppearanceTab::updateAutoStatus() {
+void ThemeTab::updateAutoStatus() {
   if (m_autoStatus == nullptr || m_config == nullptr) {
     return;
   }
@@ -879,7 +700,7 @@ void AppearanceTab::updateAutoStatus() {
   setShown(m_autoStatus, true);
 }
 
-void AppearanceTab::rebuildPaletteSelect() {
+void ThemeTab::rebuildPaletteSelect() {
   if (m_config == nullptr) {
     return;
   }
@@ -945,7 +766,7 @@ void AppearanceTab::rebuildPaletteSelect() {
   m_paletteSelect->setSelectedIndexSilently(selectedIndex);
 }
 
-void AppearanceTab::applyThemeMode(std::size_t index) {
+void ThemeTab::applyThemeMode(std::size_t index) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
@@ -955,7 +776,7 @@ void AppearanceTab::applyThemeMode(std::size_t index) {
   PanelManager::instance().refresh();
 }
 
-void AppearanceTab::applyShellMode(std::size_t index) {
+void ThemeTab::applyShellMode(std::size_t index) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
@@ -967,7 +788,7 @@ void AppearanceTab::applyShellMode(std::size_t index) {
   PanelManager::instance().refresh();
 }
 
-void AppearanceTab::applyPaletteSource(std::size_t index) {
+void ThemeTab::applyPaletteSource(std::size_t index) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
@@ -983,7 +804,7 @@ void AppearanceTab::applyPaletteSource(std::size_t index) {
   PanelManager::instance().refresh();
 }
 
-void AppearanceTab::applyPaletteSelection(std::size_t index) {
+void ThemeTab::applyPaletteSelection(std::size_t index) {
   if (m_syncing || m_config == nullptr || index >= m_paletteValues.size()) {
     return;
   }
@@ -991,81 +812,54 @@ void AppearanceTab::applyPaletteSelection(std::size_t index) {
   PanelManager::instance().refresh();
 }
 
-void AppearanceTab::applyPureBlack(bool enabled) {
+void ThemeTab::applyPureBlack(bool enabled) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
   (void)m_config->setOverride({"theme", "pure_black_dark"}, enabled);
 }
 
-void AppearanceTab::applyGreeterAutoSync(bool enabled) {
+void ThemeTab::applyNiriFocusRing(bool enabled) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
-  (void)m_config->setOverride({"shell", "greeter_sync", "auto_sync"}, enabled);
-}
-
-void AppearanceTab::syncGreeterCard() {
-  const bool available =
-      m_config != nullptr && greeter::appearanceSyncAvailable(m_config->config().shell.greeterSync);
-  setShown(m_greeterCard, available);
-  if (!available || m_greeterAutoSync == nullptr) {
-    return;
-  }
-  m_greeterAutoSync->setCheckedImmediate(m_config->config().shell.greeterSync.autoSync);
-  if (m_greeterSyncButton != nullptr) {
-    m_greeterSyncButton->setEnabled(static_cast<bool>(m_syncGreeter));
+  (void)m_config->setOverride({"theme", "niri_layout", "focus_ring"}, enabled);
+  if (const auto result = syncNiriLayoutTheme(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
   }
 }
 
-void AppearanceTab::commitUiScale() {
-  if (m_syncing || m_config == nullptr || m_uiScale == nullptr) {
+void ThemeTab::applyNiriBorder(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
     return;
   }
-  (void)m_config->setOverride({"accessibility", "ui_scale"}, m_uiScale->value());
+  (void)m_config->setOverride({"theme", "niri_layout", "border"}, enabled);
+  if (const auto result = syncNiriLayoutTheme(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
 }
 
-void AppearanceTab::commitRoundness() {
-  if (m_syncing || m_config == nullptr || m_roundness == nullptr) {
-    return;
+compositors::niri::InstallResult ThemeTab::syncNiriLayoutTheme() {
+  if (m_config == nullptr) {
+    return {};
   }
-  (void)m_config->setOverride({"shell", "corner_radius_scale"}, m_roundness->value());
+  const auto& niriLayout = m_config->config().theme.niriLayout;
+  const compositors::niri::LayoutThemeSettings settings{
+      .focusRing = niriLayout.focusRing,
+      .border = niriLayout.border,
+      .activeColorHex = colorHex(colorForRole(ColorRole::Primary)),
+      .inactiveColorHex = colorHex(colorForRole(ColorRole::Outline)),
+  };
+  return compositors::niri::saveNiriLayoutTheme(settings);
 }
 
-void AppearanceTab::openFontPicker() {
-  if (m_config == nullptr || m_settings == nullptr) {
-    return;
-  }
-  const auto& families = settings::discoverFontFamilies();
-  if (families.empty()) {
-    return;
-  }
-  std::vector<settings::SelectOption> options;
-  options.reserve(families.size());
-  for (const auto& family : families) {
-    options.push_back(settings::SelectOption{.value = family, .label = family});
-  }
-  const std::string selected = m_config->config().shell.fontFamily;
-  m_settings->openSearchPicker(
-      settings::SearchPickerOpenRequest{
-          .title = i18n::tr("settings.schema.appearance.font-family.label"),
-          .options = std::move(options),
-          .selectedValue = selected,
-          .placeholder = "sans-serif",
-          .emptyText = i18n::tr("ui.controls.search-picker.empty"),
-          .settingPath = {"shell", "font_family"},
-          .onSelect =
-              [this](const std::string& value) {
-                if (m_config != nullptr) {
-                  (void)m_config->setOverride({"shell", "font_family"}, value);
-                }
-                syncFontButton();
-              },
-      }
-  );
-}
-
-void AppearanceTab::openPalettePicker() {
+void ThemeTab::openPalettePicker() {
   if (m_config == nullptr || m_settings == nullptr) {
     return;
   }
@@ -1119,7 +913,7 @@ void AppearanceTab::openPalettePicker() {
   );
 }
 
-void AppearanceTab::openCustomPalettesFolder() {
+void ThemeTab::openCustomPalettesFolder() {
   const std::filesystem::path dir = noctalia::theme::customPaletteDir();
   std::error_code ec;
   if (!std::filesystem::exists(dir, ec)) {
@@ -1136,7 +930,7 @@ void AppearanceTab::openCustomPalettesFolder() {
   (void)process::runAsync(std::vector<std::string>{"xdg-open", dir.string()});
 }
 
-void AppearanceTab::exportWallpaperPalette() {
+void ThemeTab::exportWallpaperPalette() {
   if (m_theme == nullptr) {
     return;
   }
@@ -1160,62 +954,14 @@ void AppearanceTab::exportWallpaperPalette() {
   PanelManager::instance().refresh();
 }
 
-void AppearanceTab::syncGtkFollow() {
-  if (m_config == nullptr) {
-    return;
-  }
-  const bool gtkOn = noctalia::theme::gtkTemplatesEnabled(m_config->config().theme.templates);
-  const bool themePresent = noctalia::theme::adwGtk3ThemePresent();
-  if (!gtkOn) {
-    if (m_gtkFollowHint != nullptr) {
-      m_gtkFollowHint->setText(i18n::tr("control-center.appearance.gtk-follow-off"));
-    }
-    setShown(m_gtkFollowHint, true);
-    setShown(m_gtkFollowButton, true);
-    return;
-  }
-  setShown(m_gtkFollowButton, false);
-  if (!themePresent) {
-    if (m_gtkFollowHint != nullptr) {
-      m_gtkFollowHint->setText(i18n::tr("control-center.appearance.gtk-follow-missing-theme"));
-    }
-    setShown(m_gtkFollowHint, true);
-    return;
-  }
-  setShown(m_gtkFollowHint, false);
-}
-
-void AppearanceTab::enableGtkTemplates() {
-  if (m_config == nullptr) {
-    return;
-  }
-  const auto& current = m_config->config().theme.templates;
-  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides;
-  if (!current.enableBuiltinTemplates) {
-    overrides.push_back({{"theme", "templates", "enable_builtin_templates"}, true});
-  }
-  auto ids = current.builtinIds;
-  const bool idsChanged = noctalia::theme::appendGtkTemplateIds(ids);
-  if (idsChanged) {
-    overrides.push_back({{"theme", "templates", "builtin_ids"}, std::move(ids)});
-  }
-  if (!overrides.empty()) {
-    (void)m_config->setOverrides(std::move(overrides));
-  }
-  if (m_applyTemplates) {
-    m_applyTemplates();
-  }
-  syncGtkFollow();
-}
-
-PaletteSource AppearanceTab::selectedPaletteSource() const {
+PaletteSource ThemeTab::selectedPaletteSource() const {
   if (m_paletteSource == nullptr) {
     return m_config != nullptr ? m_config->config().theme.source : PaletteSource::Builtin;
   }
   return paletteSourceFromIndex(m_paletteSource->selectedIndex());
 }
 
-std::string AppearanceTab::paletteValueForSource(PaletteSource source) const {
+std::string ThemeTab::paletteValueForSource(PaletteSource source) const {
   if (m_config == nullptr) {
     return {};
   }

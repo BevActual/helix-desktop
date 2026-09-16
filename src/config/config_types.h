@@ -1661,6 +1661,15 @@ struct ThemeConfig {
     bool operator==(const TemplatesConfig&) const = default;
   };
 
+  // Whether niri's own window decorations (focus ring / border) follow this palette. Applied by
+  // writing niri's managed `noctalia-layout.kdl` include; see compositors::niri::saveNiriLayoutTheme.
+  struct NiriLayoutThemeConfig {
+    bool focusRing = false;
+    bool border = false;
+
+    bool operator==(const NiriLayoutThemeConfig&) const = default;
+  };
+
   PaletteSource source = PaletteSource::Builtin;
   std::string builtinPalette = "Noctalia";
   std::string communityPalette = "Oxocarbon";
@@ -1669,6 +1678,7 @@ struct ThemeConfig {
   ThemeMode mode = ThemeMode::Dark;
   ShellThemeMode shellMode = ShellThemeMode::Follow;
   bool pureBlackDark = false;
+  NiriLayoutThemeConfig niriLayout;
   TemplatesConfig templates;
 
   bool operator==(const ThemeConfig&) const = default;

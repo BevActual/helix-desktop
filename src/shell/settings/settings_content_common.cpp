@@ -314,7 +314,7 @@ namespace settings {
 
   bool settingsSectionNeedsOfflineModeNotice(SettingsSection section) {
     switch (section) {
-    case SettingsSection::Appearance:
+    case SettingsSection::Theme:
     case SettingsSection::Templates:
     case SettingsSection::Launcher:
     case SettingsSection::Security:
@@ -342,6 +342,10 @@ namespace settings {
     case SettingsSection::Niri:
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
+    case SettingsSection::Camera:
+    case SettingsSection::Type:
+    case SettingsSection::Scale:
+    case SettingsSection::Roundness:
       return false;
     }
     return false;
@@ -349,7 +353,7 @@ namespace settings {
 
   std::string offlineModeNoticeMessage(SettingsSection section) {
     switch (section) {
-    case SettingsSection::Appearance:
+    case SettingsSection::Theme:
       return i18n::tr("settings.window.offline-mode-notice.appearance");
     case SettingsSection::Templates:
       return i18n::tr("settings.window.offline-mode-notice.templates");
@@ -382,6 +386,10 @@ namespace settings {
     case SettingsSection::Niri:
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
+    case SettingsSection::Camera:
+    case SettingsSection::Type:
+    case SettingsSection::Scale:
+    case SettingsSection::Roundness:
       return {};
     }
     return {};

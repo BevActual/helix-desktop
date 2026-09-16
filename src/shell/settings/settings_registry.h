@@ -24,7 +24,10 @@
 namespace settings {
 
   enum class SettingsSection : std::uint8_t {
-    Appearance,
+    Theme,
+    Type,
+    Scale,
+    Roundness,
     Wallpaper,
     Templates,
     Desktop,
@@ -51,6 +54,7 @@ namespace settings {
     Niri,
     Bar,
     Plugins,
+    Camera,
   };
 
   struct SettingsSectionDescriptor {
@@ -297,7 +301,7 @@ namespace settings {
   using SettingVisibility = std::function<bool(const Config&)>;
 
   struct SettingEntry {
-    SettingsSection section = SettingsSection::Appearance;
+    SettingsSection section = SettingsSection::Theme;
     std::string group;
     std::string title;
     std::string subtitle;

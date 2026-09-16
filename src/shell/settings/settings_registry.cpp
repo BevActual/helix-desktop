@@ -86,8 +86,11 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 27> kSettingsSections{{
-        {SettingsSection::Appearance, "appearance", "adjustments-horizontal"},
+    constexpr std::array<SettingsSectionDescriptor, 31> kSettingsSections{{
+        {SettingsSection::Theme, "theme", "palette"},
+        {SettingsSection::Type, "type", "typography"},
+        {SettingsSection::Scale, "scale", "resize"},
+        {SettingsSection::Roundness, "roundness", "border-radius"},
         {SettingsSection::Wallpaper, "wallpaper", "paint"},
         {SettingsSection::Templates, "templates", "color-swatch"},
         {SettingsSection::Desktop, "desktop", "layout-board"},
@@ -114,6 +117,7 @@ namespace settings {
         {SettingsSection::Niri, "niri", "niri"},
         {SettingsSection::Bar, "bar", "crop-3-2", false},
         {SettingsSection::Plugins, "plugins", "puzzle", true, true},
+        {SettingsSection::Camera, "camera", "camera", true, true},
     }};
 
     const SettingsSectionDescriptor& descriptorFor(SettingsSection section) {
@@ -708,30 +712,30 @@ namespace settings {
 
     // Appearance
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.theme-mode.label"),
+        SettingsSection::Theme, "theme", tr("settings.schema.appearance.theme-mode.label"),
         tr("settings.schema.appearance.theme-mode.description"), {"theme", "mode"},
         asSegmented(enumSelect(kThemeModes, cfg.theme.mode)), "dark light auto colors"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.shell-theme-mode.label"),
+        SettingsSection::Theme, "theme", tr("settings.schema.appearance.shell-theme-mode.label"),
         tr("settings.schema.appearance.shell-theme-mode.description"), {"theme", "shell_mode"},
         asSegmented(enumSelect(kShellThemeModes, cfg.theme.shellMode)),
         "dark light auto follow shell apps templates colors"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.palette-source.label"),
+        SettingsSection::Theme, "theme", tr("settings.schema.appearance.palette-source.label"),
         tr("settings.schema.appearance.palette-source.description"), {"theme", "source"},
         asSegmented(enumSelect(kPaletteSources, cfg.theme.source)), "palette colors"
     ));
     if (cfg.theme.source == PaletteSource::Builtin) {
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.builtin-palette.label"),
+          SettingsSection::Theme, "theme", tr("settings.schema.appearance.builtin-palette.label"),
           tr("settings.schema.appearance.builtin-palette.description"), {"theme", "builtin"},
           builtinPaletteSelect(cfg.theme.builtinPalette, shellThemeMode(cfg.theme)), "builtin palette colors"
       ));
     } else if (cfg.theme.source == PaletteSource::Wallpaper) {
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.wallpaper-generation-scheme.label"),
+          SettingsSection::Theme, "theme", tr("settings.schema.appearance.wallpaper-generation-scheme.label"),
           tr("settings.schema.appearance.wallpaper-generation-scheme.description"), {"theme", "wallpaper_scheme"},
           wallpaperSchemeSelect(cfg.theme.wallpaperScheme), "wallpaper palette generator scheme material you m3 colors"
       ));
@@ -748,7 +752,7 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.community-palette.label"),
+          SettingsSection::Theme, "theme", tr("settings.schema.appearance.community-palette.label"),
           tr("settings.schema.appearance.community-palette.description"), {"theme", "community_palette"},
           std::move(communityPaletteControl), "community palette colors"
       ));
@@ -765,15 +769,25 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.custom-palette.label"),
+          SettingsSection::Theme, "theme", tr("settings.schema.appearance.custom-palette.label"),
           tr("settings.schema.appearance.custom-palette.description"), {"theme", "custom_palette"},
           std::move(customPaletteControl), "custom palette colors"
       ));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.pure-black-dark.label"),
+        SettingsSection::Theme, "theme", tr("settings.schema.appearance.pure-black-dark.label"),
         tr("settings.schema.appearance.pure-black-dark.description"), {"theme", "pure_black_dark"},
         ToggleSetting{cfg.theme.pureBlackDark}, "oled amoled true black background contrast"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Theme, "theme", tr("control-center.theme.niri-focus-ring"),
+        tr("control-center.theme.niri-description"), {"theme", "niri_layout", "focus_ring"},
+        ToggleSetting{cfg.theme.niriLayout.focusRing}, "niri window decoration highlight active"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Theme, "theme", tr("control-center.theme.niri-border"),
+        tr("control-center.theme.niri-description"), {"theme", "niri_layout", "border"},
+        ToggleSetting{cfg.theme.niriLayout.border}, "niri window decoration outline"
     ));
     {
       SettingControl fontFamilyControl =
@@ -788,29 +802,29 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Appearance, "theme", tr("settings.schema.appearance.font-family.label"),
+          SettingsSection::Type, "type", tr("settings.schema.appearance.font-family.label"),
           tr("settings.schema.appearance.font-family.description"), {"shell", "font_family"},
           std::move(fontFamilyControl), "typeface"
       ));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.corner-roundness.label"),
+        SettingsSection::Roundness, "roundness", tr("settings.schema.appearance.corner-roundness.label"),
         tr("settings.schema.appearance.corner-roundness.description"), {"shell", "corner_radius_scale"},
         sliderFor(cfg.shell.cornerRadiusScale, noctalia::config::schema::kCornerRadiusScaleRange, false),
         "rounded corners radius"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "theme", tr("settings.schema.appearance.ui-scale.label"),
+        SettingsSection::Scale, "scale", tr("settings.schema.appearance.ui-scale.label"),
         tr("settings.schema.appearance.ui-scale.description"), {"accessibility", "ui_scale"},
         sliderFor(cfg.accessibility.uiScale, noctalia::config::schema::kScaleRange, false), "size scale text panels"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "interface", tr("settings.schema.appearance.language.label"),
+        SettingsSection::Theme, "interface", tr("settings.schema.appearance.language.label"),
         tr("settings.schema.appearance.language.description"), {"shell", "lang"}, languageSelect(cfg.shell.lang),
         "locale translation", true
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "interface", tr("settings.schema.appearance.app-icon-colorize.label"),
+        SettingsSection::Theme, "interface", tr("settings.schema.appearance.app-icon-colorize.label"),
         tr("settings.schema.appearance.app-icon-colorize.description"), {"shell", "app_icon_colorize"},
         ToggleSetting{cfg.shell.appIconColorize}, "tint all application icons"
     ));
@@ -821,7 +835,7 @@ namespace settings {
       const ColorSpec pickerColor =
           cfg.shell.appIconColor.value_or(*effectiveShellAppIconColorizationTint(colorizeShell));
       auto e = makeEntry(
-          SettingsSection::Appearance, "interface", tr("settings.schema.appearance.app-icon-color.label"),
+          SettingsSection::Theme, "interface", tr("settings.schema.appearance.app-icon-color.label"),
           tr("settings.schema.appearance.app-icon-color.description"), {"shell", "app_icon_color"},
           colorSpecPicker(pickerColor), "color role dock tray application icons"
       );
@@ -829,52 +843,52 @@ namespace settings {
       entries.push_back(std::move(e));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "accessibility", tr("settings.schema.accessibility.high-contrast.label"),
+        SettingsSection::Theme, "accessibility", tr("settings.schema.accessibility.high-contrast.label"),
         tr("settings.schema.accessibility.high-contrast.description"), {"accessibility", "high_contrast"},
         ToggleSetting{cfg.accessibility.highContrast}, "accessibility high contrast visually impaired"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "motion", tr("settings.schema.appearance.animations.label"),
+        SettingsSection::Theme, "motion", tr("settings.schema.appearance.animations.label"),
         tr("settings.schema.appearance.animations.description"), {"shell", "animation", "enabled"},
         ToggleSetting{cfg.shell.animation.enabled}, "motion"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "motion", tr("settings.schema.appearance.animation-speed.label"),
+        SettingsSection::Theme, "motion", tr("settings.schema.appearance.animation-speed.label"),
         tr("settings.schema.appearance.animation-speed.description"), {"shell", "animation", "speed"},
         sliderFor(cfg.shell.animation.speed, noctalia::config::schema::kAnimationSpeedRange, false), "motion"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "borders", tr("settings.schema.appearance.button-borders.label"),
+        SettingsSection::Theme, "borders", tr("settings.schema.appearance.button-borders.label"),
         tr("settings.schema.appearance.button-borders.description"), {"shell", "button_borders"},
         ToggleSetting{cfg.shell.buttonBorders}, "button outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "borders", tr("settings.schema.appearance.input-borders.label"),
+        SettingsSection::Theme, "borders", tr("settings.schema.appearance.input-borders.label"),
         tr("settings.schema.appearance.input-borders.description"), {"shell", "input_borders"},
         ToggleSetting{cfg.shell.inputBorders}, "input text box field outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "borders", tr("settings.schema.appearance.popup-borders.label"),
+        SettingsSection::Theme, "borders", tr("settings.schema.appearance.popup-borders.label"),
         tr("settings.schema.appearance.popup-borders.description"), {"shell", "popup_borders"},
         ToggleSetting{cfg.shell.popupBorders}, "popup menu dropdown outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "borders", tr("settings.schema.appearance.card-borders.label"),
+        SettingsSection::Theme, "borders", tr("settings.schema.appearance.card-borders.label"),
         tr("settings.schema.appearance.card-borders.description"), {"shell", "card_borders"},
         ToggleSetting{cfg.shell.cardBorders}, "card section outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "effects", tr("settings.schema.shared.shadow-direction.label"),
+        SettingsSection::Theme, "effects", tr("settings.schema.shared.shadow-direction.label"),
         tr("settings.schema.appearance.global-shadow-direction.description"), {"shell", "shadow", "direction"},
         enumSelect(kShadowDirections, cfg.shell.shadow.direction), "shadow direction"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "effects", tr("settings.schema.shared.shadow-alpha.label"),
+        SettingsSection::Theme, "effects", tr("settings.schema.shared.shadow-alpha.label"),
         tr("settings.schema.appearance.global-shadow-alpha.description"), {"shell", "shadow", "alpha"},
         sliderFor(cfg.shell.shadow.alpha, noctalia::config::schema::kUnitRange, false), "shadow opacity", true
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Appearance, "effects", tr("settings.schema.appearance.popup-shadows.label"),
+        SettingsSection::Theme, "effects", tr("settings.schema.appearance.popup-shadows.label"),
         tr("settings.schema.appearance.popup-shadows.description"), {"shell", "popup_shadows"},
         ToggleSetting{cfg.shell.popupShadows}, "popup menu dropdown drop shadow depth"
     ));

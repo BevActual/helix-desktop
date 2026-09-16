@@ -64,7 +64,7 @@ namespace control_center {
 
   std::string tabIdForSettingsSection(std::string_view section) {
     if (section.empty()) {
-      return "appearance";
+      return "theme";
     }
     if (section == "location") {
       return "weather";

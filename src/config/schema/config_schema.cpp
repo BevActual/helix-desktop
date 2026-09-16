@@ -1318,6 +1318,14 @@ namespace noctalia::config::schema {
     }
   }
 
+  const Schema<ThemeConfig::NiriLayoutThemeConfig>& themeNiriLayoutSchema() {
+    static const Schema<ThemeConfig::NiriLayoutThemeConfig> s = {
+        field(&ThemeConfig::NiriLayoutThemeConfig::focusRing, "focus_ring"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::border, "border"),
+    };
+    return s;
+  }
+
   const Schema<ThemeConfig>& themeSchema() {
     static const Schema<ThemeConfig> s = {
         enumField(&ThemeConfig::source, "source", kPaletteSources),
@@ -1328,6 +1336,7 @@ namespace noctalia::config::schema {
         enumField(&ThemeConfig::mode, "mode", kThemeModes),
         enumField(&ThemeConfig::shellMode, "shell_mode", kShellThemeModes),
         field(&ThemeConfig::pureBlackDark, "pure_black_dark"),
+        subTable(&ThemeConfig::niriLayout, "niri_layout", themeNiriLayoutSchema()),
         subTable(&ThemeConfig::templates, "templates", templatesSchema()),
     };
     return s;

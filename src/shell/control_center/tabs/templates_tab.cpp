@@ -6,6 +6,7 @@
 #include "render/core/renderer.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/settings/settings_content.h"
@@ -238,6 +239,7 @@ std::size_t TemplatesTab::indexFromSource(Source source) noexcept {
 TemplatesTab::TemplatesTab(const ControlCenterServices& services)
     : m_config(services.config),
       m_applyTemplates(services.settingsActions.applyTemplates),
+      m_syncGreeter(services.settingsActions.syncGreeterAppearance),
       m_templateApply(services.templateApply),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "templates", .includedGroups = {"built-in", "community"}}
@@ -258,6 +260,8 @@ TemplatesTab::TemplatesTab(const ControlCenterServices& services)
 
 std::unique_ptr<Flex> TemplatesTab::create() {
   const float scale = contentScale();
+  const float captionSize = Style::fontSizeCaption * scale;
+  const float controlHeight = Style::controlHeight * scale;
 
   auto live = ui::column({
       .out = &m_rootLayout,
@@ -315,6 +319,95 @@ std::unique_ptr<Flex> TemplatesTab::create() {
           .participatesInLayout = false,
       })
   );
+
+  live->addChild(
+      ui::label({
+          .out = &m_gtkFollowHint,
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 4,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  live->addChild(
+      ui::button({
+          .out = &m_gtkFollowButton,
+          .text = i18n::tr("control-center.templates.gtk-follow-enable"),
+          .fontSize = Style::fontSizeBody * scale,
+          .contentAlign = ButtonContentAlign::Start,
+          .variant = ButtonVariant::Default,
+          .minHeight = controlHeight,
+          .paddingV = Style::spaceSm * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .flexGrow = 1.0F,
+          .visible = false,
+          .participatesInLayout = false,
+          .onClick = [this]() { enableGtkTemplates(); },
+      })
+  );
+
+  auto greeterCard = ui::column({
+      .out = &m_greeterCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+  });
+  addTitle(*greeterCard, i18n::tr("settings.navigation.groups.greeter"), scale);
+  greeterCard->addChild(
+      ui::label({
+          .text = i18n::tr("settings.schema.shell.sync-greeter.description"),
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
+      })
+  );
+  auto greeterAutoRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+  });
+  greeterAutoRow->addChild(
+      ui::label({
+          .text = i18n::tr("settings.schema.shell.greeter-sync-auto.label"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  greeterAutoRow->addChild(
+      ui::toggle({
+          .out = &m_greeterAutoSync,
+          .scale = scale,
+          .onChange = [this](bool enabled) { applyGreeterAutoSync(enabled); },
+      })
+  );
+  greeterCard->addChild(std::move(greeterAutoRow));
+  greeterCard->addChild(
+      ui::button({
+          .out = &m_greeterSyncButton,
+          .text = i18n::tr("settings.schema.shell.sync-greeter.button"),
+          .glyph = "refresh",
+          .fontSize = Style::fontSizeBody * scale,
+          .contentAlign = ButtonContentAlign::Start,
+          .variant = ButtonVariant::Default,
+          .minHeight = controlHeight,
+          .paddingV = Style::spaceSm * scale,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .flexGrow = 1.0F,
+          .onClick =
+              [this]() {
+                if (m_syncGreeter) {
+                  m_syncGreeter();
+                }
+              },
+      })
+  );
+  live->addChild(std::move(greeterCard));
 
   live->addChild(
       ui::column({
@@ -381,6 +474,11 @@ void TemplatesTab::onClose() {
   m_applyButton = nullptr;
   m_folderButton = nullptr;
   m_newButton = nullptr;
+  m_gtkFollowHint = nullptr;
+  m_gtkFollowButton = nullptr;
+  m_greeterCard = nullptr;
+  m_greeterAutoSync = nullptr;
+  m_greeterSyncButton = nullptr;
   m_storePopulated = false;
 }
 
@@ -505,6 +603,64 @@ void TemplatesTab::syncLiveControls() {
 
   if (sourceChanged || enableChanged || catalogChanged) {
     invalidateStore(true);
+  }
+
+  syncGtkFollow();
+  syncGreeterCard();
+}
+
+void TemplatesTab::syncGtkFollow() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const bool gtkOn = noctalia::theme::gtkTemplatesEnabled(m_config->config().theme.templates);
+  if (m_gtkFollowHint != nullptr) {
+    m_gtkFollowHint->setText(i18n::tr("control-center.templates.gtk-follow-off"));
+  }
+  setShown(m_gtkFollowHint, !gtkOn);
+  setShown(m_gtkFollowButton, !gtkOn);
+}
+
+void TemplatesTab::enableGtkTemplates() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto& current = m_config->config().theme.templates;
+  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides;
+  if (!current.enableBuiltinTemplates) {
+    overrides.push_back({{"theme", "templates", "enable_builtin_templates"}, true});
+  }
+  auto ids = current.builtinIds;
+  const bool idsChanged = noctalia::theme::appendGtkTemplateIds(ids);
+  if (idsChanged) {
+    overrides.push_back({{"theme", "templates", "builtin_ids"}, std::move(ids)});
+  }
+  if (!overrides.empty()) {
+    (void)m_config->setOverrides(std::move(overrides));
+  }
+  if (m_applyTemplates) {
+    m_applyTemplates();
+  }
+  syncGtkFollow();
+}
+
+void TemplatesTab::applyGreeterAutoSync(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"shell", "greeter_sync", "auto_sync"}, enabled);
+}
+
+void TemplatesTab::syncGreeterCard() {
+  const bool available =
+      m_config != nullptr && greeter::appearanceSyncAvailable(m_config->config().shell.greeterSync);
+  setShown(m_greeterCard, available);
+  if (!available || m_greeterAutoSync == nullptr) {
+    return;
+  }
+  m_greeterAutoSync->setCheckedImmediate(m_config->config().shell.greeterSync.autoSync);
+  if (m_greeterSyncButton != nullptr) {
+    m_greeterSyncButton->setEnabled(static_cast<bool>(m_syncGreeter));
   }
 }
 

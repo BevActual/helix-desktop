@@ -249,9 +249,6 @@
       "custom-empty": "No custom palettes in the palettes folder yet.",
       "error": "Error",
       "export-saved": "Saved as {name}",
-      "gtk-follow-enable": "Enable GTK templates",
-      "gtk-follow-missing-theme": "Install the adw-gtk3 theme (package adw-gtk3-theme) so GTK apps can follow this palette.",
-      "gtk-follow-off": "GTK apps still use the stock theme. Enable GTK 3 and GTK 4 templates so they follow this palette.",
       "open-folder-failed": "Could not open the palettes folder.",
       "open-palettes-folder": "Open palettes folder",
       "outline": "Outline",
@@ -427,6 +424,15 @@
       "saved": "Saved in noctalia-outputs.kdl",
       "layout-error": "Display layout"
     },
+    "bar": {
+      "auto-hide": "Auto-hide",
+      "enable": "Show bar",
+      "opacity": "Background opacity",
+      "position": "Position",
+      "reserve-space": "Reserve space",
+      "shadow": "Shadow",
+      "thickness": "Thickness"
+    },
     "dock": {
       "auto-hide": "Auto-hide",
       "enable": "Show dock",
@@ -449,11 +455,12 @@
       "search-placeholder": "Search pages and settings"
     },
     "sidebar": {
-      "look": "Look",
+      "appearance": "Appearance",
+      "layout": "Layout",
       "status": "Status",
-      "setup": "Setup",
-      "setup-hide": "Hide Setup",
-      "setup-show": "Show Setup"
+      "services": "Services",
+      "behavior": "Behavior",
+      "advanced": "Advanced"
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
@@ -581,6 +588,16 @@
       "share-wifi-enterprise": "Enterprise Wi-Fi cannot include a password in a QR code.",
       "throughput": "↓ {down}  •  ↑ {up}"
     },
+    "osd": {
+      "border": "Border",
+      "enable": "Show OSD popups",
+      "kinds-description": "Choose which system events show a pop-up.",
+      "kinds-title": "Popups",
+      "opacity": "Background opacity",
+      "orientation": "Orientation",
+      "position": "Position",
+      "scale": "Size"
+    },
     "notifications": {
       "clear-all": "Clear all notifications",
       "dnd-off": "Turn Do Not Disturb Off",
@@ -624,6 +641,12 @@
       "time-to-empty": "{time} remaining",
       "time-to-full": "{time} until full",
       "unknown-device": "Unknown device"
+    },
+    "roundness": {
+      "windows-description": "Round application window corners via niri (needs niri as your compositor). Managed entirely by this slider.",
+      "windows-save-failed": "Could not update niri's config",
+      "windows-save-title": "Window Corners",
+      "windows-title": "App Windows"
     },
     "screen-time": {
       "back": "Back",
@@ -766,6 +789,7 @@
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
+      "camera": "Camera",
       "clipboard": "Clipboard",
       "home": "Home",
       "media": "Media",
@@ -783,6 +807,21 @@
       "tailscale": "Tailscale",
       "localsend": "LocalSend",
       "weather": "Weather"
+    },
+    "camera": {
+      "empty": "No camera devices were found.",
+      "off": "Off",
+      "on": "On",
+      "preview-unavailable": "This camera does not support a live preview, but its controls are still adjustable.",
+      "reset": "Reset to defaults",
+      "sections": {
+        "details": "Details",
+        "exposure": "Exposure",
+        "field-of-view": "Field of View",
+        "focus": "Focus",
+        "other": "Other",
+        "white-balance": "White Balance"
+      }
     },
     "capture": {
       "screenshot": "Screenshot",
@@ -923,6 +962,14 @@
       "their-pin": "Their PIN, if required",
       "title": "LocalSend"
     },
+    "theme": {
+      "niri-border": "Themed border",
+      "niri-description": "Sync niri's own window focus-ring and border to this palette (primary for the focused window, outline color elsewhere). Requires niri.",
+      "niri-focus-ring": "Themed focus ring",
+      "niri-save-failed": "Could not update niri's config",
+      "niri-save-title": "Window Decorations",
+      "niri-title": "Niri Window Decorations"
+    },
     "templates": {
       "apply-tooltip": "Reapply enabled templates for the current palette",
       "create-failed": "Could not create that user template.",
@@ -933,6 +980,8 @@
       "edit-tooltip": "Edit output path and post-hook",
       "empty-user": "No user templates yet. Use + to create one from an installed app.",
       "enable": "Enable",
+      "gtk-follow-enable": "Enable GTK templates",
+      "gtk-follow-off": "GTK apps still use the stock theme. Enable GTK 3 and GTK 4 templates so they follow this palette.",
       "gtk-missing-theme": "GTK 3 and GTK 4 templates are on, but adw-gtk3 is not installed. Install package adw-gtk3-theme so GTK apps follow this palette.",
       "apply-failed": "Apply failed",
       "apply-failures": "{count} templates failed to apply. Turn unused ones off, or hover a tile for the error.",
@@ -1841,7 +1890,6 @@
       },
       "sections": {
         "accessibility": "Accessibility",
-        "appearance": "Appearance",
         "backdrop": "Backdrop",
         "bar": "Bar",
         "bluetooth": "Bluetooth",
@@ -1868,7 +1916,11 @@
         "system": "System",
         "tailscale": "Tailscale",
         "localsend": "LocalSend",
+        "roundness": "Roundness",
+        "scale": "Scale",
         "templates": "Templates",
+        "theme": "Theme",
+        "type": "Type",
         "wallpaper": "Wallpaper"
       }
     },

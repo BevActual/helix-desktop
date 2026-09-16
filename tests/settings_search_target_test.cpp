@@ -28,7 +28,7 @@ int main() {
 
   const std::vector<settings::SettingEntry> registry{
       entry(settings::SettingsSection::Wallpaper, "wallpaper fill mode folders"),
-      entry(settings::SettingsSection::Appearance, "appearance roundness font scale"),
+      entry(settings::SettingsSection::Theme, "appearance roundness font scale"),
       entry(settings::SettingsSection::Screenshot, "screenshot delay timer"),
       entry(settings::SettingsSection::ScreenRecord, "screen-record audio bitrate"),
       entry(settings::SettingsSection::Dock, "dock autohide pinned position"),
@@ -54,7 +54,7 @@ int main() {
       "wallpaper", true, wallpaperSections, registry, "roundness"
   );
   ok = expect(!roundOnWallpaper.stayOnCurrent, "roundness leaves wallpaper") && ok;
-  ok = expect(roundOnWallpaper.tabId == "appearance", "roundness jumps to appearance") && ok;
+  ok = expect(roundOnWallpaper.tabId == "theme", "roundness jumps to theme") && ok;
   ok = expect(roundOnWallpaper.configureMode, "roundness opens gear") && ok;
 
   const auto noneOnWallpaper = resolveSettingsSearchTarget(
@@ -95,7 +95,7 @@ int main() {
       "capture", true, captureSections, registry, "roundness"
   );
   ok = expect(!roundOnCapture.stayOnCurrent, "roundness leaves capture") && ok;
-  ok = expect(roundOnCapture.tabId == "appearance", "capture roundness -> appearance") && ok;
+  ok = expect(roundOnCapture.tabId == "theme", "capture roundness -> theme") && ok;
 
   const auto dockFromHome = resolveSettingsSearchTarget("home", true, std::vector<std::string>{"control-center"}, registry, "autohide");
   ok = expect(!dockFromHome.stayOnCurrent, "home autohide jumps") && ok;
