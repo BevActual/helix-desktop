@@ -3,6 +3,7 @@
 #include "config/config_types.h"
 #include "core/ui_phase.h"
 #include "render/scene/node.h"
+#include "ui/style.h"
 #include "wayland/layer_surface.h"
 
 #include <algorithm>
@@ -93,6 +94,9 @@ public:
   // slot: opening another panel leaves it on screen, and only an explicit toggle
   // or close dismisses it.
   [[nodiscard]] virtual bool isPersistent() const noexcept { return false; }
+  // Outer chrome radius. Control Center uses a larger concentric token; other
+  // panels keep the shared radiusXl used by bars and launcher.
+  [[nodiscard]] virtual float cornerRadius() const noexcept { return Style::scaledRadiusXl(m_contentScale); }
 
   [[nodiscard]] Node* root() const noexcept { return m_root ? m_root.get() : m_rootPtr; }
   [[nodiscard]] float contentScale() const noexcept { return m_contentScale; }

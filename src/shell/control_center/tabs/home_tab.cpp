@@ -67,8 +67,8 @@ namespace {
   constexpr std::size_t kHomeShortcutGridColumns = 2;
   // At or below this count the shortcuts stack in a single narrow column instead of the 2-column grid.
   constexpr std::size_t kHomeStackedShortcutMax = 2;
-  // Square tiles are trimmed slightly (height = width * trim) so the grid stays compact.
-  constexpr float kHomeShortcutSquareTrim = 0.82F;
+  // Modules stay close to square so they read as Apple-style Control Center tiles.
+  constexpr float kHomeShortcutSquareTrim = 0.90F;
   constexpr auto kHomeTransientPositionRegressionWindow = std::chrono::milliseconds(1500);
   constexpr std::int64_t kHomeTransientPositionRegressionFloorUs = 5'000'000;
   constexpr std::int64_t kHomeTransientPositionRegressionCeilingUs = 1'500'000;
@@ -166,9 +166,39 @@ namespace {
     card.setGap(Style::spaceSm * scale);
   }
 
+  Button::ButtonPalette homeGlassModulePalette() {
+    constexpr float kDisabledAlpha = 0.55F;
+    const auto state = [](ColorSpec bg, ColorSpec border, ColorSpec label) {
+      return Button::ButtonStateColors{.bg = bg, .border = border, .label = label};
+    };
+    return Button::ButtonPalette{
+        .borderWidth = 0.0F,
+        .normal = state(
+            colorSpecFromRole(ColorRole::SurfaceVariant), clearColorSpec(), colorSpecFromRole(ColorRole::OnSurface)
+        ),
+        .hover = state(colorSpecFromRole(ColorRole::Hover), clearColorSpec(), colorSpecFromRole(ColorRole::OnHover)),
+        .pressed = state(
+            colorSpecFromRole(ColorRole::Primary), clearColorSpec(), colorSpecFromRole(ColorRole::OnPrimary)
+        ),
+        .disabled = state(
+            colorSpecFromRole(ColorRole::SurfaceVariant, kDisabledAlpha), clearColorSpec(),
+            colorSpecFromRole(ColorRole::OnSurface, kDisabledAlpha)
+        ),
+        .selected = state(
+            colorSpecFromRole(ColorRole::Primary), colorSpecFromRole(ColorRole::Primary),
+            colorSpecFromRole(ColorRole::OnPrimary)
+        ),
+    };
+  }
+
   void applyShortcutButtonStyle(Button& button, bool enabled, bool active, float fillOpacity) {
     const bool on = enabled && active;
-    button.setVariant(on ? ButtonVariant::Primary : ButtonVariant::Default);
+    // Ghost then custom palette so toggling off after Primary does not keep a
+    // stale custom palette from the on-state (setVariant no-ops when unchanged).
+    button.setVariant(on ? ButtonVariant::Primary : ButtonVariant::Ghost);
+    if (!on) {
+      button.setCustomPalette(homeGlassModulePalette());
+    }
     button.setSurfaceOpacity(on ? 1.0F : fillOpacity);
     button.setEnabled(enabled);
   }
@@ -259,7 +289,7 @@ std::unique_ptr<Flex> HomeTab::create() {
   });
 
   {
-    const float wallpaperRadius = std::max(0.0F, Style::scaledRadiusXl(scale) - Style::borderWidth);
+    const float wallpaperRadius = std::max(0.0F, Style::scaledRadius2xl(scale) - Style::borderWidth);
     userCard->addChild(
         ui::image({
             .out = &m_wallpaperPlaceholder,
@@ -622,8 +652,8 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   auto grid = std::make_unique<GridView>();
   grid->setColumns(kHomeShortcutGridColumns);
-  grid->setColumnGap(Style::spaceMd * scale);
-  grid->setRowGap(Style::spaceMd * scale);
+  grid->setColumnGap(Style::spaceLg * scale);
+  grid->setRowGap(Style::spaceLg * scale);
   grid->setPadding(0.0F);
   grid->setUniformCellSize(true);
   grid->setStretchItems(true);
@@ -689,13 +719,13 @@ std::unique_ptr<Flex> HomeTab::create() {
     auto btn = ui::button({
         .text = showLabels ? std::optional<std::string>{label} : std::nullopt,
         .glyph = shortcut->displayIcon(),
-        .glyphSize = Style::fontSizeTitle * 1.35F * scale,
-        .contentAlign = showLabels ? ButtonContentAlign::Start : ButtonContentAlign::Center,
+        .glyphSize = Style::fontSizeHeader * 1.2F * scale,
+        .contentAlign = ButtonContentAlign::Center,
         .tooltip = label,
         .minHeight = 0.0F,
-        .padding = Style::spaceSm * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = Style::scaledRadiusXl(scale),
+        .padding = Style::spaceMd * scale,
+        .gap = Style::spaceSm * scale,
+        .radius = Style::scaledRadius2xl(scale),
         .onClick =
             [this, padIdx]() {
               if (padIdx < m_shortcutPads.size()) {
@@ -717,7 +747,7 @@ std::unique_ptr<Flex> HomeTab::create() {
                 // width and fights setMaxWidth.
                 button.setAlign(FlexAlign::Stretch);
                 if (button.label() != nullptr) {
-                  button.label()->setFontSize(Style::fontSizeMini * scale);
+                  button.label()->setFontSize(Style::fontSizeCaption * scale);
                   button.label()->setMaxLines(1);
                   button.label()->setTextAlign(TextAlign::Center);
                 }
@@ -896,7 +926,7 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
         const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
         const float cellWidth =
             (innerGrid - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols);
-        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceSm * scale);
+        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceMd * scale);
       }
       pad.label->setMaxWidth(inner);
     }
@@ -990,9 +1020,9 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
         continue;
       }
       if (showLabels) {
-        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35F * scale);
+        pad.glyph->setGlyphSize(Style::fontSizeHeader * 1.2F * scale);
       } else {
-        const float dynamicGlyphSize = std::clamp(cellSide * 0.28F, 22.0F * scale, 44.0F * scale);
+        const float dynamicGlyphSize = std::clamp(cellSide * 0.32F, 24.0F * scale, 48.0F * scale);
         pad.glyph->setGlyphSize(dynamicGlyphSize);
       }
     }
@@ -1199,7 +1229,7 @@ void HomeTab::layoutWallpaperBackground(Renderer& renderer) {
   const float bw = Style::borderWidth;
   const float cw = std::max(0.0F, m_userCard->width() - bw * 2.0F);
   const float ch = std::max(0.0F, m_userCard->height() - bw * 2.0F);
-  const float radius = std::max(0.0F, Style::scaledRadiusXl(contentScale()) - bw);
+  const float radius = std::max(0.0F, Style::scaledRadius2xl(contentScale()) - bw);
 
   const Color surface = colorForRole(ColorRole::Surface);
   const Color translucentSurface = rgba(surface.r, surface.g, surface.b, surface.a * 0.9F);
@@ -1236,7 +1266,7 @@ void HomeTab::syncUserCardFill() {
     m_userCard->clearFill();
     return;
   }
-  m_userCard->setFill(colorSpecFromRole(ColorRole::SurfaceVariant, panelCardOpacity()));
+  m_userCard->setFill(colorSpecFromRole(ColorRole::SurfaceVariant, sectionCardFillOpacity(panelCardOpacity())));
 }
 
 void HomeTab::syncWallpaperLayerVisibility() {
@@ -1374,9 +1404,7 @@ void HomeTab::cancelCrispFade() {
 }
 
 void HomeTab::syncHeaderActions() {
-  if (m_sessionButton != nullptr) {
-    m_sessionButton->setVisible(m_config == nullptr || m_config->config().controlCenter.showSessionButton);
-  }
+  setShown(m_sessionButton, m_config == nullptr || m_config->config().controlCenter.showSessionButton);
 }
 
 void HomeTab::syncStatusStrip() {
@@ -1627,7 +1655,17 @@ void HomeTab::onClose() {
 }
 
 void HomeTab::onPanelCardOpacityChanged(float opacity) {
-  (void)opacity;
+  const float scale = contentScale();
+  if (m_userCard != nullptr) {
+    applyHomeCardStyle(*m_userCard, scale, opacity);
+    syncUserCardFill();
+  }
+  if (m_mediaCard != nullptr) {
+    applyHomeCardStyle(*m_mediaCard, scale, opacity);
+  }
+  if (m_dateTimeCard != nullptr) {
+    applyHomeCardStyle(*m_dateTimeCard, scale, opacity);
+  }
   syncShortcuts();
 }
 
@@ -1664,12 +1702,12 @@ void HomeTab::syncScaledFonts() {
   }
   for (auto& pad : m_shortcutPads) {
     if (pad.label != nullptr) {
-      pad.label->setFontSize(Style::fontSizeMini * s);
+      pad.label->setFontSize(Style::fontSizeCaption * s);
     }
     if (pad.glyph != nullptr) {
       // Icon-only glyphs are sized from cell side in doLayout.
       if (m_config == nullptr || m_config->config().controlCenter.showShortcutLabels) {
-        pad.glyph->setGlyphSize(Style::fontSizeTitle * 1.35F * s);
+        pad.glyph->setGlyphSize(Style::fontSizeHeader * 1.2F * s);
       }
     }
   }

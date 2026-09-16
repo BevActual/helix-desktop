@@ -15,6 +15,7 @@ class Renderer;
 namespace control_center {
 
   void applySectionCardStyle(Flex& card, float scale = 1.0F, float fillOpacity = 1.0F);
+  [[nodiscard]] float sectionCardFillOpacity(float panelCardOpacity) noexcept;
   Label* addTitle(Flex& parent, const std::string& text, float scale = 1.0F);
   void addBody(Flex& parent, const std::string& text, float scale = 1.0F);
 

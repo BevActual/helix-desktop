@@ -71,4 +71,8 @@ namespace Style {
 
   float scaledRadiusXl(float localScale) noexcept { return scaledRadius(radiusXl, localScale); }
 
+  float scaledRadius2xl(float localScale) noexcept { return scaledRadius(radius2xl, localScale); }
+
+  float scaledRadius3xl(float localScale) noexcept { return scaledRadius(radius3xl, localScale); }
+
 } // namespace Style

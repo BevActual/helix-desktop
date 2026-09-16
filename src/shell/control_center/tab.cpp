@@ -1,13 +1,28 @@
 #include "shell/control_center/tab.h"
 
 #include "ui/builders.h"
+#include "ui/palette.h"
+#include "ui/style.h"
 
+#include <algorithm>
 #include <memory>
 
 namespace control_center {
 
+  float sectionCardFillOpacity(float panelCardOpacity) noexcept {
+    return panelCardOpacity >= 0.99F ? 1.0F : std::min(1.0F, panelCardOpacity + 0.28F);
+  }
+
   void applySectionCardStyle(Flex& card, float scale, float fillOpacity) {
-    card.setCardStyle(scale, fillOpacity);
+    // Tab bodies sit as solid wells on the glass panel chrome. Lift the fill so
+    // Glass/Soft still read as content, while Solid stays fully opaque.
+    card.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, sectionCardFillOpacity(fillOpacity)));
+    if (Style::cardBordersEnabled()) {
+      card.setBorder(colorSpecFromRole(ColorRole::Outline), Style::borderWidth);
+    } else {
+      card.clearBorder();
+    }
+    card.setRadius(Style::scaledRadius2xl(scale));
     card.setDirection(FlexDirection::Vertical);
     card.setAlign(FlexAlign::Stretch);
     card.setGap(Style::spaceSm * scale);

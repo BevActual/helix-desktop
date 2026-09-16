@@ -477,6 +477,8 @@ PanelPlacement ControlCenterPanel::panelPlacement() const noexcept {
   return m_config == nullptr ? PanelPlacement::Attached : m_config->config().shell.panel.controlCenterPlacement;
 }
 
+float ControlCenterPanel::cornerRadius() const noexcept { return Style::scaledRadius3xl(contentScale()); }
+
 bool ControlCenterPanel::dismissTransientUi() {
   if (m_modalHost.isOpen()) {
     m_modalHost.requestCloseTop();
@@ -527,7 +529,7 @@ void ControlCenterPanel::create() {
         .fillHeight = true,
         .configure = [this, scale](Flex& column) {
           column.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, panelCardOpacity()));
-          column.setRadius(Style::scaledRadiusXl(scale));
+          column.setRadius(Style::scaledRadius3xl(scale));
         },
     });
 

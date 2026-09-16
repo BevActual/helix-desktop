@@ -14,6 +14,9 @@ namespace Style {
   inline constexpr float radiusMd = 6.0F;
   inline constexpr float radiusLg = 9.0F;
   inline constexpr float radiusXl = 12.0F;
+  // Control Center concentric radii. Bars, launcher, and OSD stay on radiusXl.
+  inline constexpr float radius2xl = 18.0F;
+  inline constexpr float radius3xl = 24.0F;
 
   inline constexpr float borderWidth = 1.0F;
   inline constexpr float emphasizedBorderWidth = 3.0F;
@@ -104,5 +107,7 @@ namespace Style {
   [[nodiscard]] float scaledRadiusMd(float localScale = 1.0F) noexcept;
   [[nodiscard]] float scaledRadiusLg(float localScale = 1.0F) noexcept;
   [[nodiscard]] float scaledRadiusXl(float localScale = 1.0F) noexcept;
+  [[nodiscard]] float scaledRadius2xl(float localScale = 1.0F) noexcept;
+  [[nodiscard]] float scaledRadius3xl(float localScale = 1.0F) noexcept;
 
 } // namespace Style

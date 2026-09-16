@@ -945,7 +945,7 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
     const bool barIsVertical = barIsLeft || barIsRight;
 
     const float scale = m_activePanel->contentScale();
-    const float cornerRadius = Style::scaledRadiusXl(scale);
+    const float cornerRadius = m_activePanel->cornerRadius();
     const auto& shadowConfig = m_config->config().shell.shadow;
     const auto shadowBleed = shell::surface_shadow::bleed(m_activePanel->hasDecoration(), shadowConfig);
     const auto cornerOutset = static_cast<std::int32_t>(std::ceil(cornerRadius));
@@ -2328,7 +2328,7 @@ void PanelManager::applyPanelCompositorBlur(
     return;
   }
 
-  const float radius = Style::scaledRadiusXl(m_activePanel->contentScale());
+  const float radius = m_activePanel->cornerRadius();
   const CornerShapes corners = m_attachedToBar ? attached_panel::cornerShapes(m_attachedBarPosition) : CornerShapes{};
   const RectInsets logicalInset =
       m_attachedToBar ? attached_panel::logicalInset(m_attachedBarPosition, radius) : RectInsets{};
@@ -2381,7 +2381,7 @@ void PanelManager::applyAttachedDecorationStyle() {
     return;
   }
   const float scale = m_activePanel->contentScale();
-  const float radius = Style::scaledRadiusXl(scale);
+  const float radius = m_activePanel->cornerRadius();
 
   if (m_bgNode != nullptr) {
     auto* bg = static_cast<Box*>(m_bgNode);
@@ -2461,6 +2461,7 @@ void PanelManager::onConfigReloaded() {
   if (!m_attachedToBar && m_bgNode != nullptr) {
     auto* bg = static_cast<Box*>(m_bgNode);
     bg->setPanelStyle(m_config->config().shell.panel.borders);
+    bg->setRadius(m_activePanel->cornerRadius());
     bg->setFill(colorSpecFromRole(ColorRole::Surface, panelBackgroundOpacity));
     if (m_config->config().shell.panel.borders) {
       bg->setBorder(colorSpecFromRole(ColorRole::Outline, panelBackgroundOpacity), Style::borderWidth);
@@ -2472,7 +2473,7 @@ void PanelManager::onConfigReloaded() {
         m_config->config().shell.panel.shadow && shell::surface_shadow::enabled(true, shadowConfig);
     m_panelShadowNode->setVisible(panelShadow);
     if (!m_attachedToBar && panelShadow) {
-      const float shadowRadius = Style::scaledRadiusXl(m_activePanel->contentScale());
+      const float shadowRadius = m_activePanel->cornerRadius();
       m_panelShadowNode->setStyle(
           shell::surface_shadow::style(
               shadowConfig, panelBackgroundOpacity,
@@ -2569,7 +2570,7 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
       const bool panelBorders = m_config != nullptr && m_config->config().shell.panel.borders;
       bg->setPanelStyle(panelBorders);
       if (m_attachedToBar) {
-        const float radius = Style::scaledRadiusXl(m_activePanel->contentScale());
+        const float radius = m_activePanel->cornerRadius();
         bg->clearBorder();
         bg->setCornerShapes(attached_panel::cornerShapes(m_attachedBarPosition));
         bg->setLogicalInset(attached_panel::logicalInset(m_attachedBarPosition, radius));
@@ -2578,6 +2579,7 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
       } else {
         const float backgroundOpacity = shell::panel_surface::backgroundOpacity(m_config);
         bg->setFill(colorSpecFromRole(ColorRole::Surface, backgroundOpacity));
+        bg->setRadius(m_activePanel->cornerRadius());
         if (panelBorders) {
           bg->setBorder(colorSpecFromRole(ColorRole::Outline, backgroundOpacity), Style::borderWidth);
         }
@@ -2681,7 +2683,7 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
   const auto panelY = static_cast<float>(m_panelInsetY);
   const float panelW = m_panelVisualWidth > 0 ? static_cast<float>(m_panelVisualWidth) : w;
   const float panelH = m_panelVisualHeight > 0 ? static_cast<float>(m_panelVisualHeight) : h;
-  const float attachedRadius = m_attachedToBar ? Style::scaledRadiusXl(m_activePanel->contentScale()) : 0.0F;
+  const float attachedRadius = m_attachedToBar ? m_activePanel->cornerRadius() : 0.0F;
   const bool barIsVertical = m_attachedToBar && (m_attachedBarPosition == "left" || m_attachedBarPosition == "right");
   // The bg extends past the body along the bar cross axis for concave-corner notches.
   const float bgX = barIsVertical ? panelX : panelX - attachedRadius;
@@ -2700,7 +2702,7 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
     m_panelShadowNode->setPosition(bgX + shadowOffsetX, bgY + shadowOffsetY);
     m_panelShadowNode->setSize(bgW, bgH);
     if (!m_attachedToBar && panelShadow) {
-      const float shadowRadius = Style::scaledRadiusXl(m_activePanel->contentScale());
+      const float shadowRadius = m_activePanel->cornerRadius();
       const float panelBackgroundOpacity = shell::panel_surface::backgroundOpacity(m_config);
       m_panelShadowNode->setStyle(
           shell::surface_shadow::style(
