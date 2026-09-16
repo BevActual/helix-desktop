@@ -303,7 +303,7 @@ The NixOS module installs the package system-wide and can enable some recommende
 Each of the above modules includes a systemd user service for Noctalia, which can be enabled by setting `programs.noctalia.systemd.enable = true`.
 
 :::note
-When using the service, it is recommended to enable `launch_apps_as_systemd_services`, otherwise any apps launched by Noctalia will be terminated when the service restarts.
+When using the service, `launch_apps_as_systemd_services` defaults to on so apps launched from Noctalia survive a service restart. Turn it off only if you want those apps to die with the shell.
 :::
 
 ### Binary Cache {#binary-cache}

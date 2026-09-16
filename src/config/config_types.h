@@ -1171,7 +1171,7 @@ struct ShellConfig {
   bool showLocation = true;
   bool appIconColorize = false;
   std::optional<ColorSpec> appIconColor;
-  bool launchAppsAsSystemdServices = false;
+  bool launchAppsAsSystemdServices = true;
   std::string launchAppsCustomCommand;
   /// When false, disables clipboard history (Control Center tab, bar/control-center shortcuts).
   bool clipboardEnabled = true;

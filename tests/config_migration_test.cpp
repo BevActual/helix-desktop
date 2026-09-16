@@ -779,6 +779,46 @@ German = "Clock"
     );
   }
 
+  void checkLaunchAppsAsSystemdServicesMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = false
+)");
+    noctalia::config::schema::Diagnostics diagnostics;
+    const int applied = noctalia::config::applyPendingConfigMigrations(sidecar, 14, diagnostics);
+    expect(applied == noctalia::config::currentConfigVersion(), "systemd launch default migration was not applied");
+    expect(
+        sidecar["shell"]["launch_apps_as_systemd_services"].value<bool>() == true,
+        "legacy false systemd launch setting was not flipped to the new default"
+    );
+
+    toml::table custom = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = false
+launch_apps_custom_command = "uwsm-app -- $CMD"
+)");
+    noctalia::config::schema::Diagnostics customDiagnostics;
+    (void)noctalia::config::applyPendingConfigMigrations(custom, 14, customDiagnostics);
+    expect(
+        custom["shell"]["launch_apps_as_systemd_services"].value<bool>() == false,
+        "systemd launch migration overrode a custom launch command"
+    );
+
+    toml::table alreadyOn = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = true
+)");
+    noctalia::config::schema::Diagnostics alreadyOnDiagnostics;
+    (void)noctalia::config::applyPendingConfigMigrations(alreadyOn, 14, alreadyOnDiagnostics);
+    expect(
+        alreadyOn["shell"]["launch_apps_as_systemd_services"].value<bool>() == true,
+        "already-enabled systemd launch setting was changed"
+    );
+  }
+
   void checkCalendarEventFormatsMigration() {
     toml::table sidecar = toml::parse(R"(
 config_version = 13
@@ -992,6 +1032,7 @@ int main() {
   checkCustomButtonCommandsMigration();
   checkDeadZoneActionsMigration();
   checkCalendarEventFormatsMigration();
+  checkLaunchAppsAsSystemdServicesMigration();
   checkSysmonPresentationMigration();
   checkKeyboardLayoutShowGlyphMigration();
   checkKeyboardLayoutCustomLabelsMigration();

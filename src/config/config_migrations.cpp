@@ -27,6 +27,7 @@ namespace noctalia::config {
     constexpr int kKeyboardLayoutCustomLabelsMigrationVersion = 12;
     constexpr int kPluginAutoUpdateModeMigrationVersion = 13;
     constexpr int kCalendarEventFormatsMigrationVersion = 14;
+    constexpr int kLaunchAppsAsSystemdServicesMigrationVersion = 15;
     constexpr std::int64_t kMaxBarRadius = 500;
     constexpr std::array<std::string_view, 5> kBarRadiusKeys = {
         "radius", "radius_top_left", "radius_top_right", "radius_bottom_left", "radius_bottom_right",
@@ -692,6 +693,26 @@ namespace noctalia::config {
       });
     }
 
+    void migrateLaunchAppsAsSystemdServicesSidecar(toml::table& root, schema::Diagnostics& diag) {
+      auto* shell = root["shell"].as_table();
+      if (shell == nullptr) {
+        return;
+      }
+      const auto custom = (*shell)["launch_apps_custom_command"].value<std::string>();
+      if (custom.has_value() && !custom->empty()) {
+        return;
+      }
+      const auto enabled = (*shell)["launch_apps_as_systemd_services"].value<bool>();
+      if (!enabled.has_value() || *enabled) {
+        return;
+      }
+      shell->insert_or_assign("launch_apps_as_systemd_services", true);
+      diag.warn(
+          "shell.launch_apps_as_systemd_services",
+          "apps launched from Helix now use their own systemd units so they survive a shell restart"
+      );
+    }
+
     template <typename OnChanged> void migratePluginAutoUpdateMode(toml::table& root, OnChanged&& onChanged) {
       auto* plugins = root["plugins"].as_table();
       if (plugins == nullptr) {
@@ -820,6 +841,11 @@ namespace noctalia::config {
             .toVersion = kCalendarEventFormatsMigrationVersion,
             .summary = "calendar: move event formats to calendar configuration",
             .apply = migrateCalendarEventFormatsSidecar,
+        },
+        {
+            .toVersion = kLaunchAppsAsSystemdServicesMigrationVersion,
+            .summary = "shell: launch apps as systemd services by default",
+            .apply = migrateLaunchAppsAsSystemdServicesSidecar,
         },
     };
     return migrations;

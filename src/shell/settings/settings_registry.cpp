@@ -2152,9 +2152,8 @@ namespace settings {
                                : tr("settings.schema.shell.launch-apps-as-systemd-services.requires-systemd-session"),
         {"shell", "launch_apps_as_systemd_services"},
         ToggleSetting{
-            .checked = cfg.shell.launchAppsAsSystemdServices,
-            // Keep a leftover `true` switchable off even when the session cannot honor it.
-            .enabled = env.systemdUserManaged || cfg.shell.launchAppsAsSystemdServices
+            .checked = env.systemdUserManaged && cfg.shell.launchAppsAsSystemdServices,
+            .enabled = env.systemdUserManaged,
         }
     ));
     {

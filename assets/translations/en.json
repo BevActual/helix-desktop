@@ -3649,7 +3649,7 @@
           "label": "Keyboard Layout Labels"
         },
         "launch-apps-as-systemd-services": {
-          "description": "Launches applications in separate systemd services so they don't share Noctalia's cgroup",
+          "description": "Launch apps in their own systemd units so they survive a Helix restart. Off keeps them in Helix's process group.",
           "label": "Launch Apps as systemd Services",
           "requires-systemd-session": "Requires Noctalia to run as a systemd user service (uwsm or a systemd user unit)"
         },
