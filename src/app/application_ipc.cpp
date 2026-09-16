@@ -19,6 +19,9 @@
 #include "dbus/logind/logind_service.h"
 #include "dbus/mpris/mpris_service.h"
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/firewall/firewall_service.h"
+#include "dbus/cups/printer_service.h"
+#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/network_manager_service.h"
 #include "dbus/network/network_secret_agent.h"
@@ -781,8 +784,18 @@ void Application::initIpc() {
   m_screenRecorder.registerIpc(m_ipcService);
   m_tailscaleService.registerIpc(m_ipcService);
   m_localSendService.registerIpc(m_ipcService);
+  m_syncthingService.registerIpc(m_ipcService);
   if (m_phoneService != nullptr) {
     m_phoneService->registerIpc(m_ipcService);
+  }
+  if (m_firewallService != nullptr) {
+    m_firewallService->registerIpc(m_ipcService);
+  }
+  if (m_printerService != nullptr) {
+    m_printerService->registerIpc(m_ipcService);
+  }
+  if (m_castService != nullptr) {
+    m_castService->registerIpc(m_ipcService);
   }
   m_windowSwitcher.registerIpc(m_ipcService);
   for (const noctalia::cli::Command& command : noctalia::cli::kMsgCmd.subcommands) {

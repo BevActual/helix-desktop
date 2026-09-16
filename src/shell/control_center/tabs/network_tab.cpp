@@ -12,6 +12,7 @@
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
 #include "render/scene/input_area.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "system/format_units.h"
@@ -44,6 +45,16 @@ using namespace control_center;
 namespace {
 
   constexpr float kRowMinHeight = Style::controlHeightLg;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   // Label and wire value in one row, so the visible dropdown order and the value
   // sent to NetworkManager cannot drift apart.
@@ -1345,9 +1356,10 @@ void NetworkTab::syncPasswordCard() {
   if (m_passwordCard == nullptr) {
     return;
   }
-  m_passwordCard->setVisible(m_hasPendingSecret);
-  if (m_enterpriseFields != nullptr) {
-    m_enterpriseFields->setVisible(m_hasPendingSecret && m_pendingEnterprise);
+  const bool layoutDirty = setShown(m_passwordCard, m_hasPendingSecret) ||
+                            setShown(m_enterpriseFields, m_hasPendingSecret && m_pendingEnterprise);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
   if (m_hasPendingSecret && m_passwordTitle != nullptr) {
     if (m_pendingSsid.empty()) {
@@ -1365,10 +1377,9 @@ void NetworkTab::setCredentialError(const std::string& message) {
     return;
   }
   m_credentialError->setText(message);
-  m_credentialError->setVisible(!message.empty());
-  // Showing or hiding the message changes the card's height, and the card is
-  // above the network list.
-  PanelManager::instance().requestLayout();
+  if (setShown(m_credentialError, !message.empty())) {
+    PanelManager::instance().requestLayout();
+  }
 }
 
 network_enterprise::EnterpriseCredentials NetworkTab::collectEnterpriseCredentials(const std::string& password) const {
@@ -1513,7 +1524,7 @@ void NetworkTab::syncCurrentCard() {
     m_currentTitle->setText(i18n::tr("control-center.network.unavailable-title"));
     m_currentDetail->setText(i18n::tr("control-center.network.unavailable-detail"));
     if (m_currentRow != nullptr) {
-      m_currentRow->setVisible(false);
+    (void)setShown(m_currentRow, false);
     }
     return;
   }
@@ -1543,7 +1554,7 @@ void NetworkTab::syncCurrentCard() {
   m_currentDetail->setText(currentDetail(s, externalIp, modem));
   if (m_disconnectButton != nullptr) {
     const bool canReconnectWired = !s.connected && m_network->canActivateWiredConnection();
-    m_disconnectButton->setVisible(s.connected || canReconnectWired || m_actionPending);
+    (void)setShown(m_disconnectButton, s.connected || canReconnectWired || m_actionPending);
     m_disconnectButton->setGlyph(s.connected ? "plug-off" : "plug");
     m_disconnectButton->setVariant(s.connected ? ButtonVariant::Destructive : ButtonVariant::Default);
     m_disconnectButton->setTooltip(
@@ -1557,6 +1568,7 @@ void NetworkTab::syncCurrentCard() {
   }
   if (m_scanSpinner != nullptr) {
     m_scanSpinner->setVisible(s.scanning);
+    m_scanSpinner->setParticipatesInLayout(s.scanning);
     if (s.scanning && !m_scanSpinner->spinning()) {
       m_scanSpinner->start();
     } else if (!s.scanning && m_scanSpinner->spinning()) {
@@ -1567,18 +1579,18 @@ void NetworkTab::syncCurrentCard() {
     if (m_sysmon != nullptr && m_sysmon->isRunning() && s.connected) {
       const double rx = m_sysmon->netRxBytesPerSec(s.interfaceName);
       const double tx = m_sysmon->netTxBytesPerSec(s.interfaceName);
-      m_throughputLabel->setVisible(true);
+      (void)setShown(m_throughputLabel, true);
       m_throughputLabel->setText(i18n::tr(
           "control-center.network.throughput", "down", FormatUnits::formatDecimalBytesPerSecond(rx), "up",
           FormatUnits::formatDecimalBytesPerSecond(tx)
       ));
     } else {
-      m_throughputLabel->setVisible(false);
+      (void)setShown(m_throughputLabel, false);
     }
   }
   if (m_dnsLabel != nullptr) {
     const std::string dns = currentDnsText();
-    m_dnsLabel->setVisible(!dns.empty());
+    (void)setShown(m_dnsLabel, !dns.empty());
     if (!dns.empty()) {
       m_dnsLabel->setText(dns);
     }
@@ -2269,7 +2281,7 @@ void NetworkTab::hideWifiQr() {
   }
   m_qrVisible = false;
   if (m_qrBlock != nullptr) {
-    m_qrBlock->setVisible(false);
+    (void)setShown(m_qrBlock, false);
   }
   if (m_shareButton != nullptr) {
     m_shareButton->setSelected(false);
@@ -2284,7 +2296,7 @@ void NetworkTab::applyWifiShare(const std::string& payload, const std::string& h
   }
   m_qrVisible = true;
   if (m_qrBlock != nullptr) {
-    m_qrBlock->setVisible(true);
+    (void)setShown(m_qrBlock, true);
   }
   if (auto bitmap = qr_code::encodeRgba(payload, 6)) {
     m_qrBitmap = std::move(*bitmap);
@@ -2328,10 +2340,10 @@ void NetworkTab::syncDnsPicker() {
   const bool showNextDns = m_dnsProfile == DnsProfile::NextDns;
   const bool showCustom = m_dnsProfile == DnsProfile::Custom;
   if (m_dnsNextDnsRow != nullptr) {
-    m_dnsNextDnsRow->setVisible(showNextDns);
+    (void)setShown(m_dnsNextDnsRow, showNextDns);
   }
   if (m_dnsCustomRow != nullptr) {
-    m_dnsCustomRow->setVisible(showCustom);
+    (void)setShown(m_dnsCustomRow, showCustom);
   }
   if (m_dnsNextDnsInput != nullptr) {
     m_dnsNextDnsInput->setEnabled(enabled);

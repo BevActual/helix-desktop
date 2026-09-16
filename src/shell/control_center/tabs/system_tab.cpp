@@ -2,6 +2,7 @@
 
 #include "core/build_info.h"
 #include "i18n/i18n.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -26,6 +27,16 @@ namespace {
   constexpr float kGraphFillOpacity = 0.15F;
   constexpr double kNetMinScaleBps = 10000.0;
   constexpr std::size_t kMaxDiskRows = 4;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   // Graph cards run tighter than the default section card so the plot fills more of the card,
   // but the title gets a touch more breathing room above it.
@@ -294,6 +305,7 @@ std::unique_ptr<Flex> SystemTab::create() {
           .out = &m_gpuCard,
           .flexGrow = 1.0F,
           .visible = false,
+          .participatesInLayout = false,
           .configure = [sc, opacity = panelCardOpacity()](Flex& section) { applyGraphCardStyle(section, sc, opacity); },
       });
 
@@ -303,13 +315,13 @@ std::unique_ptr<Flex> SystemTab::create() {
       m_gpuLegend = legend;
       m_gpuUsageGroup = makeIconLabel(*legend, "gpu-usage", sc, &m_gpuUsageIcon);
       m_gpuUsageLabel = makeValueLabel(*m_gpuUsageGroup, sc);
-      m_gpuUsageGroup->setVisible(false);
+      (void)setShown(m_gpuUsageGroup, false);
       m_gpuVramGroup = makeIconLabel(*legend, "memory", sc, &m_gpuVramIcon);
       m_gpuVramLabel = makeValueLabel(*m_gpuVramGroup, sc);
-      m_gpuVramGroup->setVisible(false);
+      (void)setShown(m_gpuVramGroup, false);
       m_gpuTempGroup = makeIconLabel(*legend, "temperature", sc, &m_gpuTempIcon);
       m_gpuTempLabel = makeValueLabel(*m_gpuTempGroup, sc);
-      m_gpuTempGroup->setVisible(false);
+      (void)setShown(m_gpuTempGroup, false);
 
       row->addChild(std::move(card));
     }
@@ -868,10 +880,9 @@ void SystemTab::updateGraphs(Renderer& renderer) {
 }
 
 void SystemTab::updateGpuVisibility() {
-  if (m_gpuCard != nullptr) {
-    m_gpuCard->setVisible(m_gpuVisible);
+  if (setShown(m_gpuCard, m_gpuVisible)) {
+    PanelManager::instance().requestLayout();
   }
-  PanelManager::instance().requestLayout();
 }
 
 void SystemTab::syncLabels() {
@@ -917,21 +928,21 @@ void SystemTab::syncLabels() {
   }
   if (m_gpuTempGroup != nullptr) {
     const bool hasTempData = stats.gpuTempC.has_value();
-    m_gpuTempGroup->setVisible(hasTempData);
+    (void)setShown(m_gpuTempGroup, hasTempData);
     if (hasTempData && m_gpuTempLabel != nullptr) {
       m_gpuTempLabel->setText(std::format("{:.0F}°C", *stats.gpuTempC));
     }
   }
   if (m_gpuUsageGroup != nullptr) {
     const bool hasUsageData = stats.gpuUsagePercent.has_value();
-    m_gpuUsageGroup->setVisible(hasUsageData);
+    (void)setShown(m_gpuUsageGroup, hasUsageData);
     if (hasUsageData && m_gpuUsageLabel != nullptr) {
       m_gpuUsageLabel->setText(std::format("{:.0F}%", *stats.gpuUsagePercent));
     }
   }
   if (m_gpuVramGroup != nullptr) {
     const bool hasVramData = stats.gpuVramUsedBytes.has_value();
-    m_gpuVramGroup->setVisible(hasVramData);
+    (void)setShown(m_gpuVramGroup, hasVramData);
     if (hasVramData && m_gpuVramLabel != nullptr) {
       m_gpuVramLabel->setText(formatGpuVramUsed(stats));
     }
@@ -985,7 +996,7 @@ void SystemTab::syncLabels() {
   }
   if (m_swapRow != nullptr) {
     const bool hasSwap = stats.swapTotalMb > 0;
-    m_swapRow->setVisible(hasSwap);
+    (void)setShown(m_swapRow, hasSwap);
     if (hasSwap && m_swapLabel != nullptr) {
       m_swapLabel->setText(FormatUnits::formatBinaryMibUsageAsGib(stats.swapUsedMb, stats.swapTotalMb));
     }

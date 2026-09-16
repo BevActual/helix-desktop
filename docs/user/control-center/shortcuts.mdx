@@ -54,7 +54,7 @@ show_shortcut_labels = false
 | `dark_mode` | Dark Mode | Toggle light/dark theme | - |
 | `caffeine` | Caffeine | Toggle idle/sleep prevention | - |
 | `audio` | Audio | Toggle output mute | Open audio tab |
-| `mic_mute` | Microphone | Toggle mic mute | Open audio tab |
+| `mic_mute` | Microphone | Toggle mic mute | Open privacy tab |
 | `power_profile` | Current profile | Cycle power profile | Open system tab |
 | `media` | Media | Play/Pause active player | Open media tab |
 | `weather` | Temperature | Open weather tab | Open weather tab |
@@ -73,6 +73,11 @@ show_shortcut_labels = false
 | `tailscale` | Tailscale | Toggle connection | Open tailscale tab |
 | `localsend` | LocalSend | Toggle nearby sharing | Open localsend tab |
 | `phone` | Phone | Open the Phone tab | Open the Phone tab |
+| `syncthing` | Syncthing | Open the Syncthing tab | Open the Syncthing tab |
+| `firewall` | Firewall | Open the Firewall tab | Open the Firewall tab |
+| `printers` | Printers | Open the Printers tab | Open the Printers tab |
+| `cast` | Cast | Open the Cast tab | Open the Cast tab |
+| `privacy` | Privacy | Open the Privacy tab | Open the Privacy tab |
 
 ## Dynamic Shortcuts
 
@@ -88,6 +93,16 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 `phone` opens the Phone tab. The tile highlights when a paired phone is reachable.
 
+`syncthing` opens the Syncthing tab. The tile highlights when the local daemon is running.
+
+`firewall` opens the Firewall tab. The tile highlights when panic mode is on.
+
+`printers` opens the Printers tab. The tile highlights when a printer is printing or has queued jobs.
+
+`cast` opens the Cast tab. The tile highlights when this screen is being shared.
+
+`privacy` opens the Privacy tab. The tile highlights when an app is using the microphone, camera, or screen share.
+
 ## Related IPC
 
 Many shortcut buttons trigger the same canonical IPC commands documented elsewhere:
@@ -101,3 +116,8 @@ Many shortcut buttons trigger the same canonical IPC commands documented elsewhe
 - [Media & UI -> Tailscale](/noctalia/ipc/media-and-ui/#tailscale) for connect, disconnect, toggle, and status
 - [Media & UI -> LocalSend](/noctalia/ipc/media-and-ui/#localsend) for toggle, status, and announce
 - [Media & UI -> Phone](/noctalia/ipc/media-and-ui/#phone) for status, ping, and ring
+- [Media & UI -> Syncthing](/noctalia/ipc/media-and-ui/#syncthing) for status, start, and stop
+- [Media & UI -> Firewall](/noctalia/ipc/media-and-ui/#firewall) for status and panic toggle
+- [Media & UI -> Printers](/noctalia/ipc/media-and-ui/#printers) for status and start
+- [Media & UI -> Cast](/noctalia/ipc/media-and-ui/#cast) for status and share toggle
+- [Media & UI -> Privacy](/noctalia/ipc/media-and-ui/#privacy) for capture status

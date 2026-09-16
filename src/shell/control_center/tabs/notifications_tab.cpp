@@ -10,6 +10,7 @@
 #include "render/animation/animation.h"
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
@@ -40,6 +41,16 @@ using namespace control_center;
 namespace {
 
   constexpr Logger kLog("control-center-notifications");
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   constexpr float kHistoryIconSize = 36.0F;
   constexpr float kHistoryIconGlyphSize = 22.0F;
@@ -1065,8 +1076,8 @@ void NotificationsTab::invokeNotificationAction(uint32_t id, const std::string& 
 
 bool NotificationsTab::refreshDataSnapshot() {
   const bool hasHistory = m_notifications != nullptr && !m_notifications->history().empty();
-  if (m_clearAllButton != nullptr) {
-    m_clearAllButton->setVisible(hasHistory);
+  if (setShown(m_clearAllButton, hasHistory)) {
+    PanelManager::instance().requestLayout();
   }
   syncDndButton();
 
@@ -1115,11 +1126,9 @@ void NotificationsTab::syncDndButton() {
 }
 
 void NotificationsTab::updateEmptyState(bool hasHistory, bool hasFiltered) {
-  if (m_list != nullptr) {
-    m_list->setVisible(hasFiltered);
-  }
-  if (m_emptyCard != nullptr) {
-    m_emptyCard->setVisible(!hasFiltered);
+  const bool layoutDirty = setShown(m_list, hasFiltered) || setShown(m_emptyCard, !hasFiltered);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 
   if (m_emptyTitle == nullptr || m_emptyBody == nullptr) {

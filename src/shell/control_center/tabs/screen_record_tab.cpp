@@ -5,6 +5,7 @@
 #include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
@@ -13,7 +14,6 @@
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
-#include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/file_utils.h"
@@ -47,6 +47,16 @@ namespace {
       break;
     }
     return i18n::tr("control-center.screen-record.source-focused-tooltip");
+  }
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
   }
 
   [[nodiscard]] std::string sourceLabel(ScreenRecorderService::Source source) {
@@ -186,34 +196,6 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
           .onChange = [this](std::size_t idx) { m_delayIndex = idx; },
       })
   );
-
-  auto audioRow = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .minHeight = Style::controlHeightSm * scale,
-  });
-  audioRow->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.screen-record.audio"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  audioRow->addChild(
-      ui::toggle({
-          .out = &m_audio,
-          .checked = m_config != nullptr && m_config->config().shell.screenRecord.audio,
-          .scale = scale,
-          .onChange =
-              [this](bool value) {
-                if (m_config != nullptr) {
-                  (void)m_config->setOverride({"shell", "screen_record", "audio"}, value);
-                }
-              },
-      })
-  );
-  card->addChild(std::move(audioRow));
 
   card->addChild(
       ui::button({
@@ -369,7 +351,6 @@ void ScreenRecordTab::onClose() {
   m_rootLayout = nullptr;
   m_source = nullptr;
   m_delay = nullptr;
-  m_audio = nullptr;
   m_recordButton = nullptr;
   m_status = nullptr;
   m_elapsed = nullptr;
@@ -545,12 +526,6 @@ void ScreenRecordTab::syncUi() {
   if (m_delay != nullptr) {
     m_delay->setEnabled(!recording && !counting && !replaying);
   }
-  if (m_audio != nullptr) {
-    m_audio->setEnabled(!recording && !counting && !replaying);
-    if (m_config != nullptr && !recording && !replaying) {
-      m_audio->setCheckedImmediate(m_config->config().shell.screenRecord.audio);
-    }
-  }
   if (m_recordButton != nullptr) {
     m_recordButton->setEnabled((available || recording) && !counting && !replaying);
     if (recording) {
@@ -566,10 +541,8 @@ void ScreenRecordTab::syncUi() {
       m_recordButton->setVariant(ButtonVariant::Primary);
     }
   }
-  if (m_elapsed != nullptr) {
-    m_elapsed->setText(
-        recording && m_recorder != nullptr ? m_recorder->elapsedLabel() : std::string{"00:00"}
-    );
+  if (m_elapsed != nullptr && recording && m_recorder != nullptr) {
+    m_elapsed->setText(m_recorder->elapsedLabel());
   }
   if (m_backend != nullptr) {
     m_backend->setText(m_recorder != nullptr ? m_recorder->backendDescription() : std::string{});
@@ -579,11 +552,14 @@ void ScreenRecordTab::syncUi() {
       m_status->setText(
           i18n::tr("control-center.screen-record.countdown", "seconds", std::to_string(m_countdownLeft))
       );
-    } else if (recording && m_recorder != nullptr && !m_recorder->outputPath().empty()) {
-      m_status->setText(m_recorder->outputPath().string());
     } else {
       m_status->setText({});
     }
+  }
+  const bool layoutDirty = setShown(m_elapsed, recording) || setShown(m_backend, !available) ||
+                            setShown(m_status, counting);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
   syncReplayUi();
   PanelManager::instance().requestRedraw();

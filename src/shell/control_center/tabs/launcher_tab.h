@@ -42,13 +42,6 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
-  Toggle* m_categories = nullptr;
-  Toggle* m_showIcons = nullptr;
-  Toggle* m_origin = nullptr;
-  Toggle* m_compact = nullptr;
-  Toggle* m_appGrid = nullptr;
-  Toggle* m_appActions = nullptr;
-  Toggle* m_sortByUsage = nullptr;
   Toggle* m_typeToLaunch = nullptr;
   std::array<Toggle*, 5> m_providerGlobal{};
   ListEditor* m_pinnedList = nullptr;

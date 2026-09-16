@@ -281,7 +281,7 @@
     "ai-usage": {
       "as-of": "As of {time}",
       "balance-only": "Prepaid balance. No rate-limit windows.",
-      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, add a DeepSeek key, or install Ollama.",
+      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, set up DeepSeek, or install Ollama.",
       "now": "now",
       "ollama": {
         "absent": "Ollama is not installed",
@@ -313,7 +313,7 @@
         "expired": "Session expired. Sign in again",
         "http-error": "Could not reach the usage API",
         "no-auth": "Not signed in",
-        "no-credentials": "No credentials. Sign in with claude",
+        "no-credentials": "Not signed in. Open Claude Code and sign in.",
         "no-data": "No usage data yet",
         "stale": "Showing last known values",
         "unsupported": "This plan has no request quota to show"
@@ -345,13 +345,9 @@
       "no-output-selected": "No output device selected",
       "output-device-prefix": "Output",
       "mute": "Mute",
-      "mute-microphone": "Mute microphone",
-      "privacy": "Privacy",
-      "privacy-idle": "No apps are using the microphone, camera, or screen share.",
-      "unavailable-body": "PipeWire is not active.",
+      "unavailable-body": "Audio is not active.",
       "unavailable-title": "Audio unavailable",
-      "unmute": "Unmute",
-      "unmute-microphone": "Unmute microphone"
+      "unmute": "Unmute"
     },
     "bluetooth": {
       "accept": "Accept",
@@ -384,7 +380,7 @@
         "connected": "Connected",
         "paired": "Paired"
       },
-      "unavailable": "Bluetooth service unavailable",
+      "unavailable": "Bluetooth is not available.",
       "unknown-device": "Unknown device",
       "visible": "Discoverable by nearby devices"
     },
@@ -486,7 +482,7 @@
     "launcher": {
       "add-app": "Add an app",
       "open": "Open launcher",
-      "providers": "Providers in unprefixed search"
+      "providers": "Always in search"
     },
     "settings": {
       "configure": "Settings",
@@ -529,7 +525,7 @@
         "updates": "{count} updates waiting"
       },
       "unknown": "unknown",
-      "uptime": "Uptime – {uptime}",
+      "uptime": "Up {uptime}",
       "weather": {
         "data-unavailable": "Weather data unavailable",
         "disabled": "Weather off",
@@ -538,11 +534,11 @@
       }
     },
     "keybinds": {
-      "copy-missing-tooltip": "Copy missing niri binds",
+      "copy-missing-tooltip": "Copy missing recommended keys",
       "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
-      "install-tooltip": "Add missing recommended binds to niri",
+      "install-tooltip": "Add the missing recommended keys",
       "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
-      "open-folder-tooltip": "Open the niri config folder",
+      "open-folder-tooltip": "Open the compositor config folder",
       "reset-tooltip": "Restore managed binds to the recommended keys",
       "tab-apps": "Apps",
       "tab-apps-tooltip": "Launch an installed app",
@@ -579,7 +575,7 @@
       "previous": "Previous",
       "repeat": "Repeat",
       "shuffle": "Shuffle",
-      "start-playback": "Start playback in an MPRIS app"
+      "start-playback": "Start playback in a music or video app"
     },
     "network": {
       "anonymous-identity": "Anonymous identity (optional)",
@@ -603,8 +599,8 @@
       "eap-method": "EAP method",
       "enterprise-prompt-for": "Sign in to {ssid}",
       "error-ca-not-absolute": "The certificate path must be absolute, starting with /.",
-      "error-certificate-required": "This network requires certificate-based authentication (EAP-TLS), which is not supported yet.",
-      "error-enterprise-unsupported": "The active network backend cannot configure 802.1X networks.",
+      "error-certificate-required": "This network needs a certificate sign-in, which is not supported yet.",
+      "error-enterprise-unsupported": "This network needs a work or school sign-in that this tab cannot set up.",
       "error-missing-identity": "Enter the identity your organization issued you.",
       "error-missing-password": "Enter your password.",
       "error-unsupported-phase2": "PEAP requires MSCHAPv2 inner authentication.",
@@ -619,8 +615,8 @@
       "password-prompt-for": "Enter password for {ssid}",
       "phase2-auth": "Inner authentication",
       "saved": "Saved",
-      "unavailable-detail": "Install and enable NetworkManager, wpa_supplicant, or iwd to manage networks from here.",
-      "unavailable-title": "Network service unavailable",
+      "unavailable-detail": "Install a network manager to control Wi-Fi from here.",
+      "unavailable-title": "Network is not available",
       "vpns": "VPNs",
       "wi-fi": "Wi-Fi",
       "wifi": "Wi-Fi",
@@ -646,7 +642,7 @@
       "dns-apply": "Apply DNS",
       "dns-applied": "DNS updated",
       "dns-requires-connection": "Connect to a network to change DNS",
-      "dns-requires-networkmanager": "DNS overrides need NetworkManager",
+      "dns-requires-networkmanager": "This DNS option needs the system network service.",
       "dns-invalid": "Enter valid IPv4 or IPv6 addresses",
       "ping": "Ping",
       "rescan": "Scan for networks",
@@ -746,12 +742,6 @@
       "windows-save-title": "Window Corners",
       "windows-title": "App Windows"
     },
-    "wallpaper": {
-      "overview-backdrop-tooltip": "Blurred wallpaper behind workspaces",
-      "overview-flat-tooltip": "Use the current surface color",
-      "overview-none-tooltip": "Keep niri's own overview background",
-      "overview-stationary-tooltip": "Pin the wallpaper behind workspaces"
-    },
     "windows": {
       "columns-description": "How wide new tiled windows start, as a percent of the display.",
       "columns-title": "Columns",
@@ -813,6 +803,11 @@
       "tailscale": "Tailscale",
       "localsend": "LocalSend",
       "phone": "Phone",
+      "syncthing": "Syncthing",
+      "firewall": "Firewall",
+      "printers": "Printers",
+      "cast": "Cast",
+      "privacy": "Privacy",
       "wallpaper": "Wallpaper",
       "weather": "Weather",
       "wifi": "Wi-Fi"
@@ -869,7 +864,7 @@
       "loading-updates": "Looking for updates…",
       "no-installed": "No installed packages were found.",
       "no-updates": "No package updates are available.",
-      "progress": "{status} — {percent}%",
+      "progress": "{status} · {percent}%",
       "protected": "Helix Shell packages cannot be removed from this tab.",
       "refresh": "Refresh",
       "remove": "Remove",
@@ -883,7 +878,7 @@
       "searching": "Searching…",
       "showing-limited": "Showing {shown} of {total}",
       "source-fedora": "Fedora",
-      "source-fedora-tooltip": "RPM packages from Fedora",
+      "source-fedora-tooltip": "Packages from Fedora",
       "source-flatpak": "Flatpak",
       "source-flatpak-tooltip": "Apps installed with Flatpak",
       "source-firmware": "Firmware",
@@ -891,8 +886,8 @@
       "state-available": "Available",
       "state-installed": "Installed",
       "title": "Packages",
-      "unavailable": "PackageKit is not available.",
-      "unavailable-flatpak": "Flatpak is not available.",
+      "unavailable": "Package updates are not available.",
+      "unavailable-flatpak": "Flatpak apps cannot be listed.",
       "unavailable-firmware": "Firmware updates are not available.",
       "update": "Update",
       "update-all": "Update all",
@@ -932,6 +927,11 @@
       "tailscale": "Tailscale",
       "localsend": "LocalSend",
       "phone": "Phone",
+      "syncthing": "Syncthing",
+      "firewall": "Firewall",
+      "printers": "Printers",
+      "cast": "Cast",
+      "privacy": "Privacy",
       "weather": "Weather"
     },
     "camera": {
@@ -981,7 +981,7 @@
       "ocr-copied": "Text copied",
       "ocr-empty": "No text found in that region.",
       "ocr-failed": "Could not read text from the screen.",
-      "ocr-missing": "Install tesseract to copy text from the screen.",
+      "ocr-missing": "Install Tesseract to copy text from the screen.",
       "pick-display": "Pick display",
       "region": "Select region",
       "region-too-small": "The selected region is too small.",
@@ -991,7 +991,7 @@
       "qr-copied": "QR code copied",
       "qr-empty": "No QR code found in that region.",
       "qr-failed": "Could not scan a QR code.",
-      "qr-missing": "Install zbar (zbarimg) to scan QR codes."
+      "qr-missing": "Install ZBar to scan QR codes."
     },
     "screen-record": {
       "audio": "Include system audio",
@@ -1035,6 +1035,7 @@
       "allow-lan": "Allow LAN while using an exit node",
       "busy": "Working…",
       "connect": "Connect",
+      "connected": "Connected",
       "copy-ip": "Copy IP",
       "disconnect": "Disconnect",
       "dns": "Accept DNS",
@@ -1042,6 +1043,7 @@
       "exit-none": "None",
       "filter": "Filter peers…",
       "login": "Log in",
+      "needs-login": "Needs sign-in",
       "missing": "Install Tailscale to manage this machine from Control Center.",
       "offline": "Offline",
       "online": "Online",
@@ -1058,8 +1060,10 @@
       "ssh": "Tailscale SSH",
       "status-failed": "Could not read Tailscale status.",
       "command-failed": "The Tailscale command failed.",
-      "needs-operator": "Tailscale needs administrator approval, or run: sudo tailscale set --operator={user}",
+      "needs-operator": "Tailscale needs administrator approval on this machine.",
       "stopped": "Stopped",
+      "starting": "Starting…",
+      "stopping": "Stopping…",
       "title": "Tailscale",
       "use-exit": "Use as exit"
     },
@@ -1080,11 +1084,17 @@
       "history-sent": "Sent {file} to {name}",
       "incoming": "{name} wants to send files",
       "incoming-title": "Incoming",
+      "listening": "Visible as {name} on this network.",
       "nearby": "Nearby devices",
-      "nearby-empty": "No devices yet. Open LocalSend on the other device, then tap refresh.",
+      "nearby-empty": "No devices yet. Open LocalSend on the other device, then tap Find nearby.",
       "peer-gone": "That device is no longer nearby.",
       "pin-required": "That device requires a PIN. Enter it above and send again.",
-      "port-busy": "Port 53317 is in use, so this machine cannot receive. Sending still works.",
+      "port-busy": "This machine cannot receive right now. Sending still works.",
+      "device-desktop": "Computer",
+      "device-mobile": "Phone",
+      "device-server": "Server",
+      "device-tablet": "Tablet",
+      "device-web": "Browser",
       "progress-receive": "Receiving {index} of {count} · {file} from {name}",
       "progress-send": "Sending {index} of {count} · {file} to {name}",
       "received": "Received files from {name}",
@@ -1103,7 +1113,7 @@
       "available": "Nearby, not paired",
       "charging": "Charging",
       "devices": "Devices",
-      "devices-empty": "No phones yet. Open KDE Connect on your phone, then tap refresh.",
+      "devices-empty": "No phones yet. Open KDE Connect on your phone, then tap Refresh.",
       "missing": "Install KDE Connect to pair a phone from Control Center.",
       "offline": "Offline",
       "online": "Online",
@@ -1127,6 +1137,180 @@
       "title": "Phone",
       "unpair": "Unpair",
       "visible-as": "Visible as {name}"
+    },
+    "syncthing": {
+      "connected-count": "{count} devices connected",
+      "copy-id": "Copy this device ID",
+      "devices": "Devices",
+      "devices-empty": "No other devices yet. Add one in Syncthing, then tap Refresh.",
+      "folder-error": "Needs attention",
+      "folders": "Folders",
+      "folders-empty": "No folders yet. Add one in Syncthing.",
+      "missing": "Install Syncthing to keep folders in sync from Control Center.",
+      "offline": "Offline",
+      "online": "Online",
+      "open": "Open Syncthing",
+      "pause": "Pause folder",
+      "paused": "Paused",
+      "ready": "Ready",
+      "ready-hint": "Start Syncthing to see folders and devices.",
+      "refresh": "Refresh",
+      "resume": "Resume folder",
+      "scan": "Scan now",
+      "scanning": "Scanning",
+      "start": "Start Syncthing",
+      "starting": "Starting…",
+      "status-failed": "Could not read folders from Syncthing.",
+      "stop": "Stop",
+      "stopped": "Syncthing is not running",
+      "syncing": "Syncing",
+      "title": "Syncthing",
+      "type-both": "Send and receive",
+      "type-encrypted": "Receive encrypted",
+      "type-receive": "Receive only",
+      "type-send": "Send only",
+      "up-to-date": "Up to date",
+      "visible-as": "This machine is {name}"
+    },
+    "firewall": {
+      "interfaces": "Listening on {names}",
+      "missing": "Install the system firewall to manage incoming traffic from Control Center.",
+      "no-interfaces": "No network interfaces in this zone.",
+      "panic": "Block all traffic",
+      "panic-on": "Blocking all traffic",
+      "ready": "Ready",
+      "ready-hint": "Start the firewall to choose a zone and open services.",
+      "refresh": "Refresh",
+      "save": "Save for next boot",
+      "save-tooltip": "Keep the current zone and services after reboot",
+      "service-cockpit": "Cockpit",
+      "service-http": "Web (HTTP)",
+      "service-https": "Web (HTTPS)",
+      "service-kdeconnect": "KDE Connect",
+      "service-mdns": "Local discovery",
+      "service-samba-client": "Windows shares",
+      "service-ssh": "Remote login",
+      "service-syncthing": "Syncthing",
+      "service-syncthing-gui": "Syncthing web UI",
+      "service-wireguard": "WireGuard",
+      "services": "Incoming services",
+      "services-empty": "No services in this zone.",
+      "start": "Start firewall",
+      "starting": "Starting…",
+      "status-failed": "Could not read the firewall.",
+      "stopped": "Firewall is not running",
+      "title": "Firewall",
+      "visible-as": "Zone: {name}",
+      "write-failed": "Could not update the firewall. Confirm the password prompt if it appears.",
+      "zone": "Default zone",
+      "zone-block": "Block",
+      "zone-dmz": "DMZ",
+      "zone-drop": "Drop",
+      "zone-external": "External",
+      "zone-home": "Home",
+      "zone-internal": "Internal",
+      "zone-public": "Public",
+      "zone-server": "Server",
+      "zone-trusted": "Trusted",
+      "zone-work": "Work",
+      "zone-workstation": "Workstation"
+    },
+    "printers": {
+      "cancel-jobs": "Cancel jobs",
+      "default": "Default",
+      "empty": "No printers yet. Add one in the printer setup page.",
+      "empty-hint": "Open the printer setup page to add a printer, then tap Refresh.",
+      "idle": "Idle",
+      "jobs": "{count} jobs",
+      "list": "Printers",
+      "missing": "Install printing support to manage printers from Control Center.",
+      "open": "Open printer setup",
+      "pause": "Pause printer",
+      "paused": "Paused",
+      "print-failed": "Could not send that file to the printer.",
+      "print-file": "Print a file",
+      "printing": "Printing",
+      "ready": "Ready",
+      "ready-hint": "Start printing to see printers here.",
+      "ready-hint-on": "Set a default, pause a printer, or print a file.",
+      "refresh": "Refresh",
+      "resume": "Resume printer",
+      "set-default": "Set as default",
+      "start": "Start printing",
+      "starting": "Starting…",
+      "status-failed": "Could not list printers.",
+      "stopped": "Printing is not running",
+      "title": "Printers",
+      "write-failed": "Could not update the printer. Confirm the password prompt if it appears."
+    },
+    "cast": {
+      "connecting": "Connecting",
+      "copy": "Copy address",
+      "copy-hint": "Copy the address to connect from another device.",
+      "credentials": "Sign in as {user}",
+      "displays": "Nearby displays",
+      "displays-empty": "No TVs or displays yet. Put the other device in wireless display mode, then tap Refresh.",
+      "idle": "Ready",
+      "protocol-chromecast": "Chromecast",
+      "protocol-display": "Display",
+      "protocol-miracast": "Wireless display",
+      "ready-hint": "Turning screen sharing on…",
+      "refresh": "Refresh",
+      "share": "Share this screen",
+      "share-failed": "Could not start screen sharing.",
+      "share-hint": "Connect from another computer with Remote Desktop using this address.",
+      "share-listening": "Listening at {address}",
+      "share-missing": "Install remote desktop support to share this screen.",
+      "share-off": "Not sharing",
+      "share-off-hint": "Turn on Share this screen so another computer can view it.",
+      "share-on": "Sharing this screen",
+      "share-title": "Screen sharing",
+      "sink-error": "Could not connect",
+      "start-stream": "Cast to this display",
+      "starting": "Starting…",
+      "status-failed": "Could not list nearby displays.",
+      "stop": "Stop casting",
+      "stream-failed": "Could not start or stop casting.",
+      "streaming": "Casting",
+      "view-only": "View only",
+      "wireless-hint": "Start wireless displays to find TVs and dongles on this network.",
+      "wireless-missing": "Install Network Displays to cast to a TV from Control Center.",
+      "wireless-off": "Wireless displays off",
+      "wireless-on": "Looking for displays",
+      "wireless-on-hint": "Tap a display to cast this screen.",
+      "wireless-open": "Open Network Displays",
+      "wireless-start": "Start wireless displays",
+      "wireless-title": "Wireless displays"
+    },
+    "privacy": {
+      "auto-locate": "Approximate location",
+      "auto-locate-looking": "Looking up this machine from your IP.",
+      "auto-locate-off": "Weather and night light can use an address instead.",
+      "auto-locate-on": "Look up this machine from your IP for weather and night light.",
+      "auto-locate-using": "Using {name} from your IP.",
+      "camera": "Camera",
+      "camera-idle": "No apps are using the camera.",
+      "idle": "Idle",
+      "idle-hint": "No apps are using the microphone, camera, or screen share.",
+      "in-use": "In use",
+      "in-use-camera": "An app is using the camera.",
+      "in-use-hint": "Apps are using the microphone, camera, or screen share.",
+      "in-use-microphone": "An app is using the microphone.",
+      "in-use-screen": "An app is sharing the screen.",
+      "microphone": "Microphone",
+      "microphone-idle": "No apps are using the microphone.",
+      "mute-microphone": "Mute microphone",
+      "screen": "Screen share",
+      "screen-idle": "No apps are sharing the screen.",
+      "title": "Privacy",
+      "this-machine": "This machine",
+      "telemetry": "Anonymous startup ping",
+      "telemetry-off": "Helix will not send a startup ping.",
+      "telemetry-on": "Helix sends a small anonymous ping when it starts.",
+      "unavailable": "Unavailable",
+      "unavailable-hint": "Audio is not active, so capture activity cannot be shown.",
+      "unknown-app": "Unknown app",
+      "unmute-microphone": "Unmute microphone"
     },
     "theme": {
       "niri-blur": "Compositor blur",
@@ -1560,7 +1744,7 @@
       "lockscreen-widgets-editor": "Lockscreen widget editor",
       "lockscreen-widgets-editor-blocked-locked": "Unlock the session before editing lockscreen widgets.",
       "lockscreen-widgets-editor-enabled": "Lockscreen widget editor is on. Switch to an empty workspace so open windows do not cover the editor.",
-      "mpris-disabled": "MPRIS disabled",
+      "mpris-disabled": "Media controls are off",
       "polkit-agent": "Polkit Agent",
       "polkit-no-session": "Polkit agent needs logind, elogind, or XDG_SESSION_ID. On seatd-only setups it cannot register for graphical prompts. Use terminal pkexec for greeter sync, or install elogind for in-session authentication.",
       "screen-time-reset": "Screen Time",
@@ -2132,8 +2316,8 @@
           "toast": "toast"
         },
         "flags-label": "When matched",
-        "match-content-label": "Content Regex",
-        "match-content-placeholder": "Regex pattern to match summary or body…",
+        "match-content-label": "Message text",
+        "match-content-placeholder": "Words in the title or body…",
         "match-label": "App",
         "match-placeholder": "App name, id, or category…",
         "override-duration": "Override duration",
@@ -3262,7 +3446,7 @@
               "label": "XDG activation"
             }
           },
-          "missing": "Not in niri config",
+          "missing": "Not in this config yet",
           "none-missing": "All recommended niri setup snippets are already present",
           "optional": "Optional",
           "present": "Found in niri config",
@@ -3655,9 +3839,9 @@
           "label": "Day Temperature"
         },
         "ddcutil": {
-          "description": "Control external monitor brightness via DDC/CI",
-          "label": "DDC/CI (ddcutil)",
-          "requires-ddcutil": "Install ddcutil to enable DDC/CI brightness control"
+          "description": "Adjust brightness on external displays, not only the laptop panel.",
+          "label": "External monitor brightness",
+          "requires-ddcutil": "Install ddcutil to control external monitor brightness"
         },
         "force-night-light": {
           "description": "Always apply night light regardless of time",
@@ -3686,7 +3870,7 @@
         },
         "mpris-blacklist": {
           "description": "Players to ignore for media controls and Now Playing",
-          "label": "MPRIS Player Blacklist"
+          "label": "Ignore players"
         },
         "night-light": {
           "description": "Shift screen colors warmer at night",
@@ -4038,16 +4222,16 @@
           "label": "Polkit Agent"
         },
         "privacy-cam-filter-regex": {
-          "description": "Regex for camera apps to ignore in privacy indicators and OSDs",
-          "label": "Camera Filter Regex"
+          "description": "App names to hide from the camera bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore camera apps"
         },
         "privacy-mic-filter-regex": {
-          "description": "Regex for microphone apps to ignore in privacy indicators and OSDs",
-          "label": "Microphone Filter Regex"
+          "description": "App names to hide from the microphone bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore microphone apps"
         },
         "privacy-screen-filter-regex": {
-          "description": "Regex for screen-sharing apps to ignore in privacy indicators and OSDs",
-          "label": "Screen Sharing Filter Regex"
+          "description": "App names to hide from the screen-share bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore screen-share apps"
         },
         "screen-time-enabled": {
           "description": "Track per-app usage and show it in Control Center",
@@ -4360,7 +4544,7 @@
           "placeholder": "Wallpaper directory"
         },
         "daily-nasa-api-key": {
-          "description": "Optional NASA API key for APOD. Empty uses NASA_API_KEY or DEMO_KEY",
+          "description": "Optional NASA key for Astronomy Picture of the Day. Leave empty to use NASA's demo key.",
           "label": "NASA API Key"
         },
         "daily-provider": {
@@ -5076,8 +5260,8 @@
           "label": "Bands"
         },
         "cam-filter-regex": {
-          "description": "Regular expression for camera process names to ignore",
-          "label": "Camera Filter Regex"
+          "description": "App names to hide from the camera bar icon. They still appear on the Privacy tab.",
+          "label": "Ignore camera apps"
         },
         "capsule": {
           "description": "Draw a capsule behind this widget",
@@ -5273,7 +5457,7 @@
           "label": "Hide When No Connected Device"
         },
         "hide-when-no-media": {
-          "description": "Hide the media widget when no MPRIS player is active",
+          "description": "Hide the media widget when nothing is playing",
           "label": "Hide When No Media"
         },
         "hide-when-no-unread": {
@@ -5384,8 +5568,8 @@
           "label": "Max Length"
         },
         "mic-filter-regex": {
-          "description": "Regular expression for microphone app names to ignore",
-          "label": "Microphone Filter Regex"
+          "description": "App names to hide from the microphone bar icon. They still appear on the Privacy tab.",
+          "label": "Ignore microphone apps"
         },
         "min-length": {
           "description": "Minimum widget length in pixels",

@@ -4,6 +4,7 @@
 #include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
@@ -25,6 +26,16 @@ using namespace control_center;
 namespace {
 
   constexpr float kRowMinHeight = Style::controlHeightLg;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   const char* glyphFor(BluetoothDeviceKind kind) {
     switch (kind) {
@@ -651,6 +662,7 @@ void BluetoothTab::syncHeader() {
   if (m_scanSpinner != nullptr) {
     const bool spinnerVisible = s.discovering && s.powered && s.adapterPresent;
     m_scanSpinner->setVisible(spinnerVisible);
+    m_scanSpinner->setParticipatesInLayout(spinnerVisible);
     if (spinnerVisible && !m_scanSpinner->spinning()) {
       m_scanSpinner->start();
     } else if (!spinnerVisible && m_scanSpinner->spinning()) {
@@ -667,7 +679,9 @@ void BluetoothTab::syncPairingCard() {
     return;
   }
   const bool hasPending = m_agent != nullptr && m_agent->hasPendingRequest();
-  m_pairingCard->setVisible(hasPending);
+  if (setShown(m_pairingCard, hasPending)) {
+    PanelManager::instance().requestLayout();
+  }
   if (!hasPending) {
     return;
   }
@@ -718,7 +732,7 @@ void BluetoothTab::syncPairingCard() {
     }
   }
   if (m_pairingCode != nullptr) {
-    m_pairingCode->setVisible(showsCode);
+    (void)setShown(m_pairingCode, showsCode);
     if (showsCode) {
       if (req.kind == BluetoothPairingKind::DisplayPinCode) {
         m_pairingCode->setText(req.pin);
@@ -730,12 +744,12 @@ void BluetoothTab::syncPairingCard() {
     }
   }
   if (m_pairingInputRow != nullptr) {
-    m_pairingInputRow->setVisible(needsInput);
+    (void)setShown(m_pairingInputRow, needsInput);
   }
   if (m_pairingAccept != nullptr) {
     // DisplayPasskey has nothing to accept: the code is entered on the device and there
     // is no Agent1 reply. Show only the Reject action so Accept cannot clear the card.
-    m_pairingAccept->setVisible(req.kind != BluetoothPairingKind::DisplayPasskey);
+    (void)setShown(m_pairingAccept, req.kind != BluetoothPairingKind::DisplayPasskey);
   }
 }
 

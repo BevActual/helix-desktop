@@ -464,19 +464,16 @@ void MonitorTab::setSettingsSearchQuery(std::string_view query) { m_settings->se
 
 void MonitorTab::syncHeaderActions() {
   const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
-  if (m_rescanButton != nullptr) {
-    const bool ddc = m_configService != nullptr && m_configService->config().brightness.enableDdcutil;
-    m_rescanButton->setVisible(ddc || niri);
-  }
-  if (m_saveButton != nullptr) {
-    m_saveButton->setVisible(niri);
+  const bool ddc = m_configService != nullptr && m_configService->config().brightness.enableDdcutil;
+  const bool layoutDirty = setShown(m_rescanButton, ddc || niri) || setShown(m_saveButton, niri);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
 void MonitorTab::syncStatusLabels() {
   const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
   if (m_noteLabel != nullptr) {
-    m_noteLabel->setVisible(niri);
     if (niri && m_displayConfig != nullptr) {
       const bool saved = compositors::niri::savedLayoutMatches(m_displayConfig->outputs());
       m_noteLabel->setText(
@@ -487,7 +484,11 @@ void MonitorTab::syncStatusLabels() {
   if (m_errorLabel != nullptr) {
     const std::string error = m_displayConfig != nullptr ? m_displayConfig->lastError() : std::string{};
     m_errorLabel->setText(error);
-    m_errorLabel->setVisible(!error.empty());
+  }
+  const bool layoutDirty = setShown(m_noteLabel, niri) ||
+                            setShown(m_errorLabel, m_errorLabel != nullptr && !m_errorLabel->text().empty());
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
@@ -1272,10 +1273,11 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
 
 void MonitorTab::syncNightLight() {
   const bool available = m_platform != nullptr && m_platform->hasGammaControl();
-  if (m_nightLightCard != nullptr) {
-    m_nightLightCard->setVisible(available);
-  }
+  bool layoutDirty = setShown(m_nightLightCard, available);
   if (!available) {
+    if (layoutDirty) {
+      PanelManager::instance().requestLayout();
+    }
     return;
   }
 
@@ -1314,7 +1316,8 @@ void MonitorTab::syncNightLight() {
     m_nightLightNightValue->setText(kelvinLabel(nightlight.nightTemperature));
   }
   m_syncingNightLight = false;
-  if (setShown(m_nightLightDetails, controlsOn)) {
+  layoutDirty = setShown(m_nightLightDetails, controlsOn) || layoutDirty;
+  if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
 }
@@ -1407,8 +1410,8 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
 
   const auto sources = collectCardSources(m_brightness, m_displayConfig);
   const bool empty = sources.empty();
-  if (m_emptyState != nullptr) {
-    m_emptyState->setVisible(empty);
+  if (setShown(m_emptyState, empty)) {
+    PanelManager::instance().requestLayout();
   }
   if (empty) {
     return;

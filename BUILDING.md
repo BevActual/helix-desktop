@@ -15,7 +15,7 @@ sudo pacman -S meson gcc just \
   cairo pango harfbuzz \
   libxkbcommon glib2 \
   libsecret libsodium \
-  sdbus-cpp libpipewire wireplumber polkit \
+  sdbus-cpp libpipewire wireplumber polkit cups \
   pam curl libwebp libjxl libsndfile librsvg \
   libqalculate libxml2 \
   md4c tomlplusplus libical \
@@ -33,7 +33,7 @@ sudo dnf install meson gcc-c++ just \
   cairo-devel pango-devel harfbuzz-devel \
   libxkbcommon-devel glib2-devel \
   libsecret-devel libsodium-devel \
-  sdbus-cpp-devel pipewire-devel wireplumber-devel \
+  sdbus-cpp-devel pipewire-devel wireplumber-devel cups-devel \
   pam-devel polkit-devel libcurl-devel libwebp-devel libjxl-devel libsndfile-devel librsvg2-devel \
   libqalculate-devel libxml2-devel \
   md4c-devel tomlplusplus-devel libical-devel \
@@ -51,7 +51,7 @@ sudo zypper install meson gcc-c++ just \
   cairo-devel pango-devel harfbuzz-devel \
   libxkbcommon-devel glib2-devel \
   libsecret-devel libsodium-devel \
-  sdbus-cpp-devel pipewire-devel wireplumber-devel \
+  sdbus-cpp-devel pipewire-devel wireplumber-devel cups-devel \
   pam-devel polkit-devel libcurl-devel libwebp-devel libjxl-devel libsndfile-devel librsvg-devel \
   libqalculate-devel libxml2-devel \
   md4c-devel tomlplusplus-devel libical-devel \
@@ -69,7 +69,7 @@ sudo apt install meson g++ just \
   libcairo2-dev libpango1.0-dev libharfbuzz-dev \
   libxkbcommon-dev libglib2.0-dev \
   libsecret-1-dev libsodium-dev \
-  libsdbus-c++-dev libpipewire-0.3-dev libwireplumber-0.5-dev \
+  libsdbus-c++-dev libpipewire-0.3-dev libwireplumber-0.5-dev libcups2-dev \
   libpam0g-dev libpolkit-agent-1-dev libpolkit-gobject-1-dev \
   libcurl4-openssl-dev libwebp-dev libjxl-dev libsndfile1-dev librsvg2-dev \
   libqalculate-dev libxml2-dev \
@@ -85,7 +85,7 @@ sudo xbps-install meson ninja pkg-config git \
   wayland-devel wayland-protocols libepoxy-devel \
   MesaLib-devel libglvnd-devel cairo-devel \
   pango-devel fontconfig-devel freetype-devel \
-  harfbuzz-devel libxkbcommon-devel pipewire-devel wireplumber-devel \
+  harfbuzz-devel libxkbcommon-devel pipewire-devel wireplumber-devel cups-devel \
   libsecret-devel libsodium-devel \
   libcurl-devel pam-devel libwebp-devel libjxl-devel libsndfile-devel \
   basu-devel sdbus-c++-devel \
@@ -103,7 +103,7 @@ sudo moss install meson gcc clang just \
   cairo-devel pango-devel harfbuzz-devel \
   libxkbcommon-devel glib2-devel \
   libsecret-devel libsodium-devel \
-  sdbus-cpp-devel pipewire-devel wireplumber-devel polkit-devel \
+  sdbus-cpp-devel pipewire-devel wireplumber-devel polkit-devel cups-devel \
   linux-pam-devel curl libwebp-devel libjxl-devel libsndfile-devel librsvg-devel \
   libqalculate-devel libxml2-devel \
   md4c-devel tomlplusplus-devel libical-devel \
@@ -122,6 +122,8 @@ the launcher calculator (arithmetic, unit and currency conversion).
 Polkit agent support requires development files that provide the `polkit-agent-1` and `polkit-gobject-1` pkg-config
 modules. Some distros ship these in the runtime `polkit` package, while split-package distros use names such as
 `polkit-devel`, `polkit-dev`, or `libpolkit-agent-1-dev` / `libpolkit-gobject-1-dev`.
+
+CUPS development files (`cups` pkg-config) are required to build the Printers tab.
 
 Pipewire libraries/headers are sufficient to build Noctalia, but there is also a runtime requirement for the pipewire
 daemon. Noctalia will abort startup if it can't connect to the daemon. If your distro splits the pipewire libraries

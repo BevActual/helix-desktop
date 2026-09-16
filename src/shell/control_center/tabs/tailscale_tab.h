@@ -46,8 +46,10 @@ private:
   Label* m_status = nullptr;
   Label* m_detail = nullptr;
   Label* m_health = nullptr;
+  Flex* m_ipRow = nullptr;
   Label* m_ipv4 = nullptr;
   Label* m_ipv6 = nullptr;
+  Flex* m_actionsRow = nullptr;
   Button* m_connectButton = nullptr;
   Button* m_copyIpButton = nullptr;
   Button* m_adminButton = nullptr;

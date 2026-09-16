@@ -6,6 +6,7 @@
 #include "i18n/i18n.h"
 #include "idle/idle_inhibitor.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/session/session_action_meta.h"
@@ -28,6 +29,16 @@
 using namespace control_center;
 
 namespace {
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   ColorRole healthRole(double health) {
     if (health >= 80.0) {
@@ -332,10 +343,10 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
 void PowerTab::syncSessionCard() {
   const bool lockEnabled = m_config != nullptr && m_config->isLockScreenEnabled();
   if (m_lockButton != nullptr) {
-    m_lockButton->setVisible(m_session != nullptr && lockEnabled);
+    (void)setShown(m_lockButton, m_session != nullptr && lockEnabled);
   }
   if (m_suspendButton != nullptr) {
-    m_suspendButton->setVisible(m_session != nullptr);
+    (void)setShown(m_suspendButton, m_session != nullptr);
   }
 
   const auto actionEnabled = [this](std::string_view action) {
@@ -350,23 +361,23 @@ void PowerTab::syncSessionCard() {
     return true;
   };
   if (m_logoutButton != nullptr) {
-    m_logoutButton->setVisible(actionEnabled("logout"));
+    (void)setShown(m_logoutButton, actionEnabled("logout"));
   }
   if (m_rebootButton != nullptr) {
-    m_rebootButton->setVisible(actionEnabled("reboot"));
+    (void)setShown(m_rebootButton, actionEnabled("reboot"));
   }
   if (m_shutdownButton != nullptr) {
-    m_shutdownButton->setVisible(actionEnabled("shutdown"));
+    (void)setShown(m_shutdownButton, actionEnabled("shutdown"));
   }
   if (m_powerActionsRow != nullptr) {
-    m_powerActionsRow->setVisible(
-        actionEnabled("logout") || actionEnabled("reboot") || actionEnabled("shutdown")
+    (void)setShown(
+        m_powerActionsRow, actionEnabled("logout") || actionEnabled("reboot") || actionEnabled("shutdown")
     );
   }
 
   const bool caffeineAvailable = m_idleInhibitor != nullptr && m_idleInhibitor->available();
   if (m_caffeineRow != nullptr) {
-    m_caffeineRow->setVisible(caffeineAvailable);
+    (void)setShown(m_caffeineRow, caffeineAvailable);
   }
   if (m_caffeineToggle != nullptr && caffeineAvailable) {
     m_syncingCaffeine = true;
@@ -815,7 +826,7 @@ void PowerTab::rebuildChargeLimits() {
     }
   }
 
-  m_chargingCard->setVisible(!batteries.empty());
+  (void)setShown(m_chargingCard, !batteries.empty());
   for (std::size_t i = 0; i < batteries.size() && i < m_chargeLimitRows.size(); ++i) {
     const auto& state = batteries[i].chargeLimit;
     auto& row = m_chargeLimitRows[i];
@@ -849,6 +860,7 @@ void PowerTab::rebuildChargeLimits() {
         && !configured.empty()
         && !sameThresholds(state);
     row.configuredLabel->setVisible(showConfigured);
+    row.configuredLabel->setParticipatesInLayout(showConfigured);
     if (showConfigured) {
       row.configuredLabel->setText(i18n::tr("control-center.power.charging.configured", "limits", configured));
     }
@@ -862,6 +874,7 @@ void PowerTab::rebuildChargeLimits() {
       management = i18n::tr("control-center.power.charging.display-only");
     }
     row.managementLabel->setVisible(!management.empty());
+    row.managementLabel->setParticipatesInLayout(!management.empty());
     if (!management.empty()) {
       row.managementLabel->setText(management);
       row.managementLabel->setColor(
@@ -870,6 +883,7 @@ void PowerTab::rebuildChargeLimits() {
     }
 
     row.controlRow->setVisible(control.visible);
+    row.controlRow->setParticipatesInLayout(control.visible);
     if (control.visible) {
       row.controlLabel->setColor(
           mode == ChargeLimitMode::ExternallyManaged ? colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F)
@@ -881,6 +895,7 @@ void PowerTab::rebuildChargeLimits() {
 
     const bool hasError = state.operationError != ChargeLimitOperationError::None;
     row.errorLabel->setVisible(hasError);
+    row.errorLabel->setParticipatesInLayout(hasError);
     if (hasError) {
       row.errorLabel->setText(
           i18n::tr(
@@ -899,7 +914,7 @@ void PowerTab::syncBatteryStatus() {
   }
 
   const UPowerState& state = m_upower->state();
-  m_statusCard->setVisible(state.isPresent);
+  (void)setShown(m_statusCard, state.isPresent);
   if (!state.isPresent) {
     return;
   }
@@ -923,7 +938,7 @@ void PowerTab::syncBatteryStatus() {
   const std::int64_t seconds = charging ? state.timeToFull : state.timeToEmpty;
   if (m_timeRow != nullptr) {
     const bool show = seconds > 0;
-    m_timeRow->setVisible(show);
+    (void)setShown(m_timeRow, show);
     if (show && m_timeLabel != nullptr) {
       const std::string duration = formatDuration(std::chrono::seconds{seconds});
       m_timeLabel->setText(
@@ -936,7 +951,7 @@ void PowerTab::syncBatteryStatus() {
 
   if (m_rateRow != nullptr) {
     const bool show = state.energyRate > 0.0;
-    m_rateRow->setVisible(show);
+    (void)setShown(m_rateRow, show);
     if (show && m_rateLabel != nullptr) {
       m_rateLabel->setText(std::format("{:.1F} W", state.energyRate));
     }
@@ -960,7 +975,7 @@ void PowerTab::syncPowerProfiles() {
   }
 
   if (m_inhibitedRow != nullptr) {
-    m_inhibitedRow->setVisible(!m_powerProfiles->state().performanceInhibited.empty());
+    (void)setShown(m_inhibitedRow, !m_powerProfiles->state().performanceInhibited.empty());
   }
 }
 
@@ -971,7 +986,7 @@ void PowerTab::syncBatteryHealth() {
 
   const UPowerDeviceInfo* battery = m_upower->defaultSystemBattery();
   const std::optional<double> health = battery != nullptr ? battery->healthPercent() : std::nullopt;
-  m_healthCard->setVisible(health.has_value());
+  (void)setShown(m_healthCard, health.has_value());
   if (!health) {
     return;
   }
@@ -1047,7 +1062,7 @@ void PowerTab::rebuildPeripherals() {
     }
   }
 
-  m_peripheralsCard->setVisible(!peripherals.empty());
+  (void)setShown(m_peripheralsCard, !peripherals.empty());
 
   for (std::size_t i = 0; i < m_peripheralRows.size() && i < peripherals.size(); ++i) {
     if (m_peripheralRows[i].pctLabel != nullptr) {

@@ -54,6 +54,11 @@
 #include "shell/control_center/tabs/system_tab.h"
 #include "shell/control_center/tabs/localsend_tab.h"
 #include "shell/control_center/tabs/phone_tab.h"
+#include "shell/control_center/tabs/syncthing_tab.h"
+#include "shell/control_center/tabs/firewall_tab.h"
+#include "shell/control_center/tabs/printers_tab.h"
+#include "shell/control_center/tabs/cast_tab.h"
+#include "shell/control_center/tabs/privacy_tab.h"
 #include "shell/control_center/tabs/tailscale_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
@@ -146,6 +151,11 @@ namespace {
       {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Services},
       {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Services},
       {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Services},
+      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Services},
+      {"firewall", "control-center.tabs.firewall", "shield-lock", true, TabGroup::Services},
+      {"printers", "control-center.tabs.printers", "printer", true, TabGroup::Services},
+      {"cast", "control-center.tabs.cast", "screen-share", true, TabGroup::Services},
+      {"privacy", "control-center.tabs.privacy", "eye-off", true, TabGroup::Services},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Services},
       {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Services},
       {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Services},
@@ -275,6 +285,11 @@ namespace {
         || id == "tailscale"
         || id == "localsend"
         || id == "phone"
+        || id == "syncthing"
+        || id == "firewall"
+        || id == "printers"
+        || id == "cast"
+        || id == "privacy"
         || id == "plugins"
         || id == "home"
         || id == "desktop"
@@ -434,6 +449,11 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("tailscale", std::make_unique<TailscaleTab>(services));
   add("localsend", std::make_unique<LocalSendTab>(services));
   add("phone", std::make_unique<PhoneTab>(services));
+  add("syncthing", std::make_unique<SyncthingTab>(services));
+  add("firewall", std::make_unique<FirewallTab>(services));
+  add("printers", std::make_unique<PrintersTab>(services));
+  add("cast", std::make_unique<CastTab>(services));
+  add("privacy", std::make_unique<PrivacyTab>(services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
   add("ai", std::make_unique<AiUsageTab>(services));
   add("capture", std::make_unique<CaptureTab>(services));

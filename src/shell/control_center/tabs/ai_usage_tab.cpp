@@ -525,6 +525,7 @@ void AiUsageTab::syncUi() {
     if (m_ollamaVersion != nullptr) {
       m_ollamaVersion->setText(ollama->version);
       m_ollamaVersion->setVisible(!ollama->version.empty());
+      m_ollamaVersion->setParticipatesInLayout(!ollama->version.empty());
     }
     const bool canStart =
         ollama->hasCli && ollama->local && ollama->status == OllamaStatus::Stopped && !ollama->busy;

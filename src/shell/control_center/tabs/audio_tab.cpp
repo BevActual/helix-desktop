@@ -1847,20 +1847,13 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
 std::unique_ptr<Flex> AudioTab::create() {
   const float scale = contentScale();
 
-  auto tab = ui::column(
-      {
-          .out = &m_rootLayout,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceMd * scale,
-      },
-      ui::column({
-          .out = &m_privacyCard,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceSm * scale,
-          .visible = false,
-          .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-      }),
-      ui::row(
+  auto tab =       ui::column(
+          {
+              .out = &m_rootLayout,
+              .align = FlexAlign::Stretch,
+              .gap = Style::spaceMd * scale,
+          },
+          ui::row(
           {
               .align = FlexAlign::Stretch,
               .gap = Style::spaceMd * scale,
@@ -1963,7 +1956,6 @@ std::unique_ptr<Flex> AudioTab::create() {
     m_easyEffects->refreshActiveEffectsProfiles();
   }
 
-  populatePrivacyCard(scale);
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
@@ -1992,7 +1984,6 @@ void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
 }
 
 void AudioTab::doUpdate(Renderer& renderer) {
-  rebuildPrivacyCard(renderer);
   rebuildProgramVolumes(renderer);
   syncValueLabelWidths(renderer);
   syncEffectsProfileControls(renderer);
@@ -2114,11 +2105,6 @@ void AudioTab::onClose() {
   m_inputDeviceVolume.volumeDebounceTimer.stop();
   m_programSinkDebounceTimer.stop();
   m_rootLayout = nullptr;
-  m_privacyCard = nullptr;
-  m_privacyList = nullptr;
-  m_privacyIdle = nullptr;
-  m_privacyMuteButton = nullptr;
-  m_lastPrivacyKey.clear();
   m_deviceColumn = nullptr;
   m_outputCard = nullptr;
   m_inputCard = nullptr;
@@ -2236,160 +2222,6 @@ void AudioTab::syncEffectsProfileControls(Renderer& /*renderer*/) {
       inputProfiles, activeInput, m_inputDeviceVolume.effectsProfileRow, m_inputDeviceVolume.effectsProfileSelect,
       AudioEffectsProfileKind::Input
   );
-}
-
-void AudioTab::populatePrivacyCard(float scale) {
-  if (m_privacyCard == nullptr) {
-    return;
-  }
-
-  auto header = makeCardHeaderRow(i18n::tr("control-center.audio.privacy"), scale);
-  header->addChild(
-      ui::button({
-          .out = &m_privacyMuteButton,
-          .glyph = "microphone-mute",
-          .variant = ButtonVariant::Ghost,
-          .tooltip = i18n::tr("control-center.audio.mute-microphone"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .visible = false,
-          .onClick =
-              [this]() {
-                if (m_audio == nullptr) {
-                  return;
-                }
-                const AudioNode* source = m_audio->defaultSource();
-                if (source == nullptr) {
-                  return;
-                }
-                m_audio->setMicMuted(!source->muted);
-                PanelManager::instance().refresh();
-              },
-      })
-  );
-  m_privacyCard->addChild(std::move(header));
-  m_privacyCard->addChild(
-      ui::label({
-          .out = &m_privacyIdle,
-          .text = i18n::tr("control-center.audio.privacy-idle"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
-      })
-  );
-  m_privacyCard->addChild(
-      ui::column({
-          .out = &m_privacyList,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceXs * scale,
-      })
-  );
-}
-
-void AudioTab::rebuildPrivacyCard(Renderer& /*renderer*/) {
-  if (m_privacyCard == nullptr || m_privacyList == nullptr) {
-    return;
-  }
-
-  const PrivacyState state = m_audio != nullptr ? m_audio->privacyState() : PrivacyState{};
-  std::string key;
-  key.reserve(state.captures.size() * 32);
-  for (const auto& capture : state.captures) {
-    key += std::to_string(static_cast<int>(capture.kind));
-    key.push_back(':');
-    key += std::to_string(capture.nodeId);
-    key.push_back(':');
-    key += capture.appName;
-    key.push_back('\n');
-  }
-  if (key == m_lastPrivacyKey) {
-    syncPrivacyMute();
-    return;
-  }
-
-  uiAssertNotRendering("AudioTab::rebuildPrivacyCard");
-  while (!m_privacyList->children().empty()) {
-    m_privacyList->removeChild(m_privacyList->children().front().get());
-  }
-
-  const float scale = contentScale();
-  const bool hasCaptures = !state.captures.empty();
-  m_privacyCard->setVisible(true);
-  if (m_privacyIdle != nullptr) {
-    m_privacyIdle->setVisible(!hasCaptures);
-  }
-  m_privacyList->setVisible(hasCaptures);
-
-  for (const auto& capture : state.captures) {
-    const char* glyph = "microphone";
-    const char* kindKey = "bar.widgets.privacy.microphone";
-    switch (capture.kind) {
-    case PrivacyCaptureKind::Camera:
-      glyph = "camera";
-      kindKey = "bar.widgets.privacy.camera";
-      break;
-    case PrivacyCaptureKind::Screen:
-      glyph = "screen-share";
-      kindKey = "bar.widgets.privacy.screen-sharing";
-      break;
-    case PrivacyCaptureKind::Microphone:
-      glyph = "microphone";
-      kindKey = "bar.widgets.privacy.microphone";
-      break;
-    }
-
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    row->addChild(
-        ui::glyph({
-            .glyph = glyph,
-            .glyphSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    row->addChild(
-        ui::label({
-            .text = i18n::tr(kindKey),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-    row->addChild(
-        ui::label({
-            .text = capture.appName,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    m_privacyList->addChild(std::move(row));
-  }
-
-  m_lastPrivacyKey = std::move(key);
-  syncPrivacyMute();
-}
-
-void AudioTab::syncPrivacyMute() {
-  if (m_privacyMuteButton == nullptr || m_audio == nullptr) {
-    return;
-  }
-  const bool hasMic = std::ranges::any_of(m_audio->privacyState().captures, [](const PrivacyCapture& capture) {
-    return capture.kind == PrivacyCaptureKind::Microphone;
-  });
-  const AudioNode* source = m_audio->defaultSource();
-  const bool muted = source != nullptr && source->muted;
-  m_privacyMuteButton->setVisible(hasMic && source != nullptr);
-  if (hasMic && source != nullptr) {
-    m_privacyMuteButton->setGlyph(muted ? "microphone" : "microphone-mute");
-    m_privacyMuteButton->setTooltip(
-        i18n::tr(muted ? "control-center.audio.unmute-microphone" : "control-center.audio.mute-microphone")
-    );
-    m_privacyMuteButton->setVariant(muted ? ButtonVariant::Default : ButtonVariant::Destructive);
-  }
 }
 
 void AudioTab::rebuildProgramVolumes(Renderer& renderer) {

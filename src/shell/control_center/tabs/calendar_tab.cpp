@@ -357,6 +357,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       })
   );
   eventsCard->setVisible(m_showEventsCard);
+  eventsCard->setParticipatesInLayout(m_showEventsCard);
 
   auto side = ui::column({
       .align = FlexAlign::Stretch,
@@ -779,7 +780,7 @@ void CalendarTab::setTimezoneError(std::string_view message) {
     return;
   }
   m_timezoneError->setText(std::string(message));
-  m_timezoneError->setVisible(!message.empty());
+  (void)setShown(m_timezoneError, !message.empty());
 }
 
 void CalendarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -1208,7 +1209,7 @@ void CalendarTab::toggleEventsCard() {
     m_toggleEventsCardButton->setGlyph(m_showEventsCard ? "calendar-event" : "calendar-off");
     m_toggleEventsCardButton->setSelected(m_showEventsCard);
   }
-  if (m_eventsCard != nullptr) {
-    m_eventsCard->setVisible(m_showEventsCard);
+  if (setShown(m_eventsCard, m_showEventsCard)) {
+    PanelManager::instance().requestLayout();
   }
 }

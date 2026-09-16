@@ -17,6 +17,10 @@ class ScreenRecorderService;
 class TailscaleService;
 class LocalSendService;
 class PhoneConnectService;
+class SyncthingService;
+class FirewallService;
+class PrinterService;
+class CastService;
 class WeatherService;
 class HttpClient;
 class ClipboardService;
@@ -47,6 +51,10 @@ struct ShortcutServices {
   TailscaleService* tailscale = nullptr;
   LocalSendService* localSend = nullptr;
   PhoneConnectService* phone = nullptr;
+  SyncthingService* syncthing = nullptr;
+  FirewallService* firewall = nullptr;
+  PrinterService* printers = nullptr;
+  CastService* cast = nullptr;
   // Plugin shortcut runtime dependencies.
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;

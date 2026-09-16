@@ -12,8 +12,12 @@
 #include "idle/idle_inhibitor.h"
 #include "ipc/ipc_service.h"
 #include "net/localsend_service.h"
+#include "net/syncthing_service.h"
 #include "net/tailscale_service.h"
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/firewall/firewall_service.h"
+#include "dbus/cups/printer_service.h"
+#include "dbus/cast/cast_service.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
 #include "core/process/process.h"
@@ -268,7 +272,7 @@ namespace {
         }
       }
     }
-    void onRightClick() override { openTab("audio"); }
+    void onRightClick() override { openTab("privacy"); }
 
   private:
     PipeWireService* m_svc;
@@ -669,6 +673,98 @@ namespace {
     PhoneConnectService* m_service = nullptr;
   };
 
+  class SyncthingShortcut final : public Shortcut {
+  public:
+    explicit SyncthingShortcut(SyncthingService* service) : m_service(service) {}
+    std::string_view id() const override { return "syncthing"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.syncthing"); }
+    std::string_view iconOn() const override { return "folder"; }
+    std::string_view iconOff() const override { return "folder"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override { return m_service != nullptr && m_service->running(); }
+    void onClick() override { openTab("syncthing"); }
+    void onRightClick() override { openTab("syncthing"); }
+
+  private:
+    SyncthingService* m_service = nullptr;
+  };
+
+  class FirewallShortcut final : public Shortcut {
+  public:
+    explicit FirewallShortcut(FirewallService* service) : m_service(service) {}
+    std::string_view id() const override { return "firewall"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.firewall"); }
+    std::string_view iconOn() const override { return "shield-lock"; }
+    std::string_view iconOff() const override { return "shield-lock"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override { return m_service != nullptr && m_service->snapshot().panic; }
+    void onClick() override { openTab("firewall"); }
+    void onRightClick() override { openTab("firewall"); }
+
+  private:
+    FirewallService* m_service = nullptr;
+  };
+
+  class PrintersShortcut final : public Shortcut {
+  public:
+    explicit PrintersShortcut(PrinterService* service) : m_service(service) {}
+    std::string_view id() const override { return "printers"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.printers"); }
+    std::string_view iconOn() const override { return "printer"; }
+    std::string_view iconOff() const override { return "printer"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override {
+      if (m_service == nullptr) {
+        return false;
+      }
+      return std::ranges::any_of(m_service->snapshot().printers, [](const PrinterInfo& printer) {
+        return printer.state == "printing" || printer.jobCount > 0;
+      });
+    }
+    void onClick() override { openTab("printers"); }
+    void onRightClick() override { openTab("printers"); }
+
+  private:
+    PrinterService* m_service = nullptr;
+  };
+
+  class CastShortcut final : public Shortcut {
+  public:
+    explicit CastShortcut(CastService* service) : m_service(service) {}
+    std::string_view id() const override { return "cast"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.cast"); }
+    std::string_view iconOn() const override { return "screen-share"; }
+    std::string_view iconOff() const override { return "screen-share"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override { return m_service != nullptr && m_service->sharing(); }
+    void onClick() override { openTab("cast"); }
+    void onRightClick() override { openTab("cast"); }
+
+  private:
+    CastService* m_service = nullptr;
+  };
+
+  class PrivacyShortcut final : public Shortcut {
+  public:
+    explicit PrivacyShortcut(PipeWireService* audio) : m_audio(audio) {}
+    std::string_view id() const override { return "privacy"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.privacy"); }
+    std::string_view iconOn() const override { return "eye-off"; }
+    std::string_view iconOff() const override { return "eye-off"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override { return m_audio != nullptr && !m_audio->privacyState().captures.empty(); }
+    void onClick() override { openTab("privacy"); }
+    void onRightClick() override { openTab("privacy"); }
+
+  private:
+    PipeWireService* m_audio = nullptr;
+  };
+
   using ShortcutCreator = std::unique_ptr<Shortcut> (*)(const ShortcutServices& services);
   using ShortcutAvailability = bool (*)(const Config& config);
 
@@ -795,6 +891,26 @@ namespace {
       builtinShortcut<PhoneShortcut, &ShortcutServices::phone>({
           .type = "phone",
           .labelKey = "control-center.shortcuts.phone",
+      }),
+      builtinShortcut<SyncthingShortcut, &ShortcutServices::syncthing>({
+          .type = "syncthing",
+          .labelKey = "control-center.shortcuts.syncthing",
+      }),
+      builtinShortcut<FirewallShortcut, &ShortcutServices::firewall>({
+          .type = "firewall",
+          .labelKey = "control-center.shortcuts.firewall",
+      }),
+      builtinShortcut<PrintersShortcut, &ShortcutServices::printers>({
+          .type = "printers",
+          .labelKey = "control-center.shortcuts.printers",
+      }),
+      builtinShortcut<CastShortcut, &ShortcutServices::cast>({
+          .type = "cast",
+          .labelKey = "control-center.shortcuts.cast",
+      }),
+      builtinShortcut<PrivacyShortcut, &ShortcutServices::audio>({
+          .type = "privacy",
+          .labelKey = "control-center.shortcuts.privacy",
       }),
   });
 

@@ -40,11 +40,16 @@ class SystemMonitorService;
 class TailscaleService;
 class LocalSendService;
 class PhoneConnectService;
+class SyncthingService;
+class FirewallService;
+class PrinterService;
+class CastService;
 class ThumbnailService;
 class UPowerService;
 class VideoWallpaperService;
 class Wallpaper;
 class WeatherService;
+class LocationService;
 class GammaService;
 class WallpaperScanner;
 class DesktopWidgetsController;
@@ -70,6 +75,7 @@ struct ControlCenterServices {
   ConfigService* config = nullptr;
   HttpClient* httpClient = nullptr;
   WeatherService* weather = nullptr;
+  LocationService* location = nullptr;
   PipeWireSpectrum* spectrum = nullptr;
   UPowerService* upower = nullptr;
   PowerProfilesService* powerProfiles = nullptr;
@@ -109,6 +115,10 @@ struct ControlCenterServices {
   TailscaleService* tailscale = nullptr;
   LocalSendService* localSend = nullptr;
   PhoneConnectService* phone = nullptr;
+  SyncthingService* syncthing = nullptr;
+  FirewallService* firewall = nullptr;
+  PrinterService* printers = nullptr;
+  CastService* cast = nullptr;
   DesktopWidgetsController* desktopWidgets = nullptr;
   std::function<void()> upgradeShell;
   std::function<bool()> upgradeAvailable;
@@ -139,6 +149,10 @@ struct ControlCenterServices {
         .tailscale = tailscale,
         .localSend = localSend,
         .phone = phone,
+        .syncthing = syncthing,
+        .firewall = firewall,
+        .printers = printers,
+        .cast = cast,
         .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,

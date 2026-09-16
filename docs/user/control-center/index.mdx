@@ -47,7 +47,7 @@ sidebar = "compact"
 | `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Control Center → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Look** (theme, type, scale, roundness, wallpaper, templates), **Layout** (bar, panels, dock, desktop, windows, OSD), **Status** (media, audio, weather, and the other live pages), **Services** (packages, capture, clipboard, and similar tools), **Behavior** (launcher, keybinds, shell), then **Advanced** (security, hooks, niri, Control Center, plugins). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Look** (theme, type, scale, roundness, wallpaper, templates), **Layout** (bar, panels, dock, desktop, windows, OSD), **Status** (media, audio, weather, and the other live pages), **Services** (packages, Phone, Syncthing, Firewall, Printers, Cast, Privacy, capture, clipboard, and similar tools), **Behavior** (launcher, keybinds, shell), then **Advanced** (security, hooks, niri, Control Center, plugins). Compact mode uses separators between those groups instead of captions.
 
 Plugin Control Center tabs stay in **Status**. User `hidden_tabs` still hide any tab in every group.
 
@@ -63,11 +63,11 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `type` | Type | Shell font family. Header gear repeats that setting. |
 | `scale` | Scale | Interface scale. Header gear repeats that setting. |
 | `roundness` | Roundness | Shell corner scale, plus bar, dock, and (on niri) app-window corner radius. |
-| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. On niri, a live overview-wallpaper preset sits above the picker. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and niri backdrop blur/tint. |
-| `templates` | Templates | Built-in, community, and user app-theme catalogs. Hover Built-In/Community/User. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
+| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
+| `templates` | Templates | Built-in, community, and user app-theme catalogs. Hover Built-In/Community/User. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches, and greeter sync when the greeter is installed. |
 | `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
-| `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
-| `audio` | Audio | Privacy capture list, output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
+| `media` | Media | Media players, playback controls, and artwork. Header gear opens player ignore list. |
+| `audio` | Audio | Output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Night light, per-display brightness, plus, on niri, resolution, refresh rate, scale, rotation, VRR, and arrangement. Header gear opens brightness service settings. |
 | `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
 | `power` | Power | Lock, suspend, logout, reboot, shutdown, caffeine, battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
@@ -79,16 +79,21 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
 | `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
 | `ai` | AI | Rate-limit meters and Open actions for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, and DeepSeek, plus local Ollama status, models, and start/stop. `ai-usage` still opens this tab. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. |
-| `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, audio, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
+| `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Turning sharing off leaves the enable switch. Header gear opens receive folder, auto-accept, and port. |
-| `phone` | Phone | Pair and talk to a phone through KDE Connect: battery, ping, ring, send a file or clipboard. The tab stays available when `kdeconnectd` is missing; **Start KDE Connect** tries to launch it. Header refresh rediscovers devices. |
+| `phone` | Phone | Pair and talk to a phone through KDE Connect: battery, ping, ring, send a file or clipboard. The tab stays available when KDE Connect is missing; **Start KDE Connect** tries to launch it. Header refresh rediscovers devices. |
+| `syncthing` | Syncthing | Start or stop the local Syncthing daemon, copy this device ID, open the web UI, scan or pause folders, and see connected devices. The tab stays available when Syncthing is missing. Header refresh reloads status. |
+| `firewall` | Firewall | Default zone, panic mode (block all traffic), and incoming services for the current zone. **Save for next boot** writes the runtime config to disk. The tab stays available when the system firewall is missing. Header refresh reloads status. |
+| `printers` | Printers | Start printing, list printers, set the default, pause or resume, cancel jobs, and print a file. **Open printer setup** opens the CUPS web UI. The tab stays available when printing is missing. Header refresh reloads status. |
+| `cast` | Cast | Share this screen over Remote Desktop, or cast to a nearby TV. Screen sharing uses the session remote-desktop service. Wireless displays use Network Displays when it is installed. Header refresh reloads status. |
+| `privacy` | Privacy | Live microphone, camera, and screen-share captures, mute the default microphone, plus approximate location and the anonymous startup ping. Header gear opens capture-name filters used by the bar widget and OSD. |
 | `desktop` | Desktop | Desktop widgets on/off, widget count and Edit when widgets are on, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
 | `windows` | Windows | niri window spacing: gaps, outer padding, and how wide new columns start (percent of the display). Shown only in a niri session. Header gear repeats those sliders. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Turning the dock off hides the rest of the live controls. Header gear opens monitors, layer, size, shape, and magnification. |
 | `panels` | Panels | Shared panel layer, transparency, borders, list-row tint, and floating offset. Hover Top/Overlay and Solid/Soft/Glass for what each does. Header gear repeats those plus per-panel placement. |
-| `launcher` | Launcher | Open launcher, appearance toggles, unprefixed providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens placement, prefixes, auto-paste, and currency. |
+| `launcher` | Launcher | Open launcher, always-in-search providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
 | `control-center` | Control Center | Sidebar, width, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
 | `osd` | OSD | On-screen pop-ups for volume, brightness, and other events. Turning OSD off leaves the enable switch. Position follows orientation (wide vs stacked). Header gear opens popup kinds, monitors, and offsets, and repeats enable/position. |
 | `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. |
@@ -99,7 +104,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `plugins` | Plugins | Installed plugins and the plugin store. Hover Installed/Store. Header gear opens catalog sources. |
 | `packages` | Packages | Fedora, Flatpak, and firmware updates, search, and installs. Hover a source or Search/Updates/Installed. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, and Phone tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
+`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -134,9 +139,7 @@ Header gear opens language, icon tint, high contrast, motion, borders, and shado
 
 The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source, a Daily Bing/NASA source, and a folder button to choose any image. Select a monitor (or **ALL**) on the Current strip, then click a tile to apply it. The strip also has star and lock-screen actions. Theme-from-wallpaper controls appear when that wallpaper is starred. Video runs `mpvpaper` directly; `mpvpaper` must be installed.
 
-On niri, an **Overview wallpaper** control sits above the picker: none, blurred backdrop, stationary wallpaper, or a flat color. Hover a segment for what it does.
-
-Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, the Wallhaven API key, and Daily source. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`. `noctalia msg panel-toggle wallpaper daily` (or `bing` / `nasa`) opens Daily on that panel; `noctalia msg panel-toggle control-center wallpaper daily` does the same in Control Center.
+Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, the Wallhaven API key, Daily source, and on niri the overview wallpaper preset (none, blurred backdrop, stationary, or a flat color) plus backdrop blur/tint. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`. `noctalia msg panel-toggle wallpaper daily` (or `bing` / `nasa`) opens Daily on that panel; `noctalia msg panel-toggle control-center wallpaper daily` does the same in Control Center.
 
 ## Templates
 
@@ -144,11 +147,11 @@ The Templates tab browses app-theme templates the same way Wallpaper browses ima
 
 The header **+** button picks an installed application. If a built-in or community template matches that app, Noctalia enables it. Otherwise it scaffolds a user template under `~/.config/noctalia/templates/` and opens the starter file so you can map tokens to the app's theme format. A sheet then asks for the output path the application actually reads, plus an optional post-hook. On the User catalog, each tile's gear edits those fields or deletes the GUI-created entry (starter files stay on disk). The header folder button opens that templates directory.
 
-When Noctalia Greeter is installed, Sync Now and Auto-Sync on this tab copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK follow prompt when GTK templates are off.
+When Noctalia Greeter is installed, header gear has **Sync Now** and **Auto-Sync** to copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK follow prompt when GTK templates are off.
 
 Palettes stay on **Theme**.
 
-Header gear opens the built-in and community catalog enable switches. `noctalia msg settings-toggle templates` opens that settings view. Community catalog search from a settings search still offers **Browse Templates** as a sheet.
+Header gear opens the built-in and community catalog enable switches, plus greeter sync when it is available. `noctalia msg settings-toggle templates` opens that settings view. Community catalog search from a settings search still offers **Browse Templates** as a sheet.
 
 ## Keybinds
 
@@ -162,11 +165,11 @@ In-panel navigation (Enter, Escape, arrows, Tab) still uses the defaults. Header
 
 ## Media
 
-The Media tab shows active MPRIS players and exposes playback controls independent of any bar media widget. It is useful when multiple players are running or when artwork and track metadata need more room than a bar capsule can provide.
+The Media tab shows active players and playback controls independent of any bar media widget. It is useful when multiple players are running or when artwork and track metadata need more room than a bar capsule can provide.
 
 ## Audio
 
-The Audio tab groups PipeWire output, input, device, and stream controls. A **Privacy** card lists which apps are using the microphone, camera, or screen share. Mute the default microphone from that card when a mic capture is active. Use it for volume changes, muting, selecting devices, and inspecting application streams without opening an external mixer.
+The Audio tab groups PipeWire output, input, device, and stream controls. Use it for volume changes, muting, selecting devices, and inspecting application streams without opening an external mixer. Microphone, camera, and screen-share captures live on [Privacy](#privacy).
 
 ## Monitor
 
@@ -242,7 +245,7 @@ The Screenshot segment starts a region capture, fullscreen capture, a display pi
 
 ### Screen Record {#screen-record}
 
-The Record segment starts and stops a recording without the official plugin. Control Center closes first so it is not in the video. **Focused** records the active monitor. **Region** is shown when `wf-recorder` is installed and uses the same overlay as screenshots. **Portal** is shown when `gpu-screen-recorder` is installed and opens the desktop portal picker. Hover a source or delay for what it does. Use the delay control (Now / 3s / 5s) when you need Control Center fully gone before capture starts. Elapsed time stays visible at `00:00` until a recording is running; the backend line always names the tool in use, or tells you to install one. Recent `.mp4` files from the save folder appear under **Recent recordings**; click a name to open one, or trash (click twice) to delete it. Header gear opens `[shell.screen_record]` for the save folder, filename pattern, audio, cursor, and replay duration.
+The Record segment starts and stops a recording without the official plugin. Control Center closes first so it is not in the video. **Focused** records the active monitor. **Region** is shown when `wf-recorder` is installed and uses the same overlay as screenshots. **Portal** is shown when `gpu-screen-recorder` is installed and opens the desktop portal picker. Hover a source or delay for what it does. Use the delay control (Now / 3s / 5s) when you need Control Center fully gone before capture starts. Elapsed time appears while a recording is running. If no recorder is installed, the tab tells you to install one. Recent `.mp4` files from the save folder appear under **Recent recordings**; click a name to open one, or trash (click twice) to delete it. Header gear opens `[shell.screen_record]` for the save folder, filename pattern, audio, cursor, and replay duration.
 
 A **Replay buffer** card starts `gpu-screen-recorder` in replay mode (`-r`) the same way Record starts a capture. Start the buffer, then **Save replay** writes the last N seconds without stopping it. **Stop replay buffer** ends the process without saving. Replay needs `gpu-screen-recorder` (native or Flatpak `com.dec05eba.gpu_screen_recorder`); region source is not used for replay. Record and replay cannot run at the same time.
 
@@ -310,13 +313,51 @@ IPC: `localsend-toggle`, `localsend-status`, and `localsend-announce`. See [Medi
 
 ## Phone
 
-The Phone tab talks to the session `kdeconnectd` daemon (`org.kde.kdeconnect`). Pair a phone running KDE Connect, then ping it, ring it, send a file, or send the clipboard. Battery percent shows when the phone reports it. Unpaired nearby devices get a Pair button; an incoming pair request shows Accept and Decline plus the verification code.
+The Phone tab talks to the session KDE Connect daemon (`org.kde.kdeconnect`). Pair a phone running KDE Connect, then ping it, ring it, send a file, or send the clipboard. Battery percent shows when the phone reports it. Unpaired nearby devices get a Pair button; an incoming pair request shows Accept and Decline plus the verification code.
 
-The tab stays in the sidebar when KDE Connect is not installed. **Start KDE Connect** asks D-Bus to launch `kdeconnectd` if the package is present. Opening the tab also asks the daemon to look for nearby devices; closing the tab stops that scan.
+The tab stays in the sidebar when KDE Connect is not installed. **Start KDE Connect** asks D-Bus to launch the daemon if the package is present. Opening the tab also asks the daemon to look for nearby devices; closing the tab stops that scan.
 
 Helix does not replace KDE Connect's own pairing UI on the phone. Install the KDE Connect app on the other device and keep it on the same network.
 
 IPC: `phone-status`, `phone-ping`, and `phone-ring`. See [Media & UI](/noctalia/ipc/media-and-ui/#phone).
+
+## Syncthing
+
+The Syncthing tab talks to the local Syncthing daemon (`127.0.0.1:8384` by default). Start it from the live view if it is installed but not running. When it is up, the tab shows this machine's name, a copyable device ID, folders with scan/pause, and other devices. **Open Syncthing** opens the web UI for adding folders and pairing.
+
+The tab stays in the sidebar when Syncthing is not installed. Adding folders and devices stays in the Syncthing UI.
+
+IPC: `syncthing-status`, `syncthing-start`, and `syncthing-stop`. See [Media & UI](/noctalia/ipc/media-and-ui/#syncthing).
+
+## Firewall
+
+The Firewall tab talks to firewalld (`org.fedoraproject.FirewallD1`). Pick the default zone, toggle incoming services such as Remote login and KDE Connect, and use **Block all traffic** for panic mode. Changes apply immediately to the running firewall. **Save for next boot** copies that runtime config to disk.
+
+The tab stays in the sidebar when firewalld is not installed. **Start firewall** asks systemd to start `firewalld.service` and may show a password prompt.
+
+IPC: `firewall-status` and `firewall-panic-toggle`. See [Media & UI](/noctalia/ipc/media-and-ui/#firewall).
+
+## Printers
+
+The Printers tab talks to CUPS. Start the printing service, pick a default printer, pause or resume a queue, cancel jobs, and print a file. **Open printer setup** opens the CUPS web UI at `http://localhost:631`.
+
+The tab stays in the sidebar when printing is not running. **Start printing** asks systemd to start `cups.service` and may show a password prompt.
+
+IPC: `printers-status` and `printers-start`. See [Media & UI](/noctalia/ipc/media-and-ui/#printers).
+
+## Cast
+
+The Cast tab shares this screen over Remote Desktop (`grdctl`) and can cast to a nearby TV through Network Displays (`org.gnome.NetworkDisplays.Manager`). **Share this screen** starts the session remote-desktop service and shows the listen address. **Start wireless displays** launches Network Displays when it is installed.
+
+The tab stays in the sidebar when those packages are missing so you can turn sharing on from the tab itself.
+
+IPC: `cast-status` and `cast-share-toggle`. See [Media & UI](/noctalia/ipc/media-and-ui/#cast).
+
+## Privacy
+
+The Privacy tab lists which apps are using the microphone, camera, or screen share right now. Mute the default microphone from the status card. **Approximate location** looks this machine up from its IP for weather and night light; turn it off and set an address on Weather if you still need a location. **Anonymous startup ping** is the same switch as Security. Header gear opens `[shell.privacy]` capture-name filters used by the bar widget and OSD; those filters do not hide apps on this tab.
+
+IPC: `privacy-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#privacy).
 
 ## Weather
 
@@ -401,7 +442,7 @@ ollama = "auto"
 
 Settings pages are Control Center tabs. Theme, Type, Scale, Roundness, Wallpaper, and Templates sit under **Look**. Bar, Panels, Dock, Desktop, Windows, and OSD sit under **Layout**. Live status pages sit under **Status**. Packages, capture, clipboard, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Behavior**. Security, hooks, niri, Control Center options, and plugins sit under **Advanced**.
 
-Domain options that belong with a live view are on that tab: theme and palette on Theme (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), font on Type, UI scale on Scale, corner radius on Roundness, greeter sync on Templates, the wallpaper picker on Wallpaper (header gear for folders and Wallhaven), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures on Audio, the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher appearance/pins on Launcher (header gear for the longer forms), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
+Domain options that belong with a live view are on that tab: theme and palette on Theme (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), font on Type, UI scale on Scale, corner radius on Roundness, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the settings registry on the current tab’s gear sheet when that section matches. If it does not, Control Center opens the best matching section in gear mode instead of always dumping onto Theme.
 

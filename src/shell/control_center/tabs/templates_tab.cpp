@@ -6,7 +6,6 @@
 #include "render/core/renderer.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
-#include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/settings/settings_content.h"
@@ -246,10 +245,9 @@ std::size_t TemplatesTab::indexFromSource(Source source) noexcept {
 TemplatesTab::TemplatesTab(const ControlCenterServices& services)
     : m_config(services.config),
       m_applyTemplates(services.settingsActions.applyTemplates),
-      m_syncGreeter(services.settingsActions.syncGreeterAppearance),
       m_templateApply(services.templateApply),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "templates", .includedGroups = {"built-in", "community"}}
+          services, SettingsPaneOptions{.section = "templates", .includedGroups = {"built-in", "community", "greeter"}}
       )) {
   if (m_config != nullptr) {
     if (const std::optional<std::string> source = m_config->stateString("templates_tab", "source")) {
@@ -364,67 +362,6 @@ std::unique_ptr<Flex> TemplatesTab::create() {
       })
   );
 
-  auto greeterCard = ui::column({
-      .out = &m_greeterCard,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = false,
-      .participatesInLayout = false,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*greeterCard, i18n::tr("settings.navigation.groups.greeter"), scale);
-  greeterCard->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.shell.sync-greeter.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 3,
-      })
-  );
-  auto greeterAutoRow = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  greeterAutoRow->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.shell.greeter-sync-auto.label"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  greeterAutoRow->addChild(
-      ui::toggle({
-          .out = &m_greeterAutoSync,
-          .scale = scale,
-          .onChange = [this](bool enabled) { applyGreeterAutoSync(enabled); },
-      })
-  );
-  greeterCard->addChild(std::move(greeterAutoRow));
-  greeterCard->addChild(
-      ui::button({
-          .out = &m_greeterSyncButton,
-          .text = i18n::tr("settings.schema.shell.sync-greeter.button"),
-          .glyph = "refresh",
-          .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
-          .minHeight = controlHeight,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
-          .onClick =
-              [this]() {
-                if (m_syncGreeter) {
-                  m_syncGreeter();
-                }
-              },
-      })
-  );
-  live->addChild(std::move(greeterCard));
-
   live->addChild(
       ui::column({
           .out = &m_storeHost,
@@ -492,9 +429,6 @@ void TemplatesTab::onClose() {
   m_newButton = nullptr;
   m_gtkFollowHint = nullptr;
   m_gtkFollowButton = nullptr;
-  m_greeterCard = nullptr;
-  m_greeterAutoSync = nullptr;
-  m_greeterSyncButton = nullptr;
   m_storePopulated = false;
 }
 
@@ -621,7 +555,6 @@ void TemplatesTab::syncLiveControls() {
   }
 
   syncGtkFollow();
-  syncGreeterCard();
 }
 
 void TemplatesTab::syncGtkFollow() {
@@ -659,26 +592,6 @@ void TemplatesTab::enableGtkTemplates() {
     m_applyTemplates();
   }
   syncGtkFollow();
-}
-
-void TemplatesTab::applyGreeterAutoSync(bool enabled) {
-  if (m_syncing || m_config == nullptr) {
-    return;
-  }
-  (void)m_config->setOverride({"shell", "greeter_sync", "auto_sync"}, enabled);
-}
-
-void TemplatesTab::syncGreeterCard() {
-  const bool available =
-      m_config != nullptr && greeter::appearanceSyncAvailable(m_config->config().shell.greeterSync);
-  setShown(m_greeterCard, available);
-  if (!available || m_greeterAutoSync == nullptr) {
-    return;
-  }
-  m_greeterAutoSync->setCheckedImmediate(m_config->config().shell.greeterSync.autoSync);
-  if (m_greeterSyncButton != nullptr) {
-    m_greeterSyncButton->setEnabled(static_cast<bool>(m_syncGreeter));
-  }
 }
 
 void TemplatesTab::applySource(std::size_t index) {

@@ -1567,6 +1567,13 @@ namespace settings {
       e.visibleWhen = communityTemplatesOn;
       entries.push_back(std::move(e));
     }
+    if (env.greeterSyncAvailable) {
+      entries.push_back(makeEntry(
+          SettingsSection::Templates, "greeter", tr("settings.schema.shell.greeter-sync-auto.label"),
+          tr("settings.schema.shell.greeter-sync-auto.description"), {"shell", "greeter_sync", "auto_sync"},
+          ToggleSetting{cfg.shell.greeterSync.autoSync}, "greeter sync auto automatic login"
+      ));
+    }
 
     // Dock
     entries.push_back(makeEntry(
@@ -2088,7 +2095,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg), .maxItems = 6
         },
-        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone"
+        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
@@ -2423,11 +2430,6 @@ namespace settings {
               .browseFileExtensions = {},
           },
           "greeter sync pkexec run0 ghostty terminal sudo polkit wrapper"
-      ));
-      entries.push_back(makeEntry(
-          SettingsSection::Security, "greeter", tr("settings.schema.shell.greeter-sync-auto.label"),
-          tr("settings.schema.shell.greeter-sync-auto.description"), {"shell", "greeter_sync", "auto_sync"},
-          ToggleSetting{cfg.shell.greeterSync.autoSync}, "greeter sync auto automatic"
       ));
     }
     // Shell

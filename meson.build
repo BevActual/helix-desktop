@@ -96,6 +96,7 @@ md4c_dep            = dependency('md4c')
 nlohmann_dep        = dependency('nlohmann_json')
 tomlplusplus_dep    = dependency('tomlplusplus')
 libical_dep         = dependency('libical')
+cups_dep            = dependency('cups')
 pam_dep             = cc.find_library('pam')
 dl_dep              = cpp.find_library('dl', required: false)
 
@@ -484,6 +485,9 @@ _noctalia_sources = files(
   'src/dbus/logind/logind_service.cpp',
   'src/dbus/modem/modem_manager_service.cpp',
   'src/dbus/kdeconnect/phone_connect_service.cpp',
+  'src/dbus/firewall/firewall_service.cpp',
+  'src/dbus/cups/printer_service.cpp',
+  'src/dbus/cast/cast_service.cpp',
   'src/dbus/mpris/mpris_art.cpp',
   'src/dbus/mpris/mpris_service.cpp',
   'src/dbus/network/external_ip_service.cpp',
@@ -534,6 +538,7 @@ _noctalia_sources = files(
   'src/net/uri.cpp',
   'src/net/url_open.cpp',
   'src/net/tailscale_service.cpp',
+  'src/net/syncthing_service.cpp',
   'src/net/localsend_protocol.cpp',
   'src/net/localsend_service.cpp',
   'src/notification/notification_manager.cpp',
@@ -688,6 +693,11 @@ _noctalia_sources = files(
   'src/shell/control_center/tabs/tailscale_tab.cpp',
   'src/shell/control_center/tabs/localsend_tab.cpp',
   'src/shell/control_center/tabs/phone_tab.cpp',
+  'src/shell/control_center/tabs/syncthing_tab.cpp',
+  'src/shell/control_center/tabs/firewall_tab.cpp',
+  'src/shell/control_center/tabs/printers_tab.cpp',
+  'src/shell/control_center/tabs/cast_tab.cpp',
+  'src/shell/control_center/tabs/privacy_tab.cpp',
   'src/shell/control_center/tabs/theme_tab.cpp',
   'src/shell/control_center/tabs/type_tab.cpp',
   'src/shell/control_center/tabs/scale_tab.cpp',
@@ -1131,6 +1141,7 @@ _noctalia_system_dependencies = [
   nlohmann_dep,
   libxml2_dep,
   libical_dep,
+  cups_dep,
   tomlplusplus_dep,
   md4c_dep,
   libwebp_dep,

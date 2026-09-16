@@ -16,6 +16,7 @@
 #include <cmath>
 #include <concepts>
 #include <cstring>
+#include <format>
 #include <memory>
 #include <optional>
 #include <pipewire/device.h>
@@ -2386,5 +2387,42 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
       return "error: no default input\n";
     setMicMuted(!source->muted);
     return "ok\n";
+  });
+
+  ipc.bind(noctalia::cli::msg::privacyStatus, [this, &config](const std::string& args) -> std::string {
+    if (!noctalia::ipc::splitWords(args).empty()) {
+      return "error: privacy-status takes no arguments\n";
+    }
+    auto joinApps = [](PrivacyCaptureKind kind, const PrivacyState& state) {
+      std::string names;
+      for (const auto& capture : state.captures) {
+        if (capture.kind != kind) {
+          continue;
+        }
+        if (!names.empty()) {
+          names += ",";
+        }
+        names += capture.appName.empty() ? "-" : capture.appName;
+      }
+      return names.empty() ? std::string("-") : names;
+    };
+    const auto& location = config.config().location;
+    const char* locationMode = "off";
+    if (location.autoLocate) {
+      locationMode = "auto";
+    } else if (!location.address.empty()) {
+      locationMode = "address";
+    } else if (location.latitude.has_value() && location.longitude.has_value()) {
+      locationMode = "manual";
+    }
+    const char* telemetry = config.config().shell.telemetryEnabled ? "on" : "off";
+    if (m_privacyState.captures.empty()) {
+      return std::format("idle telemetry={} location={}\n", telemetry, locationMode);
+    }
+    return std::format(
+        "active microphone={} camera={} screen={} telemetry={} location={}\n",
+        joinApps(PrivacyCaptureKind::Microphone, m_privacyState), joinApps(PrivacyCaptureKind::Camera, m_privacyState),
+        joinApps(PrivacyCaptureKind::Screen, m_privacyState), telemetry, locationMode
+    );
   });
 }

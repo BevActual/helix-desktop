@@ -199,3 +199,60 @@ Built-in Phone control talks to the session KDE Connect daemon. There is no Heli
 | Ring | <IpcCommand command="phone-ring" /> | Ring a paired device. Optional device name or id. |
 
 Omit the device argument when exactly one device is paired. Open the tab with `noctalia msg panel-toggle control-center phone`.
+
+
+## Syncthing {#syncthing}
+
+Built-in Syncthing control talks to the local daemon on `127.0.0.1:8384` by default. There is no Helix config block; folders and pairing live in Syncthing.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="syncthing-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus name, folder count, and connected devices. |
+| Start | <IpcCommand command="syncthing-start" /> | Start the user systemd unit when present, otherwise `syncthing serve --no-browser`. |
+| Stop | <IpcCommand command="syncthing-stop" /> | Ask the daemon to shut down. |
+
+Open the tab with `noctalia msg panel-toggle control-center syncthing`.
+
+## Firewall {#firewall}
+
+Built-in Firewall control talks to firewalld on the system bus. There is no Helix config block; zones and services live in firewalld.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="firewall-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus default zone and panic mode. |
+| Panic toggle | <IpcCommand command="firewall-panic-toggle" /> | Enable or disable panic mode (block all traffic). |
+
+Open the tab with `noctalia msg panel-toggle control-center firewall`.
+
+## Printers {#printers}
+
+Built-in Printers control talks to CUPS. There is no Helix config block; queues and jobs live in CUPS.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="printers-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus the default printer. |
+| Start | <IpcCommand command="printers-start" /> | Start the CUPS printing service. |
+
+Open the tab with `noctalia msg panel-toggle control-center printers`.
+
+## Cast {#cast}
+
+Built-in Cast control shares this screen over Remote Desktop (`grdctl`) and talks to Network Displays on the session bus for nearby TVs. There is no Helix config block.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="cast-status" /> | Print `share=on` or `share=off`, the listen address, wireless `on`/`off`/`not-installed`, and the nearby display count. |
+| Share toggle | <IpcCommand command="cast-share-toggle" /> | Toggle sharing this screen over RDP. |
+
+Open the tab with `noctalia msg panel-toggle control-center cast`.
+
+## Privacy {#privacy}
+
+Built-in Privacy control reads PipeWire capture links for microphone, camera, and screen share. Mute the microphone with `mic-mute`. Approximate location is `[location].auto_locate`. The startup ping is `[shell].telemetry_enabled`. Capture-name filters live under `[shell.privacy]` and affect the bar widget and OSD, not this status list.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="privacy-status" /> | Print `idle` or `active` plus comma-separated app names per kind, plus `telemetry` and `location`. |
+
+Open the tab with `noctalia msg panel-toggle control-center privacy`.
+

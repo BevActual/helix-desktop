@@ -21,6 +21,7 @@
 
 #include <format>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -71,6 +72,25 @@ namespace {
       out += line;
     }
     return out;
+  }
+
+  [[nodiscard]] std::string backendLabel(std::string_view state) {
+    if (state.empty() || state == "Stopped" || state == "NoState") {
+      return i18n::tr("control-center.tailscale.stopped");
+    }
+    if (state == "Running") {
+      return i18n::tr("control-center.tailscale.connected");
+    }
+    if (state == "NeedsLogin") {
+      return i18n::tr("control-center.tailscale.needs-login");
+    }
+    if (state == "Starting") {
+      return i18n::tr("control-center.tailscale.starting");
+    }
+    if (state == "Stopping") {
+      return i18n::tr("control-center.tailscale.stopping");
+    }
+    return std::string{state};
   }
 
 } // namespace
@@ -139,7 +159,9 @@ std::unique_ptr<Flex> TailscaleTab::create() {
   );
 
   auto ipRow = ui::row({
+      .out = &m_ipRow,
       .align = FlexAlign::Center,
+      .wrap = true,
       .gap = Style::spaceSm * scale,
   });
   auto ips = ui::column({
@@ -182,7 +204,13 @@ std::unique_ptr<Flex> TailscaleTab::create() {
   );
   statusCard->addChild(std::move(ipRow));
 
-  statusCard->addChild(
+  auto actions = ui::row({
+      .out = &m_actionsRow,
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceSm * scale,
+  });
+  actions->addChild(
       ui::button({
           .out = &m_connectButton,
           .text = i18n::tr("control-center.tailscale.connect"),
@@ -198,7 +226,7 @@ std::unique_ptr<Flex> TailscaleTab::create() {
               },
       })
   );
-  statusCard->addChild(
+  actions->addChild(
       ui::button({
           .out = &m_adminButton,
           .text = i18n::tr("control-center.tailscale.open-admin"),
@@ -214,6 +242,7 @@ std::unique_ptr<Flex> TailscaleTab::create() {
               },
       })
   );
+  statusCard->addChild(std::move(actions));
   m_rootLayout->addChild(std::move(statusCard));
 
   auto prefsCard = ui::column({
@@ -393,8 +422,10 @@ void TailscaleTab::onClose() {
   m_status = nullptr;
   m_detail = nullptr;
   m_health = nullptr;
+  m_ipRow = nullptr;
   m_ipv4 = nullptr;
   m_ipv6 = nullptr;
+  m_actionsRow = nullptr;
   m_connectButton = nullptr;
   m_copyIpButton = nullptr;
   m_adminButton = nullptr;
@@ -471,13 +502,18 @@ void TailscaleTab::syncUi() {
   const bool running = snap.running;
   const bool interactive = installed && !snap.busy;
 
-  const bool layoutDirty = setShown(m_prefsCard, installed) || setShown(m_peersCard, installed);
+  const bool hasIp = !snap.ipv4.empty() || !snap.ipv6.empty();
+  const std::string health = joinHealth(snap.health);
+  const bool layoutDirty = setShown(m_prefsCard, installed) || setShown(m_peersCard, installed) ||
+                            setShown(m_ipRow, hasIp) || setShown(m_ipv4, !snap.ipv4.empty()) ||
+                            setShown(m_ipv6, !snap.ipv6.empty()) || setShown(m_copyIpButton, hasIp) ||
+                            setShown(m_actionsRow, installed) || setShown(m_health, !health.empty());
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
 
-  std::string status = snap.backendState.empty() ? i18n::tr("control-center.tailscale.stopped") : snap.backendState;
-  if (!snap.hostname.empty()) {
+  std::string status = backendLabel(snap.backendState);
+  if (!snap.hostname.empty() && installed) {
     status = std::format("{} · {}", snap.hostname, status);
   }
   if (snap.busy) {
@@ -501,17 +537,15 @@ void TailscaleTab::syncUi() {
   }
   (void)m_detail->setText(detail);
 
-  const std::string health = joinHealth(snap.health);
   if (m_health != nullptr) {
-    m_health->setVisible(!health.empty());
     (void)m_health->setText(health);
   }
 
-  if (m_ipv4 != nullptr) {
-    (void)m_ipv4->setText(snap.ipv4.empty() ? std::string{} : std::format("IPv4  {}", snap.ipv4));
+  if (m_ipv4 != nullptr && !snap.ipv4.empty()) {
+    (void)m_ipv4->setText(std::format("IPv4  {}", snap.ipv4));
   }
-  if (m_ipv6 != nullptr) {
-    (void)m_ipv6->setText(snap.ipv6.empty() ? std::string{} : std::format("IPv6  {}", snap.ipv6));
+  if (m_ipv6 != nullptr && !snap.ipv6.empty()) {
+    (void)m_ipv6->setText(std::format("IPv6  {}", snap.ipv6));
   }
 
   if (m_copyIpButton != nullptr) {
@@ -643,6 +677,7 @@ void TailscaleTab::rebuildPeers() {
     });
     auto header = ui::row({
         .align = FlexAlign::Center,
+        .wrap = true,
         .gap = Style::spaceSm * scale,
     });
     header->addChild(

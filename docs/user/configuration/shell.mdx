@@ -567,7 +567,7 @@ countdown_seconds = 5
 
 ### Greeter sync
 
-Requires [Noctalia Greeter](/greeter/), `noctalia-greeter-apply-appearance`, and an administrator privilege tool. When those are missing, auto-sync stays off, Security settings for greeter sync are hidden, and the `greeter-sync` IPC command is not registered.
+Requires [Noctalia Greeter](/greeter/), `noctalia-greeter-apply-appearance`, and an administrator privilege tool. When those are missing, auto-sync stays off, Templates gear greeter rows are hidden, and the `greeter-sync` IPC command is not registered.
 
 ::::caution[Passwordless version requirement]
 Passwordless sync requires **Noctalia Greeter 1.5.0 or newer** together with
@@ -622,7 +622,7 @@ Only one greeter sync runs at a time. Additional Settings or auto-sync requests 
 
 `privilege_command` wraps or replaces the detected privilege tool. With constrained sync it must ultimately launch `pkexec`, such as `ghostty -e pkexec`, because the helper verifies `PKEXEC_UID`. In legacy mode, the path retains support for administrator-authenticated alternatives such as `run0` or a terminal-wrapped `sudo`.
 
-**Appearance → Greeter** has **Sync Now** and **Auto-Sync Greeter** when the greeter is installed. Privilege launch stays under **Settings → Security → Greeter Sync Privilege Command**, or in TOML:
+**Templates** header gear has **Sync Now** and **Auto-Sync Greeter** when the greeter is installed. Privilege launch stays under **Settings → Security → Greeter Sync Privilege Command**, or in TOML:
 
 ```toml
 [shell.greeter_sync]

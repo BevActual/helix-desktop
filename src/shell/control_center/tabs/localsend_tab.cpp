@@ -21,7 +21,10 @@
 
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <utility>
 
 using namespace control_center;
@@ -36,6 +39,31 @@ namespace {
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
     return changed;
+  }
+
+  [[nodiscard]] std::string peerKind(std::string_view type) {
+    if (type == "mobile") {
+      return i18n::tr("control-center.localsend.device-mobile");
+    }
+    if (type == "tablet") {
+      return i18n::tr("control-center.localsend.device-tablet");
+    }
+    if (type == "web") {
+      return i18n::tr("control-center.localsend.device-web");
+    }
+    if (type == "headless" || type == "server") {
+      return i18n::tr("control-center.localsend.device-server");
+    }
+    return i18n::tr("control-center.localsend.device-desktop");
+  }
+
+  [[nodiscard]] std::string peerDetail(const LocalSendPeer& peer) {
+    std::string text = peerKind(peer.deviceType);
+    if (!peer.ip.empty()) {
+      text += " · ";
+      text += peer.ip;
+    }
+    return text;
   }
 
 } // namespace
@@ -136,7 +164,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
-  auto incomingRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  auto incomingRow = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
   incomingRow->addChild(
       ui::button({
           .out = &m_acceptButton,
@@ -340,9 +368,7 @@ void LocalSendTab::syncUi() {
     m_detail->setText(i18n::tr("control-center.localsend.disabled-hint"));
   } else if (snap.listening) {
     m_status->setText(snap.alias);
-    m_detail->setText(
-        snap.ip.empty() ? std::format("HTTP · {}", snap.port) : std::format("{}:{} · HTTP", snap.ip, snap.port)
-    );
+    m_detail->setText(i18n::tr("control-center.localsend.listening", "name", snap.alias));
   } else {
     m_status->setText(snap.alias);
     m_detail->setText(snap.error.empty() ? i18n::tr("control-center.localsend.port-busy") : snap.error);
@@ -401,10 +427,15 @@ void LocalSendTab::rebuildPeers() {
     return;
   }
   const auto& snap = m_service->snapshot();
+  const auto clip = m_clipboard != nullptr ? m_clipboard->clipboardText() : std::optional<std::string>{};
+  const bool hasClipboard = clip.has_value() && !clip->empty();
   std::string signature;
+  signature += hasClipboard ? '1' : '0';
   for (const auto& peer : snap.peers) {
     signature += peer.key;
     signature += peer.alias;
+    signature += peer.ip;
+    signature += peer.deviceType;
     signature += "|";
   }
   if (signature == m_peerSignature && !m_peerList->children().empty()) {
@@ -421,13 +452,16 @@ void LocalSendTab::rebuildPeers() {
             .text = i18n::tr("control-center.localsend.nearby-empty"),
             .fontSize = Style::fontSizeCaption * scale,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 3,
         })
     );
     return;
   }
   for (const auto& peer : snap.peers) {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-    row->addChild(
+    auto header = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
+    auto titles = ui::column({.align = FlexAlign::Stretch, .gap = 0.0F, .flexGrow = 1.0F});
+    titles->addChild(
         ui::label({
             .text = peer.alias.empty() ? peer.ip : peer.alias,
             .fontSize = Style::fontSizeBody * scale,
@@ -435,36 +469,40 @@ void LocalSendTab::rebuildPeers() {
             .color = colorSpecFromRole(ColorRole::OnSurface),
         })
     );
-    row->addChild(
+    titles->addChild(
         ui::label({
-            .text = std::format("{}:{} · {}", peer.ip, peer.port, peer.deviceType),
+            .text = peerDetail(peer),
             .fontSize = Style::fontSizeCaption * scale,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
         })
     );
-    auto actions = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    actions->addChild(
-        ui::button({
-            .text = i18n::tr("control-center.localsend.send-file"),
-            .glyph = "paperclip",
-            .onClick = [this, key = peer.key]() { sendFileTo(key); },
-        })
-    );
-    actions->addChild(
-        ui::button({
-            .text = i18n::tr("control-center.localsend.send-folder"),
-            .glyph = "folder",
-            .onClick = [this, key = peer.key]() { sendFolderTo(key); },
-        })
-    );
-    actions->addChild(
-        ui::button({
-            .text = i18n::tr("control-center.localsend.send-clipboard"),
-            .glyph = "clipboard",
-            .onClick = [this, key = peer.key]() { sendClipboardTo(key); },
-        })
-    );
-    row->addChild(std::move(actions));
+    header->addChild(std::move(titles));
+    const float iconSize = Style::controlHeightSm * scale;
+    auto iconButton = [scale, iconSize](
+                          std::string glyph, bool enabled, std::string tooltip, std::function<void()> onClick
+                      ) {
+      return ui::button({
+          .glyph = std::move(glyph),
+          .enabled = enabled,
+          .variant = ButtonVariant::Ghost,
+          .tooltip = std::move(tooltip),
+          .minWidth = iconSize,
+          .minHeight = iconSize,
+          .padding = Style::spaceXs * scale,
+          .onClick = std::move(onClick),
+      });
+    };
+    header->addChild(iconButton("paperclip", true, i18n::tr("control-center.localsend.send-file"), [this, key = peer.key]() {
+      sendFileTo(key);
+    }));
+    header->addChild(iconButton("folder", true, i18n::tr("control-center.localsend.send-folder"), [this, key = peer.key]() {
+      sendFolderTo(key);
+    }));
+    header->addChild(iconButton(
+        "clipboard", hasClipboard, i18n::tr("control-center.localsend.send-clipboard"),
+        [this, key = peer.key]() { sendClipboardTo(key); }
+    ));
+    row->addChild(std::move(header));
     m_peerList->addChild(std::move(row));
   }
 }

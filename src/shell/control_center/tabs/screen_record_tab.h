@@ -18,7 +18,6 @@ class Label;
 class Renderer;
 class Segmented;
 class ThumbnailService;
-class Toggle;
 struct ControlCenterServices;
 
 class ScreenRecordTab {
@@ -63,7 +62,6 @@ private:
   Flex* m_rootLayout = nullptr;
   Segmented* m_source = nullptr;
   Segmented* m_delay = nullptr;
-  Toggle* m_audio = nullptr;
   Button* m_recordButton = nullptr;
   Label* m_status = nullptr;
   Label* m_elapsed = nullptr;

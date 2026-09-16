@@ -162,34 +162,6 @@ std::unique_ptr<Flex> LauncherTab::create() {
           .onClick = []() { PanelManager::instance().togglePanel("launcher"); },
       })
   );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-categories.label"), &m_categories, launcher.categories,
-      {"shell", "launcher", "categories"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-show-icons.label"), &m_showIcons, launcher.showIcons,
-      {"shell", "launcher", "show_icons"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-app-origin-indicator.label"), &m_origin,
-      launcher.showAppOriginIndicator, {"shell", "launcher", "show_app_origin_indicator"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-compact.label"), &m_compact, launcher.compact,
-      {"shell", "launcher", "compact"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-app-grid.label"), &m_appGrid, launcher.appGrid,
-      {"shell", "launcher", "app_grid"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-app-actions.label"), &m_appActions,
-      launcher.showAppActions, {"shell", "launcher", "show_app_actions"}
-  );
-  addToggleRow(
-      *appearanceCard, i18n::tr("settings.schema.panels.launcher-sort-by-usage.label"), &m_sortByUsage,
-      launcher.sortByUsage, {"shell", "launcher", "sort_by_usage"}
-  );
   content->addChild(std::move(appearanceCard));
 
   if (compositors::isNiri()) {
@@ -294,13 +266,6 @@ void LauncherTab::onClose() {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
-  m_categories = nullptr;
-  m_showIcons = nullptr;
-  m_origin = nullptr;
-  m_compact = nullptr;
-  m_appGrid = nullptr;
-  m_appActions = nullptr;
-  m_sortByUsage = nullptr;
   m_typeToLaunch = nullptr;
   m_providerGlobal = {};
   m_pinnedList = nullptr;
@@ -343,27 +308,6 @@ void LauncherTab::syncLiveControls() {
 
   const auto& launcher = m_config->config().shell.launcher;
   m_syncing = true;
-  if (m_categories != nullptr) {
-    m_categories->setCheckedImmediate(launcher.categories);
-  }
-  if (m_showIcons != nullptr) {
-    m_showIcons->setCheckedImmediate(launcher.showIcons);
-  }
-  if (m_origin != nullptr) {
-    m_origin->setCheckedImmediate(launcher.showAppOriginIndicator);
-  }
-  if (m_compact != nullptr) {
-    m_compact->setCheckedImmediate(launcher.compact);
-  }
-  if (m_appGrid != nullptr) {
-    m_appGrid->setCheckedImmediate(launcher.appGrid);
-  }
-  if (m_appActions != nullptr) {
-    m_appActions->setCheckedImmediate(launcher.showAppActions);
-  }
-  if (m_sortByUsage != nullptr) {
-    m_sortByUsage->setCheckedImmediate(launcher.sortByUsage);
-  }
   if (m_typeToLaunch != nullptr) {
     m_typeToLaunch->setCheckedImmediate(m_config->config().shell.niriOverviewTypeToLaunchEnabled);
   }

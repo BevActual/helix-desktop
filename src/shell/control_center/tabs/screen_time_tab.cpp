@@ -7,6 +7,7 @@
 #include "render/core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_content.h"
@@ -89,6 +90,16 @@ namespace {
 
   [[nodiscard]] float usageDurationFontSize(float scale) {
     return Style::fontSizeMini * scale * kUsageDurationFontScale;
+  }
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
   }
 
   [[nodiscard]] std::vector<TooltipRow> appUsageTooltip(const std::string& displayName, std::chrono::seconds duration) {
@@ -189,6 +200,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
               .gap = Style::spaceSm * scale,
               .fillWidth = true,
               .visible = false,
+              .participatesInLayout = false,
           },
           ui::button({
               .out = &m_detailBackButton,
@@ -233,6 +245,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
       .visible = false,
+      .participatesInLayout = false,
   });
   disabledRow->addChild(
       ui::label({
@@ -675,34 +688,18 @@ void ScreenTimeTab::setActive(bool active) {
 void ScreenTimeTab::syncEnabledUi() {
   const bool enabled = m_screenTime != nullptr && m_screenTime->enabled();
   const bool inDetail = !m_detailDayKey.empty();
-  if (m_disabledRow != nullptr) {
-    m_disabledRow->setVisible(!enabled);
-  }
-  if (m_disabledLabel != nullptr) {
-    m_disabledLabel->setVisible(!enabled);
-  }
+  const bool showUsage = enabled;
+  const bool layoutDirty = setShown(m_disabledRow, !enabled) || setShown(m_disabledLabel, !enabled) ||
+                            setShown(m_enableToggle, !enabled) ||
+                            setShown(m_rangePicker, showUsage && !inDetail) ||
+                            setShown(m_detailBar, showUsage && inDetail) || setShown(m_totalLabel, showUsage) ||
+                            setShown(m_chartPlotRow, showUsage) || setShown(m_chartLabelRow, showUsage) ||
+                            setShown(m_mostUsedSection, showUsage);
   if (m_enableToggle != nullptr) {
-    m_enableToggle->setVisible(!enabled);
     m_enableToggle->setChecked(enabled);
   }
-  const bool showUsage = enabled;
-  if (m_rangePicker != nullptr) {
-    m_rangePicker->setVisible(showUsage && !inDetail);
-  }
-  if (m_detailBar != nullptr) {
-    m_detailBar->setVisible(showUsage && inDetail);
-  }
-  if (m_totalLabel != nullptr) {
-    m_totalLabel->setVisible(showUsage);
-  }
-  if (m_chartPlotRow != nullptr) {
-    m_chartPlotRow->setVisible(showUsage);
-  }
-  if (m_chartLabelRow != nullptr) {
-    m_chartLabelRow->setVisible(showUsage);
-  }
-  if (m_mostUsedSection != nullptr) {
-    m_mostUsedSection->setVisible(showUsage);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 

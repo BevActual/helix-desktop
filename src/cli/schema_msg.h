@@ -363,6 +363,12 @@ namespace noctalia::cli {
     inline constexpr Command caffeineToggle{
         "caffeine-toggle", "Toggle caffeine (idle inhibitor)", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command castShareToggle{
+        "cast-share-toggle", "Toggle sharing this screen over RDP", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command castStatus{
+        "cast-status", "Print screen sharing and wireless display status", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command clipboardClear{"clipboard-clear", "Clear clipboard history", {}, {}, {}, {}, {}, false};
     inline constexpr Command clipboardCopy{
         "clipboard-copy", "Copy text to the clipboard", {}, {}, {}, kMsgClipboardCopyPositionals, {}, false
@@ -795,6 +801,37 @@ namespace noctalia::cli {
     inline constexpr Command phoneStatus{
         "phone-status", "Print KDE Connect daemon and paired-device status", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command firewallPanicToggle{
+        "firewall-panic-toggle", "Toggle firewalld panic mode", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command firewallStatus{
+        "firewall-status", "Print firewalld status, default zone, and panic mode", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command privacyStatus{
+        "privacy-status",
+        "Print capture activity plus telemetry and location mode",
+        {},
+        {},
+        {},
+        {},
+        {},
+        false
+    };
+    inline constexpr Command printersStart{
+        "printers-start", "Start the CUPS printing service", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command printersStatus{
+        "printers-status", "Print CUPS status and default printer", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command syncthingStart{
+        "syncthing-start", "Start the local Syncthing daemon", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command syncthingStatus{
+        "syncthing-status", "Print Syncthing daemon and folder status", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command syncthingStop{
+        "syncthing-stop", "Stop the local Syncthing daemon", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
         "Step to the adjacent task or workspace group in the invoking taskbar",
@@ -955,6 +992,8 @@ namespace noctalia::cli {
       msg::caffeineDisable,
       msg::caffeineEnable,
       msg::caffeineToggle,
+      msg::castShareToggle,
+      msg::castStatus,
       msg::clipboardClear,
       msg::clipboardCopy,
       msg::clipboardText,
@@ -974,6 +1013,8 @@ namespace noctalia::cli {
       msg::dpmsOff,
       msg::dpmsOn,
       msg::effectsProfileSet,
+      msg::firewallPanicToggle,
+      msg::firewallStatus,
       msg::greeterSync,
       msg::keyboardBacklightDown,
       msg::keyboardBacklightOsd,
@@ -1018,6 +1059,9 @@ namespace noctalia::cli {
       msg::phonePing,
       msg::phoneRing,
       msg::phoneStatus,
+      msg::privacyStatus,
+      msg::printersStart,
+      msg::printersStatus,
       msg::powerCycle,
       msg::powerSet,
       msg::screenRecordReplaySave,
@@ -1040,6 +1084,9 @@ namespace noctalia::cli {
       msg::settingsOpenWidget,
       msg::settingsToggle,
       msg::status,
+      msg::syncthingStart,
+      msg::syncthingStatus,
+      msg::syncthingStop,
       msg::tailscaleDown,
       msg::tailscaleStatus,
       msg::tailscaleToggle,

@@ -269,14 +269,14 @@ namespace settings {
 
     if (actions.syncGreeterAppearance && env.greeterSyncAvailable) {
       auto it = std::ranges::find_if(registry, [](const SettingEntry& e) {
-        return e.section == SettingsSection::Security
+        return e.section == SettingsSection::Templates
             && e.group == "greeter"
-            && e.path == std::vector<std::string>{"shell", "greeter_sync", "privilege_command"};
+            && e.path == std::vector<std::string>{"shell", "greeter_sync", "auto_sync"};
       });
       registry.insert(
           it,
           SettingEntry{
-              .section = SettingsSection::Security,
+              .section = SettingsSection::Templates,
               .group = "greeter",
               .title = i18n::tr("settings.schema.shell.sync-greeter.label"),
               .subtitle = i18n::tr("settings.schema.shell.sync-greeter.description"),
@@ -286,7 +286,7 @@ namespace settings {
                       .label = i18n::tr("settings.schema.shell.sync-greeter.button"),
                       .action = actions.syncGreeterAppearance,
                   },
-              .searchText = "greeter login sync appearance wallpaper colors security",
+              .searchText = "greeter login sync appearance wallpaper colors templates",
           }
       );
     }

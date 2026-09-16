@@ -19,6 +19,9 @@
 #include "dbus/modem/modem_manager_service.h"
 #include "dbus/mpris/mpris_service.h"
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/firewall/firewall_service.h"
+#include "dbus/cups/printer_service.h"
+#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/iwd_secret_agent.h"
 #include "dbus/network/iwd_service.h"
@@ -1184,6 +1187,24 @@ void Application::initSystemBusServices() {
     }
 
     try {
+      m_firewallService = std::make_unique<FirewallService>(*m_systemBus);
+      m_firewallService->start();
+      kLog.info("firewall service active");
+    } catch (const std::exception& e) {
+      kLog.warn("firewall disabled: {}", e.what());
+      m_firewallService.reset();
+    }
+
+    try {
+      m_printerService = std::make_unique<PrinterService>(m_systemBus.get());
+      m_printerService->start();
+      kLog.info("printer service active");
+    } catch (const std::exception& e) {
+      kLog.warn("printer service disabled: {}", e.what());
+      m_printerService.reset();
+    }
+
+    try {
       m_upowerService = std::make_unique<UPowerService>(*m_systemBus);
       m_batteryHookState.reset(m_upowerService->state());
       m_batteryWarningMonitor.evaluate(m_configService.config().battery, *m_upowerService, m_notificationManager);
@@ -1605,6 +1626,15 @@ void Application::initSessionBusServices() {
       kLog.warn("phone connect disabled: {}", e.what());
       m_phoneService.reset();
     }
+
+    try {
+      m_castService = std::make_unique<CastService>(m_bus.get(), m_networkService.get());
+      m_castService->start();
+      kLog.info("cast service active");
+    } catch (const std::exception& e) {
+      kLog.warn("cast service disabled: {}", e.what());
+      m_castService.reset();
+    }
   }
 
   m_locationService.initialize();
@@ -1619,6 +1649,7 @@ void Application::initSessionBusServices() {
   });
   m_tailscaleService.start();
   m_localSendService.start();
+  m_syncthingService.start();
   m_aiUsageService.start();
 
   // LocationService is the single source of "where am I": push its resolved coordinates to the

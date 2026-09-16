@@ -18,6 +18,9 @@
 #include "dbus/logind/logind_service.h"
 #include "dbus/mpris/mpris_service.h"
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/firewall/firewall_service.h"
+#include "dbus/cups/printer_service.h"
+#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/network_manager_service.h"
 #include "dbus/network/network_secret_agent.h"
@@ -629,6 +632,7 @@ void Application::initPanelManagerAndPanels() {
           .config = &m_configService,
           .httpClient = &m_httpClient,
           .weather = &m_weatherService,
+          .location = &m_locationService,
           .spectrum = m_pipewireSpectrum.get(),
           .upower = m_upowerService.get(),
           .powerProfiles = m_powerProfilesService.get(),
@@ -679,6 +683,10 @@ void Application::initPanelManagerAndPanels() {
           .tailscale = &m_tailscaleService,
           .localSend = &m_localSendService,
           .phone = m_phoneService.get(),
+          .syncthing = &m_syncthingService,
+          .firewall = m_firewallService.get(),
+          .printers = m_printerService.get(),
+          .cast = m_castService.get(),
           .desktopWidgets = &m_desktopWidgetsController,
           .upgradeShell = [this]() { performShellUpgrade(); },
           .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },

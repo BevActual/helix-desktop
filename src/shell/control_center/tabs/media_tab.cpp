@@ -909,6 +909,7 @@ void MediaTab::refresh(Renderer& renderer) {
     if (m_trackAlbum != nullptr) {
       m_trackAlbum->setText(player.album);
       m_trackAlbum->setVisible(!player.album.empty());
+      m_trackAlbum->setParticipatesInLayout(!player.album.empty());
     }
 
     const std::string resolvedArtUrl = effectiveArtUrl(player);
@@ -1005,6 +1006,7 @@ void MediaTab::refresh(Renderer& renderer) {
   if (m_trackAlbum != nullptr) {
     m_trackAlbum->setText("");
     m_trackAlbum->setVisible(false);
+    m_trackAlbum->setParticipatesInLayout(false);
   }
   clearArt(renderer);
   m_lastArtPath.clear();

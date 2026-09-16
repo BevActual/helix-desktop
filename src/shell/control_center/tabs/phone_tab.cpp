@@ -18,6 +18,8 @@
 
 #include <filesystem>
 #include <format>
+#include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -321,6 +323,10 @@ void PhoneTab::rebuildDevices() {
     signature += device.charging ? '1' : '0';
     signature += '|';
   }
+  {
+    const auto clip = m_clipboard != nullptr ? m_clipboard->clipboardText() : std::optional<std::string>{};
+    signature += (clip.has_value() && !clip->empty()) ? '1' : '0';
+  }
   if (signature == m_deviceSignature && !m_deviceList->children().empty()) {
     return;
   }
@@ -344,7 +350,7 @@ void PhoneTab::rebuildDevices() {
 
   for (const auto& device : snap.devices) {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    auto header = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
     header->addChild(
         ui::glyph({
             .glyph = glyphForType(device.type),
@@ -370,10 +376,52 @@ void PhoneTab::rebuildDevices() {
         })
     );
     header->addChild(std::move(titles));
+    if (device.paired) {
+      const bool live = device.reachable;
+      const auto clip = m_clipboard != nullptr ? m_clipboard->clipboardText() : std::optional<std::string>{};
+      const bool hasClipboard = clip.has_value() && !clip->empty();
+      const float iconSize = Style::controlHeightSm * scale;
+      auto iconButton = [scale, iconSize](
+                            std::string glyph, bool enabled, std::string tooltip, std::function<void()> onClick
+                        ) {
+        return ui::button({
+            .glyph = std::move(glyph),
+            .enabled = enabled,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = std::move(tooltip),
+            .minWidth = iconSize,
+            .minHeight = iconSize,
+            .padding = Style::spaceXs * scale,
+            .onClick = std::move(onClick),
+        });
+      };
+      header->addChild(iconButton("bell", live, i18n::tr("control-center.phone.ping"), [this, id = device.id]() {
+        if (m_service != nullptr) {
+          m_service->ping(id);
+        }
+      }));
+      header->addChild(iconButton("bell-ringing", live, i18n::tr("control-center.phone.ring"), [this, id = device.id]() {
+        if (m_service != nullptr) {
+          m_service->ring(id);
+        }
+      }));
+      header->addChild(iconButton("paperclip", live, i18n::tr("control-center.phone.send-file"), [this, id = device.id]() {
+        sendFileTo(id);
+      }));
+      header->addChild(iconButton(
+          "clipboard", live && hasClipboard, i18n::tr("control-center.phone.send-clipboard"),
+          [this, id = device.id]() { sendClipboardTo(id); }
+      ));
+      header->addChild(iconButton("unlink", true, i18n::tr("control-center.phone.unpair"), [this, id = device.id]() {
+        if (m_service != nullptr) {
+          m_service->unpair(id);
+        }
+      }));
+    }
     row->addChild(std::move(header));
 
-    auto actions = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
     if (device.pairRequestedByPeer) {
+      auto actions = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
       actions->addChild(
           ui::button({
               .text = i18n::tr("control-center.phone.accept"),
@@ -398,7 +446,9 @@ void PhoneTab::rebuildDevices() {
               },
           })
       );
+      row->addChild(std::move(actions));
     } else if (!device.paired) {
+      auto actions = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
       actions->addChild(
           ui::button({
               .text = i18n::tr("control-center.phone.pair"),
@@ -411,62 +461,8 @@ void PhoneTab::rebuildDevices() {
               },
           })
       );
-    } else {
-      const bool live = device.reachable;
-      actions->addChild(
-          ui::button({
-              .glyph = "bell",
-              .enabled = live,
-              .tooltip = i18n::tr("control-center.phone.ping"),
-              .onClick = [this, id = device.id]() {
-                if (m_service != nullptr) {
-                  m_service->ping(id);
-                }
-              },
-          })
-      );
-      actions->addChild(
-          ui::button({
-              .glyph = "bell-ringing",
-              .enabled = live,
-              .tooltip = i18n::tr("control-center.phone.ring"),
-              .onClick = [this, id = device.id]() {
-                if (m_service != nullptr) {
-                  m_service->ring(id);
-                }
-              },
-          })
-      );
-      actions->addChild(
-          ui::button({
-              .glyph = "paperclip",
-              .enabled = live,
-              .tooltip = i18n::tr("control-center.phone.send-file"),
-              .onClick = [this, id = device.id]() { sendFileTo(id); },
-          })
-      );
-      actions->addChild(
-          ui::button({
-              .glyph = "clipboard",
-              .enabled = live && m_clipboard != nullptr,
-              .tooltip = i18n::tr("control-center.phone.send-clipboard"),
-              .onClick = [this, id = device.id]() { sendClipboardTo(id); },
-          })
-      );
-      actions->addChild(
-          ui::button({
-              .glyph = "unlink",
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.phone.unpair"),
-              .onClick = [this, id = device.id]() {
-                if (m_service != nullptr) {
-                  m_service->unpair(id);
-                }
-              },
-          })
-      );
+      row->addChild(std::move(actions));
     }
-    row->addChild(std::move(actions));
     m_deviceList->addChild(std::move(row));
   }
 }

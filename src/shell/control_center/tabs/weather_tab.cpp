@@ -797,31 +797,30 @@ void WeatherTab::doUpdate(Renderer& renderer) { sync(renderer); }
 
 void WeatherTab::setForecastVisibleRowCount(std::size_t count) {
   const std::size_t visibleCount = std::min(count, kForecastRowCount);
+  bool layoutDirty = false;
   for (std::size_t i = 0; i < kForecastRowCount; ++i) {
-    if (m_forecastRows[i] != nullptr) {
-      m_forecastRows[i]->setVisible(i < visibleCount);
-    }
+    const bool show = i < visibleCount;
+    layoutDirty = setShown(m_forecastRows[i], show) || layoutDirty;
     if (m_forecastHitAreas[i] != nullptr) {
-      m_forecastHitAreas[i]->setVisible(i < visibleCount);
-      if (i >= visibleCount) {
+      m_forecastHitAreas[i]->setVisible(show);
+      if (!show) {
         m_forecastHitAreas[i]->clearTooltip();
       }
     }
-    if (i + 1 < kForecastRowCount && m_forecastSeparators[i] != nullptr) {
-      m_forecastSeparators[i]->setVisible(i + 1 < visibleCount);
+    if (i + 1 < kForecastRowCount) {
+      layoutDirty = setShown(m_forecastSeparators[i], i + 1 < visibleCount) || layoutDirty;
     }
+  }
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
 void WeatherTab::showLocationPrompt(bool show) {
-  if (m_locationPrompt != nullptr) {
-    m_locationPrompt->setVisible(show);
-  }
-  if (m_glyphColumn != nullptr) {
-    m_glyphColumn->setVisible(!show);
-  }
-  if (m_currentText != nullptr) {
-    m_currentText->setVisible(!show);
+  const bool layoutDirty = setShown(m_locationPrompt, show) || setShown(m_glyphColumn, !show) ||
+                            setShown(m_currentText, !show);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
@@ -897,11 +896,9 @@ void WeatherTab::sync(Renderer& renderer) {
   showLocationPrompt(false);
 
   const bool showLocation = m_config == nullptr || m_config->config().shell.showLocation;
-  if (m_updatedLabel != nullptr) {
-    m_updatedLabel->setVisible(showLocation);
-  }
-  if (m_timeZoneRow != nullptr) {
-    m_timeZoneRow->setVisible(showLocation);
+  const bool locationLayoutDirty = setShown(m_updatedLabel, showLocation) || setShown(m_timeZoneRow, showLocation);
+  if (locationLayoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 
   if (!m_weather->locationConfigured()) {
@@ -952,9 +949,9 @@ void WeatherTab::sync(Renderer& renderer) {
     m_updatedLabel->setText(
         snapshot.locationName.empty() ? i18n::tr("location.locations.current") : snapshot.locationName
     );
-    m_updatedLabel->setVisible(false);
+    (void)setShown(m_updatedLabel, false);
     m_statusLabel->setText(m_weather->error());
-    m_statusLabel->setVisible(!m_weather->error().empty());
+    (void)setShown(m_statusLabel, !m_weather->error().empty());
     if (m_windLabel != nullptr) {
       m_windLabel->setText("--");
     }
@@ -1017,14 +1014,14 @@ void WeatherTab::sync(Renderer& renderer) {
   m_updatedLabel->setText(
       snapshot.locationName.empty() ? i18n::tr("location.locations.current") : snapshot.locationName
   );
-  m_updatedLabel->setVisible(showLocation);
+  (void)setShown(m_updatedLabel, showLocation);
   const std::string status = m_weather->loading() ? i18n::tr("control-center.weather.refreshing")
                                                   : (snapshot.valid ? std::string{} : m_weather->error());
   m_statusLabel->setText(status);
   m_statusLabel->setColor(
       colorSpecFromRole(m_weather->error().empty() ? ColorRole::OnSurfaceVariant : ColorRole::Error)
   );
-  m_statusLabel->setVisible(!status.empty());
+  (void)setShown(m_statusLabel, !status.empty());
   if (m_windLabel != nullptr) {
     const bool imperial = m_weather->useImperial();
     const double windSpeed = imperial ? snapshot.current.windSpeedKmh * 0.621371 : snapshot.current.windSpeedKmh;
