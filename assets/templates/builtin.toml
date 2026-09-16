@@ -12,6 +12,10 @@ category = "misc"
 name = "Cava"
 category = "audio"
 
+[catalog.cursor]
+name = "Cursor Agent"
+category = "editor"
+
 [catalog.emacs]
 name = "Emacs"
 category = "editor"
@@ -84,6 +88,10 @@ category = "terminal"
 name = "Wezterm"
 category = "terminal"
 
+[catalog.warp]
+name = "Warp"
+category = "terminal"
+
 [templates.alacritty]
 input_path = "./alacritty/alacritty.toml"
 output_path = "$XDG_CONFIG_HOME/alacritty/themes/noctalia.toml"
@@ -101,6 +109,12 @@ input_path = "./cava/cava.ini"
 output_path = "$XDG_CONFIG_HOME/cava/themes/noctalia"
 post_hook = "bash '{{ config_dir }}/cava/apply.sh'"
 undo_hook = "bash '{{ config_dir }}/cava/undo.sh'"
+
+[templates.cursor]
+input_path = "./cursor/cursor.yaml"
+output_path = "$XDG_CONFIG_HOME/Cursor/User/themes/noctalia.yaml"
+post_hook = "bash '{{ config_dir }}/cursor/apply.sh'"
+undo_hook = "bash '{{ config_dir }}/cursor/undo.sh'"
 
 [templates.emacs]
 input_path = "./emacs/emacs.el"
@@ -211,3 +225,9 @@ input_path = "./wezterm/wezterm.toml"
 output_path = "$XDG_CONFIG_HOME/wezterm/colors/Noctalia.toml"
 post_hook = "bash '{{ config_dir }}/wezterm/apply.sh'"
 undo_hook = "bash '{{ config_dir }}/wezterm/undo.sh'"
+
+[templates.warp]
+input_path = "./warp/warp.yaml"
+output_path = "$XDG_DATA_HOME/warp-terminal/themes/noctalia.yaml"
+post_hook = "bash '{{ config_dir }}/warp/apply.sh'"
+undo_hook = "bash '{{ config_dir }}/warp/undo.sh'"

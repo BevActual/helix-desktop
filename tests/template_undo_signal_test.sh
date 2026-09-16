@@ -110,3 +110,67 @@ fi
 if [ "$(stat -c '%Y' "$config_file")" = "$(date -d '2020-01-01 00:00' +%s)" ]; then
   fail "wezterm/undo.sh did not bump wezterm.lua after removing the color scheme"
 fi
+
+# Warp reloads by rewriting settings.toml; a no-op undo must not rewrite it.
+config_home="$work_dir/warp-clean"
+mkdir -p "$config_home/warp-terminal" "$config_home/data/warp-terminal/themes"
+config_file="$config_home/warp-terminal/settings.toml"
+printf '[appearance.themes]\nsystem_theme = true\n' >"$config_file"
+touch -t 202001010000 "$config_file"
+before=$(stat -c '%Y %s' "$config_file")
+run_undo "warp/undo.sh" "$config_home"
+after=$(stat -c '%Y %s' "$config_file")
+if [ "$before" != "$after" ]; then
+  fail "warp/undo.sh touched settings.toml with nothing to undo"
+fi
+
+config_home="$work_dir/warp-themed"
+mkdir -p "$config_home/warp-terminal" "$config_home/data/warp-terminal/themes"
+config_file="$config_home/warp-terminal/settings.toml"
+theme_file="$config_home/data/warp-terminal/themes/noctalia.yaml"
+printf '[appearance.themes]\nsystem_theme = true\ntheme = { custom = { name = "Noctalia", path = "%s" } }\n' "$theme_file" >"$config_file"
+printf 'name: Noctalia\n' >"$theme_file"
+run_undo "warp/undo.sh" "$config_home"
+if grep -q 'noctalia.yaml' "$config_file"; then
+  fail "warp/undo.sh left the Noctalia theme in settings.toml"
+fi
+if [ -e "$theme_file" ]; then
+  fail "warp/undo.sh left its theme file behind"
+fi
+
+# Cursor Agent undo removes the YAML and, when present, the Glass theme record.
+config_home="$work_dir/cursor-clean"
+mkdir -p "$config_home/Cursor/User/themes"
+run_undo "cursor/undo.sh" "$config_home"
+
+config_home="$work_dir/cursor-themed"
+mkdir -p "$config_home/Cursor/User/themes" "$config_home/Cursor/User/globalStorage"
+theme_file="$config_home/Cursor/User/themes/noctalia.yaml"
+db_file="$config_home/Cursor/User/globalStorage/state.vscdb"
+printf 'name: Noctalia\n' >"$theme_file"
+python3 - "$db_file" <<'PY'
+import json, sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.execute("CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)")
+themes = {"_v": 1, "themes": {"noctalia": {"name": "Noctalia", "source": "imported", "definition": {"name": "Noctalia"}}}}
+con.execute("INSERT INTO ItemTable(key, value) VALUES(?, ?)", ("glass.theme.customThemesV1", json.dumps(themes)))
+con.execute("INSERT INTO ItemTable(key, value) VALUES(?, ?)", ("glass.theme.settingsId", "cursor-custom-theme:noctalia"))
+con.commit()
+con.close()
+PY
+run_undo "cursor/undo.sh" "$config_home"
+if [ -e "$theme_file" ]; then
+  fail "cursor/undo.sh left its theme file behind"
+fi
+python3 - "$db_file" <<'PY'
+import json, sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+themes = json.loads(con.execute("SELECT value FROM ItemTable WHERE key = ?", ("glass.theme.customThemesV1",)).fetchone()[0])
+settings = con.execute("SELECT value FROM ItemTable WHERE key = ?", ("glass.theme.settingsId",)).fetchone()[0]
+con.close()
+if themes.get("themes"):
+    raise SystemExit("cursor/undo.sh left the Noctalia Glass theme in state.vscdb")
+if settings != "Cursor Dark":
+    raise SystemExit("cursor/undo.sh did not restore the default Agents window theme")
+PY
+
