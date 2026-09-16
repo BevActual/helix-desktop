@@ -8,8 +8,10 @@
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
+#include "shell/panel/panel_manager.h"
 #include "system/brightness_service.h"
 #include "system/display_config_service.h"
 #include "system/gamma_service.h"
@@ -50,6 +52,18 @@ namespace {
   constexpr double kMinScale = 0.5;
   constexpr double kMaxScale = 3.0;
   constexpr double kScaleStep = 0.05;
+
+  bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    if (changed) {
+      node->setVisible(shown);
+      node->setParticipatesInLayout(shown);
+    }
+    return changed;
+  }
 
   constexpr display_config::Transform kTransforms[] = {
       display_config::Transform::Normal,     display_config::Transform::Rotate90,
@@ -365,14 +379,25 @@ std::unique_ptr<Flex> MonitorTab::create() {
   buildNightLightCard(*m_cardsLayout, scale);
 
   m_cardsLayout->addChild(ui::column(
-      {.out = &m_emptyState,
-       .align = FlexAlign::Center,
-       .justify = FlexJustify::Center,
-       .visible = false},
+      {
+          .out = &m_emptyState,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceSm * scale,
+          .visible = false,
+          .configure =
+              [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      },
       ui::label({
           .text = i18n::tr("control-center.display.no-displays"),
           .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 2,
+      }),
+      ui::label({
+          .text = i18n::tr("control-center.display.no-displays-hint"),
+          .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
       })
   ));
 
@@ -500,6 +525,7 @@ void MonitorTab::onClose() {
   m_rescanButton = nullptr;
   m_saveButton = nullptr;
   m_nightLightCard = nullptr;
+  m_nightLightDetails = nullptr;
   m_nightLightStatus = nullptr;
   m_nightLightEnabled = nullptr;
   m_nightLightForce = nullptr;
@@ -1132,7 +1158,7 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
       })
   );
 
-  auto addToggle = [&](Toggle** out, const std::string& label, std::function<void(bool)> onChange) {
+  auto addToggle = [&](Flex& host, Toggle** out, const std::string& label, std::function<void(bool)> onChange) {
     auto row = ui::row({
         .align = FlexAlign::Center,
         .gap = Style::spaceSm * scale,
@@ -1155,19 +1181,29 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
             .onChange = std::move(onChange),
         })
     );
-    card->addChild(std::move(row));
+    host.addChild(std::move(row));
   };
 
   addToggle(
-      &m_nightLightEnabled, i18n::tr("settings.schema.services.night-light.label"),
+      *card, &m_nightLightEnabled, i18n::tr("settings.schema.services.night-light.label"),
       [this](bool checked) {
         if (!m_syncingNightLight) {
           persistNightLightEnabled(checked);
         }
       }
   );
+
+  const bool detailsOn = m_nightLight != nullptr && (m_nightLight->enabled() || m_nightLight->forceEnabled());
+  auto details = ui::column({
+      .out = &m_nightLightDetails,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = detailsOn,
+      .participatesInLayout = detailsOn,
+  });
+
   addToggle(
-      &m_nightLightForce, i18n::tr("settings.schema.services.force-night-light.label"),
+      *details, &m_nightLightForce, i18n::tr("settings.schema.services.force-night-light.label"),
       [this](bool checked) {
         if (!m_syncingNightLight) {
           persistNightLightForce(checked);
@@ -1175,7 +1211,8 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
       }
   );
 
-  auto addTempSlider = [&](Slider** sliderOut, Label** valueOut, const std::string& label, bool daySlider) {
+  auto addTempSlider =
+      [&](Flex& host, Slider** sliderOut, Label** valueOut, const std::string& label, bool daySlider) {
     auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     header->addChild(
         ui::label({
@@ -1194,8 +1231,8 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
             .color = colorSpecFromRole(ColorRole::OnSurface),
         })
     );
-    card->addChild(std::move(header));
-    card->addChild(
+    host.addChild(std::move(header));
+    host.addChild(
         ui::slider({
             .out = sliderOut,
             .minValue = static_cast<double>(NightLightConfig::kTemperatureMin),
@@ -1220,12 +1257,14 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
   };
 
   addTempSlider(
-      &m_nightLightDaySlider, &m_nightLightDayValue, i18n::tr("settings.schema.services.day-temperature.label"), true
+      *details, &m_nightLightDaySlider, &m_nightLightDayValue,
+      i18n::tr("settings.schema.services.day-temperature.label"), true
   );
   addTempSlider(
-      &m_nightLightNightSlider, &m_nightLightNightValue, i18n::tr("settings.schema.services.night-temperature.label"),
-      false
+      *details, &m_nightLightNightSlider, &m_nightLightNightValue,
+      i18n::tr("settings.schema.services.night-temperature.label"), false
   );
+  card->addChild(std::move(details));
 
   parent.addChild(std::move(card));
   syncNightLight();
@@ -1275,6 +1314,9 @@ void MonitorTab::syncNightLight() {
     m_nightLightNightValue->setText(kelvinLabel(nightlight.nightTemperature));
   }
   m_syncingNightLight = false;
+  if (setShown(m_nightLightDetails, controlsOn)) {
+    PanelManager::instance().requestLayout();
+  }
 }
 
 void MonitorTab::persistNightLightEnabled(bool enabled) {

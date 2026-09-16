@@ -190,8 +190,13 @@
   "clipboard": {
     "actions": {
       "clear-all": "Clear everything",
+      "close": "Close",
+      "copy": "Copy",
       "delete-item": "Delete item",
-      "keep-pinned": "Keep pinned"
+      "image-action": "Open image",
+      "keep-pinned": "Keep pinned",
+      "pin": "Pin",
+      "unpin": "Unpin"
     },
     "confirm": {
       "clear-desc": "Choose whether pinned items should be kept.",
@@ -237,33 +242,46 @@
   },
   "control-center": {
     "appearance": {
+      "always-dark": "Always dark",
+      "always-light": "Always light",
       "auto-apps-dark-until": "Apps: Dark until {time}",
       "auto-apps-light-until": "Apps: Light until {time}",
       "auto-dark-until": "Dark until {time}",
       "auto-light-until": "Light until {time}",
       "auto-needs-location": "Auto needs a location. Set one on Weather.",
+      "auto-schedule": "Follow sunrise and sunset",
       "auto-shell-dark-until": "Shell: Dark until {time}",
       "auto-shell-light-until": "Shell: Light until {time}",
+      "choose-font": "Choose font",
       "choose-palette": "Choose a palette",
-      "community-empty": "No community palettes are available yet.",
-      "custom-empty": "No custom palettes in the palettes folder yet.",
+      "choose-palette-tooltip": "Open the palette picker",
+      "community-empty": "No community palettes yet",
+      "custom-empty": "No custom palettes yet. Use Open palettes folder to add one.",
       "error": "Error",
+      "export-palette-tooltip": "Save the wallpaper palette as a custom palette",
       "export-saved": "Saved as {name}",
+      "follow-theme": "Match the theme mode above",
+      "no-fonts": "No fonts found",
       "open-folder-failed": "Could not open the palettes folder.",
       "open-palettes-folder": "Open palettes folder",
       "outline": "Outline",
       "palette": "Current palette",
+      "palette-builtin-tooltip": "Palettes shipped with Noctalia",
+      "palette-community-tooltip": "Palettes from the community catalog",
+      "palette-custom-tooltip": "Palettes in your palettes folder",
       "palette-hint": "These roles update with the active palette.",
+      "palette-wallpaper-tooltip": "Colors taken from the current wallpaper",
       "primary": "Primary",
       "secondary": "Secondary",
       "surface": "Surface",
+      "system-font": "System default",
       "tertiary": "Tertiary",
       "type": "Type"
     },
     "ai-usage": {
       "as-of": "As of {time}",
-      "balance-only": "Prepaid balance — no rate-limit windows.",
-      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, set DEEPSEEK_API_KEY, or install Ollama.",
+      "balance-only": "Prepaid balance. No rate-limit windows.",
+      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, add a DeepSeek key, or install Ollama.",
       "now": "now",
       "ollama": {
         "absent": "Ollama is not installed",
@@ -292,10 +310,10 @@
       "status": {
         "absent": "Not installed",
         "disabled": "Disabled",
-        "expired": "Session expired — sign in again",
+        "expired": "Session expired. Sign in again",
         "http-error": "Could not reach the usage API",
         "no-auth": "Not signed in",
-        "no-credentials": "No credentials — sign in with claude",
+        "no-credentials": "No credentials. Sign in with claude",
         "no-data": "No usage data yet",
         "stale": "Showing last known values",
         "unsupported": "This plan has no request quota to show"
@@ -312,6 +330,7 @@
     },
     "audio": {
       "application-volumes": "Application Volumes",
+      "choose-device": "Choose device",
       "choose-effects-profile": "Choose a profile",
       "default-device": "Default device",
       "effects-profile": "Effects",
@@ -325,11 +344,13 @@
       "no-output-devices-body": "No playback sinks are currently available.",
       "no-output-selected": "No output device selected",
       "output-device-prefix": "Output",
+      "mute": "Mute",
       "mute-microphone": "Mute microphone",
       "privacy": "Privacy",
       "privacy-idle": "No apps are using the microphone, camera, or screen share.",
       "unavailable-body": "PipeWire is not active.",
       "unavailable-title": "Audio unavailable",
+      "unmute": "Unmute",
       "unmute-microphone": "Unmute microphone"
     },
     "bluetooth": {
@@ -337,10 +358,14 @@
       "address": "Address",
       "auto-reconnect": "Auto-reconnect",
       "bluetooth": "Bluetooth",
+      "connect": "Connect",
       "copy-address": "Copy address",
+      "disconnect": "Disconnect",
       "enter-code": "Enter code",
+      "forget": "Forget device",
       "no-devices": "No devices found. Start scanning to discover nearby Bluetooth devices.",
       "off": "Bluetooth is off",
+      "pair": "Pair",
       "pair-title": "Pair {device}",
       "pairing-detail": {
         "authorize": "Accept the incoming pairing request?",
@@ -352,6 +377,7 @@
         "pin-code": "Enter the PIN shown on the device:"
       },
       "reject": "Reject",
+      "rescan": "Scan for nearby devices",
       "rfkill-blocked": "Bluetooth is blocked by the system. Turn it on to clear the block.",
       "sections": {
         "available": "Available",
@@ -372,7 +398,9 @@
       },
       "all-day": "All day",
       "events": "Events",
+      "next-month": "Next month",
       "no-events": "No events.",
+      "previous-month": "Previous month",
       "today": "Today",
       "toggle-events-card": "Toggle events card",
       "world-clock": {
@@ -392,6 +420,7 @@
       "moving": "Moving {name}",
       "moving-at": "Moving {name} · {x}, {y}",
       "no-displays": "No monitors available",
+      "no-displays-hint": "Connect a display, then use the header refresh button.",
       "nudge-down": "Slide down along the shared edge (Ctrl 8px, Shift 1px)",
       "nudge-left": "Slide left along the shared edge (Ctrl 8px, Shift 1px)",
       "nudge-right": "Slide right along the shared edge (Ctrl 8px, Shift 1px)",
@@ -419,14 +448,18 @@
       "vrr": "Variable refresh rate",
       "save-to-niri": "Save layout to niri",
       "save-title": "Niri display layout",
-      "save-ok": "Wrote noctalia-outputs.kdl. niri reloads the config on its own.",
+      "save-ok": "Saved the layout to niri. It reloads on its own.",
       "save-failed": "Could not update the niri config",
-      "saved": "Saved in noctalia-outputs.kdl",
+      "saved": "Saved the layout to niri",
       "layout-error": "Display layout"
     },
     "bar": {
       "auto-hide": "Auto-hide",
+      "auto-hide-off-tooltip": "Keep the bar visible",
+      "auto-hide-on-tooltip": "Hide until the pointer reaches the screen edge",
+      "auto-hide-smart-tooltip": "Show on an empty workspace; hide when windows are open",
       "enable": "Show bar",
+      "empty": "No bar configured. Create one under header gear.",
       "opacity": "Background opacity",
       "position": "Position",
       "reserve-space": "Reserve space",
@@ -434,6 +467,7 @@
       "thickness": "Thickness"
     },
     "dock": {
+      "add-app": "Add an app",
       "auto-hide": "Auto-hide",
       "enable": "Show dock",
       "pinned": "Pinned apps",
@@ -443,10 +477,14 @@
     "desktop": {
       "corners": "Corners",
       "edit": "Edit widgets",
+      "edit-tooltip": "Move and resize widgets on the desktop",
+      "empty": "No widgets yet. Use Edit widgets to add one.",
+      "off": "Widgets are off",
       "widget-count": "{count} widget",
       "widget-count-plural": "{count} widgets"
     },
     "launcher": {
+      "add-app": "Add an app",
       "open": "Open launcher",
       "providers": "Providers in unprefixed search"
     },
@@ -464,6 +502,8 @@
     },
     "home": {
       "avatar-error-title": "Avatar not updated",
+      "change-avatar": "Change avatar",
+      "change-wallpaper": "Change wallpaper",
       "media": {
         "idle": "Idle",
         "no-active-player": "No active player",
@@ -475,6 +515,10 @@
         "unknown-artist": "Unknown artist",
         "unknown-track": "Unknown track"
       },
+      "open-calendar": "Open Calendar",
+      "open-media": "Open Media",
+      "open-power": "Open Power",
+      "open-weather": "Open Weather",
       "select-avatar": "Select Avatar",
       "status": {
         "caffeine": "Caffeine on",
@@ -487,9 +531,10 @@
       "unknown": "unknown",
       "uptime": "Uptime – {uptime}",
       "weather": {
-        "data-unavailable": "Weather data unavailable.",
-        "disabled": "Weather is disabled in config.",
-        "fetching": "Fetching forecast…"
+        "data-unavailable": "Weather data unavailable",
+        "disabled": "Weather off",
+        "fetching": "Fetching forecast…",
+        "no-location": "No location"
       }
     },
     "keybinds": {
@@ -500,25 +545,40 @@
       "open-folder-tooltip": "Open the niri config folder",
       "reset-tooltip": "Restore managed binds to the recommended keys",
       "tab-apps": "Apps",
+      "tab-apps-tooltip": "Launch an installed app",
       "tab-attention": "Attention",
+      "tab-attention-tooltip": "Unfinished or taken recommended keys",
       "tab-capture": "Capture",
+      "tab-capture-tooltip": "Screenshot and screen record",
       "tab-open": "Open",
+      "tab-open-tooltip": "Launcher, settings, and window switcher",
       "tab-session": "Session",
-      "tab-sound": "Sound"
+      "tab-session-tooltip": "Lock, logout, and power",
+      "tab-sound": "Sound",
+      "tab-sound-tooltip": "Volume and media"
     },
     "plugins": {
       "installed": "Installed",
+      "installed-tooltip": "Plugins already on this machine",
       "loading-store": "Loading the plugin catalog…",
       "refresh-tooltip": "Refresh plugins",
       "store": "Store",
+      "store-tooltip": "Browse and install from enabled sources",
       "store-empty": "No plugins in the enabled sources.",
       "store-failed": "Could not load {sources}.",
       "store-partial": "Loaded with errors from {sources}."
     },
     "media": {
       "active-player": "Active player",
+      "choose-player": "Choose player",
+      "next": "Next",
       "nothing-playing": "Nothing Playing",
       "now-playing": "Now Playing",
+      "pause": "Pause",
+      "play": "Play",
+      "previous": "Previous",
+      "repeat": "Repeat",
+      "shuffle": "Shuffle",
       "start-playback": "Start playback in an MPRIS app"
     },
     "network": {
@@ -538,6 +598,7 @@
       "cellular-searching": "Searching…",
       "connect": "Connect",
       "current-connection": "Current Connection",
+      "disconnect": "Disconnect",
       "domain-suffix-match": "Server domain suffix",
       "eap-method": "EAP method",
       "enterprise-prompt-for": "Sign in to {ssid}",
@@ -548,6 +609,8 @@
       "error-missing-password": "Enter your password.",
       "error-unsupported-phase2": "PEAP requires MSCHAPv2 inner authentication.",
       "external-ip": "WAN {ip}",
+      "forget": "Forget network",
+      "hide-password": "Hide password",
       "identity": "Identity",
       "no-networks": "No networks in range",
       "not-connected": "Not connected",
@@ -567,11 +630,17 @@
       "copy-ip": "Copy IP",
       "ip-copied": "IPv4 address copied",
       "dns": "DNS {servers}",
+      "dns-label": "DNS",
       "dns-automatic": "Automatic",
+      "dns-automatic-tooltip": "Use addresses from DHCP",
       "dns-google": "Google",
+      "dns-google-tooltip": "Google Public DNS",
       "dns-cloudflare": "Cloudflare",
+      "dns-cloudflare-tooltip": "Cloudflare DNS",
       "dns-nextdns": "NextDNS",
+      "dns-nextdns-tooltip": "NextDNS; optional config ID below",
       "dns-custom": "Custom",
+      "dns-custom-tooltip": "Enter your own DNS addresses",
       "dns-custom-placeholder": "1.1.1.1, 1.0.0.1",
       "dns-nextdns-placeholder": "NextDNS config ID (optional)",
       "dns-apply": "Apply DNS",
@@ -580,6 +649,7 @@
       "dns-requires-networkmanager": "DNS overrides need NetworkManager",
       "dns-invalid": "Enter valid IPv4 or IPv6 addresses",
       "ping": "Ping",
+      "rescan": "Scan for networks",
       "ping-running": "Pinging…",
       "ping-result": "Ping {ms} ms",
       "ping-failed": "Ping failed",
@@ -592,6 +662,7 @@
       "share-wifi-copied": "Join code copied. Scan the QR code or paste it into another device.",
       "share-wifi-password-missing": "Join code copied without the stored password. Enter it on the other device after scanning.",
       "share-wifi-enterprise": "Enterprise Wi-Fi cannot include a password in a QR code.",
+      "show-password": "Show password",
       "throughput": "↓ {down}  •  ↑ {up}"
     },
     "osd": {
@@ -601,23 +672,40 @@
       "kinds-title": "Popups",
       "opacity": "Background opacity",
       "orientation": "Orientation",
+      "orientation-horizontal-tooltip": "Wide pop-up along the screen edge",
+      "orientation-vertical-tooltip": "Tall pop-up stacked as a column",
       "position": "Position",
       "scale": "Size"
     },
+    "panels": {
+      "glass-tooltip": "Blurred glass over the wallpaper",
+      "layer-overlay-tooltip": "Keep panels above fullscreen windows",
+      "layer-top-tooltip": "Use when input-method windows hide behind panels",
+      "list-rows": "Tint list rows",
+      "soft-tooltip": "Slightly translucent",
+      "solid-tooltip": "Opaque panel background"
+    },
     "notifications": {
       "clear-all": "Clear all notifications",
+      "collapse": "Show less",
       "dnd-off": "Turn Do Not Disturb Off",
       "dnd-on": "Turn Do Not Disturb On",
       "empty-body": "Recent notifications will show here.",
       "empty-title": "No Notifications",
+      "expand": "Show more",
       "filter": {
         "all": "All",
+        "all-tooltip": "Every stored notification",
         "older": "Older",
+        "older-tooltip": "Older than yesterday",
         "today": "Today",
-        "yesterday": "Yesterday"
+        "today-tooltip": "From today",
+        "yesterday": "Yesterday",
+        "yesterday-tooltip": "From yesterday"
       },
       "filter-empty-body": "No notifications match this filter.",
       "filter-empty-title": "Nothing here",
+      "remove": "Remove",
       "untitled": "Untitled notification"
     },
     "power": {
@@ -643,28 +731,38 @@
       "performance-inhibited": "Performance unavailable",
       "peripherals": "Connected Devices",
       "power-profile": "Power Profile",
+      "power-saver-tooltip": "Prefer battery life over speed",
+      "balanced-tooltip": "Default mix of speed and battery",
+      "performance-tooltip": "Prefer speed over battery life",
       "session": "Session",
       "time-to-empty": "{time} remaining",
       "time-to-full": "{time} until full",
       "unknown-device": "Unknown device"
     },
     "roundness": {
-      "windows-description": "Round application window corners via niri (needs niri as your compositor). Managed entirely by this slider.",
-      "windows-save-failed": "Could not update niri's config",
+      "bar-empty": "No bar configured",
+      "windows-description": "Round corners on application windows.",
+      "windows-save-failed": "Could not update window corners",
       "windows-save-title": "Window Corners",
       "windows-title": "App Windows"
     },
+    "wallpaper": {
+      "overview-backdrop-tooltip": "Blurred wallpaper behind workspaces",
+      "overview-flat-tooltip": "Use the current surface color",
+      "overview-none-tooltip": "Keep niri's own overview background",
+      "overview-stationary-tooltip": "Pin the wallpaper behind workspaces"
+    },
     "windows": {
-      "columns-description": "Width of new niri columns as a fraction of the output. Writes noctalia-layout.kdl only after you change the slider.",
+      "columns-description": "How wide new tiled windows start, as a percent of the display.",
       "columns-title": "Columns",
-      "save-failed": "Could not update niri's config",
+      "save-failed": "Could not update window layout",
       "save-title": "Windows",
-      "spacing-description": "Gaps between tiled windows and extra outer padding (struts) on all four sides. Writes noctalia-layout.kdl only after you change a slider.",
+      "spacing-description": "Gaps between tiled windows and extra outer padding on all four sides.",
       "spacing-title": "Spacing"
     },
     "screen-time": {
       "back": "Back",
-      "disabled": "Screen time tracking is off. Enable it in Settings to record per-app usage.",
+      "disabled": "Screen time tracking is off. Turn it on below to record per-app usage.",
       "empty": "No app usage recorded yet. Focus a window to start tracking.",
       "hour-0": "12 AM",
       "hour-12": "12 PM",
@@ -673,8 +771,11 @@
       "most-used": "MOST USED",
       "range": {
         "14-days": "14 days",
+        "14-days-tooltip": "Daily totals for the last two weeks",
         "3-days": "3 days",
-        "today": "Today"
+        "3-days-tooltip": "Daily totals for the last three days",
+        "today": "Today",
+        "today-tooltip": "Hourly usage today"
       },
       "view-day": "View Day Details"
     },
@@ -750,12 +851,15 @@
       "failed": "The package task failed.",
       "failed-detail": "The package task failed: {error}",
       "filter-all": "All",
+      "filter-all-tooltip": "Security and other updates",
       "filter-available": "Available",
       "filter-empty": "Nothing in this filter.",
       "filter-installed": "Installed",
       "filter-installed-placeholder": "Filter installed packages",
       "filter-other": "Other",
+      "filter-other-tooltip": "Updates that are not marked security",
       "filter-security": "Security",
+      "filter-security-tooltip": "Security updates only",
       "filter-updates-placeholder": "Filter updates",
       "hint": "Available package updates from Fedora.",
       "hint-installed": "Installed packages on this system.",
@@ -779,14 +883,17 @@
       "searching": "Searching…",
       "showing-limited": "Showing {shown} of {total}",
       "source-fedora": "Fedora",
+      "source-fedora-tooltip": "RPM packages from Fedora",
       "source-flatpak": "Flatpak",
+      "source-flatpak-tooltip": "Apps installed with Flatpak",
       "source-firmware": "Firmware",
+      "source-firmware-tooltip": "Device firmware updates",
       "state-available": "Available",
       "state-installed": "Installed",
       "title": "Packages",
       "unavailable": "PackageKit is not available.",
       "unavailable-flatpak": "Flatpak is not available.",
-      "unavailable-firmware": "fwupd is not available.",
+      "unavailable-firmware": "Firmware updates are not available.",
       "update": "Update",
       "update-all": "Update all",
       "update-all-ok": "All listed updates finished.",
@@ -794,8 +901,11 @@
       "updates": "Refresh updates",
       "updates-waiting": "{count} updates",
       "view-installed": "Installed",
+      "view-installed-tooltip": "What is already on this machine",
       "view-search": "Search",
+      "view-search-tooltip": "Find packages by name",
       "view-updates": "Updates",
+      "view-updates-tooltip": "Pending upgrades",
       "working": "Working on {name}…"
     },
     "tabs": {
@@ -826,10 +936,12 @@
     },
     "camera": {
       "empty": "No camera devices were found.",
+      "empty-hint": "Plug in a webcam to preview it and adjust controls.",
       "off": "Off",
       "on": "On",
       "preview-unavailable": "This camera does not support a live preview, but its controls are still adjustable.",
       "reset": "Reset to defaults",
+      "reset-tooltip": "Restore this camera's factory control values",
       "sections": {
         "details": "Details",
         "exposure": "Exposure",
@@ -840,8 +952,10 @@
       }
     },
     "capture": {
+      "record": "Record",
+      "record-tooltip": "Record video or keep a replay buffer",
       "screenshot": "Screenshot",
-      "record": "Record"
+      "screenshot-tooltip": "Capture a still image"
     },
     "captures": {
       "delete": "Delete",
@@ -853,8 +967,11 @@
       "capture": "Capture",
       "countdown": "Capturing in {seconds}s",
       "delay-3s": "3s",
+      "delay-3s-tooltip": "Wait 3 seconds after Control Center closes",
       "delay-5s": "5s",
+      "delay-5s-tooltip": "Wait 5 seconds after Control Center closes",
       "delay-none": "Now",
+      "delay-none-tooltip": "Capture as soon as Control Center closes",
       "fullscreen": "Fullscreen",
       "hint": "Control Center closes first so the overlay can take the screen.",
       "open-folder": "Open screenshot folder",
@@ -903,8 +1020,11 @@
       "recent-empty": "No recordings in the save folder yet.",
       "saved": "Recording saved",
       "source-focused": "Focused",
+      "source-focused-tooltip": "The display with the pointer",
       "source-portal": "Portal",
+      "source-portal-tooltip": "Pick a window or display from the desktop picker",
       "source-region": "Region",
+      "source-region-tooltip": "Draw a rectangle to record",
       "start": "Start recording",
       "stop": "Stop recording",
       "stopped-early": "Recording stopped without writing a file.",
@@ -1010,10 +1130,11 @@
     },
     "theme": {
       "niri-blur": "Compositor blur",
-      "niri-blur-description": "Blur windows and Helix Shell surfaces in niri. Writes noctalia-blur.kdl. Requires niri 26.04 or newer. Tune passes, offset, and noise on this card.",
+      "niri-blur-description": "Blur niri windows and Helix Shell surfaces. Tune strength on this card.",
       "niri-blur-save-title": "Niri Blur",
       "niri-border": "Themed border",
-      "niri-description": "Sync niri focus-ring, border, tab indicator, insert hint, and recent-windows highlight to this palette. Writes noctalia-layout.kdl. Requires niri.",
+      "niri-description": "Match niri window decorations to this palette.",
+      "niri-draw-border": "Fill behind window borders",
       "niri-focus-ring": "Themed focus ring",
       "niri-save-failed": "Could not update niri's config",
       "niri-save-title": "Window Decorations",
@@ -1021,6 +1142,8 @@
     },
     "templates": {
       "apply-tooltip": "Reapply enabled templates for the current palette",
+      "built-in-tooltip": "Templates bundled with Noctalia",
+      "community-tooltip": "Templates from the community catalog",
       "create-failed": "Could not create that user template.",
       "disabled-builtin": "Turn on built-in templates to browse the bundled catalog and apply them on each theme change.",
       "disabled-community": "Turn on community templates to download the catalog and apply them on each theme change.",
@@ -1047,7 +1170,8 @@
       "post-hook": "Post-hook",
       "post-hook-placeholder": "my-app --reload-theme",
       "save": "Save",
-      "search-app": "Search applications…"
+      "search-app": "Search applications…",
+      "user-tooltip": "Templates you created for installed apps"
     },
     "weather": {
       "daily": {
@@ -1071,7 +1195,9 @@
         "uv-index": "UV Index",
         "wind": "Wind"
       },
-      "disabled": "Enable [weather] in config.toml",
+      "disabled": "Weather is off",
+      "disabled-hint": "Turn it on to show conditions and forecast.",
+      "enable": "Show weather",
       "fetching": "Fetching forecast…",
       "forecast-placeholder": {
         "day": "Sunday",
@@ -1080,7 +1206,9 @@
       },
       "forecast-view": {
         "daily": "Daily",
-        "hourly": "Hourly"
+        "daily-tooltip": "One row per day",
+        "hourly": "Hourly",
+        "hourly-tooltip": "The next few hours"
       },
       "hourly": {
         "summary": "{condition} / Rain {precip}%",
@@ -1092,7 +1220,7 @@
         }
       },
       "location-unavailable": "Location unavailable",
-      "no-location-body": "Add your address or enable auto-locate in Location settings.",
+      "no-location-body": "Use the header gear to set an address or turn on auto-locate.",
       "no-location-title": "No location set",
       "refreshing": "Refreshing weather…",
       "waiting": "Waiting for weather data"
@@ -1395,7 +1523,7 @@
       "battery-low-body": "{device}: {percent}% remaining",
       "battery-low-title": "Battery low",
       "calendar": "Calendar",
-      "calendar-credential-locked-body": "Unlock the keyring used by Secret Service, then retry in Settings. With GNOME Keyring, make an automatically unlocked keyring such as Login the default.",
+      "calendar-credential-locked-body": "Unlock the keyring used by Secret Service, then tap Retry on this account. With GNOME Keyring, make an automatically unlocked keyring such as Login the default.",
       "calendar-credential-locked-title": "Calendar keyring is locked",
       "calendar-google-connect-browser-failed": "No browser opener could be launched for Google authorization. Check your default browser or xdg-open setup.",
       "calendar-google-connect-credential-store-failed": "Authorization completed, but the refresh token could not be saved. Unlock or start Secret Service, then connect again.",
@@ -1611,7 +1739,11 @@
         "unset-placeholder": "Click to bind…"
       },
       "list": {
-        "add-entry-placeholder": "Add entry…"
+        "add": "Add",
+        "add-entry-placeholder": "Add entry…",
+        "move-down": "Move down",
+        "move-up": "Move up",
+        "remove": "Remove"
       },
       "path-browse": {
         "file-title": "Choose file",
@@ -1630,7 +1762,7 @@
       "bar": {
         "create": "Create",
         "delete": "Delete",
-        "delete-confirm-desc": "This GUI-created bar will be removed from settings.toml.",
+        "delete-confirm-desc": "This bar was created in Control Center and will be deleted.",
         "delete-confirm-title": "Delete \"{name}\"?",
         "id-placeholder": "Bar ID",
         "label": "Bar: {name}",
@@ -1644,7 +1776,7 @@
       "monitor-override": {
         "create": "Create",
         "delete": "Delete",
-        "delete-confirm-desc": "This GUI-created monitor override will be removed from settings.toml.",
+        "delete-confirm-desc": "This monitor override was created in Control Center and will be deleted.",
         "delete-confirm-title": "Delete \"{name}\"?",
         "label": "Monitor: {name}",
         "management": "Monitor Override",
@@ -2003,7 +2135,7 @@
         "match-content-label": "Content Regex",
         "match-content-placeholder": "Regex pattern to match summary or body…",
         "match-label": "App",
-        "match-placeholder": "App name, desktop entry, or category…",
+        "match-placeholder": "App name, id, or category…",
         "override-duration": "Override duration",
         "play-sound": "Play sound",
         "save-history": "Save to history",
@@ -2373,7 +2505,7 @@
           "label": "Export Wallpaper Palette"
         },
         "font-family": {
-          "description": "Font family for the shell interface",
+          "description": "Used across Noctalia panels and menus",
           "label": "Font Family"
         },
         "global-shadow-alpha": {
@@ -2764,7 +2896,7 @@
           "label": "Monitors"
         },
         "pinned-apps": {
-          "description": "Desktop entry IDs of apps pinned to the dock",
+          "description": "Apps pinned to the dock",
           "label": "Pinned Apps"
         },
         "position": {
@@ -2961,7 +3093,7 @@
             "window-switcher": { "label": "Window switcher" }
           },
           "bound": "{keys}",
-          "cleared": "Removed the bind from noctalia-binds.kdl. niri reloads the config on its own.",
+          "cleared": "Removed the shortcut. niri reloads on its own.",
           "clear-bind": "Remove",
           "conflict": "{key} is already used by another niri bind",
           "copied": "Copied niri bind to the clipboard",
@@ -2976,7 +3108,7 @@
           },
           "install": {
             "button": "Add to niri",
-            "description": "Write missing recommended binds to noctalia-binds.kdl and include it from config.kdl. Existing niri binds are left unchanged.",
+            "description": "Add the missing recommended shortcuts to niri. Your existing niri shortcuts stay as-is.",
             "label": "Install recommended binds"
           },
           "install-failed": "Could not update the niri config",
@@ -2984,7 +3116,7 @@
           "install-ok": "Added {count} niri bind(s). niri reloads the config on its own.",
           "reset": {
             "button": "Restore recommended",
-            "description": "Reset managed binds in noctalia-binds.kdl back to the recommended keys. Binds in your niri config stay unchanged.",
+            "description": "Put managed shortcuts back on the recommended keys. Shortcuts in your niri config stay unchanged.",
             "label": "Restore recommended keys"
           },
           "reset-bind": "Restore recommended key",
@@ -2994,9 +3126,9 @@
           "missing": "Recommended {key}",
           "none-missing": "All recommended niri binds are already present",
           "title": "Niri keybinds",
-          "updated": "Updated noctalia-binds.kdl. niri reloads the config on its own.",
+          "updated": "Updated niri shortcuts. niri reloads on its own.",
           "add-app": {
-            "description": "Pick an installed app, then record a chord. Written as a niri spawn bind in noctalia-binds.kdl.",
+            "description": "Pick an installed app, then record a chord. Noctalia writes a niri spawn shortcut.",
             "empty": "No applications found",
             "failed": "Could not prepare a launch command for that app",
             "label": "Add app shortcut",
@@ -3065,35 +3197,35 @@
       },
       "niri": {
         "blur-noise": {
-          "description": "Grain added on top of niri blur to hide color banding. Writes noctalia-blur.kdl.",
+          "description": "Grain added on top of niri blur to hide color banding.",
           "label": "Blur noise"
         },
         "blur-offset": {
-          "description": "Sample distance per blur pass. Raise this before adding passes; too high needs more passes to avoid artifacts. Writes noctalia-blur.kdl.",
+          "description": "Sample distance per blur pass. Raise this before adding passes; too high needs more passes to avoid artifacts.",
           "label": "Blur offset"
         },
         "blur-passes": {
-          "description": "Dual Kawase downsample/upsample passes. More is smoother and costs more GPU. Writes noctalia-blur.kdl.",
+          "description": "Dual Kawase downsample/upsample passes. More is smoother and costs more GPU.",
           "label": "Blur passes"
         },
         "default-column-width": {
-          "description": "Width of new niri columns as a fraction of the output. Writes default-column-width into noctalia-layout.kdl only after you change this slider.",
+          "description": "How wide new tiled windows start, as a percent of the display. Applied the first time you change this slider.",
           "label": "Default column width"
         },
         "draw-border-with-background": {
-          "description": "When off, niri draws the focus ring and border around windows instead of as a filled rectangle behind them. Better with client-side decorations. Writes noctalia-window-rules.kdl only after you change this toggle.",
-          "label": "Draw border with background"
+          "description": "When off, niri draws the focus ring and border around windows instead of filling behind them. Better with client-side decorations.",
+          "label": "Fill behind window borders"
         },
         "gaps": {
-          "description": "Space around niri windows in logical pixels. Writes gaps into noctalia-layout.kdl only after you change this slider, so an existing niri gaps value is left alone until then.",
+          "description": "Space around tiled windows, in pixels. Applied the first time you change this slider.",
           "label": "Window gaps"
         },
         "struts": {
-          "description": "Extra outer padding on all four sides, in addition to gaps and layer-shell reserved space. Writes struts into noctalia-layout.kdl only after you change this slider.",
-          "label": "Struts"
+          "description": "Extra padding on all four sides, on top of gaps and space reserved by the bar. Applied the first time you change this slider.",
+          "label": "Outer padding"
         },
         "overview-preset": {
-          "description": "How wallpaper appears in niri overview. Writes noctalia-overview.kdl. Blurred backdrop uses the Helix Shell backdrop layer; stationary pins the wallpaper behind workspaces; flat uses the current surface color.",
+          "description": "How the wallpaper looks in niri overview.",
           "label": "Overview wallpaper"
         },
         "setup": {
@@ -3106,7 +3238,7 @@
           },
           "install": {
             "button": "Add to niri",
-            "description": "Write missing setup snippets to noctalia-setup.kdl and include it from config.kdl. Existing niri config is left unchanged.",
+            "description": "Add the missing setup snippets to niri. Your existing config stays as-is.",
             "label": "Install recommended setup"
           },
           "install-failed": "Could not update the niri config",
@@ -3143,7 +3275,7 @@
           "label": "Allowed Urgencies"
         },
         "blacklist": {
-          "description": "Hide matching senders (app name, desktop entry, or category)",
+          "description": "Hide matching senders (app name, id, or category)",
           "label": "Notification Blacklist"
         },
         "blacklist-allow-critical": {
@@ -3304,7 +3436,7 @@
           "label": "Windows in Global Search"
         },
         "launcher-pinned-apps": {
-          "description": "Desktop entry IDs of apps pinned to the launcher; they appear first when the launcher opens",
+          "description": "Apps pinned at the top of the launcher.",
           "label": "Pinned Apps"
         },
         "launcher-prefix-calculator": {
@@ -3790,7 +3922,7 @@
           "placeholder": "$CMD"
         },
         "niri-overview-type-to-launch": {
-          "description": "Open the launcher when typing in niri overview; uses a tiny keyboard-focus surface while overview is open",
+          "description": "Open the launcher when you type in niri overview.",
           "label": "Type to Launch"
         },
         "offline-mode": {
@@ -5724,7 +5856,7 @@
         "error": "Request failed",
         "filter-placeholder": "Filter titles…",
         "nasa": "NASA",
-        "offline": "Daily wallpapers need network access. Turn off offline mode in Settings → Shell.",
+        "offline": "Daily wallpapers need network access. Turn off offline mode in Security.",
         "title": "Daily"
       },
       "wallhaven": {
@@ -5743,7 +5875,7 @@
         "filter-resolution": "Resolution",
         "filter-sort": "Sort",
         "library": "Library",
-        "offline": "Wallhaven needs network access. Turn off offline mode in Settings → Shell.",
+        "offline": "Wallhaven needs network access. Turn off offline mode in Security.",
         "page": "Page {page} / {pages}",
         "purity-nsfw": "NSFW",
         "purity-sfw": "SFW",

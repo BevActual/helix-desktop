@@ -46,9 +46,11 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Toggle* m_enabled = nullptr;
+  Flex* m_details = nullptr;
   Segmented* m_position = nullptr;
   Segmented* m_autoHide = nullptr;
   Toggle* m_showRunning = nullptr;
+  Flex* m_pinnedCard = nullptr;
   ListEditor* m_pinnedList = nullptr;
 
   bool m_syncing = false;

@@ -88,6 +88,7 @@ private:
   Toggle* m_niriBorder = nullptr;
   Toggle* m_niriDrawBorder = nullptr;
   Toggle* m_niriBlur = nullptr;
+  Flex* m_niriBlurDetails = nullptr;
   Slider* m_niriBlurPasses = nullptr;
   Label* m_niriBlurPassesValue = nullptr;
   Slider* m_niriBlurOffset = nullptr;

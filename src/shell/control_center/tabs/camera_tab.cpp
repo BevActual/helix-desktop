@@ -153,15 +153,30 @@ std::unique_ptr<Flex> CameraTab::create() {
   m_devices = m_camera != nullptr ? m_camera->listDevices() : std::vector<CameraDevice>{};
 
   if (m_devices.empty()) {
-    content->addChild(
+    auto emptyCard = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+    });
+    emptyCard->addChild(
         ui::label({
             .out = &m_emptyLabel,
             .text = i18n::tr("control-center.camera.empty"),
             .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 2,
+        })
+    );
+    emptyCard->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.camera.empty-hint"),
+            .fontSize = captionSize,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
             .maxLines = 3,
         })
     );
+    content->addChild(std::move(emptyCard));
     live->addChild(std::move(scroll));
     return m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
   }
@@ -243,6 +258,7 @@ std::unique_ptr<Flex> CameraTab::create() {
           .fontSize = Style::fontSizeBody * scale,
           .contentAlign = ButtonContentAlign::Start,
           .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("control-center.camera.reset-tooltip"),
           .minHeight = Style::controlHeight * scale,
           .paddingV = Style::spaceSm * scale,
           .paddingH = Style::spaceMd * scale,
@@ -272,8 +288,6 @@ std::unique_ptr<Flex> CameraTab::createHeaderActions() { return m_settings->embe
 void CameraTab::setActive(bool active) {
   m_active = active;
   if (active) {
-    // create() runs for every tab up front while the panel isn't active yet, so the device
-    // couldn't be opened then; start it now and (re)build the control list against a live fd.
     startSelectedDevice();
     rebuildControls();
   } else if (m_camera != nullptr) {
@@ -354,22 +368,13 @@ std::unique_ptr<Flex> CameraTab::buildControlRow(const CameraControl& control) {
   const float captionSize = Style::fontSizeCaption * scale;
 
   auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-  row->addChild(
-      ui::label({
-          .text = control.name,
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      })
-  );
 
   const std::uint32_t id = control.id;
-  switch (control.type) {
-  case CameraControlType::Boolean: {
+  if (control.type == CameraControlType::Boolean) {
     auto toggleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     toggleRow->addChild(
         ui::label({
-            .text = i18n::tr(control.value != 0 ? "control-center.camera.on" : "control-center.camera.off"),
+            .text = control.name,
             .fontSize = Style::fontSizeBody * scale,
             .color = colorSpecFromRole(ColorRole::OnSurface),
             .flexGrow = 1.0F,
@@ -380,17 +385,31 @@ std::unique_ptr<Flex> CameraTab::buildControlRow(const CameraControl& control) {
             .checkedImmediate = control.value != 0,
             .enabled = !control.readOnly,
             .scale = scale,
-            .onChange = [this, id](bool enabled) {
-              if (m_camera != nullptr) {
-                m_camera->setControl(id, enabled ? 1 : 0);
-              }
-              refreshDependentVisibility();
-            },
+            .onChange =
+                [this, id](bool enabled) {
+                  if (m_camera != nullptr) {
+                    m_camera->setControl(id, enabled ? 1 : 0);
+                  }
+                  refreshDependentVisibility();
+                },
         })
     );
     row->addChild(std::move(toggleRow));
-    break;
+    return row;
   }
+
+  row->addChild(
+      ui::label({
+          .text = control.name,
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+      })
+  );
+
+  switch (control.type) {
+  case CameraControlType::Boolean:
+    break;
   case CameraControlType::Menu: {
     std::vector<std::string> labels;
     std::size_t selectedIndex = 0;

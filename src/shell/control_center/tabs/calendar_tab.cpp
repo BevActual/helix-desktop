@@ -8,6 +8,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_button_style.h"
@@ -49,6 +50,16 @@ namespace {
   // width of the two digits it holds (as a multiple of the caption font size) so it can never clip.
   constexpr float kCalendarWeekColumnRatio = 0.55F;
   constexpr float kCalendarWeekColumnMinFontScale = 1.45F;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   std::string formatShellDate(const ConfigService* config) {
     const char* format = config != nullptr ? config->config().shell.dateFormat.c_str() : "%A, %x";
@@ -267,6 +278,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .out = &m_previousButton,
           .glyph = Style::rtl() ? "chevron-right" : "chevron-left",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.calendar.previous-month"),
           .minWidth = kCalendarNavButtonSize * scale,
           .minHeight = kCalendarNavButtonSize * scale,
           .onClick = [this]() { changeMonthBy(-1); },
@@ -292,6 +304,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .out = &m_nextButton,
           .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.calendar.next-month"),
           .minWidth = kCalendarNavButtonSize * scale,
           .minHeight = kCalendarNavButtonSize * scale,
           .onClick = [this]() { changeMonthBy(1); },
@@ -405,6 +418,7 @@ void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
   );
   header->addChild(
       ui::button({
+          .out = &m_accountsAddButton,
           .glyph = "plus",
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.calendar.accounts.add"),
@@ -477,12 +491,10 @@ void CalendarTab::rebuildAccounts() {
   }
 
   const float scale = contentScale();
-  std::size_t shown = 0;
   for (const auto& account : calendar.accounts) {
     if (!isManagedCalendarAccount(account)) {
       continue;
     }
-    ++shown;
     const bool credentialLocked =
         account.type == "google" && m_calendar != nullptr && m_calendar->googleAccountCredentialLocked(account.id);
     const bool reconnectRequired =
@@ -550,17 +562,16 @@ void CalendarTab::rebuildAccounts() {
   }
 
   m_lastAccountsKey = key;
-  if (m_accountsEmpty != nullptr) {
-    m_accountsEmpty->setVisible(shown == 0);
-  }
   syncAccounts();
 }
 
 void CalendarTab::syncAccounts() {
   const bool enabled = m_calendar != nullptr && m_calendar->enabled();
-  if (m_accountsDisabledRow != nullptr) {
-    m_accountsDisabledRow->setVisible(!enabled);
-    m_accountsDisabledRow->setParticipatesInLayout(!enabled);
+  const bool hasAccounts = m_accountsList != nullptr && !m_accountsList->children().empty();
+  const bool layoutDirty = setShown(m_accountsDisabledRow, !enabled) || setShown(m_accountsAddButton, enabled)
+      || setShown(m_accountsList, enabled) || setShown(m_accountsEmpty, enabled && !hasAccounts);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
   if (m_accountsEnableToggle != nullptr) {
     m_accountsEnableToggle->setChecked(enabled);
@@ -906,6 +917,7 @@ void CalendarTab::onClose() {
   m_eventsTitle = nullptr;
   m_eventsScroll = nullptr;
   m_accountsCard = nullptr;
+  m_accountsAddButton = nullptr;
   m_accountsDisabledRow = nullptr;
   m_accountsList = nullptr;
   m_accountsEmpty = nullptr;

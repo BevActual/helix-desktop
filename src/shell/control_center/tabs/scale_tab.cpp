@@ -65,24 +65,16 @@ std::unique_ptr<Flex> ScaleTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*card, i18n::tr("settings.schema.appearance.ui-scale.label"), scale);
-  card->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.ui-scale.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
-
   auto scaleHeader = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
   });
   scaleHeader->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.appearance.ui-scale.label"),
+          .text = i18n::tr("settings.schema.appearance.ui-scale.description"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
           .flexGrow = 1.0F,
       })
   );

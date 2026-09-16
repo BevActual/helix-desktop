@@ -4,6 +4,7 @@
 #include "config/config_types.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/desktop/desktop_widgets_controller.h"
 #include "shell/panel/panel_manager.h"
@@ -21,6 +22,16 @@
 using namespace control_center;
 
 namespace {
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   [[nodiscard]] std::size_t enabledWidgetCount(const DesktopWidgetsConfig& widgets) {
     std::size_t count = 0;
@@ -113,22 +124,31 @@ std::unique_ptr<Flex> DesktopTab::create() {
       *widgetsCard, i18n::tr("settings.schema.desktop.widgets.label"), &m_widgetsEnabled, widgetsEnabled,
       &DesktopTab::applyWidgets
   );
-  widgetsCard->addChild(
+  auto widgetDetails = ui::column({
+      .out = &m_widgetDetails,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = widgetsEnabled,
+      .participatesInLayout = widgetsEnabled,
+  });
+  widgetDetails->addChild(
       ui::label({
           .out = &m_widgetCount,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
-  widgetsCard->addChild(
+  widgetDetails->addChild(
       ui::button({
           .out = &m_edit,
           .text = i18n::tr("control-center.desktop.edit"),
           .glyph = "pencil",
           .variant = ButtonVariant::Primary,
+          .tooltip = i18n::tr("control-center.desktop.edit-tooltip"),
           .onClick = [this]() { startEdit(); },
       })
   );
+  widgetsCard->addChild(std::move(widgetDetails));
   content->addChild(std::move(widgetsCard));
 
   auto cornersCard = ui::column({
@@ -163,6 +183,7 @@ void DesktopTab::onClose() {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
+  m_widgetDetails = nullptr;
   m_widgetsEnabled = nullptr;
   m_screenCorners = nullptr;
   m_hotCorners = nullptr;
@@ -206,9 +227,13 @@ void DesktopTab::syncLiveControls() {
   }
 
   const Config& cfg = m_config->config();
+  const bool widgetsOn = cfg.desktopWidgets.enabled;
   m_syncing = true;
   if (m_widgetsEnabled != nullptr) {
-    m_widgetsEnabled->setCheckedImmediate(cfg.desktopWidgets.enabled);
+    m_widgetsEnabled->setCheckedImmediate(widgetsOn);
+  }
+  if (setShown(m_widgetDetails, widgetsOn)) {
+    PanelManager::instance().requestLayout();
   }
   if (m_screenCorners != nullptr) {
     m_screenCorners->setCheckedImmediate(cfg.shell.screenCorners.enabled);
@@ -217,9 +242,12 @@ void DesktopTab::syncLiveControls() {
     m_hotCorners->setCheckedImmediate(cfg.hotCorners.enabled);
   }
   if (m_widgetCount != nullptr) {
-    m_widgetCount->setText(
-        i18n::trp("control-center.desktop.widget-count", static_cast<long>(enabledWidgetCount(cfg.desktopWidgets)))
-    );
+    const std::size_t count = enabledWidgetCount(cfg.desktopWidgets);
+    if (count == 0) {
+      m_widgetCount->setText(i18n::tr("control-center.desktop.empty"));
+    } else {
+      m_widgetCount->setText(i18n::trp("control-center.desktop.widget-count", static_cast<long>(count)));
+    }
   }
   m_syncing = false;
 }
@@ -229,6 +257,7 @@ void DesktopTab::applyWidgets(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"desktop_widgets", "enabled"}, enabled);
+  syncLiveControls();
   PanelManager::instance().refresh();
 }
 

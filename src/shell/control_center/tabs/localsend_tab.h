@@ -55,7 +55,9 @@ private:
   Button* m_acceptButton = nullptr;
   Button* m_rejectButton = nullptr;
   Label* m_transfer = nullptr;
+  Flex* m_historyCard = nullptr;
   Flex* m_historyList = nullptr;
+  Flex* m_peersCard = nullptr;
   Flex* m_peerList = nullptr;
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};

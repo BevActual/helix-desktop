@@ -6,6 +6,7 @@
 
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <utility>
 
 class Flex;
@@ -13,7 +14,10 @@ class Renderer;
 
 class SettingsTab : public Tab {
 public:
-  SettingsTab(const ControlCenterServices& services, std::string section);
+  SettingsTab(
+      const ControlCenterServices& services, std::string section,
+      std::unordered_set<std::string> includedGroups = {}
+  );
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;

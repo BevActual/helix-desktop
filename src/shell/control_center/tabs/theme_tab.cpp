@@ -13,6 +13,7 @@
 #include "notification/notifications.h"
 #include "render/core/color.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "theme/builtin_palettes.h"
@@ -74,12 +75,16 @@ namespace {
       "vibrant",    "faithful",      "soft",           "dysfunctional", "muted",
   };
 
-  void setShown(Node* node, bool shown) {
+  bool setShown(Node* node, bool shown) {
     if (node == nullptr) {
-      return;
+      return false;
     }
-    node->setVisible(shown);
-    node->setParticipatesInLayout(shown);
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    if (changed) {
+      node->setVisible(shown);
+      node->setParticipatesInLayout(shown);
+    }
+    return changed;
   }
 
   [[nodiscard]] std::size_t themeModeIndex(ThemeMode mode) {
@@ -371,9 +376,18 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .out = &m_themeMode,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.theme.mode.dark")},
-                  {.label = i18n::tr("settings.options.theme.mode.light")},
-                  {.label = i18n::tr("common.states.auto")},
+                  {
+                      .label = i18n::tr("settings.options.theme.mode.dark"),
+                      .tooltip = i18n::tr("control-center.appearance.always-dark"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.mode.light"),
+                      .tooltip = i18n::tr("control-center.appearance.always-light"),
+                  },
+                  {
+                      .label = i18n::tr("common.states.auto"),
+                      .tooltip = i18n::tr("control-center.appearance.auto-schedule"),
+                  },
               },
           .fontSize = captionSize,
           .scale = scale,
@@ -390,10 +404,22 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .out = &m_shellMode,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.theme.shell-mode.follow")},
-                  {.label = i18n::tr("settings.options.theme.mode.dark")},
-                  {.label = i18n::tr("settings.options.theme.mode.light")},
-                  {.label = i18n::tr("common.states.auto")},
+                  {
+                      .label = i18n::tr("settings.options.theme.shell-mode.follow"),
+                      .tooltip = i18n::tr("control-center.appearance.follow-theme"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.mode.dark"),
+                      .tooltip = i18n::tr("control-center.appearance.always-dark"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.mode.light"),
+                      .tooltip = i18n::tr("control-center.appearance.always-light"),
+                  },
+                  {
+                      .label = i18n::tr("common.states.auto"),
+                      .tooltip = i18n::tr("control-center.appearance.auto-schedule"),
+                  },
               },
           .fontSize = captionSize,
           .scale = scale,
@@ -420,10 +446,22 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .out = &m_paletteSource,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.theme.source.built-in")},
-                  {.label = i18n::tr("settings.options.theme.source.wallpaper")},
-                  {.label = i18n::tr("settings.options.theme.source.community")},
-                  {.label = i18n::tr("settings.options.theme.source.custom")},
+                  {
+                      .label = i18n::tr("settings.options.theme.source.built-in"),
+                      .tooltip = i18n::tr("control-center.appearance.palette-builtin-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.source.wallpaper"),
+                      .tooltip = i18n::tr("control-center.appearance.palette-wallpaper-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.source.community"),
+                      .tooltip = i18n::tr("control-center.appearance.palette-community-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.theme.source.custom"),
+                      .tooltip = i18n::tr("control-center.appearance.palette-custom-tooltip"),
+                  },
               },
           .fontSize = captionSize,
           .scale = scale,
@@ -452,6 +490,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .fontSize = Style::fontSizeBody * scale,
           .contentAlign = ButtonContentAlign::Start,
           .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("control-center.appearance.choose-palette-tooltip"),
           .minHeight = controlHeight,
           .paddingV = Style::spaceSm * scale,
           .paddingH = Style::spaceMd * scale,
@@ -479,6 +518,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .glyph = "folder",
           .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.appearance.open-palettes-folder"),
           .minHeight = controlHeight,
           .paddingH = Style::spaceMd * scale,
           .visible = false,
@@ -494,6 +534,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .glyph = "device-floppy",
           .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.appearance.export-palette-tooltip"),
           .minHeight = controlHeight,
           .paddingH = Style::spaceMd * scale,
           .onClick = [this]() { exportWallpaperPalette(); },
@@ -508,6 +549,8 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .visible = false,
       })
   );
+
+  addCaption(*themeCard, i18n::tr("control-center.appearance.palette-hint"));
 
   auto swatchRow = ui::row({
       .align = FlexAlign::Stretch,
@@ -619,7 +662,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
     auto drawBorderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     drawBorderRow->addChild(
         ui::label({
-            .text = i18n::tr("settings.schema.niri.draw-border-with-background.label"),
+            .text = i18n::tr("control-center.theme.niri-draw-border"),
             .fontSize = Style::fontSizeBody * scale,
             .color = colorSpecFromRole(ColorRole::OnSurface),
             .flexGrow = 1.0F,
@@ -651,8 +694,16 @@ std::unique_ptr<Flex> ThemeTab::create() {
           })
       );
       niriCard->addChild(std::move(blurRow));
+      const bool blurOn = m_config != nullptr && m_config->config().theme.niriLayout.blur;
+      auto blurDetails = ui::column({
+          .out = &m_niriBlurDetails,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceSm * scale,
+          .visible = blurOn,
+          .participatesInLayout = blurOn,
+      });
       addLabeledSlider(
-          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-passes.label"),
+          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-passes.label"),
           &m_niriBlurPasses, &m_niriBlurPassesValue,
           static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.min.value_or(1)),
           static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.max.value_or(8)),
@@ -660,7 +711,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
           [this]() { commitNiriBlurPasses(); }
       );
       addLabeledSlider(
-          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-offset.label"),
+          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-offset.label"),
           &m_niriBlurOffset, &m_niriBlurOffsetValue,
           static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.min.value_or(0.5F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.max.value_or(8.0F)),
@@ -668,13 +719,14 @@ std::unique_ptr<Flex> ThemeTab::create() {
           [this]() { commitNiriBlurOffset(); }
       );
       addLabeledSlider(
-          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-noise.label"),
+          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-noise.label"),
           &m_niriBlurNoise, &m_niriBlurNoiseValue,
           static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.min.value_or(0.0F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.max.value_or(0.2F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.step.value_or(0.01F)), 0.03, twoDecimalLabel,
           [this]() { commitNiriBlurNoise(); }
       );
+      niriCard->addChild(std::move(blurDetails));
     }
     content->addChild(std::move(niriCard));
   }
@@ -709,6 +761,7 @@ void ThemeTab::onClose() {
   m_niriBorder = nullptr;
   m_niriDrawBorder = nullptr;
   m_niriBlur = nullptr;
+  m_niriBlurDetails = nullptr;
   m_niriBlurPasses = nullptr;
   m_niriBlurPassesValue = nullptr;
   m_niriBlurOffset = nullptr;
@@ -792,6 +845,9 @@ void ThemeTab::syncLiveControls() {
   }
   if (m_niriBlur != nullptr) {
     m_niriBlur->setCheckedImmediate(theme.niriLayout.blur);
+  }
+  if (setShown(m_niriBlurDetails, theme.niriLayout.blur)) {
+    PanelManager::instance().requestLayout();
   }
   if (m_niriBlurPasses != nullptr) {
     m_niriBlurPasses->setValue(static_cast<double>(theme.niriLayout.blurPasses));
@@ -1028,6 +1084,9 @@ void ThemeTab::applyNiriBlur(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"theme", "niri_layout", "blur"}, enabled);
+  if (setShown(m_niriBlurDetails, enabled)) {
+    PanelManager::instance().requestLayout();
+  }
   if (const auto result = syncNiriBlur(); !result.ok) {
     notify::error(
         "Noctalia", i18n::tr("control-center.theme.niri-blur-save-title"),

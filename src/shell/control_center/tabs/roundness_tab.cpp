@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/roundness_tab.h"
 
+#include "compositors/compositor_detect.h"
 #include "compositors/niri/niri_window_rules.h"
 #include "config/config_service.h"
 #include "config/schema/ranges.h"
@@ -71,24 +72,16 @@ std::unique_ptr<Flex> RoundnessTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*card, i18n::tr("settings.schema.appearance.corner-roundness.label"), scale);
-  card->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.corner-roundness.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
-
   auto roundnessHeader = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
   });
   roundnessHeader->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.appearance.corner-roundness.label"),
+          .text = i18n::tr("settings.schema.appearance.corner-roundness.description"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
           .flexGrow = 1.0F,
       })
   );
@@ -131,23 +124,17 @@ std::unique_ptr<Flex> RoundnessTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*barCard, i18n::tr("settings.navigation.sections.bar"), scale);
-  barCard->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.bar.corner-radius.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
   auto barRadiusHeader = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
   });
   barRadiusHeader->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.shared.corner-radius.label"),
+          .out = &m_barDescription,
+          .text = i18n::tr("settings.schema.bar.corner-radius.description"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
           .flexGrow = 1.0F,
       })
   );
@@ -190,23 +177,16 @@ std::unique_ptr<Flex> RoundnessTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*dockCard, i18n::tr("settings.navigation.sections.dock"), scale);
-  dockCard->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.dock.corner-radius.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
   auto dockRadiusHeader = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
   });
   dockRadiusHeader->addChild(
       ui::label({
-          .text = i18n::tr("settings.schema.shared.corner-radius.label"),
+          .text = i18n::tr("settings.schema.dock.corner-radius.description"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
           .flexGrow = 1.0F,
       })
   );
@@ -242,64 +222,59 @@ std::unique_ptr<Flex> RoundnessTab::create() {
   );
   content->addChild(std::move(dockCard));
 
-  auto windowCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*windowCard, i18n::tr("control-center.roundness.windows-title"), scale);
-  windowCard->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.roundness.windows-description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 3,
-      })
-  );
-  auto windowRadiusHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  windowRadiusHeader->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.shared.corner-radius.label"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  windowRadiusHeader->addChild(
-      ui::label({
-          .out = &m_windowRadiusValue,
-          .text = pixelLabel(0.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  windowCard->addChild(std::move(windowRadiusHeader));
-  windowCard->addChild(
-      ui::slider({
-          .out = &m_windowRadius,
-          .minValue = 0.0,
-          .maxValue = 40.0,
-          .step = 1.0,
-          .value = 0.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_windowRadiusValue != nullptr) {
-                  m_windowRadiusValue->setText(pixelLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitWindowRadius(); },
-      })
-  );
-  content->addChild(std::move(windowCard));
+  if (compositors::isNiri()) {
+    auto windowCard = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+    });
+    addTitle(*windowCard, i18n::tr("control-center.roundness.windows-title"), scale);
+    auto windowRadiusHeader = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+    });
+    windowRadiusHeader->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.roundness.windows-description"),
+            .fontSize = captionSize,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 2,
+            .flexGrow = 1.0F,
+        })
+    );
+    windowRadiusHeader->addChild(
+        ui::label({
+            .out = &m_windowRadiusValue,
+            .text = pixelLabel(0.0),
+            .fontSize = captionSize,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    windowCard->addChild(std::move(windowRadiusHeader));
+    windowCard->addChild(
+        ui::slider({
+            .out = &m_windowRadius,
+            .minValue = 0.0,
+            .maxValue = 40.0,
+            .step = 1.0,
+            .value = 0.0,
+            .trackHeight = Style::sliderTrackHeight * scale,
+            .thumbSize = Style::sliderThumbSize * scale,
+            .controlHeight = controlHeight,
+            .flexGrow = 1.0F,
+            .onValueChanged =
+                [this](double value) {
+                  if (m_windowRadiusValue != nullptr) {
+                    m_windowRadiusValue->setText(pixelLabel(value));
+                  }
+                },
+            .onDragEnd = [this]() { commitWindowRadius(); },
+        })
+    );
+    content->addChild(std::move(windowCard));
+  }
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
@@ -320,6 +295,7 @@ void RoundnessTab::onClose() {
   m_roundnessValue = nullptr;
   m_barRadius = nullptr;
   m_barRadiusValue = nullptr;
+  m_barDescription = nullptr;
   m_dockRadius = nullptr;
   m_dockRadiusValue = nullptr;
   m_windowRadius = nullptr;
@@ -379,10 +355,22 @@ void RoundnessTab::syncLiveControls() {
     m_barName = cfg.bars.front().name;
     const auto barRadius = static_cast<double>(cfg.bars.front().radius);
     if (m_barRadius != nullptr) {
+      m_barRadius->setEnabled(true);
       m_barRadius->setValue(barRadius);
     }
     if (m_barRadiusValue != nullptr) {
       m_barRadiusValue->setText(pixelLabel(barRadius));
+    }
+    if (m_barDescription != nullptr) {
+      m_barDescription->setText(i18n::tr("settings.schema.bar.corner-radius.description"));
+    }
+  } else {
+    m_barName.clear();
+    if (m_barRadius != nullptr) {
+      m_barRadius->setEnabled(false);
+    }
+    if (m_barDescription != nullptr) {
+      m_barDescription->setText(i18n::tr("control-center.roundness.bar-empty"));
     }
   }
 

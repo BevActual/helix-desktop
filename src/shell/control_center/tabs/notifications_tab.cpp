@@ -365,8 +365,12 @@ namespace {
           })
       ));
 
-      m_expand = static_cast<Button*>(m_headerActions->addChild(makeActionButton("chevron-down", scale)));
-      m_dismiss = static_cast<Button*>(m_headerActions->addChild(makeActionButton("trash", scale)));
+      m_expand = static_cast<Button*>(
+          m_headerActions->addChild(makeActionButton("chevron-down", scale, i18n::tr("control-center.notifications.expand")))
+      );
+      m_dismiss = static_cast<Button*>(
+          m_headerActions->addChild(makeActionButton("trash", scale, i18n::tr("control-center.notifications.remove")))
+      );
 
       m_summary = static_cast<Label*>(addChild(
           ui::label({
@@ -416,6 +420,9 @@ namespace {
       m_expand->setVisible(metrics.canExpand);
       m_expand->setEnabled(metrics.canExpand);
       m_expand->setGlyph(metrics.expanded ? "chevron-up" : "chevron-down");
+      m_expand->setTooltip(
+          i18n::tr(metrics.expanded ? "control-center.notifications.collapse" : "control-center.notifications.expand")
+      );
       m_expand->setOnClick([onToggleExpanded = std::move(onToggleExpanded), id = entry.notification.id]() {
         onToggleExpanded(id);
       });
@@ -477,11 +484,12 @@ namespace {
       Raw,
     };
 
-    static std::unique_ptr<Button> makeActionButton(std::string_view glyph, float scale) {
+    static std::unique_ptr<Button> makeActionButton(std::string_view glyph, float scale, std::string_view tooltip) {
       return ui::button({
           .glyph = std::string(glyph),
           .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
+          .tooltip = std::string(tooltip),
           .minWidth = kNotificationActionButtonSize * scale,
           .minHeight = kNotificationActionButtonSize * scale,
           .padding = Style::spaceXs * scale,
@@ -663,10 +671,22 @@ std::unique_ptr<Flex> NotificationsTab::create() {
           .out = &m_filter,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.notifications.filter.all")},
-                  {.label = i18n::tr("control-center.notifications.filter.today")},
-                  {.label = i18n::tr("control-center.notifications.filter.yesterday")},
-                  {.label = i18n::tr("control-center.notifications.filter.older")},
+                  {
+                      .label = i18n::tr("control-center.notifications.filter.all"),
+                      .tooltip = i18n::tr("control-center.notifications.filter.all-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.notifications.filter.today"),
+                      .tooltip = i18n::tr("control-center.notifications.filter.today-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.notifications.filter.yesterday"),
+                      .tooltip = i18n::tr("control-center.notifications.filter.yesterday-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.notifications.filter.older"),
+                      .tooltip = i18n::tr("control-center.notifications.filter.older-tooltip"),
+                  },
               },
           .selectedIndex = m_filterIndex,
           .fontSize = Style::fontSizeCaption,

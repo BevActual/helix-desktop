@@ -1,6 +1,5 @@
 #pragma once
 
-#include "config/config_types.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -9,7 +8,6 @@
 #include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
 
 class ConfigService;
 class Flex;
@@ -43,8 +41,6 @@ private:
   void applyBorder(bool enabled);
   void commitScale();
   void commitOpacity();
-  void applyKind(std::size_t index, bool enabled);
-  void refreshKindVisibility();
 
   ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
@@ -59,9 +55,7 @@ private:
   Slider* m_opacity = nullptr;
   Label* m_opacityValue = nullptr;
   Toggle* m_border = nullptr;
-  std::vector<Toggle*> m_kindToggles;
-  Flex* m_volumeOutputRow = nullptr;
-  Flex* m_volumeInputRow = nullptr;
+  Flex* m_details = nullptr;
 
   bool m_syncing = false;
   bool m_liveDirty = false;

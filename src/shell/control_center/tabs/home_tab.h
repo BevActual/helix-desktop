@@ -89,6 +89,7 @@ private:
   void syncHeaderActions();
   void syncStatusStrip();
   bool resizeMediaArtToCard();
+  [[nodiscard]] bool mediaExpanded() const;
   void onPanelCardOpacityChanged(float opacity) override;
 
   MprisService* m_mpris = nullptr;

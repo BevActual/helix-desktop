@@ -37,6 +37,18 @@ namespace {
     return FileUtils::expandUserPath(config.shell.screenRecord.directory);
   }
 
+  [[nodiscard]] std::string sourceTooltip(ScreenRecorderService::Source source) {
+    switch (source) {
+    case ScreenRecorderService::Source::Region:
+      return i18n::tr("control-center.screen-record.source-region-tooltip");
+    case ScreenRecorderService::Source::Portal:
+      return i18n::tr("control-center.screen-record.source-portal-tooltip");
+    case ScreenRecorderService::Source::Focused:
+      break;
+    }
+    return i18n::tr("control-center.screen-record.source-focused-tooltip");
+  }
+
   [[nodiscard]] std::string sourceLabel(ScreenRecorderService::Source source) {
     switch (source) {
     case ScreenRecorderService::Source::Region:
@@ -126,7 +138,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
     if (m_sources[i] == m_selectedSource) {
       selected = i;
     }
-    sources.push_back({.label = sourceLabel(m_sources[i])});
+    sources.push_back({.label = sourceLabel(m_sources[i]), .tooltip = sourceTooltip(m_sources[i])});
   }
   m_selectedSource = m_sources[selected];
 
@@ -153,9 +165,18 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
           .out = &m_delay,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.screenshot.delay-none")},
-                  {.label = i18n::tr("control-center.screenshot.delay-3s")},
-                  {.label = i18n::tr("control-center.screenshot.delay-5s")},
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-none"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-none-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-3s"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-3s-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-5s"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-5s-tooltip"),
+                  },
               },
           .selectedIndex = m_delayIndex,
           .fontSize = Style::fontSizeCaption,

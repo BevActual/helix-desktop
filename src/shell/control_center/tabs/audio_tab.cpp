@@ -1108,6 +1108,7 @@ namespace {
               .glyph = "headphones",
               .glyphSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.audio.choose-device"),
               .minWidth = Style::controlHeightSm * scale,
               .minHeight = Style::controlHeightSm * scale,
               .padding = Style::spaceXs * scale,
@@ -1126,6 +1127,7 @@ namespace {
               .glyph = "volume-high",
               .glyphSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Default,
+              .tooltip = i18n::tr("control-center.audio.mute"),
               .minWidth = Style::controlHeightSm * scale,
               .minHeight = Style::controlHeightSm * scale,
               .padding = Style::spaceXs * scale,
@@ -1269,6 +1271,7 @@ namespace {
         m_muteButton->setEnabled(nodeEnabled);
         m_muteButton->setGlyph(m_muted ? "volume-mute" : "volume-high");
         m_muteButton->setVariant(m_muted ? ButtonVariant::Destructive : ButtonVariant::Default);
+        m_muteButton->setTooltip(i18n::tr(m_muted ? "control-center.audio.unmute" : "control-center.audio.mute"));
       }
 
       if (m_routingButton != nullptr) {
@@ -1724,6 +1727,7 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
               .glyphSize = Style::fontSizeCaption * scale,
               .enabled = false,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.audio.choose-device"),
               .minWidth = Style::controlHeightSm * scale,
               .minHeight = Style::controlHeightSm * scale,
               .padding = Style::spaceXs * scale,
@@ -1794,6 +1798,7 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
                   .glyph = std::string(card.muteGlyph),
                   .glyphSize = Style::fontSizeBody * scale,
                   .variant = ButtonVariant::Default,
+                  .tooltip = i18n::tr("control-center.audio.mute"),
                   .minWidth = Style::controlHeightSm * scale,
                   .minHeight = Style::controlHeightSm * scale,
                   .padding = Style::spaceXs * scale,
@@ -2072,6 +2077,9 @@ void AudioTab::doUpdate(Renderer& renderer) {
     m_outputDeviceVolume.muteButton->setEnabled(sink != nullptr);
     m_outputDeviceVolume.muteButton->setGlyph(outputMuted ? "volume-mute" : "volume-high");
     m_outputDeviceVolume.muteButton->setVariant(outputMuted ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_outputDeviceVolume.muteButton->setTooltip(
+        i18n::tr(outputMuted ? "control-center.audio.unmute" : "control-center.audio.mute")
+    );
   }
 
   if (m_inputDeviceVolume.slider != nullptr) {
@@ -2092,6 +2100,9 @@ void AudioTab::doUpdate(Renderer& renderer) {
     m_inputDeviceVolume.muteButton->setEnabled(source != nullptr);
     m_inputDeviceVolume.muteButton->setGlyph(inputMuted ? "microphone-mute" : "microphone");
     m_inputDeviceVolume.muteButton->setVariant(inputMuted ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_inputDeviceVolume.muteButton->setTooltip(
+        i18n::tr(inputMuted ? "control-center.audio.unmute" : "control-center.audio.mute")
+    );
   }
 }
 

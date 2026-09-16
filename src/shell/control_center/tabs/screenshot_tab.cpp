@@ -79,9 +79,18 @@ std::unique_ptr<Flex> ScreenshotTab::createLiveBody() {
           .out = &m_delay,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.screenshot.delay-none")},
-                  {.label = i18n::tr("control-center.screenshot.delay-3s")},
-                  {.label = i18n::tr("control-center.screenshot.delay-5s")},
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-none"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-none-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-3s"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-3s-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screenshot.delay-5s"),
+                      .tooltip = i18n::tr("control-center.screenshot.delay-5s-tooltip"),
+                  },
               },
           .selectedIndex = m_delayIndex,
           .fontSize = Style::fontSizeCaption,

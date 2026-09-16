@@ -150,6 +150,13 @@ namespace {
       needles.emplace_back("vscode");
       needles.emplace_back("vscodium");
     }
+    if (desktopId.find("cursor") != std::string::npos || desktopId.find("230313mzl4w4u92") != std::string::npos
+        || app.nameLower.find("cursor") != std::string::npos) {
+      needles.emplace_back("cursor");
+    }
+    if (desktopId.find("warp") != std::string::npos || app.nameLower.find("warp") != std::string::npos) {
+      needles.emplace_back("warp");
+    }
 
     CatalogMatch best;
     int bestScore = 0;
@@ -280,9 +287,18 @@ std::unique_ptr<Flex> TemplatesTab::create() {
           .out = &m_source,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.navigation.groups.built-in")},
-                  {.label = i18n::tr("settings.navigation.groups.community")},
-                  {.label = i18n::tr("settings.navigation.groups.user")},
+                  {
+                      .label = i18n::tr("settings.navigation.groups.built-in"),
+                      .tooltip = i18n::tr("control-center.templates.built-in-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.navigation.groups.community"),
+                      .tooltip = i18n::tr("control-center.templates.community-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.navigation.groups.user"),
+                      .tooltip = i18n::tr("control-center.templates.user-tooltip"),
+                  },
               },
           .selectedIndex = indexFromSource(m_sourceKind),
           .scale = scale,
@@ -586,8 +602,7 @@ void TemplatesTab::syncLiveControls() {
       m_hint->setText(i18n::tr("control-center.templates.disabled-builtin"));
     }
   }
-  const bool showHint = gtkMissingTheme || applyFailureCount > 0 || !enabled
-      || (userSource && templates.userTemplates.empty());
+  const bool showHint = gtkMissingTheme || applyFailureCount > 0 || !enabled;
   setShown(m_hint, showHint);
   setShown(m_storeHost, enabled);
   setShown(m_folderButton, userSource);
@@ -614,11 +629,13 @@ void TemplatesTab::syncGtkFollow() {
     return;
   }
   const bool gtkOn = noctalia::theme::gtkTemplatesEnabled(m_config->config().theme.templates);
+  const bool showGtkFollow = !gtkOn && m_sourceKind == Source::Builtin
+      && m_config->config().theme.templates.enableBuiltinTemplates;
   if (m_gtkFollowHint != nullptr) {
     m_gtkFollowHint->setText(i18n::tr("control-center.templates.gtk-follow-off"));
   }
-  setShown(m_gtkFollowHint, !gtkOn);
-  setShown(m_gtkFollowButton, !gtkOn);
+  setShown(m_gtkFollowHint, showGtkFollow);
+  setShown(m_gtkFollowButton, showGtkFollow);
 }
 
 void TemplatesTab::enableGtkTemplates() {

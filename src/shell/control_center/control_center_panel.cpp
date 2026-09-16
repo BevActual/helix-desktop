@@ -91,6 +91,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <wayland-client-protocol.h>
 
@@ -286,6 +287,9 @@ namespace {
   }
 
   [[nodiscard]] std::string resolveOpenTabId(std::string_view context) {
+    if (context == "appearance") {
+      return "theme";
+    }
     if (context.empty() || context == "home") {
       return "home";
     }
@@ -436,11 +440,22 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("clipboard", std::make_unique<ClipboardTab>(services));
   add("launcher", std::make_unique<LauncherTab>(services));
   add("keybinds", std::make_unique<KeybindsTab>(services));
-  add("shell", std::make_unique<SettingsTab>(services, "shell"));
+  add(
+      "shell",
+      std::make_unique<SettingsTab>(
+          services, "shell",
+          std::unordered_set<std::string>{"general", "keyboard-layout", "window-switcher"}
+      )
+  );
   add("security", std::make_unique<SettingsTab>(services, "security"));
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
-  add("control-center", std::make_unique<SettingsTab>(services, "control-center"));
+  add(
+      "control-center",
+      std::make_unique<SettingsTab>(
+          services, "control-center", std::unordered_set<std::string>{"layout", "navigation"}
+      )
+  );
   add("plugins", std::make_unique<PluginsTab>(services));
 }
 

@@ -64,6 +64,19 @@ namespace {
     return {};
   }
 
+  [[nodiscard]] std::string profileTooltip(std::string_view profile) {
+    if (profile == "power-saver") {
+      return i18n::tr("control-center.power.power-saver-tooltip");
+    }
+    if (profile == "balanced") {
+      return i18n::tr("control-center.power.balanced-tooltip");
+    }
+    if (profile == "performance") {
+      return i18n::tr("control-center.power.performance-tooltip");
+    }
+    return {};
+  }
+
   bool sameThresholds(const UPowerChargeLimitState& state) {
     return state.configuredStart == state.effectiveStart && state.configuredEnd == state.effectiveEnd;
   }
@@ -516,7 +529,11 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
   std::vector<ui::SegmentedOption> options;
   options.reserve(m_profileOrder.size());
   for (const auto& profile : m_profileOrder) {
-    options.push_back({.label = profileLabel(profile), .glyph = std::string(profileGlyphName(profile))});
+    options.push_back(
+        {.label = profileLabel(profile),
+         .glyph = std::string(profileGlyphName(profile)),
+         .tooltip = profileTooltip(profile)}
+    );
   }
 
   card->addChild(

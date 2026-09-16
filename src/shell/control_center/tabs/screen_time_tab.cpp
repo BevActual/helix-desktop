@@ -152,9 +152,18 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
           .out = &m_rangePicker,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.screen-time.range.today")},
-                  {.label = i18n::tr("control-center.screen-time.range.3-days")},
-                  {.label = i18n::tr("control-center.screen-time.range.14-days")},
+                  {
+                      .label = i18n::tr("control-center.screen-time.range.today"),
+                      .tooltip = i18n::tr("control-center.screen-time.range.today-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screen-time.range.3-days"),
+                      .tooltip = i18n::tr("control-center.screen-time.range.3-days-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.screen-time.range.14-days"),
+                      .tooltip = i18n::tr("control-center.screen-time.range.14-days-tooltip"),
+                  },
               },
           .selectedIndex = 0,
           .fontSize = Style::fontSizeCaption,

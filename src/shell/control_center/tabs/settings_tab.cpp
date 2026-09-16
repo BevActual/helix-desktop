@@ -3,8 +3,13 @@
 #include "render/core/renderer.h"
 #include "ui/controls/flex.h"
 
-SettingsTab::SettingsTab(const ControlCenterServices& services, std::string section)
-    : m_pane(services, SettingsPaneOptions{.section = std::move(section)}) {}
+SettingsTab::SettingsTab(
+    const ControlCenterServices& services, std::string section, std::unordered_set<std::string> includedGroups
+)
+    : m_pane(
+          services,
+          SettingsPaneOptions{.section = std::move(section), .includedGroups = std::move(includedGroups)}
+      ) {}
 
 std::unique_ptr<Flex> SettingsTab::create() { return m_pane.create(contentScale(), panelCardOpacity()); }
 

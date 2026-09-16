@@ -43,6 +43,7 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_widgetDetails = nullptr;
   Toggle* m_widgetsEnabled = nullptr;
   Toggle* m_screenCorners = nullptr;
   Toggle* m_hotCorners = nullptr;

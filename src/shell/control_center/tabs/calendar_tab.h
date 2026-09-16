@@ -84,6 +84,7 @@ private:
   Label* m_eventsTitle = nullptr;
   ScrollView* m_eventsScroll = nullptr;
   Flex* m_accountsCard = nullptr;
+  Button* m_accountsAddButton = nullptr;
   Flex* m_accountsDisabledRow = nullptr;
   Flex* m_accountsList = nullptr;
   Label* m_accountsEmpty = nullptr;

@@ -107,6 +107,7 @@ private:
   Label* m_noteLabel = nullptr;
   Label* m_errorLabel = nullptr;
   Flex* m_nightLightCard = nullptr;
+  Flex* m_nightLightDetails = nullptr;
   Label* m_nightLightStatus = nullptr;
   Toggle* m_nightLightEnabled = nullptr;
   Toggle* m_nightLightForce = nullptr;

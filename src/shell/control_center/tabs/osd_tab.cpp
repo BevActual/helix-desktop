@@ -28,12 +28,14 @@ using namespace control_center;
 
 namespace {
 
-  void setShown(Node* node, bool shown) {
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
     if (node == nullptr) {
-      return;
+      return false;
     }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
+    return changed;
   }
 
   [[nodiscard]] std::string multiplierLabel(double value) { return std::format("{:.2f}×", value); }
@@ -63,35 +65,6 @@ namespace {
     }
     return 0;
   }
-
-  struct OsdKindItem {
-    bool OsdKindsConfig::* member;
-    const char* tomlKey;
-    const char* labelKey;
-  };
-
-  constexpr OsdKindItem kOsdKinds[] = {
-      {&OsdKindsConfig::volume, "volume", "settings.schema.shell.osd-kinds-volume.label"},
-      {&OsdKindsConfig::volumeOutput, "volume_output", "settings.schema.shell.osd-kinds-volume-output.label"},
-      {&OsdKindsConfig::volumeInput, "volume_input", "settings.schema.shell.osd-kinds-volume-input.label"},
-      {&OsdKindsConfig::brightness, "brightness", "settings.schema.shell.osd-kinds-brightness.label"},
-      {&OsdKindsConfig::wifi, "wifi", "settings.schema.shell.osd-kinds-wifi.label"},
-      {&OsdKindsConfig::bluetooth, "bluetooth", "settings.schema.shell.osd-kinds-bluetooth.label"},
-      {&OsdKindsConfig::powerProfile, "power_profile", "settings.schema.shell.osd-kinds-power-profile.label"},
-      {&OsdKindsConfig::caffeine, "caffeine", "settings.schema.shell.osd-kinds-caffeine.label"},
-      {&OsdKindsConfig::nightlight, "nightlight", "settings.schema.shell.osd-kinds-nightlight.label"},
-      {&OsdKindsConfig::dnd, "dnd", "settings.schema.shell.osd-kinds-dnd.label"},
-      {&OsdKindsConfig::lockKeys, "lock_keys", "settings.schema.shell.osd-kinds-lock-keys.label"},
-      {&OsdKindsConfig::keyboardLayout, "keyboard_layout", "settings.schema.shell.osd-kinds-keyboard-layout.label"},
-      {&OsdKindsConfig::media, "media", "settings.schema.shell.osd-kinds-media.label"},
-      {&OsdKindsConfig::privacy, "privacy", "settings.schema.shell.osd-kinds-privacy.label"},
-      {&OsdKindsConfig::keyboardBacklight, "keyboard_backlight",
-       "settings.schema.shell.osd-kinds-keyboard-backlight.label"},
-  };
-
-  constexpr std::size_t kVolumeIndex = 0;
-  constexpr std::size_t kVolumeOutputIndex = 1;
-  constexpr std::size_t kVolumeInputIndex = 2;
 
 } // namespace
 
@@ -178,14 +151,27 @@ std::unique_ptr<Flex> OsdTab::create() {
   addTitle(*generalCard, i18n::tr("settings.navigation.sections.osd"), scale);
   addToggleRow(*generalCard, i18n::tr("control-center.osd.enable"), &m_enabled, osd.enabled, &OsdTab::applyEnabled);
 
-  addCaption(*generalCard, i18n::tr("control-center.osd.orientation"));
-  generalCard->addChild(
+  auto details = ui::column({
+      .out = &m_details,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = osd.enabled,
+      .participatesInLayout = osd.enabled,
+  });
+  addCaption(*details, i18n::tr("control-center.osd.orientation"));
+  details->addChild(
       ui::segmented({
           .out = &m_orientation,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.orientation.horizontal")},
-                  {.label = i18n::tr("settings.options.orientation.vertical")},
+                  {
+                      .label = i18n::tr("settings.options.orientation.horizontal"),
+                      .tooltip = i18n::tr("control-center.osd.orientation-horizontal-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.orientation.vertical"),
+                      .tooltip = i18n::tr("control-center.osd.orientation-vertical-tooltip"),
+                  },
               },
           .selectedIndex = osd.orientation == "vertical" ? std::size_t{1} : std::size_t{0},
           .fontSize = captionSize,
@@ -197,18 +183,19 @@ std::unique_ptr<Flex> OsdTab::create() {
       })
   );
 
-  addCaption(*generalCard, i18n::tr("control-center.osd.position"));
+  addCaption(*details, i18n::tr("control-center.osd.position"));
   {
     std::vector<std::string> labels;
     labels.reserve(kPositions.size());
     for (const auto& option : kPositions) {
       labels.push_back(i18n::tr(option.labelKey));
     }
-    generalCard->addChild(
+    const bool vertical = osd.orientation == "vertical";
+    details->addChild(
         ui::select({
             .out = &m_position,
             .options = labels,
-            .selectedIndex = positionIndex(osd.position),
+            .selectedIndex = positionIndex(vertical ? osd.positionVertical : osd.position),
             .fontSize = Style::fontSizeBody * scale,
             .controlHeight = controlHeight,
             .surfaceOpacity = panelCardOpacity(),
@@ -236,8 +223,8 @@ std::unique_ptr<Flex> OsdTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  generalCard->addChild(std::move(scaleHeader));
-  generalCard->addChild(
+  details->addChild(std::move(scaleHeader));
+  details->addChild(
       ui::slider({
           .out = &m_scale,
           .minValue = static_cast<double>(noctalia::config::schema::kScaleRange.min.value_or(0.5F)),
@@ -276,8 +263,8 @@ std::unique_ptr<Flex> OsdTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  generalCard->addChild(std::move(opacityHeader));
-  generalCard->addChild(
+  details->addChild(std::move(opacityHeader));
+  details->addChild(
       ui::slider({
           .out = &m_opacity,
           .minValue = static_cast<double>(noctalia::config::schema::kUnitRange.min.value_or(0.0F)),
@@ -297,64 +284,9 @@ std::unique_ptr<Flex> OsdTab::create() {
           .onDragEnd = [this]() { commitOpacity(); },
       })
   );
-  addToggleRow(*generalCard, i18n::tr("control-center.osd.border"), &m_border, osd.border, &OsdTab::applyBorder);
+  addToggleRow(*details, i18n::tr("control-center.osd.border"), &m_border, osd.border, &OsdTab::applyBorder);
+  generalCard->addChild(std::move(details));
   content->addChild(std::move(generalCard));
-
-  auto kindsCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*kindsCard, i18n::tr("control-center.osd.kinds-title"), scale);
-  kindsCard->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.osd.kinds-description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
-
-  m_kindToggles.assign(std::size(kOsdKinds), nullptr);
-  m_volumeOutputRow = nullptr;
-  m_volumeInputRow = nullptr;
-  for (std::size_t i = 0; i < std::size(kOsdKinds); ++i) {
-    const auto& item = kOsdKinds[i];
-    const bool checked = osd.kinds.*(item.member);
-    const bool indented = i == kVolumeOutputIndex || i == kVolumeInputIndex;
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .paddingH = indented ? Style::spaceLg * scale : 0.0F,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    Flex* rowPtr = row.get();
-    if (i == kVolumeOutputIndex) {
-      m_volumeOutputRow = rowPtr;
-    } else if (i == kVolumeInputIndex) {
-      m_volumeInputRow = rowPtr;
-    }
-    row->addChild(
-        ui::label({
-            .text = i18n::tr(item.labelKey),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    row->addChild(
-        ui::toggle({
-            .out = &m_kindToggles[i],
-            .checkedImmediate = checked,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = [this, i](bool value) { applyKind(i, value); },
-        })
-    );
-    kindsCard->addChild(std::move(row));
-  }
-  content->addChild(std::move(kindsCard));
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
@@ -379,9 +311,7 @@ void OsdTab::onClose() {
   m_opacity = nullptr;
   m_opacityValue = nullptr;
   m_border = nullptr;
-  m_kindToggles.clear();
-  m_volumeOutputRow = nullptr;
-  m_volumeInputRow = nullptr;
+  m_details = nullptr;
 }
 
 void OsdTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -427,7 +357,8 @@ void OsdTab::syncLiveControls() {
     m_orientation->setSelectedIndex(osd.orientation == "vertical" ? 1 : 0);
   }
   if (m_position != nullptr) {
-    m_position->setSelectedIndexSilently(positionIndex(osd.position));
+    const std::string& pos = osd.orientation == "vertical" ? osd.positionVertical : osd.position;
+    m_position->setSelectedIndexSilently(positionIndex(pos));
   }
   if (m_scale != nullptr) {
     m_scale->setValue(osd.scale);
@@ -444,22 +375,10 @@ void OsdTab::syncLiveControls() {
   if (m_border != nullptr) {
     m_border->setCheckedImmediate(osd.border);
   }
-  for (std::size_t i = 0; i < std::size(kOsdKinds) && i < m_kindToggles.size(); ++i) {
-    if (m_kindToggles[i] != nullptr) {
-      m_kindToggles[i]->setCheckedImmediate(osd.kinds.*(kOsdKinds[i].member));
-    }
+  if (setShown(m_details, osd.enabled)) {
+    PanelManager::instance().requestLayout();
   }
-  refreshKindVisibility();
   m_syncing = false;
-}
-
-void OsdTab::refreshKindVisibility() {
-  if (m_config == nullptr) {
-    return;
-  }
-  const bool volumeOn = m_config->config().osd.kinds.volume;
-  setShown(m_volumeOutputRow, volumeOn);
-  setShown(m_volumeInputRow, volumeOn);
 }
 
 void OsdTab::applyEnabled(bool enabled) {
@@ -467,6 +386,7 @@ void OsdTab::applyEnabled(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"osd", "enabled"}, enabled);
+  syncLiveControls();
   PanelManager::instance().refresh();
 }
 
@@ -474,7 +394,13 @@ void OsdTab::applyOrientation(std::size_t index) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
-  (void)m_config->setOverride({"osd", "orientation"}, std::string(index == 1 ? "vertical" : "horizontal"));
+  const bool vertical = index == 1;
+  (void)m_config->setOverride({"osd", "orientation"}, std::string(vertical ? "vertical" : "horizontal"));
+  if (m_position != nullptr) {
+    const auto& osd = m_config->config().osd;
+    const std::string& pos = vertical ? osd.positionVertical : osd.position;
+    m_position->setSelectedIndexSilently(positionIndex(pos));
+  }
   PanelManager::instance().refresh();
 }
 
@@ -482,7 +408,10 @@ void OsdTab::applyPosition(std::size_t index) {
   if (m_syncing || m_config == nullptr || index >= kPositions.size()) {
     return;
   }
-  (void)m_config->setOverride({"osd", "position"}, std::string(kPositions[index].value));
+  const bool vertical = m_config->config().osd.orientation == "vertical";
+  (void)m_config->setOverride(
+      {"osd", vertical ? "position_vertical" : "position"}, std::string(kPositions[index].value)
+  );
   PanelManager::instance().refresh();
 }
 
@@ -505,14 +434,4 @@ void OsdTab::commitOpacity() {
     return;
   }
   (void)m_config->setOverride({"osd", "background_opacity"}, m_opacity->value());
-}
-
-void OsdTab::applyKind(std::size_t index, bool enabled) {
-  if (m_syncing || m_config == nullptr || index >= std::size(kOsdKinds)) {
-    return;
-  }
-  (void)m_config->setOverride({"osd", "kinds", kOsdKinds[index].tomlKey}, enabled);
-  if (index == kVolumeIndex) {
-    refreshKindVisibility();
-  }
 }

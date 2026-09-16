@@ -47,6 +47,9 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_enableRow = nullptr;
+  Flex* m_details = nullptr;
+  Flex* m_shapeCard = nullptr;
   Toggle* m_enabled = nullptr;
   Segmented* m_position = nullptr;
   Segmented* m_autoHide = nullptr;
@@ -56,6 +59,7 @@ private:
   Label* m_thicknessValue = nullptr;
   Slider* m_opacity = nullptr;
   Label* m_opacityValue = nullptr;
+  Label* m_empty = nullptr;
 
   std::string m_barName;
   bool m_syncing = false;

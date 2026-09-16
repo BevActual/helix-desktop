@@ -63,7 +63,7 @@ namespace control_center {
   } // namespace
 
   std::string tabIdForSettingsSection(std::string_view section) {
-    if (section.empty()) {
+    if (section.empty() || section == "appearance") {
       return "theme";
     }
     if (section == "location") {

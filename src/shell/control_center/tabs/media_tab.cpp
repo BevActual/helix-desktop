@@ -214,6 +214,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.media.choose-player"),
           .minWidth = Style::controlHeightSm * scale,
           .minHeight = Style::controlHeightSm * scale,
           .padding = Style::spaceXs * scale,
@@ -323,6 +324,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .out = &m_repeatButton,
           .glyph = "repeat",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.media.repeat"),
           .minWidth = kMediaControlsHeight * scale,
           .minHeight = kMediaControlsHeight * scale,
           .padding = Style::spaceSm * scale,
@@ -347,6 +349,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .out = &m_prevButton,
           .glyph = "media-prev",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.media.previous"),
           .minWidth = kMediaControlsHeight * scale,
           .minHeight = kMediaControlsHeight * scale,
           .padding = Style::spaceSm * scale,
@@ -369,6 +372,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .out = &m_playPauseButton,
           .glyph = "media-play",
           .variant = ButtonVariant::Primary,
+          .tooltip = i18n::tr("control-center.media.play"),
           .minWidth = kMediaPlayPauseHeight * scale,
           .minHeight = kMediaPlayPauseHeight * scale,
           .padding = Style::spaceSm * scale,
@@ -391,6 +395,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .out = &m_nextButton,
           .glyph = "media-next",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.media.next"),
           .minWidth = kMediaControlsHeight * scale,
           .minHeight = kMediaControlsHeight * scale,
           .padding = Style::spaceSm * scale,
@@ -413,6 +418,7 @@ std::unique_ptr<Flex> MediaTab::create() {
           .out = &m_shuffleButton,
           .glyph = "shuffle",
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.media.shuffle"),
           .minWidth = kMediaControlsHeight * scale,
           .minHeight = kMediaControlsHeight * scale,
           .padding = Style::spaceSm * scale,
@@ -964,6 +970,9 @@ void MediaTab::refresh(Renderer& renderer) {
 
     m_playPauseButton->setGlyph(playPauseGlyph(player.playbackStatus));
     m_playPauseButton->setVariant(ButtonVariant::Primary);
+    m_playPauseButton->setTooltip(
+        i18n::tr(player.playbackStatus == "Playing" ? "control-center.media.pause" : "control-center.media.play")
+    );
     if (m_prevButton != nullptr) {
       m_prevButton->setEnabled(player.canGoPrevious);
     }
@@ -1005,6 +1014,7 @@ void MediaTab::refresh(Renderer& renderer) {
   m_progressSlider->setValue(0.0F);
   m_syncingProgress = false;
   m_playPauseButton->setGlyph("media-play");
+  m_playPauseButton->setTooltip(i18n::tr("control-center.media.play"));
   if (m_prevButton != nullptr) {
     m_prevButton->setEnabled(false);
   }

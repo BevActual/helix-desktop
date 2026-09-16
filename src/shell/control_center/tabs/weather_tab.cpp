@@ -6,6 +6,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/scene/effect_node.h"
 #include "render/scene/input_area.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -14,6 +15,7 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/toggle.h"
 
 #include <algorithm>
 #include <chrono>
@@ -30,6 +32,16 @@ namespace {
   constexpr EffectType kTestEffect = EffectType::None;
 
   constexpr float kCurrentGlyphSize = Style::controlHeightLg * 2.2F;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   std::string windDirectionLabel(int degrees) {
     static constexpr std::array<const char*, 8> kDirs = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
@@ -202,6 +214,49 @@ std::unique_ptr<Flex> WeatherTab::create() {
   );
   currentCard->addChild(std::move(locationPrompt));
 
+  auto enableRow = ui::column({
+      .out = &m_enableRow,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+        applySectionCardStyle(card, scale, opacity);
+      },
+  });
+  auto enableToggleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+  enableToggleRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.weather.enable"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  enableToggleRow->addChild(
+      ui::toggle({
+          .out = &m_enableToggle,
+          .checkedImmediate = m_weather != nullptr && m_weather->enabled(),
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange =
+              [this](bool value) {
+                if (m_config != nullptr) {
+                  (void)m_config->setOverride({"weather", "enabled"}, value);
+                }
+              },
+      })
+  );
+  enableRow->addChild(std::move(enableToggleRow));
+  enableRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.weather.disabled-hint"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
+      })
+  );
+  leftColumn->addChild(std::move(enableRow));
   leftColumn->addChild(std::move(currentCard));
 
   auto detailsCard = ui::column({
@@ -289,8 +344,14 @@ std::unique_ptr<Flex> WeatherTab::create() {
           .out = &m_forecastViewPicker,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.weather.forecast-view.daily")},
-                  {.label = i18n::tr("control-center.weather.forecast-view.hourly")},
+                  {
+                      .label = i18n::tr("control-center.weather.forecast-view.daily"),
+                      .tooltip = i18n::tr("control-center.weather.forecast-view.daily-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.weather.forecast-view.hourly"),
+                      .tooltip = i18n::tr("control-center.weather.forecast-view.hourly-tooltip"),
+                  },
               },
           .selectedIndex = static_cast<std::size_t>(m_forecastView),
           .fontSize = Style::fontSizeCaption,
@@ -770,6 +831,8 @@ void WeatherTab::onClose() {
   m_rootLayout = nullptr;
   m_liveScroll = nullptr;
   m_leftColumn = nullptr;
+  m_enableRow = nullptr;
+  m_enableToggle = nullptr;
   m_currentCard = nullptr;
   m_glyphColumn = nullptr;
   m_detailsCard = nullptr;
@@ -817,6 +880,20 @@ void WeatherTab::sync(Renderer& renderer) {
     return;
   }
 
+  const bool weatherOn = m_weather != nullptr && m_weather->enabled();
+  if (m_enableToggle != nullptr) {
+    m_enableToggle->setChecked(weatherOn);
+  }
+  const bool layoutDirty = setShown(m_enableRow, !weatherOn) || setShown(m_currentCard, weatherOn)
+      || setShown(m_detailsCard, weatherOn) || setShown(m_forecastColumn, weatherOn);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+  if (!weatherOn) {
+    hideEffect();
+    return;
+  }
+
   showLocationPrompt(false);
 
   const bool showLocation = m_config == nullptr || m_config->config().shell.showLocation;
@@ -825,49 +902,6 @@ void WeatherTab::sync(Renderer& renderer) {
   }
   if (m_timeZoneRow != nullptr) {
     m_timeZoneRow->setVisible(showLocation);
-  }
-
-  if (m_weather == nullptr || !m_weather->enabled()) {
-    m_currentGlyph->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
-    m_currentTempLabel->setText("--°C");
-    if (m_currentHiLoLabel != nullptr) {
-      m_currentHiLoLabel->setText("-- / --");
-    }
-    m_currentDescLabel->setText(i18n::tr("control-center.weather.disabled"));
-    m_updatedLabel->setText(i18n::tr("control-center.weather.location-unavailable"));
-    m_updatedLabel->setVisible(false);
-    m_statusLabel->setText("");
-    m_statusLabel->setVisible(false);
-    if (m_windLabel != nullptr) {
-      m_windLabel->setText("--");
-    }
-    if (m_sunriseLabel != nullptr) {
-      m_sunriseLabel->setText("--");
-    }
-    if (m_sunsetLabel != nullptr) {
-      m_sunsetLabel->setText("--");
-    }
-    if (m_tempMaxLabel != nullptr) {
-      m_tempMaxLabel->setText("--");
-    }
-    if (m_tempMinLabel != nullptr) {
-      m_tempMinLabel->setText("--");
-    }
-    if (m_feelsLikeLabel != nullptr) {
-      m_feelsLikeLabel->setText("--");
-    }
-    if (m_elevationLabel != nullptr) {
-      m_elevationLabel->setText("--");
-    }
-    if (m_uvIndexLabel != nullptr) {
-      m_uvIndexLabel->setText("--");
-    }
-    if (m_timeZoneLabel != nullptr) {
-      m_timeZoneLabel->setText("--");
-    }
-    setForecastVisibleRowCount(0);
-    hideEffect();
-    return;
   }
 
   if (!m_weather->locationConfigured()) {

@@ -114,8 +114,14 @@ std::unique_ptr<Flex> PluginsTab::create() {
           .out = &m_viewSwitch,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.plugins.installed")},
-                  {.label = i18n::tr("control-center.plugins.store")},
+                  {
+                      .label = i18n::tr("control-center.plugins.installed"),
+                      .tooltip = i18n::tr("control-center.plugins.installed-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.plugins.store"),
+                      .tooltip = i18n::tr("control-center.plugins.store-tooltip"),
+                  },
               },
           .selectedIndex = indexFromView(m_view),
           .fontSize = Style::fontSizeCaption,

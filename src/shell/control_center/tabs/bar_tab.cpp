@@ -4,6 +4,7 @@
 #include "config/config_types.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
@@ -26,6 +27,16 @@
 using namespace control_center;
 
 namespace {
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   constexpr std::size_t kAutoHideOff = 0;
   constexpr std::size_t kAutoHideOn = 1;
@@ -136,6 +147,8 @@ std::unique_ptr<Flex> BarTab::create() {
   const BarConfig* bar = m_config != nullptr ? firstBar(m_config->config()) : nullptr;
   const BarConfig defaultBar{};
   const BarConfig& barRef = bar != nullptr ? *bar : defaultBar;
+  const bool hasBar = bar != nullptr;
+  const bool barOn = hasBar && barRef.enabled;
   if (bar != nullptr) {
     m_barName = bar->name;
   }
@@ -147,10 +160,35 @@ std::unique_ptr<Flex> BarTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*generalCard, i18n::tr("settings.navigation.sections.bar"), scale);
-  addToggleRow(*generalCard, i18n::tr("control-center.bar.enable"), &m_enabled, barRef.enabled, &BarTab::applyEnabled);
-
-  addCaption(*generalCard, i18n::tr("control-center.bar.position"));
   generalCard->addChild(
+      ui::label({
+          .out = &m_empty,
+          .text = i18n::tr("control-center.bar.empty"),
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+          .visible = !hasBar,
+          .participatesInLayout = !hasBar,
+      })
+  );
+  auto enableHost = ui::column({
+      .out = &m_enableRow,
+      .align = FlexAlign::Stretch,
+      .visible = hasBar,
+      .participatesInLayout = hasBar,
+  });
+  addToggleRow(*enableHost, i18n::tr("control-center.bar.enable"), &m_enabled, barRef.enabled, &BarTab::applyEnabled);
+  generalCard->addChild(std::move(enableHost));
+
+  auto details = ui::column({
+      .out = &m_details,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = barOn,
+      .participatesInLayout = barOn,
+  });
+  addCaption(*details, i18n::tr("control-center.bar.position"));
+  details->addChild(
       ui::segmented({
           .out = &m_position,
           .options =
@@ -170,15 +208,24 @@ std::unique_ptr<Flex> BarTab::create() {
       })
   );
 
-  addCaption(*generalCard, i18n::tr("control-center.bar.auto-hide"));
-  generalCard->addChild(
+  addCaption(*details, i18n::tr("control-center.bar.auto-hide"));
+  details->addChild(
       ui::segmented({
           .out = &m_autoHide,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.bar.auto-hide.off")},
-                  {.label = i18n::tr("settings.options.bar.auto-hide.on")},
-                  {.label = i18n::tr("settings.options.bar.auto-hide.smart")},
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.off"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-off-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.on"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-on-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.smart"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-smart-tooltip"),
+                  },
               },
           .selectedIndex = autoHideIndex(barRef),
           .fontSize = captionSize,
@@ -190,15 +237,19 @@ std::unique_ptr<Flex> BarTab::create() {
       })
   );
   addToggleRow(
-      *generalCard, i18n::tr("control-center.bar.reserve-space"), &m_reserveSpace, barRef.reserveSpace,
+      *details, i18n::tr("control-center.bar.reserve-space"), &m_reserveSpace, barRef.reserveSpace,
       &BarTab::applyReserveSpace
   );
-  addToggleRow(*generalCard, i18n::tr("control-center.bar.shadow"), &m_shadow, barRef.shadow, &BarTab::applyShadow);
+  addToggleRow(*details, i18n::tr("control-center.bar.shadow"), &m_shadow, barRef.shadow, &BarTab::applyShadow);
+  generalCard->addChild(std::move(details));
   content->addChild(std::move(generalCard));
 
   auto shapeCard = ui::column({
+      .out = &m_shapeCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .visible = barOn,
+      .participatesInLayout = barOn,
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
@@ -207,19 +258,13 @@ std::unique_ptr<Flex> BarTab::create() {
   auto thicknessHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
   thicknessHeader->addChild(
       ui::label({
-          .text = i18n::tr("control-center.bar.thickness"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  thicknessHeader->addChild(
-      ui::label({
           .out = &m_thicknessValue,
           .text = pixelLabel(static_cast<double>(barRef.thickness)),
           .fontSize = captionSize,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::OnSurface),
+          .textAlign = TextAlign::End,
+          .flexGrow = 1.0F,
       })
   );
   shapeCard->addChild(std::move(thicknessHeader));
@@ -300,6 +345,9 @@ void BarTab::onClose() {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
+  m_enableRow = nullptr;
+  m_details = nullptr;
+  m_shapeCard = nullptr;
   m_enabled = nullptr;
   m_position = nullptr;
   m_autoHide = nullptr;
@@ -309,6 +357,7 @@ void BarTab::onClose() {
   m_thicknessValue = nullptr;
   m_opacity = nullptr;
   m_opacityValue = nullptr;
+  m_empty = nullptr;
 }
 
 void BarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -346,7 +395,28 @@ void BarTab::syncLiveControls() {
     return;
   }
   const BarConfig* bar = firstBar(m_config->config());
-  if (bar == nullptr) {
+  const bool hasBar = bar != nullptr;
+  const bool barOn = hasBar && bar->enabled;
+  const bool layoutDirty =
+      setShown(m_empty, !hasBar) || setShown(m_enableRow, hasBar) || setShown(m_details, barOn)
+      || setShown(m_shapeCard, barOn);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+  const auto setInteractive = [hasBar](auto* control) {
+    if (control != nullptr) {
+      control->setEnabled(hasBar);
+    }
+  };
+  setInteractive(m_enabled);
+  setInteractive(m_position);
+  setInteractive(m_autoHide);
+  setInteractive(m_reserveSpace);
+  setInteractive(m_shadow);
+  setInteractive(m_thickness);
+  setInteractive(m_opacity);
+  if (!hasBar) {
+    m_barName.clear();
     return;
   }
   m_barName = bar->name;
@@ -386,6 +456,7 @@ void BarTab::applyEnabled(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"bar", m_barName, "enabled"}, enabled);
+  syncLiveControls();
   PanelManager::instance().refresh();
 }
 

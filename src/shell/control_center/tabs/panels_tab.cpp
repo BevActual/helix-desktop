@@ -127,8 +127,14 @@ std::unique_ptr<Flex> PanelsTab::create() {
           .out = &m_floatingLayer,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.layer.top")},
-                  {.label = i18n::tr("settings.options.layer.overlay")},
+                  {
+                      .label = i18n::tr("settings.options.layer.top"),
+                      .tooltip = i18n::tr("control-center.panels.layer-top-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.layer.overlay"),
+                      .tooltip = i18n::tr("control-center.panels.layer-overlay-tooltip"),
+                  },
               },
           .selectedIndex = indexOf(kLayerValues, panel.floatingLayer),
           .fontSize = captionSize,
@@ -153,9 +159,18 @@ std::unique_ptr<Flex> PanelsTab::create() {
           .out = &m_transparencyMode,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.shell.panel-transparency.solid")},
-                  {.label = i18n::tr("settings.options.shell.panel-transparency.soft")},
-                  {.label = i18n::tr("settings.options.shell.panel-transparency.glass")},
+                  {
+                      .label = i18n::tr("settings.options.shell.panel-transparency.solid"),
+                      .tooltip = i18n::tr("control-center.panels.solid-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.shell.panel-transparency.soft"),
+                      .tooltip = i18n::tr("control-center.panels.soft-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.shell.panel-transparency.glass"),
+                      .tooltip = i18n::tr("control-center.panels.glass-tooltip"),
+                  },
               },
           .selectedIndex = indexOf(kTransparencyValues, std::string(enumToKey(kPanelTransparencyModes, panel.transparencyMode))),
           .fontSize = captionSize,
@@ -169,7 +184,7 @@ std::unique_ptr<Flex> PanelsTab::create() {
   addToggleRow(*effectsCard, i18n::tr("settings.schema.panels.borders.label"), &m_borders, panel.borders, &PanelsTab::applyBorders);
   addToggleRow(*effectsCard, i18n::tr("settings.schema.shared.shadow.label"), &m_shadow, panel.shadow, &PanelsTab::applyShadow);
   addToggleRow(
-      *effectsCard, i18n::tr("settings.schema.panels.list-item-background.label"), &m_listItemBackground,
+      *effectsCard, i18n::tr("control-center.panels.list-rows"), &m_listItemBackground,
       panel.listItemBackground, &PanelsTab::applyListItemBackground
   );
 

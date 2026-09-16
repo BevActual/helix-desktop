@@ -39,6 +39,7 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Button* m_fontButton = nullptr;
+  Label* m_fontEmpty = nullptr;
 
   bool m_syncing = false;
   bool m_liveDirty = false;

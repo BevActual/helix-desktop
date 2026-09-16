@@ -406,6 +406,15 @@ std::unique_ptr<Flex> HomeTab::create() {
   m_userCardKeyboardArea =
       addCardOverlay(*m_userCard, openWallpaperPanel, {.keyboardFocus = true, .pointerHitTest = false});
   m_userCardArea = addCardOverlay(*m_userCard, openWallpaperPanel, {.keyboardFocus = false, .pointerHitTest = true});
+  if (m_userAvatarArea != nullptr) {
+    m_userAvatarArea->setTooltip(i18n::tr("control-center.home.change-avatar"));
+  }
+  if (m_userCardArea != nullptr) {
+    m_userCardArea->setTooltip(i18n::tr("control-center.home.change-wallpaper"));
+  }
+  if (m_userCardKeyboardArea != nullptr) {
+    m_userCardKeyboardArea->setTooltip(i18n::tr("control-center.home.change-wallpaper"));
+  }
 
   tab->addChild(std::move(userCard));
 
@@ -493,7 +502,7 @@ std::unique_ptr<Flex> HomeTab::create() {
           {.out = &m_mediaText, .align = FlexAlign::Stretch, .gap = Style::spaceXs * 0.5F * scale, .flexGrow = 1.0F},
           ui::label({
               .out = &m_mediaTrack,
-              .text = "...",
+              .text = i18n::tr("control-center.home.media.nothing-playing"),
               .fontSize = Style::fontSizeBody * 0.95F * scale,
               .color = colorSpecFromRole(ColorRole::OnSurface),
               .maxLines = 1,
@@ -501,19 +510,21 @@ std::unique_ptr<Flex> HomeTab::create() {
           }),
           ui::label({
               .out = &m_mediaArtist,
-              .text = i18n::tr("control-center.home.media.no-active-player"),
+              .text = "",
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .maxLines = 1,
               .ellipsize = TextEllipsize::End,
+              .visible = false,
           }),
           ui::label({
               .out = &m_mediaStatus,
-              .text = i18n::tr("control-center.home.media.idle"),
+              .text = "",
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .maxLines = 1,
               .ellipsize = TextEllipsize::End,
+              .visible = false,
           }),
           ui::label({
               .out = &m_mediaProgress,
@@ -530,6 +541,9 @@ std::unique_ptr<Flex> HomeTab::create() {
 
   // Clicking anywhere on the media card opens the media tab.
   m_mediaCardArea = addCardOverlay(*m_mediaCard, []() { openControlCenterTab("media"); });
+  if (m_mediaCardArea != nullptr) {
+    m_mediaCardArea->setTooltip(i18n::tr("control-center.home.open-media"));
+  }
 
   // --- Date/Time + Weather (below media) ---
   auto dateTimeCard = ui::row(
@@ -589,8 +603,12 @@ std::unique_ptr<Flex> HomeTab::create() {
       *m_dateTimeCard, []() { openControlCenterTab("weather"); },
       {.keyboardFocus = false, .pointerHitTest = true}
   );
+  if (m_dateTimeCardArea != nullptr) {
+    m_dateTimeCardArea->setTooltip(i18n::tr("control-center.home.open-calendar"));
+  }
   if (m_weatherCardArea != nullptr) {
     m_weatherCardArea->setZIndex(4);
+    m_weatherCardArea->setTooltip(i18n::tr("control-center.home.open-weather"));
   }
 
   leftColumn->addChild(std::move(mediaCard));
@@ -673,6 +691,7 @@ std::unique_ptr<Flex> HomeTab::create() {
         .glyph = shortcut->displayIcon(),
         .glyphSize = Style::fontSizeTitle * 1.35F * scale,
         .contentAlign = showLabels ? ButtonContentAlign::Start : ButtonContentAlign::Center,
+        .tooltip = label,
         .minHeight = 0.0F,
         .padding = Style::spaceSm * scale,
         .gap = Style::spaceXs * scale,
@@ -755,6 +774,7 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
       ui::button({
           .out = &m_sessionButton,
           .glyph = "shutdown",
+          .tooltip = i18n::tr("control-center.home.open-power"),
           .onClick = []() { openControlCenterTab("power"); },
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
@@ -991,9 +1011,19 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     if (m_mediaCard != nullptr && m_dateTimeCard != nullptr) {
       const float colGap = Style::spaceMd * contentScale();
       const float avail = std::max(0.0F, gridH - colGap);
-      const float cardGrowTotal = kHomeMediaCardFlexGrow + kHomeDateTimeCardFlexGrow;
-      const float mediaH = std::round(avail * (kHomeMediaCardFlexGrow / cardGrowTotal));
-      const float dateH = std::max(0.0F, avail - mediaH);
+      float mediaH = 0.0F;
+      float dateH = 0.0F;
+      if (mediaExpanded()) {
+        const float cardGrowTotal = kHomeMediaCardFlexGrow + kHomeDateTimeCardFlexGrow;
+        mediaH = std::round(avail * (kHomeMediaCardFlexGrow / cardGrowTotal));
+        dateH = std::max(0.0F, avail - mediaH);
+      } else {
+        const float compact = std::round(
+            Style::controlHeightLg * 1.22F * scale + m_mediaCard->paddingTop() + m_mediaCard->paddingBottom()
+        );
+        mediaH = std::min(compact, std::round(avail * 0.42F));
+        dateH = std::max(0.0F, avail - mediaH);
+      }
 
       m_mediaCard->setMinHeight(mediaH);
       m_mediaCard->setMaxHeight(mediaH);
@@ -1118,6 +1148,10 @@ void HomeTab::layoutCardOverlays() {
   }
 }
 
+bool HomeTab::mediaExpanded() const {
+  return m_mpris != nullptr && m_mpris->activePlayer().has_value();
+}
+
 bool HomeTab::resizeMediaArtToCard() {
   if (m_mediaCard == nullptr || m_mediaArt == nullptr || m_mediaArtSlot == nullptr) {
     return false;
@@ -1125,6 +1159,19 @@ bool HomeTab::resizeMediaArtToCard() {
 
   const float scale = contentScale();
   const float minArt = Style::controlHeightLg * 1.22F * scale;
+  if (!mediaExpanded()) {
+    if (std::abs(m_mediaArtSlot->width() - minArt) <= 0.5F) {
+      return false;
+    }
+    m_mediaArtSlot->setSize(minArt, minArt);
+    m_mediaArt->setSize(minArt, minArt);
+    m_mediaArt->setRadius(Style::scaledRadiusLg(scale));
+    if (m_mediaArtFallback != nullptr) {
+      m_mediaArtFallback->setGlyphSize(minArt * 0.55F);
+    }
+    return true;
+  }
+
   const float maxArt = Style::controlHeightLg * 2.6F * scale;
   const float available =
       std::max(0.0F, m_mediaCard->height() - m_mediaCard->paddingTop() - m_mediaCard->paddingBottom());
@@ -1678,7 +1725,7 @@ void HomeTab::sync(Renderer& renderer) {
     } else if (!m_weather->locationConfigured()) {
       m_weatherGlyph->setGlyph("weather-cloud");
       m_weatherGlyph->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
-      m_weatherLine->setText(i18n::tr("control-center.weather.no-location-title"));
+      m_weatherLine->setText(i18n::tr("control-center.home.weather.no-location"));
 
     } else {
       const auto& snapshot = m_weather->snapshot();
@@ -1704,20 +1751,42 @@ void HomeTab::sync(Renderer& renderer) {
   }
 
   if (m_mediaTrack != nullptr && m_mediaArtist != nullptr && m_mediaStatus != nullptr && m_mediaProgress != nullptr) {
-    if (m_mpris == nullptr) {
-      m_mediaTrack->setText(i18n::tr("control-center.home.media.playback-unavailable"));
-      m_mediaArtist->setText("");
-      m_mediaArtist->setVisible(false);
-      m_mediaStatus->setText(i18n::tr("control-center.home.media.unavailable"));
-      m_mediaProgress->setText(" ");
-      m_mediaProgress->setVisible(false);
-      m_mediaStatus->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
-      if (m_mediaArt != nullptr) {
+    const auto setIdleMedia = [this, &renderer](std::string_view title) {
+      bool dirty = m_mediaTrack->setText(title);
+      if (m_mediaArtist->visible()) {
+        m_mediaArtist->setText("");
+        m_mediaArtist->setVisible(false);
+        dirty = true;
+      }
+      if (m_mediaStatus->visible()) {
+        m_mediaStatus->setText("");
+        m_mediaStatus->setVisible(false);
+        dirty = true;
+      }
+      if (m_mediaProgress->visible()) {
+        m_mediaProgress->setText(" ");
+        m_mediaProgress->setVisible(false);
+        dirty = true;
+      }
+      if (m_mediaArt != nullptr && (m_mediaArt->visible() || m_mediaArt->hasImage())) {
         m_mediaArt->clear(renderer);
         m_mediaArt->setVisible(false);
+        dirty = true;
       }
-      m_loadedMediaArtUrl.clear();
-      PanelManager::instance().requestLayout();
+      if (m_mediaArtFallback != nullptr && !m_mediaArtFallback->visible()) {
+        m_mediaArtFallback->setVisible(true);
+        dirty = true;
+      }
+      if (!m_loadedMediaArtUrl.empty()) {
+        m_loadedMediaArtUrl.clear();
+      }
+      if (dirty) {
+        PanelManager::instance().requestLayout();
+      }
+    };
+
+    if (m_mpris == nullptr) {
+      setIdleMedia(i18n::tr("control-center.home.media.playback-unavailable"));
     } else {
       const auto active = m_mpris->activePlayer();
       if (!active.has_value()) {
@@ -1727,30 +1796,20 @@ void HomeTab::sync(Renderer& renderer) {
         m_mediaLastPlaybackStatus.clear();
         m_mediaPositionUs = 0;
         m_mediaPositionSampleAt = {};
-        m_mediaTrack->setText(i18n::tr("control-center.home.media.nothing-playing"));
-        m_mediaArtist->setText("");
-        m_mediaArtist->setVisible(false);
-        m_mediaStatus->setText(i18n::tr("control-center.home.media.idle"));
-        m_mediaProgress->setText(" ");
-        m_mediaProgress->setVisible(false);
-        m_mediaStatus->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
-        if (m_mediaArt != nullptr) {
-          m_mediaArt->clear(renderer);
-          m_mediaArt->setVisible(false);
-        }
-        m_loadedMediaArtUrl.clear();
-        PanelManager::instance().requestLayout();
+        setIdleMedia(i18n::tr("control-center.home.media.nothing-playing"));
       } else {
         const std::string trackText =
             active->title.empty() ? i18n::tr("control-center.home.media.unknown-track") : active->title;
         const std::string artists = mpris::joinArtists(active->artists);
         const std::string artistText = artists.empty() ? i18n::tr("control-center.home.media.unknown-artist") : artists;
-        if (m_mediaTrack->text() != trackText || m_mediaArtist->text() != artistText) {
+        if (m_mediaTrack->text() != trackText || m_mediaArtist->text() != artistText || !m_mediaArtist->visible()
+            || !m_mediaStatus->visible()) {
           m_mediaTrack->setText(trackText);
           m_mediaArtist->setText(artistText);
+          m_mediaArtist->setVisible(true);
+          m_mediaStatus->setVisible(true);
           PanelManager::instance().requestLayout();
         }
-        m_mediaArtist->setVisible(true);
         const std::string trackSignature = std::format(
             "{}\n{}\n{}\n{}\n{}", active->trackId, active->title, artists, active->album, active->sourceUrl
         );
@@ -1873,6 +1932,7 @@ void HomeTab::syncShortcuts() {
 
     if (pad.button != nullptr) {
       applyShortcutButtonStyle(*pad.button, enabled, on, panelCardOpacity());
+      pad.button->setTooltip(sc.displayLabel());
     }
     if (pad.glyph != nullptr) {
       pad.glyph->setGlyph(sc.displayIcon());

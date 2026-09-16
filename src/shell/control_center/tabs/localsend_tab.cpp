@@ -4,6 +4,7 @@
 #include "i18n/i18n.h"
 #include "net/localsend_service.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -24,6 +25,20 @@
 #include <utility>
 
 using namespace control_center;
+
+namespace {
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
+
+} // namespace
 
 LocalSendTab::LocalSendTab(const ControlCenterServices& services)
     : m_service(services.localSend), m_clipboard(services.clipboard), m_config(services.config),
@@ -160,6 +175,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
   );
 
   auto historyCard = ui::column({
+      .out = &m_historyCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
@@ -171,6 +187,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
   m_rootLayout->addChild(std::move(historyCard));
 
   auto peersCard = ui::column({
+      .out = &m_peersCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .flexGrow = 1.0F,
@@ -245,7 +262,9 @@ void LocalSendTab::onClose() {
   m_acceptButton = nullptr;
   m_rejectButton = nullptr;
   m_transfer = nullptr;
+  m_historyCard = nullptr;
   m_historyList = nullptr;
+  m_peersCard = nullptr;
   m_peerList = nullptr;
   m_liveScroll = nullptr;
   m_peerSignature.clear();
@@ -328,9 +347,6 @@ void LocalSendTab::syncUi() {
     m_status->setText(snap.alias);
     m_detail->setText(snap.error.empty() ? i18n::tr("control-center.localsend.port-busy") : snap.error);
   }
-  if (m_incomingCard != nullptr) {
-    m_incomingCard->setVisible(snap.incoming.has_value());
-  }
   if (m_incomingLabel != nullptr && snap.incoming) {
     std::string files;
     for (const auto& file : snap.incoming->files) {
@@ -342,14 +358,11 @@ void LocalSendTab::syncUi() {
     m_incomingLabel->setText(std::format("{} · {}", snap.incoming->alias, files));
   }
   if (m_transfer != nullptr) {
-    if (!snap.transfer) {
+    if (!snap.enabled || !snap.transfer) {
       m_transfer->setText({});
-      m_transfer->setVisible(false);
     } else if (snap.transfer->failed) {
-      m_transfer->setVisible(true);
       m_transfer->setText(snap.transfer->error);
     } else if (snap.transfer->incoming) {
-      m_transfer->setVisible(true);
       m_transfer->setText(
           i18n::tr(
               "control-center.localsend.progress-receive", "index", snap.transfer->fileIndex, "count",
@@ -357,7 +370,6 @@ void LocalSendTab::syncUi() {
           )
       );
     } else if (snap.transfer->fileCount > 0) {
-      m_transfer->setVisible(true);
       m_transfer->setText(
           i18n::tr(
               "control-center.localsend.progress-send", "index", snap.transfer->fileIndex, "count",
@@ -365,14 +377,22 @@ void LocalSendTab::syncUi() {
           )
       );
     } else {
-      m_transfer->setVisible(true);
       m_transfer->setText(
           i18n::tr("control-center.localsend.sending", "name", snap.transfer->peerAlias, "file", snap.transfer->label)
       );
     }
   }
-  rebuildHistory();
-  rebuildPeers();
+  const bool showTransfer = snap.enabled && snap.transfer.has_value();
+  const bool layoutDirty = setShown(m_pin, snap.enabled) || setShown(m_historyCard, snap.enabled)
+      || setShown(m_peersCard, snap.enabled) || setShown(m_incomingCard, snap.enabled && snap.incoming.has_value())
+      || setShown(m_transfer, showTransfer);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+  if (snap.enabled) {
+    rebuildHistory();
+    rebuildPeers();
+  }
   m_syncing = false;
 }
 

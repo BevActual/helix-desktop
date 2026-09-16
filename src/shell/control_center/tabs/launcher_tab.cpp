@@ -243,7 +243,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
   auto pinnedList = std::make_unique<ListEditor>();
   m_pinnedList = pinnedList.get();
   m_pinnedList->setScale(scale);
-  m_pinnedList->setAddPlaceholder(i18n::tr("settings.controls.list.add-entry-placeholder"));
+  m_pinnedList->setAddPlaceholder(i18n::tr("control-center.launcher.add-app"));
   m_pinnedList->setOnAddRequested([this](std::string value) {
     if (m_syncing || m_config == nullptr || value.empty()) {
       return;

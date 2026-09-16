@@ -165,13 +165,14 @@ namespace {
 
   std::unique_ptr<Button> makeCompactIconButton(
       Button** out, std::string glyph, ButtonVariant variant, float scale, std::function<void()> onClick,
-      bool visible = true, bool participatesInLayout = true
+      std::string tooltip, bool visible = true, bool participatesInLayout = true
   ) {
     return ui::button({
         .out = out,
         .glyph = std::move(glyph),
         .glyphSize = Style::fontSizeBody * scale,
         .variant = variant,
+        .tooltip = std::move(tooltip),
         .minWidth = Style::controlHeightSm * scale,
         .minHeight = Style::controlHeightSm * scale,
         .padding = Style::spaceXs * scale,
@@ -610,9 +611,10 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
           .visible = m_options.showTitle,
           .participatesInLayout = m_options.showTitle,
       }),
-      makeCompactIconButton(&m_clearHistoryButton, "trash", ButtonVariant::Destructive, scale, [this]() {
-        requestClearUnpinnedHistory();
-      })
+      makeCompactIconButton(
+          &m_clearHistoryButton, "trash", ButtonVariant::Destructive, scale, [this]() { requestClearUnpinnedHistory(); },
+          i18n::tr("clipboard.actions.clear-all")
+      )
   );
   sidebar->addChild(std::move(sidebarHeader));
 
@@ -725,18 +727,25 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
 
   auto previewActions = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      makeCompactIconButton(&m_copyButton, "copy", ButtonVariant::Default, scale, [this]() { activateSelected(); }),
       makeCompactIconButton(
-          &m_imageActionButton, "photo-edit", ButtonVariant::Default, scale, [this]() { runImageAction(); }, false,
-          false
+          &m_copyButton, "copy", ButtonVariant::Default, scale, [this]() { activateSelected(); },
+          i18n::tr("clipboard.actions.copy")
       ),
-      makeCompactIconButton(&m_pinButton, "pin", ButtonVariant::Default, scale, [this]() { togglePinSelected(); }),
       makeCompactIconButton(
-          &m_deleteEntryButton, "trash", ButtonVariant::Destructive, scale, [this]() { requestDeleteSelectedEntry(); }
+          &m_imageActionButton, "photo-edit", ButtonVariant::Default, scale, [this]() { runImageAction(); },
+          i18n::tr("clipboard.actions.image-action"), false, false
+      ),
+      makeCompactIconButton(
+          &m_pinButton, "pin", ButtonVariant::Default, scale, [this]() { togglePinSelected(); },
+          i18n::tr("clipboard.actions.pin")
+      ),
+      makeCompactIconButton(
+          &m_deleteEntryButton, "trash", ButtonVariant::Destructive, scale, [this]() { requestDeleteSelectedEntry(); },
+          i18n::tr("clipboard.actions.delete-item")
       ),
       makeCompactIconButton(
           &m_closeButton, "close", ButtonVariant::Default, scale, [this]() { requestHostClose(); },
-          m_options.showCloseButton, m_options.showCloseButton
+          i18n::tr("clipboard.actions.close"), m_options.showCloseButton, m_options.showCloseButton
       )
   );
 
@@ -1137,6 +1146,7 @@ void ClipboardPicker::updatePreviewActions() {
     m_pinButton->setParticipatesInLayout(hasSelection);
     m_pinButton->setGlyph(pinned ? "unpin" : "pin");
     m_pinButton->setVariant(pinned ? ButtonVariant::Primary : ButtonVariant::Default);
+    m_pinButton->setTooltip(i18n::tr(pinned ? "clipboard.actions.unpin" : "clipboard.actions.pin"));
   }
 }
 

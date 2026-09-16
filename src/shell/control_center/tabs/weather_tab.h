@@ -17,6 +17,7 @@ class Label;
 class Separator;
 class ScrollView;
 class Segmented;
+class Toggle;
 class WeatherService;
 class ConfigService;
 struct WeatherSnapshot;
@@ -68,6 +69,8 @@ private:
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};
   Flex* m_leftColumn = nullptr;
+  Flex* m_enableRow = nullptr;
+  Toggle* m_enableToggle = nullptr;
   Flex* m_currentCard = nullptr;
   Flex* m_glyphColumn = nullptr;
   Flex* m_detailsCard = nullptr;

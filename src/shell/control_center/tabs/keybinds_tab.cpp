@@ -331,6 +331,7 @@ void KeybindsTab::syncSectionSwitch() {
   std::size_t selected = 0;
   for (std::size_t i = 0; i < m_visibleSections.size(); ++i) {
     m_sectionSwitch->addOption(i18n::tr(sectionTabKey(m_visibleSections[i])));
+    m_sectionSwitch->setOptionTooltip(i, i18n::tr(sectionTabTooltipKey(m_visibleSections[i])));
     if (m_visibleSections[i] == m_section) {
       selected = i;
     }
@@ -394,6 +395,24 @@ std::string_view KeybindsTab::sectionTabKey(Section section) {
     return "control-center.keybinds.tab-session";
   }
   return "control-center.keybinds.tab-open";
+}
+
+std::string_view KeybindsTab::sectionTabTooltipKey(Section section) {
+  switch (section) {
+  case Section::Attention:
+    return "control-center.keybinds.tab-attention-tooltip";
+  case Section::Open:
+    return "control-center.keybinds.tab-open-tooltip";
+  case Section::Apps:
+    return "control-center.keybinds.tab-apps-tooltip";
+  case Section::Capture:
+    return "control-center.keybinds.tab-capture-tooltip";
+  case Section::Sound:
+    return "control-center.keybinds.tab-sound-tooltip";
+  case Section::Session:
+    return "control-center.keybinds.tab-session-tooltip";
+  }
+  return "control-center.keybinds.tab-open-tooltip";
 }
 
 std::string_view KeybindsTab::sectionStateKey(Section section) {

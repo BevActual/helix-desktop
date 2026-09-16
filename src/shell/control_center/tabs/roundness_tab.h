@@ -45,6 +45,7 @@ private:
   Label* m_roundnessValue = nullptr;
   Slider* m_barRadius = nullptr;
   Label* m_barRadiusValue = nullptr;
+  Label* m_barDescription = nullptr;
   Slider* m_dockRadius = nullptr;
   Label* m_dockRadiusValue = nullptr;
   Slider* m_windowRadius = nullptr;

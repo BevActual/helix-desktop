@@ -52,6 +52,7 @@ private:
   [[nodiscard]] std::vector<Section> visibleSections() const;
   [[nodiscard]] static std::string_view sectionGroup(Section section);
   [[nodiscard]] static std::string_view sectionTabKey(Section section);
+  [[nodiscard]] static std::string_view sectionTabTooltipKey(Section section);
   [[nodiscard]] static std::string_view sectionStateKey(Section section);
   [[nodiscard]] static Section sectionFromState(std::string_view value);
 

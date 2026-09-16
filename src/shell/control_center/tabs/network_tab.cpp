@@ -434,6 +434,7 @@ public:
       action->setGlyph("check");
     } else if (saved) {
       action->setGlyph("trash");
+      action->setTooltip(i18n::tr("control-center.network.forget"));
       action->setOnClick([this]() {
         if (m_onForget) {
           m_onForget(m_ap);
@@ -578,6 +579,9 @@ namespace {
               .glyph = m_vpn.active ? "plug-off" : "plug",
               .glyphSize = Style::baseGlyphSize * scale,
               .variant = m_vpn.active ? ButtonVariant::Destructive : ButtonVariant::Default,
+              .tooltip = i18n::tr(
+                  m_vpn.active ? "control-center.network.disconnect" : "control-center.network.connect"
+              ),
               .padding = Style::spaceXs * scale,
               .radius = Style::scaledRadiusSm(scale),
               .onClick = [this]() { triggerAction(); },
@@ -799,6 +803,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .glyph = "plug-off",
           .glyphSize = Style::baseGlyphSize * scale,
           .variant = ButtonVariant::Destructive,
+          .tooltip = i18n::tr("control-center.network.disconnect"),
           .padding = Style::spaceXs * scale,
           .radius = Style::scaledRadiusSm(scale),
           .onClick = [this]() {
@@ -832,15 +837,37 @@ std::unique_ptr<Flex> NetworkTab::create() {
       })
   );
   currentCard->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.network.dns-label"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  currentCard->addChild(
       ui::segmented({
           .out = &m_dnsProfilePicker,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.network.dns-automatic")},
-                  {.label = i18n::tr("control-center.network.dns-google")},
-                  {.label = i18n::tr("control-center.network.dns-cloudflare")},
-                  {.label = i18n::tr("control-center.network.dns-nextdns")},
-                  {.label = i18n::tr("control-center.network.dns-custom")},
+                  {
+                      .label = i18n::tr("control-center.network.dns-automatic"),
+                      .tooltip = i18n::tr("control-center.network.dns-automatic-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.network.dns-google"),
+                      .tooltip = i18n::tr("control-center.network.dns-google-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.network.dns-cloudflare"),
+                      .tooltip = i18n::tr("control-center.network.dns-cloudflare-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.network.dns-nextdns"),
+                      .tooltip = i18n::tr("control-center.network.dns-nextdns-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.network.dns-custom"),
+                      .tooltip = i18n::tr("control-center.network.dns-custom-tooltip"),
+                  },
               },
           .selectedIndex = static_cast<std::size_t>(m_dnsProfile),
           .fontSize = Style::fontSizeCaption,
@@ -1115,6 +1142,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .glyph = "eye",
           .glyphSize = Style::baseGlyphSize * scale,
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.network.show-password"),
           .minWidth = Style::controlHeightSm * scale,
           .minHeight = Style::controlHeightSm * scale,
           .padding = Style::spaceXs * scale,
@@ -1128,6 +1156,10 @@ std::unique_ptr<Flex> NetworkTab::create() {
                 m_passwordInput->setPasswordMode(!m_passwordRevealed);
                 if (m_passwordRevealButton != nullptr) {
                   m_passwordRevealButton->setGlyph(m_passwordRevealed ? "eye-off" : "eye");
+                  m_passwordRevealButton->setTooltip(i18n::tr(
+                      m_passwordRevealed ? "control-center.network.hide-password"
+                                         : "control-center.network.show-password"
+                  ));
                 }
               },
       }),
@@ -1514,6 +1546,9 @@ void NetworkTab::syncCurrentCard() {
     m_disconnectButton->setVisible(s.connected || canReconnectWired || m_actionPending);
     m_disconnectButton->setGlyph(s.connected ? "plug-off" : "plug");
     m_disconnectButton->setVariant(s.connected ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_disconnectButton->setTooltip(
+        i18n::tr(s.connected ? "control-center.network.disconnect" : "control-center.network.connect")
+    );
     m_disconnectButton->setEnabled(!m_actionPending);
   }
   if (m_wifiToggle != nullptr) {
@@ -1909,6 +1944,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
               .glyph = "refresh",
               .glyphSize = Style::baseGlyphSize * scale,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.rescan"),
               .padding = Style::spaceXs * scale,
               .radius = Style::scaledRadiusSm(scale),
               .onClick = [this]() {

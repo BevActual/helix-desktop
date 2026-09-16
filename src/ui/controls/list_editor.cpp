@@ -1,5 +1,6 @@
 #include "ui/controls/list_editor.h"
 
+#include "i18n/i18n.h"
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -134,6 +135,7 @@ void ListEditor::rebuildRows() {
             .glyphSize = Style::fontSizeCaption * m_scale,
             .enabled = !atCapacity,
             .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr("settings.controls.list.add"),
             .minWidth = suggestedAddHeight,
             .minHeight = suggestedAddHeight,
             .padding = Style::spaceXs * m_scale,
@@ -172,6 +174,7 @@ void ListEditor::rebuildRows() {
           .glyph = "add",
           .glyphSize = Style::fontSizeBody * m_scale,
           .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("settings.controls.list.add"),
           .minWidth = Style::controlHeight * m_scale,
           .minHeight = Style::controlHeight * m_scale,
           .padding = Style::spaceSm * m_scale,
@@ -224,25 +227,31 @@ void ListEditor::rebuildRows() {
     );
     itemRow->addChild(std::move(labelCell));
 
-    addGhostIconButton(*itemRow, "close", Style::fontSizeCaption * m_scale, [this, i] {
+    addGhostIconButton(*itemRow, "close", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.remove"), [this, i] {
       if (m_onRemoveRequested) {
         m_onRemoveRequested(i);
       }
     });
 
     if (i > 0) {
-      addGhostIconButton(*itemRow, "chevron-up", Style::fontSizeCaption * m_scale, [this, i] {
-        if (m_onMoveRequested) {
-          m_onMoveRequested(i, i - 1);
-        }
-      });
+      addGhostIconButton(
+          *itemRow, "chevron-up", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.move-up"),
+          [this, i] {
+            if (m_onMoveRequested) {
+              m_onMoveRequested(i, i - 1);
+            }
+          }
+      );
     }
     if (i + 1 < m_items.size()) {
-      addGhostIconButton(*itemRow, "chevron-down", Style::fontSizeCaption * m_scale, [this, i] {
-        if (m_onMoveRequested) {
-          m_onMoveRequested(i, i + 1);
-        }
-      });
+      addGhostIconButton(
+          *itemRow, "chevron-down", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.move-down"),
+          [this, i] {
+            if (m_onMoveRequested) {
+              m_onMoveRequested(i, i + 1);
+            }
+          }
+      );
     }
 
     addChild(std::move(itemRow));
@@ -251,12 +260,15 @@ void ListEditor::rebuildRows() {
   markLayoutDirty();
 }
 
-void ListEditor::addGhostIconButton(Flex& row, std::string_view glyph, float size, std::function<void()> callback) {
+void ListEditor::addGhostIconButton(
+    Flex& row, std::string_view glyph, float size, std::string_view tooltip, std::function<void()> callback
+) {
   row.addChild(
       ui::button({
           .glyph = std::string(glyph),
           .glyphSize = size,
           .variant = ButtonVariant::Ghost,
+          .tooltip = std::string(tooltip),
           .minWidth = kItemRowHeight * m_scale,
           .minHeight = kItemRowHeight * m_scale,
           .padding = Style::spaceXs * m_scale,

@@ -69,21 +69,32 @@ std::unique_ptr<Flex> TypeTab::create() {
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
   addTitle(*typeCard, i18n::tr("control-center.appearance.type"), scale);
-
-  addCaption(*typeCard, i18n::tr("settings.schema.appearance.font-family.label"));
+  addCaption(*typeCard, i18n::tr("settings.schema.appearance.font-family.description"));
   typeCard->addChild(
       ui::button({
           .out = &m_fontButton,
-          .text = "sans-serif",
+          .text = i18n::tr("control-center.appearance.system-font"),
           .fontSize = Style::fontSizeBody * scale,
           .contentAlign = ButtonContentAlign::Start,
           .variant = ButtonVariant::Default,
+          .tooltip = i18n::tr("control-center.appearance.choose-font"),
           .minHeight = controlHeight,
           .paddingV = Style::spaceSm * scale,
           .paddingH = Style::spaceMd * scale,
           .radius = Style::scaledRadiusMd(scale),
           .flexGrow = 1.0F,
           .onClick = [this]() { openFontPicker(); },
+      })
+  );
+  typeCard->addChild(
+      ui::label({
+          .out = &m_fontEmpty,
+          .text = i18n::tr("control-center.appearance.no-fonts"),
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+          .visible = false,
+          .participatesInLayout = false,
       })
   );
   content->addChild(std::move(typeCard));
@@ -104,6 +115,7 @@ void TypeTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_fontButton = nullptr;
+  m_fontEmpty = nullptr;
 }
 
 void TypeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -155,7 +167,7 @@ void TypeTab::syncFontButton() {
     return;
   }
   const std::string& family = m_config->config().shell.fontFamily;
-  m_fontButton->setText(family.empty() ? "sans-serif" : family);
+  m_fontButton->setText(family.empty() ? i18n::tr("control-center.appearance.system-font") : family);
   if (Label* label = m_fontButton->label(); label != nullptr) {
     label->setFontFamily(family);
   }
@@ -167,7 +179,15 @@ void TypeTab::openFontPicker() {
   }
   const auto& families = settings::discoverFontFamilies();
   if (families.empty()) {
+    if (m_fontEmpty != nullptr) {
+      m_fontEmpty->setVisible(true);
+      m_fontEmpty->setParticipatesInLayout(true);
+    }
     return;
+  }
+  if (m_fontEmpty != nullptr) {
+    m_fontEmpty->setVisible(false);
+    m_fontEmpty->setParticipatesInLayout(false);
   }
   std::vector<settings::SelectOption> options;
   options.reserve(families.size());
@@ -180,7 +200,7 @@ void TypeTab::openFontPicker() {
           .title = i18n::tr("settings.schema.appearance.font-family.label"),
           .options = std::move(options),
           .selectedValue = selected,
-          .placeholder = "sans-serif",
+          .placeholder = i18n::tr("control-center.appearance.system-font"),
           .emptyText = i18n::tr("ui.controls.search-picker.empty"),
           .settingPath = {"shell", "font_family"},
           .onSelect =

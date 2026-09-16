@@ -104,7 +104,7 @@ std::unique_ptr<Flex> WallpaperTab::create() {
           .text = i18n::tr("settings.schema.niri.overview-preset.description"),
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 3,
+          .maxLines = 1,
       })
   );
   overviewCard->addChild(
@@ -112,10 +112,22 @@ std::unique_ptr<Flex> WallpaperTab::create() {
           .out = &m_overview,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.niri.overview.none")},
-                  {.label = i18n::tr("settings.options.niri.overview.backdrop")},
-                  {.label = i18n::tr("settings.options.niri.overview.stationary")},
-                  {.label = i18n::tr("settings.options.niri.overview.flat")},
+                  {
+                      .label = i18n::tr("settings.options.niri.overview.none"),
+                      .tooltip = i18n::tr("control-center.wallpaper.overview-none-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.niri.overview.backdrop"),
+                      .tooltip = i18n::tr("control-center.wallpaper.overview-backdrop-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.niri.overview.stationary"),
+                      .tooltip = i18n::tr("control-center.wallpaper.overview-stationary-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.niri.overview.flat"),
+                      .tooltip = i18n::tr("control-center.wallpaper.overview-flat-tooltip"),
+                  },
               },
           .fontSize = Style::fontSizeCaption * scale,
           .scale = scale,

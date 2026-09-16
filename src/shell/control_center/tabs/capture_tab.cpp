@@ -72,8 +72,14 @@ std::unique_ptr<Flex> CaptureTab::create() {
           .out = &m_viewSwitch,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.capture.screenshot")},
-                  {.label = i18n::tr("control-center.capture.record")},
+                  {
+                      .label = i18n::tr("control-center.capture.screenshot"),
+                      .tooltip = i18n::tr("control-center.capture.screenshot-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.capture.record"),
+                      .tooltip = i18n::tr("control-center.capture.record-tooltip"),
+                  },
               },
           .selectedIndex = indexFromView(m_view),
           .fontSize = Style::fontSizeCaption,

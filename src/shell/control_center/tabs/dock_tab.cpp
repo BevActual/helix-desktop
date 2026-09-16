@@ -4,6 +4,7 @@
 #include "config/config_types.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/dock/pinned_apps.h"
 #include "shell/panel/panel_manager.h"
@@ -26,6 +27,16 @@
 using namespace control_center;
 
 namespace {
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
 
   constexpr std::size_t kAutoHideOff = 0;
   constexpr std::size_t kAutoHideOn = 1;
@@ -150,8 +161,15 @@ std::unique_ptr<Flex> DockTab::create() {
   addTitle(*generalCard, i18n::tr("settings.navigation.sections.dock"), scale);
   addToggleRow(*generalCard, i18n::tr("control-center.dock.enable"), &m_enabled, dock.enabled, &DockTab::applyEnabled);
 
-  addCaption(*generalCard, i18n::tr("control-center.dock.position"));
-  generalCard->addChild(
+  auto details = ui::column({
+      .out = &m_details,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = dock.enabled,
+      .participatesInLayout = dock.enabled,
+  });
+  addCaption(*details, i18n::tr("control-center.dock.position"));
+  details->addChild(
       ui::segmented({
           .out = &m_position,
           .options =
@@ -171,15 +189,24 @@ std::unique_ptr<Flex> DockTab::create() {
       })
   );
 
-  addCaption(*generalCard, i18n::tr("control-center.dock.auto-hide"));
-  generalCard->addChild(
+  addCaption(*details, i18n::tr("control-center.dock.auto-hide"));
+  details->addChild(
       ui::segmented({
           .out = &m_autoHide,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("settings.options.bar.auto-hide.off")},
-                  {.label = i18n::tr("settings.options.bar.auto-hide.on")},
-                  {.label = i18n::tr("settings.options.bar.auto-hide.smart")},
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.off"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-off-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.on"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-on-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("settings.options.bar.auto-hide.smart"),
+                      .tooltip = i18n::tr("control-center.bar.auto-hide-smart-tooltip"),
+                  },
               },
           .selectedIndex = autoHideIndex(dock),
           .fontSize = captionSize,
@@ -191,14 +218,18 @@ std::unique_ptr<Flex> DockTab::create() {
       })
   );
   addToggleRow(
-      *generalCard, i18n::tr("control-center.dock.show-running"), &m_showRunning, dock.showRunning,
+      *details, i18n::tr("control-center.dock.show-running"), &m_showRunning, dock.showRunning,
       &DockTab::applyShowRunning
   );
+  generalCard->addChild(std::move(details));
   content->addChild(std::move(generalCard));
 
   auto pinnedCard = ui::column({
+      .out = &m_pinnedCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .visible = dock.enabled,
+      .participatesInLayout = dock.enabled,
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
@@ -206,7 +237,7 @@ std::unique_ptr<Flex> DockTab::create() {
   auto pinnedList = std::make_unique<ListEditor>();
   m_pinnedList = pinnedList.get();
   m_pinnedList->setScale(scale);
-  m_pinnedList->setAddPlaceholder(i18n::tr("settings.controls.list.add-entry-placeholder"));
+  m_pinnedList->setAddPlaceholder(i18n::tr("control-center.dock.add-app"));
   m_pinnedList->setOnAddRequested([this](std::string value) {
     if (m_syncing || m_config == nullptr || value.empty()) {
       return;
@@ -258,9 +289,11 @@ void DockTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_enabled = nullptr;
+  m_details = nullptr;
   m_position = nullptr;
   m_autoHide = nullptr;
   m_showRunning = nullptr;
+  m_pinnedCard = nullptr;
   m_pinnedList = nullptr;
 }
 
@@ -304,6 +337,10 @@ void DockTab::syncLiveControls() {
   if (m_enabled != nullptr) {
     m_enabled->setCheckedImmediate(dock.enabled);
   }
+  const bool layoutDirty = setShown(m_details, dock.enabled) || setShown(m_pinnedCard, dock.enabled);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
   if (m_position != nullptr) {
     m_position->setSelectedIndex(static_cast<std::size_t>(dock.position));
   }
@@ -325,6 +362,10 @@ void DockTab::applyEnabled(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"dock", "enabled"}, enabled);
+  const bool layoutDirty = setShown(m_details, enabled) || setShown(m_pinnedCard, enabled);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
   PanelManager::instance().refresh();
 }
 

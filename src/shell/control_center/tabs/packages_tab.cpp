@@ -140,12 +140,15 @@ std::unique_ptr<Flex> PackagesTab::create() {
   kindOptions.reserve(m_kindOrder.size());
   for (const auto kind : m_kindOrder) {
     const char* key = "control-center.packages.source-fedora";
+    const char* tooltipKey = "control-center.packages.source-fedora-tooltip";
     if (kind == noctalia::packages::Kind::Flatpak) {
       key = "control-center.packages.source-flatpak";
+      tooltipKey = "control-center.packages.source-flatpak-tooltip";
     } else if (kind == noctalia::packages::Kind::Firmware) {
       key = "control-center.packages.source-firmware";
+      tooltipKey = "control-center.packages.source-firmware-tooltip";
     }
-    kindOptions.push_back({.label = i18n::tr(key)});
+    kindOptions.push_back({.label = i18n::tr(key), .tooltip = i18n::tr(tooltipKey)});
   }
   const bool showKindSwitch = m_kindOrder.size() > 1;
   searchCard->addChild(
@@ -169,9 +172,18 @@ std::unique_ptr<Flex> PackagesTab::create() {
           .out = &m_viewSwitch,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.packages.view-search")},
-                  {.label = i18n::tr("control-center.packages.view-updates")},
-                  {.label = i18n::tr("control-center.packages.view-installed")},
+                  {
+                      .label = i18n::tr("control-center.packages.view-search"),
+                      .tooltip = i18n::tr("control-center.packages.view-search-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.packages.view-updates"),
+                      .tooltip = i18n::tr("control-center.packages.view-updates-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.packages.view-installed"),
+                      .tooltip = i18n::tr("control-center.packages.view-installed-tooltip"),
+                  },
               },
           .selectedIndex = indexFromView(m_view),
           .fontSize = Style::fontSizeCaption,
@@ -254,9 +266,18 @@ std::unique_ptr<Flex> PackagesTab::create() {
           .out = &m_filter,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.packages.filter-all")},
-                  {.label = i18n::tr("control-center.packages.filter-security")},
-                  {.label = i18n::tr("control-center.packages.filter-other")},
+                  {
+                      .label = i18n::tr("control-center.packages.filter-all"),
+                      .tooltip = i18n::tr("control-center.packages.filter-all-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.packages.filter-security"),
+                      .tooltip = i18n::tr("control-center.packages.filter-security-tooltip"),
+                  },
+                  {
+                      .label = i18n::tr("control-center.packages.filter-other"),
+                      .tooltip = i18n::tr("control-center.packages.filter-other-tooltip"),
+                  },
               },
           .selectedIndex = 0,
           .fontSize = Style::fontSizeCaption,

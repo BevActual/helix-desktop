@@ -3,6 +3,7 @@
 #include "i18n/i18n.h"
 #include "net/tailscale_service.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
@@ -46,6 +47,16 @@ namespace {
       return node.name;
     }
     return node.id;
+  }
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
   }
 
   [[nodiscard]] std::string joinHealth(const std::vector<std::string>& health) {
@@ -460,11 +471,9 @@ void TailscaleTab::syncUi() {
   const bool running = snap.running;
   const bool interactive = installed && !snap.busy;
 
-  if (m_prefsCard != nullptr) {
-    m_prefsCard->setVisible(installed);
-  }
-  if (m_peersCard != nullptr) {
-    m_peersCard->setVisible(installed);
+  const bool layoutDirty = setShown(m_prefsCard, installed) || setShown(m_peersCard, installed);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 
   std::string status = snap.backendState.empty() ? i18n::tr("control-center.tailscale.stopped") : snap.backendState;
