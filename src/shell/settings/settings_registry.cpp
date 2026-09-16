@@ -2088,7 +2088,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg), .maxItems = 6
         },
-        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend"
+        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),

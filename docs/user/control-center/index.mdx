@@ -79,6 +79,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Header gear opens receive folder, auto-accept, and port. |
+| `phone` | Phone | Pair and talk to a phone through KDE Connect: battery, ping, ring, send a file or clipboard. The tab stays available when `kdeconnectd` is missing; **Start KDE Connect** tries to launch it. Header refresh rediscovers devices. |
 | `desktop` | Desktop | Desktop widgets on/off, widget count, edit mode, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
 | `windows` | Windows | niri window spacing: gaps, struts, and default column width. Shown only in a niri session. Header gear repeats those sliders. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Header gear opens monitors, layer, size, shape, and magnification. |
@@ -94,7 +95,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `plugins` | Plugins | Installed plugins and the in-panel plugin store |
 | `packages` | Packages | Fedora, Flatpak, and firmware (`fwupd`) updates, search, and installs. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, and LocalSend tabs stay available so you can turn those features on from the tab itself.
+`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, and Phone tabs stay available so you can turn those features on from the tab itself.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -292,6 +293,16 @@ port = 53317
 | `port` | int | `53317` | TCP and UDP LocalSend port (`1024`–`65535`). |
 
 IPC: `localsend-toggle`, `localsend-status`, and `localsend-announce`. See [Media & UI](/noctalia/ipc/media-and-ui/#localsend).
+
+## Phone
+
+The Phone tab talks to the session `kdeconnectd` daemon (`org.kde.kdeconnect`). Pair a phone running KDE Connect, then ping it, ring it, send a file, or send the clipboard. Battery percent shows when the phone reports it. Unpaired nearby devices get a Pair button; an incoming pair request shows Accept and Decline plus the verification code.
+
+The tab stays in the sidebar when KDE Connect is not installed. **Start KDE Connect** asks D-Bus to launch `kdeconnectd` if the package is present. Opening the tab also asks the daemon to look for nearby devices; closing the tab stops that scan.
+
+Helix does not replace KDE Connect's own pairing UI on the phone. Install the KDE Connect app on the other device and keep it on the same network.
+
+IPC: `phone-status`, `phone-ping`, and `phone-ring`. See [Media & UI](/noctalia/ipc/media-and-ui/#phone).
 
 ## Weather
 

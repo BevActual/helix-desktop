@@ -187,3 +187,15 @@ Built-in LocalSend nearby sharing uses the LocalSend protocol on the LAN. Settin
 | Announce | <IpcCommand command="localsend-announce" /> | Broadcast this machine on the LocalSend multicast group now. |
 
 `receive-blocked` means nearby sharing is on but TCP port 53317 (or the configured port) is already in use, so this machine can still send. Open Control Center on the LocalSend tab with `noctalia msg panel-toggle control-center localsend`.
+
+## Phone {#phone}
+
+Built-in Phone control talks to the session KDE Connect daemon. There is no Helix config block; pairing lives in KDE Connect.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="phone-status" /> | Print `not-installed`, `starting`, or `running` plus announced name and paired/reachable counts. |
+| Ping | <IpcCommand command="phone-ping" /> | Ping a paired device. Optional device name or id. |
+| Ring | <IpcCommand command="phone-ring" /> | Ring a paired device. Optional device name or id. |
+
+Omit the device argument when exactly one device is paired. Open the tab with `noctalia msg panel-toggle control-center phone`.

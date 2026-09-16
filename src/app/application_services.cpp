@@ -18,6 +18,7 @@
 #include "dbus/logind/logind_service.h"
 #include "dbus/modem/modem_manager_service.h"
 #include "dbus/mpris/mpris_service.h"
+#include "dbus/kdeconnect/phone_connect_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/iwd_secret_agent.h"
 #include "dbus/network/iwd_service.h"
@@ -1595,6 +1596,15 @@ void Application::initSessionBusServices() {
     m_trayService->setMenuToggleCallback([this](const std::string& itemId, float contentScale) {
       m_trayMenu.toggleForItem(itemId, contentScale);
     });
+
+    try {
+      m_phoneService = std::make_unique<PhoneConnectService>(*m_bus);
+      m_phoneService->start();
+      kLog.info("phone connect service active");
+    } catch (const std::exception& e) {
+      kLog.warn("phone connect disabled: {}", e.what());
+      m_phoneService.reset();
+    }
   }
 
   m_locationService.initialize();

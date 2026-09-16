@@ -711,6 +711,7 @@
       "system": "System",
       "tailscale": "Tailscale",
       "localsend": "LocalSend",
+      "phone": "Phone",
       "wallpaper": "Wallpaper",
       "weather": "Weather",
       "wifi": "Wi-Fi"
@@ -820,6 +821,7 @@
       "system": "System",
       "tailscale": "Tailscale",
       "localsend": "LocalSend",
+      "phone": "Phone",
       "weather": "Weather"
     },
     "camera": {
@@ -975,6 +977,36 @@
       "sent": "Sent to {name}",
       "their-pin": "Their PIN, if required",
       "title": "LocalSend"
+    },
+    "phone": {
+      "accept": "Accept",
+      "available": "Nearby, not paired",
+      "charging": "Charging",
+      "devices": "Devices",
+      "devices-empty": "No phones yet. Open KDE Connect on your phone, then tap refresh.",
+      "missing": "Install KDE Connect to pair a phone from Control Center.",
+      "offline": "Offline",
+      "online": "Online",
+      "pair": "Pair",
+      "pair-incoming": "This device wants to pair",
+      "pair-incoming-code": "Confirm this code on both devices: {code}",
+      "pair-waiting": "Waiting for the other device to accept",
+      "pair-waiting-code": "Waiting for accept · {code}",
+      "ping": "Ping",
+      "ready": "Ready",
+      "ready-hint": "Paired phones appear below. Keep KDE Connect open on the other device to find new ones.",
+      "refresh": "Refresh",
+      "reject": "Decline",
+      "ring": "Ring",
+      "send-clipboard": "Send clipboard",
+      "send-file": "Send file",
+      "start": "Start KDE Connect",
+      "starting": "Starting…",
+      "status-failed": "Could not list devices from KDE Connect.",
+      "stopped": "KDE Connect is not running",
+      "title": "Phone",
+      "unpair": "Unpair",
+      "visible-as": "Visible as {name}"
     },
     "theme": {
       "niri-blur": "Compositor blur",

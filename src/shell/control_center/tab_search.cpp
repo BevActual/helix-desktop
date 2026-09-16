@@ -43,6 +43,7 @@ namespace control_center {
         {"system", "resources cpu memory ram disk"},
         {"tailscale", "vpn tailnet"},
         {"localsend", "nearby share airdrop send files"},
+        {"phone", "kdeconnect kde-connect gsconnect android ios pair ping ring"},
         {"templates", "template rice rices"},
         {"wallpaper", "background wallpapers overview backdrop"},
         {"weather", "forecast temperature location"},

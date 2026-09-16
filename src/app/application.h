@@ -127,6 +127,7 @@ class LogindService;
 class MainLoop;
 class ModemManagerService;
 class MprisService;
+class PhoneConnectService;
 class NetworkSecretAgent;
 class NotificationDBusHost;
 class PipeWirePollSource;
@@ -289,6 +290,7 @@ private:
   TailscaleService m_tailscaleService{m_configService};
   LocalSendService m_localSendService{m_configService, m_httpClient, m_notificationManager};
   std::unique_ptr<MprisService> m_mprisService;
+  std::unique_ptr<PhoneConnectService> m_phoneService;
   std::unique_ptr<PowerProfilesService> m_powerProfilesService;
   std::unique_ptr<INetworkService> m_networkService;
   std::unique_ptr<NetworkSecretAgent> m_networkSecretAgent;

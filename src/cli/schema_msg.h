@@ -223,6 +223,9 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgTaskbarCyclePositionals{
       Positional{"direction", {}, kMsgTaskbarCycleDirectionChoices, true, false, false},
   };
+  inline constexpr std::array kMsgPhoneDevicePositionals{
+      Positional{"device", "Paired device name or id; omit when only one device is paired", {}, false, false, false},
+  };
   inline constexpr std::array kMsgThemeModeSetPositionals{
       Positional{"mode", {}, kMsgThemeModeSetModeChoices, true, false, false},
   };
@@ -783,6 +786,15 @@ namespace noctalia::cli {
     inline constexpr Command localsendToggle{
         "localsend-toggle", "Enable or disable LocalSend nearby sharing", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command phonePing{
+        "phone-ping", "Ping a paired phone through KDE Connect", {}, {}, {}, kMsgPhoneDevicePositionals, {}, false
+    };
+    inline constexpr Command phoneRing{
+        "phone-ring", "Ring a paired phone through KDE Connect", {}, {}, {}, kMsgPhoneDevicePositionals, {}, false
+    };
+    inline constexpr Command phoneStatus{
+        "phone-status", "Print KDE Connect daemon and paired-device status", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
         "Step to the adjacent task or workspace group in the invoking taskbar",
@@ -1003,6 +1015,9 @@ namespace noctalia::cli {
       msg::panelToggle,
       msg::plugin,
       msg::plugins,
+      msg::phonePing,
+      msg::phoneRing,
+      msg::phoneStatus,
       msg::powerCycle,
       msg::powerSet,
       msg::screenRecordReplaySave,

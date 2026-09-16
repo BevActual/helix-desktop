@@ -17,6 +17,7 @@
 #include "dbus/idle/screensaver_service.h"
 #include "dbus/logind/logind_service.h"
 #include "dbus/mpris/mpris_service.h"
+#include "dbus/kdeconnect/phone_connect_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/network_manager_service.h"
 #include "dbus/network/network_secret_agent.h"
@@ -677,6 +678,7 @@ void Application::initPanelManagerAndPanels() {
           .screenRecorder = &m_screenRecorder,
           .tailscale = &m_tailscaleService,
           .localSend = &m_localSendService,
+          .phone = m_phoneService.get(),
           .desktopWidgets = &m_desktopWidgetsController,
           .upgradeShell = [this]() { performShellUpgrade(); },
           .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },

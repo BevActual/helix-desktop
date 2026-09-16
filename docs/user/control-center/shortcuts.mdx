@@ -72,6 +72,7 @@ show_shortcut_labels = false
 | `scan_qr` | Scan QR | Select a region and copy a QR code | Open screenshot tab |
 | `tailscale` | Tailscale | Toggle connection | Open tailscale tab |
 | `localsend` | LocalSend | Toggle nearby sharing | Open localsend tab |
+| `phone` | Phone | Open the Phone tab | Open the Phone tab |
 
 ## Dynamic Shortcuts
 
@@ -85,6 +86,8 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 `localsend` toggles nearby sharing. Right-click opens the LocalSend tab. The setting is saved under `[localsend].enabled`.
 
+`phone` opens the Phone tab. The tile highlights when a paired phone is reachable.
+
 ## Related IPC
 
 Many shortcut buttons trigger the same canonical IPC commands documented elsewhere:
@@ -97,3 +100,4 @@ Many shortcut buttons trigger the same canonical IPC commands documented elsewhe
 - [Media & UI -> Screen recording](/noctalia/ipc/media-and-ui/#screen-recording) for start, stop, toggle, and replay
 - [Media & UI -> Tailscale](/noctalia/ipc/media-and-ui/#tailscale) for connect, disconnect, toggle, and status
 - [Media & UI -> LocalSend](/noctalia/ipc/media-and-ui/#localsend) for toggle, status, and announce
+- [Media & UI -> Phone](/noctalia/ipc/media-and-ui/#phone) for status, ping, and ring

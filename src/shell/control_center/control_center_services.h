@@ -39,6 +39,7 @@ class SessionActionRunner;
 class SystemMonitorService;
 class TailscaleService;
 class LocalSendService;
+class PhoneConnectService;
 class ThumbnailService;
 class UPowerService;
 class VideoWallpaperService;
@@ -107,6 +108,7 @@ struct ControlCenterServices {
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
   LocalSendService* localSend = nullptr;
+  PhoneConnectService* phone = nullptr;
   DesktopWidgetsController* desktopWidgets = nullptr;
   std::function<void()> upgradeShell;
   std::function<bool()> upgradeAvailable;
@@ -136,6 +138,7 @@ struct ControlCenterServices {
         .screenRecorder = screenRecorder,
         .tailscale = tailscale,
         .localSend = localSend,
+        .phone = phone,
         .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,

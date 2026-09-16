@@ -16,6 +16,7 @@ class PowerProfilesService;
 class ScreenRecorderService;
 class TailscaleService;
 class LocalSendService;
+class PhoneConnectService;
 class WeatherService;
 class HttpClient;
 class ClipboardService;
@@ -45,6 +46,7 @@ struct ShortcutServices {
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
   LocalSendService* localSend = nullptr;
+  PhoneConnectService* phone = nullptr;
   // Plugin shortcut runtime dependencies.
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;

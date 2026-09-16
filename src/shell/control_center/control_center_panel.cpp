@@ -53,6 +53,7 @@
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/system_tab.h"
 #include "shell/control_center/tabs/localsend_tab.h"
+#include "shell/control_center/tabs/phone_tab.h"
 #include "shell/control_center/tabs/tailscale_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
@@ -143,6 +144,7 @@ namespace {
       {"packages", "control-center.tabs.packages", "package", true, TabGroup::Services},
       {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Services},
       {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Services},
+      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Services},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Services},
       {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Services},
       {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Services},
@@ -271,6 +273,7 @@ namespace {
         || id == "clipboard"
         || id == "tailscale"
         || id == "localsend"
+        || id == "phone"
         || id == "plugins"
         || id == "home"
         || id == "desktop"
@@ -426,6 +429,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("packages", std::make_unique<PackagesTab>(services));
   add("tailscale", std::make_unique<TailscaleTab>(services));
   add("localsend", std::make_unique<LocalSendTab>(services));
+  add("phone", std::make_unique<PhoneTab>(services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
   add("ai", std::make_unique<AiUsageTab>(services));
   add("capture", std::make_unique<CaptureTab>(services));

@@ -13,6 +13,7 @@
 #include "ipc/ipc_service.h"
 #include "net/localsend_service.h"
 #include "net/tailscale_service.h"
+#include "dbus/kdeconnect/phone_connect_service.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
 #include "core/process/process.h"
@@ -27,6 +28,7 @@
 #include "system/weather_service.h"
 #include "theme/theme_service.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <deque>
@@ -642,6 +644,31 @@ namespace {
     ConfigService* m_config = nullptr;
   };
 
+  class PhoneShortcut final : public Shortcut {
+  public:
+    explicit PhoneShortcut(PhoneConnectService* service) : m_service(service) {}
+    std::string_view id() const override { return "phone"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.phone"); }
+    std::string_view iconOn() const override { return "device-mobile"; }
+    std::string_view iconOff() const override { return "device-mobile"; }
+    bool isToggle() const override { return false; }
+    bool enabled() const override { return true; }
+    bool active() const override {
+      if (m_service == nullptr) {
+        return false;
+      }
+      const auto& snap = m_service->snapshot();
+      return std::ranges::any_of(snap.devices, [](const PhoneDevice& device) {
+        return device.paired && device.reachable;
+      });
+    }
+    void onClick() override { openTab("phone"); }
+    void onRightClick() override { openTab("phone"); }
+
+  private:
+    PhoneConnectService* m_service = nullptr;
+  };
+
   using ShortcutCreator = std::unique_ptr<Shortcut> (*)(const ShortcutServices& services);
   using ShortcutAvailability = bool (*)(const Config& config);
 
@@ -764,6 +791,10 @@ namespace {
       builtinShortcut<LocalSendShortcut, &ShortcutServices::localSend, &ShortcutServices::config>({
           .type = "localsend",
           .labelKey = "control-center.shortcuts.localsend",
+      }),
+      builtinShortcut<PhoneShortcut, &ShortcutServices::phone>({
+          .type = "phone",
+          .labelKey = "control-center.shortcuts.phone",
       }),
   });
 
