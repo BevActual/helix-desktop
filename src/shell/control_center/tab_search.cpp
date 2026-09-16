@@ -19,6 +19,8 @@ namespace control_center {
         {"type", "font typeface typography"},
         {"scale", "size ui-scale zoom interface-scale"},
         {"roundness", "corners rounded radius border-radius"},
+        {"windows", "gaps struts columns tiling niri windows"},
+        {"niri", "setup compositor autostart"},
         {"audio", "sound volume mic microphone speaker"},
         {"bluetooth", "bt"},
         {"calendar", "clock clocks timezone timezones world-clock date accounts caldav google ical ics vdir"},
@@ -27,7 +29,7 @@ namespace control_center {
         {"keybinds", "binds shortcuts keyboard hotkeys"},
         {"desktop", "widgets clock hot-corners corners"},
         {"dock", "taskbar pinned"},
-        {"launcher", "runner app-launcher"},
+        {"launcher", "runner app-launcher type-to-launch overview"},
         {"media", "mpris player music now-playing"},
         {"monitor", "display displays brightness night-light nightlight gamma"},
         {"network", "wifi wi-fi wireless internet ethernet"},
@@ -42,7 +44,7 @@ namespace control_center {
         {"tailscale", "vpn tailnet"},
         {"localsend", "nearby share airdrop send files"},
         {"templates", "template rice rices"},
-        {"wallpaper", "background wallpapers"},
+        {"wallpaper", "background wallpapers overview backdrop"},
         {"weather", "forecast temperature location"},
     };
 

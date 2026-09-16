@@ -17,6 +17,7 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <utility>
 
@@ -428,8 +429,14 @@ void RoundnessTab::commitWindowRadius() {
   if (m_syncing || m_windowRadius == nullptr) {
     return;
   }
-  const auto result =
-      compositors::niri::saveWindowCornerRadius(static_cast<int>(std::lround(m_windowRadius->value())));
+  std::optional<bool> drawBorder;
+  if (m_config != nullptr) {
+    drawBorder = m_config->config().theme.niriLayout.drawBorderWithBackground;
+  }
+  const auto result = compositors::niri::saveWindowRules({
+      .cornerRadius = static_cast<int>(std::lround(m_windowRadius->value())),
+      .drawBorderWithBackground = drawBorder,
+  });
   if (!result.ok) {
     notify::error(
         "Noctalia", i18n::tr("control-center.roundness.windows-save-title"),

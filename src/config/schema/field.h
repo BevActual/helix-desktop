@@ -169,6 +169,22 @@ namespace noctalia::config::schema {
     };
   }
 
+  template <typename Struct> Field<Struct> field(std::optional<bool> Struct::* member, std::string_view key) {
+    return Field<Struct>{
+        key,
+        [member, key](const toml::table& tbl, Struct& out, std::string_view, Diagnostics&) {
+          if (auto v = tbl[key].value<bool>()) {
+            out.*member = v;
+          }
+        },
+        [member, key](toml::table& tbl, const Struct& in) {
+          if ((in.*member).has_value()) {
+            tbl.insert_or_assign(key, *(in.*member));
+          }
+        },
+    };
+  }
+
   template <typename Struct> Field<Struct> field(std::optional<std::int32_t> Struct::* member, std::string_view key) {
     return Field<Struct>{
         key,

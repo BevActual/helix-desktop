@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/launcher_tab.h"
 
+#include "compositors/compositor_detect.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
 #include "i18n/i18n.h"
@@ -191,6 +192,30 @@ std::unique_ptr<Flex> LauncherTab::create() {
   );
   content->addChild(std::move(appearanceCard));
 
+  if (compositors::isNiri()) {
+    auto overviewCard = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+    });
+    addTitle(*overviewCard, i18n::tr("settings.navigation.groups.overview"), scale);
+    overviewCard->addChild(
+        ui::label({
+            .text = i18n::tr("settings.schema.shell.niri-overview-type-to-launch.description"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 3,
+        })
+    );
+    addToggleRow(
+        *overviewCard, i18n::tr("settings.schema.shell.niri-overview-type-to-launch.label"), &m_typeToLaunch,
+        m_config != nullptr && m_config->config().shell.niriOverviewTypeToLaunchEnabled,
+        {"shell", "niri_overview_type_to_launch_enabled"}
+    );
+    content->addChild(std::move(overviewCard));
+  }
+
   auto providersCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
@@ -276,6 +301,7 @@ void LauncherTab::onClose() {
   m_appGrid = nullptr;
   m_appActions = nullptr;
   m_sortByUsage = nullptr;
+  m_typeToLaunch = nullptr;
   m_providerGlobal = {};
   m_pinnedList = nullptr;
 }
@@ -337,6 +363,9 @@ void LauncherTab::syncLiveControls() {
   }
   if (m_sortByUsage != nullptr) {
     m_sortByUsage->setCheckedImmediate(launcher.sortByUsage);
+  }
+  if (m_typeToLaunch != nullptr) {
+    m_typeToLaunch->setCheckedImmediate(m_config->config().shell.niriOverviewTypeToLaunchEnabled);
   }
   for (std::size_t i = 0; i < kProviders.size(); ++i) {
     if (m_providerGlobal[i] != nullptr) {

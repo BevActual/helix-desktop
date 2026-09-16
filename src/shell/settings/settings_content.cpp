@@ -1391,11 +1391,29 @@ namespace settings {
                         .fontSize = Style::fontSizeCaption * scale,
                         .glyphSize = Style::fontSizeCaption * scale,
                         .variant = control.copy.variant,
+                        .tooltip = control.copy.tooltip.empty() ? control.copy.label : control.copy.tooltip,
                         .minHeight = Style::controlHeightSm * scale,
                         .paddingV = Style::spaceXs * scale,
                         .paddingH = Style::spaceSm * scale,
                         .radius = Style::scaledRadiusMd(scale),
                         .onClick = control.copy.action,
+                    })
+                );
+              }
+              if (!control.clear.label.empty() || !control.clear.glyph.empty()) {
+                row->addChild(
+                    ui::button({
+                        .text = control.clear.label,
+                        .glyph = control.clear.glyph.empty() ? "close" : control.clear.glyph,
+                        .fontSize = Style::fontSizeCaption * scale,
+                        .glyphSize = Style::fontSizeCaption * scale,
+                        .variant = control.clear.variant,
+                        .tooltip = control.clear.tooltip.empty() ? control.clear.label : control.clear.tooltip,
+                        .minHeight = Style::controlHeightSm * scale,
+                        .paddingV = Style::spaceXs * scale,
+                        .paddingH = Style::spaceSm * scale,
+                        .radius = Style::scaledRadiusMd(scale),
+                        .onClick = control.clear.action,
                     })
                 );
               }

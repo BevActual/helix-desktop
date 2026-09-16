@@ -12,7 +12,9 @@ import option3 from '../../assets/niri-overview/option3-v5.png';
 
 Add the following settings to your Niri configuration file (usually located at `~/.config/niri/config.kdl`).
 
-**Settings → Niri → Setup** can copy missing snippets or write them to `noctalia-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body.
+**Settings → Niri → Setup** can copy missing snippets or write them to `noctalia-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body. Theme, Wallpaper, Windows, and Monitor write their own includes (`noctalia-layout.kdl`, `noctalia-blur.kdl`, `noctalia-overview.kdl`, `noctalia-outputs.kdl`) the same way.
+
+**Control Center → Theme** owns niri decorations in `noctalia-layout.kdl` (focus-ring, border, tab-indicator, insert-hint, recent-windows) plus compositor blur (`noctalia-blur.kdl`) and `draw-border-with-background` in `noctalia-window-rules.kdl`. **Control Center → Windows** writes `gaps`, `struts`, and `default-column-width` into the same layout include, only after you change those controls. The niri color template no longer writes a second `layout` block into `noctalia.kdl`.
 
 ## Display layout
 
@@ -47,7 +49,7 @@ debug {
 
 Both `spawn-sh` and `spawn` are usable to run Noctalia keybinds.
 
-Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds → Niri** to record Super/Mod chords, copy missing lines, or install them into `noctalia-binds.kdl`:
+Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds** to record Super/Mod chords, copy missing lines, or install them into `noctalia-binds.kdl`. That include is appended last, so it overrides stock keys from an earlier `include` such as Fedora's `/usr/share/doc/niri/default-config.kdl` without rewriting your `binds { }` block. **Mod+Shift+P** replaces niri's `power-off-monitors` with the session panel. App shortcuts on that page write `spawn` lines into the same include:
 
 ```kdl
 binds {
@@ -64,13 +66,22 @@ binds {
     Mod+W { spawn-sh "noctalia msg panel-toggle wallpaper"; }
     Mod+Shift+P { spawn-sh "noctalia msg panel-toggle session"; }
     Mod+Shift+N { spawn-sh "noctalia msg nightlight-toggle"; }
+    Mod+N { spawn-sh "noctalia msg panel-toggle notifications"; }
+    Mod+Shift+C { spawn-sh "noctalia msg caffeine-toggle"; }
+    Mod+Shift+R { spawn-sh "noctalia msg screen-record-toggle"; }
+    Mod+Shift+D { spawn-sh "noctalia msg notification-dnd-toggle"; }
+    Mod+Shift+O { spawn-sh "noctalia msg screenshot-ocr"; }
+    XF86AudioPlay allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    XF86AudioNext allow-when-locked=true { spawn-sh "noctalia msg media next"; }
+    XF86AudioPrev allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
+    XF86AudioMicMute allow-when-locked=true { spawn-sh "noctalia msg mic-mute"; }
 
     // Audio & Brightness
-    XF86AudioRaiseVolume { spawn-sh "noctalia msg volume-up"; }
-    XF86AudioLowerVolume { spawn-sh "noctalia msg volume-down"; }
-    XF86AudioMute { spawn-sh "noctalia msg volume-mute"; }
-    XF86MonBrightnessUp { spawn-sh "noctalia msg brightness-up"; }
-    XF86MonBrightnessDown { spawn-sh "noctalia msg brightness-down"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
 }
 ```
 
@@ -83,9 +94,11 @@ Noctalia can open its launcher when you start typing in niri's overview. This is
 niri_overview_type_to_launch_enabled = true
 ```
 
-You can also enable this from **Settings → Niri → Overview**.
+You can also enable this from **Control Center → Launcher**.
 
 ## Wallpapers setup
+
+**Control Center → Wallpaper** writes `noctalia-overview.kdl` for one of the presets below. It also turns the Helix Shell backdrop layer on for **Blurred backdrop** and off for **Stationary wallpaper** and **Flat color**. Backdrop blur and tint live on Wallpaper’s gear. You can still paste the same rules by hand.
 
 Next, choose one of the following options for your wallpaper and overview setup.
 
@@ -163,7 +176,9 @@ Option 3 should be used with the `[backdrop]` section disabled in your Noctalia 
 Blur support was introduced in Niri version 26.04. Adding these rules to earlier versions of Niri will result in configuration errors.
 :::
 
-You can enable blur behind windows and Noctalia's bar, panels, dock, and notifications.
+**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Turning it off writes disable rules so Noctalia's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer.
+
+You can also paste the same rules by hand:
 
 ```kdl
 /* Apps: blur them all without xray so it looks more realistic. */

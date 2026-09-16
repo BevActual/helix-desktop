@@ -1322,6 +1322,15 @@ namespace noctalia::config::schema {
     static const Schema<ThemeConfig::NiriLayoutThemeConfig> s = {
         field(&ThemeConfig::NiriLayoutThemeConfig::focusRing, "focus_ring"),
         field(&ThemeConfig::NiriLayoutThemeConfig::border, "border"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blur, "blur"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurPasses, "blur_passes", kNiriBlurPassesRange),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurOffset, "blur_offset", kNiriBlurOffsetRange),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurNoise, "blur_noise", kNiriBlurNoiseRange),
+        enumField(&ThemeConfig::NiriLayoutThemeConfig::overview, "overview", kNiriOverviewPresets),
+        field(&ThemeConfig::NiriLayoutThemeConfig::gaps, "gaps"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::struts, "struts"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::defaultColumnWidth, "default_column_width"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::drawBorderWithBackground, "draw_border_with_background"),
     };
     return s;
   }

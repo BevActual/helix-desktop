@@ -3,6 +3,11 @@
 #include "calendar/calendar_service.h"
 #include "compositors/compositor_detect.h"
 #include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_config_blur.h"
+#include "compositors/niri/niri_config_overview.h"
+#include "compositors/niri/niri_layout_theme.h"
+#include "compositors/niri/niri_runtime.h"
+#include "compositors/niri/niri_window_rules.h"
 #include "config/atomic_file.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
@@ -104,6 +109,31 @@ namespace {
 
   std::string translatedIpcActionField(std::string_view command, std::string_view field) {
     return i18n::tr(std::format("settings.widgets.actions.commands.{}.{}", command, field));
+  }
+
+  [[nodiscard]] compositors::niri::BlurSettings niriBlurSettingsFrom(const ThemeConfig::NiriLayoutThemeConfig& niri) {
+    return {
+        .enabled = niri.blur,
+        .passes = niri.blurPasses,
+        .offset = niri.blurOffset,
+        .noise = niri.blurNoise,
+    };
+  }
+
+  [[nodiscard]] bool isNiriBlurPersistPath(const std::vector<std::string>& path) {
+    return path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout"
+        && (path[2] == "blur" || path[2] == "blur_passes" || path[2] == "blur_offset" || path[2] == "blur_noise");
+  }
+
+  [[nodiscard]] bool isNiriLayoutPersistPath(const std::vector<std::string>& path) {
+    return path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout"
+        && (path[2] == "focus_ring" || path[2] == "border" || path[2] == "gaps" || path[2] == "struts"
+            || path[2] == "default_column_width");
+  }
+
+  [[nodiscard]] bool isNiriWindowRulesPersistPath(const std::vector<std::string>& path) {
+    return path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout"
+        && path[2] == "draw_border_with_background";
   }
 
   std::string upowerDeviceLabel(const UPowerDeviceInfo& device) {
@@ -373,6 +403,8 @@ std::unique_ptr<Flex> SettingsPane::createHeaderActions(float scale) {
 }
 
 std::unique_ptr<Flex> SettingsPane::wrapLive(std::unique_ptr<Flex> live, float scale, float panelCardOpacity) {
+  m_scale = scale;
+  m_panelCardOpacity = panelCardOpacity;
   auto host = ui::column({
       .out = &m_embedHost,
       .align = FlexAlign::Stretch,
@@ -383,11 +415,20 @@ std::unique_ptr<Flex> SettingsPane::wrapLive(std::unique_ptr<Flex> live, float s
     m_liveRoot = live.get();
     host->addChild(std::move(live));
   }
-  auto editor = create(scale, panelCardOpacity);
-  editor->setFlexGrow(1.0F);
-  host->addChild(std::move(editor));
+  if (m_configureMode) {
+    ensureEmbeddedEditor();
+  }
   applyConfigureVisibility();
   return host;
+}
+
+void SettingsPane::ensureEmbeddedEditor() {
+  if (m_rootLayout != nullptr || m_embedHost == nullptr) {
+    return;
+  }
+  auto editor = create(m_scale, m_panelCardOpacity);
+  editor->setFlexGrow(1.0F);
+  m_embedHost->addChild(std::move(editor));
 }
 
 std::unique_ptr<Flex> SettingsPane::embedHeader(std::unique_ptr<Flex> liveActions, float scale) {
@@ -465,6 +506,9 @@ bool SettingsPane::layoutEmbedded(Renderer& renderer, float contentWidth, float 
 }
 
 void SettingsPane::setConfigureMode(bool show) {
+  if (show) {
+    ensureEmbeddedEditor();
+  }
   if (m_configureMode == show) {
     applyConfigureVisibility();
     return;
@@ -474,22 +518,25 @@ void SettingsPane::setConfigureMode(bool show) {
   PanelManager::instance().requestLayout();
 }
 
-void SettingsPane::setSection(std::string section) {
-  if (m_selectedSection == section) {
-    return;
-  }
-  m_selectedSection = std::move(section);
-  m_scrollState.offset = 0.0F;
-  queueRebuild();
-}
-
 void SettingsPane::setSearchQuery(std::string query) {
   if (m_searchQuery == query) {
     return;
   }
   m_searchQuery = std::move(query);
   m_scrollState.offset = 0.0F;
+  if (m_embedHost != nullptr && !m_searchQuery.empty()) {
+    ensureEmbeddedEditor();
+  }
   syncBarSelect();
+  queueRebuild();
+}
+
+void SettingsPane::setSection(std::string section) {
+  if (m_selectedSection == section) {
+    return;
+  }
+  m_selectedSection = std::move(section);
+  m_scrollState.offset = 0.0F;
   queueRebuild();
 }
 
@@ -751,6 +798,10 @@ settings::RegistryEnvironment SettingsPane::buildRegistryEnvironment() const {
   env.niriBackdropSupported = wayland != nullptr && compositors::isNiri();
   env.screencopySupported = wayland != nullptr && wayland->hasScreencopy();
   env.niriOverviewTypeToLaunchSupported = wayland != nullptr && compositors::isNiri();
+  if (env.niriBackdropSupported && m_platform != nullptr) {
+    const auto version = m_platform->niriRuntime().compositorVersion();
+    env.niriBlurSupported = version.has_value() && compositors::niri::versionSupportsBlur(*version);
+  }
   env.ddcutilAvailable = m_dependencies != nullptr && m_dependencies->hasDdcutil();
   env.systemdUserManaged = process::runningUnderSystemdUserManager();
   env.gammaControlAvailable = wayland != nullptr && wayland->hasGammaControl();
@@ -1016,6 +1067,85 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
   };
 }
 
+void SettingsPane::persistNiriBlurInclude() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto result = compositors::niri::saveNiriBlur(niriBlurSettingsFrom(m_config->config().theme.niriLayout));
+  if (result.ok) {
+    return;
+  }
+  m_statusMessage = result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error;
+  m_statusIsError = true;
+}
+
+void SettingsPane::persistNiriOverviewInclude() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto preset = m_config->config().theme.niriLayout.overview;
+  if (preset != NiriOverviewPreset::None) {
+    const bool wantBackdrop = compositors::niri::overviewWantsBackdrop(preset);
+    if (m_config->config().backdrop.enabled != wantBackdrop) {
+      (void)m_config->setOverride({"backdrop", "enabled"}, wantBackdrop);
+    }
+  }
+  const auto color = colorForRole(ColorRole::Surface);
+  const auto channel = [](float v) { return static_cast<int>(std::clamp(v, 0.0F, 1.0F) * 255.0F); };
+  const std::string hex =
+      std::format("#{:02x}{:02x}{:02x}", channel(color.r), channel(color.g), channel(color.b));
+  const auto result = compositors::niri::saveNiriOverview({.preset = preset, .flatColorHex = hex});
+  if (result.ok) {
+    return;
+  }
+  m_statusMessage = result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error;
+  m_statusIsError = true;
+}
+
+void SettingsPane::persistNiriLayoutInclude() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto hex = [](const Color& color) {
+    const auto channel = [](float v) { return static_cast<int>(std::clamp(v, 0.0F, 1.0F) * 255.0F); };
+    return std::format("#{:02x}{:02x}{:02x}", channel(color.r), channel(color.g), channel(color.b));
+  };
+  const auto& niriLayout = m_config->config().theme.niriLayout;
+  const auto result = compositors::niri::saveNiriLayoutTheme({
+      .focusRing = niriLayout.focusRing,
+      .border = niriLayout.border,
+      .activeColorHex = hex(colorForRole(ColorRole::Primary)),
+      .inactiveColorHex = hex(colorForRole(ColorRole::Outline)),
+      .urgentColorHex = hex(colorForRole(ColorRole::Error)),
+      .tabInactiveColorHex = hex(colorForRole(ColorRole::Secondary)),
+      .insertHintColorHex = hex(colorForRole(ColorRole::Primary)) + "80",
+      .gaps = niriLayout.gaps,
+      .struts = niriLayout.struts,
+      .defaultColumnWidth = niriLayout.defaultColumnWidth,
+  });
+  if (result.ok) {
+    return;
+  }
+  m_statusMessage = result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error;
+  m_statusIsError = true;
+}
+
+void SettingsPane::persistNiriWindowRulesInclude() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto& niriLayout = m_config->config().theme.niriLayout;
+  const auto result = compositors::niri::saveWindowRules({
+      .cornerRadius = compositors::niri::currentWindowCornerRadius(),
+      .drawBorderWithBackground = niriLayout.drawBorderWithBackground,
+  });
+  if (result.ok) {
+    return;
+  }
+  m_statusMessage = result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error;
+  m_statusIsError = true;
+}
+
 void SettingsPane::setSettingOverride(std::vector<std::string> path, ConfigOverrideValue value) {
   if (path.size() == 2 && path[0] == "shell" && path[1] == "font_family") {
     text::invalidateFontWeightCatalogCache();
@@ -1055,6 +1185,18 @@ void SettingsPane::setSettingOverride(std::vector<std::string> path, ConfigOverr
     m_statusMessage.clear();
     m_statusIsError = false;
     m_pendingResetSettingPaths.clear();
+    if (isNiriBlurPersistPath(path)) {
+      persistNiriBlurInclude();
+    }
+    if (path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout" && path[2] == "overview") {
+      persistNiriOverviewInclude();
+    }
+    if (isNiriLayoutPersistPath(path)) {
+      persistNiriLayoutInclude();
+    }
+    if (isNiriWindowRulesPersistPath(path)) {
+      persistNiriWindowRulesInclude();
+    }
     if (isCustomSchedulePath(path)) {
       const LocationConfig& location = m_config->config().location;
       if (location.customSchedule && !day_night_schedule::hasUsableCustomTimes(location)) {
@@ -1077,6 +1219,24 @@ void SettingsPane::setSettingOverrides(std::vector<std::pair<std::vector<std::st
       queueRebuild();
       return;
     }
+    bool wroteBlur = false;
+    bool wroteOverview = false;
+    bool wroteLayout = false;
+    bool wroteWindowRules = false;
+    for (const auto& [path, _] : overrides) {
+      if (isNiriBlurPersistPath(path)) {
+        wroteBlur = true;
+      }
+      if (path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout" && path[2] == "overview") {
+        wroteOverview = true;
+      }
+      if (isNiriLayoutPersistPath(path)) {
+        wroteLayout = true;
+      }
+      if (isNiriWindowRulesPersistPath(path)) {
+        wroteWindowRules = true;
+      }
+    }
     if (!m_config->setOverrides(std::move(overrides))) {
       m_statusMessage = settingsMutationError(*m_config, i18n::tr("settings.errors.batch-write"));
       m_statusIsError = true;
@@ -1086,6 +1246,18 @@ void SettingsPane::setSettingOverrides(std::vector<std::pair<std::vector<std::st
     m_statusMessage.clear();
     m_statusIsError = false;
     m_pendingResetSettingPaths.clear();
+    if (wroteBlur) {
+      persistNiriBlurInclude();
+    }
+    if (wroteOverview) {
+      persistNiriOverviewInclude();
+    }
+    if (wroteLayout) {
+      persistNiriLayoutInclude();
+    }
+    if (wroteWindowRules) {
+      persistNiriWindowRulesInclude();
+    }
     queueRebuild();
   });
 }

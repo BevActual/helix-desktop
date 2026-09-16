@@ -1606,6 +1606,20 @@ constexpr EnumOption<WifiBandFilter> kWifiBandFilters[] = {
     {WifiBandFilter::Ghz6, "6", "settings.options.wifi-band.ghz6"},
 };
 
+enum class NiriOverviewPreset : std::uint8_t {
+  None = 0,
+  Backdrop = 1,
+  Stationary = 2,
+  Flat = 3,
+};
+
+constexpr EnumOption<NiriOverviewPreset> kNiriOverviewPresets[] = {
+    {NiriOverviewPreset::None, "none", "settings.options.niri.overview.none"},
+    {NiriOverviewPreset::Backdrop, "backdrop", "settings.options.niri.overview.backdrop"},
+    {NiriOverviewPreset::Stationary, "stationary", "settings.options.niri.overview.stationary"},
+    {NiriOverviewPreset::Flat, "flat", "settings.options.niri.overview.flat"},
+};
+
 struct ThemeConfig {
   struct TemplateColorConfig {
     std::string name;
@@ -1663,9 +1677,22 @@ struct ThemeConfig {
 
   // Whether niri's own window decorations (focus ring / border) follow this palette. Applied by
   // writing niri's managed `noctalia-layout.kdl` include; see compositors::niri::saveNiriLayoutTheme.
+  // `blur` writes `noctalia-blur.kdl` and requires niri 26.04 or newer.
+  // `overview` writes `noctalia-overview.kdl` for wallpaper/overview presets.
+  // `gaps` is written into the same layout include only when set, so an existing niri
+  // `gaps` value is left alone until Settings → Niri changes it.
   struct NiriLayoutThemeConfig {
     bool focusRing = false;
     bool border = false;
+    bool blur = false;
+    std::int32_t blurPasses = 2;
+    float blurOffset = 3.0F;
+    float blurNoise = 0.03F;
+    NiriOverviewPreset overview = NiriOverviewPreset::None;
+    std::optional<std::int32_t> gaps;
+    std::optional<std::int32_t> struts;
+    std::optional<double> defaultColumnWidth;
+    std::optional<bool> drawBorderWithBackground;
 
     bool operator==(const NiriLayoutThemeConfig&) const = default;
   };

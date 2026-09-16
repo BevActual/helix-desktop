@@ -340,6 +340,7 @@ namespace settings {
     case SettingsSection::Power:
     case SettingsSection::Hooks:
     case SettingsSection::Niri:
+    case SettingsSection::Windows:
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
     case SettingsSection::Camera:
@@ -384,6 +385,7 @@ namespace settings {
     case SettingsSection::Power:
     case SettingsSection::Hooks:
     case SettingsSection::Niri:
+    case SettingsSection::Windows:
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
     case SettingsSection::Camera:

@@ -52,6 +52,7 @@ namespace settings {
     Power,
     Hooks,
     Niri,
+    Windows,
     Bar,
     Plugins,
     Camera,
@@ -263,6 +264,7 @@ namespace settings {
     std::function<void()> action;
     std::string glyph;
     ButtonVariant variant = ButtonVariant::Default;
+    std::string tooltip;
   };
 
   struct ExternalKeybindSetting {
@@ -271,6 +273,7 @@ namespace settings {
     bool enabled = true;
     std::function<void(KeyChord)> onCommit;
     ButtonSetting copy;
+    ButtonSetting clear;
   };
 
   struct ColorSpecPickerSetting {
@@ -316,6 +319,7 @@ namespace settings {
   struct RegistryEnvironment {
     bool niriBackdropSupported = false;             // hide niri backdrop entries when false
     bool niriOverviewTypeToLaunchSupported = false; // show niri-only type-to-launch integration
+    bool niriBlurSupported = false;                 // niri 26.04+ compositor blur include
     bool screencopySupported = false;               // lockscreen blurred desktop + screenshot features
     bool ddcutilAvailable = false;                  // disable ddcutil toggle when ddcutil is not on PATH
     bool systemdUserManaged = false;                // disable systemd app launching when the shell is not a user unit

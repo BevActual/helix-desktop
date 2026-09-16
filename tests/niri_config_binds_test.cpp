@@ -5,9 +5,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <print>
 #include <string>
 #include <unistd.h>
+#include <vector>
 #include <xkbcommon/xkbcommon-keysyms.h>
 
 namespace {
@@ -118,6 +120,154 @@ int main() {
   }
   ok = expect(launcherModD, "launcher chord changed to Mod+D") && ok;
 
+  const auto cleared = compositors::niri::clearRecommendedKeyInto(config, "launcher");
+  ok = expect(cleared.ok && cleared.added == 1, "clears an owned bind") && ok;
+  bool launcherGone = true;
+  for (const auto& status : compositors::niri::bindStatuses(compositors::niri::scanConfigFile(config))) {
+    if (status.recommended.id == "launcher" && !status.boundKeys.empty()) {
+      launcherGone = false;
+    }
+  }
+  ok = expect(launcherGone, "launcher bind is missing after clear") && ok;
+  const auto clearAgain = compositors::niri::clearRecommendedKeyInto(config, "launcher");
+  ok = expect(!clearAgain.ok, "clearing an unmanaged bind fails") && ok;
+
+  const auto rebound = compositors::niri::setRecommendedKeyInto(config, "volume-up", "Mod+Shift+Equal");
+  ok = expect(rebound.ok, "remaps volume-up") && ok;
+  const auto reset = compositors::niri::resetRecommendedKeysInto(config);
+  ok = expect(reset.ok && reset.added >= 1, "resets remapped managed binds") && ok;
+  bool volumeDefault = false;
+  bool volumeLocked = false;
+  const auto afterReset = compositors::niri::scanConfigFile(config);
+  for (const auto& status : compositors::niri::bindStatuses(afterReset)) {
+    if (status.recommended.id == "volume-up") {
+      volumeDefault = !status.boundKeys.empty() && status.boundKeys.front() == "XF86AudioRaiseVolume";
+    }
+  }
+  ok = expect(volumeDefault, "volume-up restored to XF86AudioRaiseVolume") && ok;
+  {
+    std::ifstream in(afterReset.bindsIncludePath);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    volumeLocked = text.find("XF86AudioRaiseVolume allow-when-locked=true") != std::string::npos;
+  }
+  ok = expect(volumeLocked, "writes allow-when-locked for media keys") && ok;
+
+  const auto play = compositors::niri::niriKeyToChord("XF86AudioPlay");
+  ok = expect(play.has_value() && play->sym == XKB_KEY_XF86AudioPlay, "parses XF86 media keys") && ok;
+  bool sawCapture = false;
+  bool sawMedia = false;
+  bool sawSystem = false;
+  for (const auto& bind : compositors::niri::recommendedBinds()) {
+    sawCapture = sawCapture || bind.kind == compositors::niri::BindKind::Capture;
+    sawMedia = sawMedia || bind.kind == compositors::niri::BindKind::Media;
+    sawSystem = sawSystem || bind.kind == compositors::niri::BindKind::System;
+  }
+  ok = expect(sawCapture && sawMedia && sawSystem, "catalog is grouped by kind") && ok;
+  ok = expect(
+           compositors::niri::kdlLine(compositors::niri::recommendedBinds()[0]).find("allow-when-locked")
+               == std::string::npos,
+           "launcher kdl has no allow-when-locked"
+       )
+      && ok;
+
+  const std::vector<std::string> kitty{"kitty"};
+  const auto appAdded = compositors::niri::setAppBindInto(config, "Mod+T", kitty);
+  ok = expect(appAdded.ok && appAdded.added == 1, "adds an owned app spawn bind") && ok;
+  const auto apps = compositors::niri::ownedAppBinds(compositors::niri::scanConfigFile(config));
+  bool kittyBound = false;
+  for (const auto& app : apps) {
+    if (app.key == "Mod+T" && app.spawnArgs == kitty) {
+      kittyBound = true;
+    }
+  }
+  ok = expect(kittyBound, "owned app bind is listed") && ok;
+  const auto remappedApp = compositors::niri::setAppBindInto(config, "Mod+Return", kitty);
+  ok = expect(remappedApp.ok, "remaps an owned app bind") && ok;
+  bool kittyMoved = false;
+  bool kittyOldGone = true;
+  for (const auto& app : compositors::niri::ownedAppBinds(compositors::niri::scanConfigFile(config))) {
+    if (app.spawnArgs == kitty && app.key == "Mod+Return") {
+      kittyMoved = true;
+    }
+    if (app.key == "Mod+T") {
+      kittyOldGone = false;
+    }
+  }
+  ok = expect(kittyMoved && kittyOldGone, "app bind key moved to Mod+Return") && ok;
+  const auto clearedApp = compositors::niri::clearAppBindInto(config, "Mod+Return");
+  ok = expect(clearedApp.ok, "clears an owned app bind") && ok;
+  ok = expect(
+           compositors::niri::ownedAppBinds(compositors::niri::scanConfigFile(config)).empty(),
+           "no owned app binds after clear"
+       )
+      && ok;
+
+  const auto stockDir = makeTempDir() / "stock";
+  std::filesystem::create_directories(stockDir);
+  const auto stockConfig = stockDir / "config.kdl";
+  {
+    std::ofstream stock(stockDir / "default-config.kdl");
+    stock << "binds {\n    Print { screenshot; }\n    Mod+Shift+P { power-off-monitors; }\n}\n";
+    std::ofstream out(stockConfig);
+    out << "include \"default-config.kdl\"\nbinds {\n    Mod+Shift+C { center-column; }\n}\n";
+  }
+  const auto stockScan = compositors::niri::scanConfigFile(stockConfig);
+  bool printConflict = false;
+  bool sessionConflict = false;
+  bool caffeineConflict = false;
+  for (const auto& status : compositors::niri::bindStatuses(stockScan)) {
+    if (status.recommended.id == "screenshot-region") {
+      printConflict = status.keyConflict;
+    }
+    if (status.recommended.id == "session") {
+      sessionConflict = status.keyConflict;
+    }
+    if (status.recommended.id == "caffeine") {
+      caffeineConflict = status.keyConflict;
+    }
+  }
+  ok = expect(!printConflict && !sessionConflict, "stock include keys are not conflicts") && ok;
+  ok = expect(caffeineConflict, "keys in the user's binds block stay conflicts") && ok;
+
+  const auto stockInstall = compositors::niri::installMissingInto(stockConfig);
+  ok = expect(stockInstall.ok && stockInstall.added > 0, "installs over stock include keys") && ok;
+  ok = expect(stockInstall.skippedConflicts == 0, "caffeine falls back instead of skipping") && ok;
+  bool printOwned = false;
+  bool sessionOwned = false;
+  bool caffeineFallback = false;
+  for (const auto& status : compositors::niri::bindStatuses(compositors::niri::scanConfigFile(stockConfig))) {
+    if (status.recommended.id == "screenshot-region") {
+      printOwned = !status.boundKeys.empty() && status.boundKeys.front() == "Print";
+    }
+    if (status.recommended.id == "session") {
+      sessionOwned = !status.boundKeys.empty() && status.boundKeys.front() == "Mod+Shift+P";
+    }
+    if (status.recommended.id == "caffeine") {
+      caffeineFallback = !status.boundKeys.empty() && status.boundKeys.front() == "Mod+Shift+Z";
+    }
+  }
+  ok = expect(printOwned && sessionOwned, "overrides stock Print and Mod+Shift+P") && ok;
+  ok = expect(caffeineFallback, "caffeine uses Mod+Shift+Z when Mod+Shift+C is taken") && ok;
+
+  const auto userPrint = makeTempDir() / "user-print";
+  std::filesystem::create_directories(userPrint);
+  const auto userPrintConfig = userPrint / "config.kdl";
+  {
+    std::ofstream out(userPrintConfig);
+    out << "binds {\n    Print { screenshot; }\n}\n";
+  }
+  bool userPrintConflict = false;
+  for (const auto& status : compositors::niri::bindStatuses(compositors::niri::scanConfigFile(userPrintConfig))) {
+    if (status.recommended.id == "screenshot-region") {
+      userPrintConflict = status.keyConflict;
+    }
+  }
+  ok = expect(userPrintConflict, "Print in config.kdl is still a conflict") && ok;
+  const auto blocked = compositors::niri::setRecommendedKeyInto(userPrintConfig, "screenshot-region", "Print");
+  ok = expect(!blocked.ok && blocked.skippedConflicts == 1, "does not steal Print from the user's binds") && ok;
+
   std::filesystem::remove_all(dir);
+  std::filesystem::remove_all(stockDir);
+  std::filesystem::remove_all(userPrint);
   return ok ? 0 : 1;
 }

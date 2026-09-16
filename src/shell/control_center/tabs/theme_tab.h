@@ -12,12 +12,14 @@
 #include <vector>
 
 class Button;
+class CompositorPlatform;
 class ConfigService;
 class Flex;
 class Label;
 class Renderer;
 class Segmented;
 class Select;
+class Slider;
 class Toggle;
 struct ControlCenterServices;
 
@@ -50,7 +52,14 @@ private:
   void applyPureBlack(bool enabled);
   void applyNiriFocusRing(bool enabled);
   void applyNiriBorder(bool enabled);
+  void applyNiriDrawBorder(bool enabled);
+  void applyNiriBlur(bool enabled);
+  void commitNiriBlurPasses();
+  void commitNiriBlurOffset();
+  void commitNiriBlurNoise();
   compositors::niri::InstallResult syncNiriLayoutTheme();
+  compositors::niri::InstallResult syncNiriBlur();
+  [[nodiscard]] bool niriBlurSupported() const;
   void openPalettePicker();
   void openCustomPalettesFolder();
   void exportWallpaperPalette();
@@ -59,6 +68,7 @@ private:
 
   ConfigService* m_config = nullptr;
   noctalia::theme::ThemeService* m_theme = nullptr;
+  CompositorPlatform* m_platform = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
@@ -76,6 +86,14 @@ private:
   Toggle* m_pureBlack = nullptr;
   Toggle* m_niriFocusRing = nullptr;
   Toggle* m_niriBorder = nullptr;
+  Toggle* m_niriDrawBorder = nullptr;
+  Toggle* m_niriBlur = nullptr;
+  Slider* m_niriBlurPasses = nullptr;
+  Label* m_niriBlurPassesValue = nullptr;
+  Slider* m_niriBlurOffset = nullptr;
+  Label* m_niriBlurOffsetValue = nullptr;
+  Slider* m_niriBlurNoise = nullptr;
+  Label* m_niriBlurNoiseValue = nullptr;
 
   std::vector<std::string> m_paletteValues;
   bool m_syncing = false;

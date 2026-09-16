@@ -88,6 +88,27 @@ namespace compositors::niri {
     return requestOk(payload, acceptNoResponse);
   }
 
+  std::optional<std::string> NiriRuntime::compositorVersion() const {
+    if (m_compositorVersionResolved) {
+      return m_compositorVersion;
+    }
+    m_compositorVersionResolved = true;
+    const auto reply = requestJson("\"Version\"\n");
+    if (!reply.has_value() || !reply->is_object()) {
+      return std::nullopt;
+    }
+    const nlohmann::json* versionNode = nullptr;
+    if (reply->contains("Ok") && (*reply)["Ok"].is_object() && (*reply)["Ok"].contains("Version")) {
+      versionNode = &(*reply)["Ok"]["Version"];
+    } else if (reply->contains("Version")) {
+      versionNode = &(*reply)["Version"];
+    }
+    if (versionNode != nullptr && versionNode->is_string()) {
+      m_compositorVersion = versionNode->get<std::string>();
+    }
+    return m_compositorVersion;
+  }
+
   NiriRuntime::IpcReply NiriRuntime::request(std::string_view request) const {
     ensureResolved();
     if (m_socketPath.empty() || request.empty()) {
@@ -166,6 +187,8 @@ namespace compositors::niri {
   void NiriRuntime::refresh() {
     m_socketPath.clear();
     m_resolved = false;
+    m_compositorVersionResolved = false;
+    m_compositorVersion.reset();
     resolveSocketPath();
   }
 

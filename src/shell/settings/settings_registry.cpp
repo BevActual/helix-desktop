@@ -17,6 +17,8 @@
 #include "shell/settings/color_spec_picker.h"
 #include "shell/settings/font_weight_catalog.h"
 #include "shell/wallpaper/wallpaper_paths.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
 #include "system/sysmon_threshold_profile.h"
 #include "theme/builtin_palettes.h"
 #include "theme/builtin_templates.h"
@@ -31,6 +33,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -86,7 +89,7 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 31> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 32> kSettingsSections{{
         {SettingsSection::Theme, "theme", "palette"},
         {SettingsSection::Type, "type", "typography"},
         {SettingsSection::Scale, "scale", "resize"},
@@ -115,6 +118,7 @@ namespace settings {
         {SettingsSection::Power, "power", "bolt"},
         {SettingsSection::Hooks, "hooks", "link"},
         {SettingsSection::Niri, "niri", "niri"},
+        {SettingsSection::Windows, "windows", "app-window"},
         {SettingsSection::Bar, "bar", "crop-3-2", false},
         {SettingsSection::Plugins, "plugins", "puzzle", true, true},
         {SettingsSection::Camera, "camera", "camera", true, true},
@@ -375,6 +379,53 @@ namespace settings {
       return out;
     }
 
+    std::string_view niriBoundGroup(compositors::niri::BindKind kind) {
+      switch (kind) {
+      case compositors::niri::BindKind::Capture:
+        return "niri-capture";
+      case compositors::niri::BindKind::Media:
+        return "niri-media";
+      case compositors::niri::BindKind::System:
+        return "niri-session";
+      case compositors::niri::BindKind::Panels:
+        break;
+      }
+      return "niri-open";
+    }
+
+    struct PendingAppBind {
+      std::string label;
+      std::vector<std::string> spawnArgs;
+    };
+
+    std::optional<PendingAppBind> gPendingAppBind;
+
+    std::string joinSpawn(const std::vector<std::string>& args) {
+      std::string out;
+      for (const auto& arg : args) {
+        if (!out.empty()) {
+          out += " ";
+        }
+        out += arg;
+      }
+      return out;
+    }
+
+    std::string labelForSpawn(const std::vector<std::string>& args) {
+      if (args.empty()) {
+        return {};
+      }
+      for (const auto& entry : desktopEntries()) {
+        if (entry.exec == joinSpawn(args) || entry.id == args.front() || entry.idLower == StringUtils::toLower(args.front())) {
+          return entry.name;
+        }
+        if (!entry.exec.empty() && entry.exec.starts_with(args.front())) {
+          return entry.name;
+        }
+      }
+      return args.front();
+    }
+
     void appendNiriKeybindEntries(std::vector<SettingEntry>& entries, const RegistryEnvironment& env) {
       if (!env.niriOverviewTypeToLaunchSupported && !env.niriBackdropSupported) {
         return;
@@ -447,60 +498,295 @@ namespace settings {
           },
           "niri compositor ipc keybind include noctalia-binds"
       ));
-
-      for (const auto& status : statuses) {
-        const std::string id(status.recommended.id);
-        std::string subtitle;
-        if (!status.boundKeys.empty()) {
-          subtitle = i18n::tr(
-              "settings.schema.keybinds.niri.bound", "keys", joinKeys(status.boundKeys), "command",
-              std::string(status.recommended.ipcCommand)
-          );
-        } else if (status.keyConflict) {
-          subtitle = i18n::tr("settings.schema.keybinds.niri.conflict", "key", std::string(status.recommended.key));
-        } else {
-          subtitle = i18n::tr("settings.schema.keybinds.niri.missing", "key", std::string(status.recommended.key));
-        }
-        const bool userOnly = !status.boundKeys.empty() && !status.inOwnedInclude;
-        const std::string displayKey =
-            !status.boundKeys.empty() ? status.boundKeys.front() : std::string(status.recommended.key);
-        const auto chord = compositors::niri::niriKeyToChord(displayKey);
-        const std::string line = compositors::niri::kdlLine(status.recommended);
-        entries.push_back(makeEntry(
-            SettingsSection::Keybinds, "niri", i18n::tr("settings.schema.keybinds.niri.actions." + id + ".label"),
-            std::move(subtitle), {},
-            ExternalKeybindSetting{
-                .chord = chord,
-                .allowSuper = true,
-                .enabled = !userOnly && !status.keyConflict,
-                .onCommit =
-                    [rebuild, id](KeyChord recorded) {
-                      const std::string key = compositors::niri::niriKeyFromChord(recorded);
-                      const auto result = compositors::niri::setRecommendedKey(id, key);
-                      if (!result.ok) {
-                        notify::error(
-                            "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
-                            result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
-                                                 : result.error
-                        );
-                        return;
-                      }
+      entries.push_back(makeEntry(
+          SettingsSection::Keybinds, "niri-actions", i18n::tr("settings.schema.keybinds.niri.reset.label"),
+          i18n::tr("settings.schema.keybinds.niri.reset.description"), {},
+          ButtonSetting{
+              .label = i18n::tr("settings.schema.keybinds.niri.reset.button"),
+              .action =
+                  [rebuild]() {
+                    const auto result = compositors::niri::resetRecommendedKeys();
+                    if (!result.ok) {
+                      notify::error(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
+                                               : result.error
+                      );
+                      return;
+                    }
+                    if (result.added == 0 && result.skippedConflicts == 0) {
                       notify::info(
                           "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
-                          i18n::tr("settings.schema.keybinds.niri.updated")
+                          i18n::tr("settings.schema.keybinds.niri.reset-none")
                       );
-                      if (rebuild) {
-                        rebuild();
+                    } else if (result.added == 0) {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.reset-skipped", "count", result.skippedConflicts)
+                      );
+                    } else {
+                      notify::info(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.reset-ok", "count", result.added)
+                      );
+                    }
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+              .glyph = "refresh",
+          },
+          "niri compositor ipc keybind reset recommended default"
+      ));
+
+      auto notifyBindError = [](const compositors::niri::InstallResult& result) {
+        notify::error(
+            "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+            result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed") : result.error
+        );
+      };
+
+      auto emitRecommended = [&](const compositors::niri::BindStatus& status, std::string group) {
+        const std::string id(status.recommended.id);
+        const bool userOnly = !status.boundKeys.empty() && !status.inOwnedInclude;
+        std::string subtitle;
+        if (status.boundKeys.empty() && status.keyConflict) {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.conflict", "key", std::string(status.recommended.key));
+        } else if (status.boundKeys.empty()) {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.missing", "key", std::string(status.recommended.key));
+        } else if (userOnly) {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.user-owned", "keys", joinKeys(status.boundKeys));
+        } else if (status.boundKeys.front() != status.recommended.key) {
+          subtitle = i18n::tr(
+              "settings.schema.keybinds.niri.custom", "keys", joinKeys(status.boundKeys), "default",
+              std::string(status.recommended.key)
+          );
+        } else {
+          subtitle = i18n::tr("settings.schema.keybinds.niri.bound", "keys", joinKeys(status.boundKeys));
+        }
+        std::optional<KeyChord> chord;
+        if (!status.boundKeys.empty()) {
+          chord = compositors::niri::niriKeyToChord(status.boundKeys.front());
+        }
+        ExternalKeybindSetting control{
+            .chord = chord,
+            .allowSuper = true,
+            .enabled = !userOnly,
+            .onCommit =
+                [rebuild, notifyBindError, id](KeyChord recorded) {
+                  const std::string key = compositors::niri::niriKeyFromChord(recorded);
+                  const auto result = compositors::niri::setRecommendedKey(id, key);
+                  if (!result.ok) {
+                    notifyBindError(result);
+                    return;
+                  }
+                  notify::info(
+                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      i18n::tr("settings.schema.keybinds.niri.updated")
+                  );
+                  if (rebuild) {
+                    rebuild();
+                  }
+                },
+        };
+        if (status.inOwnedInclude && !status.boundKeys.empty()
+            && status.boundKeys.front() != status.recommended.key) {
+          const std::string defaultKey(status.recommended.key);
+          control.copy = ButtonSetting{
+              .action =
+                  [rebuild, notifyBindError, id, defaultKey]() {
+                    const auto result = compositors::niri::setRecommendedKey(id, defaultKey);
+                    if (!result.ok) {
+                      notifyBindError(result);
+                      return;
+                    }
+                    notify::info(
+                        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                        i18n::tr("settings.schema.keybinds.niri.updated")
+                    );
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+              .glyph = "refresh",
+              .tooltip = i18n::tr("settings.schema.keybinds.niri.reset-bind"),
+          };
+        }
+        if (status.inOwnedInclude) {
+          control.clear = ButtonSetting{
+              .action =
+                  [rebuild, notifyBindError, id]() {
+                    const auto result = compositors::niri::clearRecommendedKey(id);
+                    if (!result.ok) {
+                      notifyBindError(result);
+                      return;
+                    }
+                    notify::info(
+                        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                        i18n::tr("settings.schema.keybinds.niri.cleared")
+                    );
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+              .glyph = "close",
+              .tooltip = i18n::tr("settings.schema.keybinds.niri.clear-bind"),
+          };
+        }
+        std::string search = "niri compositor ipc keybind " + id + " " + std::string(status.recommended.ipcCommand)
+            + " " + std::string(status.recommended.key) + " " + group;
+        if (!status.boundKeys.empty()) {
+          search += " " + joinKeys(status.boundKeys);
+        }
+        entries.push_back(makeEntry(
+            SettingsSection::Keybinds, std::move(group),
+            i18n::tr("settings.schema.keybinds.niri.actions." + id + ".label"), std::move(subtitle), {},
+            std::move(control), std::move(search)
+        ));
+      };
+
+      for (const auto& status : statuses) {
+        if (status.boundKeys.empty()) {
+          emitRecommended(status, "niri-attention");
+        }
+      }
+      for (const auto& status : statuses) {
+        emitRecommended(status, std::string(niriBoundGroup(status.recommended.kind)));
+      }
+
+      std::vector<SelectOption> appOptions;
+      for (const auto& entry : desktopEntries()) {
+        if (entry.noDisplay || entry.hidden || entry.name.empty()) {
+          continue;
+        }
+        appOptions.push_back({.value = entry.id, .label = entry.name});
+      }
+      std::ranges::sort(appOptions, [](const SelectOption& a, const SelectOption& b) { return a.label < b.label; });
+      entries.push_back(makeEntry(
+          SettingsSection::Keybinds, "niri-apps", i18n::tr("settings.schema.keybinds.niri.add-app.label"),
+          i18n::tr("settings.schema.keybinds.niri.add-app.description"), {},
+          SearchPickerSetting{
+              .options = std::move(appOptions),
+              .placeholder = i18n::tr("settings.schema.keybinds.niri.add-app.placeholder"),
+              .emptyText = i18n::tr("settings.schema.keybinds.niri.add-app.empty"),
+              .onSelect =
+                  [rebuild](const std::string& desktopId) {
+                    const DesktopEntry* chosen = nullptr;
+                    for (const auto& entry : desktopEntries()) {
+                      if (entry.id == desktopId) {
+                        chosen = &entry;
+                        break;
                       }
-                    },
-                .copy =
-                    ButtonSetting{
-                        .label = i18n::tr("settings.schema.keybinds.niri.copy-bind"),
-                        .action = [copyText, line]() { copyText(line, "settings.schema.keybinds.niri.copied"); },
-                        .glyph = "copy",
-                    },
-            },
-            "niri compositor ipc keybind " + std::string(status.recommended.ipcCommand)
+                    }
+                    if (chosen == nullptr) {
+                      notify::error(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.add-app.failed")
+                      );
+                      return;
+                    }
+                    const auto prepared = desktop_entry_launch::prepareCommand(chosen->exec, chosen->terminal);
+                    if (!prepared.has_value() || prepared->args.empty()) {
+                      notify::error(
+                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          i18n::tr("settings.schema.keybinds.niri.add-app.failed")
+                      );
+                      return;
+                    }
+                    gPendingAppBind = PendingAppBind{.label = chosen->name, .spawnArgs = prepared->args};
+                    if (rebuild) {
+                      rebuild();
+                    }
+                  },
+          },
+          "niri compositor app shortcut spawn desktop application"
+      ));
+      if (gPendingAppBind.has_value()) {
+        const auto pending = *gPendingAppBind;
+        ExternalKeybindSetting control{
+            .allowSuper = true,
+            .onCommit =
+                [rebuild, notifyBindError, pending](KeyChord recorded) {
+                  const std::string key = compositors::niri::niriKeyFromChord(recorded);
+                  const auto result = compositors::niri::setAppBind(key, pending.spawnArgs);
+                  if (!result.ok) {
+                    notifyBindError(result);
+                    return;
+                  }
+                  gPendingAppBind.reset();
+                  notify::info(
+                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      i18n::tr("settings.schema.keybinds.niri.updated")
+                  );
+                  if (rebuild) {
+                    rebuild();
+                  }
+                },
+            .clear =
+                ButtonSetting{
+                    .action =
+                        [rebuild]() {
+                          gPendingAppBind.reset();
+                          if (rebuild) {
+                            rebuild();
+                          }
+                        },
+                    .glyph = "close",
+                    .tooltip = i18n::tr("settings.schema.keybinds.niri.clear-bind"),
+                },
+        };
+        entries.push_back(makeEntry(
+            SettingsSection::Keybinds, "niri-apps", pending.label,
+            i18n::tr("settings.schema.keybinds.niri.add-app.record"), {}, std::move(control),
+            "niri compositor app shortcut spawn " + joinSpawn(pending.spawnArgs)
+        ));
+      }
+      for (const auto& app : compositors::niri::ownedAppBinds(scan)) {
+        const std::string title = labelForSpawn(app.spawnArgs);
+        ExternalKeybindSetting control{
+            .chord = compositors::niri::niriKeyToChord(app.key),
+            .allowSuper = true,
+            .onCommit =
+                [rebuild, notifyBindError, app](KeyChord recorded) {
+                  const std::string key = compositors::niri::niriKeyFromChord(recorded);
+                  const auto result = compositors::niri::setAppBind(key, app.spawnArgs, app.spawnSh);
+                  if (!result.ok) {
+                    notifyBindError(result);
+                    return;
+                  }
+                  notify::info(
+                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      i18n::tr("settings.schema.keybinds.niri.updated")
+                  );
+                  if (rebuild) {
+                    rebuild();
+                  }
+                },
+            .clear =
+                ButtonSetting{
+                    .action =
+                        [rebuild, notifyBindError, key = app.key]() {
+                          const auto result = compositors::niri::clearAppBind(key);
+                          if (!result.ok) {
+                            notifyBindError(result);
+                            return;
+                          }
+                          notify::info(
+                              "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                              i18n::tr("settings.schema.keybinds.niri.cleared")
+                          );
+                          if (rebuild) {
+                            rebuild();
+                          }
+                        },
+                    .glyph = "close",
+                    .tooltip = i18n::tr("settings.schema.keybinds.niri.clear-bind"),
+                },
+        };
+        entries.push_back(makeEntry(
+            SettingsSection::Keybinds, "niri-apps", title.empty() ? app.key : title,
+            i18n::tr("settings.schema.keybinds.niri.bound", "keys", app.key), {}, std::move(control),
+            "niri compositor app shortcut spawn " + joinSpawn(app.spawnArgs) + " " + app.key
         ));
       }
     }
@@ -779,16 +1065,50 @@ namespace settings {
         tr("settings.schema.appearance.pure-black-dark.description"), {"theme", "pure_black_dark"},
         ToggleSetting{cfg.theme.pureBlackDark}, "oled amoled true black background contrast"
     ));
-    entries.push_back(makeEntry(
-        SettingsSection::Theme, "theme", tr("control-center.theme.niri-focus-ring"),
-        tr("control-center.theme.niri-description"), {"theme", "niri_layout", "focus_ring"},
-        ToggleSetting{cfg.theme.niriLayout.focusRing}, "niri window decoration highlight active"
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::Theme, "theme", tr("control-center.theme.niri-border"),
-        tr("control-center.theme.niri-description"), {"theme", "niri_layout", "border"},
-        ToggleSetting{cfg.theme.niriLayout.border}, "niri window decoration outline"
-    ));
+    if (env.niriOverviewTypeToLaunchSupported || env.niriBackdropSupported) {
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("control-center.theme.niri-focus-ring"),
+          tr("control-center.theme.niri-description"), {"theme", "niri_layout", "focus_ring"},
+          ToggleSetting{cfg.theme.niriLayout.focusRing}, "niri window decoration highlight active"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("control-center.theme.niri-border"),
+          tr("control-center.theme.niri-description"), {"theme", "niri_layout", "border"},
+          ToggleSetting{cfg.theme.niriLayout.border}, "niri window decoration outline"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("settings.schema.niri.draw-border-with-background.label"),
+          tr("settings.schema.niri.draw-border-with-background.description"),
+          {"theme", "niri_layout", "draw_border_with_background"},
+          ToggleSetting{cfg.theme.niriLayout.drawBorderWithBackground.value_or(true)},
+          "niri window rule border background csd decoration"
+      ));
+    }
+    if (env.niriBlurSupported) {
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("control-center.theme.niri-blur"),
+          tr("control-center.theme.niri-blur-description"), {"theme", "niri_layout", "blur"},
+          ToggleSetting{cfg.theme.niriLayout.blur}, "niri compositor blur windows bar panels dock"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("settings.schema.niri.blur-passes.label"),
+          tr("settings.schema.niri.blur-passes.description"), {"theme", "niri_layout", "blur_passes"},
+          sliderFor(cfg.theme.niriLayout.blurPasses, noctalia::config::schema::kNiriBlurPassesRange, true),
+          "niri compositor blur passes quality gpu"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("settings.schema.niri.blur-offset.label"),
+          tr("settings.schema.niri.blur-offset.description"), {"theme", "niri_layout", "blur_offset"},
+          sliderFor(cfg.theme.niriLayout.blurOffset, noctalia::config::schema::kNiriBlurOffsetRange, false),
+          "niri compositor blur offset sample distance"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Theme, "niri", tr("settings.schema.niri.blur-noise.label"),
+          tr("settings.schema.niri.blur-noise.description"), {"theme", "niri_layout", "blur_noise"},
+          sliderFor(cfg.theme.niriLayout.blurNoise, noctalia::config::schema::kNiriBlurNoiseRange, false),
+          "niri compositor blur noise grain banding"
+      ));
+    }
     {
       SettingControl fontFamilyControl =
           TextSetting{.value = cfg.shell.fontFamily, .placeholder = "sans-serif", .browseFileExtensions = {}};
@@ -2642,29 +2962,63 @@ namespace settings {
     ));
 
     // Niri-specific integrations
-    if (env.niriOverviewTypeToLaunchSupported || env.niriBackdropSupported) {
+    if (env.niriOverviewTypeToLaunchSupported || env.niriBackdropSupported || env.niriBlurSupported) {
       appendNiriSetupEntries(entries, env, cfg);
+      if (env.niriOverviewTypeToLaunchSupported || env.niriBackdropSupported) {
+        entries.push_back(makeEntry(
+            SettingsSection::Wallpaper, "overview", tr("settings.schema.niri.overview-preset.label"),
+            tr("settings.schema.niri.overview-preset.description"), {"theme", "niri_layout", "overview"},
+            asSegmented(enumSelect(kNiriOverviewPresets, cfg.theme.niriLayout.overview)),
+            "niri overview wallpaper backdrop stationary flat color"
+        ));
+      }
       if (env.niriOverviewTypeToLaunchSupported) {
         entries.push_back(makeEntry(
-            SettingsSection::Niri, "overview", tr("settings.schema.shell.niri-overview-type-to-launch.label"),
+            SettingsSection::Launcher, "overview", tr("settings.schema.shell.niri-overview-type-to-launch.label"),
             tr("settings.schema.shell.niri-overview-type-to-launch.description"),
             {"shell", "niri_overview_type_to_launch_enabled"}, ToggleSetting{cfg.shell.niriOverviewTypeToLaunchEnabled},
             "niri overview type launch launcher search keyboard focus"
         ));
       }
+      entries.push_back(makeEntry(
+          SettingsSection::Windows, "layout", tr("settings.schema.niri.gaps.label"),
+          tr("settings.schema.niri.gaps.description"), {"theme", "niri_layout", "gaps"},
+          sliderFor(
+              cfg.theme.niriLayout.gaps.value_or(16), noctalia::config::schema::kNiriGapsRange, true
+          ),
+          "niri layout gaps spacing windows"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Windows, "layout", tr("settings.schema.niri.struts.label"),
+          tr("settings.schema.niri.struts.description"), {"theme", "niri_layout", "struts"},
+          sliderFor(
+              cfg.theme.niriLayout.struts.value_or(0), noctalia::config::schema::kNiriStrutsRange, true
+          ),
+          "niri layout struts outer padding windows"
+      ));
+      entries.push_back(makeEntry(
+          SettingsSection::Windows, "layout", tr("settings.schema.niri.default-column-width.label"),
+          tr("settings.schema.niri.default-column-width.description"),
+          {"theme", "niri_layout", "default_column_width"},
+          sliderFor(
+              cfg.theme.niriLayout.defaultColumnWidth.value_or(0.5),
+              noctalia::config::schema::kNiriColumnWidthRange, false
+          ),
+          "niri layout default column width proportion"
+      ));
       if (env.niriBackdropSupported) {
         entries.push_back(makeEntry(
-            SettingsSection::Niri, "backdrop", tr("settings.schema.shared.enabled.label"),
+            SettingsSection::Wallpaper, "backdrop", tr("settings.schema.shared.enabled.label"),
             tr("settings.schema.backdrop.enabled.description"), {"backdrop", "enabled"},
             ToggleSetting{cfg.backdrop.enabled}, "wallpaper backdrop"
         ));
         entries.push_back(makeEntry(
-            SettingsSection::Niri, "backdrop", tr("settings.schema.backdrop.blur-intensity.label"),
+            SettingsSection::Wallpaper, "backdrop", tr("settings.schema.backdrop.blur-intensity.label"),
             tr("settings.schema.backdrop.blur-intensity.description"), {"backdrop", "blur_intensity"},
             sliderFor(cfg.backdrop.blurIntensity, noctalia::config::schema::kUnitRange, false), "wallpaper"
         ));
         entries.push_back(makeEntry(
-            SettingsSection::Niri, "backdrop", tr("settings.schema.backdrop.tint-intensity.label"),
+            SettingsSection::Wallpaper, "backdrop", tr("settings.schema.backdrop.tint-intensity.label"),
             tr("settings.schema.backdrop.tint-intensity.description"), {"backdrop", "tint_intensity"},
             sliderFor(cfg.backdrop.tintIntensity, noctalia::config::schema::kUnitRange, false), "wallpaper"
         ));

@@ -1158,18 +1158,29 @@ void CompositorPlatform::setOverviewChangeCallback(ChangeCallback callback) {
 }
 
 void CompositorPlatform::activateWorkspace(const std::string& id) {
+  if (m_workspaceMetadataBackend != nullptr && m_workspaceMetadataBackend->activateWorkspaceById(id)) {
+    return;
+  }
   if (m_workspaces != nullptr) {
     m_workspaces->activate(id);
   }
 }
 
 void CompositorPlatform::activateWorkspace(wl_output* output, const std::string& id) {
+  const std::string outputName = connectorNameForOutput(output);
+  if (m_workspaceMetadataBackend != nullptr && m_workspaceMetadataBackend->activateWorkspaceById(id, outputName)) {
+    return;
+  }
   if (m_workspaces != nullptr) {
     m_workspaces->activateForOutput(output, id);
   }
 }
 
 void CompositorPlatform::activateWorkspace(wl_output* output, const Workspace& workspace) {
+  const std::string outputName = connectorNameForOutput(output);
+  if (m_workspaceMetadataBackend != nullptr && m_workspaceMetadataBackend->activateWorkspace(workspace, outputName)) {
+    return;
+  }
   if (m_workspaces != nullptr) {
     m_workspaces->activateForOutput(output, workspace);
   }
@@ -1447,11 +1458,27 @@ void CompositorPlatform::prepareAppLaunchOnOutput(wl_output* output) {
 }
 
 void CompositorPlatform::moveToplevelToOutput(const ToplevelInfo& window, wl_output* output) {
-  if (output == nullptr || m_runtimeRegistry == nullptr || !compositors::isHyprland()) {
+  if (output == nullptr || m_runtimeRegistry == nullptr) {
     return;
   }
   const std::string connector = connectorNameForOutput(output);
   if (connector.empty()) {
+    return;
+  }
+
+  if (m_workspaceMetadataBackend != nullptr) {
+    std::string windowId = window.exactIdentity ? window.identifier : std::string{};
+    if (windowId.empty()) {
+      if (const auto mapped = compositorWindowIdForToplevelInfo(window); mapped.has_value()) {
+        windowId = *mapped;
+      }
+    }
+    if (!windowId.empty() && m_workspaceMetadataBackend->moveWindowToOutput(windowId, connector)) {
+      return;
+    }
+  }
+
+  if (!compositors::isHyprland()) {
     return;
   }
 

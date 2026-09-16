@@ -1,7 +1,13 @@
 #include "shell/control_center/tabs/theme_tab.h"
 
+#include "compositors/compositor_detect.h"
+#include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_config_blur.h"
 #include "compositors/niri/niri_layout_theme.h"
+#include "compositors/niri/niri_runtime.h"
+#include "compositors/niri/niri_window_rules.h"
 #include "config/config_service.h"
+#include "config/schema/ranges.h"
 #include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
@@ -20,6 +26,7 @@
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/select.h"
 #include "ui/controls/segmented.h"
+#include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -27,9 +34,11 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <format>
+#include <functional>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -239,15 +248,72 @@ namespace {
     return std::format("#{:02x}{:02x}{:02x}", channel(color.r), channel(color.g), channel(color.b));
   }
 
+  [[nodiscard]] std::string integerLabel(double value) {
+    return std::format("{}", static_cast<int>(std::lround(value)));
+  }
+
+  [[nodiscard]] std::string oneDecimalLabel(double value) { return std::format("{:.1f}", value); }
+
+  [[nodiscard]] std::string twoDecimalLabel(double value) { return std::format("{:.2f}", value); }
+
+  void addLabeledSlider(
+      Flex& card, float scale, float captionSize, float controlHeight, const std::string& title, Slider** sliderOut,
+      Label** valueOut, double minValue, double maxValue, double step, double value,
+      std::function<std::string(double)> format, std::function<void()> onCommit
+  ) {
+    auto header = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+    });
+    header->addChild(
+        ui::label({
+            .text = title,
+            .fontSize = captionSize,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .flexGrow = 1.0F,
+        })
+    );
+    header->addChild(
+        ui::label({
+            .out = valueOut,
+            .text = format(value),
+            .fontSize = captionSize,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    card.addChild(std::move(header));
+    card.addChild(
+        ui::slider({
+            .out = sliderOut,
+            .minValue = minValue,
+            .maxValue = maxValue,
+            .step = step,
+            .value = value,
+            .trackHeight = Style::sliderTrackHeight * scale,
+            .thumbSize = Style::sliderThumbSize * scale,
+            .controlHeight = controlHeight,
+            .flexGrow = 1.0F,
+            .onValueChanged =
+                [valueOut, format](double next) {
+                  if (valueOut != nullptr && *valueOut != nullptr) {
+                    (*valueOut)->setText(format(next));
+                  }
+                },
+            .onDragEnd = std::move(onCommit),
+        })
+    );
+  }
+
 } // namespace
 
 ThemeTab::ThemeTab(const ControlCenterServices& services)
-    : m_config(services.config), m_theme(services.theme),
+    : m_config(services.config), m_theme(services.theme), m_platform(services.platform),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
               .section = "theme",
-              .includedGroups = {"interface", "accessibility", "motion", "borders", "effects"},
+              .includedGroups = {"interface", "accessibility", "motion", "borders", "effects", "niri"},
           }
       )) {
   if (services.settingsInvalidated != nullptr) {
@@ -498,57 +564,120 @@ std::unique_ptr<Flex> ThemeTab::create() {
   themeCard->addChild(std::move(pureBlackRow));
   content->addChild(std::move(themeCard));
 
-  auto niriCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*niriCard, i18n::tr("control-center.theme.niri-title"), scale);
-  niriCard->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.theme.niri-description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 3,
-      })
-  );
-  auto focusRingRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  focusRingRow->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.theme.niri-focus-ring"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  focusRingRow->addChild(
-      ui::toggle({
-          .out = &m_niriFocusRing,
-          .scale = scale,
-          .onChange = [this](bool enabled) { applyNiriFocusRing(enabled); },
-      })
-  );
-  niriCard->addChild(std::move(focusRingRow));
+  if (compositors::isNiri()) {
+    auto niriCard = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+    });
+    addTitle(*niriCard, i18n::tr("control-center.theme.niri-title"), scale);
+    niriCard->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.theme.niri-description"),
+            .fontSize = captionSize,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 3,
+        })
+    );
+    auto focusRingRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    focusRingRow->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.theme.niri-focus-ring"),
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .flexGrow = 1.0F,
+        })
+    );
+    focusRingRow->addChild(
+        ui::toggle({
+            .out = &m_niriFocusRing,
+            .scale = scale,
+            .onChange = [this](bool enabled) { applyNiriFocusRing(enabled); },
+        })
+    );
+    niriCard->addChild(std::move(focusRingRow));
 
-  auto borderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  borderRow->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.theme.niri-border"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  borderRow->addChild(
-      ui::toggle({
-          .out = &m_niriBorder,
-          .scale = scale,
-          .onChange = [this](bool enabled) { applyNiriBorder(enabled); },
-      })
-  );
-  niriCard->addChild(std::move(borderRow));
-  content->addChild(std::move(niriCard));
+    auto borderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    borderRow->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.theme.niri-border"),
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .flexGrow = 1.0F,
+        })
+    );
+    borderRow->addChild(
+        ui::toggle({
+            .out = &m_niriBorder,
+            .scale = scale,
+            .onChange = [this](bool enabled) { applyNiriBorder(enabled); },
+        })
+    );
+    niriCard->addChild(std::move(borderRow));
+
+    auto drawBorderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+    drawBorderRow->addChild(
+        ui::label({
+            .text = i18n::tr("settings.schema.niri.draw-border-with-background.label"),
+            .fontSize = Style::fontSizeBody * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .flexGrow = 1.0F,
+        })
+    );
+    drawBorderRow->addChild(
+        ui::toggle({
+            .out = &m_niriDrawBorder,
+            .scale = scale,
+            .onChange = [this](bool enabled) { applyNiriDrawBorder(enabled); },
+        })
+    );
+    niriCard->addChild(std::move(drawBorderRow));
+    if (niriBlurSupported()) {
+      auto blurRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
+      blurRow->addChild(
+          ui::label({
+              .text = i18n::tr("control-center.theme.niri-blur"),
+              .fontSize = Style::fontSizeBody * scale,
+              .color = colorSpecFromRole(ColorRole::OnSurface),
+              .flexGrow = 1.0F,
+          })
+      );
+      blurRow->addChild(
+          ui::toggle({
+              .out = &m_niriBlur,
+              .scale = scale,
+              .onChange = [this](bool enabled) { applyNiriBlur(enabled); },
+          })
+      );
+      niriCard->addChild(std::move(blurRow));
+      addLabeledSlider(
+          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-passes.label"),
+          &m_niriBlurPasses, &m_niriBlurPassesValue,
+          static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.min.value_or(1)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.max.value_or(8)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.step.value_or(1)), 2.0, integerLabel,
+          [this]() { commitNiriBlurPasses(); }
+      );
+      addLabeledSlider(
+          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-offset.label"),
+          &m_niriBlurOffset, &m_niriBlurOffsetValue,
+          static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.min.value_or(0.5F)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.max.value_or(8.0F)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.step.value_or(0.1F)), 3.0, oneDecimalLabel,
+          [this]() { commitNiriBlurOffset(); }
+      );
+      addLabeledSlider(
+          *niriCard, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-noise.label"),
+          &m_niriBlurNoise, &m_niriBlurNoiseValue,
+          static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.min.value_or(0.0F)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.max.value_or(0.2F)),
+          static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.step.value_or(0.01F)), 0.03, twoDecimalLabel,
+          [this]() { commitNiriBlurNoise(); }
+      );
+    }
+    content->addChild(std::move(niriCard));
+  }
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
@@ -578,6 +707,14 @@ void ThemeTab::onClose() {
   m_pureBlack = nullptr;
   m_niriFocusRing = nullptr;
   m_niriBorder = nullptr;
+  m_niriDrawBorder = nullptr;
+  m_niriBlur = nullptr;
+  m_niriBlurPasses = nullptr;
+  m_niriBlurPassesValue = nullptr;
+  m_niriBlurOffset = nullptr;
+  m_niriBlurOffsetValue = nullptr;
+  m_niriBlurNoise = nullptr;
+  m_niriBlurNoiseValue = nullptr;
 }
 
 void ThemeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -649,6 +786,30 @@ void ThemeTab::syncLiveControls() {
   }
   if (m_niriBorder != nullptr) {
     m_niriBorder->setCheckedImmediate(theme.niriLayout.border);
+  }
+  if (m_niriDrawBorder != nullptr) {
+    m_niriDrawBorder->setCheckedImmediate(theme.niriLayout.drawBorderWithBackground.value_or(true));
+  }
+  if (m_niriBlur != nullptr) {
+    m_niriBlur->setCheckedImmediate(theme.niriLayout.blur);
+  }
+  if (m_niriBlurPasses != nullptr) {
+    m_niriBlurPasses->setValue(static_cast<double>(theme.niriLayout.blurPasses));
+  }
+  if (m_niriBlurPassesValue != nullptr) {
+    m_niriBlurPassesValue->setText(integerLabel(static_cast<double>(theme.niriLayout.blurPasses)));
+  }
+  if (m_niriBlurOffset != nullptr) {
+    m_niriBlurOffset->setValue(theme.niriLayout.blurOffset);
+  }
+  if (m_niriBlurOffsetValue != nullptr) {
+    m_niriBlurOffsetValue->setText(oneDecimalLabel(theme.niriLayout.blurOffset));
+  }
+  if (m_niriBlurNoise != nullptr) {
+    m_niriBlurNoise->setValue(theme.niriLayout.blurNoise);
+  }
+  if (m_niriBlurNoiseValue != nullptr) {
+    m_niriBlurNoiseValue->setText(twoDecimalLabel(theme.niriLayout.blurNoise));
   }
   m_syncing = false;
   syncNiriLayoutTheme();
@@ -845,6 +1006,98 @@ void ThemeTab::applyNiriBorder(bool enabled) {
   }
 }
 
+void ThemeTab::applyNiriDrawBorder(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"theme", "niri_layout", "draw_border_with_background"}, enabled);
+  const auto result = compositors::niri::saveWindowRules({
+      .cornerRadius = compositors::niri::currentWindowCornerRadius(),
+      .drawBorderWithBackground = enabled,
+  });
+  if (!result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
+}
+
+void ThemeTab::applyNiriBlur(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"theme", "niri_layout", "blur"}, enabled);
+  if (const auto result = syncNiriBlur(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-blur-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
+}
+
+void ThemeTab::commitNiriBlurPasses() {
+  if (m_syncing || m_config == nullptr || m_niriBlurPasses == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride(
+      {"theme", "niri_layout", "blur_passes"}, static_cast<std::int64_t>(std::lround(m_niriBlurPasses->value()))
+  );
+  if (const auto result = syncNiriBlur(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-blur-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
+}
+
+void ThemeTab::commitNiriBlurOffset() {
+  if (m_syncing || m_config == nullptr || m_niriBlurOffset == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"theme", "niri_layout", "blur_offset"}, m_niriBlurOffset->value());
+  if (const auto result = syncNiriBlur(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-blur-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
+}
+
+void ThemeTab::commitNiriBlurNoise() {
+  if (m_syncing || m_config == nullptr || m_niriBlurNoise == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"theme", "niri_layout", "blur_noise"}, m_niriBlurNoise->value());
+  if (const auto result = syncNiriBlur(); !result.ok) {
+    notify::error(
+        "Noctalia", i18n::tr("control-center.theme.niri-blur-save-title"),
+        result.error.empty() ? i18n::tr("control-center.theme.niri-save-failed") : result.error
+    );
+  }
+}
+
+bool ThemeTab::niriBlurSupported() const {
+  if (m_platform == nullptr || !compositors::isNiri()) {
+    return false;
+  }
+  const auto version = m_platform->niriRuntime().compositorVersion();
+  return version.has_value() && compositors::niri::versionSupportsBlur(*version);
+}
+
+compositors::niri::InstallResult ThemeTab::syncNiriBlur() {
+  if (m_config == nullptr) {
+    return {};
+  }
+  const auto& niri = m_config->config().theme.niriLayout;
+  return compositors::niri::saveNiriBlur({
+      .enabled = niri.blur,
+      .passes = niri.blurPasses,
+      .offset = niri.blurOffset,
+      .noise = niri.blurNoise,
+  });
+}
+
 compositors::niri::InstallResult ThemeTab::syncNiriLayoutTheme() {
   if (m_config == nullptr) {
     return {};
@@ -855,6 +1108,12 @@ compositors::niri::InstallResult ThemeTab::syncNiriLayoutTheme() {
       .border = niriLayout.border,
       .activeColorHex = colorHex(colorForRole(ColorRole::Primary)),
       .inactiveColorHex = colorHex(colorForRole(ColorRole::Outline)),
+      .urgentColorHex = colorHex(colorForRole(ColorRole::Error)),
+      .tabInactiveColorHex = colorHex(colorForRole(ColorRole::Secondary)),
+      .insertHintColorHex = colorHex(colorForRole(ColorRole::Primary)) + "80",
+      .gaps = niriLayout.gaps,
+      .struts = niriLayout.struts,
+      .defaultColumnWidth = niriLayout.defaultColumnWidth,
   };
   return compositors::niri::saveNiriLayoutTheme(settings);
 }

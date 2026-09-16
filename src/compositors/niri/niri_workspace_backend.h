@@ -45,6 +45,12 @@ public:
   [[nodiscard]] std::optional<std::string> focusedWindowId() const override;
   bool focusWindowById(const std::string& windowId, bool warpPointer = false) override;
   bool closeWindowById(const std::string& windowId) override;
+  bool activateWorkspaceById(const std::string& workspaceId, std::string_view outputName = {}) override;
+  bool activateWorkspace(const Workspace& workspace, std::string_view outputName = {}) override;
+  bool moveWindowToWorkspace(
+      const std::string& windowId, const Workspace& workspace, std::string_view outputName = {}
+  ) override;
+  bool moveWindowToOutput(const std::string& windowId, std::string_view outputName) override;
   void cleanup() override;
 
 private:
@@ -89,6 +95,9 @@ private:
   [[nodiscard]] static std::string workspaceKey(const WorkspaceState& workspace);
   [[nodiscard]] std::vector<const WorkspaceState*>
   sortedWorkspaceCandidatesForOutput(const std::string& outputName) const;
+  [[nodiscard]] const WorkspaceState* resolveWorkspace(const Workspace& workspace, std::string_view outputName) const;
+  [[nodiscard]] bool requestFocusWorkspace(std::uint64_t workspaceId);
+  [[nodiscard]] bool requestMoveWindowToWorkspace(std::uint64_t windowId, std::uint64_t workspaceId);
   void recomputeOccupancy();
   void notifyChanged() const;
   void notifyOverviewChanged() const;

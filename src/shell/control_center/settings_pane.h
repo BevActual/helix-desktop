@@ -90,6 +90,10 @@ private:
   [[nodiscard]] settings::SettingsContentContext makeContentContext(
       const Config& cfg, const BarConfig* selectedBar, const BarMonitorOverride* selectedMonitorOverride
   );
+  void persistNiriBlurInclude();
+  void persistNiriOverviewInclude();
+  void persistNiriLayoutInclude();
+  void persistNiriWindowRulesInclude();
   void setSettingOverride(std::vector<std::string> path, ConfigOverrideValue value);
   void setSettingOverrides(std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides);
   void clearSettingOverride(std::vector<std::string> path);
@@ -97,6 +101,7 @@ private:
   void bindHostedEditors();
   void syncBarSelect();
   void applyConfigureVisibility();
+  void ensureEmbeddedEditor();
   void refreshPluginListIfNeeded();
   void markPluginListDirty();
   void resetBarLane(std::vector<std::string> lanePath);

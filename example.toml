@@ -16,7 +16,7 @@ date_format           = "%A, %x"    # default shell UI date format
 offline_mode          = false        # block all outgoing HTTP when true
 # panel_anchor_bar   = "main"        # bar panels attach to without a source bar; omit = first enabled bar
 telemetry_enabled     = false        # send an anonymous startup ping
-niri_overview_type_to_launch_enabled = false # opt in to type-to-launch from niri overview
+niri_overview_type_to_launch_enabled = false # Control Center → Launcher; type-to-launch from niri overview
 polkit_agent          = false
 password_style        = "default"    # default | random
 settings_show_advanced = true        # show advanced settings by default
@@ -157,9 +157,18 @@ builtin = "Noctalia"                # Ayu | Catppuccin | Dracula | Eldritch | Gr
 pure_black_dark = false             # anchor dark surfaces to true black (OLED); applies to
                                     # every palette source, not just wallpaper-generated ones
 
-[theme.niri_layout]                 # sync niri's own window focus-ring/border to this palette
+[theme.niri_layout]                 # Control Center → Theme owns decorations/blur; Windows owns gaps/struts/columns
 focus_ring = false                  # writes niri's managed noctalia-layout.kdl include; requires niri
 border     = false
+blur       = false                  # writes noctalia-blur.kdl; requires niri 26.04+
+blur_passes = 2                     # dual kawase passes (1–8)
+blur_offset = 3.0                   # sample distance per pass (0.5–8.0)
+blur_noise  = 0.03                  # grain overlay (0.0–0.2)
+overview   = "none"                 # Control Center → Wallpaper; writes noctalia-overview.kdl
+# gaps     = 16                     # optional; Control Center → Windows
+# struts   = 0                      # optional equal outer padding on all sides
+# default_column_width = 0.5        # optional; fraction of the output width
+# draw_border_with_background = false  # optional; Control Center → Theme
 
 [theme.templates]
 enable_builtin_templates            = true

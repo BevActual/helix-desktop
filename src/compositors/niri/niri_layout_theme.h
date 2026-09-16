@@ -3,6 +3,7 @@
 #include "compositors/niri/niri_config_binds.h"
 
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -13,9 +14,18 @@ namespace compositors::niri {
   struct LayoutThemeSettings {
     bool focusRing = false;
     bool border = false;
-    // "#rrggbb"; active = focused monitor's ring/border, inactive = other monitors'.
+    // "#rrggbb"; active = focused, inactive = other, urgent = attention.
     std::string activeColorHex;
     std::string inactiveColorHex;
+    std::string urgentColorHex;
+    std::string tabInactiveColorHex;
+    std::string insertHintColorHex;
+    // When set, writes `gaps` into the owned layout include. Unset leaves the user's gaps alone.
+    std::optional<int> gaps;
+    // When set, writes equal `struts` on all four sides. Unset leaves the user's struts alone.
+    std::optional<int> struts;
+    // When set, writes `default-column-width { proportion ... }`. Unset leaves niri's default.
+    std::optional<double> defaultColumnWidth;
   };
 
   [[nodiscard]] std::filesystem::path layoutThemeIncludePath();

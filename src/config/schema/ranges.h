@@ -53,4 +53,12 @@ namespace noctalia::config::schema {
   inline constexpr Range<float> kDockInactiveScaleRange{0.1F, 1.0F, 0.05F};
   inline constexpr Range<float> kDockMagnificationScaleRange{1.0F, 2.0F, 0.05F};
 
+  // Niri layout gaps in logical pixels (niri default is 16).
+  inline constexpr Range<std::int64_t> kNiriGapsRange{0, 64, 1};
+  inline constexpr Range<std::int64_t> kNiriStrutsRange{0, 64, 1};
+  inline constexpr Range<double> kNiriColumnWidthRange{0.15, 1.0, 0.05};
+  inline constexpr Range<std::int64_t> kNiriBlurPassesRange{1, 8, 1};
+  inline constexpr Range<float> kNiriBlurOffsetRange{0.5F, 8.0F, 0.1F};
+  inline constexpr Range<float> kNiriBlurNoiseRange{0.0F, 0.2F, 0.01F};
+
 } // namespace noctalia::config::schema

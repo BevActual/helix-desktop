@@ -62,6 +62,7 @@ int main() {
         {
             {{"id", 1}, {"idx", 1}, {"output", "DP-1"}},
             {{"id", 2}, {"idx", 2}, {"output", "DP-1"}},
+            {{"id", 10}, {"idx", 1}, {"name", "chat"}, {"output", "HDMI-1"}},
         }}}
   );
   changes = 0;
@@ -107,39 +108,84 @@ int main() {
 
   std::string request;
   int serverError = 0;
-  std::jthread server([&]() {
-    const int client = ::accept4(listener, nullptr, nullptr, SOCK_CLOEXEC);
-    if (client < 0) {
-      serverError = 1;
-      return;
-    }
-    char buffer[512];
-    const ssize_t size = ::read(client, buffer, sizeof(buffer));
-    if (size <= 0) {
+  auto serveOnce = [&]() {
+    serverError = 0;
+    request.clear();
+    return std::jthread([&]() {
+      const int client = ::accept4(listener, nullptr, nullptr, SOCK_CLOEXEC);
+      if (client < 0) {
+        serverError = 1;
+        return;
+      }
+      char buffer[512];
+      const ssize_t size = ::read(client, buffer, sizeof(buffer));
+      if (size <= 0) {
+        ::close(client);
+        serverError = 2;
+        return;
+      }
+      request.assign(buffer, static_cast<std::size_t>(size));
+      constexpr std::string_view response = "{\"Ok\":null}\n";
+      const ssize_t written = ::write(client, response.data(), response.size());
+      if (written != static_cast<ssize_t>(response.size())) {
+        serverError = 3;
+      }
       ::close(client);
-      serverError = 2;
-      return;
-    }
-    request.assign(buffer, static_cast<std::size_t>(size));
-    constexpr std::string_view response = "{\"Ok\":null}\n";
-    const ssize_t written = ::write(client, response.data(), response.size());
-    if (written != static_cast<ssize_t>(response.size())) {
-      serverError = 3;
-    }
-    ::close(client);
-  });
+    });
+  };
 
   if (!check(::setenv("NIRI_SOCKET", socketPath.c_str(), 1) == 0, "setenv(NIRI_SOCKET) failed")) {
     return 1;
   }
   runtime.refresh();
 
-  ok &= check(backend.closeWindowById("42"), "closeWindowById should succeed");
-  server.join();
+  ok &= check(!backend.activateWorkspace(Workspace{.id = "99"}, "DP-1"), "unknown workspace should not activate");
+
+  {
+    auto server = serveOnce();
+    ok &= check(backend.closeWindowById("42"), "closeWindowById should succeed");
+  }
   ok &= check(serverError == 0, "server thread encountered an error");
   const nlohmann::json expectedRequest{{"Action", {{"CloseWindow", {{"id", 42}}}}}};
   ok &= check(nlohmann::json::parse(request) == expectedRequest, "request payload mismatch");
   ok &= check(!backend.closeWindowById("not-an-id"), "closeWindowById with bad id should fail");
+
+  Workspace second{.id = "2"};
+  second.index = 2;
+  {
+    auto server = serveOnce();
+    ok &= check(backend.activateWorkspace(second, "DP-1"), "activate workspace 2 by index");
+  }
+  ok &= check(serverError == 0, "activate server thread encountered an error");
+  const nlohmann::json expectedFocus{{"Action", {{"FocusWorkspace", {{"reference", {{"Id", 2}}}}}}}};
+  ok &= check(nlohmann::json::parse(request) == expectedFocus, "focus workspace payload mismatch");
+
+  Workspace chat{.name = "chat"};
+  {
+    auto server = serveOnce();
+    ok &= check(backend.activateWorkspace(chat, "HDMI-1"), "activate named workspace on HDMI-1");
+  }
+  ok &= check(serverError == 0, "named activate server thread encountered an error");
+  const nlohmann::json expectedNamed{{"Action", {{"FocusWorkspace", {{"reference", {{"Id", 10}}}}}}}};
+  ok &= check(nlohmann::json::parse(request) == expectedNamed, "named workspace should resolve to id 10");
+
+  {
+    auto server = serveOnce();
+    ok &= check(backend.moveWindowToWorkspace("41", second, "DP-1"), "move window to workspace 2");
+  }
+  ok &= check(serverError == 0, "move workspace server thread encountered an error");
+  const nlohmann::json expectedMove{
+      {"Action", {{"MoveWindowToWorkspace", {{"window_id", 41}, {"reference", {{"Id", 2}}}, {"focus", true}}}}}
+  };
+  ok &= check(nlohmann::json::parse(request) == expectedMove, "move window payload mismatch");
+
+  {
+    auto server = serveOnce();
+    ok &= check(backend.moveWindowToOutput("41", "HDMI-1"), "move window to HDMI-1");
+  }
+  ok &= check(serverError == 0, "move output server thread encountered an error");
+  const nlohmann::json expectedMonitor{{"Action", {{"MoveWindowToMonitor", {{"id", 41}, {"output", "HDMI-1"}}}}}};
+  ok &= check(nlohmann::json::parse(request) == expectedMonitor, "move to monitor payload mismatch");
 
   ::close(listener);
   ::unlink(socketPath.c_str());

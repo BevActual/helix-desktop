@@ -28,6 +28,7 @@ namespace compositors::niri {
     [[nodiscard]] std::optional<nlohmann::json> requestJson(std::string_view request) const;
     [[nodiscard]] bool requestOk(std::string_view request, bool acceptNoResponse = false) const;
     [[nodiscard]] bool requestAction(const nlohmann::json& action, bool acceptNoResponse = false) const;
+    [[nodiscard]] std::optional<std::string> compositorVersion() const;
     void refresh();
     void cleanup();
 
@@ -58,6 +59,8 @@ namespace compositors::niri {
 
     mutable bool m_resolved = false;
     mutable std::string m_socketPath;
+    mutable bool m_compositorVersionResolved = false;
+    mutable std::optional<std::string> m_compositorVersion;
     std::vector<NiriEventHandler*> m_eventHandlers;
     int m_eventSocketFd = -1;
     std::vector<char> m_readBuffer;

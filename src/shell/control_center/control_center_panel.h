@@ -90,6 +90,7 @@ private:
 
   void appendBuiltinSlots(const ControlCenterServices& services);
   void rebuildPluginSlots();
+  void ensureTabUi(TabSlot& slot);
   void selectTab(std::string_view id, bool animated = false);
   void selectAdjacentVisibleTab(int direction);
   [[nodiscard]] TabSlot* slotById(std::string_view id);

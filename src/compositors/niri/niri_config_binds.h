@@ -3,6 +3,7 @@
 #include "compositors/niri/niri_config_files.h"
 #include "core/input/key_chord.h"
 
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <span>
@@ -14,16 +15,31 @@ namespace compositors::niri {
 
   inline constexpr std::string_view kBindsIncludeFileName = "noctalia-binds.kdl";
 
+  enum class BindKind : std::uint8_t { Panels, Capture, Media, System };
+
   struct RecommendedBind {
     std::string_view id;
     std::string_view ipcCommand;
     std::string_view key;
+    bool allowWhenLocked = false;
+    BindKind kind = BindKind::Panels;
+    std::string_view fallbackKey = {};
   };
 
   struct ParsedBind {
     std::string key;
     std::string ipcCommand;
     std::string action;
+    bool allowWhenLocked = false;
+    std::vector<std::string> spawnArgs;
+    bool spawnSh = false;
+    std::filesystem::path sourcePath;
+  };
+
+  struct AppBind {
+    std::string key;
+    std::vector<std::string> spawnArgs;
+    bool spawnSh = false;
   };
 
   struct BindStatus {
@@ -70,5 +86,18 @@ namespace compositors::niri {
   InstallResult setRecommendedKeyInto(
       const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey
   );
+  InstallResult clearRecommendedKey(std::string_view id);
+  InstallResult clearRecommendedKeyInto(const std::filesystem::path& configFile, std::string_view id);
+  InstallResult resetRecommendedKeys();
+  InstallResult resetRecommendedKeysInto(const std::filesystem::path& configFile);
+
+  [[nodiscard]] std::vector<AppBind> ownedAppBinds(const ConfigScan& scan);
+  InstallResult setAppBind(std::string_view key, std::span<const std::string> spawnArgs, bool spawnSh = false);
+  InstallResult setAppBindInto(
+      const std::filesystem::path& configFile, std::string_view key, std::span<const std::string> spawnArgs,
+      bool spawnSh = false
+  );
+  InstallResult clearAppBind(std::string_view key);
+  InstallResult clearAppBindInto(const std::filesystem::path& configFile, std::string_view key);
 
 } // namespace compositors::niri

@@ -60,7 +60,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 |---------|-----|---------------|
 | `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine, incoming LocalSend), media summary, date/time, weather summary, and shortcut buttons. Date/time opens Calendar; the weather line opens Weather. Header gear opens Home shortcuts, labels, and the session-button setting. |
 | `appearance` | Appearance | Theme mode, shell mode, Auto schedule status, palette source and picker, current-palette swatches, font, UI scale, and roundness. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. When Noctalia Greeter is installed, Sync Now and Auto-Sync copy wallpaper, colors, and monitors to the login screen. Header gear opens language, icon tint, high contrast, motion, borders, and shadows. |
-| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, and Daily source settings. |
+| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. On niri, a live overview-wallpaper preset sits above the picker. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and niri backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches. |
 | `bar` | Bar | Bar layout, widgets, and per-monitor bar overrides. Widget add and inspector sheets stay in Control Center. |
 | `media` | Media | MPRIS players, playback controls, and artwork. Header gear opens player blacklist settings. |
@@ -80,20 +80,21 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Header gear opens receive folder, auto-accept, and port. |
 | `desktop` | Desktop | Desktop widgets on/off, widget count, edit mode, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
+| `windows` | Windows | niri window spacing: gaps, struts, and default column width. Shown only in a niri session. Header gear repeats those sliders. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Header gear opens monitors, layer, size, shape, and magnification. |
 | `panels` | Panels | Shared panel placement and chrome |
-| `launcher` | Launcher | Open launcher, appearance toggles, unprefixed providers, and pinned apps. Header gear opens placement, prefixes, auto-paste, and currency. |
+| `launcher` | Launcher | Open launcher, appearance toggles, unprefixed providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens placement, prefixes, auto-paste, and currency. |
 | `control-center` | Control Center | Control Center sidebar, width, shortcuts, and hidden tabs |
 | `osd` | OSD | On-screen display volume and brightness popups |
 | `shell` | Shell | Shell-wide options, greeter sync, and miscellaneous chrome |
-| `keybinds` | Keybinds | Live In-Noctalia chord recorders, plus niri compositor shortcuts when running on niri. Header gear opens Copy missing / Add to niri. |
+| `keybinds` | Keybinds | On niri: top tabs for Attention, Open, Apps, Capture, Sound, and Session. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
 | `security` | Security | Lock screen and authentication |
 | `hooks` | Hooks | Startup and event hooks |
-| `niri` | Niri | niri-specific options. Shown only in a niri session. |
+| `niri` | Niri | niri setup only: copy missing snippets and install `noctalia-setup.kdl`. Shown only in a niri session. Decorations and blur live on Theme; gaps/struts/columns on Windows; overview wallpaper and backdrop on Wallpaper; type-to-launch on Launcher. |
 | `plugins` | Plugins | Installed plugins and the in-panel plugin store |
 | `packages` | Packages | Fedora, Flatpak, and firmware (`fwupd`) updates, search, and installs. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` is listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, and LocalSend tabs stay available so you can turn those features on from the tab itself.
+`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, and LocalSend tabs stay available so you can turn those features on from the tab itself.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -136,11 +137,13 @@ Header gear opens the built-in and community catalog enable switches. `noctalia 
 
 ## Keybinds
 
-The Keybinds tab records in-shell navigation chords on the live page. Switch **In Noctalia** and **Niri** when running on niri. In-Noctalia is a two-column grid of recorders; if two actions share a chord, the card warns without blocking the save. Super/Mod cannot be bound for in-shell actions.
+The Keybinds tab is niri compositor shortcuts. Top tabs switch between **Attention**, **Open**, **Apps**, **Capture**, **Sound**, and **Session**. Unfinished rows (missing, or a recommended key taken in your own `binds { }`) live on **Attention** and also remain in their category; that tab hides when the inbox is empty. Search shows matches from every section. Keys that only exist in an included stock file such as Fedora's `default-config.kdl` are not treated as taken: **Add** writes them into `noctalia-binds.kdl` last, so they override the stock action. Missing rows stay unset until you record a chord. Restore puts a managed custom chord back on the recommended key; Remove drops it from `noctalia-binds.kdl` only.
 
-On niri, the Niri source lists recommended compositor shortcuts. Record a chord to write it into `noctalia-binds.kdl`. Header **Copy**, **Add**, and **folder** copy missing binds, install them into `noctalia-binds.kdl` (plus an `include` in `config.kdl`), or open the niri config directory. Existing `binds { }` entries are left unchanged.
+**Apps** are niri `spawn` binds, not Helix IPC. Add an installed application, then record a chord. Those lines stay in `noctalia-binds.kdl` with the rest of the managed binds.
 
-Header gear repeats Copy missing / Add to niri. `noctalia msg settings-toggle keybinds` opens that settings view.
+Header **Copy**, **Add**, **Restore**, and **folder** copy missing Helix binds, install them, reset managed keys, or open the niri config directory. Media, volume, and brightness binds are written with `allow-when-locked=true`. Existing `binds { }` entries are left unchanged.
+
+In-panel navigation (Enter, Escape, arrows, Tab) still uses the defaults. Header gear exposes those as **In Helix Shell**. `noctalia msg settings-toggle keybinds` opens that settings view.
 
 ## Media
 
@@ -381,7 +384,7 @@ The plugin store, session/idle editors, notification filters, calendar accounts,
 
 Open Appearance with `noctalia msg panel-toggle control-center settings` or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab). `settings-toggle` without a section still lands on Appearance.
 
-The Niri page is shown only when the session is running under niri.
+The Niri and Windows pages are shown only when the session is running under niri. Theme owns decorations and compositor blur; Windows owns gaps, struts, and column width; Wallpaper owns overview presets and backdrop; Launcher owns type-to-launch.
 
 ## Power
 

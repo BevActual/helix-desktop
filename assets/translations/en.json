@@ -496,9 +496,15 @@
       "copy-missing-tooltip": "Copy missing niri binds",
       "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
       "install-tooltip": "Add missing recommended binds to niri",
-      "niri-hint": "Record a chord to write it into noctalia-binds.kdl. Copy or add missing binds from the header. Existing binds in your niri config stay unchanged.",
-      "open-folder-failed": "Could not open the niri config folder.",
-      "open-folder-tooltip": "Open the niri config folder"
+      "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
+      "open-folder-tooltip": "Open the niri config folder",
+      "reset-tooltip": "Restore managed binds to the recommended keys",
+      "tab-apps": "Apps",
+      "tab-attention": "Attention",
+      "tab-capture": "Capture",
+      "tab-open": "Open",
+      "tab-session": "Session",
+      "tab-sound": "Sound"
     },
     "plugins": {
       "installed": "Installed",
@@ -647,6 +653,14 @@
       "windows-save-failed": "Could not update niri's config",
       "windows-save-title": "Window Corners",
       "windows-title": "App Windows"
+    },
+    "windows": {
+      "columns-description": "Width of new niri columns as a fraction of the output. Writes noctalia-layout.kdl only after you change the slider.",
+      "columns-title": "Columns",
+      "save-failed": "Could not update niri's config",
+      "save-title": "Windows",
+      "spacing-description": "Gaps between tiled windows and extra outer padding (struts) on all four sides. Writes noctalia-layout.kdl only after you change a slider.",
+      "spacing-title": "Spacing"
     },
     "screen-time": {
       "back": "Back",
@@ -963,8 +977,11 @@
       "title": "LocalSend"
     },
     "theme": {
+      "niri-blur": "Compositor blur",
+      "niri-blur-description": "Blur windows and Helix Shell surfaces in niri. Writes noctalia-blur.kdl. Requires niri 26.04 or newer. Tune passes, offset, and noise on this card.",
+      "niri-blur-save-title": "Niri Blur",
       "niri-border": "Themed border",
-      "niri-description": "Sync niri's own window focus-ring and border to this palette (primary for the focused window, outline color elsewhere). Requires niri.",
+      "niri-description": "Sync niri focus-ring, border, tab indicator, insert hint, and recent-windows highlight to this palette. Writes noctalia-layout.kdl. Requires niri.",
       "niri-focus-ring": "Themed focus ring",
       "niri-save-failed": "Could not update niri's config",
       "niri-save-title": "Window Decorations",
@@ -1852,6 +1869,17 @@
         "night-light": "Night Light",
         "niri": "Niri",
         "niri-actions": "Niri actions",
+        "niri-apps": "Apps",
+        "niri-attention": "Needs attention",
+        "niri-bound": "Bound",
+        "niri-capture": "Capture",
+        "niri-conflict": "Conflicts",
+        "niri-media": "Sound & brightness",
+        "niri-missing": "Missing",
+        "niri-open": "Open",
+        "niri-panels": "Open",
+        "niri-session": "Session",
+        "niri-system": "Session",
         "notifications": "Notifications",
         "osd": "OSD",
         "overview": "Overview",
@@ -1921,7 +1949,8 @@
         "templates": "Templates",
         "theme": "Theme",
         "type": "Type",
-        "wallpaper": "Wallpaper"
+        "wallpaper": "Wallpaper",
+        "windows": "Windows"
       }
     },
     "notifications": {
@@ -2022,6 +2051,14 @@
       "layer": {
         "overlay": "Overlay",
         "top": "Top"
+      },
+      "niri": {
+        "overview": {
+          "backdrop": "Blurred backdrop",
+          "flat": "Flat color",
+          "none": "None",
+          "stationary": "Stationary wallpaper"
+        }
       },
       "notification-urgency": {
         "critical": "Critical",
@@ -2867,12 +2904,21 @@
           "actions": {
             "brightness-down": { "label": "Decrease brightness" },
             "brightness-up": { "label": "Increase brightness" },
+            "caffeine": { "label": "Caffeine" },
             "clipboard": { "label": "Clipboard" },
             "control-center": { "label": "Control Center" },
+            "dnd": { "label": "Do not disturb" },
             "launcher": { "label": "Launcher" },
             "lock": { "label": "Lock session" },
+            "media-next": { "label": "Next track" },
+            "media-previous": { "label": "Previous track" },
+            "media-toggle": { "label": "Play / pause" },
+            "mic-mute": { "label": "Mute microphone" },
             "night-light": { "label": "Night light" },
+            "notifications": { "label": "Notifications" },
+            "screen-record": { "label": "Screen record" },
             "screenshot-fullscreen": { "label": "Screenshot fullscreen" },
+            "screenshot-ocr": { "label": "Screenshot OCR" },
             "screenshot-region": { "label": "Screenshot region" },
             "session": { "label": "Session" },
             "settings": { "label": "Settings" },
@@ -2882,9 +2928,13 @@
             "wallpaper": { "label": "Wallpaper" },
             "window-switcher": { "label": "Window switcher" }
           },
-          "bound": "Bound as {keys} · noctalia msg {command}",
-          "conflict": "Recommended {key} is already used by another niri bind",
+          "bound": "{keys}",
+          "cleared": "Removed the bind from noctalia-binds.kdl. niri reloads the config on its own.",
+          "clear-bind": "Remove",
+          "conflict": "{key} is already used by another niri bind",
           "copied": "Copied niri bind to the clipboard",
+          "custom": "{keys} · default {default}",
+          "user-owned": "{keys} · in your niri config",
           "copied-missing": "Copied missing niri binds to the clipboard",
           "copy-bind": "Copy",
           "copy-missing": {
@@ -2900,10 +2950,27 @@
           "install-failed": "Could not update the niri config",
           "install-none": "All recommended niri binds are already present",
           "install-ok": "Added {count} niri bind(s). niri reloads the config on its own.",
-          "missing": "Not in niri config · recommended {key}",
+          "reset": {
+            "button": "Restore recommended",
+            "description": "Reset managed binds in noctalia-binds.kdl back to the recommended keys. Binds in your niri config stay unchanged.",
+            "label": "Restore recommended keys"
+          },
+          "reset-bind": "Restore recommended key",
+          "reset-none": "Managed binds already use the recommended keys",
+          "reset-ok": "Restored {count} bind(s) to the recommended keys. niri reloads the config on its own.",
+          "reset-skipped": "Could not restore {count} bind(s) because those keys are used in your niri config",
+          "missing": "Recommended {key}",
           "none-missing": "All recommended niri binds are already present",
           "title": "Niri keybinds",
-          "updated": "Updated noctalia-binds.kdl. niri reloads the config on its own."
+          "updated": "Updated noctalia-binds.kdl. niri reloads the config on its own.",
+          "add-app": {
+            "description": "Pick an installed app, then record a chord. Written as a niri spawn bind in noctalia-binds.kdl.",
+            "empty": "No applications found",
+            "failed": "Could not prepare a launch command for that app",
+            "label": "Add app shortcut",
+            "placeholder": "Search applications",
+            "record": "Record a key"
+          }
         }
       },
       "lockscreen": {
@@ -2965,6 +3032,38 @@
         }
       },
       "niri": {
+        "blur-noise": {
+          "description": "Grain added on top of niri blur to hide color banding. Writes noctalia-blur.kdl.",
+          "label": "Blur noise"
+        },
+        "blur-offset": {
+          "description": "Sample distance per blur pass. Raise this before adding passes; too high needs more passes to avoid artifacts. Writes noctalia-blur.kdl.",
+          "label": "Blur offset"
+        },
+        "blur-passes": {
+          "description": "Dual Kawase downsample/upsample passes. More is smoother and costs more GPU. Writes noctalia-blur.kdl.",
+          "label": "Blur passes"
+        },
+        "default-column-width": {
+          "description": "Width of new niri columns as a fraction of the output. Writes default-column-width into noctalia-layout.kdl only after you change this slider.",
+          "label": "Default column width"
+        },
+        "draw-border-with-background": {
+          "description": "When off, niri draws the focus ring and border around windows instead of as a filled rectangle behind them. Better with client-side decorations. Writes noctalia-window-rules.kdl only after you change this toggle.",
+          "label": "Draw border with background"
+        },
+        "gaps": {
+          "description": "Space around niri windows in logical pixels. Writes gaps into noctalia-layout.kdl only after you change this slider, so an existing niri gaps value is left alone until then.",
+          "label": "Window gaps"
+        },
+        "struts": {
+          "description": "Extra outer padding on all four sides, in addition to gaps and layer-shell reserved space. Writes struts into noctalia-layout.kdl only after you change this slider.",
+          "label": "Struts"
+        },
+        "overview-preset": {
+          "description": "How wallpaper appears in niri overview. Writes noctalia-overview.kdl. Blurred backdrop uses the Helix Shell backdrop layer; stationary pins the wallpaper behind workspaces; flat uses the current surface color.",
+          "label": "Overview wallpaper"
+        },
         "setup": {
           "copied": "Copied niri setup snippet to the clipboard",
           "copied-missing": "Copied missing niri setup snippets to the clipboard",
