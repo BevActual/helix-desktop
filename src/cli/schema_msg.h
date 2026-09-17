@@ -69,9 +69,9 @@ namespace noctalia::cli {
   inline constexpr std::array<std::string_view, 2> kMsgBarLayerSetLayerChoices{"top", "overlay"};
   inline constexpr std::array<std::string_view, 2> kMsgEffectsProfileSetKindChoices{"output", "input"};
   inline constexpr std::array<std::string_view, 4> kMsgLogLevelSetLevelChoices{"debug", "info", "warn", "error"};
-  inline constexpr std::array<std::string_view, 8> kMsgMediaActionChoices{"next",        "previous",       "toggle",
+  inline constexpr std::array<std::string_view, 9> kMsgMediaActionChoices{"next",        "previous",       "toggle",
                                                                           "play",        "pause",          "stop",
-                                                                          "next-player", "previous-player"};
+                                                                          "raise",       "next-player",    "previous-player"};
   inline constexpr std::array<std::string_view, 6> kMsgNotificationDndSetStateChoices{"on",    "off", "true",
                                                                                       "false", "1",   "0"};
   inline constexpr std::array<std::string_view, 2> kMsgPowerCycleDirectionChoices{"next", "prev"};

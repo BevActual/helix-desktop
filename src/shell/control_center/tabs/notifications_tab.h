@@ -19,6 +19,7 @@ struct ControlCenterServices;
 struct NotificationHistoryEntry;
 class Button;
 class Segmented;
+class Toggle;
 class VirtualListView;
 class Label;
 class NotificationHistoryAdapter;
@@ -34,6 +35,7 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
   void onPanelCardOpacityChanged(float opacity) override;
@@ -43,11 +45,10 @@ private:
   void doUpdate(Renderer& renderer) override;
   void clearAllNotifications();
   void removeNotificationEntry(uint32_t id, bool wasActive);
-  void toggleDoNotDisturb();
   void toggleNotificationExpanded(uint32_t id);
   void invokeNotificationAction(uint32_t id, const std::string& actionKey);
   bool refreshDataSnapshot();
-  void syncDndButton();
+  void syncDndToggle();
   void updateEmptyState(bool hasHistory, bool hasFiltered);
   std::optional<std::size_t> filteredIndexForId(uint32_t id) const;
   void cancelFilterSlide();
@@ -68,9 +69,10 @@ private:
   Label* m_emptyTitle = nullptr;
   Label* m_emptyBody = nullptr;
   Button* m_clearAllButton = nullptr;
-  Button* m_dndButton = nullptr;
+  Toggle* m_dndToggle = nullptr;
   Segmented* m_filter = nullptr;
   std::size_t m_filterIndex = 0;
+  bool m_syncingDnd = false;
   std::unordered_set<uint32_t> m_expandedIds;
   std::uint64_t m_lastSerial = 0;
   /// Wall-clock coarse slot so relative times (e.g. "2 min ago") refresh without churning every frame.

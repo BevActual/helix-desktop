@@ -21,6 +21,7 @@ class Flex;
 class Input;
 class Label;
 class ScrollView;
+class Segmented;
 class Spinner;
 class Toggle;
 struct ControlCenterServices;
@@ -66,6 +67,10 @@ private:
   [[nodiscard]] std::string structureKey(const std::vector<BluetoothDeviceInfo>& devices) const;
   [[nodiscard]] std::chrono::seconds discoveryTimeout() const;
   void applyDeviceFilters(std::vector<BluetoothDeviceInfo>& devices) const;
+  void applyCatalog(std::size_t index);
+  void persistCatalog();
+
+  enum class Catalog : std::uint8_t { Paired, Nearby };
 
   BluetoothService* m_service = nullptr;
   BluetoothAgent* m_agent = nullptr;
@@ -86,6 +91,9 @@ private:
   Button* m_pairingReject = nullptr;
 
   Flex* m_adapterCard = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Catalog m_catalog = Catalog::Paired;
+  bool m_catalogSyncing = false;
   Flex* m_discoverableRow = nullptr;
   Label* m_adapterStatus = nullptr;
 

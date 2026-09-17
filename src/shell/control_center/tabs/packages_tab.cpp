@@ -139,16 +139,16 @@ std::unique_ptr<Flex> PackagesTab::create() {
   std::vector<ui::SegmentedOption> kindOptions;
   kindOptions.reserve(m_kindOrder.size());
   for (const auto kind : m_kindOrder) {
-    const char* key = "control-center.packages.source-fedora";
     const char* tooltipKey = "control-center.packages.source-fedora-tooltip";
+    const char* glyph = "package";
     if (kind == noctalia::packages::Kind::Flatpak) {
-      key = "control-center.packages.source-flatpak";
       tooltipKey = "control-center.packages.source-flatpak-tooltip";
+      glyph = "box";
     } else if (kind == noctalia::packages::Kind::Firmware) {
-      key = "control-center.packages.source-firmware";
       tooltipKey = "control-center.packages.source-firmware-tooltip";
+      glyph = "cpu";
     }
-    kindOptions.push_back({.label = i18n::tr(key), .tooltip = i18n::tr(tooltipKey)});
+    kindOptions.push_back({.label = "", .glyph = glyph, .tooltip = i18n::tr(tooltipKey)});
   }
   const bool showKindSwitch = m_kindOrder.size() > 1;
   searchCard->addChild(
@@ -156,12 +156,10 @@ std::unique_ptr<Flex> PackagesTab::create() {
           .out = &m_kindSwitch,
           .options = std::move(kindOptions),
           .selectedIndex = indexFromKind(m_kind),
-          .fontSize = Style::fontSizeCaption,
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .surfaceRole = ColorRole::Surface,
-          .equalSegmentWidths = true,
           .visible = showKindSwitch,
           .participatesInLayout = showKindSwitch,
           .onChange = [this](std::size_t index) { applyKind(index); },

@@ -475,10 +475,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   );
   add(
       "media",
-      std::make_unique<MediaTab>(
-          services.mpris, services.httpClient, services.spectrum, services.config, wayland,
-          PanelManager::instance().renderContext(), services
-      )
+      std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services)
   );
   add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
   add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));

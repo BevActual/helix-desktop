@@ -16,8 +16,8 @@ class IdleInhibitor;
 class Label;
 class ProgressBar;
 class Renderer;
+class ScrollView;
 class Segmented;
-class Separator;
 class SessionActionRunner;
 class Toggle;
 class UPowerService;
@@ -36,6 +36,7 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
   friend class PowerTabTestAccess;
@@ -90,22 +91,18 @@ private:
   Flex* m_root = nullptr;
 
   Flex* m_sessionCard = nullptr;
-  Separator* m_caffeineDivider = nullptr;
   Button* m_lockButton = nullptr;
   Button* m_suspendButton = nullptr;
   Button* m_logoutButton = nullptr;
   Button* m_rebootButton = nullptr;
   Button* m_shutdownButton = nullptr;
-  Flex* m_powerActionsRow = nullptr;
+  Flex* m_sessionActionsRow = nullptr;
   Toggle* m_caffeineToggle = nullptr;
   Flex* m_caffeineRow = nullptr;
   bool m_syncingCaffeine = false;
 
   Flex* m_batteryWell = nullptr;
-  Separator* m_profilesDivider = nullptr;
-  Separator* m_chargingDivider = nullptr;
-  Separator* m_healthDivider = nullptr;
-  Separator* m_peripheralsDivider = nullptr;
+  ScrollView* m_leftoverScroll = nullptr;
 
   // Battery status
   Flex* m_statusCard = nullptr;

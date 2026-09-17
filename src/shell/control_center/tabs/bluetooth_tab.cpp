@@ -9,6 +9,7 @@
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/collapsible.h"
+#include "ui/controls/segmented.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "wayland/clipboard_service.h"
@@ -17,6 +18,7 @@
 #include <chrono>
 #include <cstdio>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_set>
 #include <utility>
@@ -379,7 +381,15 @@ private:
 
 BluetoothTab::BluetoothTab(BluetoothService* service, BluetoothAgent* agent, const ControlCenterServices& services)
     : m_service(service), m_agent(agent), m_config(services.config), m_clipboard(services.clipboard),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "bluetooth"})) {}
+      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "bluetooth"})) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> source = m_config->stateString("bluetooth_tab", "catalog")) {
+      if (*source == "nearby") {
+        m_catalog = Catalog::Nearby;
+      }
+    }
+  }
+}
 
 BluetoothTab::~BluetoothTab() = default;
 
@@ -563,6 +573,29 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   );
   adapterCard->addChild(std::move(powerRow));
   adapterCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "bluetooth",
+                      .tooltip = i18n::tr("control-center.bluetooth.sections.paired"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "radar",
+                      .tooltip = i18n::tr("control-center.bluetooth.nearby"),
+                  },
+              },
+          .selectedIndex = m_catalog == Catalog::Nearby ? std::size_t{1} : std::size_t{0},
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  adapterCard->addChild(
       ui::label({
           .out = &m_adapterStatus,
           .fontSize = Style::fontSizeCaption * scale,
@@ -675,6 +708,7 @@ void BluetoothTab::onClose() {
   m_pairingAccept = nullptr;
   m_pairingReject = nullptr;
   m_adapterCard = nullptr;
+  m_catalogSwitch = nullptr;
   m_discoverableRow = nullptr;
   m_adapterStatus = nullptr;
   m_listScroll = nullptr;
@@ -876,6 +910,7 @@ std::string BluetoothTab::structureKey(const std::vector<BluetoothDeviceInfo>& d
   key += s.adapterPresent ? '1' : '0';
   key += s.powered ? '1' : '0';
   key += s.rfkillSoftBlocked ? '1' : '0';
+  key += m_catalog == Catalog::Nearby ? 'N' : 'P';
   key.push_back('|');
   for (const auto& d : devices) {
     key += d.path;
@@ -960,6 +995,14 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
     return;
   }
 
+  std::erase_if(devices, [this](const BluetoothDeviceInfo& device) {
+    const auto bucket = bucketFor(device);
+    if (m_catalog == Catalog::Nearby) {
+      return bucket != DeviceBucket::Available;
+    }
+    return bucket == DeviceBucket::Available;
+  });
+
   const float opacity = panelCardOpacity();
   Flex* well = nullptr;
   auto wellCard = ui::column({
@@ -985,7 +1028,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
   bool first = true;
   for (const auto& device : devices) {
     const auto bucket = bucketFor(device);
-    if (first || bucket != currentBucket) {
+    if (m_catalog != Catalog::Nearby && (first || bucket != currentBucket)) {
       std::string sectionText;
       switch (bucket) {
       case DeviceBucket::Connected:
@@ -1020,6 +1063,9 @@ void BluetoothTab::onPanelCardOpacityChanged(float opacity) {
   if (m_pairingInput != nullptr) {
     m_pairingInput->setSurfaceOpacity(opacity);
   }
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
 }
 
 std::chrono::seconds BluetoothTab::discoveryTimeout() const {
@@ -1037,4 +1083,27 @@ void BluetoothTab::applyDeviceFilters(std::vector<BluetoothDeviceInfo>& devices)
   std::erase_if(devices, [](const BluetoothDeviceInfo& device) {
     return device.alias.empty() || device.alias == device.address;
   });
+}
+
+void BluetoothTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("bluetooth_tab", "catalog", m_catalog == Catalog::Nearby ? "nearby" : "paired");
+}
+
+void BluetoothTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = index == 1 ? Catalog::Nearby : Catalog::Paired;
+  if (next == m_catalog) {
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  m_lastStructureKey.clear();
+  if (auto* panels = PanelManager::current(); panels != nullptr) {
+    panels->requestLayout();
+  }
 }

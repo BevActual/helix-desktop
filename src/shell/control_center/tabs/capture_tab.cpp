@@ -67,30 +67,38 @@ std::unique_ptr<Flex> CaptureTab::create() {
       .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
-  live->addChild(
+  auto toolbar = ui::column({
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) {
+            applySectionCardStyle(section, scale, opacity);
+            section.setGap(Style::spaceXs * scale);
+            section.setPadding(Style::spaceSm * scale);
+          },
+  });
+  toolbar->addChild(
       ui::segmented({
           .out = &m_viewSwitch,
           .options =
               std::vector<ui::SegmentedOption>{
                   {
-                      .label = i18n::tr("control-center.capture.screenshot"),
+                      .label = "",
+                      .glyph = "screenshot",
                       .tooltip = i18n::tr("control-center.capture.screenshot-tooltip"),
                   },
                   {
-                      .label = i18n::tr("control-center.capture.record"),
+                      .label = "",
+                      .glyph = "video",
                       .tooltip = i18n::tr("control-center.capture.record-tooltip"),
                   },
               },
           .selectedIndex = indexFromView(m_view),
-          .fontSize = Style::fontSizeCaption,
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
-          .surfaceRole = ColorRole::Surface,
-          .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyView(index); },
       })
   );
+  live->addChild(std::move(toolbar));
 
   auto screenshotHost = ui::column({
       .out = &m_screenshotHost,

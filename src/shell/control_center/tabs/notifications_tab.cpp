@@ -13,10 +13,10 @@
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/control_center/control_center_services.h"
-#include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/string_utils.h"
@@ -50,6 +50,12 @@ namespace {
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
     return changed;
+  }
+
+  void requestPanelLayout() {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
+    }
   }
 
   constexpr float kHistoryIconSize = 36.0F;
@@ -675,9 +681,42 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       .out = &m_root,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
   });
 
-  tab->addChild(
+  auto liveCard = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+        applyNotificationCardStyle(card, scale, opacity);
+      },
+  });
+  m_dndToggle = addToggleRow(
+      *liveCard, scale, i18n::tr("control-center.notifications.dnd"),
+      [this](bool checked) {
+        if (m_syncingDnd || m_notifications == nullptr) {
+          return;
+        }
+        m_notifications->setDoNotDisturb(checked);
+        PanelManager::instance().refresh();
+      }
+  );
+  auto historyRow = makeControlRow(i18n::tr("control-center.notifications.history"), scale, nullptr, true);
+  historyRow->addChild(
+      ui::button({
+          .out = &m_clearAllButton,
+          .glyph = "trash",
+          .variant = ButtonVariant::Destructive,
+          .tooltip = i18n::tr("control-center.notifications.clear-all"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .visible = false,
+          .participatesInLayout = false,
+          .onClick = [this]() { clearAllNotifications(); },
+      })
+  );
+  historyRow->addChild(
       ui::segmented({
           .out = &m_filter,
           .options =
@@ -704,27 +743,32 @@ std::unique_ptr<Flex> NotificationsTab::create() {
           .scale = scale,
           .surfaceOpacity = panelCardOpacity(),
           .equalSegmentWidths = true,
-          .onChange = [this](std::size_t idx) {
-            if (idx == m_filterIndex) {
-              return;
-            }
+          .flexGrow = 1.0F,
+          .onChange =
+              [this](std::size_t idx) {
+                if (idx == m_filterIndex) {
+                  return;
+                }
 
-            cancelFilterSlide();
-            AnimationManager* animations = m_list != nullptr ? m_list->animationManager() : nullptr;
-            if (animations == nullptr || m_list == nullptr) {
-              m_filterIndex = idx;
-              m_lastRebuildFilterIndex = static_cast<std::size_t>(-1);
-              if (m_list != nullptr) {
-                m_list->scrollView().setScrollOffset(0.0F);
-              }
-              PanelManager::instance().requestLayout();
-              return;
-            }
+                cancelFilterSlide();
+                AnimationManager* animations = m_list != nullptr ? m_list->animationManager() : nullptr;
+                if (animations == nullptr || m_list == nullptr) {
+                  m_filterIndex = idx;
+                  m_lastRebuildFilterIndex = static_cast<std::size_t>(-1);
+                  if (m_list != nullptr) {
+                    m_list->scrollView().setScrollOffset(0.0F);
+                  }
+                  requestPanelLayout();
+                  return;
+                }
 
-            beginFilterSlideOut(idx);
-          },
+                beginFilterSlideOut(idx);
+              },
       })
   );
+  liveCard->addChild(std::move(historyRow));
+  tab->addChild(std::move(liveCard));
+  syncDndToggle();
 
   m_adapter = std::make_unique<NotificationHistoryAdapter>(*this, scale, panelCardOpacity());
 
@@ -736,10 +780,11 @@ std::unique_ptr<Flex> NotificationsTab::create() {
           .overscanItems = 3,
           .adapter = m_adapter.get(),
           .flexGrow = 1.0F,
-          .configure = [](VirtualListView& list) {
-            list.setFillWidth(true);
-            list.setFillHeight(true);
-          },
+          .configure =
+              [](VirtualListView& list) {
+                list.setFillWidth(true);
+                list.setFillHeight(true);
+              },
       })
   );
 
@@ -748,13 +793,11 @@ std::unique_ptr<Flex> NotificationsTab::create() {
           {
               .out = &m_emptyCard,
               .align = FlexAlign::Center,
+              .justify = FlexJustify::Center,
               .gap = Style::spaceSm * scale,
+              .flexGrow = 1.0F,
               .visible = false,
-              .configure =
-                  [scale, opacity = panelCardOpacity()](Flex& empty) {
-                    applyNotificationCardStyle(empty, scale, opacity);
-                    empty.setPadding(Style::spaceLg * scale, Style::spaceMd * scale);
-                  },
+              .participatesInLayout = false,
           },
           ui::label({
               .out = &m_emptyTitle,
@@ -774,35 +817,7 @@ std::unique_ptr<Flex> NotificationsTab::create() {
 }
 
 std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
-  const float scale = contentScale();
-  const bool dndEnabled = m_notifications != nullptr && m_notifications->doNotDisturb();
-  auto live = ui::row(
-      {
-          .align = FlexAlign::Center,
-          .gap = Style::spaceSm * scale,
-      },
-      ui::button({
-          .out = &m_clearAllButton,
-          .glyph = "trash",
-          .tooltip = i18n::tr("control-center.notifications.clear-all"),
-          .onClick = [this]() { clearAllNotifications(); },
-          .configure =
-              [scale](Button& button) {
-                panel_button_style::configureHeaderIconButton(button, scale);
-                button.setVariant(ButtonVariant::Destructive);
-              },
-      }),
-      ui::button({
-          .out = &m_dndButton,
-          .glyph = dndEnabled ? "bell-off" : "bell",
-          .selected = dndEnabled,
-          .tooltip =
-              i18n::tr(dndEnabled ? "control-center.notifications.dnd-off" : "control-center.notifications.dnd-on"),
-          .onClick = [this]() { toggleDoNotDisturb(); },
-          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
-      })
-  );
-  return m_settings->embedHeader(std::move(live), scale);
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void NotificationsTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -812,6 +827,8 @@ bool NotificationsTab::configureMode() const { return m_settings->configureMode(
 void NotificationsTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
 }
+
+SettingsPane* NotificationsTab::settingsPane() { return m_settings.get(); }
 
 void NotificationsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
@@ -860,7 +877,7 @@ void NotificationsTab::onClose() {
   m_emptyBody = nullptr;
   m_filter = nullptr;
   m_clearAllButton = nullptr;
-  m_dndButton = nullptr;
+  m_dndToggle = nullptr;
   m_adapter.reset();
   m_filtered.clear();
   m_expandedIds.clear();
@@ -920,7 +937,7 @@ void NotificationsTab::beginFilterSlideOut(std::size_t nextIndex) {
     if (m_list != nullptr) {
       m_list->scrollView().setScrollOffset(0.0F);
     }
-    PanelManager::instance().requestLayout();
+    requestPanelLayout();
     return;
   }
 
@@ -947,7 +964,7 @@ void NotificationsTab::beginFilterSlideOut(std::size_t nextIndex) {
           m_list->scrollView().setScrollOffset(0.0F);
         }
         m_startFilterSlideIn = true;
-        PanelManager::instance().requestLayout();
+        requestPanelLayout();
       },
       m_list
   );
@@ -1006,16 +1023,6 @@ void NotificationsTab::clearAllNotifications() {
   } else {
     PanelManager::instance().refresh();
   }
-}
-
-void NotificationsTab::toggleDoNotDisturb() {
-  if (m_notifications == nullptr) {
-    return;
-  }
-
-  (void)m_notifications->toggleDoNotDisturb();
-  syncDndButton();
-  PanelManager::instance().refresh();
 }
 
 void NotificationsTab::removeNotificationEntry(uint32_t id, bool wasActive) {
@@ -1077,9 +1084,9 @@ void NotificationsTab::invokeNotificationAction(uint32_t id, const std::string& 
 bool NotificationsTab::refreshDataSnapshot() {
   const bool hasHistory = m_notifications != nullptr && !m_notifications->history().empty();
   if (setShown(m_clearAllButton, hasHistory)) {
-    PanelManager::instance().requestLayout();
+    requestPanelLayout();
   }
-  syncDndButton();
+  syncDndToggle();
 
   const std::uint64_t serial = m_notifications != nullptr ? m_notifications->changeSerial() : 0;
   const std::int64_t relativeSlot = currentRelativeTimeSlot();
@@ -1111,24 +1118,21 @@ bool NotificationsTab::refreshDataSnapshot() {
   return true;
 }
 
-void NotificationsTab::syncDndButton() {
-  if (m_dndButton == nullptr) {
+void NotificationsTab::syncDndToggle() {
+  if (m_dndToggle == nullptr) {
     return;
   }
 
-  const bool enabled = m_notifications != nullptr && m_notifications->doNotDisturb();
-  m_dndButton->setEnabled(m_notifications != nullptr);
-  m_dndButton->setSelected(enabled);
-  m_dndButton->setGlyph(enabled ? "bell-off" : "bell");
-  m_dndButton->setTooltip(
-      i18n::tr(enabled ? "control-center.notifications.dnd-off" : "control-center.notifications.dnd-on")
-  );
+  m_dndToggle->setEnabled(m_notifications != nullptr);
+  m_syncingDnd = true;
+  m_dndToggle->setCheckedImmediate(m_notifications != nullptr && m_notifications->doNotDisturb());
+  m_syncingDnd = false;
 }
 
 void NotificationsTab::updateEmptyState(bool hasHistory, bool hasFiltered) {
   const bool layoutDirty = setShown(m_list, hasFiltered) || setShown(m_emptyCard, !hasFiltered);
   if (layoutDirty) {
-    PanelManager::instance().requestLayout();
+    requestPanelLayout();
   }
 
   if (m_emptyTitle == nullptr || m_emptyBody == nullptr) {

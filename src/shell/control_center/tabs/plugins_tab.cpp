@@ -104,10 +104,13 @@ std::unique_ptr<Flex> PluginsTab::create() {
       .flexGrow = 1.0F,
   });
 
-  auto toolbar = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .fillWidth = true,
+  auto toolbar = ui::column({
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) {
+            applySectionCardStyle(section, scale, opacity);
+            section.setGap(Style::spaceXs * scale);
+            section.setPadding(Style::spaceSm * scale);
+          },
   });
   toolbar->addChild(
       ui::segmented({
@@ -115,21 +118,20 @@ std::unique_ptr<Flex> PluginsTab::create() {
           .options =
               std::vector<ui::SegmentedOption>{
                   {
-                      .label = i18n::tr("control-center.plugins.installed"),
+                      .label = "",
+                      .glyph = "puzzle",
                       .tooltip = i18n::tr("control-center.plugins.installed-tooltip"),
                   },
                   {
-                      .label = i18n::tr("control-center.plugins.store"),
+                      .label = "",
+                      .glyph = "shopping-bag",
                       .tooltip = i18n::tr("control-center.plugins.store-tooltip"),
                   },
               },
           .selectedIndex = indexFromView(m_view),
-          .fontSize = Style::fontSizeCaption,
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .flexGrow = 1.0F,
           .onChange = [this](std::size_t index) { applyView(index); },
       })
   );

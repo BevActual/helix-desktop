@@ -20,6 +20,7 @@
 #include "ui/builders.h"
 #include "ui/controls/image.h"
 #include "ui/controls/input.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -35,6 +36,7 @@
 #include <cstdio>
 #include <fstream>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -751,6 +753,15 @@ NetworkTab::NetworkTab(const ControlCenterServices& services)
       m_modem(services.modem), m_config(services.config), m_http(services.httpClient), m_sysmon(services.sysmon),
       m_clipboard(services.clipboard),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "network"})) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> source = m_config->stateString("network_tab", "catalog")) {
+      if (*source == "vpn") {
+        m_catalog = Catalog::Vpn;
+      } else if (*source == "cellular") {
+        m_catalog = Catalog::Cellular;
+      }
+    }
+  }
   if (m_secrets != nullptr) {
     m_secrets->setRequestCallback([this](const NetworkSecretAgent::SecretRequest& request) {
       showPasswordPrompt(request);
@@ -783,6 +794,23 @@ std::unique_ptr<Flex> NetworkTab::create() {
       .out = &m_currentCard,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
+
+  auto catalogHost = ui::column({
+      .out = &m_catalogHost,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  catalogHost->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  currentCard->addChild(std::move(catalogHost));
 
   auto connRow = ui::row(
       {.out = &m_currentRow, .align = FlexAlign::Center, .gap = Style::spaceSm * scale},
@@ -1259,6 +1287,9 @@ void NetworkTab::doUpdate(Renderer& renderer) {
     return;
   }
   syncPasswordCard();
+  const bool hasVpns = m_network != nullptr && !m_network->vpnConnections().empty();
+  const bool hasCellular = m_modem != nullptr && !m_modem->modems().empty();
+  syncCatalogBar(hasVpns, hasCellular);
   rebuildApList(renderer);
   bool listChanged = syncApRows();
   listChanged = syncCellularCard() || listChanged;
@@ -1280,6 +1311,8 @@ void NetworkTab::onClose() {
   cancelSpeedTest();
   m_rootLayout = nullptr;
   m_currentCard = nullptr;
+  m_catalogHost = nullptr;
+  m_catalogSwitch = nullptr;
   m_currentTitle = nullptr;
   m_currentDetail = nullptr;
   m_throughputLabel = nullptr;
@@ -1693,6 +1726,8 @@ NetworkTab::structureKey(const std::vector<AccessPointInfo>& aps, const std::vec
   key += wirelessEnabled ? '1' : '0';
   key += "\nscan:";
   key += scanning ? '1' : '0';
+  key += "\ncatalog:";
+  key += std::to_string(static_cast<int>(m_catalog));
   if (m_config != nullptr) {
     const auto& networkTab = m_config->config().controlCenter.networkTab;
     key += "\nband:";
@@ -1838,6 +1873,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
   }
 
   if (m_network == nullptr) {
+    syncCatalogBar(false, false);
     auto empty = ui::column({
         .configure =
             [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
@@ -1851,22 +1887,17 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
     );
     m_list->addChild(std::move(empty));
   } else {
+    const bool hasVpns = !vpns.empty();
+    const bool hasCellular = m_modem != nullptr && !m_modem->modems().empty();
+    syncCatalogBar(hasVpns, hasCellular);
     const float opacity = panelCardOpacity();
     Flex* well = nullptr;
     auto wellCard = ui::column({
         .out = &well,
         .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
     });
-    bool needDivider = false;
-    const auto divide = [&]() {
-      if (well != nullptr && needDivider) {
-        addWellDivider(*well, scale);
-      }
-      needDivider = true;
-    };
 
-    if (!vpns.empty()) {
-      divide();
+    if (m_catalog == Catalog::Vpn && hasVpns) {
       auto vpnHeader = makeCardHeaderRow(i18n::tr("control-center.network.vpns"), scale);
       vpnHeader->addChild(
           ui::toggle({
@@ -1908,10 +1939,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
           well->addChild(std::move(row));
         }
       }
-    }
-
-    if (m_modem != nullptr && !m_modem->modems().empty()) {
-      divide();
+    } else if (m_catalog == Catalog::Cellular && hasCellular) {
       auto cellularHeader = makeCardHeaderRow(i18n::tr("control-center.network.cellular"), scale);
       cellularHeader->addChild(
           ui::toggle({
@@ -1929,47 +1957,46 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
         m_cellularRows.push_back(row.get());
         well->addChild(std::move(row));
       }
+    } else {
+      auto wifiHeader = makeCardHeaderRow(i18n::tr("control-center.network.wifi"), scale);
+      wifiHeader->addChild(
+          ui::spinner({
+              .out = &m_scanSpinner,
+              .color = colorSpecFromRole(ColorRole::Primary),
+              .spinnerSize = Style::baseGlyphSize * scale,
+              .visible = false,
+          })
+      );
+
+      wifiHeader->addChild(
+          ui::button({
+              .out = &m_rescanButton,
+              .glyph = "refresh",
+              .glyphSize = Style::baseGlyphSize * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.rescan"),
+              .padding = Style::spaceXs * scale,
+              .radius = Style::scaledRadiusSm(scale),
+              .onClick = [this]() {
+                if (m_network != nullptr) {
+                  m_network->requestScan();
+                }
+              },
+          })
+      );
+
+      wifiHeader->addChild(
+          ui::toggle({
+              .out = &m_wifiToggle,
+              .checkedImmediate = m_network->state().wirelessEnabled,
+              .toggleSize = ToggleSize::Medium,
+              .scale = scale,
+              .onChange = [this](bool checked) { requestWirelessEnabled(checked); },
+          })
+      );
+      well->addChild(std::move(wifiHeader));
+      well->addChild(buildApRows());
     }
-
-    divide();
-    auto wifiHeader = makeCardHeaderRow(i18n::tr("control-center.network.wifi"), scale);
-    wifiHeader->addChild(
-        ui::spinner({
-            .out = &m_scanSpinner,
-            .color = colorSpecFromRole(ColorRole::Primary),
-            .spinnerSize = Style::baseGlyphSize * scale,
-            .visible = false,
-        })
-    );
-
-    wifiHeader->addChild(
-        ui::button({
-            .out = &m_rescanButton,
-            .glyph = "refresh",
-            .glyphSize = Style::baseGlyphSize * scale,
-            .variant = ButtonVariant::Ghost,
-            .tooltip = i18n::tr("control-center.network.rescan"),
-            .padding = Style::spaceXs * scale,
-            .radius = Style::scaledRadiusSm(scale),
-            .onClick = [this]() {
-              if (m_network != nullptr) {
-                m_network->requestScan();
-              }
-            },
-        })
-    );
-
-    wifiHeader->addChild(
-        ui::toggle({
-            .out = &m_wifiToggle,
-            .checkedImmediate = m_network->state().wirelessEnabled,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = [this](bool checked) { requestWirelessEnabled(checked); },
-        })
-    );
-    well->addChild(std::move(wifiHeader));
-    well->addChild(buildApRows());
 
     m_list->addChild(std::move(wellCard));
 
@@ -2078,6 +2105,9 @@ void NetworkTab::onPanelCardOpacityChanged(float opacity) {
   }
   if (m_dnsNextDnsInput != nullptr) {
     m_dnsNextDnsInput->setSurfaceOpacity(opacity);
+  }
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
   }
 }
 
@@ -2468,4 +2498,85 @@ void NetworkTab::persistDnsFields() {
       (void)m_config->setOverride({"control_center", "network", "custom_dns"}, custom);
     }
   }
+}
+
+std::vector<NetworkTab::Catalog> NetworkTab::catalogOrder(bool hasVpns, bool hasCellular) const {
+  std::vector<Catalog> order;
+  order.push_back(Catalog::Wifi);
+  if (hasVpns) {
+    order.push_back(Catalog::Vpn);
+  }
+  if (hasCellular) {
+    order.push_back(Catalog::Cellular);
+  }
+  return order;
+}
+
+void NetworkTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const char* value = "wifi";
+  if (m_catalog == Catalog::Vpn) {
+    value = "vpn";
+  } else if (m_catalog == Catalog::Cellular) {
+    value = "cellular";
+  }
+  (void)m_config->setStateString("network_tab", "catalog", value);
+}
+
+void NetworkTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing || index >= m_catalogOrder.size()) {
+    return;
+  }
+  if (m_catalog == m_catalogOrder[index]) {
+    return;
+  }
+  m_catalog = m_catalogOrder[index];
+  persistCatalog();
+  m_lastStructureKey.clear();
+  if (auto* panels = PanelManager::current(); panels != nullptr) {
+    panels->requestLayout();
+  }
+}
+
+void NetworkTab::syncCatalogBar(bool hasVpns, bool hasCellular) {
+  auto order = catalogOrder(hasVpns, hasCellular);
+  if (std::ranges::find(order, m_catalog) == order.end()) {
+    m_catalog = Catalog::Wifi;
+    persistCatalog();
+  }
+  const bool show = order.size() > 1;
+  (void)setShown(m_catalogHost, show);
+  (void)setShown(m_catalogSwitch, show);
+  if (!show || m_catalogSwitch == nullptr) {
+    m_catalogOrder = std::move(order);
+    return;
+  }
+  if (order == m_catalogOrder && m_catalogSwitch->selectedIndex() < order.size()
+      && order[m_catalogSwitch->selectedIndex()] == m_catalog) {
+    return;
+  }
+  m_catalogOrder = std::move(order);
+  m_catalogSyncing = true;
+  m_catalogSwitch->clearOptions();
+  std::size_t selected = 0;
+  for (std::size_t i = 0; i < m_catalogOrder.size(); ++i) {
+    const char* glyph = "wifi";
+    const char* tooltipKey = "control-center.network.wifi";
+    if (m_catalogOrder[i] == Catalog::Vpn) {
+      glyph = "plug";
+      tooltipKey = "control-center.network.vpns";
+    } else if (m_catalogOrder[i] == Catalog::Cellular) {
+      glyph = "device-mobile";
+      tooltipKey = "control-center.network.cellular";
+    }
+    m_catalogSwitch->addOption("", glyph);
+    m_catalogSwitch->setOptionTooltip(i, i18n::tr(tooltipKey));
+    if (m_catalogOrder[i] == m_catalog) {
+      selected = i;
+    }
+  }
+  m_catalogSwitch->setSelectedIndex(selected);
+  m_catalogSyncing = false;
 }

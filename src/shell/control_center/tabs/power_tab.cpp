@@ -14,6 +14,8 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
+#include "ui/controls/progress_bar.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 
@@ -161,46 +163,73 @@ std::unique_ptr<Flex> PowerTab::create() {
       .out = &m_root,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-  });
-
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
 
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
+  buildSessionCard(*tab, scale);
 
-  buildSessionCard(*content, scale);
-
-  if (m_upower != nullptr || m_powerProfiles != nullptr) {
+  if (m_upower != nullptr || m_powerProfiles != nullptr || m_idleInhibitor != nullptr) {
     auto well = ui::column({
         .out = &m_batteryWell,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .visible = false,
+        .participatesInLayout = false,
         .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
           applySectionCardStyle(card, scale, opacity);
         },
     });
     buildStatusCard(*well, scale);
-    m_profilesDivider = addWellDivider(*well, scale);
     buildProfilesCard(*well, scale);
-    m_chargingDivider = addWellDivider(*well, scale);
-    buildChargingCard(*well, scale);
-    m_healthDivider = addWellDivider(*well, scale);
-    buildHealthCard(*well, scale);
-    m_peripheralsDivider = addWellDivider(*well, scale);
-    buildPeripheralsCard(*well, scale);
-    content->addChild(std::move(well));
-    syncBatteryWell();
+    if (m_idleInhibitor != nullptr) {
+      auto caffeine = ui::column({
+          .out = &m_caffeineRow,
+          .align = FlexAlign::Stretch,
+          .visible = false,
+          .participatesInLayout = false,
+      });
+      m_caffeineToggle = addToggleRow(
+          *caffeine, scale, i18n::tr("control-center.shortcuts.caffeine"),
+          [this](bool checked) {
+            if (m_syncingCaffeine || m_idleInhibitor == nullptr) {
+              return;
+            }
+            m_idleInhibitor->setEnabled(checked);
+          }
+      );
+      well->addChild(std::move(caffeine));
+    }
+    tab->addChild(std::move(well));
   }
 
-  m_root->addChild(std::move(scroll));
+  if (m_upower != nullptr) {
+    auto leftover = ui::scrollView({
+        .out = &m_leftoverScroll,
+        .contentScale = scale,
+        .scrollbarVisible = true,
+        .viewportPaddingH = 0.0F,
+        .viewportPaddingV = 0.0F,
+        .flexGrow = 1.0F,
+        .visible = false,
+        .participatesInLayout = false,
+        .configure =
+            [](ScrollView& scrollView) {
+              scrollView.clearFill();
+              scrollView.clearBorder();
+            },
+    });
+    auto* content = leftover->content();
+    content->setDirection(FlexDirection::Vertical);
+    content->setAlign(FlexAlign::Stretch);
+    content->setGap(Style::spaceMd * scale);
+    buildChargingCard(*content, scale);
+    buildHealthCard(*content, scale);
+    buildPeripheralsCard(*content, scale);
+    tab->addChild(std::move(leftover));
+  }
+
+  syncSessionCard();
+  syncBatteryWell();
 
   if (m_settings != nullptr) {
     return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
@@ -229,8 +258,10 @@ void PowerTab::setSettingsSearchQuery(std::string_view query) {
   }
 }
 
+SettingsPane* PowerTab::settingsPane() { return m_settings.get(); }
+
 void PowerTab::buildSessionCard(Flex& root, float scale) {
-  if (m_session == nullptr && m_idleInhibitor == nullptr) {
+  if (m_session == nullptr) {
     return;
   }
 
@@ -242,17 +273,23 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.session"), scale));
 
-  auto actions = ui::row({.align = FlexAlign::Stretch, .gap = Style::spaceSm * scale});
+  auto actions = ui::row({
+      .out = &m_sessionActionsRow,
+      .align = FlexAlign::Stretch,
+      .wrap = true,
+      .gap = Style::spaceSm * scale,
+  });
+  const float actionHeight = Style::controlHeight * scale;
+  const float actionPad = Style::spaceMd * scale;
   actions->addChild(
       ui::button({
           .out = &m_lockButton,
           .text = i18n::tr("session.actions.lock"),
           .glyph = session_action::defaultGlyph("lock"),
           .variant = ButtonVariant::Ghost,
-          .minHeight = Style::controlHeight * scale,
-          .paddingH = Style::spaceMd * scale,
+          .minHeight = actionHeight,
+          .paddingH = actionPad,
           .flexGrow = 1.0F,
           .onClick =
               [this]() {
@@ -269,106 +306,65 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
           .text = i18n::tr("session.actions.suspend"),
           .glyph = session_action::defaultGlyph("suspend"),
           .variant = ButtonVariant::Ghost,
-          .minHeight = Style::controlHeight * scale,
-          .paddingH = Style::spaceMd * scale,
+          .minHeight = actionHeight,
+          .paddingH = actionPad,
           .flexGrow = 1.0F,
           .onClick = [this]() { runSessionAction("suspend"); },
       })
   );
-  card->addChild(std::move(actions));
-
-  auto powerActions = ui::row({
-      .out = &m_powerActionsRow,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-  });
-  powerActions->addChild(
+  actions->addChild(
       ui::button({
           .out = &m_logoutButton,
           .text = i18n::tr("session.actions.logout"),
           .glyph = session_action::defaultGlyph("logout"),
           .variant = ButtonVariant::Ghost,
-          .minHeight = Style::controlHeight * scale,
-          .paddingH = Style::spaceMd * scale,
+          .minHeight = actionHeight,
+          .paddingH = actionPad,
           .flexGrow = 1.0F,
           .onClick = [this]() { runSessionAction("logout"); },
       })
   );
-  powerActions->addChild(
+  actions->addChild(
       ui::button({
           .out = &m_rebootButton,
           .text = i18n::tr("session.actions.reboot"),
           .glyph = session_action::defaultGlyph("reboot"),
           .variant = ButtonVariant::Destructive,
-          .minHeight = Style::controlHeight * scale,
-          .paddingH = Style::spaceMd * scale,
+          .minHeight = actionHeight,
+          .paddingH = actionPad,
           .flexGrow = 1.0F,
           .onClick = [this]() { runSessionAction("reboot"); },
       })
   );
-  powerActions->addChild(
+  actions->addChild(
       ui::button({
           .out = &m_shutdownButton,
           .text = i18n::tr("session.actions.shutdown"),
           .glyph = session_action::defaultGlyph("shutdown"),
           .variant = ButtonVariant::Destructive,
-          .minHeight = Style::controlHeight * scale,
-          .paddingH = Style::spaceMd * scale,
+          .minHeight = actionHeight,
+          .paddingH = actionPad,
           .flexGrow = 1.0F,
           .onClick = [this]() { runSessionAction("shutdown"); },
       })
   );
-  card->addChild(std::move(powerActions));
-
-  m_caffeineDivider = addWellDivider(*card, scale);
-  if (m_caffeineDivider != nullptr) {
-    m_caffeineDivider->setVisible(false);
-    m_caffeineDivider->setParticipatesInLayout(false);
-  }
-
-  auto caffeine = ui::row({
-      .out = &m_caffeineRow,
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .minHeight = Style::controlHeightSm * scale,
-      .visible = false,
-  });
-  caffeine->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.shortcuts.caffeine"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  caffeine->addChild(
-      ui::toggle({
-          .out = &m_caffeineToggle,
-          .checkedImmediate = false,
-          .toggleSize = ToggleSize::Medium,
-          .scale = scale,
-          .onChange =
-              [this](bool checked) {
-                if (m_syncingCaffeine || m_idleInhibitor == nullptr) {
-                  return;
-                }
-                m_idleInhibitor->setEnabled(checked);
-              },
-      })
-  );
-  card->addChild(std::move(caffeine));
+  card->addChild(std::move(actions));
   root.addChild(std::move(card));
   syncSessionCard();
 }
 
 void PowerTab::syncSessionCard() {
   const bool lockEnabled = m_config != nullptr && m_config->isLockScreenEnabled();
-  if (m_lockButton != nullptr) {
-    (void)setShown(m_lockButton, m_session != nullptr && lockEnabled);
-  }
-  if (m_suspendButton != nullptr) {
-    (void)setShown(m_suspendButton, m_session != nullptr);
-  }
+  bool anySession = false;
+  auto showAction = [&](Button* button, bool show) {
+    if (button == nullptr) {
+      return;
+    }
+    (void)setShown(button, show);
+    anySession = anySession || show;
+  };
+  showAction(m_lockButton, m_session != nullptr && lockEnabled);
+  showAction(m_suspendButton, m_session != nullptr);
 
   const auto actionEnabled = [this](std::string_view action) {
     if (m_session == nullptr || m_config == nullptr) {
@@ -381,25 +377,13 @@ void PowerTab::syncSessionCard() {
     }
     return true;
   };
-  if (m_logoutButton != nullptr) {
-    (void)setShown(m_logoutButton, actionEnabled("logout"));
-  }
-  if (m_rebootButton != nullptr) {
-    (void)setShown(m_rebootButton, actionEnabled("reboot"));
-  }
-  if (m_shutdownButton != nullptr) {
-    (void)setShown(m_shutdownButton, actionEnabled("shutdown"));
-  }
-  if (m_powerActionsRow != nullptr) {
-    (void)setShown(
-        m_powerActionsRow, actionEnabled("logout") || actionEnabled("reboot") || actionEnabled("shutdown")
-    );
-  }
+  showAction(m_logoutButton, actionEnabled("logout"));
+  showAction(m_rebootButton, actionEnabled("reboot"));
+  showAction(m_shutdownButton, actionEnabled("shutdown"));
+  (void)setShown(m_sessionActionsRow, anySession);
+  (void)setShown(m_sessionCard, anySession);
 
   const bool caffeineAvailable = m_idleInhibitor != nullptr && m_idleInhibitor->available();
-  if (m_caffeineDivider != nullptr) {
-    (void)setShown(m_caffeineDivider, caffeineAvailable);
-  }
   if (m_caffeineRow != nullptr) {
     (void)setShown(m_caffeineRow, caffeineAvailable);
   }
@@ -434,11 +418,15 @@ void PowerTab::buildChargingCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .out = &m_chargingCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
   });
-  m_chargingCard = card.get();
   card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.charging.title"), scale));
   card->addChild(
       ui::column({
@@ -456,12 +444,12 @@ void PowerTab::buildStatusCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .out = &m_statusCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
   });
-  m_statusCard = card.get();
-
-  card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.battery"), scale));
 
   auto topRow = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
@@ -500,7 +488,11 @@ void PowerTab::buildStatusCard(Flex& root, float scale) {
   );
 
   auto timeRow = ui::row(
-      {.out = &m_timeRow, .align = FlexAlign::Center, .gap = Style::spaceXs * scale, .visible = false},
+      {.out = &m_timeRow,
+       .align = FlexAlign::Center,
+       .gap = Style::spaceXs * scale,
+       .visible = false,
+       .participatesInLayout = false},
       ui::glyph({
           .glyph = "clock",
           .glyphSize = Style::fontSizeCaption * scale,
@@ -516,7 +508,11 @@ void PowerTab::buildStatusCard(Flex& root, float scale) {
   card->addChild(std::move(timeRow));
 
   auto rateRow = ui::row(
-      {.out = &m_rateRow, .align = FlexAlign::Center, .gap = Style::spaceXs * scale, .visible = false},
+      {.out = &m_rateRow,
+       .align = FlexAlign::Center,
+       .gap = Style::spaceXs * scale,
+       .visible = false,
+       .participatesInLayout = false},
       ui::glyph({
           .glyph = "bolt",
           .glyphSize = Style::fontSizeCaption * scale,
@@ -551,12 +547,12 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .out = &m_profilesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
   });
-  m_profilesCard = card.get();
 
-  card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.power-profile"), scale));
+  auto profileRow = makeControlRow(i18n::tr("control-center.power.power-profile"), scale, nullptr, true);
 
   std::vector<ui::SegmentedOption> options;
   options.reserve(m_profileOrder.size());
@@ -568,7 +564,7 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
     );
   }
 
-  card->addChild(
+  profileRow->addChild(
       ui::segmented({
           .out = &m_profiles,
           .options = std::move(options),
@@ -577,6 +573,7 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
           .surfaceOpacity = panelCardOpacity(),
           .surfaceRole = ColorRole::Surface,
           .equalSegmentWidths = true,
+          .flexGrow = 1.0F,
           .onChange = [this](std::size_t index) {
             if (m_syncingProfiles || m_powerProfiles == nullptr || index >= m_profileOrder.size()) {
               return;
@@ -585,9 +582,14 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
           },
       })
   );
+  card->addChild(std::move(profileRow));
 
   auto inhibitedRow = ui::row(
-      {.out = &m_inhibitedRow, .align = FlexAlign::Center, .gap = Style::spaceXs * scale, .visible = false},
+      {.out = &m_inhibitedRow,
+       .align = FlexAlign::Center,
+       .gap = Style::spaceXs * scale,
+       .visible = false,
+       .participatesInLayout = false},
       ui::glyph({
           .glyph = "alert-triangle",
           .glyphSize = Style::fontSizeCaption * scale,
@@ -612,11 +614,15 @@ void PowerTab::buildHealthCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .out = &m_healthCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
   });
-  m_healthCard = card.get();
 
   auto header = makeCardHeaderRow(i18n::tr("control-center.power.health"), scale);
   header->addChild(
@@ -658,11 +664,15 @@ void PowerTab::buildPeripheralsCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .out = &m_peripheralsCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
+        applySectionCardStyle(section, scale, opacity);
+      },
   });
-  m_peripheralsCard = card.get();
 
   card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.peripherals"), scale));
 
@@ -678,20 +688,16 @@ void PowerTab::onClose() {
   }
   m_root = nullptr;
   m_sessionCard = nullptr;
-  m_caffeineDivider = nullptr;
   m_lockButton = nullptr;
   m_suspendButton = nullptr;
   m_logoutButton = nullptr;
   m_rebootButton = nullptr;
   m_shutdownButton = nullptr;
-  m_powerActionsRow = nullptr;
+  m_sessionActionsRow = nullptr;
   m_caffeineToggle = nullptr;
   m_caffeineRow = nullptr;
   m_batteryWell = nullptr;
-  m_profilesDivider = nullptr;
-  m_chargingDivider = nullptr;
-  m_healthDivider = nullptr;
-  m_peripheralsDivider = nullptr;
+  m_leftoverScroll = nullptr;
   m_statusCard = nullptr;
   m_statusGlyph = nullptr;
   m_percentLabel = nullptr;
@@ -1059,28 +1065,45 @@ void PowerTab::rebuildPeripherals() {
     for (const auto& device : peripherals) {
       PeripheralRow entry;
       entry.path = device.path;
-      auto row = ui::row(
-          {.out = &entry.row, .align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-          ui::glyph({
-              .glyph = batteryDeviceGlyphName(device.type),
-              .glyphSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          }),
-          ui::label({
-              .out = &entry.nameLabel,
-              .text = deviceDisplayName(device),
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-              .maxLines = 1,
-              .ellipsize = TextEllipsize::End,
-              .flexGrow = 1.0F,
-          }),
-          ui::label({
-              .out = &entry.pctLabel,
-              .text = "",
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .minWidth = Style::controlHeightSm * scale,
+      auto row = ui::column({
+          .out = &entry.row,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      });
+      row->addChild(
+          ui::row(
+              {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
+              ui::glyph({
+                  .glyph = batteryDeviceGlyphName(device.type),
+                  .glyphSize = Style::fontSizeBody * scale,
+                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              }),
+              ui::label({
+                  .out = &entry.nameLabel,
+                  .text = deviceDisplayName(device),
+                  .fontSize = Style::fontSizeCaption * scale,
+                  .color = colorSpecFromRole(ColorRole::OnSurface),
+                  .maxLines = 1,
+                  .ellipsize = TextEllipsize::End,
+                  .flexGrow = 1.0F,
+              }),
+              ui::label({
+                  .out = &entry.pctLabel,
+                  .text = "",
+                  .fontSize = Style::fontSizeCaption * scale,
+                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                  .minWidth = Style::controlHeightSm * scale,
+              })
+          )
+      );
+      row->addChild(
+          ui::progressBar({
+              .out = &entry.bar,
+              .fill = colorSpecFromRole(ColorRole::Primary),
+              .track = colorSpecFromRole(ColorRole::Surface),
+              .radius = Style::sliderTrackHeight * scale * 0.5F,
+              .progress = 0.0F,
+              .height = Style::sliderTrackHeight * scale,
           })
       );
       m_peripheralsList->addChild(std::move(row));
@@ -1094,6 +1117,11 @@ void PowerTab::rebuildPeripherals() {
     if (m_peripheralRows[i].pctLabel != nullptr) {
       m_peripheralRows[i].pctLabel->setText(std::format("{:.0F}%", peripherals[i].state.percentage));
     }
+    if (m_peripheralRows[i].bar != nullptr) {
+      m_peripheralRows[i].bar->setProgress(
+          static_cast<float>(std::clamp(peripherals[i].state.percentage / 100.0, 0.0, 1.0))
+      );
+    }
   }
 }
 
@@ -1102,20 +1130,13 @@ void PowerTab::syncBatteryWell() {
     return node != nullptr && node->visible() && node->participatesInLayout();
   };
 
-  bool any = shown(m_statusCard);
-  auto lead = [&](Node* divider, const Node* card) {
-    const bool cardShown = shown(card);
-    (void)setShown(divider, cardShown && any);
-    if (cardShown) {
-      any = true;
+  const bool live = shown(m_statusCard) || shown(m_profilesCard) || shown(m_caffeineRow);
+  const bool leftover = shown(m_chargingCard) || shown(m_healthCard) || shown(m_peripheralsCard);
+  bool changed = setShown(m_batteryWell, live);
+  changed = setShown(m_leftoverScroll, leftover) || changed;
+  if (changed) {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
     }
-  };
-  lead(m_profilesDivider, m_profilesCard);
-  lead(m_chargingDivider, m_chargingCard);
-  lead(m_healthDivider, m_healthCard);
-  lead(m_peripheralsDivider, m_peripheralsCard);
-
-  if (setShown(m_batteryWell, any)) {
-    PanelManager::instance().requestLayout();
   }
 }

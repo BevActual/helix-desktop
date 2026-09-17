@@ -68,20 +68,20 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
 | `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
-| `media` | Media | Media players, playback controls, and artwork. Header gear opens player ignore list. |
+| `media` | Media | Artwork keeps leftover height while something is playing. Player picker, track, progress, spectrum strip, transport, and player volume sit on one card. Tap the art to raise the player. Header gear opens the ignore list. |
 | `audio` | Audio | Output and input volume on one card, application streams underneath. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Brightness and enable on a compact card, Night Light under it. On niri, the arrangement map keeps leftover height when two or more displays are on; resolution, refresh, scale, rotation, and VRR sit under it. Header gear opens brightness service settings. |
 | `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
-| `power` | Power | Lock, suspend, logout, reboot, shutdown, caffeine, battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
-| `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Wi-Fi, VPN, and cellular lists sit under it. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
-| `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Paired and nearby devices sit under it. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
+| `power` | Power | Battery percent, power profiles, and caffeine on one compact card. Session lock, suspend, logout, reboot, and shutdown sit above it. Charge limits, battery health, and connected-device batteries sit under the card. Header gear opens session panel and idle settings. |
+| `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Hover Wi-Fi, VPN, and cellular chips to swap the leftover list. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
+| `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Hover Paired and Nearby to swap the leftover list. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
 | `camera` | Camera | Live preview stays on a stage so you can see the picture while you adjust. Zoom, pan, and tilt sit with the preview. Picture, Exposure, White Balance, and Focus scroll in the inspector beside it, or under it when the panel is narrow. Header reset restores factory control values. |
 | `weather` | Weather | Current conditions and forecast. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
 | `calendar` | Calendar | Month view, world clock, calendar accounts (add/edit/reconnect), and events. Turning calendar sync off leaves the enable switch on the accounts card. Header gear opens calendar format settings. |
-| `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
+| `notifications` | Notifications | Do Not Disturb and history filters on one compact card. Notification history sits under it. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
 | `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
 | `ai` | AI | Rate-limit meters and Open actions for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, and DeepSeek, plus local Ollama status, models, and start/stop. `ai-usage` still opens this tab. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. |
-| `capture` | Capture | **Screenshot** and **Record** segments. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, recent videos, and replay buffer. Header gear follows the active segment (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching segment. |
+| `capture` | Capture | Hover Screenshot and Record chips to swap the leftover view. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, recent videos, and replay buffer. Header gear follows the active chip (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching view. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
 | `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Turning sharing off leaves the enable switch. Header gear opens receive folder, auto-accept, and port. |
@@ -99,12 +99,12 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `control-center` | Control Center | Sidebar, width, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
 | `osd` | OSD | On-screen pop-ups for volume, brightness, and other events. Turning OSD off leaves the enable switch. Position follows orientation (wide vs stacked). Header gear opens popup kinds, monitors, and offsets, and repeats enable/position. |
 | `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. |
-| `keybinds` | Keybinds | On niri: top tabs for Attention, Open, Apps, Capture, Sound, and Session. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
+| `keybinds` | Keybinds | On niri: hover Attention, Open, Apps, Capture, Sound, and Session chips. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
 | `security` | Security | Lock screen and authentication |
 | `hooks` | Hooks | Commands at startup and on shell events |
 | `niri` | Niri | niri setup only: copy missing snippets and install `noctalia-setup.kdl`. Shown only in a niri session. Decorations and blur live on Theme; gaps/outer padding/columns on Windows; overview wallpaper and backdrop on Wallpaper; type-to-launch on Launcher. |
-| `plugins` | Plugins | Installed plugins and the plugin store. Hover Installed/Store. Header gear opens catalog sources. |
-| `packages` | Packages | Fedora, Flatpak, and firmware updates, search, and installs. Hover a source or Search/Updates/Installed. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
+| `plugins` | Plugins | Hover Installed and Store chips to swap the leftover catalog. Header gear opens catalog sources. |
+| `packages` | Packages | Hover Fedora, Flatpak, and firmware chips to switch source. Search, Updates, and Installed stay labeled. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
 `niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
 
@@ -169,7 +169,7 @@ Header gear opens greeter sync when it is available. `noctalia msg settings-togg
 
 ## Keybinds
 
-The Keybinds tab is niri compositor shortcuts. Top tabs switch between **Attention**, **Open**, **Apps**, **Capture**, **Sound**, and **Session**. Unfinished rows (missing, or a recommended key taken in your own `binds { }`) live on **Attention** and also remain in their category; that tab hides when the inbox is empty. Search shows matches from every section. Keys that only exist in an included stock file such as Fedora's `default-config.kdl` are not treated as taken: **Add** writes them into `noctalia-binds.kdl` last, so they override the stock action. Missing rows stay unset until you record a chord. Restore puts a managed custom chord back on the recommended key; Remove drops it from `noctalia-binds.kdl` only.
+The Keybinds tab is niri compositor shortcuts. Hover **Attention**, **Open**, **Apps**, **Capture**, **Sound**, and **Session** chips to switch leftover groups. Unfinished rows (missing, or a recommended key taken in your own `binds { }`) live on **Attention** and also remain in their category; that chip hides when the inbox is empty. Search shows matches from every section. Keys that only exist in an included stock file such as Fedora's `default-config.kdl` are not treated as taken: **Add** writes them into `noctalia-binds.kdl` last, so they override the stock action. Missing rows stay unset until you record a chord. Restore puts a managed custom chord back on the recommended key; Remove drops it from `noctalia-binds.kdl` only.
 
 **Apps** are niri `spawn` binds, not Helix IPC. Add an installed application, then record a chord. Those lines stay in `noctalia-binds.kdl` with the rest of the managed binds.
 
@@ -179,7 +179,7 @@ In-panel navigation (Enter, Escape, arrows, Tab) still uses the defaults. Header
 
 ## Media
 
-The Media tab shows active players and playback controls independent of any bar media widget. It is useful when multiple players are running or when artwork and track metadata need more room than a bar capsule can provide.
+The Media tab is a now-playing stage. Artwork keeps leftover height while something is playing. A compact card holds the player picker, track, progress with elapsed and remaining time, a spectrum strip, transport, and per-player volume. Tap the artwork to raise the player. Ignore-list policy stays under the header gear; Hide this player adds the current app to that list.
 
 ## Audio
 
@@ -215,7 +215,7 @@ The current connection card also shows live throughput (when the system monitor 
 
 The current connection card also has icon tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Hover each tool. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
 
-Wi-Fi, VPN, and cellular lists sit under that card so they keep the leftover height.
+Hover Wi-Fi, VPN, and cellular chips on that card to swap which list keeps leftover height. The VPN and cellular chips appear when those connections exist.
 
 Header gear opens Network settings: Wi-Fi band filter and ignored SSIDs. Dual-band networks are listed once (the strongest BSS), so a 5 GHz filter hides a network whose strongest copy is on 2.4 GHz. iwd access points have no frequency and stay visible only when the band filter is **All**.
 
@@ -247,7 +247,7 @@ Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for m
 
 ## Bluetooth
 
-The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Device lists sit under that card so they keep the leftover height. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
+The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Hover Paired and Nearby chips to swap the leftover list. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
 
 ```toml
 [control_center.bluetooth]
@@ -257,7 +257,7 @@ discovery_seconds = 10
 
 ## Capture {#capture}
 
-The Capture tab combines screenshots and screen recording in one Services page with **Screenshot | Record** segments. Hover a segment for what it does. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching segment. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
+The Capture tab combines screenshots and screen recording in one Services page. Hover Screenshot and Record chips to swap the leftover view. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching view. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
 
 ### Screenshot {#screenshot}
 
@@ -412,7 +412,7 @@ Week numbers are a decoration of the month grid, so they work with `[calendar].e
 
 ## Notifications
 
-The Notifications tab shows notification history and notification actions, including Do Not Disturb. Hover a history row's expand/collapse and remove icons. Filter with **All**, **Today**, **Yesterday**, or **Older**. Notification daemon and history behavior are documented under [Notifications](/noctalia/services/notifications/).
+The Notifications tab keeps Do Not Disturb and history filters on a compact card, with the leftover height for stored notifications. Hover a history row's expand/collapse and remove icons. Filter with **All**, **Today**, **Yesterday**, or **Older**. Clear all sits with the filter when there is history. Notification daemon and history behavior are documented under [Notifications](/noctalia/services/notifications/).
 
 ## Screen Time
 
@@ -474,15 +474,15 @@ The Niri and Windows pages are shown only when the session is running under niri
 
 ## Power
 
-The Power tab consolidates session actions and power-management status, backed by UPower and `power-profiles-daemon`:
+The Power tab keeps live power state on compact cards and longer lists underneath, backed by UPower and `power-profiles-daemon`:
 
-- **Session** - lock, suspend, logout, reboot, shutdown, and caffeine (keep awake). Reboot and shutdown use the destructive style. Custom session actions and countdown confirmation stay on the session panel.
-- **Battery** - charge percentage, charging/discharging state, time remaining (or time until full), and current draw in watts
-- **Power Profile** - a selector for the profiles your machine exposes (power-saver, balanced, performance); switching here is equivalent to the Home shortcut and bar widget
+- **Session** - lock, suspend, logout, reboot, and shutdown as wrapping icon-and-text buttons. Reboot and shutdown use the destructive style. Custom session actions and countdown confirmation stay on the session panel behind header gear.
+- **Battery** - charge percentage, charging/discharging state, time remaining (or time until full), current draw in watts, the power-profile segmented control (power-saver, balanced, performance), and caffeine (keep awake). Switching the profile here is equivalent to the Home shortcut and bar widget.
+- **Battery charging** - charge-limit toggles and firmware/externally managed status when UPower exposes them
 - **Battery Health** - current full-charge capacity as a percentage of the original design capacity
 - **Connected Devices** - battery levels for peripherals such as Bluetooth mice, keyboards, and headsets
 
-Sections appear only when their data is available: the battery and health sections require a system battery, the profile selector requires `power-profiles-daemon`, and the connected-devices section appears when peripherals report a battery. The tab itself is hidden on systems where neither UPower nor `power-profiles-daemon` is running.
+Charge limits, health, and connected devices sit in the leftover list and appear only when their data is available. The compact battery card requires a system battery, `power-profiles-daemon`, or an idle inhibitor. The tab itself is hidden on systems where neither UPower nor `power-profiles-daemon` is running.
 
 ## Related IPC
 

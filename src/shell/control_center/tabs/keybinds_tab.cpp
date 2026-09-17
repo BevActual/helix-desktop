@@ -104,19 +104,21 @@ std::unique_ptr<Flex> KeybindsTab::create() {
           .out = &m_sectionSwitchHost,
           .align = FlexAlign::Stretch,
           .gap = 0.0F,
+          .configure =
+              [scale, opacity = panelCardOpacity()](Flex& section) {
+                applySectionCardStyle(section, scale, opacity);
+                section.setGap(Style::spaceXs * scale);
+                section.setPadding(Style::spaceSm * scale);
+              },
       })
   );
   if (m_sectionSwitchHost != nullptr) {
     m_sectionSwitchHost->addChild(
         ui::segmented({
             .out = &m_sectionSwitch,
-            .fontSize = Style::fontSizeCaption,
             .scale = scale,
             .compact = true,
             .surfaceOpacity = panelCardOpacity(),
-            .surfaceRole = ColorRole::Surface,
-            .equalSegmentWidths = true,
-            .flexGrow = 1.0F,
             .onChange = [this](std::size_t index) { applySection(index); },
         })
     );
@@ -330,7 +332,7 @@ void KeybindsTab::syncSectionSwitch() {
   m_sectionSwitch->clearOptions();
   std::size_t selected = 0;
   for (std::size_t i = 0; i < m_visibleSections.size(); ++i) {
-    m_sectionSwitch->addOption(i18n::tr(sectionTabKey(m_visibleSections[i])));
+    m_sectionSwitch->addOption("", sectionGlyph(m_visibleSections[i]));
     m_sectionSwitch->setOptionTooltip(i, i18n::tr(sectionTabTooltipKey(m_visibleSections[i])));
     if (m_visibleSections[i] == m_section) {
       selected = i;
@@ -413,6 +415,24 @@ std::string_view KeybindsTab::sectionTabTooltipKey(Section section) {
     return "control-center.keybinds.tab-session-tooltip";
   }
   return "control-center.keybinds.tab-open-tooltip";
+}
+
+std::string_view KeybindsTab::sectionGlyph(Section section) {
+  switch (section) {
+  case Section::Attention:
+    return "alert-triangle";
+  case Section::Open:
+    return "layout-dashboard";
+  case Section::Apps:
+    return "apps";
+  case Section::Capture:
+    return "screenshot";
+  case Section::Sound:
+    return "volume";
+  case Section::Session:
+    return "power";
+  }
+  return "layout-dashboard";
 }
 
 std::string_view KeybindsTab::sectionStateKey(Section section) {

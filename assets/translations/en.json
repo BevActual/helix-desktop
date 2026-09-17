@@ -388,6 +388,7 @@
       },
       "reject": "Reject",
       "rescan": "Scan for nearby devices",
+      "nearby": "Nearby",
       "rfkill-blocked": "Bluetooth is blocked by the system. Turn it on to clear the block.",
       "sections": {
         "available": "Available",
@@ -582,17 +583,23 @@
       "store-partial": "Loaded with errors from {sources}."
     },
     "media": {
-      "active-player": "Active player",
-      "choose-player": "Choose player",
+      "active-player": "Automatic",
+      "automatic": "Automatic",
+      "hide-player": "Hide this player",
       "next": "Next",
       "nothing-playing": "Nothing Playing",
       "now-playing": "Now Playing",
+      "open-player": "Open player",
       "pause": "Pause",
       "play": "Play",
+      "player": "Player",
       "previous": "Previous",
       "repeat": "Repeat",
+      "repeat-all": "Repeat all",
+      "repeat-one": "Repeat one",
       "shuffle": "Shuffle",
-      "start-playback": "Start playback in a music or video app"
+      "start-playback": "Start playback in a music or video app",
+      "volume": "Volume"
     },
     "network": {
       "anonymous-identity": "Anonymous identity (optional)",
@@ -701,6 +708,7 @@
     "notifications": {
       "clear-all": "Clear all notifications",
       "collapse": "Show less",
+      "dnd": "Do Not Disturb",
       "dnd-off": "Turn Do Not Disturb Off",
       "dnd-on": "Turn Do Not Disturb On",
       "empty-body": "Recent notifications will show here.",
@@ -718,6 +726,7 @@
       },
       "filter-empty-body": "No notifications match this filter.",
       "filter-empty-title": "Nothing here",
+      "history": "History",
       "remove": "Remove",
       "untitled": "Untitled notification"
     },

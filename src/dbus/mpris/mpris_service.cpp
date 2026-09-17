@@ -300,6 +300,7 @@ namespace {
     player["can_go_next"] = sdbus::Variant(info.canGoNext);
     player["can_go_previous"] = sdbus::Variant(info.canGoPrevious);
     player["can_seek"] = sdbus::Variant(info.canSeek);
+    player["can_raise"] = sdbus::Variant(info.canRaise);
     return player;
   }
 
@@ -690,7 +691,7 @@ void MprisService::registerIpc(IpcService& ipc) {
     const auto parts = noctalia::ipc::splitWords(args);
     if (parts.size() != 1) {
       return "error: media requires exactly one action "
-             "<next|previous|toggle|play|pause|stop|next-player|previous-player>\n";
+             "<next|previous|toggle|play|pause|stop|raise|next-player|previous-player>\n";
     }
 
     const std::string& action = parts[0];
@@ -712,6 +713,9 @@ void MprisService::registerIpc(IpcService& ipc) {
     if (action == "stop") {
       return stopActive() ? "ok\n" : "error: no active player or Stop unsupported\n";
     }
+    if (action == "raise") {
+      return raiseActive() ? "ok\n" : "error: no active player or Raise unsupported\n";
+    }
     if (action == "next-player") {
       return cycleActivePlayer(1) ? "ok\n" : "error: no media players available\n";
     }
@@ -719,7 +723,7 @@ void MprisService::registerIpc(IpcService& ipc) {
       return cycleActivePlayer(-1) ? "ok\n" : "error: no media players available\n";
     }
 
-    return "error: invalid media action (use next, previous, toggle, play, pause, stop, next-player, "
+    return "error: invalid media action (use next, previous, toggle, play, pause, stop, raise, next-player, "
            "previous-player)\n";
   });
 }
@@ -1096,6 +1100,36 @@ bool MprisService::setLoopStatusActive(std::string loopStatus) {
     return false;
   }
   return setLoopStatus(*active, std::move(loopStatus));
+}
+
+bool MprisService::raise(const std::string& busName) {
+  const auto it = m_players.find(busName);
+  if (it == m_players.end()) {
+    return false;
+  }
+
+  const auto proxyIt = m_playerProxies.find(busName);
+  if (proxyIt == m_playerProxies.end()) {
+    return false;
+  }
+
+  try {
+    proxyIt->second->callMethodAsync("Raise")
+        .onInterface(kMprisRootInterface)
+        .uponReplyInvoke(makeAsyncReplyHandler("raise", busName, "Raise"));
+    return true;
+  } catch (const sdbus::Error& e) {
+    kLog.warn("raise dispatch failed name={} err={}", busName, e.what());
+    return false;
+  }
+}
+
+bool MprisService::raiseActive() {
+  const auto active = chooseActivePlayer();
+  if (!active.has_value()) {
+    return false;
+  }
+  return raise(*active);
 }
 
 std::optional<int64_t> MprisService::position(const std::string& busName) const {
@@ -2102,7 +2136,8 @@ void MprisService::applyPlayerSnapshot(
         || previous_info.canGoNext != merged.canGoNext
         || previous_info.canPlay != merged.canPlay
         || previous_info.canPause != merged.canPause
-        || previous_info.canSeek != merged.canSeek;
+        || previous_info.canSeek != merged.canSeek
+        || previous_info.canRaise != merged.canRaise;
 
     if (trackChanged || previous_info.playbackStatus != merged.playbackStatus) {
       const std::weak_ptr<void> aliveGuard = m_aliveGuard;
@@ -2785,5 +2820,6 @@ MprisPlayerInfo MprisService::readPlayerInfoFromProperties(
       .canGoNext = get_bool_from_props(playerProps, "CanGoNext"),
       .canGoPrevious = get_bool_from_props(playerProps, "CanGoPrevious"),
       .canSeek = get_bool_from_props(playerProps, "CanSeek"),
+      .canRaise = get_bool_from_props(rootProps, "CanRaise"),
   };
 }

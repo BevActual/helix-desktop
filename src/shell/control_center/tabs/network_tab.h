@@ -32,6 +32,7 @@ class Label;
 class ModemManagerService;
 class ScrollView;
 class Select;
+class Segmented;
 class Spinner;
 class SystemMonitorService;
 class Toggle;
@@ -93,6 +94,12 @@ private:
   void syncDnsPicker();
   void persistDnsFields();
 
+  enum class Catalog : std::uint8_t { Wifi, Vpn, Cellular };
+  void applyCatalog(std::size_t index);
+  void persistCatalog();
+  void syncCatalogBar(bool hasVpns, bool hasCellular);
+  [[nodiscard]] std::vector<Catalog> catalogOrder(bool hasVpns, bool hasCellular) const;
+
   INetworkService* m_network = nullptr;
   NetworkSecretAgent* m_secrets = nullptr;
   ExternalIpService* m_externalIpService = nullptr;
@@ -105,6 +112,11 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Flex* m_currentCard = nullptr;
+  Flex* m_catalogHost = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Catalog m_catalog = Catalog::Wifi;
+  std::vector<Catalog> m_catalogOrder;
+  bool m_catalogSyncing = false;
   Label* m_currentTitle = nullptr;
   Label* m_currentDetail = nullptr;
   Label* m_throughputLabel = nullptr;
