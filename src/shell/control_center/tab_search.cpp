@@ -50,6 +50,7 @@ namespace control_center {
         {"firewall", "firewalld zone panic ports services ssh"},
         {"printers", "printer cups print jobs queue"},
         {"cast", "cast sharing rdp miracast chromecast wireless display tv"},
+        {"camera", "webcam webcam-preview exposure white-balance focus fov uvc v4l2"},
         {"privacy", "microphone camera webcam screen share capture mic location telemetry ping"},
         {"templates", "template rice rices"},
         {"wallpaper", "background wallpapers overview backdrop"},

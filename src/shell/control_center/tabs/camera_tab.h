@@ -20,6 +20,7 @@ class Flex;
 class Image;
 class Label;
 class Renderer;
+class ScrollView;
 class Select;
 struct ControlCenterServices;
 
@@ -43,7 +44,12 @@ private:
   void selectDevice(std::size_t index);
   void startSelectedDevice();
   void rebuildControls();
-  [[nodiscard]] std::unique_ptr<Flex> buildControlRow(const CameraControl& control);
+  void appendControl(Flex& parent, const CameraControl& control, bool withDivider);
+  void layoutStage(float contentWidth, float bodyHeight);
+  void layoutPreviewBox(float contentWidth, float bodyHeight);
+  void pinPreviewImage();
+  void syncPreviewAvailability();
+  void syncHeaderActions();
   void refreshDependentVisibility();
   void onFrame(int width, int height, const std::uint8_t* rgba);
 
@@ -52,11 +58,16 @@ private:
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_stage = nullptr;
+  Flex* m_previewColumn = nullptr;
+  Flex* m_previewCard = nullptr;
   Select* m_deviceSelect = nullptr;
   Label* m_emptyLabel = nullptr;
   Flex* m_previewBox = nullptr;
   Image* m_previewImage = nullptr;
   Label* m_previewUnavailableLabel = nullptr;
+  Flex* m_framingHost = nullptr;
+  ScrollView* m_controlsScroll = nullptr;
   Flex* m_controlsHost = nullptr;
   Button* m_resetButton = nullptr;
 

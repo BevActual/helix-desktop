@@ -6,6 +6,7 @@
 #include "render/core/texture_manager.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -24,6 +25,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <format>
+#include <functional>
 #include <string>
 #include <utility>
 
@@ -31,79 +34,79 @@ using namespace control_center;
 
 namespace {
 
-  void setShown(Node* node, bool shown) {
+  constexpr float kSplitMinWidth = 440.0F;
+  constexpr float kPreviewPaneMinWidth = 180.0F;
+  constexpr float kInspectorMinWidth = 200.0F;
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
     if (node == nullptr) {
-      return;
+      return false;
     }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
+    return changed;
   }
 
-  // Sections mirror how Elgato Camera Hub organizes webcam controls: an Auto
-  // toggle/mode sits above the manual slider it gates, grouped by what the
-  // control affects rather than in raw driver enumeration order.
-  enum class ControlSection : std::uint8_t { Exposure, WhiteBalance, Details, FieldOfView, Focus, Other };
+  [[nodiscard]] std::string folded(std::string text) {
+    std::ranges::transform(text, text.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+  }
+
+  // Picture / Exposure / White Balance / Focus follow Camera Hub and Logitech
+  // Capture. Zoom/pan/tilt stay with the preview (Apple's Video menu framing).
+  enum class ControlSection : std::uint8_t { Picture, Exposure, WhiteBalance, Focus, Framing, Other };
 
   const char* sectionTitleKey(ControlSection section) {
     switch (section) {
+    case ControlSection::Picture:
+      return "control-center.camera.sections.picture";
     case ControlSection::Exposure:
       return "control-center.camera.sections.exposure";
     case ControlSection::WhiteBalance:
       return "control-center.camera.sections.white-balance";
-    case ControlSection::Details:
-      return "control-center.camera.sections.details";
-    case ControlSection::FieldOfView:
-      return "control-center.camera.sections.field-of-view";
     case ControlSection::Focus:
       return "control-center.camera.sections.focus";
+    case ControlSection::Framing:
     case ControlSection::Other:
-      return "control-center.camera.sections.other";
+      break;
     }
     return "control-center.camera.sections.other";
   }
 
   ControlSection sectionFor(std::uint32_t id) {
     namespace ids = camera_control_ids;
-    if (id == ids::exposureAuto || id == ids::exposureAbsolute) {
+    if (id == ids::exposureAuto || id == ids::exposureAbsolute || id == ids::gain
+        || id == ids::backlightCompensation || id == ids::powerLineFrequency) {
       return ControlSection::Exposure;
     }
     if (id == ids::autoWhiteBalance || id == ids::whiteBalanceTemperature) {
       return ControlSection::WhiteBalance;
     }
     if (id == ids::zoomAbsolute || id == ids::panAbsolute || id == ids::tiltAbsolute) {
-      return ControlSection::FieldOfView;
+      return ControlSection::Framing;
     }
     if (id == ids::focusAuto || id == ids::focusAbsolute) {
       return ControlSection::Focus;
     }
     if (id == ids::brightness || id == ids::contrast || id == ids::saturation || id == ids::sharpness
-        || id == ids::hue || id == ids::gain || id == ids::gamma || id == ids::backlightCompensation
-        || id == ids::powerLineFrequency) {
-      return ControlSection::Details;
+        || id == ids::hue) {
+      return ControlSection::Picture;
     }
     return ControlSection::Other;
   }
 
-  // Order controls within a section the way Camera Hub does: the auto
-  // mode/toggle first, then the manual value it gates.
-  constexpr std::array<ControlSection, 6> kSectionOrder{
-      ControlSection::Exposure, ControlSection::WhiteBalance, ControlSection::Details,
-      ControlSection::FieldOfView, ControlSection::Focus, ControlSection::Other,
+  constexpr std::array<ControlSection, 5> kInspectorOrder{
+      ControlSection::Picture, ControlSection::Exposure, ControlSection::WhiteBalance, ControlSection::Focus,
+      ControlSection::Other,
   };
 
-  // For V4L2_CID_EXPOSURE_AUTO, UVC drivers report menu items like "Manual
-  // Mode" / "Aperture Priority Mode" rather than a plain boolean; treat the
-  // currently selected item's name as the source of truth for "manual".
   bool selectedMenuItemLooksManual(const CameraControl& control) {
     for (const auto& item : control.menuItems) {
       if (item.index != control.value) {
         continue;
       }
-      std::string lower = item.name;
-      std::ranges::transform(lower, lower.begin(), [](unsigned char c) {
-        return static_cast<char>(std::tolower(c));
-      });
-      return lower.find("manual") != std::string::npos;
+      return folded(item.name).find("manual") != std::string::npos;
     }
     return false;
   }
@@ -113,11 +116,175 @@ namespace {
     return it != controls.end() ? &*it : nullptr;
   }
 
+  bool isAutoGate(const CameraControl& control) {
+    namespace ids = camera_control_ids;
+    return control.id == ids::exposureAuto || control.id == ids::autoWhiteBalance || control.id == ids::focusAuto;
+  }
+
+  [[nodiscard]] std::string integerLabel(double value) {
+    return std::to_string(static_cast<int>(std::lround(value)));
+  }
+
+  [[nodiscard]] std::string kelvinLabel(double value) {
+    return std::format("{} K", static_cast<int>(std::lround(value)));
+  }
+
+  // V4L2_CID_EXPOSURE_ABSOLUTE is in 100 µs units.
+  [[nodiscard]] std::string shutterLabel(double value) {
+    const double seconds = value * 1.0e-4;
+    if (seconds <= 0.0) {
+      return integerLabel(value);
+    }
+    const int denom = static_cast<int>(std::lround(1.0 / seconds));
+    if (denom >= 2) {
+      return std::format("1/{}", denom);
+    }
+    return std::format("{:.3f}s", seconds);
+  }
+
+  [[nodiscard]] std::string controlTitle(const CameraControl& control) {
+    namespace ids = camera_control_ids;
+    if (control.id == ids::brightness) {
+      return i18n::tr("control-center.camera.controls.brightness");
+    }
+    if (control.id == ids::contrast) {
+      return i18n::tr("control-center.camera.controls.contrast");
+    }
+    if (control.id == ids::saturation) {
+      return i18n::tr("control-center.camera.controls.saturation");
+    }
+    if (control.id == ids::sharpness) {
+      return i18n::tr("control-center.camera.controls.sharpness");
+    }
+    if (control.id == ids::hue) {
+      return i18n::tr("control-center.camera.controls.hue");
+    }
+    if (control.id == ids::gamma) {
+      return i18n::tr("control-center.camera.controls.gamma");
+    }
+    if (control.id == ids::gain) {
+      return i18n::tr("control-center.camera.controls.gain");
+    }
+    if (control.id == ids::backlightCompensation) {
+      return i18n::tr("control-center.camera.controls.backlight");
+    }
+    if (control.id == ids::powerLineFrequency) {
+      return i18n::tr("control-center.camera.controls.flicker");
+    }
+    if (control.id == ids::whiteBalanceTemperature) {
+      return i18n::tr("control-center.camera.controls.temperature");
+    }
+    if (control.id == ids::exposureAbsolute) {
+      return i18n::tr("control-center.camera.controls.shutter");
+    }
+    if (control.id == ids::focusAbsolute) {
+      return i18n::tr("control-center.camera.controls.focus");
+    }
+    if (control.id == ids::zoomAbsolute) {
+      return i18n::tr("control-center.camera.controls.zoom");
+    }
+    if (control.id == ids::panAbsolute) {
+      return i18n::tr("control-center.camera.controls.pan");
+    }
+    if (control.id == ids::tiltAbsolute) {
+      return i18n::tr("control-center.camera.controls.tilt");
+    }
+    return control.name;
+  }
+
+  [[nodiscard]] std::string menuItemLabel(const CameraControl& control, const CameraControlMenuItem& item) {
+    if (control.id != camera_control_ids::exposureAuto) {
+      return item.name;
+    }
+    const std::string lower = folded(item.name);
+    if (lower.find("manual") != std::string::npos) {
+      return i18n::tr("control-center.camera.controls.manual");
+    }
+    if (lower.find("shutter") != std::string::npos) {
+      return i18n::tr("control-center.camera.controls.shutter-priority");
+    }
+    if (lower.find("aperture") != std::string::npos) {
+      return i18n::tr("control-center.camera.controls.aperture-priority");
+    }
+    if (lower.find("auto") != std::string::npos) {
+      return i18n::tr("control-center.camera.controls.auto");
+    }
+    return item.name;
+  }
+
+  std::function<std::string(double)> formatFor(const CameraControl& control) {
+    if (control.id == camera_control_ids::whiteBalanceTemperature) {
+      return kelvinLabel;
+    }
+    if (control.id == camera_control_ids::exposureAbsolute) {
+      return shutterLabel;
+    }
+    return integerLabel;
+  }
+
+  void addLiveSlider(
+      Flex& parent, float scale, const std::string& title, bool enabled, double minValue, double maxValue, double step,
+      double value, std::function<std::string(double)> format, std::function<void(double)> onChange
+  ) {
+    Label* valueLabel = nullptr;
+    auto header = makeControlRow(title, scale, nullptr, false);
+    header->addChild(
+        ui::label({
+            .out = &valueLabel,
+            .text = format(value),
+            .fontSize = Style::fontSizeCaption * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    parent.addChild(std::move(header));
+    parent.addChild(
+        ui::slider({
+            .minValue = minValue,
+            .maxValue = maxValue,
+            .step = step,
+            .value = value,
+            .enabled = enabled,
+            .trackHeight = Style::sliderTrackHeight * scale,
+            .thumbSize = Style::sliderThumbSize * scale,
+            .controlHeight = Style::controlHeight * scale,
+            .flexGrow = 1.0F,
+            .onValueChanged =
+                [valueLabel, format, callback = std::move(onChange)](double next) {
+                  if (valueLabel != nullptr) {
+                    valueLabel->setText(format(next));
+                  }
+                  if (callback) {
+                    callback(next);
+                  }
+                },
+        })
+    );
+  }
+
+  std::vector<const CameraControl*> membersOf(
+      const std::vector<CameraControl>& controls, ControlSection section, bool includeAuto
+  ) {
+    std::vector<const CameraControl*> members;
+    for (const auto& control : controls) {
+      if (sectionFor(control.id) != section) {
+        continue;
+      }
+      if (!includeAuto && isAutoGate(control)) {
+        continue;
+      }
+      members.push_back(&control);
+    }
+    return members;
+  }
+
 } // namespace
 
 CameraTab::CameraTab(const ControlCenterServices& services)
     : m_config(services.config), m_camera(services.camera),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "camera"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "camera", .showConfigureButton = false}
+      )) {
   if (m_camera != nullptr) {
     m_camera->setFrameCallback([this](int width, int height, const std::uint8_t* rgba) {
       onFrame(width, height, rgba);
@@ -132,30 +299,16 @@ std::unique_ptr<Flex> CameraTab::create() {
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
-
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
-  });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
 
   m_devices = m_camera != nullptr ? m_camera->listDevices() : std::vector<CameraDevice>{};
 
   if (m_devices.empty()) {
     auto emptyCard = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
+        .out = &m_previewCard,
+        .fillWidth = true,
         .configure =
             [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
     });
@@ -176,8 +329,8 @@ std::unique_ptr<Flex> CameraTab::create() {
             .maxLines = 3,
         })
     );
-    content->addChild(std::move(emptyCard));
-    live->addChild(std::move(scroll));
+    live->addChild(std::move(emptyCard));
+    syncHeaderActions();
     return m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
   }
 
@@ -190,6 +343,29 @@ std::unique_ptr<Flex> CameraTab::create() {
     m_selectedDeviceId = savedValid ? *saved : m_devices.front().id;
   }
 
+  auto stage = ui::row({
+      .out = &m_stage,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .fillWidth = true,
+      .flexGrow = 1.0F,
+  });
+
+  auto previewColumn = ui::column({
+      .out = &m_previewColumn,
+      .align = FlexAlign::Stretch,
+      .gap = 0.0F,
+      .fillWidth = true,
+      .flexGrow = 1.15F,
+  });
+
+  auto previewCard = ui::column({
+      .out = &m_previewCard,
+      .fillWidth = true,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+  });
+
   if (m_devices.size() > 1) {
     std::vector<std::string> labels;
     labels.reserve(m_devices.size());
@@ -200,69 +376,95 @@ std::unique_ptr<Flex> CameraTab::create() {
         selectedIndex = i;
       }
     }
-    content->addChild(
-        ui::select({
-            .out = &m_deviceSelect,
-            .options = labels,
-            .selectedIndex = selectedIndex,
-            .fontSize = Style::fontSizeBody * scale,
-            .controlHeight = Style::controlHeight * scale,
-            .flexGrow = 1.0F,
-            .onSelectionChanged = [this](std::size_t index, std::string_view) { selectDevice(index); },
-        })
+    m_deviceSelect = addSelectRow(
+        *previewCard, scale, i18n::tr("control-center.camera.device"), std::move(labels), panelCardOpacity(),
+        [this](std::size_t index) { selectDevice(index); }
     );
+    if (m_deviceSelect != nullptr) {
+      m_deviceSelect->setSelectedIndexSilently(selectedIndex);
+    }
+  } else {
+    previewCard->addChild(makeCardHeaderRow(m_devices.front().name, scale));
   }
 
   auto previewBox = ui::column({
       .out = &m_previewBox,
-      .align = FlexAlign::Center,
-      .justify = FlexJustify::Center,
+      .align = FlexAlign::Stretch,
+      .justify = FlexJustify::Start,
+      .fill = colorSpecFromRole(ColorRole::Surface),
+      .radius = Style::scaledRadiusMd(scale),
+      .minHeight = 140.0F * scale,
       .fillWidth = true,
-      .height = 220.0F * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .clipChildren = true,
   });
   previewBox->addChild(
       ui::image({
           .out = &m_previewImage,
           .fit = ImageFit::Contain,
           .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
+          .participatesInLayout = false,
       })
   );
-  previewBox->addChild(
+  previewCard->addChild(std::move(previewBox));
+  previewCard->addChild(
       ui::label({
           .out = &m_previewUnavailableLabel,
           .text = i18n::tr("control-center.camera.preview-unavailable"),
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
           .visible = false,
           .participatesInLayout = false,
       })
   );
-  content->addChild(std::move(previewBox));
-
-  content->addChild(
+  previewCard->addChild(
       ui::column({
-          .out = &m_controlsHost,
+          .out = &m_framingHost,
           .align = FlexAlign::Stretch,
-          .gap = Style::spaceMd * scale,
+          .visible = false,
+          .participatesInLayout = false,
       })
   );
+  previewColumn->addChild(std::move(previewCard));
+  stage->addChild(std::move(previewColumn));
 
-  content->addChild(
+  auto controlsScroll = ui::scrollView({
+      .out = &m_controlsScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  m_controlsHost = controlsScroll->content();
+  m_controlsHost->setDirection(FlexDirection::Vertical);
+  m_controlsHost->setAlign(FlexAlign::Stretch);
+  m_controlsHost->setGap(Style::spaceMd * scale);
+  stage->addChild(std::move(controlsScroll));
+  live->addChild(std::move(stage));
+
+  m_previewBound = false;
+  if (m_active) {
+    startSelectedDevice();
+  }
+  rebuildControls();
+  syncHeaderActions();
+
+  return m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
+}
+
+std::unique_ptr<Flex> CameraTab::createHeaderActions() {
+  const float scale = contentScale();
+  auto live = ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
       ui::button({
           .out = &m_resetButton,
-          .text = i18n::tr("control-center.camera.reset"),
           .glyph = "refresh",
-          .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
           .tooltip = i18n::tr("control-center.camera.reset-tooltip"),
-          .minHeight = Style::controlHeight * scale,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
           .onClick =
               [this]() {
                 if (m_camera != nullptr) {
@@ -270,22 +472,17 @@ std::unique_ptr<Flex> CameraTab::create() {
                 }
                 rebuildControls();
               },
+          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
-
-  m_previewBound = false;
-  if (m_active) {
-    startSelectedDevice();
-  }
-  rebuildControls();
-
-  live->addChild(std::move(scroll));
-  return m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
+  syncHeaderActions();
+  return m_settings->embedHeader(std::move(live), scale);
 }
 
-std::unique_ptr<Flex> CameraTab::createHeaderActions() { return m_settings->embedHeader(nullptr, contentScale()); }
-
 void CameraTab::setActive(bool active) {
+  if (m_active == active) {
+    return;
+  }
   m_active = active;
   if (active) {
     startSelectedDevice();
@@ -314,177 +511,287 @@ void CameraTab::startSelectedDevice() {
   if (m_camera == nullptr || m_selectedDeviceId.empty()) {
     return;
   }
+  if (m_camera->active() && m_camera->activeDeviceId() == m_selectedDeviceId && m_camera->previewAvailable()) {
+    syncPreviewAvailability();
+    return;
+  }
   m_camera->start(m_selectedDeviceId);
-  setShown(m_previewImage, m_camera->previewAvailable());
-  setShown(m_previewUnavailableLabel, !m_camera->previewAvailable());
+  syncPreviewAvailability();
+}
+
+void CameraTab::syncPreviewAvailability() {
+  const bool preview = m_camera != nullptr && m_camera->previewAvailable();
+  bool layoutDirty = setShown(m_previewBox, preview) || setShown(m_previewImage, preview);
+  layoutDirty = setShown(m_previewUnavailableLabel, !preview && m_camera != nullptr && m_camera->active())
+      || layoutDirty;
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void CameraTab::syncHeaderActions() {
+  if (setShown(m_resetButton, !m_selectedDeviceId.empty())) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void CameraTab::layoutStage(float contentWidth, float bodyHeight) {
+  (void)bodyHeight;
+  if (m_stage == nullptr || m_previewColumn == nullptr || m_controlsScroll == nullptr) {
+    return;
+  }
+  const float scale = contentScale();
+  const bool preview = m_previewBox != nullptr && m_previewBox->visible();
+  const bool split = preview && contentWidth >= kSplitMinWidth * scale;
+  m_stage->setDirection(split ? FlexDirection::Horizontal : FlexDirection::Vertical);
+  m_previewColumn->setFlexGrow(split ? 1.15F : 0.0F);
+  m_previewColumn->setMinWidth(split ? kPreviewPaneMinWidth * scale : 0.0F);
+  m_previewColumn->setFillHeight(split);
+  m_controlsScroll->setFlexGrow(1.0F);
+  m_controlsScroll->setMinWidth(split ? kInspectorMinWidth * scale : 0.0F);
+  m_controlsScroll->setFillHeight(true);
+}
+
+void CameraTab::layoutPreviewBox(float contentWidth, float bodyHeight) {
+  if (m_previewBox == nullptr || !m_previewBox->visible()) {
+    return;
+  }
+  const float scale = contentScale();
+  const bool split = m_stage != nullptr && m_stage->direction() == FlexDirection::Horizontal;
+  const float cardPad = Style::spaceMd * 2.0F * scale;
+  float innerWidth = contentWidth - cardPad;
+  if (m_previewCard != nullptr && m_previewCard->width() > cardPad + 1.0F) {
+    innerWidth = m_previewCard->width() - cardPad;
+  }
+  innerWidth = std::max(1.0F, innerWidth);
+
+  float aspect = 16.0F / 9.0F;
+  if (m_camera != nullptr && m_camera->previewWidth() > 0 && m_camera->previewHeight() > 0) {
+    aspect = static_cast<float>(m_camera->previewWidth()) / static_cast<float>(m_camera->previewHeight());
+  } else if (m_previewImage != nullptr && m_previewImage->hasImage() && m_previewImage->aspectRatio() > 0.0F) {
+    aspect = m_previewImage->aspectRatio();
+  }
+
+  const float minHeight = 120.0F * scale;
+  float chrome = cardPad + Style::controlHeightSm * scale + Style::spaceMd * scale;
+  if (m_framingHost != nullptr && m_framingHost->visible()) {
+    chrome += m_framingHost->height() + Style::spaceSm * scale;
+  }
+  float maxHeight = 240.0F * scale;
+  if (split) {
+    maxHeight = std::max(minHeight, bodyHeight - chrome);
+  } else {
+    const float leftoverMin = 160.0F * scale;
+    maxHeight = std::min(maxHeight, std::max(minHeight, bodyHeight - chrome - leftoverMin));
+  }
+  const float height = std::clamp(innerWidth / aspect, minHeight, maxHeight);
+  m_previewBox->setFlexGrow(0.0F);
+  m_previewBox->setMinHeight(height);
+  m_previewBox->setMaxHeight(height);
+}
+
+void CameraTab::pinPreviewImage() {
+  if (m_previewBox == nullptr || m_previewImage == nullptr || !m_previewBox->visible()) {
+    return;
+  }
+  m_previewImage->setPosition(0.0F, 0.0F);
+  m_previewImage->setSize(m_previewBox->width(), m_previewBox->height());
+}
+
+void CameraTab::appendControl(Flex& parent, const CameraControl& control, bool withDivider) {
+  const float scale = contentScale();
+  auto host = ui::column({.align = FlexAlign::Stretch});
+  if (withDivider) {
+    addWellDivider(*host, scale);
+  }
+
+  const std::uint32_t id = control.id;
+  const std::string title = controlTitle(control);
+  switch (control.type) {
+  case CameraControlType::Boolean: {
+    Toggle* toggle = addToggleRow(*host, scale, title, [this, id](bool enabled) {
+      if (m_camera != nullptr) {
+        m_camera->setControl(id, enabled ? 1 : 0);
+      }
+      refreshDependentVisibility();
+    });
+    if (toggle != nullptr) {
+      toggle->setCheckedImmediate(control.value != 0);
+      toggle->setEnabled(!control.readOnly);
+    }
+    break;
+  }
+  case CameraControlType::Menu: {
+    std::vector<std::string> labels;
+    std::size_t selectedIndex = 0;
+    labels.reserve(control.menuItems.size());
+    for (std::size_t i = 0; i < control.menuItems.size(); ++i) {
+      labels.push_back(menuItemLabel(control, control.menuItems[i]));
+      if (control.menuItems[i].index == control.value) {
+        selectedIndex = i;
+      }
+    }
+    const auto items = control.menuItems;
+    Select* select = addSelectRow(
+        *host, scale, title, std::move(labels), panelCardOpacity(),
+        [this, id, items](std::size_t index) {
+          if (m_camera != nullptr && index < items.size()) {
+            m_camera->setControl(id, items[index].index);
+          }
+          refreshDependentVisibility();
+        }
+    );
+    if (select != nullptr) {
+      select->setSelectedIndexSilently(selectedIndex);
+      select->setEnabled(!control.readOnly);
+    }
+    break;
+  }
+  case CameraControlType::Integer:
+  default: {
+    std::int32_t last = control.value;
+    addLiveSlider(
+        *host, scale, title, !control.readOnly, static_cast<double>(control.minimum),
+        static_cast<double>(control.maximum), static_cast<double>(control.step), static_cast<double>(control.value),
+        formatFor(control),
+        [this, id, last](double next) mutable {
+          if (m_camera == nullptr) {
+            return;
+          }
+          const auto rounded = static_cast<std::int32_t>(std::lround(next));
+          if (rounded == last) {
+            return;
+          }
+          last = rounded;
+          m_camera->setControl(id, rounded);
+        }
+    );
+    break;
+  }
+  }
+
+  m_controlRows[control.id] = host.get();
+  parent.addChild(std::move(host));
 }
 
 void CameraTab::rebuildControls() {
-  if (m_controlsHost == nullptr) {
-    return;
-  }
-  while (!m_controlsHost->children().empty()) {
-    m_controlsHost->removeChild(m_controlsHost->children().back().get());
-  }
   m_controlRows.clear();
+  if (m_framingHost != nullptr) {
+    while (!m_framingHost->children().empty()) {
+      m_framingHost->removeChild(m_framingHost->children().back().get());
+    }
+  }
+  if (m_controlsHost != nullptr) {
+    while (!m_controlsHost->children().empty()) {
+      m_controlsHost->removeChild(m_controlsHost->children().back().get());
+    }
+  }
   if (m_camera == nullptr || !m_camera->active()) {
+    (void)setShown(m_framingHost, false);
     return;
   }
 
   const float scale = contentScale();
   const std::vector<CameraControl> controls = m_camera->controls();
 
-  for (const ControlSection section : kSectionOrder) {
-    std::vector<const CameraControl*> members;
-    for (const auto& control : controls) {
-      if (sectionFor(control.id) == section) {
-        members.push_back(&control);
-      }
+  const auto framing = membersOf(controls, ControlSection::Framing, true);
+  if (m_framingHost != nullptr) {
+    bool first = true;
+    for (const CameraControl* control : framing) {
+      appendControl(*m_framingHost, *control, !first);
+      first = false;
     }
-    if (members.empty()) {
+    (void)setShown(m_framingHost, !framing.empty());
+  }
+
+  if (m_controlsHost == nullptr) {
+    refreshDependentVisibility();
+    return;
+  }
+
+  for (const ControlSection section : kInspectorOrder) {
+    const CameraControl* autoCtrl = nullptr;
+    if (section == ControlSection::Exposure) {
+      autoCtrl = findControl(controls, camera_control_ids::exposureAuto);
+    } else if (section == ControlSection::WhiteBalance) {
+      autoCtrl = findControl(controls, camera_control_ids::autoWhiteBalance);
+    } else if (section == ControlSection::Focus) {
+      autoCtrl = findControl(controls, camera_control_ids::focusAuto);
+    }
+    auto members = membersOf(controls, section, false);
+    if (members.empty() && autoCtrl == nullptr) {
       continue;
     }
-    // Within a section, put the Auto mode/toggle ahead of the manual value it gates
-    // (Exposure Auto before Shutter Speed, Auto White Balance before Temperature, etc).
-    std::ranges::stable_sort(members, [](const CameraControl* a, const CameraControl* b) {
-      const bool aIsAuto = a->type != CameraControlType::Integer;
-      const bool bIsAuto = b->type != CameraControlType::Integer;
-      return aIsAuto && !bIsAuto;
+
+    auto well = ui::column({
+        .align = FlexAlign::Stretch,
+        .fillWidth = true,
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
     });
 
-    addTitle(*m_controlsHost, i18n::tr(sectionTitleKey(section)), scale);
-    for (const CameraControl* control : members) {
-      auto row = buildControlRow(*control);
-      m_controlRows[control->id] = row.get();
-      m_controlsHost->addChild(std::move(row));
+    auto header = makeCardHeaderRow(i18n::tr(sectionTitleKey(section)), scale);
+    if (autoCtrl != nullptr) {
+      const std::uint32_t id = autoCtrl->id;
+      if (autoCtrl->type == CameraControlType::Boolean) {
+        Toggle* toggle = nullptr;
+        header->addChild(
+            ui::toggle({
+                .out = &toggle,
+                .checkedImmediate = autoCtrl->value != 0,
+                .enabled = !autoCtrl->readOnly,
+                .toggleSize = ToggleSize::Medium,
+                .scale = scale,
+                .onChange =
+                    [this, id](bool enabled) {
+                      if (m_camera != nullptr) {
+                        m_camera->setControl(id, enabled ? 1 : 0);
+                      }
+                      refreshDependentVisibility();
+                    },
+            })
+        );
+      } else if (autoCtrl->type == CameraControlType::Menu && !autoCtrl->menuItems.empty()) {
+        std::vector<std::string> labels;
+        std::size_t selectedIndex = 0;
+        labels.reserve(autoCtrl->menuItems.size());
+        for (std::size_t i = 0; i < autoCtrl->menuItems.size(); ++i) {
+          labels.push_back(menuItemLabel(*autoCtrl, autoCtrl->menuItems[i]));
+          if (autoCtrl->menuItems[i].index == autoCtrl->value) {
+            selectedIndex = i;
+          }
+        }
+        const auto items = autoCtrl->menuItems;
+        header->addChild(
+            ui::select({
+                .options = std::move(labels),
+                .selectedIndex = selectedIndex,
+                .fontSize = Style::fontSizeBody * scale,
+                .controlHeight = Style::controlHeight * scale,
+                .enabled = !autoCtrl->readOnly,
+                .surfaceOpacity = panelCardOpacity(),
+                .onSelectionChanged =
+                    [this, id, items](std::size_t index, std::string_view) {
+                      if (m_camera != nullptr && index < items.size()) {
+                        m_camera->setControl(id, items[index].index);
+                      }
+                      refreshDependentVisibility();
+                    },
+            })
+        );
+      }
     }
+    well->addChild(std::move(header));
+
+    bool first = true;
+    for (const CameraControl* control : members) {
+      appendControl(*well, *control, !first);
+      first = false;
+    }
+    m_controlsHost->addChild(std::move(well));
   }
 
   refreshDependentVisibility();
-}
-
-std::unique_ptr<Flex> CameraTab::buildControlRow(const CameraControl& control) {
-  const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
-
-  auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-
-  const std::uint32_t id = control.id;
-  if (control.type == CameraControlType::Boolean) {
-    auto toggleRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    toggleRow->addChild(
-        ui::label({
-            .text = control.name,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    toggleRow->addChild(
-        ui::toggle({
-            .checkedImmediate = control.value != 0,
-            .enabled = !control.readOnly,
-            .scale = scale,
-            .onChange =
-                [this, id](bool enabled) {
-                  if (m_camera != nullptr) {
-                    m_camera->setControl(id, enabled ? 1 : 0);
-                  }
-                  refreshDependentVisibility();
-                },
-        })
-    );
-    row->addChild(std::move(toggleRow));
-    return row;
-  }
-
-  row->addChild(
-      ui::label({
-          .text = control.name,
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      })
-  );
-
-  switch (control.type) {
-  case CameraControlType::Boolean:
-    break;
-  case CameraControlType::Menu: {
-    std::vector<std::string> labels;
-    std::size_t selectedIndex = 0;
-    labels.reserve(control.menuItems.size());
-    for (std::size_t i = 0; i < control.menuItems.size(); ++i) {
-      labels.push_back(control.menuItems[i].name);
-      if (control.menuItems[i].index == control.value) {
-        selectedIndex = i;
-      }
-    }
-    const auto items = control.menuItems;
-    row->addChild(
-        ui::select({
-            .options = labels,
-            .selectedIndex = selectedIndex,
-            .fontSize = Style::fontSizeBody * scale,
-            .controlHeight = Style::controlHeight * scale,
-            .enabled = !control.readOnly,
-            .flexGrow = 1.0F,
-            .onSelectionChanged =
-                [this, id, items](std::size_t index, std::string_view) {
-                  if (m_camera != nullptr && index < items.size()) {
-                    m_camera->setControl(id, items[index].index);
-                  }
-                  refreshDependentVisibility();
-                },
-        })
-    );
-    break;
-  }
-  case CameraControlType::Integer:
-  default: {
-    Label* valueLabel = nullptr;
-    Slider* slider = nullptr;
-    auto sliderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    sliderRow->addChild(
-        ui::slider({
-            .out = &slider,
-            .minValue = static_cast<double>(control.minimum),
-            .maxValue = static_cast<double>(control.maximum),
-            .step = static_cast<double>(control.step),
-            .value = static_cast<double>(control.value),
-            .enabled = !control.readOnly,
-            .thumbSize = Style::sliderThumbSize * scale,
-            .controlHeight = Style::controlHeight * scale,
-            .flexGrow = 1.0F,
-            .onValueChanged =
-                [valueLabel](double value) mutable {
-                  if (valueLabel != nullptr) {
-                    valueLabel->setText(std::to_string(static_cast<int>(std::lround(value))));
-                  }
-                },
-            .onDragEnd =
-                [this, id, slider]() {
-                  if (m_camera != nullptr && slider != nullptr) {
-                    m_camera->setControl(id, static_cast<std::int32_t>(std::lround(slider->value())));
-                  }
-                },
-        })
-    );
-    sliderRow->addChild(
-        ui::label({
-            .out = &valueLabel,
-            .text = std::to_string(control.value),
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .minWidth = Style::controlHeightSm * scale,
-            .textAlign = TextAlign::End,
-        })
-    );
-    row->addChild(std::move(sliderRow));
-    break;
-  }
-  }
-  return row;
 }
 
 void CameraTab::refreshDependentVisibility() {
@@ -493,22 +800,26 @@ void CameraTab::refreshDependentVisibility() {
   }
   namespace ids = camera_control_ids;
   const std::vector<CameraControl> controls = m_camera->controls();
+  bool layoutDirty = false;
 
   if (const CameraControl* autoExposure = findControl(controls, ids::exposureAuto); autoExposure != nullptr) {
     if (const auto it = m_controlRows.find(ids::exposureAbsolute); it != m_controlRows.end()) {
-      setShown(it->second, selectedMenuItemLooksManual(*autoExposure));
+      layoutDirty = setShown(it->second, selectedMenuItemLooksManual(*autoExposure)) || layoutDirty;
     }
   }
   if (const CameraControl* autoWhiteBalance = findControl(controls, ids::autoWhiteBalance);
       autoWhiteBalance != nullptr) {
     if (const auto it = m_controlRows.find(ids::whiteBalanceTemperature); it != m_controlRows.end()) {
-      setShown(it->second, autoWhiteBalance->value == 0);
+      layoutDirty = setShown(it->second, autoWhiteBalance->value == 0) || layoutDirty;
     }
   }
   if (const CameraControl* autoFocus = findControl(controls, ids::focusAuto); autoFocus != nullptr) {
     if (const auto it = m_controlRows.find(ids::focusAbsolute); it != m_controlRows.end()) {
-      setShown(it->second, autoFocus->value == 0);
+      layoutDirty = setShown(it->second, autoFocus->value == 0) || layoutDirty;
     }
+  }
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
@@ -534,11 +845,16 @@ void CameraTab::onClose() {
   m_active = false;
   m_previewBound = false;
   m_rootLayout = nullptr;
+  m_stage = nullptr;
+  m_previewColumn = nullptr;
+  m_previewCard = nullptr;
   m_deviceSelect = nullptr;
   m_emptyLabel = nullptr;
   m_previewBox = nullptr;
   m_previewImage = nullptr;
   m_previewUnavailableLabel = nullptr;
+  m_framingHost = nullptr;
+  m_controlsScroll = nullptr;
   m_controlsHost = nullptr;
   m_resetButton = nullptr;
 }
@@ -558,8 +874,12 @@ void CameraTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
   if (m_rootLayout == nullptr) {
     return;
   }
+  layoutStage(contentWidth, bodyHeight);
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
+  layoutPreviewBox(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+  pinPreviewImage();
 }
 
 void CameraTab::doUpdate(Renderer& renderer) {
@@ -583,8 +903,11 @@ void CameraTab::doUpdate(Renderer& renderer) {
     m_previewTexHeight = m_pendingHeight;
     m_previewImage->setExternalTexture(renderer, m_previewTexture);
     m_previewBound = true;
+    pinPreviewImage();
+    PanelManager::instance().requestLayout();
   }
   textures.updateSubImage(
       m_previewTexture, m_pendingFrame.data(), 0, 0, m_pendingWidth, m_pendingHeight, TextureDataFormat::Rgba
   );
+  PanelManager::instance().requestRedraw();
 }

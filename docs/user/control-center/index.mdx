@@ -75,7 +75,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `power` | Power | Lock, suspend, logout, reboot, shutdown, caffeine, battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
 | `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Wi-Fi, VPN, and cellular lists sit under it. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
 | `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Paired and nearby devices sit under it. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
-| `camera` | Camera | Webcam preview and camera controls when a video device is available. |
+| `camera` | Camera | Live preview stays on a stage so you can see the picture while you adjust. Zoom, pan, and tilt sit with the preview. Picture, Exposure, White Balance, and Focus scroll in the inspector beside it, or under it when the panel is narrow. Header reset restores factory control values. |
 | `weather` | Weather | Current conditions and forecast. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
 | `calendar` | Calendar | Month view, world clock, calendar accounts (add/edit/reconnect), and events. Turning calendar sync off leaves the enable switch on the accounts card. Header gear opens calendar format settings. |
 | `notifications` | Notifications | Notification history, Do Not Disturb, and notification cleanup. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
@@ -194,6 +194,10 @@ niri only keeps the cursor path between **adjacent, non-overlapping** outputs. A
 Drag a display to another side, including directly above or below. A small drag along a shared edge still slides. Drag far enough off that edge to sit against the new side. The arrows place the selected display above, below, left, or right. Pick **Relative to** when three or more are on.
 
 Live niri changes apply through compositor IPC. Use the header **Save to niri** button to write the current layout (mode, scale, transform, position, VRR, off) to `noctalia-outputs.kdl` and include it from `config.kdl`. niri reloads that file on its own, so the layout survives compositor restarts. The header refresh button re-reads the current output state (and re-runs DDC/CI detect when that backend is enabled).
+
+## Camera
+
+The Camera tab is a stage plus inspector, the same split Camera Hub and Logitech Capture use: the live frame stays visible while you change the picture. Zoom, pan, and tilt sit under the preview. Picture, Exposure, White Balance, and Focus are grouped on the right, with Auto on each section header gating the manual slider. When the panel is too narrow, the inspector moves under the preview. The preview shows the full frame (it is not cropped). Header reset restores factory values. If a device has no preview stream, its controls stay available.
 
 ## System
 

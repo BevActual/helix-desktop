@@ -70,13 +70,15 @@ public:
 
   [[nodiscard]] std::vector<CameraDevice> listDevices() const;
 
-  // Opens the device and negotiates a YUYV preview format if the driver supports one.
+  // Opens the device and negotiates a YUYV or MJPEG preview if the driver supports one.
   // Controls remain usable even when a preview could not be negotiated.
   bool start(const std::string& deviceId);
   void stop();
   [[nodiscard]] bool active() const noexcept { return m_fd >= 0; }
   [[nodiscard]] const std::string& activeDeviceId() const noexcept { return m_deviceId; }
   [[nodiscard]] bool previewAvailable() const noexcept { return m_previewAvailable; }
+  [[nodiscard]] int previewWidth() const noexcept { return m_width; }
+  [[nodiscard]] int previewHeight() const noexcept { return m_height; }
 
   [[nodiscard]] std::vector<CameraControl> controls() const;
   void setControl(std::uint32_t id, std::int32_t value);
@@ -100,10 +102,15 @@ private:
   bool startStreaming();
   void stopStreaming();
 
+  bool negotiateFormat();
+  bool decodeFrame(const std::uint8_t* data, std::size_t bytesUsed);
+
   std::string m_deviceId;
   int m_fd = -1;
   int m_width = 0;
   int m_height = 0;
+  int m_bytesPerLine = 0;
+  std::uint32_t m_pixelFormat = 0;
   bool m_previewAvailable = false;
   std::vector<MappedBuffer> m_buffers;
   std::vector<std::uint8_t> m_rgbaScratch;

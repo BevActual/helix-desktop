@@ -952,6 +952,7 @@
       "weather": "Weather"
     },
     "camera": {
+      "device": "Camera",
       "empty": "No camera devices were found.",
       "empty-hint": "Plug in a webcam to preview it and adjust controls.",
       "off": "Off",
@@ -959,12 +960,32 @@
       "preview-unavailable": "This camera does not support a live preview, but its controls are still adjustable.",
       "reset": "Reset to defaults",
       "reset-tooltip": "Restore this camera's factory control values",
+      "controls": {
+        "aperture-priority": "Aperture Priority",
+        "auto": "Auto",
+        "backlight": "Backlight",
+        "brightness": "Brightness",
+        "contrast": "Contrast",
+        "flicker": "Flicker",
+        "focus": "Focus",
+        "gain": "Gain",
+        "gamma": "Gamma",
+        "hue": "Hue",
+        "manual": "Manual",
+        "pan": "Pan",
+        "saturation": "Saturation",
+        "sharpness": "Sharpness",
+        "shutter": "Shutter",
+        "shutter-priority": "Shutter Priority",
+        "temperature": "Temperature",
+        "tilt": "Tilt",
+        "zoom": "Zoom"
+      },
       "sections": {
-        "details": "Details",
         "exposure": "Exposure",
-        "field-of-view": "Field of View",
         "focus": "Focus",
         "other": "Other",
+        "picture": "Picture",
         "white-balance": "White Balance"
       }
     },
