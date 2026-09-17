@@ -4,8 +4,10 @@
 #include "config/config_types.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
+#include "ui/palette.h"
 #include "ui/signal.h"
 
+#include <array>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -17,7 +19,6 @@ class ConfigService;
 class Flex;
 class Label;
 class Renderer;
-class Segmented;
 class Select;
 class Slider;
 class Toggle;
@@ -44,6 +45,7 @@ private:
   void doUpdate(Renderer& renderer) override;
   void syncLiveControls();
   void updateAutoStatus();
+  void syncPureBlackVisibility();
   void rebuildPaletteSelect();
   void applyThemeMode(std::size_t index);
   void applyShellMode(std::size_t index);
@@ -62,7 +64,9 @@ private:
   [[nodiscard]] bool niriBlurSupported() const;
   void openPalettePicker();
   void openCustomPalettesFolder();
-  void exportWallpaperPalette();
+  void saveCurrentPalette();
+  void pickRoleColor(ColorRole role, std::string roleLabel);
+  void syncSwatchHex();
   [[nodiscard]] PaletteSource selectedPaletteSource() const;
   [[nodiscard]] std::string paletteValueForSource(PaletteSource source) const;
 
@@ -73,16 +77,23 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
-  Segmented* m_themeMode = nullptr;
-  Segmented* m_shellMode = nullptr;
+  Select* m_themeMode = nullptr;
+  Select* m_shellMode = nullptr;
   Label* m_autoStatus = nullptr;
-  Segmented* m_paletteSource = nullptr;
+  Select* m_paletteSource = nullptr;
+  Flex* m_paletteSelectRow = nullptr;
+  Label* m_paletteSelectTitle = nullptr;
   Select* m_paletteSelect = nullptr;
+  Flex* m_palettePickerRow = nullptr;
+  Label* m_palettePickerTitle = nullptr;
   Button* m_palettePickerButton = nullptr;
   Label* m_paletteEmpty = nullptr;
+  Flex* m_paletteTools = nullptr;
   Button* m_openPalettesButton = nullptr;
-  Button* m_exportButton = nullptr;
+  Button* m_saveCustomButton = nullptr;
   Label* m_exportStatus = nullptr;
+  std::array<Label*, 6> m_swatchHex{};
+  Flex* m_pureBlackSection = nullptr;
   Toggle* m_pureBlack = nullptr;
   Toggle* m_niriFocusRing = nullptr;
   Toggle* m_niriBorder = nullptr;

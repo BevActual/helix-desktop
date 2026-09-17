@@ -138,6 +138,23 @@ int main() {
          )
         && ok;
 
+    const auto draggedDownFromRight =
+        display_config::snapDragPosition(outputs[1], outputs, outputs[1].x, outputs[0].logicalHeight + 400);
+    ok = expect(
+             draggedDownFromRight.has_value() && draggedDownFromRight->direction == display_config::LayoutDirection::Bottom
+                 && draggedDownFromRight->position.y == 970 && draggedDownFromRight->position.x <= 0,
+             "dragging a right-hand display down places it under the laptop"
+         )
+        && ok;
+
+    const auto slidAlongRight = display_config::snapDragPosition(outputs[1], outputs, outputs[1].x, 80);
+    ok = expect(
+             slidAlongRight.has_value() && slidAlongRight->direction == display_config::LayoutDirection::Right
+                 && slidAlongRight->position.x == 1552,
+             "a small downward drag stays on the right and slides along the shared edge"
+         )
+        && ok;
+
     ok = expect(
              display_config::isAdjacentOn(outputs[1], outputs[0], display_config::LayoutDirection::Right),
              "parsed HDMI is already adjacent to the right of the laptop"

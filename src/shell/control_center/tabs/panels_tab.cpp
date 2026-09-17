@@ -26,7 +26,6 @@ using namespace control_center;
 namespace {
 
   constexpr std::array<const char*, 2> kLayerValues = {"top", "overlay"};
-  constexpr std::array<const char*, 3> kTransparencyValues = {"solid", "soft", "glass"};
 
   template <std::size_t N>
   [[nodiscard]] std::size_t indexOf(const std::array<const char*, N>& values, const std::string& value) {
@@ -153,34 +152,6 @@ std::unique_ptr<Flex> PanelsTab::create() {
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*effectsCard, i18n::tr("settings.schema.panels.transparency-mode.label"), scale);
-  effectsCard->addChild(
-      ui::segmented({
-          .out = &m_transparencyMode,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = i18n::tr("settings.options.shell.panel-transparency.solid"),
-                      .tooltip = i18n::tr("control-center.panels.solid-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.shell.panel-transparency.soft"),
-                      .tooltip = i18n::tr("control-center.panels.soft-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.shell.panel-transparency.glass"),
-                      .tooltip = i18n::tr("control-center.panels.glass-tooltip"),
-                  },
-              },
-          .selectedIndex = indexOf(kTransparencyValues, std::string(enumToKey(kPanelTransparencyModes, panel.transparencyMode))),
-          .fontSize = captionSize,
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .onChange = [this](std::size_t index) { applyTransparencyMode(index); },
-      })
-  );
   addToggleRow(*effectsCard, i18n::tr("settings.schema.panels.borders.label"), &m_borders, panel.borders, &PanelsTab::applyBorders);
   addToggleRow(*effectsCard, i18n::tr("settings.schema.shared.shadow.label"), &m_shadow, panel.shadow, &PanelsTab::applyShadow);
   addToggleRow(
@@ -245,7 +216,6 @@ void PanelsTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_floatingLayer = nullptr;
-  m_transparencyMode = nullptr;
   m_borders = nullptr;
   m_shadow = nullptr;
   m_listItemBackground = nullptr;
@@ -292,11 +262,6 @@ void PanelsTab::syncLiveControls() {
   if (m_floatingLayer != nullptr) {
     m_floatingLayer->setSelectedIndex(indexOf(kLayerValues, panel.floatingLayer));
   }
-  if (m_transparencyMode != nullptr) {
-    m_transparencyMode->setSelectedIndex(
-        indexOf(kTransparencyValues, std::string(enumToKey(kPanelTransparencyModes, panel.transparencyMode)))
-    );
-  }
   if (m_borders != nullptr) {
     m_borders->setCheckedImmediate(panel.borders);
   }
@@ -320,13 +285,6 @@ void PanelsTab::applyFloatingLayer(std::size_t index) {
     return;
   }
   (void)m_config->setOverride({"shell", "panel", "floating_layer"}, std::string(kLayerValues[index]));
-}
-
-void PanelsTab::applyTransparencyMode(std::size_t index) {
-  if (m_syncing || m_config == nullptr || index >= kTransparencyValues.size()) {
-    return;
-  }
-  (void)m_config->setOverride({"shell", "panel", "transparency_mode"}, std::string(kTransparencyValues[index]));
 }
 
 void PanelsTab::applyBorders(bool enabled) {

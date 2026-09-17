@@ -38,6 +38,7 @@
 #include "render/scene/node.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -69,6 +70,62 @@ namespace {
   constexpr std::size_t kHomeStackedShortcutMax = 2;
   // Modules stay close to square so they read as Apple-style Control Center tiles.
   constexpr float kHomeShortcutSquareTrim = 0.90F;
+
+  enum class HomeShortcutCluster : std::uint8_t {
+    Connectivity,
+    Focus,
+    Display,
+    Sound,
+    Capture,
+    Power,
+    Sharing,
+    Other,
+  };
+  constexpr std::size_t kHomeShortcutClusterCount = 8;
+
+  [[nodiscard]] HomeShortcutCluster homeClusterFor(std::string_view type) {
+    if (type == "wifi" || type == "bluetooth" || type == "tailscale" || type == "localsend" || type == "phone") {
+      return HomeShortcutCluster::Connectivity;
+    }
+    if (type == "notification" || type == "caffeine" || type == "dark_mode") {
+      return HomeShortcutCluster::Focus;
+    }
+    if (type == "nightlight" || type == "wallpaper") {
+      return HomeShortcutCluster::Display;
+    }
+    if (type == "audio" || type == "mic_mute" || type == "media") {
+      return HomeShortcutCluster::Sound;
+    }
+    if (type == "screenshot"
+        || type == "pick_color"
+        || type == "ocr"
+        || type == "scan_qr"
+        || type == "screen_recorder"
+        || type == "screen_replay") {
+      return HomeShortcutCluster::Capture;
+    }
+    if (type == "power_profile" || type == "session" || type == "system" || type == "screen_time") {
+      return HomeShortcutCluster::Power;
+    }
+    if (type == "clipboard"
+        || type == "printers"
+        || type == "cast"
+        || type == "syncthing"
+        || type == "firewall"
+        || type == "privacy"
+        || type == "weather"
+        || type == "keyboard_layout") {
+      return HomeShortcutCluster::Sharing;
+    }
+    return HomeShortcutCluster::Other;
+  }
+
+  void applyHomeClusterStyle(Flex& well, float scale, float fillOpacity) {
+    applySectionCardStyle(well, scale, fillOpacity);
+    well.setPadding(Style::spaceSm * scale);
+    well.setGap(0.0F);
+  }
+
   constexpr auto kHomeTransientPositionRegressionWindow = std::chrono::milliseconds(1500);
   constexpr std::int64_t kHomeTransientPositionRegressionFloorUs = 5'000'000;
   constexpr std::int64_t kHomeTransientPositionRegressionCeilingUs = 1'500'000;
@@ -79,17 +136,16 @@ namespace {
 
   // Width for the stacked (single-column) shortcuts so each tile keeps the same width it would have
   // as one cell of the standard 2-column grid, rather than stretching across the whole column.
-  float homeStackedShortcutsWidth(float contentWidth, float bottomRowGap, const GridView& grid) {
+  float homeStackedShortcutsWidth(float contentWidth, float bottomRowGap, float wellPadding, float cellGap) {
     const float totalGrow = kHomeMainColumnFlexGrow + kHomeShortcutsFlexGrow;
     const float fullGridWidth = std::max(1.0F, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
-    const float horizontalPadding = grid.paddingLeft() + grid.paddingRight();
-    const float fullGridInnerWidth = std::max(1.0F, fullGridWidth - horizontalPadding);
+    const float fullGridInnerWidth = std::max(1.0F, fullGridWidth - 2.0F * wellPadding);
     const float cellWidth = std::max(
         1.0F,
-        (fullGridInnerWidth - grid.columnGap() * static_cast<float>(kHomeShortcutGridColumns - 1))
+        (fullGridInnerWidth - cellGap * static_cast<float>(kHomeShortcutGridColumns - 1))
             / static_cast<float>(kHomeShortcutGridColumns)
     );
-    return cellWidth + horizontalPadding;
+    return cellWidth + 2.0F * wellPadding;
   }
 
   // The 2-column shortcuts grid's natural width = its flex share of the bottom row.
@@ -166,40 +222,9 @@ namespace {
     card.setGap(Style::spaceSm * scale);
   }
 
-  Button::ButtonPalette homeGlassModulePalette() {
-    constexpr float kDisabledAlpha = 0.55F;
-    const auto state = [](ColorSpec bg, ColorSpec border, ColorSpec label) {
-      return Button::ButtonStateColors{.bg = bg, .border = border, .label = label};
-    };
-    return Button::ButtonPalette{
-        .borderWidth = 0.0F,
-        .normal = state(
-            colorSpecFromRole(ColorRole::SurfaceVariant), clearColorSpec(), colorSpecFromRole(ColorRole::OnSurface)
-        ),
-        .hover = state(colorSpecFromRole(ColorRole::Hover), clearColorSpec(), colorSpecFromRole(ColorRole::OnHover)),
-        .pressed = state(
-            colorSpecFromRole(ColorRole::Primary), clearColorSpec(), colorSpecFromRole(ColorRole::OnPrimary)
-        ),
-        .disabled = state(
-            colorSpecFromRole(ColorRole::SurfaceVariant, kDisabledAlpha), clearColorSpec(),
-            colorSpecFromRole(ColorRole::OnSurface, kDisabledAlpha)
-        ),
-        .selected = state(
-            colorSpecFromRole(ColorRole::Primary), colorSpecFromRole(ColorRole::Primary),
-            colorSpecFromRole(ColorRole::OnPrimary)
-        ),
-    };
-  }
-
-  void applyShortcutButtonStyle(Button& button, bool enabled, bool active, float fillOpacity) {
+  void applyShortcutButtonStyle(Button& button, bool enabled, bool active) {
     const bool on = enabled && active;
-    // Ghost then custom palette so toggling off after Primary does not keep a
-    // stale custom palette from the on-state (setVariant no-ops when unchanged).
     button.setVariant(on ? ButtonVariant::Primary : ButtonVariant::Ghost);
-    if (!on) {
-      button.setCustomPalette(homeGlassModulePalette());
-    }
-    button.setSurfaceOpacity(on ? 1.0F : fillOpacity);
     button.setEnabled(enabled);
   }
 
@@ -645,23 +670,10 @@ std::unique_ptr<Flex> HomeTab::create() {
   leftColumn->addChild(std::move(dateTimeCard));
   bottomRow->addChild(std::move(leftColumn));
 
-  // --- Shortcuts (right of media + clock) ---
+  // --- Shortcuts (right of media + clock), grouped into glass islands ---
   const auto& shortcuts =
       m_config != nullptr ? m_config->config().controlCenter.shortcuts : std::vector<ShortcutConfig>{};
   const std::size_t count = std::min(shortcuts.size(), std::size_t{6});
-
-  auto grid = std::make_unique<GridView>();
-  grid->setColumns(kHomeShortcutGridColumns);
-  grid->setColumnGap(Style::spaceLg * scale);
-  grid->setRowGap(Style::spaceLg * scale);
-  grid->setPadding(0.0F);
-  grid->setUniformCellSize(true);
-  grid->setStretchItems(true);
-  grid->setSquareCells(false);
-  grid->setMinCellHeight(0.0F);
-  grid->setSpanLastItem(true);
-  grid->setFlexGrow(kHomeShortcutsFlexGrow);
-  m_shortcutsGrid = grid.get();
 
   // Keep Shortcut instances across open/close so plugin file watches and runtimes
   // are not recreated on every Control Center open. Match by id/type from config.
@@ -671,6 +683,8 @@ std::unique_ptr<Flex> HomeTab::create() {
     previous.push_back(std::move(pad.shortcut));
   }
   m_shortcutPads.clear();
+  m_shortcutClusters.clear();
+  m_shortcutsColumn = nullptr;
 
   auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
     for (auto it = previous.begin(); it != previous.end(); ++it) {
@@ -690,6 +704,12 @@ std::unique_ptr<Flex> HomeTab::create() {
   if (m_config != nullptr) {
     m_lastPlugins = m_config->config().plugins;
   }
+
+  struct PendingTile {
+    std::unique_ptr<Button> button;
+    std::string type;
+  };
+  std::vector<PendingTile> tiles;
 
   for (std::size_t i = 0; i < count; ++i) {
     const auto& sc = shortcuts[i];
@@ -723,9 +743,9 @@ std::unique_ptr<Flex> HomeTab::create() {
         .contentAlign = ButtonContentAlign::Center,
         .tooltip = label,
         .minHeight = 0.0F,
-        .padding = Style::spaceMd * scale,
-        .gap = Style::spaceSm * scale,
-        .radius = Style::scaledRadius2xl(scale),
+        .padding = Style::spaceSm * scale,
+        .gap = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusXl(scale),
         .onClick =
             [this, padIdx]() {
               if (padIdx < m_shortcutPads.size()) {
@@ -739,12 +759,10 @@ std::unique_ptr<Flex> HomeTab::create() {
               }
             },
         .configure =
-            [enabled, isActive, showLabels, fillOpacity = panelCardOpacity(), scale](Button& button) {
+            [enabled, isActive, showLabels, scale](Button& button) {
               button.setDirection(FlexDirection::Vertical);
               button.setJustify(FlexJustify::Center);
               if (showLabels) {
-                // Stretch so the label width follows the cell; Center uses intrinsic text
-                // width and fights setMaxWidth.
                 button.setAlign(FlexAlign::Stretch);
                 if (button.label() != nullptr) {
                   button.label()->setFontSize(Style::fontSizeCaption * scale);
@@ -754,7 +772,7 @@ std::unique_ptr<Flex> HomeTab::create() {
               } else {
                 button.setAlign(FlexAlign::Center);
               }
-              applyShortcutButtonStyle(button, enabled, isActive, fillOpacity);
+              applyShortcutButtonStyle(button, enabled, isActive);
             },
     });
 
@@ -768,7 +786,6 @@ std::unique_ptr<Flex> HomeTab::create() {
         if (steps == 0.0F) {
           return false;
         }
-        // Scroll up moves forward (toward performance); Wayland reports up as a negative delta.
         m_shortcutPads[padIdx].shortcut->onScroll(steps > 0.0F ? -1 : 1);
         return true;
       });
@@ -779,18 +796,70 @@ std::unique_ptr<Flex> HomeTab::create() {
     pad.glyph = btnPtr->glyph();
     pad.label = btnPtr->label();
     m_shortcutPads.push_back(std::move(pad));
-    grid->addChild(std::move(btn));
+    tiles.push_back(PendingTile{.button = std::move(btn), .type = sc.type});
   }
 
-  if (m_shortcutPads.size() <= kHomeStackedShortcutMax) {
-    grid->setColumns(1);
-    grid->setFlexGrow(0.0F);
-  }
+  if (!tiles.empty()) {
+    auto column = ui::column({
+        .out = &m_shortcutsColumn,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .flexGrow = kHomeShortcutsFlexGrow,
+    });
 
-  if (!m_shortcutPads.empty()) {
-    bottomRow->addChild(std::move(grid));
-  } else {
-    m_shortcutsGrid = nullptr;
+    std::array<std::vector<std::size_t>, kHomeShortcutClusterCount> buckets{};
+    for (std::size_t i = 0; i < tiles.size(); ++i) {
+      const auto cluster = homeClusterFor(tiles[i].type);
+      buckets[static_cast<std::size_t>(cluster)].push_back(i);
+    }
+
+    std::vector<std::vector<std::size_t>> wells;
+    std::vector<std::size_t> leftovers;
+    wells.reserve(kHomeShortcutClusterCount);
+    for (auto& bucket : buckets) {
+      if (bucket.size() >= 2) {
+        wells.push_back(std::move(bucket));
+      } else {
+        leftovers.insert(leftovers.end(), bucket.begin(), bucket.end());
+      }
+    }
+    if (!leftovers.empty()) {
+      wells.push_back(std::move(leftovers));
+    }
+
+    const bool stacked = tiles.size() <= kHomeStackedShortcutMax;
+    for (const auto& indices : wells) {
+      Flex* well = nullptr;
+      auto wellCard = ui::column({
+          .out = &well,
+          .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+            applyHomeClusterStyle(card, scale, opacity);
+          },
+      });
+      auto grid = std::make_unique<GridView>();
+      const std::size_t cols = (stacked || indices.size() == 1) ? 1U : kHomeShortcutGridColumns;
+      grid->setColumns(cols);
+      grid->setColumnGap(Style::spaceSm * scale);
+      grid->setRowGap(Style::spaceSm * scale);
+      grid->setPadding(0.0F);
+      grid->setUniformCellSize(true);
+      grid->setStretchItems(true);
+      grid->setSquareCells(false);
+      grid->setMinCellHeight(0.0F);
+      grid->setSpanLastItem(true);
+      GridView* gridPtr = grid.get();
+      for (std::size_t idx : indices) {
+        grid->addChild(std::move(tiles[idx].button));
+      }
+      well->addChild(std::move(grid));
+      m_shortcutClusters.push_back(ShortcutCluster{.well = well, .grid = gridPtr, .count = indices.size()});
+      column->addChild(std::move(wellCard));
+    }
+
+    if (stacked) {
+      column->setFlexGrow(0.0F);
+    }
+    bottomRow->addChild(std::move(column));
   }
   tab->addChild(std::move(bottomRow));
 
@@ -864,23 +933,27 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     m_bottomRow->setFlexGrow(1.0F);
   }
 
-  if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
+  if (m_shortcutsColumn != nullptr && !m_shortcutPads.empty()) {
     const float bottomRowGap = m_bottomRow != nullptr ? m_bottomRow->gap() : 0.0F;
     const bool stacked = m_shortcutPads.size() <= kHomeStackedShortcutMax;
-    const std::size_t cols = stacked ? 1U : kHomeShortcutGridColumns;
-    const std::size_t rows = (m_shortcutPads.size() + cols - 1) / cols;
-    const float padH = m_shortcutsGrid->paddingLeft() + m_shortcutsGrid->paddingRight();
-    const float padV = m_shortcutsGrid->paddingTop() + m_shortcutsGrid->paddingBottom();
-    const float colGap = m_shortcutsGrid->columnGap();
-    const float rowGap = m_shortcutsGrid->rowGap();
+    const float wellPad = Style::spaceSm * scale;
+    const float cellGap = Style::spaceSm * scale;
+    const float clusterGap = m_shortcutsColumn->gap();
 
-    float gridWidth = stacked ? homeStackedShortcutsWidth(contentWidth, bottomRowGap, *m_shortcutsGrid)
-                              : homeShortcutsGridNaturalWidth(contentWidth, bottomRowGap);
+    float columnWidth = stacked ? homeStackedShortcutsWidth(contentWidth, bottomRowGap, wellPad, cellGap)
+                                : homeShortcutsGridNaturalWidth(contentWidth, bottomRowGap);
 
-    // A wide control center would otherwise grow the square tiles tall enough to crush the
-    // user card (which content-overflows). Reserve the user card's natural height and cap the
-    // square side to fit; cap the grid width to keep tiles square, handing the freed width to
-    // the media/clock column.
+    std::size_t totalRows = 0;
+    for (const auto& cluster : m_shortcutClusters) {
+      if (cluster.grid == nullptr || cluster.count == 0) {
+        continue;
+      }
+      const std::size_t cols = std::max<std::size_t>(1, std::min(cluster.grid->columns(), cluster.count));
+      totalRows += (cluster.count + cols - 1) / cols;
+    }
+    totalRows = std::max<std::size_t>(1, totalRows);
+    const std::size_t wellCount = std::max<std::size_t>(1, m_shortcutClusters.size());
+
     const float userCardReserve = homeAvatarSize(scale) + 2.0F * (Style::spaceSm + Style::spaceXs) * scale;
     const float rootGap = m_rootLayout->gap();
     float statusReserve = 0.0F;
@@ -888,30 +961,32 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
       statusReserve = std::max(m_statusStrip->minHeight(), Style::controlHeightSm * scale) + rootGap;
     }
     const float availForGrid = std::max(1.0F, bodyHeight - userCardReserve - rootGap - statusReserve);
+    const float wellChrome =
+        static_cast<float>(wellCount) * 2.0F * wellPad + static_cast<float>(wellCount - 1) * clusterGap;
+    const float innerRowGaps = static_cast<float>(totalRows > wellCount ? totalRows - wellCount : 0) * cellGap;
     const float maxCellSide =
-        std::max(1.0F, (availForGrid - static_cast<float>(rows - 1) * rowGap - padV) / static_cast<float>(rows));
-    const float maxGridWidth = static_cast<float>(cols) * (maxCellSide / kHomeShortcutSquareTrim)
-        + static_cast<float>(cols - 1) * colGap
-        + padH;
+        std::max(1.0F, (availForGrid - wellChrome - innerRowGaps) / static_cast<float>(totalRows));
+    const std::size_t widthCols = stacked ? 1U : kHomeShortcutGridColumns;
+    const float maxColumnWidth = static_cast<float>(widthCols) * (maxCellSide / kHomeShortcutSquareTrim)
+        + static_cast<float>(widthCols - 1) * cellGap
+        + 2.0F * wellPad;
 
-    const bool capped = gridWidth > maxGridWidth;
+    const bool capped = columnWidth > maxColumnWidth;
     if (capped) {
-      gridWidth = maxGridWidth;
+      columnWidth = maxColumnWidth;
     }
-    // Pin the width (flexGrow 0) for the stacked column or whenever capped, so the left column
-    // absorbs the slack; otherwise let the 2-column grid flex-grow normally.
     if (stacked || capped) {
-      m_shortcutsGrid->setFlexGrow(0.0F);
-      m_shortcutsGrid->setSize(gridWidth, m_shortcutsGrid->height());
+      m_shortcutsColumn->setFlexGrow(0.0F);
+      m_shortcutsColumn->setSize(columnWidth, m_shortcutsColumn->height());
     } else {
-      m_shortcutsGrid->setFlexGrow(kHomeShortcutsFlexGrow);
+      m_shortcutsColumn->setFlexGrow(kHomeShortcutsFlexGrow);
     }
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
 
   // Cap shortcut labels to the button's content width after cells are sized (avoids elide from grid math mismatch).
-  if (!m_shortcutPads.empty() && m_shortcutsGrid != nullptr) {
+  if (!m_shortcutPads.empty()) {
     for (auto& pad : m_shortcutPads) {
       if (pad.label == nullptr) {
         continue;
@@ -919,14 +994,14 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
       float inner = 1.0F;
       if (pad.button != nullptr && pad.button->width() > 1.0F) {
         inner = std::max(1.0F, pad.button->width() - pad.button->paddingLeft() - pad.button->paddingRight());
-      } else {
-        const float gridW = m_shortcutsGrid->width();
-        const float innerGrid =
-            std::max(1.0F, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
-        const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
+      } else if (!m_shortcutClusters.empty() && m_shortcutClusters.front().grid != nullptr) {
+        GridView* grid = m_shortcutClusters.front().grid;
+        const float gridW = grid->width();
+        const float innerGrid = std::max(1.0F, gridW - grid->paddingLeft() - grid->paddingRight());
+        const std::size_t cols = std::max<std::size_t>(1, std::min(grid->columns(), m_shortcutClusters.front().count));
         const float cellWidth =
-            (innerGrid - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols);
-        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceMd * scale);
+            (innerGrid - static_cast<float>(cols - 1) * grid->columnGap()) / static_cast<float>(cols);
+        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceSm * scale);
       }
       pad.label->setMaxWidth(inner);
     }
@@ -1003,17 +1078,36 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
 
   // Lock the shortcuts grid height to its square-cell natural size so it does not vary
   // when the media or clock cards change. The leftColumn stretches to match this height.
-  if (m_shortcutsGrid != nullptr && !m_shortcutPads.empty()) {
-    const float gridW = m_shortcutsGrid->width();
-    const float innerGridW = std::max(1.0F, gridW - m_shortcutsGrid->paddingLeft() - m_shortcutsGrid->paddingRight());
-    const std::size_t cols = std::max<std::size_t>(1, std::min(m_shortcutsGrid->columns(), m_shortcutPads.size()));
-    const std::size_t rows = (m_shortcutPads.size() + cols - 1) / cols;
-    const float cellWidth = std::max(
-        1.0F, (innerGridW - static_cast<float>(cols - 1) * m_shortcutsGrid->columnGap()) / static_cast<float>(cols)
-    );
-    // Cells aim for square but trimmed slightly so the grid stays compact and the bottom row
-    // doesn't tower over the user card area. The width was capped earlier so this stays bounded.
-    const float cellSide = cellWidth * kHomeShortcutSquareTrim;
+  if (m_shortcutsColumn != nullptr && !m_shortcutPads.empty()) {
+    float columnH = 0.0F;
+    float cellSide = 0.0F;
+    const float clusterGap = m_shortcutsColumn->gap();
+    for (std::size_t i = 0; i < m_shortcutClusters.size(); ++i) {
+      auto& cluster = m_shortcutClusters[i];
+      if (cluster.grid == nullptr || cluster.well == nullptr || cluster.count == 0) {
+        continue;
+      }
+      const float innerGridW =
+          std::max(1.0F, cluster.well->width() - cluster.well->paddingLeft() - cluster.well->paddingRight());
+      const std::size_t cols = std::max<std::size_t>(1, std::min(cluster.grid->columns(), cluster.count));
+      const std::size_t rows = (cluster.count + cols - 1) / cols;
+      const float cellWidth = std::max(
+          1.0F, (innerGridW - static_cast<float>(cols - 1) * cluster.grid->columnGap()) / static_cast<float>(cols)
+      );
+      cellSide = cellWidth * kHomeShortcutSquareTrim;
+      const float gridH = std::round(
+          static_cast<float>(rows) * cellSide
+          + static_cast<float>(rows > 0 ? rows - 1 : 0) * cluster.grid->rowGap()
+      );
+      const float wellH = gridH + cluster.well->paddingTop() + cluster.well->paddingBottom();
+      cluster.well->setMinHeight(wellH);
+      cluster.well->setMaxHeight(wellH);
+      columnH += wellH;
+      if (i + 1 < m_shortcutClusters.size()) {
+        columnH += clusterGap;
+      }
+    }
+
     const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
     for (auto& pad : m_shortcutPads) {
       if (pad.glyph == nullptr) {
@@ -1021,26 +1115,19 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
       }
       if (showLabels) {
         pad.glyph->setGlyphSize(Style::fontSizeHeader * 1.2F * scale);
-      } else {
+      } else if (cellSide > 0.0F) {
         const float dynamicGlyphSize = std::clamp(cellSide * 0.32F, 24.0F * scale, 48.0F * scale);
         pad.glyph->setGlyphSize(dynamicGlyphSize);
       }
     }
 
-    const float gridH = std::round(
-        static_cast<float>(rows) * cellSide
-        + static_cast<float>(rows > 0 ? rows - 1 : 0) * m_shortcutsGrid->rowGap()
-        + m_shortcutsGrid->paddingTop()
-        + m_shortcutsGrid->paddingBottom()
-    );
     if (m_bottomRow != nullptr) {
-      m_bottomRow->setMinHeight(gridH);
+      m_bottomRow->setMinHeight(std::round(columnH));
     }
 
-    // Integer card heights track the snapped row height so top/bottom borders land on pixels.
     if (m_mediaCard != nullptr && m_dateTimeCard != nullptr) {
       const float colGap = Style::spaceMd * contentScale();
-      const float avail = std::max(0.0F, gridH - colGap);
+      const float avail = std::max(0.0F, std::round(columnH) - colGap);
       float mediaH = 0.0F;
       float dateH = 0.0F;
       if (mediaExpanded()) {
@@ -1642,7 +1729,8 @@ void HomeTab::onClose() {
   m_mediaPositionSampleAt = {};
   m_nextRealtimeUpdateAt = {};
   m_lastRealtimeMprisPollAt = {};
-  m_shortcutsGrid = nullptr;
+  m_shortcutsColumn = nullptr;
+  m_shortcutClusters.clear();
   // Keep Shortcut instances alive; drop only the UI pointers destroyed with the scene.
   for (auto& pad : m_shortcutPads) {
     if (pad.shortcut != nullptr) {
@@ -1665,6 +1753,11 @@ void HomeTab::onPanelCardOpacityChanged(float opacity) {
   }
   if (m_dateTimeCard != nullptr) {
     applyHomeCardStyle(*m_dateTimeCard, scale, opacity);
+  }
+  for (auto& cluster : m_shortcutClusters) {
+    if (cluster.well != nullptr) {
+      applyHomeClusterStyle(*cluster.well, scale, opacity);
+    }
   }
   syncShortcuts();
 }
@@ -1969,7 +2062,7 @@ void HomeTab::syncShortcuts() {
     const bool on = sc.isToggle() && sc.active();
 
     if (pad.button != nullptr) {
-      applyShortcutButtonStyle(*pad.button, enabled, on, panelCardOpacity());
+      applyShortcutButtonStyle(*pad.button, enabled, on);
       pad.button->setTooltip(sc.displayLabel());
     }
     if (pad.glyph != nullptr) {

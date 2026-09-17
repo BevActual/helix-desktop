@@ -28,6 +28,8 @@ namespace settings {
     Type,
     Scale,
     Roundness,
+    Effects,
+    Language,
     Wallpaper,
     Templates,
     Desktop,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "theme/community_palettes.h"
+#include "ui/palette.h"
 
 #include <filesystem>
 #include <string>
@@ -16,9 +17,11 @@ namespace noctalia::theme {
   [[nodiscard]] std::vector<AvailablePalette> availableCustomPalettes();
 
   [[nodiscard]] std::string suggestCustomPaletteName(std::string_view wallpaperPath, std::string_view scheme);
+  [[nodiscard]] std::string allocateCustomPaletteName(std::string_view base);
   [[nodiscard]] std::string allocateCustomPaletteName(std::string_view wallpaperPath, std::string_view scheme);
   [[nodiscard]] bool saveCustomPaletteFromGenerated(
       std::string_view name, const GeneratedPalette& palette, std::string* errorOut = nullptr
   );
+  [[nodiscard]] bool applyEditablePaletteRole(::Palette& palette, ColorRole role, const ::Color& color);
 
 } // namespace noctalia::theme

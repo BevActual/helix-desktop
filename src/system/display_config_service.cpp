@@ -10,6 +10,7 @@
 #include <format>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <ranges>
 #include <utility>
 
 namespace {
@@ -183,6 +184,36 @@ bool DisplayConfigService::setPosition(std::string_view name, int x, int y) {
   return ok;
 }
 
+bool DisplayConfigService::setOrigin(std::string_view name) {
+  const auto* target = findOutput(name);
+  if (target == nullptr || !target->enabled) {
+    m_lastError = "display not found";
+    return false;
+  }
+  const int dx = target->x;
+  const int dy = target->y;
+  if (dx == 0 && dy == 0) {
+    return true;
+  }
+
+  std::vector<std::pair<std::string, display_config::Point>> next;
+  for (const auto& output : m_outputs) {
+    if (!output.enabled) {
+      continue;
+    }
+    next.push_back({output.name, {.x = output.x - dx, .y = output.y - dy}});
+  }
+  std::ranges::sort(next, [](const auto& a, const auto& b) { return a.first < b.first; });
+  bool ok = true;
+  for (const auto& [outputName, point] : next) {
+    if (!apply(outputName, display_config::positionAction(point.x, point.y), false)) {
+      ok = false;
+    }
+  }
+  refresh();
+  return ok;
+}
+
 bool DisplayConfigService::setVrr(std::string_view name, bool enabled) {
   return apply(name, display_config::vrrAction(enabled));
 }
@@ -211,7 +242,7 @@ bool DisplayConfigService::placeRelative(
   } else {
     proposedX += offset;
   }
-  const auto point = display_config::placeAdjacent(*moving, *reference, direction, proposedX, proposedY);
+  const auto point = display_config::placeAgainst(*moving, *reference, direction, proposedX, proposedY);
   return setPosition(name, point.x, point.y);
 }
 

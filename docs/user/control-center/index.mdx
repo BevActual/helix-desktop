@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-The Control Center is Noctalia's panel for session controls, system status, media, notifications, weather, and service-specific tools. Open it from the control-center bar widget, by right-clicking empty space on a bar, or with IPC:
+The Control Center is Helix's hybrid of a Control Center and Settings. **Home** is the live Control Center: glass modules, status, and shortcuts. Every other sidebar page is a Settings-style live tab (state and primary actions on the page, policy in the header gear). Open it from the control-center bar widget, by right-clicking empty space on a bar, or with IPC:
 
 ```sh
 noctalia msg panel-toggle control-center
@@ -47,9 +47,9 @@ sidebar = "compact"
 | `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Control Center → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Look** (theme, type, scale, roundness, wallpaper, templates), **Layout** (bar, panels, dock, desktop, windows, OSD), **Status** (media, audio, weather, and the other live pages), **Services** (packages, Phone, Syncthing, Firewall, Printers, Cast, Privacy, capture, clipboard, and similar tools), **Behavior** (launcher, keybinds, shell), then **Advanced** (security, hooks, niri, Control Center, plugins). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Appearance** (theme, type, scale, roundness, effects, language, wallpaper, templates), **Desktop** (bar, dock, desktop, windows, panels, OSD), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
 
-Plugin Control Center tabs stay in **Status**. User `hidden_tabs` still hide any tab in every group.
+Plugin Control Center tabs stay in **Services**. User `hidden_tabs` still hide any tab in every group.
 
 ### Sidebar Tabs
 
@@ -58,21 +58,23 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine, incoming LocalSend), media summary, date/time, weather summary, and shortcut buttons. Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
-| `theme` | Theme | Theme mode, shell mode, Auto schedule status, palette source and picker, and current-palette swatches. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. Hover Dark/Light/Auto and palette source. On niri, window decorations and compositor blur live here; blur quality sliders appear when blur is on. `appearance` still opens this tab. Header gear opens language, icon tint, high contrast, motion, borders, shadows, and niri blur quality. |
-| `type` | Type | Shell font family. Header gear repeats that setting. |
-| `scale` | Scale | Interface scale. Header gear repeats that setting. |
-| `roundness` | Roundness | Shell corner scale, plus bar, dock, and (on niri) app-window corner radius. |
-| `wallpaper` | Wallpaper | Library, Wallhaven, Video, Daily (Bing / NASA), and file picker for applying wallpapers. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
-| `templates` | Templates | Built-in, community, and user app-theme catalogs. Hover Built-In/Community/User. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens the catalog enable switches, and greeter sync when the greeter is installed. |
+| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine, incoming LocalSend), media summary, date/time, weather summary, and shortcut buttons grouped into glass islands (connectivity, focus, display, and similar). Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
+| `theme` | Theme | Theme mode, shell mode, Auto schedule status, and Pure Black (dark only) in one group. Palette source, picker, save-as-custom, and tappable role swatches with hex values in the next. Tap a swatch to pick a color; Helix forks the current palette into a custom file and switches source to custom. Further edits overwrite that file. Save as custom snapshots the current palette without changing colors. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. Theme mode, shell mode, and palette source are trailing dropdowns. On niri, window decorations and compositor blur live in the next well; blur quality sliders appear when blur is on. `appearance` still opens this tab. |
+| `type` | Type | Shell font family, with labeled Ghost/Primary control specimens, caption/body/title size chips, and a pangram of the selected typeface. |
+| `scale` | Scale | Interface scale, with labeled caption, body, and title specimens plus a pangram that update while you drag. |
+| `roundness` | Roundness | Shell, bar, dock, and (on niri) app-window corner radius in one grouped well. Shell has labeled Small/Medium/Large chips; each other slider has a live specimen. |
+| `effects` | Effects | Panel glass (Solid, Soft, Glass) as a trailing dropdown, high contrast, application icon tint, animation on/off and speed, button/input/popup/card borders, popup shadows, and shadow direction/opacity. |
+| `language` | Language | Shell UI language. Auto follows the system locale; otherwise pick a supported translation. |
+| `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
+| `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
 | `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
 | `media` | Media | Media players, playback controls, and artwork. Header gear opens player ignore list. |
-| `audio` | Audio | Output/input volume, devices, and streams. Header gear opens sound and overdrive settings. |
-| `monitor` | Monitor | Night light, per-display brightness, plus, on niri, resolution, refresh rate, scale, rotation, VRR, and arrangement. Header gear opens brightness service settings. |
+| `audio` | Audio | Output and input volume on one card, application streams underneath. Header gear opens sound and overdrive settings. |
+| `monitor` | Monitor | Brightness and enable on a compact card, Night Light under it. On niri, the arrangement map keeps leftover height when two or more displays are on; resolution, refresh, scale, rotation, and VRR sit under it. Header gear opens brightness service settings. |
 | `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
 | `power` | Power | Lock, suspend, logout, reboot, shutdown, caffeine, battery charge and status, power profiles, battery health, and connected-device battery levels. Header gear opens session panel and idle settings. |
-| `network` | Network | Wi-Fi, cellular, VPN, ping/throughput, copy IP, speed test, DNS picker, and Wi-Fi QR. Hover Automatic/Google/Cloudflare/NextDNS/Custom. Header gear opens band filter and ignored SSIDs. |
-| `bluetooth` | Bluetooth | Adapter power, discoverability, paired devices, connection controls, copy address, and pairing flows. Header gear opens unnamed-device filter and discovery duration. |
+| `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Wi-Fi, VPN, and cellular lists sit under it. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
+| `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Paired and nearby devices sit under it. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
 | `camera` | Camera | Webcam preview and camera controls when a video device is available. |
 | `weather` | Weather | Current conditions and forecast. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
 | `calendar` | Calendar | Month view, world clock, calendar accounts (add/edit/reconnect), and events. Turning calendar sync off leaves the enable switch on the accounts card. Header gear opens calendar format settings. |
@@ -92,7 +94,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `desktop` | Desktop | Desktop widgets on/off, widget count and Edit when widgets are on, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
 | `windows` | Windows | niri window spacing: gaps, outer padding, and how wide new columns start (percent of the display). Shown only in a niri session. Header gear repeats those sliders. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Turning the dock off hides the rest of the live controls. Header gear opens monitors, layer, size, shape, and magnification. |
-| `panels` | Panels | Shared panel layer, transparency, borders, list-row tint, and floating offset. Hover Top/Overlay and Solid/Soft/Glass for what each does. Header gear repeats those plus per-panel placement. |
+| `panels` | Panels | Shared panel layer, borders, list-row tint, and floating offset. Hover Top/Overlay for what each does. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Effects. |
 | `launcher` | Launcher | Open launcher, always-in-search providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
 | `control-center` | Control Center | Sidebar, width, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
 | `osd` | OSD | On-screen pop-ups for volume, brightness, and other events. Turning OSD off leaves the enable switch. Position follows orientation (wide vs stacked). Header gear opens popup kinds, monitors, and offsets, and repeats enable/position. |
@@ -107,7 +109,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 `niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
-they appear in **Status**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
+they appear in **Services**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
 (`author/plugin:entry`). Hide any of them except Home via `hidden_tabs` or **Control Center → Control Center**.
 See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center-tabs).
 
@@ -115,7 +117,7 @@ Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (
 
 ## Home
 
-The Home tab is the default Control Center landing view. It combines frequently checked status with a compact shortcut grid.
+The Home tab is the Control Center landing view: clustered glass shortcut islands plus a compact status column. Other tabs are Settings pages with live controls.
 
 When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), caffeine/idle-inhibit on (opens Power), and an incoming LocalSend transfer waiting to be accepted (opens LocalSend). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
 
@@ -131,27 +133,39 @@ Set `show_session_button = false` under `[control_center]` to hide the Power but
 
 ## Theme
 
-The Theme tab is the landing page for colors: Dark, Light, or Auto (sunrise and sunset, using the Weather location), a separate shell mode that can follow that theme, and the palette source (built-in, wallpaper, community, or custom). Community and custom palettes open a searchable picker. Custom palettes can open your palettes folder. On niri, toggles match window decorations to the palette.
+The Theme tab is the landing page for colors, grouped like a Settings form. Dark, Light, or Auto and the separate shell-mode dropdown share one well with Pure Black. Palette source, picker, save-as-custom, and role swatches share the next. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it. On niri, window decorations and compositor blur have their own well.
 
-Header gear opens language, icon tint, high contrast, motion, borders, and shadows. Font, scale, and corner radius each have their own tab next to Theme.
+Font, scale, corner radius, effects (contrast, motion, borders, shadows), and language each have their own tab next to Theme.
+
+## Language
+
+The Language tab sets the shell UI language. Auto follows the system locale. Otherwise pick a supported translation. Untranslated strings fall back to English.
+
+`noctalia msg panel-toggle control-center language` opens this tab. `noctalia msg settings-toggle language` opens the same page.
+
+## Effects
+
+The Effects tab is the live page for visual treatment that is not color. Panel chrome (Solid, Soft, Glass) keeps its own well with a trailing dropdown. High contrast, application icon tint, motion, borders, and popup shadows share the next well, with hairlines between those groups. Animation speed hides when motion is off. Shadow direction and opacity hide when popup shadows are off. The color picker hides when icon tint is off.
+
+`noctalia msg panel-toggle control-center effects` opens this tab.
 
 ## Wallpaper
 
-The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source, a Daily Bing/NASA source, and a folder button to choose any image. Select a monitor (or **ALL**) on the Current strip, then click a tile to apply it. The strip also has star and lock-screen actions. Theme-from-wallpaper controls appear when that wallpaper is starred. Video runs `mpvpaper` directly; `mpvpaper` must be installed.
+The Wallpaper tab is the same picker used by the dedicated wallpaper panel: a thumbnail grid from your configured folders, Wallhaven search, a Video source, a Daily Bing/NASA source, and a folder button to choose any image. Library, Wallhaven, Video, and Daily share one compact card. Icon sources, search, and that source's tools sit on the left; the current wallpaper, Display, star, and lock-screen sit on the right. The grid sits under the card. Flatten, sort, color, and Wallhaven filters open from the Filters control. Theme-from-wallpaper controls appear in the same card when that wallpaper is starred. Empty, error, and download status use a caption in the card. Video runs `mpvpaper` directly; `mpvpaper` must be installed.
 
 Header gear opens wallpaper settings: fill mode, directories, per-monitor folders, automation, the Wallhaven API key, Daily source, and on niri the overview wallpaper preset (none, blurred backdrop, stationary, or a flat color) plus backdrop blur/tint. `noctalia msg settings-toggle wallpaper` opens that settings view. The floating wallpaper panel remains available from the bar widget and `noctalia msg panel-toggle wallpaper`. `noctalia msg panel-toggle wallpaper daily` (or `bing` / `nasa`) opens Daily on that panel; `noctalia msg panel-toggle control-center wallpaper daily` does the same in Control Center.
 
 ## Templates
 
-The Templates tab browses app-theme templates the same way Wallpaper browses images. Switch **Built-In**, **Community**, and **User**, turn a catalog on, then search, filter by category, and toggle templates in the grid. Enabling a template applies it on each theme change. Header **Apply** rerenders every enabled template for the current palette (`noctalia msg templates-apply`).
+The Templates tab browses app-theme templates the same way Wallpaper browses images. Icon sources, Enable, and catalog status share one compact card; the grid sits under it. Hover Built-In, Community, and User. Built-In and Community keep Enable on the right of that card; User hides it. Search, Filters, and sort sit with the grid. Enabling a template applies it on each theme change. Header **Apply** rerenders every enabled template for the current palette (`noctalia msg templates-apply`).
 
 The header **+** button picks an installed application. If a built-in or community template matches that app, Noctalia enables it. Otherwise it scaffolds a user template under `~/.config/noctalia/templates/` and opens the starter file so you can map tokens to the app's theme format. A sheet then asks for the output path the application actually reads, plus an optional post-hook. On the User catalog, each tile's gear edits those fields or deletes the GUI-created entry (starter files stay on disk). The header folder button opens that templates directory.
 
-When Noctalia Greeter is installed, header gear has **Sync Now** and **Auto-Sync** to copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK follow prompt when GTK templates are off.
+When Noctalia Greeter is installed, header gear has **Sync Now** and **Auto-Sync** to copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK Templates row when GTK templates are off.
 
 Palettes stay on **Theme**.
 
-Header gear opens the built-in and community catalog enable switches, plus greeter sync when it is available. `noctalia msg settings-toggle templates` opens that settings view. Community catalog search from a settings search still offers **Browse Templates** as a sheet.
+Header gear opens greeter sync when it is available. `noctalia msg settings-toggle templates` opens that settings view. Community catalog search from a settings search still offers **Browse Templates** as a sheet.
 
 ## Keybinds
 
@@ -173,11 +187,11 @@ The Audio tab groups PipeWire output, input, device, and stream controls. Use it
 
 ## Monitor
 
-The Monitor tab lists connected displays. A **Night Light** card at the top enables the schedule when the compositor supports gamma control. Turning it off leaves the enable switch; force-on and day/night temperatures appear when it is on. Brightness sliders appear when Noctalia has a writable backlight (including DDC/CI when that is enabled). On niri, each display also gets resolution, refresh rate, scale, rotation, and optional VRR controls, plus a visual arrangement map when two or more outputs are enabled.
+The Monitor tab lists connected displays. On niri, **Arrangement** is a canvas of screen-shaped tiles at their real aspect ratios. The origin display shows a menu-bar strip; drag that strip onto another tile to move the origin. Click a tile to inspect it below. Night Light sits under that canvas when the compositor supports gamma control. The selected display has identity, brightness, Main display, enable, resolution, refresh rate, scale, rotation, and VRR. Brightness sliders appear when a writable backlight is available (including DDC/CI when that is enabled). Disabled displays stay listed so you can turn them back on.
 
 niri only keeps the cursor path between **adjacent, non-overlapping** outputs. A layout change that overlaps another display is rejected and niri auto-places that output to the far right, which jumps windows with it. The Monitor tab pins every enabled output's position on each change so niri does not auto-place the ones you did not move.
 
-Drag a display to another side. While two displays already share an edge, the arrows slide the selected one along that seam (and magnet to top, center, or bottom). Hold **Ctrl** for an 8px nudge and **Shift** for 1px. Left/right still swap sides when the displays are stacked, and up/down swap sides when they sit next to each other. Pick **Relative to** when three or more are on.
+Drag a display to another side, including directly above or below. A small drag along a shared edge still slides. Drag far enough off that edge to sit against the new side. The arrows place the selected display above, below, left, or right. Pick **Relative to** when three or more are on.
 
 Live niri changes apply through compositor IPC. Use the header **Save to niri** button to write the current layout (mode, scale, transform, position, VRR, off) to `noctalia-outputs.kdl` and include it from `config.kdl`. niri reloads that file on its own, so the layout survives compositor restarts. The header refresh button re-reads the current output state (and re-runs DDC/CI detect when that backend is enabled).
 
@@ -193,9 +207,11 @@ The Network tab uses the configured network backend to show wireless state and c
 
 The current connection line lists the IPv4 address, signal strength, radio band, and external IP. The band (`2.4 GHz`, `5 GHz`, `6 GHz`, or `60 GHz`) is shown only when the backend reports the connection frequency: NetworkManager and wpa_supplicant do, iwd does not.
 
-The current connection card also shows live throughput (when the system monitor is running), the nameservers from `/etc/resolv.conf`, and a DNS picker for the active NetworkManager connection: **Automatic** (DHCP), **Google**, **Cloudflare**, **NextDNS**, or **Custom**. Presets apply immediately. NextDNS can take an optional config ID; Custom takes a comma-separated list of IPv4/IPv6 addresses and an Apply button. Changing DNS updates the connection profile and reapplies it; Noctalia does not write `/etc/resolv.conf`. iwd and wpa_supplicant backends cannot set DNS from here.
+The current connection card also shows live throughput (when the system monitor is running), the nameservers from `/etc/resolv.conf`, and a trailing DNS dropdown for the active NetworkManager connection: **Automatic** (DHCP), **Google**, **Cloudflare**, **NextDNS**, or **Custom**. Presets apply immediately. NextDNS can take an optional config ID; Custom takes a comma-separated list of IPv4/IPv6 addresses and an Apply button. Changing DNS updates the connection profile and reapplies it; Noctalia does not write `/etc/resolv.conf`. iwd and wpa_supplicant backends cannot set DNS from here.
 
-The current connection card also has tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
+The current connection card also has icon tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Hover each tool. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
+
+Wi-Fi, VPN, and cellular lists sit under that card so they keep the leftover height.
 
 Header gear opens Network settings: Wi-Fi band filter and ignored SSIDs. Dual-band networks are listed once (the strongest BSS), so a 5 GHz filter hides a network whose strongest copy is on 2.4 GHz. iwd access points have no frequency and stay visible only when the band filter is **All**.
 
@@ -227,7 +243,7 @@ Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for m
 
 ## Bluetooth
 
-The Bluetooth tab shows adapter power state, paired devices, and connection controls. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
+The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Device lists sit under that card so they keep the leftover height. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
 
 ```toml
 [control_center.bluetooth]
@@ -237,7 +253,7 @@ discovery_seconds = 10
 
 ## Capture {#capture}
 
-The Capture tab combines screenshots and screen recording in one Status page with **Screenshot | Record** segments. Hover a segment for what it does. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching segment. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
+The Capture tab combines screenshots and screen recording in one Services page with **Screenshot | Record** segments. Hover a segment for what it does. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching segment. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
 
 ### Screenshot {#screenshot}
 
@@ -257,7 +273,7 @@ The Clipboard tab is the clipboard history view: filter, pin, copy, delete, and 
 
 ## Tailscale
 
-The Tailscale tab talks to the local `tailscale` CLI. Connect and disconnect this machine, copy its tailnet addresses, open the admin console, and toggle shields, subnet routes, SSH, DNS, advertising an exit node, and LAN access while using an exit node. Pick an exit node from the dropdown, or use a peer as an exit from the device list. Mullvad exit nodes stay in the exit picker and are omitted from the peer list.
+The Tailscale tab talks to the local `tailscale` CLI. Connect and disconnect this machine, copy its tailnet addresses, open the admin console, and toggle shields, subnet routes, SSH, DNS, advertising an exit node, and LAN access while using an exit node. Status, preferences, and the peer list share one grouped well. Pick an exit node from the dropdown, or use a peer as an exit from the device list. Mullvad exit nodes stay in the exit picker and are omitted from the peer list.
 
 Connect, disconnect, and preference writes need Tailscale operator access. If this user is not the operator, Noctalia asks for an administrator password (via `pkexec` and the built-in Polkit prompt) and retries. To skip that prompt later, run `sudo tailscale set --operator=$USER` once.
 
@@ -313,7 +329,7 @@ IPC: `localsend-toggle`, `localsend-status`, and `localsend-announce`. See [Medi
 
 ## Phone
 
-The Phone tab talks to the session KDE Connect daemon (`org.kde.kdeconnect`). Pair a phone running KDE Connect, then ping it, ring it, send a file, or send the clipboard. Battery percent shows when the phone reports it. Unpaired nearby devices get a Pair button; an incoming pair request shows Accept and Decline plus the verification code.
+The Phone tab talks to the session KDE Connect daemon (`org.kde.kdeconnect`). Status and the device list share one grouped well. Pair a phone running KDE Connect, then ping it, ring it, send a file, or send the clipboard. Battery percent shows when the phone reports it. Unpaired nearby devices get a Pair button; an incoming pair request shows Accept and Decline plus the verification code.
 
 The tab stays in the sidebar when KDE Connect is not installed. **Start KDE Connect** asks D-Bus to launch the daemon if the package is present. Opening the tab also asks the daemon to look for nearby devices; closing the tab stops that scan.
 
@@ -323,7 +339,7 @@ IPC: `phone-status`, `phone-ping`, and `phone-ring`. See [Media & UI](/noctalia/
 
 ## Syncthing
 
-The Syncthing tab talks to the local Syncthing daemon (`127.0.0.1:8384` by default). Start it from the live view if it is installed but not running. When it is up, the tab shows this machine's name, a copyable device ID, folders with scan/pause, and other devices. **Open Syncthing** opens the web UI for adding folders and pairing.
+The Syncthing tab talks to the local Syncthing daemon (`127.0.0.1:8384` by default). Start it from the live view if it is installed but not running. When it is up, status, folders, and other devices share one grouped well. **Open Syncthing** opens the web UI for adding folders and pairing.
 
 The tab stays in the sidebar when Syncthing is not installed. Adding folders and devices stays in the Syncthing UI.
 
@@ -331,7 +347,7 @@ IPC: `syncthing-status`, `syncthing-start`, and `syncthing-stop`. See [Media & U
 
 ## Firewall
 
-The Firewall tab talks to firewalld (`org.fedoraproject.FirewallD1`). Pick the default zone, toggle incoming services such as Remote login and KDE Connect, and use **Block all traffic** for panic mode. Changes apply immediately to the running firewall. **Save for next boot** copies that runtime config to disk.
+The Firewall tab talks to firewalld (`org.fedoraproject.FirewallD1`). Status, the default zone, and incoming services share one grouped well. Pick the default zone, toggle incoming services such as Remote login and KDE Connect, and use **Block all traffic** for panic mode. Changes apply immediately to the running firewall. **Save for next boot** copies that runtime config to disk.
 
 The tab stays in the sidebar when firewalld is not installed. **Start firewall** asks systemd to start `firewalld.service` and may show a password prompt.
 
@@ -339,7 +355,7 @@ IPC: `firewall-status` and `firewall-panic-toggle`. See [Media & UI](/noctalia/i
 
 ## Printers
 
-The Printers tab talks to CUPS. Start the printing service, pick a default printer, pause or resume a queue, cancel jobs, and print a file. **Open printer setup** opens the CUPS web UI at `http://localhost:631`.
+The Printers tab talks to CUPS. Start the printing service, then manage queues in the same grouped well: pick a default printer, pause or resume, cancel jobs, and print a file. **Open printer setup** opens the CUPS web UI at `http://localhost:631`.
 
 The tab stays in the sidebar when printing is not running. **Start printing** asks systemd to start `cups.service` and may show a password prompt.
 
@@ -347,7 +363,7 @@ IPC: `printers-status` and `printers-start`. See [Media & UI](/noctalia/ipc/medi
 
 ## Cast
 
-The Cast tab shares this screen over Remote Desktop (`grdctl`) and can cast to a nearby TV through Network Displays (`org.gnome.NetworkDisplays.Manager`). **Share this screen** starts the session remote-desktop service and shows the listen address. **Start wireless displays** launches Network Displays when it is installed.
+The Cast tab shares this screen over Remote Desktop (`grdctl`) and can cast to a nearby TV through Network Displays (`org.gnome.NetworkDisplays.Manager`). Screen sharing, wireless displays, and nearby TVs share one grouped well. **Share this screen** starts the session remote-desktop service and shows the listen address. **Start wireless displays** launches Network Displays when it is installed.
 
 The tab stays in the sidebar when those packages are missing so you can turn sharing on from the tab itself.
 
@@ -361,7 +377,7 @@ IPC: `privacy-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#privacy).
 
 ## Weather
 
-The Weather tab expands the Home weather summary into current conditions and forecast detail. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
+The Weather tab expands the Home weather summary into current conditions and forecast detail. Current conditions and the metrics list share one grouped well; daily and hourly forecast stay in a second well. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
 
 Weather configuration is documented under [Weather](/noctalia/services/weather/).
 
@@ -440,9 +456,9 @@ ollama = "auto"
 
 ## Settings
 
-Settings pages are Control Center tabs. Theme, Type, Scale, Roundness, Wallpaper, and Templates sit under **Look**. Bar, Panels, Dock, Desktop, Windows, and OSD sit under **Layout**. Live status pages sit under **Status**. Packages, capture, clipboard, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Behavior**. Security, hooks, niri, Control Center options, and plugins sit under **Advanced**.
+Settings pages are Control Center tabs. Theme, Type, Scale, Roundness, Effects, Language, Wallpaper, and Templates sit under **Appearance**. Bar, Dock, Desktop, Windows, Panels, and OSD sit under **Desktop**. Network, Bluetooth, Audio, Media, Monitor, Power, Notifications, Screen Time, Calendar, Weather, Camera, and System sit under **Device**. Privacy, Firewall, Security, Printers, Cast, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Input**. Control Center options, niri, hooks, and plugins sit under **General**.
 
-Domain options that belong with a live view are on that tab: theme and palette on Theme (Auto shows the next day/night switch; community and custom palettes use a searchable picker; header gear for language, icon tint, high contrast, motion, borders, and shadows), font on Type, UI scale on Scale, corner radius on Roundness, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
+Domain options that belong with a live view are on that tab: theme and palette on Theme (Auto shows the next day/night switch; community and custom palettes use a searchable picker), language on Language, font on Type, UI scale on Scale, corner radius on Roundness, panel glass, high contrast, icon tint, motion, borders, and shadows on Effects, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the settings registry on the current tab’s gear sheet when that section matches. If it does not, Control Center opens the best matching section in gear mode instead of always dumping onto Theme.
 

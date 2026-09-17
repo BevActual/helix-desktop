@@ -50,6 +50,7 @@ struct SettingsPaneOptions {
   std::unordered_set<std::string> includedGroups;
   bool compact = false;
   std::function<void()> openStore;
+  bool showConfigureButton = true;
 };
 
 class SettingsPane {
@@ -142,6 +143,7 @@ private:
   std::string m_selectedSection;
   std::unordered_set<std::string> m_includedGroups;
   bool m_compact = false;
+  bool m_showConfigureButton = true;
   std::string m_searchQuery;
   std::string m_selectedBarName;
   std::string m_selectedMonitorOverride;

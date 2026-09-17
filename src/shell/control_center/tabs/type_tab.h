@@ -39,6 +39,12 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Button* m_fontButton = nullptr;
+  Label* m_fontPreviewGhost = nullptr;
+  Label* m_fontPreviewPrimary = nullptr;
+  Label* m_fontPreviewCaption = nullptr;
+  Label* m_fontPreviewBody = nullptr;
+  Label* m_fontPreview = nullptr;
+  Label* m_fontPreviewPangram = nullptr;
   Label* m_fontEmpty = nullptr;
 
   bool m_syncing = false;

@@ -109,6 +109,7 @@ namespace settings {
     const bool selectedUnknown = !selectedIndex.has_value() && !selectedValue.empty();
 
     auto select = ui::select({
+        .out = options.out,
         .options = labelsForChoices(choices),
         .selectedIndex = selectedIndex,
         .clearSelection = selectedUnknown,

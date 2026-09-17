@@ -15,10 +15,12 @@ namespace control_center {
     };
 
     constexpr AliasRow kAliases[] = {
-        {"theme", "appearance color palette colours colors look"},
+        {"theme", "appearance color palette colours colors look custom customize accent"},
         {"type", "font typeface typography"},
         {"scale", "size ui-scale zoom interface-scale"},
         {"roundness", "corners rounded radius border-radius"},
+        {"effects", "contrast motion animation borders shadows tint icons glass transparency"},
+        {"language", "locale translation i18n lang"},
         {"windows", "gaps struts columns tiling niri windows"},
         {"niri", "setup compositor autostart"},
         {"audio", "sound volume mic microphone speaker"},

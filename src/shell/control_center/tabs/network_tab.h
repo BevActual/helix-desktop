@@ -31,7 +31,6 @@ class Input;
 class Label;
 class ModemManagerService;
 class ScrollView;
-class Segmented;
 class Select;
 class Spinner;
 class SystemMonitorService;
@@ -110,7 +109,7 @@ private:
   Label* m_currentDetail = nullptr;
   Label* m_throughputLabel = nullptr;
   Label* m_dnsLabel = nullptr;
-  Segmented* m_dnsProfilePicker = nullptr;
+  Select* m_dnsProfilePicker = nullptr;
   Flex* m_dnsNextDnsRow = nullptr;
   Flex* m_dnsCustomRow = nullptr;
   Input* m_dnsNextDnsInput = nullptr;

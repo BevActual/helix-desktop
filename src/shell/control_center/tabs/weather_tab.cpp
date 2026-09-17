@@ -82,17 +82,30 @@ std::unique_ptr<Flex> WeatherTab::create() {
       .flexGrow = 3.0F,
   });
 
+  auto nowWell = ui::column({
+      .out = &m_nowWell,
+      .align = FlexAlign::Stretch,
+      .gap = 0.0F,
+      .clipChildren = true,
+      .flexGrow = 1.0F,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& well) {
+        applySectionCardStyle(well, scale, opacity);
+        well.setPadding(0.0F);
+        well.setGap(0.0F);
+        well.setClipChildren(true);
+      },
+  });
+
   auto currentCard = ui::row({
       .out = &m_currentCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .padding = Style::spaceXs * scale,
+      .padding = Style::spaceMd * scale,
       .clipChildren = true,
       .flexGrow = 1.0F,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        applySectionCardStyle(card, scale, opacity);
+      .configure = [scale](Flex& card) {
         card.setDirection(FlexDirection::Horizontal);
-        card.setPadding(Style::spaceXs * scale, Style::spaceXs * scale);
+        card.setPadding(Style::spaceMd * scale);
         card.setGap(Style::spaceSm * scale);
       },
   });
@@ -101,7 +114,7 @@ std::unique_ptr<Flex> WeatherTab::create() {
   effectNode->setParticipatesInLayout(false);
   effectNode->setZIndex(-1);
   effectNode->setVisible(false);
-  effectNode->setRadius(Style::scaledRadiusXl(scale));
+  effectNode->setRadius(Style::scaledRadius2xl(scale));
   m_effectNode = static_cast<EffectNode*>(currentCard->addChild(std::move(effectNode)));
 
   auto glyphColumn = ui::row(
@@ -257,14 +270,15 @@ std::unique_ptr<Flex> WeatherTab::create() {
       })
   );
   leftColumn->addChild(std::move(enableRow));
-  leftColumn->addChild(std::move(currentCard));
+  nowWell->addChild(std::move(currentCard));
+  addWellDivider(*nowWell, scale);
 
   auto detailsCard = ui::column({
       .out = &m_detailsCard,
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        applySectionCardStyle(card, scale, opacity);
+      .padding = Style::spaceMd * scale,
+      .configure = [scale](Flex& card) {
         card.setPadding(Style::spaceMd * scale);
         card.setGap(0.0F);
       },
@@ -322,7 +336,8 @@ std::unique_ptr<Flex> WeatherTab::create() {
   addDetailRow("sun", i18n::tr("control-center.weather.details.uv-index"), m_uvIndexLabel);
   m_timeZoneRow = addDetailRow("clock", i18n::tr("control-center.weather.details.timezone"), m_timeZoneLabel);
 
-  leftColumn->addChild(std::move(detailsCard));
+  nowWell->addChild(std::move(detailsCard));
+  leftColumn->addChild(std::move(nowWell));
 
   tab->addChild(std::move(leftColumn));
 
@@ -639,11 +654,8 @@ void WeatherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
   const float leftColumnWidth = m_leftColumn != nullptr
       ? std::max(0.0F, m_leftColumn->width() - (m_leftColumn->paddingLeft() + m_leftColumn->paddingRight()))
       : contentWidth;
-  if (m_currentCard != nullptr) {
-    m_currentCard->setMinWidth(leftColumnWidth);
-  }
-  if (m_detailsCard != nullptr) {
-    m_detailsCard->setMinWidth(leftColumnWidth);
+  if (m_nowWell != nullptr) {
+    m_nowWell->setMinWidth(leftColumnWidth);
   }
   if (m_statusLabel != nullptr) {
     m_statusLabel->setMaxWidth(leftColumnWidth);
@@ -832,6 +844,7 @@ void WeatherTab::onClose() {
   m_leftColumn = nullptr;
   m_enableRow = nullptr;
   m_enableToggle = nullptr;
+  m_nowWell = nullptr;
   m_currentCard = nullptr;
   m_glyphColumn = nullptr;
   m_detailsCard = nullptr;
@@ -883,8 +896,8 @@ void WeatherTab::sync(Renderer& renderer) {
   if (m_enableToggle != nullptr) {
     m_enableToggle->setChecked(weatherOn);
   }
-  const bool layoutDirty = setShown(m_enableRow, !weatherOn) || setShown(m_currentCard, weatherOn)
-      || setShown(m_detailsCard, weatherOn) || setShown(m_forecastColumn, weatherOn);
+  const bool layoutDirty = setShown(m_enableRow, !weatherOn) || setShown(m_nowWell, weatherOn)
+      || setShown(m_forecastColumn, weatherOn);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -1116,7 +1129,7 @@ void WeatherTab::sync(Renderer& renderer) {
     }
     m_effectNode->setEffectType(m_activeEffect);
     m_effectNode->setBgColor(colorForRole(ColorRole::Surface));
-    m_effectNode->setRadius(Style::scaledRadiusXl(contentScale()));
+    m_effectNode->setRadius(Style::scaledRadius2xl(contentScale()));
     m_effectNode->setVisible(m_activeEffect != EffectType::None);
   }
 }

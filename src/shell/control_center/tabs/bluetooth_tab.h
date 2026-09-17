@@ -85,6 +85,10 @@ private:
   Button* m_pairingAccept = nullptr;
   Button* m_pairingReject = nullptr;
 
+  Flex* m_adapterCard = nullptr;
+  Flex* m_discoverableRow = nullptr;
+  Label* m_adapterStatus = nullptr;
+
   ScrollView* m_listScroll = nullptr;
   Flex* m_list = nullptr;
 

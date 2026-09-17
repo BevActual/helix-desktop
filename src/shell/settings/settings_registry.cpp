@@ -89,11 +89,13 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 32> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 34> kSettingsSections{{
         {SettingsSection::Theme, "theme", "palette"},
         {SettingsSection::Type, "type", "typography"},
         {SettingsSection::Scale, "scale", "resize"},
         {SettingsSection::Roundness, "roundness", "border-radius"},
+        {SettingsSection::Effects, "effects", "shadow"},
+        {SettingsSection::Language, "language", "language"},
         {SettingsSection::Wallpaper, "wallpaper", "paint"},
         {SettingsSection::Templates, "templates", "color-swatch"},
         {SettingsSection::Desktop, "desktop", "layout-board"},
@@ -1139,12 +1141,12 @@ namespace settings {
         sliderFor(cfg.accessibility.uiScale, noctalia::config::schema::kScaleRange, false), "size scale text panels"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "interface", tr("settings.schema.appearance.language.label"),
+        SettingsSection::Language, "language", tr("settings.schema.appearance.language.label"),
         tr("settings.schema.appearance.language.description"), {"shell", "lang"}, languageSelect(cfg.shell.lang),
-        "locale translation", true
+        "locale translation i18n lang", true
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "interface", tr("settings.schema.appearance.app-icon-colorize.label"),
+        SettingsSection::Effects, "icons", tr("settings.schema.appearance.app-icon-colorize.label"),
         tr("settings.schema.appearance.app-icon-colorize.description"), {"shell", "app_icon_colorize"},
         ToggleSetting{cfg.shell.appIconColorize}, "tint all application icons"
     ));
@@ -1155,7 +1157,7 @@ namespace settings {
       const ColorSpec pickerColor =
           cfg.shell.appIconColor.value_or(*effectiveShellAppIconColorizationTint(colorizeShell));
       auto e = makeEntry(
-          SettingsSection::Theme, "interface", tr("settings.schema.appearance.app-icon-color.label"),
+          SettingsSection::Effects, "icons", tr("settings.schema.appearance.app-icon-color.label"),
           tr("settings.schema.appearance.app-icon-color.description"), {"shell", "app_icon_color"},
           colorSpecPicker(pickerColor), "color role dock tray application icons"
       );
@@ -1163,52 +1165,52 @@ namespace settings {
       entries.push_back(std::move(e));
     }
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "accessibility", tr("settings.schema.accessibility.high-contrast.label"),
+        SettingsSection::Effects, "accessibility", tr("settings.schema.accessibility.high-contrast.label"),
         tr("settings.schema.accessibility.high-contrast.description"), {"accessibility", "high_contrast"},
         ToggleSetting{cfg.accessibility.highContrast}, "accessibility high contrast visually impaired"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "motion", tr("settings.schema.appearance.animations.label"),
+        SettingsSection::Effects, "motion", tr("settings.schema.appearance.animations.label"),
         tr("settings.schema.appearance.animations.description"), {"shell", "animation", "enabled"},
         ToggleSetting{cfg.shell.animation.enabled}, "motion"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "motion", tr("settings.schema.appearance.animation-speed.label"),
+        SettingsSection::Effects, "motion", tr("settings.schema.appearance.animation-speed.label"),
         tr("settings.schema.appearance.animation-speed.description"), {"shell", "animation", "speed"},
         sliderFor(cfg.shell.animation.speed, noctalia::config::schema::kAnimationSpeedRange, false), "motion"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "borders", tr("settings.schema.appearance.button-borders.label"),
+        SettingsSection::Effects, "borders", tr("settings.schema.appearance.button-borders.label"),
         tr("settings.schema.appearance.button-borders.description"), {"shell", "button_borders"},
         ToggleSetting{cfg.shell.buttonBorders}, "button outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "borders", tr("settings.schema.appearance.input-borders.label"),
+        SettingsSection::Effects, "borders", tr("settings.schema.appearance.input-borders.label"),
         tr("settings.schema.appearance.input-borders.description"), {"shell", "input_borders"},
         ToggleSetting{cfg.shell.inputBorders}, "input text box field outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "borders", tr("settings.schema.appearance.popup-borders.label"),
+        SettingsSection::Effects, "borders", tr("settings.schema.appearance.popup-borders.label"),
         tr("settings.schema.appearance.popup-borders.description"), {"shell", "popup_borders"},
         ToggleSetting{cfg.shell.popupBorders}, "popup menu dropdown outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "borders", tr("settings.schema.appearance.card-borders.label"),
+        SettingsSection::Effects, "borders", tr("settings.schema.appearance.card-borders.label"),
         tr("settings.schema.appearance.card-borders.description"), {"shell", "card_borders"},
         ToggleSetting{cfg.shell.cardBorders}, "card section outline border flat minimal"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "effects", tr("settings.schema.shared.shadow-direction.label"),
+        SettingsSection::Effects, "effects", tr("settings.schema.shared.shadow-direction.label"),
         tr("settings.schema.appearance.global-shadow-direction.description"), {"shell", "shadow", "direction"},
         enumSelect(kShadowDirections, cfg.shell.shadow.direction), "shadow direction"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "effects", tr("settings.schema.shared.shadow-alpha.label"),
+        SettingsSection::Effects, "effects", tr("settings.schema.shared.shadow-alpha.label"),
         tr("settings.schema.appearance.global-shadow-alpha.description"), {"shell", "shadow", "alpha"},
         sliderFor(cfg.shell.shadow.alpha, noctalia::config::schema::kUnitRange, false), "shadow opacity", true
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "effects", tr("settings.schema.appearance.popup-shadows.label"),
+        SettingsSection::Effects, "effects", tr("settings.schema.appearance.popup-shadows.label"),
         tr("settings.schema.appearance.popup-shadows.description"), {"shell", "popup_shadows"},
         ToggleSetting{cfg.shell.popupShadows}, "popup menu dropdown drop shadow depth"
     ));
@@ -1823,7 +1825,7 @@ namespace settings {
         "floating detached panel layer shell z-order input method popup fullscreen"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Panels, "effects", tr("settings.schema.panels.transparency-mode.label"),
+        SettingsSection::Effects, "chrome", tr("settings.schema.panels.transparency-mode.label"),
         tr("settings.schema.panels.transparency-mode.description"), {"shell", "panel", "transparency_mode"},
         asSegmented(enumSelect(kPanelTransparencyModes, cfg.shell.panel.transparencyMode)),
         "glass opacity alpha translucent cards blur"

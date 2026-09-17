@@ -32,6 +32,7 @@ public:
   bool setScale(std::string_view name, double scale);
   bool setTransform(std::string_view name, display_config::Transform transform);
   bool setPosition(std::string_view name, int x, int y);
+  bool setOrigin(std::string_view name);
   bool setVrr(std::string_view name, bool enabled);
   bool setEnabled(std::string_view name, bool enabled);
   bool placeRelative(

@@ -205,6 +205,44 @@ namespace noctalia::theme {
       };
     }
 
+    std::optional<ResolvedTheme> resolveFromSource(
+        const ThemeConfig& cfg, std::string_view mode, std::string_view shellMode,
+        const std::optional<GeneratedPalette>& wallpaperGenerated
+    ) {
+      if (cfg.source == PaletteSource::Custom && !cfg.customPalette.empty()) {
+        const auto path = customPalettePath(cfg.customPalette);
+        if (std::filesystem::exists(path)) {
+          if (auto parsed = parseCommunityPaletteJson(path)) {
+            return makeResolvedFromParsed(*parsed, mode, shellMode);
+          }
+        }
+        kLog.warn("custom palette '{}' not found or invalid; falling back to builtin", cfg.customPalette);
+      } else if (cfg.source == PaletteSource::Wallpaper) {
+        if (wallpaperGenerated.has_value()) {
+          return ResolvedTheme{
+              .generated = *wallpaperGenerated,
+              .palette = mapGeneratedPaletteMode(
+                  shellMode == "light" ? wallpaperGenerated->light : wallpaperGenerated->dark
+              ),
+              .mode = std::string(mode),
+              .shellMode = std::string(shellMode),
+          };
+        }
+      } else if (cfg.source == PaletteSource::Community && !cfg.communityPalette.empty()) {
+        const auto cachePath = communityPaletteCachePath(cfg.communityPalette);
+        if (std::filesystem::exists(cachePath)) {
+          if (auto parsed = parseCommunityPaletteJson(cachePath)) {
+            return makeResolvedFromParsed(*parsed, mode, shellMode);
+          }
+          std::error_code rmEc;
+          std::filesystem::remove(cachePath, rmEc);
+        }
+      } else if (cfg.source == PaletteSource::Builtin) {
+        return resolveBuiltin(cfg, mode, shellMode);
+      }
+      return std::nullopt;
+    }
+
     std::string colorSchemeValue(const ThemeConfig& theme) {
       switch (theme.source) {
       case PaletteSource::Builtin:
@@ -484,41 +522,20 @@ namespace noctalia::theme {
     const std::string mode = modeName(cfg.mode);
     const std::string shellMode = modeName(shellThemeMode(cfg));
 
-    std::optional<ResolvedTheme> resolved;
-    if (cfg.source == PaletteSource::Custom && !cfg.customPalette.empty()) {
-      const auto path = customPalettePath(cfg.customPalette);
-      if (std::filesystem::exists(path)) {
-        if (auto parsed = parseCommunityPaletteJson(path)) {
-          resolved = makeResolvedFromParsed(*parsed, mode, shellMode);
-        }
-      }
-      if (!resolved.has_value()) {
-        kLog.warn("custom palette '{}' not found or invalid; falling back to builtin", cfg.customPalette);
-      }
-    } else if (cfg.source == PaletteSource::Wallpaper) {
-      if (auto generated = resolveWallpaperGenerated(cfg, m_config.getPaletteWallpaperPath())) {
-        resolved = ResolvedTheme{
-            .generated = *generated,
-            .palette = mapGeneratedPaletteMode(shellMode == "light" ? generated->light : generated->dark),
-            .mode = mode,
-            .shellMode = shellMode,
-        };
-      }
-    } else if (cfg.source == PaletteSource::Community && !cfg.communityPalette.empty()) {
+    std::optional<GeneratedPalette> wallpaperGenerated;
+    if (cfg.source == PaletteSource::Wallpaper) {
+      wallpaperGenerated = resolveWallpaperGenerated(cfg, m_config.getPaletteWallpaperPath());
+    }
+    std::optional<ResolvedTheme> resolved = resolveFromSource(cfg, mode, shellMode, wallpaperGenerated);
+    if (cfg.source == PaletteSource::Community && !cfg.communityPalette.empty()) {
       const auto cachePath = communityPaletteCachePath(cfg.communityPalette);
       bool stale = true;
       if (std::filesystem::exists(cachePath)) {
-        if (auto parsed = parseCommunityPaletteJson(cachePath)) {
-          resolved = makeResolvedFromParsed(*parsed, mode, shellMode);
-          // Re-fetch when the catalog advertises a different checksum than the
-          // cached copy. An empty catalog md5 means "freshness unknown": keep
-          // the cached palette rather than re-downloading on every resolve.
-          const std::string expectedMd5 = communityPaletteCatalogMd5(cfg.communityPalette);
-          stale = !expectedMd5.empty() && util::fileMd5Hex(cachePath) != StringUtils::toLower(expectedMd5);
-        } else {
-          std::error_code rmEc;
-          std::filesystem::remove(cachePath, rmEc);
-        }
+        // Re-fetch when the catalog advertises a different checksum than the
+        // cached copy. An empty catalog md5 means "freshness unknown": keep
+        // the cached palette rather than re-downloading on every resolve.
+        const std::string expectedMd5 = communityPaletteCatalogMd5(cfg.communityPalette);
+        stale = !expectedMd5.empty() && util::fileMd5Hex(cachePath) != StringUtils::toLower(expectedMd5);
       }
       // A stale-but-valid cache still resolves above, so the fresh copy fades in
       // via the download callback instead of flashing the builtin palette.
@@ -678,6 +695,105 @@ namespace noctalia::theme {
     }
 
     if (!saveCustomPaletteFromGenerated(name, *generated, errorOut)) {
+      return false;
+    }
+
+    if (!m_config.setThemeColorScheme(PaletteSource::Custom, name)) {
+      return fail("failed to switch palette source to custom");
+    }
+
+    if (paletteNameOut != nullptr) {
+      *paletteNameOut = name;
+    }
+    return true;
+  }
+
+  bool ThemeService::saveCurrentPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut) {
+    auto fail = [errorOut](std::string message) {
+      if (errorOut != nullptr) {
+        *errorOut = std::move(message);
+      }
+      return false;
+    };
+
+    const auto& cfg = m_config.config().theme;
+    if (cfg.source == PaletteSource::Wallpaper) {
+      return saveWallpaperPaletteAsCustom(paletteNameOut, errorOut);
+    }
+
+    const std::string mode{resolvedMode()};
+    const std::string shellMode{resolvedShellMode()};
+    std::optional<ResolvedTheme> resolved = resolveFromSource(cfg, mode, shellMode, std::nullopt);
+    if (!resolved.has_value()) {
+      resolved = resolveBuiltin(cfg, mode, shellMode);
+    }
+
+    const std::string name = allocateCustomPaletteName("custom");
+    if (name.empty()) {
+      return fail("failed to allocate custom palette name");
+    }
+
+    if (!saveCustomPaletteFromGenerated(name, resolved->generated, errorOut)) {
+      return false;
+    }
+
+    if (!m_config.setThemeColorScheme(PaletteSource::Custom, name)) {
+      return fail("failed to switch palette source to custom");
+    }
+
+    if (paletteNameOut != nullptr) {
+      *paletteNameOut = name;
+    }
+    return true;
+  }
+
+  bool ThemeService::saveRoleColorAsCustom(
+      ColorRole role, const ::Color& color, std::string* paletteNameOut, std::string* errorOut
+  ) {
+    auto fail = [errorOut](std::string message) {
+      if (errorOut != nullptr) {
+        *errorOut = std::move(message);
+      }
+      return false;
+    };
+
+    ::Color rgb = color;
+    rgb.a = 1.0F;
+
+    const auto& cfg = m_config.config().theme;
+    const std::string mode{resolvedMode()};
+    const std::string shellMode{resolvedShellMode()};
+    std::optional<GeneratedPalette> wallpaperGenerated;
+    if (cfg.source == PaletteSource::Wallpaper) {
+      wallpaperGenerated = resolveWallpaperGenerated(cfg, m_config.getPaletteWallpaperPath());
+    }
+    std::optional<ResolvedTheme> resolved = resolveFromSource(cfg, mode, shellMode, wallpaperGenerated);
+    if (!resolved.has_value()) {
+      resolved = resolveBuiltin(cfg, mode, shellMode);
+    }
+
+    const bool light = resolved->shellMode == "light";
+    ::Palette palette = mapGeneratedPaletteMode(light ? resolved->generated.light : resolved->generated.dark);
+    if (!applyEditablePaletteRole(palette, role, rgb)) {
+      return fail("unsupported palette role");
+    }
+    if (light) {
+      resolved->generated.light = expandFixedPaletteMode(palette, false);
+    } else {
+      resolved->generated.dark = expandFixedPaletteMode(palette, true);
+    }
+
+    std::string name;
+    if (cfg.source == PaletteSource::Custom && !cfg.customPalette.empty()) {
+      name = cfg.customPalette;
+    } else {
+      name = allocateCustomPaletteName("custom");
+    }
+    if (name.empty()) {
+      return fail("failed to allocate custom palette name");
+    }
+
+    if (!saveCustomPaletteFromGenerated(name, resolved->generated, errorOut)) {
       return false;
     }
 

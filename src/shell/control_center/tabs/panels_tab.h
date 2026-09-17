@@ -34,7 +34,6 @@ private:
   void doUpdate(Renderer& renderer) override;
   void syncLiveControls();
   void applyFloatingLayer(std::size_t index);
-  void applyTransparencyMode(std::size_t index);
   void applyBorders(bool enabled);
   void applyShadow(bool enabled);
   void applyListItemBackground(bool enabled);
@@ -46,7 +45,6 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Segmented* m_floatingLayer = nullptr;
-  Segmented* m_transparencyMode = nullptr;
   Toggle* m_borders = nullptr;
   Toggle* m_shadow = nullptr;
   Toggle* m_listItemBackground = nullptr;

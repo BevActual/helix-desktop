@@ -73,13 +73,14 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Segmented* m_source = nullptr;
-  Label* m_enableLabel = nullptr;
+  Flex* m_catalogWell = nullptr;
   Toggle* m_enable = nullptr;
   Label* m_hint = nullptr;
   Flex* m_storeHost = nullptr;
   Button* m_applyButton = nullptr;
   Button* m_folderButton = nullptr;
   Button* m_newButton = nullptr;
+  Flex* m_gtkFollowSection = nullptr;
   Label* m_gtkFollowHint = nullptr;
   Button* m_gtkFollowButton = nullptr;
 

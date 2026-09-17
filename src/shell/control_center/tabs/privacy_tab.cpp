@@ -135,7 +135,8 @@ std::unique_ptr<Flex> PrivacyTab::create() {
   m_rootLayout->setAlign(FlexAlign::Stretch);
   m_rootLayout->setGap(Style::spaceMd * scale);
 
-  auto statusCard = ui::column({
+  auto capturesWell = ui::column({
+      .out = &m_capturesWell,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
@@ -166,8 +167,8 @@ std::unique_ptr<Flex> PrivacyTab::create() {
               },
       })
   );
-  statusCard->addChild(std::move(header));
-  statusCard->addChild(
+  capturesWell->addChild(std::move(header));
+  capturesWell->addChild(
       ui::label({
           .out = &m_status,
           .fontSize = Style::fontSizeBody * scale,
@@ -175,7 +176,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  statusCard->addChild(
+  capturesWell->addChild(
       ui::label({
           .out = &m_detail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -183,7 +184,34 @@ std::unique_ptr<Flex> PrivacyTab::create() {
           .maxLines = 3,
       })
   );
-  m_rootLayout->addChild(std::move(statusCard));
+
+  auto addKindSection = [this, scale, &capturesWell](const std::string& title, Separator** dividerOut, Flex** cardOut, Flex** listOut) {
+    *dividerOut = addWellDivider(*capturesWell, scale);
+    auto card = ui::column({
+        .out = cardOut,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .visible = false,
+        .participatesInLayout = false,
+    });
+    addTitle(*card, title, scale);
+    card->addChild(
+        ui::column({
+            .out = listOut,
+            .align = FlexAlign::Stretch,
+            .gap = Style::spaceXs * scale,
+        })
+    );
+    capturesWell->addChild(std::move(card));
+    if (*dividerOut != nullptr) {
+      (*dividerOut)->setVisible(false);
+      (*dividerOut)->setParticipatesInLayout(false);
+    }
+  };
+  addKindSection(i18n::tr("control-center.privacy.microphone"), &m_micDivider, &m_micCard, &m_micList);
+  addKindSection(i18n::tr("control-center.privacy.camera"), &m_cameraDivider, &m_cameraCard, &m_cameraList);
+  addKindSection(i18n::tr("control-center.privacy.screen"), &m_screenDivider, &m_screenCard, &m_screenList);
+  m_rootLayout->addChild(std::move(capturesWell));
 
   auto sharingCard = ui::column({
       .align = FlexAlign::Stretch,
@@ -230,6 +258,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
           .maxLines = 3,
       })
   );
+  addWellDivider(*sharingCard, scale);
   auto telemetryRow = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
@@ -269,29 +298,6 @@ std::unique_ptr<Flex> PrivacyTab::create() {
   );
   m_rootLayout->addChild(std::move(sharingCard));
 
-  auto addKindCard = [this, scale](const std::string& title, Flex** cardOut, Flex** listOut) {
-    auto card = ui::column({
-        .out = cardOut,
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
-        .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-          applySectionCardStyle(section, scale, opacity);
-        },
-    });
-    addTitle(*card, title, scale);
-    card->addChild(
-        ui::column({
-            .out = listOut,
-            .align = FlexAlign::Stretch,
-            .gap = Style::spaceXs * scale,
-        })
-    );
-    m_rootLayout->addChild(std::move(card));
-  };
-  addKindCard(i18n::tr("control-center.privacy.microphone"), &m_micCard, &m_micList);
-  addKindCard(i18n::tr("control-center.privacy.camera"), &m_cameraCard, &m_cameraList);
-  addKindCard(i18n::tr("control-center.privacy.screen"), &m_screenCard, &m_screenList);
-
   auto live = ui::column({
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
@@ -311,6 +317,7 @@ void PrivacyTab::onClose() {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
+  m_capturesWell = nullptr;
   m_status = nullptr;
   m_detail = nullptr;
   m_muteButton = nullptr;
@@ -318,10 +325,13 @@ void PrivacyTab::onClose() {
   m_locationHint = nullptr;
   m_telemetryToggle = nullptr;
   m_telemetryHint = nullptr;
+  m_micDivider = nullptr;
   m_micCard = nullptr;
   m_micList = nullptr;
+  m_cameraDivider = nullptr;
   m_cameraCard = nullptr;
   m_cameraList = nullptr;
+  m_screenDivider = nullptr;
   m_screenCard = nullptr;
   m_screenList = nullptr;
   m_liveScroll = nullptr;
@@ -402,8 +412,11 @@ void PrivacyTab::rebuildCaptures() {
   }
   m_captureSignature = signature;
   const bool layoutDirty = setShown(m_micCard, !lists.microphone.empty()) ||
+                            setShown(m_micDivider, !lists.microphone.empty()) ||
                             setShown(m_cameraCard, !lists.camera.empty()) ||
-                            setShown(m_screenCard, !lists.screen.empty());
+                            setShown(m_cameraDivider, !lists.camera.empty()) ||
+                            setShown(m_screenCard, !lists.screen.empty()) ||
+                            setShown(m_screenDivider, !lists.screen.empty());
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -430,7 +443,7 @@ void PrivacyTab::syncMute() {
   m_muteButton->setTooltip(
       i18n::tr(muted ? "control-center.privacy.unmute-microphone" : "control-center.privacy.mute-microphone")
   );
-  m_muteButton->setVariant(muted ? ButtonVariant::Default : ButtonVariant::Destructive);
+  m_muteButton->setVariant(muted ? ButtonVariant::Destructive : ButtonVariant::Ghost);
 }
 
 void PrivacyTab::syncSharing() {

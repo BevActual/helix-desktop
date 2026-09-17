@@ -11,6 +11,7 @@
 #include <vector>
 
 class BrightnessService;
+class Box;
 class Button;
 class ConfigService;
 class CompositorPlatform;
@@ -18,6 +19,7 @@ class DisplayConfigService;
 class Flex;
 class GammaService;
 class Glyph;
+class InputArea;
 class Label;
 class Renderer;
 class ScrollView;
@@ -53,7 +55,9 @@ private:
   void persistNightLightEnabled(bool enabled);
   void persistNightLightForce(bool enabled);
   void commitNightLightTemperatures(bool fromDaySlider);
+  void buildArrangementCard(Flex& parent, float scale);
   void rebuildLayoutSection(float scale);
+  void rebuildArrangementTiles();
   void layoutArrangementMap(Renderer& renderer);
   void selectLayoutOutput(std::string name);
   void syncLayoutSelection();
@@ -61,6 +65,7 @@ private:
   void updateLayoutDrag(const std::string& name, float localX, float localY);
   void finishLayoutPress(const std::string& name);
   void applyLayoutDrag();
+  void applyMenuBarDrop();
   [[nodiscard]] std::string layoutReferenceName() const;
   void queueBrightness(const std::string& displayId, float value);
   void flushPendingBrightness(bool force = false);
@@ -70,7 +75,6 @@ private:
   void applyRefresh(const std::string& displayId, std::size_t index);
   void applyTransform(const std::string& displayId, std::size_t index);
   void applyLayout(display_config::LayoutDirection direction);
-  [[nodiscard]] int layoutNudgePx() const;
   void reportLayoutError();
 
   BrightnessService* m_brightness = nullptr;
@@ -95,6 +99,7 @@ private:
     Label* scaleLabel = nullptr;
     Toggle* vrrToggle = nullptr;
     Toggle* enabledToggle = nullptr;
+    Toggle* mainToggle = nullptr;
     std::vector<display_config::ResolutionChoice> resolutions;
     std::vector<display_config::Mode> refreshes;
     float lastBrightness = -1.0F;
@@ -120,13 +125,22 @@ private:
   Flex* m_cardsLayout = nullptr;
   struct LayoutTile {
     std::string name;
-    Button* button = nullptr;
+    Flex* host = nullptr;
+    Box* menuBar = nullptr;
+    Label* indexLabel = nullptr;
+    Label* nameLabel = nullptr;
+    InputArea* grab = nullptr;
     float x = 0.0F;
     float y = 0.0F;
   };
 
+  void styleArrangementTile(LayoutTile& tile, bool selected, bool main);
+  void showSelectedDisplayCard();
+
   Flex* m_layoutSection = nullptr;
   Flex* m_layoutMap = nullptr;
+  Flex* m_layoutNudgeRow = nullptr;
+  Flex* m_layoutReferenceRow = nullptr;
   Label* m_layoutStatusLabel = nullptr;
   Select* m_layoutReferenceSelect = nullptr;
   Button* m_layoutPlaceTop = nullptr;
@@ -142,6 +156,7 @@ private:
   std::string m_layoutReferenceName;
   std::string m_layoutPressName;
   std::string m_lastDisplayListKey;
+  std::string m_lastLayoutTileKey;
   float m_layoutGrabX = 0.0F;
   float m_layoutGrabY = 0.0F;
   float m_layoutMapScale = 1.0F;
@@ -150,6 +165,7 @@ private:
   int m_layoutOriginX = 0;
   int m_layoutOriginY = 0;
   bool m_layoutDragging = false;
+  bool m_layoutMenuBarPress = false;
 
   std::string m_pendingDisplayId;
   float m_pendingBrightness = -1.0F;

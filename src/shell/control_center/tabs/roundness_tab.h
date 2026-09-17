@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 
+class Box;
 class ConfigService;
 class Flex;
 class Label;
@@ -31,6 +32,7 @@ private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void syncLiveControls();
+  void updateRadiusPreview();
   void commitRoundness();
   void commitBarRadius();
   void commitDockRadius();
@@ -43,13 +45,19 @@ private:
   Flex* m_rootLayout = nullptr;
   Slider* m_roundness = nullptr;
   Label* m_roundnessValue = nullptr;
+  Box* m_radiusChipSm = nullptr;
+  Box* m_radiusChipMd = nullptr;
+  Box* m_radiusChip2xl = nullptr;
   Slider* m_barRadius = nullptr;
   Label* m_barRadiusValue = nullptr;
   Label* m_barDescription = nullptr;
+  Box* m_barChip = nullptr;
   Slider* m_dockRadius = nullptr;
   Label* m_dockRadiusValue = nullptr;
+  Box* m_dockChip = nullptr;
   Slider* m_windowRadius = nullptr;
   Label* m_windowRadiusValue = nullptr;
+  Box* m_windowChip = nullptr;
 
   std::string m_barName;
   bool m_syncing = false;

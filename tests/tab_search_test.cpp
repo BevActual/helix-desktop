@@ -35,9 +35,14 @@ int main() {
       tabSearchScore("network", "Network", "wifi") > tabSearchScore("wallpaper", "Wallpaper", "wifi"),
       "wifi prefers network"
   ) && ok;
+  ok = expect(tabSearchScore("effects", "Effects", "shadows") > 0, "effects alias") && ok;
+  ok = expect(tabSearchScore("effects", "Effects", "glass") > 0, "effects glass alias") && ok;
   ok = expect(tabSearchScore("theme", "Theme", "font") == 0, "font is not a theme alias") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "customize") > 0, "theme customize alias") && ok;
   ok = expect(tabSearchScore("type", "Type", "font") > 0, "font alias") && ok;
   ok = expect(tabSearchScore("roundness", "Roundness", "corners") > 0, "roundness alias") && ok;
   ok = expect(tabSearchScore("scale", "Scale", "zoom") > 0, "scale alias") && ok;
+  ok = expect(tabSearchScore("language", "Language", "locale") > 0, "language alias") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "locale") == 0, "locale is not a theme alias") && ok;
   return ok ? 0 : 1;
 }

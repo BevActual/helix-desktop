@@ -254,10 +254,19 @@ namespace display_config {
   namespace {
 
     constexpr int kAlignMagnet = 24;
+    constexpr int kMinEdgeOverlap = 32;
     constexpr long long kStaySideBias = 480LL * 480LL;
 
     [[nodiscard]] bool rangesOverlap(int aStart, int aExtent, int bStart, int bExtent) noexcept {
       return aStart < bStart + bExtent && bStart < aStart + aExtent;
+    }
+
+    [[nodiscard]] int rangeOverlapLength(int aStart, int aExtent, int bStart, int bExtent) noexcept {
+      return std::max(0, std::min(aStart + aExtent, bStart + bExtent) - std::max(aStart, bStart));
+    }
+
+    [[nodiscard]] int minSharedEdge(int movingExtent, int refExtent) noexcept {
+      return std::max(kMinEdgeOverlap, std::min(movingExtent, refExtent) / 4);
     }
 
     [[nodiscard]] int clampEdgeOverlap(int proposed, int refStart, int refExtent, int movingExtent) {
@@ -280,6 +289,73 @@ namespace display_config {
         }
       }
       return bestDist <= kAlignMagnet ? best : value;
+    }
+
+    [[nodiscard]] int nearestAlign(int value, int beginning, int center, int end) noexcept {
+      int best = beginning;
+      int bestDist = std::abs(value - beginning);
+      for (const int target : {center, end}) {
+        const int dist = std::abs(value - target);
+        if (dist < bestDist) {
+          best = target;
+          bestDist = dist;
+        }
+      }
+      return best;
+    }
+
+    [[nodiscard]] int sharedEdgeLength(
+        LayoutDirection direction, Point pos, Size movingSize, const Output& reference, Size refSize
+    ) noexcept {
+      if (direction == LayoutDirection::Left || direction == LayoutDirection::Right) {
+        return rangeOverlapLength(pos.y, movingSize.height, reference.y, refSize.height);
+      }
+      return rangeOverlapLength(pos.x, movingSize.width, reference.x, refSize.width);
+    }
+
+    [[nodiscard]] Point alignedOnEdge(
+        const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY,
+        bool magnetOnly
+    ) {
+      const Size size = logicalSize(moving);
+      const Size refSize = logicalSize(reference);
+      auto along = [&](int proposed, int refStart, int refExtent, int movingExtent) {
+        const int beginning = refStart;
+        const int center = refStart + ((refExtent - movingExtent) / 2);
+        const int end = refStart + refExtent - movingExtent;
+        const int clamped = clampEdgeOverlap(proposed, refStart, refExtent, movingExtent);
+        const int overlap = rangeOverlapLength(clamped, movingExtent, refStart, refExtent);
+        if (overlap >= minSharedEdge(movingExtent, refExtent)) {
+          return magnetAlign(clamped, beginning, center, end);
+        }
+        if (magnetOnly) {
+          return clamped;
+        }
+        return nearestAlign(proposed, beginning, center, end);
+      };
+      switch (direction) {
+      case LayoutDirection::Right:
+        return {
+            .x = reference.x + refSize.width,
+            .y = along(proposedY, reference.y, refSize.height, size.height),
+        };
+      case LayoutDirection::Left:
+        return {
+            .x = reference.x - size.width,
+            .y = along(proposedY, reference.y, refSize.height, size.height),
+        };
+      case LayoutDirection::Top:
+        return {
+            .x = along(proposedX, reference.x, refSize.width, size.width),
+            .y = reference.y - size.height,
+        };
+      case LayoutDirection::Bottom:
+        return {
+            .x = along(proposedX, reference.x, refSize.width, size.width),
+            .y = reference.y + refSize.height,
+        };
+      }
+      return {.x = proposedX, .y = proposedY};
     }
 
   } // namespace
@@ -326,43 +402,13 @@ namespace display_config {
   Point placeAdjacent(
       const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
   ) {
-    const Size size = logicalSize(moving);
-    const Size refSize = logicalSize(reference);
-    switch (direction) {
-    case LayoutDirection::Right:
-      return {
-          .x = reference.x + refSize.width,
-          .y = magnetAlign(
-              clampEdgeOverlap(proposedY, reference.y, refSize.height, size.height), reference.y,
-              reference.y + ((refSize.height - size.height) / 2), reference.y + refSize.height - size.height
-          ),
-      };
-    case LayoutDirection::Left:
-      return {
-          .x = reference.x - size.width,
-          .y = magnetAlign(
-              clampEdgeOverlap(proposedY, reference.y, refSize.height, size.height), reference.y,
-              reference.y + ((refSize.height - size.height) / 2), reference.y + refSize.height - size.height
-          ),
-      };
-    case LayoutDirection::Top:
-      return {
-          .x = magnetAlign(
-              clampEdgeOverlap(proposedX, reference.x, refSize.width, size.width), reference.x,
-              reference.x + ((refSize.width - size.width) / 2), reference.x + refSize.width - size.width
-          ),
-          .y = reference.y - size.height,
-      };
-    case LayoutDirection::Bottom:
-      return {
-          .x = magnetAlign(
-              clampEdgeOverlap(proposedX, reference.x, refSize.width, size.width), reference.x,
-              reference.x + ((refSize.width - size.width) / 2), reference.x + refSize.width - size.width
-          ),
-          .y = reference.y + refSize.height,
-      };
-    }
-    return {.x = proposedX, .y = proposedY};
+    return alignedOnEdge(moving, reference, direction, proposedX, proposedY, true);
+  }
+
+  Point placeAgainst(
+      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
+  ) {
+    return alignedOnEdge(moving, reference, direction, proposedX, proposedY, false);
   }
 
   std::optional<SnapResult>
@@ -372,12 +418,29 @@ namespace display_config {
     constexpr LayoutDirection kDirections[] = {
         LayoutDirection::Left, LayoutDirection::Right, LayoutDirection::Top, LayoutDirection::Bottom,
     };
+    const Size movingSize = logicalSize(moving);
     for (const auto& output : outputs) {
       if (!output.enabled || output.name == moving.name) {
         continue;
       }
+      const Size refSize = logicalSize(output);
       for (const auto direction : kDirections) {
-        const Point snapped = placeAdjacent(moving, output, direction, proposedX, proposedY);
+        const bool staying = isAdjacentOn(moving, output, direction);
+        const int along =
+            (direction == LayoutDirection::Left || direction == LayoutDirection::Right)
+                ? std::min(movingSize.height, refSize.height)
+                : std::min(movingSize.width, refSize.width);
+        const int minShare = minSharedEdge(along, along);
+        Point snapped = placeAdjacent(moving, output, direction, proposedX, proposedY);
+        if (sharedEdgeLength(direction, snapped, movingSize, output, refSize) < minShare) {
+          if (staying) {
+            continue;
+          }
+          snapped = placeAgainst(moving, output, direction, proposedX, proposedY);
+          if (sharedEdgeLength(direction, snapped, movingSize, output, refSize) < minShare) {
+            continue;
+          }
+        }
         Output candidate = moving;
         candidate.x = snapped.x;
         candidate.y = snapped.y;
@@ -397,7 +460,7 @@ namespace display_config {
         const long long dx = static_cast<long long>(snapped.x) - proposedX;
         const long long dy = static_cast<long long>(snapped.y) - proposedY;
         long long dist = dx * dx + dy * dy;
-        if (isAdjacentOn(moving, output, direction)) {
+        if (staying) {
           dist = dist > kStaySideBias ? dist - kStaySideBias : 0;
         }
         if (!best.has_value() || dist < bestDist) {

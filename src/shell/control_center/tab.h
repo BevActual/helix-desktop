@@ -1,27 +1,57 @@
 #pragma once
 
 #include "core/ui_phase.h"
+#include "ui/controls/separator.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 class Flex;
 class Label;
 class Renderer;
+class Select;
+class Slider;
+class Toggle;
 
 namespace control_center {
 
   void applySectionCardStyle(Flex& card, float scale = 1.0F, float fillOpacity = 1.0F);
   [[nodiscard]] float sectionCardFillOpacity(float panelCardOpacity) noexcept;
+  Separator* addWellDivider(
+      Flex& parent, float scale, SeparatorOrientation orientation = SeparatorOrientation::HorizontalRule
+  );
   Label* addTitle(Flex& parent, const std::string& text, float scale = 1.0F);
   void addBody(Flex& parent, const std::string& text, float scale = 1.0F);
+  Label* addCaption(Flex& parent, const std::string& text, float scale = 1.0F, int maxLines = 2);
 
   // Card header row: a card-title-styled label (flexGrow) ready for trailing
   // controls appended by the caller. Used for titled group cards.
   std::unique_ptr<Flex> makeCardHeaderRow(const std::string& title, float scale = 1.0F);
+
+  // Settings live row: title left, room for a trailing control on the right.
+  // wrap lets a wide control (segmented toolbar, picker) fall under the title;
+  // toggle, select, and slider-value rows keep wrap off so the control stays trailing.
+  std::unique_ptr<Flex> makeControlRow(
+      const std::string& title, float scale = 1.0F, Label** titleOut = nullptr, bool wrap = true
+  );
+  Toggle* addToggleRow(
+      Flex& parent, float scale, const std::string& title, std::function<void(bool)> onChange
+  );
+  Select* addSelectRow(
+      Flex& parent, float scale, const std::string& title, std::vector<std::string> options, float surfaceOpacity,
+      std::function<void(std::size_t)> onChange
+  );
+  void addSliderSection(
+      Flex& parent, float scale, const std::string& title, Slider** sliderOut, Label** valueOut, double minValue,
+      double maxValue, double step, double value, std::function<std::string(double)> format,
+      std::function<void()> onCommit
+  );
 
 } // namespace control_center
 

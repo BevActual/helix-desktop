@@ -25,6 +25,7 @@ class HttpClient;
 class Input;
 class InputArea;
 class Label;
+class Box;
 class MprisService;
 class Node;
 class RovingListNavHost;
@@ -156,6 +157,8 @@ private:
   Label* m_contentTitle = nullptr;
   Button* m_closeButton = nullptr;
   Flex* m_tabBodies = nullptr;
+  Box* m_sidebarEdgeFade = nullptr;
+  Box* m_contentEdgeFade = nullptr;
   ConfigService* m_config = nullptr;
   MprisService* m_mpris = nullptr;
   NotificationManager* m_notificationManager = nullptr;

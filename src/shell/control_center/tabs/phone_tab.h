@@ -13,6 +13,7 @@ class Flex;
 class Label;
 class PhoneConnectService;
 class ScrollView;
+class Separator;
 struct ControlCenterServices;
 
 class PhoneTab : public Tab {
@@ -39,6 +40,7 @@ private:
   Label* m_detail = nullptr;
   Button* m_activateButton = nullptr;
   Flex* m_devicesCard = nullptr;
+  Separator* m_devicesDivider = nullptr;
   Flex* m_deviceList = nullptr;
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};

@@ -11,6 +11,7 @@ class Button;
 class Flex;
 class Label;
 class PrinterService;
+class Separator;
 class ScrollView;
 struct ControlCenterServices;
 
@@ -37,6 +38,7 @@ private:
   Button* m_startButton = nullptr;
   Button* m_openButton = nullptr;
   Flex* m_printersCard = nullptr;
+  Separator* m_printersDivider = nullptr;
   Flex* m_printerList = nullptr;
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};

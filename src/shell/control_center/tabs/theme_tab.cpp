@@ -26,9 +26,9 @@
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/select.h"
-#include "ui/controls/segmented.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
+#include "ui/dialogs/color_picker_dialog.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
@@ -74,6 +74,23 @@ namespace {
       "m3-content", "m3-tonal-spot", "m3-fruit-salad", "m3-rainbow",    "m3-monochrome",
       "vibrant",    "faithful",      "soft",           "dysfunctional", "muted",
   };
+
+  Button::ButtonPalette roleSwatchPalette(ColorRole role) {
+    Button::ButtonStateColors rest{
+        .bg = colorSpecFromRole(role),
+        .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+        .label = colorSpecFromRole(ColorRole::OnSurface),
+    };
+    Button::ButtonStateColors hover = rest;
+    hover.border = colorSpecFromRole(ColorRole::Primary);
+    return {
+        .borderWidth = 1.0F,
+        .normal = rest,
+        .hover = hover,
+        .pressed = hover,
+        .disabled = rest,
+    };
+  }
 
   bool setShown(Node* node, bool shown) {
     if (node == nullptr) {
@@ -261,65 +278,12 @@ namespace {
 
   [[nodiscard]] std::string twoDecimalLabel(double value) { return std::format("{:.2f}", value); }
 
-  void addLabeledSlider(
-      Flex& card, float scale, float captionSize, float controlHeight, const std::string& title, Slider** sliderOut,
-      Label** valueOut, double minValue, double maxValue, double step, double value,
-      std::function<std::string(double)> format, std::function<void()> onCommit
-  ) {
-    auto header = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-    });
-    header->addChild(
-        ui::label({
-            .text = title,
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .flexGrow = 1.0F,
-        })
-    );
-    header->addChild(
-        ui::label({
-            .out = valueOut,
-            .text = format(value),
-            .fontSize = captionSize,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    card.addChild(std::move(header));
-    card.addChild(
-        ui::slider({
-            .out = sliderOut,
-            .minValue = minValue,
-            .maxValue = maxValue,
-            .step = step,
-            .value = value,
-            .trackHeight = Style::sliderTrackHeight * scale,
-            .thumbSize = Style::sliderThumbSize * scale,
-            .controlHeight = controlHeight,
-            .flexGrow = 1.0F,
-            .onValueChanged =
-                [valueOut, format](double next) {
-                  if (valueOut != nullptr && *valueOut != nullptr) {
-                    (*valueOut)->setText(format(next));
-                  }
-                },
-            .onDragEnd = std::move(onCommit),
-        })
-    );
-  }
-
 } // namespace
 
 ThemeTab::ThemeTab(const ControlCenterServices& services)
     : m_config(services.config), m_theme(services.theme), m_platform(services.platform),
       m_settings(std::make_unique<SettingsPane>(
-          services,
-          SettingsPaneOptions{
-              .section = "theme",
-              .includedGroups = {"interface", "accessibility", "motion", "borders", "effects", "niri"},
-          }
+          services, SettingsPaneOptions{.section = "theme", .showConfigureButton = false}
       )) {
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
@@ -352,84 +316,34 @@ std::unique_ptr<Flex> ThemeTab::create() {
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
 
-  auto addCaption = [scale, captionSize](Flex& parent, const std::string& text) {
-    parent.addChild(
-        ui::label({
-            .text = text,
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-  };
-
-  auto themeCard = ui::column({
+  auto modeWell = ui::column({
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*themeCard, i18n::tr("settings.navigation.groups.theme"), scale);
 
-  addCaption(*themeCard, i18n::tr("settings.schema.appearance.theme-mode.label"));
-  themeCard->addChild(
-      ui::segmented({
-          .out = &m_themeMode,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = i18n::tr("settings.options.theme.mode.dark"),
-                      .tooltip = i18n::tr("control-center.appearance.always-dark"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.mode.light"),
-                      .tooltip = i18n::tr("control-center.appearance.always-light"),
-                  },
-                  {
-                      .label = i18n::tr("common.states.auto"),
-                      .tooltip = i18n::tr("control-center.appearance.auto-schedule"),
-                  },
-              },
-          .fontSize = captionSize,
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .onChange = [this](std::size_t index) { applyThemeMode(index); },
-      })
+  m_themeMode = addSelectRow(
+      *modeWell, scale, i18n::tr("settings.schema.appearance.theme-mode.label"),
+      {
+          i18n::tr("settings.options.theme.mode.dark"),
+          i18n::tr("settings.options.theme.mode.light"),
+          i18n::tr("common.states.auto"),
+      },
+      panelCardOpacity(), [this](std::size_t index) { applyThemeMode(index); }
   );
+  addWellDivider(*modeWell, scale);
 
-  addCaption(*themeCard, i18n::tr("settings.schema.appearance.shell-theme-mode.label"));
-  themeCard->addChild(
-      ui::segmented({
-          .out = &m_shellMode,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = i18n::tr("settings.options.theme.shell-mode.follow"),
-                      .tooltip = i18n::tr("control-center.appearance.follow-theme"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.mode.dark"),
-                      .tooltip = i18n::tr("control-center.appearance.always-dark"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.mode.light"),
-                      .tooltip = i18n::tr("control-center.appearance.always-light"),
-                  },
-                  {
-                      .label = i18n::tr("common.states.auto"),
-                      .tooltip = i18n::tr("control-center.appearance.auto-schedule"),
-                  },
-              },
-          .fontSize = captionSize,
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .onChange = [this](std::size_t index) { applyShellMode(index); },
-      })
+  m_shellMode = addSelectRow(
+      *modeWell, scale, i18n::tr("settings.schema.appearance.shell-theme-mode.label"),
+      {
+          i18n::tr("settings.options.theme.shell-mode.follow"),
+          i18n::tr("settings.options.theme.mode.dark"),
+          i18n::tr("settings.options.theme.mode.light"),
+          i18n::tr("common.states.auto"),
+      },
+      panelCardOpacity(), [this](std::size_t index) { applyShellMode(index); }
   );
-  themeCard->addChild(
+  modeWell->addChild(
       ui::label({
           .out = &m_autoStatus,
           .fontSize = captionSize,
@@ -440,68 +354,76 @@ std::unique_ptr<Flex> ThemeTab::create() {
       })
   );
 
-  addCaption(*themeCard, i18n::tr("settings.schema.appearance.palette-source.label"));
-  themeCard->addChild(
-      ui::segmented({
-          .out = &m_paletteSource,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = i18n::tr("settings.options.theme.source.built-in"),
-                      .tooltip = i18n::tr("control-center.appearance.palette-builtin-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.source.wallpaper"),
-                      .tooltip = i18n::tr("control-center.appearance.palette-wallpaper-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.source.community"),
-                      .tooltip = i18n::tr("control-center.appearance.palette-community-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("settings.options.theme.source.custom"),
-                      .tooltip = i18n::tr("control-center.appearance.palette-custom-tooltip"),
-                  },
-              },
-          .fontSize = captionSize,
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .onChange = [this](std::size_t index) { applyPaletteSource(index); },
-      })
+  auto pureBlackSection = ui::column({
+      .out = &m_pureBlackSection,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  addWellDivider(*pureBlackSection, scale);
+  m_pureBlack = addToggleRow(
+      *pureBlackSection, scale, i18n::tr("settings.schema.appearance.pure-black-dark.label"),
+      [this](bool enabled) { applyPureBlack(enabled); }
   );
+  addCaption(*pureBlackSection, i18n::tr("settings.schema.appearance.pure-black-dark.description"), scale);
+  modeWell->addChild(std::move(pureBlackSection));
+  content->addChild(std::move(modeWell));
 
-  themeCard->addChild(
+  auto paletteWell = ui::column({
+      .align = FlexAlign::Stretch,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+  });
+  m_paletteSource = addSelectRow(
+      *paletteWell, scale, i18n::tr("settings.schema.appearance.palette-source.label"),
+      {
+          i18n::tr("settings.options.theme.source.built-in"),
+          i18n::tr("settings.options.theme.source.wallpaper"),
+          i18n::tr("settings.options.theme.source.community"),
+          i18n::tr("settings.options.theme.source.custom"),
+      },
+      panelCardOpacity(), [this](std::size_t index) { applyPaletteSource(index); }
+  );
+  addWellDivider(*paletteWell, scale);
+
+  auto paletteSelectRow = makeControlRow(
+      i18n::tr("settings.schema.appearance.builtin-palette.label"), scale, &m_paletteSelectTitle, false
+  );
+  paletteSelectRow->setVisible(false);
+  paletteSelectRow->setParticipatesInLayout(false);
+  m_paletteSelectRow = paletteSelectRow.get();
+  paletteSelectRow->addChild(
       ui::select({
           .out = &m_paletteSelect,
           .fontSize = Style::fontSizeBody * scale,
           .controlHeight = controlHeight,
           .surfaceOpacity = panelCardOpacity(),
-          .flexGrow = 1.0F,
           .onSelectionChanged =
               [this](std::size_t index, std::string_view) { applyPaletteSelection(index); },
       })
   );
-  themeCard->addChild(
+  paletteWell->addChild(std::move(paletteSelectRow));
+  auto palettePickerRow = makeControlRow(
+      i18n::tr("settings.schema.appearance.community-palette.label"), scale, &m_palettePickerTitle, false
+  );
+  palettePickerRow->setVisible(false);
+  palettePickerRow->setParticipatesInLayout(false);
+  m_palettePickerRow = palettePickerRow.get();
+  palettePickerRow->addChild(
       ui::button({
           .out = &m_palettePickerButton,
           .text = i18n::tr("control-center.appearance.choose-palette"),
           .fontSize = Style::fontSizeBody * scale,
           .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
+          .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.appearance.choose-palette-tooltip"),
           .minHeight = controlHeight,
           .paddingV = Style::spaceSm * scale,
           .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
-          .visible = false,
-          .participatesInLayout = false,
           .onClick = [this]() { openPalettePicker(); },
       })
   );
-  themeCard->addChild(
+  paletteWell->addChild(std::move(palettePickerRow));
+  paletteWell->addChild(
       ui::label({
           .out = &m_paletteEmpty,
           .fontSize = captionSize,
@@ -511,10 +433,28 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .participatesInLayout = false,
       })
   );
-  themeCard->addChild(
+
+  auto tools = ui::row({
+      .out = &m_paletteTools,
+      .align = FlexAlign::Center,
+      .justify = FlexJustify::End,
+      .gap = Style::spaceXs * scale,
+  });
+  tools->addChild(
+      ui::button({
+          .out = &m_saveCustomButton,
+          .glyph = "device-floppy",
+          .fontSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.appearance.save-custom-tooltip"),
+          .minHeight = controlHeight,
+          .paddingH = Style::spaceMd * scale,
+          .onClick = [this]() { saveCurrentPalette(); },
+      })
+  );
+  tools->addChild(
       ui::button({
           .out = &m_openPalettesButton,
-          .text = i18n::tr("control-center.appearance.open-palettes-folder"),
           .glyph = "folder",
           .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
@@ -526,55 +466,61 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .onClick = [this]() { openCustomPalettesFolder(); },
       })
   );
-
-  themeCard->addChild(
-      ui::button({
-          .out = &m_exportButton,
-          .text = i18n::tr("settings.schema.appearance.export-wallpaper-palette.button"),
-          .glyph = "device-floppy",
-          .fontSize = Style::fontSizeBody * scale,
-          .variant = ButtonVariant::Ghost,
-          .tooltip = i18n::tr("control-center.appearance.export-palette-tooltip"),
-          .minHeight = controlHeight,
-          .paddingH = Style::spaceMd * scale,
-          .onClick = [this]() { exportWallpaperPalette(); },
-      })
-  );
-  themeCard->addChild(
+  paletteWell->addChild(std::move(tools));
+  paletteWell->addChild(
       ui::label({
           .out = &m_exportStatus,
           .fontSize = captionSize,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 2,
           .visible = false,
+          .participatesInLayout = false,
       })
   );
-
-  addCaption(*themeCard, i18n::tr("control-center.appearance.palette-hint"));
+  addWellDivider(*paletteWell, scale);
 
   auto swatchRow = ui::row({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
   });
-  const float swatchHeight = Style::controlHeightSm * scale;
-  for (const auto& swatch : kPaletteSwatches) {
+  const float swatchSize = Style::controlHeight * 1.15F * scale;
+  for (std::size_t i = 0; i < kPaletteSwatches.size(); ++i) {
+    const auto& swatch = kPaletteSwatches[i];
+    const std::string roleLabel = i18n::tr(swatch.labelKey);
     auto cell = ui::column({
-        .align = FlexAlign::Stretch,
+        .align = FlexAlign::Center,
         .gap = Style::spaceXs * scale,
         .flexGrow = 1.0F,
     });
     cell->addChild(
-        ui::box({
-            .fill = colorSpecFromRole(swatch.role),
-            .border = colorSpecFromRole(ColorRole::Outline, 0.35F),
-            .borderWidth = 1.0F,
-            .radius = Style::scaledRadiusSm(scale),
-            .height = swatchHeight,
+        ui::button({
+            .customPalette = roleSwatchPalette(swatch.role),
+            .tooltip = i18n::tr("control-center.appearance.edit-role-tooltip", "role", roleLabel),
+            .minWidth = swatchSize,
+            .minHeight = swatchSize,
+            .maxWidth = swatchSize,
+            .maxHeight = swatchSize,
+            .padding = 0.0F,
+            .radius = swatchSize * 0.5F,
+            .width = swatchSize,
+            .height = swatchSize,
+            .onClick =
+                [this, role = swatch.role, roleLabel]() { pickRoleColor(role, roleLabel); },
         })
     );
     cell->addChild(
         ui::label({
-            .text = i18n::tr(swatch.labelKey),
+            .text = roleLabel,
+            .fontSize = captionSize,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
+            .textAlign = TextAlign::Center,
+        })
+    );
+    cell->addChild(
+        ui::label({
+            .out = &m_swatchHex[i],
+            .text = colorHex(colorForRole(swatch.role)),
             .fontSize = captionSize,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
             .maxLines = 1,
@@ -583,117 +529,36 @@ std::unique_ptr<Flex> ThemeTab::create() {
     );
     swatchRow->addChild(std::move(cell));
   }
-  themeCard->addChild(std::move(swatchRow));
-
-  auto pureBlackRow = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  pureBlackRow->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.pure-black-dark.label"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  pureBlackRow->addChild(
-      ui::toggle({
-          .out = &m_pureBlack,
-          .scale = scale,
-          .onChange = [this](bool enabled) { applyPureBlack(enabled); },
-      })
-  );
-  themeCard->addChild(std::move(pureBlackRow));
-  content->addChild(std::move(themeCard));
+  paletteWell->addChild(std::move(swatchRow));
+  addCaption(*paletteWell, i18n::tr("control-center.appearance.palette-hint"), scale);
+  content->addChild(std::move(paletteWell));
 
   if (compositors::isNiri()) {
-    auto niriCard = ui::column({
+    auto niriWell = ui::column({
         .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
         .configure =
             [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
     });
-    addTitle(*niriCard, i18n::tr("control-center.theme.niri-title"), scale);
-    niriCard->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.theme.niri-description"),
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 3,
-        })
+    m_niriFocusRing = addToggleRow(
+        *niriWell, scale, i18n::tr("control-center.theme.niri-focus-ring"),
+        [this](bool enabled) { applyNiriFocusRing(enabled); }
     );
-    auto focusRingRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    focusRingRow->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.theme.niri-focus-ring"),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
+    addWellDivider(*niriWell, scale);
+    m_niriBorder = addToggleRow(
+        *niriWell, scale, i18n::tr("control-center.theme.niri-border"),
+        [this](bool enabled) { applyNiriBorder(enabled); }
     );
-    focusRingRow->addChild(
-        ui::toggle({
-            .out = &m_niriFocusRing,
-            .scale = scale,
-            .onChange = [this](bool enabled) { applyNiriFocusRing(enabled); },
-        })
+    addWellDivider(*niriWell, scale);
+    m_niriDrawBorder = addToggleRow(
+        *niriWell, scale, i18n::tr("control-center.theme.niri-draw-border"),
+        [this](bool enabled) { applyNiriDrawBorder(enabled); }
     );
-    niriCard->addChild(std::move(focusRingRow));
-
-    auto borderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    borderRow->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.theme.niri-border"),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    borderRow->addChild(
-        ui::toggle({
-            .out = &m_niriBorder,
-            .scale = scale,
-            .onChange = [this](bool enabled) { applyNiriBorder(enabled); },
-        })
-    );
-    niriCard->addChild(std::move(borderRow));
-
-    auto drawBorderRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    drawBorderRow->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.theme.niri-draw-border"),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    drawBorderRow->addChild(
-        ui::toggle({
-            .out = &m_niriDrawBorder,
-            .scale = scale,
-            .onChange = [this](bool enabled) { applyNiriDrawBorder(enabled); },
-        })
-    );
-    niriCard->addChild(std::move(drawBorderRow));
     if (niriBlurSupported()) {
-      auto blurRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-      blurRow->addChild(
-          ui::label({
-              .text = i18n::tr("control-center.theme.niri-blur"),
-              .fontSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-              .flexGrow = 1.0F,
-          })
+      addWellDivider(*niriWell, scale);
+      m_niriBlur = addToggleRow(
+          *niriWell, scale, i18n::tr("control-center.theme.niri-blur"),
+          [this](bool enabled) { applyNiriBlur(enabled); }
       );
-      blurRow->addChild(
-          ui::toggle({
-              .out = &m_niriBlur,
-              .scale = scale,
-              .onChange = [this](bool enabled) { applyNiriBlur(enabled); },
-          })
-      );
-      niriCard->addChild(std::move(blurRow));
       const bool blurOn = m_config != nullptr && m_config->config().theme.niriLayout.blur;
       auto blurDetails = ui::column({
           .out = &m_niriBlurDetails,
@@ -702,33 +567,32 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .visible = blurOn,
           .participatesInLayout = blurOn,
       });
-      addLabeledSlider(
-          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-passes.label"),
-          &m_niriBlurPasses, &m_niriBlurPassesValue,
-          static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.min.value_or(1)),
+      addWellDivider(*blurDetails, scale);
+      addSliderSection(
+          *blurDetails, scale, i18n::tr("settings.schema.niri.blur-passes.label"), &m_niriBlurPasses,
+          &m_niriBlurPassesValue, static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.min.value_or(1)),
           static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.max.value_or(8)),
           static_cast<double>(noctalia::config::schema::kNiriBlurPassesRange.step.value_or(1)), 2.0, integerLabel,
           [this]() { commitNiriBlurPasses(); }
       );
-      addLabeledSlider(
-          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-offset.label"),
-          &m_niriBlurOffset, &m_niriBlurOffsetValue,
-          static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.min.value_or(0.5F)),
+      addSliderSection(
+          *blurDetails, scale, i18n::tr("settings.schema.niri.blur-offset.label"), &m_niriBlurOffset,
+          &m_niriBlurOffsetValue, static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.min.value_or(0.5F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.max.value_or(8.0F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurOffsetRange.step.value_or(0.1F)), 3.0, oneDecimalLabel,
           [this]() { commitNiriBlurOffset(); }
       );
-      addLabeledSlider(
-          *blurDetails, scale, captionSize, controlHeight, i18n::tr("settings.schema.niri.blur-noise.label"),
-          &m_niriBlurNoise, &m_niriBlurNoiseValue,
-          static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.min.value_or(0.0F)),
+      addSliderSection(
+          *blurDetails, scale, i18n::tr("settings.schema.niri.blur-noise.label"), &m_niriBlurNoise,
+          &m_niriBlurNoiseValue, static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.min.value_or(0.0F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.max.value_or(0.2F)),
           static_cast<double>(noctalia::config::schema::kNiriBlurNoiseRange.step.value_or(0.01F)), 0.03, twoDecimalLabel,
           [this]() { commitNiriBlurNoise(); }
       );
-      niriCard->addChild(std::move(blurDetails));
+      niriWell->addChild(std::move(blurDetails));
     }
-    content->addChild(std::move(niriCard));
+    addCaption(*niriWell, i18n::tr("control-center.theme.niri-description"), scale, 3);
+    content->addChild(std::move(niriWell));
   }
 
   live->addChild(std::move(scroll));
@@ -750,12 +614,19 @@ void ThemeTab::onClose() {
   m_shellMode = nullptr;
   m_autoStatus = nullptr;
   m_paletteSource = nullptr;
+  m_paletteSelectRow = nullptr;
+  m_paletteSelectTitle = nullptr;
   m_paletteSelect = nullptr;
+  m_palettePickerRow = nullptr;
+  m_palettePickerTitle = nullptr;
   m_palettePickerButton = nullptr;
   m_paletteEmpty = nullptr;
+  m_paletteTools = nullptr;
   m_openPalettesButton = nullptr;
-  m_exportButton = nullptr;
+  m_saveCustomButton = nullptr;
   m_exportStatus = nullptr;
+  m_swatchHex = {};
+  m_pureBlackSection = nullptr;
   m_pureBlack = nullptr;
   m_niriFocusRing = nullptr;
   m_niriBorder = nullptr;
@@ -804,6 +675,7 @@ void ThemeTab::doUpdate(Renderer& renderer) {
     syncLiveControls();
   } else {
     updateAutoStatus();
+    syncSwatchHex();
   }
 }
 
@@ -815,25 +687,22 @@ void ThemeTab::syncLiveControls() {
   const ThemeConfig& theme = m_config->config().theme;
   m_syncing = true;
   if (m_themeMode != nullptr) {
-    m_themeMode->setSelectedIndex(themeModeIndex(theme.mode));
+    m_themeMode->setSelectedIndexSilently(themeModeIndex(theme.mode));
   }
   if (m_shellMode != nullptr) {
-    m_shellMode->setSelectedIndex(shellModeIndex(theme.shellMode));
+    m_shellMode->setSelectedIndexSilently(shellModeIndex(theme.shellMode));
   }
   if (m_paletteSource != nullptr) {
-    m_paletteSource->setSelectedIndex(paletteSourceIndex(theme.source));
+    m_paletteSource->setSelectedIndexSilently(paletteSourceIndex(theme.source));
   }
   rebuildPaletteSelect();
   updateAutoStatus();
-  const bool wallpaper = theme.source == PaletteSource::Wallpaper;
-  setShown(m_exportButton, wallpaper);
+  syncSwatchHex();
   setShown(m_openPalettesButton, theme.source == PaletteSource::Custom);
-  if (theme.source != PaletteSource::Wallpaper && theme.source != PaletteSource::Custom) {
-    setShown(m_exportStatus, false);
-  }
   if (m_pureBlack != nullptr) {
     m_pureBlack->setCheckedImmediate(theme.pureBlackDark);
   }
+  syncPureBlackVisibility();
   if (m_niriFocusRing != nullptr) {
     m_niriFocusRing->setCheckedImmediate(theme.niriLayout.focusRing);
   }
@@ -882,10 +751,12 @@ void ThemeTab::updateAutoStatus() {
   const bool shellFollows = theme.shellMode == ShellThemeMode::Follow;
   if (!appsAuto && !shellAuto) {
     setShown(m_autoStatus, false);
+    syncPureBlackVisibility();
     return;
   }
   if (m_theme == nullptr) {
     setShown(m_autoStatus, false);
+    syncPureBlackVisibility();
     return;
   }
 
@@ -893,6 +764,7 @@ void ThemeTab::updateAutoStatus() {
   if (!schedule.ready) {
     m_autoStatus->setText(i18n::tr("control-center.appearance.auto-needs-location"));
     setShown(m_autoStatus, true);
+    syncPureBlackVisibility();
     return;
   }
 
@@ -915,6 +787,13 @@ void ThemeTab::updateAutoStatus() {
   }
   m_autoStatus->setText(text);
   setShown(m_autoStatus, true);
+  syncPureBlackVisibility();
+}
+
+void ThemeTab::syncPureBlackVisibility() {
+  if (setShown(m_pureBlackSection, !isResolvedLightTheme())) {
+    PanelManager::instance().requestLayout();
+  }
 }
 
 void ThemeTab::rebuildPaletteSelect() {
@@ -935,11 +814,23 @@ void ThemeTab::rebuildPaletteSelect() {
   const bool emptyCatalog =
       (source == PaletteSource::Community || source == PaletteSource::Custom) && catalog.labels.empty();
 
-  setShown(m_paletteSelect, usesSelect && !catalog.labels.empty());
-  setShown(m_palettePickerButton, usesPicker);
+  setShown(m_paletteSelectRow, usesSelect && !catalog.labels.empty());
+  setShown(m_palettePickerRow, usesPicker);
   setShown(m_paletteEmpty, emptyCatalog);
   setShown(m_openPalettesButton, source == PaletteSource::Custom);
-  setShown(m_exportButton, source == PaletteSource::Wallpaper);
+
+  if (m_paletteSelectTitle != nullptr && usesSelect) {
+    m_paletteSelectTitle->setText(
+        source == PaletteSource::Wallpaper ? i18n::tr("settings.schema.appearance.wallpaper-generation-scheme.label")
+                                           : i18n::tr("settings.schema.appearance.builtin-palette.label")
+    );
+  }
+  if (m_palettePickerTitle != nullptr && usesPicker) {
+    m_palettePickerTitle->setText(
+        source == PaletteSource::Custom ? i18n::tr("settings.schema.appearance.custom-palette.label")
+                                        : i18n::tr("settings.schema.appearance.community-palette.label")
+    );
+  }
 
   if (m_paletteEmpty != nullptr && emptyCatalog) {
     m_paletteEmpty->setText(
@@ -1248,16 +1139,16 @@ void ThemeTab::openCustomPalettesFolder() {
   (void)process::runAsync(std::vector<std::string>{"xdg-open", dir.string()});
 }
 
-void ThemeTab::exportWallpaperPalette() {
+void ThemeTab::saveCurrentPalette() {
   if (m_theme == nullptr) {
     return;
   }
   std::string paletteName;
   std::string error;
-  if (!m_theme->saveWallpaperPaletteAsCustom(&paletteName, &error)) {
+  if (!m_theme->saveCurrentPaletteAsCustom(&paletteName, &error)) {
     if (m_exportStatus != nullptr) {
       m_exportStatus->setText(
-          error.empty() ? i18n::tr("settings.errors.export-wallpaper-palette") : error
+          error.empty() ? i18n::tr("control-center.appearance.customize-failed") : error
       );
       m_exportStatus->setColor(colorSpecFromRole(ColorRole::Error));
       setShown(m_exportStatus, true);
@@ -1270,6 +1161,50 @@ void ThemeTab::exportWallpaperPalette() {
     setShown(m_exportStatus, true);
   }
   PanelManager::instance().refresh();
+}
+
+void ThemeTab::syncSwatchHex() {
+  for (std::size_t i = 0; i < kPaletteSwatches.size(); ++i) {
+    if (m_swatchHex[i] != nullptr) {
+      m_swatchHex[i]->setText(colorHex(colorForRole(kPaletteSwatches[i].role)));
+    }
+  }
+}
+
+void ThemeTab::pickRoleColor(ColorRole role, std::string roleLabel) {
+  if (m_theme == nullptr) {
+    return;
+  }
+
+  ColorPickerDialogOptions options;
+  options.title = i18n::tr("control-center.appearance.edit-role-title", "role", roleLabel);
+  options.initialColor = colorForRole(role);
+  (void)ColorPickerDialog::open(std::move(options), [this, role](std::optional<Color> result) {
+    if (!result.has_value() || m_theme == nullptr) {
+      return;
+    }
+
+    Color rgb = *result;
+    rgb.a = 1.0F;
+    std::string paletteName;
+    std::string error;
+    if (!m_theme->saveRoleColorAsCustom(role, rgb, &paletteName, &error)) {
+      if (m_exportStatus != nullptr) {
+        m_exportStatus->setText(
+            error.empty() ? i18n::tr("control-center.appearance.customize-failed") : error
+        );
+        m_exportStatus->setColor(colorSpecFromRole(ColorRole::Error));
+        setShown(m_exportStatus, true);
+      }
+      return;
+    }
+    if (m_exportStatus != nullptr) {
+      m_exportStatus->setText(i18n::tr("control-center.appearance.export-saved", "name", paletteName));
+      m_exportStatus->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
+      setShown(m_exportStatus, true);
+    }
+    PanelManager::instance().refresh();
+  });
 }
 
 PaletteSource ThemeTab::selectedPaletteSource() const {

@@ -45,6 +45,12 @@ struct ShortcutPad {
   Label* label = nullptr;
 };
 
+struct ShortcutCluster {
+  Flex* well = nullptr;
+  GridView* grid = nullptr;
+  std::size_t count = 0;
+};
+
 class HomeTab : public Tab {
 public:
   explicit HomeTab(const ControlCenterServices& services);
@@ -177,7 +183,8 @@ private:
   // otherwise only refreshes when an unrelated service forces a redraw.
   Timer m_clockTimer;
 
-  GridView* m_shortcutsGrid = nullptr;
+  Flex* m_shortcutsColumn = nullptr;
+  std::vector<ShortcutCluster> m_shortcutClusters;
   std::vector<ShortcutPad> m_shortcutPads;
   // Plugin config as of the last shortcut grid build. A plugin shortcut seeds its Luau
   // runtime at construction, so a change here must block instance reuse.

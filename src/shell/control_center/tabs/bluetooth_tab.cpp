@@ -511,6 +511,85 @@ std::unique_ptr<Flex> BluetoothTab::create() {
 
   tab->addChild(std::move(pairingCard));
 
+  const float controlHeight = Style::controlHeight * scale;
+  auto adapterCard = ui::column({
+      .out = &m_adapterCard,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+  });
+  auto powerRow = makeControlRow(i18n::tr("control-center.bluetooth.bluetooth"), scale, nullptr, false);
+  powerRow->addChild(
+      ui::spinner({
+          .out = &m_scanSpinner,
+          .color = colorSpecFromRole(ColorRole::Primary),
+          .spinnerSize = Style::baseGlyphSize * scale,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  powerRow->addChild(
+      ui::button({
+          .out = &m_rescanButton,
+          .glyph = "refresh",
+          .glyphSize = Style::baseGlyphSize * scale,
+          .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.bluetooth.rescan"),
+          .minHeight = controlHeight,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusSm(scale),
+          .onClick = [this]() {
+            if (m_service == nullptr) {
+              return;
+            }
+            if (m_discoveryLease == DiscoveryLease::None) {
+              m_discoveryLease = DiscoveryLease::Pending;
+              m_service->startDiscovery();
+            }
+            m_discoveryTimer.start(discoveryTimeout(), [this]() { stopRequestedDiscovery(); });
+          },
+      })
+  );
+  powerRow->addChild(
+      ui::toggle({
+          .out = &m_powerToggle,
+          .checkedImmediate = false,
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange = [this](bool checked) {
+            if (m_service != nullptr) {
+              m_service->setPowered(checked);
+            }
+          },
+      })
+  );
+  adapterCard->addChild(std::move(powerRow));
+  adapterCard->addChild(
+      ui::label({
+          .out = &m_adapterStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  auto discoverableHost = ui::column({
+      .out = &m_discoverableRow,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  addWellDivider(*discoverableHost, scale);
+  m_discoverableToggle = addToggleRow(
+      *discoverableHost, scale, i18n::tr("control-center.bluetooth.visible"),
+      [this](bool checked) {
+        if (m_service != nullptr) {
+          m_service->setDiscoverable(checked);
+        }
+      }
+  );
+  adapterCard->addChild(std::move(discoverableHost));
+  tab->addChild(std::move(adapterCard));
+
   auto listScroll = ui::scrollView({
       .out = &m_listScroll,
       .contentScale = contentScale(),
@@ -552,11 +631,11 @@ void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
-  m_rootLayout->layout(renderer);
   syncPairingCard();
+  syncHeader();
+  m_rootLayout->layout(renderer);
   rebuildDeviceList(renderer);
   syncDeviceRows();
-  syncHeader();
   m_rootLayout->layout(renderer);
 }
 
@@ -566,12 +645,12 @@ void BluetoothTab::doUpdate(Renderer& renderer) {
   }
   syncDiscoveryLease();
   syncPairingCard();
+  syncHeader();
   rebuildDeviceList(renderer);
   // A metric pill's text changes its width, so the list has to be laid out again.
   if (syncDeviceRows() && m_list != nullptr) {
     m_list->layout(renderer);
   }
-  syncHeader();
 }
 
 void BluetoothTab::setActive(bool active) {
@@ -595,6 +674,9 @@ void BluetoothTab::onClose() {
   m_pairingButtonRow = nullptr;
   m_pairingAccept = nullptr;
   m_pairingReject = nullptr;
+  m_adapterCard = nullptr;
+  m_discoverableRow = nullptr;
+  m_adapterStatus = nullptr;
   m_listScroll = nullptr;
   m_list = nullptr;
   m_powerToggle = nullptr;
@@ -648,6 +730,18 @@ void BluetoothTab::stopRequestedDiscovery() {
 
 void BluetoothTab::syncHeader() {
   if (m_service == nullptr) {
+    if (m_powerToggle != nullptr) {
+      m_powerToggle->setEnabled(false);
+    }
+    if (m_rescanButton != nullptr) {
+      m_rescanButton->setEnabled(false);
+    }
+    if (m_adapterStatus != nullptr) {
+      m_adapterStatus->setText(i18n::tr("control-center.bluetooth.unavailable"));
+    }
+    if (setShown(m_adapterStatus, true) || setShown(m_discoverableRow, false) || setShown(m_listScroll, false)) {
+      PanelManager::instance().requestLayout();
+    }
     return;
   }
   const BluetoothState& s = m_service->state();
@@ -671,6 +765,22 @@ void BluetoothTab::syncHeader() {
   }
   if (m_rescanButton != nullptr) {
     m_rescanButton->setEnabled(s.adapterPresent && s.powered);
+  }
+  const bool showList = s.adapterPresent && s.powered;
+  std::string status;
+  if (!s.adapterPresent) {
+    status = i18n::tr("control-center.bluetooth.unavailable");
+  } else if (s.rfkillSoftBlocked && !s.powered) {
+    status = i18n::tr("control-center.bluetooth.rfkill-blocked");
+  }
+  if (m_adapterStatus != nullptr && !status.empty()) {
+    m_adapterStatus->setText(status);
+  }
+  bool layoutDirty = setShown(m_adapterStatus, !status.empty());
+  layoutDirty = setShown(m_discoverableRow, showList) || layoutDirty;
+  layoutDirty = setShown(m_listScroll, showList) || layoutDirty;
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
 }
 
@@ -766,7 +876,6 @@ std::string BluetoothTab::structureKey(const std::vector<BluetoothDeviceInfo>& d
   key += s.adapterPresent ? '1' : '0';
   key += s.powered ? '1' : '0';
   key += s.rfkillSoftBlocked ? '1' : '0';
-  key += s.discovering ? '1' : '0';
   key.push_back('|');
   for (const auto& d : devices) {
     key += d.path;
@@ -840,179 +949,38 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
     }
   }
 
-  m_powerToggle = nullptr;
-  m_discoverableToggle = nullptr;
-  m_scanSpinner = nullptr;
-  m_rescanButton = nullptr;
   m_deviceRows.clear();
 
   while (!m_list->children().empty()) {
     m_list->removeChild(m_list->children().front().get());
   }
 
-  if (m_service == nullptr) {
-    auto emptyCard = ui::column({
-        .align = FlexAlign::Stretch,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-    });
-    emptyCard->addChild(
+  if (m_service == nullptr || !m_service->state().adapterPresent || !m_service->state().powered) {
+    m_list->layout(renderer);
+    return;
+  }
+
+  const float opacity = panelCardOpacity();
+  Flex* well = nullptr;
+  auto wellCard = ui::column({
+      .out = &well,
+      .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+  });
+
+  if (devices.empty()) {
+    well->addChild(
         ui::label({
-            .text = i18n::tr("control-center.bluetooth.unavailable"),
-            .fontSize = Style::fontSizeBody * scale,
+            .text = i18n::tr("control-center.bluetooth.no-devices"),
+            .fontSize = Style::fontSizeCaption * scale,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
             .maxLines = 3,
         })
     );
-    m_list->addChild(std::move(emptyCard));
+    m_list->addChild(std::move(wellCard));
     m_list->layout(renderer);
     return;
   }
 
-  const auto& s = m_service->state();
-
-  // Adapter card: power + discoverable toggles
-  {
-    auto adapterCard = ui::column({
-        .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-    });
-
-    auto powerRow = ui::row(
-        {.align = FlexAlign::Center,
-         .gap = Style::spaceSm * scale,
-         .minHeight = Style::controlHeightSm * scale,
-         .maxHeight = Style::controlHeightSm * scale},
-        ui::label({
-            .text = i18n::tr("control-center.bluetooth.bluetooth"),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-
-    powerRow->addChild(
-        ui::spinner({
-            .out = &m_scanSpinner,
-            .color = colorSpecFromRole(ColorRole::Primary),
-            .spinnerSize = Style::baseGlyphSize * scale,
-            .visible = false,
-        })
-    );
-
-    powerRow->addChild(
-        ui::button({
-            .out = &m_rescanButton,
-            .glyph = "refresh",
-            .glyphSize = Style::baseGlyphSize * scale,
-            .enabled = s.adapterPresent && s.powered,
-            .variant = ButtonVariant::Ghost,
-            .tooltip = i18n::tr("control-center.bluetooth.rescan"),
-            .minHeight = Style::fontSizeBody * scale,
-            .padding = Style::spaceXs * scale,
-            .radius = Style::scaledRadiusSm(scale),
-            .onClick = [this]() {
-              if (m_service == nullptr) {
-                return;
-              }
-              // Repeated clicks renew the scan window instead of restarting discovery.
-              if (m_discoveryLease == DiscoveryLease::None) {
-                m_discoveryLease = DiscoveryLease::Pending;
-                m_service->startDiscovery();
-              }
-              m_discoveryTimer.start(discoveryTimeout(), [this]() { stopRequestedDiscovery(); });
-            },
-        })
-    );
-
-    powerRow->addChild(
-        ui::toggle({
-            .out = &m_powerToggle,
-            .checkedImmediate = s.powered,
-            .enabled = s.adapterPresent,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = [this](bool checked) {
-              if (m_service != nullptr) {
-                m_service->setPowered(checked);
-              }
-            },
-        })
-    );
-
-    adapterCard->addChild(std::move(powerRow));
-
-    if (s.powered) {
-      auto visibleRow = ui::row(
-          {.align = FlexAlign::Center,
-           .gap = Style::spaceSm * scale,
-           .minHeight = Style::controlHeightSm * scale,
-           .maxHeight = Style::controlHeightSm * scale},
-          ui::label({
-              .text = i18n::tr("control-center.bluetooth.visible"),
-              .fontSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-              .flexGrow = 1.0F,
-          }),
-          ui::toggle({
-              .out = &m_discoverableToggle,
-              .checkedImmediate = s.discoverable,
-              .enabled = s.adapterPresent,
-              .toggleSize = ToggleSize::Medium,
-              .scale = scale,
-              .onChange =
-                  [this](bool checked) {
-                    if (m_service != nullptr) {
-                      m_service->setDiscoverable(checked);
-                    }
-                  },
-          })
-      );
-      adapterCard->addChild(std::move(visibleRow));
-    }
-
-    m_list->addChild(std::move(adapterCard));
-  }
-
-  if (!s.powered) {
-    if (s.rfkillSoftBlocked) {
-      auto offCard = ui::column({
-          .align = FlexAlign::Stretch,
-          .configure =
-              [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-      });
-      offCard->addChild(
-          ui::label({
-              .text = i18n::tr("control-center.bluetooth.rfkill-blocked"),
-              .fontSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .maxLines = 3,
-          })
-      );
-      m_list->addChild(std::move(offCard));
-    }
-    m_list->layout(renderer);
-    return;
-  }
-
-  if (devices.empty()) {
-    auto emptyCard = ui::column({
-        .align = FlexAlign::Stretch,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-    });
-    emptyCard->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.bluetooth.no-devices"),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-    m_list->addChild(std::move(emptyCard));
-    m_list->layout(renderer);
-    return;
-  }
-
-  Flex* bucketCard = nullptr;
   DeviceBucket currentBucket = DeviceBucket::Connected;
   bool first = true;
   for (const auto& device : devices) {
@@ -1030,22 +998,21 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
         sectionText = i18n::tr("control-center.bluetooth.sections.available");
         break;
       }
-      auto card = ui::column({
-          .configure = [scale, opacity = panelCardOpacity()](Flex& c) { applySectionCardStyle(c, scale, opacity); },
-      });
-      card->addChild(makeCardHeaderRow(sectionText, scale));
-      bucketCard = card.get();
-      m_list->addChild(std::move(card));
+      if (!first) {
+        addWellDivider(*well, scale);
+      }
+      well->addChild(makeCardHeaderRow(sectionText, scale));
       currentBucket = bucket;
       first = false;
     }
     auto row = std::make_unique<BluetoothDeviceRow>(device, m_service, m_clipboard, scale);
     auto* rowPtr = row.get();
-    bucketCard->addChild(std::move(row));
+    well->addChild(std::move(row));
     rowPtr->setExpandedImmediate(expandedPaths.contains(device.path));
     rowPtr->startConnectingSpinner();
     m_deviceRows.emplace(rowPtr->devicePath(), rowPtr);
   }
+  m_list->addChild(std::move(wellCard));
   m_list->layout(renderer);
 }
 

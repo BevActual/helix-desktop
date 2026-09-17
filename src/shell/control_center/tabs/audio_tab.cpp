@@ -1126,7 +1126,7 @@ namespace {
               .out = &m_muteButton,
               .glyph = "volume-high",
               .glyphSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Default,
+              .variant = ButtonVariant::Ghost,
               .tooltip = i18n::tr("control-center.audio.mute"),
               .minWidth = Style::controlHeightSm * scale,
               .minHeight = Style::controlHeightSm * scale,
@@ -1270,7 +1270,7 @@ namespace {
       if (m_muteButton != nullptr) {
         m_muteButton->setEnabled(nodeEnabled);
         m_muteButton->setGlyph(m_muted ? "volume-mute" : "volume-high");
-        m_muteButton->setVariant(m_muted ? ButtonVariant::Destructive : ButtonVariant::Default);
+        m_muteButton->setVariant(m_muted ? ButtonVariant::Destructive : ButtonVariant::Ghost);
         m_muteButton->setTooltip(i18n::tr(m_muted ? "control-center.audio.unmute" : "control-center.audio.mute"));
       }
 
@@ -1685,8 +1685,9 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
       {
           .flexGrow = 1.0F,
           .configure =
-              [scale, opacity = panelCardOpacity()](Flex& column) {
-                applySectionCardStyle(column, scale, opacity);
+              [scale](Flex& column) {
+                column.setDirection(FlexDirection::Vertical);
+                column.setAlign(FlexAlign::Stretch);
                 column.setGap(Style::spaceXs * scale);
               },
       },
@@ -1706,7 +1707,7 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
               },
               ui::label({
                   .text = i18n::tr(card.devicePrefixKey),
-                  .fontSize = Style::fontSizeTitle * scale,
+                  .fontSize = Style::fontSizeBody * scale,
                   .fontWeight = FontWeight::Bold,
                   .color = colorSpecFromRole(ColorRole::OnSurface),
                   .maxLines = 1,
@@ -1797,7 +1798,7 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
                   .out = &card.state.muteButton,
                   .glyph = std::string(card.muteGlyph),
                   .glyphSize = Style::fontSizeBody * scale,
-                  .variant = ButtonVariant::Default,
+                  .variant = ButtonVariant::Ghost,
                   .tooltip = i18n::tr("control-center.audio.mute"),
                   .minWidth = Style::controlHeightSm * scale,
                   .minHeight = Style::controlHeightSm * scale,
@@ -1847,75 +1848,88 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
 std::unique_ptr<Flex> AudioTab::create() {
   const float scale = contentScale();
 
-  auto tab =       ui::column(
+  auto tab = ui::column(
+      {
+          .out = &m_rootLayout,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceMd * scale,
+      },
+      ui::column(
           {
-              .out = &m_rootLayout,
-              .align = FlexAlign::Stretch,
-              .gap = Style::spaceMd * scale,
+              .configure =
+                  [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
           },
           ui::row(
-          {
-              .align = FlexAlign::Stretch,
-              .gap = Style::spaceMd * scale,
-              // Keep volume cards at natural content height.
-              .flexGrow = 0.0F,
-          },
-          createDeviceVolumeCard({
-              .state = m_outputDeviceVolume,
-              .deviceMenu =
-                  {
-                      .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sinks; },
-                      .defaultDeviceId = [](const AudioState& state) { return state.defaultSinkId; },
-                      .activate = [this](std::uint32_t id) { m_audio->setDefaultSink(id); },
-                  },
-              .devicePrefixKey = "control-center.audio.output-device-prefix",
-              .noDeviceKey = "control-center.audio.no-output-selected",
-              .muteGlyph = "volume-high",
-              .queueVolume =
-                  [this](float value) {
-                    const AudioNode* sink = m_audio != nullptr ? m_audio->defaultSink() : nullptr;
-                    m_pendingSinkId = sink != nullptr ? sink->id : 0;
-                    m_pendingSinkVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
-                  },
-              .toggleMute =
-                  [this]() {
-                    const AudioNode* sink = m_audio->defaultSink();
-                    if (sink == nullptr) {
-                      return;
-                    }
+              {
+                  .align = FlexAlign::Stretch,
+                  .gap = Style::spaceMd * scale,
+                  .flexGrow = 0.0F,
+              },
+              createDeviceVolumeCard({
+                  .state = m_outputDeviceVolume,
+                  .deviceMenu =
+                      {
+                          .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sinks; },
+                          .defaultDeviceId = [](const AudioState& state) { return state.defaultSinkId; },
+                          .activate = [this](std::uint32_t id) { m_audio->setDefaultSink(id); },
+                      },
+                  .devicePrefixKey = "control-center.audio.output-device-prefix",
+                  .noDeviceKey = "control-center.audio.no-output-selected",
+                  .muteGlyph = "volume-high",
+                  .queueVolume =
+                      [this](float value) {
+                        const AudioNode* sink = m_audio != nullptr ? m_audio->defaultSink() : nullptr;
+                        m_pendingSinkId = sink != nullptr ? sink->id : 0;
+                        m_pendingSinkVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
+                      },
+                  .toggleMute =
+                      [this]() {
+                        const AudioNode* sink = m_audio->defaultSink();
+                        if (sink == nullptr) {
+                          return;
+                        }
 
-                    m_audio->setSinkMuted(sink->id, !sink->muted);
-                    PanelManager::instance().refresh();
-                  },
-          }),
-          createDeviceVolumeCard({
-              .state = m_inputDeviceVolume,
-              .deviceMenu =
-                  {
-                      .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sources; },
-                      .defaultDeviceId = [](const AudioState& state) { return state.defaultSourceId; },
-                      .activate = [this](std::uint32_t id) { m_audio->setDefaultSource(id); },
-                  },
-              .devicePrefixKey = "control-center.audio.input-device-prefix",
-              .noDeviceKey = "control-center.audio.no-input-selected",
-              .muteGlyph = "microphone",
-              .queueVolume =
-                  [this](float value) {
-                    const AudioNode* source = m_audio != nullptr ? m_audio->defaultSource() : nullptr;
-                    m_pendingSourceId = source != nullptr ? source->id : 0;
-                    m_pendingSourceVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
-                  },
-              .toggleMute =
-                  [this]() {
-                    const AudioNode* source = m_audio->defaultSource();
-                    if (source == nullptr) {
-                      return;
-                    }
+                        m_audio->setSinkMuted(sink->id, !sink->muted);
+                        PanelManager::instance().refresh();
+                      },
+              }),
+              ui::separator({
+                  .color = colorSpecFromRole(ColorRole::Outline, 0.45F),
+                  .spacing = Style::spaceSm * scale,
+                  .orientation = SeparatorOrientation::VerticalRule,
+                  .gradientEdges = false,
+              }),
+              createDeviceVolumeCard({
+                  .state = m_inputDeviceVolume,
+                  .deviceMenu =
+                      {
+                          .devices = [](const AudioState& state) -> std::span<const AudioNode> {
+                            return state.sources;
+                          },
+                          .defaultDeviceId = [](const AudioState& state) { return state.defaultSourceId; },
+                          .activate = [this](std::uint32_t id) { m_audio->setDefaultSource(id); },
+                      },
+                  .devicePrefixKey = "control-center.audio.input-device-prefix",
+                  .noDeviceKey = "control-center.audio.no-input-selected",
+                  .muteGlyph = "microphone",
+                  .queueVolume =
+                      [this](float value) {
+                        const AudioNode* source = m_audio != nullptr ? m_audio->defaultSource() : nullptr;
+                        m_pendingSourceId = source != nullptr ? source->id : 0;
+                        m_pendingSourceVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
+                      },
+                  .toggleMute =
+                      [this]() {
+                        const AudioNode* source = m_audio->defaultSource();
+                        if (source == nullptr) {
+                          return;
+                        }
 
-                    m_audio->setSourceMuted(source->id, !source->muted);
-                    PanelManager::instance().refresh();
-                  },
-          })
+                        m_audio->setSourceMuted(source->id, !source->muted);
+                        PanelManager::instance().refresh();
+                      },
+              })
+          )
       )
   );
 
@@ -1924,7 +1938,7 @@ std::unique_ptr<Flex> AudioTab::create() {
       .flexGrow = 1.0F,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-  addTitle(*programCard, i18n::tr("control-center.audio.application-volumes"), scale);
+  programCard->addChild(makeCardHeaderRow(i18n::tr("control-center.audio.application-volumes"), scale));
 
   auto programScroll = ui::scrollView({
       .out = &m_programScroll,
@@ -1994,12 +2008,12 @@ void AudioTab::doUpdate(Renderer& renderer) {
     if (m_outputDeviceVolume.menuButton != nullptr) {
       const bool hasOutputs = !state.sinks.empty();
       m_outputDeviceVolume.menuButton->setEnabled(hasOutputs);
-      m_outputDeviceVolume.menuButton->setVariant(hasOutputs ? ButtonVariant::Ghost : ButtonVariant::Default);
+      m_outputDeviceVolume.menuButton->setVariant(ButtonVariant::Ghost);
     }
     if (m_inputDeviceVolume.menuButton != nullptr) {
       const bool hasInputs = !state.sources.empty();
       m_inputDeviceVolume.menuButton->setEnabled(hasInputs);
-      m_inputDeviceVolume.menuButton->setVariant(hasInputs ? ButtonVariant::Ghost : ButtonVariant::Default);
+      m_inputDeviceVolume.menuButton->setVariant(ButtonVariant::Ghost);
     }
   }
 
@@ -2067,7 +2081,7 @@ void AudioTab::doUpdate(Renderer& renderer) {
     const bool outputMuted = sink != nullptr && sink->muted;
     m_outputDeviceVolume.muteButton->setEnabled(sink != nullptr);
     m_outputDeviceVolume.muteButton->setGlyph(outputMuted ? "volume-mute" : "volume-high");
-    m_outputDeviceVolume.muteButton->setVariant(outputMuted ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_outputDeviceVolume.muteButton->setVariant(outputMuted ? ButtonVariant::Destructive : ButtonVariant::Ghost);
     m_outputDeviceVolume.muteButton->setTooltip(
         i18n::tr(outputMuted ? "control-center.audio.unmute" : "control-center.audio.mute")
     );
@@ -2090,7 +2104,7 @@ void AudioTab::doUpdate(Renderer& renderer) {
     const bool inputMuted = source != nullptr && source->muted;
     m_inputDeviceVolume.muteButton->setEnabled(source != nullptr);
     m_inputDeviceVolume.muteButton->setGlyph(inputMuted ? "microphone-mute" : "microphone");
-    m_inputDeviceVolume.muteButton->setVariant(inputMuted ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_inputDeviceVolume.muteButton->setVariant(inputMuted ? ButtonVariant::Destructive : ButtonVariant::Ghost);
     m_inputDeviceVolume.muteButton->setTooltip(
         i18n::tr(inputMuted ? "control-center.audio.unmute" : "control-center.audio.mute")
     );

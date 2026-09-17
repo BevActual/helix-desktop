@@ -12,6 +12,7 @@ class ClipboardService;
 class Flex;
 class Label;
 class ScrollView;
+class Separator;
 class SyncthingService;
 struct ControlCenterServices;
 
@@ -42,8 +43,10 @@ private:
   Button* m_guiButton = nullptr;
   Button* m_copyIdButton = nullptr;
   Flex* m_foldersCard = nullptr;
+  Separator* m_foldersDivider = nullptr;
   Flex* m_folderList = nullptr;
   Flex* m_remotesCard = nullptr;
+  Separator* m_remotesDivider = nullptr;
   Flex* m_remoteList = nullptr;
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};

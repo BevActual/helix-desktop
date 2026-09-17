@@ -98,7 +98,11 @@ While the initial download is in flight - or if it fails - the shell falls back 
 
 Names a palette file in the Noctalia config directory's `palettes/` folder (honoring `NOCTALIA_CONFIG_HOME`, then `XDG_CONFIG_HOME`). The value is the file name without the `.json` extension - for example, `custom_palette = "MyPalette"` loads `~/.config/noctalia/palettes/MyPalette.json` with the default config location.
 
-The Settings GUI lists palette files found in the directory when `source = "custom"` is selected. If the file is missing or invalid, the shell falls back to the `Noctalia` built-in palette.
+The Settings GUI lists palette files found in the directory when `source = "custom"` is selected.
+
+Control Center **Appearance → Theme** can create and edit this file from the live swatches: tap a role, pick a color, and the shell forks the current palette (or overwrites the active custom palette) and switches `source` to `custom`.
+
+If the file is missing or invalid, the shell falls back to the `Noctalia` built-in palette.
 
 See [Palette](/noctalia/theming/palette/) for the custom palette JSON format.
 

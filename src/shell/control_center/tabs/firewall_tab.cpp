@@ -134,15 +134,15 @@ std::unique_ptr<Flex> FirewallTab::create() {
   m_rootLayout->setAlign(FlexAlign::Stretch);
   m_rootLayout->setGap(Style::spaceMd * scale);
 
-  auto statusCard = ui::column({
+  auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*statusCard, i18n::tr("control-center.firewall.title"), scale);
-  statusCard->addChild(
+  addTitle(*well, i18n::tr("control-center.firewall.title"), scale);
+  well->addChild(
       ui::label({
           .out = &m_status,
           .fontSize = Style::fontSizeBody * scale,
@@ -150,7 +150,7 @@ std::unique_ptr<Flex> FirewallTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::label({
           .out = &m_detail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -158,7 +158,7 @@ std::unique_ptr<Flex> FirewallTab::create() {
           .maxLines = 3,
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::button({
           .out = &m_startButton,
           .text = i18n::tr("control-center.firewall.start"),
@@ -203,16 +203,13 @@ std::unique_ptr<Flex> FirewallTab::create() {
               },
       })
   );
-  statusCard->addChild(std::move(panicRow));
-  m_rootLayout->addChild(std::move(statusCard));
+  well->addChild(std::move(panicRow));
 
+  m_zoneDivider = addWellDivider(*well, scale);
   auto zoneCard = ui::column({
       .out = &m_zoneCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*zoneCard, i18n::tr("control-center.firewall.zone"), scale);
   zoneCard->addChild(
@@ -230,15 +227,13 @@ std::unique_ptr<Flex> FirewallTab::create() {
               },
       })
   );
-  m_rootLayout->addChild(std::move(zoneCard));
+  well->addChild(std::move(zoneCard));
 
+  m_servicesDivider = addWellDivider(*well, scale);
   auto servicesCard = ui::column({
       .out = &m_servicesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*servicesCard, i18n::tr("control-center.firewall.services"), scale);
   servicesCard->addChild(
@@ -264,7 +259,8 @@ std::unique_ptr<Flex> FirewallTab::create() {
               },
       })
   );
-  m_rootLayout->addChild(std::move(servicesCard));
+  well->addChild(std::move(servicesCard));
+  m_rootLayout->addChild(std::move(well));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -308,8 +304,10 @@ void FirewallTab::onClose() {
   m_panicRow = nullptr;
   m_panicToggle = nullptr;
   m_zoneCard = nullptr;
+  m_zoneDivider = nullptr;
   m_zoneSelect = nullptr;
   m_servicesCard = nullptr;
+  m_servicesDivider = nullptr;
   m_serviceList = nullptr;
   m_saveButton = nullptr;
   m_liveScroll = nullptr;
@@ -334,9 +332,10 @@ void FirewallTab::syncUi() {
   const FirewallSnapshot empty;
   const FirewallSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
+  const bool showLists = running && !snap.panic;
   const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_panicRow, running) ||
-                            setShown(m_zoneCard, running && !snap.panic) ||
-                            setShown(m_servicesCard, running && !snap.panic);
+                            setShown(m_zoneDivider, showLists) || setShown(m_zoneCard, showLists) ||
+                            setShown(m_servicesDivider, showLists) || setShown(m_servicesCard, showLists);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

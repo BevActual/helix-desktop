@@ -89,15 +89,15 @@ std::unique_ptr<Flex> CastTab::create() {
   m_rootLayout->setAlign(FlexAlign::Stretch);
   m_rootLayout->setGap(Style::spaceMd * scale);
 
-  auto shareCard = ui::column({
+  auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*shareCard, i18n::tr("control-center.cast.share-title"), scale);
-  shareCard->addChild(
+  addTitle(*well, i18n::tr("control-center.cast.share-title"), scale);
+  well->addChild(
       ui::label({
           .out = &m_shareStatus,
           .fontSize = Style::fontSizeBody * scale,
@@ -105,7 +105,7 @@ std::unique_ptr<Flex> CastTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  shareCard->addChild(
+  well->addChild(
       ui::label({
           .out = &m_shareDetail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -141,7 +141,7 @@ std::unique_ptr<Flex> CastTab::create() {
               },
       })
   );
-  shareCard->addChild(std::move(shareToggleRow));
+  well->addChild(std::move(shareToggleRow));
 
   auto viewOnlyRow = ui::row({
       .out = &m_viewOnlyRow,
@@ -171,7 +171,7 @@ std::unique_ptr<Flex> CastTab::create() {
               },
       })
   );
-  shareCard->addChild(std::move(viewOnlyRow));
+  well->addChild(std::move(viewOnlyRow));
 
   auto credentialsRow = ui::row({
       .out = &m_credentialsRow,
@@ -200,18 +200,11 @@ std::unique_ptr<Flex> CastTab::create() {
           .onClick = [this]() { copyShareTarget(); },
       })
   );
-  shareCard->addChild(std::move(credentialsRow));
-  m_rootLayout->addChild(std::move(shareCard));
+  well->addChild(std::move(credentialsRow));
 
-  auto wirelessCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
-  });
-  addTitle(*wirelessCard, i18n::tr("control-center.cast.wireless-title"), scale);
-  wirelessCard->addChild(
+  addWellDivider(*well, scale);
+  addTitle(*well, i18n::tr("control-center.cast.wireless-title"), scale);
+  well->addChild(
       ui::label({
           .out = &m_wirelessStatus,
           .fontSize = Style::fontSizeBody * scale,
@@ -219,7 +212,7 @@ std::unique_ptr<Flex> CastTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  wirelessCard->addChild(
+  well->addChild(
       ui::label({
           .out = &m_wirelessDetail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -227,7 +220,7 @@ std::unique_ptr<Flex> CastTab::create() {
           .maxLines = 3,
       })
   );
-  wirelessCard->addChild(
+  well->addChild(
       ui::button({
           .out = &m_wirelessStart,
           .text = i18n::tr("control-center.cast.wireless-start"),
@@ -243,7 +236,7 @@ std::unique_ptr<Flex> CastTab::create() {
               },
       })
   );
-  wirelessCard->addChild(
+  well->addChild(
       ui::button({
           .out = &m_wirelessOpen,
           .text = i18n::tr("control-center.cast.wireless-open"),
@@ -259,15 +252,12 @@ std::unique_ptr<Flex> CastTab::create() {
               },
       })
   );
-  m_rootLayout->addChild(std::move(wirelessCard));
 
+  m_sinksDivider = addWellDivider(*well, scale);
   auto sinksCard = ui::column({
       .out = &m_sinksCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*sinksCard, i18n::tr("control-center.cast.displays"), scale);
   sinksCard->addChild(
@@ -277,7 +267,8 @@ std::unique_ptr<Flex> CastTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(sinksCard));
+  well->addChild(std::move(sinksCard));
+  m_rootLayout->addChild(std::move(well));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -334,6 +325,7 @@ void CastTab::onClose() {
   m_wirelessDetail = nullptr;
   m_wirelessStart = nullptr;
   m_wirelessOpen = nullptr;
+  m_sinksDivider = nullptr;
   m_sinksCard = nullptr;
   m_sinkList = nullptr;
   m_liveScroll = nullptr;
@@ -372,7 +364,8 @@ void CastTab::syncUi() {
                             setShown(m_viewOnlyRow, sharing) || setShown(m_credentialsRow, sharing) ||
                             setShown(m_copyButton, sharing && !snap.shareAddress.empty()) ||
                             setShown(m_wirelessStart, snap.wirelessInstalled && !wireless) ||
-                            setShown(m_wirelessOpen, snap.wirelessInstalled) || setShown(m_sinksCard, wireless);
+                            setShown(m_wirelessOpen, snap.wirelessInstalled) ||
+                            setShown(m_sinksDivider, wireless) || setShown(m_sinksCard, wireless);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

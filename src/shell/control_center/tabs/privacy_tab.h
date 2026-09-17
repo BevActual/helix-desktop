@@ -15,6 +15,7 @@ class Label;
 class LocationService;
 class PipeWireService;
 class ScrollView;
+class Separator;
 class Toggle;
 struct ControlCenterServices;
 
@@ -44,6 +45,7 @@ private:
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_capturesWell = nullptr;
   Label* m_status = nullptr;
   Label* m_detail = nullptr;
   Button* m_muteButton = nullptr;
@@ -51,10 +53,13 @@ private:
   Label* m_locationHint = nullptr;
   Toggle* m_telemetryToggle = nullptr;
   Label* m_telemetryHint = nullptr;
+  Separator* m_micDivider = nullptr;
   Flex* m_micCard = nullptr;
   Flex* m_micList = nullptr;
+  Separator* m_cameraDivider = nullptr;
   Flex* m_cameraCard = nullptr;
   Flex* m_cameraList = nullptr;
+  Separator* m_screenDivider = nullptr;
   Flex* m_screenCard = nullptr;
   Flex* m_screenList = nullptr;
   ScrollView* m_liveScroll = nullptr;

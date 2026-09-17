@@ -391,132 +391,123 @@ namespace settings {
 
     body.setDirection(FlexDirection::Vertical);
     body.setAlign(FlexAlign::Stretch);
-    body.setGap(Style::spaceSm * scale);
+    body.setGap(Style::spaceXs * scale);
     body.setPadding(m_callbacks.inset ? Style::spaceMd * scale : 0.0F);
 
-    body.addChild(
+    auto browse = ui::row({
+        .align = FlexAlign::Center,
+        .wrap = true,
+        .gap = Style::spaceXs * scale,
+        .fillWidth = true,
+    });
+    browse->addChild(
         ui::input({
             .value = m_searchQuery,
             .placeholder = i18n::tr("settings.templates.store.search-placeholder"),
             .fontSize = Style::fontSizeBody * scale,
-            .onChange = [this](const std::string& text) {
-              m_searchQuery = text;
-              applyFilter();
-              syncGridSelection();
-              if (m_countLabel != nullptr) {
-                m_countLabel->setText(
-                    i18n::tr(
-                        "settings.templates.store.results-count", "count", std::to_string(m_filteredIndices.size())
-                    )
-                );
-              }
-              if (m_grid != nullptr) {
-                m_grid->notifyDataChanged();
-              }
-            },
-        })
-    );
-
-    auto toolbar = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .fillWidth = true,
-    });
-    // Holds the count and sort button when the category chips are expanded, so the chips
-    // sit between the filters and the row that summarizes them.
-    auto toolbarBottom = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .fillWidth = true,
-    });
-
-    std::vector<std::unique_ptr<Button>> filterButtons;
-    toolbar->addChild(
-        ui::button({
-            .text = i18n::tr("settings.templates.store.categories"),
-            .glyph = m_categoryFiltersCollapsed ? std::string(Style::rtl() ? "chevron-left" : "chevron-right")
-                                                : std::string("chevron-down"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .glyphSize = Style::fontSizeCaption * scale,
-            .contentAlign = ButtonContentAlign::Start,
-            .variant = ButtonVariant::Ghost,
-            .onClick = [this]() {
-              m_categoryFiltersCollapsed = !m_categoryFiltersCollapsed;
-              if (m_onRebuildNeeded) {
-                m_onRebuildNeeded();
-              }
-            },
-        })
-    );
-
-    if (!m_categoryFiltersCollapsed) {
-      const auto makeFilterChip = [&](const std::string& label, std::string filterKey) {
-        const bool selected = m_selectedCategory == filterKey;
-        filterButtons.push_back(
-            ui::button({
-                .text = label,
-                .fontSize = Style::fontSizeCaption * scale,
-                .variant = selected ? ButtonVariant::Primary : ButtonVariant::Default,
-                .radius = Style::scaledRadiusMd(scale),
-                .onClick = [this, filterKey = std::move(filterKey)]() {
-                  m_selectedCategory = filterKey;
+            .controlHeight = Style::controlHeightSm * scale,
+            .horizontalPadding = Style::spaceMd * scale,
+            .clearButtonEnabled = true,
+            .minLayoutWidth = 128.0F * scale,
+            .height = 0.0F,
+            .flexGrow = 1.0F,
+            .onChange =
+                [this](const std::string& text) {
+                  m_searchQuery = text;
                   applyFilter();
+                  syncGridSelection();
+                  if (m_countLabel != nullptr) {
+                    m_countLabel->setText(
+                        i18n::tr(
+                            "settings.templates.store.results-count", "count",
+                            std::to_string(m_filteredIndices.size())
+                        )
+                    );
+                  }
+                  if (m_grid != nullptr) {
+                    m_grid->notifyDataChanged();
+                  }
+                },
+        })
+    );
+    browse->addChild(
+        ui::button({
+            .glyph = "adjustments",
+            .glyphSize = Style::fontSizeBody * scale,
+            .selected = !m_categoryFiltersCollapsed,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr("settings.templates.store.filters"),
+            .minWidth = Style::controlHeightSm * scale,
+            .minHeight = Style::controlHeightSm * scale,
+            .padding = Style::spaceXs * scale,
+            .radius = Style::scaledRadiusMd(scale),
+            .onClick =
+                [this]() {
+                  m_categoryFiltersCollapsed = !m_categoryFiltersCollapsed;
                   if (m_onRebuildNeeded) {
                     m_onRebuildNeeded();
                   }
                 },
-            })
-        );
-      };
-
-      makeFilterChip(i18n::tr("settings.templates.store.category-all"), {});
-      makeFilterChip(i18n::tr("settings.templates.store.filter-enabled"), std::string(kEnabledFilter));
-      for (const auto& category : m_allCategories) {
-        makeFilterChip(category, category);
-      }
-    }
-
-    Flex& summaryRow = m_categoryFiltersCollapsed ? *toolbar : *toolbarBottom;
-    summaryRow.addChild(ui::spacer());
-    summaryRow.addChild(
+        })
+    );
+    browse->addChild(
         ui::label({
             .out = &m_countLabel,
             .text =
                 i18n::tr("settings.templates.store.results-count", "count", std::to_string(m_filteredIndices.size())),
             .fontSize = Style::fontSizeCaption * scale,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
         })
     );
-    summaryRow.addChild(
+    browse->addChild(
         ui::button({
             .out = &m_sortButton,
             .glyph = std::string(sortModeGlyph(m_sortMode)),
-            .glyphSize = Style::fontSizeTitle * scale,
-            .variant = ButtonVariant::Default,
+            .glyphSize = Style::fontSizeBody * scale,
+            .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr(sortModeTooltipKey(m_sortMode)),
-            .minWidth = Style::controlHeight * scale,
-            .minHeight = Style::controlHeight * scale,
+            .minWidth = Style::controlHeightSm * scale,
+            .minHeight = Style::controlHeightSm * scale,
             .padding = Style::spaceXs * scale,
             .radius = Style::scaledRadiusMd(scale),
             .onClick = [this]() { cycleSortMode(); },
         })
     );
-
-    body.addChild(std::move(toolbar));
+    body.addChild(std::move(browse));
 
     if (!m_categoryFiltersCollapsed) {
       auto chipRow = ui::row({
           .align = FlexAlign::Center,
-          .justify = FlexJustify::Center,
           .wrap = true,
           .gap = Style::spaceXs * scale,
           .fillWidth = true,
       });
-      for (auto& btn : filterButtons) {
-        chipRow->addChild(std::move(btn));
+      const auto makeFilterChip = [&](const std::string& label, std::string filterKey) {
+        const bool selected = m_selectedCategory == filterKey;
+        chipRow->addChild(
+            ui::button({
+                .text = label,
+                .fontSize = Style::fontSizeCaption * scale,
+                .variant = selected ? ButtonVariant::Primary : ButtonVariant::Ghost,
+                .radius = Style::scaledRadiusMd(scale),
+                .onClick =
+                    [this, filterKey = std::move(filterKey)]() {
+                      m_selectedCategory = filterKey;
+                      applyFilter();
+                      if (m_onRebuildNeeded) {
+                        m_onRebuildNeeded();
+                      }
+                    },
+            })
+        );
+      };
+      makeFilterChip(i18n::tr("settings.templates.store.category-all"), {});
+      makeFilterChip(i18n::tr("settings.templates.store.filter-enabled"), std::string(kEnabledFilter));
+      for (const auto& category : m_allCategories) {
+        makeFilterChip(category, category);
       }
       body.addChild(std::move(chipRow));
-      body.addChild(std::move(toolbarBottom));
     }
 
     auto adapter = std::make_unique<TemplateStoreAdapter>(scale);
@@ -554,11 +545,6 @@ namespace settings {
             },
         .configure = [](VirtualGridView& view) { view.setFillWidth(true); },
     });
-    if (const auto index = indexOfTemplateId(m_selectedTemplateId.value_or("")); index.has_value()) {
-      m_grid->setSelectedIndex(index);
-    }
-    body.addChild(std::move(grid));
-
     if (m_filteredIndices.empty()) {
       body.addChild(
           ui::label({
@@ -569,9 +555,14 @@ namespace settings {
                   : i18n::tr("settings.templates.store.empty"),
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              .maxLines = 4,
           })
       );
     }
+    if (const auto index = indexOfTemplateId(m_selectedTemplateId.value_or("")); index.has_value()) {
+      m_grid->setSelectedIndex(index);
+    }
+    body.addChild(std::move(grid));
   }
 
   std::optional<std::size_t> TemplateStoreContent::indexOfTemplateId(std::string_view id) const {

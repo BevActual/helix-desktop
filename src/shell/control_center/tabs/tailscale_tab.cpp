@@ -243,15 +243,12 @@ std::unique_ptr<Flex> TailscaleTab::create() {
       })
   );
   statusCard->addChild(std::move(actions));
-  m_rootLayout->addChild(std::move(statusCard));
 
+  m_prefsDivider = addWellDivider(*statusCard, scale);
   auto prefsCard = ui::column({
       .out = &m_prefsCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*prefsCard, i18n::tr("control-center.tailscale.preferences"), scale);
   addToggleRow(*prefsCard, scale, nullptr, &m_shields, i18n::tr("control-center.tailscale.shields"));
@@ -287,15 +284,13 @@ std::unique_ptr<Flex> TailscaleTab::create() {
               },
       })
   );
-  m_rootLayout->addChild(std::move(prefsCard));
+  statusCard->addChild(std::move(prefsCard));
 
+  m_peersDivider = addWellDivider(*statusCard, scale);
   auto peersCard = ui::column({
       .out = &m_peersCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*peersCard, i18n::tr("control-center.tailscale.peers"), scale);
   peersCard->addChild(
@@ -325,7 +320,8 @@ std::unique_ptr<Flex> TailscaleTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(peersCard));
+  statusCard->addChild(std::move(peersCard));
+  m_rootLayout->addChild(std::move(statusCard));
 
   if (m_shields != nullptr) {
     m_shields->setOnChange([this](bool value) {
@@ -440,7 +436,9 @@ void TailscaleTab::onClose() {
   m_peerList = nullptr;
   m_liveScroll = nullptr;
   m_prefsCard = nullptr;
+  m_prefsDivider = nullptr;
   m_peersCard = nullptr;
+  m_peersDivider = nullptr;
   m_peerSignature.clear();
   m_exitOptionsKey.clear();
 }
@@ -504,7 +502,8 @@ void TailscaleTab::syncUi() {
 
   const bool hasIp = !snap.ipv4.empty() || !snap.ipv6.empty();
   const std::string health = joinHealth(snap.health);
-  const bool layoutDirty = setShown(m_prefsCard, installed) || setShown(m_peersCard, installed) ||
+  const bool layoutDirty = setShown(m_prefsDivider, installed) || setShown(m_prefsCard, installed) ||
+                            setShown(m_peersDivider, installed) || setShown(m_peersCard, installed) ||
                             setShown(m_ipRow, hasIp) || setShown(m_ipv4, !snap.ipv4.empty()) ||
                             setShown(m_ipv6, !snap.ipv6.empty()) || setShown(m_copyIpButton, hasIp) ||
                             setShown(m_actionsRow, installed) || setShown(m_health, !health.empty());

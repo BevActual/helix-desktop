@@ -5,6 +5,7 @@
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
@@ -26,7 +27,9 @@ namespace {
 
 ScaleTab::ScaleTab(const ControlCenterServices& services)
     : m_config(services.config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "scale"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "scale", .showConfigureButton = false}
+      )) {
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
@@ -34,8 +37,6 @@ ScaleTab::ScaleTab(const ControlCenterServices& services)
 
 std::unique_ptr<Flex> ScaleTab::create() {
   const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
 
   auto live = ui::column({
       .out = &m_rootLayout,
@@ -60,54 +61,75 @@ std::unique_ptr<Flex> ScaleTab::create() {
 
   auto card = ui::column({
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*card, i18n::tr("settings.schema.appearance.ui-scale.label"), scale);
-  auto scaleHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
+  addSliderSection(
+      *card, scale, i18n::tr("settings.schema.appearance.ui-scale.label"), &m_uiScale, &m_uiScaleValue,
+      noctalia::config::schema::kScaleRange.min.value_or(0.5F),
+      noctalia::config::schema::kScaleRange.max.value_or(2.5F),
+      noctalia::config::schema::kScaleRange.step.value_or(0.05F), 1.0, multiplierLabel, [this]() { commitUiScale(); }
+  );
+  auto preview = ui::row({
+      .align = FlexAlign::End,
+      .gap = Style::spaceMd * scale,
   });
-  scaleHeader->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.ui-scale.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-          .flexGrow = 1.0F,
-      })
+  auto makeScaleSpecimen = [&](Label** labelOut, float fontSize, FontWeight weight, const std::string& caption) {
+    auto cell = ui::column({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceXs * scale,
+        .flexGrow = 1.0F,
+    });
+    cell->addChild(
+        ui::label({
+            .out = labelOut,
+            .text = "Aa",
+            .fontSize = fontSize,
+            .fontWeight = weight,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .textAlign = TextAlign::Center,
+        })
+    );
+    cell->addChild(
+        ui::label({
+            .text = caption,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
+            .textAlign = TextAlign::Center,
+        })
+    );
+    return cell;
+  };
+  preview->addChild(
+      makeScaleSpecimen(
+          &m_scalePreviewCaption, Style::fontSizeCaption * scale, FontWeight::Normal,
+          i18n::tr("control-center.appearance.specimen-caption")
+      )
   );
-  scaleHeader->addChild(
-      ui::label({
-          .out = &m_uiScaleValue,
-          .text = multiplierLabel(1.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
+  preview->addChild(
+      makeScaleSpecimen(
+          &m_scalePreviewBody, Style::fontSizeBody * scale, FontWeight::Normal,
+          i18n::tr("control-center.appearance.specimen-body")
+      )
   );
-  card->addChild(std::move(scaleHeader));
+  preview->addChild(
+      makeScaleSpecimen(
+          &m_scalePreviewTitle, Style::fontSizeTitle * scale, FontWeight::Medium,
+          i18n::tr("control-center.appearance.specimen-title")
+      )
+  );
+  card->addChild(std::move(preview));
   card->addChild(
-      ui::slider({
-          .out = &m_uiScale,
-          .minValue = noctalia::config::schema::kScaleRange.min.value_or(0.5F),
-          .maxValue = noctalia::config::schema::kScaleRange.max.value_or(2.5F),
-          .step = noctalia::config::schema::kScaleRange.step.value_or(0.05F),
-          .value = 1.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_uiScaleValue != nullptr) {
-                  m_uiScaleValue->setText(multiplierLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitUiScale(); },
+      ui::label({
+          .out = &m_scalePreviewPangram,
+          .text = i18n::tr("control-center.appearance.font-preview"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 2,
       })
   );
+  addCaption(*card, i18n::tr("settings.schema.appearance.ui-scale.description"), scale);
   content->addChild(std::move(card));
 
   live->addChild(std::move(scroll));
@@ -127,6 +149,10 @@ void ScaleTab::onClose() {
   m_rootLayout = nullptr;
   m_uiScale = nullptr;
   m_uiScaleValue = nullptr;
+  m_scalePreviewCaption = nullptr;
+  m_scalePreviewBody = nullptr;
+  m_scalePreviewTitle = nullptr;
+  m_scalePreviewPangram = nullptr;
 }
 
 void ScaleTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -162,6 +188,7 @@ void ScaleTab::doUpdate(Renderer& renderer) {
     m_liveDirty = false;
     syncLiveControls();
   }
+  updateScalePreview();
 }
 
 void ScaleTab::syncLiveControls() {
@@ -176,7 +203,30 @@ void ScaleTab::syncLiveControls() {
   if (m_uiScaleValue != nullptr) {
     m_uiScaleValue->setText(multiplierLabel(uiScale));
   }
+  m_previewScale = -1.0F;
+  updateScalePreview();
   m_syncing = false;
+}
+
+void ScaleTab::updateScalePreview() {
+  const float next = m_uiScale != nullptr ? static_cast<float>(m_uiScale->value()) : contentScale();
+  if (m_previewScale == next) {
+    return;
+  }
+  m_previewScale = next;
+  if (m_scalePreviewCaption != nullptr) {
+    m_scalePreviewCaption->setFontSize(Style::fontSizeCaption * next);
+  }
+  if (m_scalePreviewBody != nullptr) {
+    m_scalePreviewBody->setFontSize(Style::fontSizeBody * next);
+  }
+  if (m_scalePreviewTitle != nullptr) {
+    m_scalePreviewTitle->setFontSize(Style::fontSizeTitle * next);
+  }
+  if (m_scalePreviewPangram != nullptr) {
+    m_scalePreviewPangram->setFontSize(Style::fontSizeBody * next);
+  }
+  PanelManager::instance().requestLayout();
 }
 
 void ScaleTab::commitUiScale() {

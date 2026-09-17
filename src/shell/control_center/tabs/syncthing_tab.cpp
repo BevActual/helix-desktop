@@ -116,15 +116,15 @@ std::unique_ptr<Flex> SyncthingTab::create() {
   m_rootLayout->setAlign(FlexAlign::Stretch);
   m_rootLayout->setGap(Style::spaceMd * scale);
 
-  auto statusCard = ui::column({
+  auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*statusCard, i18n::tr("control-center.syncthing.title"), scale);
-  statusCard->addChild(
+  addTitle(*well, i18n::tr("control-center.syncthing.title"), scale);
+  well->addChild(
       ui::label({
           .out = &m_status,
           .fontSize = Style::fontSizeBody * scale,
@@ -132,7 +132,7 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::label({
           .out = &m_detail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -203,16 +203,13 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .onClick = [this]() { copyDeviceId(); },
       })
   );
-  statusCard->addChild(std::move(actions));
-  m_rootLayout->addChild(std::move(statusCard));
+  well->addChild(std::move(actions));
 
+  m_foldersDivider = addWellDivider(*well, scale);
   auto foldersCard = ui::column({
       .out = &m_foldersCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*foldersCard, i18n::tr("control-center.syncthing.folders"), scale);
   foldersCard->addChild(
@@ -222,15 +219,13 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(foldersCard));
+  well->addChild(std::move(foldersCard));
 
+  m_remotesDivider = addWellDivider(*well, scale);
   auto remotesCard = ui::column({
       .out = &m_remotesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*remotesCard, i18n::tr("control-center.syncthing.devices"), scale);
   remotesCard->addChild(
@@ -240,7 +235,8 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(remotesCard));
+  well->addChild(std::move(remotesCard));
+  m_rootLayout->addChild(std::move(well));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -291,8 +287,10 @@ void SyncthingTab::onClose() {
   m_guiButton = nullptr;
   m_copyIdButton = nullptr;
   m_foldersCard = nullptr;
+  m_foldersDivider = nullptr;
   m_folderList = nullptr;
   m_remotesCard = nullptr;
+  m_remotesDivider = nullptr;
   m_remoteList = nullptr;
   m_liveScroll = nullptr;
   m_folderSignature.clear();
@@ -326,7 +324,8 @@ void SyncthingTab::syncUi() {
   const SyncthingSnapshot empty;
   const SyncthingSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
-  const bool layoutDirty = setShown(m_foldersCard, running) || setShown(m_remotesCard, running) ||
+  const bool layoutDirty = setShown(m_foldersDivider, running) || setShown(m_foldersCard, running) ||
+                            setShown(m_remotesDivider, running) || setShown(m_remotesCard, running) ||
                             setShown(m_startButton, !running) || setShown(m_stopButton, running) ||
                             setShown(m_guiButton, running) || setShown(m_copyIdButton, running && !snap.myId.empty());
   if (layoutDirty) {

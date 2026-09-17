@@ -179,11 +179,26 @@ std::unique_ptr<Flex> PowerTab::create() {
   content->setGap(Style::spaceMd * scale);
 
   buildSessionCard(*content, scale);
-  buildStatusCard(*content, scale);
-  buildProfilesCard(*content, scale);
-  buildChargingCard(*content, scale);
-  buildHealthCard(*content, scale);
-  buildPeripheralsCard(*content, scale);
+
+  if (m_upower != nullptr || m_powerProfiles != nullptr) {
+    auto well = ui::column({
+        .out = &m_batteryWell,
+        .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+          applySectionCardStyle(card, scale, opacity);
+        },
+    });
+    buildStatusCard(*well, scale);
+    m_profilesDivider = addWellDivider(*well, scale);
+    buildProfilesCard(*well, scale);
+    m_chargingDivider = addWellDivider(*well, scale);
+    buildChargingCard(*well, scale);
+    m_healthDivider = addWellDivider(*well, scale);
+    buildHealthCard(*well, scale);
+    m_peripheralsDivider = addWellDivider(*well, scale);
+    buildPeripheralsCard(*well, scale);
+    content->addChild(std::move(well));
+    syncBatteryWell();
+  }
 
   m_root->addChild(std::move(scroll));
 
@@ -305,6 +320,12 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
   );
   card->addChild(std::move(powerActions));
 
+  m_caffeineDivider = addWellDivider(*card, scale);
+  if (m_caffeineDivider != nullptr) {
+    m_caffeineDivider->setVisible(false);
+    m_caffeineDivider->setParticipatesInLayout(false);
+  }
+
   auto caffeine = ui::row({
       .out = &m_caffeineRow,
       .align = FlexAlign::Center,
@@ -376,6 +397,9 @@ void PowerTab::syncSessionCard() {
   }
 
   const bool caffeineAvailable = m_idleInhibitor != nullptr && m_idleInhibitor->available();
+  if (m_caffeineDivider != nullptr) {
+    (void)setShown(m_caffeineDivider, caffeineAvailable);
+  }
   if (m_caffeineRow != nullptr) {
     (void)setShown(m_caffeineRow, caffeineAvailable);
   }
@@ -410,10 +434,9 @@ void PowerTab::buildChargingCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
       .visible = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   m_chargingCard = card.get();
   card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.charging.title"), scale));
@@ -433,9 +456,8 @@ void PowerTab::buildStatusCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
   });
   m_statusCard = card.get();
 
@@ -529,9 +551,8 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
   });
   m_profilesCard = card.get();
 
@@ -591,10 +612,9 @@ void PowerTab::buildHealthCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
       .visible = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   m_healthCard = card.get();
 
@@ -638,10 +658,9 @@ void PowerTab::buildPeripheralsCard(Flex& root, float scale) {
   }
 
   auto card = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
       .visible = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   m_peripheralsCard = card.get();
 
@@ -659,6 +678,7 @@ void PowerTab::onClose() {
   }
   m_root = nullptr;
   m_sessionCard = nullptr;
+  m_caffeineDivider = nullptr;
   m_lockButton = nullptr;
   m_suspendButton = nullptr;
   m_logoutButton = nullptr;
@@ -667,6 +687,11 @@ void PowerTab::onClose() {
   m_powerActionsRow = nullptr;
   m_caffeineToggle = nullptr;
   m_caffeineRow = nullptr;
+  m_batteryWell = nullptr;
+  m_profilesDivider = nullptr;
+  m_chargingDivider = nullptr;
+  m_healthDivider = nullptr;
+  m_peripheralsDivider = nullptr;
   m_statusCard = nullptr;
   m_statusGlyph = nullptr;
   m_percentLabel = nullptr;
@@ -713,6 +738,7 @@ void PowerTab::doUpdate(Renderer& /*renderer*/) {
   syncPowerProfiles();
   syncBatteryHealth();
   rebuildPeripherals();
+  syncBatteryWell();
 }
 
 void PowerTab::rebuildChargeLimits() {
@@ -1068,5 +1094,28 @@ void PowerTab::rebuildPeripherals() {
     if (m_peripheralRows[i].pctLabel != nullptr) {
       m_peripheralRows[i].pctLabel->setText(std::format("{:.0F}%", peripherals[i].state.percentage));
     }
+  }
+}
+
+void PowerTab::syncBatteryWell() {
+  auto shown = [](const Node* node) {
+    return node != nullptr && node->visible() && node->participatesInLayout();
+  };
+
+  bool any = shown(m_statusCard);
+  auto lead = [&](Node* divider, const Node* card) {
+    const bool cardShown = shown(card);
+    (void)setShown(divider, cardShown && any);
+    if (cardShown) {
+      any = true;
+    }
+  };
+  lead(m_profilesDivider, m_profilesCard);
+  lead(m_chargingDivider, m_chargingCard);
+  lead(m_healthDivider, m_healthCard);
+  lead(m_peripheralsDivider, m_peripheralsCard);
+
+  if (setShown(m_batteryWell, any)) {
+    PanelManager::instance().requestLayout();
   }
 }

@@ -9,6 +9,7 @@
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "ui/builders.h"
+#include "ui/controls/box.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/slider.h"
@@ -33,7 +34,9 @@ namespace {
 
 RoundnessTab::RoundnessTab(const ControlCenterServices& services)
     : m_config(services.config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "roundness"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "roundness", .showConfigureButton = false}
+      )) {
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
@@ -41,8 +44,6 @@ RoundnessTab::RoundnessTab(const ControlCenterServices& services)
 
 std::unique_ptr<Flex> RoundnessTab::create() {
   const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
 
   auto live = ui::column({
       .out = &m_rootLayout,
@@ -65,216 +66,130 @@ std::unique_ptr<Flex> RoundnessTab::create() {
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
 
+  const float opacity = panelCardOpacity();
   auto card = ui::column({
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .configure = [scale, opacity](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*card, i18n::tr("settings.schema.appearance.corner-roundness.label"), scale);
-  auto roundnessHeader = ui::row({
+
+  addSliderSection(
+      *card, scale, i18n::tr("settings.schema.appearance.corner-roundness.label"), &m_roundness, &m_roundnessValue,
+      noctalia::config::schema::kCornerRadiusScaleRange.min.value_or(0.0F),
+      noctalia::config::schema::kCornerRadiusScaleRange.max.value_or(2.0F),
+      noctalia::config::schema::kCornerRadiusScaleRange.step.value_or(0.05F), 1.0, multiplierLabel,
+      [this]() { commitRoundness(); }
+  );
+  auto preview = ui::row({
       .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
+      .gap = Style::spaceMd * scale,
   });
-  roundnessHeader->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.appearance.corner-roundness.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-          .flexGrow = 1.0F,
-      })
+  const float chip = Style::controlHeight * scale;
+  auto makeRadiusChip = [&](Box** out, float radius, const std::string& caption) {
+    auto cell = ui::column({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceXs * scale,
+        .flexGrow = 1.0F,
+    });
+    cell->addChild(
+        ui::box({
+            .out = out,
+            .fill = colorSpecFromRole(ColorRole::Surface),
+            .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+            .borderWidth = 1.0F,
+            .radius = radius,
+            .width = chip,
+            .height = chip,
+        })
+    );
+    cell->addChild(
+        ui::label({
+            .text = caption,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
+            .textAlign = TextAlign::Center,
+        })
+    );
+    return cell;
+  };
+  preview->addChild(
+      makeRadiusChip(
+          &m_radiusChipSm, Style::scaledRadiusSm(scale), i18n::tr("control-center.appearance.radius-small")
+      )
   );
-  roundnessHeader->addChild(
-      ui::label({
-          .out = &m_roundnessValue,
-          .text = multiplierLabel(1.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
+  preview->addChild(
+      makeRadiusChip(
+          &m_radiusChipMd, Style::scaledRadiusMd(scale), i18n::tr("control-center.appearance.radius-medium")
+      )
   );
-  card->addChild(std::move(roundnessHeader));
+  preview->addChild(
+      makeRadiusChip(
+          &m_radiusChip2xl, Style::scaledRadius2xl(scale), i18n::tr("control-center.appearance.radius-large")
+      )
+  );
+  card->addChild(std::move(preview));
+  addCaption(*card, i18n::tr("settings.schema.appearance.corner-roundness.description"), scale);
+
+  addWellDivider(*card, scale);
+  addSliderSection(
+      *card, scale, i18n::tr("settings.navigation.sections.bar"), &m_barRadius, &m_barRadiusValue, 0.0, 80.0, 1.0, 0.0,
+      pixelLabel, [this]() { commitBarRadius(); }
+  );
   card->addChild(
-      ui::slider({
-          .out = &m_roundness,
-          .minValue = noctalia::config::schema::kCornerRadiusScaleRange.min.value_or(0.0F),
-          .maxValue = noctalia::config::schema::kCornerRadiusScaleRange.max.value_or(2.0F),
-          .step = noctalia::config::schema::kCornerRadiusScaleRange.step.value_or(0.05F),
-          .value = 1.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_roundnessValue != nullptr) {
-                  m_roundnessValue->setText(multiplierLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitRoundness(); },
+      ui::box({
+          .out = &m_barChip,
+          .fill = colorSpecFromRole(ColorRole::Surface),
+          .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+          .borderWidth = 1.0F,
+          .radius = Style::scaledRadiusMd(scale),
+          .width = Style::controlHeight * 2.75F * scale,
+          .height = Style::controlHeight * 0.5F * scale,
       })
   );
-  content->addChild(std::move(card));
+  m_barDescription = addCaption(*card, i18n::tr("settings.schema.bar.corner-radius.description"), scale);
 
-  auto barCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*barCard, i18n::tr("settings.navigation.sections.bar"), scale);
-  auto barRadiusHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  barRadiusHeader->addChild(
-      ui::label({
-          .out = &m_barDescription,
-          .text = i18n::tr("settings.schema.bar.corner-radius.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-          .flexGrow = 1.0F,
+  addWellDivider(*card, scale);
+  addSliderSection(
+      *card, scale, i18n::tr("settings.navigation.sections.dock"), &m_dockRadius, &m_dockRadiusValue,
+      static_cast<double>(noctalia::config::schema::kDockRadiusRange.min.value_or(0)),
+      static_cast<double>(noctalia::config::schema::kDockRadiusRange.max.value_or(80)),
+      static_cast<double>(noctalia::config::schema::kDockRadiusRange.step.value_or(1)), 0.0, pixelLabel,
+      [this]() { commitDockRadius(); }
+  );
+  card->addChild(
+      ui::box({
+          .out = &m_dockChip,
+          .fill = colorSpecFromRole(ColorRole::Surface),
+          .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+          .borderWidth = 1.0F,
+          .radius = Style::scaledRadiusMd(scale),
+          .width = Style::controlHeight * scale,
+          .height = Style::controlHeight * scale,
       })
   );
-  barRadiusHeader->addChild(
-      ui::label({
-          .out = &m_barRadiusValue,
-          .text = pixelLabel(0.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  barCard->addChild(std::move(barRadiusHeader));
-  barCard->addChild(
-      ui::slider({
-          .out = &m_barRadius,
-          .minValue = 0.0,
-          .maxValue = 80.0,
-          .step = 1.0,
-          .value = 0.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_barRadiusValue != nullptr) {
-                  m_barRadiusValue->setText(pixelLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitBarRadius(); },
-      })
-  );
-  content->addChild(std::move(barCard));
-
-  auto dockCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-  });
-  addTitle(*dockCard, i18n::tr("settings.navigation.sections.dock"), scale);
-  auto dockRadiusHeader = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  dockRadiusHeader->addChild(
-      ui::label({
-          .text = i18n::tr("settings.schema.dock.corner-radius.description"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-          .flexGrow = 1.0F,
-      })
-  );
-  dockRadiusHeader->addChild(
-      ui::label({
-          .out = &m_dockRadiusValue,
-          .text = pixelLabel(0.0),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  dockCard->addChild(std::move(dockRadiusHeader));
-  dockCard->addChild(
-      ui::slider({
-          .out = &m_dockRadius,
-          .minValue = static_cast<double>(noctalia::config::schema::kDockRadiusRange.min.value_or(0)),
-          .maxValue = static_cast<double>(noctalia::config::schema::kDockRadiusRange.max.value_or(80)),
-          .step = static_cast<double>(noctalia::config::schema::kDockRadiusRange.step.value_or(1)),
-          .value = 0.0,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_dockRadiusValue != nullptr) {
-                  m_dockRadiusValue->setText(pixelLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitDockRadius(); },
-      })
-  );
-  content->addChild(std::move(dockCard));
+  addCaption(*card, i18n::tr("settings.schema.dock.corner-radius.description"), scale);
 
   if (compositors::isNiri()) {
-    auto windowCard = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
-    });
-    addTitle(*windowCard, i18n::tr("control-center.roundness.windows-title"), scale);
-    auto windowRadiusHeader = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-    });
-    windowRadiusHeader->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.roundness.windows-description"),
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 2,
-            .flexGrow = 1.0F,
+    addWellDivider(*card, scale);
+    addSliderSection(
+        *card, scale, i18n::tr("control-center.roundness.windows-title"), &m_windowRadius, &m_windowRadiusValue, 0.0,
+        40.0, 1.0, 0.0, pixelLabel, [this]() { commitWindowRadius(); }
+    );
+    card->addChild(
+        ui::box({
+            .out = &m_windowChip,
+            .fill = colorSpecFromRole(ColorRole::Surface),
+            .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+            .borderWidth = 1.0F,
+            .radius = Style::scaledRadiusMd(scale),
+            .width = Style::controlHeight * 1.75F * scale,
+            .height = Style::controlHeight * scale,
         })
     );
-    windowRadiusHeader->addChild(
-        ui::label({
-            .out = &m_windowRadiusValue,
-            .text = pixelLabel(0.0),
-            .fontSize = captionSize,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    windowCard->addChild(std::move(windowRadiusHeader));
-    windowCard->addChild(
-        ui::slider({
-            .out = &m_windowRadius,
-            .minValue = 0.0,
-            .maxValue = 40.0,
-            .step = 1.0,
-            .value = 0.0,
-            .trackHeight = Style::sliderTrackHeight * scale,
-            .thumbSize = Style::sliderThumbSize * scale,
-            .controlHeight = controlHeight,
-            .flexGrow = 1.0F,
-            .onValueChanged =
-                [this](double value) {
-                  if (m_windowRadiusValue != nullptr) {
-                    m_windowRadiusValue->setText(pixelLabel(value));
-                  }
-                },
-            .onDragEnd = [this]() { commitWindowRadius(); },
-        })
-    );
-    content->addChild(std::move(windowCard));
+    addCaption(*card, i18n::tr("control-center.roundness.windows-description"), scale);
   }
+
+  content->addChild(std::move(card));
 
   live->addChild(std::move(scroll));
   auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
@@ -293,13 +208,19 @@ void RoundnessTab::onClose() {
   m_rootLayout = nullptr;
   m_roundness = nullptr;
   m_roundnessValue = nullptr;
+  m_radiusChipSm = nullptr;
+  m_radiusChipMd = nullptr;
+  m_radiusChip2xl = nullptr;
   m_barRadius = nullptr;
   m_barRadiusValue = nullptr;
   m_barDescription = nullptr;
+  m_barChip = nullptr;
   m_dockRadius = nullptr;
   m_dockRadiusValue = nullptr;
+  m_dockChip = nullptr;
   m_windowRadius = nullptr;
   m_windowRadiusValue = nullptr;
+  m_windowChip = nullptr;
 }
 
 void RoundnessTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -335,6 +256,7 @@ void RoundnessTab::doUpdate(Renderer& renderer) {
     m_liveDirty = false;
     syncLiveControls();
   }
+  updateRadiusPreview();
 }
 
 void RoundnessTab::syncLiveControls() {
@@ -350,6 +272,7 @@ void RoundnessTab::syncLiveControls() {
   if (m_roundnessValue != nullptr) {
     m_roundnessValue->setText(multiplierLabel(roundness));
   }
+  updateRadiusPreview();
 
   if (!cfg.bars.empty()) {
     m_barName = cfg.bars.front().name;
@@ -390,6 +313,29 @@ void RoundnessTab::syncLiveControls() {
     m_windowRadiusValue->setText(pixelLabel(windowRadius));
   }
   m_syncing = false;
+}
+
+void RoundnessTab::updateRadiusPreview() {
+  const float scale = contentScale();
+  const float roundness = m_roundness != nullptr ? static_cast<float>(m_roundness->value()) : Style::cornerRadiusScale();
+  if (m_radiusChipSm != nullptr) {
+    m_radiusChipSm->setRadius(Style::radiusSm * scale * roundness);
+  }
+  if (m_radiusChipMd != nullptr) {
+    m_radiusChipMd->setRadius(Style::radiusMd * scale * roundness);
+  }
+  if (m_radiusChip2xl != nullptr) {
+    m_radiusChip2xl->setRadius(Style::radius2xl * scale * roundness);
+  }
+  if (m_barChip != nullptr && m_barRadius != nullptr) {
+    m_barChip->setRadius(static_cast<float>(m_barRadius->value()) * scale);
+  }
+  if (m_dockChip != nullptr && m_dockRadius != nullptr) {
+    m_dockChip->setRadius(static_cast<float>(m_dockRadius->value()) * scale);
+  }
+  if (m_windowChip != nullptr && m_windowRadius != nullptr) {
+    m_windowChip->setRadius(static_cast<float>(m_windowRadius->value()) * scale);
+  }
 }
 
 void RoundnessTab::commitRoundness() {

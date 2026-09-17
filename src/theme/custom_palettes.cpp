@@ -1,5 +1,6 @@
 #include "theme/custom_palettes.h"
 
+#include "theme/contrast.h"
 #include "theme/fixed_palette.h"
 #include "util/file_utils.h"
 
@@ -268,21 +269,25 @@ namespace noctalia::theme {
     return base;
   }
 
-  std::string allocateCustomPaletteName(std::string_view wallpaperPath, std::string_view scheme) {
-    const std::string base = suggestCustomPaletteName(wallpaperPath, scheme);
-    if (base.empty()) {
+  std::string allocateCustomPaletteName(std::string_view base) {
+    const std::string sanitized = sanitizePaletteNameComponent(base);
+    if (sanitized.empty()) {
       return {};
     }
-    if (!std::filesystem::exists(customPalettePath(base))) {
-      return base;
+    if (!std::filesystem::exists(customPalettePath(sanitized))) {
+      return sanitized;
     }
     for (int suffix = 2; suffix < 1000; ++suffix) {
-      const std::string candidate = base + '-' + std::to_string(suffix);
+      const std::string candidate = sanitized + '-' + std::to_string(suffix);
       if (!std::filesystem::exists(customPalettePath(candidate))) {
         return candidate;
       }
     }
     return {};
+  }
+
+  std::string allocateCustomPaletteName(std::string_view wallpaperPath, std::string_view scheme) {
+    return allocateCustomPaletteName(suggestCustomPaletteName(wallpaperPath, scheme));
   }
 
   bool saveCustomPaletteFromGenerated(std::string_view name, const GeneratedPalette& palette, std::string* errorOut) {
@@ -343,6 +348,42 @@ namespace noctalia::theme {
       return fail("saved custom palette failed validation");
     }
     return true;
+  }
+
+  bool applyEditablePaletteRole(::Palette& palette, ColorRole role, const ::Color& color) {
+    auto toByte = [](float value) { return static_cast<int>(std::clamp(value, 0.0F, 1.0F) * 255.0F + 0.5F); };
+    const Color background(toByte(color.r), toByte(color.g), toByte(color.b));
+    const Color seed = isDark(background) ? Color(255, 255, 255) : Color(0, 0, 0);
+    const ::Color on = rgbHex(ensureContrast(seed, background, 4.5).toArgb() & 0x00FFFFFFU);
+    switch (role) {
+    case ColorRole::Primary:
+      palette.primary = color;
+      palette.onPrimary = on;
+      return true;
+    case ColorRole::Secondary:
+      palette.secondary = color;
+      palette.onSecondary = on;
+      return true;
+    case ColorRole::Tertiary:
+      palette.tertiary = color;
+      palette.onTertiary = on;
+      palette.hover = color;
+      palette.onHover = on;
+      return true;
+    case ColorRole::Error:
+      palette.error = color;
+      palette.onError = on;
+      return true;
+    case ColorRole::Surface:
+      palette.surface = color;
+      palette.onSurface = on;
+      return true;
+    case ColorRole::Outline:
+      palette.outline = color;
+      return true;
+    default:
+      return false;
+    }
   }
 
 } // namespace noctalia::theme

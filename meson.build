@@ -702,6 +702,8 @@ _noctalia_sources = files(
   'src/shell/control_center/tabs/type_tab.cpp',
   'src/shell/control_center/tabs/scale_tab.cpp',
   'src/shell/control_center/tabs/roundness_tab.cpp',
+  'src/shell/control_center/tabs/effects_tab.cpp',
+  'src/shell/control_center/tabs/language_tab.cpp',
   'src/shell/control_center/tabs/windows_tab.cpp',
   'src/shell/control_center/tabs/templates_tab.cpp',
   'src/shell/control_center/tabs/camera_tab.cpp',

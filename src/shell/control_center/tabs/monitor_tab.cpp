@@ -4,10 +4,10 @@
 #include "compositors/niri/niri_config_outputs.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
-#include "core/input/key_modifiers.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
 #include "render/core/renderer.h"
+#include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
@@ -16,12 +16,14 @@
 #include "system/display_config_service.h"
 #include "system/gamma_service.h"
 #include "ui/builders.h"
+#include "ui/controls/box.h"
+#include "ui/controls/flex.h"
+#include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
-#include "wayland/wayland_connection.h"
 
 #include "cursor-shape-v1-client-protocol.h"
 
@@ -29,8 +31,10 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <iterator>
 #include <limits>
+#include <linux/input-event-codes.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -42,11 +46,10 @@ namespace {
 
   constexpr float kBrightnessSyncEpsilon = 0.005F;
   constexpr float kScaleSyncEpsilon = 0.02F;
-  constexpr float kLayoutMapMinHeight = 132.0F;
-  constexpr float kLayoutMapMaxHeight = 220.0F;
-  constexpr int kLayoutNudge = 32;
-  constexpr int kLayoutNudgeMedium = 8;
-  constexpr int kLayoutNudgeFine = 1;
+  constexpr float kLayoutMapMinHeight = 168.0F;
+  constexpr float kLayoutMapMaxHeight = 240.0F;
+  constexpr float kLayoutMinTileSide = 64.0F;
+  constexpr float kLayoutMenuBarHeight = 10.0F;
   constexpr auto kBrightnessCommitInterval = std::chrono::milliseconds(16);
   constexpr auto kBrightnessStateHoldoff = std::chrono::milliseconds(180);
   constexpr double kMinScale = 0.5;
@@ -83,7 +86,14 @@ namespace {
     }
     key += '|';
     if (displayConfig != nullptr) {
-      key += displayConfig->fingerprint();
+      for (const auto& output : displayConfig->outputs()) {
+        key += output.name;
+        key += output.enabled ? ":1" : ":0";
+        key += std::format(
+            ";{}x{}@{};{:.4f};{};{};", output.current.width, output.current.height, output.current.refreshMilliHz,
+            output.scale, static_cast<int>(output.transform), output.vrrEnabled ? 1 : 0
+        );
+      }
     }
     return key;
   }
@@ -206,31 +216,28 @@ namespace {
     return best;
   }
 
-  std::string layoutArrowTooltip(
-      display_config::LayoutDirection direction, const display_config::Output* moving,
-      const display_config::Output* reference
-  ) {
-    if (moving != nullptr && reference != nullptr) {
-      const auto adj = display_config::adjacency(*moving, *reference);
-      if (adj.has_value()) {
-        const bool horizontal =
-            *adj == display_config::LayoutDirection::Left || *adj == display_config::LayoutDirection::Right;
-        if (horizontal
-            && (direction == display_config::LayoutDirection::Top
-                || direction == display_config::LayoutDirection::Bottom)) {
-          return direction == display_config::LayoutDirection::Top
-              ? i18n::tr("control-center.display.nudge-up")
-              : i18n::tr("control-center.display.nudge-down");
-        }
-        if (!horizontal
-            && (direction == display_config::LayoutDirection::Left
-                || direction == display_config::LayoutDirection::Right)) {
-          return direction == display_config::LayoutDirection::Left
-              ? i18n::tr("control-center.display.nudge-left")
-              : i18n::tr("control-center.display.nudge-right");
-        }
+  const display_config::Output* originOutput(const std::vector<display_config::Output>& outputs) {
+    const display_config::Output* origin = nullptr;
+    const display_config::Output* best = nullptr;
+    for (const auto& output : outputs) {
+      if (!output.enabled) {
+        continue;
+      }
+      if (output.x == 0 && output.y == 0) {
+        origin = &output;
+        break;
+      }
+      if (best == nullptr || output.x < best->x || (output.x == best->x && output.y < best->y)) {
+        best = &output;
       }
     }
+    return origin != nullptr ? origin : best;
+  }
+
+  std::string layoutArrowTooltip(
+      display_config::LayoutDirection direction, const display_config::Output* /*moving*/,
+      const display_config::Output* /*reference*/
+  ) {
     switch (direction) {
     case display_config::LayoutDirection::Top:
       return i18n::tr("control-center.display.place-top");
@@ -291,15 +298,45 @@ namespace {
     return sources;
   }
 
-  std::unique_ptr<Flex> labeledField(float scale, const std::string& label, std::unique_ptr<Select> control) {
-    return ui::column(
-        {.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale, .flexGrow = 1.0F},
+  void addLiveSlider(
+      Flex& parent, float scale, const std::string& title, Slider** sliderOut, Label** valueOut, double minValue,
+      double maxValue, double step, double value, bool enabled, std::function<std::string(double)> format,
+      std::function<void(double)> onChange, std::function<void()> onCommit
+  ) {
+    auto header = makeControlRow(title, scale, nullptr, false);
+    header->addChild(
         ui::label({
-            .text = label,
+            .out = valueOut,
+            .text = format(value),
             .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        }),
-        std::move(control)
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+        })
+    );
+    parent.addChild(std::move(header));
+    parent.addChild(
+        ui::slider({
+            .out = sliderOut,
+            .minValue = minValue,
+            .maxValue = maxValue,
+            .step = step,
+            .value = value,
+            .enabled = enabled,
+            .trackHeight = Style::sliderTrackHeight * scale,
+            .thumbSize = Style::sliderThumbSize * scale,
+            .controlHeight = Style::controlHeight * scale,
+            .flexGrow = 1.0F,
+            .onValueChanged =
+                [valueOut, format, callback = std::move(onChange)](double next) {
+                  if (valueOut != nullptr && *valueOut != nullptr) {
+                    (*valueOut)->setText(format(next));
+                  }
+                  if (callback) {
+                    callback(next);
+                  }
+                },
+            .onDragEnd = std::move(onCommit),
+        })
     );
   }
 
@@ -376,6 +413,7 @@ std::unique_ptr<Flex> MonitorTab::create() {
       })
   );
 
+  buildArrangementCard(*m_cardsLayout, scale);
   buildNightLightCard(*m_cardsLayout, scale);
 
   m_cardsLayout->addChild(ui::column(
@@ -517,6 +555,8 @@ void MonitorTab::onClose() {
   m_cardsLayout = nullptr;
   m_layoutSection = nullptr;
   m_layoutMap = nullptr;
+  m_layoutNudgeRow = nullptr;
+  m_layoutReferenceRow = nullptr;
   m_layoutStatusLabel = nullptr;
   m_layoutReferenceSelect = nullptr;
   m_layoutPlaceTop = nullptr;
@@ -540,10 +580,11 @@ void MonitorTab::onClose() {
   m_layoutPressName.clear();
   m_layoutDragging = false;
   m_lastDisplayListKey.clear();
+  m_lastLayoutTileKey.clear();
 }
 
 bool MonitorTab::dragging() const noexcept {
-  if (m_layoutDragging) {
+  if (m_layoutDragging || m_layoutMenuBarPress) {
     return true;
   }
   for (const auto& card : m_cards) {
@@ -572,6 +613,7 @@ void MonitorTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
   }
 
   rebuildCards(renderer);
+  rebuildLayoutSection(contentScale());
 
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
@@ -581,7 +623,7 @@ void MonitorTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
       std::max(1.0F, m_cardsScroll != nullptr ? m_cardsScroll->contentViewportWidth() : contentWidth);
   const float cardInnerWidth = std::max(1.0F, cardWidth - Style::spaceMd * scale * 2.0F);
   const float headerTextMaxWidth =
-      std::max(1.0F, cardInnerWidth - Style::fontSizeTitle * scale - Style::spaceSm * scale);
+      std::max(1.0F, cardInnerWidth - Style::controlHeight * scale - Style::spaceSm * scale);
   for (auto& card : m_cards) {
     if (card.card != nullptr) {
       card.card->setMinWidth(cardWidth);
@@ -668,33 +710,102 @@ void MonitorTab::doUpdate(Renderer& renderer) {
   }
 }
 
-void MonitorTab::rebuildLayoutSection(float scale) {
-  m_layoutSection = nullptr;
-  m_layoutMap = nullptr;
-  m_layoutStatusLabel = nullptr;
-  m_layoutReferenceSelect = nullptr;
-  m_layoutPlaceTop = nullptr;
-  m_layoutPlaceLeft = nullptr;
-  m_layoutPlaceRight = nullptr;
-  m_layoutPlaceBottom = nullptr;
-  m_layoutTiles.clear();
-  m_layoutReferenceNames.clear();
-  m_layoutPressName.clear();
-  m_layoutDragging = false;
+void MonitorTab::buildArrangementCard(Flex& parent, float scale) {
+  auto section = ui::column({
+      .out = &m_layoutSection,
+      .align = FlexAlign::Stretch,
+      .fillWidth = true,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& card) {
+            applySectionCardStyle(card, scale, opacity);
+            card.setGap(Style::spaceMd * scale);
+          },
+  });
+  section->addChild(ui::column({
+      .out = &m_layoutMap,
+      .minHeight = kLayoutMapMinHeight * scale,
+      .fillWidth = true,
+      .clipChildren = true,
+      .configure =
+          [](Flex& host) {
+            host.clearFill();
+            host.clearBorder();
+          },
+  }));
 
-  if (m_cardsLayout == nullptr || m_displayConfig == nullptr || !m_displayConfig->available()) {
+  const float buttonSize = Style::controlHeightSm * scale;
+  auto makeMoveButton = [this, scale, buttonSize](
+                            const char* glyph, display_config::LayoutDirection direction, Button** out
+                        ) {
+    return ui::button({
+        .out = out,
+        .glyph = glyph,
+        .width = buttonSize,
+        .height = buttonSize,
+        .onClick = [this, direction]() { applyLayout(direction); },
+        .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+    });
+  };
+  auto nudge = ui::row({
+      .out = &m_layoutNudgeRow,
+      .align = FlexAlign::Center,
+      .justify = FlexJustify::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  nudge->addChild(makeMoveButton("chevron-up", display_config::LayoutDirection::Top, &m_layoutPlaceTop));
+  nudge->addChild(makeMoveButton("chevron-left", display_config::LayoutDirection::Left, &m_layoutPlaceLeft));
+  nudge->addChild(makeMoveButton("chevron-down", display_config::LayoutDirection::Bottom, &m_layoutPlaceBottom));
+  nudge->addChild(makeMoveButton("chevron-right", display_config::LayoutDirection::Right, &m_layoutPlaceRight));
+  section->addChild(std::move(nudge));
+
+  auto referenceRow = ui::column({
+      .out = &m_layoutReferenceRow,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  m_layoutReferenceSelect = addSelectRow(
+      *referenceRow, scale, i18n::tr("control-center.display.relative-to"),
+      std::vector<std::string>{i18n::tr("control-center.display.relative-to")}, panelCardOpacity(),
+      [this](std::size_t index) {
+        if (index < m_layoutReferenceNames.size()) {
+          m_layoutReferenceName = m_layoutReferenceNames[index];
+          syncLayoutSelection();
+        }
+      }
+  );
+  section->addChild(std::move(referenceRow));
+  parent.addChild(std::move(section));
+}
+
+void MonitorTab::rebuildLayoutSection(float scale) {
+  (void)scale;
+  if (m_layoutSection == nullptr || m_layoutMap == nullptr) {
+    return;
+  }
+  if (m_displayConfig == nullptr || !m_displayConfig->available()) {
+    setShown(m_layoutSection, false);
     return;
   }
 
   const auto& outputs = m_displayConfig->outputs();
   std::vector<std::string> names;
+  std::string tileKey;
   for (const auto& output : outputs) {
     if (!output.enabled) {
       continue;
     }
     names.push_back(output.name);
+    tileKey += output.name;
+    tileKey += ';';
   }
-  if (names.size() < 2) {
+  if (names.empty()) {
+    setShown(m_layoutSection, false);
+    m_lastLayoutTileKey.clear();
     return;
   }
 
@@ -702,174 +813,156 @@ void MonitorTab::rebuildLayoutSection(float scale) {
     m_layoutMovingName = defaultMovingName(outputs);
   }
   m_layoutReferenceName = layoutReferenceName();
+  setShown(m_layoutNudgeRow, names.size() >= 2);
+  setShown(m_layoutReferenceRow, names.size() > 2);
+  setShown(m_layoutSection, true);
 
-  auto section = ui::column({
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceMd * scale);
-          },
-  });
+  if (tileKey != m_lastLayoutTileKey) {
+    m_lastLayoutTileKey = std::move(tileKey);
+    rebuildArrangementTiles();
+  }
+  syncLayoutSelection();
+}
 
-  section->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.display.layout"),
-          .fontSize = Style::fontSizeBody * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  section->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.display.layout-hint"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
+void MonitorTab::rebuildArrangementTiles() {
+  m_layoutTiles.clear();
+  m_layoutPressName.clear();
+  m_layoutDragging = false;
+  m_layoutMenuBarPress = false;
+  if (m_layoutMap == nullptr || m_displayConfig == nullptr) {
+    return;
+  }
+  while (!m_layoutMap->children().empty()) {
+    m_layoutMap->removeChild(m_layoutMap->children().front().get());
+  }
 
-  const float buttonSize = Style::controlHeightSm * scale;
-  const auto* movingForArrows = m_displayConfig->findOutput(m_layoutMovingName);
-  const auto* referenceForArrows = m_displayConfig->findOutput(m_layoutReferenceName);
-  auto makeMoveButton = [this, scale, buttonSize, movingForArrows, referenceForArrows](
-                            const char* glyph, display_config::LayoutDirection direction, Button** out
-                        ) {
-    return ui::button({
-        .out = out,
-        .glyph = glyph,
-        .tooltip = layoutArrowTooltip(direction, movingForArrows, referenceForArrows),
-        .width = buttonSize,
-        .height = buttonSize,
-        .onClick = [this, direction]() { applyLayout(direction); },
-        .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
-    });
-  };
-
-  auto map = ui::column({
-      .out = &m_layoutMap,
-      .minHeight = kLayoutMapMinHeight * scale,
-      .fillWidth = true,
-      .clipChildren = true,
-      .configure =
-          [scale](Flex& host) {
-            host.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, 0.45F));
-            host.setRadius(Style::scaledRadiusMd(scale));
-          },
-  });
-
+  const float scale = contentScale();
+  const float menuBarHeight = kLayoutMenuBarHeight * scale;
+  const auto& outputs = m_displayConfig->outputs();
+  const auto* origin = originOutput(outputs);
+  std::size_t index = 0;
   for (const auto& output : outputs) {
     if (!output.enabled) {
       continue;
     }
+    ++index;
     LayoutTile tile;
     tile.name = output.name;
-    const bool moving = output.name == m_layoutMovingName;
-    const bool reference = output.name == m_layoutReferenceName;
-    auto button = ui::button({
-        .out = &tile.button,
-        .text = output.name,
-        .fontSize = Style::fontSizeMini * scale,
-        .selected = moving,
-        .variant = moving ? ButtonVariant::TabActive
-                          : (reference ? ButtonVariant::Outline : ButtonVariant::Default),
-        .tooltip = display_config::displayLabel(output) + " · " + output.name,
-        .padding = Style::spaceXs * scale,
+    const bool selected = output.name == m_layoutMovingName;
+    const bool main = origin != nullptr && origin->name == output.name;
+    auto host = ui::column({
+        .out = &tile.host,
+        .align = FlexAlign::Stretch,
+        .clipChildren = true,
         .participatesInLayout = false,
-        .onClick = [this, name = output.name]() { selectLayoutOutput(name); },
-        .onPress =
-            [this, name = output.name](float localX, float localY, bool pressed) {
-              if (pressed) {
-                beginLayoutPress(name, localX, localY);
-              } else {
-                finishLayoutPress(name);
-              }
-            },
-        .onPointerMotion =
-            [this, name = output.name](float localX, float localY) { updateLayoutDrag(name, localX, localY); },
-        .configure =
-            [scale](Button& tileButton) {
-              tileButton.setRadius(Style::scaledRadiusMd(scale));
-              tileButton.setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB);
-            },
     });
-    map->addChild(std::move(button));
+    host->addChild(
+        ui::box({
+            .out = &tile.menuBar,
+            .fill = colorSpecFromRole(ColorRole::OnSurface, 0.88F),
+            .height = menuBarHeight,
+            .visible = main,
+            .participatesInLayout = main,
+        })
+    );
+    auto body = ui::column({
+        .align = FlexAlign::Stretch,
+        .paddingV = Style::spaceXs * scale,
+        .paddingH = Style::spaceXs * scale,
+        .flexGrow = 1.0F,
+    });
+    body->addChild(
+        ui::label({
+            .out = &tile.indexLabel,
+            .text = std::to_string(index),
+            .fontSize = Style::fontSizeTitle * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .textAlign = TextAlign::Center,
+            .flexGrow = 1.0F,
+        })
+    );
+    body->addChild(
+        ui::label({
+            .out = &tile.nameLabel,
+            .text = display_config::displayLabel(output),
+            .fontSize = Style::fontSizeMini * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
+            .textAlign = TextAlign::Center,
+            .ellipsize = TextEllipsize::End,
+        })
+    );
+    host->addChild(std::move(body));
+    host->addChild(
+        ui::inputArea({
+            .out = &tile.grab,
+            .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB,
+            .tooltip = display_config::displayLabel(output) + " · " + i18n::tr("control-center.display.layout-hint-short"),
+            .participatesInLayout = false,
+            .onMotion =
+                [this, name = output.name](const InputArea::PointerData& data) {
+                  updateLayoutDrag(name, data.localX, data.localY);
+                },
+            .onPress =
+                [this, name = output.name](const InputArea::PointerData& data) {
+                  if (data.button != BTN_LEFT) {
+                    return;
+                  }
+                  if (data.pressed) {
+                    beginLayoutPress(name, data.localX, data.localY);
+                  } else {
+                    finishLayoutPress(name);
+                  }
+                },
+            .onClick = [this, name = output.name](const InputArea::PointerData&) { selectLayoutOutput(name); },
+        })
+    );
+    m_layoutMap->addChild(std::move(host));
+    styleArrangementTile(tile, selected, main);
     m_layoutTiles.push_back(std::move(tile));
   }
+  PanelManager::instance().requestLayout();
+}
 
-  auto padColumn = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceXs * scale,
-      .flexGrow = 1.0F,
-  });
-  padColumn->addChild(
-      ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::Center},
-          makeMoveButton("chevron-up", display_config::LayoutDirection::Top, &m_layoutPlaceTop)
-      )
-  );
-  padColumn->addChild(std::move(map));
-  padColumn->addChild(
-      ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::Center},
-          makeMoveButton("chevron-down", display_config::LayoutDirection::Bottom, &m_layoutPlaceBottom)
-      )
-  );
-
-  section->addChild(
-      ui::row(
-          {.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true},
-          makeMoveButton("chevron-left", display_config::LayoutDirection::Left, &m_layoutPlaceLeft),
-          std::move(padColumn),
-          makeMoveButton("chevron-right", display_config::LayoutDirection::Right, &m_layoutPlaceRight)
-      )
-  );
-
-  const auto* movingOutput = m_displayConfig->findOutput(m_layoutMovingName);
-  const std::string movingLabel =
-      movingOutput != nullptr ? display_config::displayLabel(*movingOutput) : m_layoutMovingName;
-  section->addChild(
-      ui::label({
-          .out = &m_layoutStatusLabel,
-          .text = i18n::tr(
-              "control-center.display.moving-at", "name", movingLabel, "x",
-              movingOutput != nullptr ? movingOutput->x : 0, "y", movingOutput != nullptr ? movingOutput->y : 0
-          ),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-
-  if (names.size() > 2) {
-    std::vector<std::string> referenceLabels;
-    std::size_t referenceIndex = 0;
-    for (const auto& output : outputs) {
-      if (!output.enabled || output.name == m_layoutMovingName) {
-        continue;
-      }
-      if (output.name == m_layoutReferenceName) {
-        referenceIndex = referenceLabels.size();
-      }
-      m_layoutReferenceNames.push_back(output.name);
-      referenceLabels.push_back(display_config::displayLabel(output) + " · " + output.name);
-    }
-    auto referenceSelect = ui::select({
-        .out = &m_layoutReferenceSelect,
-        .options = std::move(referenceLabels),
-        .selectedIndex = referenceIndex,
-        .surfaceOpacity = panelCardOpacity(),
-        .flexGrow = 1.0F,
-        .onSelectionChanged =
-            [this](std::size_t index, std::string_view /*text*/) {
-              if (index < m_layoutReferenceNames.size()) {
-                m_layoutReferenceName = m_layoutReferenceNames[index];
-                syncLayoutSelection();
-              }
-            },
-    });
-    section->addChild(labeledField(scale, i18n::tr("control-center.display.relative-to"), std::move(referenceSelect)));
+void MonitorTab::styleArrangementTile(LayoutTile& tile, bool selected, bool main) {
+  if (tile.host == nullptr) {
+    return;
   }
+  const float scale = contentScale();
+  tile.host->setFill(colorSpecFromRole(ColorRole::Surface, sectionCardFillOpacity(panelCardOpacity())));
+  tile.host->setRadius(Style::scaledRadiusMd(scale));
+  if (selected) {
+    tile.host->setBorder(colorSpecFromRole(ColorRole::Primary), Style::focusRingWidth);
+  } else {
+    tile.host->setBorder(colorSpecFromRole(ColorRole::Outline, 0.55F), Style::borderWidth);
+  }
+  setShown(tile.menuBar, main);
+}
 
-  m_layoutSection = section.get();
-  m_cardsLayout->addChild(std::move(section));
+void MonitorTab::showSelectedDisplayCard() {
+  const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
+  if (!niri) {
+    for (auto& card : m_cards) {
+      setShown(card.card, true);
+    }
+    return;
+  }
+  bool anySelected = false;
+  bool dirty = false;
+  for (auto& card : m_cards) {
+    const auto* output = m_displayConfig->findOutput(card.displayId);
+    const bool selected = card.displayId == m_layoutMovingName;
+    const bool keep = output == nullptr || !output->enabled || selected;
+    anySelected = anySelected || selected;
+    dirty = setShown(card.card, keep) || dirty;
+  }
+  if (!anySelected && !m_cards.empty()) {
+    dirty = setShown(m_cards.front().card, true) || dirty;
+  }
+  if (dirty) {
+    PanelManager::instance().requestLayout();
+  }
 }
 
 void MonitorTab::layoutArrangementMap(Renderer& renderer) {
@@ -881,6 +974,7 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
   const float pad = Style::spaceSm * scale;
   const float mapWidth = m_layoutMap->width();
   if (mapWidth < 8.0F) {
+    PanelManager::instance().requestLayout();
     return;
   }
 
@@ -889,6 +983,7 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
   int maxX = std::numeric_limits<int>::min();
   int maxY = std::numeric_limits<int>::min();
   bool any = false;
+  float smallestSide = std::numeric_limits<float>::max();
   for (const auto& output : m_displayConfig->outputs()) {
     if (!output.enabled) {
       continue;
@@ -898,6 +993,7 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
     minY = std::min(minY, output.y);
     maxX = std::max(maxX, output.x + std::max(1, size.width));
     maxY = std::max(maxY, output.y + std::max(1, size.height));
+    smallestSide = std::min(smallestSide, static_cast<float>(std::max(1, std::min(size.width, size.height))));
     any = true;
   }
   if (!any) {
@@ -906,15 +1002,21 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
 
   const float boundsW = static_cast<float>(std::max(1, maxX - minX));
   const float boundsH = static_cast<float>(std::max(1, maxY - minY));
-  const float desiredHeight =
+  float desiredHeight =
       std::clamp(mapWidth * (boundsH / boundsW), kLayoutMapMinHeight * scale, kLayoutMapMaxHeight * scale);
+  const float innerW = std::max(1.0F, mapWidth - pad * 2.0F);
+  float innerH = std::max(1.0F, std::max(desiredHeight, m_layoutMap->height()) - pad * 2.0F);
+  float fitScale = std::min(innerW / boundsW, innerH / boundsH);
+  const float minSide = kLayoutMinTileSide * scale;
+  if (smallestSide > 0.0F && smallestSide * fitScale < minSide) {
+    fitScale = minSide / smallestSide;
+    desiredHeight = std::clamp(boundsH * fitScale + pad * 2.0F, kLayoutMapMinHeight * scale, kLayoutMapMaxHeight * scale);
+    innerH = std::max(1.0F, desiredHeight - pad * 2.0F);
+    fitScale = std::min(innerW / boundsW, innerH / boundsH);
+  }
   if (std::abs(m_layoutMap->minHeight() - desiredHeight) > 0.5F) {
     m_layoutMap->setMinHeight(desiredHeight);
   }
-
-  const float innerW = std::max(1.0F, mapWidth - pad * 2.0F);
-  const float innerH = std::max(1.0F, desiredHeight - pad * 2.0F);
-  const float fitScale = std::min(innerW / boundsW, innerH / boundsH);
   if (fitScale <= 0.0F) {
     return;
   }
@@ -927,10 +1029,10 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
   m_layoutOriginX = minX;
   m_layoutOriginY = minY;
 
-  const std::string reference = layoutReferenceName();
+  const auto* origin = originOutput(m_displayConfig->outputs());
   for (auto& tile : m_layoutTiles) {
     const auto* output = m_displayConfig->findOutput(tile.name);
-    if (output == nullptr || tile.button == nullptr) {
+    if (output == nullptr || tile.host == nullptr) {
       continue;
     }
     const auto size = display_config::logicalSize(*output);
@@ -940,19 +1042,21 @@ void MonitorTab::layoutArrangementMap(Renderer& renderer) {
     const float tileY = offsetY + static_cast<float>(output->y - minY) * fitScale;
     tile.x = tileX;
     tile.y = tileY;
-    tile.button->setMaxWidth(tileW);
-    tile.button->setMaxHeight(tileH);
-    tile.button->setSize(tileW, tileH);
-    tile.button->setPosition(tileX, tileY);
-    tile.button->setZIndex(tile.name == m_layoutMovingName ? 1 : 0);
-    if (tile.name == m_layoutMovingName) {
-      tile.button->setVariant(ButtonVariant::TabActive);
-    } else if (tile.name == reference) {
-      tile.button->setVariant(ButtonVariant::Outline);
-    } else {
-      tile.button->setVariant(ButtonVariant::Default);
+    const bool selected = tile.name == m_layoutMovingName;
+    const bool main = origin != nullptr && origin->name == tile.name;
+    styleArrangementTile(tile, selected, main);
+    tile.host->setSize(tileW, tileH);
+    tile.host->setPosition(tileX, tileY);
+    tile.host->setZIndex(selected ? 1 : 0);
+    if (tile.nameLabel != nullptr) {
+      tile.nameLabel->setMaxWidth(std::max(1.0F, tileW - Style::spaceSm * scale * 2.0F));
     }
-    tile.button->layout(renderer);
+    tile.host->layout(renderer);
+    if (tile.grab != nullptr) {
+      tile.grab->setPosition(0.0F, 0.0F);
+      tile.grab->setFrameSize(tileW, tileH);
+      tile.grab->setZIndex(2);
+    }
   }
 }
 
@@ -982,37 +1086,26 @@ void MonitorTab::selectLayoutOutput(std::string name) {
     m_layoutReferenceName = layoutReferenceName();
   }
   syncLayoutSelection();
+  showSelectedDisplayCard();
 }
 
 void MonitorTab::syncLayoutSelection() {
   const std::string reference = layoutReferenceName();
   m_layoutReferenceName = reference;
+  const auto* origin = m_displayConfig != nullptr ? originOutput(m_displayConfig->outputs()) : nullptr;
   for (auto& tile : m_layoutTiles) {
-    if (tile.button == nullptr) {
+    if (tile.host == nullptr) {
       continue;
     }
-    if (tile.name == m_layoutMovingName) {
-      tile.button->setVariant(ButtonVariant::TabActive);
-      tile.button->setZIndex(1);
-    } else if (tile.name == reference) {
-      tile.button->setVariant(ButtonVariant::Outline);
-      tile.button->setZIndex(0);
-    } else {
-      tile.button->setVariant(ButtonVariant::Default);
-      tile.button->setZIndex(0);
-    }
+    const bool selected = tile.name == m_layoutMovingName;
+    const bool main = origin != nullptr && origin->name == tile.name;
+    styleArrangementTile(tile, selected, main);
+    tile.host->setZIndex(selected ? 1 : 0);
   }
 
-  if (m_layoutStatusLabel != nullptr && m_displayConfig != nullptr) {
+  if (m_displayConfig != nullptr) {
     const auto* moving = m_displayConfig->findOutput(m_layoutMovingName);
     const auto* referenceOutput = m_displayConfig->findOutput(reference);
-    const std::string label = moving != nullptr ? display_config::displayLabel(*moving) : m_layoutMovingName;
-    m_layoutStatusLabel->setText(
-        i18n::tr(
-            "control-center.display.moving-at", "name", label, "x", moving != nullptr ? moving->x : 0, "y",
-            moving != nullptr ? moving->y : 0
-        )
-    );
     auto setArrow = [&](Button* button, display_config::LayoutDirection direction) {
       if (button != nullptr) {
         button->setTooltip(layoutArrowTooltip(direction, moving, referenceOutput));
@@ -1053,10 +1146,25 @@ void MonitorTab::beginLayoutPress(const std::string& name, float localX, float l
   m_layoutGrabX = localX;
   m_layoutGrabY = localY;
   m_layoutDragging = false;
+  m_layoutMenuBarPress = false;
+  for (const auto& tile : m_layoutTiles) {
+    if (tile.name != name || tile.menuBar == nullptr || !tile.menuBar->visible()) {
+      continue;
+    }
+    if (localY <= tile.menuBar->height()) {
+      m_layoutMenuBarPress = true;
+    }
+    break;
+  }
 }
 
 void MonitorTab::updateLayoutDrag(const std::string& name, float localX, float localY) {
   if (m_layoutPressName != name) {
+    return;
+  }
+  if (m_layoutMenuBarPress) {
+    m_layoutGrabX = localX;
+    m_layoutGrabY = localY;
     return;
   }
   LayoutTile* tile = nullptr;
@@ -1066,12 +1174,12 @@ void MonitorTab::updateLayoutDrag(const std::string& name, float localX, float l
       break;
     }
   }
-  if (tile == nullptr || tile->button == nullptr) {
+  if (tile == nullptr || tile->host == nullptr) {
     return;
   }
 
-  const float nextX = tile->button->x() + localX - m_layoutGrabX;
-  const float nextY = tile->button->y() + localY - m_layoutGrabY;
+  const float nextX = tile->host->x() + localX - m_layoutGrabX;
+  const float nextY = tile->host->y() + localY - m_layoutGrabY;
   const float dx = nextX - tile->x;
   const float dy = nextY - tile->y;
   if (!m_layoutDragging) {
@@ -1079,27 +1187,34 @@ void MonitorTab::updateLayoutDrag(const std::string& name, float localX, float l
       return;
     }
     m_layoutDragging = true;
-    tile->button->setZIndex(2);
-    tile->button->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRABBING);
+    tile->host->setZIndex(2);
+    if (tile->grab != nullptr) {
+      tile->grab->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRABBING);
+    }
   }
-  tile->button->setPosition(nextX, nextY);
+  tile->host->setPosition(nextX, nextY);
 }
 
 void MonitorTab::finishLayoutPress(const std::string& name) {
   if (m_layoutPressName != name) {
     return;
   }
-  if (m_layoutDragging) {
+  if (m_layoutMenuBarPress) {
+    applyMenuBarDrop();
+  } else if (m_layoutDragging) {
     applyLayoutDrag();
   }
   m_layoutDragging = false;
+  m_layoutMenuBarPress = false;
   m_layoutPressName.clear();
   for (auto& tile : m_layoutTiles) {
-    if (tile.button == nullptr) {
+    if (tile.host == nullptr) {
       continue;
     }
-    tile.button->setZIndex(tile.name == m_layoutMovingName ? 1 : 0);
-    tile.button->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB);
+    tile.host->setZIndex(tile.name == m_layoutMovingName ? 1 : 0);
+    if (tile.grab != nullptr) {
+      tile.grab->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_GRAB);
+    }
   }
 }
 
@@ -1114,7 +1229,7 @@ void MonitorTab::applyLayoutDrag() {
       break;
     }
   }
-  if (tile == nullptr || tile->button == nullptr) {
+  if (tile == nullptr || tile->host == nullptr) {
     return;
   }
   const auto* output = m_displayConfig->findOutput(tile->name);
@@ -1123,9 +1238,9 @@ void MonitorTab::applyLayoutDrag() {
   }
 
   const int proposedX =
-      m_layoutOriginX + static_cast<int>(std::lround((tile->button->x() - m_layoutMapOffsetX) / m_layoutMapScale));
+      m_layoutOriginX + static_cast<int>(std::lround((tile->host->x() - m_layoutMapOffsetX) / m_layoutMapScale));
   const int proposedY =
-      m_layoutOriginY + static_cast<int>(std::lround((tile->button->y() - m_layoutMapOffsetY) / m_layoutMapScale));
+      m_layoutOriginY + static_cast<int>(std::lround((tile->host->y() - m_layoutMapOffsetY) / m_layoutMapScale));
   const auto snap = display_config::snapDragPosition(*output, m_displayConfig->outputs(), proposedX, proposedY);
   if (!snap.has_value()) {
     return;
@@ -1137,6 +1252,43 @@ void MonitorTab::applyLayoutDrag() {
   if (!m_displayConfig->setPosition(tile->name, snap->position.x, snap->position.y)) {
     m_lastDisplayListKey.clear();
     reportLayoutError();
+    return;
+  }
+  syncLayoutSelection();
+}
+
+void MonitorTab::applyMenuBarDrop() {
+  if (m_displayConfig == nullptr) {
+    return;
+  }
+  LayoutTile* from = nullptr;
+  for (auto& entry : m_layoutTiles) {
+    if (entry.name == m_layoutPressName) {
+      from = &entry;
+      break;
+    }
+  }
+  if (from == nullptr || from->host == nullptr) {
+    return;
+  }
+  const float mapX = from->host->x() + m_layoutGrabX;
+  const float mapY = from->host->y() + m_layoutGrabY;
+  for (const auto& tile : m_layoutTiles) {
+    if (tile.host == nullptr) {
+      continue;
+    }
+    if (mapX < tile.host->x() || mapX >= tile.host->x() + tile.host->width() || mapY < tile.host->y()
+        || mapY >= tile.host->y() + tile.host->height()) {
+      continue;
+    }
+    if (tile.name == from->name) {
+      return;
+    }
+    if (!m_displayConfig->setOrigin(tile.name)) {
+      m_lastDisplayListKey.clear();
+      reportLayoutError();
+    }
+    return;
   }
 }
 
@@ -1149,50 +1301,23 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  card->addChild(makeCardHeaderRow(i18n::tr("settings.schema.services.night-light.label"), scale));
-  card->addChild(
-      ui::label({
-          .out = &m_nightLightStatus,
-          .text = nightLightStatusText(m_nightLight),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+  auto enableRow = makeControlRow(i18n::tr("settings.schema.services.night-light.label"), scale, nullptr, false);
+  enableRow->addChild(
+      ui::toggle({
+          .out = &m_nightLightEnabled,
+          .checkedImmediate = false,
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange =
+              [this](bool checked) {
+                if (!m_syncingNightLight) {
+                  persistNightLightEnabled(checked);
+                }
+              },
       })
   );
-
-  auto addToggle = [&](Flex& host, Toggle** out, const std::string& label, std::function<void(bool)> onChange) {
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    row->addChild(
-        ui::label({
-            .text = label,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    row->addChild(
-        ui::toggle({
-            .out = out,
-            .checkedImmediate = false,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = std::move(onChange),
-        })
-    );
-    host.addChild(std::move(row));
-  };
-
-  addToggle(
-      *card, &m_nightLightEnabled, i18n::tr("settings.schema.services.night-light.label"),
-      [this](bool checked) {
-        if (!m_syncingNightLight) {
-          persistNightLightEnabled(checked);
-        }
-      }
-  );
+  card->addChild(std::move(enableRow));
+  m_nightLightStatus = addCaption(*card, nightLightStatusText(m_nightLight), scale);
 
   const bool detailsOn = m_nightLight != nullptr && (m_nightLight->enabled() || m_nightLight->forceEnabled());
   auto details = ui::column({
@@ -1202,68 +1327,30 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
       .visible = detailsOn,
       .participatesInLayout = detailsOn,
   });
-
-  addToggle(
-      *details, &m_nightLightForce, i18n::tr("settings.schema.services.force-night-light.label"),
+  addWellDivider(*details, scale);
+  m_nightLightForce = addToggleRow(
+      *details, scale, i18n::tr("settings.schema.services.force-night-light.label"),
       [this](bool checked) {
         if (!m_syncingNightLight) {
           persistNightLightForce(checked);
         }
       }
   );
-
-  auto addTempSlider =
-      [&](Flex& host, Slider** sliderOut, Label** valueOut, const std::string& label, bool daySlider) {
-    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    header->addChild(
-        ui::label({
-            .text = label,
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .flexGrow = 1.0F,
-        })
-    );
-    header->addChild(
-        ui::label({
-            .out = valueOut,
-            .text = kelvinLabel(daySlider ? NightLightConfig::kTemperatureMax : NightLightConfig::kTemperatureMin),
-            .fontSize = Style::fontSizeCaption * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    host.addChild(std::move(header));
-    host.addChild(
-        ui::slider({
-            .out = sliderOut,
-            .minValue = static_cast<double>(NightLightConfig::kTemperatureMin),
-            .maxValue = static_cast<double>(NightLightConfig::kTemperatureMax),
-            .step = static_cast<double>(NightLightConfig::kTemperatureGap),
-            .value = static_cast<double>(
-                daySlider ? NightLightConfig::kTemperatureMax : NightLightConfig::kTemperatureMin
-            ),
-            .trackHeight = Style::sliderTrackHeight * scale,
-            .thumbSize = Style::sliderThumbSize * scale,
-            .controlHeight = Style::controlHeight * scale,
-            .flexGrow = 1.0F,
-            .onValueChanged =
-                [this, valueOut](double value) {
-                  if (valueOut != nullptr && *valueOut != nullptr) {
-                    (*valueOut)->setText(kelvinLabel(static_cast<std::int32_t>(std::lround(value))));
-                  }
-                },
-            .onDragEnd = [this, daySlider]() { commitNightLightTemperatures(daySlider); },
-        })
-    );
+  const auto kelvinFormat = [](double value) {
+    return kelvinLabel(static_cast<std::int32_t>(std::lround(value)));
   };
-
-  addTempSlider(
-      *details, &m_nightLightDaySlider, &m_nightLightDayValue,
-      i18n::tr("settings.schema.services.day-temperature.label"), true
+  addSliderSection(
+      *details, scale, i18n::tr("settings.schema.services.day-temperature.label"), &m_nightLightDaySlider,
+      &m_nightLightDayValue, static_cast<double>(NightLightConfig::kTemperatureMin),
+      static_cast<double>(NightLightConfig::kTemperatureMax), static_cast<double>(NightLightConfig::kTemperatureGap),
+      static_cast<double>(NightLightConfig::kTemperatureMax), kelvinFormat, [this]() { commitNightLightTemperatures(true); }
   );
-  addTempSlider(
-      *details, &m_nightLightNightSlider, &m_nightLightNightValue,
-      i18n::tr("settings.schema.services.night-temperature.label"), false
+  addSliderSection(
+      *details, scale, i18n::tr("settings.schema.services.night-temperature.label"), &m_nightLightNightSlider,
+      &m_nightLightNightValue, static_cast<double>(NightLightConfig::kTemperatureMin),
+      static_cast<double>(NightLightConfig::kTemperatureMax), static_cast<double>(NightLightConfig::kTemperatureGap),
+      static_cast<double>(NightLightConfig::kTemperatureMin), kelvinFormat,
+      [this]() { commitNightLightTemperatures(false); }
   );
   card->addChild(std::move(details));
 
@@ -1383,7 +1470,12 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
 
   const std::vector<BrightnessDisplay> noDisplays;
   const auto& displays = m_brightness != nullptr ? m_brightness->displays() : noDisplays;
-  const std::string key = buildDisplayListKey(displays, m_displayConfig);
+  std::string key = buildDisplayListKey(displays, m_displayConfig);
+  if (m_displayConfig != nullptr) {
+    if (const auto* origin = originOutput(m_displayConfig->outputs()); origin != nullptr) {
+      key += origin->name;
+    }
+  }
   if (key == m_lastDisplayListKey) {
     return;
   }
@@ -1395,64 +1487,34 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
     }
   }
   m_cards.clear();
-  if (m_layoutSection != nullptr) {
-    m_cardsLayout->removeChild(m_layoutSection);
-    m_layoutSection = nullptr;
-    m_layoutMap = nullptr;
-    m_layoutStatusLabel = nullptr;
-    m_layoutReferenceSelect = nullptr;
-    m_layoutPlaceTop = nullptr;
-    m_layoutPlaceLeft = nullptr;
-    m_layoutPlaceRight = nullptr;
-    m_layoutPlaceBottom = nullptr;
-    m_layoutTiles.clear();
-  }
 
   const auto sources = collectCardSources(m_brightness, m_displayConfig);
   const bool empty = sources.empty();
   if (setShown(m_emptyState, empty)) {
     PanelManager::instance().requestLayout();
   }
-  if (empty) {
-    return;
-  }
 
   const float scale = contentScale();
   rebuildLayoutSection(scale);
+  if (empty) {
+    return;
+  }
 
   const bool niriAvailable = m_displayConfig != nullptr && m_displayConfig->available();
   const std::size_t enabledCount = m_displayConfig != nullptr ? m_displayConfig->enabledCount() : 0;
 
   for (const auto& source : sources) {
     auto card = ui::column({
-        .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-          applySectionCardStyle(section, scale, opacity);
-          section.setGap(Style::spaceMd * scale);
-        },
+        .configure = [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
     });
 
     Glyph* iconPtr = nullptr;
     Label* nameLabelPtr = nullptr;
     Toggle* enabledToggle = nullptr;
-    auto headerRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-    headerRow->addChild(
-        ui::glyph({
-            .out = &iconPtr,
-            .glyph = "device-desktop",
-            .glyphSize = Style::fontSizeTitle * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    headerRow->addChild(
-        ui::label({
-            .out = &nameLabelPtr,
-            .text = source.label,
-            .fontSize = Style::fontSizeBody * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
+    auto headerRow = makeControlRow(source.label, scale, &nameLabelPtr, false);
+    if (nameLabelPtr != nullptr) {
+      nameLabelPtr->setFontWeight(FontWeight::Bold);
+    }
     if (source.output != nullptr) {
       const std::string displayId = source.id;
       const bool canDisable = source.output->enabled && enabledCount > 1;
@@ -1461,7 +1523,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
               .out = &enabledToggle,
               .checkedImmediate = source.output->enabled,
               .enabled = source.output->enabled ? canDisable : true,
-              .toggleSize = ToggleSize::Small,
+              .toggleSize = ToggleSize::Medium,
               .scale = scale,
               .onChange =
                   [this, displayId](bool checked) {
@@ -1482,14 +1544,73 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
                                  : (source.brightness != nullptr ? formatBrightnessDisplayInfo(*source.brightness)
                                                               : i18n::tr("control-center.display.unknown-resolution"));
     Label* detailsLabelPtr = nullptr;
-    card->addChild(
-        ui::label({
-            .out = &detailsLabelPtr,
-            .text = infoText,
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
+    detailsLabelPtr = addCaption(*card, infoText, scale);
+
+    Slider* sliderPtr = nullptr;
+    Label* valueLabelPtr = nullptr;
+    float lastBrightness = 0.0F;
+    bool lastControllable = false;
+    if (source.brightness != nullptr) {
+      const auto& display = *source.brightness;
+      lastBrightness = display.brightness;
+      lastControllable = display.controllable;
+      const std::string displayId = display.id;
+      const float minBrightness =
+          m_configService != nullptr ? m_configService->config().brightness.minimumBrightness : 0.0F;
+      addLiveSlider(
+          *card, scale, i18n::tr("control-center.display.brightness"), &sliderPtr, &valueLabelPtr, minBrightness, 1.0,
+          0.01, std::max(static_cast<double>(display.brightness), static_cast<double>(minBrightness)),
+          display.controllable,
+          [this, displayId](double value) {
+            const auto* currentDisplay = m_brightness != nullptr ? m_brightness->findDisplay(displayId) : nullptr;
+            if (currentDisplay == nullptr) {
+              return std::to_string(static_cast<int>(std::lround(value * 100.0))) + "%";
+            }
+            return formatBrightnessValue(*currentDisplay, static_cast<float>(value));
+          },
+          [this, displayId](double value) {
+            if (m_syncingSlider) {
+              return;
+            }
+            const auto* currentDisplay = m_brightness != nullptr ? m_brightness->findDisplay(displayId) : nullptr;
+            if (currentDisplay == nullptr || !currentDisplay->controllable) {
+              return;
+            }
+            const auto brightness = static_cast<float>(value);
+            queueBrightness(displayId, brightness);
+            for (auto& c : m_cards) {
+              if (c.displayId == displayId) {
+                c.lastBrightness = brightness;
+                break;
+              }
+            }
+          },
+          [this]() { flushPendingBrightness(true); }
+      );
+    }
+
+    Toggle* mainToggle = nullptr;
+    if (source.output != nullptr && niriAvailable && source.output->enabled && enabledCount > 1) {
+      const auto* origin = originOutput(m_displayConfig->outputs());
+      const bool isMain = origin != nullptr && origin->name == source.id;
+      const std::string displayId = source.id;
+      mainToggle = addToggleRow(
+          *card, scale, i18n::tr("control-center.display.main-display"),
+          [this, displayId](bool checked) {
+            if (m_syncingConfig || m_displayConfig == nullptr || !checked) {
+              return;
+            }
+            if (!m_displayConfig->setOrigin(displayId)) {
+              m_lastDisplayListKey.clear();
+              reportLayoutError();
+            }
+          }
+      );
+      if (mainToggle != nullptr) {
+        mainToggle->setCheckedImmediate(isMain);
+        mainToggle->setEnabled(!isMain);
+      }
+    }
 
     Select* resolutionSelect = nullptr;
     Select* refreshSelect = nullptr;
@@ -1507,6 +1628,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
       resolutions = display_config::resolutionChoices(output);
       refreshes = display_config::refreshChoices(output, output.current.width, output.current.height);
       const bool controlsEnabled = output.enabled && !resolutions.empty();
+      const std::string displayId = source.id;
 
       std::vector<std::string> resolutionLabels;
       resolutionLabels.reserve(resolutions.size());
@@ -1523,212 +1645,87 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
         refreshLabels.push_back(display_config::formatRefresh(choice.refreshMilliHz));
       }
 
-      const std::string displayId = source.id;
-      auto resolution = ui::select({
-          .out = &resolutionSelect,
-          .options = std::move(resolutionLabels),
-          .selectedIndex = display_config::selectedResolutionIndex(output, resolutions),
-          .placeholder = i18n::tr("control-center.display.resolution"),
-          .enabled = controlsEnabled,
-          .surfaceOpacity = panelCardOpacity(),
-          .flexGrow = 1.0F,
-          .onSelectionChanged =
-              [this, displayId](std::size_t index, std::string_view /*text*/) {
-                if (!m_syncingConfig) {
-                  applyResolution(displayId, index);
-                }
-              },
-      });
-      auto refresh = ui::select({
-          .out = &refreshSelect,
-          .options = std::move(refreshLabels),
-          .selectedIndex = display_config::selectedRefreshIndex(output, refreshes),
-          .placeholder = i18n::tr("control-center.display.refresh-rate"),
-          .enabled = controlsEnabled && !refreshes.empty(),
-          .surfaceOpacity = panelCardOpacity(),
-          .flexGrow = 1.0F,
-          .onSelectionChanged =
-              [this, displayId](std::size_t index, std::string_view /*text*/) {
-                if (!m_syncingConfig) {
-                  applyRefresh(displayId, index);
-                }
-              },
-      });
-      card->addChild(
-          ui::row(
-              {.align = FlexAlign::Start, .gap = Style::spaceSm * scale},
-              labeledField(scale, i18n::tr("control-center.display.resolution"), std::move(resolution)),
-              labeledField(scale, i18n::tr("control-center.display.refresh-rate"), std::move(refresh))
-          )
-      );
+      addWellDivider(*card, scale);
+      if (!resolutionLabels.empty()) {
+        const std::size_t selectedResolution = display_config::selectedResolutionIndex(output, resolutions);
+        resolutionSelect = addSelectRow(
+            *card, scale, i18n::tr("control-center.display.resolution"), std::move(resolutionLabels),
+            panelCardOpacity(),
+            [this, displayId](std::size_t index) {
+              if (!m_syncingConfig) {
+                applyResolution(displayId, index);
+              }
+            }
+        );
+        if (resolutionSelect != nullptr) {
+          resolutionSelect->setSelectedIndexSilently(selectedResolution);
+          resolutionSelect->setEnabled(controlsEnabled);
+        }
+      }
+      if (!refreshLabels.empty()) {
+        const std::size_t selectedRefresh = display_config::selectedRefreshIndex(output, refreshes);
+        refreshSelect = addSelectRow(
+            *card, scale, i18n::tr("control-center.display.refresh-rate"), std::move(refreshLabels), panelCardOpacity(),
+            [this, displayId](std::size_t index) {
+              if (!m_syncingConfig) {
+                applyRefresh(displayId, index);
+              }
+            }
+        );
+        if (refreshSelect != nullptr) {
+          refreshSelect->setSelectedIndexSilently(selectedRefresh);
+          refreshSelect->setEnabled(controlsEnabled);
+        }
+      }
 
-      auto rotation = ui::select({
-          .out = &transformSelect,
-          .options = transformLabels(),
-          .selectedIndex = transformIndex(output.transform),
-          .placeholder = i18n::tr("control-center.display.rotation"),
-          .enabled = output.enabled,
-          .surfaceOpacity = panelCardOpacity(),
-          .flexGrow = 1.0F,
-          .onSelectionChanged =
-              [this, displayId](std::size_t index, std::string_view /*text*/) {
-                if (!m_syncingConfig) {
-                  applyTransform(displayId, index);
-                }
-              },
-      });
-      card->addChild(labeledField(scale, i18n::tr("control-center.display.rotation"), std::move(rotation)));
+      transformSelect = addSelectRow(
+          *card, scale, i18n::tr("control-center.display.rotation"), transformLabels(), panelCardOpacity(),
+          [this, displayId](std::size_t index) {
+            if (!m_syncingConfig) {
+              applyTransform(displayId, index);
+            }
+          }
+      );
+      if (transformSelect != nullptr) {
+        transformSelect->setSelectedIndexSilently(transformIndex(output.transform));
+        transformSelect->setEnabled(output.enabled);
+      }
 
-      auto scaleHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-      scaleHeader->addChild(
-          ui::label({
-              .text = i18n::tr("control-center.display.scale"),
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .flexGrow = 1.0F,
-          })
-      );
-      scaleHeader->addChild(
-          ui::label({
-              .out = &scaleLabel,
-              .text = display_config::formatScale(currentScale),
-              .fontSize = Style::fontSizeCaption * scale,
-              .fontWeight = FontWeight::Bold,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-          })
-      );
-      card->addChild(std::move(scaleHeader));
-      card->addChild(
-          ui::slider({
-              .out = &scaleSlider,
-              .minValue = kMinScale,
-              .maxValue = kMaxScale,
-              .step = kScaleStep,
-              .value = std::clamp(currentScale, kMinScale, kMaxScale),
-              .enabled = output.enabled,
-              .trackHeight = Style::sliderTrackHeight * scale,
-              .thumbSize = Style::sliderThumbSize * scale,
-              .controlHeight = Style::controlHeight * scale,
-              .flexGrow = 1.0F,
-              .onValueChanged =
-                  [this, displayId](double value) {
-                    if (m_syncingSlider) {
-                      return;
-                    }
-                    queueScale(displayId, value);
-                    for (auto& c : m_cards) {
-                      if (c.displayId == displayId && c.scaleLabel != nullptr) {
-                        c.scaleLabel->setText(display_config::formatScale(value));
-                        c.lastScale = value;
-                        break;
-                      }
-                    }
-                  },
-              .onDragEnd = [this]() { flushPendingScale(true); },
-          })
+      addLiveSlider(
+          *card, scale, i18n::tr("control-center.display.scale"), &scaleSlider, &scaleLabel, kMinScale, kMaxScale,
+          kScaleStep, std::clamp(currentScale, kMinScale, kMaxScale), output.enabled, display_config::formatScale,
+          [this, displayId](double value) {
+            if (m_syncingSlider) {
+              return;
+            }
+            queueScale(displayId, value);
+            for (auto& c : m_cards) {
+              if (c.displayId == displayId) {
+                c.lastScale = value;
+                break;
+              }
+            }
+          },
+          [this]() { flushPendingScale(true); }
       );
 
       if (output.vrrSupported) {
-        auto vrrRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-        vrrRow->addChild(
-            ui::label({
-                .text = i18n::tr("control-center.display.vrr"),
-                .fontSize = Style::fontSizeCaption * scale,
-                .color = colorSpecFromRole(ColorRole::OnSurface),
-                .flexGrow = 1.0F,
-            })
+        vrrToggle = addToggleRow(
+            *card, scale, i18n::tr("control-center.display.vrr"),
+            [this, displayId](bool checked) {
+              if (m_syncingConfig || m_displayConfig == nullptr) {
+                return;
+              }
+              if (!m_displayConfig->setVrr(displayId, checked)) {
+                m_lastDisplayListKey.clear();
+              }
+            }
         );
-        vrrRow->addChild(
-            ui::toggle({
-                .out = &vrrToggle,
-                .checkedImmediate = output.vrrEnabled,
-                .enabled = output.enabled,
-                .toggleSize = ToggleSize::Small,
-                .scale = scale,
-                .onChange =
-                    [this, displayId](bool checked) {
-                      if (m_syncingConfig || m_displayConfig == nullptr) {
-                        return;
-                      }
-                      if (!m_displayConfig->setVrr(displayId, checked)) {
-                        m_lastDisplayListKey.clear();
-                      }
-                    },
-            })
-        );
-        card->addChild(std::move(vrrRow));
+        if (vrrToggle != nullptr) {
+          vrrToggle->setCheckedImmediate(output.vrrEnabled);
+          vrrToggle->setEnabled(output.enabled);
+        }
       }
-    }
-
-    Slider* sliderPtr = nullptr;
-    Label* valueLabelPtr = nullptr;
-    float lastBrightness = 0.0F;
-    bool lastControllable = false;
-    if (source.brightness != nullptr) {
-      const auto& display = *source.brightness;
-      lastBrightness = display.brightness;
-      lastControllable = display.controllable;
-      auto sliderRow = ui::row(
-          {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-          ui::glyph({
-              .glyph = "brightness-low",
-              .glyphSize = Style::fontSizeTitle * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          })
-      );
-
-      const std::string displayId = display.id;
-      const float minBrightness = m_configService->config().brightness.minimumBrightness;
-      auto slider = ui::slider({
-          .out = &sliderPtr,
-          .minValue = minBrightness,
-          .maxValue = 1.0F,
-          .step = 0.01F,
-          .value = std::max(display.brightness, minBrightness),
-          .enabled = display.controllable,
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = Style::controlHeight * scale,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this, displayId](double value) {
-                if (m_syncingSlider) {
-                  return;
-                }
-                const auto* currentDisplay = m_brightness != nullptr ? m_brightness->findDisplay(displayId) : nullptr;
-                if (currentDisplay == nullptr || !currentDisplay->controllable) {
-                  return;
-                }
-                const auto brightness = static_cast<float>(value);
-                queueBrightness(displayId, brightness);
-                for (auto& c : m_cards) {
-                  if (c.displayId == displayId && c.valueLabel != nullptr) {
-                    c.valueLabel->setText(formatBrightnessValue(*currentDisplay, brightness));
-                    c.lastBrightness = brightness;
-                    break;
-                  }
-                }
-              },
-          .onDragEnd = [this]() { flushPendingBrightness(true); },
-      });
-      sliderRow->addChild(std::move(slider));
-      sliderRow->addChild(
-          ui::glyph({
-              .glyph = "brightness-high",
-              .glyphSize = Style::fontSizeTitle * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          })
-      );
-      sliderRow->addChild(
-          ui::label({
-              .out = &valueLabelPtr,
-              .text = formatBrightnessValue(display, display.brightness),
-              .fontSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .minWidth = Style::controlHeightLg * scale,
-          })
-      );
-      card->addChild(std::move(sliderRow));
     }
 
     auto* cardPtr = card.get();
@@ -1749,6 +1746,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
             .scaleLabel = scaleLabel,
             .vrrToggle = vrrToggle,
             .enabledToggle = enabledToggle,
+            .mainToggle = mainToggle,
             .resolutions = std::move(resolutions),
             .refreshes = std::move(refreshes),
             .lastBrightness = lastBrightness,
@@ -1758,6 +1756,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
         }
     );
   }
+  showSelectedDisplayCard();
 }
 
 void MonitorTab::queueBrightness(const std::string& displayId, float value) {
@@ -1879,54 +1878,12 @@ void MonitorTab::applyLayout(display_config::LayoutDirection direction) {
   if (referenceName.empty()) {
     return;
   }
-  const auto* moving = m_displayConfig->findOutput(m_layoutMovingName);
-  const auto* reference = m_displayConfig->findOutput(referenceName);
-  if (moving == nullptr || reference == nullptr) {
-    return;
-  }
-
-  const auto adj = display_config::adjacency(*moving, *reference);
-  if (adj.has_value()) {
-    const bool horizontal =
-        *adj == display_config::LayoutDirection::Left || *adj == display_config::LayoutDirection::Right;
-    const bool nudgeVertical = horizontal
-        && (direction == display_config::LayoutDirection::Top || direction == display_config::LayoutDirection::Bottom);
-    const bool nudgeHorizontal = !horizontal
-        && (direction == display_config::LayoutDirection::Left || direction == display_config::LayoutDirection::Right);
-    if (nudgeVertical || nudgeHorizontal) {
-      const int delta =
-          (direction == display_config::LayoutDirection::Top || direction == display_config::LayoutDirection::Left)
-          ? -layoutNudgePx()
-          : layoutNudgePx();
-      const int proposedX = moving->x + (nudgeHorizontal ? delta : 0);
-      const int proposedY = moving->y + (nudgeVertical ? delta : 0);
-      const auto point = display_config::placeAdjacent(*moving, *reference, *adj, proposedX, proposedY);
-      if (!m_displayConfig->setPosition(m_layoutMovingName, point.x, point.y)) {
-        m_lastDisplayListKey.clear();
-        reportLayoutError();
-      }
-      return;
-    }
-  }
-
   if (!m_displayConfig->placeRelative(m_layoutMovingName, referenceName, direction)) {
     m_lastDisplayListKey.clear();
     reportLayoutError();
+    return;
   }
-}
-
-int MonitorTab::layoutNudgePx() const {
-  if (m_platform == nullptr) {
-    return kLayoutNudge;
-  }
-  const auto modifiers = m_platform->wayland().keyboardModifiers();
-  if ((modifiers & KeyMod::Shift) != 0) {
-    return kLayoutNudgeFine;
-  }
-  if ((modifiers & KeyMod::Ctrl) != 0) {
-    return kLayoutNudgeMedium;
-  }
-  return kLayoutNudge;
+  syncLayoutSelection();
 }
 
 void MonitorTab::reportLayoutError() {

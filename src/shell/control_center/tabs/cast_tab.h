@@ -13,6 +13,7 @@ class ClipboardService;
 class Flex;
 class Label;
 class ScrollView;
+class Separator;
 class Toggle;
 struct ControlCenterServices;
 
@@ -48,6 +49,7 @@ private:
   Label* m_wirelessDetail = nullptr;
   Button* m_wirelessStart = nullptr;
   Button* m_wirelessOpen = nullptr;
+  Separator* m_sinksDivider = nullptr;
   Flex* m_sinksCard = nullptr;
   Flex* m_sinkList = nullptr;
   ScrollView* m_liveScroll = nullptr;

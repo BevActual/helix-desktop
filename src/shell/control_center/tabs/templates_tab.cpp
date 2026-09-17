@@ -247,7 +247,7 @@ TemplatesTab::TemplatesTab(const ControlCenterServices& services)
       m_applyTemplates(services.settingsActions.applyTemplates),
       m_templateApply(services.templateApply),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "templates", .includedGroups = {"built-in", "community", "greeter"}}
+          services, SettingsPaneOptions{.section = "templates", .includedGroups = {"greeter"}}
       )) {
   if (m_config != nullptr) {
     if (const std::optional<std::string> source = m_config->stateString("templates_tab", "source")) {
@@ -265,65 +265,118 @@ TemplatesTab::TemplatesTab(const ControlCenterServices& services)
 
 std::unique_ptr<Flex> TemplatesTab::create() {
   const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
+  const float opacity = panelCardOpacity();
 
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
+      .gap = Style::spaceXs * scale,
       .flexGrow = 1.0F,
+  });
+
+  auto sectionCard = ui::column({
+      .align = FlexAlign::Stretch,
+      .configure =
+          [scale, opacity](Flex& section) {
+            applySectionCardStyle(section, scale, opacity);
+            section.setGap(Style::spaceXs * scale);
+            section.setPadding(Style::spaceSm * scale);
+          },
   });
 
   auto toolbar = ui::row({
       .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
+      .wrap = true,
+      .gap = Style::spaceXs * scale,
       .fillWidth = true,
   });
-  toolbar->addChild(
+  auto browse = ui::row({
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceXs * scale,
+      .flexGrow = 1.0F,
+  });
+  browse->addChild(
       ui::segmented({
           .out = &m_source,
           .options =
               std::vector<ui::SegmentedOption>{
                   {
-                      .label = i18n::tr("settings.navigation.groups.built-in"),
+                      .label = "",
+                      .glyph = "package",
                       .tooltip = i18n::tr("control-center.templates.built-in-tooltip"),
                   },
                   {
-                      .label = i18n::tr("settings.navigation.groups.community"),
+                      .label = "",
+                      .glyph = "users",
                       .tooltip = i18n::tr("control-center.templates.community-tooltip"),
                   },
                   {
-                      .label = i18n::tr("settings.navigation.groups.user"),
+                      .label = "",
+                      .glyph = "user",
                       .tooltip = i18n::tr("control-center.templates.user-tooltip"),
                   },
               },
           .selectedIndex = indexFromSource(m_sourceKind),
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .flexGrow = 1.0F,
+          .surfaceOpacity = opacity,
           .onChange = [this](std::size_t index) { applySource(index); },
       })
   );
-  toolbar->addChild(
+  toolbar->addChild(std::move(browse));
+
+  auto enableCluster = ui::row({
+      .out = &m_catalogWell,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = m_sourceKind != Source::User,
+      .participatesInLayout = m_sourceKind != Source::User,
+  });
+  enableCluster->addChild(
       ui::label({
-          .out = &m_enableLabel,
           .text = i18n::tr("control-center.templates.enable"),
           .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
       })
   );
-  toolbar->addChild(
+  enableCluster->addChild(
       ui::toggle({
           .out = &m_enable,
+          .checkedImmediate = false,
+          .toggleSize = ToggleSize::Medium,
           .scale = scale,
           .onChange = [this](bool enabled) { applyEnable(enabled); },
       })
   );
-  live->addChild(std::move(toolbar));
+  toolbar->addChild(std::move(enableCluster));
+  sectionCard->addChild(std::move(toolbar));
 
-  live->addChild(
+  auto gtkFollow = ui::column({
+      .out = &m_gtkFollowSection,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  addWellDivider(*gtkFollow, scale);
+  m_gtkFollowHint = addCaption(*gtkFollow, i18n::tr("control-center.templates.gtk-follow-off"), scale, 4);
+  auto gtkRow = makeControlRow(i18n::tr("control-center.templates.gtk-follow"), scale, nullptr, false);
+  gtkRow->addChild(
+      ui::button({
+          .out = &m_gtkFollowButton,
+          .text = i18n::tr("control-center.templates.enable"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.templates.gtk-follow-enable"),
+          .minHeight = Style::controlHeightSm * scale,
+          .paddingH = Style::spaceMd * scale,
+          .onClick = [this]() { enableGtkTemplates(); },
+      })
+  );
+  gtkFollow->addChild(std::move(gtkRow));
+  sectionCard->addChild(std::move(gtkFollow));
+  sectionCard->addChild(
       ui::label({
           .out = &m_hint,
           .fontSize = Style::fontSizeCaption * scale,
@@ -333,34 +386,7 @@ std::unique_ptr<Flex> TemplatesTab::create() {
           .participatesInLayout = false,
       })
   );
-
-  live->addChild(
-      ui::label({
-          .out = &m_gtkFollowHint,
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
-  live->addChild(
-      ui::button({
-          .out = &m_gtkFollowButton,
-          .text = i18n::tr("control-center.templates.gtk-follow-enable"),
-          .fontSize = Style::fontSizeBody * scale,
-          .contentAlign = ButtonContentAlign::Start,
-          .variant = ButtonVariant::Default,
-          .minHeight = controlHeight,
-          .paddingV = Style::spaceSm * scale,
-          .paddingH = Style::spaceMd * scale,
-          .radius = Style::scaledRadiusMd(scale),
-          .flexGrow = 1.0F,
-          .visible = false,
-          .participatesInLayout = false,
-          .onClick = [this]() { enableGtkTemplates(); },
-      })
-  );
+  live->addChild(std::move(sectionCard));
 
   live->addChild(
       ui::column({
@@ -420,13 +446,14 @@ void TemplatesTab::onClose() {
   m_store.reset();
   m_rootLayout = nullptr;
   m_source = nullptr;
-  m_enableLabel = nullptr;
+  m_catalogWell = nullptr;
   m_enable = nullptr;
   m_hint = nullptr;
   m_storeHost = nullptr;
   m_applyButton = nullptr;
   m_folderButton = nullptr;
   m_newButton = nullptr;
+  m_gtkFollowSection = nullptr;
   m_gtkFollowHint = nullptr;
   m_gtkFollowButton = nullptr;
   m_storePopulated = false;
@@ -492,8 +519,7 @@ void TemplatesTab::syncLiveControls() {
   if (m_enable != nullptr) {
     m_enable->setChecked(enabled);
   }
-  setShown(m_enableLabel, !userSource);
-  setShown(m_enable, !userSource);
+  setShown(m_catalogWell, !userSource);
   const auto& templates = m_config->config().theme.templates;
   m_applyFailures = m_templateApply != nullptr ? m_templateApply->lastFailures() : std::unordered_map<std::string, std::string>{};
   const bool gtkMissingTheme = m_sourceKind == Source::Builtin && enabled
@@ -567,8 +593,7 @@ void TemplatesTab::syncGtkFollow() {
   if (m_gtkFollowHint != nullptr) {
     m_gtkFollowHint->setText(i18n::tr("control-center.templates.gtk-follow-off"));
   }
-  setShown(m_gtkFollowHint, showGtkFollow);
-  setShown(m_gtkFollowButton, showGtkFollow);
+  setShown(m_gtkFollowSection, showGtkFollow);
 }
 
 void TemplatesTab::enableGtkTemplates() {

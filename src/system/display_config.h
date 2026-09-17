@@ -96,6 +96,12 @@ namespace display_config {
   [[nodiscard]] Point placeAdjacent(
       const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
   );
+  // Like placeAdjacent, but if the shared edge would only be a sliver, snap to
+  // left/center/right (or top/center/bottom) so the displays actually sit against
+  // each other. Use this when changing sides.
+  [[nodiscard]] Point placeAgainst(
+      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
+  );
   [[nodiscard]] bool outputsOverlap(const Output& a, const Output& b) noexcept;
   [[nodiscard]] bool isAdjacentOn(
       const Output& moving, const Output& reference, LayoutDirection direction

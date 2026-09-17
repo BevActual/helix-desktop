@@ -71,6 +71,7 @@ private:
   Flex* m_leftColumn = nullptr;
   Flex* m_enableRow = nullptr;
   Toggle* m_enableToggle = nullptr;
+  Flex* m_nowWell = nullptr;
   Flex* m_currentCard = nullptr;
   Flex* m_glyphColumn = nullptr;
   Flex* m_detailsCard = nullptr;

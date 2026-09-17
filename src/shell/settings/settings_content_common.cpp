@@ -347,6 +347,8 @@ namespace settings {
     case SettingsSection::Type:
     case SettingsSection::Scale:
     case SettingsSection::Roundness:
+    case SettingsSection::Effects:
+    case SettingsSection::Language:
       return false;
     }
     return false;
@@ -392,6 +394,8 @@ namespace settings {
     case SettingsSection::Type:
     case SettingsSection::Scale:
     case SettingsSection::Roundness:
+    case SettingsSection::Effects:
+    case SettingsSection::Language:
       return {};
     }
     return {};

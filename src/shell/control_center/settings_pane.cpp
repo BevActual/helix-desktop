@@ -176,7 +176,8 @@ SettingsPane::SettingsPane(const ControlCenterServices& services, SettingsPaneOp
       m_asyncTextures(services.asyncTextures), m_calendar(services.calendar), m_modalHost(services.modalHost),
       m_actions(services.settingsActions), m_openStore(std::move(options.openStore)),
       m_selectedSection(std::move(options.section)),
-      m_includedGroups(std::move(options.includedGroups)), m_compact(options.compact) {
+      m_includedGroups(std::move(options.includedGroups)), m_compact(options.compact),
+      m_showConfigureButton(options.showConfigureButton) {
   m_showAdvanced = m_config != nullptr ? m_config->config().shell.settingsShowAdvanced : true;
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { onExternalChanged(); });
@@ -440,19 +441,21 @@ std::unique_ptr<Flex> SettingsPane::embedHeader(std::unique_ptr<Flex> liveAction
     m_liveHeaderActions = liveActions.get();
     row->addChild(std::move(liveActions));
   }
-  row->addChild(
-      ui::button({
-          .out = &m_configureButton,
-          .glyph = "settings",
-          .selected = m_configureMode,
-          .tooltip = i18n::tr("control-center.settings.configure"),
-          .onClick =
-              [this]() {
-                setConfigureMode(!m_configureMode);
-              },
-          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
-      })
-  );
+  if (m_showConfigureButton) {
+    row->addChild(
+        ui::button({
+            .out = &m_configureButton,
+            .glyph = "settings",
+            .selected = m_configureMode,
+            .tooltip = i18n::tr("control-center.settings.configure"),
+            .onClick =
+                [this]() {
+                  setConfigureMode(!m_configureMode);
+                },
+            .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+        })
+    );
+  }
   auto editorActions = createHeaderActions(scale);
   row->addChild(std::move(editorActions));
   applyConfigureVisibility();

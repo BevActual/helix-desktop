@@ -23,6 +23,7 @@ namespace settings {
     float glyphSize = 0.0F;
     float width = 0.0F;
     bool flexGrow = false;
+    Select** out = nullptr;
   };
 
   [[nodiscard]] std::vector<ColorRole> allColorSpecRoles();

@@ -22,6 +22,8 @@
 #include "shell/control_center/plugin_control_center_tab.h"
 #include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
+#include "shell/control_center/tabs/effects_tab.h"
+#include "shell/control_center/tabs/language_tab.h"
 #include "shell/control_center/tabs/roundness_tab.h"
 #include "shell/control_center/tabs/scale_tab.h"
 #include "shell/control_center/tabs/theme_tab.h"
@@ -76,12 +78,14 @@
 #include "system/package_kit_service.h"
 #include "system/screen_time_service.h"
 #include "ui/builders.h"
+#include "ui/controls/box.h"
 #include "ui/controls/button.h"
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/roving_list_nav.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/separator.h"
+#include "ui/palette.h"
 #include "ui/scroll_into_view.h"
 #include "ui/split_pane_focus.h"
 #include "ui/style.h"
@@ -107,6 +111,39 @@ namespace {
   constexpr Logger kLog("control-center");
   constexpr auto kMprisRefreshMinInterval = std::chrono::milliseconds(750);
   constexpr float kTabViewportClipInset = 1.0F;
+  constexpr float kScrollEdgeFadePx = 28.0F;
+
+  void styleScrollEdgeFade(Box& box, ColorRole role, float opacity, bool fromTop) {
+    const Color opaque = resolveColorSpec(colorSpecFromRole(role, opacity));
+    Color clear = opaque;
+    clear.a = 0.0F;
+    Color mid = opaque;
+    mid.a *= 0.42F;
+    Color tail = opaque;
+    tail.a *= 0.12F;
+    RoundedRectStyle style;
+    style.fillMode = FillMode::LinearGradient;
+    style.gradientDirection = GradientDirection::Vertical;
+    style.softness = 0.0F;
+    style.radius = 0.0F;
+    if (fromTop) {
+      style.gradientStops = {
+          GradientStop{.position = 0.0F, .color = opaque},
+          GradientStop{.position = 0.35F, .color = mid},
+          GradientStop{.position = 0.78F, .color = tail},
+          GradientStop{.position = 1.0F, .color = clear},
+      };
+    } else {
+      style.gradientStops = {
+          GradientStop{.position = 0.0F, .color = clear},
+          GradientStop{.position = 0.22F, .color = tail},
+          GradientStop{.position = 0.65F, .color = mid},
+          GradientStop{.position = 1.0F, .color = opaque},
+      };
+    }
+    box.setStyle(style);
+    box.setHitTestVisible(false);
+  }
 
   float tabContentHeight(float viewportHeight) {
     return std::max(1.0F, std::floor(viewportHeight - kTabViewportClipInset));
@@ -128,45 +165,47 @@ namespace {
       {"type", "settings.navigation.sections.type", "typography", true, TabGroup::Appearance},
       {"scale", "settings.navigation.sections.scale", "resize", true, TabGroup::Appearance},
       {"roundness", "settings.navigation.sections.roundness", "border-radius", true, TabGroup::Appearance},
+      {"effects", "settings.navigation.sections.effects", "shadow", true, TabGroup::Appearance},
+      {"language", "settings.navigation.sections.language", "language", true, TabGroup::Appearance},
       {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true, TabGroup::Appearance},
       {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Appearance},
       {"bar", "settings.navigation.sections.bar", "crop-3-2", true, TabGroup::Layout},
-      {"panels", "settings.navigation.sections.panels", "layout-bottombar", true, TabGroup::Layout},
       {"dock", "settings.navigation.sections.dock", "layout-bottombar-inactive", true, TabGroup::Layout},
       {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Layout},
       {"windows", "settings.navigation.sections.windows", "app-window", true, TabGroup::Layout},
+      {"panels", "settings.navigation.sections.panels", "layout-bottombar", true, TabGroup::Layout},
       {"osd", "settings.navigation.sections.osd", "message-circle", true, TabGroup::Layout},
-      {"media", "control-center.tabs.media", "disc-filled", true, TabGroup::Status},
-      {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Status},
-      {"monitor", "control-center.tabs.monitor", "device-desktop", true, TabGroup::Status},
-      {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::Status},
-      {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
-      {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Status},
-      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
-      {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
+      {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Status},
+      {"media", "control-center.tabs.media", "disc-filled", true, TabGroup::Status},
+      {"monitor", "control-center.tabs.monitor", "device-desktop", true, TabGroup::Status},
+      {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
-      {"packages", "control-center.tabs.packages", "package", true, TabGroup::Services},
-      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Services},
-      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Services},
-      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Services},
-      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Services},
+      {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
+      {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
+      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
+      {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Status},
+      {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::Status},
+      {"privacy", "control-center.tabs.privacy", "eye-off", true, TabGroup::Services},
       {"firewall", "control-center.tabs.firewall", "shield-lock", true, TabGroup::Services},
+      {"security", "settings.navigation.sections.security", "shield-lock", true, TabGroup::Services},
       {"printers", "control-center.tabs.printers", "printer", true, TabGroup::Services},
       {"cast", "control-center.tabs.cast", "screen-share", true, TabGroup::Services},
-      {"privacy", "control-center.tabs.privacy", "eye-off", true, TabGroup::Services},
-      {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Services},
+      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Services},
+      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Services},
+      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Services},
+      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Services},
+      {"packages", "control-center.tabs.packages", "package", true, TabGroup::Services},
       {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Services},
       {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Services},
       {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Services},
       {"launcher", "settings.navigation.sections.launcher", "rocket", true, TabGroup::Behavior},
       {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true, TabGroup::Behavior},
       {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Behavior},
-      {"security", "settings.navigation.sections.security", "shield-lock", true, TabGroup::Advanced},
-      {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
-      {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
       {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::Advanced},
+      {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
+      {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Advanced},
   };
 
@@ -263,6 +302,7 @@ namespace {
         || id == "type"
         || id == "scale"
         || id == "roundness"
+        || id == "effects"
         || id == "windows"
         || id == "weather"
         || id == "notifications"
@@ -414,21 +454,18 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("type", std::make_unique<TypeTab>(services));
   add("scale", std::make_unique<ScaleTab>(services));
   add("roundness", std::make_unique<RoundnessTab>(services));
+  add("effects", std::make_unique<EffectsTab>(services));
+  add("language", std::make_unique<LanguageTab>(services));
   add("wallpaper", std::make_unique<WallpaperTab>(services));
   add("templates", std::make_unique<TemplatesTab>(services));
   add("bar", std::make_unique<BarTab>(services));
-  add("panels", std::make_unique<PanelsTab>(services));
   add("dock", std::make_unique<DockTab>(services));
   add("desktop", std::make_unique<DesktopTab>(services));
   add("windows", std::make_unique<WindowsTab>(services));
+  add("panels", std::make_unique<PanelsTab>(services));
   add("osd", std::make_unique<OsdTab>(services));
-  add(
-      "media",
-      std::make_unique<MediaTab>(
-          services.mpris, services.httpClient, services.spectrum, services.config, wayland,
-          PanelManager::instance().renderContext(), services
-      )
-  );
+  add("network", std::make_unique<NetworkTab>(services));
+  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
   add(
       "audio",
       std::make_unique<AudioTab>(
@@ -436,25 +473,31 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
           PanelManager::instance().renderContext(), services
       )
   );
+  add(
+      "media",
+      std::make_unique<MediaTab>(
+          services.mpris, services.httpClient, services.spectrum, services.config, wayland,
+          PanelManager::instance().renderContext(), services
+      )
+  );
   add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
-  add("system", std::make_unique<SystemTab>(services.sysmon, services));
   add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
-  add("network", std::make_unique<NetworkTab>(services));
-  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
-  add("camera", std::make_unique<CameraTab>(services));
-  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
-  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
-  add("packages", std::make_unique<PackagesTab>(services));
-  add("tailscale", std::make_unique<TailscaleTab>(services));
-  add("localsend", std::make_unique<LocalSendTab>(services));
-  add("phone", std::make_unique<PhoneTab>(services));
-  add("syncthing", std::make_unique<SyncthingTab>(services));
+  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
+  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
+  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
+  add("camera", std::make_unique<CameraTab>(services));
+  add("system", std::make_unique<SystemTab>(services.sysmon, services));
+  add("privacy", std::make_unique<PrivacyTab>(services));
   add("firewall", std::make_unique<FirewallTab>(services));
+  add("security", std::make_unique<SettingsTab>(services, "security"));
   add("printers", std::make_unique<PrintersTab>(services));
   add("cast", std::make_unique<CastTab>(services));
-  add("privacy", std::make_unique<PrivacyTab>(services));
-  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
+  add("localsend", std::make_unique<LocalSendTab>(services));
+  add("phone", std::make_unique<PhoneTab>(services));
+  add("tailscale", std::make_unique<TailscaleTab>(services));
+  add("syncthing", std::make_unique<SyncthingTab>(services));
+  add("packages", std::make_unique<PackagesTab>(services));
   add("ai", std::make_unique<AiUsageTab>(services));
   add("capture", std::make_unique<CaptureTab>(services));
   add("clipboard", std::make_unique<ClipboardTab>(services));
@@ -467,15 +510,14 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
           std::unordered_set<std::string>{"general", "keyboard-layout", "window-switcher"}
       )
   );
-  add("security", std::make_unique<SettingsTab>(services, "security"));
-  add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
-  add("niri", std::make_unique<SettingsTab>(services, "niri"));
   add(
       "control-center",
       std::make_unique<SettingsTab>(
           services, "control-center", std::unordered_set<std::string>{"layout", "navigation"}
       )
   );
+  add("niri", std::make_unique<SettingsTab>(services, "niri"));
+  add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("plugins", std::make_unique<PluginsTab>(services));
 }
 
@@ -621,6 +663,17 @@ void ControlCenterPanel::create() {
       sidebarScroll->content()->addChild(std::move(sidebarNav));
     }
     sidebar->addChild(std::move(sidebarScroll));
+    sidebar->addChild(
+        ui::box({
+            .out = &m_sidebarEdgeFade,
+            .participatesInLayout = false,
+            .configure =
+                [](Box& box) {
+                  box.setHitTestVisible(false);
+                  box.setZIndex(8);
+                },
+        })
+    );
     rootLayout->addChild(std::move(sidebar));
   }
 
@@ -655,7 +708,7 @@ void ControlCenterPanel::create() {
       ui::label({
           .out = &m_contentTitle,
           .text = i18n::tr("control-center.tabs.home"),
-          .fontSize = Style::fontSizeTitle * scale,
+          .fontSize = Style::fontSizeHeader * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::Primary),
           .flexGrow = 1.0F,
@@ -692,6 +745,17 @@ void ControlCenterPanel::create() {
   });
 
   content->addChild(std::move(bodies));
+  content->addChild(
+      ui::box({
+          .out = &m_contentEdgeFade,
+          .participatesInLayout = false,
+          .configure =
+              [](Box& box) {
+                box.setHitTestVisible(false);
+                box.setZIndex(8);
+              },
+      })
+  );
   rootLayout->addChild(std::move(content));
   setRoot(std::move(rootLayout));
 
@@ -725,6 +789,12 @@ void ControlCenterPanel::onPanelCardOpacityChanged(float opacity) {
   }
   if (m_sidebar != nullptr) {
     m_sidebar->setFill(colorSpecFromRole(ColorRole::SurfaceVariant, opacity));
+  }
+  if (m_sidebarEdgeFade != nullptr) {
+    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::SurfaceVariant, opacity, true);
+  }
+  if (m_contentEdgeFade != nullptr) {
+    styleScrollEdgeFade(*m_contentEdgeFade, ColorRole::Surface, 1.0F, true);
   }
 }
 
@@ -762,6 +832,18 @@ void ControlCenterPanel::doLayout(Renderer& renderer, float width, float height)
   if (m_contentDismissArea != nullptr) {
     m_contentDismissArea->setPosition(0.0F, 0.0F);
     m_contentDismissArea->setFrameSize(m_content->width(), m_content->height());
+  }
+
+  const float fadeH = kScrollEdgeFadePx * contentScale();
+  if (m_sidebarEdgeFade != nullptr && m_sidebarScrollView != nullptr) {
+    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::SurfaceVariant, panelCardOpacity(), true);
+    m_sidebarEdgeFade->setPosition(m_sidebarScrollView->x(), m_sidebarScrollView->y());
+    m_sidebarEdgeFade->setSize(m_sidebarScrollView->width(), fadeH);
+  }
+  if (m_contentEdgeFade != nullptr && m_tabBodies != nullptr) {
+    styleScrollEdgeFade(*m_contentEdgeFade, ColorRole::Surface, 1.0F, true);
+    m_contentEdgeFade->setPosition(m_tabBodies->x(), m_tabBodies->y());
+    m_contentEdgeFade->setSize(m_tabBodies->width(), fadeH);
   }
 
   if (m_contentHeader != nullptr) {
@@ -1050,6 +1132,8 @@ void ControlCenterPanel::onClose() {
   m_contentTitle = nullptr;
   m_closeButton = nullptr;
   m_tabBodies = nullptr;
+  m_sidebarEdgeFade = nullptr;
+  m_contentEdgeFade = nullptr;
   if (m_hostedEditors != nullptr) {
     m_hostedEditors->close();
   }
@@ -1232,7 +1316,7 @@ void ControlCenterPanel::addSidebarTabButton(RovingListNavHost& nav, TabSlot& sl
           .paddingV = Style::spaceXs * scale,
           .paddingH = (m_compact ? Style::spaceXs : Style::spaceSm) * scale,
           .gap = Style::spaceSm * scale,
-          .radius = Style::scaledRadiusLg(scale),
+          .radius = Style::scaledRadiusXl(scale),
           .onClick = onClick,
           .configure = [this, scale](Button& button) {
             if (button.label() != nullptr) {
@@ -1311,6 +1395,9 @@ void ControlCenterPanel::updateTabChrome(std::string_view id) {
     }
     if (active && m_contentTitle != nullptr) {
       m_contentTitle->setText(slot.title);
+      m_contentTitle->setColor(
+          slot.id == "home" ? colorSpecFromRole(ColorRole::Primary) : colorSpecFromRole(ColorRole::OnSurface)
+      );
     }
     if (slot.headerActions != nullptr) {
       slot.headerActions->setVisible(active);

@@ -20,7 +20,7 @@
 #include "ui/builders.h"
 #include "ui/controls/image.h"
 #include "ui/controls/input.h"
-#include "ui/controls/segmented.h"
+#include "ui/controls/select.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "util/qr_code.h"
@@ -770,30 +770,19 @@ NetworkTab::~NetworkTab() {
 
 std::unique_ptr<Flex> NetworkTab::create() {
   const float scale = contentScale();
+  const float controlHeight = Style::controlHeight * scale;
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .viewportPaddingH = 0.0F,
-      .viewportPaddingV = 0.0F,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto currentCard = ui::column({
       .out = &m_currentCard,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-  addTitle(*currentCard, i18n::tr("control-center.network.current-connection"), scale);
 
   auto connRow = ui::row(
       {.out = &m_currentRow, .align = FlexAlign::Center, .gap = Style::spaceSm * scale},
@@ -802,11 +791,8 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .fontSize = Style::fontSizeBody * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::OnSurface),
-      }),
-      ui::label({
-          .out = &m_currentDetail,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
           .flexGrow = 1.0F,
       }),
       ui::button({
@@ -815,7 +801,8 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .glyphSize = Style::baseGlyphSize * scale,
           .variant = ButtonVariant::Destructive,
           .tooltip = i18n::tr("control-center.network.disconnect"),
-          .padding = Style::spaceXs * scale,
+          .minHeight = controlHeight,
+          .paddingH = Style::spaceMd * scale,
           .radius = Style::scaledRadiusSm(scale),
           .onClick = [this]() {
             if (m_network == nullptr || m_actionPending) {
@@ -835,76 +822,54 @@ std::unique_ptr<Flex> NetworkTab::create() {
   currentCard->addChild(std::move(connRow));
   currentCard->addChild(
       ui::label({
+          .out = &m_currentDetail,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  currentCard->addChild(
+      ui::label({
           .out = &m_throughputLabel,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
+  );
+  addWellDivider(*currentCard, scale);
+  m_dnsProfilePicker = addSelectRow(
+      *currentCard, scale, i18n::tr("control-center.network.dns-label"),
+      {
+          i18n::tr("control-center.network.dns-automatic"),
+          i18n::tr("control-center.network.dns-google"),
+          i18n::tr("control-center.network.dns-cloudflare"),
+          i18n::tr("control-center.network.dns-nextdns"),
+          i18n::tr("control-center.network.dns-custom"),
+      },
+      panelCardOpacity(),
+      [this](std::size_t index) {
+        if (m_dnsSyncing || index > static_cast<std::size_t>(DnsProfile::Custom)) {
+          return;
+        }
+        m_dnsProfile = static_cast<DnsProfile>(index);
+        syncDnsPicker();
+        if (m_dnsProfile == DnsProfile::Custom) {
+          if (m_dnsCustomInput != nullptr && m_dnsCustomInput->value().empty()) {
+            if (m_config != nullptr && !m_config->config().controlCenter.networkTab.customDns.empty()) {
+              m_dnsCustomInput->setValue(m_config->config().controlCenter.networkTab.customDns);
+            }
+          }
+          PanelManager::instance().requestLayout();
+          return;
+        }
+        applySelectedDnsProfile();
+      }
   );
   currentCard->addChild(
       ui::label({
           .out = &m_dnsLabel,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  currentCard->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.network.dns-label"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  currentCard->addChild(
-      ui::segmented({
-          .out = &m_dnsProfilePicker,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = i18n::tr("control-center.network.dns-automatic"),
-                      .tooltip = i18n::tr("control-center.network.dns-automatic-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("control-center.network.dns-google"),
-                      .tooltip = i18n::tr("control-center.network.dns-google-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("control-center.network.dns-cloudflare"),
-                      .tooltip = i18n::tr("control-center.network.dns-cloudflare-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("control-center.network.dns-nextdns"),
-                      .tooltip = i18n::tr("control-center.network.dns-nextdns-tooltip"),
-                  },
-                  {
-                      .label = i18n::tr("control-center.network.dns-custom"),
-                      .tooltip = i18n::tr("control-center.network.dns-custom-tooltip"),
-                  },
-              },
-          .selectedIndex = static_cast<std::size_t>(m_dnsProfile),
-          .fontSize = Style::fontSizeCaption,
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .surfaceRole = ColorRole::Surface,
-          .equalSegmentWidths = true,
-          .onChange =
-              [this](std::size_t index) {
-                if (m_dnsSyncing || index > static_cast<std::size_t>(DnsProfile::Custom)) {
-                  return;
-                }
-                m_dnsProfile = static_cast<DnsProfile>(index);
-                syncDnsPicker();
-                if (m_dnsProfile == DnsProfile::Custom) {
-                  if (m_dnsCustomInput != nullptr && m_dnsCustomInput->value().empty()) {
-                    if (m_config != nullptr && !m_config->config().controlCenter.networkTab.customDns.empty()) {
-                      m_dnsCustomInput->setValue(m_config->config().controlCenter.networkTab.customDns);
-                    }
-                  }
-                  PanelManager::instance().requestLayout();
-                  return;
-                }
-                applySelectedDnsProfile();
-              },
+          .maxLines = 2,
       })
   );
   currentCard->addChild(
@@ -912,7 +877,8 @@ std::unique_ptr<Flex> NetworkTab::create() {
           {.out = &m_dnsNextDnsRow,
            .align = FlexAlign::Center,
            .gap = Style::spaceSm * scale,
-           .visible = false},
+           .visible = false,
+           .participatesInLayout = false},
           ui::input({
               .out = &m_dnsNextDnsInput,
               .placeholder = i18n::tr("control-center.network.dns-nextdns-placeholder"),
@@ -927,7 +893,8 @@ std::unique_ptr<Flex> NetworkTab::create() {
           {.out = &m_dnsCustomRow,
            .align = FlexAlign::Center,
            .gap = Style::spaceSm * scale,
-           .visible = false},
+           .visible = false,
+           .participatesInLayout = false},
           ui::input({
               .out = &m_dnsCustomInput,
               .placeholder = i18n::tr("control-center.network.dns-custom-placeholder"),
@@ -938,38 +905,54 @@ std::unique_ptr<Flex> NetworkTab::create() {
           ui::button({
               .out = &m_dnsApplyButton,
               .text = i18n::tr("control-center.network.dns-apply"),
+              .variant = ButtonVariant::Ghost,
+              .minHeight = controlHeight,
               .onClick = [this]() { applySelectedDnsProfile(); },
           })
       )
   );
+  addWellDivider(*currentCard, scale);
   currentCard->addChild(
       ui::row(
-          {.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale},
+          {.align = FlexAlign::Center, .justify = FlexJustify::End, .gap = Style::spaceXs * scale},
           ui::button({
               .out = &m_pingButton,
-              .text = i18n::tr("control-center.network.ping"),
               .glyph = "activity-heartbeat",
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.ping"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
               .onClick = [this]() { startPing(); },
           }),
           ui::button({
               .out = &m_speedButton,
-              .text = i18n::tr("control-center.network.speed-test"),
               .glyph = "arrow-down",
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.speed-test"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
               .onClick = [this]() { startSpeedTest(); },
           }),
           ui::button({
               .out = &m_copyIpButton,
-              .text = i18n::tr("control-center.network.copy-ip"),
               .glyph = "copy",
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.copy-ip"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
               .onClick = [this]() { copyIpv4(); },
           }),
           ui::button({
               .out = &m_shareButton,
-              .text = i18n::tr("control-center.network.share-wifi"),
               .glyph = "qrcode",
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.share-wifi"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
               .onClick = [this]() { shareWifi(); },
           })
       )
@@ -1190,19 +1173,25 @@ std::unique_ptr<Flex> NetworkTab::create() {
   passwordCard->addChild(std::move(inputRow));
   m_rootLayout->addChild(std::move(passwordCard));
 
-  auto list = ui::column({
-      .out = &m_list,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
-  });
-  m_rootLayout->addChild(std::move(list));
-
-  auto live = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+  auto listScroll = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
       .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
   });
-  live->addChild(std::move(liveScroll));
+  m_list = listScroll->content();
+  m_list->setDirection(FlexDirection::Vertical);
+  m_list->setAlign(FlexAlign::Stretch);
+  m_list->setGap(Style::spaceMd * scale);
+  m_rootLayout->addChild(std::move(listScroll));
+
   if (m_config != nullptr) {
     const auto& networkTab = m_config->config().controlCenter.networkTab;
     if (m_dnsNextDnsInput != nullptr && !networkTab.nextDnsId.empty()) {
@@ -1251,18 +1240,18 @@ void NetworkTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
   syncPasswordCard();
   rebuildApList(renderer);
   syncApRows();
   syncCellularCard();
   syncCurrentCard();
   uploadQr(renderer);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->layout(renderer);
 }
 
 void NetworkTab::doUpdate(Renderer& renderer) {
@@ -1849,21 +1838,35 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
   }
 
   if (m_network == nullptr) {
-    m_list->addChild(
+    auto empty = ui::column({
+        .configure =
+            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+    });
+    empty->addChild(
         ui::label({
             .text = i18n::tr("control-center.network.unavailable-title"),
             .fontSize = Style::fontSizeBody * scale,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
         })
     );
+    m_list->addChild(std::move(empty));
   } else {
     const float opacity = panelCardOpacity();
+    Flex* well = nullptr;
+    auto wellCard = ui::column({
+        .out = &well,
+        .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+    });
+    bool needDivider = false;
+    const auto divide = [&]() {
+      if (well != nullptr && needDivider) {
+        addWellDivider(*well, scale);
+      }
+      needDivider = true;
+    };
 
     if (!vpns.empty()) {
-      auto vpnCard = ui::column({
-          .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-      });
-
+      divide();
       auto vpnHeader = makeCardHeaderRow(i18n::tr("control-center.network.vpns"), scale);
       vpnHeader->addChild(
           ui::toggle({
@@ -1883,7 +1886,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
               },
           })
       );
-      vpnCard->addChild(std::move(vpnHeader));
+      well->addChild(std::move(vpnHeader));
 
       if (m_vpnVisible) {
         for (const auto& vpn : vpns) {
@@ -1902,18 +1905,13 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
                 PanelManager::instance().refresh();
               }
           );
-          vpnCard->addChild(std::move(row));
+          well->addChild(std::move(row));
         }
       }
-
-      m_list->addChild(std::move(vpnCard));
     }
 
     if (m_modem != nullptr && !m_modem->modems().empty()) {
-      auto cellularCard = ui::column({
-          .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-      });
-
+      divide();
       auto cellularHeader = makeCardHeaderRow(i18n::tr("control-center.network.cellular"), scale);
       cellularHeader->addChild(
           ui::toggle({
@@ -1924,68 +1922,60 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
               .onChange = [this](bool checked) { requestCellularEnabled(checked); },
           })
       );
-      cellularCard->addChild(std::move(cellularHeader));
+      well->addChild(std::move(cellularHeader));
 
       for (const auto& modem : m_modem->modems()) {
         auto row = std::make_unique<CellularRow>(scale, modem);
         m_cellularRows.push_back(row.get());
-        cellularCard->addChild(std::move(row));
+        well->addChild(std::move(row));
       }
-
-      m_list->addChild(std::move(cellularCard));
     }
 
-    {
-      auto wifiCard = ui::column({
-          .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-      });
+    divide();
+    auto wifiHeader = makeCardHeaderRow(i18n::tr("control-center.network.wifi"), scale);
+    wifiHeader->addChild(
+        ui::spinner({
+            .out = &m_scanSpinner,
+            .color = colorSpecFromRole(ColorRole::Primary),
+            .spinnerSize = Style::baseGlyphSize * scale,
+            .visible = false,
+        })
+    );
 
-      auto wifiHeader = makeCardHeaderRow(i18n::tr("control-center.network.wifi"), scale);
-      wifiHeader->addChild(
-          ui::spinner({
-              .out = &m_scanSpinner,
-              .color = colorSpecFromRole(ColorRole::Primary),
-              .spinnerSize = Style::baseGlyphSize * scale,
-              .visible = false,
-          })
-      );
+    wifiHeader->addChild(
+        ui::button({
+            .out = &m_rescanButton,
+            .glyph = "refresh",
+            .glyphSize = Style::baseGlyphSize * scale,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr("control-center.network.rescan"),
+            .padding = Style::spaceXs * scale,
+            .radius = Style::scaledRadiusSm(scale),
+            .onClick = [this]() {
+              if (m_network != nullptr) {
+                m_network->requestScan();
+              }
+            },
+        })
+    );
 
-      wifiHeader->addChild(
-          ui::button({
-              .out = &m_rescanButton,
-              .glyph = "refresh",
-              .glyphSize = Style::baseGlyphSize * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.rescan"),
-              .padding = Style::spaceXs * scale,
-              .radius = Style::scaledRadiusSm(scale),
-              .onClick = [this]() {
-                if (m_network != nullptr) {
-                  m_network->requestScan();
-                }
-              },
-          })
-      );
+    wifiHeader->addChild(
+        ui::toggle({
+            .out = &m_wifiToggle,
+            .checkedImmediate = m_network->state().wirelessEnabled,
+            .toggleSize = ToggleSize::Medium,
+            .scale = scale,
+            .onChange = [this](bool checked) { requestWirelessEnabled(checked); },
+        })
+    );
+    well->addChild(std::move(wifiHeader));
+    well->addChild(buildApRows());
 
-      wifiHeader->addChild(
-          ui::toggle({
-              .out = &m_wifiToggle,
-              .checkedImmediate = m_network->state().wirelessEnabled,
-              .toggleSize = ToggleSize::Medium,
-              .scale = scale,
-              .onChange = [this](bool checked) { requestWirelessEnabled(checked); },
-          })
-      );
-      wifiCard->addChild(std::move(wifiHeader));
+    m_list->addChild(std::move(wellCard));
 
-      wifiCard->addChild(buildApRows());
-
-      m_list->addChild(std::move(wifiCard));
-
-      // Live state (spinner visibility/animation, toggle checked) is owned by
-      // syncCurrentCard(), which runs every frame after the card is attached.
-      // rebuildApList() builds structure only and must not drive animations.
-    }
+    // Live state (spinner visibility/animation, toggle checked) is owned by
+    // syncCurrentCard(), which runs every frame after the card is attached.
+    // rebuildApList() builds structure only and must not drive animations.
   }
   m_liveScroll->layout(renderer);
 }
@@ -2334,16 +2324,20 @@ void NetworkTab::syncDnsPicker() {
   if (m_dnsProfilePicker != nullptr) {
     m_dnsProfilePicker->setEnabled(enabled);
     m_dnsSyncing = true;
-    m_dnsProfilePicker->setSelectedIndex(static_cast<std::size_t>(m_dnsProfile));
+    m_dnsProfilePicker->setSelectedIndexSilently(static_cast<std::size_t>(m_dnsProfile));
     m_dnsSyncing = false;
   }
   const bool showNextDns = m_dnsProfile == DnsProfile::NextDns;
   const bool showCustom = m_dnsProfile == DnsProfile::Custom;
+  bool layoutDirty = false;
   if (m_dnsNextDnsRow != nullptr) {
-    (void)setShown(m_dnsNextDnsRow, showNextDns);
+    layoutDirty = setShown(m_dnsNextDnsRow, showNextDns) || layoutDirty;
   }
   if (m_dnsCustomRow != nullptr) {
-    (void)setShown(m_dnsCustomRow, showCustom);
+    layoutDirty = setShown(m_dnsCustomRow, showCustom) || layoutDirty;
+  }
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
   }
   if (m_dnsNextDnsInput != nullptr) {
     m_dnsNextDnsInput->setEnabled(enabled);

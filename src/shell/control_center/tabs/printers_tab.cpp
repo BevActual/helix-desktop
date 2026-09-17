@@ -91,15 +91,15 @@ std::unique_ptr<Flex> PrintersTab::create() {
   m_rootLayout->setAlign(FlexAlign::Stretch);
   m_rootLayout->setGap(Style::spaceMd * scale);
 
-  auto statusCard = ui::column({
+  auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*statusCard, i18n::tr("control-center.printers.title"), scale);
-  statusCard->addChild(
+  addTitle(*well, i18n::tr("control-center.printers.title"), scale);
+  well->addChild(
       ui::label({
           .out = &m_status,
           .fontSize = Style::fontSizeBody * scale,
@@ -107,7 +107,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::label({
           .out = &m_detail,
           .fontSize = Style::fontSizeCaption * scale,
@@ -115,7 +115,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .maxLines = 3,
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::button({
           .out = &m_startButton,
           .text = i18n::tr("control-center.printers.start"),
@@ -131,7 +131,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
               },
       })
   );
-  statusCard->addChild(
+  well->addChild(
       ui::button({
           .out = &m_openButton,
           .text = i18n::tr("control-center.printers.open"),
@@ -142,15 +142,12 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .onClick = []() { (void)net::openInBrowser("http://localhost:631"); },
       })
   );
-  m_rootLayout->addChild(std::move(statusCard));
 
+  m_printersDivider = addWellDivider(*well, scale);
   auto printersCard = ui::column({
       .out = &m_printersCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
   addTitle(*printersCard, i18n::tr("control-center.printers.list"), scale);
   printersCard->addChild(
@@ -160,7 +157,8 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(printersCard));
+  well->addChild(std::move(printersCard));
+  m_rootLayout->addChild(std::move(well));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -209,6 +207,7 @@ void PrintersTab::onClose() {
   m_startButton = nullptr;
   m_openButton = nullptr;
   m_printersCard = nullptr;
+  m_printersDivider = nullptr;
   m_printerList = nullptr;
   m_liveScroll = nullptr;
   m_printerSignature.clear();
@@ -243,7 +242,7 @@ void PrintersTab::syncUi() {
   const PrinterSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
   const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_openButton, running) ||
-                            setShown(m_printersCard, running);
+                            setShown(m_printersDivider, running) || setShown(m_printersCard, running);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

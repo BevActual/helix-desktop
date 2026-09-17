@@ -62,6 +62,14 @@ namespace noctalia::theme {
     // Writes the current wallpaper-generated palette to ~/.config/noctalia/palettes/
     // and switches palette source to custom.
     [[nodiscard]] bool saveWallpaperPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut = nullptr);
+    // Forks the active palette into a new custom file (wallpaper palettes keep a
+    // wallpaper-based name) and switches palette source to custom.
+    [[nodiscard]] bool saveCurrentPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut = nullptr);
+    // Forks the active palette into a custom file (or overwrites the current custom
+    // palette), writes `role` for the shell's current mode, and switches source to custom.
+    [[nodiscard]] bool saveRoleColorAsCustom(
+        ColorRole role, const ::Color& color, std::string* paletteNameOut, std::string* errorOut = nullptr
+    );
 
   private:
     void resolveAndSet(bool animate);

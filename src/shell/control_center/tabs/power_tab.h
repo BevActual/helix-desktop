@@ -17,6 +17,7 @@ class Label;
 class ProgressBar;
 class Renderer;
 class Segmented;
+class Separator;
 class SessionActionRunner;
 class Toggle;
 class UPowerService;
@@ -77,6 +78,7 @@ private:
   void syncPowerProfiles();
   void syncBatteryHealth();
   void rebuildPeripherals();
+  void syncBatteryWell();
 
   UPowerService* m_upower = nullptr;
   PowerProfilesService* m_powerProfiles = nullptr;
@@ -88,6 +90,7 @@ private:
   Flex* m_root = nullptr;
 
   Flex* m_sessionCard = nullptr;
+  Separator* m_caffeineDivider = nullptr;
   Button* m_lockButton = nullptr;
   Button* m_suspendButton = nullptr;
   Button* m_logoutButton = nullptr;
@@ -97,6 +100,12 @@ private:
   Toggle* m_caffeineToggle = nullptr;
   Flex* m_caffeineRow = nullptr;
   bool m_syncingCaffeine = false;
+
+  Flex* m_batteryWell = nullptr;
+  Separator* m_profilesDivider = nullptr;
+  Separator* m_chargingDivider = nullptr;
+  Separator* m_healthDivider = nullptr;
+  Separator* m_peripheralsDivider = nullptr;
 
   // Battery status
   Flex* m_statusCard = nullptr;

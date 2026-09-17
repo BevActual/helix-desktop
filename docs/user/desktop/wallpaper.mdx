@@ -64,7 +64,7 @@ An empty global `wallpaper.directory` resolves to the standard XDG Pictures dire
 The wallpaper picker lives on Control Center's **Wallpaper** tab (`noctalia msg panel-toggle control-center wallpaper`)
 and in the dedicated wallpaper panel (`noctalia msg panel-toggle wallpaper`). Both list images from the resolved
 browse folder as a grid of thumbnails and highlight the wallpaper currently applied to the selected monitor. Use
-the folder button to open a file picker and choose any image, even outside that folder. Use the **Library / Wallhaven / Video / Daily** control to switch between local files, [Wallhaven](https://wallhaven.cc), video wallpapers, and today's Bing or NASA picture. A **Current** strip under the toolbar shows the wallpaper applied to the selected monitor (or the default path in the **ALL** view), with a monitor picker plus star and lock-screen actions. In Library, folder navigation, flatten, sort, and solid-color apply sit on a second tools row. In **Daily**, Bing and NASA switch next to the source control. In the **ALL** monitor
+the folder button to open a file picker and choose any image, even outside that folder. Library, Wallhaven, Video, and Daily share one compact card. Browse sits on the left (icon sources, search, and that source's tools). The current wallpaper sits on the right (preview, Display, star, lock-screen). Flatten, sort, color, and Wallhaven filters stay behind the Filters control so the thumbnail grid keeps the leftover height. Hover a source icon for its name. In **Daily**, Bing/NASA sits on the search row. In **Video**, mute and Stop sit on the search row. In the **ALL** monitor
 view, the highlight follows the default wallpaper path. Theme-aware directories (`directory_light` /
 `directory_dark`) are used when the shell is in Light or Dark mode; **Auto** mode falls back to `directory`.
 Missing per-mode paths fall back to `directory`.
@@ -74,11 +74,11 @@ automation, Wallhaven API, and Daily source settings.
 
 When `per_monitor_directories` is **true**, each connected monitor can define its own `directory` / `directory_light` / `directory_dark` under `[wallpaper.monitor.<name>]`. The picker and automatic rotation resolve the folder per-monitor, so selecting a monitor on the Current strip switches to that monitor's override (falling back to the global folder if unset). When **false**, all monitors share the global directories regardless of which monitor is selected.
 
-Selecting a monitor on the Current strip switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers. The lock button on the Current strip writes `[lockscreen].wallpaper` to that same path; press it again to clear the custom lock image and follow the desktop wallpaper per output. Desktop capture still takes priority when `[lockscreen].blurred_desktop` is on.
+Selecting a monitor on the Current strip switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers. The lock-screen button writes `[lockscreen].wallpaper` to that same path; turn it off to clear the custom lock image and follow the desktop wallpaper per output. Desktop capture still takes priority when `[lockscreen].blurred_desktop` is on.
 
 ## Wallhaven
 
-The wallpaper picker can search [Wallhaven](https://wallhaven.cc), download the full image into your wallpaper folder (or `[wallpaper.wallhaven].download_dir`), and apply it to the selected monitor(s). Type tags to search as you go (comma lists become separate tags; Enter searches immediately). You can paste a wallpaper page or search URL, or a `wallhaven-…` filename. Category, purity, sort, aspect ratio, and resolution filters match the previous Wallhaven plugin. The dimensions button fills **At Least** with the selected monitor's pixel size (the largest connected output when **ALL** is selected). Open that mode from the picker, from Control Center's Wallpaper tab, or:
+The wallpaper picker can search [Wallhaven](https://wallhaven.cc), download the full image into your wallpaper folder (or `[wallpaper.wallhaven].download_dir`), and apply it to the selected monitor(s). Type tags to search as you go (comma lists become separate tags; Enter searches immediately). You can paste a wallpaper page or search URL, or a `wallhaven-…` filename. Category, purity, sort, aspect ratio, and resolution open from Filters. Page controls stay on the browse row. The dimensions button fills **At Least** with the selected monitor's pixel size (the largest connected output when **ALL** is selected). Open that mode from the picker, from Control Center's Wallpaper tab, or:
 
 ```sh
 noctalia msg panel-toggle wallpaper wallhaven
@@ -94,7 +94,7 @@ Requires network access (`[shell].offline_mode` must be off). NSFW results requi
 
 ## Daily
 
-The wallpaper picker can fetch recent stills from [Bing's daily homepage](https://www.bing.com) or [NASA Astronomy Picture of the Day](https://apod.nasa.gov). Switch the picker to **Daily**, or:
+The wallpaper picker can fetch recent stills from [Bing's daily homepage](https://www.bing.com) or [NASA Astronomy Picture of the Day](https://apod.nasa.gov). Switch the picker to **Daily**, then use the **Daily Source** dropdown, or:
 
 ```sh
 noctalia msg panel-toggle wallpaper daily
