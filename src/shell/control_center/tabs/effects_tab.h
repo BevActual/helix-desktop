@@ -67,7 +67,6 @@ private:
   Button* m_motionTile = nullptr;
   Segmented* m_catalogSwitch = nullptr;
   Label* m_caption = nullptr;
-  Flex* m_specimenCard = nullptr;
   Flex* m_bordersHost = nullptr;
   Flex* m_shadowsHost = nullptr;
   Flex* m_speedHost = nullptr;

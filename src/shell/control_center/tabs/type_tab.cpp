@@ -171,7 +171,6 @@ std::unique_ptr<Flex> TypeTab::create() {
 std::unique_ptr<Flex> TypeTab::createLiveBody() {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
 
   m_fontAdapter = std::make_unique<FontGridAdapter>(scale);
 
@@ -232,127 +231,12 @@ std::unique_ptr<Flex> TypeTab::createLiveBody() {
       })
   );
   compactCard->addChild(std::move(toolbar));
-  auto ramp = ui::row({
-      .align = FlexAlign::End,
-      .gap = Style::spaceMd * scale,
-  });
-  auto makeTypeSpecimen = [&](Label** labelOut, float fontSize, FontWeight weight, const std::string& caption) {
-    auto cell = ui::column({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceXs * scale,
-        .flexGrow = 1.0F,
-    });
-    cell->addChild(
-        ui::label({
-            .out = labelOut,
-            .text = "Aa",
-            .fontSize = fontSize,
-            .fontWeight = weight,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .textAlign = TextAlign::Center,
-        })
-    );
-    cell->addChild(
-        ui::label({
-            .text = caption,
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 1,
-            .textAlign = TextAlign::Center,
-        })
-    );
-    return cell;
-  };
-  ramp->addChild(
-      makeTypeSpecimen(
-          &m_fontPreviewCaption, Style::fontSizeCaption * scale, FontWeight::Normal,
-          i18n::tr("control-center.appearance.specimen-caption")
-      )
-  );
-  ramp->addChild(
-      makeTypeSpecimen(
-          &m_fontPreviewBody, Style::fontSizeBody * scale, FontWeight::Normal,
-          i18n::tr("control-center.appearance.specimen-body")
-      )
-  );
-  ramp->addChild(
-      makeTypeSpecimen(
-          &m_fontPreview, Style::fontSizeTitle * scale, FontWeight::Medium,
-          i18n::tr("control-center.appearance.specimen-title")
-      )
-  );
-  compactCard->addChild(std::move(ramp));
-  compactCard->addChild(
-      ui::label({
-          .out = &m_fontPreviewPangram,
-          .text = i18n::tr("control-center.appearance.font-preview"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 2,
-      })
-  );
-  auto chrome = ui::row({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-  });
-  auto makeControlSpecimen = [&](Label** labelOut, ColorSpec fill, ColorSpec text, ColorSpec border, float borderWidth,
-                                 const std::string& caption) {
-    auto cell = ui::column({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceXs * scale,
-        .flexGrow = 1.0F,
-    });
-    auto chip = ui::row({
-        .align = FlexAlign::Center,
-        .justify = FlexJustify::Center,
-        .paddingH = Style::spaceMd * scale,
-        .fill = fill,
-        .radius = Style::scaledRadiusMd(scale),
-        .border = border,
-        .borderWidth = borderWidth,
-        .minHeight = controlHeight,
-        .fillWidth = true,
-    });
-    chip->addChild(
-        ui::label({
-            .out = labelOut,
-            .text = "Aa",
-            .fontSize = Style::fontSizeBody * scale,
-            .color = text,
-            .textAlign = TextAlign::Center,
-        })
-    );
-    cell->addChild(std::move(chip));
-    cell->addChild(
-        ui::label({
-            .text = caption,
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 1,
-            .textAlign = TextAlign::Center,
-        })
-    );
-    return cell;
-  };
-  chrome->addChild(
-      makeControlSpecimen(
-          &m_fontPreviewGhost, colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F),
-          colorSpecFromRole(ColorRole::OnSurface), colorSpecFromRole(ColorRole::Outline, 0.45F), 1.0F,
-          i18n::tr("control-center.appearance.specimen-ghost")
-      )
-  );
-  chrome->addChild(
-      makeControlSpecimen(
-          &m_fontPreviewPrimary, colorSpecFromRole(ColorRole::Primary), colorSpecFromRole(ColorRole::OnPrimary),
-          colorSpecFromRole(ColorRole::Primary), 0.0F, i18n::tr("control-center.appearance.specimen-primary")
-      )
-  );
-  compactCard->addChild(std::move(chrome));
   tab->addChild(std::move(compactCard));
 
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .fillHeight = true,
       .flexGrow = 1.0F,
   });
   leftover->addChild(
@@ -411,12 +295,6 @@ void TypeTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_fontName = nullptr;
-  m_fontPreviewGhost = nullptr;
-  m_fontPreviewPrimary = nullptr;
-  m_fontPreviewCaption = nullptr;
-  m_fontPreviewBody = nullptr;
-  m_fontPreview = nullptr;
-  m_fontPreviewPangram = nullptr;
   m_filter = nullptr;
   m_grid = nullptr;
   m_empty = nullptr;
@@ -455,6 +333,12 @@ void TypeTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void TypeTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_filter != nullptr) {
+    m_filter->setSurfaceOpacity(opacity);
+  }
+}
+
 void TypeTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
@@ -465,17 +349,6 @@ void TypeTab::syncLiveControls() {
     m_fontName->setText(family.empty() ? i18n::tr("control-center.appearance.system-font") : family);
     m_fontName->setFontFamily(family);
   }
-  const auto applyFamily = [&](Label* label) {
-    if (label != nullptr) {
-      label->setFontFamily(family);
-    }
-  };
-  applyFamily(m_fontPreviewGhost);
-  applyFamily(m_fontPreviewPrimary);
-  applyFamily(m_fontPreviewCaption);
-  applyFamily(m_fontPreviewBody);
-  applyFamily(m_fontPreview);
-  applyFamily(m_fontPreviewPangram);
   if (m_grid != nullptr && m_fontAdapter != nullptr) {
     auto* fonts = static_cast<FontGridAdapter*>(m_fontAdapter.get());
     m_grid->setSelectedIndex(fonts->indexOfFamily(family));

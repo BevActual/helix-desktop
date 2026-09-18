@@ -8,11 +8,11 @@
 #include <memory>
 #include <string_view>
 
-class Button;
 class ConfigService;
 class Flex;
 class Label;
 class Renderer;
+class Segmented;
 struct ControlCenterServices;
 
 class GlassTab : public Tab {
@@ -31,6 +31,7 @@ public:
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
   void applyTransparencyMode(PanelTransparencyMode mode);
 
@@ -39,11 +40,8 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
-  Button* m_modeSolid = nullptr;
-  Button* m_modeSoft = nullptr;
-  Button* m_modeGlass = nullptr;
+  Segmented* m_modeSwitch = nullptr;
   Label* m_caption = nullptr;
-  Flex* m_specimen = nullptr;
 
   bool m_syncing = false;
   bool m_liveDirty = false;

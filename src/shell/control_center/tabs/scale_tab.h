@@ -31,7 +31,6 @@ private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void syncLiveControls();
-  void updateScalePreview();
   void commitUiScale();
 
   ConfigService* m_config = nullptr;
@@ -41,13 +40,7 @@ private:
   Flex* m_rootLayout = nullptr;
   Slider* m_uiScale = nullptr;
   Label* m_uiScaleValue = nullptr;
-  Flex* m_specimenWindow = nullptr;
-  Label* m_scalePreviewCaption = nullptr;
-  Label* m_scalePreviewBody = nullptr;
-  Label* m_scalePreviewTitle = nullptr;
-  Label* m_scalePreviewPangram = nullptr;
 
   bool m_syncing = false;
   bool m_liveDirty = false;
-  float m_previewScale = -1.0F;
 };

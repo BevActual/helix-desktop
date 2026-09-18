@@ -34,6 +34,7 @@ public:
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
   void applyFontFamily(std::string family);
   void refreshFontGrid();
@@ -45,12 +46,6 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Label* m_fontName = nullptr;
-  Label* m_fontPreviewCaption = nullptr;
-  Label* m_fontPreviewBody = nullptr;
-  Label* m_fontPreview = nullptr;
-  Label* m_fontPreviewPangram = nullptr;
-  Label* m_fontPreviewGhost = nullptr;
-  Label* m_fontPreviewPrimary = nullptr;
   Input* m_filter = nullptr;
   VirtualGridView* m_grid = nullptr;
   Label* m_empty = nullptr;

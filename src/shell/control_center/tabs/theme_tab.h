@@ -21,13 +21,15 @@
 #include <vector>
 
 class Button;
+class ColorSwatchPreviewStrip;
 class ConfigService;
 class Flex;
-class GridView;
 class Input;
 class Label;
 class Renderer;
 class Segmented;
+class VirtualGridAdapter;
+class VirtualGridView;
 struct ControlCenterServices;
 
 namespace noctalia::theme {
@@ -77,8 +79,6 @@ private:
   void syncHosts();
   void syncSettingsSection();
   void syncChildChrome();
-  void updatePalettesLayout(float contentWidth);
-  [[nodiscard]] bool updatePaletteColumns(float availableWidth);
   compositors::niri::InstallResult syncNiriLayoutTheme();
   void openCustomPalettesFolder();
   void saveCurrentPalette();
@@ -101,12 +101,14 @@ private:
   std::unique_ptr<RoundnessTab> m_roundness;
   std::unique_ptr<EffectsTab> m_effects;
   std::unique_ptr<LanguageTab> m_language;
+  std::unique_ptr<VirtualGridAdapter> m_paletteAdapter;
 
   Flex* m_rootLayout = nullptr;
   Segmented* m_sectionSwitch = nullptr;
   Flex* m_palettesHost = nullptr;
   Flex* m_palettesCard = nullptr;
   Flex* m_palettesLeftover = nullptr;
+  ColorSwatchPreviewStrip* m_currentSwatches = nullptr;
   Flex* m_glassHost = nullptr;
   Flex* m_iconsHost = nullptr;
   Flex* m_typeHost = nullptr;
@@ -114,15 +116,13 @@ private:
   Flex* m_roundnessHost = nullptr;
   Flex* m_effectsHost = nullptr;
   Flex* m_languageHost = nullptr;
-  Button* m_modeDark = nullptr;
-  Button* m_modeLight = nullptr;
-  Button* m_modeAuto = nullptr;
+  Segmented* m_modeSwitch = nullptr;
   Button* m_autoStatus = nullptr;
   Label* m_paletteName = nullptr;
   Segmented* m_sourceSwitch = nullptr;
   Input* m_paletteFilter = nullptr;
   Flex* m_catalogToolbar = nullptr;
-  GridView* m_paletteGrid = nullptr;
+  VirtualGridView* m_paletteGrid = nullptr;
   Label* m_paletteEmpty = nullptr;
   Button* m_openWallpaperButton = nullptr;
   Button* m_openPalettesButton = nullptr;
@@ -131,7 +131,6 @@ private:
 
   std::vector<std::string> m_paletteValues;
   std::string m_paletteQuery;
-  std::string m_lastGridKey;
   Section m_section = Section::Palettes;
   bool m_syncing = false;
   bool m_liveDirty = false;

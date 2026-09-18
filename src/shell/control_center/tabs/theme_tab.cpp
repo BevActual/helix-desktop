@@ -13,17 +13,22 @@
 #include "theme/builtin_palettes.h"
 #include "theme/community_palettes.h"
 #include "theme/custom_palettes.h"
+#include "theme/fixed_palette.h"
+#include "theme/image_loader.h"
+#include "theme/palette_generator.h"
+#include "theme/scheme.h"
 #include "theme/theme_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/color_swatch_preview.h"
 #include "ui/controls/flex.h"
-#include "ui/controls/grid_view.h"
+#include "ui/controls/glyph.h"
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
+#include "ui/controls/virtual_grid_view.h"
 #include "ui/dialogs/color_picker_dialog.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -34,9 +39,11 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <expected>
 #include <filesystem>
 #include <format>
 #include <functional>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -196,13 +203,79 @@ namespace {
     return previewFromMetadata(palette.preview.dark);
   }
 
+  [[nodiscard]] std::vector<ColorSwatchPreview>
+  wallpaperSchemePreviews(ConfigService& config, ThemeMode previewMode) {
+    struct Cache {
+      std::string path;
+      std::int64_t mtimeNs = 0;
+      ThemeMode mode = ThemeMode::Dark;
+      std::vector<ColorSwatchPreview> previews;
+    };
+    static Cache cache;
+
+    const std::string path = config.getPaletteWallpaperPath();
+    std::int64_t mtimeNs = 0;
+    if (!path.empty()) {
+      std::error_code ec;
+      const auto writeTime = std::filesystem::last_write_time(path, ec);
+      mtimeNs = ec ? 0 : writeTime.time_since_epoch().count();
+    }
+    if (cache.path == path && cache.mtimeNs == mtimeNs && cache.mode == previewMode
+        && cache.previews.size() == kWallpaperSchemeValues.size()) {
+      return cache.previews;
+    }
+
+    cache.path = path;
+    cache.mtimeNs = mtimeNs;
+    cache.mode = previewMode;
+    cache.previews.assign(kWallpaperSchemeValues.size(), {});
+    if (path.empty()) {
+      return cache.previews;
+    }
+
+    std::optional<noctalia::theme::LoadedImage> materialImage;
+    std::optional<noctalia::theme::LoadedImage> customImage;
+    const auto rgbForScheme = [&](noctalia::theme::Scheme scheme) -> const std::vector<std::uint8_t>* {
+      std::optional<noctalia::theme::LoadedImage>& slot =
+          noctalia::theme::isMaterialScheme(scheme) ? materialImage : customImage;
+      if (!slot.has_value()) {
+        auto loaded = noctalia::theme::loadAndResize(path, scheme);
+        if (!loaded) {
+          return nullptr;
+        }
+        slot = std::move(*loaded);
+      }
+      return &slot->rgb;
+    };
+
+    for (std::size_t i = 0; i < kWallpaperSchemeValues.size(); ++i) {
+      const auto scheme = noctalia::theme::schemeFromString(kWallpaperSchemeValues[i]);
+      if (!scheme.has_value()) {
+        continue;
+      }
+      const std::vector<std::uint8_t>* rgb = rgbForScheme(*scheme);
+      if (rgb == nullptr) {
+        continue;
+      }
+      const auto generated = noctalia::theme::generate(*rgb, *scheme);
+      if (!generated) {
+        continue;
+      }
+      const noctalia::theme::TokenMap& tokens =
+          previewMode == ThemeMode::Light ? generated->light : generated->dark;
+      cache.previews[i] = previewFromPalette(noctalia::theme::mapGeneratedPaletteMode(tokens));
+    }
+    return cache.previews;
+  }
+
   struct PaletteCatalog {
     std::vector<std::string> values;
     std::vector<std::string> labels;
     std::vector<ColorSwatchPreview> previews;
   };
 
-  [[nodiscard]] PaletteCatalog buildPaletteCatalog(PaletteSource source, ThemeMode previewMode) {
+  [[nodiscard]] PaletteCatalog
+  buildPaletteCatalog(PaletteSource source, ThemeMode previewMode, ConfigService* config) {
     PaletteCatalog catalog;
     switch (source) {
     case PaletteSource::Builtin:
@@ -214,12 +287,18 @@ namespace {
         );
       }
       break;
-    case PaletteSource::Wallpaper:
+    case PaletteSource::Wallpaper: {
+      const std::vector<ColorSwatchPreview> previews =
+          config != nullptr ? wallpaperSchemePreviews(*config, previewMode) : std::vector<ColorSwatchPreview>{};
       for (std::size_t i = 0; i < kWallpaperSchemeValues.size(); ++i) {
         catalog.values.emplace_back(kWallpaperSchemeValues[i]);
         catalog.labels.emplace_back(i18n::tr(kWallpaperSchemeLabelKeys[i]));
+        if (i < previews.size()) {
+          catalog.previews.push_back(previews[i]);
+        }
       }
       break;
+    }
     case PaletteSource::Community:
       for (const auto& entry : noctalia::theme::availableCommunityPalettes()) {
         catalog.values.push_back(entry.name);
@@ -272,245 +351,180 @@ namespace {
     };
   }
 
-  constexpr Color kLightDesktop = rgbHex(0xF5F5F7);
-  constexpr Color kDarkDesktop = rgbHex(0x1C1C1E);
-  constexpr Color kLightWindow = rgbHex(0xFFFFFF);
-  constexpr Color kDarkWindow = rgbHex(0x2C2C2E);
-  constexpr Color kLightTitlebar = rgbHex(0xE8E8ED);
-  constexpr Color kDarkTitlebar = rgbHex(0x3A3A3C);
-  constexpr Color kLightRule = rgbHex(0xD1D1D6);
-  constexpr Color kDarkRule = rgbHex(0x636366);
-  constexpr Color kTrafficClose = rgbHex(0xFF5F57);
-  constexpr Color kTrafficMin = rgbHex(0xFEBC2E);
-  constexpr Color kTrafficMax = rgbHex(0x28C840);
-
-  Button::ButtonPalette appearanceTilePalette(bool light, bool autoTile) {
-    const ColorSpec fill = autoTile ? colorSpecFromRole(ColorRole::SurfaceVariant)
-                                    : (light ? fixedColorSpec(kLightDesktop) : fixedColorSpec(kDarkDesktop));
-    const ColorSpec label = autoTile ? colorSpecFromRole(ColorRole::OnSurface)
-                                     : (light ? fixedColorSpec(kDarkDesktop) : fixedColorSpec(kLightDesktop));
-    const ColorSpec restBorder = autoTile ? colorSpecFromRole(ColorRole::Outline, 0.4F)
-                                          : (light ? fixedColorSpec(Color{0.0F, 0.0F, 0.0F, 0.10F})
-                                                   : fixedColorSpec(Color{1.0F, 1.0F, 1.0F, 0.14F}));
-    const ColorSpec selectedBorder = colorSpecFromRole(ColorRole::Primary);
-    Button::ButtonStateColors rest{.bg = fill, .border = restBorder, .label = label};
-    Button::ButtonStateColors selected{.bg = fill, .border = selectedBorder, .label = label};
-    return {
-        .borderWidth = 2.0F,
-        .normal = rest,
-        .hover = selected,
-        .pressed = selected,
-        .disabled = rest,
-        .selected = selected,
-    };
+  [[nodiscard]] ColorSpec opaqueSpec(const ColorSpec& spec) {
+    Color color = resolveColorSpec(spec);
+    color.a = 1.0F;
+    return fixedColorSpec(color);
   }
 
-  void insertBeforeLabel(Button& button, std::unique_ptr<Node> child) {
-    std::size_t labelIndex = button.children().size();
-    for (std::size_t i = 0; i < button.children().size(); ++i) {
-      if (button.children()[i].get() == button.label()) {
-        labelIndex = i;
-        break;
+  [[nodiscard]] ColorSpec leftoverFill(const ColorSpec& overlay) {
+    const Color top = resolveColorSpec(overlay);
+    const Color base = resolveColorSpec(colorSpecFromRole(ColorRole::Surface));
+    const float a = std::clamp(top.a, 0.0F, 1.0F);
+    return fixedColorSpec(Color{
+        .r = top.r * a + base.r * (1.0F - a),
+        .g = top.g * a + base.g * (1.0F - a),
+        .b = top.b * a + base.b * (1.0F - a),
+        .a = 1.0F,
+    });
+  }
+
+  [[nodiscard]] Node* contentChild(Flex& flex, std::size_t index) {
+    std::size_t n = 0;
+    for (const auto& child : flex.children()) {
+      if (child == nullptr || child->zIndex() < 0 || child->type() == NodeType::Rect) {
+        continue;
+      }
+      if (n == index) {
+        return child.get();
+      }
+      ++n;
+    }
+    return nullptr;
+  }
+
+  class PaletteGridAdapter final : public VirtualGridAdapter {
+  public:
+    explicit PaletteGridAdapter(float scale) : m_scale(scale) {}
+
+    void setCatalog(PaletteCatalog catalog, std::string fallbackGlyph) {
+      m_catalog = std::move(catalog);
+      m_fallbackGlyph = std::move(fallbackGlyph);
+    }
+
+    [[nodiscard]] std::size_t itemCount() const override { return m_catalog.labels.size(); }
+
+    [[nodiscard]] std::unique_ptr<Node> createTile() override {
+      const float wellHeight = Style::controlHeight * 1.15F * m_scale;
+      auto tile = ui::column({
+          .align = FlexAlign::Stretch,
+          .justify = FlexJustify::Center,
+          .gap = Style::spaceXs * m_scale,
+          .padding = Style::spaceSm * m_scale,
+          .fill = leftoverFill(colorSpecFromRole(ColorRole::Surface)),
+          .radius = Style::scaledRadiusXl(m_scale),
+          .border = colorSpecFromRole(ColorRole::Outline, 0.28F),
+          .borderWidth = 2.0F,
+      });
+      auto well = ui::column({
+          .align = FlexAlign::Stretch,
+          .justify = FlexJustify::Center,
+          .gap = 0.0F,
+          .fill = opaqueSpec(colorSpecFromRole(ColorRole::Surface)),
+          .radius = Style::scaledRadiusMd(m_scale),
+          .minHeight = wellHeight,
+          .maxHeight = wellHeight,
+          .fillWidth = true,
+          .clipChildren = true,
+          .height = wellHeight,
+      });
+      well->addChild(
+          ui::glyph({
+              .glyph = "palette",
+              .glyphSize = Style::fontSizeTitle * m_scale,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          })
+      );
+      auto accents = ui::row({
+          .align = FlexAlign::Stretch,
+          .gap = 0.0F,
+          .minHeight = wellHeight,
+          .maxHeight = wellHeight,
+          .fillWidth = true,
+          .visible = false,
+          .participatesInLayout = false,
+      });
+      for (std::size_t i = 0; i < ColorSwatchPreviewStrip::kMaxSwatches; ++i) {
+        accents->addChild(
+            ui::row({
+                .fill = opaqueSpec(colorSpecFromRole(ColorRole::Surface)),
+                .fillHeight = true,
+                .flexGrow = 1.0F,
+            })
+        );
+      }
+      well->addChild(std::move(accents));
+      tile->addChild(std::move(well));
+      tile->addChild(
+          ui::label({
+              .fontSize = Style::fontSizeCaption * m_scale,
+              .color = colorSpecFromRole(ColorRole::OnSurface),
+              .maxLines = 1,
+              .textAlign = TextAlign::Center,
+              .ellipsize = TextEllipsize::End,
+          })
+      );
+      return tile;
+    }
+
+    void bindTile(Node& tile, std::size_t index, bool selected, bool hovered) override {
+      auto* flex = dynamic_cast<Flex*>(&tile);
+      if (flex == nullptr || index >= m_catalog.labels.size()) {
+        return;
+      }
+      auto* well = dynamic_cast<Flex*>(contentChild(*flex, 0));
+      auto* name = dynamic_cast<Label*>(contentChild(*flex, 1));
+      const ColorSpec fill = selected ? leftoverFill(colorSpecFromRole(ColorRole::Primary, 0.18F))
+          : hovered                   ? leftoverFill(colorSpecFromRole(ColorRole::Hover))
+                                      : leftoverFill(colorSpecFromRole(ColorRole::Surface));
+      const ColorSpec border = selected ? colorSpecFromRole(ColorRole::Primary)
+                                        : colorSpecFromRole(ColorRole::Outline, 0.28F);
+      flex->setFill(fill);
+      flex->setBorder(border, 2.0F);
+      if (name != nullptr) {
+        name->setText(m_catalog.labels[index]);
+      }
+      if (well == nullptr) {
+        return;
+      }
+      auto* glyph = dynamic_cast<Glyph*>(contentChild(*well, 0));
+      auto* accents = dynamic_cast<Flex*>(contentChild(*well, 1));
+      const ColorSwatchPreview preview =
+          index < m_catalog.previews.size() ? m_catalog.previews[index] : ColorSwatchPreview{};
+      const bool hasSwatches = !preview.swatches.empty();
+      well->setFill(opaqueSpec(preview.surface.value_or(colorSpecFromRole(ColorRole::SurfaceVariant))));
+      well->setJustify(hasSwatches ? FlexJustify::Start : FlexJustify::Center);
+      well->setAlign(hasSwatches ? FlexAlign::Stretch : FlexAlign::Center);
+      if (glyph != nullptr) {
+        glyph->setGlyph(m_fallbackGlyph);
+        glyph->setVisible(!hasSwatches);
+        glyph->setParticipatesInLayout(!hasSwatches);
+      }
+      if (accents != nullptr) {
+        accents->setVisible(hasSwatches);
+        accents->setParticipatesInLayout(hasSwatches);
+        std::size_t colorIndex = 0;
+        for (const auto& child : accents->children()) {
+          auto* swatch = dynamic_cast<Flex*>(child.get());
+          if (swatch == nullptr || child->zIndex() < 0 || child->type() == NodeType::Rect) {
+            continue;
+          }
+          const bool shown = colorIndex < preview.swatches.size();
+          swatch->setVisible(shown);
+          swatch->setParticipatesInLayout(shown);
+          if (shown) {
+            swatch->setFill(opaqueSpec(preview.swatches[colorIndex]));
+          }
+          ++colorIndex;
+        }
       }
     }
-    button.insertChildAt(labelIndex, std::move(child));
-  }
+
+    [[nodiscard]] std::string itemTooltip(std::size_t index) const override {
+      if (index >= m_catalog.labels.size()) {
+        return {};
+      }
+      return m_catalog.labels[index];
+    }
+
+  private:
+    float m_scale = 1.0F;
+    PaletteCatalog m_catalog;
+    std::string m_fallbackGlyph = "palette";
+  };
 
   void openControlCenterTab(std::string_view tab) {
     PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = tab});
-  }
-
-  struct WindowPreviewStyle {
-    ColorSpec desktop;
-    ColorSpec window;
-    ColorSpec titlebar;
-    ColorSpec border;
-    ColorSpec accent;
-    ColorSpec rule;
-  };
-
-  WindowPreviewStyle appearanceWindowStyle(bool light) {
-    return {
-        .desktop = light ? fixedColorSpec(kLightDesktop) : fixedColorSpec(kDarkDesktop),
-        .window = light ? fixedColorSpec(kLightWindow) : fixedColorSpec(kDarkWindow),
-        .titlebar = light ? fixedColorSpec(kLightTitlebar) : fixedColorSpec(kDarkTitlebar),
-        .border = light ? fixedColorSpec(Color{0.0F, 0.0F, 0.0F, 0.10F})
-                        : fixedColorSpec(Color{1.0F, 1.0F, 1.0F, 0.12F}),
-        .accent = colorSpecFromRole(ColorRole::Primary),
-        .rule = light ? fixedColorSpec(kLightRule) : fixedColorSpec(kDarkRule),
-    };
-  }
-
-  WindowPreviewStyle styleFromPreview(const ColorSwatchPreview& preview) {
-    const ColorSpec surface = preview.surface.value_or(colorSpecFromRole(ColorRole::Surface));
-    const ColorSpec accent =
-        preview.swatches.empty() ? colorSpecFromRole(ColorRole::Primary) : preview.swatches.front();
-    const ColorSpec rule =
-        preview.swatches.size() > 1 ? preview.swatches[1] : colorSpecFromRole(ColorRole::Outline, 0.45F);
-    const ColorSpec titlebar =
-        preview.swatches.size() > 2 ? preview.swatches[2] : colorSpecFromRole(ColorRole::SurfaceVariant);
-    return {
-        .desktop = surface,
-        .window = surface,
-        .titlebar = titlebar,
-        .border = colorSpecFromRole(ColorRole::Outline, 0.32F),
-        .accent = accent,
-        .rule = rule,
-    };
-  }
-
-  std::unique_ptr<Box> makeTrafficDot(const Color& fill, float size) {
-    return ui::box({
-        .fill = fixedColorSpec(fill),
-        .radius = size * 0.5F,
-        .width = size,
-        .height = size,
-    });
-  }
-
-  std::unique_ptr<Flex> makeMiniWindow(const WindowPreviewStyle& style, float scale, bool compact) {
-    const float titleHeight = (compact ? 11.0F : 14.0F) * scale;
-    const float dot = (compact ? 4.5F : 6.0F) * scale;
-    const float radius = Style::scaledRadiusMd(scale);
-    const float ruleHeight = (compact ? 3.0F : 4.0F) * scale;
-    auto window = ui::column({
-        .align = FlexAlign::Stretch,
-        .fill = style.window,
-        .radius = radius,
-        .border = style.border,
-        .borderWidth = 1.0F,
-        .minHeight = (compact ? 34.0F : 48.0F) * scale,
-        .fillWidth = true,
-        .clipChildren = true,
-        .flexGrow = 1.0F,
-    });
-    auto titlebar = ui::row({
-        .align = FlexAlign::Center,
-        .gap = std::max(2.0F, 3.0F * scale),
-        .paddingV = std::max(2.0F, 3.0F * scale),
-        .paddingH = std::max(4.0F, 5.0F * scale),
-        .fill = style.titlebar,
-        .minHeight = titleHeight,
-        .fillWidth = true,
-    });
-    titlebar->addChild(makeTrafficDot(kTrafficClose, dot));
-    titlebar->addChild(makeTrafficDot(kTrafficMin, dot));
-    titlebar->addChild(makeTrafficDot(kTrafficMax, dot));
-    auto body = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = std::max(2.0F, 3.0F * scale),
-        .padding = std::max(4.0F, 5.0F * scale),
-        .fillWidth = true,
-        .flexGrow = 1.0F,
-    });
-    body->addChild(
-        ui::row({
-            .fill = style.accent,
-            .radius = 2.0F * scale,
-            .minHeight = (compact ? 5.0F : 6.0F) * scale,
-            .fillWidth = true,
-        })
-    );
-    body->addChild(
-        ui::row({
-            .fill = style.rule,
-            .radius = 2.0F * scale,
-            .minHeight = ruleHeight,
-            .maxWidth = 48.0F * scale,
-            .fillWidth = true,
-        })
-    );
-    window->addChild(std::move(titlebar));
-    window->addChild(std::move(body));
-    return window;
-  }
-
-  std::unique_ptr<Flex> makeDesktopPreview(const WindowPreviewStyle& style, float scale, bool compact, float height) {
-    const float pad = Style::spaceXs * scale;
-    auto desktop = ui::column({
-        .align = FlexAlign::Stretch,
-        .justify = FlexJustify::Center,
-        .padding = pad,
-        .fill = style.desktop,
-        .minHeight = height,
-        .fillWidth = true,
-        .flexGrow = 1.0F,
-        .configure = [](Flex& host) { host.setHitTestVisible(false); },
-    });
-    desktop->addChild(makeMiniWindow(style, scale, compact));
-    return desktop;
-  }
-
-  std::unique_ptr<Flex> makeAppearancePreview(bool light, bool autoTile, float scale) {
-    const float pad = Style::spaceXs * scale;
-    const float previewHeight = Style::controlHeightLg * 2.05F * scale;
-    const float radius = Style::scaledRadiusLg(scale);
-    if (autoTile) {
-      auto split = ui::row({
-          .align = FlexAlign::Stretch,
-          .gap = 0.0F,
-          .radius = radius,
-          .minHeight = previewHeight,
-          .fillWidth = true,
-          .clipChildren = true,
-          .flexGrow = 1.0F,
-          .configure = [](Flex& host) { host.setHitTestVisible(false); },
-      });
-      auto left = ui::column({
-          .align = FlexAlign::Stretch,
-          .padding = pad,
-          .fill = fixedColorSpec(kLightDesktop),
-          .minHeight = previewHeight,
-          .fillHeight = true,
-          .flexGrow = 1.0F,
-          .configure = [radius](Flex& pane) { pane.setRadii(Radii{radius, 0.0F, 0.0F, radius}); },
-      });
-      left->addChild(makeMiniWindow(appearanceWindowStyle(true), scale, true));
-      auto right = ui::column({
-          .align = FlexAlign::Stretch,
-          .padding = pad,
-          .fill = fixedColorSpec(kDarkDesktop),
-          .minHeight = previewHeight,
-          .fillHeight = true,
-          .flexGrow = 1.0F,
-          .configure = [radius](Flex& pane) { pane.setRadii(Radii{0.0F, radius, radius, 0.0F}); },
-      });
-      right->addChild(makeMiniWindow(appearanceWindowStyle(false), scale, true));
-      split->addChild(std::move(left));
-      split->addChild(std::move(right));
-      return split;
-    }
-
-    return makeDesktopPreview(appearanceWindowStyle(light), scale, false, previewHeight);
-  }
-
-  std::unique_ptr<Flex> makeCatalogPreview(
-      const ColorSwatchPreview& preview, bool wallpaperFallback, float scale, float wellHeight
-  ) {
-    if (!preview.empty()) {
-      return makeDesktopPreview(styleFromPreview(preview), scale, true, wellHeight);
-    }
-    if (!wallpaperFallback) {
-      return nullptr;
-    }
-    auto well = ui::row({
-        .align = FlexAlign::Center,
-        .justify = FlexJustify::Center,
-        .padding = Style::spaceXs * scale,
-        .fill = colorSpecFromRole(ColorRole::Surface),
-        .radius = Style::scaledRadiusLg(scale),
-        .minHeight = wellHeight,
-        .fillWidth = true,
-        .configure = [](Flex& host) { host.setHitTestVisible(false); },
-    });
-    well->addChild(
-        ui::glyph({
-            .glyph = "photo",
-            .glyphSize = Style::fontSizeTitle * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-    return well;
   }
 
   Button::ButtonPalette captionButtonPalette() {
@@ -529,59 +543,9 @@ namespace {
     };
   }
 
-  Button::ButtonPalette catalogTilePalette() {
-    const ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F);
-    const ColorSpec label = colorSpecFromRole(ColorRole::OnSurface);
-    const ColorSpec restBorder = colorSpecFromRole(ColorRole::Outline, 0.28F);
-    const ColorSpec selectedBorder = colorSpecFromRole(ColorRole::Primary);
-    Button::ButtonStateColors rest{.bg = fill, .border = restBorder, .label = label};
-    Button::ButtonStateColors selected{.bg = fill, .border = selectedBorder, .label = label};
-    return {
-        .borderWidth = 2.0F,
-        .normal = rest,
-        .hover = selected,
-        .pressed = selected,
-        .disabled = rest,
-        .selected = selected,
-    };
-  }
-
   [[nodiscard]] std::string colorHex(const Color& color) {
     const auto channel = [](float v) { return static_cast<int>(std::clamp(v, 0.0F, 1.0F) * 255.0F); };
     return std::format("#{:02x}{:02x}{:02x}", channel(color.r), channel(color.g), channel(color.b));
-  }
-
-  std::unique_ptr<Button> makeAppearanceTile(
-      Button** out, const std::string& label, bool selected, bool light, bool autoTile, float scale,
-      std::function<void()> onClick
-  ) {
-    return ui::button({
-        .out = out,
-        .text = std::string(label),
-        .fontSize = Style::fontSizeCaption * scale,
-        .selected = selected,
-        .contentAlign = ButtonContentAlign::Center,
-        .customPalette = appearanceTilePalette(light, autoTile),
-        .tooltip = label,
-        .minHeight = Style::controlHeightLg * 3.05F * scale,
-        .padding = Style::spaceXs * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = Style::scaledRadiusXl(scale),
-        .flexGrow = 1.0F,
-        .onClick = std::move(onClick),
-        .configure =
-            [light, autoTile, scale](Button& button) {
-              button.setDirection(FlexDirection::Vertical);
-              button.setAlign(FlexAlign::Stretch);
-              button.setJustify(FlexJustify::Start);
-              button.setClipChildren(true);
-              if (button.label() != nullptr) {
-                button.label()->setMaxLines(1);
-                button.label()->setTextAlign(TextAlign::Center);
-              }
-              insertBeforeLabel(button, makeAppearancePreview(light, autoTile, scale));
-            },
-    });
   }
 
 } // namespace
@@ -709,6 +673,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       m_config != nullptr ? m_config->config().theme.source : PaletteSource::Builtin;
   const float opacity = panelCardOpacity();
   syncChildChrome();
+  m_paletteAdapter = std::make_unique<PaletteGridAdapter>(scale);
 
   auto tab = ui::column({
       .out = &m_rootLayout,
@@ -786,6 +751,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       .out = &m_palettesHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
+      .fillHeight = true,
       .flexGrow = 1.0F,
   });
   auto palettesCard = ui::column({
@@ -835,6 +801,34 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .compact = true,
           .surfaceOpacity = opacity,
           .onChange = [this](std::size_t index) { applyPaletteSource(index); },
+      })
+  );
+  browse->addChild(
+      ui::segmented({
+          .out = &m_modeSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "moon",
+                      .tooltip = i18n::tr("settings.options.theme.mode.dark"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "sun",
+                      .tooltip = i18n::tr("settings.options.theme.mode.light"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "sun-moon",
+                      .tooltip = i18n::tr("common.states.auto"),
+                  },
+              },
+          .selectedIndex = modeIndex,
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = opacity,
+          .onChange = [this](std::size_t index) { applyThemeMode(index); },
       })
   );
   browse->addChild(
@@ -914,7 +908,16 @@ std::unique_ptr<Flex> ThemeTab::create() {
       .fillWidth = true,
   });
   toolbar->addChild(std::move(browse));
-  toolbar->addChild(
+  auto currentPick = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceXs * scale,
+  });
+  auto currentSwatches = std::make_unique<ColorSwatchPreviewStrip>();
+  currentSwatches->setMetricsFromFontSize(captionSize);
+  currentSwatches->setPreview(currentRolePreview());
+  m_currentSwatches = currentSwatches.get();
+  currentPick->addChild(std::move(currentSwatches));
+  currentPick->addChild(
       ui::label({
           .out = &m_paletteName,
           .text = i18n::tr("control-center.appearance.palette"),
@@ -922,28 +925,10 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 1,
           .ellipsize = TextEllipsize::End,
-          .visible = false,
-          .participatesInLayout = false,
       })
   );
+  toolbar->addChild(std::move(currentPick));
   palettesCard->addChild(std::move(toolbar));
-
-  auto modeRow = ui::row({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-  });
-  modeRow->addChild(makeAppearanceTile(
-      &m_modeDark, i18n::tr("settings.options.theme.mode.dark"), modeIndex == 0, false, false, scale,
-      [this]() { applyThemeMode(0); }
-  ));
-  modeRow->addChild(makeAppearanceTile(
-      &m_modeLight, i18n::tr("settings.options.theme.mode.light"), modeIndex == 1, true, false, scale,
-      [this]() { applyThemeMode(1); }
-  ));
-  modeRow->addChild(makeAppearanceTile(
-      &m_modeAuto, i18n::tr("common.states.auto"), modeIndex == 2, false, true, scale, [this]() { applyThemeMode(2); }
-  ));
-  palettesCard->addChild(std::move(modeRow));
   palettesCard->addChild(
       ui::button({
           .out = &m_autoStatus,
@@ -968,32 +953,25 @@ std::unique_ptr<Flex> ThemeTab::create() {
 
   auto heroWell = ui::row({
       .align = FlexAlign::Center,
-      .justify = FlexJustify::Center,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceSm * scale,
-      .fill = colorSpecFromRole(ColorRole::Surface),
-      .radius = Style::scaledRadiusXl(scale),
-      .minHeight = Style::controlHeightLg * 1.25F * scale,
+      .wrap = true,
+      .gap = Style::spaceXs * scale,
       .fillWidth = true,
   });
-  const float primarySize = Style::controlHeight * 1.45F * scale;
-  const float swatchSize = Style::controlHeight * 1.05F * scale;
-  for (std::size_t i = 0; i < kPaletteSwatches.size(); ++i) {
-    const auto& swatch = kPaletteSwatches[i];
+  const float swatchSize = Style::controlHeightSm * scale;
+  for (const auto& swatch : kPaletteSwatches) {
     const std::string roleLabel = i18n::tr(swatch.labelKey);
-    const float size = i == 0 ? primarySize : swatchSize;
     heroWell->addChild(
         ui::button({
             .customPalette = roleSwatchPalette(swatch.role),
             .tooltip = i18n::tr("control-center.appearance.edit-role-tooltip", "role", roleLabel),
-            .minWidth = size,
-            .minHeight = size,
-            .maxWidth = size,
-            .maxHeight = size,
+            .minWidth = swatchSize,
+            .minHeight = swatchSize,
+            .maxWidth = swatchSize,
+            .maxHeight = swatchSize,
             .padding = 0.0F,
-            .radius = size * 0.5F,
-            .width = size,
-            .height = size,
+            .radius = swatchSize * 0.5F,
+            .width = swatchSize,
+            .height = swatchSize,
             .onClick = [this, role = swatch.role, roleLabel]() { pickRoleColor(role, roleLabel); },
         })
     );
@@ -1015,6 +993,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       .out = &m_palettesLeftover,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .fillHeight = true,
       .flexGrow = 1.0F,
   });
   leftover->addChild(
@@ -1027,32 +1006,34 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .participatesInLayout = false,
       })
   );
-  auto listScroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .viewportPaddingH = 0.0F,
-      .viewportPaddingV = 0.0F,
-      .flexGrow = 1.0F,
-      .configure =
-          [](ScrollView& scrollView) {
-            scrollView.clearFill();
-            scrollView.clearBorder();
-          },
-  });
-  auto* content = listScroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  auto grid = std::make_unique<GridView>();
-  grid->setColumns(2);
-  grid->setColumnGap(Style::spaceSm * scale);
-  grid->setRowGap(Style::spaceSm * scale);
-  grid->setUniformCellSize(true);
-  grid->setStretchItems(true);
-  grid->setSquareCells(false);
-  grid->setMinCellHeight(Style::controlHeightLg * 2.45F * scale);
-  m_paletteGrid = grid.get();
-  content->addChild(std::move(grid));
-  leftover->addChild(std::move(listScroll));
+  leftover->addChild(
+      ui::virtualGridView({
+          .out = &m_paletteGrid,
+          .contentScale = scale,
+          .columns = 0,
+          .minCellWidth = 148.0F * scale,
+          .cellHeight = Style::controlHeightLg * 1.85F * scale,
+          .squareCells = false,
+          .columnGap = Style::spaceSm * scale,
+          .rowGap = Style::spaceSm * scale,
+          .scrollbarVisible = true,
+          .adapter = m_paletteAdapter.get(),
+          .flexGrow = 1.0F,
+          .onSelectionChanged =
+              [this](std::optional<std::size_t> index) {
+                if (!index.has_value() || m_syncing || m_paletteAdapter == nullptr) {
+                  return;
+                }
+                applyPaletteSelection(*index);
+              },
+          .configure =
+              [](VirtualGridView& grid) {
+                grid.scrollView().clearFill();
+                grid.scrollView().clearBorder();
+                grid.setFillWidth(true);
+              },
+      })
+  );
   palettesHost->addChild(std::move(leftover));
   tab->addChild(std::move(palettesHost));
 
@@ -1114,6 +1095,7 @@ void ThemeTab::onClose() {
   m_palettesHost = nullptr;
   m_palettesCard = nullptr;
   m_palettesLeftover = nullptr;
+  m_currentSwatches = nullptr;
   m_glassHost = nullptr;
   m_iconsHost = nullptr;
   m_typeHost = nullptr;
@@ -1121,21 +1103,19 @@ void ThemeTab::onClose() {
   m_roundnessHost = nullptr;
   m_effectsHost = nullptr;
   m_languageHost = nullptr;
-  m_modeDark = nullptr;
-  m_modeLight = nullptr;
-  m_modeAuto = nullptr;
+  m_modeSwitch = nullptr;
   m_autoStatus = nullptr;
   m_paletteName = nullptr;
   m_sourceSwitch = nullptr;
   m_paletteFilter = nullptr;
   m_catalogToolbar = nullptr;
   m_paletteGrid = nullptr;
+  m_paletteAdapter.reset();
   m_paletteEmpty = nullptr;
   m_openWallpaperButton = nullptr;
   m_openPalettesButton = nullptr;
   m_saveCustomButton = nullptr;
   m_exportStatus = nullptr;
-  m_lastGridKey.clear();
   m_sectionSyncing = false;
 }
 
@@ -1296,39 +1276,6 @@ Flex* ThemeTab::hostNode() const noexcept {
   }
 }
 
-void ThemeTab::updatePalettesLayout(float contentWidth) {
-  if (m_palettesHost == nullptr) {
-    return;
-  }
-  const float scale = contentScale();
-  const bool split = m_section == Section::Palettes && contentWidth >= 640.0F * scale;
-  m_palettesHost->setDirection(split ? FlexDirection::Horizontal : FlexDirection::Vertical);
-  if (m_palettesCard != nullptr) {
-    m_palettesCard->setMinWidth(split ? 280.0F * scale : 0.0F);
-    m_palettesCard->setMaxWidth(split ? 380.0F * scale : 0.0F);
-    m_palettesCard->setFillHeight(split);
-  }
-  if (m_palettesLeftover != nullptr) {
-    m_palettesLeftover->setFlexGrow(1.0F);
-    m_palettesLeftover->setFillHeight(true);
-    m_palettesLeftover->setMinWidth(split ? 280.0F * scale : 0.0F);
-  }
-}
-
-bool ThemeTab::updatePaletteColumns(float availableWidth) {
-  if (m_paletteGrid == nullptr || availableWidth <= 0.0F) {
-    return false;
-  }
-  const float scale = contentScale();
-  const std::size_t columns =
-      leftoverCatalogColumns(availableWidth, 168.0F * scale, Style::spaceSm * scale, 2, 5);
-  if (m_paletteGrid->columns() == columns) {
-    return false;
-  }
-  m_paletteGrid->setColumns(columns);
-  return true;
-}
-
 void ThemeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
@@ -1336,17 +1283,8 @@ void ThemeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
   if (m_rootLayout == nullptr) {
     return;
   }
-  updatePalettesLayout(contentWidth);
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
-  if (m_section == Section::Palettes) {
-    const float catalogWidth = m_palettesLeftover != nullptr && m_palettesLeftover->width() > 1.0F
-        ? m_palettesLeftover->width()
-        : contentWidth;
-    if (updatePaletteColumns(catalogWidth)) {
-      m_rootLayout->layout(renderer);
-    }
-  }
   if (Tab* child = hostedTab(); child != nullptr) {
     Flex* host = hostNode();
     const float hostWidth = host != nullptr && host->width() > 1.0F ? host->width() : contentWidth;
@@ -1379,6 +1317,9 @@ void ThemeTab::onPanelCardOpacityChanged(float opacity) {
   if (m_sourceSwitch != nullptr) {
     m_sourceSwitch->setSurfaceOpacity(opacity);
   }
+  if (m_modeSwitch != nullptr) {
+    m_modeSwitch->setSurfaceOpacity(opacity);
+  }
   syncChildChrome();
 }
 
@@ -1390,14 +1331,8 @@ void ThemeTab::syncLiveControls() {
   const ThemeConfig& theme = m_config->config().theme;
   m_syncing = true;
   const std::size_t modeIndex = themeModeIndex(theme.mode);
-  if (m_modeDark != nullptr) {
-    m_modeDark->setSelected(modeIndex == 0);
-  }
-  if (m_modeLight != nullptr) {
-    m_modeLight->setSelected(modeIndex == 1);
-  }
-  if (m_modeAuto != nullptr) {
-    m_modeAuto->setSelected(modeIndex == 2);
+  if (m_modeSwitch != nullptr) {
+    m_modeSwitch->setSelectedIndex(modeIndex);
   }
   if (m_sourceSwitch != nullptr) {
     m_sourceSwitch->setSelectedIndex(paletteSourceIndex(theme.source));
@@ -1457,43 +1392,39 @@ void ThemeTab::updateAutoStatus() {
 }
 
 void ThemeTab::rebuildPaletteGrid() {
-  if (m_paletteGrid == nullptr || m_config == nullptr) {
+  if (m_paletteGrid == nullptr || m_paletteAdapter == nullptr || m_config == nullptr) {
     return;
   }
   uiAssertNotRendering("ThemeTab::rebuildPaletteGrid");
 
   const ThemeConfig& theme = m_config->config().theme;
   const PaletteSource source = selectedPaletteSource();
-  PaletteCatalog catalog = filterPaletteCatalog(buildPaletteCatalog(source, shellThemeMode(theme)), m_paletteQuery);
+  PaletteCatalog catalog = filterPaletteCatalog(buildPaletteCatalog(source, shellThemeMode(theme), m_config), m_paletteQuery);
   const std::string selectedValue = paletteValueForSource(source);
-  if (source == PaletteSource::Wallpaper) {
-    catalog.previews.assign(catalog.values.size(), {});
-    for (std::size_t i = 0; i < catalog.values.size(); ++i) {
-      if (catalog.values[i] == selectedValue) {
-        catalog.previews[i] = currentRolePreview();
-        break;
-      }
+
+  std::size_t selectedIndex = catalog.values.size();
+  for (std::size_t i = 0; i < catalog.values.size(); ++i) {
+    if (catalog.values[i] == selectedValue) {
+      selectedIndex = i;
+      break;
     }
   }
-
-  std::string gridKey;
-  gridKey.reserve(64 + catalog.values.size() * 16);
-  gridKey += std::to_string(static_cast<int>(source));
-  gridKey += '|';
-  gridKey += m_paletteQuery;
-  gridKey += '|';
-  gridKey += selectedValue;
-  gridKey += '|';
-  for (const auto& value : catalog.values) {
-    gridKey += value;
-    gridKey += ',';
+  if (m_paletteName != nullptr) {
+    if (selectedIndex < catalog.labels.size()) {
+      m_paletteName->setText(catalog.labels[selectedIndex]);
+    } else if (!selectedValue.empty()) {
+      m_paletteName->setText(selectedValue);
+    } else {
+      m_paletteName->setText(i18n::tr("control-center.appearance.palette"));
+    }
   }
-  if (gridKey == m_lastGridKey) {
-    m_paletteValues = catalog.values;
-    return;
+  if (m_currentSwatches != nullptr) {
+    if (selectedIndex < catalog.previews.size() && !catalog.previews[selectedIndex].empty()) {
+      m_currentSwatches->setPreview(catalog.previews[selectedIndex]);
+    } else {
+      m_currentSwatches->setPreview(currentRolePreview());
+    }
   }
-  m_lastGridKey = gridKey;
-  m_paletteValues = catalog.values;
 
   const bool emptyCatalog = catalog.labels.empty();
   setShown(m_paletteEmpty, emptyCatalog);
@@ -1501,8 +1432,8 @@ void ThemeTab::rebuildPaletteGrid() {
   m_paletteGrid->setParticipatesInLayout(!emptyCatalog);
   setShown(m_openPalettesButton, source == PaletteSource::Custom);
   setShown(m_openWallpaperButton, source == PaletteSource::Wallpaper);
-  setShown(m_paletteFilter, source != PaletteSource::Wallpaper);
-  setShown(m_paletteName, source == PaletteSource::Wallpaper);
+  setShown(m_paletteFilter, true);
+  setShown(m_paletteName, true);
 
   if (m_paletteFilter != nullptr) {
     const char* placeholderKey = "control-center.appearance.palette-search";
@@ -1525,64 +1456,18 @@ void ThemeTab::rebuildPaletteGrid() {
     }
   }
 
-  std::size_t selectedIndex = catalog.values.size();
-  for (std::size_t i = 0; i < catalog.values.size(); ++i) {
-    if (catalog.values[i] == selectedValue) {
-      selectedIndex = i;
-      break;
-    }
+  m_paletteValues = catalog.values;
+  auto* adapter = static_cast<PaletteGridAdapter*>(m_paletteAdapter.get());
+  adapter->setCatalog(std::move(catalog), source == PaletteSource::Wallpaper ? "photo" : "palette");
+  const std::optional<std::size_t> selected =
+      selectedIndex < m_paletteValues.size() ? std::optional<std::size_t>{selectedIndex} : std::nullopt;
+  const bool wasSyncing = m_syncing;
+  m_syncing = true;
+  if (m_paletteGrid->selectedIndex() != selected) {
+    m_paletteGrid->setSelectedIndex(selected);
   }
-  if (m_paletteName != nullptr) {
-    if (selectedIndex < catalog.labels.size()) {
-      m_paletteName->setText(catalog.labels[selectedIndex]);
-    } else if (!selectedValue.empty()) {
-      m_paletteName->setText(selectedValue);
-    } else {
-      m_paletteName->setText(i18n::tr("control-center.appearance.palette"));
-    }
-  }
-
-  while (!m_paletteGrid->children().empty()) {
-    m_paletteGrid->removeChild(m_paletteGrid->children().back().get());
-  }
-  m_paletteGrid->clearChildSpans();
-
-  const float scale = contentScale();
-  const float wellHeight = Style::controlHeightLg * 1.55F * scale;
-  const bool wallpaperFallback = source == PaletteSource::Wallpaper;
-  for (std::size_t i = 0; i < catalog.labels.size(); ++i) {
-    const bool selected = i == selectedIndex;
-    const ColorSwatchPreview preview = i < catalog.previews.size() ? catalog.previews[i] : ColorSwatchPreview{};
-    auto tile = ui::button({
-        .text = catalog.labels[i],
-        .fontSize = Style::fontSizeCaption * scale,
-        .selected = selected,
-        .contentAlign = ButtonContentAlign::Center,
-        .customPalette = catalogTilePalette(),
-        .tooltip = catalog.labels[i],
-        .minHeight = Style::controlHeightLg * 2.45F * scale,
-        .padding = Style::spaceSm * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = Style::scaledRadiusXl(scale),
-        .onClick = [this, i]() { applyPaletteSelection(i); },
-        .configure =
-            [preview, wallpaperFallback, scale, wellHeight](Button& button) {
-              button.setDirection(FlexDirection::Vertical);
-              button.setAlign(FlexAlign::Stretch);
-              button.setJustify(FlexJustify::Center);
-              if (button.label() != nullptr) {
-                button.label()->setMaxLines(1);
-                button.label()->setTextAlign(TextAlign::Center);
-                button.label()->setEllipsize(TextEllipsize::End);
-              }
-              auto well = makeCatalogPreview(preview, wallpaperFallback, scale, wellHeight);
-              if (well != nullptr) {
-                insertBeforeLabel(button, std::move(well));
-              }
-            },
-    });
-    m_paletteGrid->addChild(std::move(tile));
-  }
+  m_syncing = wasSyncing;
+  m_paletteGrid->notifyDataChanged();
 }
 
 void ThemeTab::applyThemeMode(std::size_t index) {
@@ -1590,7 +1475,6 @@ void ThemeTab::applyThemeMode(std::size_t index) {
     return;
   }
   m_config->setThemeMode(themeModeFromIndex(index));
-  m_lastGridKey.clear();
   rebuildPaletteGrid();
   updateAutoStatus();
   PanelManager::instance().refresh();
@@ -1601,13 +1485,12 @@ void ThemeTab::applyPaletteSource(std::size_t index) {
     return;
   }
   m_paletteQuery.clear();
-  m_lastGridKey.clear();
   if (m_paletteFilter != nullptr) {
     m_paletteFilter->setValue("");
   }
   const PaletteSource source = paletteSourceFromIndex(index);
   const PaletteCatalog catalog =
-      filterPaletteCatalog(buildPaletteCatalog(source, shellThemeMode(m_config->config().theme)), m_paletteQuery);
+      filterPaletteCatalog(buildPaletteCatalog(source, shellThemeMode(m_config->config().theme), m_config), m_paletteQuery);
   m_paletteValues = catalog.values;
   std::string value = paletteValueForSource(source);
   if (value.empty() && !m_paletteValues.empty()) {

@@ -45,7 +45,7 @@ namespace {
 
   [[nodiscard]] std::string percentLabel(double value) { return std::format("{:.0f}%", value * 100.0); }
 
-  Button::ButtonPalette treatmentTilePalette() {
+  Button::ButtonPalette treatmentTogglePalette() {
     const ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F);
     const ColorSpec label = colorSpecFromRole(ColorRole::OnSurface);
     const ColorSpec restBorder = colorSpecFromRole(ColorRole::Outline, 0.28F);
@@ -62,36 +62,25 @@ namespace {
     };
   }
 
-  std::unique_ptr<Button> makeTreatmentTile(
+  std::unique_ptr<Button> makeTreatmentToggle(
       Button** out, std::string_view glyph, const std::string& label, bool selected, float scale,
       std::function<void()> onClick
   ) {
+    const float size = Style::controlHeightSm * scale;
     return ui::button({
         .out = out,
-        .text = label,
         .glyph = std::string(glyph),
-        .fontSize = Style::fontSizeCaption * scale,
-        .glyphSize = Style::fontSizeTitle * scale,
+        .glyphSize = Style::baseGlyphSize * scale,
         .selected = selected,
-        .contentAlign = ButtonContentAlign::Center,
-        .customPalette = treatmentTilePalette(),
+        .customPalette = treatmentTogglePalette(),
         .tooltip = label,
-        .minHeight = Style::controlHeightLg * 2.6F * scale,
-        .padding = Style::spaceSm * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = Style::scaledRadiusXl(scale),
-        .flexGrow = 1.0F,
+        .minWidth = size,
+        .minHeight = size,
+        .maxWidth = size,
+        .maxHeight = size,
+        .padding = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusMd(scale),
         .onClick = std::move(onClick),
-        .configure =
-            [](Button& button) {
-              button.setDirection(FlexDirection::Vertical);
-              button.setAlign(FlexAlign::Center);
-              button.setJustify(FlexJustify::Center);
-              if (button.label() != nullptr) {
-                button.label()->setMaxLines(1);
-                button.label()->setTextAlign(TextAlign::Center);
-              }
-            },
     });
   }
 
@@ -133,13 +122,20 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
   });
 
   auto compactCard = ui::column({
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& card) {
+            applySectionCardStyle(card, scale, opacity);
+            card.setGap(Style::spaceXs * scale);
+            card.setPadding(Style::spaceSm * scale);
+          },
   });
-  auto tileRow = ui::row({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
+  auto toolbar = ui::row({
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceXs * scale,
+      .fillWidth = true,
   });
-  tileRow->addChild(makeTreatmentTile(
+  toolbar->addChild(makeTreatmentToggle(
       &m_contrastTile, "contrast", i18n::tr("settings.schema.accessibility.high-contrast.label"), highContrast, scale,
       [this]() {
         if (m_config == nullptr) {
@@ -148,7 +144,7 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
         applyHighContrast(!m_config->config().accessibility.highContrast);
       }
   ));
-  tileRow->addChild(makeTreatmentTile(
+  toolbar->addChild(makeTreatmentToggle(
       &m_motionTile, "player-play", i18n::tr("settings.schema.appearance.animations.label"), animations, scale,
       [this]() {
         if (m_config == nullptr) {
@@ -157,8 +153,7 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
         applyAnimations(!m_config->config().shell.animation.enabled);
       }
   ));
-  compactCard->addChild(std::move(tileRow));
-  compactCard->addChild(
+  toolbar->addChild(
       ui::segmented({
           .out = &m_catalogSwitch,
           .options =
@@ -186,6 +181,7 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
       })
   );
+  compactCard->addChild(std::move(toolbar));
   compactCard->addChild(
       ui::label({
           .out = &m_caption,
@@ -201,67 +197,6 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
       .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
-  auto specimen = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceMd * scale,
-      .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
-      .radius = Style::scaledRadiusXl(scale),
-      .minHeight = Style::controlHeightLg * 3.6F * scale,
-      .fillWidth = true,
-  });
-  auto chrome = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-  });
-  chrome->addChild(
-      ui::button({
-          .text = i18n::tr("control-center.appearance.specimen-primary"),
-          .variant = ButtonVariant::Primary,
-          .flexGrow = 1.0F,
-      })
-  );
-  chrome->addChild(
-      ui::button({
-          .text = i18n::tr("control-center.appearance.specimen-ghost"),
-          .variant = ButtonVariant::Ghost,
-          .flexGrow = 1.0F,
-      })
-  );
-  specimen->addChild(std::move(chrome));
-  specimen->addChild(
-      ui::row(
-          {.align = FlexAlign::Center},
-          ui::input({
-              .placeholder = i18n::tr("control-center.appearance.specimen-input"),
-              .fontSize = Style::fontSizeBody * scale,
-              .controlHeight = Style::controlHeightSm * scale,
-              .flexGrow = 1.0F,
-          })
-      )
-  );
-  auto card = ui::column({
-      .out = &m_specimenCard,
-      .align = FlexAlign::Stretch,
-      .padding = Style::spaceSm * scale,
-      .fill = colorSpecFromRole(ColorRole::Surface),
-      .radius = Style::scaledRadiusLg(scale),
-      .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
-      .borderWidth = 1.0F,
-      .minHeight = Style::controlHeight * scale,
-      .fillWidth = true,
-  });
-  card->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.appearance.specimen-card"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-      })
-  );
-  specimen->addChild(std::move(card));
-  leftover->addChild(std::move(specimen));
-
   const float opacity = panelCardOpacity();
   auto makeHost = [&](Flex** out, bool visible) {
     return ui::column({
@@ -395,7 +330,6 @@ void EffectsTab::onClose() {
   m_motionTile = nullptr;
   m_catalogSwitch = nullptr;
   m_caption = nullptr;
-  m_specimenCard = nullptr;
   m_bordersHost = nullptr;
   m_shadowsHost = nullptr;
   m_speedHost = nullptr;
@@ -495,13 +429,6 @@ void EffectsTab::syncLiveControls() {
     m_motionTile->setSelected(cfg.shell.animation.enabled);
   }
   refreshCaption();
-  if (m_specimenCard != nullptr) {
-    if (cfg.shell.cardBorders) {
-      m_specimenCard->setBorder(colorSpecFromRole(ColorRole::Outline, 0.45F), 1.0F);
-    } else {
-      m_specimenCard->clearBorder();
-    }
-  }
   if (m_animationSpeed != nullptr) {
     m_animationSpeed->setValue(cfg.shell.animation.speed);
   }

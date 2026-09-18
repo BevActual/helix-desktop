@@ -61,7 +61,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
 | `home` | Home | User card (name, host, uptime), optional status strip, glanceable media and stacked clock/weather modules, and extra-large shortcut tiles grouped into Control Center wells. Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media; while playing, previous / play-pause / next stay on the module. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
-| `theme` | Theme | Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, search, save, and the current palette on a compact card; leftover is the palette grid. Light, Dark, and Auto are appearance tiles. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
+| `theme` | Theme | Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, Dark/Light/Auto, search, save, and the current palette on a compact card; leftover is a uniform swatch grid. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
 | `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
 | `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
@@ -126,7 +126,7 @@ Helix follows Apple Human Interface Guidelines as a hierarchy, not a skin. Liqui
 
 **High Contrast** on Effects maps to Increased Contrast and Reduced Transparency: palette stretch, opaque chrome and leftover, contrasting outlines, and no module softness. **Motion** maps to Reduced Motion. Concentric rounding uses `radius3xl` on leftover wells and `radius2xl` on grouped lists inside them.
 
-Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the compact card; leftover is only the grid. Theme organizes appearance sources the same way Capture organizes Screenshot and Record. Size Control Center like a Settings window (`width` / `height` under `[control_center]`) so leftover catalogs can use extra columns and, on Theme Palettes, sit beside Light/Dark/Auto.
+Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the compact card; leftover is only the grid. Theme organizes appearance sources the same way Capture organizes Screenshot and Record. Size Control Center like a Settings window (`width` / `height` under `[control_center]`) so leftover catalogs can use extra columns. Live previews stay only where leftover does not already show the choice, and the running shell is not already the preview.
 
 ## Home
 
@@ -148,7 +148,7 @@ Set `show_session_button = false` under `[control_center]` to hide the Power but
 
 Theme is the Appearance hub. Compact sources are Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language, the same pattern Capture uses for Screenshot and Record. Wallpaper and Templates stay sibling Appearance catalogs.
 
-Palettes leftover matches Wallpaper: Built-in, Wallpaper, Community, and Custom sources, search, save, and the current palette sit on a compact card; leftover is only the palette grid. When Control Center is wide enough to feel like a Settings window, Light/Dark/Auto and the color row sit beside that grid. Light, Dark, and Auto are appearance tiles under that toolbar. Light and Dark keep their own fills with a mini window preview, Auto is split light/dark, and Auto shows the next day/night switch under the tiles. Tap that caption to open Weather for location. The compact card’s Color row is tappable role swatches, with Primary larger than the rest. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it.
+Palettes leftover matches Wallpaper: Built-in, Wallpaper, Community, and Custom sources, Dark/Light/Auto, search, save, and the current palette sit on a compact card; leftover is a uniform swatch grid. Auto shows the next day/night switch under the toolbar; tap that caption to open Weather for location. The compact card’s Color row is equal tappable role swatches. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it.
 
 On Wallpaper palettes, a photo button opens the Wallpaper tab. Save-as-custom sits with the sources. Header gear follows the active source: palettes open shell mode, Pure Black, and on niri window decorations and compositor blur.
 
@@ -156,31 +156,31 @@ On Wallpaper palettes, a photo button opens the Wallpaper tab. Save-as-custom si
 
 ### Glass {#glass}
 
-Glass sets panel chrome: Solid (opaque), Soft (Regular glass), and Glass (Clear glass) as material tiles, like Light/Dark/Auto on Palettes. A leftover specimen shows the selected material over wallpaper. Clear adds a dimming layer so leftover type stays readable. Compact cards and catalogs stay leftover, not nested glass-on-glass.
+Glass sets panel chrome: Solid (opaque), Soft (Regular glass), and Glass (Clear glass) as a compact segmented control. The running shell is the preview. Clear adds a dimming layer so leftover type stays readable. Compact cards and catalogs stay leftover, not nested glass-on-glass.
 
 `noctalia msg panel-toggle control-center glass` opens this source.
 
 ### Icons {#icons}
 
-Icons sets application icon style. Default and Tinted are compact sources, with a current preview on the right. Leftover is the tint catalog: palette roles or a custom color for dock, tray, taskbar, and launcher icons. Picking a tint turns Tinted on.
+Icons sets application icon style. Default and Tinted are compact sources, with a current preview on the right. Leftover is the tint catalog when Tinted is on: palette roles or a custom color for dock, tray, taskbar, and launcher icons. Picking a tint turns Tinted on.
 
 `noctalia msg panel-toggle control-center icons` opens this source.
 
 ### Type {#type}
 
-Type is the live page for the shell font. Search and the current family sit on the compact specimen card with caption/body/title size chips, a pangram, and Ghost/Primary control specimens. Leftover is the font grid; the first tile is System default (empty `shell.font_family`).
+Type is the live page for the shell font. Search and the current family sit on the compact card. Leftover is the font grid; each tile shows Aa in that family. The first tile is System default (empty `shell.font_family`).
 
 `noctalia msg panel-toggle control-center type` opens this source.
 
 ### Scale {#scale}
 
-Scale sets interface scale. The compact card is the slider. Leftover is a mini window whose type size, padding, and corner radius follow the value while you drag.
+Scale sets interface scale. The compact card is the slider and caption. The running shell is the preview.
 
 `noctalia msg panel-toggle control-center scale` opens this source.
 
 ### Roundness {#roundness}
 
-Roundness sets corner radius. The compact card is the shell scale with Small/Medium/Large chips. Bar, Dock, and (on niri) Windows sources swap the leftover specimen.
+Roundness sets corner radius. Shell, Bar, Dock, and (on niri) Windows sources share one slider. The running shell is the preview.
 
 `noctalia msg panel-toggle control-center roundness` opens this source.
 
@@ -192,7 +192,7 @@ Language sets the shell UI language. Search and the current locale sit on the co
 
 ### Effects {#effects}
 
-Effects is the live page for contrast, motion, borders, and shadows. High Contrast and Motion are compact tiles. High Contrast frosts chrome and leftover wells and draws contrasting outlines. Borders, Shadows, and Speed sources swap leftover controls. Live button, input, and card specimens stay under the chips. Animation speed hides when Motion is off. Shadow direction and opacity hide when popup shadows are off. Panel glass lives on Glass; icon tint lives on Icons.
+Effects is the live page for contrast, motion, borders, and shadows. High Contrast and Motion are compact icon toggles. High Contrast frosts chrome and leftover wells and draws contrasting outlines. Borders, Shadows, and Speed sources swap leftover controls. Animation speed hides when Motion is off. Shadow direction and opacity hide when popup shadows are off. Panel glass lives on Glass; icon tint lives on Icons.
 
 `noctalia msg panel-toggle control-center effects` opens this source.
 

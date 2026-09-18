@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/timer_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -10,7 +9,6 @@
 #include <string>
 #include <string_view>
 
-class Box;
 class ConfigService;
 class Flex;
 class Label;
@@ -33,22 +31,19 @@ public:
   [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
-  enum class Catalog : std::uint8_t { Bar, Dock, Windows };
+  enum class Catalog : std::uint8_t { Shell, Bar, Dock, Windows };
 
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
-  void updateRadiusPreview();
   void commitRoundness();
   void commitBarRadius();
   void commitDockRadius();
   void commitWindowRadius();
-  void applyCatalog(std::size_t index, bool persist = true);
+  void applyCatalog(std::size_t index);
   void persistCatalog();
   void syncCatalog();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] bool syncDetailLabel();
   [[nodiscard]] Catalog catalogFromState(std::string_view value) const noexcept;
   [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
@@ -61,31 +56,24 @@ private:
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
 
   Flex* m_rootLayout = nullptr;
-  Slider* m_roundness = nullptr;
-  Label* m_roundnessValue = nullptr;
-  Box* m_radiusChipSm = nullptr;
-  Box* m_radiusChipMd = nullptr;
-  Box* m_radiusChip2xl = nullptr;
   Segmented* m_catalogSwitch = nullptr;
   Label* m_detailLabel = nullptr;
+  Flex* m_shellHost = nullptr;
+  Slider* m_roundness = nullptr;
+  Label* m_roundnessValue = nullptr;
   Flex* m_barHost = nullptr;
   Slider* m_barRadius = nullptr;
   Label* m_barRadiusValue = nullptr;
-  Label* m_barDescription = nullptr;
-  Flex* m_barChip = nullptr;
   Flex* m_dockHost = nullptr;
   Slider* m_dockRadius = nullptr;
   Label* m_dockRadiusValue = nullptr;
-  Flex* m_dockChip = nullptr;
   Flex* m_windowHost = nullptr;
   Slider* m_windowRadius = nullptr;
   Label* m_windowRadiusValue = nullptr;
-  Flex* m_windowChip = nullptr;
 
   std::string m_barName;
-  Catalog m_catalog = Catalog::Bar;
-  Catalog m_pinnedCatalog = Catalog::Bar;
-  Timer m_hoverEndTimer;
+  Catalog m_catalog = Catalog::Shell;
+  Catalog m_pinnedCatalog = Catalog::Shell;
   bool m_catalogSyncing = false;
   bool m_syncing = false;
   bool m_liveDirty = false;

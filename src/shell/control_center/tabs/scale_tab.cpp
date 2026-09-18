@@ -5,7 +5,6 @@
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
-#include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/label.h"
@@ -13,7 +12,6 @@
 #include "ui/palette.h"
 #include "ui/style.h"
 
-#include <algorithm>
 #include <format>
 #include <string>
 #include <utility>
@@ -42,7 +40,6 @@ std::unique_ptr<Flex> ScaleTab::create() {
 
 std::unique_ptr<Flex> ScaleTab::createLiveBody() {
   const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
 
   auto tab = ui::column({
       .out = &m_rootLayout,
@@ -63,76 +60,6 @@ std::unique_ptr<Flex> ScaleTab::createLiveBody() {
   addCaption(*compactCard, i18n::tr("settings.schema.appearance.ui-scale.description"), scale);
   tab->addChild(std::move(compactCard));
 
-  auto leftover = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
-  });
-  auto desktop = ui::column({
-      .align = FlexAlign::Stretch,
-      .justify = FlexJustify::Center,
-      .padding = Style::spaceMd * scale,
-      .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
-      .radius = Style::scaledRadiusXl(scale),
-      .minHeight = Style::controlHeightLg * 4.4F * scale,
-      .fillWidth = true,
-      .flexGrow = 1.0F,
-  });
-  auto window = ui::column({
-      .out = &m_specimenWindow,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceMd * scale,
-      .fill = colorSpecFromRole(ColorRole::Surface),
-      .radius = Style::scaledRadiusLg(scale),
-      .border = colorSpecFromRole(ColorRole::Outline, 0.32F),
-      .borderWidth = 1.0F,
-      .minHeight = Style::controlHeightLg * 3.2F * scale,
-      .fillWidth = true,
-      .clipChildren = true,
-      .flexGrow = 1.0F,
-  });
-  window->addChild(
-      ui::label({
-          .out = &m_scalePreviewTitle,
-          .text = i18n::tr("control-center.appearance.specimen-title"),
-          .fontSize = Style::fontSizeTitle * scale,
-          .fontWeight = FontWeight::Medium,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-      })
-  );
-  window->addChild(
-      ui::label({
-          .out = &m_scalePreviewBody,
-          .text = i18n::tr("control-center.appearance.specimen-body"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-      })
-  );
-  window->addChild(
-      ui::label({
-          .out = &m_scalePreviewCaption,
-          .text = i18n::tr("control-center.appearance.specimen-caption"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      })
-  );
-  window->addChild(
-      ui::label({
-          .out = &m_scalePreviewPangram,
-          .text = i18n::tr("control-center.appearance.font-preview"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 2,
-      })
-  );
-  desktop->addChild(std::move(window));
-  leftover->addChild(std::move(desktop));
-  tab->addChild(std::move(leftover));
-
   syncLiveControls();
   return tab;
 }
@@ -148,11 +75,6 @@ void ScaleTab::onClose() {
   m_rootLayout = nullptr;
   m_uiScale = nullptr;
   m_uiScaleValue = nullptr;
-  m_specimenWindow = nullptr;
-  m_scalePreviewCaption = nullptr;
-  m_scalePreviewBody = nullptr;
-  m_scalePreviewTitle = nullptr;
-  m_scalePreviewPangram = nullptr;
 }
 
 void ScaleTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -185,7 +107,6 @@ void ScaleTab::doUpdate(Renderer& renderer) {
     m_liveDirty = false;
     syncLiveControls();
   }
-  updateScalePreview();
 }
 
 void ScaleTab::syncLiveControls() {
@@ -200,35 +121,7 @@ void ScaleTab::syncLiveControls() {
   if (m_uiScaleValue != nullptr) {
     m_uiScaleValue->setText(multiplierLabel(uiScale));
   }
-  m_previewScale = -1.0F;
-  updateScalePreview();
   m_syncing = false;
-}
-
-void ScaleTab::updateScalePreview() {
-  const float next = m_uiScale != nullptr ? static_cast<float>(m_uiScale->value()) : contentScale();
-  if (m_previewScale == next) {
-    return;
-  }
-  m_previewScale = next;
-  if (m_scalePreviewCaption != nullptr) {
-    m_scalePreviewCaption->setFontSize(Style::fontSizeCaption * next);
-  }
-  if (m_scalePreviewBody != nullptr) {
-    m_scalePreviewBody->setFontSize(Style::fontSizeBody * next);
-  }
-  if (m_scalePreviewTitle != nullptr) {
-    m_scalePreviewTitle->setFontSize(Style::fontSizeTitle * next);
-  }
-  if (m_scalePreviewPangram != nullptr) {
-    m_scalePreviewPangram->setFontSize(Style::fontSizeBody * next);
-  }
-  if (m_specimenWindow != nullptr) {
-    m_specimenWindow->setRadius(Style::radiusLg * next);
-    m_specimenWindow->setPadding(Style::spaceMd * next);
-    m_specimenWindow->setGap(Style::spaceSm * next);
-  }
-  PanelManager::instance().requestLayout();
 }
 
 void ScaleTab::commitUiScale() {

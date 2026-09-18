@@ -36,6 +36,7 @@ public:
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
   void applyIconStyle(bool tinted);
   void applyTintRole(ColorRole role);
@@ -52,7 +53,6 @@ private:
   Button* m_customTint = nullptr;
   std::vector<Button*> m_tintButtons;
   std::array<Box*, 3> m_tintedPreview{};
-  std::array<Box*, 3> m_specimenPreview{};
 
   bool m_syncing = false;
   bool m_liveDirty = false;

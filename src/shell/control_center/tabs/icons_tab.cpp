@@ -75,20 +75,15 @@ namespace {
     };
   }
 
-  std::unique_ptr<Flex> makeIconPreview(
-      const ColorSpec fills[3], Box** out[3], float scale, float minHeight, bool leftover
-  ) {
-    const float size = leftover ? Style::controlHeightLg * 2.15F * scale : Style::controlHeight * 0.72F * scale;
-    const float radius = leftover ? Style::scaledRadiusXl(scale) : Style::scaledRadiusMd(scale);
+  std::unique_ptr<Flex> makeIconPreview(const ColorSpec fills[3], Box** out[3], float scale, float minHeight) {
+    const float size = Style::controlHeight * 0.72F * scale;
+    const float radius = Style::scaledRadiusMd(scale);
     auto row = ui::row({
         .align = FlexAlign::Center,
         .justify = FlexJustify::Center,
-        .gap = leftover ? Style::spaceMd * scale : Style::spaceXs * scale,
-        .padding = leftover ? Style::spaceLg * scale : Style::spaceXs * scale,
+        .gap = Style::spaceXs * scale,
+        .padding = Style::spaceXs * scale,
         .minHeight = minHeight,
-        .fillWidth = leftover,
-        .fillHeight = leftover,
-        .flexGrow = leftover ? 1.0F : 0.0F,
         .configure = [](Flex& host) { host.setHitTestVisible(false); },
     });
     for (std::size_t i = 0; i < 3; ++i) {
@@ -189,7 +184,7 @@ std::unique_ptr<Flex> IconsTab::createLiveBody() {
       tinted ? tintFill : defaultFills[2],
   };
   Box** tintedOut[3] = {&m_tintedPreview[0], &m_tintedPreview[1], &m_tintedPreview[2]};
-  auto current = makeIconPreview(previewFills, tintedOut, scale, Style::controlHeightSm * 1.35F * scale, false);
+  auto current = makeIconPreview(previewFills, tintedOut, scale, Style::controlHeightSm * 1.35F * scale);
   toolbar->addChild(std::move(current));
   compactCard->addChild(std::move(toolbar));
   compactCard->addChild(
@@ -212,18 +207,6 @@ std::unique_ptr<Flex> IconsTab::createLiveBody() {
       .fillHeight = true,
       .flexGrow = 1.0F,
   });
-  Box** specimenOut[3] = {&m_specimenPreview[0], &m_specimenPreview[1], &m_specimenPreview[2]};
-  auto specimen = ui::column({
-      .align = FlexAlign::Stretch,
-      .justify = FlexJustify::Center,
-      .fillHeight = true,
-      .flexGrow = 1.0F,
-      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
-  });
-  specimen->addChild(
-      makeIconPreview(previewFills, specimenOut, scale, Style::controlHeightLg * 4.2F * scale, true)
-  );
-  leftover->addChild(std::move(specimen));
   auto tintRow = ui::row({
       .out = &m_tintRow,
       .align = FlexAlign::Center,
@@ -293,7 +276,6 @@ void IconsTab::onClose() {
   m_customTint = nullptr;
   m_tintButtons.clear();
   m_tintedPreview = {};
-  m_specimenPreview = {};
 }
 
 void IconsTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -325,6 +307,12 @@ void IconsTab::doUpdate(Renderer& renderer) {
   if (m_liveDirty) {
     m_liveDirty = false;
     syncLiveControls();
+  }
+}
+
+void IconsTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_styleSwitch != nullptr) {
+    m_styleSwitch->setSurfaceOpacity(opacity);
   }
 }
 
@@ -364,7 +352,6 @@ void IconsTab::syncLiveControls() {
     }
   };
   applyPreviewFill(m_tintedPreview);
-  applyPreviewFill(m_specimenPreview);
   (void)setShown(m_tintRow, tinted);
 
   const std::string selectedValue = tint.has_value() ? colorSpecToConfigString(*tint) : std::string{};
