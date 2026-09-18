@@ -2,6 +2,7 @@
 
 #include "render/core/color.h"
 #include "render/core/renderer.h"
+#include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "render/scene/rect_node.h"
 #include "time/time_format.h"
@@ -12,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <ctime>
+#include <linux/input-event-codes.h>
 #include <memory>
 #include <numbers>
 #include <utility>
@@ -212,7 +214,16 @@ DesktopClockWidget::DesktopClockWidget(Options options)
       m_showsSeconds(m_style == Style::Analog || formatShowsSeconds(m_format)) {}
 
 void DesktopClockWidget::create() {
-  auto rootNode = ui::node({});
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("clock");
+          },
+  });
 
   auto digitalRoot = ui::node({});
   m_digitalRoot = digitalRoot.get();

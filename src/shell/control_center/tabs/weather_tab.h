@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/core/render_styles.h"
 #include "shell/control_center/settings_pane.h"
@@ -8,6 +9,8 @@
 #include <array>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <string_view>
 
 class EffectNode;
 class Flex;
@@ -37,15 +40,17 @@ public:
   [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
-  enum class ForecastView : std::uint8_t {
+  enum class Catalog : std::uint8_t {
     Daily = 0,
     Hourly = 1,
+    Details = 2,
   };
 
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void sync(Renderer& renderer);
-  void beginForecastSlideOut(ForecastView nextView);
+  void beginForecastSlideOut(Catalog nextView);
   void beginForecastSlideIn();
   void applyForecastSlide(float progress, bool slidingIn);
   void cancelForecastSlide();
@@ -54,6 +59,17 @@ private:
   void syncHourlyForecast(Renderer& renderer, const WeatherSnapshot& snapshot);
   void showLocationPrompt(bool show);
   void hideEffect();
+  void applyCatalog(std::size_t index, bool persist = true);
+  void persistCatalog();
+  void syncCatalog();
+  [[nodiscard]] bool syncDetailLabel();
+  void previewCatalog(std::size_t index);
+  void restorePinnedCatalog();
+  [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
+  [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
+  [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
+  [[nodiscard]] static Catalog catalogFromIndex(std::size_t index) noexcept;
+  [[nodiscard]] static bool isForecastCatalog(Catalog catalog) noexcept;
   [[nodiscard]] static std::string todayIso(std::int32_t utcOffsetSeconds);
   [[nodiscard]] static std::string hourLabel(const std::string& isoTime, const std::string& timeFormat);
   [[nodiscard]] static std::string weekdayLabel(const std::string& isoDate);
@@ -64,24 +80,22 @@ private:
   WeatherService* m_weather = nullptr;
   ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
-  Flex* m_liveRoot = nullptr;
   Flex* m_rootLayout = nullptr;
-  ScrollView* m_liveScroll = nullptr;
-  ScrollViewState m_liveScrollState{};
-  Flex* m_leftColumn = nullptr;
+  Flex* m_compactCard = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Label* m_detailLabel = nullptr;
   Flex* m_enableRow = nullptr;
   Toggle* m_enableToggle = nullptr;
-  Flex* m_nowWell = nullptr;
   Flex* m_currentCard = nullptr;
   Flex* m_glyphColumn = nullptr;
+  Flex* m_detailsHost = nullptr;
   Flex* m_detailsCard = nullptr;
   Flex* m_currentText = nullptr;
   Flex* m_locationPrompt = nullptr;
   Glyph* m_locationPromptGlyph = nullptr;
   Label* m_locationPromptBody = nullptr;
-  Flex* m_forecastColumn = nullptr;
+  Flex* m_forecastHost = nullptr;
   Flex* m_forecastRowsContainer = nullptr;
-  Segmented* m_forecastViewPicker = nullptr;
   Label* m_statusLabel = nullptr;
   Glyph* m_currentGlyph = nullptr;
   Label* m_currentTempLabel = nullptr;
@@ -108,12 +122,15 @@ private:
   std::array<InputArea*, kForecastRowCount> m_forecastHitAreas{};
   EffectNode* m_effectNode = nullptr;
   EffectType m_activeEffect = EffectType::None;
-  ForecastView m_forecastView = ForecastView::Daily;
+  Catalog m_catalog = Catalog::Daily;
+  Catalog m_pinnedCatalog = Catalog::Daily;
+  bool m_catalogSyncing = false;
   int m_forecastSlideDirection = 0;
-  ForecastView m_pendingForecastView = ForecastView::Daily;
+  Catalog m_pendingCatalog = Catalog::Daily;
   bool m_startForecastSlideIn = false;
   AnimationManager::Id m_forecastSlideAnimId = 0;
   float m_forecastRowsBaseX = 0.0F;
   float m_forecastRowsBaseY = 0.0F;
   float m_shaderTime = 0.0F;
+  Timer m_hoverEndTimer;
 };

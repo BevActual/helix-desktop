@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-The Control Center is Helix's hybrid of a Control Center and Settings. **Home** is the live Control Center: glass modules, status, and shortcuts. Every other sidebar page is a Settings-style live tab (state and primary actions on the page, policy in the header gear). Open it from the control-center bar widget, by right-clicking empty space on a bar, or with IPC:
+The Control Center is Helix's hybrid of Apple Control Center and Apple apps. **Home** is the live Control Center: frosted modules that light up, status, and shortcuts on Liquid Glass chrome. Every other sidebar page is an Apple-app-style live tab (Weather, Calendar, Settings, and so on): leftover content on the same glass panel, state and primary actions on the page, policy in the header gear. Open it from the control-center bar widget, by right-clicking empty space on a bar, or with IPC:
 
 ```sh
 noctalia msg panel-toggle control-center
@@ -32,7 +32,8 @@ Keyboard navigation uses the global [`[keybinds]`](/noctalia/configuration/shell
 [control_center]
 sidebar = "compact"
 # sidebar_section = "compact"  # optional; defaults to the same as sidebar
-# width = 700  # full-sidebar width in pixels (600–1200)
+# width = 700  # full-sidebar width in pixels (600–1600)
+# height = 700 # window height in pixels (480–1200)
 # show_shortcut_labels = true  # text under Home shortcut icons
 # show_session_button = true   # Power tab button in the Home header
 # hidden_tabs = ["monitor", "weather"]  # hide tabs you never use
@@ -42,12 +43,13 @@ sidebar = "compact"
 |--------|------|---------|-------------|
 | `sidebar` | string | `"compact"` | Sidebar on Home / general open: `"full"`, `"compact"`, or `"none"` |
 | `sidebar_section` | string | `"compact"` | Sidebar when opening straight to a tab: `"full"`, `"compact"`, or `"none"` |
-| `width` | int | `700` | Control Center width in pixels (`600`–`1200`). This is the full-sidebar width; the compact and no-sidebar modes scale down from it. |
+| `width` | int | `700` | Control Center width in pixels (`600`–`1600`). This is the full-sidebar width; the compact and no-sidebar modes scale down from it. Size it like a Settings window when you want leftover catalogs to spread out. |
+| `height` | int | `700` | Control Center height in pixels (`480`–`1200`). Leftover catalogs, grids, and specimens fill the extra space. |
 | `show_shortcut_labels` | bool | `true` | Show text labels under Home shortcut icons. When `false`, shortcuts are icon-only and glyphs scale with cell size; hover still shows the name. |
 | `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Control Center → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Appearance** (theme, type, scale, roundness, effects, language, wallpaper, templates), **Desktop** (bar, dock, desktop, windows, panels, OSD), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Appearance** (theme, wallpaper, templates), **Desktop** (bar, dock, desktop, windows, panels, OSD), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, clock, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
 
 Plugin Control Center tabs stay in **Services**. User `hidden_tabs` still hide any tab in every group.
 
@@ -58,28 +60,24 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card, optional status strip (updates, recording/replay, night light, caffeine, incoming LocalSend), media summary, date/time, weather summary, and shortcut buttons grouped into glass islands (connectivity, focus, display, and similar). Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
-| `theme` | Theme | Theme mode, shell mode, Auto schedule status, and Pure Black (dark only) in one group. Palette source, picker, save-as-custom, and tappable role swatches with hex values in the next. Tap a swatch to pick a color; Helix forks the current palette into a custom file and switches source to custom. Further edits overwrite that file. Save as custom snapshots the current palette without changing colors. Community and custom palettes open a searchable picker; custom palettes can open the palettes folder. Theme mode, shell mode, and palette source are trailing dropdowns. On niri, window decorations and compositor blur live in the next well; blur quality sliders appear when blur is on. `appearance` still opens this tab. |
-| `type` | Type | Shell font family, with labeled Ghost/Primary control specimens, caption/body/title size chips, and a pangram of the selected typeface. |
-| `scale` | Scale | Interface scale, with labeled caption, body, and title specimens plus a pangram that update while you drag. |
-| `roundness` | Roundness | Shell, bar, dock, and (on niri) app-window corner radius in one grouped well. Shell has labeled Small/Medium/Large chips; each other slider has a live specimen. |
-| `effects` | Effects | Panel glass (Solid, Soft, Glass) as a trailing dropdown, high contrast, application icon tint, animation on/off and speed, button/input/popup/card borders, popup shadows, and shadow direction/opacity. |
-| `language` | Language | Shell UI language. Auto follows the system locale; otherwise pick a supported translation. |
+| `home` | Home | User card (name, host, uptime), optional status strip, glanceable media and stacked clock/weather modules, and extra-large shortcut tiles grouped into Control Center wells. Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media; while playing, previous / play-pause / next stay on the module. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
+| `theme` | Theme | Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, search, save, and the current palette on a compact card; leftover is the palette grid. Light, Dark, and Auto are appearance tiles. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
 | `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
 | `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
 | `media` | Media | Artwork keeps leftover height while something is playing. Player picker, track, progress, spectrum strip, transport, and player volume sit on one card. Tap the art to raise the player. Header gear opens the ignore list. |
-| `audio` | Audio | Output and input volume on one card, application streams underneath. Header gear opens sound and overdrive settings. |
+| `audio` | Audio | Output and input volume on one compact card. Hover Output, Input, and Apps to preview the leftover; click to keep it. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Brightness and enable on a compact card, Night Light under it. On niri, the arrangement map keeps leftover height when two or more displays are on; resolution, refresh, scale, rotation, and VRR sit under it. Header gear opens brightness service settings. |
-| `system` | System | Distro/kernel, hardware summary, uptime, CPU/RAM/GPU/network graphs, and resource details. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
+| `system` | System | Distro, live CPU, and memory on one compact card. Hover CPU, Memory, GPU, Network, and About to preview the leftover; click to keep it. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
 | `power` | Power | Battery percent, power profiles, and caffeine on one compact card. Session lock, suspend, logout, reboot, and shutdown sit above it. Charge limits, battery health, and connected-device batteries sit under the card. Header gear opens session panel and idle settings. |
 | `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Hover Wi-Fi, VPN, and cellular chips to swap the leftover list. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
 | `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Hover Paired and Nearby to swap the leftover list. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
 | `camera` | Camera | Live preview stays on a stage so you can see the picture while you adjust. Zoom, pan, and tilt sit with the preview. Picture, Exposure, White Balance, and Focus scroll in the inspector beside it, or under it when the panel is narrow. Header reset restores factory control values. |
-| `weather` | Weather | Current conditions and forecast. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
-| `calendar` | Calendar | Month view, world clock, calendar accounts (add/edit/reconnect), and events. Turning calendar sync off leaves the enable switch on the accounts card. Header gear opens calendar format settings. |
+| `weather` | Weather | Current conditions on one compact card. Hover Daily, Hourly, and Details to preview the leftover; click to keep it. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
+| `calendar` | Calendar | Today and catalog chips on one compact card. Hover Month, Events, and Accounts to preview the leftover; click to keep it. Month is the leftover stage. Click a day to open Events. Turning calendar sync off leaves the enable switch on the card. Header gear opens calendar format settings. |
+| `clock` | Clock | Local time, date, and zone on a compact card. Extra IANA timezones fill the leftover. Header gear opens the timezone list. |
 | `notifications` | Notifications | Do Not Disturb and history filters on one compact card. Notification history sits under it. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
-| `screen-time` | Screen Time | Foreground app usage totals and charts. The enable toggle is on the live view when tracking is off; header gear opens reset. |
+| `screen-time` | Screen Time | Total time and the top app on one compact card. Hover Today, 3 days, and 14 days to preview the leftover chart; click to keep it. The enable toggle is on the live view when tracking is off; header gear opens reset. |
 | `ai` | AI | Rate-limit meters and Open actions for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, and DeepSeek, plus local Ollama status, models, and start/stop. `ai-usage` still opens this tab. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. |
 | `capture` | Capture | Hover Screenshot and Record chips to swap the leftover view. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, recent videos, and replay buffer. Header gear follows the active chip (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching view. |
 | `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
@@ -94,9 +92,9 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `desktop` | Desktop | Desktop widgets on/off, widget count and Edit when widgets are on, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
 | `windows` | Windows | niri window spacing: gaps, outer padding, and how wide new columns start (percent of the display). Shown only in a niri session. Header gear repeats those sliders. |
 | `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Turning the dock off hides the rest of the live controls. Header gear opens monitors, layer, size, shape, and magnification. |
-| `panels` | Panels | Shared panel layer, borders, list-row tint, and floating offset. Hover Top/Overlay for what each does. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Effects. |
+| `panels` | Panels | Shared panel layer, borders, list-row tint, and floating offset. Hover Top/Overlay for what each does. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Glass. |
 | `launcher` | Launcher | Open launcher, always-in-search providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
-| `control-center` | Control Center | Sidebar, width, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
+| `control-center` | Control Center | Sidebar, width, height, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
 | `osd` | OSD | On-screen pop-ups for volume, brightness, and other events. Turning OSD off leaves the enable switch. Position follows orientation (wide vs stacked). Header gear opens popup kinds, monitors, and offsets, and repeats enable/position. |
 | `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. |
 | `keybinds` | Keybinds | On niri: hover Attention, Open, Apps, Capture, Sound, and Session chips. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
@@ -115,13 +113,28 @@ See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center
 
 Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
 
+## Design language
+
+Helix follows Apple Human Interface Guidelines as a hierarchy, not a skin. Liquid Glass is chrome. Leftover is content.
+
+| Layer | Surfaces | Helix mapping |
+|-------|----------|---------------|
+| Chrome | Panel, sidebar, header | `[shell.panel].transparency_mode`: **Solid** (opaque), **Soft** (Regular glass), **Glass** (Clear glass). Clear needs a dimming layer so type stays readable. Do not nest glass-on-glass. |
+| Leftover | Compact cards, leftover catalogs, grouped lists | Solid wells (`applySectionCardStyle`, `applyContentCardStyle`). Color and type live here. |
+| Modules | Home shortcut plates | Frosted functional plates (`applyModuleWellStyle`), not a second glass layer. |
+| Widgets | Home clock/weather/media, desktop widgets | Glanceable. Deep-link into Calendar, Weather, Media. Not mini Control Center pages. |
+
+**High Contrast** on Effects maps to Increased Contrast and Reduced Transparency: palette stretch, opaque chrome and leftover, contrasting outlines, and no module softness. **Motion** maps to Reduced Motion. Concentric rounding uses `radius3xl` on leftover wells and `radius2xl` on grouped lists inside them.
+
+Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the compact card; leftover is only the grid. Theme organizes appearance sources the same way Capture organizes Screenshot and Record. Size Control Center like a Settings window (`width` / `height` under `[control_center]`) so leftover catalogs can use extra columns and, on Theme Palettes, sit beside Light/Dark/Auto.
+
 ## Home
 
-The Home tab is the Control Center landing view: clustered glass shortcut islands plus a compact status column. Other tabs are Settings pages with live controls.
+The Home tab is the Control Center landing view: glanceable identity, media, and clock/weather modules plus clustered shortcut tiles. Other tabs are Apple-app pages with live controls. The panel chrome stays Liquid Glass; Home cards use leftover surfaces and shortcut wells are functional modules, so content is not nested glass-on-glass.
 
 When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), caffeine/idle-inhibit on (opens Power), and an incoming LocalSend transfer waiting to be accepted (opens LocalSend). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
 
-Click the avatar to pick a custom image, or the rest of the user card to open **Wallpaper**. Click the media card to open **Media**; with nothing playing it stays a single compact row so the clock and weather keep the leftover height. Click the date or time to open **Calendar** (including the world-clock card). Click the weather line to open **Weather**. Hover any of those regions for a tooltip. Noctalia saves the selected avatar path as `[shell].avatar_path`.
+Click the avatar to pick a custom image, or the rest of the user card to open **Wallpaper**. The card shows your name, `user@host`, and uptime; version and hardware live on **System**. Click the media card to open **Media**; while something is playing it is a Now Playing module with artwork, a progress bar, and previous / play-pause / next. Idle media stays a single compact row so the clock and weather keep the leftover height. The clock stacks time, date, and a one-line weather caption like a Lock Screen widget. Click the date or time to open **Calendar**. Extra timezones live on **Clock**. Click the weather line to open **Weather**. Hover media and clock to illuminate those modules from within. Shortcut tiles sit on frosted plates and light up on hover; an active toggle keeps a quiet inner glow. Noctalia saves the selected avatar path as `[shell].avatar_path`.
 
 When AccountsService is available, Noctalia also writes the selected avatar to `org.freedesktop.Accounts` as your user's `IconFile`. That is what Noctalia Greeter reads for the login user list. On distros where this is not enabled by default, install and enable **accountsservice** (usually the `accounts-daemon` service) if you want the same avatar in both the shell and the greeter.
 
@@ -133,21 +146,55 @@ Set `show_session_button = false` under `[control_center]` to hide the Power but
 
 ## Theme
 
-The Theme tab is the landing page for colors, grouped like a Settings form. Dark, Light, or Auto and the separate shell-mode dropdown share one well with Pure Black. Palette source, picker, save-as-custom, and role swatches share the next. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it. On niri, window decorations and compositor blur have their own well.
+Theme is the Appearance hub. Compact sources are Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language, the same pattern Capture uses for Screenshot and Record. Wallpaper and Templates stay sibling Appearance catalogs.
 
-Font, scale, corner radius, effects (contrast, motion, borders, shadows), and language each have their own tab next to Theme.
+Palettes leftover matches Wallpaper: Built-in, Wallpaper, Community, and Custom sources, search, save, and the current palette sit on a compact card; leftover is only the palette grid. When Control Center is wide enough to feel like a Settings window, Light/Dark/Auto and the color row sit beside that grid. Light, Dark, and Auto are appearance tiles under that toolbar. Light and Dark keep their own fills with a mini window preview, Auto is split light/dark, and Auto shows the next day/night switch under the tiles. Tap that caption to open Weather for location. The compact card’s Color row is tappable role swatches, with Primary larger than the rest. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it.
 
-## Language
+On Wallpaper palettes, a photo button opens the Wallpaper tab. Save-as-custom sits with the sources. Header gear follows the active source: palettes open shell mode, Pure Black, and on niri window decorations and compositor blur.
 
-The Language tab sets the shell UI language. Auto follows the system locale. Otherwise pick a supported translation. Untranslated strings fall back to English.
+`noctalia msg panel-toggle control-center theme` opens Theme. `appearance` is an alias. `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` open the matching source.
 
-`noctalia msg panel-toggle control-center language` opens this tab. `noctalia msg settings-toggle language` opens the same page.
+### Glass {#glass}
 
-## Effects
+Glass sets panel chrome: Solid (opaque), Soft (Regular glass), and Glass (Clear glass) as material tiles, like Light/Dark/Auto on Palettes. A leftover specimen shows the selected material over wallpaper. Clear adds a dimming layer so leftover type stays readable. Compact cards and catalogs stay leftover, not nested glass-on-glass.
 
-The Effects tab is the live page for visual treatment that is not color. Panel chrome (Solid, Soft, Glass) keeps its own well with a trailing dropdown. High contrast, application icon tint, motion, borders, and popup shadows share the next well, with hairlines between those groups. Animation speed hides when motion is off. Shadow direction and opacity hide when popup shadows are off. The color picker hides when icon tint is off.
+`noctalia msg panel-toggle control-center glass` opens this source.
 
-`noctalia msg panel-toggle control-center effects` opens this tab.
+### Icons {#icons}
+
+Icons sets application icon style. Default and Tinted are compact sources, with a current preview on the right. Leftover is the tint catalog: palette roles or a custom color for dock, tray, taskbar, and launcher icons. Picking a tint turns Tinted on.
+
+`noctalia msg panel-toggle control-center icons` opens this source.
+
+### Type {#type}
+
+Type is the live page for the shell font. Search and the current family sit on the compact specimen card with caption/body/title size chips, a pangram, and Ghost/Primary control specimens. Leftover is the font grid; the first tile is System default (empty `shell.font_family`).
+
+`noctalia msg panel-toggle control-center type` opens this source.
+
+### Scale {#scale}
+
+Scale sets interface scale. The compact card is the slider. Leftover is a mini window whose type size, padding, and corner radius follow the value while you drag.
+
+`noctalia msg panel-toggle control-center scale` opens this source.
+
+### Roundness {#roundness}
+
+Roundness sets corner radius. The compact card is the shell scale with Small/Medium/Large chips. Bar, Dock, and (on niri) Windows sources swap the leftover specimen.
+
+`noctalia msg panel-toggle control-center roundness` opens this source.
+
+### Language {#language}
+
+Language sets the shell UI language. Search and the current locale sit on the compact card. Leftover is Auto plus supported translations. Auto follows the system locale; untranslated strings fall back to English.
+
+`noctalia msg panel-toggle control-center language` opens this source. `noctalia msg settings-toggle language` opens the same page.
+
+### Effects {#effects}
+
+Effects is the live page for contrast, motion, borders, and shadows. High Contrast and Motion are compact tiles. High Contrast frosts chrome and leftover wells and draws contrasting outlines. Borders, Shadows, and Speed sources swap leftover controls. Live button, input, and card specimens stay under the chips. Animation speed hides when Motion is off. Shadow direction and opacity hide when popup shadows are off. Panel glass lives on Glass; icon tint lives on Icons.
+
+`noctalia msg panel-toggle control-center effects` opens this source.
 
 ## Wallpaper
 
@@ -183,7 +230,7 @@ The Media tab is a now-playing stage. Artwork keeps leftover height while someth
 
 ## Audio
 
-The Audio tab groups PipeWire output, input, device, and stream controls. Use it for volume changes, muting, selecting devices, and inspecting application streams without opening an external mixer. Microphone, camera, and screen-share captures live on [Privacy](#privacy).
+The Audio tab keeps output and input volume on one compact card. Hover **Output**, **Input**, and **Apps** to preview the leftover; click a chip to keep it. Output and Input list playback and recording devices. Apps lists application streams. Use it for volume changes, muting, selecting devices, and inspecting streams without opening an external mixer. Microphone, camera, and screen-share captures live on [Privacy](#privacy).
 
 ## Monitor
 
@@ -201,7 +248,7 @@ The Camera tab is a stage plus inspector, the same split Camera Hub and Logitech
 
 ## System
 
-The System tab summarizes the machine and live resource usage. It shows distribution/kernel details, board/CPU/GPU information, uptime, install age, load averages, memory and swap, and graphs driven by the shared system monitor service. The header copy button places that summary on the clipboard.
+The System tab keeps distro, live CPU, and memory on one compact card. Hover **CPU**, **Memory**, **GPU**, **Network**, and **About** to preview the leftover; click a chip to keep it. Each graph fills leftover height. About lists hardware, uptime, load, memory, and disks. The header copy button places that summary on the clipboard.
 
 System monitor sampling is configured globally under `[system.monitor]`; see [System monitor](/noctalia/services/system-monitor/).
 
@@ -381,13 +428,13 @@ IPC: `privacy-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#privacy).
 
 ## Weather
 
-The Weather tab expands the Home weather summary into current conditions and forecast detail. Current conditions and the metrics list share one grouped well; daily and hourly forecast stay in a second well. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
+The Weather tab keeps location and current conditions on one compact card. Hover **Daily**, **Hourly**, and **Details** to preview the leftover; click a chip to keep it. Daily and hourly forecast fill the remaining height; Details lists wind, UV, sunrise, and the rest of the metrics. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
 
 Weather configuration is documented under [Weather](/noctalia/services/weather/).
 
 ## Calendar
 
-The Calendar tab shows the month view, a world clock of extra IANA timezones, accounts (add, edit, reconnect), and events from those accounts. Turning calendar sync off leaves the enable switch on the accounts card. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
+The Calendar tab keeps today and catalog chips on one compact card. Hover **Month**, **Events**, and **Accounts** to preview the leftover; click a chip to keep it. Month is the leftover stage: prev/next and the grid fill the remaining height. Click a day to open Events for that date. Accounts add, edit, and reconnect. Extra IANA timezones live on the [Clock](#clock) tab. Turning calendar sync off leaves the enable switch on the compact card. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
 
 Right-click a day to launch the application registered for the `text/calendar` MIME type. The Calendar panel closes
 after a successful launch.
@@ -396,19 +443,28 @@ after a successful launch.
 
 ```toml
 [control_center.calendar]
-show_events_card  = true
 show_week_numbers = false       # ISO 8601 week numbers in the month grid
-timezones         = []         # IANA names for the world-clock card, e.g. "America/Los_Angeles"
 ```
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `show_events_card` | bool | `true` | Show the event list beside the month grid. Also toggled from the calendar button in the tab header. |
 | `show_week_numbers` | bool | `false` | Show a column of ISO 8601 week numbers to the left of the month grid, separated from it by a divider. Each row is numbered by the week its Thursday falls in. |
-| `timezones` | string array | `[]` | Extra IANA timezones on the world-clock card. Search and pick them from the live card, or edit the list in Calendar settings. Times use `[shell].time_format`. |
 
 The shared `event_date_format` and `event_time_format` options are documented under [Calendar](/noctalia/services/calendar/).
 Week numbers are a decoration of the month grid, so they work with `[calendar].enabled = false` and no accounts configured.
+
+## Clock
+
+The Clock tab keeps local time, date, and zone on a compact card. Extra IANA timezones fill the leftover: search and pick them, or edit the list in Clock settings. Times use `[shell].time_format`. Home date/time still opens Calendar.
+
+```toml
+[control_center.clock]
+timezones = []         # IANA names besides local time, e.g. "America/Los_Angeles"
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `timezones` | string array | `[]` | Extra IANA timezones on the Clock leftover. Search and pick them from the tab, or edit the list in Clock settings. Times use `[shell].time_format`. |
 
 ## Notifications
 
@@ -416,14 +472,13 @@ The Notifications tab keeps Do Not Disturb and history filters on a compact card
 
 ## Screen Time
 
-The Screen Time tab shows how long each application was in the foreground today. Noctalia tracks focus using the active `zwlr_foreign_toplevel` window, pauses tracking while its session lock is active, and stores daily totals under `$XDG_STATE_HOME/noctalia/screen_time.json` (about 14 days retained).
+The Screen Time tab keeps total foreground time and the top app on one compact card. Hover **Today**, **3 days**, and **14 days** to preview the leftover chart and most-used list; click a chip to keep that range. Today is hourly; the longer ranges are daily bars. Click a day to open that day's hours. Helix tracks focus using the active `zwlr_foreign_toplevel` window, pauses tracking while its session lock is active, and stores daily totals under `$XDG_STATE_HOME/noctalia/screen_time.json` (about 14 days retained).
 
 When tracking is off, the tab shows a disabled banner with the enable toggle on that same live view.
 
-- **Range** toggle: today (hourly chart), last 3 days, or last 14 days (daily bars)
-- **Total** time for the selected range, with a stacked bar chart (hourly or per-day)
-- **Chart legend** as a horizontal row under the chart (chart colors only; app list uses neutral bars)
-- **Most used** apps with icons, usage bars, and duration for the selected range
+- **Range** chips on the compact card: today (hourly chart), last 3 days, or last 14 days (daily bars)
+- **Total** time for the selected range, with the top app as a secondary glance
+- **Leftover** stacked bar chart (hourly or per-day) and most-used apps with icons, usage bars, and duration
 
 Open it from the control center sidebar (`screen-time` context) or add a Home shortcut with `type = "screen_time"`.
 
@@ -460,9 +515,9 @@ ollama = "auto"
 
 ## Settings
 
-Settings pages are Control Center tabs. Theme, Type, Scale, Roundness, Effects, Language, Wallpaper, and Templates sit under **Appearance**. Bar, Dock, Desktop, Windows, Panels, and OSD sit under **Desktop**. Network, Bluetooth, Audio, Media, Monitor, Power, Notifications, Screen Time, Calendar, Weather, Camera, and System sit under **Device**. Privacy, Firewall, Security, Printers, Cast, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Input**. Control Center options, niri, hooks, and plugins sit under **General**.
+Settings pages are Control Center tabs. Theme, Wallpaper, and Templates sit under **Appearance**. Theme hosts Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources. Bar, Dock, Desktop, Windows, Panels, and OSD sit under **Desktop**. Network, Bluetooth, Audio, Media, Monitor, Power, Notifications, Screen Time, Calendar, Weather, Camera, and System sit under **Device**. Privacy, Firewall, Security, Printers, Cast, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Input**. Control Center options, niri, hooks, and plugins sit under **General**.
 
-Domain options that belong with a live view are on that tab: theme and palette on Theme (Auto shows the next day/night switch; community and custom palettes use a searchable picker), language on Language, font on Type, UI scale on Scale, corner radius on Roundness, panel glass, high contrast, icon tint, motion, borders, and shadows on Effects, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, and AI for the longer forms.
+Domain options that belong with a live view are on that tab: theme and palette on Theme Palettes (Light, Dark, and Auto as tiles; Auto shows the next day/night switch; Built-in, Wallpaper, Community, and Custom palettes fill the leftover catalog), language on Language, font on Type, UI scale on Scale, corner radius on Roundness, panel glass on Glass, icon tint on Icons, high contrast and motion tiles plus leftover Borders/Shadows/Speed chips on Effects, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, Theme, and AI for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the settings registry on the current tab’s gear sheet when that section matches. If it does not, Control Center opens the best matching section in gear mode instead of always dumping onto Theme.
 

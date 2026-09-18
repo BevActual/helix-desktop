@@ -3,6 +3,7 @@
 #include "render/scene/node.h"
 
 #include <cstddef>
+#include <unordered_map>
 
 class GridView : public Node {
 public:
@@ -23,6 +24,8 @@ public:
   void setMinCellHeight(float height);
   // When true, the last child in an incomplete row stretches across remaining columns.
   void setSpanLastItem(bool span);
+  void setChildSpan(Node* child, std::size_t columnSpan, std::size_t rowSpan);
+  void clearChildSpans();
 
   [[nodiscard]] std::size_t columns() const noexcept { return m_columns; }
   [[nodiscard]] float columnGap() const noexcept { return m_columnGap; }
@@ -36,6 +39,10 @@ public:
   [[nodiscard]] bool squareCells() const noexcept { return m_squareCells; }
   [[nodiscard]] bool squareGridShrinkWrap() const noexcept { return m_squareGridShrinkWrap; }
   [[nodiscard]] bool spanLastItem() const noexcept { return m_spanLastItem; }
+  [[nodiscard]] std::size_t childColumnSpan(const Node* child) const noexcept;
+  [[nodiscard]] std::size_t childRowSpan(const Node* child) const noexcept;
+  [[nodiscard]] std::size_t packedRowCount() const;
+
   [[nodiscard]] float minCellWidth() const noexcept { return m_minCellWidth; }
   [[nodiscard]] float minCellHeight() const noexcept { return m_minCellHeight; }
 
@@ -54,6 +61,11 @@ private:
   bool m_squareCells = false;
   bool m_squareGridShrinkWrap = true;
   bool m_spanLastItem = false;
+  struct ChildSpan {
+    std::size_t columns = 1;
+    std::size_t rows = 1;
+  };
+  std::unordered_map<const Node*, ChildSpan> m_childSpans;
   float m_minCellWidth = 0.0F;
   float m_minCellHeight = 0.0F;
 };

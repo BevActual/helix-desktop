@@ -200,8 +200,15 @@ struct BarConfig {
   bool operator==(const BarConfig&) const = default;
 };
 
+enum class ShortcutSize : std::uint8_t {
+  Small = 0,
+  Wide = 1,
+  Large = 2,
+};
+
 struct ShortcutConfig {
   std::string type;
+  ShortcutSize size = ShortcutSize::Small;
   bool operator==(const ShortcutConfig&) const = default;
 };
 
@@ -1580,6 +1587,12 @@ constexpr EnumOption<ControlCenterSidebarMode> kControlCenterSidebarModes[] = {
     {ControlCenterSidebarMode::None, "none", "settings.options.control-center.sidebar.none"},
 };
 
+constexpr EnumOption<ShortcutSize> kShortcutSizes[] = {
+    {ShortcutSize::Small, "small", "settings.options.control-center.shortcut-size.small"},
+    {ShortcutSize::Wide, "wide", "settings.options.control-center.shortcut-size.wide"},
+    {ShortcutSize::Large, "large", "settings.options.control-center.shortcut-size.large"},
+};
+
 enum class AiUsageProviderMode : std::uint8_t {
   Auto = 0,
   On = 1,
@@ -1729,12 +1742,17 @@ struct ThemeConfig {
 
 struct ControlCenterConfig {
   static constexpr std::int32_t kDefaultWidth = 700;
+  static constexpr std::int32_t kDefaultHeight = 700;
 
   struct CalendarTabConfig {
     bool showEventsCard = true;
     bool showWeekNumbers = false;
-    std::vector<std::string> timezones;
     bool operator==(const CalendarTabConfig&) const = default;
+  };
+
+  struct ClockTabConfig {
+    std::vector<std::string> timezones;
+    bool operator==(const ClockTabConfig&) const = default;
   };
 
   struct NetworkTabConfig {
@@ -1772,9 +1790,11 @@ struct ControlCenterConfig {
   ControlCenterSidebarMode sidebarMode = ControlCenterSidebarMode::Compact;
   ControlCenterSidebarMode sidebarSectionMode = ControlCenterSidebarMode::Compact;
   std::int32_t width = kDefaultWidth; // full-sidebar logical width; compact/none modes scale down from this
+  std::int32_t height = kDefaultHeight; // logical height; leftover catalogs fill the extra space
   bool showShortcutLabels = true;
   bool showSessionButton = true;
   CalendarTabConfig calendarTab;
+  ClockTabConfig clockTab;
   NetworkTabConfig networkTab;
   BluetoothTabConfig bluetoothTab;
   AiUsageTabConfig aiUsage;

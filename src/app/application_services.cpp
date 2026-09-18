@@ -522,18 +522,24 @@ void Application::initStyleThemeAndWayland() {
     motion.setSpeed(m_configService.config().shell.animation.speed);
     motion.setEnabled(m_configService.config().shell.animation.enabled);
   };
-  auto applyStyleConfig = [this, lastCornerRadiusScale = std::numeric_limits<float>::quiet_NaN()]() mutable {
+  auto applyStyleConfig = [this, lastCornerRadiusScale = std::numeric_limits<float>::quiet_NaN(),
+                           lastHighContrast = false, haveStyleSnapshot = false]() mutable {
     const float corner = m_configService.config().shell.cornerRadiusScale;
+    const bool highContrast = m_configService.config().accessibility.highContrast;
     const bool cornerChanged =
         std::isfinite(lastCornerRadiusScale) && std::abs(corner - lastCornerRadiusScale) > 1.0e-4F;
+    const bool contrastChanged = haveStyleSnapshot && lastHighContrast != highContrast;
     Style::setCornerRadiusScale(corner);
     Style::setButtonBordersEnabled(m_configService.config().shell.buttonBorders);
     Style::setInputBordersEnabled(m_configService.config().shell.inputBorders);
     Style::setPopupBordersEnabled(m_configService.config().shell.popupBorders);
     Style::setPopupShadowsEnabled(m_configService.config().shell.popupShadows);
     Style::setCardBordersEnabled(m_configService.config().shell.cardBorders);
+    Style::setHighContrastEnabled(highContrast);
     lastCornerRadiusScale = corner;
-    if (cornerChanged) {
+    lastHighContrast = highContrast;
+    haveStyleSnapshot = true;
+    if (cornerChanged || contrastChanged) {
       m_notificationToast.requestLayout();
       m_panelManager.requestLayout();
     }

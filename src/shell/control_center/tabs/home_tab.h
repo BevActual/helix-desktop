@@ -7,6 +7,7 @@
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/shortcut_services.h"
 #include "shell/control_center/tab.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/signal.h"
 
 #include <chrono>
@@ -30,6 +31,8 @@ class GridView;
 class Image;
 class InputArea;
 class Label;
+class ProgressBar;
+class ScrollView;
 class Shortcut;
 class Wallpaper;
 class ClipboardService;
@@ -43,6 +46,7 @@ struct ShortcutPad {
   Button* button = nullptr;
   Glyph* glyph = nullptr;
   Label* label = nullptr;
+  ShortcutSize size = ShortcutSize::Small;
 };
 
 struct ShortcutCluster {
@@ -111,6 +115,8 @@ private:
   bool m_active = false;
 
   Flex* m_rootLayout = nullptr;
+  ScrollView* m_liveScroll = nullptr;
+  ScrollViewState m_liveScrollState{};
   Flex* m_statusStrip = nullptr;
   Flex* m_bottomRow = nullptr;
   Flex* m_dateTimeCard = nullptr;
@@ -128,7 +134,6 @@ private:
   Label* m_weatherLine = nullptr;
   Label* m_userHost = nullptr;
   Label* m_userUptime = nullptr;
-  Label* m_userVersion = nullptr;
   Button* m_sessionButton = nullptr;
   Button* m_statusUpdates = nullptr;
   Button* m_statusCapture = nullptr;
@@ -162,8 +167,11 @@ private:
 
   Label* m_mediaTrack = nullptr;
   Label* m_mediaArtist = nullptr;
-  Label* m_mediaStatus = nullptr;
-  Label* m_mediaProgress = nullptr;
+  Flex* m_mediaTransport = nullptr;
+  Button* m_mediaPrev = nullptr;
+  Button* m_mediaPlayPause = nullptr;
+  Button* m_mediaNext = nullptr;
+  ProgressBar* m_mediaProgressBar = nullptr;
   Flex* m_mediaArtSlot = nullptr;
   Glyph* m_mediaArtFallback = nullptr;
   Image* m_mediaArt = nullptr;

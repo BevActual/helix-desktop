@@ -344,9 +344,12 @@ namespace settings {
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
     case SettingsSection::Camera:
+    case SettingsSection::Clock:
     case SettingsSection::Type:
     case SettingsSection::Scale:
     case SettingsSection::Roundness:
+    case SettingsSection::Glass:
+    case SettingsSection::Icons:
     case SettingsSection::Effects:
     case SettingsSection::Language:
       return false;
@@ -391,9 +394,12 @@ namespace settings {
     case SettingsSection::Bar:
     case SettingsSection::Plugins:
     case SettingsSection::Camera:
+    case SettingsSection::Clock:
     case SettingsSection::Type:
     case SettingsSection::Scale:
     case SettingsSection::Roundness:
+    case SettingsSection::Glass:
+    case SettingsSection::Icons:
     case SettingsSection::Effects:
     case SettingsSection::Language:
       return {};

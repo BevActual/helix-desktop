@@ -8,19 +8,21 @@
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
-#include "shell/settings/color_spec_picker.h"
-#include "ui/app_icon_colorization.h"
 #include "ui/builders.h"
+#include "ui/controls/button.h"
+#include "ui/controls/flex.h"
 #include "ui/controls/label.h"
-#include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
+#include <chrono>
 #include <format>
-#include <iterator>
+#include <functional>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -43,192 +45,277 @@ namespace {
 
   [[nodiscard]] std::string percentLabel(double value) { return std::format("{:.0f}%", value * 100.0); }
 
+  Button::ButtonPalette treatmentTilePalette() {
+    const ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F);
+    const ColorSpec label = colorSpecFromRole(ColorRole::OnSurface);
+    const ColorSpec restBorder = colorSpecFromRole(ColorRole::Outline, 0.28F);
+    const ColorSpec selectedBorder = colorSpecFromRole(ColorRole::Primary);
+    Button::ButtonStateColors rest{.bg = fill, .border = restBorder, .label = label};
+    Button::ButtonStateColors selected{.bg = fill, .border = selectedBorder, .label = label};
+    return {
+        .borderWidth = 2.0F,
+        .normal = rest,
+        .hover = selected,
+        .pressed = selected,
+        .disabled = rest,
+        .selected = selected,
+    };
+  }
+
+  std::unique_ptr<Button> makeTreatmentTile(
+      Button** out, std::string_view glyph, const std::string& label, bool selected, float scale,
+      std::function<void()> onClick
+  ) {
+    return ui::button({
+        .out = out,
+        .text = label,
+        .glyph = std::string(glyph),
+        .fontSize = Style::fontSizeCaption * scale,
+        .glyphSize = Style::fontSizeTitle * scale,
+        .selected = selected,
+        .contentAlign = ButtonContentAlign::Center,
+        .customPalette = treatmentTilePalette(),
+        .tooltip = label,
+        .minHeight = Style::controlHeightLg * 2.6F * scale,
+        .padding = Style::spaceSm * scale,
+        .gap = Style::spaceXs * scale,
+        .radius = Style::scaledRadiusXl(scale),
+        .flexGrow = 1.0F,
+        .onClick = std::move(onClick),
+        .configure =
+            [](Button& button) {
+              button.setDirection(FlexDirection::Vertical);
+              button.setAlign(FlexAlign::Center);
+              button.setJustify(FlexJustify::Center);
+              if (button.label() != nullptr) {
+                button.label()->setMaxLines(1);
+                button.label()->setTextAlign(TextAlign::Center);
+              }
+            },
+    });
+  }
+
 } // namespace
 
 EffectsTab::EffectsTab(const ControlCenterServices& services)
     : m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(
-          services,
-          SettingsPaneOptions{.section = "effects", .includedGroups = {"icons"}, .showConfigureButton = false}
+          services, SettingsPaneOptions{.section = "effects", .showConfigureButton = false}
       )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("effects_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+    }
+  }
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
 }
 
 std::unique_ptr<Flex> EffectsTab::create() {
+  return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
+}
+
+std::unique_ptr<Flex> EffectsTab::createLiveBody() {
   const float scale = contentScale();
+  const float captionSize = Style::fontSizeCaption * scale;
   m_syncing = true;
 
-  auto live = ui::column({
+  const bool highContrast = m_config != nullptr && m_config->config().accessibility.highContrast;
+  const bool animations = m_config != nullptr && m_config->config().shell.animation.enabled;
+
+  auto tab = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
 
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
+  auto compactCard = ui::column({
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
+  auto tileRow = ui::row({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  tileRow->addChild(makeTreatmentTile(
+      &m_contrastTile, "contrast", i18n::tr("settings.schema.accessibility.high-contrast.label"), highContrast, scale,
+      [this]() {
+        if (m_config == nullptr) {
+          return;
+        }
+        applyHighContrast(!m_config->config().accessibility.highContrast);
+      }
+  ));
+  tileRow->addChild(makeTreatmentTile(
+      &m_motionTile, "player-play", i18n::tr("settings.schema.appearance.animations.label"), animations, scale,
+      [this]() {
+        if (m_config == nullptr) {
+          return;
+        }
+        applyAnimations(!m_config->config().shell.animation.enabled);
+      }
+  ));
+  compactCard->addChild(std::move(tileRow));
+  compactCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "border-all",
+                      .tooltip = i18n::tr("control-center.appearance.effects-borders"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "shadow",
+                      .tooltip = i18n::tr("control-center.appearance.effects-shadows"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "player-play",
+                      .tooltip = i18n::tr("control-center.appearance.effects-speed"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index, true); },
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_caption,
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  tab->addChild(std::move(compactCard));
+
+  auto leftover = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  auto specimen = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .padding = Style::spaceMd * scale,
+      .fill = colorSpecFromRole(ColorRole::SurfaceVariant),
+      .radius = Style::scaledRadiusXl(scale),
+      .minHeight = Style::controlHeightLg * 3.6F * scale,
+      .fillWidth = true,
+  });
+  auto chrome = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+  });
+  chrome->addChild(
+      ui::button({
+          .text = i18n::tr("control-center.appearance.specimen-primary"),
+          .variant = ButtonVariant::Primary,
+          .flexGrow = 1.0F,
+      })
+  );
+  chrome->addChild(
+      ui::button({
+          .text = i18n::tr("control-center.appearance.specimen-ghost"),
+          .variant = ButtonVariant::Ghost,
+          .flexGrow = 1.0F,
+      })
+  );
+  specimen->addChild(std::move(chrome));
+  specimen->addChild(
+      ui::row(
+          {.align = FlexAlign::Center},
+          ui::input({
+              .placeholder = i18n::tr("control-center.appearance.specimen-input"),
+              .fontSize = Style::fontSizeBody * scale,
+              .controlHeight = Style::controlHeightSm * scale,
+              .flexGrow = 1.0F,
+          })
+      )
+  );
+  auto card = ui::column({
+      .out = &m_specimenCard,
+      .align = FlexAlign::Stretch,
+      .padding = Style::spaceSm * scale,
+      .fill = colorSpecFromRole(ColorRole::Surface),
+      .radius = Style::scaledRadiusLg(scale),
+      .border = colorSpecFromRole(ColorRole::Outline, 0.45F),
+      .borderWidth = 1.0F,
+      .minHeight = Style::controlHeight * scale,
+      .fillWidth = true,
+  });
+  card->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.appearance.specimen-card"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+      })
+  );
+  specimen->addChild(std::move(card));
+  leftover->addChild(std::move(specimen));
 
   const float opacity = panelCardOpacity();
-  auto makeWell = [scale, opacity]() {
+  auto makeHost = [&](Flex** out, bool visible) {
     return ui::column({
+        .out = out,
         .align = FlexAlign::Stretch,
-        .configure = [scale, opacity](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+        .flexGrow = 1.0F,
+        .visible = visible,
+        .participatesInLayout = visible,
+        .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
     });
   };
 
-  auto chromeWell = makeWell();
-  std::vector<std::string> transparencyLabels;
-  transparencyLabels.reserve(std::size(kPanelTransparencyModes));
-  for (const auto& option : kPanelTransparencyModes) {
-    transparencyLabels.emplace_back(i18n::tr(option.labelKey));
-  }
-  m_transparencyMode = addSelectRow(
-      *chromeWell, scale, i18n::tr("settings.schema.panels.transparency-mode.label"), std::move(transparencyLabels),
-      opacity, [this](std::size_t index) { applyTransparencyMode(index); }
-  );
-  addCaption(*chromeWell, i18n::tr("settings.schema.panels.transparency-mode.description"), scale);
-  content->addChild(std::move(chromeWell));
-
-  auto treatmentWell = makeWell();
-  m_highContrast = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.accessibility.high-contrast.label"),
-      [this](bool enabled) {
-        if (!m_syncing && m_config != nullptr) {
-          (void)m_config->setOverride({"accessibility", "high_contrast"}, enabled);
-        }
-      }
-  );
-
-  addWellDivider(*treatmentWell, scale);
-  m_iconColorize = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.app-icon-colorize.label"),
-      [this](bool enabled) {
-        if (!m_syncing && m_config != nullptr) {
-          (void)m_config->setOverride({"shell", "app_icon_colorize"}, enabled);
-          syncLiveControls();
-          PanelManager::instance().requestLayout();
-        }
-      }
-  );
-  auto iconColorSection = ui::column({
-      .out = &m_iconColorSection,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-  });
-  addWellDivider(*iconColorSection, scale);
-  auto iconColorRow = makeControlRow(i18n::tr("settings.schema.appearance.app-icon-color.label"), scale, nullptr, false);
-  std::string iconColorValue;
-  if (m_config != nullptr) {
-    ShellConfig colorizeShell = m_config->config().shell;
-    colorizeShell.appIconColorize = true;
-    if (const auto tint = effectiveShellAppIconColorizationTint(colorizeShell)) {
-      iconColorValue = settings::colorSpecConfigValue(*tint);
-    }
-  }
-  iconColorRow->addChild(settings::makeColorSpecSelect(
-      settings::ColorSpecSelectOptions{
-          .selectedValue = std::move(iconColorValue),
-          .fontSize = Style::fontSizeBody * scale,
-          .controlHeight = Style::controlHeight * scale,
-          .out = &m_iconColor,
-      },
-      [this](std::string value) {
-        if (!m_syncing && m_config != nullptr) {
-          (void)m_config->setOverride({"shell", "app_icon_color"}, std::move(value));
-        }
-      },
-      [this]() {
-        if (!m_syncing && m_config != nullptr) {
-          (void)m_config->clearOverride({"shell", "app_icon_color"});
-        }
-      }
-  ));
-  iconColorSection->addChild(std::move(iconColorRow));
-  treatmentWell->addChild(std::move(iconColorSection));
-  addCaption(*treatmentWell, i18n::tr("settings.schema.accessibility.high-contrast.description"), scale);
-  addCaption(*treatmentWell, i18n::tr("settings.schema.appearance.app-icon-colorize.description"), scale);
-
-  addWellDivider(*treatmentWell, scale);
-  m_animations = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.animations.label"),
-      [this](bool enabled) {
-        if (!m_syncing && m_config != nullptr) {
-          (void)m_config->setOverride({"shell", "animation", "enabled"}, enabled);
-          syncLiveControls();
-          PanelManager::instance().requestLayout();
-        }
-      }
-  );
-  auto speedSection = ui::column({
-      .out = &m_animationSpeedSection,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-  });
-  addWellDivider(*speedSection, scale);
-  addSliderSection(
-      *speedSection, scale, i18n::tr("settings.schema.appearance.animation-speed.label"), &m_animationSpeed,
-      &m_animationSpeedValue, noctalia::config::schema::kAnimationSpeedRange.min.value_or(0.1F),
-      noctalia::config::schema::kAnimationSpeedRange.max.value_or(4.0F),
-      noctalia::config::schema::kAnimationSpeedRange.step.value_or(0.05F), 1.0, multiplierLabel,
-      [this]() { commitAnimationSpeed(); }
-  );
-  treatmentWell->addChild(std::move(speedSection));
-  addCaption(*treatmentWell, i18n::tr("settings.schema.appearance.animations.description"), scale);
-
-  addWellDivider(*treatmentWell, scale);
+  auto borders = makeHost(&m_bordersHost, true);
   m_buttonBorders = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.button-borders.label"),
+      *borders, scale, i18n::tr("settings.schema.appearance.button-borders.label"),
       [this](bool enabled) {
         if (!m_syncing && m_config != nullptr) {
           (void)m_config->setOverride({"shell", "button_borders"}, enabled);
         }
       }
   );
-  addWellDivider(*treatmentWell, scale);
+  addWellDivider(*borders, scale);
   m_inputBorders = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.input-borders.label"),
+      *borders, scale, i18n::tr("settings.schema.appearance.input-borders.label"),
       [this](bool enabled) {
         if (!m_syncing && m_config != nullptr) {
           (void)m_config->setOverride({"shell", "input_borders"}, enabled);
         }
       }
   );
-  addWellDivider(*treatmentWell, scale);
+  addWellDivider(*borders, scale);
   m_popupBorders = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.popup-borders.label"),
+      *borders, scale, i18n::tr("settings.schema.appearance.popup-borders.label"),
       [this](bool enabled) {
         if (!m_syncing && m_config != nullptr) {
           (void)m_config->setOverride({"shell", "popup_borders"}, enabled);
         }
       }
   );
-  addWellDivider(*treatmentWell, scale);
+  addWellDivider(*borders, scale);
   m_cardBorders = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.card-borders.label"),
+      *borders, scale, i18n::tr("settings.schema.appearance.card-borders.label"),
       [this](bool enabled) {
         if (!m_syncing && m_config != nullptr) {
           (void)m_config->setOverride({"shell", "card_borders"}, enabled);
+          syncLiveControls();
         }
       }
   );
-  addCaption(*treatmentWell, i18n::tr("control-center.appearance.borders-hint"), scale);
+  leftover->addChild(std::move(borders));
 
-  addWellDivider(*treatmentWell, scale);
+  auto shadows = makeHost(&m_shadowsHost, false);
   m_popupShadows = addToggleRow(
-      *treatmentWell, scale, i18n::tr("settings.schema.appearance.popup-shadows.label"),
+      *shadows, scale, i18n::tr("settings.schema.appearance.popup-shadows.label"),
       [this](bool enabled) {
         if (!m_syncing && m_config != nullptr) {
           (void)m_config->setOverride({"shell", "popup_shadows"}, enabled);
@@ -258,14 +345,40 @@ std::unique_ptr<Flex> EffectsTab::create() {
       noctalia::config::schema::kUnitRange.min.value_or(0.0F), noctalia::config::schema::kUnitRange.max.value_or(1.0F),
       noctalia::config::schema::kUnitRange.step.value_or(0.01F), 0.55, percentLabel, [this]() { commitShadowAlpha(); }
   );
-  treatmentWell->addChild(std::move(shadowDetails));
-  addCaption(*treatmentWell, i18n::tr("settings.schema.appearance.popup-shadows.description"), scale);
-  content->addChild(std::move(treatmentWell));
+  shadows->addChild(std::move(shadowDetails));
+  leftover->addChild(std::move(shadows));
 
-  live->addChild(std::move(scroll));
-  auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
+  auto speed = makeHost(&m_speedHost, false);
+  auto speedSection = ui::column({
+      .out = &m_animationSpeedSection,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  addSliderSection(
+      *speedSection, scale, i18n::tr("settings.schema.appearance.animation-speed.label"), &m_animationSpeed,
+      &m_animationSpeedValue, noctalia::config::schema::kAnimationSpeedRange.min.value_or(0.1F),
+      noctalia::config::schema::kAnimationSpeedRange.max.value_or(4.0F),
+      noctalia::config::schema::kAnimationSpeedRange.step.value_or(0.05F), 1.0, multiplierLabel,
+      [this]() { commitAnimationSpeed(); }
+  );
+  speed->addChild(std::move(speedSection));
+  speed->addChild(
+      ui::label({
+          .out = &m_speedOffCaption,
+          .text = i18n::tr("control-center.appearance.effects-speed-off"),
+          .fontSize = captionSize,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  leftover->addChild(std::move(speed));
+  tab->addChild(std::move(leftover));
+
   syncLiveControls();
-  return wrapped;
+  syncCatalog();
+  return tab;
 }
 
 std::unique_ptr<Flex> EffectsTab::createHeaderActions() {
@@ -273,19 +386,23 @@ std::unique_ptr<Flex> EffectsTab::createHeaderActions() {
 }
 
 void EffectsTab::onClose() {
+  m_hoverEndTimer.stop();
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
-  m_transparencyMode = nullptr;
-  m_highContrast = nullptr;
-  m_iconColorize = nullptr;
-  m_iconColorSection = nullptr;
-  m_iconColor = nullptr;
-  m_animations = nullptr;
+  m_contrastTile = nullptr;
+  m_motionTile = nullptr;
+  m_catalogSwitch = nullptr;
+  m_caption = nullptr;
+  m_specimenCard = nullptr;
+  m_bordersHost = nullptr;
+  m_shadowsHost = nullptr;
+  m_speedHost = nullptr;
   m_animationSpeedSection = nullptr;
   m_animationSpeed = nullptr;
   m_animationSpeedValue = nullptr;
+  m_speedOffCaption = nullptr;
   m_buttonBorders = nullptr;
   m_inputBorders = nullptr;
   m_popupBorders = nullptr;
@@ -302,9 +419,6 @@ void EffectsTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show
 bool EffectsTab::configureMode() const { return m_settings->configureMode(); }
 
 void EffectsTab::setSettingsSearchQuery(std::string_view query) {
-  if (!query.empty()) {
-    m_settings->setConfigureMode(true);
-  }
   m_settings->setSearchQuery(std::string(query));
 }
 
@@ -317,6 +431,7 @@ void EffectsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
   if (m_rootLayout == nullptr) {
     return;
   }
+  syncCatalog();
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
 }
@@ -332,35 +447,66 @@ void EffectsTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void EffectsTab::refreshCaption() {
+  if (m_caption == nullptr) {
+    return;
+  }
+  const char* key = "control-center.appearance.borders-hint";
+  switch (m_catalog) {
+  case Catalog::Shadows:
+    key = "settings.schema.appearance.popup-shadows.description";
+    break;
+  case Catalog::Speed:
+    key = "settings.schema.appearance.animations.description";
+    break;
+  case Catalog::Borders:
+    break;
+  }
+  m_caption->setText(i18n::tr(key));
+}
+
+void EffectsTab::applyHighContrast(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"accessibility", "high_contrast"}, enabled);
+  syncLiveControls();
+}
+
+void EffectsTab::applyAnimations(bool enabled) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setOverride({"shell", "animation", "enabled"}, enabled);
+  syncLiveControls();
+  PanelManager::instance().requestLayout();
+}
+
 void EffectsTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
   }
   const Config& cfg = m_config->config();
   m_syncing = true;
-  if (m_transparencyMode != nullptr) {
-    m_transparencyMode->setSelectedIndexSilently(static_cast<std::size_t>(cfg.shell.panel.transparencyMode));
+  if (m_contrastTile != nullptr) {
+    m_contrastTile->setSelected(cfg.accessibility.highContrast);
   }
-  if (m_highContrast != nullptr) {
-    m_highContrast->setCheckedImmediate(cfg.accessibility.highContrast);
+  if (m_motionTile != nullptr) {
+    m_motionTile->setSelected(cfg.shell.animation.enabled);
   }
-  if (m_iconColorize != nullptr) {
-    m_iconColorize->setCheckedImmediate(cfg.shell.appIconColorize);
-  }
-  if (setShown(m_iconColorSection, cfg.shell.appIconColorize)) {
-    PanelManager::instance().requestLayout();
-  }
-  if (m_animations != nullptr) {
-    m_animations->setCheckedImmediate(cfg.shell.animation.enabled);
+  refreshCaption();
+  if (m_specimenCard != nullptr) {
+    if (cfg.shell.cardBorders) {
+      m_specimenCard->setBorder(colorSpecFromRole(ColorRole::Outline, 0.45F), 1.0F);
+    } else {
+      m_specimenCard->clearBorder();
+    }
   }
   if (m_animationSpeed != nullptr) {
     m_animationSpeed->setValue(cfg.shell.animation.speed);
   }
   if (m_animationSpeedValue != nullptr) {
     m_animationSpeedValue->setText(multiplierLabel(cfg.shell.animation.speed));
-  }
-  if (setShown(m_animationSpeedSection, cfg.shell.animation.enabled)) {
-    PanelManager::instance().requestLayout();
   }
   if (m_buttonBorders != nullptr) {
     m_buttonBorders->setCheckedImmediate(cfg.shell.buttonBorders);
@@ -398,6 +544,7 @@ void EffectsTab::syncLiveControls() {
     m_shadowAlphaValue->setText(percentLabel(cfg.shell.shadow.alpha));
   }
   m_syncing = false;
+  syncCatalog();
 }
 
 void EffectsTab::commitAnimationSpeed() {
@@ -421,12 +568,112 @@ void EffectsTab::applyShadowDirection(std::size_t index) {
   (void)m_config->setOverride({"shell", "shadow", "direction"}, m_shadowDirectionKeys[index]);
 }
 
-void EffectsTab::applyTransparencyMode(std::size_t index) {
-  if (m_syncing || m_config == nullptr || index >= std::size(kPanelTransparencyModes)) {
+EffectsTab::Catalog EffectsTab::catalogFromState(std::string_view value) noexcept {
+  if (value == "shadows") {
+    return Catalog::Shadows;
+  }
+  if (value == "speed") {
+    return Catalog::Speed;
+  }
+  return Catalog::Borders;
+}
+
+std::string_view EffectsTab::catalogState(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Shadows:
+    return "shadows";
+  case Catalog::Speed:
+    return "speed";
+  case Catalog::Borders:
+    break;
+  }
+  return "borders";
+}
+
+std::size_t EffectsTab::indexFromCatalog(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Shadows:
+    return 1;
+  case Catalog::Speed:
+    return 2;
+  case Catalog::Borders:
+    break;
+  }
+  return 0;
+}
+
+EffectsTab::Catalog EffectsTab::catalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 1:
+    return Catalog::Shadows;
+  case 2:
+    return Catalog::Speed;
+  default:
+    return Catalog::Borders;
+  }
+}
+
+void EffectsTab::persistCatalog() {
+  if (m_config == nullptr) {
     return;
   }
-  (void)m_config->setOverride(
-      {"shell", "panel", "transparency_mode"}, std::string(kPanelTransparencyModes[index].key)
-  );
+  (void)m_config->setStateString("effects_tab", "catalog", std::string(catalogState(m_pinnedCatalog)));
+}
+
+void EffectsTab::syncCatalog() {
+  const bool borders = m_catalog == Catalog::Borders;
+  const bool shadows = m_catalog == Catalog::Shadows;
+  const bool speed = m_catalog == Catalog::Speed;
+  const bool motionOn = m_config != nullptr && m_config->config().shell.animation.enabled;
+  bool dirty = setShown(m_bordersHost, borders) || setShown(m_shadowsHost, shadows) || setShown(m_speedHost, speed);
+  dirty = setShown(m_animationSpeedSection, speed && motionOn) || setShown(m_speedOffCaption, speed && !motionOn)
+      || dirty;
+  refreshCaption();
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_pinnedCatalog));
+    m_catalogSyncing = false;
+    dirty = true;
+  }
+  if (dirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void EffectsTab::applyCatalog(std::size_t index, bool persist) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (persist) {
+    m_hoverEndTimer.stop();
+    m_pinnedCatalog = next;
+    persistCatalog();
+  }
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  syncCatalog();
+}
+
+void EffectsTab::previewCatalog(std::size_t index) {
+  m_hoverEndTimer.stop();
+  applyCatalog(index, false);
   PanelManager::instance().refresh();
+}
+
+void EffectsTab::restorePinnedCatalog() {
+  m_hoverEndTimer.stop();
+  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
+    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
+    PanelManager::instance().refresh();
+  });
+}
+
+void EffectsTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
 }

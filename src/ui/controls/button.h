@@ -94,6 +94,7 @@ public:
   [[nodiscard]] bool hovered() const noexcept;
   [[nodiscard]] bool pressed() const noexcept;
   [[nodiscard]] bool enabled() const noexcept { return m_enabled; }
+  [[nodiscard]] bool selected() const noexcept { return m_selected; }
   [[nodiscard]] ButtonVariant variant() const noexcept { return m_variant; }
 
   [[nodiscard]] static ButtonPalette defaultPalette(ButtonVariant variant);

@@ -2463,8 +2463,12 @@ void PanelManager::onConfigReloaded() {
     bg->setPanelStyle(m_config->config().shell.panel.borders);
     bg->setRadius(m_activePanel->cornerRadius());
     bg->setFill(colorSpecFromRole(ColorRole::Surface, panelBackgroundOpacity));
-    if (m_config->config().shell.panel.borders) {
-      bg->setBorder(colorSpecFromRole(ColorRole::Outline, panelBackgroundOpacity), Style::borderWidth);
+    if (shell::panel_surface::chromeBorderEnabled(m_config->config().shell.panel.borders)) {
+      bg->setBorder(
+          colorSpecFromRole(ColorRole::Outline, panelBackgroundOpacity), shell::panel_surface::chromeBorderWidth()
+      );
+    } else {
+      bg->clearBorder();
     }
   }
   if (m_panelShadowNode != nullptr) {
@@ -2580,8 +2584,12 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
         const float backgroundOpacity = shell::panel_surface::backgroundOpacity(m_config);
         bg->setFill(colorSpecFromRole(ColorRole::Surface, backgroundOpacity));
         bg->setRadius(m_activePanel->cornerRadius());
-        if (panelBorders) {
-          bg->setBorder(colorSpecFromRole(ColorRole::Outline, backgroundOpacity), Style::borderWidth);
+        if (shell::panel_surface::chromeBorderEnabled(panelBorders)) {
+          bg->setBorder(
+              colorSpecFromRole(ColorRole::Outline, backgroundOpacity), shell::panel_surface::chromeBorderWidth()
+          );
+        } else {
+          bg->clearBorder();
         }
       }
       m_bgNode = sceneParent->addChild(std::move(bg));

@@ -21,8 +21,25 @@ class Toggle;
 
 namespace control_center {
 
-  void applySectionCardStyle(Flex& card, float scale = 1.0F, float fillOpacity = 1.0F);
+  // Helix maps Apple HIG Liquid Glass to a hierarchy, not a skin:
+  // chrome = panel / sidebar / header (glass), leftover = tab content (solid wells),
+  // modules = Home shortcut plates, widgets = glanceable Home/desktop cards that deep-link.
+  // Do not nest glass-on-glass. Compact cards and leftover catalogs stay leftover.
+  void applySectionCardStyle(Flex& card, float scale, float fillOpacity);
   [[nodiscard]] float sectionCardFillOpacity(float panelCardOpacity) noexcept;
+  void applyGroupedListStyle(Flex& host, float scale);
+  // Glanceable widgets and Apple-app content on the glass panel chrome.
+  void applyContentCardStyle(Flex& card, float scale);
+  // Control Center functional modules (frosted plates). Not a second glass layer.
+  void applyModuleWellStyle(Flex& well, float scale);
+  // How many leftover catalog tiles fit in `availableWidth`. Used when Control Center
+  // is sized like a Settings window.
+  [[nodiscard]] std::size_t leftoverCatalogColumns(
+      float availableWidth, float minCellWidth, float gap, std::size_t minColumns = 2,
+      std::size_t maxColumns = 5
+  ) noexcept;
+  enum class GroupedListRowEmphasis : std::uint8_t { None, Hover, Pressed, Selected };
+  void applyGroupedListRowStyle(Flex& row, float scale, GroupedListRowEmphasis emphasis);
   Separator* addWellDivider(
       Flex& parent, float scale, SeparatorOrientation orientation = SeparatorOrientation::HorizontalRule
   );

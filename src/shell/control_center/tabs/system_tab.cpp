@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/system_tab.h"
 
+#include "config/config_service.h"
 #include "core/build_info.h"
 #include "i18n/i18n.h"
 #include "render/scene/node.h"
@@ -13,10 +14,12 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/graph.h"
+#include "ui/controls/segmented.h"
 #include "wayland/clipboard_service.h"
 
 #include <algorithm>
 #include <format>
+#include <optional>
 #include <vector>
 
 using namespace control_center;
@@ -38,36 +41,13 @@ namespace {
     return changed;
   }
 
-  // Graph cards run tighter than the default section card so the plot fills more of the card,
-  // but the title gets a touch more breathing room above it.
-  constexpr float kGraphCardPadTop = Style::spaceSm;
-  constexpr float kGraphCardPadV = Style::spaceXs;
-  constexpr float kGraphCardPadH = Style::spaceMd;
-
-  // Section card style with reduced padding, shared by the four graph cards.
-  void applyGraphCardStyle(Flex& section, float scale, float opacity) {
-    control_center::applySectionCardStyle(section, scale, opacity);
-    section.setGap(Style::spaceXs * scale);
-    section.setPadding(
-        kGraphCardPadTop * scale, kGraphCardPadH * scale, kGraphCardPadV * scale, kGraphCardPadH * scale
-    );
+  void requestPanelLayout() {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
+    }
   }
 
-  Flex* makeHeaderRow(Flex& parent, const std::string& title, float scale) {
-    Flex* ptr = nullptr;
-    auto row = ui::row(
-        {.out = &ptr, .align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-        ui::label({
-            .text = title,
-            .fontSize = Style::fontSizeTitle * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    parent.addChild(std::move(row));
-    return ptr;
-  }
+  // Graph leftover fills remaining height. Keep a little gap under the plot for the legend.
 
   Flex* makeIconLabel(Flex& parent, const char* glyphName, float scale, Glyph** outIcon = nullptr) {
     Flex* ptr = nullptr;
@@ -184,10 +164,11 @@ namespace {
   ) {
     auto card = ui::column({
         .flexGrow = grow,
-        .configure = [scale, fillOpacity](Flex& section) {
-          applySectionCardStyle(section, scale, fillOpacity);
-          section.setGap(Style::spaceXs * scale);
-        },
+        .configure =
+            [scale, fillOpacity](Flex& section) {
+              (void)fillOpacity;
+              section.setGap(Style::spaceXs * scale);
+            },
     });
 
     addTitle(*card, title, scale);
@@ -220,15 +201,23 @@ namespace {
 } // namespace
 
 SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services)
-    : m_monitor(monitor), m_clipboard(services.clipboard), m_upgradeShell(services.upgradeShell),
-      m_upgradeAvailable(services.upgradeAvailable), m_upgradeBusy(services.upgradeBusy),
+    : m_monitor(monitor), m_clipboard(services.clipboard), m_config(services.config),
+      m_upgradeShell(services.upgradeShell), m_upgradeAvailable(services.upgradeAvailable),
+      m_upgradeBusy(services.upgradeBusy),
       m_settings(std::make_unique<SettingsPane>(
           services,
           SettingsPaneOptions{
               .section = "system",
               .includedGroups = {"battery", "monitor", "monitor-polling", "monitor-thresholds"},
           }
-      )) {}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("system_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+    }
+  }
+}
 
 SystemTab::~SystemTab() { retainStats(false); }
 
@@ -239,219 +228,237 @@ std::unique_ptr<Flex> SystemTab::create() {
       .out = &m_root,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * sc,
+      .flexGrow = 1.0F,
   });
 
-  // --- Graph grid ---
-  // Row 1: CPU, Memory
-  {
-    auto row = ui::row({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceMd * sc,
-        .flexGrow = 1.0F,
-    });
-
-    // CPU card
-    {
-      auto card = ui::column({
-          .out = &m_cpuCard,
+  auto compactCard = ui::column({
+      .out = &m_compactCard,
+      .configure = [sc, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, sc, opacity); },
+  });
+  compactCard->addChild(
+      ui::label({
+          .out = &m_titleLabel,
+          .text = distroLabel(),
+          .fontSize = Style::fontSizeBody * sc,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
           .flexGrow = 1.0F,
-          .configure = [sc, opacity = panelCardOpacity()](Flex& section) { applyGraphCardStyle(section, sc, opacity); },
-      });
-
-      makeHeaderRow(*card, i18n::tr("control-center.system.titles.cpu"), sc);
-      m_cpuGraph = addGraph(*card);
-      auto* legend = makeLegendRow(*card, sc);
-      m_cpuLegend = legend;
-      auto* cpuPctGroup = makeIconLabel(*legend, "cpu-usage", sc, &m_cpuPctIcon);
-      m_cpuPctLabel = makeValueLabel(*cpuPctGroup, sc);
-      auto* cpuTempGroup = makeIconLabel(*legend, "cpu-temperature", sc, &m_cpuTempIcon);
-      m_cpuTempLabel = makeValueLabel(*cpuTempGroup, sc);
-
-      row->addChild(std::move(card));
-    }
-
-    // Memory card
-    {
-      auto card = ui::column({
-          .out = &m_ramCard,
+      })
+  );
+  auto glance = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceLg * sc,
+  });
+  glance->addChild(
+      ui::label({
+          .out = &m_glanceCpuLabel,
+          .text = "--%",
+          .fontSize = Style::fontSizeTitle * sc,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::Primary),
+          .maxLines = 1,
+      })
+  );
+  glance->addChild(
+      ui::label({
+          .out = &m_glanceRamLabel,
+          .text = "--",
+          .fontSize = Style::fontSizeBody * sc,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
           .flexGrow = 1.0F,
-          .configure = [sc, opacity = panelCardOpacity()](Flex& section) { applyGraphCardStyle(section, sc, opacity); },
-      });
-
-      makeHeaderRow(*card, i18n::tr("control-center.system.titles.memory"), sc);
-      m_ramGraph = addGraph(*card);
-      auto* legend = makeLegendRow(*card, sc);
-      m_ramLegend = legend;
-      auto* ramGroup = makeIconLabel(*legend, "memory", sc, &m_ramIcon);
-      m_ramLabel = makeValueLabel(*ramGroup, sc);
-
-      row->addChild(std::move(card));
-    }
-
-    tab->addChild(std::move(row));
-  }
-
-  // Row 2: GPU (optional), Network
-  {
-    auto row = ui::row({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceMd * sc,
-        .flexGrow = 1.0F,
-    });
-
-    // GPU card
-    {
-      auto card = ui::column({
-          .out = &m_gpuCard,
-          .flexGrow = 1.0F,
-          .visible = false,
-          .participatesInLayout = false,
-          .configure = [sc, opacity = panelCardOpacity()](Flex& section) { applyGraphCardStyle(section, sc, opacity); },
-      });
-
-      makeHeaderRow(*card, i18n::tr("control-center.system.titles.gpu"), sc);
-      m_gpuGraph = addGraph(*card);
-      auto* legend = makeLegendRow(*card, sc);
-      m_gpuLegend = legend;
-      m_gpuUsageGroup = makeIconLabel(*legend, "gpu-usage", sc, &m_gpuUsageIcon);
-      m_gpuUsageLabel = makeValueLabel(*m_gpuUsageGroup, sc);
-      (void)setShown(m_gpuUsageGroup, false);
-      m_gpuVramGroup = makeIconLabel(*legend, "memory", sc, &m_gpuVramIcon);
-      m_gpuVramLabel = makeValueLabel(*m_gpuVramGroup, sc);
-      (void)setShown(m_gpuVramGroup, false);
-      m_gpuTempGroup = makeIconLabel(*legend, "temperature", sc, &m_gpuTempIcon);
-      m_gpuTempLabel = makeValueLabel(*m_gpuTempGroup, sc);
-      (void)setShown(m_gpuTempGroup, false);
-
-      row->addChild(std::move(card));
-    }
-
-    // Network card
-    {
-      auto card = ui::column({
-          .out = &m_netCard,
-          .flexGrow = 1.0F,
-          .configure = [sc, opacity = panelCardOpacity()](Flex& section) { applyGraphCardStyle(section, sc, opacity); },
-      });
-
-      makeHeaderRow(*card, i18n::tr("control-center.system.titles.network"), sc);
-      m_netGraph = addGraph(*card);
-      auto* legend = makeLegendRow(*card, sc);
-      m_netLegend = legend;
-      auto* rxGroup = makeIconLabel(*legend, "download-speed", sc, &m_rxIcon);
-      m_rxLabel = makeValueLabel(*rxGroup, sc);
-      auto* txGroup = makeIconLabel(*legend, "upload-speed", sc, &m_txIcon);
-      m_txLabel = makeValueLabel(*txGroup, sc);
-
-      row->addChild(std::move(card));
-    }
-
-    tab->addChild(std::move(row));
-  }
-
-  // --- Info row: System, Resources ---
-  {
-    auto row = ui::row({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceMd * sc,
-    });
-    static constexpr const char* kSystemGlyphs[] = {"cpu-usage",        "video",      "device-desktop",
-                                                    "layers-intersect", "app-window", "clock"};
-    auto* systemCard = makeInfoCard(
-        *row, i18n::tr("control-center.system.titles.system"), sc, 1.0F, panelCardOpacity(), m_systemLines,
-        kSystemLines, kSystemGlyphs
-    );
-    if (m_upgradeAvailable && m_upgradeAvailable()) {
-      const float controlHeight = Style::controlHeight * sc;
-      systemCard->addChild(
-          ui::label({
-              .text = i18n::tr("control-center.system.upgrade-description"),
-              .fontSize = Style::fontSizeCaption * sc,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .maxLines = 3,
-          })
-      );
-      systemCard->addChild(
-          ui::button({
-              .out = &m_upgradeButton,
-              .text = i18n::tr("control-center.system.upgrade"),
-              .glyph = "refresh",
-              .fontSize = Style::fontSizeBody * sc,
-              .contentAlign = ButtonContentAlign::Start,
-              .variant = ButtonVariant::Default,
-              .minHeight = controlHeight,
-              .paddingV = Style::spaceSm * sc,
-              .paddingH = Style::spaceMd * sc,
-              .radius = Style::scaledRadiusMd(sc),
-              .flexGrow = 1.0F,
-              .onClick =
-                  [this]() {
-                    if (m_upgradeShell) {
-                      m_upgradeShell();
-                    }
+      })
+  );
+  compactCard->addChild(std::move(glance));
+  compactCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "cpu-usage",
+                      .tooltip = i18n::tr("control-center.system.titles.cpu"),
                   },
-          })
-      );
-    }
+                  {
+                      .label = "",
+                      .glyph = "memory",
+                      .tooltip = i18n::tr("control-center.system.titles.memory"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "video",
+                      .tooltip = i18n::tr("control-center.system.titles.gpu"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "network",
+                      .tooltip = i18n::tr("control-center.system.titles.network"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "list-details",
+                      .tooltip = i18n::tr("control-center.system.titles.about"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = sc,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index, true); },
+          .onHover = [this](std::size_t index) { previewCatalog(index); },
+          .onHoverEnd = [this]() { restorePinnedCatalog(); },
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_detailLabel,
+          .fontSize = Style::fontSizeCaption * sc,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  tab->addChild(std::move(compactCard));
 
-    auto* resourcesCard = makeInfoCard(
-        *row, i18n::tr("control-center.system.titles.resources"), sc, 1.0F, panelCardOpacity(), nullptr, 0, nullptr
+  auto addGraphHost = [&](Flex** hostOut, Graph** graphOut, Flex** legendOut, auto buildLegend) {
+    auto host = ui::column({
+        .out = hostOut,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * sc,
+        .flexGrow = 1.0F,
+        .configure = [](Flex& column) { column.setClipChildren(true); },
+    });
+    *graphOut = addGraph(*host);
+    auto* legend = makeLegendRow(*host, sc);
+    *legendOut = legend;
+    buildLegend(*legend);
+    tab->addChild(std::move(host));
+  };
+
+  addGraphHost(&m_cpuHost, &m_cpuGraph, &m_cpuLegend, [&](Flex& legend) {
+    auto* cpuPctGroup = makeIconLabel(legend, "cpu-usage", sc, &m_cpuPctIcon);
+    m_cpuPctLabel = makeValueLabel(*cpuPctGroup, sc);
+    auto* cpuTempGroup = makeIconLabel(legend, "cpu-temperature", sc, &m_cpuTempIcon);
+    m_cpuTempLabel = makeValueLabel(*cpuTempGroup, sc);
+  });
+  addGraphHost(&m_ramHost, &m_ramGraph, &m_ramLegend, [&](Flex& legend) {
+    auto* ramGroup = makeIconLabel(legend, "memory", sc, &m_ramIcon);
+    m_ramLabel = makeValueLabel(*ramGroup, sc);
+  });
+  addGraphHost(&m_gpuHost, &m_gpuGraph, &m_gpuLegend, [&](Flex& legend) {
+    m_gpuUsageGroup = makeIconLabel(legend, "gpu-usage", sc, &m_gpuUsageIcon);
+    m_gpuUsageLabel = makeValueLabel(*m_gpuUsageGroup, sc);
+    (void)setShown(m_gpuUsageGroup, false);
+    m_gpuVramGroup = makeIconLabel(legend, "memory", sc, &m_gpuVramIcon);
+    m_gpuVramLabel = makeValueLabel(*m_gpuVramGroup, sc);
+    (void)setShown(m_gpuVramGroup, false);
+    m_gpuTempGroup = makeIconLabel(legend, "temperature", sc, &m_gpuTempIcon);
+    m_gpuTempLabel = makeValueLabel(*m_gpuTempGroup, sc);
+    (void)setShown(m_gpuTempGroup, false);
+  });
+  addGraphHost(&m_netHost, &m_netGraph, &m_netLegend, [&](Flex& legend) {
+    auto* rxGroup = makeIconLabel(legend, "download-speed", sc, &m_rxIcon);
+    m_rxLabel = makeValueLabel(*rxGroup, sc);
+    auto* txGroup = makeIconLabel(legend, "upload-speed", sc, &m_txIcon);
+    m_txLabel = makeValueLabel(*txGroup, sc);
+  });
+
+  auto aboutHost = ui::column({
+      .out = &m_aboutHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceLg * sc,
+      .flexGrow = 1.0F,
+  });
+  static constexpr const char* kSystemGlyphs[] = {"cpu-usage",        "video",      "device-desktop",
+                                                  "layers-intersect", "app-window", "clock"};
+  auto* systemCard = makeInfoCard(
+      *aboutHost, i18n::tr("control-center.system.titles.system"), sc, 1.0F, panelCardOpacity(), m_systemLines,
+      kSystemLines, kSystemGlyphs
+  );
+  if (m_upgradeAvailable && m_upgradeAvailable()) {
+    const float controlHeight = Style::controlHeight * sc;
+    systemCard->addChild(
+        ui::label({
+            .text = i18n::tr("control-center.system.upgrade-description"),
+            .fontSize = Style::fontSizeCaption * sc,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 3,
+        })
     );
-
-    // Named rows with right-aligned values: load, RAM, then swap (hidden in doUpdate when absent).
-    m_resourcesLines[0] = addResourceRow(
-        *resourcesCard, "activity", i18n::tr("control-center.system.labels.load"), sc, nullptr,
-        i18n::tr("control-center.system.tooltips.load")
+    systemCard->addChild(
+        ui::button({
+            .out = &m_upgradeButton,
+            .text = i18n::tr("control-center.system.upgrade"),
+            .glyph = "refresh",
+            .fontSize = Style::fontSizeBody * sc,
+            .contentAlign = ButtonContentAlign::Start,
+            .variant = ButtonVariant::Default,
+            .minHeight = controlHeight,
+            .paddingV = Style::spaceSm * sc,
+            .paddingH = Style::spaceMd * sc,
+            .radius = Style::scaledRadiusMd(sc),
+            .flexGrow = 1.0F,
+            .onClick =
+                [this]() {
+                  if (m_upgradeShell) {
+                    m_upgradeShell();
+                  }
+                },
+        })
     );
-    m_resourcesLines[1] = addResourceRow(*resourcesCard, "memory", i18n::tr("control-center.system.labels.ram"), sc);
-    m_swapLabel = addResourceRow(
-        *resourcesCard, "arrows-exchange", i18n::tr("control-center.system.labels.swap"), sc, &m_swapRow
-    );
-
-    // Up to four physical disks, discovered automatically (root first). Usage refreshes in doUpdate.
-    m_diskMountPoints = physicalDiskMountPoints();
-    if (m_diskMountPoints.size() > kMaxDiskRows) {
-      m_diskMountPoints.resize(kMaxDiskRows);
-    }
-    m_diskLabels.clear();
-    m_diskLabels.reserve(m_diskMountPoints.size());
-    // Mount path and usage are separate labels: the path grows and ellipsizes when long,
-    // while the usage column keeps its natural width so it is never truncated. The full
-    // mount path is recoverable via the path label's tooltip.
-    for (const auto& mountPoint : m_diskMountPoints) {
-      Label* usageLabel = nullptr;
-      resourcesCard->addChild(
-          ui::row(
-              {.align = FlexAlign::Center, .gap = Style::spaceXs * sc},
-              ui::glyph({
-                  .glyph = "storage",
-                  .glyphSize = Style::fontSizeMini * sc,
-                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              }),
-              ui::label({
-                  .text = mountPoint,
-                  .fontSize = Style::fontSizeMini * sc,
-                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-                  .maxLines = 1,
-                  // Ellipsize from the start so the identifying tail stays visible ("…/long/mount/point").
-                  .ellipsize = TextEllipsize::Start,
-                  .flexGrow = 1.0F,
-                  .configure = [mountPoint](Label& label) { label.setTooltip(mountPoint); },
-              }),
-              ui::label({
-                  .out = &usageLabel,
-                  .fontSize = Style::fontSizeMini * sc,
-                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-                  .maxLines = 1,
-              })
-          )
-      );
-      m_diskLabels.push_back(usageLabel);
-    }
-
-    tab->addChild(std::move(row));
   }
 
+  auto* resourcesCard = makeInfoCard(
+      *aboutHost, i18n::tr("control-center.system.titles.resources"), sc, 1.0F, panelCardOpacity(), nullptr, 0, nullptr
+  );
+  m_resourcesLines[0] = addResourceRow(
+      *resourcesCard, "activity", i18n::tr("control-center.system.labels.load"), sc, nullptr,
+      i18n::tr("control-center.system.tooltips.load")
+  );
+  m_resourcesLines[1] = addResourceRow(*resourcesCard, "memory", i18n::tr("control-center.system.labels.ram"), sc);
+  m_swapLabel = addResourceRow(
+      *resourcesCard, "arrows-exchange", i18n::tr("control-center.system.labels.swap"), sc, &m_swapRow
+  );
+  m_diskMountPoints = physicalDiskMountPoints();
+  if (m_diskMountPoints.size() > kMaxDiskRows) {
+    m_diskMountPoints.resize(kMaxDiskRows);
+  }
+  m_diskLabels.clear();
+  m_diskLabels.reserve(m_diskMountPoints.size());
+  for (const auto& mountPoint : m_diskMountPoints) {
+    Label* usageLabel = nullptr;
+    resourcesCard->addChild(
+        ui::row(
+            {.align = FlexAlign::Center, .gap = Style::spaceXs * sc},
+            ui::glyph({
+                .glyph = "storage",
+                .glyphSize = Style::fontSizeMini * sc,
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            }),
+            ui::label({
+                .text = mountPoint,
+                .fontSize = Style::fontSizeMini * sc,
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                .maxLines = 1,
+                .ellipsize = TextEllipsize::Start,
+                .flexGrow = 1.0F,
+                .configure = [mountPoint](Label& label) { label.setTooltip(mountPoint); },
+            }),
+            ui::label({
+                .out = &usageLabel,
+                .fontSize = Style::fontSizeMini * sc,
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                .maxLines = 1,
+            })
+        )
+    );
+    m_diskLabels.push_back(usageLabel);
+  }
+  tab->addChild(std::move(aboutHost));
+
+  syncCatalog();
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
@@ -476,11 +483,176 @@ bool SystemTab::configureMode() const { return m_settings->configureMode(); }
 
 void SystemTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
+SettingsPane* SystemTab::settingsPane() { return m_settings.get(); }
+
+SystemTab::Catalog SystemTab::catalogFromState(std::string_view value) noexcept {
+  if (value == "memory") {
+    return Catalog::Memory;
+  }
+  if (value == "gpu") {
+    return Catalog::Gpu;
+  }
+  if (value == "network") {
+    return Catalog::Network;
+  }
+  if (value == "about") {
+    return Catalog::About;
+  }
+  return Catalog::Cpu;
+}
+
+std::string_view SystemTab::catalogState(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Memory:
+    return "memory";
+  case Catalog::Gpu:
+    return "gpu";
+  case Catalog::Network:
+    return "network";
+  case Catalog::About:
+    return "about";
+  case Catalog::Cpu:
+    break;
+  }
+  return "cpu";
+}
+
+std::size_t SystemTab::indexFromCatalog(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Memory:
+    return 1;
+  case Catalog::Gpu:
+    return 2;
+  case Catalog::Network:
+    return 3;
+  case Catalog::About:
+    return 4;
+  case Catalog::Cpu:
+    break;
+  }
+  return 0;
+}
+
+SystemTab::Catalog SystemTab::catalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 1:
+    return Catalog::Memory;
+  case 2:
+    return Catalog::Gpu;
+  case 3:
+    return Catalog::Network;
+  case 4:
+    return Catalog::About;
+  default:
+    return Catalog::Cpu;
+  }
+}
+
+bool SystemTab::syncDetailLabel() {
+  if (m_detailLabel == nullptr) {
+    return false;
+  }
+  const char* key = "control-center.system.sections.cpu-caption";
+  switch (m_catalog) {
+  case Catalog::Memory:
+    key = "control-center.system.sections.memory-caption";
+    break;
+  case Catalog::Gpu:
+    key = "control-center.system.sections.gpu-caption";
+    break;
+  case Catalog::Network:
+    key = "control-center.system.sections.network-caption";
+    break;
+  case Catalog::About:
+    key = "control-center.system.sections.about-caption";
+    break;
+  case Catalog::Cpu:
+    break;
+  }
+  m_detailLabel->setText(i18n::tr(key));
+  return setShown(m_detailLabel, true);
+}
+
+void SystemTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("system_tab", "catalog", std::string(catalogState(m_pinnedCatalog)));
+}
+
+void SystemTab::applyCatalog(std::size_t index, bool persist) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (persist) {
+    m_hoverEndTimer.stop();
+    m_pinnedCatalog = next;
+    persistCatalog();
+  }
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  syncCatalog();
+  requestPanelLayout();
+}
+
+void SystemTab::previewCatalog(std::size_t index) {
+  m_hoverEndTimer.stop();
+  applyCatalog(index, false);
+  PanelManager::instance().refresh();
+}
+
+void SystemTab::restorePinnedCatalog() {
+  m_hoverEndTimer.stop();
+  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
+    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
+    PanelManager::instance().refresh();
+  });
+}
+
+void SystemTab::syncCatalog() {
+  const bool cpu = m_catalog == Catalog::Cpu;
+  const bool memory = m_catalog == Catalog::Memory;
+  const bool gpu = m_catalog == Catalog::Gpu;
+  const bool network = m_catalog == Catalog::Network;
+  const bool about = m_catalog == Catalog::About;
+  bool layoutDirty = setShown(m_cpuHost, cpu) || setShown(m_ramHost, memory) || setShown(m_gpuHost, gpu)
+      || setShown(m_netHost, network) || setShown(m_aboutHost, about);
+  layoutDirty = syncDetailLabel() || layoutDirty;
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_pinnedCatalog));
+    m_catalogSyncing = false;
+    layoutDirty = true;
+  }
+  if (layoutDirty) {
+    requestPanelLayout();
+  }
+}
+
+void SystemTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
 void SystemTab::setActive(bool active) {
   m_active = active;
   retainStats(active);
   if (!active) {
+    m_hoverEndTimer.stop();
     m_redrawLimiter.reset();
+    return;
+  }
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("system_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+      syncCatalog();
+    }
   }
 }
 
@@ -508,15 +680,23 @@ void SystemTab::retainStats(bool retain) {
 
 void SystemTab::onClose() {
   m_settings->onClose();
+  m_hoverEndTimer.stop();
   m_root = nullptr;
+  m_compactCard = nullptr;
+  m_catalogSwitch = nullptr;
+  m_titleLabel = nullptr;
+  m_glanceCpuLabel = nullptr;
+  m_glanceRamLabel = nullptr;
+  m_detailLabel = nullptr;
   m_cpuGraph = nullptr;
   m_ramGraph = nullptr;
   m_gpuGraph = nullptr;
   m_netGraph = nullptr;
-  m_cpuCard = nullptr;
-  m_ramCard = nullptr;
-  m_gpuCard = nullptr;
-  m_netCard = nullptr;
+  m_cpuHost = nullptr;
+  m_ramHost = nullptr;
+  m_gpuHost = nullptr;
+  m_netHost = nullptr;
+  m_aboutHost = nullptr;
   m_cpuLegend = nullptr;
   m_ramLegend = nullptr;
   m_gpuLegend = nullptr;
@@ -605,34 +785,29 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
 
   const float sc = contentScale();
 
+  syncCatalog();
   m_root->setSize(contentWidth, bodyHeight);
   m_root->layout(renderer);
 
-  const float cardPadH = kGraphCardPadH * sc * 2.0F;
-
-  auto sizeGraph = [&](Graph* g, Flex* card, Flex* legend) {
-    if (g == nullptr || card == nullptr || !card->visible()) {
+  auto sizeGraph = [&](Graph* g, Flex* host, Flex* legend) {
+    if (g == nullptr || host == nullptr || !host->visible()) {
       return;
     }
-    const float graphW = std::max(0.0F, card->width() - cardPadH);
-    const float usedAbove = g->y() - card->y();
-    const float bottomPad = kGraphCardPadV * sc;
-    // Reserve room for the legend that now sits below the graph (plus the card gap above it).
-    float usedBelow = bottomPad;
+    const float graphW = std::max(0.0F, host->width() - (host->paddingLeft() + host->paddingRight()));
+    const float usedAbove = g->y() - host->y();
+    float usedBelow = host->paddingBottom();
     if (legend != nullptr && legend->visible() && legend->height() > 0.0F) {
-      usedBelow += legend->height() + Style::spaceXs * sc;
+      usedBelow += legend->height() + host->gap();
     }
-    const float graphH = std::max(0.0F, card->height() - usedAbove - usedBelow);
+    const float graphH = std::max(0.0F, host->height() - usedAbove - usedBelow);
     g->setSize(graphW, graphH);
     g->setLineWidth(kGraphLineWidth * sc);
   };
 
-  sizeGraph(m_cpuGraph, m_cpuCard, m_cpuLegend);
-  sizeGraph(m_ramGraph, m_ramCard, m_ramLegend);
-  if (m_gpuVisible) {
-    sizeGraph(m_gpuGraph, m_gpuCard, m_gpuLegend);
-  }
-  sizeGraph(m_netGraph, m_netCard, m_netLegend);
+  sizeGraph(m_cpuGraph, m_cpuHost, m_cpuLegend);
+  sizeGraph(m_ramGraph, m_ramHost, m_ramLegend);
+  sizeGraph(m_gpuGraph, m_gpuHost, m_gpuLegend);
+  sizeGraph(m_netGraph, m_netHost, m_netLegend);
 
   m_root->layout(renderer);
 }
@@ -880,8 +1055,8 @@ void SystemTab::updateGraphs(Renderer& renderer) {
 }
 
 void SystemTab::updateGpuVisibility() {
-  if (setShown(m_gpuCard, m_gpuVisible)) {
-    PanelManager::instance().requestLayout();
+  if (m_catalog == Catalog::Gpu) {
+    requestPanelLayout();
   }
 }
 
@@ -889,6 +1064,9 @@ void SystemTab::syncLabels() {
   if (m_monitor == nullptr || !m_monitor->isRunning()) {
     if (m_cpuPctLabel != nullptr) {
       m_cpuPctLabel->setText("--");
+    }
+    if (m_glanceCpuLabel != nullptr) {
+      m_glanceCpuLabel->setText("--%");
     }
     if (m_cpuTempLabel != nullptr) {
       m_cpuTempLabel->setText("--");
@@ -905,6 +1083,9 @@ void SystemTab::syncLabels() {
     if (m_ramLabel != nullptr) {
       m_ramLabel->setText("--");
     }
+    if (m_glanceRamLabel != nullptr) {
+      m_glanceRamLabel->setText("--");
+    }
     if (m_rxLabel != nullptr) {
       m_rxLabel->setText("--");
     }
@@ -918,6 +1099,9 @@ void SystemTab::syncLabels() {
 
   if (m_cpuPctLabel != nullptr) {
     m_cpuPctLabel->setText(std::format("{:.0F}%", stats.cpuUsagePercent));
+  }
+  if (m_glanceCpuLabel != nullptr) {
+    m_glanceCpuLabel->setText(std::format("{:.0F}%", stats.cpuUsagePercent));
   }
   if (m_cpuTempLabel != nullptr) {
     if (stats.cpuTempC.has_value()) {
@@ -952,6 +1136,11 @@ void SystemTab::syncLabels() {
         FormatUnits::formatBinaryMibAsGib(stats.ramUsedMb) + std::format(" · {:.0F}%", stats.ramUsagePercent)
     );
   }
+  if (m_glanceRamLabel != nullptr) {
+    m_glanceRamLabel->setText(
+        FormatUnits::formatBinaryMibAsGib(stats.ramUsedMb) + std::format(" · {:.0F}%", stats.ramUsagePercent)
+    );
+  }
   if (m_rxLabel != nullptr) {
     m_rxLabel->setText(FormatUnits::formatDecimalBytesPerSecond(stats.netRxBytesPerSec));
   }
@@ -969,6 +1158,9 @@ void SystemTab::syncLabels() {
   }
   if (m_systemLines[2] != nullptr) {
     m_systemLines[2]->setText(distroLabel());
+  }
+  if (m_titleLabel != nullptr) {
+    m_titleLabel->setText(distroLabel());
   }
   if (m_systemLines[3] != nullptr) {
     m_systemLines[3]->setText(kernelLabel());

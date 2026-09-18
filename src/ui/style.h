@@ -99,6 +99,10 @@ namespace Style {
   [[nodiscard]] bool cardBordersEnabled() noexcept;
   void setCardBordersEnabled(bool enabled);
 
+  // Increased Contrast / Reduced Transparency for Liquid Glass chrome.
+  [[nodiscard]] bool highContrastEnabled() noexcept;
+  void setHighContrastEnabled(bool enabled);
+
   [[nodiscard]] bool popupShadowsEnabled() noexcept;
   void setPopupShadowsEnabled(bool enabled);
 

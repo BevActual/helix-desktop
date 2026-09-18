@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
@@ -8,6 +9,7 @@
 #include <array>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class Box;
@@ -53,13 +55,26 @@ private:
   void syncDayLabelHover();
   void openDayDetail(std::size_t bucketIndex);
   void clearDayDetail();
+  void applyRange(std::size_t index, bool persist = true);
+  void persistRange();
+  void syncRangePicker();
+  [[nodiscard]] bool syncDetailLabel();
+  void previewRange(std::size_t index);
+  void restorePinnedRange();
   [[nodiscard]] std::string resolveIconPath(const std::string& appKey) const;
+  [[nodiscard]] static int rangeDaysFromState(std::string_view value) noexcept;
+  [[nodiscard]] static std::string_view rangeState(int rangeDays) noexcept;
+  [[nodiscard]] static std::size_t indexFromRangeDays(int rangeDays) noexcept;
+  [[nodiscard]] static int rangeDaysFromIndex(std::size_t index) noexcept;
 
   ScreenTimeService* m_screenTime = nullptr;
   ConfigService* m_config = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
+  bool m_rangeSyncing = false;
   int m_rangeDays = 1;
+  int m_pinnedRangeDays = 1;
+  Timer m_hoverEndTimer;
   std::string m_detailDayKey;
   std::vector<std::string> m_bucketDayKeys;
   std::string m_lastSnapshotKey;
@@ -71,11 +86,15 @@ private:
   float m_scrollBaseY = 0.0F;
 
   Flex* m_root = nullptr;
-  Flex* m_usageCard = nullptr;
+  Flex* m_compactCard = nullptr;
+  Flex* m_leftoverHost = nullptr;
   Flex* m_detailBar = nullptr;
   Flex* m_disabledRow = nullptr;
   Label* m_disabledLabel = nullptr;
   Toggle* m_enableToggle = nullptr;
+  Label* m_titleLabel = nullptr;
+  Label* m_topAppLabel = nullptr;
+  Label* m_detailLabel = nullptr;
   Label* m_detailTitle = nullptr;
   Button* m_detailBackButton = nullptr;
   Segmented* m_rangePicker = nullptr;

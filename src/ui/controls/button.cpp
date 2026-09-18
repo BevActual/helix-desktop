@@ -471,7 +471,7 @@ void Button::setSelected(bool selected) {
 void Button::setContentAlign(ButtonContentAlign align) { m_contentAlign = align; }
 
 void Button::setVariant(ButtonVariant variant) {
-  if (m_variant == variant) {
+  if (m_variant == variant && !m_customPalette.has_value()) {
     return;
   }
   m_variant = variant;

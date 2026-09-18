@@ -9,6 +9,8 @@
 #include "render/core/renderer.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstddef>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -16,6 +18,9 @@
 namespace control_center {
 
   float sectionCardFillOpacity(float panelCardOpacity) noexcept {
+    if (Style::highContrastEnabled()) {
+      return 1.0F;
+    }
     return panelCardOpacity >= 0.99F ? 1.0F : std::min(1.0F, panelCardOpacity + 0.28F);
   }
 
@@ -32,19 +37,89 @@ namespace control_center {
   }
 
   void applySectionCardStyle(Flex& card, float scale, float fillOpacity) {
-    // Tab bodies sit as solid wells on the glass panel chrome. Lift the fill so
-    // Glass/Soft still read as content, while Solid stays fully opaque.
+    // Tab bodies sit as leftover wells on the glass panel chrome. Lift the fill so
+    // Glass/Soft still read as content, while Solid stays fully opaque. High Contrast
+    // frosts leftover to opaque and keeps a contrasting outline.
     card.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, sectionCardFillOpacity(fillOpacity)));
-    if (Style::cardBordersEnabled()) {
-      card.setBorder(colorSpecFromRole(ColorRole::Outline), Style::borderWidth);
+    if (Style::cardBordersEnabled() || Style::highContrastEnabled()) {
+      card.setBorder(
+          colorSpecFromRole(ColorRole::Outline),
+          Style::highContrastEnabled() ? Style::emphasizedBorderWidth : Style::borderWidth
+      );
     } else {
       card.clearBorder();
     }
-    card.setRadius(Style::scaledRadius2xl(scale));
+    card.setRadius(Style::scaledRadius3xl(scale));
     card.setDirection(FlexDirection::Vertical);
     card.setAlign(FlexAlign::Stretch);
     card.setGap(Style::spaceSm * scale);
     card.setPadding(Style::spaceMd * scale);
+  }
+
+  void applyGroupedListStyle(Flex& host, float scale) {
+    host.setFill(colorSpecFromRole(ColorRole::Surface));
+    if (Style::highContrastEnabled()) {
+      host.setBorder(colorSpecFromRole(ColorRole::Outline), Style::emphasizedBorderWidth);
+    } else {
+      host.clearBorder();
+    }
+    host.setRadius(Style::scaledRadius2xl(scale));
+    host.setGap(0.0F);
+    host.setClipChildren(true);
+  }
+
+  void applyContentCardStyle(Flex& card, float scale) {
+    applyGroupedListStyle(card, scale);
+    card.setRadius(Style::scaledRadius3xl(scale));
+    card.setPadding(Style::spaceMd * scale);
+    card.setGap(Style::spaceSm * scale);
+    card.setAlign(FlexAlign::Stretch);
+  }
+
+  void applyModuleWellStyle(Flex& well, float scale) {
+    applyGroupedListStyle(well, scale);
+    well.setClipChildren(false);
+    well.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, Style::highContrastEnabled() ? 1.0F : 0.84F));
+    well.setRadius(Style::scaledRadius3xl(scale));
+    well.setPadding(Style::spaceXs * scale);
+    well.setGap(0.0F);
+    well.setSoftness(Style::highContrastEnabled() ? 0.0F : 1.0F);
+    if (!Style::highContrastEnabled()) {
+      well.clearBorder();
+    }
+  }
+
+  std::size_t leftoverCatalogColumns(
+      float availableWidth, float minCellWidth, float gap, std::size_t minColumns, std::size_t maxColumns
+  ) noexcept {
+    minColumns = std::max<std::size_t>(1, minColumns);
+    maxColumns = std::max(minColumns, maxColumns);
+    if (availableWidth <= 0.0F || minCellWidth <= 0.0F) {
+      return minColumns;
+    }
+    const float cell = minCellWidth + std::max(0.0F, gap);
+    const auto fit = static_cast<std::size_t>(std::floor((availableWidth + std::max(0.0F, gap)) / cell));
+    return std::clamp(fit, minColumns, maxColumns);
+  }
+
+  void applyGroupedListRowStyle(Flex& row, float scale, GroupedListRowEmphasis emphasis) {
+    row.setRadius(0.0F);
+    row.clearBorder();
+    row.setMinHeight(Style::controlHeightLg * scale);
+    switch (emphasis) {
+    case GroupedListRowEmphasis::Pressed:
+      row.setFill(colorSpecFromRole(ColorRole::Primary, 0.18F));
+      break;
+    case GroupedListRowEmphasis::Hover:
+      row.setFill(colorSpecFromRole(ColorRole::Hover));
+      break;
+    case GroupedListRowEmphasis::Selected:
+      row.setFill(colorSpecFromRole(ColorRole::Primary, 0.12F));
+      break;
+    case GroupedListRowEmphasis::None:
+      row.clearFill();
+      break;
+    }
   }
 
   Label* addTitle(Flex& parent, const std::string& text, float scale) {

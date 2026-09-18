@@ -29,6 +29,8 @@ public:
   void setScale(float scale);
 
   void setOnChange(std::function<void(std::size_t)> callback);
+  void setOnHover(std::function<void(std::size_t)> callback);
+  void setOnHoverEnd(std::function<void()> callback);
 
   void setOptionTooltip(std::size_t index, std::string_view text);
   void setCompact(bool compact);
@@ -54,6 +56,9 @@ private:
   [[nodiscard]] std::unique_ptr<Separator> makeSegmentSeparator();
   [[nodiscard]] std::unique_ptr<Button>
   makeSegmentButton(std::string_view label, std::string_view glyph, std::size_t index);
+  void handleSegmentEnter(std::size_t index);
+  void handleSegmentLeave();
+  void activateIndex(std::size_t index);
   void applyButtonMetrics(Button& button) const;
   void refreshVariants();
   void applyOuterStyle();
@@ -65,6 +70,8 @@ private:
   InputArea* m_focusArea = nullptr;
   std::size_t m_selected = 0;
   std::function<void(std::size_t)> m_onChange;
+  std::function<void(std::size_t)> m_onHover;
+  std::function<void()> m_onHoverEnd;
   float m_fontSize = 0.0F;
   float m_scale = 1.0F;
   bool m_equalSegmentWidths = false;

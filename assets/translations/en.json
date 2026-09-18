@@ -248,7 +248,8 @@
       "auto-apps-light-until": "Apps: Light until {time}",
       "auto-dark-until": "Dark until {time}",
       "auto-light-until": "Light until {time}",
-      "auto-needs-location": "Auto needs a location. Set one on Weather.",
+      "auto-needs-location": "Auto needs a location. Tap to set one on Weather.",
+      "auto-open-weather": "Open Weather for location and Auto schedule",
       "auto-schedule": "Follow sunrise and sunset",
       "auto-shell-dark-until": "Shell: Dark until {time}",
       "auto-shell-light-until": "Shell: Light until {time}",
@@ -257,8 +258,16 @@
       "choose-palette": "Choose a palette",
       "choose-palette-tooltip": "Open the palette picker",
       "community-empty": "No community palettes yet",
+      "contrast-off-caption": "Default contrast.",
+      "contrast-on-caption": "Stronger outlines and fills.",
       "custom-empty": "No custom palettes yet. Tap a swatch to make one, or open the palettes folder.",
+      "custom-tint": "Custom tint",
+      "custom-tint-tooltip": "Pick a custom tint color",
       "customize-failed": "Could not save the custom palette.",
+      "effects-borders": "Borders",
+      "effects-shadows": "Shadows",
+      "effects-speed": "Speed",
+      "effects-speed-off": "Turn on Motion to change animation speed.",
       "error": "Error",
       "edit-role-title": "Customize {role}",
       "edit-role-tooltip": "Customize {role}",
@@ -266,15 +275,32 @@
       "export-saved": "Saved as {name}",
       "follow-theme": "Match the theme mode above",
       "font-preview": "The quick brown fox jumps over the lazy dog.",
+      "font-search": "Search fonts",
+      "glass-glass-caption": "Clear glass over wallpaper. Leftover stays dimmed so type stays readable.",
+      "glass-soft-caption": "Regular glass chrome. Leftover cards stay solid.",
+      "glass-solid-caption": "Opaque chrome. Leftover cards stay leftover.",
+      "icons-default": "Default",
+      "icons-default-caption": "App icons keep their original colors.",
+      "icons-tinted": "Tinted",
+      "icons-tinted-caption": "Tint dock, tray, taskbar, and launcher icons.",
+      "ink": "Ink",
+      "language-auto-caption": "Using {language} from the system locale.",
+      "language-search": "Search languages",
+      "motion-off-caption": "Reduce motion.",
+      "motion-on-caption": "Animated transitions.",
       "no-fonts": "No fonts found",
       "open-folder-failed": "Could not open the palettes folder.",
+      "open-glass": "Open Glass",
+      "open-icons": "Open Icons",
       "open-palettes-folder": "Open palettes folder",
+      "open-wallpaper": "Open Wallpaper",
       "outline": "Outline",
       "palette": "Current palette",
       "palette-builtin-tooltip": "Palettes shipped with Noctalia",
       "palette-community-tooltip": "Palettes from the community catalog",
       "palette-custom-tooltip": "Palettes in your palettes folder",
       "palette-hint": "Tap a swatch to customize this light or dark mode.",
+      "palette-search": "Search palettes",
       "palette-wallpaper-tooltip": "Colors taken from the current wallpaper",
       "primary": "Primary",
       "radius-large": "Large",
@@ -284,7 +310,9 @@
       "secondary": "Secondary",
       "specimen-body": "Body",
       "specimen-caption": "Caption",
+      "specimen-card": "Card",
       "specimen-ghost": "Ghost",
+      "specimen-input": "Input",
       "specimen-primary": "Primary",
       "specimen-title": "Title",
       "surface": "Surface",
@@ -359,6 +387,11 @@
       "no-output-selected": "No output device selected",
       "output-device-prefix": "Output",
       "mute": "Mute",
+      "sections": {
+        "apps-caption": "Application volumes",
+        "input-caption": "Recording devices",
+        "output-caption": "Playback devices"
+      },
       "unavailable-body": "Audio is not active.",
       "unavailable-title": "Audio unavailable",
       "unmute": "Unmute"
@@ -412,6 +445,12 @@
       "next-month": "Next month",
       "no-events": "No events.",
       "previous-month": "Previous month",
+      "sections": {
+        "accounts": "Accounts",
+        "clock": "World clock",
+        "events": "Events",
+        "month": "Month"
+      },
       "today": "Today",
       "toggle-events-card": "Toggle events card",
       "world-clock": {
@@ -422,6 +461,13 @@
         "remove": "Remove timezone",
         "title": "World Clock"
       }
+    },
+    "clock": {
+      "empty": "Add extra timezones to compare with local time.",
+      "invalid": "Unknown IANA timezone.",
+      "no-match": "No matching timezones",
+      "placeholder": "Search timezones…",
+      "remove": "Remove timezone"
     },
     "display": {
       "brightness": "Brightness",
@@ -793,6 +839,11 @@
         "today": "Today",
         "today-tooltip": "Hourly usage today"
       },
+      "sections": {
+        "14-days-caption": "Daily totals for the last two weeks",
+        "3-days-caption": "Daily totals for the last three days",
+        "today-caption": "Hourly usage today"
+      },
       "view-day": "View Day Details"
     },
     "shortcuts": {
@@ -845,12 +896,20 @@
         "swap": "Swap"
       },
       "titles": {
+        "about": "About",
         "cpu": "CPU",
         "gpu": "GPU",
         "memory": "Memory",
         "network": "Network",
         "resources": "Resources",
         "system": "System"
+      },
+      "sections": {
+        "about-caption": "Machine and storage",
+        "cpu-caption": "Processor load and temperature",
+        "gpu-caption": "Graphics load, memory, and temperature",
+        "memory-caption": "Memory in use",
+        "network-caption": "Download and upload"
       },
       "tooltips": {
         "load": "Load average over 1 / 5 / 15 minutes"
@@ -936,6 +995,7 @@
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
       "camera": "Camera",
+      "clock": "Clock",
       "clipboard": "Clipboard",
       "home": "Home",
       "media": "Media",
@@ -1441,6 +1501,14 @@
         "daily-tooltip": "One row per day",
         "hourly": "Hourly",
         "hourly-tooltip": "The next few hours"
+      },
+      "sections": {
+        "daily": "Daily",
+        "daily-caption": "The next seven days",
+        "details": "Details",
+        "details-caption": "Wind, sun, and more",
+        "hourly": "Hourly",
+        "hourly-caption": "The next few hours"
       },
       "hourly": {
         "summary": "{condition} / Rain {precip}%",
@@ -2226,6 +2294,7 @@
         "calendar": "Calendar",
         "capsules": "Capsules",
         "clipboard": "Clipboard",
+        "clock": "Clock",
         "community": "Community",
         "control-center": "Control Center",
         "dead-zone": "Dead Zone",
@@ -2238,6 +2307,7 @@
         "focus-styling": "Focus Styling",
         "formats": "Formats",
         "general": "General",
+        "glass": "Glass",
         "greeter": "Greeter",
         "grouping": "Grouping",
         "history": "History",
@@ -2280,6 +2350,7 @@
         "notifications": "Notifications",
         "osd": "OSD",
         "overview": "Overview",
+        "palette": "Palette",
         "pinned-apps": "Pinned Apps",
         "polkit": "Polkit",
         "power": "Power",
@@ -2318,12 +2389,15 @@
         "backdrop": "Backdrop",
         "bar": "Bar",
         "bluetooth": "Bluetooth",
+        "clock": "Clock",
         "control-center": "Control Center",
         "desktop": "Desktop",
         "dock": "Dock",
         "effects": "Effects",
+        "glass": "Glass",
         "language": "Language",
         "hooks": "Hooks",
+        "icons": "Icons",
         "keybinds": "Keybinds",
         "launcher": "Launcher",
         "location": "Location",
@@ -2405,6 +2479,11 @@
           "compact": "Compact",
           "full": "Full",
           "none": "None"
+        },
+        "shortcut-size": {
+          "large": "Large",
+          "small": "Small",
+          "wide": "Wide"
         }
       },
       "ai-usage": {
@@ -2959,6 +3038,12 @@
         "widget-spacing": {
           "description": "Space between bar widgets",
           "label": "Widget Spacing"
+        }
+      },
+      "clock": {
+        "timezones": {
+          "description": "IANA timezones shown on the Clock tab besides local time (for example America/Los_Angeles)",
+          "label": "World Clock"
         }
       },
       "desktop": {
@@ -3599,8 +3684,12 @@
           "label": "Control Center Tabs"
         },
         "control-center-width": {
-          "description": "Width of the Control Center panel in pixels (compact and no-sidebar modes scale down from this)",
+          "description": "Width of the Control Center window in pixels (compact and no-sidebar modes scale down from this). Up to 1600, like a Settings app.",
           "label": "Control Center Width"
+        },
+        "control-center-height": {
+          "description": "Height of the Control Center window in pixels. Leftover catalogs fill the extra space.",
+          "label": "Control Center Height"
         },
         "floating-layer": {
           "description": "Use Top if input method candidate windows are hidden behind floating panels; Overlay keeps panels above fullscreen content",
@@ -3615,7 +3704,7 @@
           "label": "Show Header Session Button"
         },
         "home-shortcuts": {
-          "description": "Choose up to six shortcut buttons for the home tab",
+          "description": "Choose shortcut buttons for the Home tab. Size each tile small, wide, or large.",
           "label": "Home Shortcuts"
         },
         "home-shortcuts-show-labels": {
@@ -3872,10 +3961,6 @@
           "description-recovery": "The calendar event cache could not be authenticated or is damaged; retry after restoring the correct key, or reset private storage",
           "description-unavailable": "No Secret Service provider is available; calendar events remain available for this session only",
           "label": "Calendar Event Storage"
-        },
-        "calendar-timezones": {
-          "description": "IANA timezones shown on the Calendar tab world clock (for example America/Los_Angeles)",
-          "label": "World Clock"
         },
         "calendar-week-numbers": {
           "description": "Show ISO 8601 week numbers alongside the calendar grid",

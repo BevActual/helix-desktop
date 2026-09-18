@@ -19,6 +19,7 @@ public:
   explicit ScaleTab(const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setConfigureMode(bool show) override;
@@ -40,6 +41,7 @@ private:
   Flex* m_rootLayout = nullptr;
   Slider* m_uiScale = nullptr;
   Label* m_uiScaleValue = nullptr;
+  Flex* m_specimenWindow = nullptr;
   Label* m_scalePreviewCaption = nullptr;
   Label* m_scalePreviewBody = nullptr;
   Label* m_scalePreviewTitle = nullptr;

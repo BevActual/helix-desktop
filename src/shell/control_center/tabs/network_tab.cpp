@@ -385,15 +385,12 @@ public:
       float scale, AccessPointInfo ap, bool saved, std::function<void(const AccessPointInfo&)> onActivate,
       std::function<void(const AccessPointInfo&)> onForget
   )
-      : m_ap(std::move(ap)), m_onActivate(std::move(onActivate)), m_onForget(std::move(onForget)) {
+      : m_ap(std::move(ap)), m_onActivate(std::move(onActivate)), m_onForget(std::move(onForget)), m_scale(scale) {
     setDirection(FlexDirection::Horizontal);
     setAlign(FlexAlign::Center);
     setGap(Style::spaceSm * scale);
     setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
-    setMinHeight(kRowMinHeight * scale);
-    setRadius(Style::scaledRadiusMd(scale));
-    setFill(colorSpecFromRole(ColorRole::Surface));
-    clearBorder();
+    applyGroupedListRowStyle(*this, scale, GroupedListRowEmphasis::None);
 
     addChild(
         ui::glyph({
@@ -515,28 +512,24 @@ private:
   void applyState() {
     const bool hov = m_inputArea != nullptr && m_inputArea->hovered();
     const bool pressed = m_inputArea != nullptr && m_inputArea->pressed();
+    GroupedListRowEmphasis emphasis = GroupedListRowEmphasis::None;
     if (pressed) {
-      setFill(colorSpecFromRole(ColorRole::Primary));
-      setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth);
-      if (m_title != nullptr) {
-        m_title->setColor(colorSpecFromRole(ColorRole::OnPrimary));
-      }
-    } else {
-      setFill(colorSpecFromRole(ColorRole::Surface));
-      if (hov) {
-        setBorder(colorSpecFromRole(ColorRole::Hover), Style::borderWidth);
-      } else {
-        clearBorder();
-      }
-      if (m_title != nullptr) {
-        m_title->setColor(colorSpecFromRole(ColorRole::OnSurface));
-      }
+      emphasis = GroupedListRowEmphasis::Pressed;
+    } else if (hov) {
+      emphasis = GroupedListRowEmphasis::Hover;
+    } else if (m_ap.active) {
+      emphasis = GroupedListRowEmphasis::Selected;
+    }
+    applyGroupedListRowStyle(*this, m_scale, emphasis);
+    if (m_title != nullptr) {
+      m_title->setColor(colorSpecFromRole(ColorRole::OnSurface));
     }
   }
 
   AccessPointInfo m_ap;
   std::function<void(const AccessPointInfo&)> m_onActivate;
   std::function<void(const AccessPointInfo&)> m_onForget;
+  float m_scale = 1.0F;
   Label* m_title = nullptr;
   Button* m_actionButton = nullptr;
   InputArea* m_inputArea = nullptr;

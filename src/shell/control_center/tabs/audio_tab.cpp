@@ -18,6 +18,7 @@
 #include "ui/builders.h"
 #include "ui/controls/context_menu.h"
 #include "ui/controls/context_menu_popup.h"
+#include "ui/controls/segmented.h"
 #include "ui/palette.h"
 #include "util/string_utils.h"
 
@@ -27,6 +28,7 @@
 #include <format>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <ranges>
 #include <span>
 #include <string>
@@ -44,6 +46,22 @@ namespace {
   constexpr Logger kLogProgramUi{"audio_tab"};
   constexpr float kVolumeSyncEpsilon = 0.005F; // 0.5%
   constexpr auto kVolumeCommitInterval = std::chrono::milliseconds(16);
+
+  [[nodiscard]] bool setShown(Node* node, bool shown) {
+    if (node == nullptr) {
+      return false;
+    }
+    const bool changed = node->visible() != shown || node->participatesInLayout() != shown;
+    node->setVisible(shown);
+    node->setParticipatesInLayout(shown);
+    return changed;
+  }
+
+  void requestPanelLayout() {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
+    }
+  }
 
   // Application icons for AudioTab rows. Must stay function-local: at TU scope
   // its icon-theme walk runs before main(), on every CLI invocation.
@@ -863,15 +881,13 @@ namespace {
 
   class AudioDeviceRow : public Flex {
   public:
-    explicit AudioDeviceRow(float scale, std::function<void()> onSelect) : m_onSelect(std::move(onSelect)) {
+    explicit AudioDeviceRow(float scale, std::function<void()> onSelect)
+        : m_onSelect(std::move(onSelect)), m_scale(scale) {
       setDirection(FlexDirection::Horizontal);
       setAlign(FlexAlign::Center);
       setGap(Style::spaceSm * scale);
       setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
-      setMinHeight(Style::controlHeightLg * scale);
-      setRadius(Style::scaledRadiusMd(scale));
-      setFill(colorSpecFromRole(ColorRole::Surface));
-      clearBorder();
+      applyGroupedListRowStyle(*this, scale, GroupedListRowEmphasis::None);
 
       addChild(
           ui::radioButton({
@@ -948,21 +964,15 @@ namespace {
 
   private:
     void applyState() {
+      GroupedListRowEmphasis emphasis = GroupedListRowEmphasis::None;
       if (pressed()) {
-        setFill(colorSpecFromRole(ColorRole::Primary));
-        setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth);
-        if (m_title != nullptr) {
-          m_title->setColor(colorSpecFromRole(ColorRole::OnPrimary));
-        }
-        return;
+        emphasis = GroupedListRowEmphasis::Pressed;
+      } else if (hovered()) {
+        emphasis = GroupedListRowEmphasis::Hover;
+      } else if (m_radio != nullptr && m_radio->checked()) {
+        emphasis = GroupedListRowEmphasis::Selected;
       }
-
-      setFill(colorSpecFromRole(ColorRole::Surface));
-      if (hovered()) {
-        setBorder(colorSpecFromRole(ColorRole::Primary), Style::borderWidth);
-      } else {
-        clearBorder();
-      }
+      applyGroupedListRowStyle(*this, m_scale, emphasis);
       if (m_title != nullptr) {
         m_title->setColor(colorSpecFromRole(ColorRole::OnSurface));
       }
@@ -972,6 +982,7 @@ namespace {
     [[nodiscard]] bool pressed() const noexcept { return m_inputArea != nullptr && m_inputArea->pressed(); }
 
     std::function<void()> m_onSelect;
+    float m_scale = 1.0F;
     RadioButton* m_radio = nullptr;
     Label* m_title = nullptr;
     Label* m_detail = nullptr;
@@ -992,10 +1003,7 @@ namespace {
       setAlign(FlexAlign::Center);
       setGap(Style::spaceMd * scale);
       setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
-      setMinHeight((Style::controlHeightLg + Style::spaceSm) * scale);
-      setRadius(Style::scaledRadiusMd(scale));
-      setFill(colorSpecFromRole(ColorRole::Surface));
-      clearBorder();
+      applyGroupedListRowStyle(*this, scale, GroupedListRowEmphasis::None);
 
       constexpr float kIconSizeSm = 28.0F;
       constexpr float kCompactSliderControlHeight = 20.0F;
@@ -1421,12 +1429,6 @@ namespace {
                 .align = FlexAlign::Start,
                 .gap = Style::spaceXs * scale,
                 .padding = Style::spaceMd * scale,
-                .configure =
-                    [scale](Flex& card) {
-                      card.setRadius(Style::scaledRadiusMd(scale));
-                      card.setFill(colorSpecFromRole(ColorRole::Surface));
-                      card.clearBorder();
-                    },
             },
             ui::label({
                 .text = title,
@@ -1443,7 +1445,7 @@ namespace {
     );
   }
 
-  std::string deviceListKey(const std::vector<AudioNode>& devices) {
+  std::string deviceListKey(std::span<const AudioNode> devices) {
     std::string key;
     for (const auto& device : devices) {
       key += std::to_string(device.id);
@@ -1475,7 +1477,14 @@ AudioTab::AudioTab(
       m_renderContext(renderContext),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "services", .includedGroups = {"audio"}}
-      )) {}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("audio_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+    }
+  }
+}
 
 AudioTab::~AudioTab() = default;
 
@@ -1848,118 +1857,166 @@ std::unique_ptr<Flex> AudioTab::createDeviceVolumeCard(DeviceVolumeCardSpec card
 std::unique_ptr<Flex> AudioTab::create() {
   const float scale = contentScale();
 
-  auto tab = ui::column(
-      {
-          .out = &m_rootLayout,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceMd * scale,
-      },
-      ui::column(
-          {
-              .configure =
-                  [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-          },
-          ui::row(
-              {
-                  .align = FlexAlign::Stretch,
-                  .gap = Style::spaceMd * scale,
-                  .flexGrow = 0.0F,
-              },
-              createDeviceVolumeCard({
-                  .state = m_outputDeviceVolume,
-                  .deviceMenu =
-                      {
-                          .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sinks; },
-                          .defaultDeviceId = [](const AudioState& state) { return state.defaultSinkId; },
-                          .activate = [this](std::uint32_t id) { m_audio->setDefaultSink(id); },
-                      },
-                  .devicePrefixKey = "control-center.audio.output-device-prefix",
-                  .noDeviceKey = "control-center.audio.no-output-selected",
-                  .muteGlyph = "volume-high",
-                  .queueVolume =
-                      [this](float value) {
-                        const AudioNode* sink = m_audio != nullptr ? m_audio->defaultSink() : nullptr;
-                        m_pendingSinkId = sink != nullptr ? sink->id : 0;
-                        m_pendingSinkVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
-                      },
-                  .toggleMute =
-                      [this]() {
-                        const AudioNode* sink = m_audio->defaultSink();
-                        if (sink == nullptr) {
-                          return;
-                        }
-
-                        m_audio->setSinkMuted(sink->id, !sink->muted);
-                        PanelManager::instance().refresh();
-                      },
-              }),
-              ui::separator({
-                  .color = colorSpecFromRole(ColorRole::Outline, 0.45F),
-                  .spacing = Style::spaceSm * scale,
-                  .orientation = SeparatorOrientation::VerticalRule,
-                  .gradientEdges = false,
-              }),
-              createDeviceVolumeCard({
-                  .state = m_inputDeviceVolume,
-                  .deviceMenu =
-                      {
-                          .devices = [](const AudioState& state) -> std::span<const AudioNode> {
-                            return state.sources;
-                          },
-                          .defaultDeviceId = [](const AudioState& state) { return state.defaultSourceId; },
-                          .activate = [this](std::uint32_t id) { m_audio->setDefaultSource(id); },
-                      },
-                  .devicePrefixKey = "control-center.audio.input-device-prefix",
-                  .noDeviceKey = "control-center.audio.no-input-selected",
-                  .muteGlyph = "microphone",
-                  .queueVolume =
-                      [this](float value) {
-                        const AudioNode* source = m_audio != nullptr ? m_audio->defaultSource() : nullptr;
-                        m_pendingSourceId = source != nullptr ? source->id : 0;
-                        m_pendingSourceVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
-                      },
-                  .toggleMute =
-                      [this]() {
-                        const AudioNode* source = m_audio->defaultSource();
-                        if (source == nullptr) {
-                          return;
-                        }
-
-                        m_audio->setSourceMuted(source->id, !source->muted);
-                        PanelManager::instance().refresh();
-                      },
-              })
-          )
-      )
-  );
-
-  auto programCard = ui::column({
-      .out = &m_programCard,
+  auto tab = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
+  });
+
+  auto compactCard = ui::column({
+      .out = &m_compactCard,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-  programCard->addChild(makeCardHeaderRow(i18n::tr("control-center.audio.application-volumes"), scale));
+  compactCard->addChild(
+      ui::row(
+          {
+              .align = FlexAlign::Stretch,
+              .gap = Style::spaceMd * scale,
+              .flexGrow = 0.0F,
+          },
+          createDeviceVolumeCard({
+              .state = m_outputDeviceVolume,
+              .deviceMenu =
+                  {
+                      .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sinks; },
+                      .defaultDeviceId = [](const AudioState& state) { return state.defaultSinkId; },
+                      .activate = [this](std::uint32_t id) { m_audio->setDefaultSink(id); },
+                  },
+              .devicePrefixKey = "control-center.audio.output-device-prefix",
+              .noDeviceKey = "control-center.audio.no-output-selected",
+              .muteGlyph = "volume-high",
+              .queueVolume =
+                  [this](float value) {
+                    const AudioNode* sink = m_audio != nullptr ? m_audio->defaultSink() : nullptr;
+                    m_pendingSinkId = sink != nullptr ? sink->id : 0;
+                    m_pendingSinkVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
+                  },
+              .toggleMute =
+                  [this]() {
+                    const AudioNode* sink = m_audio->defaultSink();
+                    if (sink == nullptr) {
+                      return;
+                    }
 
-  auto programScroll = ui::scrollView({
-      .out = &m_programScroll,
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .viewportPaddingH = 0.0F,
-      .viewportPaddingV = 0.0F,
+                    m_audio->setSinkMuted(sink->id, !sink->muted);
+                    PanelManager::instance().refresh();
+                  },
+          }),
+          ui::separator({
+              .color = colorSpecFromRole(ColorRole::Outline, 0.45F),
+              .spacing = Style::spaceSm * scale,
+              .orientation = SeparatorOrientation::VerticalRule,
+              .gradientEdges = false,
+          }),
+          createDeviceVolumeCard({
+              .state = m_inputDeviceVolume,
+              .deviceMenu =
+                  {
+                      .devices = [](const AudioState& state) -> std::span<const AudioNode> { return state.sources; },
+                      .defaultDeviceId = [](const AudioState& state) { return state.defaultSourceId; },
+                      .activate = [this](std::uint32_t id) { m_audio->setDefaultSource(id); },
+                  },
+              .devicePrefixKey = "control-center.audio.input-device-prefix",
+              .noDeviceKey = "control-center.audio.no-input-selected",
+              .muteGlyph = "microphone",
+              .queueVolume =
+                  [this](float value) {
+                    const AudioNode* source = m_audio != nullptr ? m_audio->defaultSource() : nullptr;
+                    m_pendingSourceId = source != nullptr ? source->id : 0;
+                    m_pendingSourceVolume = std::clamp(value, 0.0F, sliderMaxPercent() / 100.0F);
+                  },
+              .toggleMute =
+                  [this]() {
+                    const AudioNode* source = m_audio->defaultSource();
+                    if (source == nullptr) {
+                      return;
+                    }
+
+                    m_audio->setSourceMuted(source->id, !source->muted);
+                    PanelManager::instance().refresh();
+                  },
+          })
+      )
+  );
+  compactCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "volume-high",
+                      .tooltip = i18n::tr("control-center.audio.output-device-prefix"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "microphone",
+                      .tooltip = i18n::tr("control-center.audio.input-device-prefix"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "apps",
+                      .tooltip = i18n::tr("control-center.audio.application-volumes"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index, true); },
+          .onHover = [this](std::size_t index) { previewCatalog(index); },
+          .onHoverEnd = [this]() { restorePinnedCatalog(); },
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_detailLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  tab->addChild(std::move(compactCard));
+
+  auto leftoverHost = ui::column({
+      .align = FlexAlign::Stretch,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scroll) {
-        scroll.clearFill();
-        scroll.clearBorder();
-      },
   });
-
-  m_programList = programScroll->content();
-  m_programList->setDirection(FlexDirection::Vertical);
-  m_programList->setAlign(FlexAlign::Stretch);
-  m_programList->setGap(Style::spaceSm * scale);
-
-  programCard->addChild(std::move(programScroll));
-  tab->addChild(std::move(programCard));
+  auto addListHost = [&](Flex** hostOut, ScrollView** scrollOut, Flex** listOut) {
+    auto host = ui::column({
+        .out = hostOut,
+        .align = FlexAlign::Stretch,
+        .flexGrow = 1.0F,
+        .visible = false,
+        .participatesInLayout = false,
+        .configure = [scale](Flex& column) { applyGroupedListStyle(column, scale); },
+    });
+    auto scroll = ui::scrollView({
+        .out = scrollOut,
+        .contentScale = scale,
+        .scrollbarVisible = true,
+        .viewportPaddingH = 0.0F,
+        .viewportPaddingV = 0.0F,
+        .flexGrow = 1.0F,
+        .configure =
+            [](ScrollView& view) {
+              view.clearFill();
+              view.clearBorder();
+            },
+    });
+    *listOut = scroll->content();
+    (*listOut)->setDirection(FlexDirection::Vertical);
+    (*listOut)->setAlign(FlexAlign::Stretch);
+    (*listOut)->setGap(0.0F);
+    host->addChild(std::move(scroll));
+    leftoverHost->addChild(std::move(host));
+  };
+  addListHost(&m_outputHost, &m_outputScroll, &m_outputList);
+  addListHost(&m_inputHost, &m_inputScroll, &m_inputList);
+  addListHost(&m_appsHost, &m_programScroll, &m_programList);
+  tab->addChild(std::move(leftoverHost));
+  syncCatalog();
 
   if (m_wayland != nullptr && m_renderContext != nullptr) {
     m_deviceMenuPopup = std::make_unique<ContextMenuPopup>(*m_wayland, *m_renderContext);
@@ -1983,6 +2040,150 @@ bool AudioTab::configureMode() const { return m_settings->configureMode(); }
 
 void AudioTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
+void AudioTab::setActive(bool active) {
+  if (!active) {
+    m_hoverEndTimer.stop();
+    return;
+  }
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("audio_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+      syncCatalog();
+    }
+  }
+}
+
+void AudioTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+AudioTab::Catalog AudioTab::catalogFromState(std::string_view value) noexcept {
+  if (value == "output") {
+    return Catalog::Output;
+  }
+  if (value == "input") {
+    return Catalog::Input;
+  }
+  return Catalog::Apps;
+}
+
+std::string_view AudioTab::catalogState(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Output:
+    return "output";
+  case Catalog::Input:
+    return "input";
+  case Catalog::Apps:
+    return "apps";
+  }
+  return "apps";
+}
+
+std::size_t AudioTab::indexFromCatalog(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Output:
+    return 0;
+  case Catalog::Input:
+    return 1;
+  case Catalog::Apps:
+    return 2;
+  }
+  return 2;
+}
+
+AudioTab::Catalog AudioTab::catalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 0:
+    return Catalog::Output;
+  case 1:
+    return Catalog::Input;
+  default:
+    return Catalog::Apps;
+  }
+}
+
+void AudioTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("audio_tab", "catalog", std::string(catalogState(m_pinnedCatalog)));
+}
+
+bool AudioTab::syncDetailLabel() {
+  if (m_detailLabel == nullptr) {
+    return false;
+  }
+  const char* key = "control-center.audio.sections.apps-caption";
+  switch (m_catalog) {
+  case Catalog::Output:
+    key = "control-center.audio.sections.output-caption";
+    break;
+  case Catalog::Input:
+    key = "control-center.audio.sections.input-caption";
+    break;
+  case Catalog::Apps:
+    break;
+  }
+  m_detailLabel->setText(i18n::tr(key));
+  return setShown(m_detailLabel, true);
+}
+
+void AudioTab::syncCatalog() {
+  const bool output = m_catalog == Catalog::Output;
+  const bool input = m_catalog == Catalog::Input;
+  const bool apps = m_catalog == Catalog::Apps;
+  bool dirty = setShown(m_outputHost, output) || setShown(m_outputScroll, output) || setShown(m_outputList, output);
+  dirty = setShown(m_inputHost, input) || setShown(m_inputScroll, input) || setShown(m_inputList, input) || dirty;
+  dirty = setShown(m_appsHost, apps) || setShown(m_programScroll, apps) || setShown(m_programList, apps) || dirty;
+  dirty = syncDetailLabel() || dirty;
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_pinnedCatalog));
+    m_catalogSyncing = false;
+  }
+  if (dirty) {
+    m_lastOutputWidth = -1.0F;
+    m_lastInputWidth = -1.0F;
+  }
+}
+
+void AudioTab::applyCatalog(std::size_t index, bool persist) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (persist) {
+    m_hoverEndTimer.stop();
+    m_pinnedCatalog = next;
+    persistCatalog();
+  }
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  (void)dismissTransientUi();
+  m_catalog = next;
+  syncCatalog();
+  requestPanelLayout();
+}
+
+void AudioTab::previewCatalog(std::size_t index) {
+  m_hoverEndTimer.stop();
+  applyCatalog(index, false);
+  PanelManager::instance().refresh();
+}
+
+void AudioTab::restorePinnedCatalog() {
+  m_hoverEndTimer.stop();
+  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
+    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
+    PanelManager::instance().refresh();
+  });
+}
+
 void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
@@ -1991,13 +2192,16 @@ void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
     return;
   }
 
+  syncCatalog();
   syncValueLabelWidths(renderer);
 
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
+  rebuildLists(renderer);
 }
 
 void AudioTab::doUpdate(Renderer& renderer) {
+  rebuildLists(renderer);
   rebuildProgramVolumes(renderer);
   syncValueLabelWidths(renderer);
   syncEffectsProfileControls(renderer);
@@ -2113,15 +2317,19 @@ void AudioTab::doUpdate(Renderer& renderer) {
 
 void AudioTab::onClose() {
   m_settings->onClose();
+  m_hoverEndTimer.stop();
   flushPendingVolumes(true);
   flushPendingProgramVolumes(true);
   m_outputDeviceVolume.volumeDebounceTimer.stop();
   m_inputDeviceVolume.volumeDebounceTimer.stop();
   m_programSinkDebounceTimer.stop();
   m_rootLayout = nullptr;
-  m_deviceColumn = nullptr;
-  m_outputCard = nullptr;
-  m_inputCard = nullptr;
+  m_compactCard = nullptr;
+  m_catalogSwitch = nullptr;
+  m_detailLabel = nullptr;
+  m_outputHost = nullptr;
+  m_inputHost = nullptr;
+  m_appsHost = nullptr;
   m_outputScroll = nullptr;
   m_inputScroll = nullptr;
   m_outputList = nullptr;
@@ -2133,7 +2341,6 @@ void AudioTab::onClose() {
   m_lastInputWidth = -1.0F;
   m_lastOutputListKey.clear();
   m_lastInputListKey.clear();
-  m_programCard = nullptr;
   m_programScroll = nullptr;
   m_programList = nullptr;
   m_programRows.clear();
@@ -2389,107 +2596,85 @@ void AudioTab::flushPendingProgramVolumes(bool) {
 
 void AudioTab::rebuildLists(Renderer& renderer) {
   uiAssertNotRendering("AudioTab::rebuildLists");
-  if (m_outputList == nullptr || m_inputList == nullptr || m_outputScroll == nullptr || m_inputScroll == nullptr) {
-    return;
-  }
-
-  const float outputWidth = m_outputScroll->contentViewportWidth();
-  const float inputWidth = m_inputScroll->contentViewportWidth();
-
-  if (outputWidth <= 0.0F || inputWidth <= 0.0F) {
-    return;
-  }
 
   const float scale = contentScale();
-  if (m_audio == nullptr) {
-    if (outputWidth == m_lastOutputWidth
-        && inputWidth == m_lastInputWidth
-        && m_lastOutputListKey == "unavailable"
-        && m_lastInputListKey == "unavailable") {
+  auto rebuild = [&](ScrollView* scroll, Flex* list, float& lastWidth, std::string& lastKey,
+                     std::span<const AudioNode> devices, std::uint32_t defaultId, bool isOutput) {
+    if (scroll == nullptr || list == nullptr || !scroll->visible()) {
       return;
     }
-    while (!m_outputList->children().empty()) {
-      m_outputList->removeChild(m_outputList->children().front().get());
+    const float width = scroll->contentViewportWidth();
+    if (width <= 0.0F) {
+      return;
     }
-    while (!m_inputList->children().empty()) {
-      m_inputList->removeChild(m_inputList->children().front().get());
+
+    if (m_audio == nullptr) {
+      if (width == lastWidth && lastKey == "unavailable") {
+        return;
+      }
+      while (!list->children().empty()) {
+        list->removeChild(list->children().front().get());
+      }
+      addEmptyState(
+          *list, i18n::tr("control-center.audio.unavailable-title"), i18n::tr("control-center.audio.unavailable-body"),
+          scale
+      );
+      lastWidth = width;
+      lastKey = "unavailable";
+      return;
     }
-    addEmptyState(
-        *m_outputList, i18n::tr("control-center.audio.unavailable-title"),
-        i18n::tr("control-center.audio.unavailable-body"), scale
-    );
-    addEmptyState(
-        *m_inputList, i18n::tr("control-center.audio.unavailable-title"),
-        i18n::tr("control-center.audio.unavailable-body"), scale
-    );
-    m_lastOutputWidth = outputWidth;
-    m_lastInputWidth = inputWidth;
-    m_lastOutputListKey = "unavailable";
-    m_lastInputListKey = "unavailable";
+
+    const std::string nextKey = devices.empty() ? "empty" : deviceListKey(devices);
+    if (width == lastWidth && nextKey == lastKey) {
+      return;
+    }
+
+    while (!list->children().empty()) {
+      list->removeChild(list->children().front().get());
+    }
+
+    if (devices.empty()) {
+      addEmptyState(
+          *list,
+          i18n::tr(isOutput ? "control-center.audio.no-output-devices" : "control-center.audio.no-input-devices"),
+          i18n::tr(
+              isOutput ? "control-center.audio.no-output-devices-body" : "control-center.audio.no-input-devices-body"
+          ),
+          scale
+      );
+    } else {
+      for (const auto& device : sortedDevices(availableDevices(devices, defaultId))) {
+        auto row = std::make_unique<AudioDeviceRow>(scale, [this, id = device.id, isOutput]() {
+          if (m_audio != nullptr) {
+            if (isOutput) {
+              m_audio->setDefaultSink(id);
+            } else {
+              m_audio->setDefaultSource(id);
+            }
+          }
+          PanelManager::instance().refresh();
+        });
+        row->setDevice(device);
+        list->addChild(std::move(row));
+      }
+    }
+
+    list->layout(renderer);
+    lastWidth = width;
+    lastKey = nextKey;
+  };
+
+  if (m_audio == nullptr) {
+    rebuild(m_outputScroll, m_outputList, m_lastOutputWidth, m_lastOutputListKey, {}, 0, true);
+    rebuild(m_inputScroll, m_inputList, m_lastInputWidth, m_lastInputListKey, {}, 0, false);
     return;
   }
 
   const AudioState& state = m_audio->state();
-  const std::string nextOutputListKey = state.sinks.empty() ? "empty" : deviceListKey(state.sinks);
-  const std::string nextInputListKey = state.sources.empty() ? "empty" : deviceListKey(state.sources);
-
-  if (outputWidth == m_lastOutputWidth
-      && inputWidth == m_lastInputWidth
-      && nextOutputListKey == m_lastOutputListKey
-      && nextInputListKey == m_lastInputListKey) {
-    return;
-  }
-
-  while (!m_outputList->children().empty()) {
-    m_outputList->removeChild(m_outputList->children().front().get());
-  }
-  while (!m_inputList->children().empty()) {
-    m_inputList->removeChild(m_inputList->children().front().get());
-  }
-
-  if (state.sinks.empty()) {
-    addEmptyState(
-        *m_outputList, i18n::tr("control-center.audio.no-output-devices"),
-        i18n::tr("control-center.audio.no-output-devices-body"), scale
-    );
-  } else {
-    for (const auto& sink : sortedDevices(availableDevices(state.sinks, state.defaultSinkId))) {
-      auto row = std::make_unique<AudioDeviceRow>(scale, [this, id = sink.id]() {
-        if (m_audio != nullptr) {
-          m_audio->setDefaultSink(id);
-        }
-        PanelManager::instance().refresh();
-      });
-      row->setDevice(sink);
-      m_outputList->addChild(std::move(row));
-    }
-  }
-
-  if (state.sources.empty()) {
-    addEmptyState(
-        *m_inputList, i18n::tr("control-center.audio.no-input-devices"),
-        i18n::tr("control-center.audio.no-input-devices-body"), scale
-    );
-  } else {
-    for (const auto& source : sortedDevices(availableDevices(state.sources, state.defaultSourceId))) {
-      auto row = std::make_unique<AudioDeviceRow>(scale, [this, id = source.id]() {
-        if (m_audio != nullptr) {
-          m_audio->setDefaultSource(id);
-        }
-        PanelManager::instance().refresh();
-      });
-      row->setDevice(source);
-      m_inputList->addChild(std::move(row));
-    }
-  }
-
-  m_outputList->layout(renderer);
-  m_inputList->layout(renderer);
-
-  m_lastOutputWidth = outputWidth;
-  m_lastInputWidth = inputWidth;
-  m_lastOutputListKey = nextOutputListKey;
-  m_lastInputListKey = nextInputListKey;
+  rebuild(m_outputScroll, m_outputList, m_lastOutputWidth, m_lastOutputListKey, state.sinks, state.defaultSinkId, true);
+  rebuild(
+      m_inputScroll, m_inputList, m_lastInputWidth, m_lastInputListKey, state.sources, state.defaultSourceId, false
+  );
 }
 
 void AudioTab::syncValueLabelWidths(Renderer& renderer) {

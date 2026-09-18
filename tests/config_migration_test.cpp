@@ -886,6 +886,64 @@ event_time_format = "%H:%M"
     );
   }
 
+  void checkClockTimezonesMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 15
+[control_center.calendar]
+timezones = ["UTC", "Europe/Berlin"]
+)");
+    noctalia::config::schema::Diagnostics diagnostics;
+    const int applied = noctalia::config::applyPendingConfigMigrations(sidecar, 15, diagnostics);
+    expect(applied == noctalia::config::currentConfigVersion(), "clock timezone migration was not applied");
+    const auto* clockZones = sidecar["control_center"]["clock"]["timezones"].as_array();
+    expect(clockZones != nullptr && clockZones->size() == 2, "clock timezones were not moved");
+    expect(
+        clockZones != nullptr && (*clockZones)[0].value<std::string_view>() == std::optional<std::string_view>{"UTC"}
+            && (*clockZones)[1].value<std::string_view>() == std::optional<std::string_view>{"Europe/Berlin"},
+        "clock timezone values were not preserved"
+    );
+    const auto* legacyCalendar = sidecar["control_center"]["calendar"].as_table();
+    expect(
+        legacyCalendar != nullptr && legacyCalendar->get("timezones") == nullptr,
+        "legacy calendar timezones were not removed"
+    );
+
+    toml::table conflict = toml::parse(R"(
+config_version = 15
+[control_center.calendar]
+timezones = ["UTC"]
+[control_center.clock]
+timezones = ["America/Los_Angeles"]
+)");
+    noctalia::config::schema::Diagnostics conflictDiagnostics;
+    (void)noctalia::config::applyPendingConfigMigrations(conflict, 15, conflictDiagnostics);
+    const auto* kept = conflict["control_center"]["clock"]["timezones"].as_array();
+    expect(
+        kept != nullptr && kept->size() == 1
+            && (*kept)[0].value<std::string_view>() == std::optional<std::string_view>{"America/Los_Angeles"},
+        "clock timezone migration overwrote the canonical list"
+    );
+    const auto* conflictCalendar = conflict["control_center"]["calendar"].as_table();
+    expect(
+        conflictCalendar != nullptr && conflictCalendar->get("timezones") == nullptr,
+        "conflicting calendar timezones were not removed"
+    );
+
+    toml::table legacyConfig = toml::parse(R"(
+[control_center.calendar]
+timezones = ["Asia/Tokyo"]
+)");
+    noctalia::config::LegacyConfigIssues issues;
+    noctalia::config::normalizeLegacyConfig(legacyConfig, issues);
+    const auto* legacyClock = legacyConfig["control_center"]["clock"]["timezones"].as_array();
+    expect(
+        legacyClock != nullptr && legacyClock->size() == 1
+            && (*legacyClock)[0].value<std::string_view>() == std::optional<std::string_view>{"Asia/Tokyo"},
+        "legacy calendar timezones were not moved"
+    );
+    expect(hasIssuePath(issues, "control_center.calendar.timezones"), "legacy clock timezone issue was missing");
+  }
+
   void checkVersionGating() {
     toml::table legacy = toml::parse(R"(
 [bar.main]
@@ -1033,6 +1091,7 @@ int main() {
   checkDeadZoneActionsMigration();
   checkCalendarEventFormatsMigration();
   checkLaunchAppsAsSystemdServicesMigration();
+  checkClockTimezonesMigration();
   checkSysmonPresentationMigration();
   checkKeyboardLayoutShowGlyphMigration();
   checkKeyboardLayoutCustomLabelsMigration();

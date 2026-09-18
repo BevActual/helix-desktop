@@ -194,7 +194,7 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
     auto widget = std::make_unique<DesktopCalendarWidget>(
         m_scriptDeps.configService, m_calendar,
         DesktopCalendarWidget::Options{
-            .showEvents = getBoolSetting(settings, "show_events", true),
+            .showEvents = getBoolSetting(settings, "show_events", false),
             .showWeekNumbers = getBoolSetting(settings, "show_week_numbers", false),
         }
     );

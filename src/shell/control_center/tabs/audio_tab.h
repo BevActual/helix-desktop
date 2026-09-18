@@ -26,6 +26,7 @@ class PipeWireService;
 class RenderContext;
 class Renderer;
 class ScrollView;
+class Segmented;
 class Select;
 class Slider;
 class WaylandConnection;
@@ -44,6 +45,7 @@ public:
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
+  void setActive(bool active) override;
   bool dismissTransientUi() override;
   [[nodiscard]] bool dragging() const noexcept;
   void setConfigureMode(bool show) override;
@@ -80,11 +82,24 @@ private:
     std::function<void()> toggleMute;
   };
 
+  enum class Catalog : std::uint8_t { Output, Input, Apps };
+
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   std::unique_ptr<Flex> createDeviceVolumeCard(DeviceVolumeCardSpec card);
   void rebuildLists(Renderer& renderer);
   void rebuildProgramVolumes(Renderer& renderer);
+  void applyCatalog(std::size_t index, bool persist = true);
+  void persistCatalog();
+  void syncCatalog();
+  [[nodiscard]] bool syncDetailLabel();
+  void previewCatalog(std::size_t index);
+  void restorePinnedCatalog();
+  [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
+  [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
+  [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
+  [[nodiscard]] static Catalog catalogFromIndex(std::size_t index) noexcept;
   void syncValueLabelWidths(Renderer& renderer);
   void syncProgramVolumeRows();
   void queueProgramSinkVolume(std::uint32_t id, float value);
@@ -105,16 +120,22 @@ private:
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;
-  Flex* m_deviceColumn = nullptr;
-  Flex* m_outputCard = nullptr;
-  Flex* m_inputCard = nullptr;
+  Flex* m_compactCard = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Label* m_detailLabel = nullptr;
+  Flex* m_outputHost = nullptr;
+  Flex* m_inputHost = nullptr;
+  Flex* m_appsHost = nullptr;
   ScrollView* m_outputScroll = nullptr;
   ScrollView* m_inputScroll = nullptr;
   Flex* m_outputList = nullptr;
   Flex* m_inputList = nullptr;
-  Flex* m_programCard = nullptr;
   ScrollView* m_programScroll = nullptr;
   Flex* m_programList = nullptr;
+  bool m_catalogSyncing = false;
+  Timer m_hoverEndTimer;
+  Catalog m_catalog = Catalog::Apps;
+  Catalog m_pinnedCatalog = Catalog::Apps;
   std::vector<Flex*> m_programRows;
   std::string m_lastProgramListKey;
   float m_lastProgramSliderMax = -1.0F;

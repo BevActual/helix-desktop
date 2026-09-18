@@ -244,7 +244,7 @@ namespace desktop_settings {
     auto add = [&](WidgetSettingSpec spec) { specs.push_back(std::move(spec)); };
 
     if (type == "calendar") {
-      add(boolSpec("show_events", true));
+      add(boolSpec("show_events", false));
       add(boolSpec("show_week_numbers", false));
       add(fontFamilySpec());
     } else if (type == "clock") {

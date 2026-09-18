@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -22,6 +23,7 @@ public:
   void setAddPlaceholder(std::string_view placeholder);
   void setScale(float scale);
   void setMaxItems(std::size_t maxItems);
+  void setItemAccessory(std::function<std::unique_ptr<Node>(std::size_t)> accessory);
   void setOnAddRequested(std::function<void(std::string)> callback);
   void setOnRemoveRequested(std::function<void(std::size_t)> callback);
   void setOnMoveRequested(std::function<void(std::size_t, std::size_t)> callback);
@@ -41,6 +43,7 @@ private:
   std::vector<ListEditorOption> m_suggestedOptions;
   std::string m_addPlaceholder;
   std::size_t m_maxItems = 0;
+  std::function<std::unique_ptr<Node>(std::size_t)> m_itemAccessory;
   std::function<void(std::string)> m_onAddRequested;
   std::function<void(std::size_t)> m_onRemoveRequested;
   std::function<void(std::size_t, std::size_t)> m_onMoveRequested;

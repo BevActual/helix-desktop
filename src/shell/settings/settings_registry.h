@@ -28,6 +28,8 @@ namespace settings {
     Type,
     Scale,
     Roundness,
+    Glass,
+    Icons,
     Effects,
     Language,
     Wallpaper,
@@ -58,6 +60,7 @@ namespace settings {
     Bar,
     Plugins,
     Camera,
+    Clock,
   };
 
   struct SettingsSectionDescriptor {

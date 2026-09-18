@@ -489,7 +489,10 @@ namespace noctalia::config::schema {
 
   namespace {
     const Schema<ShortcutConfig>& shortcutSchema() {
-      static const Schema<ShortcutConfig> s = {field(&ShortcutConfig::type, "type")};
+      static const Schema<ShortcutConfig> s = {
+          field(&ShortcutConfig::type, "type"),
+          enumField(&ShortcutConfig::size, "size", kShortcutSizes),
+      };
       return s;
     }
 
@@ -497,7 +500,13 @@ namespace noctalia::config::schema {
       static const Schema<ControlCenterConfig::CalendarTabConfig> s = {
           field(&ControlCenterConfig::CalendarTabConfig::showEventsCard, "show_events_card"),
           field(&ControlCenterConfig::CalendarTabConfig::showWeekNumbers, "show_week_numbers"),
-          field(&ControlCenterConfig::CalendarTabConfig::timezones, "timezones"),
+      };
+      return s;
+    }
+
+    const Schema<ControlCenterConfig::ClockTabConfig>& clockTabSchema() {
+      static const Schema<ControlCenterConfig::ClockTabConfig> s = {
+          field(&ControlCenterConfig::ClockTabConfig::timezones, "timezones"),
       };
       return s;
     }
@@ -551,10 +560,12 @@ namespace noctalia::config::schema {
         enumField(&ControlCenterConfig::sidebarMode, "sidebar", kControlCenterSidebarModes),
         enumField(&ControlCenterConfig::sidebarSectionMode, "sidebar_section", kControlCenterSidebarModes),
         field(&ControlCenterConfig::width, "width", kControlCenterWidthRange),
+        field(&ControlCenterConfig::height, "height", kControlCenterHeightRange),
         field(&ControlCenterConfig::showShortcutLabels, "show_shortcut_labels"),
         field(&ControlCenterConfig::showSessionButton, "show_session_button"),
         field(&ControlCenterConfig::hiddenTabs, "hidden_tabs"),
         subTable(&ControlCenterConfig::calendarTab, "calendar", calendarTabSchema()),
+        subTable(&ControlCenterConfig::clockTab, "clock", clockTabSchema()),
         subTable(&ControlCenterConfig::networkTab, "network", networkTabSchema()),
         subTable(&ControlCenterConfig::bluetoothTab, "bluetooth", bluetoothTabSchema()),
         subTable(&ControlCenterConfig::aiUsage, "ai_usage", aiUsageTabSchema()),

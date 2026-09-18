@@ -28,6 +28,7 @@ namespace noctalia::config {
     constexpr int kPluginAutoUpdateModeMigrationVersion = 13;
     constexpr int kCalendarEventFormatsMigrationVersion = 14;
     constexpr int kLaunchAppsAsSystemdServicesMigrationVersion = 15;
+    constexpr int kClockTimezonesMigrationVersion = 16;
     constexpr std::int64_t kMaxBarRadius = 500;
     constexpr std::array<std::string_view, 5> kBarRadiusKeys = {
         "radius", "radius_top_left", "radius_top_right", "radius_bottom_left", "radius_bottom_right",
@@ -713,6 +714,52 @@ namespace noctalia::config {
       );
     }
 
+    template <typename OnChanged> void migrateCalendarTimezonesToClock(toml::table& root, OnChanged&& onChanged) {
+      auto* controlCenter = root["control_center"].as_table();
+      if (controlCenter == nullptr) {
+        return;
+      }
+      auto* calendarTab = (*controlCenter)["calendar"].as_table();
+      if (calendarTab == nullptr) {
+        return;
+      }
+      toml::node* oldNode = calendarTab->get("timezones");
+      if (oldNode == nullptr) {
+        return;
+      }
+
+      toml::table* clockTab = (*controlCenter)["clock"].as_table();
+      if (clockTab == nullptr) {
+        if (controlCenter->contains("clock")) {
+          calendarTab->erase("timezones");
+          onChanged("control_center.calendar.timezones", true);
+          return;
+        }
+        controlCenter->insert("clock", toml::table{});
+        clockTab = (*controlCenter)["clock"].as_table();
+      }
+      if (clockTab == nullptr) {
+        return;
+      }
+
+      const bool keptCanonical = clockTab->contains("timezones");
+      if (!keptCanonical) {
+        clockTab->insert_or_assign("timezones", *oldNode);
+      }
+      calendarTab->erase("timezones");
+      onChanged("control_center.calendar.timezones", keptCanonical);
+    }
+
+    void migrateCalendarTimezonesToClockSidecar(toml::table& root, schema::Diagnostics& diag) {
+      migrateCalendarTimezonesToClock(root, [&diag](const std::string& path, bool keptCanonical) {
+        diag.warn(
+            path,
+            keptCanonical ? "moved world-clock timezones to clock configuration; kept the existing canonical value"
+                          : "moved world-clock timezones to clock configuration"
+        );
+      });
+    }
+
     template <typename OnChanged> void migratePluginAutoUpdateMode(toml::table& root, OnChanged&& onChanged) {
       auto* plugins = root["plugins"].as_table();
       if (plugins == nullptr) {
@@ -846,6 +893,11 @@ namespace noctalia::config {
             .toVersion = kLaunchAppsAsSystemdServicesMigrationVersion,
             .summary = "shell: launch apps as systemd services by default",
             .apply = migrateLaunchAppsAsSystemdServicesSidecar,
+        },
+        {
+            .toVersion = kClockTimezonesMigrationVersion,
+            .summary = "control-center: move world-clock timezones to the Clock tab",
+            .apply = migrateCalendarTimezonesToClockSidecar,
         },
     };
     return migrations;
@@ -1000,6 +1052,15 @@ namespace noctalia::config {
           .message = keptCanonical
               ? "event format is deprecated; move it to [calendar] and keep the existing canonical value"
               : "event format is deprecated; move it to [calendar]",
+      });
+    });
+    migrateCalendarTimezonesToClock(root, [&issues](const std::string& path, bool keptCanonical) {
+      issues.push_back({
+          .migrationVersion = kClockTimezonesMigrationVersion,
+          .path = path,
+          .message = keptCanonical
+              ? "world-clock timezones are deprecated; move them to [control_center.clock] and keep the existing canonical value"
+              : "world-clock timezones are deprecated; move them to [control_center.clock]",
       });
     });
   }

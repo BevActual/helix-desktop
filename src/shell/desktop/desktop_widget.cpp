@@ -1,6 +1,7 @@
 #include "shell/desktop/desktop_widget.h"
 
 #include "core/ui_phase.h"
+#include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/box.h"
 
@@ -246,4 +247,8 @@ void DesktopWidget::applyBackground() {
     outerRoot->setSize(boxW, boxH);
     outerRoot->setClipChildren(m_bgEnabled || boxed);
   }
+}
+
+void DesktopWidget::openControlCenterTab(std::string_view tab) {
+  PanelManager::instance().openPanel("control-center", PanelOpenRequest{.context = tab});
 }

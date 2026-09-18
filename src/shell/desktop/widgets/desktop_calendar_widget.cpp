@@ -82,7 +82,13 @@ void DesktopCalendarWidget::create() {
           .maxLines = 1,
           .configure = [this](Label& label) {
             label.setHitTestVisible(true);
-            label.setOnClick([this](const InputArea::PointerData&) { focusToday(); });
+            label.setOnClick([this](const InputArea::PointerData&) {
+              focusToday();
+              if (m_config != nullptr) {
+                (void)m_config->setStateString("calendar_tab", "catalog", "month");
+              }
+              openControlCenterTab("calendar");
+            });
           },
       })
   );
@@ -349,6 +355,12 @@ void DesktopCalendarWidget::rebuildCalendar() {
             m_monthOffset += monthShift;
             m_dirty = true;
             requestLayout();
+            if (!m_showEvents) {
+              if (m_config != nullptr) {
+                (void)m_config->setStateString("calendar_tab", "catalog", "events");
+              }
+              openControlCenterTab("calendar");
+            }
           },
       .onDateRightClicked =
           [](calendar_view::Date) { (void)desktop_entry_launch::launchDefaultForMimeType("text/calendar"); },

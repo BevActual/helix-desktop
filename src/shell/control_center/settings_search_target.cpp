@@ -45,7 +45,7 @@ namespace control_center {
       return false;
     }
 
-    std::string bestMatchingTabId(const std::unordered_map<std::string, int>& counts) {
+    std::string bestMatchingSectionId(const std::unordered_map<std::string, int>& counts) {
       int bestCount = 0;
       std::string bestSection;
       for (const auto& [section, count] : counts) {
@@ -57,13 +57,22 @@ namespace control_center {
       if (bestCount <= 0) {
         return {};
       }
-      return tabIdForSettingsSection(bestSection);
+      return bestSection;
     }
 
   } // namespace
 
   std::string tabIdForSettingsSection(std::string_view section) {
     if (section.empty() || section == "appearance") {
+      return "theme";
+    }
+    if (section == "glass"
+        || section == "icons"
+        || section == "type"
+        || section == "scale"
+        || section == "roundness"
+        || section == "effects"
+        || section == "language") {
       return "theme";
     }
     if (section == "location") {
@@ -88,10 +97,12 @@ namespace control_center {
     const std::string normalized = settings::normalizedSettingQuery(query);
     const auto counts = sectionMatchCounts(registry, normalized);
     const bool localMatch = currentSectionMatches(counts, currentTabId, currentSectionIds);
-    const std::string bestTab = bestMatchingTabId(counts);
+    const std::string bestSection = bestMatchingSectionId(counts);
+    const std::string bestTab = bestSection.empty() ? std::string{} : tabIdForSettingsSection(bestSection);
 
     SettingsSearchTarget out;
     out.tabId = std::string(currentTabId);
+    out.sectionId = bestSection;
     out.stayOnCurrent = true;
     out.configureMode = hasSettingsPane;
 

@@ -23,7 +23,8 @@ public:
   virtual void onClick() {}
   virtual void onRightClick() {}
   /// direction >= 0 scrolls forward (e.g. toward performance), direction < 0 backward.
-  virtual void onScroll(int /*direction*/) {}
+  /// Return true if the shortcut consumed the scroll; false leaves it for the page.
+  virtual bool onScroll(int /*direction*/) { return false; }
 
   // Control Center keeps shortcut instances across panel open/close. Plugin-backed
   // shortcuts use these hooks to pause timers and source file watches while closed.

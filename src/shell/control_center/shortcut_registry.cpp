@@ -299,7 +299,10 @@ namespace {
     }
     void onClick() override { cycle(1); }
     void onRightClick() override { cycle(-1); }
-    void onScroll(int direction) override { cycle(direction); }
+    bool onScroll(int direction) override {
+      cycle(direction);
+      return true;
+    }
 
   private:
     void cycle(int direction) {

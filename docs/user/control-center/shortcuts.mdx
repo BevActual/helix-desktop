@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-The Home tab displays shortcut buttons beside the media and clock cards. Related shortcuts group into glass islands (Wi-Fi with Bluetooth, Do Not Disturb with Caffeine, and so on). Up to 6 shortcuts are shown. You can configure the list in TOML or edit it from **Settings -> Control Center**.
+The Home tab displays shortcut buttons beside the media and clock cards. Related shortcuts group into frosted Control Center plates (Wi-Fi with Bluetooth, Do Not Disturb with Caffeine, and so on). Tiles stay quiet on the plate and illuminate when hovered or on. Add as many shortcuts as you want, then size each one **Small** (one cell), **Wide** (a full row), or **Large** (a 2×2 module), like Apple Control Center. You can configure the list in TOML or edit it from **Home → header gear**.
 
 ```toml
 [[control_center.shortcuts]]
@@ -16,6 +16,7 @@ type = "bluetooth"
 
 [[control_center.shortcuts]]
 type = "nightlight"
+size = "wide"
 
 [[control_center.shortcuts]]
 type = "notification"
@@ -25,6 +26,7 @@ type = "wallpaper"
 
 [[control_center.shortcuts]]
 type = "session"
+size = "large"
 ```
 
 When no `[[control_center.shortcuts]]` entries are defined, the default set is: `wifi`, `bluetooth`, `caffeine`, `nightlight`, `notification`, `power_profile`.
@@ -42,6 +44,7 @@ show_shortcut_labels = false
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | string | *required* | Shortcut type from the list below |
+| `size` | string | `"small"` | Tile size: `"small"` (1×1), `"wide"` (2×1), or `"large"` (2×2) |
 
 ## Types
 

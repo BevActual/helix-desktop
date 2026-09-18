@@ -22,12 +22,7 @@
 #include "shell/control_center/plugin_control_center_tab.h"
 #include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
-#include "shell/control_center/tabs/effects_tab.h"
-#include "shell/control_center/tabs/language_tab.h"
-#include "shell/control_center/tabs/roundness_tab.h"
-#include "shell/control_center/tabs/scale_tab.h"
 #include "shell/control_center/tabs/theme_tab.h"
-#include "shell/control_center/tabs/type_tab.h"
 #include "shell/control_center/tabs/windows_tab.h"
 #include "shell/control_center/tabs/dock_tab.h"
 #include "shell/control_center/tabs/desktop_tab.h"
@@ -38,6 +33,7 @@
 #include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
 #include "shell/control_center/tabs/camera_tab.h"
+#include "shell/control_center/tabs/clock_tab.h"
 #include "shell/control_center/tabs/clipboard_tab.h"
 #include "shell/control_center/tabs/home_tab.h"
 #include "shell/control_center/tabs/keybinds_tab.h"
@@ -162,11 +158,6 @@ namespace {
   constexpr BuiltinTabSpec kBuiltinTabs[] = {
       {"home", "control-center.tabs.home", "home", false, TabGroup::Home},
       {"theme", "settings.navigation.sections.theme", "palette", true, TabGroup::Appearance},
-      {"type", "settings.navigation.sections.type", "typography", true, TabGroup::Appearance},
-      {"scale", "settings.navigation.sections.scale", "resize", true, TabGroup::Appearance},
-      {"roundness", "settings.navigation.sections.roundness", "border-radius", true, TabGroup::Appearance},
-      {"effects", "settings.navigation.sections.effects", "shadow", true, TabGroup::Appearance},
-      {"language", "settings.navigation.sections.language", "language", true, TabGroup::Appearance},
       {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true, TabGroup::Appearance},
       {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Appearance},
       {"bar", "settings.navigation.sections.bar", "crop-3-2", true, TabGroup::Layout},
@@ -184,6 +175,7 @@ namespace {
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
       {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
+      {"clock", "control-center.tabs.clock", "clock", true, TabGroup::Status},
       {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
       {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Status},
       {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::Status},
@@ -299,6 +291,8 @@ namespace {
 
   bool isLiveSettingsHost(std::string_view id) {
     return id == "theme"
+        || id == "glass"
+        || id == "icons"
         || id == "type"
         || id == "scale"
         || id == "roundness"
@@ -310,6 +304,7 @@ namespace {
         || id == "system"
         || id == "packages"
         || id == "calendar"
+        || id == "clock"
         || id == "audio"
         || id == "monitor"
         || id == "wallpaper"
@@ -342,7 +337,14 @@ namespace {
   }
 
   [[nodiscard]] std::string resolveOpenTabId(std::string_view context) {
-    if (context == "appearance") {
+    if (context == "appearance"
+        || context == "glass"
+        || context == "icons"
+        || context == "type"
+        || context == "scale"
+        || context == "roundness"
+        || context == "effects"
+        || context == "language") {
       return "theme";
     }
     if (context.empty() || context == "home") {
@@ -399,6 +401,20 @@ namespace {
     return true;
   }
 
+  [[nodiscard]] std::optional<ThemeTab::Section> themeSectionForContext(std::string_view context) {
+    if (context == "glass"
+        || context == "icons"
+        || context == "type"
+        || context == "scale"
+        || context == "roundness"
+        || context == "effects"
+        || context == "language"
+        || context == "palettes") {
+      return ThemeTab::sectionFromId(context);
+    }
+    return std::nullopt;
+  }
+
   [[nodiscard]] std::optional<CaptureTab::View> captureViewForContext(std::string_view context) {
     if (context == "screenshot") {
       return CaptureTab::View::Screenshot;
@@ -451,11 +467,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
 
   add("home", std::make_unique<HomeTab>(services));
   add("theme", std::make_unique<ThemeTab>(services));
-  add("type", std::make_unique<TypeTab>(services));
-  add("scale", std::make_unique<ScaleTab>(services));
-  add("roundness", std::make_unique<RoundnessTab>(services));
-  add("effects", std::make_unique<EffectsTab>(services));
-  add("language", std::make_unique<LanguageTab>(services));
   add("wallpaper", std::make_unique<WallpaperTab>(services));
   add("templates", std::make_unique<TemplatesTab>(services));
   add("bar", std::make_unique<BarTab>(services));
@@ -482,6 +493,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
   add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
+  add("clock", std::make_unique<ClockTab>(services));
   add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
   add("camera", std::make_unique<CameraTab>(services));
   add("system", std::make_unique<SystemTab>(services.sysmon, services));
@@ -530,6 +542,12 @@ float ControlCenterPanel::preferredWidth() const {
   case ControlCenterSidebarMode::Compact:
     return fullSize * 0.85F * m_contentScale;
   }
+}
+
+float ControlCenterPanel::preferredHeight() const {
+  const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.height)
+                                             : static_cast<float>(ControlCenterConfig::kDefaultHeight);
+  return fullSize * m_contentScale;
 }
 
 PanelPlacement ControlCenterPanel::panelPlacement() const noexcept {
@@ -923,17 +941,23 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   const auto settingsTarget = parseSettingsOpenContext(context);
   std::string tabId;
   std::optional<CaptureTab::View> captureView;
+  std::optional<ThemeTab::Section> themeSection;
   if (settingsTarget.isSettings) {
     tabId = tabIdForSettingsSection(settingsTarget.section);
     captureView = captureViewForContext(settingsTarget.section);
+    themeSection = themeSectionForContext(settingsTarget.section);
   } else {
     tabId = resolveOpenTabId(context);
     captureView = captureViewForContext(context);
+    themeSection = themeSectionForContext(context);
   }
   selectTab(tabId, animateTabSwitch);
   if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
     if (auto* capture = dynamic_cast<CaptureTab*>(slot->tab.get()); capture != nullptr && captureView.has_value()) {
       capture->applyOpenView(*captureView);
+    }
+    if (auto* theme = dynamic_cast<ThemeTab*>(slot->tab.get()); theme != nullptr && themeSection.has_value()) {
+      theme->applyOpenSection(*themeSection);
     }
     if (auto* wallpaper = dynamic_cast<WallpaperTab*>(slot->tab.get()); wallpaper != nullptr) {
       wallpaper->applyOpenContext(wallpaperPickerContext(context));
@@ -1010,6 +1034,13 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
           }
           return false;
         }
+        if (tabId == "theme") {
+          if (const auto section = themeSectionForContext(settingsTarget.section)) {
+            if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
+              return theme->currentSection() == *section;
+            }
+          }
+        }
         return true;
       }
       return false;
@@ -1039,6 +1070,18 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
       if (const auto* capture = dynamic_cast<const CaptureTab*>(slot->tab.get())) {
         if (const auto view = captureViewForContext(requested)) {
           return capture->currentView() == *view;
+        }
+      }
+    }
+  }
+  if (tabId == "theme") {
+    if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+      if (slot->tab->configureMode()) {
+        return false;
+      }
+      if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
+        if (const auto section = themeSectionForContext(requested)) {
+          return theme->currentSection() == *section;
         }
       }
     }
@@ -1702,6 +1745,10 @@ bool ControlCenterPanel::isDirectSectionOpenContext(std::string_view context) co
   if (context == "settings" || context.find(':') != std::string_view::npos) {
     return true;
   }
+  if (context == "appearance" || themeSectionForContext(context).has_value()
+      || captureViewForContext(context).has_value()) {
+    return true;
+  }
   for (const auto& spec : kBuiltinTabs) {
     if (spec.hideable && context == spec.id) {
       return true;
@@ -1743,6 +1790,13 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     if (!best.empty() && best != m_activeTabId) {
       selectTab(best, false);
     }
+    if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
+      if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get())) {
+        if (const auto section = themeSectionForContext(StringUtils::trim(m_searchQuery))) {
+          theme->applyOpenSection(*section, false);
+        }
+      }
+    }
   } else if (searching) {
     auto* slot = slotById(m_activeTabId);
     const bool hasSettingsPane = isSettingsEditorTab(m_activeTabId)
@@ -1752,6 +1806,9 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     std::vector<std::string> currentSections;
     if (m_activeTabId == "capture") {
       currentSections = {"screenshot", "screen-record"};
+    } else if (m_activeTabId == "theme") {
+      currentSections = {
+          "theme", "niri", "glass", "icons", "type", "scale", "roundness", "effects", "language"};
     } else if (slot != nullptr && slot->tab != nullptr) {
       if (const auto* pane = slot->tab->settingsPane(); pane != nullptr && !pane->section().empty()) {
         currentSections.push_back(pane->section());
@@ -1771,8 +1828,14 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     if (!target.stayOnCurrent) {
       selectTab(target.tabId, false);
     }
-    if (target.configureMode) {
-      if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
+    if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
+      if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get());
+          theme != nullptr && !target.sectionId.empty()) {
+        if (const auto section = themeSectionForContext(target.sectionId)) {
+          theme->applyOpenSection(*section, false);
+        }
+      }
+      if (target.configureMode) {
         active->tab->setConfigureMode(true);
       }
     }

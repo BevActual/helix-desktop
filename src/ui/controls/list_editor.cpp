@@ -59,6 +59,11 @@ void ListEditor::setMaxItems(std::size_t maxItems) {
   rebuildRows();
 }
 
+void ListEditor::setItemAccessory(std::function<std::unique_ptr<Node>(std::size_t)> accessory) {
+  m_itemAccessory = std::move(accessory);
+  rebuildRows();
+}
+
 void ListEditor::setOnAddRequested(std::function<void(std::string)> callback) {
   m_onAddRequested = std::move(callback);
 }
@@ -96,8 +101,8 @@ void ListEditor::rebuildRows() {
     removeChild(children().back().get());
   }
 
-  const float labelCellWidth = kLabelCellWidth * m_scale;
-  const float itemRowHeight = kItemRowHeight * m_scale;
+  const float labelCellWidth = (m_itemAccessory ? 132.0F : kLabelCellWidth) * m_scale;
+  const float itemRowHeight = (m_itemAccessory ? Style::controlHeightSm : kItemRowHeight) * m_scale;
   const float suggestedAddHeight = kSuggestedAddHeight * m_scale;
 
   std::unique_ptr<Flex> addRow;
@@ -226,6 +231,12 @@ void ListEditor::rebuildRows() {
         makeListLabel(labelForValue(m_items[i]), m_scale)
     );
     itemRow->addChild(std::move(labelCell));
+
+    if (m_itemAccessory) {
+      if (auto accessory = m_itemAccessory(i)) {
+        itemRow->addChild(std::move(accessory));
+      }
+    }
 
     addGhostIconButton(*itemRow, "close", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.remove"), [this, i] {
       if (m_onRemoveRequested) {

@@ -11,7 +11,6 @@
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
-#include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "system/desktop_entry_launch.h"
 #include "time/time_format.h"
@@ -20,21 +19,24 @@
 #include "ui/controls/calendar_view.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
-#include "util/string_utils.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <ctime>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
-#include <unordered_set>
 #include <vector>
 #include <wayland-client-protocol.h>
+
+using namespace control_center;
 
 namespace {
 
@@ -66,78 +68,18 @@ namespace {
     return formatLocalTime(format);
   }
 
-  [[nodiscard]] std::string timezoneDisplayName(std::string_view tzName) {
-    std::string name(tzName);
-    if (const auto slash = name.rfind('/'); slash != std::string::npos) {
-      name = name.substr(slash + 1);
+  [[nodiscard]] std::string formatSelectedDay(const ConfigService* config, int year, int month, int day) {
+    if (year == std::numeric_limits<int>::min() || month < 0 || day < 0) {
+      return {};
     }
-    std::replace(name.begin(), name.end(), '_', ' ');
-    return name;
-  }
-
-  [[nodiscard]] std::string timezoneTimeText(const ConfigService* config, std::string_view tzName) {
-    const char* format = config != nullptr ? config->config().shell.timeFormat.c_str() : "{:%H:%M}";
-    return formatTimezoneTime(format, tzName);
-  }
-
-  [[nodiscard]] std::string timezoneListKey(const std::vector<std::string>& timezones) {
-    std::string key;
-    key.reserve(timezones.size() * 24);
-    for (const auto& zone : timezones) {
-      key += zone;
-      key.push_back('\n');
-    }
-    return key;
-  }
-
-  [[nodiscard]] SearchPickerOption makeTimezoneOption(std::string name) {
-    SearchPickerOption option;
-    option.value = std::move(name);
-    option.label = timezoneDisplayName(option.value);
-    if (option.label != option.value) {
-      option.description = option.value;
-    }
-    return option;
-  }
-
-  [[nodiscard]] const std::vector<SearchPickerOption>& timezoneCatalog() {
-    static const std::vector<SearchPickerOption> catalog = [] {
-      std::vector<SearchPickerOption> options;
-      std::unordered_set<std::string> seen;
-      try {
-        const auto& db = std::chrono::get_tzdb();
-        options.reserve(db.zones.size() + db.links.size());
-        for (const auto& zone : db.zones) {
-          std::string name(zone.name());
-          if (!seen.insert(name).second) {
-            continue;
-          }
-          options.push_back(makeTimezoneOption(std::move(name)));
-        }
-        for (const auto& link : db.links) {
-          std::string name(link.name());
-          if (!seen.insert(name).second) {
-            continue;
-          }
-          options.push_back(makeTimezoneOption(std::move(name)));
-        }
-      } catch (...) {
-      }
-      return options;
-    }();
-    return catalog;
-  }
-
-  [[nodiscard]] std::vector<SearchPickerOption> availableTimezoneOptions(const std::vector<std::string>& selected) {
-    std::vector<SearchPickerOption> options;
-    const auto& catalog = timezoneCatalog();
-    options.reserve(catalog.size());
-    for (const auto& option : catalog) {
-      if (!std::ranges::contains(selected, option.value)) {
-        options.push_back(option);
-      }
-    }
-    return options;
+    std::tm selected{};
+    selected.tm_year = year - 1900;
+    selected.tm_mon = month;
+    selected.tm_mday = day;
+    selected.tm_isdst = -1;
+    const std::time_t selectedRaw = std::mktime(&selected);
+    const char* format = config != nullptr ? config->config().calendar.eventDateFormat.c_str() : "%A %e %B";
+    return formatLocalUnixTime(static_cast<std::int64_t>(selectedRaw), format);
   }
 
   [[nodiscard]] bool isManagedCalendarAccount(const CalendarConfig::Account& account) {
@@ -186,16 +128,30 @@ namespace {
     }
     return key;
   }
+
+  void requestPanelLayout() {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
+    }
+  }
 } // namespace
 
 CalendarTab::CalendarTab(ConfigService* config, CalendarService* calendar, const ControlCenterServices& services)
     : m_config(config), m_calendar(calendar),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "services", .includedGroups = {"calendar"}}
-      )) {}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("calendar_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+    }
+  }
+}
 
 std::unique_ptr<Flex> CalendarTab::create() {
   const float scale = contentScale();
+  const float controlHeight = Style::controlHeight * scale;
 
   if (m_calendar != nullptr && !m_changeCallbackRegistered) {
     m_changeCallbackRegistered = true;
@@ -206,18 +162,138 @@ std::unique_ptr<Flex> CalendarTab::create() {
   }
 
   if (m_config != nullptr) {
-    m_showEventsCard = m_config->config().controlCenter.calendarTab.showEventsCard;
     m_showWeekNumbers = m_config->config().controlCenter.calendarTab.showWeekNumbers;
   }
 
-  auto tab = ui::row({
+  auto tab = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
   });
 
+  auto compactCard = ui::column({
+      .out = &m_compactCard,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+  });
+
+  auto titleRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = controlHeight,
+  });
+  titleRow->addChild(
+      ui::label({
+          .out = &m_todayLabel,
+          .text = formatShellDate(m_config),
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .flexGrow = 1.0F,
+          .configure =
+              [this](Label& label) {
+                label.setHitTestVisible(true);
+                label.setTooltip(i18n::tr("control-center.calendar.today"));
+                label.setOnClick([this](const InputArea::PointerData&) {
+                  focusToday();
+                  applyCatalog(indexFromCatalog(Catalog::Month));
+                  PanelManager::instance().refresh();
+                });
+              },
+      })
+  );
+  titleRow->addChild(
+      ui::button({
+          .out = &m_accountsAddButton,
+          .glyph = "plus",
+          .glyphSize = Style::baseGlyphSize * scale,
+          .variant = ButtonVariant::Ghost,
+          .tooltip = i18n::tr("control-center.calendar.accounts.add"),
+          .minHeight = controlHeight,
+          .paddingH = Style::spaceMd * scale,
+          .radius = Style::scaledRadiusSm(scale),
+          .visible = false,
+          .participatesInLayout = false,
+          .onClick = [this]() { openAccount(std::nullopt); },
+      })
+  );
+  compactCard->addChild(std::move(titleRow));
+  compactCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "calendar-month",
+                      .tooltip = i18n::tr("control-center.calendar.sections.month"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "calendar-event",
+                      .tooltip = i18n::tr("control-center.calendar.sections.events"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "users",
+                      .tooltip = i18n::tr("control-center.calendar.sections.accounts"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index, true); },
+          .onHover = [this](std::size_t index) { previewCatalog(index); },
+          .onHoverEnd = [this]() { restorePinnedCatalog(); },
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_detailLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+
+  auto enableRow = ui::row({
+      .out = &m_enableRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  enableRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.calendar.accounts.disabled"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  enableRow->addChild(
+      ui::toggle({
+          .out = &m_enableToggle,
+          .checked = m_calendar != nullptr && m_calendar->enabled(),
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange = [this](bool value) { setCalendarEnabled(value); },
+      })
+  );
+  compactCard->addChild(std::move(enableRow));
+  tab->addChild(std::move(compactCard));
+
+  auto monthHost = ui::column({
+      .out = &m_monthHost,
+      .align = FlexAlign::Stretch,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
+  });
   auto calendarArea = ui::inputArea({});
-  calendarArea->setFlexGrow(3.0F);
+  calendarArea->setFlexGrow(1.0F);
   calendarArea->setOnAxis([this](const InputArea::PointerData& data) {
     if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL) {
       return;
@@ -232,37 +308,10 @@ std::unique_ptr<Flex> CalendarTab::create() {
 
   auto calendarCard = ui::column({
       .out = &m_card,
-      .gap = Style::spaceMd * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        control_center::applySectionCardStyle(card, scale, opacity);
-      },
+      .align = FlexAlign::Stretch,
+      .gap = kCalendarGridGap * scale,
+      .flexGrow = 1.0F,
   });
-
-  calendarCard->addChild(
-      ui::label({
-          .out = &m_todayLabel,
-          .text = formatShellDate(m_config),
-          .fontSize = Style::fontSizeTitle * scale,
-          .fontWeight = FontWeight::Medium,
-          .color = colorSpecFromRole(ColorRole::Secondary),
-          .maxLines = 1,
-          .configure = [this](Label& label) {
-            label.setHitTestVisible(true);
-            label.setOnClick([this](const InputArea::PointerData&) {
-              const calendar_view::State state = calendar_view::stateForOffset(m_monthOffset);
-              const bool focusedOnToday = m_monthOffset == 0
-                  && m_selectedYear == state.current.year
-                  && m_selectedMonth == state.current.month
-                  && m_selectedDay == state.current.day;
-              if (focusedOnToday) {
-                return;
-              }
-              focusToday();
-              PanelManager::instance().refresh();
-            });
-          },
-      })
-  );
 
   auto header = ui::row({
       .out = &m_header,
@@ -271,8 +320,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .gap = Style::spaceSm * scale,
       .minHeight = kCalendarHeaderHeight * scale,
   });
-
-  auto previousSlot = ui::row(
+  header->addChild(ui::row(
       {.out = &m_previousSlot, .align = FlexAlign::Center, .justify = FlexJustify::Center},
       ui::button({
           .out = &m_previousButton,
@@ -283,10 +331,8 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .minHeight = kCalendarNavButtonSize * scale,
           .onClick = [this]() { changeMonthBy(-1); },
       })
-  );
-  header->addChild(std::move(previousSlot));
-
-  auto monthWrap = ui::column(
+  ));
+  header->addChild(ui::column(
       {.out = &m_monthWrap, .align = FlexAlign::Center, .justify = FlexJustify::Center, .flexGrow = 1.0F},
       ui::label({
           .out = &m_monthLabel,
@@ -295,10 +341,8 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .maxLines = 1,
       })
-  );
-  header->addChild(std::move(monthWrap));
-
-  auto nextSlot = ui::row(
+  ));
+  header->addChild(ui::row(
       {.out = &m_nextSlot, .align = FlexAlign::Center, .justify = FlexJustify::Center},
       ui::button({
           .out = &m_nextButton,
@@ -309,9 +353,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .minHeight = kCalendarNavButtonSize * scale,
           .onClick = [this]() { changeMonthBy(1); },
       })
-  );
-  header->addChild(std::move(nextSlot));
-
+  ));
   calendarCard->addChild(std::move(header));
 
   auto gridViewport = ui::column({
@@ -321,77 +363,52 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .flexGrow = 1.0F,
       .configure = [](Flex& viewport) { viewport.setClipChildren(true); },
   });
-
-  auto grid = ui::column({
+  gridViewport->addChild(ui::column({
       .out = &m_grid,
       .align = FlexAlign::Stretch,
       .gap = kCalendarGridGap * scale,
       .configure = [](Flex& layer) { layer.setParticipatesInLayout(false); },
-  });
-  gridViewport->addChild(std::move(grid));
+  }));
   calendarCard->addChild(std::move(gridViewport));
   calendarArea->addChild(std::move(calendarCard));
-  tab->addChild(std::move(calendarArea));
+  monthHost->addChild(std::move(calendarArea));
+  tab->addChild(std::move(monthHost));
 
-  auto eventsCard = ui::column(
-      {.out = &m_eventsCard,
-       .gap = Style::spaceSm * scale,
-       .flexGrow = 1.0F,
-       .configure = [scale, opacity = panelCardOpacity()](
-                        Flex& card
-                    ) { control_center::applySectionCardStyle(card, scale, opacity); }},
-      ui::label({
-          .out = &m_eventsTitle,
-          .text = i18n::tr("control-center.calendar.events"),
-          .fontSize = Style::fontSizeTitle * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-      }),
-      ui::scrollView({
-          .out = &m_eventsScroll,
-          .contentScale = scale,
-          .fillWidth = true,
-          .fillHeight = true,
-          .flexGrow = 1.0F,
-      })
-  );
-  eventsCard->setVisible(m_showEventsCard);
-  eventsCard->setParticipatesInLayout(m_showEventsCard);
-
-  auto side = ui::column({
+  auto eventsHost = ui::column({
+      .out = &m_eventsHost,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
-      .flexGrow = 2.0F,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
   });
-  buildAccountsCard(*side, scale);
-  buildWorldClockCard(*side, scale);
-  side->addChild(std::move(eventsCard));
-  tab->addChild(std::move(side));
+  eventsHost->addChild(ui::scrollView({
+      .out = &m_eventsScroll,
+      .contentScale = scale,
+      .fillWidth = true,
+      .fillHeight = true,
+      .flexGrow = 1.0F,
+      .configure =
+          [](ScrollView& scrollView) {
+            scrollView.clearFill();
+            scrollView.clearBorder();
+          },
+  }));
+  tab->addChild(std::move(eventsHost));
 
+  auto accountsHost = ui::column({
+      .out = &m_accountsHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+  });
+  buildAccountsCard(*accountsHost, scale);
+  tab->addChild(std::move(accountsHost));
+
+  syncCatalog();
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> CalendarTab::createHeaderActions() {
-  const float scale = contentScale();
-  if (m_config != nullptr) {
-    m_showEventsCard = m_config->config().controlCenter.calendarTab.showEventsCard;
-  }
-  auto live = ui::row(
-      {
-          .align = FlexAlign::Center,
-          .gap = Style::spaceSm * scale,
-      },
-      ui::button({
-          .out = &m_toggleEventsCardButton,
-          .glyph = m_showEventsCard ? "calendar-event" : "calendar-off",
-          .selected = m_showEventsCard,
-          .tooltip = i18n::tr("control-center.calendar.toggle-events-card"),
-          .onClick = [this]() { toggleEventsCard(); },
-          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
-      })
-  );
-  return m_settings->embedHeader(std::move(live), scale);
+  return m_settings->embedHeader(nullptr, contentScale());
 }
 
 void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
@@ -399,62 +416,8 @@ void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
       .out = &m_accountsCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { control_center::applySectionCardStyle(section, scale, opacity); },
+      .flexGrow = 1.0F,
   });
-
-  auto header = ui::row({
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .minHeight = Style::controlHeightSm * scale,
-  });
-  header->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.calendar.accounts.title"),
-          .fontSize = Style::fontSizeBody * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .flexGrow = 1.0F,
-      })
-  );
-  header->addChild(
-      ui::button({
-          .out = &m_accountsAddButton,
-          .glyph = "plus",
-          .variant = ButtonVariant::Ghost,
-          .tooltip = i18n::tr("control-center.calendar.accounts.add"),
-          .minWidth = Style::controlHeightSm * scale,
-          .minHeight = Style::controlHeightSm * scale,
-          .padding = Style::spaceXs * scale,
-          .onClick = [this]() { openAccount(std::nullopt); },
-      })
-  );
-  card->addChild(std::move(header));
-
-  auto disabledRow = ui::row({
-      .out = &m_accountsDisabledRow,
-      .align = FlexAlign::Center,
-      .gap = Style::spaceSm * scale,
-      .visible = false,
-  });
-  disabledRow->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.calendar.accounts.disabled"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  disabledRow->addChild(
-      ui::toggle({
-          .out = &m_accountsEnableToggle,
-          .checked = m_calendar != nullptr && m_calendar->enabled(),
-          .scale = scale,
-          .onChange = [this](bool value) { setCalendarEnabled(value); },
-      })
-  );
-  card->addChild(std::move(disabledRow));
-
   card->addChild(
       ui::label({
           .out = &m_accountsEmpty,
@@ -464,13 +427,25 @@ void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
           .visible = false,
       })
   );
-  card->addChild(
-      ui::column({
-          .out = &m_accountsList,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceXs * scale,
-      })
-  );
+  auto listScroll = ui::scrollView({
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure =
+          [](ScrollView& scrollView) {
+            scrollView.clearFill();
+            scrollView.clearBorder();
+          },
+  });
+  m_accountsList = listScroll->content();
+  if (m_accountsList != nullptr) {
+    m_accountsList->setDirection(FlexDirection::Vertical);
+    m_accountsList->setAlign(FlexAlign::Stretch);
+    m_accountsList->setGap(Style::spaceXs * scale);
+  }
+  card->addChild(std::move(listScroll));
   parent.addChild(std::move(card));
   rebuildAccounts();
   syncAccounts();
@@ -541,13 +516,12 @@ void CalendarTab::rebuildAccounts() {
     row->addChild(std::move(text));
     row->addChild(
         ui::button({
-            .text = i18n::tr(buttonKey),
             .glyph = glyph,
-            .fontSize = Style::fontSizeCaption * scale,
-            .variant = credentialLocked ? ButtonVariant::Secondary : ButtonVariant::Outline,
+            .variant = ButtonVariant::Ghost,
+            .tooltip = i18n::tr(buttonKey),
+            .minWidth = Style::controlHeightSm * scale,
             .minHeight = Style::controlHeightSm * scale,
-            .paddingV = Style::spaceXs * scale,
-            .paddingH = Style::spaceSm * scale,
+            .padding = Style::spaceXs * scale,
             .onClick =
                 [this, id = account.id, credentialLocked]() {
                   if (credentialLocked && m_calendar != nullptr) {
@@ -569,13 +543,10 @@ void CalendarTab::rebuildAccounts() {
 void CalendarTab::syncAccounts() {
   const bool enabled = m_calendar != nullptr && m_calendar->enabled();
   const bool hasAccounts = m_accountsList != nullptr && !m_accountsList->children().empty();
-  const bool layoutDirty = setShown(m_accountsDisabledRow, !enabled) || setShown(m_accountsAddButton, enabled)
-      || setShown(m_accountsList, enabled) || setShown(m_accountsEmpty, enabled && !hasAccounts);
+  const bool layoutDirty =
+      setShown(m_accountsList, enabled && hasAccounts) || setShown(m_accountsEmpty, enabled && !hasAccounts);
   if (layoutDirty) {
-    PanelManager::instance().requestLayout();
-  }
-  if (m_accountsEnableToggle != nullptr) {
-    m_accountsEnableToggle->setChecked(enabled);
+    requestPanelLayout();
   }
 }
 
@@ -592,195 +563,8 @@ void CalendarTab::setCalendarEnabled(bool enabled) {
   (void)m_config->setOverride({"calendar", "enabled"}, enabled);
   m_lastAccountsKey.clear();
   rebuildAccounts();
+  syncCatalog();
   PanelManager::instance().refresh();
-}
-
-void CalendarTab::buildWorldClockCard(Flex& parent, float scale) {
-  auto card = ui::column({
-      .out = &m_worldClockCard,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { control_center::applySectionCardStyle(section, scale, opacity); },
-  });
-  card->addChild(control_center::makeCardHeaderRow(i18n::tr("control-center.calendar.world-clock.title"), scale));
-  card->addChild(
-      ui::column({
-          .out = &m_timezoneList,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceXs * scale,
-      })
-  );
-  card->addChild(
-      ui::label({
-          .out = &m_timezoneError,
-          .text = "",
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::Error),
-          .visible = false,
-      })
-  );
-  card->addChild(
-      ui::searchPicker({
-          .out = &m_timezonePicker,
-          .placeholder = i18n::tr("control-center.calendar.world-clock.placeholder"),
-          .emptyText = i18n::tr("control-center.calendar.world-clock.empty"),
-          .height = Style::controlHeight * 6.5F * scale,
-          .onActivated =
-              [this](const SearchPickerOption& option) {
-                if (!option.value.empty()) {
-                  addTimezone(option.value);
-                }
-              },
-          .configure =
-              [](SearchPicker& picker) {
-                picker.clearFill();
-                picker.clearBorder();
-                picker.setRadius(0.0F);
-                picker.setPadding(0.0F);
-              },
-      })
-  );
-  parent.addChild(std::move(card));
-  rebuildWorldClock();
-  syncTimezonePicker();
-}
-
-void CalendarTab::rebuildWorldClock() {
-  if (m_timezoneList == nullptr) {
-    return;
-  }
-  const std::vector<std::string> timezones =
-      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
-  const std::string key = timezoneListKey(timezones);
-  if (key == m_lastTimezoneKey) {
-    return;
-  }
-
-  uiAssertNotRendering("CalendarTab::rebuildWorldClock");
-  while (!m_timezoneList->children().empty()) {
-    m_timezoneList->removeChild(m_timezoneList->children().front().get());
-  }
-  m_timezoneRows.clear();
-
-  const float scale = contentScale();
-  for (const auto& zone : timezones) {
-    TimezoneRow row;
-    row.zone = zone;
-    auto item = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    item->addChild(
-        ui::label({
-            .text = timezoneDisplayName(zone),
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    item->addChild(
-        ui::label({
-            .out = &row.timeLabel,
-            .text = timezoneTimeText(m_config, zone),
-            .fontSize = Style::fontSizeBody * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-        })
-    );
-    const std::size_t index = m_timezoneRows.size();
-    item->addChild(
-        ui::button({
-            .glyph = "trash",
-            .variant = ButtonVariant::Ghost,
-            .tooltip = i18n::tr("control-center.calendar.world-clock.remove"),
-            .minWidth = Style::controlHeightSm * scale,
-            .minHeight = Style::controlHeightSm * scale,
-            .padding = Style::spaceXs * scale,
-            .onClick = [this, index]() { removeTimezone(index); },
-        })
-    );
-    m_timezoneRows.push_back(row);
-    m_timezoneList->addChild(std::move(item));
-  }
-
-  m_lastTimezoneKey = key;
-  syncTimezonePicker();
-}
-
-void CalendarTab::syncTimezonePicker() {
-  if (m_timezonePicker == nullptr) {
-    return;
-  }
-  const std::vector<std::string> timezones =
-      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
-  m_timezonePicker->setOptions(availableTimezoneOptions(timezones));
-}
-
-void CalendarTab::syncWorldClockTimes() {
-  for (auto& row : m_timezoneRows) {
-    if (row.timeLabel != nullptr) {
-      row.timeLabel->setText(timezoneTimeText(m_config, row.zone));
-    }
-  }
-}
-
-void CalendarTab::addTimezone(std::string_view raw) {
-  const std::string zone = StringUtils::trim(raw);
-  if (zone.empty()) {
-    return;
-  }
-  if (!isValidTimezone(zone)) {
-    setTimezoneError(i18n::tr("control-center.calendar.world-clock.invalid"));
-    return;
-  }
-
-  std::vector<std::string> timezones =
-      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
-  if (std::ranges::contains(timezones, zone)) {
-    setTimezoneError({});
-    if (m_timezonePicker != nullptr) {
-      m_timezonePicker->setFilter("");
-    }
-    return;
-  }
-
-  timezones.push_back(zone);
-  persistTimezones(timezones);
-  setTimezoneError({});
-  rebuildWorldClock();
-  if (m_timezonePicker != nullptr) {
-    m_timezonePicker->setFilter("");
-  }
-  PanelManager::instance().refresh();
-}
-
-void CalendarTab::removeTimezone(std::size_t index) {
-  std::vector<std::string> timezones =
-      m_config != nullptr ? m_config->config().controlCenter.calendarTab.timezones : std::vector<std::string>{};
-  if (index >= timezones.size()) {
-    return;
-  }
-  timezones.erase(timezones.begin() + static_cast<std::ptrdiff_t>(index));
-  persistTimezones(timezones);
-  rebuildWorldClock();
-  PanelManager::instance().refresh();
-}
-
-void CalendarTab::persistTimezones(const std::vector<std::string>& timezones) {
-  if (m_config == nullptr) {
-    return;
-  }
-  (void)m_config->setOverride({"control_center", "calendar", "timezones"}, timezones);
-}
-
-void CalendarTab::setTimezoneError(std::string_view message) {
-  if (m_timezoneError == nullptr) {
-    return;
-  }
-  m_timezoneError->setText(std::string(message));
-  (void)setShown(m_timezoneError, !message.empty());
 }
 
 void CalendarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -789,68 +573,213 @@ bool CalendarTab::configureMode() const { return m_settings->configureMode(); }
 
 void CalendarTab::setSettingsSearchQuery(std::string_view query) { m_settings->setSearchQuery(std::string(query)); }
 
+SettingsPane* CalendarTab::settingsPane() { return m_settings.get(); }
+
+CalendarTab::Catalog CalendarTab::catalogFromState(std::string_view value) noexcept {
+  if (value == "events") {
+    return Catalog::Events;
+  }
+  if (value == "accounts") {
+    return Catalog::Accounts;
+  }
+  return Catalog::Month;
+}
+
+std::string_view CalendarTab::catalogState(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Events:
+    return "events";
+  case Catalog::Accounts:
+    return "accounts";
+  case Catalog::Month:
+    break;
+  }
+  return "month";
+}
+
+std::size_t CalendarTab::indexFromCatalog(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Events:
+    return 1;
+  case Catalog::Accounts:
+    return 2;
+  case Catalog::Month:
+    break;
+  }
+  return 0;
+}
+
+CalendarTab::Catalog CalendarTab::catalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 1:
+    return Catalog::Events;
+  case 2:
+    return Catalog::Accounts;
+  default:
+    return Catalog::Month;
+  }
+}
+
+bool CalendarTab::syncDetailLabel() {
+  if (m_detailLabel == nullptr) {
+    return false;
+  }
+  const bool show = m_catalog == Catalog::Month || m_catalog == Catalog::Events;
+  if (show) {
+    m_detailLabel->setText(formatSelectedDay(m_config, m_selectedYear, m_selectedMonth, m_selectedDay));
+  }
+  return setShown(m_detailLabel, show);
+}
+
+void CalendarTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("calendar_tab", "catalog", std::string(catalogState(m_pinnedCatalog)));
+}
+
+void CalendarTab::applyCatalog(std::size_t index, bool persist) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (persist) {
+    m_hoverEndTimer.stop();
+    m_pinnedCatalog = next;
+    persistCatalog();
+  }
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  m_eventsDirty = true;
+  m_lastInnerWidth = -1.0F;
+  m_lastInnerHeight = -1.0F;
+  syncCatalog();
+  requestPanelLayout();
+}
+
+void CalendarTab::previewCatalog(std::size_t index) {
+  m_hoverEndTimer.stop();
+  applyCatalog(index, false);
+  PanelManager::instance().refresh();
+}
+
+void CalendarTab::restorePinnedCatalog() {
+  m_hoverEndTimer.stop();
+  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
+    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
+    PanelManager::instance().refresh();
+  });
+}
+
+void CalendarTab::syncCatalog() {
+  const bool enabled = m_calendar != nullptr && m_calendar->enabled();
+  const bool month = m_catalog == Catalog::Month;
+  const bool events = m_catalog == Catalog::Events;
+  const bool accounts = m_catalog == Catalog::Accounts;
+  bool layoutDirty = setShown(m_monthHost, month) || setShown(m_eventsHost, events) || setShown(m_accountsHost, accounts)
+      || setShown(m_enableRow, !enabled) || setShown(m_accountsAddButton, accounts && enabled);
+  layoutDirty = syncDetailLabel() || layoutDirty;
+  if (m_enableToggle != nullptr) {
+    m_enableToggle->setChecked(enabled);
+  }
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_pinnedCatalog));
+    m_catalogSyncing = false;
+    layoutDirty = true;
+  }
+  if (layoutDirty) {
+    requestPanelLayout();
+  }
+}
+
+void CalendarTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
 void CalendarTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  if (m_rootLayout == nullptr || m_card == nullptr || m_calendarArea == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
+  if (m_config != nullptr) {
+    const bool weekNumbers = m_config->config().controlCenter.calendarTab.showWeekNumbers;
+    if (weekNumbers != m_showWeekNumbers) {
+      m_showWeekNumbers = weekNumbers;
+      m_lastInnerWidth = -1.0F;
+      m_lastInnerHeight = -1.0F;
+    }
+  }
 
+  syncCatalog();
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
-  m_card->setSize(m_calendarArea->width(), m_calendarArea->height());
-  m_card->layout(renderer);
 
-  const float innerWidth = std::max(0.0F, m_card->width() - (m_card->paddingLeft() + m_card->paddingRight()));
-  const float innerHeight = std::max(0.0F, m_card->height() - (m_card->paddingTop() + m_card->paddingBottom()));
-  const calendar_view::State state = calendar_view::stateForOffset(m_monthOffset);
+  if (m_catalog == Catalog::Month && m_card != nullptr && m_calendarArea != nullptr) {
+    m_card->setSize(m_calendarArea->width(), m_calendarArea->height());
+    m_card->layout(renderer);
 
-  // Default the selection to today until the user picks a day.
-  if (m_selectedDay < 0) {
-    m_selectedYear = state.current.year;
-    m_selectedMonth = state.current.month;
-    m_selectedDay = state.current.day;
-  }
-
-  const bool sizeChanged = std::abs(innerWidth - m_lastInnerWidth) >= kCalendarLayoutEpsilon
-      || std::abs(innerHeight - m_lastInnerHeight) >= kCalendarLayoutEpsilon;
-  const bool displayChanged = state.displayYear != m_lastDisplayYear || state.displayMonth != m_lastDisplayMonth;
-  const bool todayChanged = state.current.year != m_lastCurrentYear
-      || state.current.month != m_lastCurrentMonth
-      || state.current.day != m_lastToday;
-
-  if (m_monthSlideAnimId != 0 && !m_startMonthSlideIn) {
-    m_rootLayout->layout(renderer);
-    calendar_view::layoutEventLinkOverlays(m_eventListState);
-    return;
-  }
-
-  if (!sizeChanged && !displayChanged && !todayChanged && !m_eventsDirty && !m_startMonthSlideIn) {
-    return;
-  }
-  m_eventsDirty = false;
-
-  m_lastInnerWidth = innerWidth;
-  m_lastInnerHeight = innerHeight;
-  m_lastDisplayYear = state.displayYear;
-  m_lastDisplayMonth = state.displayMonth;
-  m_lastCurrentYear = state.current.year;
-  m_lastCurrentMonth = state.current.month;
-  m_lastToday = state.current.day;
-
-  rebuild();
-  if (m_grid != nullptr) {
-    if (m_monthSlideAnimId == 0 && !m_startMonthSlideIn) {
-      m_grid->setPosition(0.0F, 0.0F);
-      m_grid->setOpacity(1.0F);
+    const float innerWidth = std::max(0.0F, m_card->width() - (m_card->paddingLeft() + m_card->paddingRight()));
+    const float innerHeight = std::max(0.0F, m_card->height() - (m_card->paddingTop() + m_card->paddingBottom()));
+    if (innerWidth < 1.0F || innerHeight < 1.0F) {
+      m_rootLayout->layout(renderer);
+      return;
     }
-    m_grid->layout(renderer);
+    const calendar_view::State state = calendar_view::stateForOffset(m_monthOffset);
+
+    if (m_selectedDay < 0) {
+      m_selectedYear = state.current.year;
+      m_selectedMonth = state.current.month;
+      m_selectedDay = state.current.day;
+    }
+
+    const bool sizeChanged = std::abs(innerWidth - m_lastInnerWidth) >= kCalendarLayoutEpsilon
+        || std::abs(innerHeight - m_lastInnerHeight) >= kCalendarLayoutEpsilon;
+    const bool displayChanged = state.displayYear != m_lastDisplayYear || state.displayMonth != m_lastDisplayMonth;
+    const bool todayChanged = state.current.year != m_lastCurrentYear || state.current.month != m_lastCurrentMonth
+        || state.current.day != m_lastToday;
+
+    if (m_monthSlideAnimId != 0 && !m_startMonthSlideIn) {
+      m_rootLayout->layout(renderer);
+      calendar_view::layoutEventLinkOverlays(m_eventListState);
+      return;
+    }
+
+    if (sizeChanged || displayChanged || todayChanged || m_eventsDirty || m_startMonthSlideIn) {
+      m_eventsDirty = false;
+      m_lastInnerWidth = innerWidth;
+      m_lastInnerHeight = innerHeight;
+      m_lastDisplayYear = state.displayYear;
+      m_lastDisplayMonth = state.displayMonth;
+      m_lastCurrentYear = state.current.year;
+      m_lastCurrentMonth = state.current.month;
+      m_lastToday = state.current.day;
+
+      rebuild();
+      if (m_grid != nullptr) {
+        if (m_monthSlideAnimId == 0 && !m_startMonthSlideIn) {
+          m_grid->setPosition(0.0F, 0.0F);
+          m_grid->setOpacity(1.0F);
+        }
+        m_grid->layout(renderer);
+      }
+      if (m_startMonthSlideIn && m_gridViewport != nullptr) {
+        m_startMonthSlideIn = false;
+        beginSlideIn();
+      }
+    }
+  } else if (m_eventsDirty || m_catalog == Catalog::Events) {
+    m_eventsDirty = false;
+    rebuildEventList(contentScale());
   }
-  if (m_startMonthSlideIn && m_gridViewport != nullptr) {
-    m_startMonthSlideIn = false;
-    beginSlideIn();
-  }
+
   m_rootLayout->layout(renderer);
   calendar_view::layoutEventLinkOverlays(m_eventListState);
 }
@@ -860,16 +789,22 @@ void CalendarTab::doUpdate(Renderer& renderer) {
   if (m_todayLabel != nullptr) {
     m_todayLabel->setText(formatShellDate(m_config));
   }
-  rebuildWorldClock();
-  syncWorldClockTimes();
+  (void)syncDetailLabel();
   rebuildAccounts();
 }
 
 void CalendarTab::setActive(bool active) {
   if (!active) {
     m_eventFadeTimer.stop();
-    m_clockTimer.stop();
+    m_hoverEndTimer.stop();
     return;
+  }
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("calendar_tab", "catalog")) {
+      m_catalog = catalogFromState(*catalog);
+      m_pinnedCatalog = m_catalog;
+      syncCatalog();
+    }
   }
   focusToday();
   if (!m_eventFadeTimer.active()) {
@@ -877,9 +812,6 @@ void CalendarTab::setActive(bool active) {
       m_eventsDirty = true;
       PanelManager::instance().refresh();
     });
-  }
-  if (!m_clockTimer.active()) {
-    m_clockTimer.startRepeating(std::chrono::milliseconds(1000), [this]() { PanelManager::instance().refresh(); });
   }
 }
 
@@ -898,9 +830,16 @@ void CalendarTab::focusToday() {
 void CalendarTab::onClose() {
   m_settings->onClose();
   m_eventFadeTimer.stop();
-  m_clockTimer.stop();
+  m_hoverEndTimer.stop();
   cancelMonthSlide();
   m_rootLayout = nullptr;
+  m_compactCard = nullptr;
+  m_catalogSwitch = nullptr;
+  m_enableRow = nullptr;
+  m_enableToggle = nullptr;
+  m_monthHost = nullptr;
+  m_eventsHost = nullptr;
+  m_accountsHost = nullptr;
   m_calendarArea = nullptr;
   m_card = nullptr;
   m_header = nullptr;
@@ -908,27 +847,17 @@ void CalendarTab::onClose() {
   m_nextSlot = nullptr;
   m_monthWrap = nullptr;
   m_todayLabel = nullptr;
+  m_detailLabel = nullptr;
   m_monthLabel = nullptr;
   m_previousButton = nullptr;
   m_nextButton = nullptr;
-  m_toggleEventsCardButton = nullptr;
   m_gridViewport = nullptr;
   m_grid = nullptr;
-  m_eventsCard = nullptr;
-  m_eventsTitle = nullptr;
   m_eventsScroll = nullptr;
   m_accountsCard = nullptr;
   m_accountsAddButton = nullptr;
-  m_accountsDisabledRow = nullptr;
   m_accountsList = nullptr;
   m_accountsEmpty = nullptr;
-  m_accountsEnableToggle = nullptr;
-  m_worldClockCard = nullptr;
-  m_timezoneList = nullptr;
-  m_timezoneError = nullptr;
-  m_timezonePicker = nullptr;
-  m_timezoneRows.clear();
-  m_lastTimezoneKey.clear();
   m_lastAccountsKey.clear();
   m_eventListState.linkOverlays.clear();
   m_selectedYear = std::numeric_limits<int>::min();
@@ -1123,7 +1052,6 @@ void CalendarTab::rebuild() {
   m_monthLabel->setMaxWidth(monthWidth);
   if (m_todayLabel != nullptr) {
     m_todayLabel->setText(formatShellDate(m_config));
-    m_todayLabel->setMaxWidth(innerWidth);
   }
 
   calendar_view::rebuildMonth({
@@ -1157,6 +1085,7 @@ void CalendarTab::rebuild() {
             if (monthShift != 0) {
               changeMonthBy(monthShift);
             } else {
+              applyCatalog(indexFromCatalog(Catalog::Events), true);
               PanelManager::instance().refresh();
             }
           },
@@ -1171,7 +1100,6 @@ void CalendarTab::rebuild() {
   if (m_gridViewport != nullptr) {
     m_gridViewport->setSize(innerWidth, m_grid->height());
   }
-  rebuildEventList(scale);
 }
 
 void CalendarTab::rebuildEventList(float scale) {
@@ -1188,7 +1116,7 @@ void CalendarTab::rebuildEventList(float scale) {
   }
   calendar_view::rebuildEventList({
       .scroll = *m_eventsScroll,
-      .title = m_eventsTitle,
+      .title = nullptr,
       .snapshot = m_calendar != nullptr ? &m_calendar->snapshot() : nullptr,
       .selected = {.year = m_selectedYear, .month = m_selectedMonth, .day = m_selectedDay},
       .scale = scale,
@@ -1198,18 +1126,4 @@ void CalendarTab::rebuildEventList(float scale) {
       .state = &m_eventListState,
       .requestRedraw = []() { PanelManager::instance().requestRedraw(); },
   });
-}
-
-void CalendarTab::toggleEventsCard() {
-  m_showEventsCard = !m_showEventsCard;
-  if (m_config != nullptr) {
-    m_config->setOverride({"control_center", "calendar", "show_events_card"}, m_showEventsCard);
-  }
-  if (m_toggleEventsCardButton != nullptr) {
-    m_toggleEventsCardButton->setGlyph(m_showEventsCard ? "calendar-event" : "calendar-off");
-    m_toggleEventsCardButton->setSelected(m_showEventsCard);
-  }
-  if (setShown(m_eventsCard, m_showEventsCard)) {
-    PanelManager::instance().requestLayout();
-  }
 }

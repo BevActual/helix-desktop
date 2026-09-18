@@ -1,7 +1,10 @@
 #include "ui/controls/grid_view.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <functional>
 #include <numeric>
+#include <utility>
 #include <vector>
 
 void GridView::setColumns(std::size_t columns) {
@@ -97,6 +100,140 @@ void GridView::setSpanLastItem(bool span) {
   markLayoutDirty();
 }
 
+void GridView::setChildSpan(Node* child, std::size_t columnSpan, std::size_t rowSpan) {
+  if (child == nullptr) {
+    return;
+  }
+  const ChildSpan next{
+      .columns = std::max<std::size_t>(1, columnSpan),
+      .rows = std::max<std::size_t>(1, rowSpan),
+  };
+  if (next.columns == 1 && next.rows == 1) {
+    if (m_childSpans.erase(child) > 0) {
+      markLayoutDirty();
+    }
+    return;
+  }
+  auto [it, inserted] = m_childSpans.try_emplace(child, next);
+  if (!inserted && it->second.columns == next.columns && it->second.rows == next.rows) {
+    return;
+  }
+  it->second = next;
+  markLayoutDirty();
+}
+
+void GridView::clearChildSpans() {
+  if (m_childSpans.empty()) {
+    return;
+  }
+  m_childSpans.clear();
+  markLayoutDirty();
+}
+
+std::size_t GridView::childColumnSpan(const Node* child) const noexcept {
+  const auto it = m_childSpans.find(child);
+  return it == m_childSpans.end() ? 1 : std::max<std::size_t>(1, it->second.columns);
+}
+
+std::size_t GridView::childRowSpan(const Node* child) const noexcept {
+  const auto it = m_childSpans.find(child);
+  return it == m_childSpans.end() ? 1 : std::max<std::size_t>(1, it->second.rows);
+}
+
+namespace {
+
+  struct PackedSlot {
+    Node* child = nullptr;
+    std::size_t col = 0;
+    std::size_t row = 0;
+    std::size_t colSpan = 1;
+    std::size_t rowSpan = 1;
+  };
+
+  std::vector<PackedSlot> packGridItems(
+      const std::vector<Node*>& children, std::size_t columns,
+      const std::function<std::pair<std::size_t, std::size_t>(const Node*)>& spanOf
+  ) {
+    columns = std::max<std::size_t>(1, columns);
+    std::vector<PackedSlot> packed;
+    packed.reserve(children.size());
+    std::vector<std::uint8_t> occ;
+    const auto ensureRow = [&](std::size_t row) {
+      const std::size_t need = (row + 1) * columns;
+      if (occ.size() < need) {
+        occ.resize(need, 0);
+      }
+    };
+    const auto freeAt = [&](std::size_t row, std::size_t col, std::size_t colSpan, std::size_t rowSpan) {
+      for (std::size_t dr = 0; dr < rowSpan; ++dr) {
+        ensureRow(row + dr);
+        for (std::size_t dc = 0; dc < colSpan; ++dc) {
+          if (occ[(row + dr) * columns + (col + dc)] != 0) {
+            return false;
+          }
+        }
+      }
+      return true;
+    };
+    const auto occupy = [&](std::size_t row, std::size_t col, std::size_t colSpan, std::size_t rowSpan) {
+      for (std::size_t dr = 0; dr < rowSpan; ++dr) {
+        ensureRow(row + dr);
+        for (std::size_t dc = 0; dc < colSpan; ++dc) {
+          occ[(row + dr) * columns + (col + dc)] = 1;
+        }
+      }
+    };
+
+    for (Node* child : children) {
+      const auto [rawColSpan, rawRowSpan] = spanOf(child);
+      const std::size_t colSpan = std::clamp(rawColSpan, std::size_t{1}, columns);
+      const std::size_t rowSpan = std::max<std::size_t>(1, rawRowSpan);
+      bool placed = false;
+      for (std::size_t row = 0; !placed; ++row) {
+        for (std::size_t col = 0; col + colSpan <= columns; ++col) {
+          if (!freeAt(row, col, colSpan, rowSpan)) {
+            continue;
+          }
+          occupy(row, col, colSpan, rowSpan);
+          packed.push_back(PackedSlot{child, col, row, colSpan, rowSpan});
+          placed = true;
+          break;
+        }
+      }
+    }
+    return packed;
+  }
+
+  std::size_t packedRowCountOf(const std::vector<PackedSlot>& packed) {
+    std::size_t rows = 0;
+    for (const auto& slot : packed) {
+      rows = std::max(rows, slot.row + slot.rowSpan);
+    }
+    return rows;
+  }
+
+} // namespace
+
+std::size_t GridView::packedRowCount() const {
+  std::vector<Node*> visibleChildren;
+  visibleChildren.reserve(children().size());
+  for (const auto& child : children()) {
+    if (child->visible()) {
+      visibleChildren.push_back(child.get());
+    }
+  }
+  if (visibleChildren.empty()) {
+    return 0;
+  }
+  const auto packed = packGridItems(
+      visibleChildren, m_columns,
+      [this](const Node* child) {
+        return std::pair<std::size_t, std::size_t>{childColumnSpan(child), childRowSpan(child)};
+      }
+  );
+  return packedRowCountOf(packed);
+}
+
 LayoutSize GridView::doMeasure(Renderer& renderer, const LayoutConstraints& constraints) {
   float useW = width();
   if (constraints.hasExactWidth()) {
@@ -133,6 +270,77 @@ void GridView::doLayout(Renderer& renderer) {
 
   if (visibleChildren.empty()) {
     setSize(std::max(width(), m_paddingLeft + m_paddingRight), std::max(height(), m_paddingTop + m_paddingBottom));
+    return;
+  }
+
+  bool usesItemSpans = false;
+  for (Node* child : visibleChildren) {
+    if (childColumnSpan(child) > 1 || childRowSpan(child) > 1) {
+      usesItemSpans = true;
+      break;
+    }
+  }
+
+  if (usesItemSpans) {
+    const std::size_t columns = std::max<std::size_t>(1, m_columns);
+    const auto packed = packGridItems(
+        visibleChildren, columns,
+        [this](const Node* child) {
+          return std::pair<std::size_t, std::size_t>{childColumnSpan(child), childRowSpan(child)};
+        }
+    );
+    const std::size_t rows = std::max<std::size_t>(1, packedRowCountOf(packed));
+    const bool hasFixedWidth = width() > 0.0F;
+    const bool hasFixedHeight = height() > 0.0F;
+    const float fixedWidth = width();
+    const float fixedHeight = height();
+    float cellW = m_minCellWidth;
+    float cellH = m_minCellHeight;
+    if (hasFixedWidth && columns > 0) {
+      const float innerWidth =
+          std::max(0.0F, fixedWidth - m_paddingLeft - m_paddingRight - m_columnGap * static_cast<float>(columns - 1));
+      cellW = std::max(cellW, innerWidth / static_cast<float>(columns));
+    }
+    if (m_squareCells) {
+      cellH = cellW;
+    } else if (hasFixedHeight && rows > 0) {
+      const float innerHeight =
+          std::max(0.0F, fixedHeight - m_paddingTop - m_paddingBottom - m_rowGap * static_cast<float>(rows - 1));
+      cellH = std::max(cellH, innerHeight / static_cast<float>(rows));
+    }
+    if (cellW <= 0.0F || cellH <= 0.0F) {
+      for (Node* child : visibleChildren) {
+        child->layout(renderer);
+        cellW = std::max(cellW, child->width());
+        cellH = std::max(cellH, child->height());
+      }
+      if (m_squareCells) {
+        cellW = cellH = std::max(cellW, cellH);
+      }
+    }
+
+    for (const auto& slot : packed) {
+      const float itemW =
+          static_cast<float>(slot.colSpan) * cellW + static_cast<float>(slot.colSpan > 0 ? slot.colSpan - 1 : 0) * m_columnGap;
+      const float itemH =
+          static_cast<float>(slot.rowSpan) * cellH + static_cast<float>(slot.rowSpan > 0 ? slot.rowSpan - 1 : 0) * m_rowGap;
+      layoutWithAssignedSize(slot.child, itemW, itemH);
+    }
+
+    const float contentWidth =
+        static_cast<float>(columns) * cellW + static_cast<float>(columns > 0 ? columns - 1 : 0) * m_columnGap;
+    const float contentHeight =
+        static_cast<float>(rows) * cellH + static_cast<float>(rows > 0 ? rows - 1 : 0) * m_rowGap;
+    const float computedWidth = m_paddingLeft + contentWidth + m_paddingRight;
+    const float computedHeight = m_paddingTop + contentHeight + m_paddingBottom;
+    setSize(hasFixedWidth ? std::max(fixedWidth, computedWidth) : computedWidth, computedHeight);
+
+    for (const auto& slot : packed) {
+      slot.child->setPosition(
+          m_paddingLeft + static_cast<float>(slot.col) * (cellW + m_columnGap),
+          m_paddingTop + static_cast<float>(slot.row) * (cellH + m_rowGap)
+      );
+    }
     return;
   }
 

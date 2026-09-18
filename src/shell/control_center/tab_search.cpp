@@ -15,17 +15,15 @@ namespace control_center {
     };
 
     constexpr AliasRow kAliases[] = {
-        {"theme", "appearance color palette colours colors look custom customize accent"},
-        {"type", "font typeface typography"},
-        {"scale", "size ui-scale zoom interface-scale"},
-        {"roundness", "corners rounded radius border-radius"},
-        {"effects", "contrast motion animation borders shadows tint icons glass transparency"},
-        {"language", "locale translation i18n lang"},
+        {"theme",
+         "appearance color palette colours colors look custom customize accent dark light auto "
+         "glass icons type scale roundness effects language"},
         {"windows", "gaps struts columns tiling niri windows"},
         {"niri", "setup compositor autostart"},
         {"audio", "sound volume mic microphone speaker"},
         {"bluetooth", "bt nearby paired"},
-        {"calendar", "clock clocks timezone timezones world-clock date accounts caldav google ical ics vdir"},
+        {"calendar", "date accounts caldav google ical ics vdir"},
+        {"clock", "clocks timezone timezones world-clock worldclock time date"},
         {"clipboard", "paste clips cliphist"},
         {"control-center", "cc"},
         {"keybinds", "binds shortcuts keyboard hotkeys attention"},

@@ -273,9 +273,16 @@ event_time_format           = "%H:%M"       # time format used for events
 
 # Calendar tab of the control center.
 
+[control_center]
+# width  = 700   # full-sidebar width in pixels (600–1600); size like a Settings window
+# height = 700   # window height in pixels (480–1200); leftover catalogs fill extra space
+
 [control_center.calendar]
 show_events_card            = true
 show_week_numbers           = false         # ISO 8601 week numbers in the month grid
+
+[control_center.clock]
+timezones                   = []            # extra IANA timezones besides local time
 
 [control_center.network]
 wifi_band     = "all"                    # all | 2.4 | 5 | 6
@@ -523,13 +530,14 @@ enabled = false
 
 # ── Control Center ────────────────────────────────────────────────────────────
 
-# Shortcut buttons shown on the right side of the dashboard (up to 6).
+# Shortcut buttons on Home. Add as many as you like; size = "small" | "wide" | "large".
 # [[control_center.shortcuts]]
 # type = "wifi"
 # [[control_center.shortcuts]]
 # type = "bluetooth"
 # [[control_center.shortcuts]]
 # type = "nightlight"
+# size = "wide"
 # [[control_center.shortcuts]]
 # type = "notification"
 # [[control_center.shortcuts]]

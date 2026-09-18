@@ -191,8 +191,8 @@ Requires the external `mpvpaper` command (which pulls in `mpv`; `mpv` also rende
 <PluginMeta icon="world" id="noctalia/world_clock" />
 
 Track multiple IANA timezones in an attached **panel**, or use the built-in world clock on Control Center's
-**Calendar** tab (`noctalia msg panel-toggle control-center calendar`). The Calendar card stores zones in
-`[control_center.calendar].timezones` and uses `[shell].time_format`. The plugin panel is independent: a headless
+**Clock** tab (`noctalia msg panel-toggle control-center clock`). The Clock tab stores zones in
+`[control_center.clock].timezones` and uses `[shell].time_format`. The plugin panel is independent: a headless
 **service** owns its own zone list and publishes live times; a bar **widget** (`bar`) shows a world glyph and opens
 the panel on click. Plugin zones persist under the plugin data directory across updates.
 

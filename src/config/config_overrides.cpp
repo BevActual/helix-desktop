@@ -496,6 +496,9 @@ namespace {
               }
               toml::table shortcut;
               shortcut.insert_or_assign("type", item.type);
+              if (item.size != ShortcutSize::Small) {
+                shortcut.insert_or_assign("size", std::string(enumToKey(kShortcutSizes, item.size)));
+              }
               array.push_back(std::move(shortcut));
             }
             table.insert_or_assign(key, std::move(array));

@@ -11,6 +11,7 @@ namespace control_center {
 
   struct SettingsSearchTarget {
     std::string tabId;
+    std::string sectionId;
     bool stayOnCurrent = true;
     bool configureMode = false;
   };

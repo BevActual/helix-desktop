@@ -2,6 +2,7 @@
 
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/input_area.h"
 #include "render/scene/node.h"
 #include "system/weather_service.h"
 #include "time/time_format.h"
@@ -14,6 +15,7 @@
 #include <cmath>
 #include <ctime>
 #include <format>
+#include <linux/input-event-codes.h>
 #include <memory>
 
 namespace {
@@ -73,8 +75,17 @@ DesktopWeatherWidget::DesktopWeatherWidget(const WeatherService* weather, Option
       m_forecastDays(std::clamp(options.forecastDays, 1, static_cast<int>(kMaxForecastRows))) {}
 
 void DesktopWeatherWidget::create() {
-  auto rootNode = ui::node({});
-  rootNode->setClipChildren(true);
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .clipChildren = true,
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("weather");
+          },
+  });
 
   auto glyph = ui::glyph({
       .out = &m_glyph,

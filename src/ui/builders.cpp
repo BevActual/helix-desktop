@@ -733,6 +733,12 @@ namespace ui {
     if (props.onChange) {
       control->setOnChange(std::move(props.onChange));
     }
+    if (props.onHover) {
+      control->setOnHover(std::move(props.onHover));
+    }
+    if (props.onHoverEnd) {
+      control->setOnHoverEnd(std::move(props.onHoverEnd));
+    }
     applyNodeProps(*control, props);
     if (props.configure) {
       props.configure(*control);

@@ -6,6 +6,7 @@
 #include "shell/control_center/tab.h"
 #include "ui/controls/calendar_view.h"
 
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -19,7 +20,7 @@ class ConfigService;
 class InputArea;
 class Label;
 class ScrollView;
-class SearchPicker;
+class Segmented;
 class Toggle;
 struct ControlCenterServices;
 
@@ -34,8 +35,11 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
+  enum class Catalog : std::uint8_t { Month, Events, Accounts };
+
   void focusToday();
   void changeMonthBy(int delta);
   void cancelMonthSlide();
@@ -44,22 +48,24 @@ private:
   void applyMonthSlide(float progress, bool slidingIn);
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void rebuild();
   void rebuildEventList(float scale);
-  void toggleEventsCard();
   void buildAccountsCard(Flex& parent, float scale);
   void rebuildAccounts();
   void syncAccounts();
   void openAccount(std::optional<std::string> accountId);
   void setCalendarEnabled(bool enabled);
-  void buildWorldClockCard(Flex& parent, float scale);
-  void rebuildWorldClock();
-  void syncWorldClockTimes();
-  void syncTimezonePicker();
-  void addTimezone(std::string_view raw);
-  void removeTimezone(std::size_t index);
-  void persistTimezones(const std::vector<std::string>& timezones);
-  void setTimezoneError(std::string_view message);
+  void applyCatalog(std::size_t index, bool persist = true);
+  void persistCatalog();
+  void syncCatalog();
+  [[nodiscard]] bool syncDetailLabel();
+  void previewCatalog(std::size_t index);
+  void restorePinnedCatalog();
+  [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
+  [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
+  [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
+  [[nodiscard]] static Catalog catalogFromIndex(std::size_t index) noexcept;
 
   ConfigService* m_config = nullptr;
   CalendarService* m_calendar = nullptr;
@@ -67,7 +73,13 @@ private:
   bool m_changeCallbackRegistered = false;
   bool m_eventsDirty = false;
   Flex* m_rootLayout = nullptr;
-  Button* m_toggleEventsCardButton = nullptr;
+  Flex* m_compactCard = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Flex* m_enableRow = nullptr;
+  Toggle* m_enableToggle = nullptr;
+  Flex* m_monthHost = nullptr;
+  Flex* m_eventsHost = nullptr;
+  Flex* m_accountsHost = nullptr;
   InputArea* m_calendarArea = nullptr;
   Flex* m_card = nullptr;
   Flex* m_header = nullptr;
@@ -75,32 +87,22 @@ private:
   Flex* m_nextSlot = nullptr;
   Flex* m_monthWrap = nullptr;
   Label* m_todayLabel = nullptr;
+  Label* m_detailLabel = nullptr;
   Label* m_monthLabel = nullptr;
   Button* m_previousButton = nullptr;
   Button* m_nextButton = nullptr;
   Flex* m_gridViewport = nullptr;
   Flex* m_grid = nullptr;
-  Flex* m_eventsCard = nullptr;
-  Label* m_eventsTitle = nullptr;
   ScrollView* m_eventsScroll = nullptr;
   Flex* m_accountsCard = nullptr;
   Button* m_accountsAddButton = nullptr;
-  Flex* m_accountsDisabledRow = nullptr;
   Flex* m_accountsList = nullptr;
   Label* m_accountsEmpty = nullptr;
-  Toggle* m_accountsEnableToggle = nullptr;
-  Flex* m_worldClockCard = nullptr;
-  Flex* m_timezoneList = nullptr;
-  Label* m_timezoneError = nullptr;
-  SearchPicker* m_timezonePicker = nullptr;
-  struct TimezoneRow {
-    std::string zone;
-    Label* timeLabel = nullptr;
-  };
-  std::vector<TimezoneRow> m_timezoneRows;
-  std::string m_lastTimezoneKey;
   std::string m_lastAccountsKey;
   calendar_view::EventListState m_eventListState;
+  Catalog m_catalog = Catalog::Month;
+  Catalog m_pinnedCatalog = Catalog::Month;
+  bool m_catalogSyncing = false;
   int m_selectedYear = std::numeric_limits<int>::min();
   int m_selectedMonth = -1;
   int m_selectedDay = -1;
@@ -116,8 +118,7 @@ private:
   int m_pendingMonthDelta = 0;
   bool m_startMonthSlideIn = false;
   AnimationManager::Id m_monthSlideAnimId = 0;
-  bool m_showEventsCard = true;
   bool m_showWeekNumbers = false;
   Timer m_eventFadeTimer;
-  Timer m_clockTimer;
+  Timer m_hoverEndTimer;
 };

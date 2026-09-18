@@ -4,24 +4,30 @@
 #include "config/config_types.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
+#include "shell/control_center/tabs/effects_tab.h"
+#include "shell/control_center/tabs/glass_tab.h"
+#include "shell/control_center/tabs/icons_tab.h"
+#include "shell/control_center/tabs/language_tab.h"
+#include "shell/control_center/tabs/roundness_tab.h"
+#include "shell/control_center/tabs/scale_tab.h"
+#include "shell/control_center/tabs/type_tab.h"
 #include "ui/palette.h"
 #include "ui/signal.h"
 
-#include <array>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
 
 class Button;
-class CompositorPlatform;
 class ConfigService;
 class Flex;
+class GridView;
+class Input;
 class Label;
 class Renderer;
-class Select;
-class Slider;
-class Toggle;
+class Segmented;
 struct ControlCenterServices;
 
 namespace noctalia::theme {
@@ -30,84 +36,104 @@ namespace noctalia::theme {
 
 class ThemeTab : public Tab {
 public:
+  enum class Section : std::uint8_t {
+    Palettes,
+    Glass,
+    Icons,
+    Type,
+    Scale,
+    Roundness,
+    Effects,
+    Language,
+  };
+
   explicit ThemeTab(const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
+  void setActive(bool active) override;
   void onClose() override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
   [[nodiscard]] SettingsPane* settingsPane() override;
+  void applyOpenSection(Section section, bool persist = true);
+  [[nodiscard]] Section currentSection() const noexcept { return m_section; }
+  [[nodiscard]] static Section sectionFromId(std::string_view id) noexcept;
+  [[nodiscard]] static std::string_view idFromSection(Section section) noexcept;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
   void updateAutoStatus();
-  void syncPureBlackVisibility();
-  void rebuildPaletteSelect();
+  void rebuildPaletteGrid();
   void applyThemeMode(std::size_t index);
-  void applyShellMode(std::size_t index);
   void applyPaletteSource(std::size_t index);
   void applyPaletteSelection(std::size_t index);
-  void applyPureBlack(bool enabled);
-  void applyNiriFocusRing(bool enabled);
-  void applyNiriBorder(bool enabled);
-  void applyNiriDrawBorder(bool enabled);
-  void applyNiriBlur(bool enabled);
-  void commitNiriBlurPasses();
-  void commitNiriBlurOffset();
-  void commitNiriBlurNoise();
+  void applySection(std::size_t index);
+  void persistSection();
+  void syncHosts();
+  void syncSettingsSection();
+  void syncChildChrome();
+  void updatePalettesLayout(float contentWidth);
+  [[nodiscard]] bool updatePaletteColumns(float availableWidth);
   compositors::niri::InstallResult syncNiriLayoutTheme();
-  compositors::niri::InstallResult syncNiriBlur();
-  [[nodiscard]] bool niriBlurSupported() const;
-  void openPalettePicker();
   void openCustomPalettesFolder();
   void saveCurrentPalette();
   void pickRoleColor(ColorRole role, std::string roleLabel);
-  void syncSwatchHex();
   [[nodiscard]] PaletteSource selectedPaletteSource() const;
   [[nodiscard]] std::string paletteValueForSource(PaletteSource source) const;
+  [[nodiscard]] Tab* hostedTab() const noexcept;
+  [[nodiscard]] Flex* hostNode() const noexcept;
+  [[nodiscard]] static std::size_t indexFromSection(Section section) noexcept;
+  [[nodiscard]] static Section sectionFromIndex(std::size_t index) noexcept;
 
   ConfigService* m_config = nullptr;
   noctalia::theme::ThemeService* m_theme = nullptr;
-  CompositorPlatform* m_platform = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
   Signal<>::ScopedConnection m_settingsInvalidatedConn;
+  std::unique_ptr<GlassTab> m_glass;
+  std::unique_ptr<IconsTab> m_icons;
+  std::unique_ptr<TypeTab> m_type;
+  std::unique_ptr<ScaleTab> m_scale;
+  std::unique_ptr<RoundnessTab> m_roundness;
+  std::unique_ptr<EffectsTab> m_effects;
+  std::unique_ptr<LanguageTab> m_language;
 
   Flex* m_rootLayout = nullptr;
-  Select* m_themeMode = nullptr;
-  Select* m_shellMode = nullptr;
-  Label* m_autoStatus = nullptr;
-  Select* m_paletteSource = nullptr;
-  Flex* m_paletteSelectRow = nullptr;
-  Label* m_paletteSelectTitle = nullptr;
-  Select* m_paletteSelect = nullptr;
-  Flex* m_palettePickerRow = nullptr;
-  Label* m_palettePickerTitle = nullptr;
-  Button* m_palettePickerButton = nullptr;
+  Segmented* m_sectionSwitch = nullptr;
+  Flex* m_palettesHost = nullptr;
+  Flex* m_palettesCard = nullptr;
+  Flex* m_palettesLeftover = nullptr;
+  Flex* m_glassHost = nullptr;
+  Flex* m_iconsHost = nullptr;
+  Flex* m_typeHost = nullptr;
+  Flex* m_scaleHost = nullptr;
+  Flex* m_roundnessHost = nullptr;
+  Flex* m_effectsHost = nullptr;
+  Flex* m_languageHost = nullptr;
+  Button* m_modeDark = nullptr;
+  Button* m_modeLight = nullptr;
+  Button* m_modeAuto = nullptr;
+  Button* m_autoStatus = nullptr;
+  Label* m_paletteName = nullptr;
+  Segmented* m_sourceSwitch = nullptr;
+  Input* m_paletteFilter = nullptr;
+  Flex* m_catalogToolbar = nullptr;
+  GridView* m_paletteGrid = nullptr;
   Label* m_paletteEmpty = nullptr;
-  Flex* m_paletteTools = nullptr;
+  Button* m_openWallpaperButton = nullptr;
   Button* m_openPalettesButton = nullptr;
   Button* m_saveCustomButton = nullptr;
   Label* m_exportStatus = nullptr;
-  std::array<Label*, 6> m_swatchHex{};
-  Flex* m_pureBlackSection = nullptr;
-  Toggle* m_pureBlack = nullptr;
-  Toggle* m_niriFocusRing = nullptr;
-  Toggle* m_niriBorder = nullptr;
-  Toggle* m_niriDrawBorder = nullptr;
-  Toggle* m_niriBlur = nullptr;
-  Flex* m_niriBlurDetails = nullptr;
-  Slider* m_niriBlurPasses = nullptr;
-  Label* m_niriBlurPassesValue = nullptr;
-  Slider* m_niriBlurOffset = nullptr;
-  Label* m_niriBlurOffsetValue = nullptr;
-  Slider* m_niriBlurNoise = nullptr;
-  Label* m_niriBlurNoiseValue = nullptr;
 
   std::vector<std::string> m_paletteValues;
+  std::string m_paletteQuery;
+  std::string m_lastGridKey;
+  Section m_section = Section::Palettes;
   bool m_syncing = false;
   bool m_liveDirty = false;
+  bool m_sectionSyncing = false;
 };

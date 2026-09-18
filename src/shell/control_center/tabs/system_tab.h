@@ -1,13 +1,16 @@
 #pragma once
 
 #include "core/frame_rate_limiter.h"
+#include "core/timer_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 class Flex;
@@ -16,6 +19,8 @@ class Graph;
 class Label;
 class Button;
 class ClipboardService;
+class ConfigService;
+class Segmented;
 class SystemMonitorService;
 struct ControlCenterServices;
 
@@ -32,21 +37,36 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
+  enum class Catalog : std::uint8_t { Cpu, Memory, Gpu, Network, About };
+
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
+  void onPanelCardOpacityChanged(float opacity) override;
 
   void retainStats(bool retain);
   void updateGraphs(Renderer& renderer);
   void syncLabels();
   void updateGpuVisibility();
   void copySystemInfo();
+  void applyCatalog(std::size_t index, bool persist = true);
+  void persistCatalog();
+  void syncCatalog();
+  [[nodiscard]] bool syncDetailLabel();
+  void previewCatalog(std::size_t index);
+  void restorePinnedCatalog();
   [[nodiscard]] std::string systemInfoText() const;
   [[nodiscard]] float scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const;
+  [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
+  [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
+  [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
+  [[nodiscard]] static Catalog catalogFromIndex(std::size_t index) noexcept;
 
   SystemMonitorService* m_monitor;
   ClipboardService* m_clipboard = nullptr;
+  ConfigService* m_config = nullptr;
   std::function<void()> m_upgradeShell;
   std::function<bool()> m_upgradeAvailable;
   std::function<bool()> m_upgradeBusy;
@@ -55,9 +75,13 @@ private:
   bool m_statsRetained = false;
   bool m_graphInitialized = false;
   bool m_gpuVisible = false;
+  bool m_catalogSyncing = false;
   float m_scrollProgress = 1.0F;
   std::chrono::steady_clock::time_point m_lastSampleAt;
   FrameRateLimiter m_redrawLimiter{std::chrono::milliseconds{200}};
+  Timer m_hoverEndTimer;
+  Catalog m_catalog = Catalog::Cpu;
+  Catalog m_pinnedCatalog = Catalog::Cpu;
 
   double m_cpuTempMin = 30.0;
   double m_cpuTempMax = 80.0;
@@ -66,16 +90,23 @@ private:
   double m_netPeak = 0.0;
 
   Flex* m_root = nullptr;
+  Flex* m_compactCard = nullptr;
+  Segmented* m_catalogSwitch = nullptr;
+  Label* m_titleLabel = nullptr;
+  Label* m_glanceCpuLabel = nullptr;
+  Label* m_glanceRamLabel = nullptr;
+  Label* m_detailLabel = nullptr;
 
   Graph* m_cpuGraph = nullptr;
   Graph* m_ramGraph = nullptr;
   Graph* m_gpuGraph = nullptr;
   Graph* m_netGraph = nullptr;
 
-  Flex* m_cpuCard = nullptr;
-  Flex* m_ramCard = nullptr;
-  Flex* m_gpuCard = nullptr;
-  Flex* m_netCard = nullptr;
+  Flex* m_cpuHost = nullptr;
+  Flex* m_ramHost = nullptr;
+  Flex* m_gpuHost = nullptr;
+  Flex* m_netHost = nullptr;
+  Flex* m_aboutHost = nullptr;
 
   Flex* m_cpuLegend = nullptr;
   Flex* m_ramLegend = nullptr;
@@ -104,11 +135,9 @@ private:
   Glyph* m_txIcon = nullptr;
   Label* m_txLabel = nullptr;
 
-  // System card: cpu, gpu, distro, kernel, wm, uptime + os age
   static constexpr int kSystemLines = 6;
   Label* m_systemLines[kSystemLines] = {};
 
-  // Resources card: load, memory, swap (hidden when no swap), then up to four discovered physical disks.
   static constexpr int kResourcesLines = 2;
   Label* m_resourcesLines[kResourcesLines] = {};
   Flex* m_swapRow = nullptr;

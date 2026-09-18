@@ -13,6 +13,40 @@
 #include <memory>
 #include <utility>
 
+namespace {
+
+  Button::ButtonStateColors compactState(ColorSpec bg, ColorSpec label) {
+    return Button::ButtonStateColors{
+        .bg = bg,
+        .border = clearColorSpec(),
+        .label = label,
+    };
+  }
+
+  Button::ButtonPalette compactInactivePalette() {
+    return Button::ButtonPalette{
+        .borderWidth = 0.0F,
+        .normal = compactState(clearColorSpec(), colorSpecFromRole(ColorRole::OnSurfaceVariant)),
+        .hover = compactState(colorSpecFromRole(ColorRole::Hover), colorSpecFromRole(ColorRole::OnHover)),
+        .pressed = compactState(colorSpecFromRole(ColorRole::Surface), colorSpecFromRole(ColorRole::OnSurface)),
+        .disabled = compactState(clearColorSpec(), colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.55F)),
+    };
+  }
+
+  Button::ButtonPalette compactActivePalette() {
+    const auto fill = colorSpecFromRole(ColorRole::Surface);
+    const auto label = colorSpecFromRole(ColorRole::OnSurface);
+    return Button::ButtonPalette{
+        .borderWidth = 0.0F,
+        .normal = compactState(fill, label),
+        .hover = compactState(fill, label),
+        .pressed = compactState(fill, label),
+        .disabled = compactState(colorSpecFromRole(ColorRole::Surface, 0.55F), colorSpecFromRole(ColorRole::OnSurface, 0.55F)),
+    };
+  }
+
+} // namespace
+
 Segmented::Segmented() {
   setDirection(FlexDirection::Horizontal);
   setAlign(FlexAlign::Stretch);
@@ -67,6 +101,20 @@ void Segmented::setSelectedIndex(std::size_t index) {
   }
 }
 
+void Segmented::activateIndex(std::size_t index) {
+  if (index >= m_buttons.size()) {
+    return;
+  }
+  if (index != m_selected) {
+    m_selected = index;
+    refreshVariants();
+    m_rovingNav.notifyExternalSelectionChanged();
+  }
+  if (m_onChange) {
+    m_onChange(index);
+  }
+}
+
 void Segmented::setFontSize(float size) {
   m_fontSize = size;
   const float fs = effectiveFontSize();
@@ -104,11 +152,16 @@ void Segmented::setCompact(bool compact) {
     return;
   }
   m_compact = compact;
+  if (m_compact) {
+    setEqualSegmentWidths(true);
+  }
   for (Button* btn : m_buttons) {
     if (btn != nullptr) {
       applyButtonMetrics(*btn);
     }
   }
+  applyOuterStyle();
+  refreshVariants();
   markLayoutDirty();
 }
 
@@ -152,6 +205,22 @@ void Segmented::clearOptions() {
 }
 
 void Segmented::setOnChange(std::function<void(std::size_t)> callback) { m_onChange = std::move(callback); }
+
+void Segmented::setOnHover(std::function<void(std::size_t)> callback) { m_onHover = std::move(callback); }
+
+void Segmented::setOnHoverEnd(std::function<void()> callback) { m_onHoverEnd = std::move(callback); }
+
+void Segmented::handleSegmentEnter(std::size_t index) {
+  if (m_onHover) {
+    m_onHover(index);
+  }
+}
+
+void Segmented::handleSegmentLeave() {
+  if (m_onHoverEnd) {
+    m_onHoverEnd();
+  }
+}
 
 void Segmented::setSurfaceOpacity(float opacity) {
   const float clamped = std::clamp(opacity, 0.0F, 1.0F);
@@ -204,7 +273,9 @@ Segmented::makeSegmentButton(std::string_view label, std::string_view glyph, std
     btn->setFontSize(effectiveFontSize());
   }
   applyButtonMetrics(*btn);
-  btn->setOnClick([this, index]() { setSelectedIndex(index); });
+  btn->setOnClick([this, index]() { activateIndex(index); });
+  btn->setOnEnter([this, index]() { handleSegmentEnter(index); });
+  btn->setOnLeave([this]() { handleSegmentLeave(); });
   btn->setTabStop(false);
   btn->setFlexGrow(m_equalSegmentWidths ? 1.0F : 0.0F);
   btn->setContentAlign(ButtonContentAlign::Center);
@@ -238,14 +309,25 @@ void Segmented::setEqualSegmentWidths(bool equalWidths) {
 
 void Segmented::refreshVariants() {
   const std::size_t n = m_buttons.size();
-  const float r = Style::scaledRadiusMd(m_scale);
+  const float r = m_compact ? Style::scaledRadiusLg(m_scale) : Style::scaledRadiusMd(m_scale);
+  for (Separator* sep : m_separators) {
+    if (sep == nullptr) {
+      continue;
+    }
+    sep->setVisible(!m_compact);
+    sep->setParticipatesInLayout(!m_compact);
+  }
   for (std::size_t i = 0; i < n; ++i) {
     if (m_buttons[i] == nullptr) {
       continue;
     }
-    m_buttons[i]->setVariant(i == m_selected ? ButtonVariant::TabActive : ButtonVariant::Tab);
+    const bool active = i == m_selected;
+    m_buttons[i]->setVariant(active ? ButtonVariant::TabActive : ButtonVariant::Tab);
+    if (m_compact) {
+      m_buttons[i]->setCustomPalette(active ? compactActivePalette() : compactInactivePalette());
+    }
     Radii radii;
-    if (n == 1) {
+    if (m_compact || n == 1) {
       radii = Radii{r, r, r, r};
     } else if (i == 0) {
       radii = Radii{r, 0.0F, 0.0F, r};
@@ -259,10 +341,12 @@ void Segmented::refreshVariants() {
 }
 
 void Segmented::applyOuterStyle() {
-  Flex::setPadding(m_outerPadding);
+  const float inset = m_compact ? std::max(2.0F, Style::spaceXs * 0.5F * m_scale) : m_outerPadding;
+  Flex::setPadding(inset);
+  setGap(m_compact ? inset : 0.0F);
   setFill(colorSpecFromRole(m_surfaceRole, m_surfaceOpacity));
   clearBorder();
-  setRadius(Style::scaledRadiusMd(m_scale));
+  setRadius(m_compact ? Style::scaledRadiusXl(m_scale) : Style::scaledRadiusMd(m_scale));
 }
 
 void Segmented::doLayout(Renderer& renderer) {

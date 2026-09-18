@@ -7,6 +7,8 @@ sidebar:
 
 # Desktop Widgets
 
+Desktop widgets are glanceable: they show a few facts and deep-link into the matching Control Center tab. They are not mini Control Center pages.
+
 Desktop widgets are configured through the normal Noctalia config stack. Declare layouts in `~/.config/noctalia/*.toml`;
 the interactive editor writes its layout overrides to `settings.toml`.
 
@@ -197,12 +199,15 @@ circle = true
 | `circle` | bool | `true` | Analog only. Shows the outer ring and minute tick marks around the dial. When disabled, only the hands are drawn. |
 | `timezone` | string | `""` | Optional timezone identifier (e.g. `Europe/Berlin`, `UTC`) to use for this clock. If empty, uses the system's local time. |
 
+Click the clock to open the [Clock](/noctalia/control-center/#clock) Control Center tab.
+
 ---
 
 ### calendar
 
 The calendar widget uses the configured [calendar service](/noctalia/services/calendar/) accounts. It shows event indicators
-in the month grid and can show the selected day's events beside the grid.
+in the month grid. New widgets are month-only; turn on `show_events` for a large/agenda layout with the selected day's
+events beside the grid.
 
 ```toml
 [desktop_widgets.widget.calendar_main]
@@ -212,22 +217,21 @@ cx     = 480.0
 cy     = 360.0
 
 [desktop_widgets.widget.calendar_main.settings]
-show_events       = true
+show_events       = false
 show_week_numbers = false
 font_family       = ""
 ```
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `show_events` | bool | `true` | Show the selected day's event list beside the month grid |
+| `show_events` | bool | `false` | Show the selected day's event list beside the month grid. Off keeps the widget glanceable; on is a large/agenda layout. |
 | `show_week_numbers` | bool | `false` | Show ISO week numbers beside the month grid |
 | `font_family` | string | `""` | Typeface for calendar text; empty inherits the global shell font |
 
 The event list uses the shared `event_date_format` and `event_time_format` from [`[calendar]`](/noctalia/services/calendar/),
 so the desktop widget and control center use the same event formatting.
 
-Use the arrow buttons or vertical scrolling to change months. Select a day to update the event list; selecting a day
-from the preceding or following month also navigates to that month. Select the date or month heading to return to today.
+Use the arrow buttons or vertical scrolling to change months. Click the date heading to open the [Calendar](/noctalia/control-center/#calendar) tab. When `show_events` is off, clicking a day also opens Calendar on Events; when it is on, clicking a day updates the local event list. Selecting a day from the preceding or following month also navigates to that month. Select the month heading to return to today.
 
 Right-click a day to launch the application registered for the `text/calendar` MIME type.
 
@@ -335,6 +339,8 @@ forecast_days  = 3
 |---------|------|---------|-------------|
 | `show_forecast` | bool | `false` | Show upcoming daily forecast rows below the current conditions |
 | `forecast_days` | int | `3` | Number of forecast days to show (1–6; only applies when `show_forecast` is enabled) |
+
+Click the widget to open the [Weather](/noctalia/control-center/#weather) Control Center tab. Forecast rows stay optional so the default widget stays glanceable.
 
 ---
 

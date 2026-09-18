@@ -914,6 +914,35 @@ namespace settings {
       listEditor->setAddPlaceholder(i18n::tr("settings.controls.list.add-entry-placeholder"));
       listEditor->setSuggestedOptions(std::move(suggestedOptions));
       listEditor->setItems(std::move(itemTypes));
+      listEditor->setItemAccessory([scale, setOverride = ctx.setOverride, items = shortcuts.items,
+                                    path = entry.path](std::size_t index) -> std::unique_ptr<Node> {
+        if (index >= items.size()) {
+          return nullptr;
+        }
+        const std::size_t selected = static_cast<std::size_t>(items[index].size);
+        auto sizePicker = ui::segmented({
+            .options =
+                std::vector<ui::SegmentedOption>{
+                    {.label = "S", .glyph = {}, .tooltip = i18n::tr("settings.options.control-center.shortcut-size.small")},
+                    {.label = "W", .glyph = {}, .tooltip = i18n::tr("settings.options.control-center.shortcut-size.wide")},
+                    {.label = "L", .glyph = {}, .tooltip = i18n::tr("settings.options.control-center.shortcut-size.large")},
+                },
+            .selectedIndex = selected,
+            .scale = scale,
+            .compact = true,
+            .equalSegmentWidths = true,
+            .onChange =
+                [setOverride, items, path, index](std::size_t sizeIndex) mutable {
+                  if (index >= items.size() || sizeIndex > static_cast<std::size_t>(ShortcutSize::Large)) {
+                    return;
+                  }
+                  items[index].size = static_cast<ShortcutSize>(sizeIndex);
+                  setOverride(path, items);
+                },
+        });
+        sizePicker->setSize(108.0F * scale, Style::controlHeightSm * scale);
+        return sizePicker;
+      });
       listEditor->setOnAddRequested([setOverride = ctx.setOverride, items = shortcuts.items,
                                      path = entry.path](std::string value) mutable {
         if (value.empty() || std::ranges::contains(items, value, &ShortcutConfig::type)) {

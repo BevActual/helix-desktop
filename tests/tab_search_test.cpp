@@ -24,6 +24,12 @@ int main() {
   ok = expect(tabSearchScore("capture", "Capture", "recording") > 0, "recording alias") && ok;
   ok = expect(tabSearchScore("capture", "Capture", "screenshot") > 0, "screenshot alias") && ok;
   ok = expect(tabSearchScore("calendar", "Calendar", "accounts") > 0, "calendar accounts alias") && ok;
+  ok = expect(tabSearchScore("clock", "Clock", "timezone") > 0, "clock timezone alias") && ok;
+  ok = expect(tabSearchScore("clock", "Clock", "world-clock") > 0, "clock world-clock alias") && ok;
+  ok = expect(
+      tabSearchScore("clock", "Clock", "timezone") > tabSearchScore("calendar", "Calendar", "timezone"),
+      "timezone prefers clock"
+  ) && ok;
   ok = expect(tabSearchScore("ai", "AI", "claude") > 0, "ai claude alias") && ok;
   ok = expect(tabSearchScore("ai", "AI", "ollama") > 0, "ai ollama alias") && ok;
   ok = expect(tabSearchScore("ai", "AI", "ai-usage") > 0, "ai-usage alias") && ok;
@@ -35,14 +41,13 @@ int main() {
       tabSearchScore("network", "Network", "wifi") > tabSearchScore("wallpaper", "Wallpaper", "wifi"),
       "wifi prefers network"
   ) && ok;
-  ok = expect(tabSearchScore("effects", "Effects", "shadows") > 0, "effects alias") && ok;
-  ok = expect(tabSearchScore("effects", "Effects", "glass") > 0, "effects glass alias") && ok;
-  ok = expect(tabSearchScore("theme", "Theme", "font") == 0, "font is not a theme alias") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "glass") > 0, "glass alias on theme") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "type") > 0, "type alias on theme") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "effects") > 0, "effects alias on theme") && ok;
   ok = expect(tabSearchScore("theme", "Theme", "customize") > 0, "theme customize alias") && ok;
-  ok = expect(tabSearchScore("type", "Type", "font") > 0, "font alias") && ok;
-  ok = expect(tabSearchScore("roundness", "Roundness", "corners") > 0, "roundness alias") && ok;
-  ok = expect(tabSearchScore("scale", "Scale", "zoom") > 0, "scale alias") && ok;
-  ok = expect(tabSearchScore("language", "Language", "locale") > 0, "language alias") && ok;
-  ok = expect(tabSearchScore("theme", "Theme", "locale") == 0, "locale is not a theme alias") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "roundness") > 0, "roundness alias on theme") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "language") > 0, "language alias on theme") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "font") == 0, "font uses settings search") && ok;
+  ok = expect(tabSearchScore("theme", "Theme", "locale") == 0, "locale uses settings search") && ok;
   return ok ? 0 : 1;
 }

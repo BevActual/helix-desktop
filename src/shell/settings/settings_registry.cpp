@@ -89,11 +89,13 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 34> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 37> kSettingsSections{{
         {SettingsSection::Theme, "theme", "palette"},
         {SettingsSection::Type, "type", "typography"},
         {SettingsSection::Scale, "scale", "resize"},
         {SettingsSection::Roundness, "roundness", "border-radius"},
+        {SettingsSection::Glass, "glass", "glass"},
+        {SettingsSection::Icons, "icons", "apps"},
         {SettingsSection::Effects, "effects", "shadow"},
         {SettingsSection::Language, "language", "language"},
         {SettingsSection::Wallpaper, "wallpaper", "paint"},
@@ -124,6 +126,7 @@ namespace settings {
         {SettingsSection::Bar, "bar", "crop-3-2", false},
         {SettingsSection::Plugins, "plugins", "puzzle", true, true},
         {SettingsSection::Camera, "camera", "camera", true, true},
+        {SettingsSection::Clock, "clock", "clock"},
     }};
 
     const SettingsSectionDescriptor& descriptorFor(SettingsSection section) {
@@ -1000,7 +1003,7 @@ namespace settings {
 
     // Appearance
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "theme", tr("settings.schema.appearance.theme-mode.label"),
+        SettingsSection::Theme, "palette", tr("settings.schema.appearance.theme-mode.label"),
         tr("settings.schema.appearance.theme-mode.description"), {"theme", "mode"},
         asSegmented(enumSelect(kThemeModes, cfg.theme.mode)), "dark light auto colors"
     ));
@@ -1011,19 +1014,19 @@ namespace settings {
         "dark light auto follow shell apps templates colors"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Theme, "theme", tr("settings.schema.appearance.palette-source.label"),
+        SettingsSection::Theme, "palette", tr("settings.schema.appearance.palette-source.label"),
         tr("settings.schema.appearance.palette-source.description"), {"theme", "source"},
         asSegmented(enumSelect(kPaletteSources, cfg.theme.source)), "palette colors"
     ));
     if (cfg.theme.source == PaletteSource::Builtin) {
       entries.push_back(makeEntry(
-          SettingsSection::Theme, "theme", tr("settings.schema.appearance.builtin-palette.label"),
+          SettingsSection::Theme, "palette", tr("settings.schema.appearance.builtin-palette.label"),
           tr("settings.schema.appearance.builtin-palette.description"), {"theme", "builtin"},
           builtinPaletteSelect(cfg.theme.builtinPalette, shellThemeMode(cfg.theme)), "builtin palette colors"
       ));
     } else if (cfg.theme.source == PaletteSource::Wallpaper) {
       entries.push_back(makeEntry(
-          SettingsSection::Theme, "theme", tr("settings.schema.appearance.wallpaper-generation-scheme.label"),
+          SettingsSection::Theme, "palette", tr("settings.schema.appearance.wallpaper-generation-scheme.label"),
           tr("settings.schema.appearance.wallpaper-generation-scheme.description"), {"theme", "wallpaper_scheme"},
           wallpaperSchemeSelect(cfg.theme.wallpaperScheme), "wallpaper palette generator scheme material you m3 colors"
       ));
@@ -1040,7 +1043,7 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Theme, "theme", tr("settings.schema.appearance.community-palette.label"),
+          SettingsSection::Theme, "palette", tr("settings.schema.appearance.community-palette.label"),
           tr("settings.schema.appearance.community-palette.description"), {"theme", "community_palette"},
           std::move(communityPaletteControl), "community palette colors"
       ));
@@ -1057,7 +1060,7 @@ namespace settings {
         };
       }
       entries.push_back(makeEntry(
-          SettingsSection::Theme, "theme", tr("settings.schema.appearance.custom-palette.label"),
+          SettingsSection::Theme, "palette", tr("settings.schema.appearance.custom-palette.label"),
           tr("settings.schema.appearance.custom-palette.description"), {"theme", "custom_palette"},
           std::move(customPaletteControl), "custom palette colors"
       ));
@@ -1146,9 +1149,9 @@ namespace settings {
         "locale translation i18n lang", true
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Effects, "icons", tr("settings.schema.appearance.app-icon-colorize.label"),
+        SettingsSection::Icons, "icons", tr("settings.schema.appearance.app-icon-colorize.label"),
         tr("settings.schema.appearance.app-icon-colorize.description"), {"shell", "app_icon_colorize"},
-        ToggleSetting{cfg.shell.appIconColorize}, "tint all application icons"
+        ToggleSetting{cfg.shell.appIconColorize}, "tint all application icons default tinted"
     ));
     {
       const SettingVisibility colorizeOn = [](const Config& c) { return c.shell.appIconColorize; };
@@ -1157,7 +1160,7 @@ namespace settings {
       const ColorSpec pickerColor =
           cfg.shell.appIconColor.value_or(*effectiveShellAppIconColorizationTint(colorizeShell));
       auto e = makeEntry(
-          SettingsSection::Effects, "icons", tr("settings.schema.appearance.app-icon-color.label"),
+          SettingsSection::Icons, "icons", tr("settings.schema.appearance.app-icon-color.label"),
           tr("settings.schema.appearance.app-icon-color.description"), {"shell", "app_icon_color"},
           colorSpecPicker(pickerColor), "color role dock tray application icons"
       );
@@ -1825,10 +1828,10 @@ namespace settings {
         "floating detached panel layer shell z-order input method popup fullscreen"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Effects, "chrome", tr("settings.schema.panels.transparency-mode.label"),
+        SettingsSection::Glass, "glass", tr("settings.schema.panels.transparency-mode.label"),
         tr("settings.schema.panels.transparency-mode.description"), {"shell", "panel", "transparency_mode"},
         asSegmented(enumSelect(kPanelTransparencyModes, cfg.shell.panel.transparencyMode)),
-        "glass opacity alpha translucent cards blur"
+        "glass opacity alpha translucent cards blur solid soft"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Panels, "effects", tr("settings.schema.panels.borders.label"),
@@ -2058,7 +2061,17 @@ namespace settings {
       entries.push_back(makeEntry(
           SettingsSection::ControlCenter, "layout", tr("settings.schema.panels.control-center-width.label"),
           tr("settings.schema.panels.control-center-width.description"), {"control_center", "width"}, std::move(width),
-          "size dimension wide narrow"
+          "size dimension wide narrow window"
+      ));
+    }
+    {
+      SliderSetting height =
+          sliderFor(cfg.controlCenter.height, noctalia::config::schema::kControlCenterHeightRange, true);
+      height.valueSuffix = "px";
+      entries.push_back(makeEntry(
+          SettingsSection::ControlCenter, "layout", tr("settings.schema.panels.control-center-height.label"),
+          tr("settings.schema.panels.control-center-height.description"), {"control_center", "height"},
+          std::move(height), "size dimension tall short window"
       ));
     }
     entries.push_back(makeEntry(
@@ -2095,9 +2108,9 @@ namespace settings {
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts.label"),
         tr("settings.schema.panels.home-shortcuts.description"), {"control_center", "shortcuts"},
         ShortcutListSetting{
-            .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg), .maxItems = 6
+            .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg)
         },
-        "quick settings shortcuts toggles wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy"
+        "quick settings shortcuts toggles size small wide large wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
@@ -3457,11 +3470,6 @@ namespace settings {
         {"control_center", "calendar", "show_week_numbers"},
         ToggleSetting{cfg.controlCenter.calendarTab.showWeekNumbers}, "calendar week numbers iso"
     ));
-    entries.push_back(makeEntry(
-        SettingsSection::Services, "calendar", tr("settings.schema.services.calendar-timezones.label"),
-        tr("settings.schema.services.calendar-timezones.description"), {"control_center", "calendar", "timezones"},
-        ListSetting{.items = cfg.controlCenter.calendarTab.timezones}, "calendar world clock timezone iana"
-    ));
     // Sync cadence belongs with the accounts it drives; the account rows are injected right after it.
     {
       auto e = makeEntry(
@@ -3472,6 +3480,11 @@ namespace settings {
       e.visibleWhen = calendarOn;
       entries.push_back(std::move(e));
     }
+    entries.push_back(makeEntry(
+        SettingsSection::Clock, "clock", tr("settings.schema.clock.timezones.label"),
+        tr("settings.schema.clock.timezones.description"), {"control_center", "clock", "timezones"},
+        ListSetting{.items = cfg.controlCenter.clockTab.timezones}, "clock world clock timezone iana"
+    ));
 
     entries.push_back(makeEntry(
         SettingsSection::Services, "audio", tr("settings.schema.services.audio-overdrive.label"),

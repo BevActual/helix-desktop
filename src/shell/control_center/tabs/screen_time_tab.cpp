@@ -19,6 +19,7 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -26,6 +27,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -144,7 +146,14 @@ ScreenTimeTab::ScreenTimeTab(ScreenTimeService* screenTime, const ControlCenterS
     : m_screenTime(screenTime), m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "system", .includedGroups = {"screen-time"}}
-      )) {}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> range = m_config->stateString("screen_time_tab", "range")) {
+      m_rangeDays = rangeDaysFromState(*range);
+      m_pinnedRangeDays = m_rangeDays;
+    }
+  }
+}
 
 std::unique_ptr<Flex> ScreenTimeTab::create() {
   const float scale = contentScale();
@@ -152,46 +161,78 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
   auto tab = ui::column({
       .out = &m_root,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
       .configure = [](Flex& column) { column.setClipChildren(true); },
   });
 
-  m_rangeDays = 1;
   m_detailDayKey.clear();
-  tab->addChild(
+
+  auto compactCard = ui::column({
+      .out = &m_compactCard,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+  });
+  compactCard->addChild(
+      ui::label({
+          .out = &m_titleLabel,
+          .text = i18n::tr("control-center.tabs.screen-time"),
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .flexGrow = 1.0F,
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_totalLabel,
+          .fontSize = Style::fontSizeTitle * 2.0F * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+      })
+  );
+  compactCard->addChild(
+      ui::label({
+          .out = &m_topAppLabel,
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::Primary),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+      })
+  );
+  compactCard->addChild(
       ui::segmented({
           .out = &m_rangePicker,
           .options =
               std::vector<ui::SegmentedOption>{
                   {
-                      .label = i18n::tr("control-center.screen-time.range.today"),
-                      .tooltip = i18n::tr("control-center.screen-time.range.today-tooltip"),
+                      .label = "",
+                      .glyph = "clock",
+                      .tooltip = i18n::tr("control-center.screen-time.range.today"),
                   },
                   {
-                      .label = i18n::tr("control-center.screen-time.range.3-days"),
-                      .tooltip = i18n::tr("control-center.screen-time.range.3-days-tooltip"),
+                      .label = "",
+                      .glyph = "calendar-week",
+                      .tooltip = i18n::tr("control-center.screen-time.range.3-days"),
                   },
                   {
-                      .label = i18n::tr("control-center.screen-time.range.14-days"),
-                      .tooltip = i18n::tr("control-center.screen-time.range.14-days-tooltip"),
+                      .label = "",
+                      .glyph = "calendar-stats",
+                      .tooltip = i18n::tr("control-center.screen-time.range.14-days"),
                   },
               },
-          .selectedIndex = 0,
-          .fontSize = Style::fontSizeCaption,
+          .selectedIndex = indexFromRangeDays(m_rangeDays),
           .scale = scale,
+          .compact = true,
           .surfaceOpacity = panelCardOpacity(),
-          .equalSegmentWidths = true,
-          .onChange = [this](std::size_t idx) {
-            static constexpr int kRanges[] = {1, 3, 14};
-            const int nextRange = kRanges[std::min(idx, std::size_t{2})];
-            m_detailDayKey.clear();
-            m_lastSnapshotKey.clear();
-            beginRangeSlideOut(nextRange);
-          },
+          .onChange = [this](std::size_t index) { applyRange(index, true); },
+          .onHover = [this](std::size_t index) { previewRange(index); },
+          .onHoverEnd = [this]() { restorePinnedRange(); },
       })
   );
-
-  tab->addChild(
+  compactCard->addChild(
       ui::row(
           {
               .out = &m_detailBar,
@@ -217,28 +258,14 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
           })
       )
   );
-
-  auto scroll = ui::scrollView({
-      .out = &m_scroll,
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
-  });
-
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceLg * scale);
-
-  auto usageCard = ui::column({
-      .out = &m_usageCard,
-      .gap = Style::spaceMd * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
-  });
+  compactCard->addChild(
+      ui::label({
+          .out = &m_detailLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
 
   auto disabledRow = ui::row({
       .out = &m_disabledRow,
@@ -269,16 +296,31 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
               },
       })
   );
-  usageCard->addChild(std::move(disabledRow));
+  compactCard->addChild(std::move(disabledRow));
+  tab->addChild(std::move(compactCard));
 
-  usageCard->addChild(
-      ui::label({
-          .out = &m_totalLabel,
-          .fontSize = Style::fontSizeHeader * 1.6F * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
+  auto leftoverHost = ui::column({
+      .out = &m_leftoverHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceLg * scale,
+      .flexGrow = 1.0F,
+  });
+
+  auto scroll = ui::scrollView({
+      .out = &m_scroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+
+  auto* content = scroll->content();
+  content->setDirection(FlexDirection::Vertical);
+  content->setAlign(FlexAlign::Stretch);
+  content->setGap(Style::spaceLg * scale);
 
   auto chartPlotRow = ui::row({
       .out = &m_chartPlotRow,
@@ -389,9 +431,8 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
     labelCell->addChild(std::move(labelHit));
     chartLabelRow->addChild(std::move(labelCell));
   }
-  usageCard->addChild(std::move(chartPlotRow));
-  usageCard->addChild(std::move(chartLabelRow));
-  content->addChild(std::move(usageCard));
+  content->addChild(std::move(chartPlotRow));
+  content->addChild(std::move(chartLabelRow));
 
   auto mostUsedSection = ui::column({
       .out = &m_mostUsedSection,
@@ -529,7 +570,8 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
 
   mostUsedSection->addChild(std::move(appsGrid));
   content->addChild(std::move(mostUsedSection));
-  tab->addChild(std::move(scroll));
+  leftoverHost->addChild(std::move(scroll));
+  tab->addChild(std::move(leftoverHost));
   syncEnabledUi();
   m_paletteConn = paletteChanged().connect([this] {
     m_lastSnapshotKey.clear();
@@ -650,10 +692,12 @@ void ScreenTimeTab::beginRangeSlideIn() {
 
 void ScreenTimeTab::onClose() {
   m_settings->onClose();
+  m_hoverEndTimer.stop();
   cancelRangeSlide();
   m_root = nullptr;
+  m_compactCard = nullptr;
+  m_leftoverHost = nullptr;
   m_scroll = nullptr;
-  m_usageCard = nullptr;
   m_detailBar = nullptr;
   m_detailTitle = nullptr;
   m_detailBackButton = nullptr;
@@ -661,6 +705,9 @@ void ScreenTimeTab::onClose() {
   m_disabledRow = nullptr;
   m_enableToggle = nullptr;
   m_rangePicker = nullptr;
+  m_titleLabel = nullptr;
+  m_topAppLabel = nullptr;
+  m_detailLabel = nullptr;
   m_chartPlotRow = nullptr;
   m_chartLabelRow = nullptr;
   m_mostUsedSection = nullptr;
@@ -673,16 +720,26 @@ void ScreenTimeTab::onClose() {
   m_bucketDayKeys.clear();
   m_detailDayKey.clear();
   m_lastSnapshotKey.clear();
-  m_rangeDays = 1;
+  m_rangeDays = m_pinnedRangeDays;
   m_paletteConn = {};
 }
 
 void ScreenTimeTab::setActive(bool active) {
   m_active = active;
-  if (m_active) {
-    m_lastSnapshotKey.clear();
-    syncEnabledUi();
+  if (!m_active) {
+    m_hoverEndTimer.stop();
+    return;
   }
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> range = m_config->stateString("screen_time_tab", "range")) {
+      m_rangeDays = rangeDaysFromState(*range);
+      m_pinnedRangeDays = m_rangeDays;
+      syncRangePicker();
+      (void)syncDetailLabel();
+    }
+  }
+  m_lastSnapshotKey.clear();
+  syncEnabledUi();
 }
 
 void ScreenTimeTab::syncEnabledUi() {
@@ -693,6 +750,8 @@ void ScreenTimeTab::syncEnabledUi() {
                             setShown(m_enableToggle, !enabled) ||
                             setShown(m_rangePicker, showUsage && !inDetail) ||
                             setShown(m_detailBar, showUsage && inDetail) || setShown(m_totalLabel, showUsage) ||
+                            setShown(m_topAppLabel, showUsage) || setShown(m_detailLabel, showUsage && !inDetail) ||
+                            setShown(m_leftoverHost, showUsage) || setShown(m_scroll, showUsage) ||
                             setShown(m_chartPlotRow, showUsage) || setShown(m_chartLabelRow, showUsage) ||
                             setShown(m_mostUsedSection, showUsage);
   if (m_enableToggle != nullptr) {
@@ -825,6 +884,18 @@ void ScreenTimeTab::syncContent(Renderer& renderer) {
   }
 
   m_totalLabel->setText(formatDuration(snapshot.total));
+  if (m_topAppLabel != nullptr) {
+    if (snapshot.apps.empty()) {
+      m_topAppLabel->setText({});
+      (void)setShown(m_topAppLabel, false);
+    } else {
+      m_topAppLabel->setText(
+          snapshot.apps.front().displayName + " · " + formatDuration(snapshot.apps.front().total)
+      );
+      (void)setShown(m_topAppLabel, true);
+    }
+  }
+  (void)syncDetailLabel();
 
   const std::size_t bucketCount = snapshot.buckets.size();
   // Bar scale uses chart series totals only, not full bucket usage.
@@ -1063,18 +1134,18 @@ void ScreenTimeTab::layoutChart(Renderer& renderer) {
   }
 
   float rowWidth = m_chartPlotRow->width();
-  if (rowWidth <= 0.0F && m_usageCard != nullptr) {
-    rowWidth = m_usageCard->width();
+  if (rowWidth <= 0.0F && m_leftoverHost != nullptr) {
+    rowWidth = m_leftoverHost->width();
   }
   auto columnWidth = activeBuckets > 0 && rowWidth > 0.0F
       ? (rowWidth - barGap * static_cast<float>(activeBuckets - 1)) / static_cast<float>(activeBuckets)
       : 0.0F;
 
-  if (columnWidth <= 0.0F && activeBuckets > 0 && m_usageCard != nullptr) {
-    m_usageCard->layout(renderer);
+  if (columnWidth <= 0.0F && activeBuckets > 0 && m_leftoverHost != nullptr) {
+    m_leftoverHost->layout(renderer);
     rowWidth = m_chartPlotRow->width();
     if (rowWidth <= 0.0F) {
-      rowWidth = m_usageCard->width();
+      rowWidth = m_leftoverHost->width();
     }
     columnWidth = activeBuckets > 0 && rowWidth > 0.0F
         ? (rowWidth - barGap * static_cast<float>(activeBuckets - 1)) / static_cast<float>(activeBuckets)
@@ -1271,4 +1342,117 @@ void ScreenTimeTab::onPanelCardOpacityChanged(float opacity) {
   if (m_rangePicker != nullptr) {
     m_rangePicker->setSurfaceOpacity(opacity);
   }
+}
+
+int ScreenTimeTab::rangeDaysFromState(std::string_view value) noexcept {
+  if (value == "3") {
+    return 3;
+  }
+  if (value == "14") {
+    return 14;
+  }
+  return 1;
+}
+
+std::string_view ScreenTimeTab::rangeState(int rangeDays) noexcept {
+  if (rangeDays == 3) {
+    return "3";
+  }
+  if (rangeDays == 14) {
+    return "14";
+  }
+  return "1";
+}
+
+std::size_t ScreenTimeTab::indexFromRangeDays(int rangeDays) noexcept {
+  if (rangeDays == 3) {
+    return 1;
+  }
+  if (rangeDays == 14) {
+    return 2;
+  }
+  return 0;
+}
+
+int ScreenTimeTab::rangeDaysFromIndex(std::size_t index) noexcept {
+  static constexpr int kRanges[] = {1, 3, 14};
+  return kRanges[std::min(index, std::size_t{2})];
+}
+
+void ScreenTimeTab::persistRange() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("screen_time_tab", "range", std::string(rangeState(m_pinnedRangeDays)));
+}
+
+void ScreenTimeTab::syncRangePicker() {
+  if (m_rangePicker == nullptr) {
+    return;
+  }
+  const std::size_t index = indexFromRangeDays(m_pinnedRangeDays);
+  if (m_rangePicker->selectedIndex() == index) {
+    return;
+  }
+  m_rangeSyncing = true;
+  m_rangePicker->setSelectedIndex(index);
+  m_rangeSyncing = false;
+}
+
+bool ScreenTimeTab::syncDetailLabel() {
+  if (m_detailLabel == nullptr) {
+    return false;
+  }
+  const char* key = "control-center.screen-time.sections.today-caption";
+  if (m_rangeDays == 3) {
+    key = "control-center.screen-time.sections.3-days-caption";
+  } else if (m_rangeDays == 14) {
+    key = "control-center.screen-time.sections.14-days-caption";
+  }
+  m_detailLabel->setText(i18n::tr(key));
+  return setShown(m_detailLabel, m_detailDayKey.empty());
+}
+
+void ScreenTimeTab::applyRange(std::size_t index, bool persist) {
+  if (m_rangeSyncing) {
+    return;
+  }
+  const int next = rangeDaysFromIndex(index);
+  if (persist) {
+    m_hoverEndTimer.stop();
+    m_pinnedRangeDays = next;
+    persistRange();
+  }
+  if (next == m_rangeDays) {
+    if (persist && !m_detailDayKey.empty()) {
+      clearDayDetail();
+    }
+    syncRangePicker();
+    (void)syncDetailLabel();
+    return;
+  }
+  m_lastSnapshotKey.clear();
+  if (persist) {
+    beginRangeSlideOut(next);
+  } else {
+    cancelRangeSlide();
+    m_detailDayKey.clear();
+    m_rangeDays = next;
+  }
+  syncRangePicker();
+  (void)syncDetailLabel();
+}
+
+void ScreenTimeTab::previewRange(std::size_t index) {
+  m_hoverEndTimer.stop();
+  applyRange(index, false);
+  PanelManager::instance().refresh();
+}
+
+void ScreenTimeTab::restorePinnedRange() {
+  m_hoverEndTimer.stop();
+  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
+    applyRange(indexFromRangeDays(m_pinnedRangeDays), false);
+    PanelManager::instance().refresh();
+  });
 }

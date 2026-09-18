@@ -8,12 +8,15 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 class AnimationManager;
 class Box;
 class Renderer;
 
+// Desktop widgets stay glanceable and deep-link into Control Center. They are
+// not mini Control Center pages.
 class DesktopWidget {
 public:
   using UpdateCallback = std::function<void()>;
@@ -93,6 +96,7 @@ public:
 
 protected:
   void setRoot(std::unique_ptr<Node> root);
+  static void openControlCenterTab(std::string_view tab);
 
   void requestUpdate() {
     if (m_updateCallback) {

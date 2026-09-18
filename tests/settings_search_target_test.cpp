@@ -37,10 +37,15 @@ int main() {
   bool ok = true;
   ok = expect(tabIdForSettingsSection("location") == "weather", "location -> weather") && ok;
   ok = expect(tabIdForSettingsSection("services") == "calendar", "services -> calendar") && ok;
+  ok = expect(tabIdForSettingsSection("clock") == "clock", "clock stays") && ok;
   ok = expect(tabIdForSettingsSection("screenshot") == "capture", "screenshot -> capture") && ok;
   ok = expect(tabIdForSettingsSection("screen-record") == "capture", "screen-record -> capture") && ok;
   ok = expect(tabIdForSettingsSection("ai-usage") == "ai", "ai-usage -> ai") && ok;
   ok = expect(tabIdForSettingsSection("wallpaper") == "wallpaper", "wallpaper stays") && ok;
+  ok = expect(tabIdForSettingsSection("glass") == "theme", "glass -> theme") && ok;
+  ok = expect(tabIdForSettingsSection("type") == "theme", "type -> theme") && ok;
+  ok = expect(tabIdForSettingsSection("roundness") == "theme", "roundness -> theme") && ok;
+  ok = expect(tabIdForSettingsSection("language") == "theme", "language -> theme") && ok;
 
   const std::vector<std::string> wallpaperSections{"wallpaper"};
   const auto fillOnWallpaper = resolveSettingsSearchTarget(

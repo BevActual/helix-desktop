@@ -19,7 +19,7 @@ class ScrollView;
 class DesktopCalendarWidget : public DesktopWidget {
 public:
   struct Options {
-    bool showEvents = true;
+    bool showEvents = false;
     bool showWeekNumbers = false;
   };
 
@@ -44,7 +44,7 @@ private:
 
   ConfigService* m_config = nullptr;
   CalendarService* m_calendar = nullptr;
-  bool m_showEvents = true;
+  bool m_showEvents = false;
   bool m_showWeekNumbers = false;
   bool m_dirty = true;
 

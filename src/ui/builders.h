@@ -396,6 +396,8 @@ namespace ui {
     std::optional<bool> visible = std::nullopt;
     std::optional<bool> participatesInLayout = std::nullopt;
     std::function<void(std::size_t)> onChange = nullptr;
+    std::function<void(std::size_t)> onHover = nullptr;
+    std::function<void()> onHoverEnd = nullptr;
     std::function<void(Segmented&)> configure = nullptr;
   };
 
