@@ -59,6 +59,24 @@ namespace {
     return kDirs[static_cast<std::size_t>(index)];
   }
 
+  // Location is the compact identity when the user shows it. Otherwise last-updated is the
+  // caption. Never fall back to the tab title already in the panel header.
+  void applyCompactMeta(
+      Label* label, bool showLocation, std::string_view locationName, bool haveFetch,
+      std::chrono::system_clock::time_point fetchedAt
+  ) {
+    std::string text;
+    if (showLocation && !locationName.empty()) {
+      text.assign(locationName);
+    } else if (haveFetch) {
+      text = formatTimeAgo(fetchedAt);
+    }
+    if (label != nullptr) {
+      label->setText(text.empty() ? " " : text);
+    }
+    (void)setShown(label, !text.empty());
+  }
+
 } // namespace
 
 WeatherTab::WeatherTab(WeatherService* weather, ConfigService* config, const ControlCenterServices& services)
@@ -97,19 +115,6 @@ std::unique_ptr<Flex> WeatherTab::create() {
       .out = &m_compactCard,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-
-  compactCard->addChild(
-      ui::label({
-          .out = &m_updatedLabel,
-          .text = i18n::tr("control-center.tabs.weather"),
-          .fontSize = Style::fontSizeBody * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-          .ellipsize = TextEllipsize::End,
-          .flexGrow = 1.0F,
-      })
-  );
 
   auto currentCard = ui::row({
       .out = &m_currentCard,
@@ -191,6 +196,8 @@ std::unique_ptr<Flex> WeatherTab::create() {
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .maxLines = 1,
+              .visible = false,
+              .participatesInLayout = false,
           }),
           ui::label({
               .out = &m_statusLabel,
@@ -266,8 +273,6 @@ std::unique_ptr<Flex> WeatherTab::create() {
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
-          .onHover = [this](std::size_t index) { previewCatalog(index); },
-          .onHoverEnd = [this]() { restorePinnedCatalog(); },
       })
   );
   compactCard->addChild(
@@ -326,6 +331,7 @@ std::unique_ptr<Flex> WeatherTab::create() {
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   auto detailsCard = ui::column({
       .out = &m_detailsCard,
@@ -393,7 +399,11 @@ std::unique_ptr<Flex> WeatherTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceXs * scale,
       .flexGrow = 1.0F,
-      .configure = [](Flex& host) { host.setClipChildren(true); },
+      .configure =
+          [scale](Flex& host) {
+            applyContentCardStyle(host, scale);
+            host.setClipChildren(true);
+          },
   });
 
   auto forecastRowsContainer = ui::column({
@@ -582,7 +592,6 @@ void WeatherTab::applyCatalog(std::size_t index, bool persist) {
   }
   const Catalog next = catalogFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedCatalog = next;
     persistCatalog();
   }
@@ -599,20 +608,6 @@ void WeatherTab::applyCatalog(std::size_t index, bool persist) {
   m_catalog = next;
   syncCatalog();
   requestPanelLayout();
-}
-
-void WeatherTab::previewCatalog(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyCatalog(index, false);
-  PanelManager::instance().refresh();
-}
-
-void WeatherTab::restorePinnedCatalog() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
-    PanelManager::instance().refresh();
-  });
 }
 
 void WeatherTab::syncCatalog() {
@@ -935,7 +930,6 @@ void WeatherTab::showLocationPrompt(bool show) {
 
 void WeatherTab::onClose() {
   m_settings->onClose();
-  m_hoverEndTimer.stop();
   cancelForecastSlide();
   m_rootLayout = nullptr;
   m_compactCard = nullptr;
@@ -1035,9 +1029,7 @@ void WeatherTab::sync(Renderer& renderer) {
     if (m_timeZoneLabel != nullptr) {
       m_timeZoneLabel->setText("--");
     }
-    if (m_updatedLabel != nullptr) {
-      m_updatedLabel->setText(i18n::tr("control-center.tabs.weather"));
-    }
+    applyCompactMeta(m_updatedLabel, false, {}, false, {});
     setForecastVisibleRowCount(0);
     hideEffect();
     syncCatalog();
@@ -1055,10 +1047,7 @@ void WeatherTab::sync(Renderer& renderer) {
         m_weather->loading() ? i18n::tr("control-center.weather.fetching")
                              : i18n::tr("control-center.weather.data-unavailable")
     );
-    m_updatedLabel->setText(
-        showLocation && !snapshot.locationName.empty() ? snapshot.locationName
-                                                       : i18n::tr("control-center.tabs.weather")
-    );
+    applyCompactMeta(m_updatedLabel, showLocation, snapshot.locationName, false, {});
     m_statusLabel->setText(m_weather->error());
     (void)setShown(m_statusLabel, !m_weather->error().empty());
     if (m_windLabel != nullptr) {
@@ -1120,9 +1109,7 @@ void WeatherTab::sync(Renderer& renderer) {
     }
   }
   m_currentDescLabel->setText(WeatherService::descriptionForCode(snapshot.current.weatherCode));
-  m_updatedLabel->setText(
-      showLocation && !snapshot.locationName.empty() ? snapshot.locationName : i18n::tr("control-center.tabs.weather")
-  );
+  applyCompactMeta(m_updatedLabel, showLocation, snapshot.locationName, true, snapshot.fetchedAt);
   const std::string status = m_weather->loading() ? i18n::tr("control-center.weather.refreshing")
                                                   : (snapshot.valid ? std::string{} : m_weather->error());
   m_statusLabel->setText(status);

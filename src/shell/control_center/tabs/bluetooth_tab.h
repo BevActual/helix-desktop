@@ -95,6 +95,7 @@ private:
   Catalog m_catalog = Catalog::Paired;
   bool m_catalogSyncing = false;
   Flex* m_discoverableRow = nullptr;
+  Label* m_adapterTitle = nullptr;
   Label* m_adapterStatus = nullptr;
 
   ScrollView* m_listScroll = nullptr;

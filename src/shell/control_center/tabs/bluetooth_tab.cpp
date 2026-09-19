@@ -405,7 +405,8 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   auto pairingCard = ui::column({
       .out = &m_pairingCard,
       .visible = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      // Prompt sheet above the compact card: a solid well, not a second glass layer.
+      .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
   });
 
   pairingCard->addChild(
@@ -439,7 +440,7 @@ std::unique_ptr<Flex> BluetoothTab::create() {
       ui::input({
           .out = &m_pairingInput,
           .placeholder = i18n::tr("control-center.bluetooth.enter-code"),
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .flexGrow = 1.0F,
           .onSubmit = [this](const std::string& value) {
             if (m_agent == nullptr) {
@@ -526,7 +527,23 @@ std::unique_ptr<Flex> BluetoothTab::create() {
       .out = &m_adapterCard,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
-  auto powerRow = makeControlRow(i18n::tr("control-center.bluetooth.bluetooth"), scale, nullptr, false);
+  auto powerRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = controlHeight,
+  });
+  powerRow->addChild(
+      ui::label({
+          .out = &m_adapterTitle,
+          .text = i18n::tr("control-center.bluetooth.unavailable-title"),
+          .fontSize = Style::fontSizeTitle * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .flexGrow = 1.0F,
+      })
+  );
   powerRow->addChild(
       ui::spinner({
           .out = &m_scanSpinner,
@@ -710,6 +727,7 @@ void BluetoothTab::onClose() {
   m_adapterCard = nullptr;
   m_catalogSwitch = nullptr;
   m_discoverableRow = nullptr;
+  m_adapterTitle = nullptr;
   m_adapterStatus = nullptr;
   m_listScroll = nullptr;
   m_list = nullptr;
@@ -763,6 +781,11 @@ void BluetoothTab::stopRequestedDiscovery() {
 }
 
 void BluetoothTab::syncHeader() {
+  auto setAdapterTitle = [this](const std::string& text) {
+    if (m_adapterTitle != nullptr) {
+      m_adapterTitle->setText(text);
+    }
+  };
   if (m_service == nullptr) {
     if (m_powerToggle != nullptr) {
       m_powerToggle->setEnabled(false);
@@ -770,6 +793,7 @@ void BluetoothTab::syncHeader() {
     if (m_rescanButton != nullptr) {
       m_rescanButton->setEnabled(false);
     }
+    setAdapterTitle(i18n::tr("control-center.bluetooth.unavailable-title"));
     if (m_adapterStatus != nullptr) {
       m_adapterStatus->setText(i18n::tr("control-center.bluetooth.unavailable"));
     }
@@ -799,6 +823,15 @@ void BluetoothTab::syncHeader() {
   }
   if (m_rescanButton != nullptr) {
     m_rescanButton->setEnabled(s.adapterPresent && s.powered);
+  }
+  if (!s.adapterPresent) {
+    setAdapterTitle(i18n::tr("control-center.bluetooth.unavailable-title"));
+  } else if (!s.adapterName.empty()) {
+    setAdapterTitle(s.adapterName);
+  } else if (s.powered) {
+    setAdapterTitle(i18n::tr("control-center.bluetooth.on"));
+  } else {
+    setAdapterTitle(i18n::tr("control-center.bluetooth.off-title"));
   }
   const bool showList = s.adapterPresent && s.powered;
   std::string status;
@@ -1003,11 +1036,10 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
     return bucket == DeviceBucket::Available;
   });
 
-  const float opacity = panelCardOpacity();
   Flex* well = nullptr;
   auto wellCard = ui::column({
       .out = &well,
-      .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
   });
 
   if (devices.empty()) {
@@ -1060,9 +1092,7 @@ void BluetoothTab::rebuildDeviceList(Renderer& renderer) {
 }
 
 void BluetoothTab::onPanelCardOpacityChanged(float opacity) {
-  if (m_pairingInput != nullptr) {
-    m_pairingInput->setSurfaceOpacity(opacity);
-  }
+  // The pairing prompt is a solid well; its code field stays opaque and does not follow panel glass.
   if (m_catalogSwitch != nullptr) {
     m_catalogSwitch->setSurfaceOpacity(opacity);
   }

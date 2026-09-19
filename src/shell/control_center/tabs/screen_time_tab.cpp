@@ -76,20 +76,6 @@ namespace {
     return key;
   }
 
-  Label* makeSectionHeader(Flex& parent, const std::string& text, float scale) {
-    Label* ptr = nullptr;
-    parent.addChild(
-        ui::label({
-            .out = &ptr,
-            .text = text,
-            .fontSize = Style::fontSizeCaption * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-    return ptr;
-  }
-
   [[nodiscard]] float usageDurationFontSize(float scale) {
     return Style::fontSizeMini * scale * kUsageDurationFontScale;
   }
@@ -174,18 +160,6 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
   });
   compactCard->addChild(
       ui::label({
-          .out = &m_titleLabel,
-          .text = i18n::tr("control-center.tabs.screen-time"),
-          .fontSize = Style::fontSizeBody * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-          .ellipsize = TextEllipsize::End,
-          .flexGrow = 1.0F,
-      })
-  );
-  compactCard->addChild(
-      ui::label({
           .out = &m_totalLabel,
           .fontSize = Style::fontSizeTitle * 2.0F * scale,
           .fontWeight = FontWeight::Bold,
@@ -228,8 +202,6 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyRange(index, true); },
-          .onHover = [this](std::size_t index) { previewRange(index); },
-          .onHoverEnd = [this]() { restorePinnedRange(); },
       })
   );
   compactCard->addChild(
@@ -304,6 +276,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceLg * scale,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
 
   auto scroll = ui::scrollView({
@@ -440,7 +413,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
       .gap = Style::spaceSm * scale,
   });
 
-  makeSectionHeader(*mostUsedSection, i18n::tr("control-center.screen-time.most-used"), scale);
+  addTitle(*mostUsedSection, i18n::tr("control-center.screen-time.most-used"), scale);
 
   auto appsGrid = ui::column({
       .out = &m_appsGrid,
@@ -692,7 +665,6 @@ void ScreenTimeTab::beginRangeSlideIn() {
 
 void ScreenTimeTab::onClose() {
   m_settings->onClose();
-  m_hoverEndTimer.stop();
   cancelRangeSlide();
   m_root = nullptr;
   m_compactCard = nullptr;
@@ -705,7 +677,6 @@ void ScreenTimeTab::onClose() {
   m_disabledRow = nullptr;
   m_enableToggle = nullptr;
   m_rangePicker = nullptr;
-  m_titleLabel = nullptr;
   m_topAppLabel = nullptr;
   m_detailLabel = nullptr;
   m_chartPlotRow = nullptr;
@@ -727,7 +698,6 @@ void ScreenTimeTab::onClose() {
 void ScreenTimeTab::setActive(bool active) {
   m_active = active;
   if (!m_active) {
-    m_hoverEndTimer.stop();
     return;
   }
   if (m_config != nullptr) {
@@ -1419,7 +1389,6 @@ void ScreenTimeTab::applyRange(std::size_t index, bool persist) {
   }
   const int next = rangeDaysFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedRangeDays = next;
     persistRange();
   }
@@ -1441,18 +1410,4 @@ void ScreenTimeTab::applyRange(std::size_t index, bool persist) {
   }
   syncRangePicker();
   (void)syncDetailLabel();
-}
-
-void ScreenTimeTab::previewRange(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyRange(index, false);
-  PanelManager::instance().refresh();
-}
-
-void ScreenTimeTab::restorePinnedRange() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyRange(indexFromRangeDays(m_pinnedRangeDays), false);
-    PanelManager::instance().refresh();
-  });
 }

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/core/render_styles.h"
 #include "shell/control_center/settings_pane.h"
@@ -63,8 +62,6 @@ private:
   void persistCatalog();
   void syncCatalog();
   [[nodiscard]] bool syncDetailLabel();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
   [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
   [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
@@ -132,5 +129,4 @@ private:
   float m_forecastRowsBaseX = 0.0F;
   float m_forecastRowsBaseY = 0.0F;
   float m_shaderTime = 0.0F;
-  Timer m_hoverEndTimer;
 };

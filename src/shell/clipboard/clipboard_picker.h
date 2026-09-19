@@ -95,6 +95,7 @@ private:
 
   InputArea* m_focusArea = nullptr;
   Flex* m_rootLayout = nullptr;
+  Flex* m_compactCard = nullptr;
   Flex* m_sidebar = nullptr;
   Flex* m_sidebarHeaderRow = nullptr;
   Label* m_sidebarTitle = nullptr;

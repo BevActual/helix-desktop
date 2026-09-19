@@ -14,6 +14,7 @@
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/animation/animation_manager.h"
+#include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
@@ -32,6 +33,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+
+using namespace control_center;
 
 namespace {
 
@@ -548,8 +551,8 @@ void ClipboardPicker::setCloseCallback(std::function<void()> callback) {
 
 void ClipboardPicker::setPanelCardOpacity(float opacity) {
   m_panelCardOpacity = opacity;
-  if (m_previewScrollView != nullptr) {
-    m_previewScrollView->setCardStyle(contentScale(), opacity);
+  if (m_compactCard != nullptr) {
+    applySectionCardStyle(*m_compactCard, contentScale(), opacity);
   }
   if (m_filterInput != nullptr) {
     m_filterInput->setSurfaceOpacity(opacity);
@@ -569,29 +572,12 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
   });
-  auto contentRow = ui::row({
+  auto compactCard = ui::column({
+      .out = &m_compactCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
-  });
-
-  auto focusArea = ui::inputArea({});
-  focusArea->setFocusable(true);
-  focusArea->setTabStop(false);
-  focusArea->setVisible(false);
-  focusArea->setOnKeyDown([this](const InputArea::KeyData& key) {
-    if (key.pressed) {
-      handleKeyEvent(key.sym, key.modifiers);
-    }
-  });
-  m_focusArea = static_cast<InputArea*>(rootLayout->addChild(std::move(focusArea)));
-
-  auto sidebar = ui::column({
-      .out = &m_sidebar,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .padding = Style::spaceSm * scale,
-      .flexGrow = 2.0F,
+      .configure =
+          [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
   });
 
   auto sidebarHeader = ui::row(
@@ -605,9 +591,9 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       ui::label({
           .out = &m_sidebarTitle,
           .text = i18n::tr("clipboard.title"),
-          .fontSize = Style::fontSizeTitle * scale,
+          .fontSize = Style::fontSizeBody * scale,
           .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::Primary),
+          .color = colorSpecFromRole(ColorRole::OnSurface),
           .visible = m_options.showTitle,
           .participatesInLayout = m_options.showTitle,
       }),
@@ -616,7 +602,49 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
           i18n::tr("clipboard.actions.clear-all")
       )
   );
-  sidebar->addChild(std::move(sidebarHeader));
+  compactCard->addChild(std::move(sidebarHeader));
+
+  compactCard->addChild(
+      ui::input({
+          .out = &m_filterInput,
+          .placeholder = i18n::tr("clipboard.filter-placeholder"),
+          .fontSize = Style::fontSizeBody * scale,
+          .controlHeight = Style::controlHeight * scale,
+          .horizontalPadding = Style::spaceMd * scale,
+          .clearButtonEnabled = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](const std::string& text) { onFilterChanged(text); },
+          .onSubmit = [this](const std::string& /*text*/) { activateSelected(); },
+          .onKeyEvent = [this](std::uint32_t sym, std::uint32_t modifiers) { return handleKeyEvent(sym, modifiers); },
+      })
+  );
+  rootLayout->addChild(std::move(compactCard));
+
+  auto contentRow = ui::row({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+  });
+
+  auto sidebar = ui::column({
+      .out = &m_sidebar,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .padding = Style::spaceSm * scale,
+      .flexGrow = 2.0F,
+      .configure = [scale](Flex& well) { applyContentCardStyle(well, scale); },
+  });
+
+  auto focusArea = ui::inputArea({});
+  focusArea->setFocusable(true);
+  focusArea->setTabStop(false);
+  focusArea->setVisible(false);
+  focusArea->setOnKeyDown([this](const InputArea::KeyData& key) {
+    if (key.pressed) {
+      handleKeyEvent(key.sym, key.modifiers);
+    }
+  });
+  m_focusArea = static_cast<InputArea*>(rootLayout->addChild(std::move(focusArea)));
 
   auto clearConfirmPanel = makeInlineConfirmPanel(&m_clearConfirmPanel, scale);
   clearConfirmPanel->addChild(
@@ -658,26 +686,10 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
   );
   rootLayout->addChild(std::move(clearConfirmPanel));
 
-  sidebar->addChild(
-      ui::input({
-          .out = &m_filterInput,
-          .placeholder = i18n::tr("clipboard.filter-placeholder"),
-          .fontSize = Style::fontSizeBody * scale,
-          .controlHeight = Style::controlHeight * scale,
-          .horizontalPadding = Style::spaceMd * scale,
-          .clearButtonEnabled = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .onChange = [this](const std::string& text) { onFilterChanged(text); },
-          .onSubmit = [this](const std::string& /*text*/) { activateSelected(); },
-          .onKeyEvent = [this](std::uint32_t sym, std::uint32_t modifiers) { return handleKeyEvent(sym, modifiers); },
-      })
-  );
-
   const bool listItemBackground = m_config != nullptr && m_config->config().shell.panel.listItemBackground;
   m_listAdapter = std::make_unique<ClipboardListAdapter>(
       scale, m_clipboard, m_asyncTextures,
-      listItemBackground ? std::optional(colorSpecFromRole(ColorRole::SurfaceVariant, panelCardOpacity()))
-                         : std::nullopt
+      listItemBackground ? std::optional(colorSpecFromRole(ColorRole::SurfaceVariant)) : std::nullopt
   );
   m_listAdapter->setFilteredIndices(&m_filteredIndices);
   m_listAdapter->setOnActivate([this](std::size_t index) {
@@ -721,8 +733,9 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       .out = &m_previewCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .padding = Style::spaceSm * scale,
+      .padding = Style::spaceMd * scale,
       .flexGrow = 3.0F,
+      .configure = [scale](Flex& well) { applyContentCardStyle(well, scale); },
   });
 
   auto previewActions = ui::row(
@@ -759,9 +772,9 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       ui::label({
           .out = &m_previewTitle,
           .text = i18n::tr("clipboard.entry.title"),
-          .fontSize = Style::fontSizeTitle * scale,
+          .fontSize = Style::fontSizeBody * scale,
           .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::Primary),
+          .color = colorSpecFromRole(ColorRole::OnSurface),
           .flexGrow = 1.0F,
       }),
       std::move(previewActions)
@@ -816,8 +829,9 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       .contentScale = scale,
       .scrollbarVisible = true,
       .flexGrow = 1.0F,
-      .configure = [scale, opacity = panelCardOpacity()](ScrollView& scrollView) {
-        scrollView.setCardStyle(scale, opacity);
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
       },
   });
   m_previewContent = previewScroll->content();
@@ -956,6 +970,7 @@ void ClipboardPicker::onClose() {
   }
   m_listAdapter.reset();
   m_rootLayout = nullptr;
+  m_compactCard = nullptr;
   m_focusArea = nullptr;
   m_sidebar = nullptr;
   m_sidebarHeaderRow = nullptr;
