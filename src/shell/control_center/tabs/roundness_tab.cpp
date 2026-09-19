@@ -67,7 +67,7 @@ std::unique_ptr<Flex> RoundnessTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> RoundnessTab::createLiveBody() {
+std::unique_ptr<Flex> RoundnessTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -80,10 +80,8 @@ std::unique_ptr<Flex> RoundnessTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) {
-            applySectionCardStyle(section, scale, opacity);
-            section.setGap(Style::spaceXs * scale);
-            section.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& section) {
+            applyCompactCardStyle(section, scale, opacity, hosted);
           },
   });
   std::vector<ui::SegmentedOption> catalogOptions{

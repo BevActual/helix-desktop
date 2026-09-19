@@ -22,7 +22,8 @@ class ScreenshotTab {
 public:
   explicit ScreenshotTab(const ControlCenterServices& services);
 
-  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
+  [[nodiscard]] std::unique_ptr<Flex> createCompactBody();
+  [[nodiscard]] std::unique_ptr<Flex> createLeftoverBody();
   void setActive(bool active);
   void onClose();
   void updateContent(Renderer& renderer);

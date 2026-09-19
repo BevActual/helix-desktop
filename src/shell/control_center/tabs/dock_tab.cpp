@@ -11,7 +11,6 @@
 #include "system/desktop_entry.h"
 #include "ui/builders.h"
 #include "ui/controls/list_editor.h"
-#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
@@ -20,6 +19,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -76,100 +76,127 @@ namespace {
 
 } // namespace
 
+std::size_t DockTab::indexFromSection(Section section) noexcept {
+  return section == Section::Pinned ? 1 : 0;
+}
+
+DockTab::Section DockTab::sectionFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Section::Pinned : Section::Layout;
+}
+
+DockTab::Section DockTab::sectionFromId(std::string_view id) noexcept {
+  return id == "pinned" ? Section::Pinned : Section::Layout;
+}
+
+std::string_view DockTab::idFromSection(Section section) noexcept {
+  return section == Section::Pinned ? "pinned" : "layout";
+}
+
 DockTab::DockTab(const ControlCenterServices& services)
     : m_config(services.config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "dock"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "dock", .showConfigureButton = false}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> section = m_config->stateString("dock_tab", "section")) {
+      m_section = sectionFromId(*section);
+    }
+  }
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
 }
 
 std::unique_ptr<Flex> DockTab::create() {
+  return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
+}
+
+std::unique_ptr<Flex> DockTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
+  const float opacity = panelCardOpacity();
+  const DockConfig dock = m_config != nullptr ? m_config->config().dock : DockConfig{};
 
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
 
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
+  auto compactCard = ui::column({
       .configure =
-          [](ScrollView& scrollView) {
-            scrollView.clearFill();
-            scrollView.clearBorder();
+          [scale, opacity, hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
+  m_enabled = addToggleRow(*compactCard, scale, i18n::tr("control-center.dock.enable"), [this](bool value) {
+    applyEnabled(value);
+  });
+  if (m_enabled != nullptr) {
+    m_enabled->setCheckedImmediate(dock.enabled);
+  }
 
-  auto addCaption = [scale, captionSize](Flex& parent, const std::string& text) {
-    parent.addChild(
+  if (!hosted) {
+    auto sectionToolbar = ui::column({
+        .out = &m_sectionToolbar,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * scale,
+        .visible = dock.enabled,
+        .participatesInLayout = dock.enabled,
+    });
+    sectionToolbar->addChild(
+        ui::segmented({
+            .out = &m_sectionSwitch,
+            .options =
+                std::vector<ui::SegmentedOption>{
+                    {
+                        .label = "",
+                        .glyph = "layout-bottombar-inactive",
+                        .tooltip = i18n::tr("control-center.dock.layout-tooltip"),
+                    },
+                    {
+                        .label = "",
+                        .glyph = "pin",
+                        .tooltip = i18n::tr("control-center.dock.pinned-tooltip"),
+                    },
+                },
+            .selectedIndex = indexFromSection(m_section),
+            .scale = scale,
+            .compact = true,
+            .surfaceOpacity = opacity,
+            .onChange = [this](std::size_t index) { applySection(index); },
+        })
+    );
+    sectionToolbar->addChild(
         ui::label({
-            .text = text,
+            .out = &m_caption,
             .fontSize = captionSize,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 2,
         })
     );
-  };
+    compactCard->addChild(std::move(sectionToolbar));
+  }
+  live->addChild(std::move(compactCard));
 
-  auto addToggleRow = [scale, this](Flex& parent, const std::string& text, Toggle** out, bool checked,
-                                    void (DockTab::*apply)(bool)) {
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    row->addChild(
-        ui::label({
-            .text = text,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    row->addChild(
-        ui::toggle({
-            .out = out,
-            .checkedImmediate = checked,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange =
-                [this, apply](bool value) {
-                  (this->*apply)(value);
-                },
-        })
-    );
-    parent.addChild(std::move(row));
-  };
-
-  const DockConfig dock = m_config != nullptr ? m_config->config().dock : DockConfig{};
-
-  auto generalCard = ui::column({
+  const bool layoutOpen = dock.enabled && m_section == Section::Layout;
+  auto layoutHost = ui::column({
+      .out = &m_layoutHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+      .visible = layoutOpen,
+      .participatesInLayout = layoutOpen,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
   });
-  addTitle(*generalCard, i18n::tr("settings.navigation.sections.dock"), scale);
-  addToggleRow(*generalCard, i18n::tr("control-center.dock.enable"), &m_enabled, dock.enabled, &DockTab::applyEnabled);
-
-  auto details = ui::column({
-      .out = &m_details,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = dock.enabled,
-      .participatesInLayout = dock.enabled,
-  });
-  addCaption(*details, i18n::tr("control-center.dock.position"));
-  details->addChild(
+  addCaption(*layoutHost, i18n::tr("control-center.dock.position"), scale);
+  layoutHost->addChild(
       ui::segmented({
           .out = &m_position,
           .options =
@@ -183,14 +210,13 @@ std::unique_ptr<Flex> DockTab::create() {
           .fontSize = captionSize,
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = opacity,
           .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyPosition(index); },
       })
   );
-
-  addCaption(*details, i18n::tr("control-center.dock.auto-hide"));
-  details->addChild(
+  addCaption(*layoutHost, i18n::tr("control-center.dock.auto-hide"), scale);
+  layoutHost->addChild(
       ui::segmented({
           .out = &m_autoHide,
           .options =
@@ -212,28 +238,34 @@ std::unique_ptr<Flex> DockTab::create() {
           .fontSize = captionSize,
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = opacity,
           .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyAutoHide(index); },
       })
   );
-  addToggleRow(
-      *details, i18n::tr("control-center.dock.show-running"), &m_showRunning, dock.showRunning,
-      &DockTab::applyShowRunning
+  m_showRunning = addToggleRow(
+      *layoutHost, scale, i18n::tr("control-center.dock.show-running"), [this](bool value) { applyShowRunning(value); }
   );
-  generalCard->addChild(std::move(details));
-  content->addChild(std::move(generalCard));
+  if (m_showRunning != nullptr) {
+    m_showRunning->setCheckedImmediate(dock.showRunning);
+  }
+  live->addChild(std::move(layoutHost));
 
-  auto pinnedCard = ui::column({
-      .out = &m_pinnedCard,
+  const bool pinnedOpen = dock.enabled && m_section == Section::Pinned;
+  auto pinnedHost = ui::column({
+      .out = &m_pinnedHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .visible = dock.enabled,
-      .participatesInLayout = dock.enabled,
+      .flexGrow = 1.0F,
+      .visible = pinnedOpen,
+      .participatesInLayout = pinnedOpen,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
   });
-  addTitle(*pinnedCard, i18n::tr("control-center.dock.pinned"), scale);
   auto pinnedList = std::make_unique<ListEditor>();
   m_pinnedList = pinnedList.get();
   m_pinnedList->setScale(scale);
@@ -270,13 +302,11 @@ std::unique_ptr<Flex> DockTab::create() {
     items.insert(items.begin() + static_cast<std::ptrdiff_t>(to), item);
     commitPinned(std::move(items));
   });
-  pinnedCard->addChild(std::move(pinnedList));
-  content->addChild(std::move(pinnedCard));
+  pinnedHost->addChild(std::move(pinnedList));
+  live->addChild(std::move(pinnedHost));
 
-  live->addChild(std::move(scroll));
-  auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
   syncLiveControls();
-  return wrapped;
+  return live;
 }
 
 std::unique_ptr<Flex> DockTab::createHeaderActions() {
@@ -289,11 +319,14 @@ void DockTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_enabled = nullptr;
-  m_details = nullptr;
+  m_sectionToolbar = nullptr;
+  m_sectionSwitch = nullptr;
+  m_caption = nullptr;
+  m_layoutHost = nullptr;
+  m_pinnedHost = nullptr;
   m_position = nullptr;
   m_autoHide = nullptr;
   m_showRunning = nullptr;
-  m_pinnedCard = nullptr;
   m_pinnedList = nullptr;
 }
 
@@ -327,6 +360,56 @@ void DockTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void DockTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSwitch->setSurfaceOpacity(opacity);
+  }
+  if (m_position != nullptr) {
+    m_position->setSurfaceOpacity(opacity);
+  }
+  if (m_autoHide != nullptr) {
+    m_autoHide->setSurfaceOpacity(opacity);
+  }
+}
+
+void DockTab::syncHosts() {
+  const bool enabled = m_config != nullptr && m_config->config().dock.enabled;
+  const bool layoutOpen = enabled && m_section == Section::Layout;
+  const bool pinnedOpen = enabled && m_section == Section::Pinned;
+  const bool layoutDirty = setShown(m_sectionToolbar, enabled) || setShown(m_layoutHost, layoutOpen)
+      || setShown(m_pinnedHost, pinnedOpen);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void DockTab::persistSection() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("dock_tab", "section", std::string(idFromSection(m_section)));
+}
+
+void DockTab::applySection(std::size_t index) {
+  if (m_sectionSyncing) {
+    return;
+  }
+  const Section section = sectionFromIndex(index);
+  if (m_section == section) {
+    syncHosts();
+    return;
+  }
+  m_section = section;
+  persistSection();
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSyncing = true;
+    m_sectionSwitch->setSelectedIndex(indexFromSection(m_section));
+    m_sectionSyncing = false;
+  }
+  syncHosts();
+  syncLiveControls();
+}
+
 void DockTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
@@ -337,10 +420,13 @@ void DockTab::syncLiveControls() {
   if (m_enabled != nullptr) {
     m_enabled->setCheckedImmediate(dock.enabled);
   }
-  const bool layoutDirty = setShown(m_details, dock.enabled) || setShown(m_pinnedCard, dock.enabled);
-  if (layoutDirty) {
-    PanelManager::instance().requestLayout();
+  if (m_caption != nullptr) {
+    m_caption->setText(
+        m_section == Section::Pinned ? i18n::tr("control-center.dock.pinned-caption")
+                                     : i18n::tr("control-center.dock.layout-caption")
+    );
   }
+  syncHosts();
   if (m_position != nullptr) {
     m_position->setSelectedIndex(static_cast<std::size_t>(dock.position));
   }
@@ -362,10 +448,7 @@ void DockTab::applyEnabled(bool enabled) {
     return;
   }
   (void)m_config->setOverride({"dock", "enabled"}, enabled);
-  const bool layoutDirty = setShown(m_details, enabled) || setShown(m_pinnedCard, enabled);
-  if (layoutDirty) {
-    PanelManager::instance().requestLayout();
-  }
+  syncLiveControls();
   PanelManager::instance().refresh();
 }
 

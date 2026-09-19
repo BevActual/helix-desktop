@@ -122,7 +122,6 @@ std::unique_ptr<Flex> PhoneTab::create() {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*well, i18n::tr("control-center.phone.title"), scale);
   well->addChild(
       ui::label({
           .out = &m_status,
@@ -156,11 +155,11 @@ std::unique_ptr<Flex> PhoneTab::create() {
       })
   );
 
-  m_devicesDivider = addWellDivider(*well, scale);
   auto devicesCard = ui::column({
       .out = &m_devicesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*devicesCard, i18n::tr("control-center.phone.devices"), scale);
   devicesCard->addChild(
@@ -170,8 +169,8 @@ std::unique_ptr<Flex> PhoneTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  well->addChild(std::move(devicesCard));
   m_rootLayout->addChild(std::move(well));
+  m_rootLayout->addChild(std::move(devicesCard));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -227,7 +226,6 @@ void PhoneTab::onClose() {
   m_detail = nullptr;
   m_activateButton = nullptr;
   m_devicesCard = nullptr;
-  m_devicesDivider = nullptr;
   m_deviceList = nullptr;
   m_liveScroll = nullptr;
   m_deviceSignature.clear();
@@ -276,7 +274,7 @@ void PhoneTab::syncUi() {
   const PhoneSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool available = snap.available;
 
-  const bool layoutDirty = setShown(m_devicesDivider, available) || setShown(m_devicesCard, available) ||
+  const bool layoutDirty = setShown(m_devicesCard, available) ||
                             setShown(m_activateButton, !available);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();

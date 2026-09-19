@@ -1,6 +1,7 @@
 #include "dbus/cups/printer_service.h"
 
 #include "cli/schema_msg.h"
+#include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "dbus/system_bus.h"
@@ -17,6 +18,7 @@
 #include <optional>
 #include <sdbus-c++/IProxy.h>
 #include <sdbus-c++/Types.h>
+#include <thread>
 #include <unistd.h>
 #include <utility>
 
@@ -55,6 +57,66 @@ namespace {
       return "printing";
     }
     return "idle";
+  }
+
+  struct CollectedSnapshot {
+    PrinterSnapshot snapshot;
+    // Set when cupsd answered but the destination query failed; the caller translates the message on
+    // the main thread so the worker never touches i18n.
+    bool statusFailed = false;
+  };
+
+  // Blocking CUPS work. Runs on a worker thread: connecting to a socket-activated cupsd and enumerating
+  // destinations can take a second or more, which stalled the main loop when it ran inline.
+  // libcups keeps its default connection and error state in thread-local storage, so a fresh thread
+  // gets its own CUPS_HTTP_DEFAULT and does not race the main thread's write calls.
+  [[nodiscard]] CollectedSnapshot collectSnapshot() {
+    CollectedSnapshot out;
+    PrinterSnapshot& next = out.snapshot;
+    next.installed = cupsInstalled();
+    next.running = next.installed && cupsReachable();
+    if (!next.running) {
+      return out;
+    }
+
+    cups_dest_t* dests = nullptr;
+    const int count = cupsGetDests(&dests);
+    if (count < 0) {
+      out.statusFailed = true;
+      return out;
+    }
+
+    next.printers.reserve(static_cast<std::size_t>(std::max(count, 0)));
+    for (int i = 0; i < count; ++i) {
+      const cups_dest_t& dest = dests[i];
+      if (dest.name == nullptr || dest.name[0] == '\0') {
+        continue;
+      }
+      PrinterInfo printer;
+      printer.name = dest.name;
+      const char* info = cupsGetOption("printer-info", dest.num_options, dest.options);
+      printer.info = info != nullptr ? info : "";
+      const char* location = cupsGetOption("printer-location", dest.num_options, dest.options);
+      printer.location = location != nullptr ? location : "";
+      printer.isDefault = dest.is_default != 0;
+      const char* accepting = cupsGetOption("printer-is-accepting-jobs", dest.num_options, dest.options);
+      const int state = cupsGetIntegerOption("printer-state", dest.num_options, dest.options);
+      printer.enabled = accepting == nullptr || std::string_view(accepting) != "false";
+      if (state == IPP_PSTATE_STOPPED) {
+        printer.enabled = false;
+      }
+      printer.state = printerStateLabel(state, printer.enabled);
+
+      cups_job_t* jobs = nullptr;
+      const int jobCount = cupsGetJobs2(CUPS_HTTP_DEFAULT, &jobs, dest.name, 0, CUPS_WHICHJOBS_ACTIVE);
+      printer.jobCount = std::max(jobCount, 0);
+      if (jobCount > 0) {
+        cupsFreeJobs(jobCount, jobs);
+      }
+      next.printers.push_back(std::move(printer));
+    }
+    cupsFreeDests(count, dests);
+    return out;
   }
 
 } // namespace
@@ -109,62 +171,43 @@ void PrinterService::setWantFastPoll(bool enabled) {
 
 void PrinterService::finishRefresh(PrinterSnapshot next) {
   next.busy = m_snapshot.busy;
-  if (next == m_snapshot) {
-    return;
+  const bool changed = next != m_snapshot;
+  if (changed) {
+    m_snapshot = std::move(next);
   }
-  m_snapshot = std::move(next);
-  notifyChanged();
+  // Always re-arm the poll: the one-shot timer must not depend on the snapshot having changed.
   schedulePoll();
+  if (changed) {
+    notifyChanged();
+  }
 }
 
 void PrinterService::refresh() {
-  PrinterSnapshot next;
-  next.installed = cupsInstalled();
-  next.running = next.installed && cupsReachable();
-  if (!next.running) {
-    finishRefresh(std::move(next));
+  if (m_refreshInflight) {
+    // Coalesce: one worker at a time, and re-run once it lands so a request made mid-flight
+    // (after a write, or when the tab opens) still observes the newest state.
+    m_refreshQueued = true;
     return;
   }
-
-  cups_dest_t* dests = nullptr;
-  const int count = cupsGetDests(&dests);
-  if (count < 0) {
-    next.error = i18n::tr("control-center.printers.status-failed");
-    finishRefresh(std::move(next));
-    return;
-  }
-
-  next.printers.reserve(static_cast<std::size_t>(std::max(count, 0)));
-  for (int i = 0; i < count; ++i) {
-    const cups_dest_t& dest = dests[i];
-    if (dest.name == nullptr || dest.name[0] == '\0') {
-      continue;
-    }
-    PrinterInfo printer;
-    printer.name = dest.name;
-    const char* info = cupsGetOption("printer-info", dest.num_options, dest.options);
-    printer.info = info != nullptr ? info : "";
-    const char* location = cupsGetOption("printer-location", dest.num_options, dest.options);
-    printer.location = location != nullptr ? location : "";
-    printer.isDefault = dest.is_default != 0;
-    const char* accepting = cupsGetOption("printer-is-accepting-jobs", dest.num_options, dest.options);
-    const int state = cupsGetIntegerOption("printer-state", dest.num_options, dest.options);
-    printer.enabled = accepting == nullptr || std::string_view(accepting) != "false";
-    if (state == IPP_PSTATE_STOPPED) {
-      printer.enabled = false;
-    }
-    printer.state = printerStateLabel(state, printer.enabled);
-
-    cups_job_t* jobs = nullptr;
-    const int jobCount = cupsGetJobs2(CUPS_HTTP_DEFAULT, &jobs, dest.name, 0, CUPS_WHICHJOBS_ACTIVE);
-    printer.jobCount = std::max(jobCount, 0);
-    if (jobCount > 0) {
-      cupsFreeJobs(jobCount, jobs);
-    }
-    next.printers.push_back(std::move(printer));
-  }
-  cupsFreeDests(count, dests);
-  finishRefresh(std::move(next));
+  m_refreshInflight = true;
+  const std::weak_ptr<void> lifetime = m_impl->token();
+  std::thread([this, lifetime]() {
+    CollectedSnapshot collected = collectSnapshot();
+    DeferredCall::callLater([this, lifetime, collected = std::move(collected)]() mutable {
+      if (lifetime.expired()) {
+        return;
+      }
+      m_refreshInflight = false;
+      if (collected.statusFailed) {
+        collected.snapshot.error = i18n::tr("control-center.printers.status-failed");
+      }
+      finishRefresh(std::move(collected.snapshot));
+      if (m_refreshQueued) {
+        m_refreshQueued = false;
+        refresh();
+      }
+    });
+  }).detach();
 }
 
 void PrinterService::tryStart() {

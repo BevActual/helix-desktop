@@ -56,6 +56,7 @@ The window list refreshes while the overlay stays open (new windows, closed wind
 | Lock session | <IpcCommand command="session lock" /> | Lock the current session. `loginctl lock-session` uses the same path when Noctalia is running. |
 | Suspend system | <IpcCommand command="session suspend" /> | Suspend without locking first. |
 | Lock and suspend | <IpcCommand command="session lock-and-suspend" /> | Lock the session, then suspend once the lock is active. |
+| Lid close | <IpcCommand command="session lid-close" /> | Used by niri lid-close switch events. Keeps the session awake when **Keep Using Other Displays** is on and another display is enabled; otherwise locks and suspends. |
 | Log out | <IpcCommand command="session logout" /> | End the graphical session (compositor-native when available). |
 | Reboot | <IpcCommand command="session reboot" /> | Reboot the system. |
 | Shut down | <IpcCommand command="session shutdown" /> | Shut down the system. |

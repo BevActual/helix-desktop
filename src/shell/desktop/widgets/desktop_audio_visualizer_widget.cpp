@@ -10,6 +10,7 @@
 #include "ui/visuals/audio_visualizer.h"
 
 #include <algorithm>
+#include <linux/input-event-codes.h>
 #include <memory>
 
 namespace {
@@ -34,8 +35,17 @@ DesktopAudioVisualizerWidget::~DesktopAudioVisualizerWidget() {
 }
 
 void DesktopAudioVisualizerWidget::create() {
-  auto rootNode = ui::node({});
-  rootNode->setClipChildren(true);
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .clipChildren = true,
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("media");
+          },
+  });
 
   auto visualizer = std::make_unique<AudioVisualizer>();
   visualizer->setOrientation(AudioSpectrumOrientation::Horizontal);

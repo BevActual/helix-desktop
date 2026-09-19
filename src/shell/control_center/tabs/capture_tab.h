@@ -49,8 +49,10 @@ private:
   std::unique_ptr<ScreenRecordTab> m_record;
   Flex* m_rootLayout = nullptr;
   Segmented* m_viewSwitch = nullptr;
-  Flex* m_screenshotHost = nullptr;
-  Flex* m_recordHost = nullptr;
+  Flex* m_screenshotCompactHost = nullptr;
+  Flex* m_recordCompactHost = nullptr;
+  Flex* m_screenshotLeftoverHost = nullptr;
+  Flex* m_recordLeftoverHost = nullptr;
   View m_view = View::Screenshot;
   bool m_viewSyncing = false;
 };

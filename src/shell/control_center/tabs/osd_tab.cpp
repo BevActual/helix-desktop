@@ -9,7 +9,6 @@
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/label.h"
-#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/controls/slider.h"
@@ -20,6 +19,7 @@
 #include <array>
 #include <cstddef>
 #include <format>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -68,98 +68,127 @@ namespace {
 
 } // namespace
 
+std::size_t OsdTab::indexFromSection(Section section) noexcept {
+  return section == Section::Style ? 1 : 0;
+}
+
+OsdTab::Section OsdTab::sectionFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Section::Style : Section::Placement;
+}
+
+OsdTab::Section OsdTab::sectionFromId(std::string_view id) noexcept {
+  return id == "style" ? Section::Style : Section::Placement;
+}
+
+std::string_view OsdTab::idFromSection(Section section) noexcept {
+  return section == Section::Style ? "style" : "placement";
+}
+
 OsdTab::OsdTab(const ControlCenterServices& services)
     : m_config(services.config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "osd"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "osd", .showConfigureButton = false}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> section = m_config->stateString("osd_tab", "section")) {
+      m_section = sectionFromId(*section);
+    }
+  }
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
 }
 
 std::unique_ptr<Flex> OsdTab::create() {
+  return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
+}
+
+std::unique_ptr<Flex> OsdTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
+  const float opacity = panelCardOpacity();
+  const OsdConfig osd = m_config != nullptr ? m_config->config().osd : OsdConfig{};
 
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
 
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
+  auto compactCard = ui::column({
       .configure =
-          [](ScrollView& scrollView) {
-            scrollView.clearFill();
-            scrollView.clearBorder();
+          [scale, opacity, hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
+  m_enabled = addToggleRow(*compactCard, scale, i18n::tr("control-center.osd.enable"), [this](bool value) {
+    applyEnabled(value);
+  });
+  if (m_enabled != nullptr) {
+    m_enabled->setCheckedImmediate(osd.enabled);
+  }
 
-  auto addCaption = [scale, captionSize](Flex& parent, const std::string& text) {
-    parent.addChild(
+  if (!hosted) {
+    auto sectionToolbar = ui::column({
+        .out = &m_sectionToolbar,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * scale,
+        .visible = osd.enabled,
+        .participatesInLayout = osd.enabled,
+    });
+    sectionToolbar->addChild(
+        ui::segmented({
+            .out = &m_sectionSwitch,
+            .options =
+                std::vector<ui::SegmentedOption>{
+                    {
+                        .label = "",
+                        .glyph = "layout-navbar",
+                        .tooltip = i18n::tr("control-center.osd.placement-tooltip"),
+                    },
+                    {
+                        .label = "",
+                        .glyph = "contrast",
+                        .tooltip = i18n::tr("control-center.osd.style-tooltip"),
+                    },
+                },
+            .selectedIndex = indexFromSection(m_section),
+            .scale = scale,
+            .compact = true,
+            .surfaceOpacity = opacity,
+            .onChange = [this](std::size_t index) { applySection(index); },
+        })
+    );
+    sectionToolbar->addChild(
         ui::label({
-            .text = text,
+            .out = &m_caption,
             .fontSize = captionSize,
             .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 2,
         })
     );
-  };
+    compactCard->addChild(std::move(sectionToolbar));
+  }
+  live->addChild(std::move(compactCard));
 
-  auto addToggleRow = [scale, this](Flex& parent, const std::string& text, Toggle** out, bool checked,
-                                    void (OsdTab::*apply)(bool)) {
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    row->addChild(
-        ui::label({
-            .text = text,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    row->addChild(
-        ui::toggle({
-            .out = out,
-            .checkedImmediate = checked,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = [this, apply](bool value) { (this->*apply)(value); },
-        })
-    );
-    parent.addChild(std::move(row));
-  };
-
-  const OsdConfig osd = m_config != nullptr ? m_config->config().osd : OsdConfig{};
-
-  auto generalCard = ui::column({
+  const bool placementOpen = osd.enabled && m_section == Section::Placement;
+  auto placementHost = ui::column({
+      .out = &m_placementHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+      .visible = placementOpen,
+      .participatesInLayout = placementOpen,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
   });
-  addTitle(*generalCard, i18n::tr("settings.navigation.sections.osd"), scale);
-  addToggleRow(*generalCard, i18n::tr("control-center.osd.enable"), &m_enabled, osd.enabled, &OsdTab::applyEnabled);
-
-  auto details = ui::column({
-      .out = &m_details,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = osd.enabled,
-      .participatesInLayout = osd.enabled,
-  });
-  addCaption(*details, i18n::tr("control-center.osd.orientation"));
-  details->addChild(
+  addCaption(*placementHost, i18n::tr("control-center.osd.orientation"), scale);
+  placementHost->addChild(
       ui::segmented({
           .out = &m_orientation,
           .options =
@@ -177,121 +206,65 @@ std::unique_ptr<Flex> OsdTab::create() {
           .fontSize = captionSize,
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = opacity,
           .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyOrientation(index); },
       })
   );
-
-  addCaption(*details, i18n::tr("control-center.osd.position"));
-  {
-    std::vector<std::string> labels;
-    labels.reserve(kPositions.size());
-    for (const auto& option : kPositions) {
-      labels.push_back(i18n::tr(option.labelKey));
-    }
-    const bool vertical = osd.orientation == "vertical";
-    details->addChild(
-        ui::select({
-            .out = &m_position,
-            .options = labels,
-            .selectedIndex = positionIndex(vertical ? osd.positionVertical : osd.position),
-            .fontSize = Style::fontSizeBody * scale,
-            .controlHeight = controlHeight,
-            .surfaceOpacity = panelCardOpacity(),
-            .flexGrow = 1.0F,
-            .onSelectionChanged = [this](std::size_t index, std::string_view) { applyPosition(index); },
-        })
-    );
+  std::vector<std::string> labels;
+  labels.reserve(kPositions.size());
+  for (const auto& option : kPositions) {
+    labels.push_back(i18n::tr(option.labelKey));
   }
+  const bool vertical = osd.orientation == "vertical";
+  m_position = addSelectRow(
+      *placementHost, scale, i18n::tr("control-center.osd.position"), std::move(labels), opacity,
+      [this](std::size_t index) { applyPosition(index); }
+  );
+  if (m_position != nullptr) {
+    m_position->setSelectedIndexSilently(positionIndex(vertical ? osd.positionVertical : osd.position));
+  }
+  live->addChild(std::move(placementHost));
 
-  auto scaleHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  scaleHeader->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.osd.scale"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
+  const bool styleOpen = osd.enabled && m_section == Section::Style;
+  auto styleHost = ui::column({
+      .out = &m_styleHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+      .visible = styleOpen,
+      .participatesInLayout = styleOpen,
+      .configure =
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
+  });
+  addSliderSection(
+      *styleHost, scale, i18n::tr("control-center.osd.scale"), &m_scale, &m_scaleValue,
+      static_cast<double>(noctalia::config::schema::kScaleRange.min.value_or(0.5F)),
+      static_cast<double>(noctalia::config::schema::kScaleRange.max.value_or(2.5F)),
+      static_cast<double>(noctalia::config::schema::kScaleRange.step.value_or(0.05F)), static_cast<double>(osd.scale),
+      multiplierLabel, [this]() { commitScale(); }
   );
-  scaleHeader->addChild(
-      ui::label({
-          .out = &m_scaleValue,
-          .text = multiplierLabel(osd.scale),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
+  addSliderSection(
+      *styleHost, scale, i18n::tr("control-center.osd.opacity"), &m_opacity, &m_opacityValue,
+      static_cast<double>(noctalia::config::schema::kUnitRange.min.value_or(0.0F)),
+      static_cast<double>(noctalia::config::schema::kUnitRange.max.value_or(1.0F)),
+      static_cast<double>(noctalia::config::schema::kUnitRange.step.value_or(0.01F)),
+      static_cast<double>(osd.backgroundOpacity), percentLabel, [this]() { commitOpacity(); }
   );
-  details->addChild(std::move(scaleHeader));
-  details->addChild(
-      ui::slider({
-          .out = &m_scale,
-          .minValue = static_cast<double>(noctalia::config::schema::kScaleRange.min.value_or(0.5F)),
-          .maxValue = static_cast<double>(noctalia::config::schema::kScaleRange.max.value_or(2.5F)),
-          .step = static_cast<double>(noctalia::config::schema::kScaleRange.step.value_or(0.05F)),
-          .value = static_cast<double>(osd.scale),
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_scaleValue != nullptr) {
-                  m_scaleValue->setText(multiplierLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitScale(); },
-      })
-  );
+  m_border = addToggleRow(*styleHost, scale, i18n::tr("control-center.osd.border"), [this](bool value) {
+    applyBorder(value);
+  });
+  if (m_border != nullptr) {
+    m_border->setCheckedImmediate(osd.border);
+  }
+  live->addChild(std::move(styleHost));
 
-  auto opacityHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  opacityHeader->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.osd.opacity"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  opacityHeader->addChild(
-      ui::label({
-          .out = &m_opacityValue,
-          .text = percentLabel(osd.backgroundOpacity),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  details->addChild(std::move(opacityHeader));
-  details->addChild(
-      ui::slider({
-          .out = &m_opacity,
-          .minValue = static_cast<double>(noctalia::config::schema::kUnitRange.min.value_or(0.0F)),
-          .maxValue = static_cast<double>(noctalia::config::schema::kUnitRange.max.value_or(1.0F)),
-          .step = static_cast<double>(noctalia::config::schema::kUnitRange.step.value_or(0.01F)),
-          .value = static_cast<double>(osd.backgroundOpacity),
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_opacityValue != nullptr) {
-                  m_opacityValue->setText(percentLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitOpacity(); },
-      })
-  );
-  addToggleRow(*details, i18n::tr("control-center.osd.border"), &m_border, osd.border, &OsdTab::applyBorder);
-  generalCard->addChild(std::move(details));
-  content->addChild(std::move(generalCard));
-
-  live->addChild(std::move(scroll));
-  auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
   syncLiveControls();
-  return wrapped;
+  return live;
 }
 
 std::unique_ptr<Flex> OsdTab::createHeaderActions() {
@@ -304,6 +277,11 @@ void OsdTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_enabled = nullptr;
+  m_sectionToolbar = nullptr;
+  m_sectionSwitch = nullptr;
+  m_caption = nullptr;
+  m_placementHost = nullptr;
+  m_styleHost = nullptr;
   m_orientation = nullptr;
   m_position = nullptr;
   m_scale = nullptr;
@@ -311,7 +289,6 @@ void OsdTab::onClose() {
   m_opacity = nullptr;
   m_opacityValue = nullptr;
   m_border = nullptr;
-  m_details = nullptr;
 }
 
 void OsdTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -344,6 +321,56 @@ void OsdTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void OsdTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSwitch->setSurfaceOpacity(opacity);
+  }
+  if (m_orientation != nullptr) {
+    m_orientation->setSurfaceOpacity(opacity);
+  }
+  if (m_position != nullptr) {
+    m_position->setSurfaceOpacity(opacity);
+  }
+}
+
+void OsdTab::syncHosts() {
+  const bool enabled = m_config != nullptr && m_config->config().osd.enabled;
+  const bool placementOpen = enabled && m_section == Section::Placement;
+  const bool styleOpen = enabled && m_section == Section::Style;
+  const bool layoutDirty = setShown(m_sectionToolbar, enabled) || setShown(m_placementHost, placementOpen)
+      || setShown(m_styleHost, styleOpen);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void OsdTab::persistSection() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("osd_tab", "section", std::string(idFromSection(m_section)));
+}
+
+void OsdTab::applySection(std::size_t index) {
+  if (m_sectionSyncing) {
+    return;
+  }
+  const Section section = sectionFromIndex(index);
+  if (m_section == section) {
+    syncHosts();
+    return;
+  }
+  m_section = section;
+  persistSection();
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSyncing = true;
+    m_sectionSwitch->setSelectedIndex(indexFromSection(m_section));
+    m_sectionSyncing = false;
+  }
+  syncHosts();
+  syncLiveControls();
+}
+
 void OsdTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
@@ -352,6 +379,12 @@ void OsdTab::syncLiveControls() {
   m_syncing = true;
   if (m_enabled != nullptr) {
     m_enabled->setCheckedImmediate(osd.enabled);
+  }
+  if (m_caption != nullptr) {
+    m_caption->setText(
+        m_section == Section::Style ? i18n::tr("control-center.osd.style-caption")
+                                    : i18n::tr("control-center.osd.placement-caption")
+    );
   }
   if (m_orientation != nullptr) {
     m_orientation->setSelectedIndex(osd.orientation == "vertical" ? 1 : 0);
@@ -375,9 +408,7 @@ void OsdTab::syncLiveControls() {
   if (m_border != nullptr) {
     m_border->setCheckedImmediate(osd.border);
   }
-  if (setShown(m_details, osd.enabled)) {
-    PanelManager::instance().requestLayout();
-  }
+  syncHosts();
   m_syncing = false;
 }
 

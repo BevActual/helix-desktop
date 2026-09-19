@@ -123,7 +123,6 @@ std::unique_ptr<Flex> SyncthingTab::create() {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*well, i18n::tr("control-center.syncthing.title"), scale);
   well->addChild(
       ui::label({
           .out = &m_status,
@@ -205,11 +204,11 @@ std::unique_ptr<Flex> SyncthingTab::create() {
   );
   well->addChild(std::move(actions));
 
-  m_foldersDivider = addWellDivider(*well, scale);
   auto foldersCard = ui::column({
       .out = &m_foldersCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*foldersCard, i18n::tr("control-center.syncthing.folders"), scale);
   foldersCard->addChild(
@@ -219,13 +218,11 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  well->addChild(std::move(foldersCard));
-
-  m_remotesDivider = addWellDivider(*well, scale);
   auto remotesCard = ui::column({
       .out = &m_remotesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*remotesCard, i18n::tr("control-center.syncthing.devices"), scale);
   remotesCard->addChild(
@@ -235,8 +232,9 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  well->addChild(std::move(remotesCard));
   m_rootLayout->addChild(std::move(well));
+  m_rootLayout->addChild(std::move(foldersCard));
+  m_rootLayout->addChild(std::move(remotesCard));
 
   auto live = ui::column({
       .align = FlexAlign::Stretch,
@@ -287,10 +285,8 @@ void SyncthingTab::onClose() {
   m_guiButton = nullptr;
   m_copyIdButton = nullptr;
   m_foldersCard = nullptr;
-  m_foldersDivider = nullptr;
   m_folderList = nullptr;
   m_remotesCard = nullptr;
-  m_remotesDivider = nullptr;
   m_remoteList = nullptr;
   m_liveScroll = nullptr;
   m_folderSignature.clear();
@@ -324,8 +320,7 @@ void SyncthingTab::syncUi() {
   const SyncthingSnapshot empty;
   const SyncthingSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
-  const bool layoutDirty = setShown(m_foldersDivider, running) || setShown(m_foldersCard, running) ||
-                            setShown(m_remotesDivider, running) || setShown(m_remotesCard, running) ||
+  const bool layoutDirty = setShown(m_foldersCard, running) || setShown(m_remotesCard, running) ||
                             setShown(m_startButton, !running) || setShown(m_stopButton, running) ||
                             setShown(m_guiButton, running) || setShown(m_copyIdButton, running && !snap.myId.empty());
   if (layoutDirty) {

@@ -320,6 +320,7 @@ void Application::initLockScreenAndSession() {
       m_logindService->setSessionLockIntegrationEnabled(m_configService.isLockScreenEnabled());
       m_logindService->setLockBeforeSuspendEnabled(m_configService.shouldLockBeforeSuspend());
     }
+    syncLidCloseInhibit();
     m_lockScreen.onConfigChanged();
     m_lockscreenWidgetsController.onLockStateChanged();
   });
@@ -370,6 +371,7 @@ void Application::initLockScreenAndSession() {
         m_lockScreen.unlock();
       }
     });
+    syncLidCloseInhibit();
   }
 
   SessionActionHooks sessionActionHooks;

@@ -93,7 +93,7 @@ std::unique_ptr<Flex> LanguageTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> LanguageTab::createLiveBody() {
+std::unique_ptr<Flex> LanguageTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -106,10 +106,8 @@ std::unique_ptr<Flex> LanguageTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
   auto toolbar = ui::row({

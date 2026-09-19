@@ -143,7 +143,22 @@ std::unique_ptr<Flex> PrivacyTab::create() {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  auto header = makeCardHeaderRow(i18n::tr("control-center.privacy.title"), scale);
+  auto header = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .minHeight = Style::controlHeightSm * scale,
+  });
+  header->addChild(
+      ui::label({
+          .out = &m_status,
+          .fontSize = Style::fontSizeTitle * scale,
+          .fontWeight = FontWeight::Bold,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .flexGrow = 1.0F,
+      })
+  );
   header->addChild(
       ui::button({
           .out = &m_muteButton,
@@ -168,14 +183,6 @@ std::unique_ptr<Flex> PrivacyTab::create() {
       })
   );
   capturesWell->addChild(std::move(header));
-  capturesWell->addChild(
-      ui::label({
-          .out = &m_status,
-          .fontSize = Style::fontSizeBody * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
   capturesWell->addChild(
       ui::label({
           .out = &m_detail,
@@ -216,9 +223,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
   auto sharingCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*sharingCard, i18n::tr("control-center.privacy.this-machine"), scale);
   auto locationRow = ui::row({

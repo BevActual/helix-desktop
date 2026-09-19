@@ -106,7 +106,7 @@ std::unique_ptr<Flex> EffectsTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> EffectsTab::createLiveBody() {
+std::unique_ptr<Flex> EffectsTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   m_syncing = true;
@@ -123,10 +123,8 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
   auto toolbar = ui::row({
@@ -321,7 +319,6 @@ std::unique_ptr<Flex> EffectsTab::createHeaderActions() {
 }
 
 void EffectsTab::onClose() {
-  m_hoverEndTimer.stop();
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
@@ -573,7 +570,6 @@ void EffectsTab::applyCatalog(std::size_t index, bool persist) {
   }
   const Catalog next = catalogFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedCatalog = next;
     persistCatalog();
   }
@@ -583,20 +579,6 @@ void EffectsTab::applyCatalog(std::size_t index, bool persist) {
   }
   m_catalog = next;
   syncCatalog();
-}
-
-void EffectsTab::previewCatalog(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyCatalog(index, false);
-  PanelManager::instance().refresh();
-}
-
-void EffectsTab::restorePinnedCatalog() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
-    PanelManager::instance().refresh();
-  });
 }
 
 void EffectsTab::onPanelCardOpacityChanged(float opacity) {

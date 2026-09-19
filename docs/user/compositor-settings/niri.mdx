@@ -14,7 +14,9 @@ Add the following settings to your Niri configuration file (usually located at `
 
 **Settings → Niri → Setup** can copy missing snippets or write them to `noctalia-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body. Theme, Wallpaper, Windows, and Monitor write their own includes (`noctalia-layout.kdl`, `noctalia-blur.kdl`, `noctalia-overview.kdl`, `noctalia-outputs.kdl`) the same way.
 
-**Control Center → Theme** owns niri decorations in `noctalia-layout.kdl` (focus-ring, border, tab-indicator, insert-hint, recent-windows) plus compositor blur (`noctalia-blur.kdl`) and `draw-border-with-background` in `noctalia-window-rules.kdl`. **Control Center → Windows** writes `gaps`, `struts`, and `default-column-width` into the same layout include, only after you change those controls. The niri color template no longer writes a second `layout` block into `noctalia.kdl`.
+The stack is **greetd → helix-greeter → helix-niri + Helix Shell**. Helix stays the session shell; niri still owns windows; greetd still starts the login session. Keep those as **sibling packages** (this tree, `helix-niri`, `helix-greeter`); a distro metapackage can depend on all three. Do not merge them into one binary. Stock niri, Hyprland, and other compositors remain fallbacks: layer-shell still works, and refraction stays off.
+
+**Control Center → Theme** owns niri decorations in `noctalia-layout.kdl` (focus-ring, border, tab-indicator, insert-hint, recent-windows) plus compositor blur (`noctalia-blur.kdl`) and `draw-border-with-background` in `noctalia-window-rules.kdl`. **Control Center → Desktop → Windows** writes `gaps`, `struts`, and `default-column-width` into the same layout include, only after you change those controls. The niri color template no longer writes a second `layout` block into `noctalia.kdl`. Helix writes `liquid-glass { … }` only after a capability probe (`niri msg helix-capabilities`) succeeds, falling back to a version string that contains `helix` (helix-niri). Refraction strength follows `[shell.panel].glass`. High Contrast omits liquid-glass.
 
 ## Display layout
 
@@ -176,7 +178,7 @@ Option 3 should be used with the `[backdrop]` section disabled in your Noctalia 
 Blur support was introduced in Niri version 26.04. Adding these rules to earlier versions of Niri will result in configuration errors.
 :::
 
-**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Turning it off writes disable rules so Noctalia's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer.
+**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Helix also rewrites that include when niri IPC connects, so a probe that ran before helix-niri was ready still lands `liquid-glass`. Turning blur off writes disable rules so Noctalia's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer. **Chrome → Glass → Refraction** on helix-niri adds a `liquid-glass { }` child for Helix chrome namespaces (bars, panels, dock, OSD, notifications, idle-grace, capture overlays). Strength follows the Solid→Glass slider. Refraction without layout blur writes `blur false` on those chrome rules so client `ext-background-effect` blur does not stack with liquid-glass. Stock niri never emits `liquid-glass`. High Contrast frosts chrome and omits refraction.
 
 You can also paste the same rules by hand:
 
@@ -270,15 +272,18 @@ layer-rule {
 
 With the lock screen enabled, Noctalia locks before sleep by default (`[lockscreen].lock_before_suspend = true`), including lid-close suspend handled by logind. Set `lock_before_suspend = false` if you want lid close / `systemctl suspend` without locking.
 
-To lock and suspend yourself from Niri (for example when logind lid handling is ignored), add:
+**Keep using other displays** (`[lockscreen].lid_close_keep_external_displays`, default `true`) is on Control Center → Power. When another display is on, Noctalia blocks logind from suspending on lid close. niri still turns off the laptop panel, so you can keep working on the external display. Turn the setting off if you want the lid to suspend even while docked.
+
+If you install the optional niri setup snippet, lid close runs `noctalia msg session lid-close`: it is a no-op in that clamshell case, and otherwise locks and suspends (useful when logind lid handling is ignored).
 
 ``` kdl
 switch-events {
-    lid-close { spawn "noctalia" "msg" "session" "lock-and-suspend"; }
+    lid-close { spawn "noctalia" "msg" "session" "lid-close"; }
 }
 ```
 
-You may also need to edit your `logind.conf` to set:
+You only need to edit `logind.conf` if you want lid close ignored even with no external display:
+
 ```
 HandleLidSwitch=ignore
 HandleLidSwitchExternalPower=ignore

@@ -1529,6 +1529,20 @@ void DesktopWidgetsEditor::applyScaleDragPreview(const DesktopWidgetState& state
   }
 }
 
+void DesktopWidgetsEditor::addWidgetOfType(const std::string& type) {
+  if (!m_open || m_wayland == nullptr) {
+    return;
+  }
+  std::string outputName;
+  if (!m_surfaces.empty() && m_surfaces.front() != nullptr) {
+    outputName = m_surfaces.front()->outputName;
+  } else if (const WaylandOutput* output = desktop_widgets::resolveEffectiveOutput(*m_wayland, {});
+             output != nullptr) {
+    outputName = desktop_widgets::outputKey(*output);
+  }
+  addWidget(outputName, type);
+}
+
 void DesktopWidgetsEditor::addWidget(const std::string& outputName, const std::string& type) {
   if (!m_open || m_wayland == nullptr) {
     return;

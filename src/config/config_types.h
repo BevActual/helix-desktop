@@ -591,6 +591,9 @@ struct LockscreenConfig {
   // Lock on PrepareForSleep (lid close / systemctl suspend) via logind sleep-delay inhibit.
   // Distinct from idle/session lock_and_suspend actions.
   bool lockBeforeSuspend = true;
+  // When an enabled external display is connected, inhibit logind lid-switch suspend so
+  // closing the lid blanks the laptop panel and leaves the other display usable.
+  bool lidCloseKeepExternalDisplays = true;
   bool fingerprint = true;
   bool allowEmptyPassword = false;
   bool blurredDesktop = false;
@@ -608,6 +611,10 @@ struct LockscreenConfig {
 
 [[nodiscard]] inline bool shouldLockBeforeSuspend(const LockscreenConfig& lockscreen) noexcept {
   return lockscreen.enabled && lockscreen.lockBeforeSuspend;
+}
+
+[[nodiscard]] inline bool shouldKeepSessionOnLidClose(const LockscreenConfig& lockscreen) noexcept {
+  return lockscreen.lidCloseKeepExternalDisplays;
 }
 
 template <typename T> struct EnumOption {
@@ -1033,6 +1040,9 @@ struct ShellConfig {
 
   struct PanelConfig {
     PanelTransparencyMode transparencyMode = PanelTransparencyMode::Solid;
+    // 0 = solid chrome, 1 = clear glass. Unset derives from transparencyMode.
+    std::optional<float> glass;
+    bool refraction = false;               // compositor refraction (helix-niri) or chrome blur (stock niri)
     bool borders = true;                   // outline on floating panel surfaces
     bool shadow = true;                    // cast the global [shell.shadow] from panel surfaces
     bool listItemBackground = false;       // filled rounded background behind launcher/clipboard list items
@@ -1211,6 +1221,11 @@ struct ShellConfig {
 
   bool operator==(const ShellConfig&) const = default;
 };
+
+[[nodiscard]] float resolvedPanelGlass(const ShellConfig::PanelConfig& panel) noexcept;
+[[nodiscard]] PanelTransparencyMode transparencyModeForGlass(float glass) noexcept;
+[[nodiscard]] float panelCardOpacityForGlass(float glass, float panelBackgroundOpacity) noexcept;
+[[nodiscard]] float detachedPanelBackgroundOpacityForGlass(float glass) noexcept;
 
 struct WeatherConfig {
   bool enabled = true;

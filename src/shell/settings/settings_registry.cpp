@@ -1828,10 +1828,15 @@ namespace settings {
         "floating detached panel layer shell z-order input method popup fullscreen"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Glass, "glass", tr("settings.schema.panels.transparency-mode.label"),
-        tr("settings.schema.panels.transparency-mode.description"), {"shell", "panel", "transparency_mode"},
-        asSegmented(enumSelect(kPanelTransparencyModes, cfg.shell.panel.transparencyMode)),
-        "glass opacity alpha translucent cards blur solid soft"
+        SettingsSection::Glass, "glass", tr("settings.schema.panels.glass.label"),
+        tr("settings.schema.panels.glass.description"), {"shell", "panel", "glass"},
+        sliderFor(resolvedPanelGlass(cfg.shell.panel), noctalia::config::schema::kUnitRange, false),
+        "glass opacity alpha translucent cards blur solid refraction chrome"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Glass, "glass", tr("settings.schema.panels.refraction.label"),
+        tr("settings.schema.panels.refraction.description"), {"shell", "panel", "refraction"},
+        ToggleSetting{cfg.shell.panel.refraction}, "refraction liquid-glass helix-niri compositor blur"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Panels, "effects", tr("settings.schema.panels.borders.label"),
@@ -2325,6 +2330,16 @@ namespace settings {
           ToggleSetting{cfg.lockscreen.lockBeforeSuspend}, "lock screen before suspend sleep lid close prepareforsleep"
       );
       e.visibleWhen = lockscreenOn;
+      entries.push_back(std::move(e));
+    }
+    {
+      auto e = makeEntry(
+          SettingsSection::Security, "lock-screen",
+          tr("settings.schema.lockscreen.lid-close-keep-external-displays.label"),
+          tr("settings.schema.lockscreen.lid-close-keep-external-displays.description"),
+          {"lockscreen", "lid_close_keep_external_displays"}, ToggleSetting{cfg.lockscreen.lidCloseKeepExternalDisplays},
+          "lid close clamshell external display monitor laptop dock suspend lock screen"
+      );
       entries.push_back(std::move(e));
     }
     {
@@ -3715,6 +3730,12 @@ namespace settings {
         tr("settings.schema.power.session-actions.description"), {"shell", "session", "actions"},
         SessionPanelActionsSetting{.items = cfg.shell.session.actions},
         "session panel power menu logout reboot shutdown lock command actions order"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Power, "lid", tr("settings.schema.lockscreen.lid-close-keep-external-displays.label"),
+        tr("settings.schema.lockscreen.lid-close-keep-external-displays.description"),
+        {"lockscreen", "lid_close_keep_external_displays"}, ToggleSetting{cfg.lockscreen.lidCloseKeepExternalDisplays},
+        "lid close clamshell external display monitor laptop dock suspend"
     ));
 
     // Idle

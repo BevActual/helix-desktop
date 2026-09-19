@@ -60,8 +60,6 @@ private:
   void persistCatalog();
   void syncCatalog();
   [[nodiscard]] bool syncDetailLabel();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
   [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
   [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
@@ -120,5 +118,4 @@ private:
   AnimationManager::Id m_monthSlideAnimId = 0;
   bool m_showWeekNumbers = false;
   Timer m_eventFadeTimer;
-  Timer m_hoverEndTimer;
 };

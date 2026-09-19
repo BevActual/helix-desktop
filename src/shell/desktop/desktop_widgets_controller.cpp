@@ -4,6 +4,7 @@
 #include "core/log.h"
 #include "ipc/ipc_service.h"
 #include "shell/desktop/desktop_widget_layout.h"
+#include "shell/desktop/desktop_widget_settings_registry.h"
 #include "shell/desktop/desktop_widgets_host.h"
 #include "shell/desktop/editor/desktop_widgets_editor.h"
 #include "shell/desktop/editor/desktop_widgets_editor_types.h"
@@ -360,6 +361,54 @@ void DesktopWidgetsController::toggleEdit() {
   } else {
     enterEdit();
   }
+}
+
+bool DesktopWidgetsController::addWidget(std::string_view type) {
+  if (!m_initialized || m_wayland == nullptr || type.empty()) {
+    return false;
+  }
+  if (isEditing() && m_editor != nullptr) {
+    m_editor->addWidgetOfType(std::string(type));
+    return true;
+  }
+
+  const WaylandOutput* output = desktop_widgets::resolveEffectiveOutput(*m_wayland, {});
+  if (output == nullptr) {
+    return false;
+  }
+
+  if (!m_snapshot.enabled) {
+    m_snapshot.enabled = true;
+    m_lastEnabled = true;
+  }
+
+  std::uint64_t maxCounter = 0;
+  for (const auto& widget : m_snapshot.widgets) {
+    std::uint64_t counter = 0;
+    if (parseDesktopWidgetCounter(widget.id, counter)) {
+      maxCounter = std::max(maxCounter, counter);
+    }
+  }
+  const std::uint64_t nextCounter =
+      maxCounter == std::numeric_limits<std::uint64_t>::max() ? maxCounter : (maxCounter + 1);
+
+  DesktopWidgetState widget;
+  widget.id = makeDesktopWidgetId(nextCounter);
+  widget.type = std::string(type);
+  widget.outputName = desktop_widgets::outputKey(*output);
+  widget.cx = desktop_widgets::outputLogicalWidth(*output) * 0.5F;
+  widget.cy = desktop_widgets::outputLogicalHeight(*output) * 0.5F;
+  widget.placementWidth = desktop_widgets::outputLogicalWidth(*output);
+  widget.placementHeight = desktop_widgets::outputLogicalHeight(*output);
+  widget.boxWidth = 0.0F;
+  widget.boxHeight = 0.0F;
+  widget.enabled = true;
+  desktop_settings::applyAllDesktopWidgetDefaultSettings(widget.settings, widget.type);
+  m_snapshot.widgets.push_back(std::move(widget));
+  normalizeSnapshot();
+  saveSnapshotToConfig();
+  applyVisibility();
+  return true;
 }
 
 void DesktopWidgetsController::setOnEnterEditCallback(std::function<void()> callback) {

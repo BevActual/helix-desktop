@@ -399,27 +399,31 @@ Set **`[lockscreen].enabled = false`** to turn off session lock entirely: no `ex
 
 When the lock screen is enabled, **`lock_before_suspend`** (default `true`) locks the session on logind `PrepareForSleep` before suspend or hibernate (including lid-close sleep), so you do not need a separate idle daemon for lock-before-sleep. Set it `false` if you want external suspend without locking.
 
+**`lid_close_keep_external_displays`** (default `true`) keeps the session awake when you close the laptop lid and another display is on. niri still turns off the laptop panel. Turn this off if you want lid close to suspend even with an external display connected.
+
 When enabled and `wlr-screencopy` is available, Noctalia can capture the desktop **before** the session lock engages and use that snapshot as the lock screen background instead of the wallpaper. Desktop capture is disabled by default.
 
-Configure under **`[lockscreen]`** in TOML, or use **Settings → Security → Lock Screen**. The **Desktop capture** toggle appears only when your compositor supports screencopy. Use **Wallpaper** to pick a custom lock screen image (empty uses the desktop wallpaper per output). The wallpaper picker lock button writes the same `[lockscreen].wallpaper` key.
+Configure under **`[lockscreen]`** in TOML, or use **Settings → Security → Lock Screen** and **Control Center → Power**. The **Desktop capture** toggle appears only when your compositor supports screencopy. Use **Wallpaper** to pick a custom lock screen image (empty uses the desktop wallpaper per output). The wallpaper picker lock button writes the same `[lockscreen].wallpaper` key.
 
 ```toml
 [lockscreen]
-enabled               = true      # master switch for session lock
-lock_before_suspend   = true      # lock on PrepareForSleep (lid close / systemctl suspend)
-fingerprint           = true      # allow fingerprint (PAM) authentication on the lock screen
-allow_empty_password  = false     # submit Enter with an empty password (security-key PAM stacks)
-blurred_desktop       = false     # use a desktop snapshot as the lock screen background
-blur_intensity        = 0.5       # background blur (0.0 = none, 1.0 = maximum)
-tint_intensity        = 0.3       # surface-color tint over the background (0.0 = none, 1.0 = opaque)
-wallpaper             = ""        # optional image path; empty uses the desktop wallpaper per output
-monitors              = []        # connectors that show the lock screen; empty = all outputs, others stay black
+enabled                           = true      # master switch for session lock
+lock_before_suspend               = true      # lock on PrepareForSleep (lid close / systemctl suspend)
+lid_close_keep_external_displays  = true      # close the lid and keep using other displays
+fingerprint                       = true      # allow fingerprint (PAM) authentication on the lock screen
+allow_empty_password              = false     # submit Enter with an empty password (security-key PAM stacks)
+blurred_desktop                   = false     # use a desktop snapshot as the lock screen background
+blur_intensity                    = 0.5       # background blur (0.0 = none, 1.0 = maximum)
+tint_intensity                    = 0.3       # surface-color tint over the background (0.0 = none, 1.0 = opaque)
+wallpaper                         = ""        # optional image path; empty uses the desktop wallpaper per output
+monitors                          = []        # connectors that show the lock screen; empty = all outputs, others stay black
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `enabled` | bool | `true` | Master switch for session lock, logind integration, and lock actions. |
 | `lock_before_suspend` | bool | `true` | When `true`, hold a logind sleep-delay inhibitor and lock on `PrepareForSleep` before suspend/hibernate (including lid-close sleep). Set `false` to allow external suspend without locking; explicit **Lock and Suspend** actions still lock first. |
+| `lid_close_keep_external_displays` | bool | `true` | When `true` and another display is on, inhibit logind lid-switch suspend so closing the lid blanks the laptop screen and leaves the other display usable. Set `false` to suspend on lid close even with an external display. |
 | `fingerprint` | bool | `true` | When `true`, fingerprint (PAM) authentication is offered on the lock screen alongside the password field. Set `false` to require password entry only. |
 | `allow_empty_password` | bool | `false` | When `true`, Enter can submit an empty password (needed for some security-key PAM stacks). When `false`, empty submits are ignored to avoid accidental `pam_faillock` lockouts from wake keys. |
 | `blurred_desktop` | bool | `false` | Capture each output before lock and use it as the lock screen background. |

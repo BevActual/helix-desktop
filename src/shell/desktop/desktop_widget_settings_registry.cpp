@@ -171,7 +171,7 @@ namespace desktop_settings {
   std::vector<WidgetSettingSpec> commonDesktopWidgetSettingSpecs(std::string_view type) {
     if (type == "login_box") {
       auto bgColor = colorSpec("background_color", "surface_variant");
-      auto bgRadius = intSpec("background_radius", 12.0, 0.0, 32.0, 1.0);
+      auto bgRadius = intSpec("background_radius", 24.0, 0.0, 32.0, 1.0);
       auto bgOpacity = doubleSpec("background_opacity", 0.88, 0.0, 1.0, 0.01);
       return {
           std::move(bgColor),
@@ -190,7 +190,7 @@ namespace desktop_settings {
     auto bgColor = colorSpec("background_color", "surface");
     bgColor.visibleWhen = backgroundOn;
 
-    auto bgRadius = intSpec("background_radius", 12.0, 0.0, 32.0, 1.0);
+    auto bgRadius = intSpec("background_radius", 24.0, 0.0, 32.0, 1.0);
     bgRadius.visibleWhen = backgroundOn;
 
     auto bgPadding = intSpec("background_padding", 10.0, 0.0, 32.0, 1.0);

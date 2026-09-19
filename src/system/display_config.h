@@ -86,6 +86,8 @@ namespace display_config {
   [[nodiscard]] std::string formatResolution(int width, int height);
   [[nodiscard]] std::string formatScale(double scale);
   [[nodiscard]] std::string displayLabel(const Output& output);
+  [[nodiscard]] bool isInternalOutputName(std::string_view name) noexcept;
+  [[nodiscard]] bool hasEnabledExternalOutput(const std::vector<Output>& outputs) noexcept;
   [[nodiscard]] Size logicalSize(const Output& output);
   [[nodiscard]] Point snapPosition(
       const Output& moving, const Output& reference, LayoutDirection direction, int offset = 0

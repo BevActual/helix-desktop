@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core/frame_rate_limiter.h"
-#include "core/timer_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 
@@ -55,8 +54,6 @@ private:
   void persistCatalog();
   void syncCatalog();
   [[nodiscard]] bool syncDetailLabel();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] std::string systemInfoText() const;
   [[nodiscard]] float scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const;
   [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
@@ -79,7 +76,6 @@ private:
   float m_scrollProgress = 1.0F;
   std::chrono::steady_clock::time_point m_lastSampleAt;
   FrameRateLimiter m_redrawLimiter{std::chrono::milliseconds{200}};
-  Timer m_hoverEndTimer;
   Catalog m_catalog = Catalog::Cpu;
   Catalog m_pinnedCatalog = Catalog::Cpu;
 

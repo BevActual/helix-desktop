@@ -55,6 +55,7 @@ public:
 
   void applySettingChange(const std::string& key, WidgetSettingValue value);
   void resetSelectedWidgetSettings();
+  void addWidgetOfType(const std::string& type);
 
 private:
   enum class ScaleCorner : std::uint8_t {

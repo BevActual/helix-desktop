@@ -3,10 +3,12 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <format>
 #include <limits>
+#include <ranges>
 #include <utility>
 
 namespace display_config {
@@ -210,6 +212,29 @@ namespace display_config {
       return output.make;
     }
     return output.name;
+  }
+
+  bool isInternalOutputName(std::string_view name) noexcept {
+    auto startsWithIgnoreCase = [&](std::string_view prefix) {
+      if (name.size() < prefix.size()) {
+        return false;
+      }
+      for (std::size_t i = 0; i < prefix.size(); ++i) {
+        const auto a = static_cast<unsigned char>(name[i]);
+        const auto b = static_cast<unsigned char>(prefix[i]);
+        if (std::tolower(a) != std::tolower(b)) {
+          return false;
+        }
+      }
+      return true;
+    };
+    return startsWithIgnoreCase("eDP") || startsWithIgnoreCase("LVDS") || startsWithIgnoreCase("DSI");
+  }
+
+  bool hasEnabledExternalOutput(const std::vector<Output>& outputs) noexcept {
+    return std::ranges::any_of(outputs, [](const Output& output) {
+      return output.enabled && !isInternalOutputName(output.name);
+    });
   }
 
   Size logicalSize(const Output& output) {

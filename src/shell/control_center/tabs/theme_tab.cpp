@@ -553,18 +553,14 @@ namespace {
 ThemeTab::Section ThemeTab::sectionFromIndex(std::size_t index) noexcept {
   switch (index) {
   case 1:
-    return Section::Glass;
+    return Section::Chrome;
   case 2:
     return Section::Icons;
   case 3:
     return Section::Type;
   case 4:
-    return Section::Scale;
-  case 5:
-    return Section::Roundness;
-  case 6:
     return Section::Effects;
-  case 7:
+  case 5:
     return Section::Language;
   case 0:
   default:
@@ -574,20 +570,16 @@ ThemeTab::Section ThemeTab::sectionFromIndex(std::size_t index) noexcept {
 
 std::size_t ThemeTab::indexFromSection(Section section) noexcept {
   switch (section) {
-  case Section::Glass:
+  case Section::Chrome:
     return 1;
   case Section::Icons:
     return 2;
   case Section::Type:
     return 3;
-  case Section::Scale:
-    return 4;
-  case Section::Roundness:
-    return 5;
   case Section::Effects:
-    return 6;
+    return 4;
   case Section::Language:
-    return 7;
+    return 5;
   case Section::Palettes:
   default:
     return 0;
@@ -596,16 +588,12 @@ std::size_t ThemeTab::indexFromSection(Section section) noexcept {
 
 std::string_view ThemeTab::idFromSection(Section section) noexcept {
   switch (section) {
-  case Section::Glass:
-    return "glass";
+  case Section::Chrome:
+    return "chrome";
   case Section::Icons:
     return "icons";
   case Section::Type:
     return "type";
-  case Section::Scale:
-    return "scale";
-  case Section::Roundness:
-    return "roundness";
   case Section::Effects:
     return "effects";
   case Section::Language:
@@ -617,20 +605,14 @@ std::string_view ThemeTab::idFromSection(Section section) noexcept {
 }
 
 ThemeTab::Section ThemeTab::sectionFromId(std::string_view id) noexcept {
-  if (id == "glass") {
-    return Section::Glass;
+  if (id == "chrome" || id == "glass" || id == "scale" || id == "roundness") {
+    return Section::Chrome;
   }
   if (id == "icons") {
     return Section::Icons;
   }
   if (id == "type") {
     return Section::Type;
-  }
-  if (id == "scale") {
-    return Section::Scale;
-  }
-  if (id == "roundness") {
-    return Section::Roundness;
   }
   if (id == "effects") {
     return Section::Effects;
@@ -639,6 +621,52 @@ ThemeTab::Section ThemeTab::sectionFromId(std::string_view id) noexcept {
     return Section::Language;
   }
   return Section::Palettes;
+}
+
+std::size_t ThemeTab::indexFromChromeCatalog(ChromeCatalog catalog) noexcept {
+  switch (catalog) {
+  case ChromeCatalog::Scale:
+    return 1;
+  case ChromeCatalog::Roundness:
+    return 2;
+  case ChromeCatalog::Glass:
+  default:
+    return 0;
+  }
+}
+
+ThemeTab::ChromeCatalog ThemeTab::chromeCatalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 1:
+    return ChromeCatalog::Scale;
+  case 2:
+    return ChromeCatalog::Roundness;
+  case 0:
+  default:
+    return ChromeCatalog::Glass;
+  }
+}
+
+ThemeTab::ChromeCatalog ThemeTab::chromeCatalogFromId(std::string_view id) noexcept {
+  if (id == "scale") {
+    return ChromeCatalog::Scale;
+  }
+  if (id == "roundness") {
+    return ChromeCatalog::Roundness;
+  }
+  return ChromeCatalog::Glass;
+}
+
+std::string_view ThemeTab::idFromChromeCatalog(ChromeCatalog catalog) noexcept {
+  switch (catalog) {
+  case ChromeCatalog::Scale:
+    return "scale";
+  case ChromeCatalog::Roundness:
+    return "roundness";
+  case ChromeCatalog::Glass:
+  default:
+    return "glass";
+  }
 }
 
 ThemeTab::ThemeTab(const ControlCenterServices& services)
@@ -658,7 +686,21 @@ ThemeTab::ThemeTab(const ControlCenterServices& services)
   }
   if (m_config != nullptr) {
     if (const std::optional<std::string> section = m_config->stateString("theme_tab", "section")) {
-      m_section = sectionFromId(*section);
+      if (*section == "glass") {
+        m_section = Section::Chrome;
+        m_chromeCatalog = ChromeCatalog::Glass;
+      } else if (*section == "scale") {
+        m_section = Section::Chrome;
+        m_chromeCatalog = ChromeCatalog::Scale;
+      } else if (*section == "roundness") {
+        m_section = Section::Chrome;
+        m_chromeCatalog = ChromeCatalog::Roundness;
+      } else {
+        m_section = sectionFromId(*section);
+      }
+    }
+    if (const std::optional<std::string> chrome = m_config->stateString("theme_tab", "chrome")) {
+      m_chromeCatalog = chromeCatalogFromId(*chrome);
     }
   }
   syncSettingsSection();
@@ -703,7 +745,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
                   {
                       .label = "",
                       .glyph = "glass",
-                      .tooltip = i18n::tr("settings.navigation.sections.glass"),
+                      .tooltip = i18n::tr("settings.navigation.sections.chrome"),
                   },
                   {
                       .label = "",
@@ -714,16 +756,6 @@ std::unique_ptr<Flex> ThemeTab::create() {
                       .label = "",
                       .glyph = "typography",
                       .tooltip = i18n::tr("settings.navigation.sections.type"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "resize",
-                      .tooltip = i18n::tr("settings.navigation.sections.scale"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "border-radius",
-                      .tooltip = i18n::tr("settings.navigation.sections.roundness"),
                   },
                   {
                       .label = "",
@@ -745,23 +777,15 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .configure = [](Segmented& sources) { sources.setWrap(true); },
       })
   );
-  tab->addChild(std::move(compactCard));
 
-  auto palettesHost = ui::column({
-      .out = &m_palettesHost,
+  const bool palettesOpen = m_section == Section::Palettes;
+  const bool chromeOpen = m_section == Section::Chrome;
+  auto palettesToolbar = ui::column({
+      .out = &m_palettesToolbar,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
-      .fillHeight = true,
-      .flexGrow = 1.0F,
-  });
-  auto palettesCard = ui::column({
-      .out = &m_palettesCard,
-      .configure =
-          [scale, opacity](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
-          },
+      .gap = Style::spaceXs * scale,
+      .visible = palettesOpen,
+      .participatesInLayout = palettesOpen,
   });
 
   auto browse = ui::row({
@@ -928,8 +952,8 @@ std::unique_ptr<Flex> ThemeTab::create() {
       })
   );
   toolbar->addChild(std::move(currentPick));
-  palettesCard->addChild(std::move(toolbar));
-  palettesCard->addChild(
+  palettesToolbar->addChild(std::move(toolbar));
+  palettesToolbar->addChild(
       ui::button({
           .out = &m_autoStatus,
           .fontSize = captionSize,
@@ -976,8 +1000,8 @@ std::unique_ptr<Flex> ThemeTab::create() {
         })
     );
   }
-  palettesCard->addChild(std::move(heroWell));
-  palettesCard->addChild(
+  palettesToolbar->addChild(std::move(heroWell));
+  palettesToolbar->addChild(
       ui::label({
           .out = &m_exportStatus,
           .fontSize = captionSize,
@@ -987,7 +1011,53 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .participatesInLayout = false,
       })
   );
-  palettesHost->addChild(std::move(palettesCard));
+  compactCard->addChild(std::move(palettesToolbar));
+
+  auto chromeToolbar = ui::column({
+      .out = &m_chromeToolbar,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * scale,
+      .visible = chromeOpen,
+      .participatesInLayout = chromeOpen,
+  });
+  chromeToolbar->addChild(
+      ui::segmented({
+          .out = &m_chromeSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "glass",
+                      .tooltip = i18n::tr("settings.navigation.sections.glass"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "resize",
+                      .tooltip = i18n::tr("settings.navigation.sections.scale"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "border-radius",
+                      .tooltip = i18n::tr("settings.navigation.sections.roundness"),
+                  },
+              },
+          .selectedIndex = indexFromChromeCatalog(m_chromeCatalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = opacity,
+          .onChange = [this](std::size_t index) { applyChromeCatalog(index); },
+      })
+  );
+  compactCard->addChild(std::move(chromeToolbar));
+  tab->addChild(std::move(compactCard));
+
+  auto palettesHost = ui::column({
+      .out = &m_palettesHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .fillHeight = true,
+      .flexGrow = 1.0F,
+  });
 
   auto leftover = ui::column({
       .out = &m_palettesLeftover,
@@ -1037,23 +1107,34 @@ std::unique_ptr<Flex> ThemeTab::create() {
   palettesHost->addChild(std::move(leftover));
   tab->addChild(std::move(palettesHost));
 
-  auto addHost = [&]<typename Hosted>(Flex** out, Hosted* child) {
-    auto host = ui::column({
-        .out = out,
-        .align = FlexAlign::Stretch,
-        .gap = 0.0F,
-        .flexGrow = 1.0F,
-    });
-    host->addChild(child->createLiveBody());
+  auto addHost = [&]<typename Hosted>(Flex** out, Hosted* child, bool leftoverWell) {
+    std::unique_ptr<Flex> host;
+    if (leftoverWell) {
+      host = ui::column({
+          .out = out,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceSm * scale,
+          .flexGrow = 1.0F,
+          .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+      });
+    } else {
+      host = ui::column({
+          .out = out,
+          .align = FlexAlign::Stretch,
+          .gap = 0.0F,
+          .flexGrow = 1.0F,
+      });
+    }
+    host->addChild(child->createLiveBody(true));
     tab->addChild(std::move(host));
   };
-  addHost(&m_glassHost, m_glass.get());
-  addHost(&m_iconsHost, m_icons.get());
-  addHost(&m_typeHost, m_type.get());
-  addHost(&m_scaleHost, m_scale.get());
-  addHost(&m_roundnessHost, m_roundness.get());
-  addHost(&m_effectsHost, m_effects.get());
-  addHost(&m_languageHost, m_language.get());
+  addHost(&m_glassHost, m_glass.get(), true);
+  addHost(&m_scaleHost, m_scale.get(), true);
+  addHost(&m_roundnessHost, m_roundness.get(), true);
+  addHost(&m_iconsHost, m_icons.get(), false);
+  addHost(&m_typeHost, m_type.get(), false);
+  addHost(&m_effectsHost, m_effects.get(), false);
+  addHost(&m_languageHost, m_language.get(), false);
 
   syncHosts();
   auto wrapped = m_settings->wrapLive(std::move(tab), scale, panelCardOpacity());
@@ -1092,8 +1173,10 @@ void ThemeTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_sectionSwitch = nullptr;
+  m_palettesToolbar = nullptr;
+  m_chromeToolbar = nullptr;
+  m_chromeSwitch = nullptr;
   m_palettesHost = nullptr;
-  m_palettesCard = nullptr;
   m_palettesLeftover = nullptr;
   m_currentSwatches = nullptr;
   m_glassHost = nullptr;
@@ -1117,6 +1200,7 @@ void ThemeTab::onClose() {
   m_saveCustomButton = nullptr;
   m_exportStatus = nullptr;
   m_sectionSyncing = false;
+  m_chromeSyncing = false;
 }
 
 void ThemeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -1130,8 +1214,9 @@ void ThemeTab::setSettingsSearchQuery(std::string_view query) {
 SettingsPane* ThemeTab::settingsPane() { return m_settings.get(); }
 
 void ThemeTab::setActive(bool active) {
+  const bool chrome = active && m_section == Section::Chrome;
   if (m_glass != nullptr) {
-    m_glass->setActive(active && m_section == Section::Glass);
+    m_glass->setActive(chrome && m_chromeCatalog == ChromeCatalog::Glass);
   }
   if (m_icons != nullptr) {
     m_icons->setActive(active && m_section == Section::Icons);
@@ -1140,10 +1225,10 @@ void ThemeTab::setActive(bool active) {
     m_type->setActive(active && m_section == Section::Type);
   }
   if (m_scale != nullptr) {
-    m_scale->setActive(active && m_section == Section::Scale);
+    m_scale->setActive(chrome && m_chromeCatalog == ChromeCatalog::Scale);
   }
   if (m_roundness != nullptr) {
-    m_roundness->setActive(active && m_section == Section::Roundness);
+    m_roundness->setActive(chrome && m_chromeCatalog == ChromeCatalog::Roundness);
   }
   if (m_effects != nullptr) {
     m_effects->setActive(active && m_section == Section::Effects);
@@ -1154,24 +1239,70 @@ void ThemeTab::setActive(bool active) {
 }
 
 void ThemeTab::applyOpenSection(Section section, bool persist) {
-  if (m_section == section) {
-    syncHosts();
-    syncSettingsSection();
-    return;
-  }
-  m_section = section;
-  if (persist) {
-    persistSection();
-  }
-  if (m_sectionSwitch != nullptr) {
-    m_sectionSyncing = true;
-    m_sectionSwitch->setSelectedIndex(indexFromSection(m_section));
-    m_sectionSyncing = false;
+  if (m_section != section) {
+    m_section = section;
+    if (persist) {
+      persistSection();
+      if (m_section == Section::Chrome) {
+        persistChrome();
+      }
+    }
+    if (m_sectionSwitch != nullptr) {
+      m_sectionSyncing = true;
+      m_sectionSwitch->setSelectedIndex(indexFromSection(m_section));
+      m_sectionSyncing = false;
+    }
   }
   syncHosts();
   syncSettingsSection();
   setActive(true);
   PanelManager::instance().requestLayout();
+}
+
+void ThemeTab::applyOpenContext(std::string_view context, bool persist) {
+  if (context.empty() || context == "appearance" || context == "theme") {
+    return;
+  }
+  ChromeCatalog catalog = m_chromeCatalog;
+  if (context == "glass") {
+    catalog = ChromeCatalog::Glass;
+  } else if (context == "scale") {
+    catalog = ChromeCatalog::Scale;
+  } else if (context == "roundness") {
+    catalog = ChromeCatalog::Roundness;
+  }
+  const bool catalogChanged = catalog != m_chromeCatalog;
+  m_chromeCatalog = catalog;
+  if (catalogChanged) {
+    if (persist) {
+      persistChrome();
+    }
+    if (m_chromeSwitch != nullptr) {
+      m_chromeSyncing = true;
+      m_chromeSwitch->setSelectedIndex(indexFromChromeCatalog(m_chromeCatalog));
+      m_chromeSyncing = false;
+    }
+  }
+  applyOpenSection(sectionFromId(context), persist);
+}
+
+bool ThemeTab::matchesOpenContext(std::string_view context) const noexcept {
+  if (context == "glass") {
+    return m_section == Section::Chrome && m_chromeCatalog == ChromeCatalog::Glass;
+  }
+  if (context == "scale") {
+    return m_section == Section::Chrome && m_chromeCatalog == ChromeCatalog::Scale;
+  }
+  if (context == "roundness") {
+    return m_section == Section::Chrome && m_chromeCatalog == ChromeCatalog::Roundness;
+  }
+  if (context == "chrome") {
+    return m_section == Section::Chrome;
+  }
+  if (context == "palettes" || context == "theme" || context == "appearance") {
+    return m_section == Section::Palettes;
+  }
+  return m_section == sectionFromId(context);
 }
 
 void ThemeTab::applySection(std::size_t index) {
@@ -1181,6 +1312,22 @@ void ThemeTab::applySection(std::size_t index) {
   applyOpenSection(sectionFromIndex(index), true);
 }
 
+void ThemeTab::applyChromeCatalog(std::size_t index) {
+  if (m_chromeSyncing) {
+    return;
+  }
+  const ChromeCatalog catalog = chromeCatalogFromIndex(index);
+  if (catalog == m_chromeCatalog) {
+    return;
+  }
+  m_chromeCatalog = catalog;
+  persistChrome();
+  syncHosts();
+  syncSettingsSection();
+  setActive(true);
+  PanelManager::instance().requestLayout();
+}
+
 void ThemeTab::persistSection() {
   if (m_config == nullptr) {
     return;
@@ -1188,14 +1335,24 @@ void ThemeTab::persistSection() {
   (void)m_config->setStateString("theme_tab", "section", std::string(idFromSection(m_section)));
 }
 
+void ThemeTab::persistChrome() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("theme_tab", "chrome", std::string(idFromChromeCatalog(m_chromeCatalog)));
+}
+
 void ThemeTab::syncHosts() {
   const bool palettes = m_section == Section::Palettes;
+  const bool chrome = m_section == Section::Chrome;
+  setShown(m_palettesToolbar, palettes);
+  setShown(m_chromeToolbar, chrome);
   setShown(m_palettesHost, palettes);
-  setShown(m_glassHost, m_section == Section::Glass);
+  setShown(m_glassHost, chrome && m_chromeCatalog == ChromeCatalog::Glass);
+  setShown(m_scaleHost, chrome && m_chromeCatalog == ChromeCatalog::Scale);
+  setShown(m_roundnessHost, chrome && m_chromeCatalog == ChromeCatalog::Roundness);
   setShown(m_iconsHost, m_section == Section::Icons);
   setShown(m_typeHost, m_section == Section::Type);
-  setShown(m_scaleHost, m_section == Section::Scale);
-  setShown(m_roundnessHost, m_section == Section::Roundness);
   setShown(m_effectsHost, m_section == Section::Effects);
   setShown(m_languageHost, m_section == Section::Language);
 }
@@ -1207,6 +1364,11 @@ void ThemeTab::syncSettingsSection() {
   if (m_section == Section::Palettes) {
     m_settings->setSection("theme");
     m_settings->setIncludedGroups({"theme", "niri"});
+    return;
+  }
+  if (m_section == Section::Chrome) {
+    m_settings->setSection(std::string(idFromChromeCatalog(m_chromeCatalog)));
+    m_settings->setIncludedGroups({});
     return;
   }
   m_settings->setSection(std::string(idFromSection(m_section)));
@@ -1234,16 +1396,20 @@ void ThemeTab::syncChildChrome() {
 
 Tab* ThemeTab::hostedTab() const noexcept {
   switch (m_section) {
-  case Section::Glass:
-    return m_glass.get();
+  case Section::Chrome:
+    switch (m_chromeCatalog) {
+    case ChromeCatalog::Scale:
+      return m_scale.get();
+    case ChromeCatalog::Roundness:
+      return m_roundness.get();
+    case ChromeCatalog::Glass:
+    default:
+      return m_glass.get();
+    }
   case Section::Icons:
     return m_icons.get();
   case Section::Type:
     return m_type.get();
-  case Section::Scale:
-    return m_scale.get();
-  case Section::Roundness:
-    return m_roundness.get();
   case Section::Effects:
     return m_effects.get();
   case Section::Language:
@@ -1256,16 +1422,20 @@ Tab* ThemeTab::hostedTab() const noexcept {
 
 Flex* ThemeTab::hostNode() const noexcept {
   switch (m_section) {
-  case Section::Glass:
-    return m_glassHost;
+  case Section::Chrome:
+    switch (m_chromeCatalog) {
+    case ChromeCatalog::Scale:
+      return m_scaleHost;
+    case ChromeCatalog::Roundness:
+      return m_roundnessHost;
+    case ChromeCatalog::Glass:
+    default:
+      return m_glassHost;
+    }
   case Section::Icons:
     return m_iconsHost;
   case Section::Type:
     return m_typeHost;
-  case Section::Scale:
-    return m_scaleHost;
-  case Section::Roundness:
-    return m_roundnessHost;
   case Section::Effects:
     return m_effectsHost;
   case Section::Language:
@@ -1319,6 +1489,9 @@ void ThemeTab::onPanelCardOpacityChanged(float opacity) {
   }
   if (m_modeSwitch != nullptr) {
     m_modeSwitch->setSurfaceOpacity(opacity);
+  }
+  if (m_chromeSwitch != nullptr) {
+    m_chromeSwitch->setSurfaceOpacity(opacity);
   }
   syncChildChrome();
 }

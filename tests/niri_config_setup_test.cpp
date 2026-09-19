@@ -63,9 +63,29 @@ int main() {
   const auto second = includeText.find("spawn-at-startup \"noctalia\"", first == std::string::npos ? 0 : first + 1);
   ok = expect(first == std::string::npos, "does not duplicate autostart into the owned include") && ok;
   static_cast<void>(second);
+  ok = expect(
+           includeText.find(R"(session" "lid-close")") != std::string::npos,
+           "installs lid-close IPC snippet"
+       )
+      && ok;
 
   const auto again = compositors::niri::installSetupInto(config, true);
   ok = expect(again.ok && again.added == 0, "second setup install is a no-op") && ok;
+
+  const auto legacyInclude = dir / "legacy-lid-close.kdl";
+  {
+    std::ofstream out(legacyInclude);
+    out << "switch-events {\n    lid-close { spawn \"noctalia\" \"msg\" \"session\" \"lock-and-suspend\"; }\n}\n";
+  }
+  std::string migrateError;
+  ok = expect(
+           compositors::niri::migrateLidCloseSnippetIn(legacyInclude, migrateError),
+           "migrates lock-and-suspend lid-close"
+       )
+      && ok;
+  const auto migrated = compositors::niri::readFile(legacyInclude);
+  ok = expect(migrated.find("lock-and-suspend") == std::string::npos, "removes lock-and-suspend lid spawn") && ok;
+  ok = expect(migrated.find(R"(session" "lid-close")") != std::string::npos, "rewrites to session lid-close") && ok;
 
   std::filesystem::remove_all(dir);
   return ok ? 0 : 1;

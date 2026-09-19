@@ -75,6 +75,7 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Flex* m_nowCard = nullptr;
+  Flex* m_artworkWell = nullptr;
   Flex* m_playerSelectHost = nullptr;
   Select* m_playerSelect = nullptr;
   Button* m_hidePlayerButton = nullptr;

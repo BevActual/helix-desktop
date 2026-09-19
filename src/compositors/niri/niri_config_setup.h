@@ -40,5 +40,8 @@ namespace compositors::niri {
 
   InstallResult installSetup(bool includeBackdrop = true);
   InstallResult installSetupInto(const std::filesystem::path& configFile, bool includeBackdrop = true);
+  // Rewrite a managed lid-close spawn from lock-and-suspend to session lid-close.
+  bool migrateLidCloseSnippet();
+  bool migrateLidCloseSnippetIn(const std::filesystem::path& setupIncludePath, std::string& error);
 
 } // namespace compositors::niri

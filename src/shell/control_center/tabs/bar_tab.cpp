@@ -9,7 +9,6 @@
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/label.h"
-#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
@@ -20,6 +19,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -72,77 +72,52 @@ namespace {
 
 } // namespace
 
+std::size_t BarTab::indexFromSection(Section section) noexcept {
+  return section == Section::Shape ? 1 : 0;
+}
+
+BarTab::Section BarTab::sectionFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Section::Shape : Section::Layout;
+}
+
+BarTab::Section BarTab::sectionFromId(std::string_view id) noexcept {
+  return id == "shape" ? Section::Shape : Section::Layout;
+}
+
+std::string_view BarTab::idFromSection(Section section) noexcept {
+  return section == Section::Shape ? "shape" : "layout";
+}
+
 BarTab::BarTab(const ControlCenterServices& services)
     : m_config(services.config),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "bar"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "bar", .showConfigureButton = false}
+      )) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> section = m_config->stateString("bar_tab", "section")) {
+      m_section = sectionFromId(*section);
+    }
+  }
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { m_liveDirty = true; });
   }
 }
 
 std::unique_ptr<Flex> BarTab::create() {
+  return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
+}
+
+std::unique_ptr<Flex> BarTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
-  const float controlHeight = Style::controlHeight * scale;
+  const float opacity = panelCardOpacity();
 
   auto live = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
   });
-
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
-      .configure =
-          [](ScrollView& scrollView) {
-            scrollView.clearFill();
-            scrollView.clearBorder();
-          },
-  });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
-
-  auto addCaption = [scale, captionSize](Flex& parent, const std::string& text) {
-    parent.addChild(
-        ui::label({
-            .text = text,
-            .fontSize = captionSize,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-  };
-
-  auto addToggleRow = [scale, this](Flex& parent, const std::string& text, Toggle** out, bool checked,
-                                    void (BarTab::*apply)(bool)) {
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-        .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-    });
-    row->addChild(
-        ui::label({
-            .text = text,
-            .fontSize = Style::fontSizeBody * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    row->addChild(
-        ui::toggle({
-            .out = out,
-            .checkedImmediate = checked,
-            .toggleSize = ToggleSize::Medium,
-            .scale = scale,
-            .onChange = [this, apply](bool value) { (this->*apply)(value); },
-        })
-    );
-    parent.addChild(std::move(row));
-  };
 
   const BarConfig* bar = m_config != nullptr ? firstBar(m_config->config()) : nullptr;
   const BarConfig defaultBar{};
@@ -153,14 +128,13 @@ std::unique_ptr<Flex> BarTab::create() {
     m_barName = bar->name;
   }
 
-  auto generalCard = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
+  auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, opacity, hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
+          },
   });
-  addTitle(*generalCard, i18n::tr("settings.navigation.sections.bar"), scale);
-  generalCard->addChild(
+  compactCard->addChild(
       ui::label({
           .out = &m_empty,
           .text = i18n::tr("control-center.bar.empty"),
@@ -177,18 +151,74 @@ std::unique_ptr<Flex> BarTab::create() {
       .visible = hasBar,
       .participatesInLayout = hasBar,
   });
-  addToggleRow(*enableHost, i18n::tr("control-center.bar.enable"), &m_enabled, barRef.enabled, &BarTab::applyEnabled);
-  generalCard->addChild(std::move(enableHost));
+  m_enabled = addToggleRow(*enableHost, scale, i18n::tr("control-center.bar.enable"), [this](bool value) {
+    applyEnabled(value);
+  });
+  if (m_enabled != nullptr) {
+    m_enabled->setCheckedImmediate(barRef.enabled);
+  }
+  compactCard->addChild(std::move(enableHost));
 
-  auto details = ui::column({
-      .out = &m_details,
+  if (!hosted) {
+    auto sectionToolbar = ui::column({
+        .out = &m_sectionToolbar,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * scale,
+        .visible = barOn,
+        .participatesInLayout = barOn,
+    });
+    sectionToolbar->addChild(
+        ui::segmented({
+            .out = &m_sectionSwitch,
+            .options =
+                std::vector<ui::SegmentedOption>{
+                    {
+                        .label = "",
+                        .glyph = "crop-3-2",
+                        .tooltip = i18n::tr("control-center.bar.layout-tooltip"),
+                    },
+                    {
+                        .label = "",
+                        .glyph = "resize",
+                        .tooltip = i18n::tr("control-center.bar.shape-tooltip"),
+                    },
+                },
+            .selectedIndex = indexFromSection(m_section),
+            .scale = scale,
+            .compact = true,
+            .surfaceOpacity = opacity,
+            .onChange = [this](std::size_t index) { applySection(index); },
+        })
+    );
+    sectionToolbar->addChild(
+        ui::label({
+            .out = &m_caption,
+            .fontSize = captionSize,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 2,
+        })
+    );
+    compactCard->addChild(std::move(sectionToolbar));
+  }
+  live->addChild(std::move(compactCard));
+
+  const bool layoutOpen = barOn && m_section == Section::Layout;
+  auto layoutHost = ui::column({
+      .out = &m_layoutHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .visible = barOn,
-      .participatesInLayout = barOn,
+      .flexGrow = 1.0F,
+      .visible = layoutOpen,
+      .participatesInLayout = layoutOpen,
+      .configure =
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
   });
-  addCaption(*details, i18n::tr("control-center.bar.position"));
-  details->addChild(
+  addCaption(*layoutHost, i18n::tr("control-center.bar.position"), scale);
+  layoutHost->addChild(
       ui::segmented({
           .out = &m_position,
           .options =
@@ -202,14 +232,13 @@ std::unique_ptr<Flex> BarTab::create() {
           .fontSize = captionSize,
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = opacity,
           .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyPosition(index); },
       })
   );
-
-  addCaption(*details, i18n::tr("control-center.bar.auto-hide"));
-  details->addChild(
+  addCaption(*layoutHost, i18n::tr("control-center.bar.auto-hide"), scale);
+  layoutHost->addChild(
       ui::segmented({
           .out = &m_autoHide,
           .options =
@@ -231,109 +260,52 @@ std::unique_ptr<Flex> BarTab::create() {
           .fontSize = captionSize,
           .scale = scale,
           .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = opacity,
           .equalSegmentWidths = true,
           .onChange = [this](std::size_t index) { applyAutoHide(index); },
       })
   );
-  addToggleRow(
-      *details, i18n::tr("control-center.bar.reserve-space"), &m_reserveSpace, barRef.reserveSpace,
-      &BarTab::applyReserveSpace
+  m_reserveSpace = addToggleRow(
+      *layoutHost, scale, i18n::tr("control-center.bar.reserve-space"), [this](bool value) { applyReserveSpace(value); }
   );
-  addToggleRow(*details, i18n::tr("control-center.bar.shadow"), &m_shadow, barRef.shadow, &BarTab::applyShadow);
-  generalCard->addChild(std::move(details));
-  content->addChild(std::move(generalCard));
+  if (m_reserveSpace != nullptr) {
+    m_reserveSpace->setCheckedImmediate(barRef.reserveSpace);
+  }
+  live->addChild(std::move(layoutHost));
 
-  auto shapeCard = ui::column({
-      .out = &m_shapeCard,
+  const bool shapeOpen = barOn && m_section == Section::Shape;
+  auto shapeHost = ui::column({
+      .out = &m_shapeHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .visible = barOn,
-      .participatesInLayout = barOn,
+      .flexGrow = 1.0F,
+      .visible = shapeOpen,
+      .participatesInLayout = shapeOpen,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, hosted](Flex& section) {
+            if (!hosted) {
+              applyContentCardStyle(section, scale);
+            }
+          },
   });
-  addTitle(*shapeCard, i18n::tr("control-center.bar.thickness"), scale);
+  addSliderSection(
+      *shapeHost, scale, i18n::tr("control-center.bar.thickness"), &m_thickness, &m_thicknessValue, 10.0, 120.0, 1.0,
+      static_cast<double>(barRef.thickness), pixelLabel, [this]() { commitThickness(); }
+  );
+  addSliderSection(
+      *shapeHost, scale, i18n::tr("control-center.bar.opacity"), &m_opacity, &m_opacityValue, 0.0, 1.0, 0.01,
+      static_cast<double>(barRef.backgroundOpacity), percentLabel, [this]() { commitOpacity(); }
+  );
+  m_shadow = addToggleRow(*shapeHost, scale, i18n::tr("control-center.bar.shadow"), [this](bool value) {
+    applyShadow(value);
+  });
+  if (m_shadow != nullptr) {
+    m_shadow->setCheckedImmediate(barRef.shadow);
+  }
+  live->addChild(std::move(shapeHost));
 
-  auto thicknessHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  thicknessHeader->addChild(
-      ui::label({
-          .out = &m_thicknessValue,
-          .text = pixelLabel(static_cast<double>(barRef.thickness)),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .textAlign = TextAlign::End,
-          .flexGrow = 1.0F,
-      })
-  );
-  shapeCard->addChild(std::move(thicknessHeader));
-  shapeCard->addChild(
-      ui::slider({
-          .out = &m_thickness,
-          .minValue = 10.0,
-          .maxValue = 120.0,
-          .step = 1.0,
-          .value = static_cast<double>(barRef.thickness),
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_thicknessValue != nullptr) {
-                  m_thicknessValue->setText(pixelLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitThickness(); },
-      })
-  );
-
-  auto opacityHeader = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
-  opacityHeader->addChild(
-      ui::label({
-          .text = i18n::tr("control-center.bar.opacity"),
-          .fontSize = captionSize,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .flexGrow = 1.0F,
-      })
-  );
-  opacityHeader->addChild(
-      ui::label({
-          .out = &m_opacityValue,
-          .text = percentLabel(static_cast<double>(barRef.backgroundOpacity)),
-          .fontSize = captionSize,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-      })
-  );
-  shapeCard->addChild(std::move(opacityHeader));
-  shapeCard->addChild(
-      ui::slider({
-          .out = &m_opacity,
-          .minValue = 0.0,
-          .maxValue = 1.0,
-          .step = 0.01,
-          .value = static_cast<double>(barRef.backgroundOpacity),
-          .trackHeight = Style::sliderTrackHeight * scale,
-          .thumbSize = Style::sliderThumbSize * scale,
-          .controlHeight = controlHeight,
-          .flexGrow = 1.0F,
-          .onValueChanged =
-              [this](double value) {
-                if (m_opacityValue != nullptr) {
-                  m_opacityValue->setText(percentLabel(value));
-                }
-              },
-          .onDragEnd = [this]() { commitOpacity(); },
-      })
-  );
-  content->addChild(std::move(shapeCard));
-
-  live->addChild(std::move(scroll));
-  auto wrapped = m_settings->wrapLive(std::move(live), scale, panelCardOpacity());
   syncLiveControls();
-  return wrapped;
+  return live;
 }
 
 std::unique_ptr<Flex> BarTab::createHeaderActions() {
@@ -346,9 +318,11 @@ void BarTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_enableRow = nullptr;
-  m_details = nullptr;
-  m_shapeCard = nullptr;
+  m_sectionToolbar = nullptr;
+  m_layoutHost = nullptr;
+  m_shapeHost = nullptr;
   m_enabled = nullptr;
+  m_sectionSwitch = nullptr;
   m_position = nullptr;
   m_autoHide = nullptr;
   m_reserveSpace = nullptr;
@@ -358,6 +332,7 @@ void BarTab::onClose() {
   m_opacity = nullptr;
   m_opacityValue = nullptr;
   m_empty = nullptr;
+  m_caption = nullptr;
 }
 
 void BarTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -390,19 +365,65 @@ void BarTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void BarTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSwitch->setSurfaceOpacity(opacity);
+  }
+  if (m_position != nullptr) {
+    m_position->setSurfaceOpacity(opacity);
+  }
+  if (m_autoHide != nullptr) {
+    m_autoHide->setSurfaceOpacity(opacity);
+  }
+}
+
+void BarTab::syncHosts() {
+  const BarConfig* bar = m_config != nullptr ? firstBar(m_config->config()) : nullptr;
+  const bool hasBar = bar != nullptr;
+  const bool barOn = hasBar && bar->enabled;
+  const bool layoutOpen = barOn && m_section == Section::Layout;
+  const bool shapeOpen = barOn && m_section == Section::Shape;
+  bool layoutDirty = setShown(m_empty, !hasBar) || setShown(m_enableRow, hasBar) || setShown(m_sectionToolbar, barOn)
+      || setShown(m_layoutHost, layoutOpen) || setShown(m_shapeHost, shapeOpen);
+  if (layoutDirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void BarTab::persistSection() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString("bar_tab", "section", std::string(idFromSection(m_section)));
+}
+
+void BarTab::applySection(std::size_t index) {
+  if (m_sectionSyncing) {
+    return;
+  }
+  const Section section = sectionFromIndex(index);
+  if (m_section == section) {
+    syncHosts();
+    return;
+  }
+  m_section = section;
+  persistSection();
+  if (m_sectionSwitch != nullptr) {
+    m_sectionSyncing = true;
+    m_sectionSwitch->setSelectedIndex(indexFromSection(m_section));
+    m_sectionSyncing = false;
+  }
+  syncHosts();
+  syncLiveControls();
+}
+
 void BarTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
   }
   const BarConfig* bar = firstBar(m_config->config());
   const bool hasBar = bar != nullptr;
-  const bool barOn = hasBar && bar->enabled;
-  const bool layoutDirty =
-      setShown(m_empty, !hasBar) || setShown(m_enableRow, hasBar) || setShown(m_details, barOn)
-      || setShown(m_shapeCard, barOn);
-  if (layoutDirty) {
-    PanelManager::instance().requestLayout();
-  }
+  syncHosts();
   const auto setInteractive = [hasBar](auto* control) {
     if (control != nullptr) {
       control->setEnabled(hasBar);
@@ -415,6 +436,12 @@ void BarTab::syncLiveControls() {
   setInteractive(m_shadow);
   setInteractive(m_thickness);
   setInteractive(m_opacity);
+  if (m_caption != nullptr) {
+    m_caption->setText(
+        m_section == Section::Shape ? i18n::tr("control-center.bar.shape-caption")
+                                    : i18n::tr("control-center.bar.layout-caption")
+    );
+  }
   if (!hasBar) {
     m_barName.clear();
     return;
@@ -500,9 +527,7 @@ void BarTab::commitThickness() {
   if (m_syncing || m_config == nullptr || m_thickness == nullptr || m_barName.empty()) {
     return;
   }
-  (void)m_config->setOverride(
-      {"bar", m_barName, "thickness"}, static_cast<std::int64_t>(m_thickness->value())
-  );
+  (void)m_config->setOverride({"bar", m_barName, "thickness"}, static_cast<std::int64_t>(m_thickness->value()));
 }
 
 void BarTab::commitOpacity() {

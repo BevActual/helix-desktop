@@ -66,10 +66,7 @@ private:
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};
   Flex* m_prefsCard = nullptr;
-  Separator* m_prefsDivider = nullptr;
   Flex* m_peersCard = nullptr;
-  Separator* m_peersDivider = nullptr;
-
   std::string m_peerFilterText;
   std::string m_peerSignature;
   std::string m_exitOptionsKey;

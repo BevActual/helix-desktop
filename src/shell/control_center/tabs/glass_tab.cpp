@@ -1,5 +1,9 @@
 #include "shell/control_center/tabs/glass_tab.h"
 
+#include "compositors/compositor_detect.h"
+#include "compositors/compositor_platform.h"
+#include "compositors/niri/niri_config_blur.h"
+#include "compositors/niri/niri_runtime.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
 #include "i18n/i18n.h"
@@ -9,10 +13,13 @@
 #include "ui/builders.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/label.h"
-#include "ui/controls/segmented.h"
+#include "ui/controls/slider.h"
+#include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
+#include <algorithm>
+#include <format>
 #include <iterator>
 #include <string>
 #include <utility>
@@ -22,22 +29,35 @@ using namespace control_center;
 
 namespace {
 
-  [[nodiscard]] const char* captionKey(PanelTransparencyMode mode) {
-    switch (mode) {
-    case PanelTransparencyMode::Soft:
-      return "control-center.appearance.glass-soft-caption";
-    case PanelTransparencyMode::Glass:
-      return "control-center.appearance.glass-glass-caption";
-    case PanelTransparencyMode::Solid:
-    default:
+  [[nodiscard]] const char* captionKey(float glass) {
+    if (glass < 1.0F / 3.0F) {
       return "control-center.appearance.glass-solid-caption";
     }
+    if (glass < 2.0F / 3.0F) {
+      return "control-center.appearance.glass-soft-caption";
+    }
+    return "control-center.appearance.glass-glass-caption";
+  }
+
+  [[nodiscard]] const char* refractionCaptionKey(bool helixNiri) {
+    if (!compositors::isNiri()) {
+      return "control-center.appearance.glass-refraction-other-caption";
+    }
+    if (helixNiri) {
+      return "control-center.appearance.glass-refraction-helix-caption";
+    }
+    return "control-center.appearance.glass-refraction-stock-caption";
+  }
+
+  [[nodiscard]] std::string glassPercentLabel(double value) {
+    return std::format("{:.0f}%", std::clamp(value, 0.0, 1.0) * 100.0);
   }
 
 } // namespace
 
 GlassTab::GlassTab(const ControlCenterServices& services)
     : m_config(services.config),
+      m_platform(services.platform),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "glass", .showConfigureButton = false}
       )) {
@@ -50,11 +70,11 @@ std::unique_ptr<Flex> GlassTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> GlassTab::createLiveBody() {
+std::unique_ptr<Flex> GlassTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
-  const float captionSize = Style::fontSizeCaption * scale;
-  const PanelTransparencyMode current =
-      m_config != nullptr ? m_config->config().shell.panel.transparencyMode : PanelTransparencyMode::Solid;
+  const float glass =
+      m_config != nullptr ? resolvedPanelGlass(m_config->config().shell.panel) : 0.0F;
+  const bool refraction = m_config != nullptr && m_config->config().shell.panel.refraction;
 
   auto tab = ui::column({
       .out = &m_rootLayout,
@@ -65,51 +85,37 @@ std::unique_ptr<Flex> GlassTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
-  compactCard->addChild(
-      ui::segmented({
-          .out = &m_modeSwitch,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = "",
-                      .glyph = "square",
-                      .tooltip = i18n::tr("settings.options.shell.panel-transparency.solid"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "blur",
-                      .tooltip = i18n::tr("settings.options.shell.panel-transparency.soft"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "glass",
-                      .tooltip = i18n::tr("settings.options.shell.panel-transparency.glass"),
-                  },
-              },
-          .selectedIndex = static_cast<std::size_t>(current),
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .onChange =
-              [this](std::size_t index) {
-                if (index >= std::size(kPanelTransparencyModes)) {
-                  return;
-                }
-                applyTransparencyMode(kPanelTransparencyModes[index].value);
-              },
-      })
+  addSliderSection(
+      *compactCard, scale, i18n::tr("control-center.appearance.glass-slider"), &m_glass, &m_glassValue, 0.0, 1.0, 0.01,
+      glass, glassPercentLabel, [this]() { commitGlass(); }
   );
   compactCard->addChild(
       ui::label({
           .out = &m_caption,
-          .text = i18n::tr(captionKey(current)),
-          .fontSize = captionSize,
+          .text = i18n::tr(captionKey(glass)),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  m_refraction = addToggleRow(
+      *compactCard, scale, i18n::tr("control-center.appearance.glass-refraction"),
+      [this](bool value) { applyRefraction(value); }
+  );
+  if (m_refraction != nullptr) {
+    m_refraction->setCheckedImmediate(refraction);
+  }
+  compactCard->addChild(
+      ui::label({
+          .out = &m_refractionCaption,
+          .text = i18n::tr(refractionCaptionKey(
+              m_platform != nullptr && compositors::niri::detectLiquidGlass(&m_platform->niriRuntime())
+          )),
+          .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 2,
       })
@@ -129,8 +135,11 @@ void GlassTab::onClose() {
     m_settings->onClose();
   }
   m_rootLayout = nullptr;
-  m_modeSwitch = nullptr;
+  m_glass = nullptr;
+  m_glassValue = nullptr;
   m_caption = nullptr;
+  m_refraction = nullptr;
+  m_refractionCaption = nullptr;
 }
 
 void GlassTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -165,36 +174,67 @@ void GlassTab::doUpdate(Renderer& renderer) {
   }
 }
 
-void GlassTab::onPanelCardOpacityChanged(float opacity) {
-  if (m_modeSwitch != nullptr) {
-    m_modeSwitch->setSurfaceOpacity(opacity);
-  }
-}
-
 void GlassTab::syncLiveControls() {
   if (m_config == nullptr) {
     return;
   }
-  const PanelTransparencyMode mode = m_config->config().shell.panel.transparencyMode;
+  const float glass = resolvedPanelGlass(m_config->config().shell.panel);
+  const bool refraction = m_config->config().shell.panel.refraction;
   m_syncing = true;
-  if (m_modeSwitch != nullptr) {
-    m_modeSwitch->setSelectedIndex(static_cast<std::size_t>(mode));
+  if (m_glass != nullptr) {
+    m_glass->setValue(glass);
+  }
+  if (m_glassValue != nullptr) {
+    m_glassValue->setText(glassPercentLabel(glass));
   }
   if (m_caption != nullptr) {
-    m_caption->setText(i18n::tr(captionKey(mode)));
+    m_caption->setText(i18n::tr(captionKey(glass)));
+  }
+  if (m_refraction != nullptr) {
+    m_refraction->setCheckedImmediate(refraction);
+  }
+  if (m_refractionCaption != nullptr) {
+    m_refractionCaption->setText(i18n::tr(refractionCaptionKey(
+        m_platform != nullptr && compositors::niri::detectLiquidGlass(&m_platform->niriRuntime())
+    )));
   }
   m_syncing = false;
 }
 
-void GlassTab::applyTransparencyMode(PanelTransparencyMode mode) {
+void GlassTab::commitGlass() {
+  if (m_syncing || m_config == nullptr || m_glass == nullptr) {
+    return;
+  }
+  const float glass = static_cast<float>(std::clamp(m_glass->value(), 0.0, 1.0));
+  const auto mode = transparencyModeForGlass(glass);
+  const auto index = static_cast<std::size_t>(mode);
+  std::vector<std::pair<std::vector<std::string>, ConfigOverrideValue>> overrides;
+  overrides.emplace_back(std::vector<std::string>{"shell", "panel", "glass"}, static_cast<double>(glass));
+  if (index < std::size(kPanelTransparencyModes)) {
+    overrides.emplace_back(
+        std::vector<std::string>{"shell", "panel", "transparency_mode"}, std::string(kPanelTransparencyModes[index].key)
+    );
+  }
+  (void)m_config->setOverrides(std::move(overrides));
+  persistCompositorGlass();
+  syncLiveControls();
+  PanelManager::instance().refresh();
+}
+
+void GlassTab::applyRefraction(bool enabled) {
   if (m_syncing || m_config == nullptr) {
     return;
   }
-  const auto index = static_cast<std::size_t>(mode);
-  if (index >= std::size(kPanelTransparencyModes)) {
-    return;
-  }
-  (void)m_config->setOverride({"shell", "panel", "transparency_mode"}, std::string(kPanelTransparencyModes[index].key));
+  (void)m_config->setOverride({"shell", "panel", "refraction"}, enabled);
+  persistCompositorGlass();
   syncLiveControls();
   PanelManager::instance().refresh();
+}
+
+void GlassTab::persistCompositorGlass() {
+  if (m_config == nullptr || !compositors::isNiri()) {
+    return;
+  }
+  const bool helixNiri = m_platform != nullptr && compositors::niri::detectLiquidGlass(&m_platform->niriRuntime());
+  (void)compositors::niri::saveNiriBlur(compositors::niri::blurSettingsFromConfig(m_config->config(), helixNiri));
 }

@@ -111,16 +111,22 @@ namespace {
     return i18n::tr(std::format("settings.widgets.actions.commands.{}.{}", command, field));
   }
 
-  [[nodiscard]] compositors::niri::BlurSettings niriBlurSettingsFrom(const ThemeConfig::NiriLayoutThemeConfig& niri) {
-    return {
-        .enabled = niri.blur,
-        .passes = niri.blurPasses,
-        .offset = niri.blurOffset,
-        .noise = niri.blurNoise,
-    };
+  [[nodiscard]] compositors::niri::BlurSettings niriBlurSettingsFrom(
+      const Config& config, CompositorPlatform* platform
+  ) {
+    const bool helixNiri =
+        platform != nullptr && compositors::niri::detectLiquidGlass(&platform->niriRuntime());
+    return compositors::niri::blurSettingsFromConfig(config, helixNiri);
   }
 
   [[nodiscard]] bool isNiriBlurPersistPath(const std::vector<std::string>& path) {
+    if (path.size() == 3 && path[0] == "shell" && path[1] == "panel"
+        && (path[2] == "refraction" || path[2] == "glass")) {
+      return true;
+    }
+    if (path.size() == 2 && path[0] == "accessibility" && path[1] == "high_contrast") {
+      return true;
+    }
     return path.size() == 3 && path[0] == "theme" && path[1] == "niri_layout"
         && (path[2] == "blur" || path[2] == "blur_passes" || path[2] == "blur_offset" || path[2] == "blur_noise");
   }
@@ -1071,10 +1077,10 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
 }
 
 void SettingsPane::persistNiriBlurInclude() {
-  if (m_config == nullptr) {
+  if (m_config == nullptr || !compositors::isNiri()) {
     return;
   }
-  const auto result = compositors::niri::saveNiriBlur(niriBlurSettingsFrom(m_config->config().theme.niriLayout));
+  const auto result = compositors::niri::saveNiriBlur(niriBlurSettingsFrom(m_config->config(), m_platform));
   if (result.ok) {
     return;
   }

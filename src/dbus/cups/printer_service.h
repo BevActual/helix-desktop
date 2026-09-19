@@ -71,5 +71,8 @@ private:
   ChangeCallback m_changeCallback;
   Timer m_pollTimer;
   bool m_fastPoll = false;
+  // refresh() runs CUPS queries on a worker thread; these are only touched on the main thread.
+  bool m_refreshInflight = false;
+  bool m_refreshQueued = false;
   std::unique_ptr<Impl> m_impl;
 };

@@ -92,6 +92,12 @@ int main() {
     ok = expect(outputs[0].scale > 1.6 && outputs[0].scale < 1.7, "reads fractional scale") && ok;
     ok = expect(outputs[0].vrrSupported && outputs[0].vrrEnabled, "reads vrr flags") && ok;
     ok = expect(display_config::displayLabel(outputs[0]) == "BOE Panel", "formats make+model label") && ok;
+    ok = expect(display_config::isInternalOutputName("eDP-1"), "eDP is an internal panel") && ok;
+    ok = expect(display_config::isInternalOutputName("LVDS-1"), "LVDS is an internal panel") && ok;
+    ok = expect(display_config::isInternalOutputName("dsi-1"), "DSI is an internal panel") && ok;
+    ok = expect(!display_config::isInternalOutputName("DP-1"), "DisplayPort is external") && ok;
+    ok = expect(!display_config::isInternalOutputName("HDMI-A-1"), "HDMI is external") && ok;
+    ok = expect(display_config::hasEnabledExternalOutput(outputs), "enabled HDMI counts as external") && ok;
   }
 
   ok = expect(

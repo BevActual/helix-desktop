@@ -38,7 +38,7 @@ std::unique_ptr<Flex> ScaleTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> ScaleTab::createLiveBody() {
+std::unique_ptr<Flex> ScaleTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
 
   auto tab = ui::column({
@@ -49,7 +49,10 @@ std::unique_ptr<Flex> ScaleTab::createLiveBody() {
   });
 
   auto compactCard = ui::column({
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .configure =
+          [scale, opacity = panelCardOpacity(), hosted](Flex& section) {
+            applyCompactCardStyle(section, scale, opacity, hosted);
+          },
   });
   addSliderSection(
       *compactCard, scale, i18n::tr("settings.schema.appearance.ui-scale.label"), &m_uiScale, &m_uiScaleValue,

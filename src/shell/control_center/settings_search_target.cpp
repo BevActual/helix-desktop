@@ -72,7 +72,8 @@ namespace control_center {
         || section == "scale"
         || section == "roundness"
         || section == "effects"
-        || section == "language") {
+        || section == "language"
+        || section == "chrome") {
       return "theme";
     }
     if (section == "location") {
@@ -83,6 +84,17 @@ namespace control_center {
     }
     if (section == "screenshot" || section == "screen-record") {
       return "capture";
+    }
+    if (section == "widgets"
+        || section == "corners"
+        || section == "hot-corners"
+        || section == "screen-corners"
+        || section == "bar"
+        || section == "dock"
+        || section == "windows"
+        || section == "panels"
+        || section == "osd") {
+      return "desktop";
     }
     if (section == "ai-usage") {
       return "ai";

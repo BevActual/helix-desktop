@@ -279,6 +279,11 @@
       "glass-glass-caption": "Clear glass over wallpaper. Leftover stays dimmed so type stays readable.",
       "glass-soft-caption": "Regular glass chrome. Leftover cards stay solid.",
       "glass-solid-caption": "Opaque chrome. Leftover cards stay leftover.",
+      "glass-slider": "Solid to Glass",
+      "glass-refraction": "Refraction",
+      "glass-refraction-helix-caption": "helix-niri refracts wallpaper through chrome. Strength follows the slider.",
+      "glass-refraction-stock-caption": "Stock niri uses chrome blur. liquid-glass is helix-niri only.",
+      "glass-refraction-other-caption": "Refraction needs niri. Other compositors keep this off.",
       "icons-default": "Default",
       "icons-default-caption": "App icons keep their original colors.",
       "icons-tinted": "Tinted",
@@ -408,6 +413,8 @@
       "forget": "Forget device",
       "no-devices": "No devices found. Start scanning to discover nearby Bluetooth devices.",
       "off": "Bluetooth is off",
+      "off-title": "Off",
+      "on": "On",
       "pair": "Pair",
       "pair-title": "Pair {device}",
       "pairing-detail": {
@@ -429,6 +436,7 @@
         "paired": "Paired"
       },
       "unavailable": "Bluetooth is not available.",
+      "unavailable-title": "Unavailable",
       "unknown-device": "Unknown device",
       "visible": "Discoverable by nearby devices"
     },
@@ -520,28 +528,51 @@
       "auto-hide-smart-tooltip": "Show on an empty workspace; hide when windows are open",
       "enable": "Show bar",
       "empty": "No bar configured. Create one under header gear.",
+      "layout-caption": "Edge, auto-hide, and reserved space.",
+      "layout-tooltip": "Position and auto-hide",
       "opacity": "Background opacity",
       "position": "Position",
       "reserve-space": "Reserve space",
       "shadow": "Shadow",
+      "shape-caption": "Thickness, opacity, and shadow.",
+      "shape-tooltip": "Thickness and opacity",
       "thickness": "Thickness"
     },
     "dock": {
       "add-app": "Add an app",
       "auto-hide": "Auto-hide",
       "enable": "Show dock",
+      "layout-caption": "Edge, auto-hide, and running apps.",
+      "layout-tooltip": "Position and auto-hide",
       "pinned": "Pinned apps",
+      "pinned-caption": "Apps that stay in the dock.",
+      "pinned-tooltip": "Pinned apps",
       "position": "Position",
       "show-running": "Show running apps"
     },
     "desktop": {
+      "add": "Add",
+      "add-tooltip": "Add this widget to the desktop",
       "corners": "Corners",
-      "edit": "Edit widgets",
+      "corners-caption": "Rounded screen corners and hot-corner actions.",
+      "corners-tooltip": "Screen corners and hot corners",
+      "edit": "Edit layout",
       "edit-tooltip": "Move and resize widgets on the desktop",
-      "empty": "No widgets yet. Use Edit widgets to add one.",
+      "empty": "No widgets yet. Click a type to add one.",
+      "hot-corners-caption": "Pointer actions when you hit a screen corner.",
+      "hot-corners-tooltip": "Hot-corner actions",
       "off": "Widgets are off",
+      "on-desktop": "{count} on desktop",
+      "on-desktop-plural": "{count} on desktop",
+      "screen-corners-caption": "Rounded corners on the desktop.",
+      "screen-corners-tooltip": "Screen corner size",
+      "search": "Search widgets",
       "widget-count": "{count} widget",
-      "widget-count-plural": "{count} widgets"
+      "widget-count-plural": "{count} widgets",
+      "widgets-glanceable-tooltip": "Clock, calendar, and weather",
+      "widgets-sound-tooltip": "Media, volume, and visualizers",
+      "widgets-tools-tooltip": "System monitor, buttons, labels, and stickers",
+      "widgets-tooltip": "Desktop widgets"
     },
     "launcher": {
       "add-app": "Add an app",
@@ -740,14 +771,22 @@
       "orientation": "Orientation",
       "orientation-horizontal-tooltip": "Wide pop-up along the screen edge",
       "orientation-vertical-tooltip": "Tall pop-up stacked as a column",
+      "placement-caption": "Orientation and screen position.",
+      "placement-tooltip": "Position on screen",
       "position": "Position",
-      "scale": "Size"
+      "scale": "Size",
+      "style-caption": "Size, opacity, and border.",
+      "style-tooltip": "Size and opacity"
     },
     "panels": {
+      "chrome-caption": "Borders, shadow, and list-row tint.",
+      "chrome-tooltip": "Borders and shadow",
       "glass-tooltip": "Blurred glass over the wallpaper",
       "layer-overlay-tooltip": "Keep panels above fullscreen windows",
       "layer-top-tooltip": "Use when input-method windows hide behind panels",
       "list-rows": "Tint list rows",
+      "placement-caption": "Layer and floating offset.",
+      "placement-tooltip": "Layer and offset",
       "soft-tooltip": "Slightly translucent",
       "solid-tooltip": "Opaque panel background"
     },
@@ -796,6 +835,10 @@
       },
       "design-capacity": "Of design capacity",
       "health": "Battery Health",
+      "lid-close": {
+        "description": "When another display is on, closing the lid turns off the laptop screen instead of suspending.",
+        "title": "Lid close"
+      },
       "performance-inhibited": "Performance unavailable",
       "peripherals": "Connected Devices",
       "power-profile": "Power Profile",
@@ -815,12 +858,16 @@
       "windows-title": "App Windows"
     },
     "windows": {
+      "columns-caption": "How wide new tiled windows start.",
       "columns-description": "How wide new tiled windows start, as a percent of the display.",
       "columns-title": "Columns",
+      "columns-tooltip": "Default column width",
       "save-failed": "Could not update window layout",
       "save-title": "Windows",
+      "spacing-caption": "Gaps between windows and outer padding.",
       "spacing-description": "Gaps between tiled windows and extra outer padding on all four sides.",
-      "spacing-title": "Spacing"
+      "spacing-title": "Spacing",
+      "spacing-tooltip": "Gaps and outer padding"
     },
     "screen-time": {
       "back": "Back",
@@ -2395,6 +2442,7 @@
         "dock": "Dock",
         "effects": "Effects",
         "glass": "Glass",
+        "chrome": "Chrome",
         "language": "Language",
         "hooks": "Hooks",
         "icons": "Icons",
@@ -3482,6 +3530,10 @@
           "description": "Lock the session before sleep (lid close, systemctl suspend, hibernate); Lock & Suspend actions still lock first",
           "label": "Lock Before Suspend"
         },
+        "lid-close-keep-external-displays": {
+          "description": "When another display is on, closing the lid turns off the laptop screen instead of suspending",
+          "label": "Keep Using Other Displays"
+        },
         "monitors": {
           "description": "Choose which monitors show the lock screen; leave empty to show on all monitors",
           "label": "Monitors"
@@ -3574,8 +3626,8 @@
               "label": "Backdrop layer-rule"
             },
             "lid-close": {
-              "description": "Lock and suspend when the laptop lid closes",
-              "label": "Lid close lock and suspend"
+              "description": "On lid close, keep using other displays when they are on; otherwise lock and suspend",
+              "label": "Lid close"
             },
             "xdg-activation": {
               "description": "Allow notification actions and window activation from Noctalia",
@@ -3886,6 +3938,14 @@
         "transparency-mode": {
           "description": "Panel glass style, including floating panel opacity and card translucency",
           "label": "Transparency"
+        },
+        "glass": {
+          "description": "Solid to glass fill for panel chrome. Leftover cards stay leftover, not nested glass.",
+          "label": "Glass"
+        },
+        "refraction": {
+          "description": "On helix-niri, refract the wallpaper through chrome. On stock niri, this is chrome blur.",
+          "label": "Refraction"
         }
       },
       "power": {

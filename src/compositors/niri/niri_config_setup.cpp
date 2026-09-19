@@ -29,9 +29,12 @@ namespace compositors::niri {
 )";
 
     constexpr std::string_view kLidCloseKdl = R"(switch-events {
-    lid-close { spawn "noctalia" "msg" "session" "lock-and-suspend"; }
+    lid-close { spawn "noctalia" "msg" "session" "lid-close"; }
 }
 )";
+    constexpr std::string_view kLegacyLidCloseSpawn =
+        R"(lid-close { spawn "noctalia" "msg" "session" "lock-and-suspend"; })";
+    constexpr std::string_view kLidCloseSpawn = R"(lid-close { spawn "noctalia" "msg" "session" "lid-close"; })";
 
     constexpr SetupItem kRequired[] = {
         {.id = "autostart", .kdl = kAutostartKdl},
@@ -94,9 +97,24 @@ namespace compositors::niri {
             && hasKeyword(text, "place-within-backdrop");
       }
       if (id == "lid-close") {
-        return hasKeyword(text, "lid-close") && text.find("lock-and-suspend") != std::string_view::npos;
+        return hasKeyword(text, "lid-close")
+            && (text.find("lock-and-suspend") != std::string_view::npos
+                || text.find(R"("lid-close")") != std::string_view::npos);
       }
       return false;
+    }
+
+    [[nodiscard]] bool rewriteLidCloseSpawn(std::string& body) {
+      bool changed = false;
+      for (;;) {
+        const auto found = body.find(kLegacyLidCloseSpawn);
+        if (found == std::string::npos) {
+          break;
+        }
+        body.replace(found, kLegacyLidCloseSpawn.size(), kLidCloseSpawn);
+        changed = true;
+      }
+      return changed;
     }
 
     [[nodiscard]] bool alreadyContainsKdl(std::string_view existing, std::string_view kdl) {
@@ -187,6 +205,7 @@ namespace compositors::niri {
     } else if (body.back() != '\n') {
       body.push_back('\n');
     }
+    (void)rewriteLidCloseSpawn(body);
 
     std::unordered_set<std::string> added;
     for (const auto& item : missing) {
@@ -209,6 +228,32 @@ namespace compositors::niri {
     }
     result.ok = true;
     return result;
+  }
+
+  bool migrateLidCloseSnippet() {
+    const auto path = setupIncludePath();
+    if (path.empty()) {
+      return false;
+    }
+    std::string error;
+    return migrateLidCloseSnippetIn(path, error);
+  }
+
+  bool migrateLidCloseSnippetIn(const std::filesystem::path& setupInclude, std::string& error) {
+    error.clear();
+    if (setupInclude.empty()) {
+      error = "niri setup include path is unknown";
+      return false;
+    }
+    std::error_code ec;
+    if (!std::filesystem::exists(setupInclude, ec) || ec) {
+      return false;
+    }
+    std::string body = readFile(setupInclude);
+    if (!rewriteLidCloseSpawn(body)) {
+      return false;
+    }
+    return writeFile(setupInclude, body, error);
   }
 
 } // namespace compositors::niri

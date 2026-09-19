@@ -1027,8 +1027,9 @@ std::unique_ptr<Flex> NetworkTab::create() {
   auto passwordCard = ui::column({
       .out = &m_passwordCard,
       .visible = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        applySectionCardStyle(card, scale, opacity);
+      // Prompt sheet under the compact card: a solid well, not a second glass layer.
+      .configure = [scale](Flex& card) {
+        applyContentCardStyle(card, scale);
         card.setGap(Style::spaceMd * scale);
       },
   });
@@ -1074,7 +1075,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
               .options = optionLabels(kEapOptions),
               .selectedIndex = std::size_t{0},
               .placeholder = i18n::tr("control-center.network.eap-method"),
-              .surfaceOpacity = panelCardOpacity(),
+              .surfaceOpacity = 1.0F,
               .flexGrow = 1.0F,
               .onSelectionChanged =
                   [this](std::size_t index, std::string_view /*text*/) {
@@ -1098,7 +1099,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
               .selectedIndex = kPeapPhase2Index,
               .placeholder = i18n::tr("control-center.network.phase2-auth"),
               .enabled = false,
-              .surfaceOpacity = panelCardOpacity(),
+              .surfaceOpacity = 1.0F,
               .flexGrow = 1.0F,
           })
       )
@@ -1108,7 +1109,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
       ui::input({
           .out = &m_identityInput,
           .placeholder = i18n::tr("control-center.network.identity"),
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .onSubmit = submitFromForm,
       })
   );
@@ -1117,7 +1118,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
       ui::input({
           .out = &m_anonymousIdentityInput,
           .placeholder = i18n::tr("control-center.network.anonymous-identity"),
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .onSubmit = submitFromForm,
       })
   );
@@ -1126,7 +1127,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
       ui::input({
           .out = &m_domainMatchInput,
           .placeholder = i18n::tr("control-center.network.domain-suffix-match"),
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .onSubmit = submitFromForm,
       })
   );
@@ -1135,7 +1136,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
       ui::input({
           .out = &m_caCertInput,
           .placeholder = i18n::tr("control-center.network.ca-certificate"),
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .onSubmit = submitFromForm,
       })
   );
@@ -1148,7 +1149,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .out = &m_passwordInput,
           .placeholder = i18n::tr("control-center.network.password"),
           .passwordMode = true,
-          .surfaceOpacity = panelCardOpacity(),
+          .surfaceOpacity = 1.0F,
           .flexGrow = 1.0F,
           .onSubmit = [this](const std::string& value) { submitPasswordPrompt(value); },
       }),
@@ -1868,8 +1869,7 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
   if (m_network == nullptr) {
     syncCatalogBar(false, false);
     auto empty = ui::column({
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+        .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
     });
     empty->addChild(
         ui::label({
@@ -1883,11 +1883,10 @@ void NetworkTab::rebuildApList(Renderer& renderer) {
     const bool hasVpns = !vpns.empty();
     const bool hasCellular = m_modem != nullptr && !m_modem->modems().empty();
     syncCatalogBar(hasVpns, hasCellular);
-    const float opacity = panelCardOpacity();
     Flex* well = nullptr;
     auto wellCard = ui::column({
         .out = &well,
-        .configure = [scale, opacity](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+        .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
     });
 
     if (m_catalog == Catalog::Vpn && hasVpns) {
@@ -2090,9 +2089,7 @@ void NetworkTab::requestCellularEnabled(bool enabled) {
 }
 
 void NetworkTab::onPanelCardOpacityChanged(float opacity) {
-  if (m_passwordInput != nullptr) {
-    m_passwordInput->setSurfaceOpacity(opacity);
-  }
+  // The password prompt is a solid well; its fields stay opaque and do not follow panel glass.
   if (m_dnsCustomInput != nullptr) {
     m_dnsCustomInput->setSurfaceOpacity(opacity);
   }

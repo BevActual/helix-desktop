@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core/timer_manager.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -27,7 +26,7 @@ public:
   explicit EffectsTab(const ControlCenterServices& services);
 
   std::unique_ptr<Flex> create() override;
-  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody(bool hosted = false);
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setConfigureMode(bool show) override;
@@ -51,8 +50,6 @@ private:
   void applyCatalog(std::size_t index, bool persist = true);
   void persistCatalog();
   void syncCatalog();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
   [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
   [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
@@ -87,7 +84,6 @@ private:
 
   Catalog m_catalog = Catalog::Borders;
   Catalog m_pinnedCatalog = Catalog::Borders;
-  Timer m_hoverEndTimer;
   bool m_catalogSyncing = false;
   bool m_syncing = false;
   bool m_liveDirty = false;

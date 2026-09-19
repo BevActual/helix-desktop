@@ -445,6 +445,8 @@ namespace {
     appearance.insert_or_assign("scheme", "Synced");
     appearance.insert_or_assign("theme_mode", std::string(resolvedMode));
     appearance.insert_or_assign("corner_radius_scale", static_cast<double>(config.shell.cornerRadiusScale));
+    appearance.insert_or_assign("glass", static_cast<double>(resolvedPanelGlass(config.shell.panel)));
+    appearance.insert_or_assign("refraction", config.shell.panel.refraction);
     if (!config.shell.fontFamily.empty()) {
       appearance.insert_or_assign("font_family", config.shell.fontFamily);
     }

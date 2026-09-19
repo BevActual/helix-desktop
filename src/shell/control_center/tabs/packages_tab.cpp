@@ -1193,8 +1193,7 @@ void PackagesTab::rebuildResults() {
   auto card = ui::column({
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
 
   if (hits.empty()) {

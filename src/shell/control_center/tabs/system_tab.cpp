@@ -308,8 +308,6 @@ std::unique_ptr<Flex> SystemTab::create() {
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
-          .onHover = [this](std::size_t index) { previewCatalog(index); },
-          .onHoverEnd = [this]() { restorePinnedCatalog(); },
       })
   );
   compactCard->addChild(
@@ -328,7 +326,11 @@ std::unique_ptr<Flex> SystemTab::create() {
         .align = FlexAlign::Stretch,
         .gap = Style::spaceXs * sc,
         .flexGrow = 1.0F,
-        .configure = [](Flex& column) { column.setClipChildren(true); },
+        .configure =
+            [sc](Flex& column) {
+              applyContentCardStyle(column, sc);
+              column.setClipChildren(true);
+            },
     });
     *graphOut = addGraph(*host);
     auto* legend = makeLegendRow(*host, sc);
@@ -370,6 +372,7 @@ std::unique_ptr<Flex> SystemTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceLg * sc,
       .flexGrow = 1.0F,
+      .configure = [sc](Flex& host) { applyContentCardStyle(host, sc); },
   });
   static constexpr const char* kSystemGlyphs[] = {"cpu-usage",        "video",      "device-desktop",
                                                   "layers-intersect", "app-window", "clock"};
@@ -586,7 +589,6 @@ void SystemTab::applyCatalog(std::size_t index, bool persist) {
   }
   const Catalog next = catalogFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedCatalog = next;
     persistCatalog();
   }
@@ -597,20 +599,6 @@ void SystemTab::applyCatalog(std::size_t index, bool persist) {
   m_catalog = next;
   syncCatalog();
   requestPanelLayout();
-}
-
-void SystemTab::previewCatalog(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyCatalog(index, false);
-  PanelManager::instance().refresh();
-}
-
-void SystemTab::restorePinnedCatalog() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
-    PanelManager::instance().refresh();
-  });
 }
 
 void SystemTab::syncCatalog() {
@@ -643,7 +631,6 @@ void SystemTab::setActive(bool active) {
   m_active = active;
   retainStats(active);
   if (!active) {
-    m_hoverEndTimer.stop();
     m_redrawLimiter.reset();
     return;
   }
@@ -680,7 +667,6 @@ void SystemTab::retainStats(bool retain) {
 
 void SystemTab::onClose() {
   m_settings->onClose();
-  m_hoverEndTimer.stop();
   m_root = nullptr;
   m_compactCard = nullptr;
   m_catalogSwitch = nullptr;

@@ -48,6 +48,7 @@ public:
   void enterEdit();
   void exitEdit();
   void toggleEdit();
+  bool addWidget(std::string_view type);
   void setOnEnterEditCallback(std::function<void()> callback);
   void setOnExitEditCallback(std::function<void()> callback);
 

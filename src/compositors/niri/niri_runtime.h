@@ -29,6 +29,7 @@ namespace compositors::niri {
     [[nodiscard]] bool requestOk(std::string_view request, bool acceptNoResponse = false) const;
     [[nodiscard]] bool requestAction(const nlohmann::json& action, bool acceptNoResponse = false) const;
     [[nodiscard]] std::optional<std::string> compositorVersion() const;
+    [[nodiscard]] std::optional<bool> helixLiquidGlassCapability() const;
     void refresh();
     void cleanup();
 
@@ -55,12 +56,15 @@ namespace compositors::niri {
     void parseMessages();
     [[nodiscard]] bool handleMessage(std::string_view line);
     void dispatchEvent(std::string_view key, const nlohmann::json& value) const;
+    void notifyStreamConnected() const;
     void notifyStreamReset() const;
 
     mutable bool m_resolved = false;
     mutable std::string m_socketPath;
     mutable bool m_compositorVersionResolved = false;
     mutable std::optional<std::string> m_compositorVersion;
+    mutable bool m_helixLiquidGlassResolved = false;
+    mutable std::optional<bool> m_helixLiquidGlass;
     std::vector<NiriEventHandler*> m_eventHandlers;
     int m_eventSocketFd = -1;
     std::vector<char> m_readBuffer;

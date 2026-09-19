@@ -18,7 +18,6 @@ namespace control_center {
         {"theme",
          "appearance color palette colours colors look custom customize accent dark light auto "
          "glass icons type scale roundness effects language"},
-        {"windows", "gaps struts columns tiling niri windows"},
         {"niri", "setup compositor autostart"},
         {"audio", "sound volume mic microphone speaker"},
         {"bluetooth", "bt nearby paired"},
@@ -27,8 +26,9 @@ namespace control_center {
         {"clipboard", "paste clips cliphist"},
         {"control-center", "cc"},
         {"keybinds", "binds shortcuts keyboard hotkeys attention"},
-        {"desktop", "widgets clock hot-corners corners"},
-        {"dock", "taskbar pinned"},
+        {"desktop",
+         "widgets corners hot-corners screen-corners layout-board glanceable bar dock windows panels osd "
+         "thickness pinned taskbar gaps struts columns hud"},
         {"launcher", "runner app-launcher type-to-launch overview"},
         {"media", "mpris player music now-playing artwork album shuffle repeat visualizer spectrum"},
         {"monitor", "display displays brightness night-light nightlight gamma"},

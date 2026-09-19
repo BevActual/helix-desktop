@@ -191,6 +191,7 @@ std::unique_ptr<Flex> ClockTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   leftover->addChild(
       ui::label({

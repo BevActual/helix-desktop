@@ -89,16 +89,24 @@ ScreenRecordTab::ScreenRecordTab(const ControlCenterServices& services)
   }
 }
 
-std::unique_ptr<Flex> ScreenRecordTab::createLiveBody() {
+std::unique_ptr<Flex> ScreenRecordTab::createCompactBody() {
   const float scale = contentScale();
-
-  auto live = ui::column({
+  auto card = ui::column({
       .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  buildRecordCard(*card, scale);
+  return card;
+}
+
+std::unique_ptr<Flex> ScreenRecordTab::createLeftoverBody() {
+  const float scale = contentScale();
+  auto leftover = ui::column({
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
   });
-
   auto scroll = ui::scrollView({
       .contentScale = scale,
       .scrollbarVisible = true,
@@ -112,32 +120,27 @@ std::unique_ptr<Flex> ScreenRecordTab::createLiveBody() {
   content->setDirection(FlexDirection::Vertical);
   content->setAlign(FlexAlign::Stretch);
   content->setGap(Style::spaceMd * scale);
-
-  buildRecordCard(*content, scale);
   buildReplayCard(*content, scale);
   buildRecentCard(*content, scale);
-
-  live->addChild(std::move(scroll));
+  leftover->addChild(std::move(scroll));
   bindRecentGallery();
   syncUi();
   rebuildRecentFiles();
-  return live;
+  return leftover;
 }
 
 void ScreenRecordTab::setPanelCardOpacity(float opacity) noexcept {
   m_panelCardOpacity = std::clamp(opacity, 0.0F, 1.0F);
+  if (m_source != nullptr) {
+    m_source->setSurfaceOpacity(m_panelCardOpacity);
+  }
+  if (m_delay != nullptr) {
+    m_delay->setSurfaceOpacity(m_panelCardOpacity);
+  }
 }
 
 void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
-  auto card = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
-  });
-  addTitle(*card, i18n::tr("control-center.screen-record.record"), scale);
-  addBody(*card, i18n::tr("control-center.screen-record.hint"), scale);
+  addBody(root, i18n::tr("control-center.screen-record.hint"), scale);
 
   m_sources = m_recorder != nullptr ? m_recorder->availableSources()
                                    : std::vector<ScreenRecorderService::Source>{ScreenRecorderService::Source::Focused};
@@ -152,7 +155,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
   }
   m_selectedSource = m_sources[selected];
 
-  card->addChild(
+  root.addChild(
       ui::segmented({
           .out = &m_source,
           .options = std::move(sources),
@@ -170,7 +173,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
       })
   );
 
-  card->addChild(
+  root.addChild(
       ui::segmented({
           .out = &m_delay,
           .options =
@@ -197,7 +200,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
       })
   );
 
-  card->addChild(
+  root.addChild(
       ui::button({
           .out = &m_recordButton,
           .text = i18n::tr("control-center.screen-record.start"),
@@ -219,7 +222,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
               },
       })
   );
-  card->addChild(
+  root.addChild(
       ui::button({
           .text = i18n::tr("control-center.screen-record.open-folder"),
           .glyph = "folder",
@@ -229,7 +232,7 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
           .onClick = [this]() { openRecordingsFolder(); },
       })
   );
-  card->addChild(
+  root.addChild(
       ui::label({
           .out = &m_elapsed,
           .fontSize = Style::fontSizeHeader * scale,
@@ -237,31 +240,27 @@ void ScreenRecordTab::buildRecordCard(Flex& root, float scale) {
           .color = colorSpecFromRole(ColorRole::OnSurface),
       })
   );
-  card->addChild(
+  root.addChild(
       ui::label({
           .out = &m_backend,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
-  card->addChild(
+  root.addChild(
       ui::label({
           .out = &m_status,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
-
-  root.addChild(std::move(card));
 }
 
 void ScreenRecordTab::buildReplayCard(Flex& root, float scale) {
   auto card = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*card, i18n::tr("control-center.screen-record.replay"), scale);
   card->addChild(
@@ -315,9 +314,7 @@ void ScreenRecordTab::buildRecentCard(Flex& root, float scale) {
   auto card = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*card, i18n::tr("control-center.screen-record.recent"), scale);
   card->addChild(

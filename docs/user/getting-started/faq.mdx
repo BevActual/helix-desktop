@@ -341,6 +341,14 @@ To suspend without locking (for example lid close or `systemctl suspend`), set `
 
 </FaqItem>
 
+<FaqItem question="Can I close my laptop lid and keep using an external display?">
+
+Yes. **Keep Using Other Displays** is on by default (`[lockscreen].lid_close_keep_external_displays = true`). Open Control Center → Power, or Settings → Security → Lock Screen. When another display is on, closing the lid turns off the laptop screen instead of suspending. Turn the setting off if you want the lid to suspend even while docked.
+
+niri still blanks the built-in panel. You do not need to set `HandleLidSwitch=ignore` in logind for this.
+
+</FaqItem>
+
 <FaqItem question="Why can't NetworkManager communicate with wpa_supplicant?" id="wpa-supplicant">
 
 If your wireless management tools (like `NetworkManager` or desktop applets) fail to communicate with `wpa_supplicant`, it is often a matter of missing D-Bus permissions or incorrect service options. The steps below allow users in the `wheel` group to interact with the wpa_supplicant daemon.

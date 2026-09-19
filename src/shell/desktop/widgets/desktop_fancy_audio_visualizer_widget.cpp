@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <linux/input-event-codes.h>
 #include <memory>
 #include <span>
 
@@ -46,8 +47,17 @@ DesktopFancyAudioVisualizerWidget::~DesktopFancyAudioVisualizerWidget() {
 }
 
 void DesktopFancyAudioVisualizerWidget::create() {
-  auto rootNode = ui::node({});
-  rootNode->setClipChildren(true);
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .clipChildren = true,
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("media");
+          },
+  });
 
   auto visualizer = std::make_unique<FancyAudioVisualizer>();
   m_visualizer = visualizer.get();

@@ -12,6 +12,7 @@
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/style.h"
 #include "util/file_utils.h"
 
@@ -40,38 +41,14 @@ namespace {
 ScreenshotTab::ScreenshotTab(const ControlCenterServices& services)
     : m_ipc(services.ipc), m_config(services.config), m_thumbnails(services.thumbnails) {}
 
-std::unique_ptr<Flex> ScreenshotTab::createLiveBody() {
+std::unique_ptr<Flex> ScreenshotTab::createCompactBody() {
   const float scale = contentScale();
 
-  auto live = ui::column({
+  auto card = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = 0.0F,
-      .flexGrow = 1.0F,
-  });
-
-  auto scroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
-  });
-  auto* content = scroll->content();
-  content->setDirection(FlexDirection::Vertical);
-  content->setAlign(FlexAlign::Stretch);
-  content->setGap(Style::spaceMd * scale);
-
-  auto card = ui::column({
-      .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
   });
-  addTitle(*card, i18n::tr("control-center.screenshot.capture"), scale);
   addBody(*card, i18n::tr("control-center.screenshot.hint"), scale);
 
   card->addChild(
@@ -179,15 +156,34 @@ std::unique_ptr<Flex> ScreenshotTab::createLiveBody() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
+  return card;
+}
 
-  content->addChild(std::move(card));
+std::unique_ptr<Flex> ScreenshotTab::createLeftoverBody() {
+  const float scale = contentScale();
+  auto leftover = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = 0.0F,
+      .flexGrow = 1.0F,
+  });
+  auto scroll = ui::scrollView({
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* content = scroll->content();
+  content->setDirection(FlexDirection::Vertical);
+  content->setAlign(FlexAlign::Stretch);
+  content->setGap(Style::spaceMd * scale);
 
   auto recentCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*recentCard, i18n::tr("control-center.screenshot.recent"), scale);
   recentCard->addChild(
@@ -206,14 +202,17 @@ std::unique_ptr<Flex> ScreenshotTab::createLiveBody() {
       })
   );
   content->addChild(std::move(recentCard));
-  live->addChild(std::move(scroll));
+  leftover->addChild(std::move(scroll));
   bindRecentGallery();
   rebuildRecentFiles();
-  return live;
+  return leftover;
 }
 
 void ScreenshotTab::setPanelCardOpacity(float opacity) noexcept {
   m_panelCardOpacity = std::clamp(opacity, 0.0F, 1.0F);
+  if (m_delay != nullptr) {
+    m_delay->setSurfaceOpacity(m_panelCardOpacity);
+  }
 }
 
 void ScreenshotTab::setActive(bool active) {

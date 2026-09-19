@@ -114,7 +114,7 @@ namespace {
     return colorSpecFromConfigString(*value, key);
   }
 
-  constexpr float kDefaultBgRadius = 12.0F;
+  constexpr float kDefaultBgRadius = 24.0F;
   constexpr float kDefaultBgPadding = 10.0F;
 
   std::optional<FancyAudioVisualizerMode>

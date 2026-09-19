@@ -94,8 +94,6 @@ private:
   void persistCatalog();
   void syncCatalog();
   [[nodiscard]] bool syncDetailLabel();
-  void previewCatalog(std::size_t index);
-  void restorePinnedCatalog();
   [[nodiscard]] static Catalog catalogFromState(std::string_view value) noexcept;
   [[nodiscard]] static std::string_view catalogState(Catalog catalog) noexcept;
   [[nodiscard]] static std::size_t indexFromCatalog(Catalog catalog) noexcept;
@@ -133,7 +131,6 @@ private:
   ScrollView* m_programScroll = nullptr;
   Flex* m_programList = nullptr;
   bool m_catalogSyncing = false;
-  Timer m_hoverEndTimer;
   Catalog m_catalog = Catalog::Apps;
   Catalog m_pinnedCatalog = Catalog::Apps;
   std::vector<Flex*> m_programRows;

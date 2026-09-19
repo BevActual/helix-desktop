@@ -246,8 +246,6 @@ std::unique_ptr<Flex> CalendarTab::create() {
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
-          .onHover = [this](std::size_t index) { previewCatalog(index); },
-          .onHoverEnd = [this]() { restorePinnedCatalog(); },
       })
   );
   compactCard->addChild(
@@ -291,6 +289,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   auto calendarArea = ui::inputArea({});
   calendarArea->setFlexGrow(1.0F);
@@ -379,6 +378,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   eventsHost->addChild(ui::scrollView({
       .out = &m_eventsScroll,
@@ -399,6 +399,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .flexGrow = 1.0F,
+      .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   buildAccountsCard(*accountsHost, scale);
   tab->addChild(std::move(accountsHost));
@@ -644,7 +645,6 @@ void CalendarTab::applyCatalog(std::size_t index, bool persist) {
   }
   const Catalog next = catalogFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedCatalog = next;
     persistCatalog();
   }
@@ -658,20 +658,6 @@ void CalendarTab::applyCatalog(std::size_t index, bool persist) {
   m_lastInnerHeight = -1.0F;
   syncCatalog();
   requestPanelLayout();
-}
-
-void CalendarTab::previewCatalog(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyCatalog(index, false);
-  PanelManager::instance().refresh();
-}
-
-void CalendarTab::restorePinnedCatalog() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
-    PanelManager::instance().refresh();
-  });
 }
 
 void CalendarTab::syncCatalog() {
@@ -796,7 +782,6 @@ void CalendarTab::doUpdate(Renderer& renderer) {
 void CalendarTab::setActive(bool active) {
   if (!active) {
     m_eventFadeTimer.stop();
-    m_hoverEndTimer.stop();
     return;
   }
   if (m_config != nullptr) {
@@ -830,7 +815,6 @@ void CalendarTab::focusToday() {
 void CalendarTab::onClose() {
   m_settings->onClose();
   m_eventFadeTimer.stop();
-  m_hoverEndTimer.stop();
   cancelMonthSlide();
   m_rootLayout = nullptr;
   m_compactCard = nullptr;

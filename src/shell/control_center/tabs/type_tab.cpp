@@ -113,12 +113,29 @@ namespace {
 
     void bindTile(Node& tile, std::size_t index, bool selected, bool hovered) override {
       auto* flex = dynamic_cast<Flex*>(&tile);
-      if (flex == nullptr || index >= m_visible.size() || flex->children().size() < 2) {
+      if (flex == nullptr || index >= m_visible.size()) {
         return;
       }
       const std::string& family = m_families[m_visible[index]];
-      auto* specimen = dynamic_cast<Label*>(flex->children()[0].get());
-      auto* name = dynamic_cast<Label*>(flex->children()[1].get());
+      Label* specimen = nullptr;
+      Label* name = nullptr;
+      std::size_t labelIndex = 0;
+      for (const auto& child : flex->children()) {
+        if (child == nullptr || child->zIndex() < 0 || child->type() == NodeType::Rect) {
+          continue;
+        }
+        auto* label = dynamic_cast<Label*>(child.get());
+        if (label == nullptr) {
+          continue;
+        }
+        if (labelIndex == 0) {
+          specimen = label;
+        } else if (labelIndex == 1) {
+          name = label;
+          break;
+        }
+        ++labelIndex;
+      }
       const ColorSpec fill = selected ? colorSpecFromRole(ColorRole::Primary, 0.18F)
           : hovered                   ? colorSpecFromRole(ColorRole::Hover, 0.55F)
                                       : colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F);
@@ -127,6 +144,7 @@ namespace {
       flex->setFill(fill);
       flex->setBorder(border, 2.0F);
       if (specimen != nullptr) {
+        specimen->setText("Aa");
         specimen->setFontFamily(family);
         specimen->setColor(colorSpecFromRole(ColorRole::OnSurface));
       }
@@ -168,7 +186,7 @@ std::unique_ptr<Flex> TypeTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> TypeTab::createLiveBody() {
+std::unique_ptr<Flex> TypeTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -183,10 +201,8 @@ std::unique_ptr<Flex> TypeTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
   auto toolbar = ui::row({

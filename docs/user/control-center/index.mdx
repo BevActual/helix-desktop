@@ -49,7 +49,7 @@ sidebar = "compact"
 | `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
 | `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Control Center → Control Center**. The Home tab cannot be hidden. |
 
-The full sidebar shows group captions: **Appearance** (theme, wallpaper, templates), **Desktop** (bar, dock, desktop, windows, panels, OSD), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, clock, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
+The full sidebar shows group captions: **Appearance** (theme, wallpaper, templates), **Desktop** (desktop), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, clock, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
 
 Plugin Control Center tabs stay in **Services**. User `hidden_tabs` still hide any tab in every group.
 
@@ -61,50 +61,50 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
 | `home` | Home | User card (name, host, uptime), optional status strip, glanceable media and stacked clock/weather modules, and extra-large shortcut tiles grouped into Control Center wells. Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media; while playing, previous / play-pause / next stay on the module. Date/time opens Calendar; the weather line opens Weather. Idle media stays compact so the clock keeps the leftover height. Header gear opens Home shortcuts, labels, and the session-button setting. |
-| `theme` | Theme | Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, Dark/Light/Auto, search, save, and the current palette on a compact card; leftover is a uniform swatch grid. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
+| `theme` | Theme | Palettes, Chrome, Icons, Type, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, Dark/Light/Auto, search, save, and the current palette share the same compact card as the domain switch; leftover is a uniform swatch grid. Chrome leftover is Glass, Scale, and Roundness editors. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
 | `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
-| `bar` | Bar | Enable, position, auto-hide, reserve space, shadow, thickness, and opacity for the first bar. Turning the bar off leaves the enable switch. Header gear opens widgets, extra bars, and per-monitor overrides. |
+| `bar` | Desktop → Bar | Alias for the Bar source on Desktop. Layout leftover is edge, auto-hide, and reserved space. Shape leftover is thickness, opacity, and shadow. Header gear opens widgets, extra bars, and per-monitor overrides. |
 | `media` | Media | Artwork keeps leftover height while something is playing. Player picker, track, progress, spectrum strip, transport, and player volume sit on one card. Tap the art to raise the player. Header gear opens the ignore list. |
-| `audio` | Audio | Output and input volume on one compact card. Hover Output, Input, and Apps to preview the leftover; click to keep it. Header gear opens sound and overdrive settings. |
+| `audio` | Audio | Output and input volume on one compact card. Click Output, Input, and Apps to pin leftover. Header gear opens sound and overdrive settings. |
 | `monitor` | Monitor | Brightness and enable on a compact card, Night Light under it. On niri, the arrangement map keeps leftover height when two or more displays are on; resolution, refresh, scale, rotation, and VRR sit under it. Header gear opens brightness service settings. |
-| `system` | System | Distro, live CPU, and memory on one compact card. Hover CPU, Memory, GPU, Network, and About to preview the leftover; click to keep it. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
-| `power` | Power | Battery percent, power profiles, and caffeine on one compact card. Session lock, suspend, logout, reboot, and shutdown sit above it. Charge limits, battery health, and connected-device batteries sit under the card. Header gear opens session panel and idle settings. |
-| `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Hover Wi-Fi, VPN, and cellular chips to swap the leftover list. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Hover ping, speed test, copy IP, and share Wi-Fi. Header gear opens band filter and ignored SSIDs. |
-| `bluetooth` | Bluetooth | Adapter power, discoverable, and rescan on one compact card. Hover Paired and Nearby to swap the leftover list. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
-| `camera` | Camera | Live preview stays on a stage so you can see the picture while you adjust. Zoom, pan, and tilt sit with the preview. Picture, Exposure, White Balance, and Focus scroll in the inspector beside it, or under it when the panel is narrow. Header reset restores factory control values. |
-| `weather` | Weather | Current conditions on one compact card. Hover Daily, Hourly, and Details to preview the leftover; click to keep it. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
-| `calendar` | Calendar | Today and catalog chips on one compact card. Hover Month, Events, and Accounts to preview the leftover; click to keep it. Month is the leftover stage. Click a day to open Events. Turning calendar sync off leaves the enable switch on the card. Header gear opens calendar format settings. |
+| `system` | System | Distro, live CPU, and memory on one compact card. Click CPU, Memory, GPU, Network, and About to pin leftover. Copy the summary from the header. Header gear opens battery warnings and system monitor settings. |
+| `power` | Power | Battery percent, power profiles, and caffeine on one compact card. Session lock, suspend, logout, reboot, and shutdown sit above it as a shortcut plate, the same module well Home uses. Lid close, charge limits, battery health, and connected-device batteries are leftover wells under the card. Header gear opens session panel, lid close, and idle settings. |
+| `network` | Network | Current connection, DNS, and ping/speed/copy/QR tools on one compact card. Click Wi-Fi, VPN, and cellular chips to swap the leftover list. DNS is a trailing dropdown (Automatic, Google, Cloudflare, NextDNS, Custom). Header gear opens band filter and ignored SSIDs. |
+| `bluetooth` | Bluetooth | Adapter name, power, and rescan on one compact card. Click Paired and Nearby to swap the leftover list. Expand a device for connection controls and copy address. Header gear opens unnamed-device filter and discovery duration. |
+| `camera` | Camera | Live preview stays on a stage so you can see the picture while you adjust. Zoom, pan, and tilt sit with the preview. Picture, Exposure, White Balance, and Focus are leftover wells in the inspector beside it, or under it when the panel is narrow. Header reset restores factory control values. |
+| `weather` | Weather | Temperature and conditions on one compact card. Location (when shown) or last-updated sits under the temperature. Click Daily, Hourly, and Details to pin leftover. Location, units, and enable live under header gear; the enable toggle is also on the live view when Weather is off. |
+| `calendar` | Calendar | Today and catalog chips on one compact card. Click Month, Events, and Accounts to pin leftover. Month is the leftover stage. Click a day to open Events. Turning calendar sync off leaves the enable switch on the card. Header gear opens calendar format settings. |
 | `clock` | Clock | Local time, date, and zone on a compact card. Extra IANA timezones fill the leftover. Header gear opens the timezone list. |
-| `notifications` | Notifications | Do Not Disturb and history filters on one compact card. Notification history sits under it. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
-| `screen-time` | Screen Time | Total time and the top app on one compact card. Hover Today, 3 days, and 14 days to preview the leftover chart; click to keep it. The enable toggle is on the live view when tracking is off; header gear opens reset. |
-| `ai` | AI | Rate-limit meters and Open actions for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, and DeepSeek, plus local Ollama status, models, and start/stop. `ai-usage` still opens this tab. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. |
-| `capture` | Capture | Hover Screenshot and Record chips to swap the leftover view. Screenshot: region (primary), fullscreen and pick-display, color pick, annotate, scan text, and scan QR, plus delay, recent PNGs, and open-folder. Record: start/stop, elapsed time, source picker, delay, recent videos, and replay buffer. Header gear follows the active chip (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching view. |
-| `clipboard` | Clipboard | Clipboard history, preview, pin, and delete. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
-| `tailscale` | Tailscale | Connect or disconnect, copy addresses, exit-node pick, and peer list. Header gear opens refresh interval, peer toasts, and the admin URL. |
-| `localsend` | LocalSend | Nearby file sharing with LocalSend apps: enable, optional PIN, accept incoming transfers, send a file, folder, or clipboard, transfer progress, and recent history. Turning sharing off leaves the enable switch. Header gear opens receive folder, auto-accept, and port. |
-| `phone` | Phone | Pair and talk to a phone through KDE Connect: battery, ping, ring, send a file or clipboard. The tab stays available when KDE Connect is missing; **Start KDE Connect** tries to launch it. Header refresh rediscovers devices. |
-| `syncthing` | Syncthing | Start or stop the local Syncthing daemon, copy this device ID, open the web UI, scan or pause folders, and see connected devices. The tab stays available when Syncthing is missing. Header refresh reloads status. |
-| `firewall` | Firewall | Default zone, panic mode (block all traffic), and incoming services for the current zone. **Save for next boot** writes the runtime config to disk. The tab stays available when the system firewall is missing. Header refresh reloads status. |
-| `printers` | Printers | Start printing, list printers, set the default, pause or resume, cancel jobs, and print a file. **Open printer setup** opens the CUPS web UI. The tab stays available when printing is missing. Header refresh reloads status. |
-| `cast` | Cast | Share this screen over Remote Desktop, or cast to a nearby TV. Screen sharing uses the session remote-desktop service. Wireless displays use Network Displays when it is installed. Header refresh reloads status. |
-| `privacy` | Privacy | Live microphone, camera, and screen-share captures, mute the default microphone, plus approximate location and the anonymous startup ping. Header gear opens capture-name filters used by the bar widget and OSD. |
-| `desktop` | Desktop | Desktop widgets on/off, widget count and Edit when widgets are on, screen corners, and hot corners. Header gear opens corner size, delay, and per-corner actions. |
-| `windows` | Windows | niri window spacing: gaps, outer padding, and how wide new columns start (percent of the display). Shown only in a niri session. Header gear repeats those sliders. |
-| `dock` | Dock | Enable, position, auto-hide, running apps, and pinned apps. Turning the dock off hides the rest of the live controls. Header gear opens monitors, layer, size, shape, and magnification. |
-| `panels` | Panels | Shared panel layer, borders, list-row tint, and floating offset. Hover Top/Overlay for what each does. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Glass. |
-| `launcher` | Launcher | Open launcher, always-in-search providers, and pinned apps. On niri, Type to Launch opens the launcher when you type in overview. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
+| `notifications` | Notifications | Do Not Disturb and history filters on one compact card. Notification history sits under it as leftover wells. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
+| `screen-time` | Screen Time | Total time and the top app on one compact card. Click Today, 3 days, and 14 days to pin leftover. The enable toggle is on the live view when tracking is off; header gear opens reset. |
+| `ai` | AI | Empty or last-updated status on one compact card. Click through leftover wells for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, DeepSeek, and local Ollama. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. `ai-usage` still opens this tab. |
+| `capture` | Capture | Click Screenshot and Record chips to swap leftover. Capture tools, delay, and start/stop sit on the compact card with the chips. Screenshot leftover is recent PNGs. Record leftover is replay buffer and recent videos. Header gear follows the active chip (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching view. |
+| `clipboard` | Clipboard | Search and clear on one compact card. History and preview are leftover wells. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
+| `tailscale` | Tailscale | Status, addresses, and connect on one compact card. Preferences and the peer list are leftover wells. Header gear opens refresh interval, peer toasts, and the admin URL. |
+| `localsend` | LocalSend | Enable, status, and PIN on one compact card. Incoming transfers, history, and nearby devices are leftover wells. Turning sharing off leaves the enable switch. Header gear opens receive folder, auto-accept, and port. |
+| `phone` | Phone | KDE Connect status and start on one compact card; paired phones (battery, ping, ring, send a file or clipboard) are the leftover well. The tab stays available when KDE Connect is missing. Header refresh rediscovers devices. |
+| `syncthing` | Syncthing | Daemon status, start/stop, web UI, and copy device ID on one compact card. Folders and connected devices are leftover wells. The tab stays available when Syncthing is missing. Header refresh reloads status. |
+| `firewall` | Firewall | Status, start, and panic mode (block all traffic) on one compact card. Default zone and incoming services are leftover wells; **Save for next boot** writes the runtime config to disk. The tab stays available when the system firewall is missing. Header refresh reloads status. |
+| `printers` | Printers | Printing status, start, and CUPS setup on one compact card. Printers (default, pause/resume, cancel jobs, print a file) are the leftover well. The tab stays available when printing is missing. Header refresh reloads status. |
+| `cast` | Cast | Screen sharing over Remote Desktop on the compact card. Wireless display casting and discovered displays are leftover wells; they use Network Displays when it is installed. Header refresh reloads status. |
+| `privacy` | Privacy | Live microphone, camera, and screen-share captures with mute on the compact card. Approximate location and the anonymous startup ping are a leftover well. Header gear opens capture-name filters used by the bar widget and OSD. |
+| `desktop` | Desktop | Layout hub, like Theme for Appearance. Compact sources are Widgets, Corners, Bar, Dock, Windows (niri), Panels, and OSD. Nested leftover catalogs sit on the same compact card: Glanceable/Sound/Tools, Screen/Hot, Layout/Shape, Layout/Pinned, Spacing/Columns, Placement/Chrome, Placement/Style. Leftover is a catalog for Widgets and leftover wells for the rest. `bar`, `dock`, `windows`, `panels`, and `osd` still open the matching source. Header gear follows the active source. |
+| `windows` | Desktop → Windows | Alias for the Windows source on Desktop (niri only). Spacing leftover is gaps and outer padding. Columns leftover is how wide new tiled windows start. Header gear repeats those sliders. |
+| `dock` | Desktop → Dock | Alias for the Dock source on Desktop. Layout leftover is edge, auto-hide, and running apps. Pinned leftover is the app catalog. Header gear opens monitors, layer, size, shape, and magnification. |
+| `panels` | Desktop → Panels | Alias for the Panels source on Desktop. Placement leftover is layer and floating offset. Chrome leftover is borders, shadow, and list-row tint. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Glass. |
+| `launcher` | Launcher | Open launcher on the compact card. Overview Type to Launch (niri), always-in-search providers, and pinned apps are leftover wells. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
 | `control-center` | Control Center | Sidebar, width, height, and hidden tabs. Home shortcuts stay on Home gear; AI settings stay on AI gear. |
-| `osd` | OSD | On-screen pop-ups for volume, brightness, and other events. Turning OSD off leaves the enable switch. Position follows orientation (wide vs stacked). Header gear opens popup kinds, monitors, and offsets, and repeats enable/position. |
-| `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. |
-| `keybinds` | Keybinds | On niri: hover Attention, Open, Apps, Capture, Sound, and Session chips. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
+| `osd` | Desktop → OSD | Alias for the OSD source on Desktop. Placement leftover is orientation and screen position. Style leftover is size, opacity, and border. Header gear opens popup kinds, monitors, and offsets. |
+| `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. Settings groups here, on Security, Hooks, Niri, Control Center, and in every header gear are leftover wells, not glass cards. |
+| `keybinds` | Keybinds | On niri: click Attention, Open, Apps, Capture, Sound, and Session chips. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
 | `security` | Security | Lock screen and authentication |
 | `hooks` | Hooks | Commands at startup and on shell events |
 | `niri` | Niri | niri setup only: copy missing snippets and install `noctalia-setup.kdl`. Shown only in a niri session. Decorations and blur live on Theme; gaps/outer padding/columns on Windows; overview wallpaper and backdrop on Wallpaper; type-to-launch on Launcher. |
-| `plugins` | Plugins | Hover Installed and Store chips to swap the leftover catalog. Header gear opens catalog sources. |
-| `packages` | Packages | Hover Fedora, Flatpak, and firmware chips to switch source. Search, Updates, and Installed stay labeled. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
+| `plugins` | Plugins | Click Installed and Store chips to swap leftover. Header gear opens catalog sources. |
+| `packages` | Packages | Click Fedora, Flatpak, and firmware chips to switch source. Search, Updates, and Installed stay labeled. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` and `windows` are listed only in a niri session. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
+`niri` is listed only in a niri session. The Windows source on Desktop is also niri-only. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Services**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -119,14 +119,16 @@ Helix follows Apple Human Interface Guidelines as a hierarchy, not a skin. Liqui
 
 | Layer | Surfaces | Helix mapping |
 |-------|----------|---------------|
-| Chrome | Panel, sidebar, header | `[shell.panel].transparency_mode`: **Solid** (opaque), **Soft** (Regular glass), **Glass** (Clear glass). Clear needs a dimming layer so type stays readable. Do not nest glass-on-glass. |
+| Chrome | Panel, sidebar, header | `[shell.panel].glass` 0–1 (solid → clear) plus `[shell.panel].refraction`. Clear needs a dimming layer so type stays readable. Do not nest glass-on-glass. helix-niri writes `liquid-glass`; stock niri maps refraction to chrome blur. |
 | Leftover | Compact cards, leftover catalogs, grouped lists | Solid wells (`applySectionCardStyle`, `applyContentCardStyle`). Color and type live here. |
 | Modules | Home shortcut plates | Frosted functional plates (`applyModuleWellStyle`), not a second glass layer. |
 | Widgets | Home clock/weather/media, desktop widgets | Glanceable. Deep-link into Calendar, Weather, Media. Not mini Control Center pages. |
 
 **High Contrast** on Effects maps to Increased Contrast and Reduced Transparency: palette stretch, opaque chrome and leftover, contrasting outlines, and no module softness. **Motion** maps to Reduced Motion. Concentric rounding uses `radius3xl` on leftover wells and `radius2xl` on grouped lists inside them.
 
-Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the compact card; leftover is only the grid. Theme organizes appearance sources the same way Capture organizes Screenshot and Record. Size Control Center like a Settings window (`width` / `height` under `[control_center]`) so leftover catalogs can use extra columns. Live previews stay only where leftover does not already show the choice, and the running shell is not already the preview.
+Every tab has one glass compact card. The panel header carries the tab title, so the compact card does not repeat it. Leftover wells, schema settings groups, and gear editors label their group with one bold body-size header (`addTitle` / `makeCardHeaderRow`); the larger title size is reserved for values such as battery percent, local time, or the track name.
+
+Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the compact card; leftover is only the grid. Theme organizes appearance sources the same way Capture organizes Screenshot and Record. Leftover catalogs and editors sit in leftover wells (`applyContentCardStyle`), not a second glass card. Size Control Center like a Settings window (`width` / `height` under `[control_center]`) so leftover catalogs can use extra columns. Live previews stay only where leftover does not already show the choice, and the running shell is not already the preview.
 
 ## Home
 
@@ -146,17 +148,17 @@ Set `show_session_button = false` under `[control_center]` to hide the Power but
 
 ## Theme
 
-Theme is the Appearance hub. Compact sources are Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language, the same pattern Capture uses for Screenshot and Record. Wallpaper and Templates stay sibling Appearance catalogs.
+Theme is the Appearance hub. Compact sources are Palettes, Chrome, Icons, Type, Effects, and Language, the same pattern Capture uses for Screenshot and Record. Chrome leftover is Glass, Scale, and Roundness editors, like Effects leftover for Borders, Shadows, and Speed. Wallpaper and Templates stay sibling Appearance catalogs.
 
-Palettes leftover matches Wallpaper: Built-in, Wallpaper, Community, and Custom sources, Dark/Light/Auto, search, save, and the current palette sit on a compact card; leftover is a uniform swatch grid. Auto shows the next day/night switch under the toolbar; tap that caption to open Weather for location. The compact card’s Color row is equal tappable role swatches. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it.
+Palettes leftover matches Wallpaper: Built-in, Wallpaper, Community, and Custom sources, Dark/Light/Auto, search, save, and the current palette sit on the same compact card as the domain switch; leftover is a uniform swatch grid. Auto shows the next day/night switch under the toolbar; tap that caption to open Weather for location. The compact card’s Color row is equal tappable role swatches. Tap a swatch to customize that role for the current light or dark mode; the shell saves a custom palette and switches to it.
 
 On Wallpaper palettes, a photo button opens the Wallpaper tab. Save-as-custom sits with the sources. Header gear follows the active source: palettes open shell mode, Pure Black, and on niri window decorations and compositor blur.
 
-`noctalia msg panel-toggle control-center theme` opens Theme. `appearance` is an alias. `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` open the matching source.
+`noctalia msg panel-toggle control-center theme` opens Theme. `appearance` is an alias. `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` open the matching source. `chrome` opens the Chrome source.
 
 ### Glass {#glass}
 
-Glass sets panel chrome: Solid (opaque), Soft (Regular glass), and Glass (Clear glass) as a compact segmented control. The running shell is the preview. Clear adds a dimming layer so leftover type stays readable. Compact cards and catalogs stay leftover, not nested glass-on-glass.
+Glass is a Chrome leftover editor for panel chrome: a Solid→Glass slider for fill and dimming, and a Refraction toggle. The running shell is the preview. Clear adds a dimming layer so leftover type stays readable. Compact cards and catalogs stay leftover, not nested glass-on-glass. On helix-niri, Refraction writes `liquid-glass` into `noctalia-blur.kdl` with strength from the slider; on stock niri it is chrome blur only. High Contrast frosts chrome and turns refraction off.
 
 `noctalia msg panel-toggle control-center glass` opens this source.
 
@@ -174,13 +176,13 @@ Type is the live page for the shell font. Search and the current family sit on t
 
 ### Scale {#scale}
 
-Scale sets interface scale. The compact card is the slider and caption. The running shell is the preview.
+Scale is a Chrome leftover editor for interface scale. The leftover card is the slider and caption. The running shell is the preview.
 
 `noctalia msg panel-toggle control-center scale` opens this source.
 
 ### Roundness {#roundness}
 
-Roundness sets corner radius. Shell, Bar, Dock, and (on niri) Windows sources share one slider. The running shell is the preview.
+Roundness is a Chrome leftover editor for corner radius. Shell, Bar, Dock, and (on niri) Windows sources share one slider. The running shell is the preview.
 
 `noctalia msg panel-toggle control-center roundness` opens this source.
 
@@ -216,7 +218,7 @@ Header gear opens greeter sync when it is available. `noctalia msg settings-togg
 
 ## Keybinds
 
-The Keybinds tab is niri compositor shortcuts. Hover **Attention**, **Open**, **Apps**, **Capture**, **Sound**, and **Session** chips to switch leftover groups. Unfinished rows (missing, or a recommended key taken in your own `binds { }`) live on **Attention** and also remain in their category; that chip hides when the inbox is empty. Search shows matches from every section. Keys that only exist in an included stock file such as Fedora's `default-config.kdl` are not treated as taken: **Add** writes them into `noctalia-binds.kdl` last, so they override the stock action. Missing rows stay unset until you record a chord. Restore puts a managed custom chord back on the recommended key; Remove drops it from `noctalia-binds.kdl` only.
+The Keybinds tab is niri compositor shortcuts. Click **Attention**, **Open**, **Apps**, **Capture**, **Sound**, and **Session** chips to switch leftover groups. Unfinished rows (missing, or a recommended key taken in your own `binds { }`) live on **Attention** and also remain in their category; that chip hides when the inbox is empty. Search shows matches from every section. Keys that only exist in an included stock file such as Fedora's `default-config.kdl` are not treated as taken: **Add** writes them into `noctalia-binds.kdl` last, so they override the stock action. Missing rows stay unset until you record a chord. Restore puts a managed custom chord back on the recommended key; Remove drops it from `noctalia-binds.kdl` only.
 
 **Apps** are niri `spawn` binds, not Helix IPC. Add an installed application, then record a chord. Those lines stay in `noctalia-binds.kdl` with the rest of the managed binds.
 
@@ -230,7 +232,7 @@ The Media tab is a now-playing stage. Artwork keeps leftover height while someth
 
 ## Audio
 
-The Audio tab keeps output and input volume on one compact card. Hover **Output**, **Input**, and **Apps** to preview the leftover; click a chip to keep it. Output and Input list playback and recording devices. Apps lists application streams. Use it for volume changes, muting, selecting devices, and inspecting streams without opening an external mixer. Microphone, camera, and screen-share captures live on [Privacy](#privacy).
+The Audio tab keeps output and input volume on one compact card. Click **Output**, **Input**, and **Apps** to pin leftover. Output and Input list playback and recording devices. Apps lists application streams. Use it for volume changes, muting, selecting devices, and inspecting streams without opening an external mixer. Microphone, camera, and screen-share captures live on [Privacy](#privacy).
 
 ## Monitor
 
@@ -248,7 +250,7 @@ The Camera tab is a stage plus inspector, the same split Camera Hub and Logitech
 
 ## System
 
-The System tab keeps distro, live CPU, and memory on one compact card. Hover **CPU**, **Memory**, **GPU**, **Network**, and **About** to preview the leftover; click a chip to keep it. Each graph fills leftover height. About lists hardware, uptime, load, memory, and disks. The header copy button places that summary on the clipboard.
+The System tab keeps distro, live CPU, and memory on one compact card. Click **CPU**, **Memory**, **GPU**, **Network**, and **About** to pin leftover. Each graph fills leftover height. About lists hardware, uptime, load, memory, and disks. The header copy button places that summary on the clipboard.
 
 System monitor sampling is configured globally under `[system.monitor]`; see [System monitor](/noctalia/services/system-monitor/).
 
@@ -262,7 +264,7 @@ The current connection card also shows live throughput (when the system monitor 
 
 The current connection card also has icon tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Hover each tool. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
 
-Hover Wi-Fi, VPN, and cellular chips on that card to swap which list keeps leftover height. The VPN and cellular chips appear when those connections exist.
+Click Wi-Fi, VPN, and cellular chips on that card to swap which list keeps leftover height. The VPN and cellular chips appear when those connections exist.
 
 Header gear opens Network settings: Wi-Fi band filter and ignored SSIDs. Dual-band networks are listed once (the strongest BSS), so a 5 GHz filter hides a network whose strongest copy is on 2.4 GHz. iwd access points have no frequency and stay visible only when the band filter is **All**.
 
@@ -294,7 +296,7 @@ Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for m
 
 ## Bluetooth
 
-The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Hover Paired and Nearby chips to swap the leftover list. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
+The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Click Paired and Nearby chips to swap the leftover list. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
 
 ```toml
 [control_center.bluetooth]
@@ -304,7 +306,7 @@ discovery_seconds = 10
 
 ## Capture {#capture}
 
-The Capture tab combines screenshots and screen recording in one Services page. Hover Screenshot and Record chips to swap the leftover view. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching view. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
+The Capture tab combines screenshots and screen recording in one Services page. Click Screenshot and Record chips to swap leftover. Capture tools stay on the compact card with the chips; leftover is recent files, plus Record's replay well. Contexts `screenshot` and `screen-record` (and `settings:screenshot` / `settings:screen-record`) still open the matching view. Hiding either legacy id in `hidden_tabs` hides the whole Capture tab.
 
 ### Screenshot {#screenshot}
 
@@ -320,7 +322,7 @@ Install `gpu-screen-recorder` and/or `wf-recorder`. The optional [`noctalia/scre
 
 ## Clipboard
 
-The Clipboard tab is the clipboard history view: filter, pin, copy, delete, and preview text or images. Hover the preview icons for pin, copy, delete, and the optional image action. Header gear opens `[shell]` clipboard settings (history, auto-paste, and the image action). The bar widget, the Home clipboard shortcut, and `noctalia msg panel-toggle clipboard` open this tab.
+The Clipboard tab is the clipboard history view: search and clear sit on the compact card; the history list and preview are leftover wells. Hover the preview icons for pin, copy, delete, and the optional image action. Header gear opens `[shell]` clipboard settings (history, auto-paste, and the image action). The bar widget, the Home clipboard shortcut, and `noctalia msg panel-toggle clipboard` open this tab.
 
 ## Tailscale
 
@@ -428,13 +430,13 @@ IPC: `privacy-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#privacy).
 
 ## Weather
 
-The Weather tab keeps location and current conditions on one compact card. Hover **Daily**, **Hourly**, and **Details** to preview the leftover; click a chip to keep it. Daily and hourly forecast fill the remaining height; Details lists wind, UV, sunrise, and the rest of the metrics. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
+The Weather tab keeps location and current conditions on one compact card. Click **Daily**, **Hourly**, and **Details** to pin leftover. Daily and hourly forecast fill the remaining height; Details lists wind, UV, sunrise, and the rest of the metrics. Location, units, and the Weather enable switch live under header gear. When Weather is off, the live view shows that enable switch. Night light lives on the Monitor tab.
 
 Weather configuration is documented under [Weather](/noctalia/services/weather/).
 
 ## Calendar
 
-The Calendar tab keeps today and catalog chips on one compact card. Hover **Month**, **Events**, and **Accounts** to preview the leftover; click a chip to keep it. Month is the leftover stage: prev/next and the grid fill the remaining height. Click a day to open Events for that date. Accounts add, edit, and reconnect. Extra IANA timezones live on the [Clock](#clock) tab. Turning calendar sync off leaves the enable switch on the compact card. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
+The Calendar tab keeps today and catalog chips on one compact card. Click **Month**, **Events**, and **Accounts** to pin leftover. Month is the leftover stage: prev/next and the grid fill the remaining height. Click a day to open Events for that date. Accounts add, edit, and reconnect. Extra IANA timezones live on the [Clock](#clock) tab. Turning calendar sync off leaves the enable switch on the compact card. Calendar accounts and sync behavior are documented under [Calendar](/noctalia/services/calendar/).
 
 Right-click a day to launch the application registered for the `text/calendar` MIME type. The Calendar panel closes
 after a successful launch.
@@ -468,11 +470,11 @@ timezones = []         # IANA names besides local time, e.g. "America/Los_Angele
 
 ## Notifications
 
-The Notifications tab keeps Do Not Disturb and history filters on a compact card, with the leftover height for stored notifications. Hover a history row's expand/collapse and remove icons. Filter with **All**, **Today**, **Yesterday**, or **Older**. Clear all sits with the filter when there is history. Notification daemon and history behavior are documented under [Notifications](/noctalia/services/notifications/).
+The Notifications tab keeps Do Not Disturb and history filters on a compact card. Stored notifications are leftover wells, not nested glass cards. Hover a history row's expand/collapse and remove icons. Filter with **All**, **Today**, **Yesterday**, or **Older**. Clear all sits with the filter when there is history. Notification daemon and history behavior are documented under [Notifications](/noctalia/services/notifications/).
 
 ## Screen Time
 
-The Screen Time tab keeps total foreground time and the top app on one compact card. Hover **Today**, **3 days**, and **14 days** to preview the leftover chart and most-used list; click a chip to keep that range. Today is hourly; the longer ranges are daily bars. Click a day to open that day's hours. Helix tracks focus using the active `zwlr_foreign_toplevel` window, pauses tracking while its session lock is active, and stores daily totals under `$XDG_STATE_HOME/noctalia/screen_time.json` (about 14 days retained).
+The Screen Time tab keeps total foreground time and the top app on one compact card. Click **Today**, **3 days**, and **14 days** to pin leftover. Today is hourly; the longer ranges are daily bars. Click a day to open that day's hours. Helix tracks focus using the active `zwlr_foreign_toplevel` window, pauses tracking while its session lock is active, and stores daily totals under `$XDG_STATE_HOME/noctalia/screen_time.json` (about 14 days retained).
 
 When tracking is off, the tab shows a disabled banner with the enable toggle on that same live view.
 
@@ -515,9 +517,9 @@ ollama = "auto"
 
 ## Settings
 
-Settings pages are Control Center tabs. Theme, Wallpaper, and Templates sit under **Appearance**. Theme hosts Palettes, Glass, Icons, Type, Scale, Roundness, Effects, and Language as compact sources. Bar, Dock, Desktop, Windows, Panels, and OSD sit under **Desktop**. Network, Bluetooth, Audio, Media, Monitor, Power, Notifications, Screen Time, Calendar, Weather, Camera, and System sit under **Device**. Privacy, Firewall, Security, Printers, Cast, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Input**. Control Center options, niri, hooks, and plugins sit under **General**.
+Settings pages are Control Center tabs. Theme, Wallpaper, and Templates sit under **Appearance**. Theme hosts Palettes, Chrome, Icons, Type, Effects, and Language as compact sources. Chrome leftover catalogs Glass, Scale, and Roundness sit on the same compact card. Desktop sits under **Desktop** and hosts Widgets, Corners, Bar, Dock, Windows (niri), Panels, and OSD as compact sources, the same way Theme hosts Appearance. Nested leftover catalogs also sit on that compact card: Glanceable/Sound/Tools, Screen/Hot, Layout/Shape, Layout/Pinned, Spacing/Columns, Placement/Chrome, and Placement/Style. Widgets leftover is a catalog. The rest use leftover wells. `bar`, `dock`, `windows`, `panels`, and `osd` still open the matching Desktop source. Network, Bluetooth, Audio, Media, Monitor, Power, Notifications, Screen Time, Calendar, Weather, Camera, and System sit under **Device**. Privacy, Firewall, Security, Printers, Cast, and similar tools sit under **Services**. Launcher, keybinds, and shell sit under **Input**. Control Center options, niri, hooks, and plugins sit under **General**.
 
-Domain options that belong with a live view are on that tab: theme and palette on Theme Palettes (Light, Dark, and Auto as tiles; Auto shows the next day/night switch; Built-in, Wallpaper, Community, and Custom palettes fill the leftover catalog), language on Language, font on Type, UI scale on Scale, corner radius on Roundness, panel glass on Glass, icon tint on Icons, high contrast and motion tiles plus leftover Borders/Shadows/Speed chips on Effects, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, dock enable/position/auto-hide/pins on Dock (header gear for size, shape, and magnification), desktop widgets/corners on Desktop, launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Bar, Bluetooth, Network, Capture, Screen Time, Theme, and AI for the longer forms.
+Domain options that belong with a live view are on that tab: theme and palette on Theme Palettes (Light, Dark, and Auto as tiles; Auto shows the next day/night switch; Built-in, Wallpaper, Community, and Custom palettes fill the leftover catalog), language on Language, font on Type, UI scale on Scale, corner radius on Roundness, panel glass on Glass, icon tint on Icons, high contrast and motion tiles plus leftover Borders/Shadows/Speed chips on Effects, greeter sync under Templates gear, the wallpaper picker on Wallpaper (header gear for folders, Wallhaven, and on niri overview wallpaper), location, units, and Weather enable under Weather gear (enable also on the compact-off card), night light on Monitor (force and temperatures when on), lock/suspend/logout/reboot/shutdown/caffeine on Power, world clock on Calendar, privacy captures plus approximate location and the startup ping on Privacy (header gear for capture-name filters), the enable toggle on Screen Time, Network DNS and Wi-Fi QR on Network, capture buttons on Capture, Dock Layout and Pinned leftover on Desktop, desktop Glanceable/Sound/Tools catalogs and Screen/Hot corner leftover on Desktop (header gear follows the active source), launcher pins and always-in-search providers on Launcher (header gear for appearance, placement, prefixes, auto-paste, and currency), Home shortcuts behind the Home header gear, and header gear on Notifications, Power, System, Calendar, Audio, Monitor, Media, Desktop, Bluetooth, Network, Capture, Screen Time, Theme, and AI for the longer forms.
 
 Each settings page is searchable from the sidebar field above Home (or from the header when the sidebar is hidden). Press `/` or Ctrl+F to focus the field. An empty query keeps that page’s filter. A tab name (for example `calendar`) filters the sidebar and opens that live page; the same query is kept for that tab’s settings, so the header gear shows matching rows. Other queries search the settings registry on the current tab’s gear sheet when that section matches. If it does not, Control Center opens the best matching section in gear mode instead of always dumping onto Theme.
 
@@ -525,7 +527,7 @@ The plugin store, session/idle editors, notification filters, calendar accounts,
 
 Open Theme with `noctalia msg panel-toggle control-center settings` or `noctalia msg settings-toggle`. Pass a section to land on that page, for example `noctalia msg settings-toggle bar` or `noctalia msg settings-toggle location` (Weather tab). `settings-toggle` without a section still lands on Theme. `appearance` is an alias for Theme.
 
-The Niri and Windows pages are shown only when the session is running under niri. Theme owns decorations and compositor blur; Windows owns gaps, outer padding, and column width; Wallpaper owns overview presets and backdrop; Launcher owns type-to-launch.
+The Niri page is shown only when the session is running under niri. Theme owns decorations and compositor blur; Desktop → Windows owns gaps, outer padding, and column width; Wallpaper owns overview presets and backdrop; Launcher owns type-to-launch.
 
 ## Power
 

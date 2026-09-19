@@ -7,6 +7,8 @@ sidebar:
 
 Noctalia v5 is a new generation of the shell, with a native runtime, refreshed UI, and a configuration model built for the current desktop experience.
 
+The Helix product is three sibling packages, not one binary: **greetd → helix-greeter → helix-niri + Helix Shell**. Helix Shell stays in this tree (binary still `noctalia`). Stock niri, Hyprland, and other compositors remain fallbacks.
+
 
 If you are setting up Noctalia for the first time, start with [Installation](/noctalia/getting-started/installation/), then [Running Noctalia](/noctalia/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/noctalia/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
 
@@ -21,7 +23,7 @@ If you are setting up Noctalia for the first time, start with [Installation](/no
 - **[Installation](/noctalia/getting-started/installation/)** - Package options, distro-specific commands, and manual install steps.
 - **[Running Noctalia](/noctalia/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
 - **[How configuration works](/noctalia/configuration/)** - Config files, GUI-managed overrides, load order, and hot reload.
-- **[Greeter installation](/greeter/)** - Install noctalia-greeter, configure greetd, and sync your login screen with Noctalia.
+- **[Greeter installation](/greeter/)** - Install helix-greeter (binaries stay `noctalia-greeter`), configure greetd, and sync your login screen with Helix.
 - **[Shell](/noctalia/configuration/shell/)** - Global UI scale, fonts, animations, shadows, OSD, lock screen, and keybinds.
 - **[Hooks](/noctalia/automation/hooks/)** - Advanced event-driven automation.
 - **[Launcher](/noctalia/launcher/)** - Application search, calculator, emoji picker, and wallpaper browser.

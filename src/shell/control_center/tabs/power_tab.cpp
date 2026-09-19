@@ -18,6 +18,7 @@
 #include "ui/controls/scroll_view.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
+#include "ui/style.h"
 
 #include <algorithm>
 #include <chrono>
@@ -202,7 +203,7 @@ std::unique_ptr<Flex> PowerTab::create() {
     tab->addChild(std::move(well));
   }
 
-  if (m_upower != nullptr) {
+  if (m_config != nullptr || m_upower != nullptr) {
     auto leftover = ui::scrollView({
         .out = &m_leftoverScroll,
         .contentScale = scale,
@@ -222,13 +223,17 @@ std::unique_ptr<Flex> PowerTab::create() {
     content->setDirection(FlexDirection::Vertical);
     content->setAlign(FlexAlign::Stretch);
     content->setGap(Style::spaceMd * scale);
-    buildChargingCard(*content, scale);
-    buildHealthCard(*content, scale);
-    buildPeripheralsCard(*content, scale);
+    buildLidCloseCard(*content, scale);
+    if (m_upower != nullptr) {
+      buildChargingCard(*content, scale);
+      buildHealthCard(*content, scale);
+      buildPeripheralsCard(*content, scale);
+    }
     tab->addChild(std::move(leftover));
   }
 
   syncSessionCard();
+  syncLidCloseToggle();
   syncBatteryWell();
 
   if (m_settings != nullptr) {
@@ -265,13 +270,13 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
     return;
   }
 
+  // Session actions are shortcut plates, the same module well Home uses. The battery card below is
+  // the tab's one glass compact card, so this must not read as a second glass layer.
   auto card = ui::column({
       .out = &m_sessionCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyModuleWellStyle(section, scale); },
   });
 
   auto actions = ui::row({
@@ -412,6 +417,40 @@ void PowerTab::runSessionAction(std::string_view action) {
   m_session->invoke(cfg);
 }
 
+void PowerTab::buildLidCloseCard(Flex& root, float scale) {
+  if (m_config == nullptr) {
+    return;
+  }
+
+  auto card = ui::column({
+      .out = &m_lidCloseCard,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.lid-close.title"), scale));
+  addCaption(*card, i18n::tr("control-center.power.lid-close.description"), scale, 3);
+  m_lidCloseToggle = addToggleRow(
+      *card, scale, i18n::tr("settings.schema.lockscreen.lid-close-keep-external-displays.label"),
+      [this](bool checked) {
+        if (m_syncingLidClose || m_config == nullptr) {
+          return;
+        }
+        (void)m_config->setOverride({"lockscreen", "lid_close_keep_external_displays"}, checked);
+      }
+  );
+  root.addChild(std::move(card));
+}
+
+void PowerTab::syncLidCloseToggle() {
+  if (m_lidCloseToggle == nullptr || m_config == nullptr) {
+    return;
+  }
+  m_syncingLidClose = true;
+  m_lidCloseToggle->setCheckedImmediate(m_config->shouldKeepSessionOnLidClose());
+  m_syncingLidClose = false;
+}
+
 void PowerTab::buildChargingCard(Flex& root, float scale) {
   if (m_upower == nullptr) {
     return;
@@ -423,9 +462,7 @@ void PowerTab::buildChargingCard(Flex& root, float scale) {
       .gap = Style::spaceSm * scale,
       .visible = false,
       .participatesInLayout = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.charging.title"), scale));
   card->addChild(
@@ -619,9 +656,7 @@ void PowerTab::buildHealthCard(Flex& root, float scale) {
       .gap = Style::spaceSm * scale,
       .visible = false,
       .participatesInLayout = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
 
   auto header = makeCardHeaderRow(i18n::tr("control-center.power.health"), scale);
@@ -669,9 +704,7 @@ void PowerTab::buildPeripheralsCard(Flex& root, float scale) {
       .gap = Style::spaceSm * scale,
       .visible = false,
       .participatesInLayout = false,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
 
   card->addChild(makeCardHeaderRow(i18n::tr("control-center.power.peripherals"), scale));
@@ -696,6 +729,8 @@ void PowerTab::onClose() {
   m_sessionActionsRow = nullptr;
   m_caffeineToggle = nullptr;
   m_caffeineRow = nullptr;
+  m_lidCloseCard = nullptr;
+  m_lidCloseToggle = nullptr;
   m_batteryWell = nullptr;
   m_leftoverScroll = nullptr;
   m_statusCard = nullptr;
@@ -739,6 +774,7 @@ void PowerTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
 
 void PowerTab::doUpdate(Renderer& /*renderer*/) {
   syncSessionCard();
+  syncLidCloseToggle();
   syncBatteryStatus();
   rebuildChargeLimits();
   syncPowerProfiles();
@@ -1131,7 +1167,8 @@ void PowerTab::syncBatteryWell() {
   };
 
   const bool live = shown(m_statusCard) || shown(m_profilesCard) || shown(m_caffeineRow);
-  const bool leftover = shown(m_chargingCard) || shown(m_healthCard) || shown(m_peripheralsCard);
+  const bool leftover =
+      shown(m_lidCloseCard) || shown(m_chargingCard) || shown(m_healthCard) || shown(m_peripheralsCard);
   bool changed = setShown(m_batteryWell, live);
   changed = setShown(m_leftoverScroll, leftover) || changed;
   if (changed) {

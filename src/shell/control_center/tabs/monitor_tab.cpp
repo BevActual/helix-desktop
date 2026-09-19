@@ -422,8 +422,7 @@ std::unique_ptr<Flex> MonitorTab::create() {
           .align = FlexAlign::Stretch,
           .gap = Style::spaceSm * scale,
           .visible = false,
-          .configure =
-              [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
       },
       ui::label({
           .text = i18n::tr("control-center.display.no-displays"),
@@ -718,8 +717,8 @@ void MonitorTab::buildArrangementCard(Flex& parent, float scale) {
       .visible = false,
       .participatesInLayout = false,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
+          [scale](Flex& card) {
+            applyContentCardStyle(card, scale);
             card.setGap(Style::spaceMd * scale);
           },
   });
@@ -1299,7 +1298,7 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
       .gap = Style::spaceSm * scale,
       .visible = false,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   auto enableRow = makeControlRow(i18n::tr("settings.schema.services.night-light.label"), scale, nullptr, false);
   enableRow->addChild(
@@ -1505,7 +1504,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
 
   for (const auto& source : sources) {
     auto card = ui::column({
-        .configure = [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+        .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
     });
 
     Glyph* iconPtr = nullptr;

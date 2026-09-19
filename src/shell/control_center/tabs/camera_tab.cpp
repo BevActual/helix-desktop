@@ -726,8 +726,7 @@ void CameraTab::rebuildControls() {
     auto well = ui::column({
         .align = FlexAlign::Stretch,
         .fillWidth = true,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+        .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
     });
 
     auto header = makeCardHeaderRow(i18n::tr(sectionTitleKey(section)), scale);
@@ -769,7 +768,7 @@ void CameraTab::rebuildControls() {
                 .fontSize = Style::fontSizeBody * scale,
                 .controlHeight = Style::controlHeight * scale,
                 .enabled = !autoCtrl->readOnly,
-                .surfaceOpacity = panelCardOpacity(),
+                .surfaceOpacity = 1.0F,
                 .onSelectionChanged =
                     [this, id, items](std::size_t index, std::string_view) {
                       if (m_camera != nullptr && index < items.size()) {

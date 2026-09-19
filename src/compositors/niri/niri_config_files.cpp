@@ -84,6 +84,9 @@ namespace compositors::niri {
 
   bool writeFile(const std::filesystem::path& path, std::string_view contents, std::string& error) {
     std::error_code ec;
+    if (std::filesystem::exists(path, ec) && !ec && readFile(path) == contents) {
+      return true;
+    }
     const auto parent = path.parent_path();
     if (!parent.empty()) {
       std::filesystem::create_directories(parent, ec);

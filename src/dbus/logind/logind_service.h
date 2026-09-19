@@ -37,6 +37,13 @@ public:
   bool acquireSleepDelayInhibit();
   void releaseSleepDelayInhibit();
 
+  // Block-type lid-switch inhibit: stops logind HandleLidSwitch from suspending
+  // while an external display should stay usable (clamshell).
+  [[nodiscard]] bool hasLidSwitchInhibit() const noexcept;
+  bool acquireLidSwitchInhibit();
+  void releaseLidSwitchInhibit();
+  void setLidSwitchInhibitEnabled(bool enabled);
+
 private:
   void ensureSessionLockMonitor();
 
@@ -49,4 +56,5 @@ private:
   SessionLockCallback m_unlockCallback;
   int m_idleInhibitFd = -1;
   int m_sleepDelayInhibitFd = -1;
+  int m_lidSwitchInhibitFd = -1;
 };

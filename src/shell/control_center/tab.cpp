@@ -56,6 +56,21 @@ namespace control_center {
     card.setPadding(Style::spaceMd * scale);
   }
 
+  void applyCompactCardStyle(Flex& card, float scale, float fillOpacity, bool hosted) {
+    card.setDirection(FlexDirection::Vertical);
+    card.setAlign(FlexAlign::Stretch);
+    card.setGap(Style::spaceXs * scale);
+    if (hosted) {
+      card.clearFill();
+      card.clearBorder();
+      card.setPadding(0.0F);
+      return;
+    }
+    applySectionCardStyle(card, scale, fillOpacity);
+    card.setGap(Style::spaceXs * scale);
+    card.setPadding(Style::spaceSm * scale);
+  }
+
   void applyGroupedListStyle(Flex& host, float scale) {
     host.setFill(colorSpecFromRole(ColorRole::Surface));
     if (Style::highContrastEnabled()) {
@@ -123,11 +138,13 @@ namespace control_center {
   }
 
   Label* addTitle(Flex& parent, const std::string& text, float scale) {
+    // Well header. The tab title already sits in the panel header, so wells label their group at
+    // body size, the same weight makeCardHeaderRow() uses; only one title size lives inside a tab.
     Label* ptr = nullptr;
     auto label = ui::label({
         .out = &ptr,
         .text = text,
-        .fontSize = Style::fontSizeTitle * scale,
+        .fontSize = Style::fontSizeBody * scale,
         .fontWeight = FontWeight::Bold,
         .color = colorSpecFromRole(ColorRole::OnSurface),
     });

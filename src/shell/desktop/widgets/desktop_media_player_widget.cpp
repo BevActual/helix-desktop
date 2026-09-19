@@ -11,6 +11,7 @@
 #include "ui/style.h"
 
 #include <cmath>
+#include <linux/input-event-codes.h>
 
 using namespace mpris;
 
@@ -37,7 +38,16 @@ DesktopMediaPlayerWidget::DesktopMediaPlayerWidget(MprisService* mpris, HttpClie
 DesktopMediaPlayerWidget::~DesktopMediaPlayerWidget() { m_aliveGuard.reset(); }
 
 void DesktopMediaPlayerWidget::create() {
-  auto rootNode = ui::node({});
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("media");
+          },
+  });
 
   auto artwork = ui::image({
       .out = &m_artwork,

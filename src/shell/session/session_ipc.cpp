@@ -8,6 +8,7 @@
 #include "shell/session/session_action_meta.h"
 #include "shell/session/session_action_runner.h"
 
+#include <functional>
 #include <string>
 #include <string_view>
 
@@ -20,19 +21,36 @@ namespace {
   [[nodiscard]] std::string unknownSessionActionError(std::string_view action) {
     return "error: unknown session action \""
         + std::string(action)
-        + "\" (try: lock, suspend, lock-and-suspend, logout, reboot, shutdown)\n";
+        + "\" (try: lock, suspend, lock-and-suspend, lid-close, logout, reboot, shutdown)\n";
   }
 
 } // namespace
 
-void registerSessionIpc(IpcService& ipc, SessionActionRunner& runner, LockScreen& lockScreen, ConfigService& config) {
-  const auto dispatch = [&runner, &lockScreen, &config](const std::string& args) -> std::string {
+void registerSessionIpc(
+    IpcService& ipc, SessionActionRunner& runner, LockScreen& lockScreen, ConfigService& config,
+    std::function<bool()> keepSessionOnLidClose
+) {
+  const auto dispatch = [&runner, &lockScreen, &config, keepSessionOnLidClose = std::move(keepSessionOnLidClose)](
+                            const std::string& args
+                        ) -> std::string {
     const auto parts = noctalia::ipc::splitWords(args);
     if (parts.empty()) {
-      return "error: session requires <lock|suspend|lock-and-suspend|logout|reboot|shutdown>\n";
+      return "error: session requires <lock|suspend|lock-and-suspend|lid-close|logout|reboot|shutdown>\n";
     }
 
     const std::string& ipcAction = parts[0];
+    if (ipcAction == "lid-close") {
+      if (keepSessionOnLidClose && keepSessionOnLidClose()) {
+        return "ok\n";
+      }
+      if (!config.isLockScreenEnabled()) {
+        runner.invoke(builtinAction("suspend"));
+        return "ok\n";
+      }
+      runner.invoke(builtinAction("lock_and_suspend"));
+      return "ok\n";
+    }
+
     const auto action = session_action::canonicalActionName(ipcAction);
     if (!action.has_value()) {
       return unknownSessionActionError(ipcAction);

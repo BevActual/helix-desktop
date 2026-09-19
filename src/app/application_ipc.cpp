@@ -82,6 +82,7 @@
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
 #include "system/distro_info.h"
+#include "system/display_config_service.h"
 #include "system/easyeffects_service.h"
 #include "system/keyboard_backlight_service.h"
 #include "system/system_monitor_service.h"
@@ -549,7 +550,13 @@ void Application::initIpc() {
       IpcService::HandlerOptions{.actionEditorVisibility = IpcService::ActionEditorVisibility::Hidden}
   );
 
-  registerSessionIpc(m_ipcService, m_sessionActionRunner, m_lockScreen, m_configService);
+  registerSessionIpc(
+      m_ipcService, m_sessionActionRunner, m_lockScreen, m_configService,
+      [this]() {
+        return m_configService.shouldKeepSessionOnLidClose() && m_displayConfigService != nullptr
+            && m_displayConfigService->hasEnabledExternalOutput();
+      }
+  );
 
   if (m_powerProfilesService != nullptr) {
     m_powerProfilesService->registerIpc(m_ipcService, [this](std::string_view profile) {

@@ -157,10 +157,35 @@ std::unique_ptr<Flex> AiUsageTab::create() {
   auto tab = ui::column({
       .out = &m_root,
       .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
+      .gap = Style::spaceMd * scale,
       .fillWidth = true,
       .fillHeight = true,
   });
+
+  auto compact = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+  });
+  compact->addChild(
+      ui::label({
+          .out = &m_empty,
+          .text = i18n::tr("control-center.ai-usage.empty"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 4,
+          .visible = false,
+      })
+  );
+  compact->addChild(
+      ui::label({
+          .out = &m_updated,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+      })
+  );
+  tab->addChild(std::move(compact));
 
   auto scroll = ui::scrollView({
       .out = &m_scroll,
@@ -179,16 +204,6 @@ std::unique_ptr<Flex> AiUsageTab::create() {
       .gap = Style::spaceSm * scale,
       .fillWidth = true,
   });
-  list->addChild(
-      ui::label({
-          .out = &m_empty,
-          .text = i18n::tr("control-center.ai-usage.empty"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-          .visible = false,
-      })
-  );
 
   auto ollamaCard = ui::column({
       .out = &m_ollamaCard,
@@ -196,10 +211,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
       .gap = Style::spaceSm * scale,
       .padding = Style::spaceMd * scale,
       .visible = false,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) {
-            applySectionCardStyle(section, scale, opacity);
-          },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   ollamaCard->addChild(
       ui::row(
@@ -311,10 +323,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
         .gap = Style::spaceSm * scale,
         .padding = Style::spaceMd * scale,
         .visible = false,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& section) {
-              applySectionCardStyle(section, scale, opacity);
-            },
+        .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
     });
     card->addChild(
         ui::row(
@@ -415,14 +424,6 @@ std::unique_ptr<Flex> AiUsageTab::create() {
   content->setGap(Style::spaceSm * scale);
   content->addChild(std::move(list));
   tab->addChild(std::move(scroll));
-  tab->addChild(
-      ui::label({
-          .out = &m_updated,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      })
-  );
   m_paletteConn = paletteChanged().connect([this] { syncUi(); });
   syncUi();
   return m_settings->wrapLive(std::move(tab), scale, panelCardOpacity());
@@ -492,15 +493,8 @@ void AiUsageTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
 }
 
 void AiUsageTab::onPanelCardOpacityChanged(float opacity) {
-  const float scale = contentScale();
-  if (m_ollamaCard != nullptr) {
-    applySectionCardStyle(*m_ollamaCard, scale, opacity);
-  }
-  for (auto& widgets : m_providers) {
-    if (widgets.card != nullptr) {
-      applySectionCardStyle(*widgets.card, scale, opacity);
-    }
-  }
+  // Provider and Ollama cards are leftover wells; their fill does not follow panel glass.
+  (void)opacity;
 }
 
 void AiUsageTab::syncUi() {
@@ -664,7 +658,8 @@ void AiUsageTab::syncUi() {
     m_empty->setParticipatesInLayout(!any);
   }
   if (m_updated != nullptr) {
-    if (newest.time_since_epoch().count() == 0) {
+    const bool haveTime = newest.time_since_epoch().count() != 0;
+    if (!haveTime) {
       m_updated->setText({});
     } else {
       const std::time_t raw = std::chrono::system_clock::to_time_t(newest);
@@ -674,6 +669,8 @@ void AiUsageTab::syncUi() {
       std::strftime(buf, sizeof(buf), "%H:%M:%S", &tm);
       m_updated->setText(i18n::tr("control-center.ai-usage.updated-at", "time", buf));
     }
+    m_updated->setVisible(haveTime);
+    m_updated->setParticipatesInLayout(haveTime);
   }
   if (m_refreshButton != nullptr && snapshot != nullptr) {
     m_refreshButton->setEnabled(!snapshot->refreshing && (ollama == nullptr || !ollama->busy));

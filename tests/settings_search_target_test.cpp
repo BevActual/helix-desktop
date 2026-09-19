@@ -40,9 +40,19 @@ int main() {
   ok = expect(tabIdForSettingsSection("clock") == "clock", "clock stays") && ok;
   ok = expect(tabIdForSettingsSection("screenshot") == "capture", "screenshot -> capture") && ok;
   ok = expect(tabIdForSettingsSection("screen-record") == "capture", "screen-record -> capture") && ok;
+  ok = expect(tabIdForSettingsSection("widgets") == "desktop", "widgets -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("corners") == "desktop", "corners -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("hot-corners") == "desktop", "hot-corners -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("screen-corners") == "desktop", "screen-corners -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("bar") == "desktop", "bar -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("dock") == "desktop", "dock -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("windows") == "desktop", "windows -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("panels") == "desktop", "panels -> desktop") && ok;
+  ok = expect(tabIdForSettingsSection("osd") == "desktop", "osd -> desktop") && ok;
   ok = expect(tabIdForSettingsSection("ai-usage") == "ai", "ai-usage -> ai") && ok;
   ok = expect(tabIdForSettingsSection("wallpaper") == "wallpaper", "wallpaper stays") && ok;
   ok = expect(tabIdForSettingsSection("glass") == "theme", "glass -> theme") && ok;
+  ok = expect(tabIdForSettingsSection("chrome") == "theme", "chrome -> theme") && ok;
   ok = expect(tabIdForSettingsSection("type") == "theme", "type -> theme") && ok;
   ok = expect(tabIdForSettingsSection("roundness") == "theme", "roundness -> theme") && ok;
   ok = expect(tabIdForSettingsSection("language") == "theme", "language -> theme") && ok;
@@ -104,7 +114,7 @@ int main() {
 
   const auto dockFromHome = resolveSettingsSearchTarget("home", true, std::vector<std::string>{"control-center"}, registry, "autohide");
   ok = expect(!dockFromHome.stayOnCurrent, "home autohide jumps") && ok;
-  ok = expect(dockFromHome.tabId == "dock", "home autohide -> dock") && ok;
+  ok = expect(dockFromHome.tabId == "desktop", "home autohide -> desktop") && ok;
 
   return ok ? 0 : 1;
 }

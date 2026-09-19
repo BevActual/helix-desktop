@@ -23,13 +23,10 @@
 #include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/theme_tab.h"
-#include "shell/control_center/tabs/windows_tab.h"
-#include "shell/control_center/tabs/dock_tab.h"
 #include "shell/control_center/tabs/desktop_tab.h"
 #include "shell/control_center/tabs/launcher_tab.h"
 #include "shell/control_center/tabs/ai_usage_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
-#include "shell/control_center/tabs/bar_tab.h"
 #include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
 #include "shell/control_center/tabs/camera_tab.h"
@@ -40,8 +37,6 @@
 #include "shell/control_center/tabs/media_tab.h"
 #include "shell/control_center/tabs/monitor_tab.h"
 #include "shell/control_center/tabs/network_tab.h"
-#include "shell/control_center/tabs/osd_tab.h"
-#include "shell/control_center/tabs/panels_tab.h"
 #include "shell/control_center/tabs/notifications_tab.h"
 #include "shell/control_center/tabs/capture_tab.h"
 #include "shell/control_center/tabs/packages_tab.h"
@@ -160,12 +155,7 @@ namespace {
       {"theme", "settings.navigation.sections.theme", "palette", true, TabGroup::Appearance},
       {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true, TabGroup::Appearance},
       {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Appearance},
-      {"bar", "settings.navigation.sections.bar", "crop-3-2", true, TabGroup::Layout},
-      {"dock", "settings.navigation.sections.dock", "layout-bottombar-inactive", true, TabGroup::Layout},
       {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Layout},
-      {"windows", "settings.navigation.sections.windows", "app-window", true, TabGroup::Layout},
-      {"panels", "settings.navigation.sections.panels", "layout-bottombar", true, TabGroup::Layout},
-      {"osd", "settings.navigation.sections.osd", "message-circle", true, TabGroup::Layout},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
       {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Status},
@@ -297,7 +287,6 @@ namespace {
         || id == "scale"
         || id == "roundness"
         || id == "effects"
-        || id == "windows"
         || id == "weather"
         || id == "notifications"
         || id == "power"
@@ -328,11 +317,7 @@ namespace {
         || id == "plugins"
         || id == "home"
         || id == "desktop"
-        || id == "dock"
-        || id == "bar"
         || id == "camera"
-        || id == "osd"
-        || id == "panels"
         || id == "launcher";
   }
 
@@ -344,7 +329,9 @@ namespace {
         || context == "scale"
         || context == "roundness"
         || context == "effects"
-        || context == "language") {
+        || context == "language"
+        || context == "chrome"
+        || context == "palettes") {
       return "theme";
     }
     if (context.empty() || context == "home") {
@@ -355,6 +342,19 @@ namespace {
     }
     if (context == "ai" || context == "ai-usage") {
       return "ai";
+    }
+    if (context == "widgets"
+        || context == "corners"
+        || context == "hot-corners"
+        || context == "screen-corners"
+        || context == "hot_corners"
+        || context == "screen_corners"
+        || context == "bar"
+        || context == "dock"
+        || context == "windows"
+        || context == "panels"
+        || context == "osd") {
+      return "desktop";
     }
     if (context == "wallpaper"
         || context.starts_with("wallpaper ")
@@ -409,7 +409,8 @@ namespace {
         || context == "roundness"
         || context == "effects"
         || context == "language"
-        || context == "palettes") {
+        || context == "palettes"
+        || context == "chrome") {
       return ThemeTab::sectionFromId(context);
     }
     return std::nullopt;
@@ -421,6 +422,23 @@ namespace {
     }
     if (context == "screen-record") {
       return CaptureTab::View::Record;
+    }
+    return std::nullopt;
+  }
+
+  [[nodiscard]] std::optional<DesktopTab::Section> desktopSectionForContext(std::string_view context) {
+    if (context == "widgets"
+        || context == "corners"
+        || context == "hot-corners"
+        || context == "screen-corners"
+        || context == "hot_corners"
+        || context == "screen_corners"
+        || context == "bar"
+        || context == "dock"
+        || context == "windows"
+        || context == "panels"
+        || context == "osd") {
+      return DesktopTab::sectionFromId(context);
     }
     return std::nullopt;
   }
@@ -469,12 +487,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("theme", std::make_unique<ThemeTab>(services));
   add("wallpaper", std::make_unique<WallpaperTab>(services));
   add("templates", std::make_unique<TemplatesTab>(services));
-  add("bar", std::make_unique<BarTab>(services));
-  add("dock", std::make_unique<DockTab>(services));
   add("desktop", std::make_unique<DesktopTab>(services));
-  add("windows", std::make_unique<WindowsTab>(services));
-  add("panels", std::make_unique<PanelsTab>(services));
-  add("osd", std::make_unique<OsdTab>(services));
   add("network", std::make_unique<NetworkTab>(services));
   add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
   add(
@@ -942,14 +955,17 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   std::string tabId;
   std::optional<CaptureTab::View> captureView;
   std::optional<ThemeTab::Section> themeSection;
+  std::optional<DesktopTab::Section> desktopSection;
   if (settingsTarget.isSettings) {
     tabId = tabIdForSettingsSection(settingsTarget.section);
     captureView = captureViewForContext(settingsTarget.section);
     themeSection = themeSectionForContext(settingsTarget.section);
+    desktopSection = desktopSectionForContext(settingsTarget.section);
   } else {
     tabId = resolveOpenTabId(context);
     captureView = captureViewForContext(context);
     themeSection = themeSectionForContext(context);
+    desktopSection = desktopSectionForContext(context);
   }
   selectTab(tabId, animateTabSwitch);
   if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
@@ -957,12 +973,23 @@ void ControlCenterPanel::onOpen(std::string_view context) {
       capture->applyOpenView(*captureView);
     }
     if (auto* theme = dynamic_cast<ThemeTab*>(slot->tab.get()); theme != nullptr && themeSection.has_value()) {
-      theme->applyOpenSection(*themeSection);
+      if (settingsTarget.isSettings) {
+        theme->applyOpenContext(settingsTarget.section);
+      } else {
+        theme->applyOpenContext(context);
+      }
+    }
+    if (auto* desktop = dynamic_cast<DesktopTab*>(slot->tab.get()); desktop != nullptr && desktopSection.has_value()) {
+      if (settingsTarget.isSettings) {
+        desktop->applyOpenContext(settingsTarget.section);
+      } else {
+        desktop->applyOpenContext(context);
+      }
     }
     if (auto* wallpaper = dynamic_cast<WallpaperTab*>(slot->tab.get()); wallpaper != nullptr) {
       wallpaper->applyOpenContext(wallpaperPickerContext(context));
     }
-    if (settingsTarget.isSettings && tabId != "theme") {
+    if (settingsTarget.isSettings && tabId != "theme" && !desktopSection.has_value()) {
       slot->tab->setConfigureMode(true);
     } else if (isLiveSettingsHost(tabId)) {
       slot->tab->setConfigureMode(false);
@@ -1005,7 +1032,10 @@ void ControlCenterPanel::maybeOpenPendingEditor() {
     std::string widgetName = std::move(m_pendingOpenWidgetInspectorName);
     m_pendingOpenBarName.clear();
     m_pendingOpenWidgetInspectorName.clear();
-    if (auto* slot = slotById("bar"); slot != nullptr && slot->tab != nullptr) {
+    if (auto* slot = slotById("desktop"); slot != nullptr && slot->tab != nullptr) {
+      if (auto* desktop = dynamic_cast<DesktopTab*>(slot->tab.get())) {
+        desktop->applyOpenSection(DesktopTab::Section::Bar);
+      }
       if (auto* pane = slot->tab->settingsPane(); pane != nullptr) {
         pane->openWidgetInspector(std::move(barName), std::move(widgetName));
       }
@@ -1035,9 +1065,16 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
           return false;
         }
         if (tabId == "theme") {
-          if (const auto section = themeSectionForContext(settingsTarget.section)) {
+          if (themeSectionForContext(settingsTarget.section).has_value()) {
             if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
-              return theme->currentSection() == *section;
+              return theme->matchesOpenContext(settingsTarget.section);
+            }
+          }
+        }
+        if (tabId == "desktop") {
+          if (desktopSectionForContext(settingsTarget.section).has_value()) {
+            if (const auto* desktop = dynamic_cast<const DesktopTab*>(slot->tab.get())) {
+              return desktop->matchesOpenContext(settingsTarget.section);
             }
           }
         }
@@ -1080,8 +1117,20 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
         return false;
       }
       if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
-        if (const auto section = themeSectionForContext(requested)) {
-          return theme->currentSection() == *section;
+        if (themeSectionForContext(requested).has_value()) {
+          return theme->matchesOpenContext(requested);
+        }
+      }
+    }
+  }
+  if (tabId == "desktop") {
+    if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
+      if (slot->tab->configureMode()) {
+        return false;
+      }
+      if (const auto* desktop = dynamic_cast<const DesktopTab*>(slot->tab.get())) {
+        if (desktopSectionForContext(requested).has_value()) {
+          return desktop->matchesOpenContext(requested);
         }
       }
     }
@@ -1746,7 +1795,7 @@ bool ControlCenterPanel::isDirectSectionOpenContext(std::string_view context) co
     return true;
   }
   if (context == "appearance" || themeSectionForContext(context).has_value()
-      || captureViewForContext(context).has_value()) {
+      || captureViewForContext(context).has_value() || desktopSectionForContext(context).has_value()) {
     return true;
   }
   for (const auto& spec : kBuiltinTabs) {
@@ -1791,9 +1840,15 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
       selectTab(best, false);
     }
     if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
+      const std::string query = StringUtils::trim(m_searchQuery);
       if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get())) {
-        if (const auto section = themeSectionForContext(StringUtils::trim(m_searchQuery))) {
-          theme->applyOpenSection(*section, false);
+        if (themeSectionForContext(query).has_value()) {
+          theme->applyOpenContext(query, false);
+        }
+      }
+      if (auto* desktop = dynamic_cast<DesktopTab*>(active->tab.get())) {
+        if (desktopSectionForContext(query).has_value()) {
+          desktop->applyOpenContext(query, false);
         }
       }
     }
@@ -1808,7 +1863,10 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
       currentSections = {"screenshot", "screen-record"};
     } else if (m_activeTabId == "theme") {
       currentSections = {
-          "theme", "niri", "glass", "icons", "type", "scale", "roundness", "effects", "language"};
+          "theme", "niri", "chrome", "glass", "icons", "type", "scale", "roundness", "effects", "language"};
+    } else if (m_activeTabId == "desktop") {
+      currentSections = {
+          "desktop", "widgets", "corners", "hot-corners", "screen-corners", "bar", "dock", "windows", "panels", "osd"};
     } else if (slot != nullptr && slot->tab != nullptr) {
       if (const auto* pane = slot->tab->settingsPane(); pane != nullptr && !pane->section().empty()) {
         currentSections.push_back(pane->section());
@@ -1831,8 +1889,16 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
       if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get());
           theme != nullptr && !target.sectionId.empty()) {
-        if (const auto section = themeSectionForContext(target.sectionId)) {
-          theme->applyOpenSection(*section, false);
+        if (themeSectionForContext(target.sectionId).has_value()) {
+          theme->applyOpenContext(target.sectionId, false);
+        }
+      }
+      if (auto* desktop = dynamic_cast<DesktopTab*>(active->tab.get())) {
+        const std::string query = StringUtils::trim(m_searchQuery);
+        if (desktopSectionForContext(query).has_value()) {
+          desktop->applyOpenContext(query, false);
+        } else if (!target.sectionId.empty() && desktopSectionForContext(target.sectionId).has_value()) {
+          desktop->applyOpenContext(target.sectionId, false);
         }
       }
       if (target.configureMode) {

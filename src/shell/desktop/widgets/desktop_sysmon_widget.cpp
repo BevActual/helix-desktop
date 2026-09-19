@@ -14,6 +14,7 @@
 #include <algorithm>
 #include <cmath>
 #include <format>
+#include <linux/input-event-codes.h>
 #include <utility>
 #include <vector>
 
@@ -130,7 +131,16 @@ DesktopSysmonWidget::~DesktopSysmonWidget() {
 }
 
 void DesktopSysmonWidget::create() {
-  auto rootNode = ui::node({});
+  auto rootNode = ui::inputArea({
+      .acceptedButtons = InputArea::buttonMask({BTN_LEFT}),
+      .onClick =
+          [](const InputArea::PointerData& data) {
+            if (data.button != BTN_LEFT) {
+              return;
+            }
+            openControlCenterTab("system");
+          },
+  });
 
   auto glyph = ui::glyph({
       .out = &m_glyph,

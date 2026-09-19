@@ -116,7 +116,7 @@ std::unique_ptr<Flex> IconsTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> IconsTab::createLiveBody() {
+std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const bool tinted = m_config != nullptr && m_config->config().shell.appIconColorize;
@@ -130,10 +130,8 @@ std::unique_ptr<Flex> IconsTab::createLiveBody() {
 
   auto compactCard = ui::column({
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+          [scale, opacity = panelCardOpacity(), hosted](Flex& card) {
+            applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
   auto toolbar = ui::row({

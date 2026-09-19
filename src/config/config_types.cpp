@@ -213,6 +213,58 @@ float detachedPanelBackgroundOpacityForTransparencyMode(PanelTransparencyMode mo
   return 1.0F;
 }
 
+float resolvedPanelGlass(const ShellConfig::PanelConfig& panel) noexcept {
+  if (panel.glass.has_value()) {
+    return std::clamp(*panel.glass, 0.0F, 1.0F);
+  }
+  switch (panel.transparencyMode) {
+  case PanelTransparencyMode::Soft:
+    return 0.5F;
+  case PanelTransparencyMode::Glass:
+    return 1.0F;
+  case PanelTransparencyMode::Solid:
+  default:
+    return 0.0F;
+  }
+}
+
+PanelTransparencyMode transparencyModeForGlass(float glass) noexcept {
+  const float clamped = std::clamp(glass, 0.0F, 1.0F);
+  if (clamped < 1.0F / 3.0F) {
+    return PanelTransparencyMode::Solid;
+  }
+  if (clamped < 2.0F / 3.0F) {
+    return PanelTransparencyMode::Soft;
+  }
+  return PanelTransparencyMode::Glass;
+}
+
+namespace {
+
+  [[nodiscard]] float lerp(float a, float b, float t) noexcept { return a + (b - a) * t; }
+
+} // namespace
+
+float panelCardOpacityForGlass(float glass, float panelBackgroundOpacity) noexcept {
+  const float t = std::clamp(glass, 0.0F, 1.0F);
+  const float backgroundOpacity = std::clamp(panelBackgroundOpacity, 0.0F, 1.0F);
+  const float solid = 1.0F;
+  const float soft = std::clamp(backgroundOpacity + 0.08F, 0.82F, 0.92F);
+  const float clear = std::clamp(backgroundOpacity + 0.10F, 0.62F, 0.75F);
+  if (t <= 0.5F) {
+    return lerp(solid, soft, t / 0.5F);
+  }
+  return lerp(soft, clear, (t - 0.5F) / 0.5F);
+}
+
+float detachedPanelBackgroundOpacityForGlass(float glass) noexcept {
+  const float t = std::clamp(glass, 0.0F, 1.0F);
+  if (t <= 0.5F) {
+    return lerp(1.0F, 0.80F, t / 0.5F);
+  }
+  return lerp(0.80F, 0.55F, (t - 0.5F) / 0.5F);
+}
+
 void normalizeIdleBehaviorAction(IdleBehaviorConfig& behavior) {
   if (behavior.action == "suspend" && behavior.lockBeforeSuspend) {
     behavior.action = "lock_and_suspend";

@@ -41,10 +41,8 @@ private:
   Flex* m_panicRow = nullptr;
   Toggle* m_panicToggle = nullptr;
   Flex* m_zoneCard = nullptr;
-  Separator* m_zoneDivider = nullptr;
   Select* m_zoneSelect = nullptr;
   Flex* m_servicesCard = nullptr;
-  Separator* m_servicesDivider = nullptr;
   Flex* m_serviceList = nullptr;
   Button* m_saveButton = nullptr;
   ScrollView* m_liveScroll = nullptr;

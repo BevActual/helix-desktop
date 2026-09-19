@@ -39,6 +39,8 @@ public:
     }
   }
 
+  void handleStreamConnected() override { m_service.onNiriConnected(); }
+
   void handleStreamReset() override { m_service.refresh(); }
 
 private:
@@ -63,6 +65,13 @@ void DisplayConfigService::onNiriConfigLoaded() {
   }
 }
 
+void DisplayConfigService::onNiriConnected() {
+  refresh();
+  if (m_connectedCallback) {
+    m_connectedCallback();
+  }
+}
+
 bool DisplayConfigService::available() const noexcept {
   return compositors::isNiri() && m_platform.niriRuntime().available();
 }
@@ -81,6 +90,10 @@ std::size_t DisplayConfigService::enabledCount() const noexcept {
   return static_cast<std::size_t>(std::ranges::count_if(m_outputs, [](const display_config::Output& output) {
     return output.enabled;
   }));
+}
+
+bool DisplayConfigService::hasEnabledExternalOutput() const noexcept {
+  return display_config::hasEnabledExternalOutput(m_outputs);
 }
 
 std::string DisplayConfigService::fingerprint() const {
@@ -250,6 +263,10 @@ void DisplayConfigService::setChangeCallback(ChangeCallback callback) { m_change
 
 void DisplayConfigService::setConfigLoadedCallback(ChangeCallback callback) {
   m_configLoadedCallback = std::move(callback);
+}
+
+void DisplayConfigService::setConnectedCallback(ChangeCallback callback) {
+  m_connectedCallback = std::move(callback);
 }
 
 bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action, bool refreshAfter) {

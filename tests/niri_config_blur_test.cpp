@@ -36,6 +36,19 @@ int main() {
   ok = expect(!compositors::niri::versionSupportsBlur(""), "empty version does not support blur") && ok;
   ok = expect(!compositors::niri::versionSupportsBlur("abc"), "non-version does not support blur") && ok;
 
+  ok = expect(
+      compositors::niri::versionSupportsLiquidGlass("26.04 helix (abc)"), "helix-niri 26.04 supports liquid-glass"
+  ) && ok;
+  ok = expect(
+      compositors::niri::versionSupportsLiquidGlass("niri 26.04 helix (deadbeef)"),
+      "prefixed helix version supports liquid-glass"
+  ) && ok;
+  ok = expect(!compositors::niri::versionSupportsLiquidGlass("26.04"), "stock niri does not support liquid-glass")
+      && ok;
+  ok = expect(
+      !compositors::niri::versionSupportsLiquidGlass("25.08 helix (abc)"), "old helix-niri without blur does not"
+  ) && ok;
+
   const auto enabled = compositors::niri::kdlForBlur({.enabled = true});
   ok = expect(enabled.find("blur true") != std::string::npos, "enabled kdl requests blur") && ok;
   ok = expect(enabled.find("xray false") != std::string::npos, "enabled kdl disables xray") && ok;
@@ -44,6 +57,7 @@ int main() {
   ok = expect(enabled.find("noise 0.03") != std::string::npos, "enabled kdl sets default blur noise") && ok;
   ok = expect(enabled.find("noctalia-window-switcher") != std::string::npos, "enabled kdl covers the window switcher")
       && ok;
+  ok = expect(enabled.find("liquid-glass {") == std::string::npos, "stock niri never emits liquid-glass") && ok;
 
   const auto tuned = compositors::niri::kdlForBlur({.enabled = true, .passes = 5, .offset = 4.5F, .noise = 0.08F});
   ok = expect(tuned.find("passes 5") != std::string::npos, "writes configured passes") && ok;
@@ -59,6 +73,46 @@ int main() {
   ok = expect(disabled.find("blur false") != std::string::npos, "disabled kdl clears blur") && ok;
   ok = expect(disabled.find("^noctalia-") != std::string::npos, "disabled kdl matches all noctalia layers") && ok;
   ok = expect(disabled.find("passes") == std::string::npos, "disabled kdl does not set global blur params") && ok;
+  ok = expect(disabled.find("liquid-glass {") == std::string::npos, "disabled kdl never emits liquid-glass") && ok;
+
+  const auto stockRefraction = compositors::niri::kdlForBlur({.enabled = false, .refraction = true, .helixNiri = false});
+  ok = expect(stockRefraction.find("liquid-glass {") == std::string::npos, "stock refraction never emits liquid-glass")
+      && ok;
+  ok = expect(stockRefraction.find("blur true") != std::string::npos, "stock refraction maps to chrome blur") && ok;
+
+  const auto helixRefraction =
+      compositors::niri::kdlForBlur({.enabled = false, .refraction = true, .helixNiri = true, .refractionStrength = 0.4F});
+  ok = expect(helixRefraction.find("liquid-glass {") != std::string::npos, "helix-niri refraction emits liquid-glass")
+      && ok;
+  ok = expect(helixRefraction.find("refraction-strength 0.40") != std::string::npos, "helix-niri writes glass strength")
+      && ok;
+  ok = expect(helixRefraction.find("xray true") != std::string::npos, "helix-niri refraction uses xray") && ok;
+  ok = expect(helixRefraction.find("Greeter") != std::string::npos, "helix-niri refraction covers the greeter") && ok;
+  ok = expect(helixRefraction.find("idle-grace") != std::string::npos, "helix-niri refraction covers idle-grace") && ok;
+  ok = expect(helixRefraction.find("blur false") != std::string::npos, "helix-niri refraction turns client blur off")
+      && ok;
+  ok = expect(helixRefraction.find("blur true") == std::string::npos, "helix-niri refraction does not stack niri blur")
+      && ok;
+
+  const auto helixBlurAndGlass = compositors::niri::kdlForBlur(
+      {.enabled = true, .refraction = true, .helixNiri = true, .refractionStrength = 0.4F}
+  );
+  ok = expect(helixBlurAndGlass.find("liquid-glass {") != std::string::npos, "helix-niri layout blur keeps liquid-glass")
+      && ok;
+  ok = expect(helixBlurAndGlass.find("blur true") != std::string::npos, "helix-niri layout blur still requests blur")
+      && ok;
+
+  const auto helixOff = compositors::niri::kdlForBlur({.enabled = true, .refraction = false, .helixNiri = true});
+  ok = expect(helixOff.find("liquid-glass {") == std::string::npos, "helix-niri without refraction omits liquid-glass")
+      && ok;
+
+  const auto helixSolid =
+      compositors::niri::kdlForBlur({.enabled = false, .refraction = true, .helixNiri = true, .refractionStrength = 0.0F});
+  ok = expect(helixSolid.find("liquid-glass {") == std::string::npos, "solid chrome omits liquid-glass") && ok;
+
+  const auto helixContrast =
+      compositors::niri::kdlForBlur({.enabled = false, .refraction = true, .helixNiri = true, .highContrast = true});
+  ok = expect(helixContrast.find("liquid-glass {") == std::string::npos, "high contrast omits liquid-glass") && ok;
 
   const auto dir = makeTempDir();
   const auto config = dir / "config.kdl";

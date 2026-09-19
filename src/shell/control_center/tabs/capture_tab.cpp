@@ -98,25 +98,40 @@ std::unique_ptr<Flex> CaptureTab::create() {
           .onChange = [this](std::size_t index) { applyView(index); },
       })
   );
+  auto screenshotCompact = ui::column({
+      .out = &m_screenshotCompactHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  screenshotCompact->addChild(m_screenshot->createCompactBody());
+  toolbar->addChild(std::move(screenshotCompact));
+
+  auto recordCompact = ui::column({
+      .out = &m_recordCompactHost,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+  });
+  recordCompact->addChild(m_record->createCompactBody());
+  toolbar->addChild(std::move(recordCompact));
   live->addChild(std::move(toolbar));
 
-  auto screenshotHost = ui::column({
-      .out = &m_screenshotHost,
+  auto screenshotLeftover = ui::column({
+      .out = &m_screenshotLeftoverHost,
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
   });
-  screenshotHost->addChild(m_screenshot->createLiveBody());
-  live->addChild(std::move(screenshotHost));
+  screenshotLeftover->addChild(m_screenshot->createLeftoverBody());
+  live->addChild(std::move(screenshotLeftover));
 
-  auto recordHost = ui::column({
-      .out = &m_recordHost,
+  auto recordLeftover = ui::column({
+      .out = &m_recordLeftoverHost,
       .align = FlexAlign::Stretch,
       .gap = 0.0F,
       .flexGrow = 1.0F,
   });
-  recordHost->addChild(m_record->createLiveBody());
-  live->addChild(std::move(recordHost));
+  recordLeftover->addChild(m_record->createLeftoverBody());
+  live->addChild(std::move(recordLeftover));
 
   syncHosts();
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
@@ -157,8 +172,10 @@ void CaptureTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_viewSwitch = nullptr;
-  m_screenshotHost = nullptr;
-  m_recordHost = nullptr;
+  m_screenshotCompactHost = nullptr;
+  m_recordCompactHost = nullptr;
+  m_screenshotLeftoverHost = nullptr;
+  m_recordLeftoverHost = nullptr;
   m_viewSyncing = false;
 }
 
@@ -207,8 +224,10 @@ void CaptureTab::persistView() {
 
 void CaptureTab::syncHosts() {
   const bool record = m_view == View::Record;
-  setShown(m_screenshotHost, !record);
-  setShown(m_recordHost, record);
+  setShown(m_screenshotCompactHost, !record);
+  setShown(m_recordCompactHost, record);
+  setShown(m_screenshotLeftoverHost, !record);
+  setShown(m_recordLeftoverHost, record);
 }
 
 void CaptureTab::syncSettingsSection() {

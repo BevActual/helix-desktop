@@ -26,6 +26,8 @@ namespace control_center {
   // modules = Home shortcut plates, widgets = glanceable Home/desktop cards that deep-link.
   // Do not nest glass-on-glass. Compact cards and leftover catalogs stay leftover.
   void applySectionCardStyle(Flex& card, float scale, float fillOpacity);
+  // Compact source well. Hosted Theme children skip the well so Theme keeps one card.
+  void applyCompactCardStyle(Flex& card, float scale, float fillOpacity, bool hosted);
   [[nodiscard]] float sectionCardFillOpacity(float panelCardOpacity) noexcept;
   void applyGroupedListStyle(Flex& host, float scale);
   // Glanceable widgets and Apple-app content on the glass panel chrome.
@@ -43,6 +45,7 @@ namespace control_center {
   Separator* addWellDivider(
       Flex& parent, float scale, SeparatorOrientation orientation = SeparatorOrientation::HorizontalRule
   );
+  // Well header label (body size, bold). Do not repeat the tab title on the compact card.
   Label* addTitle(Flex& parent, const std::string& text, float scale = 1.0F);
   void addBody(Flex& parent, const std::string& text, float scale = 1.0F);
   Label* addCaption(Flex& parent, const std::string& text, float scale = 1.0F, int maxLines = 2);

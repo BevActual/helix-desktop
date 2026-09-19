@@ -113,6 +113,7 @@ namespace noctalia::config::schema {
     static const Schema<LockscreenConfig> s = {
         field(&LockscreenConfig::enabled, "enabled"),
         field(&LockscreenConfig::lockBeforeSuspend, "lock_before_suspend"),
+        field(&LockscreenConfig::lidCloseKeepExternalDisplays, "lid_close_keep_external_displays"),
         field(&LockscreenConfig::fingerprint, "fingerprint"),
         field(&LockscreenConfig::allowEmptyPassword, "allow_empty_password"),
         field(&LockscreenConfig::blurredDesktop, "blurred_desktop"),
@@ -1440,6 +1441,20 @@ namespace noctalia::config::schema {
     const Schema<ShellConfig::PanelConfig>& shellPanelSchema() {
       static const Schema<ShellConfig::PanelConfig> s = {
           enumField(&ShellConfig::PanelConfig::transparencyMode, "transparency_mode", kPanelTransparencyModes),
+          custom<ShellConfig::PanelConfig>(
+              "glass",
+              [](const toml::table& tbl, ShellConfig::PanelConfig& out, std::string_view, Diagnostics&) {
+                if (auto v = finiteDouble(tbl["glass"])) {
+                  out.glass = applyRange(static_cast<float>(*v), kUnitRange);
+                }
+              },
+              [](toml::table& tbl, const ShellConfig::PanelConfig& in) {
+                if (in.glass.has_value()) {
+                  tbl.insert_or_assign("glass", static_cast<double>(*in.glass));
+                }
+              }
+          ),
+          field(&ShellConfig::PanelConfig::refraction, "refraction"),
           field(&ShellConfig::PanelConfig::borders, "borders"),
           field(&ShellConfig::PanelConfig::shadow, "shadow"),
           field(&ShellConfig::PanelConfig::listItemBackground, "list_item_background"),

@@ -2,6 +2,8 @@
 #include "application.h"
 #include "application_internal.h"
 #include "compositors/compositor_detect.h"
+#include "compositors/niri/niri_config_blur.h"
+#include "compositors/niri/niri_config_setup.h"
 #include "config/config_export.h"
 #include "config/config_types.h"
 #include "core/build_info.h"
@@ -1038,6 +1040,15 @@ void Application::releaseSleepDelayInhibitIfPending() {
   }
 }
 
+void Application::syncLidCloseInhibit() {
+  if (m_logindService == nullptr) {
+    return;
+  }
+  const bool inhibit = m_configService.shouldKeepSessionOnLidClose() && m_displayConfigService != nullptr
+      && m_displayConfigService->hasEnabledExternalOutput();
+  m_logindService->setLidSwitchInhibitEnabled(inhibit);
+}
+
 void Application::initSystemBusServices() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
@@ -1445,11 +1456,28 @@ void Application::initBrightnessAndPipewire() {
   try {
     m_displayConfigService = std::make_unique<DisplayConfigService>(m_compositorPlatform);
     m_displayConfigService->setChangeCallback([this, shouldRefreshControlCenter]() {
+      syncLidCloseInhibit();
       if (shouldRefreshControlCenter()) {
         m_panelManager.refresh();
       }
     });
     m_displayConfigService->setConfigLoadedCallback([this]() { m_settingsInvalidated.emit(); });
+    auto persistNiriBlur = [this]() {
+      if (!compositors::isNiri()) {
+        return;
+      }
+      (void)compositors::niri::persistBlurFromConfig(
+          m_configService.config(), &m_compositorPlatform.niriRuntime()
+      );
+      (void)compositors::niri::migrateLidCloseSnippet();
+    };
+    m_displayConfigService->setConnectedCallback([this, persistNiriBlur]() {
+      persistNiriBlur();
+      syncLidCloseInhibit();
+      m_settingsInvalidated.emit();
+    });
+    persistNiriBlur();
+    syncLidCloseInhibit();
   } catch (const std::exception& e) {
     kLog.warn("display config service disabled: {}", e.what());
     m_displayConfigService.reset();

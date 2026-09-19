@@ -67,6 +67,8 @@ private:
 
   void buildSessionCard(Flex& root, float scale);
   void syncSessionCard();
+  void buildLidCloseCard(Flex& root, float scale);
+  void syncLidCloseToggle();
   void runSessionAction(std::string_view action);
   void buildStatusCard(Flex& root, float scale);
   void buildChargingCard(Flex& root, float scale);
@@ -100,6 +102,10 @@ private:
   Toggle* m_caffeineToggle = nullptr;
   Flex* m_caffeineRow = nullptr;
   bool m_syncingCaffeine = false;
+
+  Flex* m_lidCloseCard = nullptr;
+  Toggle* m_lidCloseToggle = nullptr;
+  bool m_syncingLidClose = false;
 
   Flex* m_batteryWell = nullptr;
   ScrollView* m_leftoverScroll = nullptr;

@@ -105,7 +105,6 @@ std::unique_ptr<Flex> LocalSendTab::create() {
         applySectionCardStyle(section, scale, opacity);
       },
   });
-  addTitle(*statusCard, i18n::tr("control-center.localsend.title"), scale);
   auto enableRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
   enableRow->addChild(
       ui::label({
@@ -152,9 +151,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       .out = &m_incomingCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*incoming, i18n::tr("control-center.localsend.incoming-title"), scale);
   incoming->addChild(
@@ -206,9 +203,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       .out = &m_historyCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*historyCard, i18n::tr("control-center.localsend.history"), scale);
   historyCard->addChild(ui::column({.out = &m_historyList, .align = FlexAlign::Stretch, .gap = Style::spaceXs * scale}));
@@ -219,9 +214,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .flexGrow = 1.0F,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
-      },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*peersCard, i18n::tr("control-center.localsend.nearby"), scale);
   peersCard->addChild(ui::column({.out = &m_peerList, .align = FlexAlign::Stretch, .gap = Style::spaceSm * scale}));

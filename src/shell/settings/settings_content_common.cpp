@@ -21,10 +21,19 @@
 namespace settings {
 
   namespace {
-    // Cards sit on the Surface window background and hold controls that fill SurfaceVariant at full
-    // opacity, so a full-strength card fill would match them. Mixing the theme's own elevated tone
-    // partway toward Surface keeps the palette hue and still reads distinct from those controls.
-    constexpr float kCardFillOpacity = 0.4F;
+    // Settings groups are leftover wells on the glass chrome, the same surface Control Center uses
+    // for leftover catalogs and grouped lists: solid Surface, concentric radius, outline only when
+    // High Contrast asks for one. Not a second glass card.
+    void applySettingsWellStyle(Flex& container, float scale) {
+      container.setFill(colorSpecFromRole(ColorRole::Surface));
+      if (Style::highContrastEnabled()) {
+        container.setBorder(colorSpecFromRole(ColorRole::Outline), Style::emphasizedBorderWidth);
+      } else {
+        container.clearBorder();
+      }
+      container.setRadius(Style::scaledRadius3xl(scale));
+      container.setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
+    }
   } // namespace
 
   bool isMonitorOverrideSettingPath(const std::vector<std::string>& path) {
@@ -187,13 +196,9 @@ namespace settings {
         {
             .align = FlexAlign::Stretch,
             .gap = Style::spaceSm * scale,
-            .configure =
-                [scale](Flex& container) {
-                  container.setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
-                  container.setCardStyle(scale, kCardFillOpacity);
-                },
+            .configure = [scale](Flex& container) { applySettingsWellStyle(container, scale); },
         },
-        makeLabel(title, Style::fontSizeTitle * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold),
+        makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold),
         ui::column({
             .out = &bodyRaw,
             .align = FlexAlign::Stretch,
@@ -205,10 +210,10 @@ namespace settings {
   }
 
   Flex* addSettingsGroupCard(SettingsGroupCardProps props) {
-    auto card = ui::column({.align = FlexAlign::Stretch, .configure = [scale = props.scale](Flex& container) {
-                              container.setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
-                              container.setCardStyle(scale, kCardFillOpacity);
-                            }});
+    auto card = ui::column({
+        .align = FlexAlign::Stretch,
+        .configure = [scale = props.scale](Flex& container) { applySettingsWellStyle(container, scale); },
+    });
     auto body = ui::column({
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * props.scale,
@@ -221,7 +226,7 @@ namespace settings {
     collapsible->setScale(props.scale);
     collapsible->setHeaderPadding(Style::spaceXs, 0.0F);
     collapsible->setHeader(makeLabel(
-        props.title, Style::fontSizeTitle * props.scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+        props.title, Style::fontSizeBody * props.scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
     ));
     collapsible->setBody(std::move(body));
     collapsible->setExpandedImmediate(props.expandedGroups.contains(props.group));

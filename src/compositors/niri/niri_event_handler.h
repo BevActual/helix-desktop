@@ -20,6 +20,9 @@ namespace compositors::niri {
     NiriEventHandler& operator=(const NiriEventHandler&) = delete;
 
     virtual void handleEvent(std::string_view key, const nlohmann::json& value) = 0;
+    // Called when the event-stream socket is up, including for handlers that
+    // register after the first successful connect.
+    virtual void handleStreamConnected() {}
     // Called when the runtime tears the event stream down (e.g. cleanup): the
     // handler's cached state should be considered stale.
     virtual void handleStreamReset() {}

@@ -153,7 +153,6 @@ std::unique_ptr<Flex> LauncherTab::create() {
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
   });
-  addTitle(*appearanceCard, i18n::tr("settings.navigation.sections.launcher"), scale);
   appearanceCard->addChild(
       ui::button({
           .text = i18n::tr("control-center.launcher.open"),
@@ -168,8 +167,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
     auto overviewCard = ui::column({
         .align = FlexAlign::Stretch,
         .gap = Style::spaceSm * scale,
-        .configure =
-            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+        .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
     });
     addTitle(*overviewCard, i18n::tr("settings.navigation.groups.overview"), scale);
     overviewCard->addChild(
@@ -191,8 +189,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
   auto providersCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*providersCard, i18n::tr("control-center.launcher.providers"), scale);
   for (std::size_t i = 0; i < kProviders.size(); ++i) {
@@ -208,8 +205,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
   auto pinnedCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
   addTitle(*pinnedCard, i18n::tr("settings.schema.panels.launcher-pinned-apps.label"), scale);
   auto pinnedList = std::make_unique<ListEditor>();

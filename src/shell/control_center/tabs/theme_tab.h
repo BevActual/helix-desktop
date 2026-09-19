@@ -40,13 +40,17 @@ class ThemeTab : public Tab {
 public:
   enum class Section : std::uint8_t {
     Palettes,
-    Glass,
+    Chrome,
     Icons,
     Type,
-    Scale,
-    Roundness,
     Effects,
     Language,
+  };
+
+  enum class ChromeCatalog : std::uint8_t {
+    Glass,
+    Scale,
+    Roundness,
   };
 
   explicit ThemeTab(const ControlCenterServices& services);
@@ -60,7 +64,10 @@ public:
   void setSettingsSearchQuery(std::string_view query) override;
   [[nodiscard]] SettingsPane* settingsPane() override;
   void applyOpenSection(Section section, bool persist = true);
+  void applyOpenContext(std::string_view context, bool persist = true);
+  [[nodiscard]] bool matchesOpenContext(std::string_view context) const noexcept;
   [[nodiscard]] Section currentSection() const noexcept { return m_section; }
+  [[nodiscard]] ChromeCatalog currentChromeCatalog() const noexcept { return m_chromeCatalog; }
   [[nodiscard]] static Section sectionFromId(std::string_view id) noexcept;
   [[nodiscard]] static std::string_view idFromSection(Section section) noexcept;
 
@@ -75,7 +82,9 @@ private:
   void applyPaletteSource(std::size_t index);
   void applyPaletteSelection(std::size_t index);
   void applySection(std::size_t index);
+  void applyChromeCatalog(std::size_t index);
   void persistSection();
+  void persistChrome();
   void syncHosts();
   void syncSettingsSection();
   void syncChildChrome();
@@ -89,6 +98,10 @@ private:
   [[nodiscard]] Flex* hostNode() const noexcept;
   [[nodiscard]] static std::size_t indexFromSection(Section section) noexcept;
   [[nodiscard]] static Section sectionFromIndex(std::size_t index) noexcept;
+  [[nodiscard]] static std::size_t indexFromChromeCatalog(ChromeCatalog catalog) noexcept;
+  [[nodiscard]] static ChromeCatalog chromeCatalogFromIndex(std::size_t index) noexcept;
+  [[nodiscard]] static ChromeCatalog chromeCatalogFromId(std::string_view id) noexcept;
+  [[nodiscard]] static std::string_view idFromChromeCatalog(ChromeCatalog catalog) noexcept;
 
   ConfigService* m_config = nullptr;
   noctalia::theme::ThemeService* m_theme = nullptr;
@@ -105,8 +118,10 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Segmented* m_sectionSwitch = nullptr;
+  Flex* m_palettesToolbar = nullptr;
+  Flex* m_chromeToolbar = nullptr;
+  Segmented* m_chromeSwitch = nullptr;
   Flex* m_palettesHost = nullptr;
-  Flex* m_palettesCard = nullptr;
   Flex* m_palettesLeftover = nullptr;
   ColorSwatchPreviewStrip* m_currentSwatches = nullptr;
   Flex* m_glassHost = nullptr;
@@ -132,7 +147,9 @@ private:
   std::vector<std::string> m_paletteValues;
   std::string m_paletteQuery;
   Section m_section = Section::Palettes;
+  ChromeCatalog m_chromeCatalog = ChromeCatalog::Glass;
   bool m_syncing = false;
   bool m_liveDirty = false;
   bool m_sectionSyncing = false;
+  bool m_chromeSyncing = false;
 };

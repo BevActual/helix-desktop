@@ -43,8 +43,14 @@ DesktopVolumeWidget::DesktopVolumeWidget(PipeWireService* audio, Options options
 
 void DesktopVolumeWidget::create() {
   auto area = ui::inputArea({});
-  // Whole card: scroll only. Mute is on the glyph hit target below.
-  area->setAcceptedButtons(0);
+  // Whole card: scroll to change volume, click to open Audio. Mute is on the glyph.
+  area->setAcceptedButtons(InputArea::buttonMask({BTN_LEFT}));
+  area->setOnClick([](const InputArea::PointerData& data) {
+    if (data.button != BTN_LEFT) {
+      return;
+    }
+    openControlCenterTab("audio");
+  });
   area->setOnAxis([this](const InputArea::PointerData& data) {
     const auto* node = currentNode();
     if (node == nullptr) {

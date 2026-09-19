@@ -47,6 +47,17 @@ int main() {
   ok = expect(tabSearchScore("theme", "Theme", "customize") > 0, "theme customize alias") && ok;
   ok = expect(tabSearchScore("theme", "Theme", "roundness") > 0, "roundness alias on theme") && ok;
   ok = expect(tabSearchScore("theme", "Theme", "language") > 0, "language alias on theme") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "widgets") > 0, "widgets alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "corners") > 0, "corners alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "hot-corners") > 0, "hot-corners alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "bar") > 0, "bar alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "thickness") > 0, "thickness alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "dock") > 0, "dock alias on desktop") && ok;
+  ok = expect(tabSearchScore("desktop", "Desktop", "gaps") > 0, "gaps alias on desktop") && ok;
+  ok = expect(
+      tabSearchScore("clock", "Clock", "clock") > tabSearchScore("desktop", "Desktop", "clock"),
+      "clock prefers clock tab"
+  ) && ok;
   ok = expect(tabSearchScore("theme", "Theme", "font") == 0, "font uses settings search") && ok;
   ok = expect(tabSearchScore("theme", "Theme", "locale") == 0, "locale uses settings search") && ok;
   return ok ? 0 : 1;

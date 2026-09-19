@@ -1965,8 +1965,6 @@ std::unique_ptr<Flex> AudioTab::create() {
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
-          .onHover = [this](std::size_t index) { previewCatalog(index); },
-          .onHoverEnd = [this]() { restorePinnedCatalog(); },
       })
   );
   compactCard->addChild(
@@ -1990,7 +1988,7 @@ std::unique_ptr<Flex> AudioTab::create() {
         .flexGrow = 1.0F,
         .visible = false,
         .participatesInLayout = false,
-        .configure = [scale](Flex& column) { applyGroupedListStyle(column, scale); },
+        .configure = [scale](Flex& column) { applyContentCardStyle(column, scale); },
     });
     auto scroll = ui::scrollView({
         .out = scrollOut,
@@ -2042,7 +2040,6 @@ void AudioTab::setSettingsSearchQuery(std::string_view query) { m_settings->setS
 
 void AudioTab::setActive(bool active) {
   if (!active) {
-    m_hoverEndTimer.stop();
     return;
   }
   if (m_config != nullptr) {
@@ -2156,7 +2153,6 @@ void AudioTab::applyCatalog(std::size_t index, bool persist) {
   }
   const Catalog next = catalogFromIndex(index);
   if (persist) {
-    m_hoverEndTimer.stop();
     m_pinnedCatalog = next;
     persistCatalog();
   }
@@ -2168,20 +2164,6 @@ void AudioTab::applyCatalog(std::size_t index, bool persist) {
   m_catalog = next;
   syncCatalog();
   requestPanelLayout();
-}
-
-void AudioTab::previewCatalog(std::size_t index) {
-  m_hoverEndTimer.stop();
-  applyCatalog(index, false);
-  PanelManager::instance().refresh();
-}
-
-void AudioTab::restorePinnedCatalog() {
-  m_hoverEndTimer.stop();
-  m_hoverEndTimer.start(std::chrono::milliseconds(40), [this]() {
-    applyCatalog(indexFromCatalog(m_pinnedCatalog), false);
-    PanelManager::instance().refresh();
-  });
 }
 
 void AudioTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
@@ -2317,7 +2299,6 @@ void AudioTab::doUpdate(Renderer& renderer) {
 
 void AudioTab::onClose() {
   m_settings->onClose();
-  m_hoverEndTimer.stop();
   flushPendingVolumes(true);
   flushPendingProgramVolumes(true);
   m_outputDeviceVolume.volumeDebounceTimer.stop();

@@ -46,18 +46,18 @@ namespace shell::panel_surface {
     if (Style::highContrastEnabled()) {
       return 1.0F;
     }
-    const auto mode =
-        configService != nullptr ? configService->config().shell.panel.transparencyMode : PanelTransparencyMode::Solid;
-    return detachedPanelBackgroundOpacityForTransparencyMode(mode);
+    const float glass =
+        configService != nullptr ? resolvedPanelGlass(configService->config().shell.panel) : 0.0F;
+    return detachedPanelBackgroundOpacityForGlass(glass);
   }
 
   [[nodiscard]] inline float cardOpacity(const ConfigService* configService, float panelBackgroundOpacity) noexcept {
     if (Style::highContrastEnabled()) {
       return 1.0F;
     }
-    const auto mode =
-        configService != nullptr ? configService->config().shell.panel.transparencyMode : PanelTransparencyMode::Solid;
-    return panelCardOpacityForTransparencyMode(mode, panelBackgroundOpacity);
+    const float glass =
+        configService != nullptr ? resolvedPanelGlass(configService->config().shell.panel) : 0.0F;
+    return panelCardOpacityForGlass(glass, panelBackgroundOpacity);
   }
 
   [[nodiscard]] inline bool chromeBorderEnabled(bool panelBorders) noexcept {

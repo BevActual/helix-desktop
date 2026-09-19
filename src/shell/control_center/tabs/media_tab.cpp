@@ -170,9 +170,16 @@ bool MediaTab::syncPlaybackChrome(bool hasPlayer, bool showVisualizer) {
   dirty |= setShown(m_volumeHost, hasPlayer);
   dirty |= setShown(m_visualizerHost, showVisualizer);
   if (m_nowCard != nullptr) {
+    if (std::abs(m_nowCard->flexGrow()) > 0.01F) {
+      m_nowCard->setFlexGrow(0.0F);
+      dirty = true;
+    }
+  }
+  dirty |= setShown(m_artworkWell, hasPlayer);
+  if (m_artworkWell != nullptr) {
     const float grow = hasPlayer ? 1.0F : 0.0F;
-    if (std::abs(m_nowCard->flexGrow() - grow) > 0.01F) {
-      m_nowCard->setFlexGrow(grow);
+    if (std::abs(m_artworkWell->flexGrow() - grow) > 0.01F) {
+      m_artworkWell->setFlexGrow(grow);
       dirty = true;
     }
   }
@@ -337,52 +344,6 @@ std::unique_ptr<Flex> MediaTab::create() {
   );
   playerHost->addChild(std::move(playerRow));
   nowCard->addChild(std::move(playerHost));
-
-  auto artworkHost = ui::column({
-      .out = &m_artworkHost,
-      .align = FlexAlign::Center,
-      .justify = FlexJustify::Center,
-      .fillWidth = true,
-  });
-  auto artworkSlot = ui::column({
-      .out = &m_artworkSlot,
-      .align = FlexAlign::Center,
-      .justify = FlexJustify::Center,
-      .fill = colorSpecFromRole(ColorRole::Surface),
-      .radius = Style::scaledRadiusXl(scale),
-      .clipChildren = true,
-      .width = artSize,
-      .height = artSize,
-  });
-  artworkSlot->addChild(
-      ui::glyph({
-          .out = &m_artworkFallback,
-          .glyph = "disc-filled",
-          .glyphSize = artSize * 0.45F,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  artworkSlot->addChild(
-      ui::image({
-          .out = &m_artwork,
-          .fit = ImageFit::Cover,
-          .radius = Style::scaledRadiusXl(scale),
-          .participatesInLayout = false,
-          .configure = [](Image& image) { image.setZIndex(1); },
-      })
-  );
-  artworkSlot->addChild(
-      ui::inputArea({
-          .out = &m_artworkHit,
-          .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
-          .tooltip = i18n::tr("control-center.media.open-player"),
-          .zIndex = 2,
-          .participatesInLayout = false,
-          .onClick = [this](const InputArea::PointerData&) { openPlayer(); },
-      })
-  );
-  artworkHost->addChild(std::move(artworkSlot));
-  nowCard->addChild(std::move(artworkHost));
 
   nowCard->addChild(
       ui::column(
@@ -682,6 +643,63 @@ std::unique_ptr<Flex> MediaTab::create() {
   nowCard->addChild(std::move(volumeHost));
   live->addChild(std::move(nowCard));
 
+  auto leftover = ui::column({
+      .out = &m_artworkWell,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .flexGrow = 1.0F,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  auto artworkHost = ui::column({
+      .out = &m_artworkHost,
+      .align = FlexAlign::Center,
+      .justify = FlexJustify::Center,
+      .fillWidth = true,
+      .flexGrow = 1.0F,
+  });
+  auto artworkSlot = ui::column({
+      .out = &m_artworkSlot,
+      .align = FlexAlign::Center,
+      .justify = FlexJustify::Center,
+      .fill = colorSpecFromRole(ColorRole::Surface),
+      .radius = Style::scaledRadiusXl(scale),
+      .clipChildren = true,
+      .width = artSize,
+      .height = artSize,
+  });
+  artworkSlot->addChild(
+      ui::glyph({
+          .out = &m_artworkFallback,
+          .glyph = "disc-filled",
+          .glyphSize = artSize * 0.45F,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  artworkSlot->addChild(
+      ui::image({
+          .out = &m_artwork,
+          .fit = ImageFit::Cover,
+          .radius = Style::scaledRadiusXl(scale),
+          .participatesInLayout = false,
+          .configure = [](Image& image) { image.setZIndex(1); },
+      })
+  );
+  artworkSlot->addChild(
+      ui::inputArea({
+          .out = &m_artworkHit,
+          .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+          .tooltip = i18n::tr("control-center.media.open-player"),
+          .zIndex = 2,
+          .participatesInLayout = false,
+          .onClick = [this](const InputArea::PointerData&) { openPlayer(); },
+      })
+  );
+  artworkHost->addChild(std::move(artworkSlot));
+  leftover->addChild(std::move(artworkHost));
+  live->addChild(std::move(leftover));
+
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
@@ -854,6 +872,7 @@ void MediaTab::onClose() {
   m_active = false;
   m_rootLayout = nullptr;
   m_nowCard = nullptr;
+  m_artworkWell = nullptr;
   m_playerSelectHost = nullptr;
   m_playerSelect = nullptr;
   m_hidePlayerButton = nullptr;

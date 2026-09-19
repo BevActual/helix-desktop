@@ -23,7 +23,7 @@ public:
   ~TypeTab() override;
 
   std::unique_ptr<Flex> create() override;
-  [[nodiscard]] std::unique_ptr<Flex> createLiveBody();
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody(bool hosted = false);
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setConfigureMode(bool show) override;
