@@ -21,6 +21,7 @@ class SyncthingService;
 class FirewallService;
 class PrinterService;
 class CastService;
+class AiUsageService;
 class WeatherService;
 class HttpClient;
 class ClipboardService;
@@ -55,6 +56,7 @@ struct ShortcutServices {
   FirewallService* firewall = nullptr;
   PrinterService* printers = nullptr;
   CastService* cast = nullptr;
+  AiUsageService* aiUsage = nullptr;
   // Plugin shortcut runtime dependencies.
   scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;

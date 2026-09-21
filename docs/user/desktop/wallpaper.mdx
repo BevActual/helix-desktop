@@ -153,14 +153,14 @@ Monitor overrides may also set `fill_color`.
 
 By default, the first wallpaper on each output appears immediately with no transition. Set `transition_on_startup = true` to fade (or wipe, etc.) in from a black screen at shell startup, matching v4 behavior. Later wallpaper changes always use the configured transition pool.
 
-When automation is enabled and `source = "folder"` (the default), Noctalia picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
+When automation is enabled and `source = "folder"` (the default), Helix picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
 `order = "random"` chooses a random image each cycle.
 `order = "alphabetical"` sorts paths case-insensitively and advances to the next image each cycle (wrapping at the end).
 When `source = "daily"`, automation applies today's Bing or NASA still instead (see [Daily](#daily)); the interval is ignored.
 
 ## Favorites
 
-There is no separate Settings page for favorites. The wallpaper panel manages image favorites through tile stars, and advanced users can also declare favorites with `[[wallpaper.favorite]]` in Noctalia config.
+There is no separate Settings page for favorites. The wallpaper panel manages image favorites through tile stars, and advanced users can also declare favorites with `[[wallpaper.favorite]]` in Helix config.
 
 Starred wallpapers appear at the **top of the browse grid** at the wallpaper root (before folders and images from that folder). Inside a subfolder, only favorites whose files live in that folder (or under it when **Flatten** is on) are pinned at the top. Solid `color:#RRGGBB` favorites can be declared in config and only appear at the root. The panel can display and remove those declarative color favorites, but it does not create them from the color picker because colors are applied through a dialog, not selected from the grid. Star an image tile to bookmark it; star again to remove it. The monitor selector (**ALL** vs one output) works the same for favorites and browse entries.
 
@@ -206,6 +206,6 @@ blur_intensity = 0.5    # 0.0 = no blur, 1.0 = maximum blur
 tint_intensity = 0.3    # 0.0 = no tint, 1.0 = fully opaque tint
 ```
 
-When `enabled` on a supported compositor, backdrop layer surfaces and wallpaper textures stay loaded in GPU memory for the lifetime of the shell. Noctalia renders the blurred/tinted backdrop at startup and reuses the cached result until the wallpaper, scale, or backdrop styling changes.
+When `enabled` on a supported compositor, backdrop layer surfaces and wallpaper textures stay loaded in GPU memory for the lifetime of the shell. Helix renders the blurred/tinted backdrop at startup and reuses the cached result until the wallpaper, scale, or backdrop styling changes.
 
 The tint color is `palette.surface` and is not currently configurable.

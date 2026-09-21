@@ -16,7 +16,7 @@ These commands control shell state, logging, settings, the window switcher, and 
 | Print status | <IpcCommand command="status" /> | Print basic shell state as JSON. |
 | Show log level | <IpcCommand command="log-level-status" /> | Print the current console log level. |
 | Set log level | <IpcCommand command="log-level-set debug" /> | Set the console log level for the running session. Use `debug`, `info`, `warn`, or `error`. |
-| Reload config | <IpcCommand command="config-reload" /> | Reload the merged Noctalia config stack immediately. |
+| Reload config | <IpcCommand command="config-reload" /> | Reload the merged Helix config stack immediately. |
 | Open settings | <IpcCommand command="settings-open [context]" /> | Open Control Center on that settings page, or focus it if already open (e.g. `bar`). |
 | Open plugin settings | <IpcCommand command="settings-open-plugin noctalia/notes" /> | Open Control Center at an installed plugin's settings sheet. The plugin must be enabled and expose settings. |
 | Close settings | <IpcCommand command="settings-close" /> | Close Control Center if it is the open panel. |
@@ -53,7 +53,7 @@ The window list refreshes while the overlay stays open (new windows, closed wind
 
 | Action | Command | Description |
 |--------|---------|-------------|
-| Lock session | <IpcCommand command="session lock" /> | Lock the current session. `loginctl lock-session` uses the same path when Noctalia is running. |
+| Lock session | <IpcCommand command="session lock" /> | Lock the current session. `loginctl lock-session` uses the same path when Helix is running. |
 | Suspend system | <IpcCommand command="session suspend" /> | Suspend without locking first. |
 | Lock and suspend | <IpcCommand command="session lock-and-suspend" /> | Lock the session, then suspend once the lock is active. |
 | Lid close | <IpcCommand command="session lid-close" /> | Used by niri lid-close switch events. Keeps the session awake when **Keep Using Other Displays** is on and another display is enabled; otherwise locks and suspends. |

@@ -379,7 +379,7 @@ void WindowsTab::persistLayout() {
   });
   if (!result.ok) {
     notify::error(
-        "Noctalia", i18n::tr("control-center.windows.save-title"),
+        "Helix", i18n::tr("control-center.windows.save-title"),
         result.error.empty() ? i18n::tr("control-center.windows.save-failed") : result.error
     );
   }

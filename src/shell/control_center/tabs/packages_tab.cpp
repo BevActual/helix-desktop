@@ -133,7 +133,9 @@ std::unique_ptr<Flex> PackagesTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, opacity = panelCardOpacity()](Flex& section) {
+            applyCompactCardStyle(section, scale, opacity, false);
+          },
   });
   rebuildKindOrder();
   std::vector<ui::SegmentedOption> kindOptions;
@@ -865,7 +867,7 @@ void PackagesTab::runAction(
 ) {
   if (action == noctalia::packages::Action::Remove && noctalia::packages::isProtectedPackage(name)) {
     notify::error(
-        "Noctalia", i18n::tr("control-center.packages.title"), i18n::tr("control-center.packages.protected")
+        "Helix", i18n::tr("control-center.packages.title"), i18n::tr("control-center.packages.protected")
     );
     return;
   }
@@ -929,7 +931,7 @@ void PackagesTab::launchAction(
               }
               if (result.success) {
                 notify::info(
-                    "Noctalia", i18n::tr("control-center.packages.title"),
+                    "Helix", i18n::tr("control-center.packages.title"),
                     i18n::tr("control-center.packages.action-ok", "name", name)
                 );
                 m_issuedQuery.reset();
@@ -938,7 +940,7 @@ void PackagesTab::launchAction(
                 return;
               }
               notify::error(
-                  "Noctalia", i18n::tr("control-center.packages.title"),
+                  "Helix", i18n::tr("control-center.packages.title"),
                   result.error.empty() ? i18n::tr("control-center.packages.failed")
                                        : i18n::tr("control-center.packages.failed-detail", "error", result.error)
               );
@@ -994,7 +996,7 @@ void PackagesTab::launchUpdateAll() {
       }
       if (result.success) {
         notify::info(
-            "Noctalia", i18n::tr("control-center.packages.title"), i18n::tr("control-center.packages.update-all-ok")
+            "Helix", i18n::tr("control-center.packages.title"), i18n::tr("control-center.packages.update-all-ok")
         );
         m_issuedQuery.reset();
         invalidateCaches();
@@ -1002,7 +1004,7 @@ void PackagesTab::launchUpdateAll() {
         return;
       }
       notify::error(
-          "Noctalia", i18n::tr("control-center.packages.title"),
+          "Helix", i18n::tr("control-center.packages.title"),
           result.error.empty() ? i18n::tr("control-center.packages.failed")
                                : i18n::tr("control-center.packages.failed-detail", "error", result.error)
       );

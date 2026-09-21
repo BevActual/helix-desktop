@@ -11,7 +11,7 @@ This guide covers theming applications built with GTK, Qt, and KDE Plasma toolki
 
 ## GTK 3/4 Applications
 
-GTK applications include most GNOME apps and many Linux applications. Noctalia can automatically theme them using the `adw-gtk3` theme.
+GTK applications include most GNOME apps and many Linux applications. Helix can automatically theme them using the `adw-gtk3` theme.
 
 ### Setup
 
@@ -27,7 +27,7 @@ GTK applications include most GNOME apps and many Linux applications. Noctalia c
 2. **Apply the GTK theme:**
    - **Using nwg-look (recommended):**
       :::tip[GTK4 Theming]
-      In nwg-look, make sure to **uncheck the GTK4 option**. Leaving GTK4 checked can prevent GTK4 applications from using Noctalia's color scheme.
+      In nwg-look, make sure to **uncheck the GTK4 option**. Leaving GTK4 checked can prevent GTK4 applications from using Helix's color scheme.
 
       If you previously applied a custom GTK4 theme, you may need to hit **"Clear"** (found in the **Preference** tab) in nwg-look before reapplying and regenerating the color scheme. This ensures the new colors are accepted by GTK4 apps.
       :::
@@ -41,7 +41,7 @@ GTK applications include most GNOME apps and many Linux applications. Noctalia c
      gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3'
      ```
 
-3. **Enable GTK theming in Noctalia:**
+3. **Enable GTK theming in Helix:**
   - Open **Control Center → Templates**
   - Toggle on **GTK 3** and/or **GTK 4**
 
@@ -136,7 +136,7 @@ Qt applications include KDE apps and many cross-platform applications. KDE apps 
    export QT_QPA_PLATFORMTHEME=qt6ct
    ```
 
-3. **Enable the KColorScheme (or QT theme) in Noctalia:**
+3. **Enable the KColorScheme (or QT theme) in Helix:**
   - Open **Control Center → Templates**
   - Toggle on **KColorScheme** (or **Qt**)
 
@@ -161,20 +161,20 @@ Qt applications include KDE apps and many cross-platform applications. KDE apps 
 
 ## KDE Plasma (KColorScheme)
 
-If you're using KDE Plasma, Noctalia can apply colors through the native KColorScheme system.
+If you're using KDE Plasma, Helix can apply colors through the native KColorScheme system.
 
 ### Setup
 
-1. **Enable KColorScheme in Noctalia:**
+1. **Enable KColorScheme in Helix:**
   - Open **Control Center → Templates**
   - Toggle on **KColorScheme**
 
 2. **Apply in KDE System Settings:**
   - Open **System Settings → Appearance → Colors**
   - Select the `noctalia` color scheme
-  - The scheme will update automatically when you change colors in Noctalia
+  - The scheme will update automatically when you change colors in Helix
 
 ### Troubleshooting
 
 - **Scheme not appearing:** Restart KDE Plasma or log out and back in
-- **Colors not updating:** Ensure KColorScheme toggle is enabled in Noctalia settings
+- **Colors not updating:** Ensure KColorScheme toggle is enabled in Helix settings

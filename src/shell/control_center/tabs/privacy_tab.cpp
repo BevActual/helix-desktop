@@ -140,7 +140,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
   auto header = ui::row({
@@ -191,9 +191,20 @@ std::unique_ptr<Flex> PrivacyTab::create() {
           .maxLines = 3,
       })
   );
+  m_rootLayout->addChild(std::move(capturesWell));
 
-  auto addKindSection = [this, scale, &capturesWell](const std::string& title, Separator** dividerOut, Flex** cardOut, Flex** listOut) {
-    *dividerOut = addWellDivider(*capturesWell, scale);
+  auto leftover = ui::column({
+      .out = &m_capturesLeftover,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  auto addKindSection = [this, scale, &leftover](
+                            const std::string& title, Separator** dividerOut, Flex** cardOut, Flex** listOut
+                        ) {
+    *dividerOut = addWellDivider(*leftover, scale);
     auto card = ui::column({
         .out = cardOut,
         .align = FlexAlign::Stretch,
@@ -206,10 +217,15 @@ std::unique_ptr<Flex> PrivacyTab::create() {
         ui::column({
             .out = listOut,
             .align = FlexAlign::Stretch,
-            .gap = Style::spaceXs * scale,
+            .configure =
+                [scale](Flex& list) {
+                  applyGroupedListStyle(list, scale);
+                  list.setPadding(Style::spaceSm * scale);
+                  list.setGap(Style::spaceXs * scale);
+                },
         })
     );
-    capturesWell->addChild(std::move(card));
+    leftover->addChild(std::move(card));
     if (*dividerOut != nullptr) {
       (*dividerOut)->setVisible(false);
       (*dividerOut)->setParticipatesInLayout(false);
@@ -218,7 +234,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
   addKindSection(i18n::tr("control-center.privacy.microphone"), &m_micDivider, &m_micCard, &m_micList);
   addKindSection(i18n::tr("control-center.privacy.camera"), &m_cameraDivider, &m_cameraCard, &m_cameraList);
   addKindSection(i18n::tr("control-center.privacy.screen"), &m_screenDivider, &m_screenCard, &m_screenList);
-  m_rootLayout->addChild(std::move(capturesWell));
+  m_rootLayout->addChild(std::move(leftover));
 
   auto sharingCard = ui::column({
       .align = FlexAlign::Stretch,
@@ -323,6 +339,7 @@ void PrivacyTab::onClose() {
   }
   m_rootLayout = nullptr;
   m_capturesWell = nullptr;
+  m_capturesLeftover = nullptr;
   m_status = nullptr;
   m_detail = nullptr;
   m_muteButton = nullptr;
@@ -416,12 +433,18 @@ void PrivacyTab::rebuildCaptures() {
     return;
   }
   m_captureSignature = signature;
-  const bool layoutDirty = setShown(m_micCard, !lists.microphone.empty()) ||
-                            setShown(m_micDivider, !lists.microphone.empty()) ||
+  const bool anyCaptures =
+      !lists.microphone.empty() || !lists.camera.empty() || !lists.screen.empty();
+  const bool layoutDirty = setShown(m_capturesLeftover, anyCaptures) ||
+                            setShown(m_micCard, !lists.microphone.empty()) ||
+                            setShown(m_micDivider, false) ||
                             setShown(m_cameraCard, !lists.camera.empty()) ||
-                            setShown(m_cameraDivider, !lists.camera.empty()) ||
+                            setShown(m_cameraDivider, !lists.camera.empty() && !lists.microphone.empty()) ||
                             setShown(m_screenCard, !lists.screen.empty()) ||
-                            setShown(m_screenDivider, !lists.screen.empty());
+                            setShown(
+                                m_screenDivider,
+                                !lists.screen.empty() && (!lists.microphone.empty() || !lists.camera.empty())
+                            );
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

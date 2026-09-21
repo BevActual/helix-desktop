@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-Idle behaviors are named entries under `[idle.behavior.*]`. When the resolved config does not define idle behaviors, Noctalia seeds built-in Lock and Monitor off behaviors, both disabled by default.
+Idle behaviors are named entries under `[idle.behavior.*]`. When the resolved config does not define idle behaviors, Helix seeds built-in Lock and Monitor off behaviors, both disabled by default.
 
 Optional top-level **`[idle]`** keys apply before any behavior’s `command` runs:
 
@@ -24,7 +24,7 @@ after the listed entries; unknown names are ignored.
 
 While a fade is in progress, the overlay is click-through so pointer/keyboard activity still reaches the compositor; if the session becomes active again during that window, the pending command is cancelled. The dim is a layer-shell **overlay** that covers the full monitor (including the bar).
 
-Each behavior picks an **`action`**. The built-in actions are native - they need no `command`. Use `action = "command"` only when you want to run something Noctalia doesn't have a native action for. Command fields are normal shell commands; use `noctalia msg ...` when a shell command needs to call Noctalia IPC.
+Each behavior picks an **`action`**. The built-in actions are native - they need no `command`. Use `action = "command"` only when you want to run something Helix doesn't have a native action for. Command fields are normal shell commands; use `noctalia msg ...` when a shell command needs to call Helix IPC.
 
 ```toml
 [idle.behavior.lock]
@@ -57,7 +57,7 @@ resume_command = "notify-send 'Idle' 'Back from idle'"
 | `resume_command` | string | `""` | Optional shell command to run when activity resumes |
 | `lock_before_suspend` | bool | `true` | For `action = "suspend"`, lock the session first (equivalent to `action = "lock_and_suspend"`). Set `false` to suspend without locking. |
 
-`action = "screen_off"` turns the monitors off on idle and **back on automatically** when you return. If `resume_command` is set, Noctalia restores monitor power first and then runs the command. The command still runs if monitor power restoration reports a failure.
+`action = "screen_off"` turns the monitors off on idle and **back on automatically** when you return. If `resume_command` is set, Helix restores monitor power first and then runs the command. The command still runs if monitor power restoration reports a failure.
 
 For a fully custom power action, use the canonical IPC CLI as part of a shell command:
 

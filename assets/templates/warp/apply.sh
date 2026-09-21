@@ -3,7 +3,7 @@ set -euo pipefail
 
 theme_file="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/noctalia.yaml"
 config_file="${XDG_CONFIG_HOME:-$HOME/.config}/warp-terminal/settings.toml"
-custom_table="{ custom = { name = \"Noctalia\", path = \"${theme_file}\" } }"
+custom_table="{ custom = { name = \"Helix\", path = \"${theme_file}\" } }"
 
 if [[ ! -f "$theme_file" ]]; then
     printf 'Warning: Warp theme file not found: %s\n' "$theme_file" >&2

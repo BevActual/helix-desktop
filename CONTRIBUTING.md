@@ -1,13 +1,11 @@
 Contributing
 ===
 
-This file collects contributor-facing details for Noctalia: design goals, stack notes, code style, source layout,
-runtime asset behavior, and debugging helpers.
+This file collects contributor-facing details for Helix Shell: design goals, stack notes, code style, source layout,
+runtime asset behavior, and debugging helpers. Product contracts with helix-niri and helix-greeter are in the sibling
+`HELIX.md` files and in `.cursor/rules/helix-hig.mdc`.
 
 For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md).
-
-Before contributing, read our [ethos](https://noctalia.dev/ethos) to understand the values and philosophy guiding the
-project.
 
 ## Design Principles
 
@@ -63,7 +61,7 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 
 With a different Meson `prefix`/`datadir`, the same structure is preserved under that prefix.
 
-Noctalia needs the `assets/` tree at runtime. Copying only the bare `noctalia` binary is not enough.
+Helix Shell needs the `assets/` tree at runtime. Copying only the bare `noctalia` binary is not enough.
 
 Portable bundle layouts are also supported:
 
@@ -135,7 +133,7 @@ C++ identifiers.
 
 ## Translations
 
-Noctalia translations are managed through [Noctalia Translate](https://i18n.noctalia.dev/projects/noctalia). The JSON
+Helix translations are managed through [Noctalia Translate](https://i18n.noctalia.dev/projects/noctalia). The JSON
 files in `assets/translations/` are exported from that workflow, with `assets/translations/en.json` acting as the
 source catalog for new strings.
 
@@ -234,7 +232,7 @@ src/
   wayland/          Wayland connection, seats, surfaces, clipboard, toplevels, text input
     hyprland/       Hyprland-specific Wayland protocol helpers
 assets/
-  fonts/            Bundled Noctalia Tabler and UI fonts
+  fonts/            Bundled Tabler and UI fonts
   sounds/           Notification and UI sounds
   templates/        Built-in theme templates
   translations/     Exported translation catalogs
@@ -265,7 +263,7 @@ gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug
 gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.GetVerboseLogs
 
 # Emit an internal notification (app_name, summary, body, timeout_ms, urgency 0-2)
-gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.EmitInternalNotification "Noctalia" "Test" "Hello from debug" 5000 1
+gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.EmitInternalNotification "Helix" "Test" "Hello from debug" 5000 1
 ```
 
 ### Crash output
@@ -276,7 +274,7 @@ When reporting a crash, include the complete terminal output from the process if
 ### ASan crash reports
 
 AddressSanitizer (ASan) can find memory errors that a normal build reports only as a crash. It requires a temporary
-source build; it does not replace the Noctalia package you already use.
+source build; it does not replace the Helix package you already use.
 
 Install the source-build dependencies for your distribution using the commands in
 [BUILDING.md](BUILDING.md#dependencies), then clone the repository:
@@ -286,7 +284,7 @@ git clone https://github.com/noctalia-dev/noctalia.git
 cd noctalia
 ```
 
-Stop the Noctalia instance started by your compositor, then configure and build ASan:
+Stop the Helix instance started by your compositor, then configure and build ASan:
 
 ```sh
 just configure asan && just build asan
@@ -298,6 +296,6 @@ Start the ASan binary in the foreground and save its output:
 ASAN_OPTIONS=log_path=/tmp/noctalia-asan ./build-asan/noctalia 2>&1 | tee noctalia-asan-terminal.log
 ```
 
-Reproduce the crash once. If Noctalia does not exit, press `Ctrl+C`. Attach both `noctalia-asan-terminal.log` and every
+Reproduce the crash once. If Helix does not exit, press `Ctrl+C`. Attach both `noctalia-asan-terminal.log` and every
 `/tmp/noctalia-asan.*` file to the GitHub issue. The files in `/tmp` preserve the ASan report if the crash takes down
 the terminal. If the build or startup fails, attach that complete output instead.

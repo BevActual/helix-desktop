@@ -115,7 +115,8 @@ namespace {
         || type == "firewall"
         || type == "privacy"
         || type == "weather"
-        || type == "keyboard_layout") {
+        || type == "keyboard_layout"
+        || type == "ai") {
       return HomeShortcutCluster::Sharing;
     }
     return HomeShortcutCluster::Other;
@@ -504,7 +505,7 @@ std::unique_ptr<Flex> HomeTab::create() {
         return;
       }
       notify::error(
-          "Noctalia", i18n::tr("control-center.home.avatar-error-title"),
+          "Helix", i18n::tr("control-center.home.avatar-error-title"),
           i18n::tr(shell::avatarApplyErrorTranslationKey(applyResult.error))
       );
     });
@@ -914,7 +915,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
     const std::string label = shortcut->displayLabel();
     const bool enabled = shortcut->enabled();
-    const bool isActive = shortcut->isToggle() && shortcut->active();
+    const bool isActive = shortcut->active();
     const float glyphMul = sc.size == ShortcutSize::Large ? 1.45F : (sc.size == ShortcutSize::Wide ? 1.12F : 1.0F);
 
     const std::size_t padIdx = m_shortcutPads.size();
@@ -2292,7 +2293,7 @@ void HomeTab::syncShortcuts() {
   for (auto& pad : m_shortcutPads) {
     auto& sc = *pad.shortcut;
     const bool enabled = sc.enabled();
-    const bool on = sc.isToggle() && sc.active();
+    const bool on = sc.active();
 
     if (pad.button != nullptr) {
       applyShortcutButtonStyle(*pad.button, enabled, on);

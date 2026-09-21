@@ -1230,7 +1230,7 @@ void ConfigService::setConfigParseError(ConfigProblem problem) {
   std::string title = located ? problem.origin.shortFormat(m_configDir) : std::string("Config error");
   std::string body = located ? "Error: " + problem.message : std::move(problem.message);
   m_configErrorNotificationId =
-      m_notificationManager->addInternal("Noctalia", std::move(title), std::move(body), Urgency::Critical, 0);
+      m_notificationManager->addInternal("Helix", std::move(title), std::move(body), Urgency::Critical, 0);
 }
 
 void ConfigService::updateLegacyConfigIssues(noctalia::config::LegacyConfigIssues issues) {
@@ -1296,7 +1296,7 @@ void ConfigService::notifyLegacyConfigIssues() {
   std::string title = issue.origin.valid() ? issue.origin.shortFormat(m_configDir)
                                            : i18n::tr("notifications.internal.config-migration-title");
   (void)m_notificationManager->addInternal(
-      "Noctalia", std::move(title),
+      "Helix", std::move(title),
       i18n::tr("notifications.internal.config-migration-body", "path", issue.path + ": " + issue.message),
       Urgency::Normal
   );

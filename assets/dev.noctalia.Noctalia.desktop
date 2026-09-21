@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Helix Shell
-Comment=A Fedora niri desktop.
+Comment=niri-first Wayland desktop shell
 Exec=noctalia --daemon
 Icon=noctalia
 Terminal=false

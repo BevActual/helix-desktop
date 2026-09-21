@@ -1,7 +1,7 @@
 {
   "brand": {
     "name": "Helix Shell",
-    "version": "Helix Shell · Noctalia {version}"
+    "version": "Helix Shell {version}"
   },
   "auth": {
     "fingerprint": {
@@ -315,7 +315,7 @@
       "open-wallpaper": "Open Wallpaper",
       "outline": "Outline",
       "palette": "Current palette",
-      "palette-builtin-tooltip": "Palettes shipped with Noctalia",
+      "palette-builtin-tooltip": "Palettes shipped with Helix",
       "palette-community-tooltip": "Palettes from the community catalog",
       "palette-custom-tooltip": "Palettes in your palettes folder",
       "palette-hint": "Tap a swatch to customize this light or dark mode.",
@@ -413,12 +413,16 @@
         "unsupported": "This plan has no request quota to show"
       },
       "updated-at": "Updated {time}",
+      "updating": "Updating…",
       "windows": {
         "chat": "Chat",
         "completions": "Completions",
         "day": "Today",
+        "extra": "Extra",
+        "opus": "Opus (7 days)",
         "premium": "Premium requests",
         "session": "Session (5 h)",
+        "sonnet": "Sonnet (7 days)",
         "weekly": "Week (7 days)"
       }
     },
@@ -1528,12 +1532,12 @@
     },
     "templates": {
       "apply-tooltip": "Reapply enabled templates for the current palette",
-      "built-in-tooltip": "Templates bundled with Noctalia",
+      "built-in-tooltip": "Templates bundled with Helix",
       "community-tooltip": "Templates from the community catalog",
       "create-failed": "Could not create that user template.",
       "disabled-builtin": "Turn on built-in templates to browse the bundled catalog and apply them on each theme change.",
       "disabled-community": "Turn on community templates to download the catalog and apply them on each theme change.",
-      "disabled-user": "Pick an installed app to create a user template. If Noctalia already has one, that catalog entry is enabled instead.",
+      "disabled-user": "Pick an installed app to create a user template. If Helix already has one, that catalog entry is enabled instead.",
       "edit-title": "Edit {id}",
       "edit-tooltip": "Edit output path and post-hook",
       "empty-user": "No user templates yet. Use + to create one from an installed app.",
@@ -1934,14 +1938,14 @@
       "calendar-google-connect-start-failed": "Could not start Google authorization. Check your network connection and try again.",
       "calendar-google-connect-start-http": "Could not start Google authorization. The OAuth broker returned HTTP {status}.",
       "calendar-google-connect-timeout": "Google authorization timed out. Start the connection again when you are ready to sign in.",
-      "config-migration-body": "Update {path} in the source file. Noctalia is applying this replacement only temporarily. Run noctalia config validate to list every required change.",
+      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run noctalia config validate to list every required change.",
       "config-migration-title": "Configuration update needed",
       "dbus-disabled": "DBus notifications disabled",
       "desktop-widgets-editor": "Widget editor",
       "desktop-widgets-editor-enabled": "Desktop widget editor is on. Switch to an empty workspace so open windows do not cover the editor.",
-      "greeter-sync": "Noctalia Greeter",
+      "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Syncing appearance to the greeter. If an administrator prompt appears, approve it; passwordless authorization follows system policy.",
-      "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Noctalia, on a TTY, or on a console.",
+      "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Helix, on a TTY, or on a console.",
       "greeter-sync-pending-legacy": "Syncing through the authenticated legacy helper. Administrator approval is required.",
       "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving NOCTALIA_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
       "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
@@ -2029,7 +2033,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin} targets plugin API {version}; this Noctalia supports API {oldest}–{current}.",
+      "body-incompatible": "{plugin} targets plugin API {version}; this Helix supports API {oldest}–{current}.",
       "body-timeout": "{plugin} took too long to install.",
       "title": "Plugin not enabled"
     }
@@ -2325,7 +2329,7 @@
       },
       "reset-page": "Failed to reset some settings.",
       "support-report": "Failed to save support report.",
-      "sync-greeter": "Could not sync appearance to Noctalia Greeter.",
+      "sync-greeter": "Could not sync appearance to Helix Greeter.",
       "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
       "sync-greeter-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
       "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
@@ -2795,7 +2799,7 @@
         "deprecated": "deprecated",
         "empty": "No enabled plugins.",
         "held-back": "older version",
-        "held-back-hint": "v{version} needs plugin API {required}; this Noctalia supports up to {current}. Upgrade Noctalia to get it.",
+        "held-back-hint": "v{version} needs plugin API {required}; this Helix supports up to {current}. Upgrade Helix to get it.",
         "incompatible-plugin-api": "incompatible plugin API",
         "remove": "Remove plugin",
         "requires": "Requires: {dependencies}",
@@ -2843,9 +2847,9 @@
         "category-all": "All",
         "empty": "No plugins found",
         "held-back": "Older version",
-        "held-back-hint": "Installs v{version} for plugin API {resolved}. The newest v{latest} needs plugin API {latestRequired}; this Noctalia supports up to {current}.",
+        "held-back-hint": "Installs v{version} for plugin API {resolved}. The newest v{latest} needs plugin API {latestRequired}; this Helix supports up to {current}.",
         "incompatible": "Incompatible",
-        "incompatible-hint": "Needs plugin API {required}; this Noctalia supports {oldest}–{current}.",
+        "incompatible-hint": "Needs plugin API {required}; this Helix supports {oldest}–{current}.",
         "installed": "Installed",
         "loading": "Loading catalog…",
         "no-readme": "No description available.",
@@ -2919,7 +2923,7 @@
           "label": "Export Wallpaper Palette"
         },
         "font-family": {
-          "description": "Used across Noctalia panels and menus",
+          "description": "Used across Helix panels and menus",
           "label": "Font Family"
         },
         "global-shadow-alpha": {
@@ -3407,7 +3411,7 @@
             "label": "On Shutdown"
           },
           "started": {
-            "description": "Command to run after Noctalia starts",
+            "description": "Command to run after Helix starts",
             "label": "On Started"
           },
           "theme-mode-changed": {
@@ -3548,7 +3552,7 @@
           "title": "Niri keybinds",
           "updated": "Updated niri shortcuts. niri reloads on its own.",
           "add-app": {
-            "description": "Pick an installed app, then record a chord. Noctalia writes a niri spawn shortcut.",
+            "description": "Pick an installed app, then record a chord. Helix writes a niri spawn shortcut.",
             "empty": "No applications found",
             "failed": "Could not prepare a launch command for that app",
             "label": "Add app shortcut",
@@ -3682,7 +3686,7 @@
               "label": "Lid close"
             },
             "xdg-activation": {
-              "description": "Allow notification actions and window activation from Noctalia",
+              "description": "Allow notification actions and window activation from Helix",
               "label": "XDG activation"
             }
           },
@@ -4346,7 +4350,7 @@
         "launch-apps-as-systemd-services": {
           "description": "Launch apps in their own systemd units so they survive a Helix restart. Off keeps them in Helix's process group.",
           "label": "Launch Apps as systemd Services",
-          "requires-systemd-session": "Requires Noctalia to run as a systemd user service (uwsm or a systemd user unit)"
+          "requires-systemd-session": "Requires Helix to run as a systemd user service (uwsm or a systemd user unit)"
         },
         "launch-apps-custom-command": {
           "description": "Wraps apps launched from the launcher, dock, and taskbar; substitutes $CMD with the original command",
@@ -4570,8 +4574,8 @@
         },
         "sync-greeter": {
           "button": "Sync Now",
-          "description": "Copy the current appearance and monitor arrangement to Noctalia Greeter. Administrator approval is requested unless system policy authorizes passwordless sync for your user.",
-          "label": "Noctalia Greeter"
+          "description": "Copy the current appearance and monitor arrangement to Helix Greeter. Administrator approval is requested unless system policy authorizes passwordless sync for your user.",
+          "label": "Helix Greeter"
         },
         "telemetry": {
           "description": "Sends a small anonymous startup ping with version, OS, compositor, monitor resolutions, RAM, and UI scale",
@@ -4645,6 +4649,14 @@
         "refresh-seconds": {
           "description": "How often usage is refreshed while the shell is running",
           "label": "Refresh Interval"
+        },
+        "warn-percent": {
+          "description": "Notify when a quota reaches this percent. 0 disables usage warnings.",
+          "label": "Usage Warning"
+        },
+        "warn-reset-minutes": {
+          "description": "Notify when a busy quota resets within this many minutes. 0 disables reset warnings.",
+          "label": "Reset Warning"
         }
       },
       "tailscale": {
@@ -5093,7 +5105,7 @@
             "label": "Set EasyEffects profile"
           },
           "greeter-sync": {
-            "description": "Sync wallpaper, colors, and monitor layout to Noctalia Greeter",
+            "description": "Sync wallpaper, colors, and monitor layout to Helix Greeter",
             "label": "Sync greeter appearance"
           },
           "keyboard-backlight-down": {
@@ -5209,7 +5221,7 @@
             "label": "Invoke latest notification action"
           },
           "notification-show": {
-            "description": "Show an internal Noctalia notification",
+            "description": "Show an internal Helix notification",
             "label": "Show a notification"
           },
           "osd-disable": {
@@ -6133,7 +6145,7 @@
       "export-config": "Export Config…",
       "export-config-saved": "Config export saved.",
       "filter-overridden": "Overridden",
-      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Noctalia is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
+      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
       "native-title": "Helix Shell Settings",
       "no-results": "No settings found",
       "no-results-hint": "Try a different setting name or config key.",

@@ -88,7 +88,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `firewall` | Firewall | Status, start, and panic mode (block all traffic) on one compact card. Default zone and incoming services are leftover wells; **Save for next boot** writes the runtime config to disk. The tab stays available when the system firewall is missing. Header refresh reloads status. |
 | `printers` | Printers | Printing status, start, and CUPS setup on one compact card. Printers (default, pause/resume, cancel jobs, print a file) are the leftover well. The tab stays available when printing is missing. Header refresh reloads status. |
 | `cast` | Cast | Screen sharing over Remote Desktop on the compact card. Wireless display casting and discovered displays are leftover wells; they use Network Displays when it is installed. Header refresh reloads status. |
-| `privacy` | Privacy | Live microphone, camera, and screen-share captures with mute on the compact card. Approximate location and the anonymous startup ping are a leftover well. Header gear opens capture-name filters used by the bar widget and OSD. |
+| `privacy` | Privacy | Live Idle/In use on the compact card with mic mute. Apps using the microphone, camera, or screen share list in leftover. Approximate location and the anonymous startup ping are a leftover well. Header gear opens capture-name filters used by the bar widget and OSD. |
 | `desktop` | Desktop | Layout hub, like Theme for Appearance. Compact sources are Widgets, Corners, Bar, Dock, Windows (niri), Panels, and OSD. Nested leftover catalogs sit on the same compact card: Glanceable/Sound/Tools, Screen/Hot, Layout/Shape, Layout/Pinned, Spacing/Columns, Placement/Chrome, Placement/Style. Leftover is a catalog for Widgets and leftover wells for the rest. `bar`, `dock`, `windows`, `panels`, and `osd` still open the matching source. Header gear follows the active source. |
 | `windows` | Desktop → Windows | Alias for the Windows source on Desktop (niri only). Spacing leftover is gaps and outer padding. Columns leftover is how wide new tiled windows start. Header gear repeats those sliders. |
 | `dock` | Desktop → Dock | Alias for the Dock source on Desktop. Layout leftover is edge, auto-hide, and running apps. Pinned leftover is the app catalog. Header gear opens monitors, layer, size, shape, and magnification. |
@@ -136,9 +136,9 @@ The Home tab is the Control Center landing view: glanceable identity, media, and
 
 When something needs attention, a status row appears between the user card and the media/clock cards: pending package updates (opens Packages), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), caffeine/idle-inhibit on (opens Power), and an incoming LocalSend transfer waiting to be accepted (opens LocalSend). The row hides when everything is idle. Shortcuts stay for actions; the chips only report state.
 
-Click the avatar to pick a custom image, or the rest of the user card to open **Wallpaper**. The card shows your name, `user@host`, and uptime; version and hardware live on **System**. Click the media card to open **Media**; while something is playing it is a Now Playing module with artwork, a progress bar, and previous / play-pause / next. Idle media stays a single compact row so the clock and weather keep the leftover height. The clock stacks time, date, and a one-line weather caption like a Lock Screen widget. Click the date or time to open **Calendar**. Extra timezones live on **Clock**. Click the weather line to open **Weather**. Hover media and clock to illuminate those modules from within. Shortcut tiles sit on frosted plates and light up on hover; an active toggle keeps a quiet inner glow. Noctalia saves the selected avatar path as `[shell].avatar_path`.
+Click the avatar to pick a custom image, or the rest of the user card to open **Wallpaper**. The card shows your name, `user@host`, and uptime; version and hardware live on **System**. Click the media card to open **Media**; while something is playing it is a Now Playing module with artwork, a progress bar, and previous / play-pause / next. Idle media stays a single compact row so the clock and weather keep the leftover height. The clock stacks time, date, and a one-line weather caption like a Lock Screen widget. Click the date or time to open **Calendar**. Extra timezones live on **Clock**. Click the weather line to open **Weather**. Hover media and clock to illuminate those modules from within. Shortcut tiles sit on frosted plates and light up on hover; an active toggle keeps a quiet inner glow. Helix saves the selected avatar path as `[shell].avatar_path`.
 
-When AccountsService is available, Noctalia also writes the selected avatar to `org.freedesktop.Accounts` as your user's `IconFile`. That is what Noctalia Greeter reads for the login user list. On distros where this is not enabled by default, install and enable **accountsservice** (usually the `accounts-daemon` service) if you want the same avatar in both the shell and the greeter.
+When AccountsService is available, Helix also writes the selected avatar to `org.freedesktop.Accounts` as your user's `IconFile`. That is what Helix Greeter reads for the login user list. On distros where this is not enabled by default, install and enable **accountsservice** (usually the `accounts-daemon` service) if you want the same avatar in both the shell and the greeter.
 
 The shortcut buttons are configured separately; see [Control Center shortcuts](/noctalia/control-center/shortcuts/).
 
@@ -208,9 +208,9 @@ Header gear opens wallpaper settings: fill mode, directories, per-monitor folder
 
 The Templates tab browses app-theme templates the same way Wallpaper browses images. Icon sources, Enable, and catalog status share one compact card; the grid sits under it. Hover Built-In, Community, and User. Built-In and Community keep Enable on the right of that card; User hides it. Search, Filters, and sort sit with the grid. Enabling a template applies it on each theme change. Header **Apply** rerenders every enabled template for the current palette (`noctalia msg templates-apply`).
 
-The header **+** button picks an installed application. If a built-in or community template matches that app, Noctalia enables it. Otherwise it scaffolds a user template under `~/.config/noctalia/templates/` and opens the starter file so you can map tokens to the app's theme format. A sheet then asks for the output path the application actually reads, plus an optional post-hook. On the User catalog, each tile's gear edits those fields or deletes the GUI-created entry (starter files stay on disk). The header folder button opens that templates directory.
+The header **+** button picks an installed application. If a built-in or community template matches that app, Helix enables it. Otherwise it scaffolds a user template under `~/.config/noctalia/templates/` and opens the starter file so you can map tokens to the app's theme format. A sheet then asks for the output path the application actually reads, plus an optional post-hook. On the User catalog, each tile's gear edits those fields or deletes the GUI-created entry (starter files stay on disk). The header folder button opens that templates directory.
 
-When Noctalia Greeter is installed, header gear has **Sync Now** and **Auto-Sync** to copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK Templates row when GTK templates are off.
+When Helix Greeter is installed, header gear has **Sync Now** and **Auto-Sync** to copy wallpaper, colors, and monitors to the login screen. Built-in catalogs also offer a GTK Templates row when GTK templates are off.
 
 Palettes stay on **Theme**.
 
@@ -260,7 +260,7 @@ The Network tab uses the configured network backend to show wireless state and c
 
 The current connection line lists the IPv4 address, signal strength, radio band, and external IP. The band (`2.4 GHz`, `5 GHz`, `6 GHz`, or `60 GHz`) is shown only when the backend reports the connection frequency: NetworkManager and wpa_supplicant do, iwd does not.
 
-The current connection card also shows live throughput (when the system monitor is running), the nameservers from `/etc/resolv.conf`, and a trailing DNS dropdown for the active NetworkManager connection: **Automatic** (DHCP), **Google**, **Cloudflare**, **NextDNS**, or **Custom**. Presets apply immediately. NextDNS can take an optional config ID; Custom takes a comma-separated list of IPv4/IPv6 addresses and an Apply button. Changing DNS updates the connection profile and reapplies it; Noctalia does not write `/etc/resolv.conf`. iwd and wpa_supplicant backends cannot set DNS from here.
+The current connection card also shows live throughput (when the system monitor is running), the nameservers from `/etc/resolv.conf`, and a trailing DNS dropdown for the active NetworkManager connection: **Automatic** (DHCP), **Google**, **Cloudflare**, **NextDNS**, or **Custom**. Presets apply immediately. NextDNS can take an optional config ID; Custom takes a comma-separated list of IPv4/IPv6 addresses and an Apply button. Changing DNS updates the connection profile and reapplies it; Helix does not write `/etc/resolv.conf`. iwd and wpa_supplicant backends cannot set DNS from here.
 
 The current connection card also has icon tools to ping, copy the LAN IPv4 address, run a short download speed test, or share the current Wi-Fi network as a QR code and join string. Hover each tool. Sharing copies a `WIFI:` payload with the SSID. On NetworkManager, the stored PSK is included when GetSecrets can return it; otherwise the QR still starts the join flow and the other device asks for the password. 802.1X networks never embed a password.
 
@@ -292,11 +292,11 @@ When ModemManager reports a modem, the Network tab adds a **Cellular** card with
 
 The switch follows GNOME's mobile-data semantics: with a saved NetworkManager `gsm` profile it turns the data connection on and off and leaves the modem registered on the network; with no such profile it powers the modem radio itself. Turning it on can take several seconds while the modem enables, searches, and registers, and the switch holds the requested position until the change lands.
 
-Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for mobile data, a `gsm` connection profile created with `nmcli` or another NetworkManager front end. Noctalia does not create or edit cellular profiles.
+Cellular needs ModemManager running (`org.freedesktop.ModemManager1`) and, for mobile data, a `gsm` connection profile created with `nmcli` or another NetworkManager front end. Helix does not create or edit cellular profiles.
 
 ## Bluetooth
 
-The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Click Paired and Nearby chips to swap the leftover list. Expand a device to copy its Bluetooth address. It is backed by Noctalia's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
+The Bluetooth tab shows adapter power, discoverable, and rescan on one compact card. Click Paired and Nearby chips to swap the leftover list. Expand a device to copy its Bluetooth address. It is backed by Helix's Bluetooth service and agent. Header gear opens unnamed-device hiding and how long **Rescan** keeps discovery running.
 
 ```toml
 [control_center.bluetooth]
@@ -328,7 +328,7 @@ The Clipboard tab is the clipboard history view: search and clear sit on the com
 
 The Tailscale tab talks to the local `tailscale` CLI. Connect and disconnect this machine, copy its tailnet addresses, open the admin console, and toggle shields, subnet routes, SSH, DNS, advertising an exit node, and LAN access while using an exit node. Status, preferences, and the peer list share one grouped well. Pick an exit node from the dropdown, or use a peer as an exit from the device list. Mullvad exit nodes stay in the exit picker and are omitted from the peer list.
 
-Connect, disconnect, and preference writes need Tailscale operator access. If this user is not the operator, Noctalia asks for an administrator password (via `pkexec` and the built-in Polkit prompt) and retries. To skip that prompt later, run `sudo tailscale set --operator=$USER` once.
+Connect, disconnect, and preference writes need Tailscale operator access. If this user is not the operator, Helix asks for an administrator password (via `pkexec` and the built-in Polkit prompt) and retries. To skip that prompt later, run `sudo tailscale set --operator=$USER` once.
 
 The tab stays visible when `tailscale` is not installed, with a message to install it. Header gear opens `[tailscale]` for poll interval, optional peer online/offline toasts, and an admin URL override. Daemon prefs are applied with `tailscale set` and are not stored in `settings.toml`.
 
@@ -424,7 +424,7 @@ IPC: `cast-status` and `cast-share-toggle`. See [Media & UI](/noctalia/ipc/media
 
 ## Privacy
 
-The Privacy tab lists which apps are using the microphone, camera, or screen share right now. Mute the default microphone from the status card. **Approximate location** looks this machine up from its IP for weather and night light; turn it off and set an address on Weather if you still need a location. **Anonymous startup ping** is the same switch as Security. Header gear opens `[shell.privacy]` capture-name filters used by the bar widget and OSD; those filters do not hide apps on this tab.
+The Privacy tab shows Idle or In use on the compact card, with mute for the default microphone. Apps using the microphone, camera, or screen share list in leftover, not inside that card. **Approximate location** looks this machine up from its IP for weather and night light; turn it off and set an address on Weather if you still need a location. **Anonymous startup ping** is the same switch as Security. Header gear opens `[shell.privacy]` capture-name filters used by the bar widget and OSD; those filters do not hide apps on this tab.
 
 IPC: `privacy-status`. See [Media & UI](/noctalia/ipc/media-and-ui/#privacy).
 

@@ -1102,7 +1102,7 @@ void ScreenshotService::startTextScan(ScreencopyImage image, ScanKind kind) {
                     return;
                   }
                   m_notifications.addInternal(
-                      "Noctalia",
+                      "Helix",
                       kind == ScanKind::Ocr ? i18n::tr("control-center.screenshot.ocr-copied")
                                              : i18n::tr("control-center.screenshot.qr-copied"),
                       scanPreview(text)
@@ -1160,7 +1160,7 @@ void ScreenshotService::ensureRegionOverlay() {
       notifyError("Failed to copy color");
       return;
     }
-    m_notifications.addInternal("Noctalia", "Color copied", *hex);
+    m_notifications.addInternal("Helix", "Color copied", *hex);
   });
 
   m_regionOverlay->setCompleteCallback(
@@ -2138,9 +2138,9 @@ ScreenshotService::makeScreenshotPath(const OutputOptions& options, const std::s
 }
 
 void ScreenshotService::notifySaved(const std::filesystem::path& path) {
-  m_notifications.addInternal("Noctalia", "Screenshot saved", path.string());
+  m_notifications.addInternal("Helix", "Screenshot saved", path.string());
 }
 
 void ScreenshotService::notifyError(const std::string& message) {
-  m_notifications.addInternal("Noctalia", "Screenshot failed", message, Urgency::Critical);
+  m_notifications.addInternal("Helix", "Screenshot failed", message, Urgency::Critical);
 }

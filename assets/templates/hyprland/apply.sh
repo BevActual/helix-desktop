@@ -43,7 +43,7 @@ detect_mode() {
 }
 
 apply_lua() {
-  local include_line='-- For Noctalia Color templates
+  local include_line='-- For Helix color templates
 require("noctalia").apply_theme()'
 
   mkdir -p "$config_dir"
@@ -53,14 +53,14 @@ require("noctalia").apply_theme()'
     return
   fi
 
-  # Append only if there is no Noctalia include at all
+  # Append only if there is no Helix include at all
   if ! grep -qF 'require("noctalia")' "$lua_config_file"; then
     printf '\n%s\n' "$include_line" >>"$lua_config_file"
   fi
 }
 
 apply_conf() {
-  local include_line="# For Noctalia Color templates
+  local include_line="# For Helix color templates
 source = $conf_source_path"
 
   mkdir -p "$config_dir"
@@ -70,7 +70,7 @@ source = $conf_source_path"
     return
   fi
 
-  # Avoid appending duplicate Noctalia includes
+  # Avoid appending duplicate Helix includes
   if ! grep -qE 'source\s*=.*noctalia\.conf' "$conf_config_file"; then
     printf '\n%s\n' "$include_line" >>"$conf_config_file"
   fi

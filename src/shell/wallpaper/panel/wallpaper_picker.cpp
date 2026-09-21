@@ -3491,7 +3491,7 @@ void WallpaperPicker::applyWallhavenItem(std::string_view id) {
   }
   const auto* item = wallhavenItemById(id);
   if (item == nullptr || item->path.empty()) {
-    notify::error("Noctalia", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed"));
+    notify::error("Helix", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed"));
     return;
   }
 
@@ -3508,7 +3508,7 @@ void WallpaperPicker::applyWallhavenItem(std::string_view id) {
   if (ec) {
     m_wallhavenApplying = false;
     syncWallhavenPager();
-    notify::error("Noctalia", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed"));
+    notify::error("Helix", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed"));
     PanelManager::instance().refresh();
     return;
   }
@@ -3523,14 +3523,14 @@ void WallpaperPicker::applyWallhavenItem(std::string_view id) {
     if (!ok) {
       syncWallhavenPager();
       notify::error(
-          "Noctalia", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed")
+          "Helix", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.download-failed")
       );
       PanelManager::instance().refresh();
       return;
     }
     applyWallpaperPath(dest.string(), favoriteThemeToApply(dest.string()));
     syncWallhavenPager();
-    notify::info("Noctalia", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.applied"));
+    notify::info("Helix", i18n::tr("wallpaper.panel.wallhaven.title"), i18n::tr("wallpaper.panel.wallhaven.applied"));
     kLog.info("applied wallhaven wallpaper {}", dest.string());
     PanelManager::instance().refresh();
   });
@@ -3774,7 +3774,7 @@ void WallpaperPicker::applyDailyItem(std::string_view id) {
   }
   const auto* item = dailyItemById(id);
   if (item == nullptr || wallpaper::daily::downloadUrls(*item).empty()) {
-    notify::error("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
+    notify::error("Helix", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
     return;
   }
 
@@ -3791,7 +3791,7 @@ void WallpaperPicker::applyDailyItem(std::string_view id) {
   if (ec) {
     m_dailyApplying = false;
     syncDailyChrome();
-    notify::error("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
+    notify::error("Helix", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed"));
     PanelManager::instance().refresh();
     return;
   }
@@ -3801,7 +3801,7 @@ void WallpaperPicker::applyDailyItem(std::string_view id) {
     m_dailyApplying = false;
     applyWallpaperPath(dest.string(), favoriteThemeToApply(dest.string()));
     syncDailyChrome();
-    notify::info("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
+    notify::info("Helix", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
     kLog.info("applied daily wallpaper {}", dest.string());
     PanelManager::instance().refresh();
     return;
@@ -3816,14 +3816,14 @@ void WallpaperPicker::applyDailyItem(std::string_view id) {
     if (!ok) {
       syncDailyChrome();
       notify::error(
-          "Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed")
+          "Helix", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.download-failed")
       );
       PanelManager::instance().refresh();
       return;
     }
     applyWallpaperPath(dest.string(), favoriteThemeToApply(dest.string()));
     syncDailyChrome();
-    notify::info("Noctalia", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
+    notify::info("Helix", i18n::tr("wallpaper.panel.daily.title"), i18n::tr("wallpaper.panel.daily.applied"));
     kLog.info("applied daily wallpaper {}", dest.string());
     PanelManager::instance().refresh();
   });

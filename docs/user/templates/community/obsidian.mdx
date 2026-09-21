@@ -1,10 +1,10 @@
 ---
 title: Obsidian
-description: Theming Obsidian with Noctalia
+description: Theming Obsidian with Helix
 sidebar:
   order: 10
 ---
-Applies Noctalia's generated color palette to [Obsidian](https://obsidian.md/) as a CSS snippet. Both dark and light mode variants are generated, and Obsidian will use whichever matches its current appearance setting.
+Applies Helix's generated color palette to [Obsidian](https://obsidian.md/) as a CSS snippet. Both dark and light mode variants are generated, and Obsidian will use whichever matches its current appearance setting.
 ## Requirements:
 
 - `obsidian.css` provided [here](https://github.com/noctalia-dev/community-templates/blob/main/obsidian/obsidian.css)
@@ -12,7 +12,7 @@ Applies Noctalia's generated color palette to [Obsidian](https://obsidian.md/) a
 ## Setup:
 1. **Download `obsidian.css` from the Obsidian community-templates [Github](https://github.com/noctalia-dev/community-templates/blob/main/obsidian/obsidian.css) page.**
 
-2. **Enable User Templates in Noctalia:**
+2. **Enable User Templates in Helix:**
 	- **Settings → Templates → Toggle Enable User Templates ON → Toggle obsidian (editor) ON**
 
 3. **Set up Obsidian files**
@@ -28,7 +28,7 @@ Applies Noctalia's generated color palette to [Obsidian](https://obsidian.md/) a
 	cp ~/Downloads/obsidian.css ~/.config/noctalia/Obsidian
 	```
 
-4. **Set up Noctalia files**
+4. **Set up Helix files**
 	- Navigate to wherever your Obsidian Vault is located, and create a folder called `snippets`. Create a file inside the `/snippets` folder named `noctalia.css`. The command `touch` creates empty files, `mkdir` makes folders.
 	```shell 
 	mkdir ~/Documents/vault/.obsidian/snippets
@@ -50,7 +50,7 @@ Applies Noctalia's generated color palette to [Obsidian](https://obsidian.md/) a
 		- Toggle "CSS Snippets" should now populate a button, toggle it **ON**
 
 ## How it works:
-This template renders a CSS snippet (`noctalia.css`) into your Obsidian vault's `snippets/` directory. The snippet overrides Obsidian's CSS custom properties to match Noctalia's active palette: backgrounds, text, accents, headings, links, tags, graph view, and more. 
+This template renders a CSS snippet (`noctalia.css`) into your Obsidian vault's `snippets/` directory. The snippet overrides Obsidian's CSS custom properties to match Helix's active palette: backgrounds, text, accents, headings, links, tags, graph view, and more. 
 
 ## Notes:
 - The snippet layers on top of any installed Obsidian theme - it overrides color variables without removing your base theme.

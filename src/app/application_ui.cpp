@@ -175,7 +175,7 @@ void Application::launchGreeterSync(bool quiet) {
       }
       if (success) {
         notify::info(
-            "Noctalia", i18n::tr("notifications.internal.greeter-sync"),
+            "Helix", i18n::tr("notifications.internal.greeter-sync"),
             i18n::tr("notifications.internal.greeter-sync-success")
         );
         return;
@@ -183,7 +183,7 @@ void Application::launchGreeterSync(bool quiet) {
       const bool authAgentFailed = error.contains("textual authentication agent")
           || error.contains("No such device or address");
       notify::error(
-          "Noctalia", i18n::tr("notifications.internal.greeter-sync"),
+          "Helix", i18n::tr("notifications.internal.greeter-sync"),
           i18n::tr(authAgentFailed ? "settings.errors.sync-greeter-auth" : "settings.errors.sync-greeter")
       );
     });
@@ -201,7 +201,7 @@ void Application::launchGreeterSync(bool quiet) {
   if (launch == greeter::GreeterSyncLaunch::Failed) {
     if (!quiet) {
       notify::error(
-          "Noctalia", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
+          "Helix", i18n::tr("notifications.internal.greeter-sync"), i18n::tr("settings.errors.sync-greeter")
       );
     }
     return;
@@ -209,7 +209,7 @@ void Application::launchGreeterSync(bool quiet) {
   if (launch == greeter::GreeterSyncLaunch::StagedOnly) {
     if (!quiet) {
       notify::info(
-          "Noctalia", i18n::tr("notifications.internal.greeter-sync"),
+          "Helix", i18n::tr("notifications.internal.greeter-sync"),
           i18n::tr("notifications.internal.greeter-sync-pending-manual")
       );
     }
@@ -231,7 +231,7 @@ void Application::launchGreeterSync(bool quiet) {
         return;
       }
       notify::error(
-          "Noctalia", i18n::tr("notifications.internal.greeter-sync"),
+          "Helix", i18n::tr("notifications.internal.greeter-sync"),
           i18n::tr(
               inSessionPolkit  ? "settings.errors.sync-greeter-timeout"
                   : legacySync ? "settings.errors.sync-greeter-timeout-manual"
@@ -270,7 +270,7 @@ void Application::launchShellUpgrade() {
       m_settingsInvalidated.emit();
       if (success) {
         notify::info(
-            "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+            "Helix", i18n::tr("notifications.internal.shell-upgrade"),
             i18n::tr("notifications.internal.shell-upgrade-success")
         );
         return;
@@ -283,28 +283,28 @@ void Application::launchShellUpgrade() {
         body += '\n';
         body += detail;
       }
-      notify::error("Noctalia", i18n::tr("notifications.internal.shell-upgrade"), std::move(body));
+      notify::error("Helix", i18n::tr("notifications.internal.shell-upgrade"), std::move(body));
     });
   };
 
   const auto launch = noctalia::fedora_upgrade::start(complete);
   if (launch == noctalia::fedora_upgrade::Launch::Busy) {
     notify::info(
-        "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+        "Helix", i18n::tr("notifications.internal.shell-upgrade"),
         i18n::tr("notifications.internal.shell-upgrade-busy")
     );
     return;
   }
   if (launch == noctalia::fedora_upgrade::Launch::Failed) {
     notify::error(
-        "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+        "Helix", i18n::tr("notifications.internal.shell-upgrade"),
         i18n::tr("notifications.internal.shell-upgrade-failed")
     );
     return;
   }
   m_settingsInvalidated.emit();
   notify::info(
-      "Noctalia", i18n::tr("notifications.internal.shell-upgrade"),
+      "Helix", i18n::tr("notifications.internal.shell-upgrade"),
       i18n::tr("notifications.internal.shell-upgrade-started")
   );
 }
@@ -516,7 +516,7 @@ void Application::initPanelManagerAndPanels() {
             const bool calendarCleared = m_calendarService.clearEncryptedCacheForRecovery();
             if (!clipboardCleared || !calendarCleared) {
               notify::error(
-                  "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                  "Helix", i18n::tr("settings.storage-recovery.label"),
                   i18n::tr("settings.storage-recovery.error-delete")
               );
               m_settingsInvalidated.emit();
@@ -525,12 +525,12 @@ void Application::initPanelManagerAndPanels() {
             m_storageKeyProvider.resetAfterEncryptedDataCleared([this](bool success) {
               if (success) {
                 notify::info(
-                    "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                    "Helix", i18n::tr("settings.storage-recovery.label"),
                     i18n::tr("settings.storage-recovery.success")
                 );
               } else {
                 notify::error(
-                    "Noctalia", i18n::tr("settings.storage-recovery.label"),
+                    "Helix", i18n::tr("settings.storage-recovery.label"),
                     i18n::tr("settings.storage-recovery.error-key")
                 );
               }
@@ -542,13 +542,13 @@ void Application::initPanelManagerAndPanels() {
           [this]() {
             if (!m_templateApplyService.reapplyLast()) {
               notify::error(
-                  "Noctalia", i18n::tr("notifications.internal.templates-apply"),
+                  "Helix", i18n::tr("notifications.internal.templates-apply"),
                   i18n::tr("notifications.internal.templates-apply-pending")
               );
               return;
             }
             notify::info(
-                "Noctalia", i18n::tr("notifications.internal.templates-apply"),
+                "Helix", i18n::tr("notifications.internal.templates-apply"),
                 i18n::tr("notifications.internal.templates-apply-success")
             );
           },
@@ -558,7 +558,7 @@ void Application::initPanelManagerAndPanels() {
               m_launcherPanel->clearUsage();
             }
             notify::info(
-                "Noctalia", i18n::tr("notifications.internal.launcher-usage-reset"),
+                "Helix", i18n::tr("notifications.internal.launcher-usage-reset"),
                 i18n::tr("notifications.internal.launcher-usage-reset-success")
             );
           },
@@ -566,7 +566,7 @@ void Application::initPanelManagerAndPanels() {
           [this]() {
             m_screenTimeService.clearAll();
             notify::info(
-                "Noctalia", i18n::tr("notifications.internal.screen-time-reset"),
+                "Helix", i18n::tr("notifications.internal.screen-time-reset"),
                 i18n::tr("notifications.internal.screen-time-reset-success")
             );
           },
@@ -576,14 +576,14 @@ void Application::initPanelManagerAndPanels() {
             std::string error;
             if (!m_themeService.saveWallpaperPaletteAsCustom(&paletteName, &error)) {
               notify::error(
-                  "Noctalia", i18n::tr("notifications.internal.wallpaper-palette-export"),
+                  "Helix", i18n::tr("notifications.internal.wallpaper-palette-export"),
                   error.empty() ? i18n::tr("settings.errors.export-wallpaper-palette") : std::move(error)
               );
               return;
             }
             m_settingsInvalidated.emit();
             notify::info(
-                "Noctalia", i18n::tr("notifications.internal.wallpaper-palette-export"),
+                "Helix", i18n::tr("notifications.internal.wallpaper-palette-export"),
                 i18n::tr("notifications.internal.wallpaper-palette-export-success", "name", paletteName)
             );
           },
@@ -596,7 +596,7 @@ void Application::initPanelManagerAndPanels() {
             m_desktopWidgetsController.toggleEdit();
             if (!wasEditing && m_desktopWidgetsController.isEditing()) {
               notify::info(
-                  "Noctalia", i18n::tr("notifications.internal.desktop-widgets-editor"),
+                  "Helix", i18n::tr("notifications.internal.desktop-widgets-editor"),
                   i18n::tr("notifications.internal.desktop-widgets-editor-enabled")
               );
             }
@@ -608,7 +608,7 @@ void Application::initPanelManagerAndPanels() {
             }
             if (m_lockScreen.isActive()) {
               notify::info(
-                  "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
+                  "Helix", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
                   i18n::tr("notifications.internal.lockscreen-widgets-editor-blocked-locked")
               );
               return;
@@ -620,7 +620,7 @@ void Application::initPanelManagerAndPanels() {
             m_lockscreenWidgetsController.toggleEdit();
             if (!wasEditing && m_lockscreenWidgetsController.isEditing()) {
               notify::info(
-                  "Noctalia", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
+                  "Helix", i18n::tr("notifications.internal.lockscreen-widgets-editor"),
                   i18n::tr("notifications.internal.lockscreen-widgets-editor-enabled")
               );
             }

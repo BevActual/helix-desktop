@@ -460,13 +460,13 @@ std::unique_ptr<Flex> MonitorTab::createHeaderActions() {
                 const auto result = compositors::niri::saveOutputs(m_displayConfig->outputs());
                 if (!result.ok) {
                   notify::error(
-                      "Noctalia", i18n::tr("control-center.display.save-title"),
+                      "Helix", i18n::tr("control-center.display.save-title"),
                       result.error.empty() ? i18n::tr("control-center.display.save-failed") : result.error
                   );
                   return;
                 }
                 notify::info(
-                    "Noctalia", i18n::tr("control-center.display.save-title"),
+                    "Helix", i18n::tr("control-center.display.save-title"),
                     i18n::tr("control-center.display.save-ok")
                 );
                 syncStatusLabels();
@@ -1893,6 +1893,6 @@ void MonitorTab::reportLayoutError() {
   if (error.empty()) {
     return;
   }
-  notify::error("Noctalia", i18n::tr("control-center.display.layout-error"), error);
+  notify::error("Helix", i18n::tr("control-center.display.layout-error"), error);
   syncStatusLabels();
 }

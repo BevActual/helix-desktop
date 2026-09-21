@@ -267,7 +267,7 @@ void PluginControlCenterTab::reloadScript() {
   auto name = m_sourcePath.filename().string();
   if (source.empty() || m_runtime == nullptr) {
     kLog.warn("hot reload: failed to reload '{}'", name);
-    notify::error("Noctalia", i18n::tr("bar.widgets.scripted.reload-failed"), name);
+    notify::error("Helix", i18n::tr("bar.widgets.scripted.reload-failed"), name);
     return;
   }
 
@@ -281,7 +281,7 @@ void PluginControlCenterTab::reloadScript() {
   startUpdateTimer();
   requestHostRefresh();
   kLog.info("hot reload: reloaded '{}'", name);
-  notify::info("Noctalia", i18n::tr("bar.widgets.scripted.reloaded"), name);
+  notify::info("Helix", i18n::tr("bar.widgets.scripted.reloaded"), name);
 }
 
 void PluginControlCenterTab::requestHostRefresh() {

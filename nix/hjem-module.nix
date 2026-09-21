@@ -101,7 +101,7 @@ in
     packages = optional (cfg.package != null) cfg.package;
 
     systemd.services.noctalia = mkIf (cfg.systemd.enable) {
-      description = "Noctalia - A lightweight Wayland shell and bar";
+      description = "Helix Shell (noctalia)";
       documentation = [ "https://docs.noctalia.dev/noctalia/" ];
       partOf = [ cfg.systemd.target ];
       after = [ cfg.systemd.target ];

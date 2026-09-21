@@ -67,7 +67,7 @@ namespace shell::dock::pinned_apps {
 
   void notifyUnresolved(const DesktopEntry& entry) {
     notify::error(
-        "Noctalia", i18n::tr("dock.missing-app"), i18n::tr("dock.missing-app-body", "id", entry.id)
+        "Helix", i18n::tr("dock.missing-app"), i18n::tr("dock.missing-app-body", "id", entry.id)
     );
   }
 

@@ -1,6 +1,6 @@
 ---
 title: Hyprland
-description: Configure Hyprland for the best experience with Noctalia.
+description: Configure Hyprland for the best experience with Helix.
 sidebar:
   order: 5
 ---
@@ -10,7 +10,7 @@ import blur1 from '../../assets/hyprland-blur/hyprland-blur-1-v5.png';
 
 Add the following settings to your Hyprland Lua configuration file (usually found at `~/.config/hypr/hyprland.lua`).
 
-## Autostart Noctalia
+## Autostart Helix
 
 Add this to your `hyprland.start` event hook:
 
@@ -54,7 +54,7 @@ hl.config({
 
 ## Persistent Workspaces
 
-For the best workspace indicator behavior, make your regular Hyprland workspaces persistent. This keeps empty workspaces visible in Noctalia instead of only showing workspaces that currently contain windows.
+For the best workspace indicator behavior, make your regular Hyprland workspaces persistent. This keeps empty workspaces visible in Helix instead of only showing workspaces that currently contain windows.
 
 Update the monitor name and workspace list to match your setup. You can find more syntax and examples in the official [Workspace Rules](https://wiki.hypr.land/Configuring/Basics/Workspace-Rules/) documentation.
 
@@ -87,7 +87,7 @@ hl.bind("XF86AudioMute", hl.dsp.exec_cmd(ipc .. "volume-mute"))
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd(ipc .. "brightness-up"))
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(ipc .. "brightness-down"))
 
--- Noctalia Settings
+-- Helix Settings
 hl.window_rule({
     match = { class = "dev.noctalia.Noctalia" },
     float = true,
@@ -97,10 +97,10 @@ hl.window_rule({
 
 ## Blur
 
-Enable blur for Noctalia's bar, panels, dock, and notifications.
-We also disable Hyprland's built-in layer animations for Noctalia so they do not interfere with Noctalia's own animations.
+Enable blur for Helix's bar, panels, dock, and notifications.
+We also disable Hyprland's built-in layer animations for Helix so they do not interfere with Helix's own animations.
 
-<ImageLightbox src={blur1} alt="Blurred Noctalia surfaces" />
+<ImageLightbox src={blur1} alt="Blurred Helix surfaces" />
 
 ```lua
 hl.layer_rule({

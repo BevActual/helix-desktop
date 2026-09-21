@@ -174,7 +174,9 @@ std::unique_ptr<Flex> CalendarTab::create() {
 
   auto compactCard = ui::column({
       .out = &m_compactCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+        applyCompactCardStyle(card, scale, opacity, false);
+      },
   });
 
   auto titleRow = ui::row({
@@ -186,7 +188,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       ui::label({
           .out = &m_todayLabel,
           .text = formatShellDate(m_config),
-          .fontSize = Style::fontSizeBody * scale,
+          .fontSize = Style::fontSizeTitle * scale,
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .maxLines = 1,

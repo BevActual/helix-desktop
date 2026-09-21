@@ -1,6 +1,6 @@
 ---
 title: Niri
-description: Configure Niri for the best experience with Noctalia.
+description: Configure Niri for the best experience with Helix.
 sidebar:
   order: 4
 ---
@@ -22,7 +22,7 @@ The stack is **greetd → helix-greeter → helix-niri + Helix Shell**. Helix st
 
 Control Center → Monitor can arrange niri outputs live. Those IPC positions are forgotten when niri reloads unless you click **Save to niri**, which writes `noctalia-outputs.kdl` next to your config and appends `include "noctalia-outputs.kdl"`.
 
-## Autostart Noctalia
+## Autostart Helix
 
 ```kdl
 spawn-at-startup "noctalia"
@@ -42,20 +42,20 @@ window-rule {
 }
 
 debug {
-  // Allows notification actions and window activation from Noctalia.
+  // Allows notification actions and window activation from Helix.
   honor-xdg-activation-with-invalid-serial
 }
 ```
 
 ## IPC Keybinds
 
-Both `spawn-sh` and `spawn` are usable to run Noctalia keybinds.
+Both `spawn-sh` and `spawn` are usable to run Helix keybinds.
 
 Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds** to record Super/Mod chords, copy missing lines, or install them into `noctalia-binds.kdl`. That include is appended last, so it overrides stock keys from an earlier `include` such as Fedora's `/usr/share/doc/niri/default-config.kdl` without rewriting your `binds { }` block. **Mod+Shift+P** replaces niri's `power-off-monitors` with the session panel. App shortcuts on that page write `spawn` lines into the same include:
 
 ```kdl
 binds {
-    // Core Noctalia binds
+    // Core Helix binds
     Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }
     Mod+S { spawn-sh "noctalia msg panel-toggle control-center"; }
     Mod+Comma { spawn-sh "noctalia msg settings-toggle"; }
@@ -89,7 +89,7 @@ binds {
 
 ## Optional Type to Launch
 
-Noctalia can open its launcher when you start typing in niri's overview. This is disabled by default because it requires a tiny keyboard-focus layer surface while overview is open, which means some niri overview-only keyboard state, such as the app focus ring, may not behave exactly like native overview navigation.
+Helix can open its launcher when you start typing in niri's overview. This is disabled by default because it requires a tiny keyboard-focus layer surface while overview is open, which means some niri overview-only keyboard state, such as the app focus ring, may not behave exactly like native overview navigation.
 
 ```toml
 [shell]
@@ -110,7 +110,7 @@ The "backdrop" in Niri is a layer behind all workspaces that is visible when you
 
 ### Option 1: Blurred Overview Wallpaper
 
-This configuration places Noctalia's dedicated backdrop layer (a blurred and tinted copy of the wallpaper) within Niri's overview backdrop.
+This configuration places Helix's dedicated backdrop layer (a blurred and tinted copy of the wallpaper) within Niri's overview backdrop.
 
 <ImageLightbox src={option1} alt="Blurred Overview Wallpaper" />
 
@@ -122,7 +122,7 @@ layer-rule {
 ```
 
 :::note
-Option 1 requires the `[niri/backdrop]` section to be enabled in your Noctalia configuration. See [Wallpaper and backdrop](/noctalia/desktop/wallpaper/) for the relevant options.
+Option 1 requires the `[niri/backdrop]` section to be enabled in your Helix configuration. See [Wallpaper and backdrop](/noctalia/desktop/wallpaper/) for the relevant options.
 :::
 
 ### Option 2: Stationary Wallpaper
@@ -152,7 +152,7 @@ overview {
 ```
 
 :::note
-Option 2 should be used with the `[niri/backdrop]` section disabled in your Noctalia configuration.
+Option 2 should be used with the `[niri/backdrop]` section disabled in your Helix configuration.
 :::
 
 ### Option 3: Flat Colored Overview
@@ -169,7 +169,7 @@ overview {
 ```
 
 :::note
-Option 3 should be used with the `[backdrop]` section disabled in your Noctalia configuration.
+Option 3 should be used with the `[backdrop]` section disabled in your Helix configuration.
 :::
 
 ## Blur
@@ -178,7 +178,7 @@ Option 3 should be used with the `[backdrop]` section disabled in your Noctalia 
 Blur support was introduced in Niri version 26.04. Adding these rules to earlier versions of Niri will result in configuration errors.
 :::
 
-**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Helix also rewrites that include when niri IPC connects, so a probe that ran before helix-niri was ready still lands `liquid-glass`. Turning blur off writes disable rules so Noctalia's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer. **Chrome → Glass → Refraction** on helix-niri adds a `liquid-glass { }` child for Helix chrome namespaces (bars, panels, dock, OSD, notifications, idle-grace, capture overlays). Strength follows the Solid→Glass slider. Refraction without layout blur writes `blur false` on those chrome rules so client `ext-background-effect` blur does not stack with liquid-glass. Stock niri never emits `liquid-glass`. High Contrast frosts chrome and omits refraction.
+**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Helix also rewrites that include when niri IPC connects, so a probe that ran before helix-niri was ready still lands `liquid-glass`. Turning blur off writes disable rules so Helix's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer. **Chrome → Glass → Refraction** on helix-niri adds a `liquid-glass { }` child for Helix chrome namespaces (bars, panels, dock, OSD, notifications, idle-grace, capture overlays). Strength follows the Solid→Glass slider. Refraction without layout blur writes `blur false` on those chrome rules so client `ext-background-effect` blur does not stack with liquid-glass. Stock niri never emits `liquid-glass`. High Contrast frosts chrome and omits refraction.
 
 You can also paste the same rules by hand:
 
@@ -192,9 +192,9 @@ window-rule {
 }
 
 /*
-  Noctalia
+  Helix
   Disable xray on all our surfaces so it looks more realistic.
-  Noctalia publishes blur regions automatically when ext-background-effects is available.
+  Helix publishes blur regions automatically when ext-background-effects is available.
 */
 layer-rule {
   match namespace="^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
@@ -223,12 +223,12 @@ blur {
 ```
 
 :::tip[Turning blur off]
-When Noctalia detects `ext-background-effects`, it automatically publishes blur regions for its layer surfaces. This means bars, panels, dock, notifications, and OSD can still blur even if you do not declare any Noctalia `layer-rule` in your Niri config.
+When Helix detects `ext-background-effects`, it automatically publishes blur regions for its layer surfaces. This means bars, panels, dock, notifications, and OSD can still blur even if you do not declare any Helix `layer-rule` in your Niri config.
 
 With Niri's default xray behavior, that blur samples the wallpaper. On contrasting wallpapers, it can show through the anti-aliased edges of rounded surfaces as faint, wallpaper-colored corner pixels.
 
-- To keep blur but use the windows and content behind Noctalia, set `xray false` as shown above.
-- To disable blur entirely, use `blur false`. A broad namespace match also covers future Noctalia layer surfaces:
+- To keep blur but use the windows and content behind Helix, set `xray false` as shown above.
+- To disable blur entirely, use `blur false`. A broad namespace match also covers future Helix layer surfaces:
 
 ```kdl
 layer-rule {
@@ -239,7 +239,7 @@ layer-rule {
 }
 ```
 
-Omitting the Noctalia `layer-rule` is not enough to disable its client-requested blur.
+Omitting the Helix `layer-rule` is not enough to disable its client-requested blur.
 :::
 
 ## Per-widget desktop layer rules
@@ -270,9 +270,9 @@ layer-rule {
 
 ## Laptop
 
-With the lock screen enabled, Noctalia locks before sleep by default (`[lockscreen].lock_before_suspend = true`), including lid-close suspend handled by logind. Set `lock_before_suspend = false` if you want lid close / `systemctl suspend` without locking.
+With the lock screen enabled, Helix locks before sleep by default (`[lockscreen].lock_before_suspend = true`), including lid-close suspend handled by logind. Set `lock_before_suspend = false` if you want lid close / `systemctl suspend` without locking.
 
-**Keep using other displays** (`[lockscreen].lid_close_keep_external_displays`, default `true`) is on Control Center → Power. When another display is on, Noctalia blocks logind from suspending on lid close. niri still turns off the laptop panel, so you can keep working on the external display. Turn the setting off if you want the lid to suspend even while docked.
+**Keep using other displays** (`[lockscreen].lid_close_keep_external_displays`, default `true`) is on Control Center → Power. When another display is on, Helix blocks logind from suspending on lid close. niri still turns off the laptop panel, so you can keep working on the external display. Turn the setting off if you want the lid to suspend even while docked.
 
 If you install the optional niri setup snippet, lid close runs `noctalia msg session lid-close`: it is a no-op in that clamshell case, and otherwise locks and suspends (useful when logind lid handling is ignored).
 

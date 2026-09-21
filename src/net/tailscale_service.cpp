@@ -619,7 +619,7 @@ void TailscaleService::notifyPeerChanges(const TailscaleSnapshot& previous, cons
       continue;
     }
     notify::info(
-        "Noctalia", i18n::tr("control-center.tailscale.title"),
+        "Helix", i18n::tr("control-center.tailscale.title"),
         peer.online ? i18n::tr("control-center.tailscale.peer-online", "name", peer.name)
                     : i18n::tr("control-center.tailscale.peer-offline", "name", peer.name)
     );

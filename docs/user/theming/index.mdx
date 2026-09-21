@@ -5,7 +5,7 @@ sidebar:
   order: 8
 ---
 
-Controls the active palette source and the dark/light modes used by Noctalia and by your apps.
+Controls the active palette source and the dark/light modes used by Helix and by your apps.
 
 ```toml
 [theme]
@@ -39,17 +39,17 @@ shortcut, and the theme mode bar widget all act on this key.
 
 ## `shell_mode`
 
-Noctalia's own mode: bars, panels, the launcher, wallpaper directory selection, and the greeter appearance.
+Helix's own mode: bars, panels, the launcher, wallpaper directory selection, and the greeter appearance.
 
 | Value | Description |
 |-------|-------------|
-| `follow` | Track `mode`, so Noctalia and your apps switch together (default). |
-| `dark` / `light` | Pin Noctalia to that variant while `mode` keeps driving apps. |
-| `auto` | Switch Noctalia on the `[location]` schedule, independently of `mode`. |
+| `follow` | Track `mode`, so Helix and your apps switch together (default). |
+| `dark` / `light` | Pin Helix to that variant while `mode` keeps driving apps. |
+| `auto` | Switch Helix on the `[location]` schedule, independently of `mode`. |
 
 Pinning it gives combinations such as a permanently dark bar with light apps, or a dark bar while apps follow the
 day/night schedule. Templates and the GNOME `color-scheme` preference never follow `shell_mode`; a `shell_mode`-only
-change repaints Noctalia without rewriting a single template.
+change repaints Helix without rewriting a single template.
 
 ## `pure_black_dark`
 
@@ -70,7 +70,7 @@ For theme mode and palette commands, see
 | `builtin` | Use one of the palettes compiled into the binary. |
 | `wallpaper` | Generate a palette from the current default wallpaper each time it changes. |
 | `community` | Fetch a palette by name from `https://api.noctalia.dev/palette/<name>`. |
-| `custom` | Load a palette JSON file from the Noctalia config directory's `palettes/` folder. |
+| `custom` | Load a palette JSON file from the Helix config directory's `palettes/` folder. |
 
 ---
 
@@ -96,7 +96,7 @@ While the initial download is in flight - or if it fails - the shell falls back 
 
 ## `custom_palette`
 
-Names a palette file in the Noctalia config directory's `palettes/` folder (honoring `NOCTALIA_CONFIG_HOME`, then `XDG_CONFIG_HOME`). The value is the file name without the `.json` extension - for example, `custom_palette = "MyPalette"` loads `~/.config/noctalia/palettes/MyPalette.json` with the default config location.
+Names a palette file in the Helix config directory's `palettes/` folder (honoring `NOCTALIA_CONFIG_HOME`, then `XDG_CONFIG_HOME`). The value is the file name without the `.json` extension - for example, `custom_palette = "MyPalette"` loads `~/.config/noctalia/palettes/MyPalette.json` with the default config location.
 
 The Settings GUI lists palette files found in the directory when `source = "custom"` is selected.
 
@@ -128,6 +128,6 @@ Picks the generator when `source = "wallpaper"`:
 ## Where next?
 
 - [Palette](/noctalia/theming/palette/) covers color roles, custom palette files, and terminal colors.
-- [App Theming](/noctalia/theming/app-theming/) covers applying Noctalia colors to app config files.
+- [App Theming](/noctalia/theming/app-theming/) covers applying Helix colors to app config files.
 - [Template Reference](/noctalia/theming/templates/) covers template syntax, tokens, filters, hooks, and CLI rendering.
 - [FAQ: external wallpaper apps](/noctalia/getting-started/faq/#how-do-i-use-noctalia-colors-with-an-external-wallpaper-app) covers wallpaper-driven colors when another tool displays the wallpaper.

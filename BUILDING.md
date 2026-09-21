@@ -1,8 +1,8 @@
-# Building Noctalia from source
+# Building Helix Shell from source
 
 This guide covers source dependencies, distro-specific package installation, build modes, and install layouts.
-For prebuilt packages and other installation methods, see the
-[installation documentation](https://docs.noctalia.dev/noctalia/getting-started/installation/).
+The installed command is still `noctalia`. For prebuilt packages and other installation methods, see
+[docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
 
 ## Dependencies
 
@@ -125,8 +125,8 @@ modules. Some distros ship these in the runtime `polkit` package, while split-pa
 
 CUPS development files (`cups` pkg-config) are required to build the Printers tab.
 
-Pipewire libraries/headers are sufficient to build Noctalia, but there is also a runtime requirement for the pipewire
-daemon. Noctalia will abort startup if it can't connect to the daemon. If your distro splits the pipewire libraries
+Pipewire libraries/headers are sufficient to build Helix, but there is also a runtime requirement for the pipewire
+daemon. Helix will abort startup if it can't connect to the daemon. If your distro splits the pipewire libraries
 and daemon into separate packages, make sure you have both installed.
 
 `upower` is an optional dependency used for battery and power device integration.
@@ -134,7 +134,7 @@ and daemon into separate packages, make sure you have both installed.
 `ddcutil` is an optional dependency used for controlling monitor brightness.
 
 Credential and encrypted-state persistence requires a Secret Service provider at runtime, such as GNOME Keyring,
-KWallet, or KeePassXC. `libsecret` is the client library and does not provide the session service by itself. Noctalia
+KWallet, or KeePassXC. `libsecret` is the client library and does not provide the session service by itself. Helix
 continues to run when no provider is available, but features requiring durable secrets cannot persist them.
 CalDAV accounts may instead read their password from one explicitly configured regular file, which supports secret
 provisioners such as agenix and sops-nix without installing a Secret Service provider. Google refresh tokens and
@@ -195,7 +195,7 @@ just build
 just run
 ```
 
-Unit tests are not compiled by `just build`, which targets only the Noctalia executable. Build and run them explicitly
+Unit tests are not compiled by `just build`, which targets only the Helix executable. Build and run them explicitly
 with `just test` (use `just test release` to force them on for a release build). Direct Meson users can control test
 target generation with the `-Dtests=enabled|disabled|auto` option.
 Production sources compile once into an internal static library shared by the shell and test executables.
@@ -207,7 +207,7 @@ Meson installs the binary and shipped assets using the normal prefix layout:
 /usr/local/share/noctalia/assets/...
 ```
 
-Noctalia needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
+Helix needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
 
 Firefox theming uses the built-in template `post_action = "firefox-theme"` (same pattern as
 `kde-color-scheme`) plus the [Pywalfox](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/)

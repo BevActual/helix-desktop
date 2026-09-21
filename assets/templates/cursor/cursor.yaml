@@ -1,4 +1,4 @@
-name: Noctalia
+name: Helix
 appearance: '{{ mode }}'
 highContrast: false
 sidebar: '{{colors.surface_container.default.hex}}'

@@ -19,14 +19,14 @@ rewrite_config() {
 }
 
 rewrite_config "$config_dir/hyprland.conf" '
-    /#[[:space:]]*For Noctalia Color templates/ { pending = $0; next }
+    /#[[:space:]]*For (Noctalia|Helix) [Cc]olor templates/ { pending = $0; next }
     /^[[:space:]]*source[[:space:]]*=.*noctalia\.conf/ { pending = ""; next }
     pending != "" { print pending; pending = "" }
     { print }
     END { if (pending != "") print pending }
 '
 rewrite_config "$config_dir/hyprland.lua" '
-    /--[[:space:]]*For Noctalia Color templates/ { pending = $0; next }
+    /--[[:space:]]*For (Noctalia|Helix) [Cc]olor templates/ { pending = $0; next }
     /require\("noctalia"\)\.apply_theme\(\)/ { pending = ""; next }
     pending != "" { print pending; pending = "" }
     { print }

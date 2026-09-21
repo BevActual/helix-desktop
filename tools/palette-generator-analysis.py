@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Analyze Noctalia's C++ palette generator against Python + matugen references.
+Analyze Helix's C++ palette generator against Python + matugen references.
 
 Usage:
     ./tools/palette-generator-analysis.py <wallpaper>
     ./tools/palette-generator-analysis.py <wallpaper> --fail-threshold 20
 
 Three backends:
-  - Noctalia  : ../build-debug/noctalia theme <img> --scheme <s> --dark
+  - Helix     : ../build-debug/noctalia theme <img> --scheme <s> --dark
   - Python    : the upstream reference in noctalia-shell/Scripts/python
   - Matugen   : Rust reference (M3 schemes only)
 
@@ -213,7 +213,7 @@ def compare_custom(image: Path, scheme: str) -> list[int]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Compare Noctalia C++ palette generator vs Python/matugen"
+        description="Compare Helix C++ palette generator vs Python/matugen"
     )
     parser.add_argument("wallpaper", type=Path)
     parser.add_argument("--fail-threshold", type=int, default=-1,

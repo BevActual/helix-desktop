@@ -1,6 +1,6 @@
 ---
 title: Cursor Agent
-description: Theme the Cursor Agents window with Noctalia colors.
+description: Theme the Cursor Agents window with Helix colors.
 sidebar:
   order: 7
 ---
@@ -14,7 +14,7 @@ The classic Cursor editor uses a VS Code color theme. For that surface, enable t
 1. Enable **Cursor Agent** under **Settings → Templates → Editors**.
 2. Fully quit and reopen Cursor so the Agents window reloads its theme store.
 
-Noctalia writes `~/.config/Cursor/User/themes/noctalia.yaml` and registers it as a custom Glass theme named **Noctalia**. It also points the Agents window's dark and light slots at that theme.
+Helix writes `~/.config/Cursor/User/themes/noctalia.yaml` and registers it as a custom Glass theme named **Helix**. It also points the Agents window's dark and light slots at that theme.
 
 Cursor does not watch the YAML while it is running. Palette changes rewrite the file and the stored theme, then take effect after a restart.
 
@@ -22,4 +22,4 @@ Cursor does not watch the YAML while it is running. Palette changes rewrite the 
 
 - **Agents window still uses Cursor Dark:** Quit every Cursor window, including the Agents window, then start Cursor again. The theme is stored in `state.vscdb` and is read at startup.
 - **Theme file exists but colors never apply:** `python3` is required for the apply hook to update Cursor's theme store. The YAML is still written so you can import it from **Agents window → Settings → Appearance → Manage Themes** when that UI is available.
-- **Editor and Agents window do not match:** Enable the community VSCode template as well, and select **Noctalia** as the editor color theme.
+- **Editor and Agents window do not match:** Enable the community VSCode template as well, and select **NoctaliaTheme** as the editor color theme.

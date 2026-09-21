@@ -1,6 +1,6 @@
 ---
 title: Using Plugins
-description: Install, enable, update, and configure Noctalia plugins from git or local sources.
+description: Install, enable, update, and configure Helix plugins from git or local sources.
 sidebar:
   label: Using Plugins
   order: 1
@@ -8,7 +8,7 @@ sidebar:
 
 import PluginApiRange from '../../../../components/PluginApiRange.astro';
 
-Plugins extend Noctalia with **bar widgets**, **desktop widgets**, **shell panels**, **control-center shortcuts**,
+Plugins extend Helix with **bar widgets**, **desktop widgets**, **shell panels**, **control-center shortcuts**,
 **control-center tabs**, **launcher providers**, and headless **background services** - all driven by trusted [Luau](https://luau.org) scripts
 running in isolated VMs. A plugin is a directory containing a static
 `plugin.toml` manifest and one or more `.luau` entry scripts.
@@ -23,7 +23,7 @@ You can also add your own git repos or local directories.
 ## Enabling a plugin
 
 Nothing is active until you enable it - installed ≠ enabled. Enabling a plugin from a git source exports just that
-plugin's directory from the source repo cache into `$XDG_STATE_HOME/noctalia/plugins/materialized/`. Noctalia owns both
+plugin's directory from the source repo cache into `$XDG_STATE_HOME/noctalia/plugins/materialized/`. Helix owns both
 the repo cache and exported runtime files.
 
 ### From the settings GUI
@@ -38,7 +38,7 @@ all of the plugin's parts (for example the screen recorder's codec, quality, and
 state dir, so a read-only config directory is fine. Bar-widget entries can also declare widget settings, edited where
 that widget is configured.
 
-If a plugin is enabled in `config.toml` and you disable it in Settings, Noctalia writes an app-owned
+If a plugin is enabled in `config.toml` and you disable it in Settings, Helix writes an app-owned
 `[plugins].enabled` override to `settings.toml`. That override wins until you remove or edit it.
 
 ### From the command line
@@ -84,14 +84,14 @@ also writes runtime toggles to its state file, and both are merged.
 enabled = ["noctalia/screen_recorder"]
 auto_update = "all" # "all" | "official" | "none"; background git updates on startup and every 6 hours
 
-# A git source: cached and updated by Noctalia.
+# A git source: cached and updated by Helix.
 [[plugins.source]]
 name     = "official"
 kind     = "git"
 location = "https://github.com/noctalia-dev/official-plugins"
 enabled  = true
 
-# A path source: an immutable local directory Noctalia treats read-only
+# A path source: an immutable local directory Helix treats read-only
 # (no git ops). Ideal for local development or Nix-managed plugins.
 [[plugins.source]]
 name     = "my-dev"
@@ -114,12 +114,12 @@ handy for development. Like every plugin, they must be enabled before they activ
 [File locations](/noctalia/configuration/#file-locations) for where plugin code and everything else lives.
 
 Git source operations are non-interactive. Private repos must be reachable through an already-working credential helper,
-SSH agent, or SSH config; otherwise clone/update fails and Noctalia continues without prompting for a password.
+SSH agent, or SSH config; otherwise clone/update fails and Helix continues without prompting for a password.
 Git source runtime files are exported caches, not editable plugin state. Use a `path` source or
 `~/.local/share/noctalia/plugins/` for local plugin development.
 
 A source `name` is its identity, so duplicate names in `[[plugins.source]]` are rejected with a config error. Replacing
-a git source with the same name but a different `location` deletes Noctalia's app-managed repo cache and exported
+a git source with the same name but a different `location` deletes Helix's app-managed repo cache and exported
 runtime files for that source, then re-fetches from the new location when needed.
 
 ## Updating
@@ -129,14 +129,14 @@ runtime files for that source, then re-fetches from the new location when needed
 pulls every enabled git source, `"official"` pulls only the built-in `official` source, and `"none"` disables
 background updates.
 Updates are safe per enabled plugin: if one enabled plugin's new
-version targets an unsupported plugin API level, Noctalia keeps that plugin's previous exported copy, still updates
-compatible enabled plugins from the same source, and advances the source catalog. After Noctalia gains support for that
+version targets an unsupported plugin API level, Helix keeps that plugin's previous exported copy, still updates
+compatible enabled plugins from the same source, and advances the source catalog. After Helix gains support for that
 API level, the held plugin can catch up from the already-updated source revision.
 
 ## Compatibility
 
-Every plugin declares a mandatory integer `plugin_api` in its manifest. It is the oldest Noctalia plugin API level that
-the plugin requires, independent of both the plugin's version and Noctalia's release version. Noctalia supports
+Every plugin declares a mandatory integer `plugin_api` in its manifest. It is the oldest Helix plugin API level that
+the plugin requires, independent of both the plugin's version and Helix's release version. Helix supports
 plugin API levels <PluginApiRange />. Plugins outside the API range supported by the running shell are shown but badged
 **"incompatible plugin API"** and cannot be enabled.
 

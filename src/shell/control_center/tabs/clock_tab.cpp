@@ -153,7 +153,9 @@ std::unique_ptr<Flex> ClockTab::create() {
 
   auto compactCard = ui::column({
       .out = &m_compactCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
+        applyCompactCardStyle(card, scale, opacity, false);
+      },
   });
   compactCard->addChild(
       ui::label({
@@ -217,9 +219,8 @@ std::unique_ptr<Flex> ClockTab::create() {
   });
   m_zoneList = listScroll->content();
   if (m_zoneList != nullptr) {
-    m_zoneList->setDirection(FlexDirection::Vertical);
-    m_zoneList->setAlign(FlexAlign::Stretch);
-    m_zoneList->setGap(Style::spaceXs * scale);
+    applyGroupedListStyle(*m_zoneList, scale);
+    m_zoneList->setPadding(Style::spaceXs * scale);
   }
   leftover->addChild(std::move(listScroll));
   leftover->addChild(
@@ -355,7 +356,7 @@ void ClockTab::rebuildZones() {
     auto item = ui::row({
         .align = FlexAlign::Center,
         .gap = Style::spaceSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
+        .configure = [scale](Flex& host) { applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None); },
     });
     item->addChild(
         ui::label({

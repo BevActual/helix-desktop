@@ -1,22 +1,22 @@
-# Packaging Noctalia
+# Packaging Helix Shell
 
 Notes for distribution packagers. End-user install docs live in the
-[README](README.md) and at [docs.noctalia.dev](https://docs.noctalia.dev/noctalia/getting-started/installation/).
+[README](README.md) and [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
 
 ## Package description
 
 Use this exact short description for package metadata (`pkgdesc`, `Summary`,
 AppStream, etc.):
 
-> A sleek, customizable desktop shell crafted for Wayland.
+> Helix Shell — a niri-first Wayland desktop shell (command: noctalia).
 
 Do not substitute shorter or alternate blurbs (“lightweight Wayland bar”,
-“status bar”, ...). Noctalia is a full desktop shell (bars, dock, launcher,
-notifications, lock screen, wallpaper, settings, ...), not a bar-only tool.
+“status bar”, ...). Helix Shell is a full desktop shell (bars, dock, launcher,
+notifications, lock screen, wallpaper, settings, Control Center services), not a bar-only tool.
 
 ## Packaged distributions
 
-v5 is already packaged for:
+Upstream Noctalia v5 is already packaged as `noctalia` for:
 
 - Arch Linux
 - NixOS
@@ -28,21 +28,20 @@ v5 is already packaged for:
 - GNU Guix
 - Debian (including Ubuntu)
 
-[Repology](https://repology.org/project/noctalia/versions) is a useful at-a-glance
-check, but it only covers repositories it indexes (and may still list v4 as
-`noctalia-shell`). It is not a complete inventory of community packaging.
+Helix currently builds from this tree. Keep the `noctalia` command and config paths until a rename is an explicit release.
 
 ## Identity
 
 | | |
 |---|---|
-| Name | `noctalia` |
-| Homepage | https://github.com/noctalia-dev/noctalia |
-| Docs | https://docs.noctalia.dev |
+| Product | Helix Shell |
+| Command | `noctalia` |
+| Homepage | this tree (lineage: https://github.com/noctalia-dev/noctalia) |
+| Docs | [`docs/user/`](docs/user/) |
 | License | MIT ([LICENSE](LICENSE)); also see vendored licenses under `third_party/` for SPDX completeness |
 | Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
 | Binary | `noctalia` |
-| Desktop entry | `dev.noctalia.Noctalia.desktop` |
+| Desktop entry | `dev.noctalia.Noctalia.desktop` (Name=Helix Shell) |
 | Icon | `noctalia` (`share/icons/hicolor/scalable/apps/noctalia.svg`) |
 
 ## Maintenance Policy
@@ -179,14 +178,14 @@ AppStream summary as well.
 
 ## Session conflicts
 
-On non-Plasma sessions Noctalia provides and registers:
+On non-Plasma sessions Helix provides and registers:
 
 - `org.freedesktop.Notifications`
 - `org.kde.StatusNotifierWatcher` (system tray host)
 
 Do not run it alongside another notification daemon or StatusNotifier host
 (mako, dunst, swaync, waybar-as-host, ...) unless those are disabled. On Plasma,
-Noctalia integrates with Plasma's notification / tray paths instead of claiming
+Helix integrates with Plasma's notification / tray paths instead of claiming
 the freedesktop Notifications name.
 
 ## User data paths
@@ -201,18 +200,13 @@ the freedesktop Notifications name.
 Override bases with `NOCTALIA_CONFIG_HOME`, `NOCTALIA_STATE_HOME`,
 `NOCTALIA_DATA_HOME` (each still appends `/noctalia`).
 
-## What Noctalia is not
+## What Helix is not
 
-- Not a compositor, display manager, or greeter. Greeter support is
-  [noctalia-greeter](https://github.com/noctalia-dev/noctalia-greeter).
+- Not a compositor, display manager, or greeter. Login is helix-greeter
+  (commands stay `noctalia-greeter`).
 - Not a replacement for file managers, screen casting, or drive mounting.
-- Compositor support varies (protocols / IPC). See the compositor docs for
-  [Niri](https://docs.noctalia.dev/noctalia/compositor-settings/niri/),
-  [Hyprland](https://docs.noctalia.dev/noctalia/compositor-settings/hyprland/),
-  [Sway / Scroll](https://docs.noctalia.dev/noctalia/compositor-settings/sway-scroll/),
-  [Mango](https://docs.noctalia.dev/noctalia/compositor-settings/mango/),
-  [Labwc](https://docs.noctalia.dev/noctalia/compositor-settings/labwc/), and
-  [KDE Plasma](https://docs.noctalia.dev/noctalia/compositor-settings/kde/).
+- Compositor support varies (protocols / IPC). See
+  [`docs/user/compositor-settings/`](docs/user/compositor-settings/).
 
 ## Versioning
 
@@ -221,5 +215,5 @@ you maintain a `-git` / nightly package on purpose.
 
 ## Contact
 
-- Issues: https://github.com/noctalia-dev/noctalia/issues
-- Discord: https://discord.noctalia.dev
+This tree is Helix Shell. Upstream lineage and issue tracker:
+https://github.com/noctalia-dev/noctalia

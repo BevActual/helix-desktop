@@ -60,7 +60,7 @@ record = {
     "name": definition["name"],
     "source": "imported",
     "definition": definition,
-    "vscodeThemeSettingsId": "Noctalia",
+    "vscodeThemeSettingsId": "Helix",
     "createdAt": now,
     "updatedAt": now,
 }
@@ -88,7 +88,7 @@ try:
         for key, value in themes.items():
             if not isinstance(value, dict):
                 continue
-            if value.get("name") == "Noctalia" or value.get("vscodeThemeSettingsId") == "Noctalia":
+            if value.get("name") in {"Helix", "Noctalia"} or value.get("vscodeThemeSettingsId") in {"Helix", "Noctalia"}:
                 existing_id = key
                 existing = value
                 break

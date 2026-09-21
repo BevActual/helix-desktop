@@ -48,7 +48,7 @@ namespace clipboard_paste {
     if (lastNotice.time_since_epoch().count() == 0 || now - lastNotice >= std::chrono::seconds(8)) {
       lastNotice = now;
       notify::error(
-          "Noctalia", i18n::tr("clipboard.auto-paste-unavailable-title"),
+          "Helix", i18n::tr("clipboard.auto-paste-unavailable-title"),
           i18n::tr("clipboard.auto-paste-unavailable-body")
       );
     }

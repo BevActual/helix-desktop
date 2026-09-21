@@ -46,6 +46,7 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Flex* m_capturesWell = nullptr;
+  Flex* m_capturesLeftover = nullptr;
   Label* m_status = nullptr;
   Label* m_detail = nullptr;
   Button* m_muteButton = nullptr;

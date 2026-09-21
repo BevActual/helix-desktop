@@ -106,9 +106,7 @@ std::unique_ptr<Flex> KeybindsTab::create() {
           .gap = 0.0F,
           .configure =
               [scale, opacity = panelCardOpacity()](Flex& section) {
-                applySectionCardStyle(section, scale, opacity);
-                section.setGap(Style::spaceXs * scale);
-                section.setPadding(Style::spaceSm * scale);
+                applyCompactCardStyle(section, scale, opacity, false);
               },
       })
   );
@@ -491,7 +489,7 @@ void KeybindsTab::copyMissingNiriBinds() {
   const auto missing = compositors::niri::missingRecommended(compositors::niri::scanConfig());
   if (missing.empty()) {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.none-missing")
     );
     return;
@@ -500,7 +498,7 @@ void KeybindsTab::copyMissingNiriBinds() {
     (void)m_clipboard->copyText(compositors::niri::kdlBlock(missing));
   }
   notify::info(
-      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+      "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
       i18n::tr("settings.schema.keybinds.niri.copied-missing")
   );
 }
@@ -509,19 +507,19 @@ void KeybindsTab::installMissingNiriBinds() {
   const auto result = compositors::niri::installMissing();
   if (!result.ok) {
     notify::error(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed") : result.error
     );
     return;
   }
   if (result.added == 0) {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.install-none")
     );
   } else {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.install-ok", "count", result.added)
     );
   }
@@ -538,24 +536,24 @@ void KeybindsTab::resetNiriBinds() {
   const auto result = compositors::niri::resetRecommendedKeys();
   if (!result.ok) {
     notify::error(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed") : result.error
     );
     return;
   }
   if (result.added == 0 && result.skippedConflicts == 0) {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.reset-none")
     );
   } else if (result.added == 0) {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.reset-skipped", "count", result.skippedConflicts)
     );
   } else {
     notify::info(
-        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
         i18n::tr("settings.schema.keybinds.niri.reset-ok", "count", result.added)
     );
   }

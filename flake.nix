@@ -1,5 +1,5 @@
 {
-  description = "A sleek, customizable desktop shell crafted for Wayland.";
+  description = "Helix Shell — a niri-first Wayland desktop shell (command: noctalia).";
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";

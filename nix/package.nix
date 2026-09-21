@@ -128,7 +128,7 @@ lib.warnIf cudaSupport
   ninjaFlags = [ "-v" ];
 
   meta = with lib; {
-    description = "A sleek, customizable desktop shell crafted for Wayland.";
+    description = "Helix Shell — a niri-first Wayland desktop shell (command: noctalia).";
     homepage = "https://github.com/noctalia-dev/noctalia";
     license = licenses.mit;
     platforms = platforms.linux;

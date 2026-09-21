@@ -199,7 +199,7 @@ void HttpClient::download(std::string_view url, const std::filesystem::path& des
   curl_easy_setopt(easy, CURLOPT_CONNECTTIMEOUT, 10L);
   if (urlStr.find("wallhaven.cc") != std::string::npos) {
     curl_easy_setopt(easy, CURLOPT_REFERER, "https://wallhaven.cc/");
-    curl_easy_setopt(easy, CURLOPT_USERAGENT, "Noctalia");
+    curl_easy_setopt(easy, CURLOPT_USERAGENT, "Helix");
   }
 
   Transfer transfer{};

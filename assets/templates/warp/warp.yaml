@@ -1,4 +1,4 @@
-name: Noctalia
+name: Helix
 accent: '{{colors.primary.default.hex}}'
 cursor: '{{colors.terminal_cursor.default.hex}}'
 background: '{{colors.terminal_background.default.hex}}'

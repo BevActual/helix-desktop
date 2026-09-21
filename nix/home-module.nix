@@ -98,7 +98,7 @@ in
   config = lib.mkIf cfg.enable {
     systemd.user.services.noctalia = lib.mkIf cfg.systemd.enable {
       Unit = {
-        Description = "Noctalia - A lightweight Wayland shell and bar";
+        Description = "Helix Shell (noctalia)";
         Documentation = "https://docs.noctalia.dev/noctalia/";
         PartOf = [ config.wayland.systemd.target ];
         After = [ config.wayland.systemd.target ];

@@ -7,6 +7,8 @@
 
 namespace notify {
 
+  inline constexpr const char* kAppName = "Helix";
+
   inline NotificationManager*& instancePtr() {
     static NotificationManager* ptr = nullptr;
     return ptr;
@@ -22,10 +24,14 @@ namespace notify {
     }
   }
 
+  inline void error(std::string title, std::string body) { error(kAppName, std::move(title), std::move(body)); }
+
   inline void info(std::string app, std::string title, std::string body) {
     if (auto* m = instancePtr()) {
       m->addInternal(std::move(app), std::move(title), std::move(body));
     }
   }
+
+  inline void info(std::string title, std::string body) { info(kAppName, std::move(title), std::move(body)); }
 
 } // namespace notify

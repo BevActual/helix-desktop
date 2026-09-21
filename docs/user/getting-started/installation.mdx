@@ -1,13 +1,13 @@
 ---
 title: Installation
-description: Start here to set up and use Noctalia.
+description: Start here to set up and use Helix Shell.
 sidebar:
   order: 1
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-Noctalia is available on the following distributions. Choose your platform below, or use the manual installation method on another Linux distribution.
+Helix Shell packages still use the `noctalia` name so existing installs keep working. Choose your platform below, or use the manual installation method on another Linux distribution.
 
 - [Arch Linux](#arch)
 - [NixOS](/noctalia/getting-started/nixos/)
@@ -21,11 +21,11 @@ Noctalia is available on the following distributions. Choose your platform below
 You can also [install manually](#manual-install) on any other Linux distribution.
 
 :::note[Package ownership]
-The Noctalia team maintains the **manual installation method**. Official distribution packages are maintained through their distributions' own packaging processes; other repositories listed here are community-maintained. Review a third-party repository before installing from it.
+Helix Shell currently installs from the same `noctalia` package names listed below. Official distribution packages are maintained through their distributions' own packaging processes; other repositories listed here are community-maintained. Review a third-party repository before installing from it. Building from this tree is the Helix product.
 :::
 
 :::note[Helix sibling packages]
-The Helix product is three binaries: **Helix Shell** (this package, still `noctalia`), **helix-niri**, and **helix-greeter** (binaries stay `noctalia-greeter` / `noctalia-greeter-apply-appearance`). Packaging should depend on the sibling compositor and greeter packages rather than folding them into this tree.
+Helix is three packages: **Helix Shell** (this package, command still `noctalia`), **helix-niri**, and **helix-greeter** (commands stay `noctalia-greeter` / `noctalia-greeter-apply-appearance`). Packaging should depend on the sibling compositor and greeter packages rather than folding them into this tree.
 :::
 
 <details>
@@ -33,12 +33,12 @@ The Helix product is three binaries: **Helix Shell** (this package, still `nocta
 
   Noctalia v5 is a fresh install, not an automatic upgrade from the Quickshell-based v4 implementation. Its package and configuration files are separate, so both versions can be installed at the same time on most distributions, but v4 settings are not migrated.
 
-  Only your **compositor keybinds** need attention. Update any bindings that launch the Noctalia launcher, panels, settings UI, or other commands when switching between versions.
+  Only your **compositor keybinds** need attention. Update any bindings that launch the Helix launcher, panels, settings UI, or other commands when switching between versions.
 </details>
 
 ## Arch Linux {#arch}
 
-Noctalia is available in the [extra] repository.
+Helix is available in the [extra] repository.
 
 ```bash
 sudo pacman -S noctalia
@@ -47,7 +47,7 @@ sudo pacman -S noctalia
 
 ## Fedora {#fedora}
 
-Noctalia is available from the default repos for Fedora 44 and up.
+Helix is available from the default repos for Fedora 44 and up.
 
 **Step 1**: Install noctalia
 
@@ -73,7 +73,7 @@ sudo dnf install noctalia-git
 
 ## openSUSE {#opensuse}
 
-Noctalia is available via [home:neifua:Noctalia](https://build.opensuse.org/package/show/home:neifua:Noctalia/noctalia-git) repository on the openSUSE Build Service.
+Helix is available via [home:neifua:Noctalia](https://build.opensuse.org/package/show/home:neifua:Noctalia/noctalia-git) repository on the openSUSE Build Service.
 
 **Step 1**: Add the OBS repository
 
@@ -119,7 +119,7 @@ v5 will only be available for **Tumbleweed** and **Slowroll**. **Leap 16.0** is 
 
 ## Gentoo {#gentoo}
 
-Noctalia is available in the [GURU](https://wiki.gentoo.org/wiki/Project:GURU) overlay.
+Helix is available in the [GURU](https://wiki.gentoo.org/wiki/Project:GURU) overlay.
 
 :::note[Gentoo exception]
 Gentoo packaging does not provide [SLOTs](https://wiki.gentoo.org/wiki/SLOT) for v4 and v5 as v4 will be dropped eventually, therefore they cannot be installed simultaneously.
@@ -152,7 +152,7 @@ emerge --ask gui-apps/noctalia
 
 ## Void Linux {#void}
 
-Noctalia is available through a custom XBPS repository.
+Helix is available through a custom XBPS repository.
 
 **Step 1**: Add the repository source
 
@@ -160,7 +160,7 @@ Noctalia is available through a custom XBPS repository.
 echo "repository=https://repo.voiders.dev" | sudo tee /etc/xbps.d/10-voiders-community.conf
 ```
 
-**Step 2**: Sync and install Noctalia
+**Step 2**: Sync and install Helix
 
 ```bash
 sudo xbps-install -S
@@ -168,7 +168,7 @@ sudo xbps-install noctalia
 ```
 
 :::note
-If Noctalia fails to run, install the `sdbus-c++` package.
+If Helix fails to run, install the `sdbus-c++` package.
 :::
 
 ### Alternative: Build from source using xbps-src
@@ -182,7 +182,7 @@ git clone --depth 1 https://github.com/void-linux/void-packages.git
 cd void-packages
 ./xbps-src binary-bootstrap
 
-# Copy Noctalia build templates
+# Copy Helix build templates
 mkdir srcpkgs/noctalia
 wget https://git.voiders.dev/voiders-community/repository/raw/branch/main/pkgs/noctalia/template -P srcpkgs/noctalia/
 
@@ -197,7 +197,7 @@ sudo xbps-install --repository=hostdir/binpkgs noctalia
 
 ## GNU Guix {#guix}
 
-The Git repository of Noctalia is also available as a [Guix channel](https://guix.gnu.org/manual/devel/en/html_node/Channels.html).  It provides a `(noctalia)` [module](https://guix.gnu.org/manual/devel/en/html_node/Package-Modules.html) with the `noctalia-git` package.
+The Git repository of Helix is also available as a [Guix channel](https://guix.gnu.org/manual/devel/en/html_node/Channels.html).  It provides a `(noctalia)` [module](https://guix.gnu.org/manual/devel/en/html_node/Package-Modules.html) with the `noctalia-git` package.
 
 ```scheme
 (channel
@@ -216,7 +216,7 @@ To use this channel, add it into your `~/.config/guix/channels.scm`.  For exampl
       %default-guix-channel)
 ```
 
-After updating channels via [`guix pull`](https://guix.gnu.org/manual/devel/en/html_node/Invoking-guix-pull.html), Noctalia will be available to your Guix installation.  Then you're free to do what you want with the `noctalia-git` package ;-)
+After updating channels via [`guix pull`](https://guix.gnu.org/manual/devel/en/html_node/Invoking-guix-pull.html), Helix will be available to your Guix installation.  Then you're free to do what you want with the `noctalia-git` package ;-)
 
 For example, spawn one-off software environment via [`guix shell`](https://guix.gnu.org/manual/devel/en/html_node/Invoking-guix-shell.html):
 
@@ -260,7 +260,7 @@ or [whole-system configuration](https://guix.gnu.org/manual/devel/en/html_node/S
 
 ## Debian {#debian}
 
-Noctalia provides an APT repository for Debian-based distributions.
+Helix provides an APT repository for Debian-based distributions.
 
 **Step 1**: Install the repository signing key
 
@@ -334,7 +334,7 @@ sudo systmectl enable --now greetd
 Manual installation has **no easy upgrade path**. You will need to manually download and replace files for each update. We strongly recommend using a package manager ([Arch](#arch), [Fedora](#fedora)) whenever possible.
 :::
 
-If you prefer to install Noctalia locally or want more control over the installation process, you can install it manually to your user configuration directory. This method works on any Linux distribution.
+If you prefer to install Helix locally or want more control over the installation process, you can install it manually to your user configuration directory. This method works on any Linux distribution.
 
 **Step 1**: Sync and install dependencies
 
@@ -412,7 +412,7 @@ git clone https://github.com/noctalia-dev/noctalia --branch main
 cd noctalia
 ```
 
-**Step 3**: Building and installing Noctalia
+**Step 3**: Building and installing Helix
 
 Requires [just](https://github.com/casey/just) and [meson](https://mesonbuild.com/).
 
@@ -456,7 +456,7 @@ Meson installs the binary and shipped assets using the normal prefix layout:
 /usr/local/share/noctalia/assets/...
 ```
 
-Noctalia needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
+Helix needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
 
 Portable bundle layouts are also supported:
 

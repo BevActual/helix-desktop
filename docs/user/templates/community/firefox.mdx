@@ -1,25 +1,25 @@
 ---
 title: Firefox
-description: Theming Firefox with the Pywalfox extension and Noctalia
+description: Theming Firefox with the Pywalfox extension and Helix
 sidebar:
   order: 7
 ---
 
 Firefox is themed through the [Pywalfox](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/) browser extension.
-Noctalia writes a pywal-compatible `colors.json` and can drive the extension either with a built-in host
+Helix writes a pywal-compatible `colors.json` and can drive the extension either with a built-in host
 (`post_action = "firefox-theme"`, community template **`pywalfox-beta4`+**) or with the legacy Python `pywalfox`
 package (community template **`pywalfox`**).
 
-Prefer **`pywalfox-beta4`+** when your Noctalia build includes Firefox theme support. Keep the legacy path only if
+Prefer **`pywalfox-beta4`+** when your Helix build includes Firefox theme support. Keep the legacy path only if
 you still need it; both templates write `$XDG_CACHE_HOME/wal/colors.json`, so enable **one**, not both.
 
 ## Recommended: `pywalfox-beta4`+ (built-in host)
 
-No separate Python package. Noctalia is the native messaging host.
+No separate Python package. Helix is the native messaging host.
 
 ### Requirements
 
-- Noctalia with the built-in `firefox-theme` post-action
+- Helix with the built-in `firefox-theme` post-action
 - Community template **`pywalfox-beta4`** or newer
 - The [Pywalfox](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/) extension
 
@@ -27,12 +27,12 @@ No separate Python package. Noctalia is the native messaging host.
 
 1. **Install the Pywalfox extension** from [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/).
 
-2. **Enable the community template in Noctalia:**
+2. **Enable the community template in Helix:**
    - Open **Control Center → Templates**, switch to **Community**, and turn the catalog on
    - Search for **`pywalfox-beta4`** (display name may look like **Pywalfox (beta4)**) and enable it
    - Leave the legacy **`pywalfox`** template off
 
-3. **Apply a theme** (change wallpaper / palette, or re-apply templates) so Noctalia writes `colors.json` and runs
+3. **Apply a theme** (change wallpaper / palette, or re-apply templates) so Helix writes `colors.json` and runs
    `firefox-theme`. That installs the user-local native messaging manifest when needed:
    `~/.mozilla/native-messaging-hosts/pywalfox.json` → your `noctalia` binary.
 
@@ -55,9 +55,9 @@ noctalia firefox-theme --help
 ### Migrating from the legacy Python host
 
 1. Disable the legacy **`pywalfox`** template; enable **`pywalfox-beta4`** (or newer) instead.
-2. If `~/.mozilla/native-messaging-hosts/pywalfox.json` still points at a non-Noctalia binary, remove that manifest
-   (or uninstall the Python package’s host); Noctalia **will not overwrite** a foreign host.
-3. Re-apply templates (or change theme) so Noctalia can install its own manifest, then **restart Firefox**.
+2. If `~/.mozilla/native-messaging-hosts/pywalfox.json` still points at a non-Helix binary, remove that manifest
+   (or uninstall the Python package’s host); Helix **will not overwrite** a foreign host.
+3. Re-apply templates (or change theme) so Helix can install its own manifest, then **restart Firefox**.
 
 Optional cleanup: uninstall `python-pywalfox` when you no longer need it.
 
@@ -77,12 +77,12 @@ community template’s `post_hook`.
 2. **Install the Pywalfox browser extension** from
    [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/).
 
-3. **Enable Firefox theming in Noctalia:**
+3. **Enable Firefox theming in Helix:**
    - Open **Control Center → Templates**, switch to **Community**, and turn the catalog on
    - Enable **`pywalfox`** (display name may look like **Firefox (Pywalfox)**)
    - Leave **`pywalfox-beta4`** off if you stay on this path
 
-Pywalfox syncs Noctalia’s color scheme while the Python daemon / host is running. Theme updates follow Noctalia
+Pywalfox syncs Helix’s color scheme while the Python daemon / host is running. Theme updates follow Helix
 palette changes as long as that host stays up.
 
 ## Troubleshooting
@@ -94,7 +94,7 @@ palette changes as long as that host stays up.
 - **Colors file updates but Firefox does not:** Confirm you enabled exactly one of **`pywalfox-beta4`+** or legacy
   **`pywalfox`**, and that the manifest `path` matches the host you intend (noctalia vs Python).
 - **Only one of several Firefox profiles refreshes:** Expected with the legacy Python host. With **`pywalfox-beta4`+**,
-  restart each profile once after updating Noctalia so every profile is running the new host; then theme pushes should
+  restart each profile once after updating Helix so every profile is running the new host; then theme pushes should
   reach all open profiles.
 - **Stuck on the Python host after switching to beta4:** Check the `path` field in the manifest; remove a foreign
-  host entry before Noctalia can install its own.
+  host entry before Helix can install its own.

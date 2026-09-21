@@ -322,7 +322,7 @@ void RoundnessTab::commitWindowRadius() {
   });
   if (!result.ok) {
     notify::error(
-        "Noctalia", i18n::tr("control-center.roundness.windows-save-title"),
+        "Helix", i18n::tr("control-center.roundness.windows-save-title"),
         result.error.empty() ? i18n::tr("control-center.roundness.windows-save-failed") : result.error
     );
   }

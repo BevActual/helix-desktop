@@ -1,6 +1,6 @@
 ---
-title: Running Noctalia
-description: This page gives you a basic example on how to run the shell.
+title: Running Helix
+description: Start Helix Shell from your compositor or a terminal. The command is still noctalia.
 sidebar:
   order: 3
 ---
@@ -9,7 +9,7 @@ sidebar:
 Use compositor autostart as the primary method.
 :::
 ### Autostart by your Wayland compositor
-This is the recommended method for launching noctalia, as it integrates with your window manager.
+This is the recommended method for launching Helix Shell, as it integrates with your window manager. The command is still `noctalia`.
 
 For the *Niri* compositor, add the following line to the end of your configuration file, typically located at `~/.config/niri/config.kdl`
 ```ini
@@ -23,7 +23,7 @@ hl.on("hyprland.start", function()
 end)
 ```
 
-If your compositor expects startup commands to return after the shell has initialized, run Noctalia in daemon mode:
+If your compositor expects startup commands to return after the shell has initialized, run Helix Shell in daemon mode:
 ```bash
 noctalia --daemon
 ```
@@ -32,13 +32,13 @@ Daemon mode returns after the shell has initialized. The optional polkit authent
 ---
 
 ### Manual Launch for Debugging
-The most direct way to run Noctalia for testing or debugging. Open a terminal and execute:
+The most direct way to run Helix Shell for testing or debugging. Open a terminal and execute:
 ```bash
 noctalia
 ```
 
 ### Logs
-Noctalia writes its main log to `$XDG_CACHE_HOME/noctalia/noctalia.log`. If
+Helix writes its main log to `$XDG_CACHE_HOME/noctalia/noctalia.log`. If
 `XDG_CACHE_HOME` is unset, the fallback path is
 `~/.cache/noctalia/noctalia.log`. The previous file is retained as
 `noctalia.log.1` when the current log reaches 1 MiB.

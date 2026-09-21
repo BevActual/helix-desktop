@@ -1,15 +1,15 @@
 ---
 title: Emacs
-description: Theming Emacs with Noctalia
+description: Theming Emacs with Helix
 sidebar:
   order: 8
 ---
 
-Emacs can be themed using the Noctalia color scheme through the built-in theme system.
+Emacs can be themed using the Helix color scheme through the built-in theme system.
 
 ## Setup
 
-1. **Enable Emacs theming in Noctalia:**
+1. **Enable Emacs theming in Helix:**
   - Open **Settings → Color Scheme → Templates → Programs**
   - Toggle on **Emacs**
 
@@ -40,27 +40,27 @@ If you get an error saying `noctalia-theme` can't be found, you may need to add 
 Here's a complete example of how to add it to your `config.el`:
 
 ```elisp
-;; Load Noctalia theme
+;; Load Helix theme
 (load-theme 'noctalia t)
 ```
 
 You can also add it conditionally or after other configurations:
 
 ```elisp
-;; Load Noctalia theme after startup
+;; Load Helix theme after startup
 (add-hook 'after-init-hook (lambda () (load-theme 'noctalia t)))
 ```
 
 ## Troubleshooting
 
-- **Theme not found:** Ensure that Emacs theming is enabled in Noctalia settings and that the theme files are being generated correctly. If the files exist but aren't found, add `(add-to-list 'custom-theme-load-path "~/.config/emacs/themes/")` before `(load-theme 'noctalia t)`.
+- **Theme not found:** Ensure that Emacs theming is enabled in Helix settings and that the theme files are being generated correctly. If the files exist but aren't found, add `(add-to-list 'custom-theme-load-path "~/.config/emacs/themes/")` before `(load-theme 'noctalia t)`.
 - **Theme not applying:** Make sure you've added `(load-theme 'noctalia t)` to your Emacs configuration file
-- **Colors not updating:** Restart Emacs or reload your configuration after changing color schemes in Noctalia
+- **Colors not updating:** Restart Emacs or reload your configuration after changing color schemes in Helix
 - **Theme conflicts:** The `t` argument in `load-theme` disables other themes. If you want to keep other themes, you may need to adjust your configuration
 
 ## Additional Notes
 
-The Noctalia theme for Emacs integrates with Noctalia's color scheme system. When you change color schemes in Noctalia, the Emacs theme will be regenerated to match. You'll need to reload the theme in Emacs to see the changes:
+The Helix theme for Emacs integrates with Helix's color scheme system. When you change color schemes in Helix, the Emacs theme will be regenerated to match. You'll need to reload the theme in Emacs to see the changes:
 
 ```elisp
 (load-theme 'noctalia t)

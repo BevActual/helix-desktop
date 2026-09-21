@@ -807,14 +807,14 @@
       "dbus-disabled": "Notificaciones DBus deshabilitada",
       "desktop-widgets-editor": "Editor de Widget",
       "desktop-widgets-editor-enabled": "El editor de widgets del escritorio está activado. Cambia a un espacio de trabajo vacío para ver el panel del editor.",
-      "greeter-sync": "Noctalia Greeter",
+      "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Sincronizando la apariencia con el greeter. Si aparece una solicitud del administrador, acéptala; la autorización sin contraseña sigue la política del sistema.",
-      "greeter-sync-pending-console": "Sincronizando la apariencia con el greeter. Si se requiere autorización, aprueba la solicitud de polkit en Noctalia, en una TTY o en una consola.",
+      "greeter-sync-pending-console": "Sincronizando la apariencia con el greeter. Si se requiere autorización, aprueba la solicitud de polkit en Helix, en una TTY o en una consola.",
       "greeter-sync-pending-manual": "Los archivos están preparados para la sincronización heredada autenticada. Ejecuta el asistente de aplicación posicional en una terminal, conservando NOCTALIA_GREETER_STATE_DIR si usas una ruta personalizada, o configura shell.greeter_sync.privilege_command y sincroniza de nuevo.",
       "greeter-sync-success": "Apariencia sincronizada. Los cambios se aplicarán en la siguiente pantalla de inicio de sesión.",
       "greeter-sync-timeout": "La sincronización con el greeter sigue a la espera de autorización. Busca una solicitud de polkit en una TTY o consola, activa el agente de polkit en los ajustes de Seguridad, o ejecuta pkexec manualmente.",
       "greeter-sync-timeout-manual": "La sincronización heredada autenticada todavía necesita la aprobación del administrador. Ejecuta el asistente de aplicación posicional en una terminal y conserva NOCTALIA_GREETER_STATE_DIR si usas una ruta personalizada.",
-      "keybind-app": "Noctalia",
+      "keybind-app": "Helix",
       "keybind-invalid-modifier": "Este atajo acepta una sola tecla sin modificadores.",
       "keybind-invalid-printable": "Las teclas imprimibles (letras, números, símbolos) requieren un modificador como Ctrl o Alt.",
       "keybind-invalid-super": "La tecla Super/Windows no se puede usar en los atajos de teclado del shell.",
@@ -886,7 +886,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin} requiere Noctalia {version} o más reciente",
+      "body-incompatible": "{plugin} requiere Helix {version} o más reciente",
       "body-timeout": "{plugin} tardó demasiado en instalarse.",
       "title": "Complemento no habilitado"
     }
@@ -1160,7 +1160,7 @@
       },
       "reset-page": "No se pudieron restablecer algunas configuraciones.",
       "support-report": "No se pudo guardar el informe de soporte.",
-      "sync-greeter": "No se pudo sincronizar la apariencia con Noctalia Greeter.",
+      "sync-greeter": "No se pudo sincronizar la apariencia con Helix Greeter.",
       "sync-greeter-timeout": "La sincronización con el greeter sigue a la espera de autorización. Busca una solicitud de polkit en una TTY o consola, activa el agente de polkit en los ajustes de Seguridad, o ejecuta pkexec manualmente.",
       "sync-greeter-timeout-manual": "La sincronización heredada autenticada todavía necesita la aprobación del administrador. Ejecuta el asistente de aplicación posicional en una terminal y conserva NOCTALIA_GREETER_STATE_DIR si usas una ruta personalizada.",
       "widget": {
@@ -1549,7 +1549,7 @@
         "update": "Actualizar"
       },
       "store": {
-        "add": "Añadir a Noctalia",
+        "add": "Añadir a Helix",
         "categories": "Categorías",
         "category-all": "Todo",
         "empty": "No se encontraron plugins",
@@ -2052,7 +2052,7 @@
             "label": "Al apagar"
           },
           "started": {
-            "description": "Comando a ejecutar después de que Noctalia se inicie",
+            "description": "Comando a ejecutar después de que Helix se inicie",
             "label": "Al iniciar"
           },
           "theme-mode-changed": {
@@ -2703,7 +2703,7 @@
           "label": "Comando de privilegios para sincronizar pantalla de inicio"
         },
         "launch-apps-as-systemd-services": {
-          "description": "Inicia las aplicaciones en servicios systemd independientes para que no compartan el cgroup de Noctalia",
+          "description": "Inicia las aplicaciones en servicios systemd independientes para que no compartan el cgroup de Helix",
           "label": "Iniciar aplicaciones como servicios systemd"
         },
         "launch-apps-custom-command": {
@@ -2885,8 +2885,8 @@
         },
         "sync-greeter": {
           "button": "Sincronizar ahora",
-          "description": "Copiar la apariencia actual y la disposición de monitores al Greeter de Noctalia. Se solicita la aprobación del administrador a menos que la política del sistema autorice la sincronización sin contraseña para tu usuario.",
-          "label": "Noctalia Greeter"
+          "description": "Copiar la apariencia actual y la disposición de monitores al Greeter de Helix. Se solicita la aprobación del administrador a menos que la política del sistema autorice la sincronización sin contraseña para tu usuario.",
+          "label": "Helix Greeter"
         },
         "telemetry": {
           "description": "Envía un pequeño ping anónimo de inicio con la versión, el SO, el compositor, las resoluciones de monitor, la RAM y la escala de la interfaz",
@@ -3588,7 +3588,7 @@
       "export-config": "Exportar configuración...",
       "export-config-saved": "Exportación de configuración guardada.",
       "filter-overridden": "Sobreescrito",
-      "native-title": "Ajustes de Noctalia",
+      "native-title": "Ajustes de Helix",
       "no-results": "Ajustes no encontrados.",
       "no-results-hint": "Prueba con otro nombre de configuración o clave de config.",
       "reset-page": "Restablecer página",
@@ -3610,7 +3610,7 @@
     "no-wallpaper-selected": "Ningún fondo de pantalla seleccionado",
     "select-wallpaper": "Seleccionar fondo de pantalla",
     "subtitle": "Algunas opciones rápidas para empezar.",
-    "title": "Bienvenido a Noctalia",
+    "title": "Bienvenido a Helix",
     "wallpaper": "Fondo de pantalla",
     "wallpaper-scheme": "Esquema de fondo de pantalla"
   },

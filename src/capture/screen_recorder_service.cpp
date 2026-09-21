@@ -196,19 +196,19 @@ void ScreenRecorderService::notifyChanged() {
 
 void ScreenRecorderService::notifySaved() {
   m_notifications.addInternal(
-      "Noctalia", i18n::tr("control-center.screen-record.saved"), m_outputPath.string()
+      "Helix", i18n::tr("control-center.screen-record.saved"), m_outputPath.string()
   );
 }
 
 void ScreenRecorderService::notifyReplaySaved() {
   m_notifications.addInternal(
-      "Noctalia", i18n::tr("control-center.screen-record.replay-saved"), outputDirectory().string()
+      "Helix", i18n::tr("control-center.screen-record.replay-saved"), outputDirectory().string()
   );
 }
 
 void ScreenRecorderService::notifyFailed(const std::string& message) {
   m_notifications.addInternal(
-      "Noctalia", i18n::tr("control-center.screen-record.failed"), message, Urgency::Critical
+      "Helix", i18n::tr("control-center.screen-record.failed"), message, Urgency::Critical
   );
 }
 

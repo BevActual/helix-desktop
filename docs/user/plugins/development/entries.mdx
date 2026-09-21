@@ -8,7 +8,7 @@ sidebar:
 
 import PluginApiBadge from '../../../../../components/PluginApiBadge.astro';
 
-A script defines **global functions** that Noctalia calls, and drives the UI through the API namespaces. Which globals
+A script defines **global functions** that Helix calls, and drives the UI through the API namespaces. Which globals
 apply depends on the entry kind:
 
 | Function | Widget | Shortcut | Launcher | Desktop | Panel | CC tab | Service | When |
@@ -133,7 +133,7 @@ silences the callback outright.
 ### Cleaning up when an entry exits
 
 Define `onExit(signal, reason)` to release resources owned by an entry before its Luau runtime is destroyed. It runs when
-Noctalia exits normally, when a plugin or entry is disabled or removed, and before a runtime is restarted or reloaded.
+Helix exits normally, when a plugin or entry is disabled or removed, and before a runtime is restarted or reloaded.
 The first argument remains the process signal: `2` for graceful `SIGINT`, `15` for `SIGTERM`, and `0` for every other
 teardown. The optional second argument requires <PluginApiBadge feature="service-lifecycle" /> and describes why the
 runtime is exiting:
@@ -143,7 +143,7 @@ runtime is exiting:
 | `"disable"` | The enabled plugin is being explicitly disabled. |
 | `"uninstall"` | The enabled plugin is being explicitly uninstalled. |
 | `"reload"` | The entry is being reloaded, restarted, or otherwise replaced without a process shutdown. |
-| `"shutdown"` | Noctalia is shutting down after `SIGINT` or `SIGTERM`. |
+| `"shutdown"` | Helix is shutting down after `SIGINT` or `SIGTERM`. |
 
 Existing handlers that accept only `signal` remain compatible; Luau ignores the additional argument:
 
@@ -158,7 +158,7 @@ end
 ```
 
 Keep cleanup short: `onExit` has the normal callback time budget. It cannot run after `SIGKILL`, a process crash, or
-another abrupt termination that prevents Noctalia from shutting down gracefully. If cleanup must continue after the
+another abrupt termination that prevents Helix from shutting down gracefully. If cleanup must continue after the
 entry VM is destroyed, call `noctalia.runAsync(command)` without a result callback; the detached command outlives the
 runtime. An uninstall command must use an installed helper or otherwise avoid plugin-directory files, which may be
 removed as soon as the hook returns. A detached command cannot report its eventual result back to the destroyed
@@ -185,7 +185,7 @@ end
 ```
 
 `onEnable()` describes an explicit plugin-manager action, not every service start. It does not run during ordinary
-Noctalia startup, a source update, a script reload, or a settings-driven service restart. Use top-level initialization
+Helix startup, a source update, a script reload, or a settings-driven service restart. Use top-level initialization
 for normal service startup.
 
 Lifecycle hooks can only run while an entry runtime exists. Removing a plugin that was already disabled cannot invoke
@@ -342,7 +342,7 @@ before running `onQuery` - set it for network-backed providers so you aren't cal
   the same provider, e.g. `"/tr french "`. (An `onActivate` that does *not* call `setQuery` closes the launcher as
   usual.)
 
-Use `noctalia.fuzzyScore(pattern, text)` to rank local lists with Noctalia's native fuzzy matcher. It returns a numeric
+Use `noctalia.fuzzyScore(pattern, text)` to rank local lists with Helix's native fuzzy matcher. It returns a numeric
 score, or `nil` when `pattern` does not match `text`.
 
 Queries run off the UI thread, so a result can arrive after `onQuery` returns - publish a placeholder synchronously,

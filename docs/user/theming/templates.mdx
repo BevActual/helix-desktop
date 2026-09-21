@@ -303,7 +303,7 @@ Supported iterable expressions:
 - arrays and maps from the current scope (e.g. TOML data bound via `[config]`)
 
 :::note
-Noctalia uses `<* *>` for block tags and `{{ }}` for expressions. This is different from matugen, which uses Tera syntax (`{% %}` / `{{ }}`). The two are not interchangeable: a matugen template must be adapted to use `<* *>` blocks.
+Helix uses `<* *>` for block tags and `{{ }}` for expressions. This is different from matugen, which uses Tera syntax (`{% %}` / `{{ }}`). The two are not interchangeable: a matugen template must be adapted to use `<* *>` blocks.
 :::
 
 ### `colors`
@@ -440,7 +440,7 @@ Use the generated roles through `colors.<role>.<mode>.<format>` just like built-
 }
 ```
 
-In Noctalia's main config, put the same custom color definitions under `[theme.templates.custom_colors]` and reference them from any enabled user template:
+In Helix's main config, put the same custom color definitions under `[theme.templates.custom_colors]` and reference them from any enabled user template:
 
 ```toml
 [theme.templates.custom_colors]
@@ -581,7 +581,7 @@ example when two entries restart or reconfigure the same application.
 A theme change always waits for the hooks it started before reporting the theme as applied, and hooks left over from a
 superseded theme change are dropped or awaited before the next one is applied.
 
-`post_action` selects a Noctalia-owned native operation that runs after all outputs are written successfully. The
+`post_action` selects a Helix-owned native operation that runs after all outputs are written successfully. The
 canonical `kde-color-scheme` action requires exactly one output, merges that generated KDE color scheme into
 `$XDG_CONFIG_HOME/kdeglobals`, and notifies running KDE applications over the session bus. Unknown action names fail
 the template entry.

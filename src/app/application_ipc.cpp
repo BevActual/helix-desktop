@@ -267,7 +267,7 @@ void Application::initIpc() {
       return "error: notification-show requires <summary> or <json-payload>\n";
     }
 
-    std::string appName = "Noctalia";
+    std::string appName = "Helix";
     std::string summary;
     std::string body;
     Urgency urgency = Urgency::Normal;

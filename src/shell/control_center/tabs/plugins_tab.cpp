@@ -107,9 +107,7 @@ std::unique_ptr<Flex> PluginsTab::create() {
   auto toolbar = ui::column({
       .configure =
           [scale, opacity = panelCardOpacity()](Flex& section) {
-            applySectionCardStyle(section, scale, opacity);
-            section.setGap(Style::spaceXs * scale);
-            section.setPadding(Style::spaceSm * scale);
+            applyCompactCardStyle(section, scale, opacity, false);
           },
   });
   toolbar->addChild(

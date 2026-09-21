@@ -360,9 +360,7 @@ std::unique_ptr<Flex> DesktopTab::create() {
   auto compactCard = ui::column({
       .configure =
           [scale, opacity](Flex& card) {
-            applySectionCardStyle(card, scale, opacity);
-            card.setGap(Style::spaceXs * scale);
-            card.setPadding(Style::spaceSm * scale);
+            applyCompactCardStyle(card, scale, opacity, false);
           },
   });
   compactCard->addChild(

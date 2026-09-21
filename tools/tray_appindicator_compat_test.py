@@ -12,7 +12,7 @@ from gi.repository import Gtk
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Richer GTK/AppIndicator tray compatibility harness for Noctalia submenu testing."
+        description="Richer GTK/AppIndicator tray compatibility harness for Helix submenu testing."
     )
     parser.add_argument(
         "--force-appindicator",

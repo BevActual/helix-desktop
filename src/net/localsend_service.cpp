@@ -557,7 +557,7 @@ void LocalSendService::noteIncomingFileDone(const std::string& fileId) {
   }
   if (m_config.config().localsend.notifyOnReceive) {
     m_notifications.addInternal(
-        "Noctalia", i18n::tr("control-center.localsend.title"),
+        "Helix", i18n::tr("control-center.localsend.title"),
         i18n::tr("control-center.localsend.received", "name", m_impl->session.alias)
     );
   }
@@ -681,7 +681,7 @@ void LocalSendService::uploadRemaining(
     m_snapshot.busy = false;
     m_snapshot.transfer.reset();
     m_notifications.addInternal(
-        "Noctalia", i18n::tr("control-center.localsend.title"),
+        "Helix", i18n::tr("control-center.localsend.title"),
         i18n::tr("control-center.localsend.sent", "name", peer.alias)
     );
     if (m_changeCallback) {
@@ -1054,7 +1054,7 @@ void LocalSendService::dispatch(const std::vector<pollfd>& fds, std::size_t star
         m_snapshot.incoming = incoming;
         if (m_config.config().localsend.notifyOnReceive) {
           m_notifications.addInternal(
-              "Noctalia", i18n::tr("control-center.localsend.title"),
+              "Helix", i18n::tr("control-center.localsend.title"),
               i18n::tr("control-center.localsend.incoming", "name", incoming.alias)
           );
         }

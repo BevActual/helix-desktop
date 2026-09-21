@@ -9,7 +9,7 @@ sidebar:
 import PluginApiBadge from '../../../../../components/PluginApiBadge.astro';
 
 Desktop widgets, panels, Control Center tabs, and (optionally) bar widgets do not have to patch a fixed control. They can describe their UI
-as a retained `ui.*` tree; Noctalia diffs each render against the previous tree and updates native controls in place.
+as a retained `ui.*` tree; Helix diffs each render against the previous tree and updates native controls in place.
 
 ## `desktopWidget.*` - declarative desktop widget UI {#desktopwidget--declarative-desktop-widget-ui}
 
@@ -402,7 +402,7 @@ end
 ```
 
 `chord` is the exact string from the manifest, so match on what you declared rather than on a key name the host
-invented. Chord syntax is the same as elsewhere in Noctalia (`space`, `ctrl+r`, `shift+Return`).
+invented. Chord syntax is the same as elsewhere in Helix (`space`, `ctrl+r`, `shift+Return`).
 
 Constraints worth knowing before designing around it:
 

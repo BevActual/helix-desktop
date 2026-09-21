@@ -444,7 +444,7 @@ namespace settings {
         if (copy) {
           copy(std::move(text));
         }
-        notify::info("Noctalia", i18n::tr("settings.schema.keybinds.niri.title"), i18n::tr(std::string(toastKey)));
+        notify::info("Helix", i18n::tr("settings.schema.keybinds.niri.title"), i18n::tr(std::string(toastKey)));
       };
 
       entries.push_back(makeEntry(
@@ -457,7 +457,7 @@ namespace settings {
                     const auto missing = compositors::niri::missingRecommended(compositors::niri::scanConfig());
                     if (missing.empty()) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.none-missing")
                       );
                       return;
@@ -478,7 +478,7 @@ namespace settings {
                     const auto result = compositors::niri::installMissing();
                     if (!result.ok) {
                       notify::error(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
                                                : result.error
                       );
@@ -486,12 +486,12 @@ namespace settings {
                     }
                     if (result.added == 0) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.install-none")
                       );
                     } else {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.install-ok", "count", result.added)
                       );
                     }
@@ -513,7 +513,7 @@ namespace settings {
                     const auto result = compositors::niri::resetRecommendedKeys();
                     if (!result.ok) {
                       notify::error(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed")
                                                : result.error
                       );
@@ -521,17 +521,17 @@ namespace settings {
                     }
                     if (result.added == 0 && result.skippedConflicts == 0) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.reset-none")
                       );
                     } else if (result.added == 0) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.reset-skipped", "count", result.skippedConflicts)
                       );
                     } else {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.reset-ok", "count", result.added)
                       );
                     }
@@ -546,7 +546,7 @@ namespace settings {
 
       auto notifyBindError = [](const compositors::niri::InstallResult& result) {
         notify::error(
-            "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+            "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
             result.error.empty() ? i18n::tr("settings.schema.keybinds.niri.install-failed") : result.error
         );
       };
@@ -586,7 +586,7 @@ namespace settings {
                     return;
                   }
                   notify::info(
-                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                       i18n::tr("settings.schema.keybinds.niri.updated")
                   );
                   if (rebuild) {
@@ -606,7 +606,7 @@ namespace settings {
                       return;
                     }
                     notify::info(
-                        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                         i18n::tr("settings.schema.keybinds.niri.updated")
                     );
                     if (rebuild) {
@@ -627,7 +627,7 @@ namespace settings {
                       return;
                     }
                     notify::info(
-                        "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                        "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                         i18n::tr("settings.schema.keybinds.niri.cleared")
                     );
                     if (rebuild) {
@@ -685,7 +685,7 @@ namespace settings {
                     }
                     if (chosen == nullptr) {
                       notify::error(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.add-app.failed")
                       );
                       return;
@@ -693,7 +693,7 @@ namespace settings {
                     const auto prepared = desktop_entry_launch::prepareCommand(chosen->exec, chosen->terminal);
                     if (!prepared.has_value() || prepared->args.empty()) {
                       notify::error(
-                          "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                          "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                           i18n::tr("settings.schema.keybinds.niri.add-app.failed")
                       );
                       return;
@@ -720,7 +720,7 @@ namespace settings {
                   }
                   gPendingAppBind.reset();
                   notify::info(
-                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                       i18n::tr("settings.schema.keybinds.niri.updated")
                   );
                   if (rebuild) {
@@ -760,7 +760,7 @@ namespace settings {
                     return;
                   }
                   notify::info(
-                      "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                      "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                       i18n::tr("settings.schema.keybinds.niri.updated")
                   );
                   if (rebuild) {
@@ -777,7 +777,7 @@ namespace settings {
                             return;
                           }
                           notify::info(
-                              "Noctalia", i18n::tr("settings.schema.keybinds.niri.title"),
+                              "Helix", i18n::tr("settings.schema.keybinds.niri.title"),
                               i18n::tr("settings.schema.keybinds.niri.cleared")
                           );
                           if (rebuild) {
@@ -809,7 +809,7 @@ namespace settings {
         if (copy) {
           copy(std::move(text));
         }
-        notify::info("Noctalia", i18n::tr("settings.schema.niri.setup.title"), i18n::tr(std::string(toastKey)));
+        notify::info("Helix", i18n::tr("settings.schema.niri.setup.title"), i18n::tr(std::string(toastKey)));
       };
 
       entries.push_back(makeEntry(
@@ -822,7 +822,7 @@ namespace settings {
                     const auto missing = compositors::niri::missingSetup(compositors::niri::scanSetup(backdrop));
                     if (missing.empty()) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          "Helix", i18n::tr("settings.schema.niri.setup.title"),
                           i18n::tr("settings.schema.niri.setup.none-missing")
                       );
                       return;
@@ -843,7 +843,7 @@ namespace settings {
                     const auto result = compositors::niri::installSetup(backdrop);
                     if (!result.ok) {
                       notify::error(
-                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          "Helix", i18n::tr("settings.schema.niri.setup.title"),
                           result.error.empty() ? i18n::tr("settings.schema.niri.setup.install-failed")
                                                : result.error
                       );
@@ -851,12 +851,12 @@ namespace settings {
                     }
                     if (result.added == 0) {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          "Helix", i18n::tr("settings.schema.niri.setup.title"),
                           i18n::tr("settings.schema.niri.setup.install-none")
                       );
                     } else {
                       notify::info(
-                          "Noctalia", i18n::tr("settings.schema.niri.setup.title"),
+                          "Helix", i18n::tr("settings.schema.niri.setup.title"),
                           i18n::tr("settings.schema.niri.setup.install-ok", "count", result.added)
                       );
                     }
@@ -2115,7 +2115,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg)
         },
-        "quick settings shortcuts toggles size small wide large wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy"
+        "quick settings shortcuts toggles size small wide large wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy ai"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),

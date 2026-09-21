@@ -1,27 +1,25 @@
 ---
 title: Overview
-description: Guides and reference documentation for Noctalia.
+description: Guides and reference documentation for Helix Shell.
 sidebar:
   order: 0
 ---
 
-Noctalia v5 is a new generation of the shell, with a native runtime, refreshed UI, and a configuration model built for the current desktop experience.
+Helix is a niri-first desktop: **greetd → helix-greeter → helix-niri + Helix Shell**. This tree is Helix Shell, a native Wayland runtime with Control Center, first-party services, and a configuration model built for that desktop. The command and config paths stay `noctalia`. Stock niri, Hyprland, and other compositors remain fallbacks.
 
-The Helix product is three sibling packages, not one binary: **greetd → helix-greeter → helix-niri + Helix Shell**. Helix Shell stays in this tree (binary still `noctalia`). Stock niri, Hyprland, and other compositors remain fallbacks.
+If you are setting up Helix for the first time, start with [Installation](/noctalia/getting-started/installation/), then [Running Helix](/noctalia/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/noctalia/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
 
-
-If you are setting up Noctalia for the first time, start with [Installation](/noctalia/getting-started/installation/), then [Running Noctalia](/noctalia/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/noctalia/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
-
-:::caution[Moving from v4?]
-- v5 installs separately and does not replace v4.
+:::caution[Coming from Noctalia v4?]
+- Helix Shell (and Noctalia v5) install separately and do not replace v4.
 - v4 settings are not migrated, but both versions can coexist on most distributions.
-- Update any compositor keybinds that launch Noctalia commands.
+- Update any compositor keybinds that launch `noctalia` commands.
 :::
 
 ## Topics
 
+- **[Helix](/noctalia/helix/)** - How Helix Shell, helix-niri, and helix-greeter fit together.
 - **[Installation](/noctalia/getting-started/installation/)** - Package options, distro-specific commands, and manual install steps.
-- **[Running Noctalia](/noctalia/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
+- **[Running Helix](/noctalia/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
 - **[How configuration works](/noctalia/configuration/)** - Config files, GUI-managed overrides, load order, and hot reload.
 - **[Greeter installation](/greeter/)** - Install helix-greeter (binaries stay `noctalia-greeter`), configure greetd, and sync your login screen with Helix.
 - **[Shell](/noctalia/configuration/shell/)** - Global UI scale, fonts, animations, shadows, OSD, lock screen, and keybinds.

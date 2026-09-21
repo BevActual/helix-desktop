@@ -5,11 +5,11 @@ sidebar:
   order: 5
 ---
 
-The Noctalia launcher is a centralized search interface that provides quick access to your applications, system actions, and utility providers.
+The Helix launcher is a centralized search interface that provides quick access to your applications, system actions, and utility providers.
 
 ## How search works
 
-As you type, Noctalia queries all active **Launcher Providers**. Providers can either be "global" (always searching) or "prefixed" (triggered by a specific keyword).
+As you type, Helix queries all active **Launcher Providers**. Providers can either be "global" (always searching) or "prefixed" (triggered by a specific keyword).
 
 - **Global providers** (like Applications and Calculator) results are merged and sorted by a relevance score.
 - **Prefixed providers** (like Emoji and Wallpaper) take over the search results when their prefix is detected at the start of your query.
@@ -118,7 +118,7 @@ or pressing Escape prints nothing and exits `1`. `-p` / `--prompt` sets the laun
 A tab inside a candidate splits the display into title and description, but the full original line is still returned. If
 the current filter has no candidate match, pressing Enter returns the typed text.
 
-The command talks to the running Noctalia instance on the same `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY`; start Noctalia
+The command talks to the running Helix instance on the same `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY`; start Helix
 first, then call `noctalia dmenu` from scripts or compositor commands.
 
 ### Persistent dmenu entries
@@ -164,7 +164,7 @@ Fields:
 | `global` | Whether results participate in normal non-prefixed launcher search |
 | `freeform` | Whether non-empty typed text can become an activatable result |
 
-Noctalia runs `exec` as a detached command; it does not automatically open a terminal. For interactive commands such as
+Helix runs `exec` as a detached command; it does not automatically open a terminal. For interactive commands such as
 `dnf upgrade`, launch your terminal emulator explicitly (`foot -e ...`, `kitty -e ...`, `alacritty -e ...`, etc.).
 That is different from Application results with `Terminal=true`, which use `$TERMINAL` / terminal discovery
 (see [Shell settings](/noctalia/configuration/shell/#shell-settings)).

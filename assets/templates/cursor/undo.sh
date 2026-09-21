@@ -50,7 +50,7 @@ try:
     for key, value in list(themes.items()):
         name = value.get("name") if isinstance(value, dict) else None
         vscode_id = value.get("vscodeThemeSettingsId") if isinstance(value, dict) else None
-        if key == theme_id or name == "Noctalia" or vscode_id == "Noctalia":
+        if key == theme_id or name in {"Helix", "Noctalia"} or vscode_id in {"Helix", "Noctalia"}:
             removed.append(key)
             themes.pop(key)
 

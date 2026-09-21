@@ -1,6 +1,6 @@
 ---
 title: NixOS
-description: Start here to set up and use Noctalia.
+description: Start here to set up and use Helix.
 sidebar:
   order: 2
 ---
@@ -9,7 +9,7 @@ import SettingsReference from '../../../../components/SettingsReference.astro';
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
 :::caution
-To make Noctalia's wifi, bluetooth, power-profile, and battery feature available, please ensure the following NixOS options are enabled:
+To make Helix's wifi, bluetooth, power-profile, and battery feature available, please ensure the following NixOS options are enabled:
 - `networking.networkmanager.enable`
 - `hardware.bluetooth.enable`
 - `services.power-profiles-daemon.enable` or `services.tuned.enable`
@@ -17,7 +17,7 @@ To make Noctalia's wifi, bluetooth, power-profile, and battery feature available
 :::
 
 ## Installation
-A Noctalia package is available on [nixpkgs unstable](https://search.nixos.org/packages?channel=unstable&show=noctalia). 
+A Helix package is available on [nixpkgs unstable](https://search.nixos.org/packages?channel=unstable&show=noctalia). 
 
 If you'd prefer the latest git version or would like to use one of the modules, you can [add the input](#add-input) using your preferred input-pinning method and optionally use the [binary cache](#binary-cache) to avoid compiling locally.
 
@@ -25,7 +25,7 @@ If you'd prefer the latest git version or would like to use one of the modules, 
 
 <Tabs>
   <TabItem label="flakes">
-    Add Noctalia to your flake inputs:
+    Add Helix to your flake inputs:
 
     ```nix
     # flake.nix
@@ -44,19 +44,19 @@ If you'd prefer the latest git version or would like to use one of the modules, 
     :::
   </TabItem>
   <TabItem label="tack">
-    Add Noctalia to your tack inputs:
+    Add Helix to your tack inputs:
     ```
     tack add noctalia github:noctalia-dev/noctalia
     ```
 
-    If you want to use the cache, make sure to disable any sort of following for Noctalia's nixpkgs input.
+    If you want to use the cache, make sure to disable any sort of following for Helix's nixpkgs input.
 
     :::note
     For flakes/tack instructions, we assume you are passing in `inputs` through `specialArgs` or equivalent. 
     :::
   </TabItem>
   <TabItem label="npins">
-    Add Noctalia to your npins sources:
+    Add Helix to your npins sources:
     ```
     npins add github noctalia-dev noctalia --branch main
     ```
@@ -73,7 +73,7 @@ If you'd prefer the latest git version or would like to use one of the modules, 
     ```
   </TabItem>
   <TabItem label="tarball">
-    Add Noctalia directly using `builtins.fetchTarball`.
+    Add Helix directly using `builtins.fetchTarball`.
     With pinning:
     ```nix
     # configuration.nix
@@ -143,7 +143,7 @@ Note that both the Home Manager and Hjem modules install the package for you, so
 
 ### Home Manager Module {#home-manager}
 
-The Home Manager module allows you to configure Noctalia's settings [(that you would otherwise put in `~/.config/noctalia/`)](/noctalia/configuration/) using nix instead of toml, or allows you to link an existing toml file. It is optional.
+The Home Manager module allows you to configure Helix's settings [(that you would otherwise put in `~/.config/noctalia/`)](/noctalia/configuration/) using nix instead of toml, or allows you to link an existing toml file. It is optional.
 
 <Tabs>
   <TabItem label="flakes/tack">
@@ -300,10 +300,10 @@ The NixOS module installs the package system-wide and can enable some recommende
 
 ### Systemd Service {#systemd}
 
-Each of the above modules includes a systemd user service for Noctalia, which can be enabled by setting `programs.noctalia.systemd.enable = true`.
+Each of the above modules includes a systemd user service for Helix, which can be enabled by setting `programs.noctalia.systemd.enable = true`.
 
 :::note
-When using the service, `launch_apps_as_systemd_services` defaults to on so apps launched from Noctalia survive a service restart. Turn it off only if you want those apps to die with the shell.
+When using the service, `launch_apps_as_systemd_services` defaults to on so apps launched from Helix survive a service restart. Turn it off only if you want those apps to die with the shell.
 :::
 
 ### Binary Cache {#binary-cache}
@@ -313,7 +313,7 @@ Pre-built binaries are available on [Cachix](https://app.cachix.org/cache/noctal
 You can configure the substituter either in your NixOS config, flake, or `/etc/nix/nix.conf`:
 
 :::caution
-To use the binary cache, you have to omit `inputs.nixpkgs.follows` from the Noctalia input with flakes/tack or avoid `inherit pkgs;` with npins/tarball.
+To use the binary cache, you have to omit `inputs.nixpkgs.follows` from the Helix input with flakes/tack or avoid `inherit pkgs;` with npins/tarball.
 :::
 
 You can add the cache either to your flake, nixos configuration, or `/etc/nix/nix.conf`.
@@ -343,7 +343,7 @@ You can add the cache either to your flake, nixos configuration, or `/etc/nix/ni
   </TabItem>
 </Tabs>
 
-Overriding any of Noctalia's inputs (e.g. via `inputs.nixpkgs.follows` with flakes) changes the derivation hash, causing cache misses.
+Overriding any of Helix's inputs (e.g. via `inputs.nixpkgs.follows` with flakes) changes the derivation hash, causing cache misses.
 
 Additionally, tracking `main` directly may pull in a commit that hasn't been cached yet by CI.
 

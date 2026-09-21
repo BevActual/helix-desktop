@@ -35,7 +35,7 @@ discover_starship_config() {
         return 0
     fi
 
-    # Noctalia applies templates from its daemon, which does not inherit shell-only
+    # Helix applies templates from its daemon, which does not inherit shell-only
     # exports from .bashrc/.zshrc. Recover STARSHIP_CONFIG from the user session.
     if command -v systemctl >/dev/null 2>&1; then
         local from_systemd

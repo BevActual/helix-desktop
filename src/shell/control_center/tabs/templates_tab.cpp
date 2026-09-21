@@ -200,7 +200,7 @@ namespace {
     if (!out) {
       return false;
     }
-    out << "# Noctalia user template for " << appName << " (" << id << ")\n";
+    out << "# Helix user template for " << appName << " (" << id << ")\n";
     out << "# Colors update on each theme change. Point output_path at the app's theme file.\n";
     out << "# Tokens: https://docs.noctalia.dev/noctalia/theming/templates/\n\n";
     out << "background=" << "{{ colors.surface.default.hex }}\n";
@@ -278,9 +278,7 @@ std::unique_ptr<Flex> TemplatesTab::create() {
       .align = FlexAlign::Stretch,
       .configure =
           [scale, opacity](Flex& section) {
-            applySectionCardStyle(section, scale, opacity);
-            section.setGap(Style::spaceXs * scale);
-            section.setPadding(Style::spaceSm * scale);
+            applyCompactCardStyle(section, scale, opacity, false);
           },
   });
 

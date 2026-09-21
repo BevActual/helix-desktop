@@ -16,8 +16,8 @@ boolean immediately to say whether the work was accepted, then deliver results t
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `noctalia.setUpdateInterval(ms)` | nothing | Sets how often this entry's `update()` function runs. Values below 16 ms are clamped. |
-| `noctalia.log(msg)` | nothing | Writes a message to Noctalia's log with this plugin's script context. |
-| `noctalia.isDarkMode()` | bool | Returns whether the palette Noctalia renders with is dark, so it tracks [`[theme].shell_mode`](/noctalia/theming/#shell_mode) when that is pinned. |
+| `noctalia.log(msg)` | nothing | Writes a message to Helix's log with this plugin's script context. |
+| `noctalia.isDarkMode()` | bool | Returns whether the palette Helix renders with is dark, so it tracks [`[theme].shell_mode`](/noctalia/theming/#shell_mode) when that is pinned. |
 | `noctalia.getSetting(path)` | config value or `nil` | Reads any effective shell config value by TOML dotted path. Tables and arrays become Luau tables; array indices in paths are zero-based. Missing paths log a warning and return `nil`. Requires <PluginApiBadge feature="get-setting" />. |
 | `noctalia.focusedOutputName()` | string or `nil` | Returns the focused output's connector name, falling back to the preferred interactive output when needed. |
 | `noctalia.getConfig(key)` | setting value or `nil` | Reads a declared plugin or entry setting. Undeclared keys log a warning and return `nil`. |
@@ -32,7 +32,7 @@ effective configuration. For example, `noctalia.getSetting("shell.offline_mode")
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `noctalia.outputs()` | array | Returns connected outputs as `{ name, description, width, height, x, y, scale, focused }` tables. |
-| `noctalia.setWallpaperEnabled(connector, enabled)` | nothing | Enables or disables Noctalia's own wallpaper surface on one output. This is runtime-only and clears on restart. |
+| `noctalia.setWallpaperEnabled(connector, enabled)` | nothing | Enables or disables Helix's own wallpaper surface on one output. This is runtime-only and clears on restart. |
 | `noctalia.setWallpaper(path)` | nothing | Applies and persists a wallpaper image on every output. |
 | `noctalia.setWallpaper(connector, path)` | nothing | Applies and persists a wallpaper image on one output. |
 | `noctalia.wallpaperDirectory()` | string or `nil` | Returns the resolved wallpaper folder for the current theme mode, or `nil` when unset. |
@@ -43,17 +43,17 @@ effective configuration. For example, `noctalia.getSetting("shell.offline_mode")
 | `noctalia.openSettings()` | nothing | Opens Control Center at this plugin's own settings, closing any other open panel. Requires <PluginApiBadge feature="open-settings" />. |
 
 `outputs()` uses the DRM connector name in `name`; that is the same connector string expected by compositor tools such
-as `mpvpaper`. A `[[service]]` may also define `onOutputsChanged()`, which Noctalia calls whenever the output set or
+as `mpvpaper`. A `[[service]]` may also define `onOutputsChanged()`, which Helix calls whenever the output set or
 geometry changes.
 
 `setWallpaper(path)` behaves like the built-in wallpaper panel. Prefer it and `togglePanel(id)` over shelling out to the
 `noctalia` CLI from a plugin; the API path runs in-process and avoids an IPC round trip.
 
-Wallpaper masks use the wallpaper source's intrinsic pixel dimensions and Noctalia's configured fill mode, so plugins
+Wallpaper masks use the wallpaper source's intrinsic pixel dimensions and Helix's configured fill mode, so plugins
 must not pre-crop or project them to output geometry. Pixel value `0` leaves widgets visible, `255` erases them, and
 intermediate values feather the boundary. `wallpaperPath` must exactly match `noctalia.wallpaperPath(connector)`;
 stale, malformed, unreadable, and dimension-mismatched masks are rejected. One plugin runtime owns an output mask at a
-time. The owner may replace or clear it, and Noctalia clears all of that runtime's masks when it unloads.
+time. The owner may replace or clear it, and Helix clears all of that runtime's masks when it unloads.
 
 `openSettings()` takes no id - the host uses the calling plugin's own id, so a plugin can only ever open its own page.
 It is the way to offer a "configure me" affordance from a panel or widget, since plugins read config but cannot write
@@ -93,7 +93,7 @@ cache results keyed by app id instead of resolving on every `update()`.
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `noctalia.formatTime(pattern)` | string | Formats the current local time with the same tokens as Noctalia clock and filename settings. |
+| `noctalia.formatTime(pattern)` | string | Formats the current local time with the same tokens as Helix clock and filename settings. |
 | `noctalia.formatTime(pattern, unixSeconds)` | string | Formats a specific Unix timestamp in local time. |
 | `noctalia.formatTime(pattern, unixSeconds, timezone)` | string | Formats a Unix timestamp in an IANA timezone (for example `"Europe/Berlin"`). Omit or pass `nil` for `unixSeconds` to use now. Invalid zones fall back to local time. Requires <PluginApiBadge feature="format-time-timezone" />. |
 | `noctalia.timeFormat()` | string | Current `[shell].time_format` (for example `"{:%H:%M}"`). Requires <PluginApiBadge feature="format-time-timezone" />. |
@@ -270,7 +270,7 @@ Values concatenated into a shell command must be shell-quoted; an argument array
 ```
 
 `runStream()` is meant for long-running processes. The runtime terminates active streams when the script reloads, the
-entry is removed, or Noctalia stops the plugin.
+entry is removed, or Helix stops the plugin.
 
 ## Filesystem
 
@@ -301,10 +301,10 @@ immediately available.
 
 `noctalia.state` (below) lives only in memory - it is cleared when the plugin stops. To keep data across restarts, write
 it to a file. Do **not** persist inside `noctalia.pluginDir()`: for git-installed plugins that directory is a runtime copy
-that Noctalia rewrites on update, so anything you save there is lost.
+that Helix rewrites on update, so anything you save there is lost.
 
 Use `noctalia.pluginDataDir()` instead. It returns a per-plugin folder that survives updates, is scoped to your plugin id,
-follows Noctalia's `NOCTALIA_STATE_HOME` override, and is created for you on first call.
+follows Helix's `NOCTALIA_STATE_HOME` override, and is created for you on first call.
 
 ```lua
 local dir = noctalia.pluginDataDir()
@@ -416,7 +416,7 @@ It returns a handle with a `stop()` function, or `nil` when the stream could not
 once when the transfer ends - server close, network error, or an HTTP error response fully read - unless the stream was
 stopped. Non-2xx responses are not special-cased: their body streams to `onLine` and the status arrives in `onClose`
 (`ok = true, status = 401` for a rejected token). There is no overall transfer timeout; reconnecting after `onClose` is
-the caller's job. Active streams are cancelled when the script reloads, the entry is removed, or Noctalia stops the
+the caller's job. Active streams are cancelled when the script reloads, the entry is removed, or Helix stops the
 plugin. With `[shell] offline_mode = true` the stream never connects and `onClose` fires with `ok = false`.
 
 ## Translations and data helpers
@@ -433,7 +433,7 @@ plugin. With `[shell] offline_mode = true` the stream never connects and `onClos
 | `noctalia.string.trim(str)` | string | Trims leading and trailing whitespace. |
 | `noctalia.string.urlEncode(str)` | string | Percent-encodes a string for use in URLs. |
 | `noctalia.string.urlDecode(str)` | string | Decodes percent-encoded URL text. |
-| `noctalia.fuzzyScore(pattern, text)` | number or `nil` | Scores a fuzzy match with Noctalia's native matcher. `nil` means no match. |
+| `noctalia.fuzzyScore(pattern, text)` | number or `nil` | Scores a fuzzy match with Helix's native matcher. `nil` means no match. |
 
 `json.*` and `string.*` are synchronous pure transforms. Prefer `string.urlEncode()` when building query strings for
 `http()` or `download()`.

@@ -9,7 +9,7 @@ changed=0
 if [ -f "$config_file" ]; then
     tmp_file="$(mktemp "${config_file}.tmp.XXXXXX")"
     trap 'rm -f "$tmp_file"' EXIT
-    awk '!/^[[:space:]]*config\.color_scheme[[:space:]]*=[[:space:]]*["'"'"']Noctalia["'"'"']/' "$config_file" >"$tmp_file"
+    awk '!/^[[:space:]]*config\.color_scheme[[:space:]]*=[[:space:]]*["'"'"'](Noctalia|Helix)["'"'"']/' "$config_file" >"$tmp_file"
     if ! cmp -s "$config_file" "$tmp_file"; then
         cat "$tmp_file" >"$config_file"
         changed=1

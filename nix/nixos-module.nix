@@ -12,7 +12,7 @@ in
   disabledModules = [ "programs/wayland/noctalia.nix" ];
 
   options.programs.noctalia = {
-    enable = lib.mkEnableOption "Whether to enable noctalia, a lightweight Wayland shell and bar.";
+    enable = lib.mkEnableOption "Whether to enable Helix Shell (noctalia), a niri-first Wayland desktop shell.";
 
     package = lib.mkOption {
       type = lib.types.nullOr lib.types.package;
@@ -32,7 +32,7 @@ in
     };
 
     recommendedServices.enable = lib.mkEnableOption ''
-      NixOS services used by Noctalia v5 integrations, including NetworkManager,
+      NixOS services used by Helix Shell integrations, including NetworkManager,
       Bluetooth, UPower, and a power profile service.
     '';
   };
@@ -45,7 +45,7 @@ in
         environment.systemPackages = lib.optional (cfg.package != null) cfg.package;
 
         systemd.user.services.noctalia = lib.mkIf cfg.systemd.enable {
-          description = "Noctalia - A lightweight Wayland shell and bar";
+          description = "Helix Shell (noctalia)";
           documentation = [ "https://docs.noctalia.dev/noctalia/" ];
           partOf = [ cfg.systemd.target ];
           after = [ cfg.systemd.target ];

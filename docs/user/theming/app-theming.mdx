@@ -1,21 +1,21 @@
 ---
 title: App Theming
-description: Built-in, community, and user templates for applying Noctalia colors to other apps.
+description: Built-in, community, and user templates for applying Helix colors to other apps.
 sidebar:
   order: 10
 ---
 
-Noctalia can render the resolved theme colors into external app config files whenever the palette changes. This lets terminals, editors, browsers, launchers, and other apps follow the same colors as the shell.
+Helix can render the resolved theme colors into external app config files whenever the palette changes. This lets terminals, editors, browsers, launchers, and other apps follow the same colors as the shell.
 
 Templates always render the variant selected by [`[theme].mode`](/noctalia/theming/#mode), never
-[`shell_mode`](/noctalia/theming/#shell_mode), so pinning Noctalia to dark keeps your apps on whatever `mode` resolves to.
+[`shell_mode`](/noctalia/theming/#shell_mode), so pinning Helix to dark keeps your apps on whatever `mode` resolves to.
 
 To rerender enabled templates for the current palette without changing the theme, use
 [Media & UI → Theme](/noctalia/ipc/media-and-ui/#theme).
 
 ## Built-in Templates
 
-Built-in templates ship with Noctalia. Enable the built-in catalog, then opt in to the template IDs you want:
+Built-in templates ship with Helix. Enable the built-in catalog, then opt in to the template IDs you want:
 
 ```toml
 [theme.templates]
@@ -25,12 +25,12 @@ builtin_ids              = []        # opt-in; run: noctalia theme --list-templa
 
 `builtin_ids` selects which shipped templates run. An empty array means no built-in templates are applied.
 
-Disabling a built-in template removes its generated Noctalia theme file and undoes any Noctalia-owned include or theme
+Disabling a built-in template removes its generated Helix theme file and undoes any Helix-owned include or theme
 selection that the template added to the application's config. Disabling `enable_builtin_templates` performs the same
 cleanup for every selected built-in template.
 
-Application configs must be writable for Noctalia to remove those integrations. For declaratively managed configs such
-as Home Manager symlinks into the Nix store, remove the Noctalia include or theme selection from the declarative source.
+Application configs must be writable for Helix to remove those integrations. For declaratively managed configs such
+as Home Manager symlinks into the Nix store, remove the Helix include or theme selection from the declarative source.
 
 List available built-in and configured template IDs:
 
@@ -50,13 +50,13 @@ community_ids              = []        # opt-in; fetched from api.noctalia.dev/t
 
 `community_ids` selects which community templates run. In **Control Center → Templates**, enable community templates and browse the catalog (search, category, or enabled-only). Metadata and files are stored in `~/.local/state/noctalia/community-templates/` (honoring `NOCTALIA_STATE_HOME`, then `XDG_STATE_HOME`).
 
-Cached community template files are treated as editable local copies. Sync updates files only while their content still matches the last Noctalia-written md5; local edits are preserved until you delete the edited cached file.
+Cached community template files are treated as editable local copies. Sync updates files only while their content still matches the last Helix-written md5; local edits are preserved until you delete the edited cached file.
 
 Community template discovery and updates require network access unless the selected template is already cached. [`shell.offline_mode`](/noctalia/configuration/shell/#shell-settings) prevents outgoing HTTP requests, including community template requests.
 
 ## User Templates
 
-User templates can be created from **Control Center → Templates**: header **+**, pick an installed app. Matching built-in or community templates are enabled instead of duplicated. Otherwise Noctalia writes a starter file under `~/.config/noctalia/templates/` and registers `[theme.templates.user.<id>]`. A sheet sets `output_path` (the file the app reads) and an optional `post_hook`. User tiles keep a gear for those fields; the header folder button opens the templates directory. Header **Apply** rerenders enabled templates for the current palette.
+User templates can be created from **Control Center → Templates**: header **+**, pick an installed app. Matching built-in or community templates are enabled instead of duplicated. Otherwise Helix writes a starter file under `~/.config/noctalia/templates/` and registers `[theme.templates.user.<id>]`. A sheet sets `output_path` (the file the app reads) and an optional `post_hook`. User tiles keep a gear for those fields; the header folder button opens the templates directory. Header **Apply** rerenders enabled templates for the current palette.
 
 You can still declare them directly in config:
 
@@ -69,7 +69,7 @@ post_hook   = "my-app --reload-theme"
 
 Defining `[theme.templates.user.<id>]` enables that user template. Set `enabled = false` on an entry to keep it available but inactive.
 
-Relative paths resolve from the Noctalia config directory. A leading `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, `$XDG_STATE_HOME`, or `$XDG_CACHE_HOME` token is expanded using the XDG base directory defaults when the matching environment variable is not set.
+Relative paths resolve from the Helix config directory. A leading `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, `$XDG_STATE_HOME`, or `$XDG_CACHE_HOME` token is expanded using the XDG base directory defaults when the matching environment variable is not set.
 
 User template entries support the same fields documented in [Template Entries](/noctalia/theming/templates/#template-entries), including `input_path_modes`, `output_path_dynamic`, `colors_to_compare`, `compare_to`, `pre_hook`, `post_hook`, `post_action`, and `index`.
 
