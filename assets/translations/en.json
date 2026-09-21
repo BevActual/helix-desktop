@@ -84,6 +84,20 @@
       "region": "Select region"
     },
     "widgets": {
+      "ai": {
+        "default": "AI",
+        "updating": "AI…",
+        "tooltip": {
+          "loading": "Loading",
+          "local": "Local",
+          "model": "Model",
+          "ollama": "Ollama",
+          "provider": "Assistant",
+          "quota": "Used",
+          "used": "Count",
+          "window": "Window"
+        }
+      },
       "active-window": {
         "no-active-window": "No active window"
       },
@@ -327,20 +341,53 @@
     },
     "ai-usage": {
       "as-of": "As of {time}",
+      "attention-tooltip": "{provider} {window} is at {percent}%",
       "balance-only": "Prepaid balance. No rate-limit windows.",
-      "empty": "No AI tools detected. Sign in to Claude Code, Cursor, Codex, Gemini CLI, Copilot, or Qwen, set up DeepSeek, or install Ollama.",
+      "empty": "No AI CLIs detected. Install Claude Code, Codex, Gemini CLI, Qwen Code, or Ollama, or run llama.cpp or vLLM locally.",
+      "empty-hint": "Use header gear to keep a provider Always on.",
       "now": "now",
       "ollama": {
         "absent": "Ollama is not installed",
         "disabled": "Disabled",
+        "empty-models": "No models installed",
         "error": "Could not reach Ollama",
+        "install": "Install",
+        "installed": "Installed",
+        "installing": "Installing…",
+        "cancel": "Cancel",
+        "retry": "Retry",
+        "in-memory": "{size} in memory",
+        "remove": "Remove",
+        "remove-confirm": "Remove?",
+        "removing": "Removing…",
+        "select": "Select",
+        "library": "Library",
+        "library-empty": "No models match",
+        "library-error": "Could not reach the Ollama library",
+        "library-hint": "Search the Ollama library and install a model",
+        "library-search": "Search models",
         "loaded": "loaded",
+        "loaded-toggle": "Loaded",
+        "loading": "Loading…",
+        "load": "Load",
+        "in-use": "In use",
         "more": "+{count} more",
         "running": "Running",
+        "service": "Service",
         "start": "Start",
+        "starting": "Starting…",
         "stop": "Stop",
+        "stopping": "Stopping…",
         "stopped": "Stopped",
-        "title": "Ollama"
+        "title": "Ollama",
+        "unloading": "Unloading…"
+      },
+      "local": {
+        "jan": "Jan",
+        "llamacpp": "llama.cpp",
+        "lmstudio": "LM Studio",
+        "title": "Local",
+        "vllm": "vLLM"
       },
       "open": "Open",
       "providers": {
@@ -894,6 +941,7 @@
       "view-day": "View Day Details"
     },
     "shortcuts": {
+      "ai": "AI",
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "caffeine": "Caffeine",
@@ -1864,6 +1912,10 @@
     },
     "internal": {
       "battery": "Battery",
+      "ai-usage-high-body": "{provider} {window} is at {percent}%.",
+      "ai-usage-high-title": "{provider} is almost spent",
+      "ai-usage-reset-body": "{provider} {window} resets in {reset} ({percent}% used).",
+      "ai-usage-reset-title": "{provider} resets soon",
       "battery-critical-body": "{device}: {percent}%; your computer will shut down soon",
       "battery-critical-title": "Battery critically low",
       "battery-device": "Battery device",
@@ -4571,12 +4623,17 @@
           "label": "Ollama Host",
           "placeholder": "127.0.0.1:11434"
         },
+        "ollama-model": {
+          "description": "Local model Helix loads when Ollama is running. The AI tab leftover Installed list shows downloaded models; Library installs more.",
+          "label": "Ollama Model",
+          "placeholder": "llama3.2:latest"
+        },
         "gemini-daily-limit": {
           "description": "Requests per day on your Gemini plan (1000 on the free tier). Used to compute today's percentage.",
           "label": "Gemini Daily Request Quota"
         },
         "provider-mode": {
-          "description": "Auto shows a provider only when its local data source exists. Always on keeps the row even when missing."
+          "description": "Auto shows a CLI when it is on PATH. Always on keeps the row even if the CLI is missing. Cursor, Copilot, and DeepSeek are editor apps and stay hidden unless Always on."
         },
         "qwen": {
           "label": "Qwen Code"
@@ -4851,6 +4908,38 @@
       "actions": {
         "command-placeholder": "Shell command",
         "commands": {
+          "ai-usage-ollama-cancel": {
+            "description": "Cancel an in-progress Ollama model download",
+            "label": "Cancel Ollama download"
+          },
+          "ai-usage-ollama-delete": {
+            "description": "Remove an installed Ollama model",
+            "label": "Remove Ollama model"
+          },
+          "ai-usage-ollama-model": {
+            "description": "Load an Ollama model and persist it as the selected model",
+            "label": "Set Ollama model"
+          },
+          "ai-usage-ollama-pull": {
+            "description": "Download an Ollama model from the library",
+            "label": "Install Ollama model"
+          },
+          "ai-usage-ollama-start": {
+            "description": "Start the local Ollama daemon",
+            "label": "Start Ollama"
+          },
+          "ai-usage-ollama-stop": {
+            "description": "Stop the local Ollama daemon",
+            "label": "Stop Ollama"
+          },
+          "ai-usage-refresh": {
+            "description": "Refetch AI usage from local tools",
+            "label": "Refresh AI usage"
+          },
+          "ai-usage-status": {
+            "description": "Print AI usage and local inference status",
+            "label": "AI usage status"
+          },
           "annotate": {
             "description": "Draw on the screen over running apps; press F or the Freeze button to capture the background",
             "label": "Annotate screen"
@@ -6003,6 +6092,7 @@
         }
       },
       "types": {
+        "ai": "AI",
         "active-window": "Active Window",
         "audio-visualizer": "Audio Visualizer",
         "battery": "Battery",

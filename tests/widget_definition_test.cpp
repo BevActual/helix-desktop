@@ -2,6 +2,7 @@
 // throw std::logic_error on the first resolve()/schemaFields() call, and WidgetFactory::create() does
 // not catch. Without this test a malformed definition ships as an uncaught exception at bar build.
 #include "shell/bar/widget_gesture_defaults.h"
+#include "shell/bar/widgets/ai_widget_definition.h"
 #include "shell/bar/widgets/active_window_widget_definition.h"
 #include "shell/bar/widgets/audio_visualizer_widget_definition.h"
 #include "shell/bar/widgets/battery_widget_definition.h"
@@ -122,6 +123,7 @@ namespace {
 int main() {
   const BatteryConfig batteryConfig;
 
+  checkDefinition("ai", aiWidgetDefinition);
   checkDefinition("active_window", activeWindowWidgetDefinition);
   checkDefinition("audio_visualizer", audioVisualizerWidgetDefinition);
   checkDefinition("battery", batteryWidgetDefinition, BatteryWidgetDefinitionContext{.batteryConfig = &batteryConfig});

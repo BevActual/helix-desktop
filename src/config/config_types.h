@@ -1797,6 +1797,9 @@ struct ControlCenterConfig {
     std::int32_t geminiDailyLimit = 1000;
     std::int32_t qwenDailyLimit = 2000;
     std::string ollamaHost;
+    std::string ollamaModel;
+    std::int32_t warnPercent = 90;
+    std::int32_t warnResetMinutes = 30;
     bool operator==(const AiUsageTabConfig&) const = default;
   };
 

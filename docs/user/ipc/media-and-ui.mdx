@@ -257,3 +257,20 @@ Built-in Privacy control reads PipeWire capture links for microphone, camera, an
 
 Open the tab with `noctalia msg panel-toggle control-center privacy`.
 
+## AI {#ai}
+
+Built-in AI status reads AI CLIs on this machine (`claude`, `codex`, `gemini`, `qwen`, `ollama`) plus running llama.cpp / vLLM servers. Settings live under [`[control_center.ai_usage]`](/noctalia/control-center/#ai).
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Status | <IpcCommand command="ai-usage-status" /> | Print refreshing state, each visible CLI's plan and window percents (and used/max when known), Ollama running/stopped and selected model, and llama.cpp / vLLM if they answered `/v1/models`. |
+| Refresh | <IpcCommand command="ai-usage-refresh" /> | Refetch usage from local tools and APIs. |
+| Start Ollama | <IpcCommand command="ai-usage-ollama-start" /> | Start the user systemd unit when present, otherwise `ollama serve`. Loads the selected model once the daemon is up. |
+| Stop Ollama | <IpcCommand command="ai-usage-ollama-stop" /> | Stop the user systemd unit (and a serve process Helix started). |
+| Set model | <IpcCommand command="ai-usage-ollama-model" /> | Persist `[control_center.ai_usage].ollama_model`, load it, and start Ollama if it is stopped. |
+| Install model | <IpcCommand command="ai-usage-ollama-pull" /> | Download a model from the Ollama library (`POST /api/pull`). Starts the local daemon if it is stopped. |
+| Cancel download | <IpcCommand command="ai-usage-ollama-cancel" /> | Cancel an in-progress `ollama pull`. |
+| Remove model | <IpcCommand command="ai-usage-ollama-delete" /> | Remove an installed model (`DELETE /api/delete`). Starts the local daemon if it is stopped. |
+
+Percents are utilization, not currency. Extra usage for Claude is a percent even when the OAuth payload includes credit fields. Codex prefers live `codex app-server` limits and falls back to the newest session `.jsonl`. Open the tab with `noctalia msg panel-toggle control-center ai`.
+

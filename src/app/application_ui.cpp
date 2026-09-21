@@ -930,6 +930,7 @@ void Application::initBarDockAndLayout() {
       .audioSpectrum = m_pipewireSpectrum.get(),
       .httpClient = &m_httpClient,
       .weather = &m_weatherService,
+      .aiUsage = &m_aiUsageService,
       .renderContext = &m_renderContext,
       .nightLight = &m_gammaService,
       .theme = &m_themeService,

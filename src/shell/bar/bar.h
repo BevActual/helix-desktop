@@ -45,6 +45,7 @@ class UPowerService;
 class TrayService;
 class GammaService;
 class WeatherService;
+class AiUsageService;
 namespace noctalia::theme {
   class ThemeService;
 }
@@ -185,6 +186,7 @@ private:
   PipeWireSpectrum* m_audioSpectrum = nullptr;
   HttpClient* m_httpClient = nullptr;
   WeatherService* m_weatherService = nullptr;
+  AiUsageService* m_aiUsageService = nullptr;
   RenderContext* m_renderContext = nullptr;
   GammaService* m_nightLight = nullptr;
   noctalia::theme::ThemeService* m_themeService = nullptr;

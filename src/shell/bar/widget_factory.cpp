@@ -3,6 +3,8 @@
 #include "compositors/compositor_platform.h"
 #include "config/config_service.h"
 #include "core/log.h"
+#include "shell/bar/widgets/ai_widget.h"
+#include "shell/bar/widgets/ai_widget_definition.h"
 #include "shell/bar/widgets/active_window_widget.h"
 #include "shell/bar/widgets/active_window_widget_definition.h"
 #include "shell/bar/widgets/audio_visualizer_widget.h"
@@ -102,6 +104,7 @@ WidgetFactory::WidgetFactory(const BarServices& services)
       m_powerProfiles(services.powerProfiles), m_network(services.network), m_modem(services.modem),
       m_externalIp(services.externalIp), m_idleInhibitor(services.idleInhibitor), m_mpris(services.mpris),
       m_audioSpectrum(services.audioSpectrum), m_httpClient(services.httpClient), m_weather(services.weather),
+      m_aiUsage(services.aiUsage),
       m_nightLight(services.nightLight), m_themeService(services.theme), m_bluetooth(services.bluetooth),
       m_brightness(services.brightness), m_lockKeys(services.lockKeys), m_clipboard(services.clipboard),
       m_fileWatcher(services.fileWatcher), m_screenshots(services.screenshots), m_renderContext(services.renderContext),
@@ -149,6 +152,12 @@ std::unique_ptr<Widget> WidgetFactory::create(
   };
 
   static constexpr auto kBuiltinWidgets = std::to_array<BuiltinWidget>({
+      {"ai", [](const WidgetFactory& f, const BuiltinWidgetContext& context) {
+            return createWidget<AiWidget>(
+                context.contentScale, f.m_aiUsage,
+                aiWidgetDefinition().resolve(context.config, context.settingContext)
+            );
+          }},
       {"active_window", [](const WidgetFactory& f, const BuiltinWidgetContext& context) {
             return createWidget<ActiveWindowWidget>(
                 context.contentScale, f.m_configService, f.m_platform,

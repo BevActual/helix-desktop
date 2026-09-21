@@ -196,6 +196,7 @@ Application::~Application() {
   // API's pointer to it here, while both are still alive, or a plugin that used noctalia.cpuCores
   // releases its reference through a dangling pointer as its host is torn down.
   m_scriptApi.setSystemMonitor(nullptr);
+  m_scriptApi.setAiUsageSnapshot({});
   TooltipManager::instance().shutdown();
   m_notificationManager.flushPersistedHistory();
   m_wayland.setClipboardService(nullptr);

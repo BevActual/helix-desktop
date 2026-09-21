@@ -85,6 +85,7 @@
 #include "shell/tray/tray_drawer_panel.h"
 #include "shell/wallpaper/panel/wallpaper_panel.h"
 #include "shell/wallpaper/wallpaper_paths.h"
+#include "system/ai_usage.h"
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
 #include "system/camera_service.h"
@@ -144,6 +145,64 @@ namespace {
       cmd += "'\"";
       (void)process::runAsync(cmd);
     }
+  }
+
+  scripting::ScriptApiContext::AiUsageSnapshot scriptAiUsageFrom(const noctalia::ai_usage::Snapshot& snapshot) {
+    scripting::ScriptApiContext::AiUsageSnapshot out;
+    out.refreshing = snapshot.refreshing;
+    if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
+      out.hot = scripting::ScriptApiContext::AiUsageHot{
+          .provider = std::string(noctalia::ai_usage::providerKey(hit->provider)),
+          .window = std::string(noctalia::ai_usage::windowKeyId(hit->window.key)),
+          .percent = static_cast<double>(hit->window.percent),
+      };
+    }
+    out.providers.reserve(snapshot.providers.size());
+    for (const auto& provider : snapshot.providers) {
+      if (!noctalia::ai_usage::providerVisible(provider.status)) {
+        continue;
+      }
+      scripting::ScriptApiContext::AiUsageProvider row;
+      row.id = std::string(noctalia::ai_usage::providerKey(provider.id));
+      row.status = std::string(noctalia::ai_usage::statusKey(provider.status));
+      row.plan = provider.plan;
+      row.stale = provider.stale;
+      row.windows.reserve(provider.windows.size());
+      for (const auto& window : provider.windows) {
+        scripting::ScriptApiContext::AiUsageWindow w;
+        w.id = std::string(noctalia::ai_usage::windowKeyId(window.key));
+        w.percent = static_cast<double>(window.percent);
+        w.used = window.used;
+        w.max = window.max;
+        if (window.reset.has_value()) {
+          w.resetsAtMs = std::chrono::duration<double, std::milli>(window.reset->time_since_epoch()).count();
+        }
+        row.windows.push_back(std::move(w));
+      }
+      out.providers.push_back(std::move(row));
+    }
+    if (noctalia::ai_usage::ollamaVisible(snapshot.ollama.status)) {
+      scripting::ScriptApiContext::AiUsageOllama ollama;
+      ollama.status = std::string(noctalia::ai_usage::ollamaStatusKey(snapshot.ollama.status));
+      ollama.version = snapshot.ollama.version;
+      ollama.model = snapshot.ollama.selected;
+      ollama.models.reserve(snapshot.ollama.models.size());
+      for (const auto& model : snapshot.ollama.models) {
+        ollama.models.push_back(
+            {.name = model.name, .size = model.size, .loaded = model.loaded, .vram = model.vram}
+        );
+      }
+      out.ollama = std::move(ollama);
+    }
+    out.localRuntimes.reserve(snapshot.localRuntimes.size());
+    for (const auto& runtime : snapshot.localRuntimes) {
+      out.localRuntimes.push_back({
+          .id = std::string(noctalia::ai_usage::localRuntimeKey(runtime.kind)),
+          .port = runtime.port,
+          .models = runtime.models,
+      });
+    }
+    return out;
   }
 } // namespace
 
@@ -1685,6 +1744,16 @@ void Application::initSessionBusServices() {
   m_localSendService.start();
   m_syncthingService.start();
   m_aiUsageService.start();
+  auto publishAiUsage = [this]() { m_scriptApi.setAiUsageSnapshot(scriptAiUsageFrom(m_aiUsageService.snapshot())); };
+  publishAiUsage();
+  m_aiUsageService.addChangeCallback([this, publishAiUsage, shouldRefreshControlCenter]() {
+    publishAiUsage();
+    m_bar.refresh();
+    m_desktopWidgetsController.requestLayout();
+    if (shouldRefreshControlCenter()) {
+      m_panelManager.refresh();
+    }
+  });
 
   // LocationService is the single source of "where am I": push its resolved coordinates to the
   // weather service, night light, and theme auto mode. Manual latitude/longitude and fixed

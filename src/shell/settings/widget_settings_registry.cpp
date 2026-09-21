@@ -5,6 +5,7 @@
 #include "scripting/plugin_panel_shell.h"
 #include "scripting/plugin_registry.h"
 #include "shell/bar/widget_gesture_defaults.h"
+#include "shell/bar/widgets/ai_widget_definition.h"
 #include "shell/bar/widgets/active_window_widget_definition.h"
 #include "shell/bar/widgets/audio_visualizer_widget_definition.h"
 #include "shell/bar/widgets/battery_widget_definition.h"
@@ -135,6 +136,7 @@ namespace settings {
     }
 
     constexpr std::array kTypedWidgetDefinitions{
+        projectWidgetDefinition<aiWidgetDefinition>(),
         projectWidgetDefinition<activeWindowWidgetDefinition>(),
         projectWidgetDefinition<audioVisualizerWidgetDefinition>(),
         projectWidgetDefinition<batteryWidgetDefinition>(),
@@ -225,6 +227,7 @@ namespace settings {
     }
 
     const std::vector<WidgetTypeSpec> kWidgetTypeSpecs = {
+        {.type = "ai", .labelKey = "settings.widgets.types.ai", .glyph = "sparkles"},
         {.type = "active_window", .labelKey = "settings.widgets.types.active-window", .glyph = "app-window"},
         {.type = "audio_visualizer", .labelKey = "settings.widgets.types.audio-visualizer", .glyph = "wave-sine"},
         {.type = "battery", .labelKey = "settings.widgets.types.battery", .glyph = "battery-4"},

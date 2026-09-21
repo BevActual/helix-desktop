@@ -28,6 +28,8 @@
 #include "shell/control_center/shortcut_services.h"
 #include "shell/keyboard_layout_label.h"
 #include "shell/panel/panel_manager.h"
+#include "system/ai_usage.h"
+#include "system/ai_usage_service.h"
 #include "system/gamma_service.h"
 #include "system/weather_service.h"
 #include "theme/theme_service.h"
@@ -438,6 +440,68 @@ namespace {
     void onRightClick() override { openTab("screen-time"); }
   };
 
+  class AiShortcut final : public Shortcut {
+  public:
+    explicit AiShortcut(AiUsageService* svc) : m_svc(svc) {}
+    std::string_view id() const override { return "ai"; }
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.ai"); }
+    std::string displayLabel() const override {
+      if (m_svc == nullptr) {
+        return defaultLabel();
+      }
+      const auto& snapshot = m_svc->snapshot();
+      if (noctalia::ai_usage::activeOllamaPull(snapshot) != nullptr) {
+        return noctalia::ai_usage::snapshotGlanceLabel(snapshot);
+      }
+      if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
+        return std::format("{:.0f}%", static_cast<double>(hit->window.percent));
+      }
+      if (noctalia::ai_usage::glanceableOllama(snapshot)) {
+        return noctalia::ai_usage::ollamaGlanceLabel(snapshot.ollama);
+      }
+      if (const auto* runtime = noctalia::ai_usage::glanceableLocalRuntime(snapshot)) {
+        return noctalia::ai_usage::localRuntimeLabel(runtime->kind);
+      }
+      return defaultLabel();
+    }
+    std::string displayIcon() const override {
+      if (m_svc == nullptr) {
+        return "sparkles";
+      }
+      const auto& snapshot = m_svc->snapshot();
+      if (noctalia::ai_usage::activeOllamaPull(snapshot) != nullptr) {
+        return "server";
+      }
+      if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
+        return std::string(noctalia::ai_usage::providerGlyph(hit->provider));
+      }
+      if (noctalia::ai_usage::glanceableOllama(snapshot)) {
+        return "server";
+      }
+      if (const auto* runtime = noctalia::ai_usage::glanceableLocalRuntime(snapshot)) {
+        return std::string(noctalia::ai_usage::localRuntimeGlyph(runtime->kind));
+      }
+      return "sparkles";
+    }
+    std::string_view iconOn() const override { return "sparkles"; }
+    std::string_view iconOff() const override { return "sparkles"; }
+    bool active() const override {
+      if (m_svc == nullptr) {
+        return false;
+      }
+      const auto hit = noctalia::ai_usage::hottestQuota(m_svc->snapshot());
+      if (!hit.has_value()) {
+        return false;
+      }
+      return hit->window.percent + 0.5F >= static_cast<float>(m_svc->attentionPercent());
+    }
+    void onClick() override { openTab("ai"); }
+    void onRightClick() override { openTab("ai"); }
+
+  private:
+    AiUsageService* m_svc = nullptr;
+  };
+
   class WallpaperShortcut final : public Shortcut {
   public:
     std::string_view id() const override { return "wallpaper"; }
@@ -841,6 +905,10 @@ namespace {
           .type = "screen_time",
           .labelKey = "control-center.shortcuts.screen-time",
           .isAvailable = [](const Config& config) { return config.shell.screenTimeEnabled; },
+      }),
+      builtinShortcut<AiShortcut, &ShortcutServices::aiUsage>({
+          .type = "ai",
+          .labelKey = "control-center.shortcuts.ai",
       }),
       builtinShortcut<KeyboardLayoutShortcut, &ShortcutServices::platform, &ShortcutServices::config>({
           .type = "keyboard_layout",

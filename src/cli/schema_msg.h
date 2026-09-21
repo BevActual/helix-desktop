@@ -273,8 +273,56 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgWorkspaceSwitchPositionals{
       Positional{"direction", {}, kMsgWorkspaceSwitchDirectionChoices, true, false, false},
   };
+  inline constexpr std::array kMsgAiUsageOllamaModelPositionals{
+      Positional{"name", {}, {}, true, false, false},
+  };
 
   namespace msg {
+    inline constexpr Command aiUsageOllamaCancel{
+        "ai-usage-ollama-cancel", "Cancel an in-progress Ollama model download", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageOllamaDelete{
+        "ai-usage-ollama-delete",
+        "Remove an installed Ollama model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageOllamaModel{
+        "ai-usage-ollama-model",
+        "Load an Ollama model and persist it as the selected model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageOllamaPull{
+        "ai-usage-ollama-pull",
+        "Download an Ollama model from the library",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageOllamaStart{
+        "ai-usage-ollama-start", "Start the local Ollama daemon", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageOllamaStop{
+        "ai-usage-ollama-stop", "Stop the local Ollama daemon", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageRefresh{
+        "ai-usage-refresh", "Refetch AI usage from local tools", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageStatus{
+        "ai-usage-status", "Print AI usage and local inference status", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command annotate{
         "annotate",
         "Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the "
@@ -974,6 +1022,14 @@ namespace noctalia::cli {
   } // namespace msg
 
   inline constexpr std::array kMsgSubcommands{
+      msg::aiUsageOllamaCancel,
+      msg::aiUsageOllamaDelete,
+      msg::aiUsageOllamaModel,
+      msg::aiUsageOllamaPull,
+      msg::aiUsageOllamaStart,
+      msg::aiUsageOllamaStop,
+      msg::aiUsageRefresh,
+      msg::aiUsageStatus,
       msg::annotate,
       msg::barAutoHideSet,
       msg::barHide,

@@ -31,6 +31,7 @@ class TrayService;
 class SystemMonitorService;
 class UPowerService;
 class WeatherService;
+class AiUsageService;
 struct wl_output;
 class GammaService;
 namespace noctalia::theme {
@@ -69,6 +70,7 @@ private:
   PipeWireSpectrum* m_audioSpectrum;
   HttpClient* m_httpClient;
   WeatherService* m_weather;
+  AiUsageService* m_aiUsage = nullptr;
   GammaService* m_nightLight;
   noctalia::theme::ThemeService* m_themeService;
   BluetoothService* m_bluetooth;

@@ -190,6 +190,40 @@ as "not ready yet" rather than "this machine has no cores".
 Cores are in `/proc/stat` order. Offline cores are absent from that file, so the array length can change between calls,
 and an entry's position is not necessarily its core id.
 
+## AI usage
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `noctalia.aiUsage()` | table | Read-only snapshot of AI CLIs and local CLI servers on this machine. Requires <PluginApiBadge feature="ai-usage" />. |
+
+Use this instead of fetching provider tokens or probing loopback ports from a plugin. The table is a copy of the host's
+latest sample; it never includes credentials. Percents are utilization, not currency. `ollama` is absent when Ollama is
+not visible. `localRuntimes` lists OpenAI-compatible CLI servers that answered `GET /v1/models` on loopback
+(llama.cpp, vLLM). Editor apps and GUI local servers are omitted unless Always on.
+
+```lua
+local ai = noctalia.aiUsage()
+if ai.hot ~= nil then
+  noctalia.log(string.format("%s %s %.0f%%", ai.hot.provider, ai.hot.window, ai.hot.percent))
+elseif ai.ollama ~= nil then
+  noctalia.log("ollama " .. ai.ollama.status)
+elseif #ai.localRuntimes > 0 then
+  noctalia.log(ai.localRuntimes[1].id .. " running")
+end
+```
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `refreshing` | bool | True while a fetch is in flight. |
+| `hot` | table | Hottest quota: `provider`, `window`, `percent`. Absent when no rate-limit window is visible. |
+| `providers` | array | Visible assistants only. Each has `id`, `status`, optional `plan`, `stale`, and `windows`. |
+| `providers[].windows[]` | table | `id`, `percent`, optional `used` / `max` counts, optional `resetsAtMs`. |
+| `ollama` | table | `status` (`stopped` / `running` / `error`), optional `version`, optional `model` (Helix's selected Ollama model), `models` with `name`, `size`, `loaded`, and optional `vram` when the model is in memory. Absent when Ollama is hidden. |
+| `localRuntimes` | array | Running CLI servers: `id` (`llamacpp`, `vllm`), `port`, and model id strings. |
+
+Values refresh on `[control_center.ai_usage].refresh_seconds`, not on every call. Open the tab with
+`noctalia msg panel-toggle control-center ai`.
+
 ## Subprocesses and environment
 
 | Method | Returns | Description |

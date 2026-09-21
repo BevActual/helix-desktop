@@ -78,7 +78,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `clock` | Clock | Local time, date, and zone on a compact card. Extra IANA timezones fill the leftover. Header gear opens the timezone list. |
 | `notifications` | Notifications | Do Not Disturb and history filters on one compact card. Notification history sits under it as leftover wells. Hover expand, collapse, and remove. Header gear opens daemon, toast, history, and filter settings. |
 | `screen-time` | Screen Time | Total time and the top app on one compact card. Click Today, 3 days, and 14 days to pin leftover. The enable toggle is on the live view when tracking is off; header gear opens reset. |
-| `ai` | AI | Empty or last-updated status on one compact card. Click through leftover wells for Claude Code, Cursor, Codex, Gemini CLI, Qwen Code, GitHub Copilot, DeepSeek, and local Ollama. Header refresh refetches; header gear opens poll interval, per-provider auto/on/off, and the Ollama host. `ai-usage` still opens this tab. |
+| `ai` | AI | Hottest CLI quota (or local llama.cpp / vLLM / selected Ollama model) on one compact card, with Open in a terminal, Start when Ollama is stopped, or Open for the Ollama app when it is installed. Click chips to pin leftover wells for Claude Code, Codex, Gemini CLI, Qwen Code, and Local. Local leftover has Installed and Library sources: Installed turns Ollama on and off and picks the model to load; search filters the installed list; Library searches ollama.com and installs with `POST /api/pull`. Compact shows disk and loaded VRAM. Editor apps (Cursor, Copilot, DeepSeek) stay hidden unless Always on. The sidebar badge shows the hottest percent at or above the usage warning. Header refresh refetches; header gear opens poll interval, per-CLI auto/on/off, usage and reset warnings, the Ollama host, and the Ollama model. `ai-usage` still opens this tab. Add a Home shortcut with `type = "ai"` for the same glanceable number. |
 | `capture` | Capture | Click Screenshot and Record chips to swap leftover. Capture tools, delay, and start/stop sit on the compact card with the chips. Screenshot leftover is recent PNGs. Record leftover is replay buffer and recent videos. Header gear follows the active chip (`screenshot` / `screen-record` settings). Contexts `screenshot` and `screen-record` still open the matching view. |
 | `clipboard` | Clipboard | Search and clear on one compact card. History and preview are leftover wells. Hover the preview icons. Header gear opens history size, auto-paste, and image-action settings. |
 | `tailscale` | Tailscale | Status, addresses, and connect on one compact card. Preferences and the peer list are leftover wells. Header gear opens refresh interval, peer toasts, and the admin URL. |
@@ -484,25 +484,24 @@ When tracking is off, the tab shows a disabled banner with the enable toggle on 
 
 Open it from the control center sidebar (`screen-time` context) or add a Home shortcut with `type = "screen_time"`.
 
-Reset stored history from the Screen Time tab header gear (**Screen Time** settings) or **System → Screen Time → Reset Screen Time Data**. That clears `screen_time.json` while Noctalia is running.
+Reset stored history from the Screen Time tab header gear (**Screen Time** settings) or **System → Screen Time → Reset Screen Time Data**. That clears `screen_time.json` while Helix is running.
 
 ## AI
 
-The AI tab shows coding assistants and local inference on this machine. Assistants follow the same local data sources as the community [AI Usage Tracker](https://github.com/JakubSx01/ai-usage-tracker) plugin: each provider is auto-detected from sign-in files or an installed app/CLI, then queried with your existing credentials. **Open** launches the matching desktop entry, or a terminal for CLI tools.
+The AI tab tracks AI CLIs on this machine. The compact card always answers the global question — hottest quota, else a running local server, else Ollama stopped, else empty — while chips pin leftover. **Open** on compact launches that CLI in a terminal (or **Start** when Ollama is stopped). Auto-detect is PATH: `claude`, `codex`, `gemini`, `qwen`, `ollama`. Usage still comes from that CLI's own local credentials. Cursor, GitHub Copilot, and DeepSeek are editor apps; they stay hidden unless you set them to Always on.
 
 | Provider | Detected from | Data |
 |----------|---------------|------|
-| Claude Code | `~/.claude/.credentials.json` or `claude` | Anthropic OAuth usage (5 h and 7 day windows) |
-| Cursor | Cursor `state.vscdb` + `sqlite3`, or the Cursor app | `cursor.com/api/usage` premium request quota |
-| Codex | `~/.codex/sessions` or `codex` | `rate_limits` from the newest session `.jsonl` |
-| Gemini CLI | `~/.gemini` or `gemini` | Today's prompts vs a configurable daily quota |
-| Qwen Code | `~/.qwen` or `qwen` | Today's prompts vs a configurable daily quota |
-| GitHub Copilot | `~/.config/github-copilot` + `gh` | Copilot quota snapshots |
-| DeepSeek | DeepSeek API key in the environment | Prepaid balance (no percentage) |
+| Claude Code | `claude` on PATH | Anthropic OAuth usage (5 h, 7 day, Opus/Sonnet weeks, Extra percent) from `~/.claude/.credentials.json` |
+| Codex | `codex` on PATH | Live `account/rateLimits/read` from `codex app-server`, falling back to `rate_limits` in `~/.codex/sessions` |
+| Gemini CLI | `gemini` on PATH | Today's prompts in `~/.gemini` vs a configurable daily quota |
+| Qwen Code | `qwen` on PATH | Today's prompts in `~/.qwen` vs a configurable daily quota |
 
-**Ollama** appears when the `ollama` CLI is on `PATH` (or always-on in settings). The card shows running/stopped, installed models, and which are loaded. Start uses `systemctl --user start ollama`, then `ollama serve` if that unit is missing. Stop uses the user unit (and a serve process Noctalia started). A remote `ollama_host` lists models only.
+**Ollama** appears when the `ollama` CLI is on `PATH` (or always-on in settings). Local leftover has two compact sources. **Installed** is pick, load, and on/off: the model list selects `ollama_model`, **Loaded** loads or unloads that model (`POST /api/generate` with `keep_alive` -1 / 0), and **Ollama** starts or stops the daemon. Turning Ollama on loads the selected model. Clicking a model while the daemon is running loads it. Search on the compact card filters Installed by name, size class, or quantization. Rows show parameter size, quantization, and disk size from `GET /api/tags`; loaded VRAM comes from `GET /api/ps`. Compact and the leftover version line show total disk and memory in use. **Library** searches the Ollama catalog (the same search field, leftover is the result list). **Install** pulls a model (`POST /api/pull`); compact and the row show byte progress, and **Cancel** stops the download. **Retry** appears if a pull fails. A typed name that is not in the catalog is still offered so you can pull a tag such as `llama3.2:1b`. After a model is installed, **Select** pins it and switches to Installed. Installed rows can **Remove** a model (`DELETE /api/delete`) after a confirm tap. Compact **Start** brings the daemon up; **Load** appears when a picked model is not in memory. **Open** launches the Ollama desktop app when it is installed. The daemon toggle uses `systemctl --user start ollama`, then `ollama serve` if that unit is missing; stop uses the user unit (and a serve process Helix started). If Ollama is already running when Helix starts, the selected model is loaded. If nothing is selected and exactly one model is loaded, Helix remembers that one. A remote `ollama_host` lists models only and does not pull.
 
-Tokens stay on this machine except for requests to that provider's own API. A failed refresh keeps the last good numbers. Open the tab with `noctalia msg panel-toggle control-center ai` (`ai-usage` is an alias). Header gear is `[control_center.ai_usage]`:
+**Local** leftover also lists OpenAI-compatible CLI servers that answered `GET /v1/models` on loopback: llama.cpp (`:8080`) and vLLM (`:8000`). GUI apps (LM Studio, Jan) are omitted. Helix does not send chat completions.
+
+Tokens stay on this machine except for requests to that provider's own API. A failed refresh keeps the last good numbers. Open the tab with `noctalia msg panel-toggle control-center ai` (`ai-usage` is an alias), add a bar widget with `type = "ai"`, or add a Home shortcut with `type = "ai"` — the tile and bar widget show the hottest CLI quota (or the selected Ollama model / local inference status) and light up when a quota is near the warning threshold. Dump or refetch from scripts with `noctalia msg ai-usage-status` and `noctalia msg ai-usage-refresh`. Start, stop, pick, or install an Ollama model with `noctalia msg ai-usage-ollama-start`, `ai-usage-ollama-stop`, `ai-usage-ollama-model NAME`, and `ai-usage-ollama-pull NAME`. Plugins can read the same snapshot with `noctalia.aiUsage()` instead of fetching tokens. The Control Center sidebar badge shows that same percent when it reaches **Usage Warning**. Header gear is `[control_center.ai_usage]`:
 
 ```toml
 [control_center.ai_usage]
@@ -510,10 +509,15 @@ refresh_seconds = 120          # 30–900
 claude = "auto"                # auto | on | off
 cursor = "auto"
 ollama = "auto"
+warn_percent = 90              # 0 disables
+warn_reset_minutes = 30        # 0 disables
 # ollama_host = "127.0.0.1:11434"
+# ollama_model = "llama3.2:latest"
 # gemini_daily_limit = 1000
 # qwen_daily_limit = 2000
 ```
+
+Helix notifies once when a quota crosses **Usage Warning**, and again when a busy quota (at least 50% used) will reset within **Reset Warning**. Each warning fires once per window until usage drops or the window resets.
 
 ## Settings
 

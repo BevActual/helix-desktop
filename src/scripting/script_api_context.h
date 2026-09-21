@@ -100,6 +100,68 @@ namespace scripting {
       return m_clipboardText;
     }
 
+    struct AiUsageWindow {
+      std::string id;
+      double percent = 0.0;
+      std::optional<double> used;
+      std::optional<double> max;
+      std::optional<double> resetsAtMs;
+    };
+
+    struct AiUsageProvider {
+      std::string id;
+      std::string status;
+      std::string plan;
+      bool stale = false;
+      std::vector<AiUsageWindow> windows;
+    };
+
+    struct AiUsageOllamaModel {
+      std::string name;
+      std::uint64_t size = 0;
+      bool loaded = false;
+      std::uint64_t vram = 0;
+    };
+
+    struct AiUsageOllama {
+      std::string status;
+      std::string version;
+      std::string model;
+      std::vector<AiUsageOllamaModel> models;
+    };
+
+    struct AiUsageLocalRuntime {
+      std::string id;
+      std::uint16_t port = 0;
+      std::vector<std::string> models;
+    };
+
+    struct AiUsageHot {
+      std::string provider;
+      std::string window;
+      double percent = 0.0;
+    };
+
+    struct AiUsageSnapshot {
+      bool refreshing = false;
+      std::optional<AiUsageHot> hot;
+      std::vector<AiUsageProvider> providers;
+      std::optional<AiUsageOllama> ollama;
+      std::vector<AiUsageLocalRuntime> localRuntimes;
+    };
+
+    // Latest AI status snapshot — published on the main thread, copied out under lock so
+    // plugin bindings (worker thread) never read the live service. Read-only: no tokens.
+    void setAiUsageSnapshot(AiUsageSnapshot snapshot) {
+      std::scoped_lock lock(m_mutex);
+      m_aiUsageSnapshot = std::move(snapshot);
+    }
+
+    [[nodiscard]] AiUsageSnapshot aiUsageSnapshot() const {
+      std::scoped_lock lock(m_mutex);
+      return m_aiUsageSnapshot;
+    }
+
     // Shell [shell].time_format / date_format — mirrored for noctalia.timeFormat() / dateFormat().
     void setTimeFormat(std::string format) {
       std::scoped_lock lock(m_mutex);
@@ -225,6 +287,7 @@ namespace scripting {
     std::vector<ScriptOutputInfo> m_outputs;
     std::unordered_map<std::string, std::string> m_wallpaperPaths;
     std::optional<std::string> m_clipboardText;
+    AiUsageSnapshot m_aiUsageSnapshot;
     std::function<void(const std::string&, bool)> m_wallpaperEnabledHook;
     std::function<void(const std::string&, const std::string&)> m_wallpaperHook;
     SetWallpaperMaskHook m_wallpaperMaskHook;

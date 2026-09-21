@@ -2189,6 +2189,31 @@ namespace settings {
         },
         "ai ollama host url local"
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.ollama-model.label"),
+        tr("settings.schema.ai-usage.ollama-model.description"), {"control_center", "ai_usage", "ollama_model"},
+        TextSetting{
+            .value = cfg.controlCenter.aiUsage.ollamaModel,
+            .placeholder = tr("settings.schema.ai-usage.ollama-model.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "ai ollama model local inference"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.warn-percent.label"),
+        tr("settings.schema.ai-usage.warn-percent.description"), {"control_center", "ai_usage", "warn_percent"},
+        sliderFor(cfg.controlCenter.aiUsage.warnPercent, noctalia::config::schema::kAiUsageWarnPercentRange, true),
+        "ai usage quota warning notification percent"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.warn-reset-minutes.label"),
+        tr("settings.schema.ai-usage.warn-reset-minutes.description"),
+        {"control_center", "ai_usage", "warn_reset_minutes"},
+        sliderFor(
+            cfg.controlCenter.aiUsage.warnResetMinutes, noctalia::config::schema::kAiUsageWarnResetMinutesRange, true
+        ),
+        "ai usage quota reset warning notification minutes"
+    ));
 
     // Desktop
     entries.push_back(makeEntry(

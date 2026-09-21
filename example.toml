@@ -300,17 +300,20 @@ discovery_seconds   = 10                # 5-60; how long Rescan keeps discovery 
 
 [control_center.ai_usage]
 refresh_seconds     = 120               # 30-900
-claude              = "auto"            # auto | on | off
+claude              = "auto"            # auto | on | off; Auto = CLI on PATH
 codex               = "auto"
 gemini              = "auto"
 qwen                = "auto"
-copilot             = "auto"
-cursor              = "auto"
-deepseek            = "auto"
+copilot             = "auto"            # editor app; Auto stays hidden
+cursor              = "auto"            # editor app; Auto stays hidden
+deepseek            = "auto"            # API key; Auto stays hidden
 ollama              = "auto"
 # ollama_host       = "127.0.0.1:11434"
+# ollama_model      = "llama3.2:latest"
 # gemini_daily_limit = 1000
 # qwen_daily_limit   = 2000
+warn_percent        = 90                # 0 disables usage warnings
+warn_reset_minutes  = 30                # 0 disables reset-soon warnings
 
 # ── Weather ───────────────────────────────────────────────────────────────────
 

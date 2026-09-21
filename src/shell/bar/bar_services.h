@@ -24,6 +24,7 @@ class SystemMonitorService;
 class TrayService;
 class UPowerService;
 class WeatherService;
+class AiUsageService;
 class GammaService;
 
 namespace noctalia::theme {
@@ -51,6 +52,7 @@ struct BarServices {
   PipeWireSpectrum* audioSpectrum = nullptr;
   HttpClient* httpClient = nullptr;
   WeatherService* weather = nullptr;
+  AiUsageService* aiUsage = nullptr;
   RenderContext* renderContext = nullptr;
   GammaService* nightLight = nullptr;
   noctalia::theme::ThemeService* theme = nullptr;

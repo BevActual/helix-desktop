@@ -497,6 +497,103 @@ namespace {
     return 1;
   }
 
+  // aiUsage() -> a copy of the host's latest AI status snapshot.
+  //
+  //   { refreshing, hot? = { provider, window, percent },
+  //     providers = { { id, status, plan?, stale, windows = { { id, percent, used?, max?, resetsAtMs? } } } },
+  //     ollama? = { status, version?, model?, models = { { name, size, loaded, vram? } } },
+  //     localRuntimes = { { id, port, models = { id, ... } } } }
+  //
+  // Read-only. No credentials or tokens. Absent ollama means Ollama is not visible on this machine.
+  int luau_aiUsage(lua_State* L) {
+    auto* host = hostForState(L);
+    if (host == nullptr) {
+      lua_pushnil(L);
+      return 1;
+    }
+
+    const auto snap = host->api().aiUsageSnapshot();
+    lua_createtable(L, 0, 5);
+    setTableBool(L, "refreshing", snap.refreshing);
+
+    if (snap.hot.has_value()) {
+      lua_createtable(L, 0, 3);
+      setTableString(L, "provider", snap.hot->provider);
+      setTableString(L, "window", snap.hot->window);
+      setTableNumber(L, "percent", snap.hot->percent);
+      lua_setfield(L, -2, "hot");
+    }
+
+    lua_createtable(L, static_cast<int>(snap.providers.size()), 0);
+    int providerIndex = 1;
+    for (const auto& provider : snap.providers) {
+      lua_createtable(L, 0, 5);
+      setTableString(L, "id", provider.id);
+      setTableString(L, "status", provider.status);
+      if (!provider.plan.empty()) {
+        setTableString(L, "plan", provider.plan);
+      }
+      setTableBool(L, "stale", provider.stale);
+      lua_createtable(L, static_cast<int>(provider.windows.size()), 0);
+      int windowIndex = 1;
+      for (const auto& window : provider.windows) {
+        lua_createtable(L, 0, 5);
+        setTableString(L, "id", window.id);
+        setTableNumber(L, "percent", window.percent);
+        setTableOptionalNumber(L, "used", window.used);
+        setTableOptionalNumber(L, "max", window.max);
+        setTableOptionalNumber(L, "resetsAtMs", window.resetsAtMs);
+        lua_rawseti(L, -2, windowIndex++);
+      }
+      lua_setfield(L, -2, "windows");
+      lua_rawseti(L, -2, providerIndex++);
+    }
+    lua_setfield(L, -2, "providers");
+
+    if (snap.ollama.has_value()) {
+      lua_createtable(L, 0, 3);
+      setTableString(L, "status", snap.ollama->status);
+      if (!snap.ollama->version.empty()) {
+        setTableString(L, "version", snap.ollama->version);
+      }
+      if (!snap.ollama->model.empty()) {
+        setTableString(L, "model", snap.ollama->model);
+      }
+      lua_createtable(L, static_cast<int>(snap.ollama->models.size()), 0);
+      int modelIndex = 1;
+      for (const auto& model : snap.ollama->models) {
+        lua_createtable(L, 0, 4);
+        setTableString(L, "name", model.name);
+        setTableNumber(L, "size", static_cast<double>(model.size));
+        setTableBool(L, "loaded", model.loaded);
+        if (model.vram > 0) {
+          setTableNumber(L, "vram", static_cast<double>(model.vram));
+        }
+        lua_rawseti(L, -2, modelIndex++);
+      }
+      lua_setfield(L, -2, "models");
+      lua_setfield(L, -2, "ollama");
+    }
+
+    lua_createtable(L, static_cast<int>(snap.localRuntimes.size()), 0);
+    int runtimeIndex = 1;
+    for (const auto& runtime : snap.localRuntimes) {
+      lua_createtable(L, 0, 3);
+      setTableString(L, "id", runtime.id);
+      setTableInteger(L, "port", static_cast<int>(runtime.port));
+      lua_createtable(L, static_cast<int>(runtime.models.size()), 0);
+      int modelIndex = 1;
+      for (const auto& model : runtime.models) {
+        lua_pushlstring(L, model.data(), model.size());
+        lua_rawseti(L, -2, modelIndex++);
+      }
+      lua_setfield(L, -2, "models");
+      lua_rawseti(L, -2, runtimeIndex++);
+    }
+    lua_setfield(L, -2, "localRuntimes");
+    return 1;
+  }
+
   // cpuCores() -> array of per-core CPU usage percentages, or nil when the monitor is unavailable
   // or has not produced a sample yet.
   //
@@ -1750,6 +1847,7 @@ namespace {
       {"focusedOutputName", luau_focusedOutputName},
       {"outputs", luau_outputs},
       {"systemStats", luau_systemStats},
+      {"aiUsage", luau_aiUsage},
       {"cpuCores", luau_cpuCores},
       {"diskMounts", luau_diskMounts},
       {"diskStats", luau_diskStats},

@@ -153,6 +153,7 @@ struct ControlCenterServices {
         .firewall = firewall,
         .printers = printers,
         .cast = cast,
+        .aiUsage = aiUsage,
         .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,

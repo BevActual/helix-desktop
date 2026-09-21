@@ -64,6 +64,7 @@
 #include "shell/settings/settings_registry.h"
 #include "shell/panel/panel_manager.h"
 #include "wayland/wayland_seat.h"
+#include "system/ai_usage_service.h"
 #include "system/dependency_service.h"
 #include "system/easyeffects_service.h"
 #include "system/package_kit_service.h"
@@ -447,6 +448,7 @@ namespace {
 
 ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
   m_config = services.config;
+  m_aiUsage = services.aiUsage;
   m_mpris = services.mpris;
   m_notificationManager = services.notifications;
   m_dependencies = services.dependencies;
@@ -931,6 +933,7 @@ void ControlCenterPanel::doUpdate(Renderer& renderer) {
     syncTabVisibility();
   }
   syncPackagesBadge();
+  syncAiBadge();
   if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
     slot->tab->update(renderer);
   }
@@ -1434,6 +1437,28 @@ void ControlCenterPanel::syncPackagesBadge() {
   slot->button->setBadge(badge);
   slot->button->setBadgeFontSize(Style::fontSizeCaption * contentScale());
   const std::string waiting = i18n::tr("control-center.packages.updates-waiting", "count", std::to_string(count));
+  slot->button->setTooltip(m_compact ? slot->title + " · " + waiting : waiting);
+}
+
+void ControlCenterPanel::syncAiBadge() {
+  auto* slot = slotById("ai");
+  if (slot == nullptr || slot->button == nullptr || m_aiUsage == nullptr) {
+    return;
+  }
+  const auto hit = noctalia::ai_usage::hottestQuota(m_aiUsage->snapshot());
+  const int attention = m_aiUsage->attentionPercent();
+  if (!hit.has_value() || hit->window.percent + 0.5F < static_cast<float>(attention)) {
+    slot->button->setBadge("");
+    slot->button->setTooltip(m_compact ? slot->title : std::string{});
+    return;
+  }
+  const int percent = static_cast<int>(std::lround(hit->window.percent));
+  slot->button->setBadge(std::to_string(percent));
+  slot->button->setBadgeFontSize(Style::fontSizeCaption * contentScale());
+  const std::string waiting = i18n::tr(
+      "control-center.ai-usage.attention-tooltip", "provider", noctalia::ai_usage::providerLabel(hit->provider),
+      "window", noctalia::ai_usage::windowLabel(hit->window.key), "percent", std::to_string(percent)
+  );
   slot->button->setTooltip(m_compact ? slot->title + " · " + waiting : waiting);
 }
 

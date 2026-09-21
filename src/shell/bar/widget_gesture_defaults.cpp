@@ -28,6 +28,7 @@ namespace noctalia::bar {
     };
 
     // Widgets whose whole-widget gestures are declared here rather than wired by hand in create().
+    constexpr std::array<GestureBinding, 1> kAi{{{Gesture::Left, "panel-toggle control-center ai"}}};
     constexpr std::array<GestureBinding, 1> kBattery{{{Gesture::Left, "panel-toggle control-center power"}}};
     constexpr std::array<GestureBinding, 2> kBluetooth{
         {{Gesture::Left, "panel-toggle control-center bluetooth"}, {Gesture::Right, "bluetooth-toggle"}}
@@ -96,7 +97,8 @@ namespace noctalia::bar {
     };
     constexpr std::array<GestureBinding, 1> kWeather{{{Gesture::Left, "panel-toggle control-center weather"}}};
 
-    constexpr std::array<TypeDefaults, 23> kTypeDefaults{{
+    constexpr std::array<TypeDefaults, 24> kTypeDefaults{{
+        {"ai", kAi},
         {"battery", kBattery},
         {"bluetooth", kBluetooth},
         {"brightness", kBrightness},

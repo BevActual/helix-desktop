@@ -1441,6 +1441,7 @@ bool Bar::initialize(const BarServices& services) {
   m_audioSpectrum = services.audioSpectrum;
   m_httpClient = services.httpClient;
   m_weatherService = services.weather;
+  m_aiUsageService = services.aiUsage;
   m_renderContext = services.renderContext;
   m_nightLight = services.nightLight;
   m_themeService = services.theme;
@@ -1494,6 +1495,7 @@ BarServices Bar::services() const {
       .audioSpectrum = m_audioSpectrum,
       .httpClient = m_httpClient,
       .weather = m_weatherService,
+      .aiUsage = m_aiUsageService,
       .renderContext = m_renderContext,
       .nightLight = m_nightLight,
       .theme = m_themeService,

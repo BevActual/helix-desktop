@@ -172,5 +172,11 @@
     "noctaliaVersion": null,
     "feature": "control-center-tab",
     "introduced": "The `[[control_center_tab]]` entry kind, adding a plugin page to the Control Center sidebar."
+  },
+  {
+    "level": 32,
+    "noctaliaVersion": null,
+    "feature": "ai-usage",
+    "introduced": "`noctalia.aiUsage()` for a read-only snapshot of AI CLIs and local CLI servers on this machine."
   }
 ]

@@ -551,6 +551,12 @@ namespace noctalia::config::schema {
           ),
           field(&ControlCenterConfig::AiUsageTabConfig::qwenDailyLimit, "qwen_daily_limit", kAiUsageDailyLimitRange),
           field(&ControlCenterConfig::AiUsageTabConfig::ollamaHost, "ollama_host"),
+          field(&ControlCenterConfig::AiUsageTabConfig::ollamaModel, "ollama_model"),
+          field(&ControlCenterConfig::AiUsageTabConfig::warnPercent, "warn_percent", kAiUsageWarnPercentRange),
+          field(
+              &ControlCenterConfig::AiUsageTabConfig::warnResetMinutes, "warn_reset_minutes",
+              kAiUsageWarnResetMinutesRange
+          ),
       };
       return s;
     }
