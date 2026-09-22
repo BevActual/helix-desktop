@@ -10,6 +10,7 @@
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
+#include "shell/panel/panel_surface_style.h"
 #include "ui/builders.h"
 #include "ui/controls/flex.h"
 #include "ui/controls/label.h"
@@ -92,7 +93,7 @@ std::unique_ptr<Flex> GlassTab::createLiveBody(bool hosted) {
   });
   addSliderSection(
       *compactCard, scale, i18n::tr("control-center.appearance.glass-slider"), &m_glass, &m_glassValue, 0.0, 1.0, 0.01,
-      glass, glassPercentLabel, [this]() { commitGlass(); }
+      glass, glassPercentLabel, [this]() { commitGlass(); }, [this](double next) { previewGlass(next); }
   );
   compactCard->addChild(
       ui::label({
@@ -132,6 +133,8 @@ std::unique_ptr<Flex> GlassTab::createHeaderActions() {
 }
 
 void GlassTab::onClose() {
+  // A panel closed mid-drag must not leave the chrome pinned to the thumb.
+  shell::panel_surface::setGlassPreview(std::nullopt);
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
@@ -206,7 +209,22 @@ void GlassTab::syncLiveControls() {
   m_syncing = false;
 }
 
+// Drag tick: the open Control Center (and any persistent panels) restyle to the thumb, the
+// caption names the band. Nothing is written until release.
+void GlassTab::previewGlass(double next) {
+  if (m_syncing || m_config == nullptr) {
+    return;
+  }
+  const float glass = static_cast<float>(std::clamp(next, 0.0, 1.0));
+  shell::panel_surface::setGlassPreview(glass);
+  if (m_caption != nullptr) {
+    m_caption->setText(i18n::tr(captionKey(glass)));
+  }
+  PanelManager::instance().onConfigReloaded();
+}
+
 void GlassTab::commitGlass() {
+  shell::panel_surface::setGlassPreview(std::nullopt);
   if (m_syncing || m_config == nullptr || m_glass == nullptr) {
     return;
   }

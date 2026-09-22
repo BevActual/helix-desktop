@@ -124,6 +124,10 @@ extern Palette palette;
 [[nodiscard]] std::string_view colorRoleToken(ColorRole role) noexcept;
 [[nodiscard]] ColorSpec colorSpecFromRole(ColorRole role, float alpha = 1.0F) noexcept;
 [[nodiscard]] ColorSpec fixedColorSpec(const Color& color) noexcept;
+// A fixed hue pulled up to 15° toward the current primary (Material harmonize) so system colors
+// (blue for connectivity, green for power, red for alerts) sit in the wallpaper palette's family
+// without losing their meaning. Resolved against the palette at call time.
+[[nodiscard]] Color harmonizeToPrimary(const Color& fixed) noexcept;
 [[nodiscard]] Color resolveColorSpec(const ColorSpec& color) noexcept;
 [[nodiscard]] bool isLightPalette() noexcept;
 // Set by ThemeService from resolved light/dark mode (not inferred from palette colors).

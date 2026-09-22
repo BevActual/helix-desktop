@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <optional>
 
 // Sizing and styling shared by the panel surfaces: PanelManager's single active
 // panel and PersistentPanelHost's long-lived ones.
@@ -42,22 +43,32 @@ namespace shell::panel_surface {
     return std::max(0.1F, configService->config().accessibility.uiScale);
   }
 
+  // While the Chrome slider is being dragged the chrome follows the thumb instead of the saved
+  // value, so the choice is made on what it looks like rather than on a percentage. Cleared on
+  // release, when the value is committed to config and the compositor.
+  inline std::optional<float> g_glassPreview;
+  inline void setGlassPreview(std::optional<float> glass) noexcept { g_glassPreview = glass; }
+  [[nodiscard]] inline std::optional<float> glassPreview() noexcept { return g_glassPreview; }
+
+  [[nodiscard]] inline float glass(const ConfigService* configService) noexcept {
+    if (g_glassPreview.has_value()) {
+      return std::clamp(*g_glassPreview, 0.0F, 1.0F);
+    }
+    return configService != nullptr ? resolvedPanelGlass(configService->config().shell.panel) : 0.0F;
+  }
+
   [[nodiscard]] inline float backgroundOpacity(const ConfigService* configService) noexcept {
     if (Style::highContrastEnabled()) {
       return 1.0F;
     }
-    const float glass =
-        configService != nullptr ? resolvedPanelGlass(configService->config().shell.panel) : 0.0F;
-    return detachedPanelBackgroundOpacityForGlass(glass);
+    return detachedPanelBackgroundOpacityForGlass(glass(configService));
   }
 
   [[nodiscard]] inline float cardOpacity(const ConfigService* configService, float panelBackgroundOpacity) noexcept {
     if (Style::highContrastEnabled()) {
       return 1.0F;
     }
-    const float glass =
-        configService != nullptr ? resolvedPanelGlass(configService->config().shell.panel) : 0.0F;
-    return panelCardOpacityForGlass(glass, panelBackgroundOpacity);
+    return panelCardOpacityForGlass(glass(configService), panelBackgroundOpacity);
   }
 
   [[nodiscard]] inline bool chromeBorderEnabled(bool panelBorders) noexcept {

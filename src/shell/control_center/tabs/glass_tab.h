@@ -34,6 +34,7 @@ private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void syncLiveControls();
+  void previewGlass(double next);
   void commitGlass();
   void applyRefraction(bool enabled);
   void persistCompositorGlass();

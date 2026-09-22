@@ -254,7 +254,7 @@ namespace control_center {
   void addSliderSection(
       Flex& parent, float scale, const std::string& title, Slider** sliderOut, Label** valueOut, double minValue,
       double maxValue, double step, double value, std::function<std::string(double)> format,
-      std::function<void()> onCommit
+      std::function<void()> onCommit, std::function<void(double)> onLiveChange
   ) {
     auto header = makeControlRow(title, scale, nullptr, false);
     header->addChild(
@@ -280,9 +280,12 @@ namespace control_center {
             .controlHeight = Style::controlHeight * scale,
             .flexGrow = 0.0F,
             .onValueChanged =
-                [valueOut, format](double next) {
+                [valueOut, format, onLiveChange = std::move(onLiveChange)](double next) {
                   if (valueOut != nullptr && *valueOut != nullptr) {
                     (*valueOut)->setText(format(next));
+                  }
+                  if (onLiveChange) {
+                    onLiveChange(next);
                   }
                 },
             .onDragEnd = std::move(onCommit),

@@ -572,6 +572,14 @@ void Button::ensureGlyph() {
   applyColors(m_targetBg, m_targetBorder, m_targetLabel);
 }
 
+void Button::setGlyphTint(std::optional<ColorSpec> tint) {
+  if (m_glyphTint == tint) {
+    return;
+  }
+  m_glyphTint = tint;
+  applyColors(m_targetBg, m_targetBorder, m_targetLabel);
+}
+
 void Button::applyColors(const Color& bg, const Color& border, const Color& label) {
   setFill(bg);
   setBorder(border, effectiveBorderWidth());
@@ -579,7 +587,8 @@ void Button::applyColors(const Color& bg, const Color& border, const Color& labe
     m_label->setColor(label);
   }
   if (m_glyph != nullptr) {
-    m_glyph->setColor(label);
+    const bool tinted = m_glyphTint.has_value() && !(m_enabled && m_selected);
+    m_glyph->setColor(tinted ? resolveColorSpec(*m_glyphTint) : label);
   }
   for (auto& child : children()) {
     if (child.get() == m_label || child.get() == m_glyph || child.get() == m_badge) {

@@ -60,6 +60,10 @@ public:
   void setControlHeight(float height);
   void setEnabled(bool enabled);
   void setSelected(bool selected);
+  // Tint the glyph independently of the label while the button is not selected (sidebar icons
+  // with a color each). Selected buttons keep the palette's label color so the icon stays readable
+  // on the selection fill.
+  void setGlyphTint(std::optional<ColorSpec> tint);
   void setContentAlign(ButtonContentAlign align);
   void setVariant(ButtonVariant variant);
   void setCustomPalette(ButtonPalette customPalette);
@@ -148,6 +152,7 @@ private:
   float m_surfaceOpacity = 1.0F;
   bool m_enabled = true;
   bool m_selected = false;
+  std::optional<ColorSpec> m_glyphTint;
   bool m_keyboardFocusHint = false;
   bool m_hoverSuppressed = false;
   bool m_hoveredVisual = false;

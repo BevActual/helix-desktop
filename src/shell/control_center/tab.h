@@ -70,7 +70,7 @@ namespace control_center {
   void addSliderSection(
       Flex& parent, float scale, const std::string& title, Slider** sliderOut, Label** valueOut, double minValue,
       double maxValue, double step, double value, std::function<std::string(double)> format,
-      std::function<void()> onCommit
+      std::function<void()> onCommit, std::function<void(double)> onLiveChange = nullptr
   );
   // Size a hosted live body to its content height so leftover wells can scroll
   // instead of stretching sliders and clipping trailing rows.

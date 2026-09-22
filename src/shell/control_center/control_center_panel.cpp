@@ -193,6 +193,62 @@ namespace {
       {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Advanced},
   };
 
+  // Sidebar icon color per tab, the way macOS sidebars carry a tint per section: appearance tabs
+  // take the accent itself, connectivity blue, power green, alerts red, media pink, tools yellow.
+  // Fixed hues are harmonized toward the palette primary. Advanced and plain utilities stay neutral.
+  std::optional<ColorSpec> sidebarTabTint(std::string_view id, TabGroup group) {
+    constexpr Color kBlue = rgbHex(0x0A84FF);
+    constexpr Color kGreen = rgbHex(0x30D158);
+    constexpr Color kOrange = rgbHex(0xFF9F0A);
+    constexpr Color kRed = rgbHex(0xFF453A);
+    constexpr Color kPink = rgbHex(0xFF375F);
+    constexpr Color kIndigo = rgbHex(0x5E5CE6);
+    constexpr Color kPurple = rgbHex(0xBF5AF2);
+    constexpr Color kCyan = rgbHex(0x64D2FF);
+    constexpr Color kYellow = rgbHex(0xFFD60A);
+    const auto fixed = [](const Color& c) { return fixedColorSpec(harmonizeToPrimary(c)); };
+    const auto neutral = colorSpecFromRole(ColorRole::OnSurfaceVariant);
+
+    if (group == TabGroup::Home || group == TabGroup::Appearance) {
+      return colorSpecFromRole(ColorRole::Primary);
+    }
+    if (group == TabGroup::Layout) {
+      return colorSpecFromRole(ColorRole::Tertiary);
+    }
+    if (id == "network" || id == "bluetooth" || id == "tailscale" || id == "syncthing" || id == "localsend"
+        || id == "cast" || id == "phone") {
+      return fixed(kBlue);
+    }
+    if (id == "power" || id == "system") {
+      return fixed(kGreen);
+    }
+    if (id == "audio" || id == "packages") {
+      return fixed(kOrange);
+    }
+    if (id == "notifications" || id == "calendar") {
+      return fixed(kRed);
+    }
+    if (id == "media" || id == "capture" || id == "launcher") {
+      return fixed(kPink);
+    }
+    if (id == "screen-time" || id == "clock" || id == "privacy" || id == "firewall" || id == "security") {
+      return fixed(kIndigo);
+    }
+    if (id == "ai") {
+      return fixed(kPurple);
+    }
+    if (id == "monitor" || id == "weather") {
+      return fixed(kCyan);
+    }
+    if (id == "clipboard") {
+      return fixed(kYellow);
+    }
+    if (group == TabGroup::Services) {
+      return colorSpecFromRole(ColorRole::Secondary); // plugins and the rest of the service catalog
+    }
+    return neutral;
+  }
+
   std::string groupCaption(TabGroup group) {
     switch (group) {
     case TabGroup::Appearance:
@@ -610,22 +666,20 @@ void ControlCenterPanel::create() {
   auto rootLayout = ui::row({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
-      .gap = Style::panelPadding * scale,
+      .gap = Style::spaceMd * scale,
       .padding = 0.0F,
   });
 
   if (m_showSidebar) {
+    // The sidebar is chrome, not a card: no fill or radius of its own, it runs the panel's full
+    // height and a hairline separates it from the content (macOS 27's edge-to-edge sidebar).
     auto sidebar = ui::column({
         .out = &m_sidebar,
         .align = FlexAlign::Stretch,
         .gap = Style::spaceXs * scale,
-        .padding = Style::spaceMd * scale,
+        .padding = 0.0F,
         .fillWidth = false,
         .fillHeight = true,
-        .configure = [this, scale](Flex& column) {
-          column.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, panelCardOpacity()));
-          column.setRadius(Style::scaledRadius3xl(scale));
-        },
     });
 
     auto sidebarScrollArea = ui::inputArea({});
@@ -708,6 +762,13 @@ void ControlCenterPanel::create() {
         })
     );
     rootLayout->addChild(std::move(sidebar));
+    rootLayout->addChild(
+        ui::box({
+            .fill = colorSpecFromRole(ColorRole::Outline, 0.6F),
+            .width = 1.0F,
+            .configure = [](Box& box) { box.setHitTestVisible(false); },
+        })
+    );
   }
 
   auto content = ui::column({
@@ -820,11 +881,8 @@ void ControlCenterPanel::onPanelCardOpacityChanged(float opacity) {
       slot.tab->setPanelCardOpacity(opacity);
     }
   }
-  if (m_sidebar != nullptr) {
-    m_sidebar->setFill(colorSpecFromRole(ColorRole::SurfaceVariant, opacity));
-  }
   if (m_sidebarEdgeFade != nullptr) {
-    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::SurfaceVariant, opacity, true);
+    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::Surface, 1.0F, true);
   }
   if (m_contentEdgeFade != nullptr) {
     styleScrollEdgeFade(*m_contentEdgeFade, ColorRole::Surface, 1.0F, true);
@@ -869,7 +927,7 @@ void ControlCenterPanel::doLayout(Renderer& renderer, float width, float height)
 
   const float fadeH = kScrollEdgeFadePx * contentScale();
   if (m_sidebarEdgeFade != nullptr && m_sidebarScrollView != nullptr) {
-    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::SurfaceVariant, panelCardOpacity(), true);
+    styleScrollEdgeFade(*m_sidebarEdgeFade, ColorRole::Surface, 1.0F, true);
     m_sidebarEdgeFade->setPosition(m_sidebarScrollView->x(), m_sidebarScrollView->y());
     m_sidebarEdgeFade->setSize(m_sidebarScrollView->width(), fadeH);
   }
@@ -1428,11 +1486,12 @@ void ControlCenterPanel::addSidebarTabButton(RovingListNavHost& nav, TabSlot& sl
           .gap = Style::spaceSm * scale,
           .radius = Style::scaledRadiusXl(scale),
           .onClick = onClick,
-          .configure = [this, scale](Button& button) {
+          .configure = [this, scale, tint = sidebarTabTint(slot.id, slot.group)](Button& button) {
             if (button.label() != nullptr) {
               button.label()->setFontWeight(FontWeight::Bold);
               button.label()->setFontSize(Style::fontSizeBody * scale);
             }
+            button.setGlyphTint(tint);
             wireSidebarScroll(button.inputArea());
           },
       })

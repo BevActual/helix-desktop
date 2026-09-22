@@ -1,9 +1,13 @@
 #include "ui/palette.h"
 
+#include "cpp/blend/blend.h"
 #include "render/core/color.h"
 #include "theme/builtin_palettes.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <mutex>
 #include <string>
 
@@ -62,6 +66,20 @@ const Color& colorForRole(ColorRole role) noexcept {
   }
 
   return palette.onSurface;
+}
+
+namespace {
+  std::uint32_t argbOf(const Color& c) noexcept {
+    const auto ch = [](float v) { return static_cast<std::uint32_t>(std::lround(std::clamp(v, 0.0F, 1.0F) * 255.0F)); };
+    return (0xFFU << 24U) | (ch(c.r) << 16U) | (ch(c.g) << 8U) | ch(c.b);
+  }
+} // namespace
+
+Color harmonizeToPrimary(const Color& fixed) noexcept {
+  const std::uint32_t out = material_color_utilities::BlendHarmonize(argbOf(fixed), argbOf(colorForRole(ColorRole::Primary, 1.0F)));
+  return Color{
+      .r = colorByte((out >> 16U) & 0xFFU), .g = colorByte((out >> 8U) & 0xFFU), .b = colorByte(out & 0xFFU), .a = fixed.a
+  };
 }
 
 Color colorForRole(ColorRole role, float alpha) noexcept {
