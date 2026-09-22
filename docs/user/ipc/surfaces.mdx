@@ -1,6 +1,6 @@
 ---
 title: Surfaces
-description: IPC commands for bar, panels, dock, desktop widgets, and lockscreen widgets.
+description: IPC commands for bar, bar widgets, workspace alerts, panels, dock, desktop widgets, and lockscreen widgets.
 sidebar:
   order: 2
 ---
@@ -21,6 +21,29 @@ These commands open, close, or adjust Helix UI surfaces.
 | Set bar layer | <IpcCommand command="bar-layer-set" /> &lt;top\|overlay&gt; [bar-name] [monitor-selector] | Temporarily move matching bar instance(s) to the `top` or `overlay` layer-shell layer. `overlay` shows the bar above fullscreen apps; attached panels follow the bar's layer. Omit `bar-name` to update every bar. |
 
 Use <IpcCommand command="bar-hide" /> when you want the bar to stay hidden until <IpcCommand command="bar-show" />.
+
+## Bar widgets
+
+These commands are meant for bar widget gestures (`[[bar.<name>.widget]] gestures`). Invoked from a gesture they act on the widget that received it; from a keybind or script they need the widget named explicitly or fail.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Open widget settings | <IpcCommand command="settings-open-widget" /> [bar-name] [widget-name] | Open Control Center at a bar widget's editor. With no arguments it targets the widget whose gesture invoked it (the default middle-click on every widget). |
+| Cycle taskbar entries | <IpcCommand command="taskbar-cycle next" /> | Step to the adjacent task or workspace group in the invoking taskbar widget; `next` or `prev`. Order follows that taskbar's pins, grouping, and monitor filter, so this only works from a taskbar widget gesture such as scroll. |
+| Switch workspace | <IpcCommand command="workspace-switch next" /> | Activate the adjacent workspace, `next` or `prev`, stopping at both ends. From a bar widget gesture it targets that bar's monitor; from a keybind it targets the focused one. |
+| Cycle keyboard layout | <IpcCommand command="keyboard-layout-cycle" /> | Switch to the next keyboard layout through the compositor (niri, Hyprland, Sway, Mango). The default left-click on the keyboard layout widget. |
+
+## Workspace alerts
+
+Workspace alerts mark a workspace urgent in the bar until you visit it. They are runtime state, not configuration, so scripts can flag a workspace when a build finishes or a message arrives.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Alert a workspace | <IpcCommand command="workspace-alert-add 3" /> | Mark a workspace by index, name, or compositor id. The alert shows once the workspace is inactive and clears when you switch to it. Unknown workspaces are rejected. |
+| Alert a window's workspace | <IpcCommand command="workspace-alert-add-window 42" /> | Resolve a compositor window id (`niri msg windows`, `hyprctl clients`) to its workspace and alert that. |
+| Clear one alert | <IpcCommand command="workspace-alert-clear 3" /> | Remove an alert by the same token it was added with. |
+| Clear all alerts | <IpcCommand command="workspace-alert-clear-all" /> | Remove every workspace alert. |
+| List alerts | <IpcCommand command="workspace-alert-status" /> | Print one alert token per line, or `(no workspace alerts)`. |
 
 ## Panels
 
