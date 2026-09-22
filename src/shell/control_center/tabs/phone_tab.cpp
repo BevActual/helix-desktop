@@ -5,6 +5,7 @@
 #include "core/process/process.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/kdeconnect/phone_cast_logic.h"
 #include "i18n/i18n.h"
 #include "net/url_open.h"
 #include "notification/notifications.h"
@@ -1611,10 +1612,12 @@ void PhoneTab::rebuildCast() {
   const bool androidPeer = peer != nullptr && m_service->castAndroidFor(*peer);
   const bool applePeer = peer != nullptr && m_service->castAppleFor(*peer);
   const bool supportedPeer = androidPeer || applePeer;
-  const bool showAdbRow = androidPeer && cast.toolsReady;
-  const bool showMirror = (androidPeer && cast.toolsReady && cast.adbConnected)
-      || (applePeer && cast.toolsReady);
-  const bool showSearch = androidPeer && showMirror && !cast.apps.empty();
+  const phone_cast::CastRows rows = phone_cast::castRows(
+      androidPeer, applePeer, cast.toolsReady, cast.adbConnected, cast.airplayRunning, !cast.apps.empty()
+  );
+  const bool showAdbRow = rows.adb;
+  const bool showMirror = rows.mirror;
+  const bool showSearch = rows.search;
   std::string signature = peerId;
   signature += cast.loading ? '1' : '0';
   signature += cast.connecting ? '1' : '0';
@@ -1707,7 +1710,7 @@ void PhoneTab::rebuildCast() {
       (void)setShown(m_castEmpty, applePeer || !showSearch || cast.apps.empty());
     }
     (void)setShown(m_castAdbRow, showAdbRow);
-    (void)setShown(m_castAudioRow, showAdbRow);
+    (void)setShown(m_castAudioRow, rows.audio);
     if (m_castAudio != nullptr && m_config != nullptr) {
       m_castAudio->setChecked(m_config->config().phone.castAudio);
     }
@@ -1747,41 +1750,32 @@ void PhoneTab::rebuildCast() {
         m_castMirrorButton->setGlyph("cast");
       }
     }
-    (void)setShown(m_castAlwaysOnRow, applePeer && cast.toolsReady);
+    (void)setShown(m_castAlwaysOnRow, rows.alwaysOn);
     if (m_castAlwaysOn != nullptr && m_config != nullptr) {
       m_castAlwaysOn->setChecked(m_config->config().phone.mirrorAlwaysOn);
     }
-    (void)setShown(m_castNotificationsRow, applePeer && cast.toolsReady);
+    (void)setShown(m_castNotificationsRow, rows.notifications);
     if (m_castNotifications != nullptr && m_config != nullptr) {
       m_castNotifications->setChecked(m_config->config().phone.notifications);
     }
     if (m_castNotificationsStatus != nullptr && m_config != nullptr) {
-      const bool wanted = m_config->config().phone.notifications;
+      const char* key = phone_cast::notificationsStatusKey(
+          m_config->config().phone.notifications, cast.pointerRunning, cast.ancsAttached, cast.ancsPosted
+      );
       std::string text;
-      if (wanted) {
-        if (!cast.pointerRunning) {
-          text = i18n::tr("control-center.phone.cast-notifications-starting");
-        } else if (!cast.ancsAttached) {
-          text = i18n::tr("control-center.phone.cast-notifications-waiting");
-        } else if (cast.ancsPosted == 0) {
-          text = i18n::tr("control-center.phone.cast-notifications-allow");
-        } else {
-          text = i18n::trp("control-center.phone.cast-notifications-syncing", cast.ancsActive);
-        }
+      if (key != nullptr) {
+        text = std::string_view(key).ends_with("-syncing") ? i18n::trp(key, cast.ancsActive) : i18n::tr(key);
       }
       m_castNotificationsStatus->setText(text);
       (void)setShown(m_castNotificationsStatus, !text.empty());
     }
-    const bool showPointer = applePeer && cast.airplayRunning;
+    const bool showPointer = rows.pointer;
     (void)setShown(m_castPointerWell, showPointer);
     if (showPointer) {
       if (m_castPointerStatus != nullptr) {
-        const char* key = !cast.pointerRunning    ? "control-center.phone.cast-pointer-starting"
-                          : cast.pointerBondLost   ? "control-center.phone.cast-pointer-lost"
-                          : !cast.pointerConnected ? "control-center.phone.cast-pointer-waiting"
-                          : cast.pointerKeyboard   ? "control-center.phone.cast-pointer-typing"
-                                                   : "control-center.phone.cast-pointer-connected";
-        m_castPointerStatus->setText(i18n::tr(key));
+        m_castPointerStatus->setText(i18n::tr(phone_cast::pointerStatusKey(
+            cast.pointerRunning, cast.pointerBondLost, cast.pointerConnected, cast.pointerKeyboard
+        )));
       }
       if (m_castPointerActions != nullptr) {
         for (const auto& child : m_castPointerActions->children()) {

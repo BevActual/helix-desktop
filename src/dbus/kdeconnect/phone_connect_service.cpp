@@ -1,4 +1,5 @@
 #include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/kdeconnect/phone_cast_logic.h"
 
 #include "dbus/bus_name_watch.h"
 
@@ -419,51 +420,11 @@ namespace {
     return ordered;
   }
 
-  [[nodiscard]] std::string phoneMirrorWindowTitle(std::string_view label = {}) {
-    using compositors::niri::kPhoneMirrorWindowTitle;
-    if (label.empty() || label == kPhoneMirrorWindowTitle) {
-      return std::string(kPhoneMirrorWindowTitle);
-    }
-    return std::string(label) + " · " + std::string(kPhoneMirrorWindowTitle);
-  }
-
   void ensurePhoneMirrorWindowRules() {
     const auto result = compositors::niri::ensurePhoneCastWindowRules();
     if (!result.ok && !result.error.empty()) {
       kLog.warn("phone cast window rules: {}", result.error);
     }
-  }
-
-  [[nodiscard]] std::vector<std::string> scrcpyArgs(
-      const std::string& serial, std::string windowTitle, bool audio, std::initializer_list<const char*> extra
-  ) {
-    using compositors::niri::kPhoneMirrorHeight;
-    using compositors::niri::kPhoneMirrorWidth;
-    ensurePhoneMirrorWindowRules();
-    std::vector<std::string> args{"scrcpy"};
-    if (!serial.empty()) {
-      args.push_back("-s");
-      args.push_back(serial);
-    }
-    for (const char* flag : extra) {
-      args.emplace_back(flag);
-    }
-    // scrcpy forwards audio by default on Android 11+ and quietly carries on without it
-    // on older phones; --no-audio is the explicit opt-out.
-    if (!audio) {
-      args.emplace_back("--no-audio");
-    }
-    args.push_back(std::format("--window-width={}", kPhoneMirrorWidth));
-    args.push_back(std::format("--window-height={}", kPhoneMirrorHeight));
-    args.push_back("--window-borderless");
-    args.push_back("--always-on-top");
-    args.push_back("--background-color=#000000");
-    if (!windowTitle.empty()) {
-      args.push_back("--window-title=" + phoneMirrorWindowTitle(windowTitle));
-    } else {
-      args.push_back("--window-title=" + phoneMirrorWindowTitle());
-    }
-    return args;
   }
 
   [[nodiscard]] std::filesystem::path castIconCacheDir(const std::string& deviceId) {
@@ -1962,11 +1923,8 @@ void PhoneConnectService::onAirplayLog(std::uint32_t generation, std::string lin
     return;
   }
   bool streaming = m_cast.mirrorStreaming;
-  if (line.find("raop_rtp_mirror starting mirroring") != std::string::npos) {
-    streaming = true;
-  } else if (line.find("TEARDOWN") != std::string::npos || line.find("Connection closed") != std::string::npos
-             || line.find("raop_rtp_mirror stopped") != std::string::npos) {
-    streaming = false;
+  if (const auto edge = phone_cast::airplayStreamingEdge(line); edge.has_value()) {
+    streaming = *edge;
   } else if (line.find("Client connected") != std::string::npos) {
     // A new client took the receiver over; frames follow shortly.
     m_pointerLastSeen = std::chrono::steady_clock::now();
@@ -2093,28 +2051,29 @@ bool PhoneConnectService::applyPhonePointerStatus(const std::optional<nlohmann::
       m_cast.pointerBonded, m_cast.pointerBondLost, m_cast.ancsEnabled, m_cast.ancsAttached, m_cast.ancsActive,
       m_cast.ancsPosted
   );
-  if (!status.has_value()) {
-    m_cast.pointerRunning = false;
-    m_cast.pointerConnected = false;
-    m_cast.pointerKeyboard = false;
-    m_cast.ancsAttached = false;
-    m_cast.ancsActive = 0;
-  } else {
-    m_cast.pointerRunning = true;
-    m_cast.pointerConnected = status->value("connected", false);
-    m_cast.pointerKeyboard = status->value("keyboard_captured", false);
-    m_cast.pointerConfigOk = status->value("bluetooth_config_ok", true);
-    m_cast.pointerBonded = status->value("bonded", false);
-    if (const auto ancs = status->find("ancs"); ancs != status->end() && ancs->is_object()) {
-      m_cast.ancsEnabled = ancs->value("enabled", true);
-      m_cast.ancsAttached = ancs->value("attached", false);
-      m_cast.ancsActive = ancs->value("active", 0);
-      m_cast.ancsPosted = ancs->value("posted", 0);
-    } else {
-      m_cast.ancsAttached = false;
-      m_cast.ancsActive = 0;
-    }
-  }
+  const phone_cast::PointerStatus parsed = phone_cast::parsePointerStatus(
+      status,
+      phone_cast::PointerStatus{
+          .running = m_cast.pointerRunning,
+          .connected = m_cast.pointerConnected,
+          .keyboard = m_cast.pointerKeyboard,
+          .configOk = m_cast.pointerConfigOk,
+          .bonded = m_cast.pointerBonded,
+          .ancsEnabled = m_cast.ancsEnabled,
+          .ancsAttached = m_cast.ancsAttached,
+          .ancsActive = m_cast.ancsActive,
+          .ancsPosted = m_cast.ancsPosted,
+      }
+  );
+  m_cast.pointerRunning = parsed.running;
+  m_cast.pointerConnected = parsed.connected;
+  m_cast.pointerKeyboard = parsed.keyboard;
+  m_cast.pointerConfigOk = parsed.configOk;
+  m_cast.pointerBonded = parsed.bonded;
+  m_cast.ancsEnabled = parsed.ancsEnabled;
+  m_cast.ancsAttached = parsed.ancsAttached;
+  m_cast.ancsActive = parsed.ancsActive;
+  m_cast.ancsPosted = parsed.ancsPosted;
   // iOS drops the bond silently (or AssistiveTouch is switched off). The phone is
   // demonstrably nearby while it mirrors, so a bonded pointer that stays disconnected
   // for a while during mirroring is the user-visible sign.
@@ -2866,7 +2825,8 @@ void PhoneConnectService::launchCastMirror(const std::string& deviceId) {
     saveCastAdbHost(deviceId, *serial);
   }
   const std::string title = device->name.empty() ? device->id : device->name;
-  auto args = scrcpyArgs(*serial, title, m_castAudio, {"--max-size=1080"});
+  ensurePhoneMirrorWindowRules();
+  auto args = phone_cast::scrcpyArgs(*serial, title, m_castAudio, {"--max-size=1080"});
   (void)process::runAsync(std::move(args));
 }
 
@@ -2890,7 +2850,8 @@ void PhoneConnectService::launchCastApp(
   }
   recordCastRecent(deviceId, package, label);
   const std::string windowTitle = label.empty() ? package : label;
-  auto args = scrcpyArgs(*serial, windowTitle, m_castAudio, {"--new-display=1080x2400"});
+  ensurePhoneMirrorWindowRules();
+  auto args = phone_cast::scrcpyArgs(*serial, windowTitle, m_castAudio, {"--new-display=1080x2400"});
   args.push_back("--start-app=" + package);
   (void)process::runAsync(std::move(args));
   if (m_cast.deviceId == deviceId) {
