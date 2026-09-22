@@ -332,7 +332,7 @@ location = "https://example.invalid/bad"
   // checks exercise real serialization rather than all-defaults.
   Config makeProbe() {
     Config c;
-    c.audio = AudioConfig{true, true, 0.73F, "change.ogg", "notify.ogg"};
+    c.audio = AudioConfig{true, true, 0.73F, "freedesktop"};
     c.weather = WeatherConfig{false, false, 17, "imperial"};
     c.tailscale = TailscaleConfig{15, true, "https://example.invalid/admin"};
     c.localsend = LocalSendConfig{false, "Studio", "2468", "~/Downloads/LocalSend", true, false, 53318};
@@ -514,6 +514,8 @@ location = "https://example.invalid/bad"
     c.shell.screenshot.pipeToCommand = true;
     c.shell.screenRecord.directory = "/recordings";
     c.shell.screenRecord.audio = false;
+    c.shell.screenshot.skipAnnotateOnCopySave = true;
+    c.shell.screenshot.closeOnSave = false; // non-default (default is true) so the round-trip exercises it
     c.shell.session.actions = {
         SessionPanelActionConfig{
             "lock",

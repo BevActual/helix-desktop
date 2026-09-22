@@ -46,6 +46,7 @@
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
+#include "launcher/panel_provider.h"
 #include "launcher/plugin_launcher_provider.h"
 #include "launcher/session_provider.h"
 #include "launcher/wallpaper_provider.h"
@@ -114,6 +115,15 @@
 
 namespace {
   constexpr Logger kLog("app");
+
+  [[nodiscard]] bool overviewTypeToLaunchEnabled(const ConfigService& configService) {
+    if (compositors::isUmbriel()) {
+      return configService.config().shell.umbrielOverviewTypeToLaunchEnabled;
+    } else if (compositors::isNiri()) {
+      return configService.config().shell.niriOverviewTypeToLaunchEnabled;
+    }
+    return false;
+  }
 } // namespace
 
 void Application::initUi() {
@@ -335,6 +345,9 @@ void Application::initLockScreenAndSession() {
         if (m_logindService != nullptr) {
           m_logindService->setSessionLockedHint(true);
         }
+        if (m_screenSaverService != nullptr) {
+          m_screenSaverService->emitActiveChanged(true);
+        }
         releaseSleepDelayInhibitIfPending();
       },
       [this]() {
@@ -347,6 +360,9 @@ void Application::initLockScreenAndSession() {
         requestAllSurfacesRedraw();
         if (m_logindService != nullptr) {
           m_logindService->setSessionLockedHint(false);
+        }
+        if (m_screenSaverService != nullptr) {
+          m_screenSaverService->emitActiveChanged(false);
         }
       },
       [this]() {
@@ -717,6 +733,9 @@ void Application::initPanelManagerAndPanels() {
     launcherPanel->addProvider(std::make_unique<AppProvider>(&m_configService, &m_compositorPlatform));
     launcherPanel->addProvider(std::make_unique<WallpaperProvider>(&m_configService, &m_wayland, &m_themeService));
     launcherPanel->addProvider(std::make_unique<WindowProvider>(&m_compositorPlatform));
+    launcherPanel->addProvider(
+        std::make_unique<PanelProvider>(&m_panelManager, m_controlCenter, &m_configService)
+    );
     launcherPanel->addProvider(std::make_unique<SessionProvider>(&m_configService, &m_sessionActionRunner));
     launcherPanel->addProvider(std::make_unique<MathProvider>(&m_clipboardService, &m_configService, &m_httpClient));
     launcherPanel->addProvider(std::make_unique<EmojiProvider>(&m_clipboardService));
@@ -765,7 +784,7 @@ void Application::initPanelManagerAndPanels() {
   reloadDmenuProviders();
   reloadPluginPanels();
   m_overviewLauncherCapture.initialize(m_wayland, &m_renderContext, m_compositorPlatform, m_panelManager);
-  m_overviewLauncherCapture.setEnabled(m_configService.config().shell.niriOverviewTypeToLaunchEnabled);
+  m_overviewLauncherCapture.setEnabled(overviewTypeToLaunchEnabled(m_configService));
   m_overviewLauncherCapture.setOpenLauncherCallback(
       [this](std::string_view initialQuery, wl_output* output, std::string_view sourceBarName) {
         if (m_panelManager.isOpenPanel("launcher")) {
@@ -797,7 +816,7 @@ void Application::initPanelManagerAndPanels() {
     m_bar.refresh();
   });
   m_configService.addReloadCallback([this]() {
-    m_overviewLauncherCapture.setEnabled(m_configService.config().shell.niriOverviewTypeToLaunchEnabled);
+    m_overviewLauncherCapture.setEnabled(overviewTypeToLaunchEnabled(m_configService));
   });
   m_overviewLauncherCapture.sync();
   m_panelManager.registerPanel(
@@ -996,8 +1015,8 @@ void Application::initBarDockAndLayout() {
   m_panelManager.setAttachedPanelAvailabilityCallback([this](wl_output* output, std::string_view barName) {
     return m_bar.canAttachPanelToBar(output, barName);
   });
-  m_panelManager.setAttachedPanelLayerProvider([this](wl_output* output, std::string_view barName) {
-    return m_bar.layerForBar(output, barName);
+  m_panelManager.setBarConfigProvider([this](wl_output* output, std::string_view barName) {
+    return m_bar.configForBar(output, barName);
   });
   m_panelManager.setAttachedPanelBarSettledCallback([this](wl_output* output, std::string_view barName) {
     return m_bar.isAttachedPanelBarSettled(output, barName);

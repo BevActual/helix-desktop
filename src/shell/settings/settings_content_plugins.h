@@ -28,6 +28,10 @@ namespace settings {
     std::string_view selectedSection;
     // Empty means render every group. Live Plugins uses {"plugins"}; gear uses {"sources"}.
     std::unordered_set<std::string> includedGroups;
+    // In page search query and empty means no filtering. Owned copy so the context
+    // never views a string that a debounced rebuild could observe mid mutation.
+    std::string searchQuery;
+    std::function<void(std::string)> setSearchQuery;
     std::vector<scripting::PluginStatus> plugins;
     std::vector<PluginSourceConfig> sources;
     bool searchActive = false;

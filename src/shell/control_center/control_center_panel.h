@@ -52,6 +52,15 @@ public:
   };
   [[nodiscard]] static std::vector<TabCatalogEntry> hideableTabCatalog();
 
+  // Tabs a launcher row can jump straight to right now (feature-available and not
+  // hidden via [control_center] hidden_tabs), excluding Home.
+  struct LauncherTabEntry {
+    std::string key;   // slot id, also the open() context
+    std::string title; // translated
+    std::string glyph;
+  };
+  [[nodiscard]] std::vector<LauncherTabEntry> visibleTabsForLauncher() const;
+
   void create() override;
   void onFrameTick(float deltaMs) override;
   void onOpen(std::string_view context) override;

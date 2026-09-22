@@ -1222,7 +1222,7 @@ int main() {
        )
       && ok;
   ok = expectEq(
-           error, "entry 'displays': control_center_tab requires plugin_api >= 31",
+           error, "entry 'displays': control_center_tab requires plugin_api >= 33",
            "control_center_tab api gate error"
        )
       && ok;
@@ -1232,7 +1232,7 @@ int main() {
            ccTabPath,
            "id = \"me/cc-tab\"\n"
            "name = \"CC Tab\"\n"
-           "plugin_api = 31\n"
+           "plugin_api = 33\n"
            "icon = \"device-desktop\"\n"
            "[[control_center_tab]]\n"
            "id = \"displays\"\n"

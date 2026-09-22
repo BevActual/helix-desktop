@@ -1,5 +1,5 @@
 #pragma once
-
+#include "config/config_types.h"
 #include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_dispatcher.h"
@@ -86,7 +86,7 @@ public:
   void setPanelClosedCallback(std::function<void()> callback);
   void setPanelOpenedCallback(std::function<void()> callback);
   void setAttachedPanelAvailabilityCallback(std::function<bool(wl_output*, std::string_view)> callback);
-  void setAttachedPanelLayerProvider(std::function<std::optional<std::string>(wl_output*, std::string_view)> provider);
+  void setBarConfigProvider(std::function<std::optional<BarConfig>(wl_output*, std::string_view)> provider);
   void setAttachedPanelBarSettledCallback(std::function<bool(wl_output*, std::string_view)> callback);
   // Called when an auto-hide bar finishes revealing for an attached panel open.
   void onAttachedBarRevealSettled(wl_output* output, std::string_view barName);
@@ -95,6 +95,8 @@ public:
   // Drops a previously registered panel, closing it first if it is open. Used to
   // retire plugin-backed panels on a plugin enable/disable/reload.
   void unregisterPanel(const std::string& id);
+  // Every currently registered panel id (regular and persistent), unsorted.
+  [[nodiscard]] std::vector<std::string> availablePanelIds() const;
 
   // "clipboard" is a compat alias for Control Center's clipboard tab (existing panel-toggle clipboard binds).
   void openPanel(const std::string& panelId, PanelOpenRequest request = {});
@@ -214,7 +216,7 @@ private:
   std::function<void()> m_panelClosedCallback;
   std::function<void()> m_panelOpenedCallback;
   std::function<bool(wl_output*, std::string_view)> m_attachedPanelAvailabilityCallback;
-  std::function<std::optional<std::string>(wl_output*, std::string_view)> m_attachedPanelLayerProvider;
+  std::function<std::optional<BarConfig>(wl_output*, std::string_view)> m_barConfigProvider;
   std::function<bool(wl_output*, std::string_view)> m_attachedPanelBarSettledCallback;
   PanelClickShield m_clickShield;
   PersistentPanelHost m_persistentHost;

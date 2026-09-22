@@ -188,6 +188,7 @@ namespace {
       {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Behavior},
       {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::Advanced},
       {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
+      {"umbriel", "settings.navigation.sections.umbriel", "umbriel", true, TabGroup::Advanced},
       {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Advanced},
   };
@@ -277,6 +278,7 @@ namespace {
         || id == "security"
         || id == "hooks"
         || id == "niri"
+        || id == "umbriel"
         || id == "control-center";
   }
 
@@ -541,6 +543,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
       )
   );
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
+  add("umbriel", std::make_unique<SettingsTab>(services, "umbriel"));
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("plugins", std::make_unique<PluginsTab>(services));
 }
@@ -1250,6 +1253,9 @@ bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
   if (id == "niri" || id == "windows") {
     return compositors::isNiri();
   }
+  if (id == "umbriel") {
+    return compositors::isUmbriel();
+  }
   if (id == "packages") {
     return noctalia::packages::tabAvailable();
   }
@@ -1316,6 +1322,18 @@ std::vector<ControlCenterPanel::TabCatalogEntry> ControlCenterPanel::hideableTab
     }
     const auto chrome = pluginTabChrome(resolved);
     out.push_back({.key = resolved.fullId(), .title = chrome.title});
+  }
+  return out;
+}
+
+std::vector<ControlCenterPanel::LauncherTabEntry> ControlCenterPanel::visibleTabsForLauncher() const {
+  std::vector<LauncherTabEntry> out;
+  out.reserve(m_slots.size());
+  for (const auto& slot : m_slots) {
+    if (slot.id == "home" || !isTabVisible(slot.id)) {
+      continue;
+    }
+    out.push_back({.key = slot.id, .title = slot.title, .glyph = slot.glyph});
   }
   return out;
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/timer_manager.h"
 #include "scripting/plugin_manager.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/settings/config_export_dialog_modal.h"
@@ -145,6 +146,9 @@ private:
   bool m_compact = false;
   bool m_showConfigureButton = true;
   std::string m_searchQuery;
+  // Installed-plugins list filter (Plugins tab), debounced so typing does not rebuild per key.
+  std::string m_pluginSearchQuery;
+  Timer m_pluginSearchDebounceTimer;
   std::string m_selectedBarName;
   std::string m_selectedMonitorOverride;
   std::string m_statusMessage;

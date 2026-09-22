@@ -744,7 +744,7 @@ std::unique_ptr<Flex> HomeTab::create() {
            .height = artSize},
           ui::glyph({
               .out = &m_mediaArtFallback,
-              .glyph = "disc-filled",
+              .glyph = "disc",
               .glyphSize = artSize * 0.55F,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           }),
@@ -1550,7 +1550,7 @@ void HomeTab::syncWallpaperBackground(Renderer& renderer) {
   if (m_crispNeedsFade) {
     startCrispFade();
   } else {
-    // Ready on the first look (cached) — snap in without a crossfade.
+    // Ready on the first look (cached), so snap in without a crossfade.
     cancelCrispFade();
     m_wallpaperBg->setOpacity(1.0F);
     m_crispOpaque = true;

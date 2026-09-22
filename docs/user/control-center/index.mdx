@@ -110,6 +110,9 @@ they appear in **Services**, each with an id. Built-in ids stay short (`monitor`
 See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center-tabs).
 
 Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
+Every available tab except Home that isn't hidden also gets its own row in the launcher's [Panels provider](/noctalia/launcher/#panels) (`/pan`), so you can jump straight to, say, Bluetooth without landing on Home first. Home remains available through the main Control Center row.
+
+Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
 
 ## Design language
 

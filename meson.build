@@ -429,6 +429,8 @@ _wlr_ls_c = custom_target('wlr-layer-shell-unstable-v1-client-source',
 _protocol_sources += _wlr_ls_c
 _protocol_headers += _wlr_ls_h
 
+alias_target('wayland-protocol-headers', _protocol_headers)
+
 # ── Main sources ──────────────────────────────────────────────────────────────
 _noctalia_sources = files(
   'src/app/application.cpp',
@@ -529,6 +531,8 @@ _noctalia_sources = files(
   'src/launcher/dmenu_stdin_provider.cpp',
   'src/launcher/emoji_provider.cpp',
   'src/launcher/math_provider.cpp',
+  'src/launcher/panel_catalog.cpp',
+  'src/launcher/panel_provider.cpp',
   'src/launcher/plugin_launcher_provider.cpp',
   'src/launcher/session_provider.cpp',
   'src/launcher/wallpaper_provider.cpp',
@@ -1383,8 +1387,10 @@ if build_tests
     'ui_tree_reconciler',
     'upower_charge_limit',
     'upower_device_catalog',
+    'uri',
     'vdir_reader',
     'virtual_grid_view_gesture',
+    'wallpaper_scan_symlink',
     'wallpaper_shuffle_state',
     'wallhaven_client',
     'video_wallpaper',
@@ -1393,6 +1399,7 @@ if build_tests
     'webp_decoder',
     'widget_action',
     'widget_definition',
+    'widget_settings_schema',
     'workspace_alert_service',
   ]
 

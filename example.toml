@@ -40,7 +40,9 @@ shared_gl_context     = true         # startup-only; false isolates GPU contexts
 # avatar_path         = "~/Pictures/avatar.png"
 
 [shell.screenshot]
+skip_annotate_on_copy_save = false  # Ctrl+C / Ctrl+S in the region overlay skip the annotation editor
 close_on_copy = true                # close the annotation editor after Copy or Ctrl+C succeeds
+close_on_save = true                # close the annotation editor after Save or Ctrl+S succeeds
 
 [shell.screen_record]
 # directory         = ""        # empty = ~/Videos/Recordings
@@ -350,8 +352,7 @@ mirror_always_on = true           # keep the iPhone AirPlay receiver + Bluetooth
 enable_overdrive = false            # allow volume above 100% (up to 150%)
 enable_sounds = false               # master toggle for UI feedback sounds
 sound_volume = 0.5                  # 0.0 - 1.0
-volume_change_sound = ""            # empty = bundled sounds/volume-change.wav
-notification_sound = ""             # empty = bundled sounds/notification.wav
+sound_theme = "freedesktop"
 
 # ── Brightness ────────────────────────────────────────────────────────────────
 

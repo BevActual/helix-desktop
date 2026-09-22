@@ -10,6 +10,8 @@
 #include "core/process/process.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
+#include "launcher/panel_catalog.h"
+#include "pipewire/sound_player.h"
 #include "shell/bar/widget_gesture.h"
 #include "shell/bar/widget_gesture_defaults.h"
 #include "shell/control_center/control_center_panel.h"
@@ -56,6 +58,7 @@ namespace settings {
     constexpr auto kLauncherProviderSettings = std::to_array<LauncherProviderSettingSpec>({
         {.name = "calculator", .prefixPlaceholder = "calc", .globalByDefault = true},
         {.name = "emoji", .prefixPlaceholder = "emo"},
+        {.name = "panels", .prefixPlaceholder = "pan"},
         {.name = "session", .prefixPlaceholder = "session"},
         {.name = "wallpaper", .prefixPlaceholder = "wall"},
         {.name = "windows", .prefixPlaceholder = "win"},
@@ -89,7 +92,7 @@ namespace settings {
       return defaultKeybindSet(action);
     }
 
-    constexpr std::array<SettingsSectionDescriptor, 37> kSettingsSections{{
+    constexpr std::array<SettingsSectionDescriptor, 38> kSettingsSections{{
         {SettingsSection::Theme, "theme", "palette"},
         {SettingsSection::Type, "type", "typography"},
         {SettingsSection::Scale, "scale", "resize"},
@@ -123,6 +126,7 @@ namespace settings {
         {SettingsSection::Hooks, "hooks", "link"},
         {SettingsSection::Niri, "niri", "niri"},
         {SettingsSection::Windows, "windows", "app-window"},
+        {SettingsSection::Umbriel, "umbriel", "umbriel"},
         {SettingsSection::Bar, "bar", "crop-3-2", false},
         {SettingsSection::Plugins, "plugins", "puzzle", true, true},
         {SettingsSection::Camera, "camera", "camera", true, true},
@@ -1635,7 +1639,7 @@ namespace settings {
         ToggleSetting{cfg.dock.showInstanceCount}, "badge windows"
     ));
     entries.push_back(makeEntry(
-        SettingsSection::Dock, "behavior", tr("settings.schema.dock.launcher-position.label"),
+        SettingsSection::Dock, "layout", tr("settings.schema.dock.launcher-position.label"),
         tr("settings.schema.dock.launcher-position.description"), {"dock", "launcher_position"},
         asSegmented(enumSelect(kDockLauncherPositions, cfg.dock.launcherPosition)), "launcher apps grid"
     ));
@@ -1645,7 +1649,7 @@ namespace settings {
     };
     {
       auto e = makeEntry(
-          SettingsSection::Dock, "behavior", tr("settings.schema.dock.launcher-icon.label"),
+          SettingsSection::Dock, "layout", tr("settings.schema.dock.launcher-icon.label"),
           tr("settings.schema.dock.launcher-icon.description"), {"dock", "launcher_icon"},
           TextSetting{.value = cfg.dock.launcherIcon, .placeholder = "grid-dots", .browseFileExtensions = {}},
           "launcher apps icon glyph"
@@ -1655,7 +1659,7 @@ namespace settings {
     }
     {
       auto e = makeEntry(
-          SettingsSection::Dock, "behavior", tr("settings.schema.dock.launcher-custom-image.label"),
+          SettingsSection::Dock, "layout", tr("settings.schema.dock.launcher-custom-image.label"),
           tr("settings.schema.dock.launcher-custom-image.description"), {"dock", "launcher_custom_image"},
           TextSetting{
               .value = cfg.dock.launcherCustomImage,
@@ -1671,7 +1675,7 @@ namespace settings {
     }
     {
       auto e = makeEntry(
-          SettingsSection::Dock, "behavior", tr("settings.schema.dock.launcher-custom-image-colorize.label"),
+          SettingsSection::Dock, "layout", tr("settings.schema.dock.launcher-custom-image-colorize.label"),
           tr("settings.schema.dock.launcher-custom-image-colorize.description"),
           {"dock", "launcher_custom_image_colorize"}, ToggleSetting{cfg.dock.launcherCustomImageColorize},
           "launcher apps image tint color"
@@ -2010,6 +2014,21 @@ namespace settings {
           {"shell", "launcher", "providers", std::string(provider.name), "global"}, ToggleSetting{global},
           std::format("launcher {} global search unprefixed", provider.name)
       ));
+      if (provider.name == "panels") {
+        ListSetting ignoredPanels;
+        ignoredPanels.items = cfg.shell.launcher.panels.ignored;
+        const auto knownPanelIds = panel_catalog::allKnownIds();
+        ignoredPanels.suggestedOptions.reserve(knownPanelIds.size());
+        for (const auto& panelId : knownPanelIds) {
+          ignoredPanels.suggestedOptions.push_back(SelectOption{panelId, panel_catalog::describe(panelId).title});
+        }
+        entries.push_back(makeEntry(
+            SettingsSection::Launcher, "providers", tr("settings.schema.panels.launcher-ignored-panels.label"),
+            tr("settings.schema.panels.launcher-ignored-panels.description"),
+            {"shell", "launcher", "panels", "ignored"}, std::move(ignoredPanels),
+            "launcher panels ignore hide exclude noise polkit setup wizard test"
+        ));
+      }
     }
     entries.push_back(makeEntry(
         SettingsSection::Panels, "polkit", tr("settings.schema.panels.placement-polkit.label"),
@@ -2657,9 +2676,23 @@ namespace settings {
     ));
     entries.push_back(makeEntry(
         SettingsSection::Screenshot, "screenshot-annotation",
+        tr("settings.schema.shell.screenshot-skip-annotate-on-copy-save.label"),
+        tr("settings.schema.shell.screenshot-skip-annotate-on-copy-save.description"),
+        {"shell", "screenshot", "skip_annotate_on_copy_save"},
+        ToggleSetting{cfg.shell.screenshot.skipAnnotateOnCopySave},
+        "screenshot annotate annotation skip copy save region quick"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Screenshot, "screenshot-annotation",
         tr("settings.schema.shell.screenshot-close-on-copy.label"),
         tr("settings.schema.shell.screenshot-close-on-copy.description"), {"shell", "screenshot", "close_on_copy"},
         ToggleSetting{cfg.shell.screenshot.closeOnCopy}, "screenshot annotation close copy clipboard exit"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::Screenshot, "screenshot-annotation",
+        tr("settings.schema.shell.screenshot-close-on-save.label"),
+        tr("settings.schema.shell.screenshot-close-on-save.description"), {"shell", "screenshot", "close_on_save"},
+        ToggleSetting{cfg.shell.screenshot.closeOnSave}, "screenshot annotation close save exit"
     ));
 
     entries.push_back(makeEntry(
@@ -3092,6 +3125,17 @@ namespace settings {
             sliderFor(cfg.backdrop.tintIntensity, noctalia::config::schema::kUnitRange, false), "wallpaper"
         ));
       }
+    }
+
+    // Umbriel-specific integrations
+    if (env.umbrielOverviewTypeToLaunchSupported) {
+      entries.push_back(makeEntry(
+          SettingsSection::Umbriel, "overview", tr("settings.schema.shell.umbriel-overview-type-to-launch.label"),
+          tr("settings.schema.shell.umbriel-overview-type-to-launch.description"),
+          {"shell", "umbriel_overview_type_to_launch_enabled"},
+          ToggleSetting{cfg.shell.umbrielOverviewTypeToLaunchEnabled},
+          "umbriel overview type launch launcher search keyboard focus"
+      ));
     }
 
     // System
@@ -3553,27 +3597,17 @@ namespace settings {
         tr("settings.schema.services.sound-volume.description"), {"audio", "sound_volume"},
         sliderFor(cfg.audio.soundVolume, noctalia::config::schema::kUnitRange, false), "sound"
     ));
+    std::vector<SelectOption> soundThemeOptions;
+    for (const auto& [value, label] : SoundPlayer::availableThemes()) {
+      soundThemeOptions.push_back(SelectOption{value, label});
+    }
+    if (soundThemeOptions.empty()) {
+      soundThemeOptions.push_back(SelectOption{"freedesktop", tr("settings.schema.services.sound-theme.default")});
+    }
     entries.push_back(makeEntry(
-        SettingsSection::Services, "audio", tr("settings.schema.services.volume-change-sound.label"),
-        tr("settings.schema.services.volume-change-sound.description"), {"audio", "volume_change_sound"},
-        TextSetting{
-            .value = cfg.audio.volumeChangeSound,
-            .placeholder = tr("settings.schema.services.volume-change-sound.placeholder"),
-            .browseMode = TextSettingBrowseMode::OpenFile,
-            .browseFileExtensions = {".wav", ".flac", ".ogg", ".oga", ".opus", ".mp3", ".aiff", ".aif"}
-        },
-        "sound path file", true
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::Services, "audio", tr("settings.schema.services.notification-sound.label"),
-        tr("settings.schema.services.notification-sound.description"), {"audio", "notification_sound"},
-        TextSetting{
-            .value = cfg.audio.notificationSound,
-            .placeholder = tr("settings.schema.services.notification-sound.placeholder"),
-            .browseMode = TextSettingBrowseMode::OpenFile,
-            .browseFileExtensions = {".wav", ".flac", ".ogg", ".oga", ".opus", ".mp3", ".aiff", ".aif"}
-        },
-        "sound path file", true
+        SettingsSection::Services, "audio", tr("settings.schema.services.sound-theme.label"),
+        tr("settings.schema.services.sound-theme.description"), {"audio", "sound_theme"},
+        SelectSetting{std::move(soundThemeOptions), cfg.audio.soundTheme}, "sound theme"
     ));
     entries.push_back(makeEntry(
         SettingsSection::Services, "brightness", tr("settings.schema.services.ddcutil.label"),

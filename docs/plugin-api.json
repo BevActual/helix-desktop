@@ -170,11 +170,23 @@
   {
     "level": 31,
     "noctaliaVersion": null,
+    "feature": "get-color",
+    "introduced": "`noctalia.getColor(role)` for reading colors from the active theme palette."
+  },
+  {
+    "level": 32,
+    "noctaliaVersion": null,
+    "feature": "container-tooltip",
+    "introduced": "The `tooltip` prop on `ui.box`, `ui.row`, `ui.column`, and `ui.image`, shown on hover."
+  },
+  {
+    "level": 33,
+    "noctaliaVersion": null,
     "feature": "control-center-tab",
     "introduced": "The `[[control_center_tab]]` entry kind, adding a plugin page to the Control Center sidebar."
   },
   {
-    "level": 32,
+    "level": 34,
     "noctaliaVersion": null,
     "feature": "ai-usage",
     "introduced": "`noctalia.aiUsage()` for a read-only snapshot of AI CLIs and local CLI servers on this machine."

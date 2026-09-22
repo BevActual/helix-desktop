@@ -64,6 +64,7 @@
 #include "wayland/wayland_connection.h"
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <format>
 #include <functional>
@@ -77,6 +78,8 @@
 #include <vector>
 
 namespace {
+
+  constexpr auto kPluginSearchDebounceInterval = std::chrono::milliseconds(120);
 
   bool useLightPalettePreview(ThemeMode mode) { return mode == ThemeMode::Light; }
 
@@ -680,6 +683,16 @@ void SettingsPane::fillContent(Flex& content) {
           .selectedSection = m_selectedSection,
           .includedGroups = (!m_searchQuery.empty() && !m_compact) ? std::unordered_set<std::string>{}
                                                                     : m_includedGroups,
+          .searchQuery = m_pluginSearchQuery,
+          .setSearchQuery =
+              [this](std::string query) {
+                if (m_pluginSearchQuery == query) {
+                  return;
+                }
+                m_pluginSearchQuery = std::move(query);
+                m_pluginSearchDebounceTimer.stop();
+                m_pluginSearchDebounceTimer.start(kPluginSearchDebounceInterval, [this]() { queueRebuild(); });
+              },
           .plugins = m_pluginList,
           .sources = cfg.plugins.sources,
           .searchActive = !m_searchQuery.empty(),
@@ -807,6 +820,7 @@ settings::RegistryEnvironment SettingsPane::buildRegistryEnvironment() const {
   env.niriBackdropSupported = wayland != nullptr && compositors::isNiri();
   env.screencopySupported = wayland != nullptr && wayland->hasScreencopy();
   env.niriOverviewTypeToLaunchSupported = wayland != nullptr && compositors::isNiri();
+  env.umbrielOverviewTypeToLaunchSupported = wayland != nullptr && compositors::isUmbriel();
   if (env.niriBackdropSupported && m_platform != nullptr) {
     const auto version = m_platform->niriRuntime().compositorVersion();
     env.niriBlurSupported = version.has_value() && compositors::niri::versionSupportsBlur(*version);
