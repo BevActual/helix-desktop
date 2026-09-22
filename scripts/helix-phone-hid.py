@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import socket
+import struct
 import sys
 import threading
 import time
@@ -16,6 +17,7 @@ import dbus.service
 from gi.repository import GLib
 
 NAME = "Helix Phone"
+VERBOSE = os.environ.get("HELIX_PHONE_VERBOSE", "") not in ("", "0")
 ADAPTER = "/org/bluez/hci0"
 APP_PATH = "/org/helix/phone"
 AD_PATH = "/org/helix/phone/advertisement0"
@@ -379,13 +381,18 @@ class Advertisement(dbus.service.Object):
     def GetAll(self, interface):
         if interface != "org.bluez.LEAdvertisement1":
             raise Rejected()
-        # Keep this inside a 31-byte legacy advert. A 128-bit UUID forces
-        # Bluetooth 5 extended advertising, which AssistiveTouch does not list.
-        # 0x03C0 is Generic HID, the appearance iOS scans for.
+        # Keep this inside a 31-byte legacy advert: flags (3) + HID 16-bit UUID (4) +
+        # ANCS solicitation (18) = 25; the kernel moves appearance and name into the scan
+        # response. A 128-bit *service* UUID would force extended advertising, which
+        # AssistiveTouch does not list, but a solicitation UUID is what tells iOS this
+        # accessory consumes notifications, and it is the only way the phone offers
+        # "Share System Notifications" for the bond. 0x03C0 is Generic HID, the
+        # appearance iOS scans for.
         print(f"advertising {NAME} as a HID mouse", flush=True)
         return {
             "Type": dbus.String("peripheral"),
             "ServiceUUIDs": dbus.Array(["1812"], signature="s"),
+            "SolicitUUIDs": dbus.Array([ANCS_SERVICE_UUID], signature="s"),
             "LocalName": dbus.String(NAME),
             "Appearance": dbus.UInt16(0x03C0),
             "Discoverable": dbus.Boolean(True),
@@ -515,6 +522,477 @@ class KeyboardState:
         self.active = bool(self.pressed or self.modifiers)
 
 
+ANCS_SERVICE_UUID = "7905f431-b5ce-4e99-a40f-4b1e122d00d0"
+ANCS_NOTIFICATION_SOURCE = "9fbf120d-6301-42d9-8c58-25e699a21dbd"
+ANCS_CONTROL_POINT = "69d1d8f3-45e1-49a8-9821-9bbdfdaad9d9"
+ANCS_DATA_SOURCE = "22eac6e9-24d6-4bb5-be44-b36ace7c7bfb"
+
+ANCS_EVENT_ADDED, ANCS_EVENT_MODIFIED, ANCS_EVENT_REMOVED = 0, 1, 2
+ANCS_FLAG_SILENT, ANCS_FLAG_IMPORTANT, ANCS_FLAG_PREEXISTING = 0x01, 0x02, 0x04
+ANCS_FLAG_POSITIVE_ACTION, ANCS_FLAG_NEGATIVE_ACTION = 0x08, 0x10
+ANCS_CMD_NOTIFICATION_ATTRIBUTES, ANCS_CMD_APP_ATTRIBUTES, ANCS_CMD_PERFORM_ACTION = 0, 1, 2
+ANCS_ATTR_APP_ID, ANCS_ATTR_TITLE, ANCS_ATTR_SUBTITLE, ANCS_ATTR_MESSAGE = 0, 1, 2, 3
+ANCS_ATTR_DATE, ANCS_ATTR_POSITIVE_LABEL, ANCS_ATTR_NEGATIVE_LABEL = 5, 6, 7
+ANCS_ACTION_POSITIVE, ANCS_ACTION_NEGATIVE = 0, 1
+
+# CategoryID -> (freedesktop category hint, icon name). Icons come from the desktop icon
+# theme so the toast reads like any other desktop notification, not a phone screenshot.
+ANCS_CATEGORIES = {
+    1: ("call.incoming", "call-start-symbolic"),
+    2: ("call.missed", "call-missed-symbolic"),
+    3: ("call.voicemail", "media-record-symbolic"),
+    4: ("im.received", "user-available-symbolic"),
+    5: ("schedule", "x-office-calendar-symbolic"),
+    6: ("email.arrived", "mail-unread-symbolic"),
+    7: ("news", "application-rss+xml-symbolic"),
+    8: ("health", "emblem-favorite-symbolic"),
+    9: ("finance", "emblem-money-symbolic"),
+    10: ("location", "mark-location-symbolic"),
+    11: ("entertainment", "applications-multimedia-symbolic"),
+}
+ANCS_DEFAULT_ICON = "phone-symbolic"
+
+NOTIFICATIONS_BUS = "org.freedesktop.Notifications"
+NOTIFICATIONS_PATH = "/org/freedesktop/Notifications"
+
+
+class AncsClient:
+    """Mirror iPhone notifications onto the desktop through Apple Notification Center Service.
+
+    The iPhone exposes ANCS on the same encrypted link AssistiveTouch uses for the HID
+    pointer, so once it is paired BlueZ already has the remote GATT database under the
+    device path. We subscribe to Notification Source and Data Source, fetch attributes
+    over Control Point one command at a time (ANCS answers strictly in order), and post
+    each notification to org.freedesktop.Notifications, which the shell serves. Actions on
+    the toast go back as PerformNotificationAction; dismissing it performs the negative
+    action (Clear) so the phone stays in step, the way KDE Connect does for Android.
+
+    Everything here runs on the GLib main loop; control-socket threads only read the
+    small status dict.
+    """
+
+    REQUEST_TIMEOUT_MS = 4000
+
+    def __init__(self, bus, bonded):
+        self.bus = bus
+        self.bonded = bonded
+        self.enabled = True
+        self.session = None
+        self.device_path = None
+        self.device_name = ""
+        self.chars = {}
+        self.attached = False
+        self.queue = []
+        self.inflight = None
+        self.timeout_id = None
+        self.buffer = bytearray()
+        self.app_names = {}
+        self.pending = {}          # uid -> parsed notification waiting on an app name
+        self.notifications = {}    # uid -> {"id": desktop id, "flags": .., "app": ..}
+        self.desktop_ids = {}      # desktop id -> uid
+        self.posted = 0
+        self.attached_at = 0.0
+        self.status_lock = threading.Lock()
+        bus.add_signal_receiver(self._device_changed, dbus_interface="org.freedesktop.DBus.Properties",
+                                signal_name="PropertiesChanged", path_keyword="path")
+        GLib.idle_add(self._scan)
+
+    # ── status / config ────────────────────────────────────────────────────────
+
+    def set_enabled(self, enabled):
+        enabled = bool(enabled)
+        if enabled == self.enabled:
+            return
+        self.enabled = enabled
+        print(f"ancs {'enabled' if enabled else 'disabled'}", flush=True)
+        if not enabled:
+            GLib.idle_add(self._close_all)
+
+    def status(self):
+        with self.status_lock:
+            return {
+                "enabled": self.enabled,
+                "attached": self.attached,
+                "device": self.device_name,
+                "active": len(self.notifications),
+                "posted": self.posted,
+            }
+
+    # ── attach / detach ────────────────────────────────────────────────────────
+
+    def _scan(self):
+        try:
+            manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+            objects = manager.GetManagedObjects()
+        except dbus.exceptions.DBusException:
+            return False
+        for path, interfaces in objects.items():
+            device = interfaces.get("org.bluez.Device1")
+            if device is None or not str(path).startswith(ADAPTER):
+                continue
+            if bool(device.get("Connected", False)) and bool(device.get("ServicesResolved", False)):
+                self._attach(str(path), objects)
+                if self.attached:
+                    break
+        return False
+
+    def _device_changed(self, interface, changed, invalidated, path=None):
+        if path is None:
+            return
+        if interface == "org.bluez.GattCharacteristic1":
+            if "Value" in changed:
+                self.on_value(str(path), bytes(changed["Value"]))
+            return
+        if interface != "org.bluez.Device1":
+            return
+        path = str(path)
+        if not path.startswith(ADAPTER):
+            return
+        if "ServicesResolved" in changed and bool(changed["ServicesResolved"]):
+            GLib.idle_add(self._attach, path, None)
+        elif path == self.device_path:
+            if ("Connected" in changed and not bool(changed["Connected"])) or (
+                    "ServicesResolved" in changed and not bool(changed["ServicesResolved"])):
+                self._detach()
+
+    def _attach(self, device_path, objects):
+        if self.attached and self.device_path == device_path:
+            return False
+        if objects is None:
+            try:
+                manager = dbus.Interface(self.bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+                objects = manager.GetManagedObjects()
+            except dbus.exceptions.DBusException:
+                return False
+        chars = {}
+        for path, interfaces in objects.items():
+            char = interfaces.get("org.bluez.GattCharacteristic1")
+            if char is None or not str(path).startswith(device_path + "/"):
+                continue
+            uuid = str(char.get("UUID", "")).lower()
+            if uuid in (ANCS_NOTIFICATION_SOURCE, ANCS_CONTROL_POINT, ANCS_DATA_SOURCE):
+                chars[uuid] = str(path)
+        if len(chars) != 3:
+            return False
+        if self.attached:
+            self._detach()
+        device = objects.get(device_path, {}).get("org.bluez.Device1", {})
+        with self.status_lock:
+            self.device_path = device_path
+            self.device_name = str(device.get("Alias", device.get("Name", "iPhone")))
+            self.chars = chars
+        # Data Source first so the reply channel is open before any event can arrive.
+        self._start_notify(chars[ANCS_DATA_SOURCE], lambda: self._start_notify(
+            chars[ANCS_NOTIFICATION_SOURCE], self._attached))
+        return False
+
+    def _start_notify(self, path, then):
+        def ok():
+            then()
+
+        def failed(error):
+            text = str(error)
+            if "Already notifying" in text or "InProgress" in text:
+                then()
+                return
+            print(f"ancs StartNotify failed on {path[-8:]}: {error}", flush=True)
+
+        try:
+            self._char(path).StartNotify(reply_handler=ok, error_handler=failed)
+        except dbus.exceptions.DBusException as error:
+            failed(error)
+
+    def _attached(self):
+        with self.status_lock:
+            self.attached = True
+        self.attached_at = time.time()
+        print(f"ancs attached to {self.device_name}", flush=True)
+
+    def _detach(self):
+        if self.device_path is None:
+            return
+        print(f"ancs detached from {self.device_name}", flush=True)
+        with self.status_lock:
+            self.attached = False
+            self.device_path = None
+            self.chars = {}
+        self._cancel_timeout()
+        self.queue.clear()
+        self.inflight = None
+        self.buffer.clear()
+        self.pending.clear()
+        self._close_all()
+
+    def _char(self, path):
+        return dbus.Interface(self.bus.get_object("org.bluez", path), "org.bluez.GattCharacteristic1")
+
+    # ── GATT traffic ───────────────────────────────────────────────────────────
+
+    def on_value(self, path, data):
+        """Called from the shared PropertiesChanged receiver for GattCharacteristic1 Value."""
+        if path == self.chars.get(ANCS_NOTIFICATION_SOURCE):
+            self._on_notification_source(data)
+        elif path == self.chars.get(ANCS_DATA_SOURCE):
+            self._on_data_source(data)
+
+    def _on_notification_source(self, data):
+        if len(data) < 8:
+            return
+        event, flags, category, count, uid = struct.unpack("<BBBBI", data[:8])
+        if event == ANCS_EVENT_REMOVED:
+            self._close(uid, from_phone=True)
+            return
+        if not self.enabled:
+            return
+        if flags & ANCS_FLAG_PREEXISTING and event == ANCS_EVENT_ADDED:
+            # Already on the phone before we connected; the user has seen these.
+            return
+        if VERBOSE:
+            print(f"ancs event={event} flags={flags:#04x} category={category} uid={uid}", flush=True)
+        entry = self.notifications.setdefault(uid, {"id": 0})
+        entry.update({"flags": flags, "category": category, "count": count})
+        self._enqueue({
+            "cmd": ANCS_CMD_NOTIFICATION_ATTRIBUTES,
+            "uid": uid,
+            "attrs": [ANCS_ATTR_APP_ID, ANCS_ATTR_TITLE, ANCS_ATTR_SUBTITLE, ANCS_ATTR_MESSAGE,
+                      ANCS_ATTR_DATE, ANCS_ATTR_POSITIVE_LABEL, ANCS_ATTR_NEGATIVE_LABEL],
+        })
+
+    def _enqueue(self, request):
+        self.queue.append(request)
+        self._pump()
+
+    def _pump(self):
+        if self.inflight is not None or not self.queue or not self.attached:
+            return
+        request = self.queue.pop(0)
+        payload = bytearray([request["cmd"]])
+        if request["cmd"] == ANCS_CMD_NOTIFICATION_ATTRIBUTES:
+            payload += struct.pack("<I", request["uid"])
+            for attr in request["attrs"]:
+                payload.append(attr)
+                if attr in (ANCS_ATTR_TITLE, ANCS_ATTR_SUBTITLE):
+                    payload += struct.pack("<H", 160)
+                elif attr == ANCS_ATTR_MESSAGE:
+                    payload += struct.pack("<H", 1024)
+        elif request["cmd"] == ANCS_CMD_APP_ATTRIBUTES:
+            payload += request["app"].encode("utf-8") + b"\x00" + bytes([0])
+        elif request["cmd"] == ANCS_CMD_PERFORM_ACTION:
+            payload += struct.pack("<IB", request["uid"], request["action"])
+        self.inflight = request
+        self.buffer.clear()
+
+        def failed(error):
+            print(f"ancs control point write failed: {error}", flush=True)
+            if self.inflight is request:
+                self.inflight = None
+                self._cancel_timeout()
+                self._pump()
+
+        def wrote():
+            if request["cmd"] == ANCS_CMD_PERFORM_ACTION and self.inflight is request:
+                # No Data Source reply for actions.
+                self.inflight = None
+                self._cancel_timeout()
+                self._pump()
+
+        try:
+            self._char(self.chars[ANCS_CONTROL_POINT]).WriteValue(
+                dbus.ByteArray(bytes(payload)), {"type": "request"}, reply_handler=wrote, error_handler=failed)
+        except (dbus.exceptions.DBusException, KeyError) as error:
+            failed(error)
+            return
+        self._cancel_timeout()
+        self.timeout_id = GLib.timeout_add(self.REQUEST_TIMEOUT_MS, self._timed_out, request)
+
+    def _timed_out(self, request):
+        self.timeout_id = None
+        if self.inflight is request:
+            print(f"ancs request {request['cmd']} timed out", flush=True)
+            self.inflight = None
+            self.buffer.clear()
+            self._pump()
+        return False
+
+    def _cancel_timeout(self):
+        if self.timeout_id is not None:
+            GLib.source_remove(self.timeout_id)
+            self.timeout_id = None
+
+    def _on_data_source(self, data):
+        request = self.inflight
+        if request is None:
+            return
+        self.buffer.extend(data)
+        buf = self.buffer
+        if not buf or buf[0] != request["cmd"]:
+            return
+        if request["cmd"] == ANCS_CMD_NOTIFICATION_ATTRIBUTES:
+            if len(buf) < 5:
+                return
+            offset = 5
+            expected = len(request["attrs"])
+        else:
+            end = buf.find(b"\x00", 1)
+            if end < 0:
+                return
+            offset = end + 1
+            expected = 1
+        attrs = {}
+        while len(attrs) < expected:
+            if offset + 3 > len(buf):
+                return
+            attr_id = buf[offset]
+            length = struct.unpack_from("<H", buf, offset + 1)[0]
+            if offset + 3 + length > len(buf):
+                return
+            attrs[attr_id] = bytes(buf[offset + 3:offset + 3 + length]).decode("utf-8", "replace")
+            offset += 3 + length
+        self.inflight = None
+        self._cancel_timeout()
+        self.buffer.clear()
+        if request["cmd"] == ANCS_CMD_NOTIFICATION_ATTRIBUTES:
+            self._got_notification(request["uid"], attrs)
+        else:
+            self._got_app_name(request["app"], attrs.get(0, ""))
+        self._pump()
+
+    # ── desktop notifications ──────────────────────────────────────────────────
+
+    def _got_notification(self, uid, attrs):
+        entry = self.notifications.get(uid)
+        if entry is None:
+            return
+        if not entry.get("id") and self._dated_before_attach(attrs.get(ANCS_ATTR_DATE, "")):
+            # iOS replays Notification Center on every subscribe and does not always set
+            # PreExisting; anything dated before we attached has been on the phone already.
+            self.notifications.pop(uid, None)
+            return
+        entry["attrs"] = attrs
+        app = attrs.get(ANCS_ATTR_APP_ID, "")
+        entry["app"] = app
+        if app and app not in self.app_names:
+            self.pending[uid] = True
+            if not any(r["cmd"] == ANCS_CMD_APP_ATTRIBUTES and r["app"] == app for r in self.queue):
+                self._enqueue({"cmd": ANCS_CMD_APP_ATTRIBUTES, "app": app})
+            return
+        self._post(uid)
+
+    def _dated_before_attach(self, date):
+        # ANCS dates are the phone's local time as yyyyMMdd'T'HHmmSS.
+        try:
+            stamp = time.mktime(time.strptime(date, "%Y%m%dT%H%M%S"))
+        except (ValueError, OverflowError):
+            return False
+        return stamp < self.attached_at - 90
+
+    def _got_app_name(self, app, name):
+        self.app_names[app] = name or app.rsplit(".", 1)[-1].capitalize()
+        for uid in [u for u, e in self.notifications.items() if e.get("app") == app and u in self.pending]:
+            self.pending.pop(uid, None)
+            self._post(uid)
+
+    def _session_bus(self):
+        if self.session is None:
+            self.session = dbus.SessionBus()
+            self.session.add_signal_receiver(self._action_invoked, dbus_interface=NOTIFICATIONS_BUS,
+                                             signal_name="ActionInvoked")
+            self.session.add_signal_receiver(self._notification_closed, dbus_interface=NOTIFICATIONS_BUS,
+                                             signal_name="NotificationClosed")
+        return dbus.Interface(self.session.get_object(NOTIFICATIONS_BUS, NOTIFICATIONS_PATH), NOTIFICATIONS_BUS)
+
+    def _post(self, uid):
+        entry = self.notifications.get(uid)
+        if entry is None or "attrs" not in entry or not self.enabled:
+            return
+        attrs = entry["attrs"]
+        flags = entry.get("flags", 0)
+        app_name = self.app_names.get(entry.get("app", ""), self.device_name or "iPhone")
+        title = attrs.get(ANCS_ATTR_TITLE, "").strip() or app_name
+        body_parts = [attrs.get(ANCS_ATTR_SUBTITLE, "").strip(), attrs.get(ANCS_ATTR_MESSAGE, "").strip()]
+        body = "\n".join(part for part in body_parts if part)
+        category, icon = ANCS_CATEGORIES.get(entry.get("category", 0), ("", ANCS_DEFAULT_ICON))
+        actions = []
+        if flags & ANCS_FLAG_POSITIVE_ACTION and attrs.get(ANCS_ATTR_POSITIVE_LABEL):
+            actions += ["positive", attrs[ANCS_ATTR_POSITIVE_LABEL]]
+        if flags & ANCS_FLAG_NEGATIVE_ACTION and attrs.get(ANCS_ATTR_NEGATIVE_LABEL):
+            actions += ["negative", attrs[ANCS_ATTR_NEGATIVE_LABEL]]
+        hints = {
+            "x-helix-phone": dbus.String(self.device_name or "iPhone"),
+            "x-helix-phone-app": dbus.String(entry.get("app", "")),
+            "urgency": dbus.Byte(2 if entry.get("category") == 1 else (1 if flags & ANCS_FLAG_IMPORTANT else 0)),
+            "suppress-sound": dbus.Boolean(bool(flags & ANCS_FLAG_SILENT)),
+        }
+        if category:
+            hints["category"] = dbus.String(category)
+
+        def posted(desktop_id):
+            desktop_id = int(desktop_id)
+            current = self.notifications.get(uid)
+            if current is None:
+                # Removed on the phone while we were posting.
+                self._close_desktop(desktop_id)
+                return
+            if current.get("id") and current["id"] != desktop_id:
+                self.desktop_ids.pop(current["id"], None)
+            current["id"] = desktop_id
+            self.desktop_ids[desktop_id] = uid
+            with self.status_lock:
+                self.posted += 1
+
+        def failed(error):
+            print(f"ancs could not post notification: {error}", flush=True)
+
+        try:
+            self._session_bus().Notify(
+                app_name, dbus.UInt32(entry.get("id", 0)), icon, title, body,
+                dbus.Array(actions, signature="s"), dbus.Dictionary(hints, signature="sv"), dbus.Int32(-1),
+                reply_handler=posted, error_handler=failed)
+        except dbus.exceptions.DBusException as error:
+            failed(error)
+
+    def _action_invoked(self, desktop_id, action_key):
+        uid = self.desktop_ids.get(int(desktop_id))
+        if uid is None:
+            return
+        action = {"positive": ANCS_ACTION_POSITIVE, "negative": ANCS_ACTION_NEGATIVE}.get(str(action_key))
+        if action is None:
+            return
+        self._enqueue({"cmd": ANCS_CMD_PERFORM_ACTION, "uid": uid, "action": action})
+
+    def _notification_closed(self, desktop_id, reason):
+        uid = self.desktop_ids.pop(int(desktop_id), None)
+        if uid is None:
+            return
+        entry = self.notifications.pop(uid, None)
+        self.pending.pop(uid, None)
+        # Reason 2 is "dismissed by the user": clear it on the phone too.
+        if int(reason) == 2 and entry is not None and entry.get("flags", 0) & ANCS_FLAG_NEGATIVE_ACTION:
+            self._enqueue({"cmd": ANCS_CMD_PERFORM_ACTION, "uid": uid, "action": ANCS_ACTION_NEGATIVE})
+
+    def _close(self, uid, from_phone=False):
+        entry = self.notifications.pop(uid, None)
+        self.pending.pop(uid, None)
+        if entry is None:
+            return
+        desktop_id = entry.get("id", 0)
+        if desktop_id:
+            self.desktop_ids.pop(desktop_id, None)
+            self._close_desktop(desktop_id)
+
+    def _close_desktop(self, desktop_id):
+        try:
+            self._session_bus().CloseNotification(dbus.UInt32(desktop_id), reply_handler=lambda: None,
+                                                  error_handler=lambda _e: None)
+        except dbus.exceptions.DBusException:
+            pass
+
+    def _close_all(self):
+        for uid in list(self.notifications):
+            self._close(uid)
+        return False
+
+
 class ControlSocket:
     """Line-delimited JSON on a Unix socket so the shell (and tests) can drive the phone.
 
@@ -530,18 +1008,20 @@ class ControlSocket:
     {"type":"pointer","x":0.5,"y":0.5,"buttons":0,"scroll":0}  live stream: coalesced, no reply
     {"type":"keysym","keysym":104,"pressed":true,"modifiers":2}  key from the mirror window (X keysym + HID mods)
     {"type":"release"}                                lift every held key and button
+    {"type":"ancs","enabled":true}                    mirror iPhone notifications to the desktop
     {"type":"status"}
 
     The shell's Helix Phone window streams "absolute" (with buttons) and "keysym" as the
     user moves, clicks, and types over the mirror; the rest is for chips and tests.
     """
 
-    def __init__(self, mouse, absolute, keyboard, consumer, bonded):
+    def __init__(self, mouse, absolute, keyboard, consumer, bonded, ancs):
         self.mouse = mouse
         self.absolute = absolute
         self.keyboard = keyboard
         self.consumer = consumer
         self.bonded = bonded
+        self.ancs = ancs
         self.keys = KeyboardState(self._emit)
         self.buttons = 0
         self.lock = threading.Lock()
@@ -683,11 +1163,14 @@ class ControlSocket:
             if self.buttons:
                 self.buttons = 0
                 self._emit(self.absolute, bytes(5))
+        elif kind == "ancs":
+            self.ancs.set_enabled(message.get("enabled", True))
         elif kind == "status":
             missing = bluetooth_conf_missing()
             bonded = self.bonded.paired()
             return {
                 "connected": self.absolute.notifying,
+                "ancs": self.ancs.status(),
                 "bonded": bool(bonded),
                 "bonded_devices": bonded,
                 "keyboard_captured": self.keys.active,
@@ -840,7 +1323,8 @@ def main() -> int:
     missing_conf = bluetooth_conf_missing()
     if missing_conf:
         print("bluetooth config needs: " + "; ".join(missing_conf) + f" (in {BLUETOOTH_CONF})", flush=True)
-    ControlSocket(mouse, absolute, keyboard, consumer, BondedDevices(bus)).start()
+    bonded = BondedDevices(bus)
+    ControlSocket(mouse, absolute, keyboard, consumer, bonded, AncsClient(bus, bonded)).start()
     print(f"{NAME} is waiting for the iPhone", flush=True)
     try:
         loop.run()

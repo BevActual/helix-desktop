@@ -51,6 +51,7 @@ namespace noctalia::config::schema {
   const Schema<PhoneConfig>& phoneSchema() {
     static const Schema<PhoneConfig> s = {
         field(&PhoneConfig::mirrorAlwaysOn, "mirror_always_on"),
+        field(&PhoneConfig::notifications, "notifications"),
     };
     return s;
   }

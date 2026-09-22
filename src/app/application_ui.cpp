@@ -1094,9 +1094,11 @@ void Application::initWidgetControllersAndCallbacks() {
     // window goes away when the phone stops. Closing the window ends the phone's
     // session (UxPlay restarts when always-on, otherwise stops).
     m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
+    m_phoneService->setPhoneNotifications(m_configService.config().phone.notifications);
     m_configService.addReloadCallback([this]() {
       if (m_phoneService != nullptr) {
         m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
+        m_phoneService->setPhoneNotifications(m_configService.config().phone.notifications);
       }
     });
     m_phoneMirrorConn = m_phoneService->changed().connect([this]() {

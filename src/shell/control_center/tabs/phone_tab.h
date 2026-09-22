@@ -90,6 +90,9 @@ private:
   Button* m_castMirrorButton = nullptr;
   Flex* m_castAlwaysOnRow = nullptr;
   Toggle* m_castAlwaysOn = nullptr;
+  Flex* m_castNotificationsRow = nullptr;
+  Toggle* m_castNotifications = nullptr;
+  Label* m_castNotificationsStatus = nullptr;
   Flex* m_castPointerWell = nullptr;
   Label* m_castPointerStatus = nullptr;
   Flex* m_castPointerActions = nullptr;

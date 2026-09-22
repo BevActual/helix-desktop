@@ -113,6 +113,11 @@ struct PhoneCastSnapshot {
   bool pointerConfigOk = true;   // bluetoothd has Privacy on + JustWorksRepairing always
   bool pointerBonded = false;    // some device is paired with the Helix Phone adapter
   bool pointerBondLost = false;  // bonded, mirroring, yet not connected for a while
+  // iPhone notifications over ANCS, read from the same script.
+  bool ancsEnabled = true;       // script is posting them (follows [phone] notifications)
+  bool ancsAttached = false;     // subscribed to the iPhone's Notification Source
+  int ancsActive = 0;            // notifications currently shown on the desktop
+  int ancsPosted = 0;            // posted since the script started
   std::string adbSerial;
   std::string suggestedHost;
   std::string airplayName;
@@ -187,6 +192,9 @@ public:
   // [phone] mirror_always_on: keep the AirPlay receiver and the Bluetooth pointer up
   // whenever an iPhone is paired, so mirroring is one tap on the phone.
   void setMirrorAlwaysOn(bool enabled);
+  // [phone] notifications: mirror iPhone notifications to the desktop over ANCS. The
+  // script is told on every status poll that disagrees, so a restart self-heals.
+  void setPhoneNotifications(bool enabled);
   // Ends the phone's current session (UxPlay has no per-client kick) and, when the
   // receiver is always-on, brings it straight back.
   void restartReceiver();
@@ -235,6 +243,7 @@ private:
   bool m_airplayAlive = false;
   std::uint32_t m_airplayGeneration = 0;
   bool m_mirrorAlwaysOn = true;
+  bool m_phoneNotifications = true;
   bool m_receiverUserStopped = false; // Stop pressed: no auto re-arm until Start
   bool m_armPending = false;
   bool m_destroying = false;

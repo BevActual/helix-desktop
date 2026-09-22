@@ -1262,6 +1262,9 @@ struct PhoneConfig {
   // Keep the AirPlay receiver (UxPlay) and the Helix Phone Bluetooth pointer up whenever an
   // iPhone is paired through KDE Connect, so mirroring is one tap on the phone.
   bool mirrorAlwaysOn = true;
+  // Mirror iPhone notifications to the desktop over Apple Notification Center Service on the
+  // Helix Phone Bluetooth link. The phone has to allow "Share System Notifications" for it.
+  bool notifications = true;
 
   bool operator==(const PhoneConfig&) const = default;
 };

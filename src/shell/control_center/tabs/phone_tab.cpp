@@ -751,6 +751,47 @@ std::unique_ptr<Flex> PhoneTab::create() {
     }
   });
   castHost->addChild(std::move(alwaysOnRow));
+  // [phone] notifications: iPhone notifications over ANCS. Same grouped-row shape; the
+  // caption underneath says what the phone still needs (Share System Notifications).
+  auto notificationsRow = ui::column({
+      .out = &m_castNotificationsRow,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * scale,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  auto notificationsToggleRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+  });
+  notificationsToggleRow->addChild(ui::label({
+      .text = i18n::tr("control-center.phone.cast-notifications"),
+      .fontSize = Style::fontSizeBody * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .flexGrow = 1.0F,
+  }));
+  notificationsToggleRow->addChild(ui::toggle({
+      .out = &m_castNotifications,
+      .checkedImmediate = false,
+      .toggleSize = ToggleSize::Medium,
+      .scale = scale,
+  }));
+  m_castNotifications->setOnChange([this](bool value) {
+    if (m_config != nullptr) {
+      (void)m_config->setOverride({"phone", "notifications"}, value);
+    }
+    if (m_service != nullptr) {
+      m_service->setPhoneNotifications(value);
+    }
+  });
+  notificationsRow->addChild(std::move(notificationsToggleRow));
+  notificationsRow->addChild(ui::label({
+      .out = &m_castNotificationsStatus,
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = 4,
+  }));
+  castHost->addChild(std::move(notificationsRow));
   // iPhone pointer: a module well of functional plates (status line + phone shortcuts),
   // shown only while AirPlay is running. Not a second glass layer.
   auto pointerWell = ui::column({
@@ -922,6 +963,9 @@ void PhoneTab::onClose() {
   m_castMirrorButton = nullptr;
   m_castAlwaysOnRow = nullptr;
   m_castAlwaysOn = nullptr;
+  m_castNotificationsRow = nullptr;
+  m_castNotifications = nullptr;
+  m_castNotificationsStatus = nullptr;
   m_castPointerWell = nullptr;
   m_castPointerStatus = nullptr;
   m_castPointerActions = nullptr;
@@ -1554,6 +1598,10 @@ void PhoneTab::rebuildCast() {
   signature += cast.pointerKeyboard ? '1' : '0';
   signature += cast.pointerConfigOk ? '1' : '0';
   signature += cast.pointerBondLost ? '1' : '0';
+  signature += cast.ancsEnabled ? '1' : '0';
+  signature += cast.ancsAttached ? '1' : '0';
+  signature += std::to_string(cast.ancsActive);
+  signature += std::to_string(cast.ancsPosted);
   signature += cast.error;
   signature += cast.preflightDone ? '1' : '0';
   signature += cast.decoder;
@@ -1667,6 +1715,27 @@ void PhoneTab::rebuildCast() {
     (void)setShown(m_castAlwaysOnRow, applePeer && cast.toolsReady);
     if (m_castAlwaysOn != nullptr && m_config != nullptr) {
       m_castAlwaysOn->setChecked(m_config->config().phone.mirrorAlwaysOn);
+    }
+    (void)setShown(m_castNotificationsRow, applePeer && cast.toolsReady);
+    if (m_castNotifications != nullptr && m_config != nullptr) {
+      m_castNotifications->setChecked(m_config->config().phone.notifications);
+    }
+    if (m_castNotificationsStatus != nullptr && m_config != nullptr) {
+      const bool wanted = m_config->config().phone.notifications;
+      std::string text;
+      if (wanted) {
+        if (!cast.pointerRunning) {
+          text = i18n::tr("control-center.phone.cast-notifications-starting");
+        } else if (!cast.ancsAttached) {
+          text = i18n::tr("control-center.phone.cast-notifications-waiting");
+        } else if (cast.ancsPosted == 0) {
+          text = i18n::tr("control-center.phone.cast-notifications-allow");
+        } else {
+          text = i18n::trp("control-center.phone.cast-notifications-syncing", cast.ancsActive);
+        }
+      }
+      m_castNotificationsStatus->setText(text);
+      (void)setShown(m_castNotificationsStatus, !text.empty());
     }
     const bool showPointer = applePeer && cast.airplayRunning;
     (void)setShown(m_castPointerWell, showPointer);

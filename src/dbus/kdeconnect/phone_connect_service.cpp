@@ -1998,6 +1998,16 @@ void PhoneConnectService::onAirplayExit(std::uint32_t generation, int exitCode) 
   }
 }
 
+void PhoneConnectService::setPhoneNotifications(bool enabled) {
+  if (m_phoneNotifications == enabled) {
+    return;
+  }
+  m_phoneNotifications = enabled;
+  if (m_cast.pointerRunning) {
+    pollPhonePointer();
+  }
+}
+
 void PhoneConnectService::setMirrorAlwaysOn(bool enabled) {
   if (m_mirrorAlwaysOn == enabled) {
     return;
@@ -2050,10 +2060,15 @@ void PhoneConnectService::pollPhonePointer() {
   }
   m_pointerProbeInFlight = true;
   std::weak_ptr<void> lifetime = m_lifetime;
-  std::thread([this, lifetime]() {
+  const bool wantNotifications = m_phoneNotifications;
+  std::thread([this, lifetime, wantNotifications]() {
     auto status = phonePointerRequest({{"type", "status"}});
     if (!status.has_value()) {
       ensurePhonePointer();
+    } else if (const auto ancs = status->find("ancs");
+               ancs != status->end() && ancs->is_object() && ancs->value("enabled", true) != wantNotifications) {
+      (void)phonePointerRequest({{"type", "ancs"}, {"enabled", wantNotifications}});
+      (*ancs)["enabled"] = wantNotifications;
     }
     DeferredCall::callLater([this, lifetime, status = std::move(status)]() {
       if (lifetime.expired()) {
@@ -2070,18 +2085,30 @@ void PhoneConnectService::pollPhonePointer() {
 bool PhoneConnectService::applyPhonePointerStatus(const std::optional<nlohmann::json>& status) {
   const auto snapshot = std::make_tuple(
       m_cast.pointerRunning, m_cast.pointerConnected, m_cast.pointerKeyboard, m_cast.pointerConfigOk,
-      m_cast.pointerBonded, m_cast.pointerBondLost
+      m_cast.pointerBonded, m_cast.pointerBondLost, m_cast.ancsEnabled, m_cast.ancsAttached, m_cast.ancsActive,
+      m_cast.ancsPosted
   );
   if (!status.has_value()) {
     m_cast.pointerRunning = false;
     m_cast.pointerConnected = false;
     m_cast.pointerKeyboard = false;
+    m_cast.ancsAttached = false;
+    m_cast.ancsActive = 0;
   } else {
     m_cast.pointerRunning = true;
     m_cast.pointerConnected = status->value("connected", false);
     m_cast.pointerKeyboard = status->value("keyboard_captured", false);
     m_cast.pointerConfigOk = status->value("bluetooth_config_ok", true);
     m_cast.pointerBonded = status->value("bonded", false);
+    if (const auto ancs = status->find("ancs"); ancs != status->end() && ancs->is_object()) {
+      m_cast.ancsEnabled = ancs->value("enabled", true);
+      m_cast.ancsAttached = ancs->value("attached", false);
+      m_cast.ancsActive = ancs->value("active", 0);
+      m_cast.ancsPosted = ancs->value("posted", 0);
+    } else {
+      m_cast.ancsAttached = false;
+      m_cast.ancsActive = 0;
+    }
   }
   // iOS drops the bond silently (or AssistiveTouch is switched off). The phone is
   // demonstrably nearby while it mirrors, so a bonded pointer that stays disconnected
@@ -2095,7 +2122,8 @@ bool PhoneConnectService::applyPhonePointerStatus(const std::optional<nlohmann::
   return snapshot
       != std::make_tuple(
              m_cast.pointerRunning, m_cast.pointerConnected, m_cast.pointerKeyboard, m_cast.pointerConfigOk,
-             m_cast.pointerBonded, m_cast.pointerBondLost
+             m_cast.pointerBonded, m_cast.pointerBondLost, m_cast.ancsEnabled, m_cast.ancsAttached,
+             m_cast.ancsActive, m_cast.ancsPosted
          );
 }
 
