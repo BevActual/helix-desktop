@@ -198,6 +198,7 @@ Built-in Phone control talks to the session KDE Connect daemon. There is no Heli
 | Status | <IpcCommand command="phone-status" /> | Print `not-installed`, `starting`, or `running` plus announced name and paired/reachable counts. |
 | Ping | <IpcCommand command="phone-ping" /> | Ping a paired device. Optional device name or id. |
 | Ring | <IpcCommand command="phone-ring" /> | Ring a paired device. Optional device name or id. |
+| Cast | <IpcCommand command="phone-cast" /> | Toggle the phone mirror: a scrcpy window on Android, the Helix Phone AirPlay receiver on iPhone (stopping it also pauses `[phone] mirror_always_on` until the next start). Optional device name or id. |
 
 Omit the device argument when exactly one device is paired. Open the tab with `noctalia msg panel-toggle control-center phone`.
 

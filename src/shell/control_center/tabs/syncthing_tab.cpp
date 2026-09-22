@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/syncthing_tab.h"
 
+#include "config/config_service.h"
 #include "i18n/i18n.h"
 #include "net/syncthing_service.h"
 #include "render/core/renderer.h"
@@ -11,12 +12,15 @@
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "wayland/clipboard_service.h"
 
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 using namespace control_center;
 
@@ -87,8 +91,23 @@ namespace {
 
 } // namespace
 
+SyncthingTab::Catalog SyncthingTab::catalogFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Catalog::Devices : Catalog::Folders;
+}
+
+std::size_t SyncthingTab::indexFromCatalog(Catalog catalog) noexcept {
+  return catalog == Catalog::Devices ? 1 : 0;
+}
+
 SyncthingTab::SyncthingTab(const ControlCenterServices& services)
-    : m_service(services.syncthing), m_clipboard(services.clipboard) {
+    : m_service(services.syncthing), m_clipboard(services.clipboard), m_config(services.config) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("syncthing_tab", "catalog")) {
+      if (*catalog == "devices") {
+        m_catalog = Catalog::Devices;
+      }
+    }
+  }
   if (m_service != nullptr) {
     m_service->setChangeCallback([this]() {
       syncUi();
@@ -100,27 +119,18 @@ SyncthingTab::SyncthingTab(const ControlCenterServices& services)
 std::unique_ptr<Flex> SyncthingTab::create() {
   const float scale = contentScale();
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
   well->addChild(
@@ -203,6 +213,46 @@ std::unique_ptr<Flex> SyncthingTab::create() {
       })
   );
   well->addChild(std::move(actions));
+  well->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "folder",
+                      .tooltip = i18n::tr("control-center.syncthing.folders"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "devices",
+                      .tooltip = i18n::tr("control-center.syncthing.devices"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  live->addChild(std::move(well));
+
+  auto leftover = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* leftoverContent = leftover->content();
+  leftoverContent->setDirection(FlexDirection::Vertical);
+  leftoverContent->setAlign(FlexAlign::Stretch);
+  leftoverContent->setGap(Style::spaceMd * scale);
 
   auto foldersCard = ui::column({
       .out = &m_foldersCard,
@@ -232,16 +282,9 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(well));
-  m_rootLayout->addChild(std::move(foldersCard));
-  m_rootLayout->addChild(std::move(remotesCard));
-
-  auto live = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = 0.0F,
-      .flexGrow = 1.0F,
-  });
-  live->addChild(std::move(liveScroll));
+  leftoverContent->addChild(std::move(foldersCard));
+  leftoverContent->addChild(std::move(remotesCard));
+  live->addChild(std::move(leftover));
   syncUi();
   return live;
 }
@@ -284,6 +327,7 @@ void SyncthingTab::onClose() {
   m_stopButton = nullptr;
   m_guiButton = nullptr;
   m_copyIdButton = nullptr;
+  m_catalogSwitch = nullptr;
   m_foldersCard = nullptr;
   m_folderList = nullptr;
   m_remotesCard = nullptr;
@@ -294,11 +338,52 @@ void SyncthingTab::onClose() {
 }
 
 void SyncthingTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+}
+
+void SyncthingTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+void SyncthingTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString(
+      "syncthing_tab", "catalog", m_catalog == Catalog::Devices ? "devices" : "folders"
+  );
+}
+
+void SyncthingTab::syncCatalog() {
+  const bool folders = m_catalog == Catalog::Folders;
+  (void)setShown(m_foldersCard, folders);
+  (void)setShown(m_remotesCard, !folders);
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_catalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_catalog));
+    m_catalogSyncing = false;
+  }
+}
+
+void SyncthingTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  syncCatalog();
+  PanelManager::instance().requestLayout();
 }
 
 void SyncthingTab::copyDeviceId() {
@@ -320,9 +405,14 @@ void SyncthingTab::syncUi() {
   const SyncthingSnapshot empty;
   const SyncthingSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
-  const bool layoutDirty = setShown(m_foldersCard, running) || setShown(m_remotesCard, running) ||
-                            setShown(m_startButton, !running) || setShown(m_stopButton, running) ||
-                            setShown(m_guiButton, running) || setShown(m_copyIdButton, running && !snap.myId.empty());
+  const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_stopButton, running) ||
+                            setShown(m_guiButton, running) || setShown(m_copyIdButton, running && !snap.myId.empty()) ||
+                            setShown(m_catalogSwitch, running) || setShown(m_liveScroll, running);
+  syncCatalog();
+  if (!running) {
+    (void)setShown(m_foldersCard, false);
+    (void)setShown(m_remotesCard, false);
+  }
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

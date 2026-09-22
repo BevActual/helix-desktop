@@ -1820,6 +1820,8 @@ void Application::triggerShellAction(const std::string& action, wl_output* outpu
     // There is no public toggle for overview in OverviewLauncherCapture.
     // Try to execute a generic compositor action, or use niri directly if using niri.
     runShellCommand("niri msg action toggle-overview");
+  } else if (action == "widgets") {
+    m_panelManager.openPanel("control-center", PanelOpenRequest{.output = output, .context = "widgets"});
   } else if (action == "window_switcher") {
     m_windowSwitcher.show(output);
   }

@@ -82,6 +82,8 @@ public:
   void setKeyboardFocusCallback(KeyboardFocusCallback callback);
   void setLockKeysChangeCallback(LockKeysChangeCallback callback);
   void setCursorShape(std::uint32_t serial, std::uint32_t shape);
+  /// No cursor image over the hovered surface (the iPhone mirror draws iOS's own pointer).
+  void hideCursor();
   void forgetSurface(wl_surface* surface) noexcept;
   void cleanup();
 

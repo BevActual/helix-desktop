@@ -509,9 +509,7 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
       .align = FlexAlign::Stretch,
       .configure =
           [scale, opacity](Flex& section) {
-            control_center::applySectionCardStyle(section, scale, opacity);
-            section.setGap(Style::spaceXs * scale);
-            section.setPadding(Style::spaceSm * scale);
+            control_center::applyCompactCardStyle(section, scale, opacity, false);
           },
   });
 

@@ -850,6 +850,16 @@ namespace noctalia::cli {
     inline constexpr Command phoneStatus{
         "phone-status", "Print KDE Connect daemon and paired-device status", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command phoneCast{
+        "phone-cast",
+        "Toggle the phone mirror: scrcpy on Android, AirPlay receiver (Helix Phone) on iPhone",
+        {},
+        {},
+        {},
+        kMsgPhoneDevicePositionals,
+        {},
+        false
+    };
     inline constexpr Command firewallPanicToggle{
         "firewall-panic-toggle", "Toggle firewalld panic mode", {}, {}, {}, {}, {}, false
     };
@@ -1113,6 +1123,7 @@ namespace noctalia::cli {
       msg::panelToggle,
       msg::plugin,
       msg::plugins,
+      msg::phoneCast,
       msg::phonePing,
       msg::phoneRing,
       msg::phoneStatus,

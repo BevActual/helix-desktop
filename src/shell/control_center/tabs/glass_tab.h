@@ -50,6 +50,7 @@ private:
   Toggle* m_refraction = nullptr;
   Label* m_refractionCaption = nullptr;
 
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_liveDirty = false;
 };

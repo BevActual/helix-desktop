@@ -1,6 +1,7 @@
 #include "shell/control_center/tabs/home_tab.h"
 
 #include "config/config_service.h"
+#include "calendar/calendar_service.h"
 #include "core/deferred_call.h"
 #include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
@@ -21,7 +22,15 @@
 #include "shell/profile/avatar_path.h"
 #include "shell/wallpaper/wallpaper.h"
 #include "capture/screen_recorder_service.h"
+#include "dbus/cast/cast_service.h"
+#include "dbus/firewall/firewall_service.h"
+#include "dbus/kdeconnect/phone_connect_service.h"
+#include "dbus/upower/upower_service.h"
 #include "idle/idle_inhibitor.h"
+#include "notification/notification_manager.h"
+#include "pipewire/pipewire_service.h"
+#include "system/ai_usage_service.h"
+#include "system/battery_warning_monitor.h"
 #include "system/distro_info.h"
 #include "system/gamma_service.h"
 #include "system/package_kit_service.h"
@@ -30,7 +39,6 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
-#include "ui/controls/grid_view.h"
 #include "ui/controls/progress_bar.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/dialogs/file_dialog.h"
@@ -39,10 +47,10 @@
 #include "render/scene/node.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <format>
 #include <memory>
@@ -59,68 +67,6 @@ namespace {
   constexpr float kHomeAvatarScale = 2.6F;
   // Avatar sources above this size decode noticeably slowly; warn so users understand why.
   constexpr std::uintmax_t kHomeAvatarSourceWarnBytes = 8ULL * 1024ULL * 1024ULL;
-  // Bottom row split: media/clock column grows more than the shortcuts column so the row feels balanced
-  // (tweak either value slightly if needed).
-  constexpr float kHomeMainColumnFlexGrow = 1.32F;
-  constexpr float kHomeShortcutsFlexGrow = 1.12F;
-  // Left-column card height split (media above, clock/weather below).
-  constexpr float kHomeMediaCardFlexGrow = 1.4F;
-  constexpr float kHomeDateTimeCardFlexGrow = 1.0F;
-  constexpr std::size_t kHomeShortcutGridColumns = 2;
-  // At or below this count the shortcuts stack in a single narrow column instead of the 2-column grid.
-  constexpr std::size_t kHomeStackedShortcutMax = 2;
-  // Extra-large Control Center tiles stay square.
-  constexpr float kHomeShortcutSquareTrim = 1.0F;
-
-  enum class HomeShortcutCluster : std::uint8_t {
-    Connectivity,
-    Focus,
-    Display,
-    Sound,
-    Capture,
-    Power,
-    Sharing,
-    Other,
-  };
-  constexpr std::size_t kHomeShortcutClusterCount = 8;
-
-  [[nodiscard]] HomeShortcutCluster homeClusterFor(std::string_view type) {
-    if (type == "wifi" || type == "bluetooth" || type == "tailscale" || type == "localsend" || type == "phone") {
-      return HomeShortcutCluster::Connectivity;
-    }
-    if (type == "notification" || type == "caffeine" || type == "dark_mode") {
-      return HomeShortcutCluster::Focus;
-    }
-    if (type == "nightlight" || type == "wallpaper") {
-      return HomeShortcutCluster::Display;
-    }
-    if (type == "audio" || type == "mic_mute" || type == "media") {
-      return HomeShortcutCluster::Sound;
-    }
-    if (type == "screenshot"
-        || type == "pick_color"
-        || type == "ocr"
-        || type == "scan_qr"
-        || type == "screen_recorder"
-        || type == "screen_replay") {
-      return HomeShortcutCluster::Capture;
-    }
-    if (type == "power_profile" || type == "session" || type == "system" || type == "screen_time") {
-      return HomeShortcutCluster::Power;
-    }
-    if (type == "clipboard"
-        || type == "printers"
-        || type == "cast"
-        || type == "syncthing"
-        || type == "firewall"
-        || type == "privacy"
-        || type == "weather"
-        || type == "keyboard_layout"
-        || type == "ai") {
-      return HomeShortcutCluster::Sharing;
-    }
-    return HomeShortcutCluster::Other;
-  }
 
   float homeConcentricRadius(float outerRadius, float padding, float floorRadius) {
     return std::max(floorRadius, outerRadius - padding);
@@ -132,14 +78,82 @@ namespace {
     );
   }
 
-  float homeShortcutTileRadius(float scale) {
-    return homeConcentricRadius(
-        Style::scaledRadius3xl(scale), Style::spaceXs * scale, Style::scaledRadiusLg(scale)
-    );
+  // Now Playing is a compact widget: album art beside track, progress, and transport.
+  [[nodiscard]] float homeNowPlayingHeight(float scale) {
+    const float art = Style::controlHeightLg * 1.6F * scale;
+    const float text = Style::fontSizeTitle * scale + Style::fontSizeCaption * scale + 4.0F * scale
+        + Style::controlHeight * scale + Style::spaceXs * 3.0F * scale;
+    const float pad = Style::spaceMd * 2.0F * scale;
+    return std::max(art, text) + pad;
   }
 
-  void applyHomeClusterStyle(Flex& well, float scale, float /*fillOpacity*/) {
-    applyModuleWellStyle(well, scale);
+  [[nodiscard]] float homeClockMinHeight(float scale, bool eventRow) {
+    const float time = Style::fontSizeHeader * 1.75F * scale;
+    const float date = Style::fontSizeBody * 0.95F * scale;
+    const float weather = Style::fontSizeBody * scale;
+    const float event = eventRow ? Style::fontSizeBody * scale : 0.0F;
+    const float gaps = Style::spaceSm * (eventRow ? 3.0F : 2.0F) * scale;
+    const float pad = Style::spaceMd * 2.0F * scale;
+    return time + date + weather + event + gaps + pad;
+  }
+
+  float homeTimeFontSize(float scale, float cardInnerHeight, bool eventRow) {
+    const float minSize = Style::fontSizeHeader * 1.75F * scale;
+    const float maxSize = Style::fontSizeBody * 3.8F * scale;
+    if (cardInnerHeight <= 0.0F) {
+      return minSize;
+    }
+    const float dateH = Style::fontSizeBody * 0.95F * scale;
+    const float weatherH = Style::fontSizeBody * scale;
+    const float eventH = eventRow ? Style::fontSizeBody * scale : 0.0F;
+    const float gaps = Style::spaceSm * (eventRow ? 3.0F : 2.0F) * scale;
+    const float leftover = cardInnerHeight - dateH - weatherH - eventH - gaps;
+    return std::clamp(leftover * 0.78F, minSize, maxSize);
+  }
+
+  std::chrono::system_clock::time_point homeNextLocalMidnight(std::chrono::system_clock::time_point time) {
+    const std::time_t raw = std::chrono::system_clock::to_time_t(time);
+    std::tm local{};
+    if (localtime_r(&raw, &local) == nullptr) {
+      return time + std::chrono::hours{24};
+    }
+    local.tm_hour = 0;
+    local.tm_min = 0;
+    local.tm_sec = 0;
+    ++local.tm_mday;
+    local.tm_isdst = -1;
+    const std::time_t next = std::mktime(&local);
+    return next == static_cast<std::time_t>(-1) ? time + std::chrono::hours{24}
+                                                : std::chrono::system_clock::from_time_t(next);
+  }
+
+  std::chrono::system_clock::time_point homeEventEndInstant(const CalendarEvent& event) {
+    if (!event.allDay) {
+      return std::max(event.end, event.start);
+    }
+    if (event.end > event.start) {
+      return event.end;
+    }
+    return homeNextLocalMidnight(event.start);
+  }
+
+  const CalendarEvent* homeNextCalendarEvent(const CalendarSnapshot& snapshot) {
+    const auto now = std::chrono::system_clock::now();
+    const CalendarEvent* current = nullptr;
+    const CalendarEvent* upcoming = nullptr;
+    for (const CalendarEvent& event : snapshot.events) {
+      if (homeEventEndInstant(event) <= now) {
+        continue;
+      }
+      if (!event.allDay && event.start <= now) {
+        if (current == nullptr || event.start > current->start) {
+          current = &event;
+        }
+      } else if (upcoming == nullptr || event.start < upcoming->start) {
+        upcoming = &event;
+      }
+    }
+    return current != nullptr ? current : upcoming;
   }
 
   constexpr auto kHomeTransientPositionRegressionWindow = std::chrono::milliseconds(1500);
@@ -149,47 +163,6 @@ namespace {
   constexpr int kHomeMediaArtLayoutPassLimit = 8;
 
   float homeAvatarSize(float scale) { return Style::controlHeightLg * kHomeAvatarScale * scale; }
-
-  float homeTimeFontSize(float scale, float cardInnerHeight) {
-    const float minSize = Style::fontSizeHeader * 1.75F * scale;
-    const float maxSize = Style::fontSizeBody * 3.8F * scale;
-    if (cardInnerHeight <= 0.0F) {
-      return minSize;
-    }
-    const float dateH = Style::fontSizeBody * 0.95F * scale;
-    const float weatherH = Style::fontSizeBody * scale;
-    const float gaps = Style::spaceSm * 2.0F * scale;
-    const float leftover = cardInnerHeight - dateH - weatherH - gaps;
-    return std::clamp(leftover * 0.78F, minSize, maxSize);
-  }
-
-  // Width for the stacked (single-column) shortcuts so each tile keeps the same width it would have
-  // as one cell of the standard 2-column grid, rather than stretching across the whole column.
-  float homeStackedShortcutsWidth(float contentWidth, float bottomRowGap, float wellPadding, float cellGap) {
-    const float totalGrow = kHomeMainColumnFlexGrow + kHomeShortcutsFlexGrow;
-    const float fullGridWidth = std::max(1.0F, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
-    const float fullGridInnerWidth = std::max(1.0F, fullGridWidth - 2.0F * wellPadding);
-    const float cellWidth = std::max(
-        1.0F,
-        (fullGridInnerWidth - cellGap * static_cast<float>(kHomeShortcutGridColumns - 1))
-            / static_cast<float>(kHomeShortcutGridColumns)
-    );
-    return cellWidth + 2.0F * wellPadding;
-  }
-
-  // The 2-column shortcuts grid's natural width = its flex share of the bottom row.
-  float homeShortcutsGridNaturalWidth(float contentWidth, float bottomRowGap) {
-    const float totalGrow = kHomeMainColumnFlexGrow + kHomeShortcutsFlexGrow;
-    return std::max(1.0F, contentWidth - bottomRowGap) * (kHomeShortcutsFlexGrow / totalGrow);
-  }
-
-  std::size_t homeShortcutColumnSpan(ShortcutSize size) noexcept {
-    return size == ShortcutSize::Small ? 1 : 2;
-  }
-
-  std::size_t homeShortcutRowSpan(ShortcutSize size) noexcept {
-    return size == ShortcutSize::Large ? 2 : 1;
-  }
 
   std::filesystem::path avatarStartDirectory(const AccountsService* accounts, const ConfigService* config) {
     const std::string currentPath =
@@ -396,9 +369,9 @@ namespace {
 
 HomeTab::HomeTab(const ControlCenterServices& services)
     : m_mpris(services.mpris), m_httpClient(services.httpClient), m_weather(services.weather),
-      m_config(services.config), m_accounts(services.accounts), m_wallpaper(services.wallpaper),
-      m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures),
-      m_services(services.shortcutServices()),
+      m_calendar(services.calendar), m_config(services.config), m_accounts(services.accounts),
+      m_wallpaper(services.wallpaper), m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures),
+      m_upower(services.upower), m_services(services.shortcutServices()),
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "control-center", .includedGroups = {"home"}}
       )) {
@@ -624,6 +597,12 @@ std::unique_ptr<Flex> HomeTab::create() {
   statusChips->addChild(makeStatusChip(&m_statusUpdates, scale, chipOpacity, []() {
     openControlCenterTab("packages");
   }));
+  statusChips->addChild(makeStatusChip(&m_statusAi, scale, chipOpacity, []() {
+    openControlCenterTab("ai");
+  }));
+  statusChips->addChild(makeStatusChip(&m_statusBattery, scale, chipOpacity, []() {
+    openControlCenterTab("power");
+  }));
   statusChips->addChild(makeStatusChip(&m_statusCapture, scale, chipOpacity, []() {
     openControlCenterTab("screen-record");
   }));
@@ -633,104 +612,81 @@ std::unique_ptr<Flex> HomeTab::create() {
   statusChips->addChild(makeStatusChip(&m_statusCaffeine, scale, chipOpacity, []() {
     openControlCenterTab("power");
   }));
+  statusChips->addChild(makeStatusChip(&m_statusDnd, scale, chipOpacity, []() {
+    openControlCenterTab("notifications");
+  }));
   statusChips->addChild(makeStatusChip(&m_statusLocalSend, scale, chipOpacity, []() {
     openControlCenterTab("localsend");
+  }));
+  statusChips->addChild(makeStatusChip(&m_statusPhone, scale, chipOpacity, []() {
+    openControlCenterTab("phone");
+  }));
+  statusChips->addChild(makeStatusChip(&m_statusPrivacy, scale, chipOpacity, []() {
+    openControlCenterTab("privacy");
+  }));
+  statusChips->addChild(makeStatusChip(&m_statusCast, scale, chipOpacity, []() {
+    openControlCenterTab("cast");
+  }));
+  statusChips->addChild(makeStatusChip(&m_statusFirewall, scale, chipOpacity, []() {
+    openControlCenterTab("firewall");
   }));
   statusWell->addChild(std::move(statusChips));
   tab->addChild(std::move(statusWell));
 
-  auto bottomRow = ui::row({
-      .out = &m_bottomRow,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceMd * scale,
-      .fillWidth = true,
-      .flexGrow = 1.0F,
-  });
-
-  auto leftColumn = ui::column({
-      .align = FlexAlign::Stretch,
-      .justify = FlexJustify::Start,
-      .gap = Style::spaceMd * scale,
-      .fillWidth = true,
-      .flexGrow = kHomeMainColumnFlexGrow,
-  });
-
-  // --- Media (top of left column) ---
+  // --- Now Playing: only participates when a player is active ---
   auto mediaCard = ui::column({
       .out = &m_mediaCard,
       .justify = FlexJustify::Center,
       .gap = Style::spaceXs * scale,
       .fillWidth = true,
-      .fillHeight = true,
-      .flexGrow = kHomeMediaCardFlexGrow,
+      .fillHeight = false,
+      .flexGrow = 0.0F,
+      .visible = false,
+      .participatesInLayout = false,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeCardStyle(card, scale, opacity); },
   });
 
-  const float artSize = Style::controlHeightLg * 1.22F * scale;
-  auto mediaContent = ui::row(
-      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
-      ui::column(
-          {.out = &m_mediaArtSlot,
-           .align = FlexAlign::Center,
-           .justify = FlexJustify::Center,
-           .width = artSize,
-           .height = artSize},
-          ui::glyph({
-              .out = &m_mediaArtFallback,
-              .glyph = "disc-filled",
-              .glyphSize = artSize * 0.55F,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          }),
-          ui::image({
-              .out = &m_mediaArt,
-              .fit = ImageFit::Cover,
-              .radius = homeMediaArtRadius(scale),
-              .width = artSize,
-              .height = artSize,
-              .participatesInLayout = false,
-              .configure = [](Image& image) { image.setZIndex(1); },
-          })
-      ),
-      ui::column(
-          {.out = &m_mediaText, .align = FlexAlign::Stretch, .gap = Style::spaceXs * 0.5F * scale, .flexGrow = 1.0F},
-          ui::label({
-              .out = &m_mediaTrack,
-              .text = i18n::tr("control-center.home.media.nothing-playing"),
-              .fontSize = Style::fontSizeBody * 0.95F * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-              .maxLines = 1,
-              .ellipsize = TextEllipsize::End,
-          }),
-          ui::label({
-              .out = &m_mediaArtist,
-              .text = "",
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .maxLines = 1,
-              .ellipsize = TextEllipsize::End,
-              .visible = false,
-          })
-      )
-  );
-  mediaCard->addChild(std::move(mediaContent));
-  mediaCard->addChild(
-      ui::progressBar({
-          .out = &m_mediaProgressBar,
-          .fill = colorSpecFromRole(ColorRole::Primary),
-          .track = colorSpecFromRole(ColorRole::OnSurface, 0.12F),
-          .radius = 2.0F * scale,
-          .softness = 1.0F,
-          .progress = 0.0F,
-          .height = 4.0F * scale,
-          .visible = false,
-          .participatesInLayout = false,
-          .configure = [](ProgressBar& bar) { bar.setHitTestVisible(false); },
-      })
-  );
+  const float artSize = Style::controlHeightLg * 1.6F * scale;
+  auto mediaText = ui::column({
+      .out = &m_mediaText,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * 0.5F * scale,
+      .flexGrow = 1.0F,
+  });
+  mediaText->addChild(ui::label({
+      .out = &m_mediaTrack,
+      .text = i18n::tr("control-center.home.media.nothing-playing"),
+      .fontSize = Style::fontSizeTitle * scale,
+      .fontWeight = FontWeight::Bold,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .maxLines = 1,
+      .ellipsize = TextEllipsize::End,
+  }));
+  mediaText->addChild(ui::label({
+      .out = &m_mediaArtist,
+      .text = "",
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = 1,
+      .ellipsize = TextEllipsize::End,
+      .visible = false,
+  }));
+  mediaText->addChild(ui::progressBar({
+      .out = &m_mediaProgressBar,
+      .fill = colorSpecFromRole(ColorRole::Primary),
+      .track = colorSpecFromRole(ColorRole::OnSurface, 0.12F),
+      .radius = 2.0F * scale,
+      .softness = 1.0F,
+      .progress = 0.0F,
+      .height = 4.0F * scale,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [](ProgressBar& bar) { bar.setHitTestVisible(false); },
+  }));
   auto transport = ui::row({
       .out = &m_mediaTransport,
       .align = FlexAlign::Center,
-      .justify = FlexJustify::Center,
+      .justify = FlexJustify::Start,
       .gap = Style::spaceSm * scale,
       .fillWidth = true,
       .visible = false,
@@ -776,7 +732,35 @@ std::unique_ptr<Flex> HomeTab::create() {
         });
       }
   ));
-  mediaCard->addChild(std::move(transport));
+  mediaText->addChild(std::move(transport));
+
+  auto mediaContent = ui::row(
+      {.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true},
+      ui::column(
+          {.out = &m_mediaArtSlot,
+           .align = FlexAlign::Center,
+           .justify = FlexJustify::Center,
+           .width = artSize,
+           .height = artSize},
+          ui::glyph({
+              .out = &m_mediaArtFallback,
+              .glyph = "disc-filled",
+              .glyphSize = artSize * 0.55F,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          }),
+          ui::image({
+              .out = &m_mediaArt,
+              .fit = ImageFit::Cover,
+              .radius = homeMediaArtRadius(scale),
+              .width = artSize,
+              .height = artSize,
+              .participatesInLayout = false,
+              .configure = [](Image& image) { image.setZIndex(1); },
+          })
+      ),
+      std::move(mediaText)
+  );
+  mediaCard->addChild(std::move(mediaContent));
 
   // Clicking anywhere on the media card opens the media tab. Transport sits above this overlay.
   m_mediaCardArea = addCardOverlay(*m_mediaCard, []() { openControlCenterTab("media"); });
@@ -784,7 +768,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     m_mediaCardArea->setTooltip(i18n::tr("control-center.home.open-media"));
   }
 
-  // --- Date/Time + Weather (below media): stacked glanceable widget ---
+  // --- Clock leftover: stacked glanceable widget filling remaining height ---
   auto dateTimeCard = ui::column(
       {.out = &m_dateTimeCard,
        .align = FlexAlign::Start,
@@ -792,13 +776,13 @@ std::unique_ptr<Flex> HomeTab::create() {
        .gap = Style::spaceSm * scale,
        .fillWidth = true,
        .fillHeight = true,
-       .flexGrow = kHomeDateTimeCardFlexGrow,
+       .flexGrow = 1.0F,
        .configure =
            [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeClockCardStyle(card, scale, opacity); }},
       ui::label({
           .out = &m_timeLabel,
           .text = formatShellTime(m_config),
-          .fontSize = homeTimeFontSize(scale, 0.0F),
+          .fontSize = homeTimeFontSize(scale, 0.0F, false),
           .fontWeight = FontWeight::Bold,
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .maxLines = 1,
@@ -810,6 +794,29 @@ std::unique_ptr<Flex> HomeTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 1,
       }),
+      ui::row(
+          {.out = &m_eventRow,
+           .align = FlexAlign::Center,
+           .gap = Style::spaceSm * scale,
+           .fillWidth = true,
+           .visible = false,
+           .participatesInLayout = false},
+          ui::glyph({
+              .out = &m_eventGlyph,
+              .glyph = "calendar-event",
+              .glyphSize = Style::fontSizeTitle * scale,
+              .color = colorSpecFromRole(ColorRole::Primary),
+          }),
+          ui::label({
+              .out = &m_eventLine,
+              .text = "",
+              .fontSize = Style::fontSizeBody * 0.95F * scale,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              .maxLines = 1,
+              .ellipsize = TextEllipsize::End,
+              .flexGrow = 1.0F,
+          })
+      ),
       ui::row(
           {.out = &m_weatherRow,
            .align = FlexAlign::Center,
@@ -847,11 +854,10 @@ std::unique_ptr<Flex> HomeTab::create() {
     m_weatherCardArea->setTooltip(i18n::tr("control-center.home.open-weather"));
   }
 
-  leftColumn->addChild(std::move(mediaCard));
-  leftColumn->addChild(std::move(dateTimeCard));
-  bottomRow->addChild(std::move(leftColumn));
+  tab->addChild(std::move(mediaCard));
+  tab->addChild(std::move(dateTimeCard));
 
-  // --- Shortcuts (right of media + clock), grouped into leftover islands ---
+  // --- Optional pins: leftover grouped list, user order, no Control Center cell sizes ---
   const auto& shortcuts =
       m_config != nullptr ? m_config->config().controlCenter.shortcuts : std::vector<ShortcutConfig>{};
   const std::size_t count = shortcuts.size();
@@ -864,7 +870,6 @@ std::unique_ptr<Flex> HomeTab::create() {
     previous.push_back(std::move(pad.shortcut));
   }
   m_shortcutPads.clear();
-  m_shortcutClusters.clear();
   m_shortcutsColumn = nullptr;
 
   auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
@@ -886,13 +891,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     m_lastPlugins = m_config->config().plugins;
   }
 
-  struct PendingTile {
-    std::unique_ptr<Button> button;
-    std::string type;
-    ShortcutSize size = ShortcutSize::Small;
-  };
-  std::vector<PendingTile> tiles;
-
+  std::vector<std::unique_ptr<Button>> pendingButtons;
   for (std::size_t i = 0; i < count; ++i) {
     const auto& sc = shortcuts[i];
     auto shortcut = takeReusable(sc.type);
@@ -912,23 +911,22 @@ std::unique_ptr<Flex> HomeTab::create() {
       shortcut->onPanelOpen();
     }
 
-    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
     const std::string label = shortcut->displayLabel();
     const bool enabled = shortcut->enabled();
     const bool isActive = shortcut->active();
-    const float glyphMul = sc.size == ShortcutSize::Large ? 1.45F : (sc.size == ShortcutSize::Wide ? 1.12F : 1.0F);
 
     const std::size_t padIdx = m_shortcutPads.size();
     auto btn = ui::button({
-        .text = showLabels ? std::optional<std::string>{label} : std::nullopt,
+        .text = label,
         .glyph = shortcut->displayIcon(),
-        .glyphSize = Style::fontSizeHeader * 1.4F * scale * glyphMul,
-        .contentAlign = ButtonContentAlign::Center,
+        .glyphSize = Style::fontSizeHeader * scale,
+        .contentAlign = ButtonContentAlign::Start,
         .tooltip = label,
-        .minHeight = 0.0F,
-        .padding = Style::spaceSm * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = homeShortcutTileRadius(scale),
+        .minHeight = Style::controlHeightLg * scale,
+        .paddingV = Style::spaceSm * scale,
+        .paddingH = Style::spaceMd * scale,
+        .gap = Style::spaceSm * scale,
+        .radius = 0.0F,
         .onClick =
             [this, padIdx]() {
               if (padIdx < m_shortcutPads.size()) {
@@ -942,18 +940,16 @@ std::unique_ptr<Flex> HomeTab::create() {
               }
             },
         .configure =
-            [enabled, isActive, showLabels, scale](Button& button) {
-              button.setDirection(FlexDirection::Vertical);
-              button.setJustify(FlexJustify::Center);
-              if (showLabels) {
-                button.setAlign(FlexAlign::Stretch);
-                if (button.label() != nullptr) {
-                  button.label()->setFontSize(Style::fontSizeCaption * scale);
-                  button.label()->setMaxLines(1);
-                  button.label()->setTextAlign(TextAlign::Center);
-                }
-              } else {
-                button.setAlign(FlexAlign::Center);
+            [enabled, isActive, scale](Button& button) {
+              button.setDirection(FlexDirection::Horizontal);
+              button.setAlign(FlexAlign::Center);
+              button.setJustify(FlexJustify::Start);
+              button.setFillWidth(true);
+              if (button.label() != nullptr) {
+                button.label()->setFontSize(Style::fontSizeBody * scale);
+                button.label()->setMaxLines(1);
+                button.label()->setTextAlign(TextAlign::Start);
+                button.label()->setEllipsize(TextEllipsize::End);
               }
               applyShortcutButtonStyle(button, enabled, isActive);
             },
@@ -977,93 +973,27 @@ std::unique_ptr<Flex> HomeTab::create() {
     pad.button = btnPtr;
     pad.glyph = btnPtr->glyph();
     pad.label = btnPtr->label();
-    pad.size = sc.size;
     m_shortcutPads.push_back(std::move(pad));
-    tiles.push_back(PendingTile{.button = std::move(btn), .type = sc.type, .size = sc.size});
+    pendingButtons.push_back(std::move(btn));
   }
 
-  if (!tiles.empty()) {
+  if (!pendingButtons.empty()) {
     auto column = ui::column({
         .out = &m_shortcutsColumn,
         .align = FlexAlign::Stretch,
-        .gap = Style::spaceMd * scale,
-        .flexGrow = kHomeShortcutsFlexGrow,
+        .fillWidth = true,
+        .flexGrow = 0.0F,
+        .configure =
+            [scale](Flex& list) {
+              applyGroupedListStyle(list, scale);
+            },
     });
-
-    std::array<std::vector<std::size_t>, kHomeShortcutClusterCount> buckets{};
-    for (std::size_t i = 0; i < tiles.size(); ++i) {
-      const auto cluster = homeClusterFor(tiles[i].type);
-      buckets[static_cast<std::size_t>(cluster)].push_back(i);
+    for (auto& btn : pendingButtons) {
+      column->addChild(std::move(btn));
     }
-
-    std::vector<std::vector<std::size_t>> wells;
-    std::vector<std::size_t> leftovers;
-    wells.reserve(kHomeShortcutClusterCount);
-    for (auto& bucket : buckets) {
-      if (bucket.size() >= 2) {
-        wells.push_back(std::move(bucket));
-      } else {
-        leftovers.insert(leftovers.end(), bucket.begin(), bucket.end());
-      }
-    }
-    if (!leftovers.empty()) {
-      wells.push_back(std::move(leftovers));
-    }
-
-    bool anyWideTile = false;
-    for (const auto& tile : tiles) {
-      if (homeShortcutColumnSpan(tile.size) > 1) {
-        anyWideTile = true;
-        break;
-      }
-    }
-    const bool stacked = tiles.size() <= kHomeStackedShortcutMax && !anyWideTile;
-    for (const auto& indices : wells) {
-      Flex* well = nullptr;
-      auto wellCard = ui::column({
-          .out = &well,
-          .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-            applyHomeClusterStyle(card, scale, opacity);
-          },
-      });
-      auto grid = std::make_unique<GridView>();
-      bool anyWide = false;
-      for (std::size_t idx : indices) {
-        if (homeShortcutColumnSpan(tiles[idx].size) > 1) {
-          anyWide = true;
-          break;
-        }
-      }
-      const std::size_t cols =
-          (stacked || (indices.size() == 1 && !anyWide)) ? 1U : kHomeShortcutGridColumns;
-      grid->setColumns(cols);
-      grid->setColumnGap(Style::spaceXs * scale);
-      grid->setRowGap(Style::spaceXs * scale);
-      grid->setPadding(0.0F);
-      grid->setUniformCellSize(true);
-      grid->setStretchItems(true);
-      grid->setSquareCells(true);
-      grid->setMinCellHeight(0.0F);
-      grid->setSpanLastItem(!anyWide);
-      GridView* gridPtr = grid.get();
-      for (std::size_t idx : indices) {
-        Button* tileButton = tiles[idx].button.get();
-        grid->addChild(std::move(tiles[idx].button));
-        grid->setChildSpan(
-            tileButton, homeShortcutColumnSpan(tiles[idx].size), homeShortcutRowSpan(tiles[idx].size)
-        );
-      }
-      well->addChild(std::move(grid));
-      m_shortcutClusters.push_back(ShortcutCluster{.well = well, .grid = gridPtr, .count = indices.size()});
-      column->addChild(std::move(wellCard));
-    }
-
-    if (stacked) {
-      column->setFlexGrow(0.0F);
-    }
-    bottomRow->addChild(std::move(column));
+    tab->addChild(std::move(column));
   }
-  tab->addChild(std::move(bottomRow));
+
 
   auto liveScroll = ui::scrollView({
       .out = &m_liveScroll,
@@ -1136,14 +1066,16 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   syncStatusStrip();
 
   const float scale = contentScale();
+  const bool playing = mediaExpanded();
+  setShown(m_mediaCard, playing);
+
   const float userCardHeight = homeAvatarSize(scale) + 2.0F * Style::spaceMd * scale;
   const bool statusVisible = m_statusStrip != nullptr && m_statusStrip->visible();
-  const float statusHeight =
-      statusVisible ? Style::controlHeightSm * scale + 2.0F * Style::spaceXs * scale : 0.0F;
   if (m_statusStrip != nullptr) {
     m_statusStrip->setParticipatesInLayout(statusVisible);
     m_statusStrip->setFlexGrow(0.0F);
-    m_statusStrip->setMinHeight(statusHeight);
+    m_statusStrip->setMinHeight(0.0F);
+    m_statusStrip->setMaxHeight(0.0F);
   }
   if (m_userCard != nullptr) {
     m_userCard->setFlexGrow(0.0F);
@@ -1151,38 +1083,34 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     m_userCard->setMinHeight(userCardHeight);
     m_userCard->setMaxHeight(userCardHeight);
   }
-  if (m_bottomRow != nullptr) {
-    m_bottomRow->setFlexGrow(1.0F);
+
+  const float mediaH = playing ? homeNowPlayingHeight(scale) : 0.0F;
+  if (m_mediaCard != nullptr) {
+    m_mediaCard->setFlexGrow(0.0F);
+    m_mediaCard->setFillHeight(false);
+    m_mediaCard->setMinHeight(mediaH);
+    m_mediaCard->setMaxHeight(mediaH);
   }
 
-  if (m_shortcutsColumn != nullptr && !m_shortcutPads.empty()) {
-    const float bottomRowGap = m_bottomRow != nullptr ? m_bottomRow->gap() : 0.0F;
-    bool anyWideTile = false;
-    for (const auto& pad : m_shortcutPads) {
-      if (homeShortcutColumnSpan(pad.size) > 1) {
-        anyWideTile = true;
-        break;
-      }
-    }
-    const bool stacked = m_shortcutPads.size() <= kHomeStackedShortcutMax && !anyWideTile;
-    const float wellPad = Style::spaceXs * scale;
-    const float cellGap = Style::spaceXs * scale;
-
-    float columnWidth = stacked ? homeStackedShortcutsWidth(contentWidth, bottomRowGap, wellPad, cellGap)
-                                : homeShortcutsGridNaturalWidth(contentWidth, bottomRowGap);
-
-    if (stacked) {
-      m_shortcutsColumn->setFlexGrow(0.0F);
-      m_shortcutsColumn->setSize(columnWidth, m_shortcutsColumn->height());
-    } else {
-      m_shortcutsColumn->setFlexGrow(kHomeShortcutsFlexGrow);
-    }
+  const bool eventVisible = m_eventRow != nullptr && m_eventRow->visible();
+  const float clockMin = homeClockMinHeight(scale, eventVisible);
+  if (m_dateTimeCard != nullptr) {
+    m_dateTimeCard->setFlexGrow(1.0F);
+    m_dateTimeCard->setFillHeight(true);
+    m_dateTimeCard->setMinHeight(clockMin);
+    m_dateTimeCard->setMaxHeight(0.0F);
   }
+
+  if (m_shortcutsColumn != nullptr) {
+    m_shortcutsColumn->setFlexGrow(0.0F);
+    m_shortcutsColumn->setFillHeight(false);
+  }
+
   m_rootLayout->setMinHeight(0.0F);
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
 
-  // Cap shortcut labels to the button's content width after cells are sized (avoids elide from grid math mismatch).
+  // Cap pin labels to the row's content width after the list is sized.
   if (!m_shortcutPads.empty()) {
     for (auto& pad : m_shortcutPads) {
       if (pad.label == nullptr) {
@@ -1190,15 +1118,12 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
       }
       float inner = 1.0F;
       if (pad.button != nullptr && pad.button->width() > 1.0F) {
-        inner = std::max(1.0F, pad.button->width() - pad.button->paddingLeft() - pad.button->paddingRight());
-      } else if (!m_shortcutClusters.empty() && m_shortcutClusters.front().grid != nullptr) {
-        GridView* grid = m_shortcutClusters.front().grid;
-        const float gridW = grid->width();
-        const float innerGrid = std::max(1.0F, gridW - grid->paddingLeft() - grid->paddingRight());
-        const std::size_t cols = std::max<std::size_t>(1, std::min(grid->columns(), m_shortcutClusters.front().count));
-        const float cellWidth =
-            (innerGrid - static_cast<float>(cols - 1) * grid->columnGap()) / static_cast<float>(cols);
-        inner = std::max(1.0F, cellWidth - 2.0F * Style::spaceXs * scale);
+        const float glyphW = pad.glyph != nullptr ? pad.glyph->width() : 0.0F;
+        inner = std::max(
+            1.0F,
+            pad.button->width() - pad.button->paddingLeft() - pad.button->paddingRight() - glyphW
+                - pad.button->gap()
+        );
       }
       pad.label->setMaxWidth(inner);
     }
@@ -1230,14 +1155,22 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     m_weatherLine->setMaxLines(1);
     m_weatherLine->setEllipsize(TextEllipsize::End);
   }
-  // Grow the album art square to fill the media card height so the row feels balanced
-  // when the card flex-grows. A later bottom-row min-height pass can change the card
-  // height, so this runs again after that final layout pass below.
+  const float eventMetaWrap = std::max(
+      1.0F,
+      dateTimeWrap
+          - (m_eventGlyph != nullptr ? m_eventGlyph->width() : 0.0F)
+          - Style::spaceSm * scale
+  );
+  if (m_eventLine != nullptr) {
+    m_eventLine->setMaxWidth(eventMetaWrap);
+    m_eventLine->setMaxLines(1);
+    m_eventLine->setEllipsize(TextEllipsize::End);
+  }
+  // Grow the album art square to the Now Playing card height so transport stays balanced.
   resizeMediaArtToCard();
 
   // Keep the media card height stable: one ellipsized line each, capped to the
-  // text column width. Wrapping a long title used to grow this card and stretch
-  // the adjacent shortcut buttons (same bottom-row height).
+  // text column width so a long title does not grow Now Playing.
   const float mediaTextWrap = m_mediaText != nullptr ? innerWidth(m_mediaText) : 1.0F;
   for (Label* label : {m_mediaTrack, m_mediaArtist}) {
     if (label != nullptr) {
@@ -1269,92 +1202,48 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     m_userMain->setSize(m_userMain->width(), desiredAvatar);
   }
 
-  // Lock the shortcuts grid height to its square-cell natural size so it does not vary
-  // when the media or clock cards change. The leftColumn stretches to match this height.
-  float contentH = bodyHeight;
-  if (m_shortcutsColumn != nullptr && !m_shortcutPads.empty()) {
-    float columnH = 0.0F;
-    float cellSide = 0.0F;
-    const float clusterGap = m_shortcutsColumn->gap();
-    for (std::size_t i = 0; i < m_shortcutClusters.size(); ++i) {
-      auto& cluster = m_shortcutClusters[i];
-      if (cluster.grid == nullptr || cluster.well == nullptr || cluster.count == 0) {
-        continue;
-      }
-      const float innerGridW =
-          std::max(1.0F, cluster.well->width() - cluster.well->paddingLeft() - cluster.well->paddingRight());
-      const std::size_t cols = std::max<std::size_t>(1, cluster.grid->columns());
-      const std::size_t rows = std::max<std::size_t>(1, cluster.grid->packedRowCount());
-      const float cellWidth = std::max(
-          1.0F, (innerGridW - static_cast<float>(cols - 1) * cluster.grid->columnGap()) / static_cast<float>(cols)
-      );
-      cellSide = cellWidth * kHomeShortcutSquareTrim;
-      const float gridH = std::round(
-          static_cast<float>(rows) * cellSide
-          + static_cast<float>(rows > 0 ? rows - 1 : 0) * cluster.grid->rowGap()
-      );
-      const float wellH = gridH + cluster.well->paddingTop() + cluster.well->paddingBottom();
-      cluster.well->setMinHeight(wellH);
-      cluster.well->setMaxHeight(wellH);
-      columnH += wellH;
-      if (i + 1 < m_shortcutClusters.size()) {
-        columnH += clusterGap;
-      }
-    }
-
-    const bool showLabels = m_config != nullptr ? m_config->config().controlCenter.showShortcutLabels : true;
-    for (auto& pad : m_shortcutPads) {
-      if (pad.glyph == nullptr) {
-        continue;
-      }
-      const float glyphMul = pad.size == ShortcutSize::Large ? 1.45F : (pad.size == ShortcutSize::Wide ? 1.12F : 1.0F);
-      if (showLabels) {
-        pad.glyph->setGlyphSize(Style::fontSizeHeader * 1.4F * scale * glyphMul);
-      } else if (cellSide > 0.0F) {
-        const float dynamicGlyphSize = std::clamp(cellSide * 0.38F * glyphMul, 24.0F * scale, 72.0F * scale);
-        pad.glyph->setGlyphSize(dynamicGlyphSize);
-      }
-      if (pad.button != nullptr && cellSide > 0.0F) {
-        pad.button->setRadius(cellSide * 0.5F);
-      }
-    }
-
-    if (m_bottomRow != nullptr) {
-      m_bottomRow->setMinHeight(std::round(columnH));
-    }
-
-    if (m_mediaCard != nullptr && m_dateTimeCard != nullptr) {
-      const float colGap = Style::spaceMd * contentScale();
-      const float avail = std::max(0.0F, std::round(columnH) - colGap);
-      float mediaH = 0.0F;
-      float dateH = 0.0F;
-      if (mediaExpanded()) {
-        const float cardGrowTotal = kHomeMediaCardFlexGrow + kHomeDateTimeCardFlexGrow;
-        mediaH = std::round(avail * (kHomeMediaCardFlexGrow / cardGrowTotal));
-        dateH = std::max(0.0F, avail - mediaH);
-      } else {
-        const float compact = std::round(
-            Style::controlHeightLg * 1.22F * scale + m_mediaCard->paddingTop() + m_mediaCard->paddingBottom()
-        );
-        mediaH = std::min(compact, std::round(avail * 0.42F));
-        dateH = std::max(0.0F, avail - mediaH);
-      }
-
-      m_mediaCard->setMinHeight(mediaH);
-      m_mediaCard->setMaxHeight(mediaH);
-      m_dateTimeCard->setMinHeight(dateH);
-      m_dateTimeCard->setMaxHeight(dateH);
-    }
-
-    float naturalH = userCardHeight;
-    if (statusVisible) {
-      naturalH += statusHeight;
-    }
-    naturalH += std::round(columnH);
-    const float parts = 2.0F + (statusVisible ? 1.0F : 0.0F);
-    naturalH += (parts - 1.0F) * m_rootLayout->gap();
-    contentH = std::max(bodyHeight, naturalH);
+  // Pins keep intrinsic row height; clock takes leftover. If identity + clock min + pins
+  // overflow the panel, the live scroll grows.
+  float statusHeight = 0.0F;
+  if (statusVisible && m_statusStrip != nullptr) {
+    const float oneRow = Style::controlHeightSm * scale + 2.0F * Style::spaceXs * scale;
+    statusHeight = std::max(m_statusStrip->height(), oneRow);
+    m_statusStrip->setMinHeight(statusHeight);
+    m_statusStrip->setMaxHeight(statusHeight);
   }
+
+  float contentH = bodyHeight;
+  float pinsH = 0.0F;
+  if (m_shortcutsColumn != nullptr && !m_shortcutPads.empty()) {
+    pinsH = m_shortcutsColumn->height();
+    if (pinsH <= 1.0F) {
+      pinsH = static_cast<float>(m_shortcutPads.size()) * Style::controlHeightLg * scale;
+    }
+    m_shortcutsColumn->setMinHeight(pinsH);
+    m_shortcutsColumn->setMaxHeight(pinsH);
+  }
+
+  float naturalH = userCardHeight;
+  if (statusVisible) {
+    naturalH += statusHeight;
+  }
+  if (playing) {
+    naturalH += mediaH;
+  }
+  naturalH += clockMin;
+  naturalH += pinsH;
+  float parts = 2.0F;
+  if (statusVisible) {
+    parts += 1.0F;
+  }
+  if (playing) {
+    parts += 1.0F;
+  }
+  if (pinsH > 0.0F) {
+    parts += 1.0F;
+  }
+  naturalH += (parts - 1.0F) * m_rootLayout->gap();
+  contentH = std::max(bodyHeight, naturalH);
   m_rootLayout->setMinHeight(contentH);
   m_rootLayout->setSize(contentWidth, contentH);
 
@@ -1362,7 +1251,7 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
     const float clockH = std::max(m_dateTimeCard->minHeight(), m_dateTimeCard->height());
     const float innerH =
         std::max(0.0F, clockH - m_dateTimeCard->paddingTop() - m_dateTimeCard->paddingBottom());
-    float size = homeTimeFontSize(scale, innerH);
+    float size = homeTimeFontSize(scale, innerH, eventVisible);
     m_timeLabel->setFontSize(size);
     m_timeLabel->measure(renderer);
     const float wrap = innerWidth(m_dateTimeCard);
@@ -1393,6 +1282,9 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   layoutCardOverlays();
   if (m_weatherGlyph != nullptr) {
     m_weatherGlyph->measure(renderer);
+  }
+  if (m_eventGlyph != nullptr) {
+    m_eventGlyph->measure(renderer);
   }
 }
 
@@ -1503,24 +1395,7 @@ bool HomeTab::resizeMediaArtToCard() {
   }
 
   const float scale = contentScale();
-  const float minArt = Style::controlHeightLg * 1.22F * scale;
-  if (!mediaExpanded()) {
-    if (std::abs(m_mediaArtSlot->width() - minArt) <= 0.5F) {
-      return false;
-    }
-    m_mediaArtSlot->setSize(minArt, minArt);
-    m_mediaArt->setSize(minArt, minArt);
-    m_mediaArt->setRadius(homeMediaArtRadius(scale));
-    if (m_mediaArtFallback != nullptr) {
-      m_mediaArtFallback->setGlyphSize(minArt * 0.55F);
-    }
-    return true;
-  }
-
-  const float maxArt = Style::controlHeightLg * 2.6F * scale;
-  const float available =
-      std::max(0.0F, m_mediaCard->height() - m_mediaCard->paddingTop() - m_mediaCard->paddingBottom());
-  const float desired = std::clamp(available, minArt, maxArt);
+  const float desired = Style::controlHeightLg * 1.6F * scale;
   if (std::abs(m_mediaArtSlot->width() - desired) <= 0.5F) {
     return false;
   }
@@ -1751,6 +1626,55 @@ void HomeTab::syncStatusStrip() {
                 )
       || layoutDirty;
 
+  auto* aiUsage = m_services.aiUsage;
+  if (aiUsage != nullptr) {
+    const auto hit = noctalia::ai_usage::hottestQuota(aiUsage->snapshot());
+    const bool hot =
+        hit.has_value() && hit->window.percent + 0.5F >= static_cast<float>(aiUsage->attentionPercent());
+    if (hot) {
+      layoutDirty = applyChip(
+                        m_statusAi, true,
+                        i18n::tr(
+                            "control-center.home.status.ai", "percent",
+                            std::format("{:.0f}", static_cast<double>(hit->window.percent))
+                        ),
+                        noctalia::ai_usage::providerGlyph(hit->provider), true
+                    )
+          || layoutDirty;
+    } else {
+      layoutDirty = applyChip(m_statusAi, false, {}, "sparkles", false) || layoutDirty;
+    }
+  } else {
+    layoutDirty = applyChip(m_statusAi, false, {}, "sparkles", false) || layoutDirty;
+  }
+
+  if (m_upower != nullptr && m_config != nullptr) {
+    const auto* battery = m_upower->defaultSystemBattery();
+    bool low = false;
+    int pct = 0;
+    BatteryState state = BatteryState::Unknown;
+    if (battery != nullptr && battery->state.isPresent) {
+      pct = static_cast<int>(std::lround(battery->state.percentage));
+      state = battery->state.state;
+      const int warn = batteryWarningThresholdForDevice(m_config->config().battery, *battery, battery);
+      const bool discharging = state == BatteryState::Discharging || state == BatteryState::PendingDischarge
+          || state == BatteryState::Empty || battery->state.onBattery;
+      low = warn > 0 && pct <= warn && discharging;
+    }
+    if (low) {
+      layoutDirty = applyChip(
+                        m_statusBattery, true,
+                        i18n::tr("control-center.home.status.battery", "percent", std::to_string(pct)),
+                        batteryGlyphName(static_cast<double>(pct), state), true
+                    )
+          || layoutDirty;
+    } else {
+      layoutDirty = applyChip(m_statusBattery, false, {}, "battery-2", false) || layoutDirty;
+    }
+  } else {
+    layoutDirty = applyChip(m_statusBattery, false, {}, "battery-2", false) || layoutDirty;
+  }
+
   auto* recorder = m_services.screenRecorder;
   const bool recording =
       recorder != nullptr
@@ -1785,6 +1709,13 @@ void HomeTab::syncStatusStrip() {
                 )
       || layoutDirty;
 
+  auto* notifications = m_services.notifications;
+  const bool dnd = notifications != nullptr && notifications->doNotDisturb();
+  layoutDirty = applyChip(
+                    m_statusDnd, dnd, i18n::tr("control-center.home.status.dnd"), "bell-off", false
+                )
+      || layoutDirty;
+
   auto* localSend = m_services.localSend;
   const bool incoming = localSend != nullptr && localSend->snapshot().incoming.has_value();
   if (incoming) {
@@ -1798,15 +1729,102 @@ void HomeTab::syncStatusStrip() {
     layoutDirty = applyChip(m_statusLocalSend, false, {}, "share", false) || layoutDirty;
   }
 
+  auto* phone = m_services.phone;
+  const auto* peer = phone != nullptr ? phone->peerDevice() : nullptr;
+  if (peer != nullptr) {
+    const std::string name = peer->name.empty() ? peer->id : peer->name;
+    std::string text;
+    if (!peer->reachable) {
+      text = i18n::tr("control-center.home.status.phone-offline", "name", name);
+    } else if (peer->hasBattery && peer->charge >= 0) {
+      text = i18n::tr("control-center.home.status.phone-battery", "name", name, "percent", peer->charge);
+    } else {
+      text = i18n::tr("control-center.home.status.phone", "name", name);
+    }
+    layoutDirty = applyChip(m_statusPhone, true, text, "device-mobile", peer->reachable) || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusPhone, false, {}, "device-mobile", false) || layoutDirty;
+  }
+
+  auto* audio = m_services.audio;
+  const PrivacyState* privacy = audio != nullptr ? &audio->privacyState() : nullptr;
+  bool privacyMic = false;
+  bool privacyCamera = false;
+  bool privacyScreen = false;
+  if (privacy != nullptr) {
+    for (const auto& capture : privacy->captures) {
+      switch (capture.kind) {
+      case PrivacyCaptureKind::Microphone:
+        privacyMic = true;
+        break;
+      case PrivacyCaptureKind::Camera:
+        privacyCamera = true;
+        break;
+      case PrivacyCaptureKind::Screen:
+        privacyScreen = true;
+        break;
+      }
+    }
+  }
+  const int privacyKinds = static_cast<int>(privacyMic) + static_cast<int>(privacyCamera)
+      + static_cast<int>(privacyScreen);
+  if (privacyKinds > 0) {
+    const char* glyph = "eye-off";
+    const char* key = "control-center.home.status.privacy";
+    if (privacyKinds == 1) {
+      if (privacyMic) {
+        glyph = "microphone";
+        key = "control-center.home.status.privacy-microphone";
+      } else if (privacyCamera) {
+        glyph = "camera";
+        key = "control-center.home.status.privacy-camera";
+      } else {
+        glyph = "screen-share";
+        key = "control-center.home.status.privacy-screen";
+      }
+    }
+    layoutDirty = applyChip(m_statusPrivacy, true, i18n::tr(key), glyph, true) || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusPrivacy, false, {}, "eye-off", false) || layoutDirty;
+  }
+
+  auto* cast = m_services.cast;
+  const bool sharing = cast != nullptr && cast->sharing();
+  if (sharing) {
+    layoutDirty = applyChip(
+                      m_statusCast, true, i18n::tr("control-center.home.status.cast"), "screen-share", true
+                  )
+        || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusCast, false, {}, "screen-share", false) || layoutDirty;
+  }
+
+  auto* firewall = m_services.firewall;
+  const bool panic = firewall != nullptr && firewall->snapshot().panic;
+  if (panic) {
+    layoutDirty = applyChip(
+                      m_statusFirewall, true, i18n::tr("control-center.home.status.firewall"), "shield-lock", true
+                  )
+        || layoutDirty;
+  } else {
+    layoutDirty = applyChip(m_statusFirewall, false, {}, "shield-lock", false) || layoutDirty;
+  }
+
   const bool any = (m_statusUpdates != nullptr && m_statusUpdates->visible())
+      || (m_statusAi != nullptr && m_statusAi->visible())
+      || (m_statusBattery != nullptr && m_statusBattery->visible())
       || (m_statusCapture != nullptr && m_statusCapture->visible())
       || (m_statusNightLight != nullptr && m_statusNightLight->visible())
       || (m_statusCaffeine != nullptr && m_statusCaffeine->visible())
-      || (m_statusLocalSend != nullptr && m_statusLocalSend->visible());
+      || (m_statusDnd != nullptr && m_statusDnd->visible())
+      || (m_statusLocalSend != nullptr && m_statusLocalSend->visible())
+      || (m_statusPhone != nullptr && m_statusPhone->visible())
+      || (m_statusPrivacy != nullptr && m_statusPrivacy->visible())
+      || (m_statusCast != nullptr && m_statusCast->visible())
+      || (m_statusFirewall != nullptr && m_statusFirewall->visible());
   if (m_statusStrip != nullptr) {
     const bool wasShown = m_statusStrip->visible();
     setShown(m_statusStrip, any);
-    m_statusStrip->setMinHeight(any ? Style::controlHeightSm * contentScale() + 2.0F * Style::spaceXs * contentScale() : 0.0F);
     layoutDirty = layoutDirty || wasShown != any;
   }
   if (layoutDirty) {
@@ -1906,7 +1924,6 @@ void HomeTab::onClose() {
   m_liveScroll = nullptr;
   m_liveScrollState.offset = 0.0F;
   m_statusStrip = nullptr;
-  m_bottomRow = nullptr;
   m_dateTimeCard = nullptr;
   m_mediaCard = nullptr;
   m_mediaText = nullptr;
@@ -1918,14 +1935,24 @@ void HomeTab::onClose() {
   m_weatherRow = nullptr;
   m_weatherGlyph = nullptr;
   m_weatherLine = nullptr;
+  m_eventRow = nullptr;
+  m_eventGlyph = nullptr;
+  m_eventLine = nullptr;
   m_userHost = nullptr;
   m_userUptime = nullptr;
   m_sessionButton = nullptr;
   m_statusUpdates = nullptr;
+  m_statusAi = nullptr;
+  m_statusBattery = nullptr;
   m_statusCapture = nullptr;
   m_statusNightLight = nullptr;
   m_statusCaffeine = nullptr;
+  m_statusDnd = nullptr;
   m_statusLocalSend = nullptr;
+  m_statusPhone = nullptr;
+  m_statusPrivacy = nullptr;
+  m_statusCast = nullptr;
+  m_statusFirewall = nullptr;
   m_userCardKeyboardArea = nullptr;
   m_userCardArea = nullptr;
   m_mediaCardArea = nullptr;
@@ -1962,7 +1989,6 @@ void HomeTab::onClose() {
   m_nextRealtimeUpdateAt = {};
   m_lastRealtimeMprisPollAt = {};
   m_shortcutsColumn = nullptr;
-  m_shortcutClusters.clear();
   // Keep Shortcut instances alive; drop only the UI pointers destroyed with the scene.
   for (auto& pad : m_shortcutPads) {
     if (pad.shortcut != nullptr) {
@@ -1989,10 +2015,8 @@ void HomeTab::onPanelCardOpacityChanged(float opacity) {
   if (m_statusStrip != nullptr) {
     applyModuleWellStyle(*m_statusStrip, scale);
   }
-  for (auto& cluster : m_shortcutClusters) {
-    if (cluster.well != nullptr) {
-      applyHomeClusterStyle(*cluster.well, scale, opacity);
-    }
+  if (m_shortcutsColumn != nullptr) {
+    applyGroupedListStyle(*m_shortcutsColumn, scale);
   }
   syncShortcuts();
 }
@@ -2008,26 +2032,31 @@ void HomeTab::syncScaledFonts() {
   if (m_weatherLine != nullptr) {
     m_weatherLine->setFontSize(Style::fontSizeBody * 0.95F * s);
   }
+  if (m_eventGlyph != nullptr) {
+    m_eventGlyph->setGlyphSize(Style::fontSizeTitle * s);
+  }
+  if (m_eventLine != nullptr) {
+    m_eventLine->setFontSize(Style::fontSizeBody * 0.95F * s);
+  }
   for (Label* label : {m_userHost, m_userUptime}) {
     if (label != nullptr) {
       label->setFontSize(Style::fontSizeCaption * s);
     }
   }
   if (m_mediaTrack != nullptr) {
-    m_mediaTrack->setFontSize(Style::fontSizeBody * 0.95F * s);
+    const bool expanded = mediaExpanded();
+    m_mediaTrack->setFontSize((expanded ? Style::fontSizeTitle : Style::fontSizeBody * 0.95F) * s);
+    m_mediaTrack->setFontWeight(expanded ? FontWeight::Bold : FontWeight::Normal);
   }
   if (m_mediaArtist != nullptr) {
     m_mediaArtist->setFontSize(Style::fontSizeCaption * s);
   }
   for (auto& pad : m_shortcutPads) {
     if (pad.label != nullptr) {
-      pad.label->setFontSize(Style::fontSizeCaption * s);
+      pad.label->setFontSize(Style::fontSizeBody * s);
     }
     if (pad.glyph != nullptr) {
-      // Icon-only glyphs are sized from cell side in doLayout.
-      if (m_config == nullptr || m_config->config().controlCenter.showShortcutLabels) {
-        pad.glyph->setGlyphSize(Style::fontSizeHeader * 1.4F * s);
-      }
+      pad.glyph->setGlyphSize(Style::fontSizeHeader * s);
     }
   }
 }
@@ -2100,6 +2129,33 @@ void HomeTab::sync(Renderer& renderer) {
     }
   }
 
+  if (m_eventRow != nullptr && m_eventLine != nullptr && m_eventGlyph != nullptr) {
+    const CalendarEvent* next = nullptr;
+    if (m_calendar != nullptr && m_calendar->enabled() && m_calendar->hasData()) {
+      next = homeNextCalendarEvent(m_calendar->snapshot());
+    }
+    const bool show = next != nullptr;
+    if (m_eventRow->visible() != show) {
+      setShown(m_eventRow, show);
+      PanelManager::instance().requestLayout();
+    }
+    if (show) {
+      const std::string title =
+          next->title.empty() ? i18n::tr("control-center.calendar.events") : next->title;
+      std::string when;
+      if (next->allDay) {
+        when = i18n::tr("control-center.calendar.all-day");
+      } else {
+        const std::time_t raw = std::chrono::system_clock::to_time_t(next->start);
+        const char* format = m_config != nullptr ? m_config->config().shell.timeFormat.c_str() : "{:%H:%M}";
+        when = formatLocalUnixTime(static_cast<std::int64_t>(raw), format);
+      }
+      m_eventGlyph->setGlyph("calendar-event");
+      m_eventGlyph->setColor(colorSpecFromRole(ColorRole::Primary));
+      m_eventLine->setText(std::format("{} · {}", when, title));
+    }
+  }
+
   if (m_mediaTrack != nullptr && m_mediaArtist != nullptr) {
     const auto setIdleMedia = [this, &renderer](std::string_view title) {
       bool dirty = m_mediaTrack->setText(title);
@@ -2127,6 +2183,10 @@ void HomeTab::sync(Renderer& renderer) {
       }
       if (!m_loadedMediaArtUrl.empty()) {
         m_loadedMediaArtUrl.clear();
+      }
+      if (m_mediaCard != nullptr && m_mediaCard->visible()) {
+        setShown(m_mediaCard, false);
+        dirty = true;
       }
       if (dirty) {
         PanelManager::instance().requestLayout();
@@ -2176,6 +2236,10 @@ void HomeTab::sync(Renderer& renderer) {
         setIdleMedia(i18n::tr("control-center.home.media.nothing-playing"));
         syncTransport(nullptr);
       } else {
+        if (m_mediaCard != nullptr && !m_mediaCard->visible()) {
+          setShown(m_mediaCard, true);
+          PanelManager::instance().requestLayout();
+        }
         const std::string trackText =
             active->title.empty() ? i18n::tr("control-center.home.media.unknown-track") : active->title;
         const std::string artists = mpris::joinArtists(active->artists);

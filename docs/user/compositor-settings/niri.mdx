@@ -65,6 +65,8 @@ binds {
     Print { spawn-sh "noctalia msg screenshot-region"; }
     Shift+Print { spawn-sh "noctalia msg screenshot-fullscreen"; }
     Mod+V { spawn-sh "noctalia msg panel-toggle clipboard"; }
+    // Caps Lock key. Helix remaps it to F19 so it does not toggle Caps.
+    F19 repeat=false { spawn-sh "noctalia msg panel-toggle quick-insert"; }
     Mod+W { spawn-sh "noctalia msg panel-toggle wallpaper"; }
     Mod+Shift+P { spawn-sh "noctalia msg panel-toggle session"; }
     Mod+Shift+N { spawn-sh "noctalia msg nightlight-toggle"; }

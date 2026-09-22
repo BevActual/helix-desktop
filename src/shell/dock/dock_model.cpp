@@ -112,7 +112,7 @@ namespace shell::dock {
       }
     }
 
-    snapshot.items.reserve(itemEntries.size());
+    snapshot.items.reserve(itemEntries.size() + (deps.phone.has_value() ? 1 : 0));
     for (const auto& entry : itemEntries) {
       DockItemModel dockItem;
       dockItem.entry = entry;
@@ -136,6 +136,17 @@ namespace shell::dock {
       snapshot.items.push_back(std::move(dockItem));
     }
 
+    if (deps.phone.has_value()) {
+      DockItemModel phoneItem;
+      phoneItem.kind = DockItemKind::Phone;
+      phoneItem.entry.id = std::string(kPhoneDockEntryId);
+      phoneItem.entry.name = deps.phone->name;
+      phoneItem.idLower = std::string(kPhoneDockEntryId);
+      phoneItem.running = deps.phone->reachable;
+      phoneItem.instanceCount = deps.phone->notificationCount;
+      snapshot.items.push_back(std::move(phoneItem));
+    }
+
     return snapshot;
   }
 
@@ -144,7 +155,13 @@ namespace shell::dock {
       return false;
     }
     for (std::size_t i = 0; i < a.items.size(); ++i) {
+      if (a.items[i].kind != b.items[i].kind) {
+        return false;
+      }
       if (a.items[i].entry.id != b.items[i].entry.id) {
+        return false;
+      }
+      if (a.items[i].entry.name != b.items[i].entry.name) {
         return false;
       }
       if (a.items[i].idLower != b.items[i].idLower) {

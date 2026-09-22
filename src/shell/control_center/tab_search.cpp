@@ -27,7 +27,7 @@ namespace control_center {
         {"control-center", "cc"},
         {"keybinds", "binds shortcuts keyboard hotkeys attention"},
         {"desktop",
-         "widgets corners hot-corners screen-corners layout-board glanceable bar dock windows panels osd "
+         "widgets corners hot-corners screen-corners layout-board glanceable folder file path bar dock windows panels osd "
          "thickness pinned taskbar gaps struts columns hud"},
         {"launcher", "runner app-launcher type-to-launch overview"},
         {"media", "mpris player music now-playing artwork album shuffle repeat visualizer spectrum"},
@@ -43,7 +43,7 @@ namespace control_center {
         {"system", "resources cpu memory ram disk"},
         {"tailscale", "vpn tailnet"},
         {"localsend", "nearby share airdrop send files"},
-        {"phone", "kdeconnect kde-connect gsconnect android ios pair ping ring"},
+        {"phone", "kdeconnect kde-connect gsconnect android ios iphone pair ping ring files sftp photos continue share notifications sms code otp cast scrcpy adb apps mirror airplay uxplay"},
         {"syncthing", "sync folders devices backup"},
         {"firewall", "firewalld zone panic ports services ssh"},
         {"printers", "printer cups print jobs queue"},

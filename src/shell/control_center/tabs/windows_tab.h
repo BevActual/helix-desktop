@@ -67,6 +67,7 @@ private:
   Label* m_columnWidthValue = nullptr;
 
   Section m_section = Section::Spacing;
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_sectionSyncing = false;
   bool m_liveDirty = false;

@@ -43,6 +43,7 @@
 #include "shell/desktop/desktop_widgets_controller.h"
 #include "shell/dock/dock.h"
 #include "shell/hot_corners/hot_corners.h"
+#include "shell/phone_mirror/phone_mirror_window.h"
 #include "shell/lockscreen/lock_screen.h"
 #include "shell/lockscreen/lockscreen_widgets_controller.h"
 #include "shell/notification/notification_toast.h"
@@ -375,6 +376,8 @@ private:
   PrivacyOsd m_privacyOsd;
   OsdOverlay m_osdOverlay;
   HotCorners m_hotCorners{this};
+  PhoneMirrorWindow m_phoneMirror{m_wayland, m_renderContext};
+  Signal<>::ScopedConnection m_phoneMirrorConn;
   ScreenCorners m_screenCorners;
   TrayMenu m_trayMenu;
   Wallpaper m_wallpaper;

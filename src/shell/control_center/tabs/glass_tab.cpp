@@ -71,6 +71,7 @@ std::unique_ptr<Flex> GlassTab::create() {
 }
 
 std::unique_ptr<Flex> GlassTab::createLiveBody(bool hosted) {
+  m_hosted = hosted;
   const float scale = contentScale();
   const float glass =
       m_config != nullptr ? resolvedPanelGlass(m_config->config().shell.panel) : 0.0F;
@@ -80,7 +81,7 @@ std::unique_ptr<Flex> GlassTab::createLiveBody(bool hosted) {
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
   });
 
   auto compactCard = ui::column({
@@ -157,6 +158,10 @@ void GlassTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
     return;
   }
   if (m_rootLayout == nullptr) {
+    return;
+  }
+  if (m_hosted) {
+    layoutHostedLiveBody(m_rootLayout, renderer, contentWidth);
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);

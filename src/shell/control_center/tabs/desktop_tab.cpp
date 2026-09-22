@@ -12,6 +12,7 @@
 #include "shell/desktop/desktop_widget_settings_registry.h"
 #include "shell/desktop/desktop_widgets_controller.h"
 #include "shell/panel/panel_manager.h"
+#include "ui/dialogs/file_dialog.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
@@ -27,6 +28,8 @@
 #include "ui/style.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
+#include <filesystem>
 #include <array>
 #include <cmath>
 #include <cstddef>
@@ -43,8 +46,8 @@ using namespace control_center;
 
 namespace {
 
-  constexpr std::array<std::string_view, 5> kHotCornerActions{
-      "none", "launcher", "control_center", "window_switcher", "command"};
+  constexpr std::array<std::string_view, 6> kHotCornerActions{
+      "none", "launcher", "control_center", "widgets", "window_switcher", "command"};
 
   Button::ButtonPalette catalogTilePalette() {
     const ColorSpec fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.55F);
@@ -109,6 +112,12 @@ namespace {
     if (type == "sticker") {
       return "photo";
     }
+    if (type == "folder") {
+      return "folder";
+    }
+    if (type == "file") {
+      return "file";
+    }
     return "puzzle";
   }
 
@@ -137,6 +146,7 @@ namespace {
         i18n::tr("settings.options.hot-corners.none"),
         i18n::tr("settings.options.hot-corners.launcher"),
         i18n::tr("settings.options.hot-corners.control-center"),
+        i18n::tr("settings.options.hot-corners.widgets"),
         i18n::tr("settings.options.hot-corners.window-switcher"),
         i18n::tr("settings.options.hot-corners.command"),
     };
@@ -300,7 +310,8 @@ bool DesktopTab::widgetTypeInCatalog(std::string_view type, WidgetCatalog catalo
     return type == "media_player" || type == "volume" || type == "audio_visualizer"
         || type == "fancy_audio_visualizer";
   case WidgetCatalog::Tools:
-    return type == "sysmon" || type == "button" || type == "label" || type == "sticker";
+    return type == "sysmon" || type == "button" || type == "label" || type == "sticker" || type == "folder"
+      || type == "file";
   }
   return true;
 }
@@ -465,6 +476,7 @@ std::unique_ptr<Flex> DesktopTab::create() {
           .scale = scale,
           .compact = true,
           .surfaceOpacity = opacity,
+          .equalSegmentWidths = false,
           .onChange = [this](std::size_t index) { applyWidgetCatalog(index); },
       })
   );
@@ -525,28 +537,52 @@ std::unique_ptr<Flex> DesktopTab::create() {
       .visible = cornersOpen,
       .participatesInLayout = cornersOpen,
   });
-  cornersToolbar->addChild(
-      ui::segmented({
-          .out = &m_cornersCatalogSwitch,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = "",
-                      .glyph = "border-radius",
-                      .tooltip = i18n::tr("control-center.desktop.screen-corners-tooltip"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "click",
-                      .tooltip = i18n::tr("control-center.desktop.hot-corners-tooltip"),
-                  },
-              },
-          .selectedIndex = indexFromCornersCatalog(m_cornersCatalog),
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = opacity,
-          .onChange = [this](std::size_t index) { applyCornersCatalog(index); },
-      })
+  auto addNestedCatalog = [&](
+                              Flex& parent,
+                              Segmented** switchOut,
+                              std::vector<ui::SegmentedOption> options,
+                              std::size_t selected,
+                              auto onChange
+                          ) {
+    auto chips = ui::row({
+        .align = FlexAlign::Center,
+        .wrap = true,
+        .gap = Style::spaceXs * scale,
+    });
+    chips->addChild(
+        ui::segmented({
+            .out = switchOut,
+            .options = std::move(options),
+            .selectedIndex = selected,
+            .scale = scale,
+            .compact = true,
+            .surfaceOpacity = opacity,
+            .equalSegmentWidths = false,
+            .onChange = std::move(onChange),
+            .configure =
+                [](Segmented& sources) {
+                  sources.setWrap(true);
+                  sources.setFillWidth(false);
+                },
+        })
+    );
+    parent.addChild(std::move(chips));
+  };
+  addNestedCatalog(
+      *cornersToolbar, &m_cornersCatalogSwitch,
+      {
+          {
+              .label = "",
+              .glyph = "border-radius",
+              .tooltip = i18n::tr("control-center.desktop.screen-corners-tooltip"),
+          },
+          {
+              .label = "",
+              .glyph = "click",
+              .tooltip = i18n::tr("control-center.desktop.hot-corners-tooltip"),
+          },
+      },
+      indexFromCornersCatalog(m_cornersCatalog), [this](std::size_t index) { applyCornersCatalog(index); }
   );
   compactCard->addChild(std::move(cornersToolbar));
 
@@ -556,7 +592,8 @@ std::unique_ptr<Flex> DesktopTab::create() {
                                bool open,
                                std::vector<ui::SegmentedOption> options,
                                std::size_t selected,
-                               auto onChange
+                               auto onChange,
+                               auto prefix
                            ) {
     auto toolbar = ui::column({
         .out = out,
@@ -565,19 +602,11 @@ std::unique_ptr<Flex> DesktopTab::create() {
         .visible = open,
         .participatesInLayout = open,
     });
-    toolbar->addChild(
-        ui::segmented({
-            .out = switchOut,
-            .options = std::move(options),
-            .selectedIndex = selected,
-            .scale = scale,
-            .compact = true,
-            .surfaceOpacity = opacity,
-            .onChange = std::move(onChange),
-        })
-    );
+    prefix(*toolbar);
+    addNestedCatalog(*toolbar, switchOut, std::move(options), selected, std::move(onChange));
     compactCard->addChild(std::move(toolbar));
   };
+  auto noPrefix = [](Flex&) {};
   addCatalogToolbar(
       &m_barToolbar, &m_barCatalogSwitch, m_section == Section::Bar,
       {
@@ -589,7 +618,8 @@ std::unique_ptr<Flex> DesktopTab::create() {
         if (m_bar != nullptr) {
           m_bar->applyOpenSection(index);
         }
-      }
+      },
+      noPrefix
   );
   addCatalogToolbar(
       &m_dockToolbar, &m_dockCatalogSwitch, m_section == Section::Dock,
@@ -606,7 +636,8 @@ std::unique_ptr<Flex> DesktopTab::create() {
         if (m_dock != nullptr) {
           m_dock->applyOpenSection(index);
         }
-      }
+      },
+      noPrefix
   );
   if (compositors::isNiri()) {
     addCatalogToolbar(
@@ -620,7 +651,8 @@ std::unique_ptr<Flex> DesktopTab::create() {
           if (m_windows != nullptr) {
             m_windows->applyOpenSection(index);
           }
-        }
+        },
+        noPrefix
     );
   }
   addCatalogToolbar(
@@ -638,7 +670,8 @@ std::unique_ptr<Flex> DesktopTab::create() {
         if (m_panels != nullptr) {
           m_panels->applyOpenSection(index);
         }
-      }
+      },
+      noPrefix
   );
   addCatalogToolbar(
       &m_osdToolbar, &m_osdCatalogSwitch, m_section == Section::Osd,
@@ -650,6 +683,21 @@ std::unique_ptr<Flex> DesktopTab::create() {
       [this](std::size_t index) {
         if (m_osd != nullptr) {
           m_osd->applyOpenSection(index);
+        }
+      },
+      [this, scale](Flex& toolbar) {
+        const Config* liveCfg = m_config != nullptr ? &m_config->config() : nullptr;
+        m_osdEnabled = addToggleRow(
+            toolbar, scale, i18n::tr("control-center.osd.enable"),
+            [this](bool value) {
+              if (m_osd != nullptr) {
+                m_osd->applyEnabled(value);
+              }
+              syncHosts();
+            }
+        );
+        if (m_osdEnabled != nullptr) {
+          m_osdEnabled->setCheckedImmediate(liveCfg != nullptr && liveCfg->osd.enabled);
         }
       }
   );
@@ -700,95 +748,102 @@ std::unique_ptr<Flex> DesktopTab::create() {
   widgetsHost->addChild(std::move(listScroll));
   live->addChild(std::move(widgetsHost));
 
-  const bool screenOpen = m_section == Section::Corners && m_cornersCatalog == CornersCatalog::Screen;
-  const bool hotOpen = m_section == Section::Corners && m_cornersCatalog == CornersCatalog::Hot;
-  auto screenHost = ui::column({
-      .out = &m_screenHost,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
-      .visible = screenOpen,
-      .participatesInLayout = screenOpen,
-      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
-  });
-  m_screenCorners = addToggleRow(
-      *screenHost, scale, i18n::tr("settings.schema.desktop.screen-corners-enabled.label"),
-      [this](bool value) { applyScreenCorners(value); }
-  );
-  if (m_screenCorners != nullptr) {
-    m_screenCorners->setCheckedImmediate(cornersEnabled);
-  }
-  auto screenDetails = ui::column({
-      .out = &m_screenDetails,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = cornersEnabled,
-      .participatesInLayout = cornersEnabled,
-  });
-  addSliderSection(
-      *screenDetails, scale, i18n::tr("settings.schema.desktop.screen-corners-size.label"), &m_cornerSize,
-      &m_cornerSizeValue, sizeMin, sizeMax, sizeStep, cornerSize, pixelLabel, [this]() { commitScreenCornerSize(); }
-  );
-  screenHost->addChild(std::move(screenDetails));
-  live->addChild(std::move(screenHost));
-
-  auto hotHost = ui::column({
-      .out = &m_hotHost,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
-      .visible = hotOpen,
-      .participatesInLayout = hotOpen,
-      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
-  });
-  m_hotCorners = addToggleRow(
-      *hotHost, scale, i18n::tr("settings.schema.desktop.hot-corners-enabled.label"),
-      [this](bool value) { applyHotCorners(value); }
-  );
-  if (m_hotCorners != nullptr) {
-    m_hotCorners->setCheckedImmediate(hotEnabled);
-  }
-  auto hotDetails = ui::column({
-      .out = &m_hotDetails,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = hotEnabled,
-      .participatesInLayout = hotEnabled,
-  });
-  addSliderSection(
-      *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-delay-ms.label"), &m_hotDelay,
-      &m_hotDelayValue, delayMin, delayMax, delayStep, hotDelay, delayLabel, [this]() { commitHotCornerDelay(); }
-  );
-  const auto actions = hotCornerActionLabels();
-  m_topLeft = addSelectRow(
-      *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-top-left.label"), actions, opacity,
-      [this](std::size_t index) { applyHotCornerAction("top_left", index); }
-  );
-  m_topRight = addSelectRow(
-      *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-top-right.label"), actions, opacity,
-      [this](std::size_t index) { applyHotCornerAction("top_right", index); }
-  );
-  m_bottomLeft = addSelectRow(
-      *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-bottom-left.label"), actions, opacity,
-      [this](std::size_t index) { applyHotCornerAction("bottom_left", index); }
-  );
-  m_bottomRight = addSelectRow(
-      *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-bottom-right.label"), actions, opacity,
-      [this](std::size_t index) { applyHotCornerAction("bottom_right", index); }
-  );
-  hotHost->addChild(std::move(hotDetails));
-  live->addChild(std::move(hotHost));
-
-  auto addHost = [&]<typename Hosted>(Flex** out, Hosted* child) {
+  auto leftoverWell = [&](Flex** out, bool open, auto&& fill) {
     auto host = ui::column({
         .out = out,
         .align = FlexAlign::Stretch,
-        .gap = Style::spaceSm * scale,
+        .gap = 0.0F,
         .flexGrow = 1.0F,
+        .visible = open,
+        .participatesInLayout = open,
         .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
     });
-    host->addChild(child->createLiveBody(true));
+    auto scroll = ui::scrollView({
+        .contentScale = scale,
+        .scrollbarVisible = true,
+        .viewportPaddingH = 0.0F,
+        .viewportPaddingV = 0.0F,
+        .flexGrow = 1.0F,
+        .configure =
+            [](ScrollView& scrollView) {
+              scrollView.clearFill();
+              scrollView.clearBorder();
+            },
+    });
+    auto* leftover = scroll->content();
+    leftover->setDirection(FlexDirection::Vertical);
+    leftover->setAlign(FlexAlign::Stretch);
+    leftover->setGap(Style::spaceSm * scale);
+    fill(*leftover);
+    host->addChild(std::move(scroll));
     live->addChild(std::move(host));
+  };
+
+  const bool screenOpen = m_section == Section::Corners && m_cornersCatalog == CornersCatalog::Screen;
+  const bool hotOpen = m_section == Section::Corners && m_cornersCatalog == CornersCatalog::Hot;
+  leftoverWell(&m_screenHost, screenOpen, [&](Flex& leftover) {
+    m_screenCorners = addToggleRow(
+        leftover, scale, i18n::tr("settings.schema.desktop.screen-corners-enabled.label"),
+        [this](bool value) { applyScreenCorners(value); }
+    );
+    if (m_screenCorners != nullptr) {
+      m_screenCorners->setCheckedImmediate(cornersEnabled);
+    }
+    auto screenDetails = ui::column({
+        .out = &m_screenDetails,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .visible = cornersEnabled,
+        .participatesInLayout = cornersEnabled,
+    });
+    addSliderSection(
+        *screenDetails, scale, i18n::tr("settings.schema.desktop.screen-corners-size.label"), &m_cornerSize,
+        &m_cornerSizeValue, sizeMin, sizeMax, sizeStep, cornerSize, pixelLabel, [this]() { commitScreenCornerSize(); }
+    );
+    leftover.addChild(std::move(screenDetails));
+  });
+
+  leftoverWell(&m_hotHost, hotOpen, [&](Flex& leftover) {
+    m_hotCorners = addToggleRow(
+        leftover, scale, i18n::tr("settings.schema.desktop.hot-corners-enabled.label"),
+        [this](bool value) { applyHotCorners(value); }
+    );
+    if (m_hotCorners != nullptr) {
+      m_hotCorners->setCheckedImmediate(hotEnabled);
+    }
+    auto hotDetails = ui::column({
+        .out = &m_hotDetails,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .visible = hotEnabled,
+        .participatesInLayout = hotEnabled,
+    });
+    addSliderSection(
+        *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-delay-ms.label"), &m_hotDelay,
+        &m_hotDelayValue, delayMin, delayMax, delayStep, hotDelay, delayLabel, [this]() { commitHotCornerDelay(); }
+    );
+    const auto actions = hotCornerActionLabels();
+    m_topLeft = addSelectRow(
+        *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-top-left.label"), actions, opacity,
+        [this](std::size_t index) { applyHotCornerAction("top_left", index); }
+    );
+    m_topRight = addSelectRow(
+        *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-top-right.label"), actions, opacity,
+        [this](std::size_t index) { applyHotCornerAction("top_right", index); }
+    );
+    m_bottomLeft = addSelectRow(
+        *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-bottom-left.label"), actions, opacity,
+        [this](std::size_t index) { applyHotCornerAction("bottom_left", index); }
+    );
+    m_bottomRight = addSelectRow(
+        *hotDetails, scale, i18n::tr("settings.schema.desktop.hot-corners-bottom-right.label"), actions, opacity,
+        [this](std::size_t index) { applyHotCornerAction("bottom_right", index); }
+    );
+    leftover.addChild(std::move(hotDetails));
+  });
+
+  auto addHost = [&]<typename Hosted>(Flex** out, Hosted* child) {
+    leftoverWell(out, false, [&](Flex& leftover) { leftover.addChild(child->createLiveBody(true)); });
   };
   addHost(&m_barHost, m_bar.get());
   addHost(&m_dockHost, m_dock.get());
@@ -846,6 +901,7 @@ void DesktopTab::onClose() {
   m_screenDetails = nullptr;
   m_hotDetails = nullptr;
   m_widgetsEnabled = nullptr;
+  m_osdEnabled = nullptr;
   m_screenCorners = nullptr;
   m_hotCorners = nullptr;
   m_cornerSize = nullptr;
@@ -918,8 +974,14 @@ void DesktopTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
   m_rootLayout->layout(renderer);
   if (Tab* child = hostedTab(); child != nullptr) {
     Flex* host = hostNode();
-    const float hostWidth = host != nullptr && host->width() > 1.0F ? host->width() : contentWidth;
-    const float hostHeight = host != nullptr && host->height() > 1.0F ? host->height() : bodyHeight;
+    float hostWidth = contentWidth;
+    float hostHeight = bodyHeight;
+    if (host != nullptr && host->width() > 1.0F) {
+      hostWidth = std::max(1.0F, host->width() - host->paddingLeft() - host->paddingRight());
+    }
+    if (host != nullptr && host->height() > 1.0F) {
+      hostHeight = std::max(1.0F, host->height() - host->paddingTop() - host->paddingBottom());
+    }
     child->layout(renderer, hostWidth, hostHeight);
   }
 }
@@ -930,6 +992,10 @@ void DesktopTab::doUpdate(Renderer& renderer) {
   }
   if (Tab* child = hostedTab(); child != nullptr) {
     child->update(renderer);
+    if (m_liveDirty) {
+      m_liveDirty = false;
+      syncLiveControls();
+    }
     return;
   }
   (void)renderer;
@@ -993,6 +1059,9 @@ void DesktopTab::syncLiveControls() {
   m_syncing = true;
   if (m_widgetsEnabled != nullptr) {
     m_widgetsEnabled->setCheckedImmediate(widgetsOn);
+  }
+  if (m_osdEnabled != nullptr) {
+    m_osdEnabled->setCheckedImmediate(cfg.osd.enabled);
   }
   if (m_screenCorners != nullptr) {
     m_screenCorners->setCheckedImmediate(cfg.shell.screenCorners.enabled);
@@ -1069,7 +1138,7 @@ void DesktopTab::syncHosts() {
   setShown(m_dockHost, m_section == Section::Dock);
   setShown(m_windowsHost, m_section == Section::Windows);
   setShown(m_panelsHost, m_section == Section::Panels);
-  setShown(m_osdHost, m_section == Section::Osd);
+  setShown(m_osdHost, m_section == Section::Osd && m_config != nullptr && m_config->config().osd.enabled);
 }
 
 void DesktopTab::syncSettingsSection() {
@@ -1445,11 +1514,45 @@ void DesktopTab::addWidgetType(std::string type) {
   if (m_widgets == nullptr || type.empty()) {
     return;
   }
-  if (m_widgets->addWidget(type)) {
-    m_lastGridKey.clear();
-    rebuildWidgetGrid();
-    syncLiveControls();
-    PanelManager::instance().refresh();
+  const std::optional<std::string> added = m_widgets->addWidget(type);
+  if (!added.has_value()) {
+    return;
+  }
+  m_lastGridKey.clear();
+  rebuildWidgetGrid();
+  syncLiveControls();
+  PanelManager::instance().refresh();
+  if (!added->empty() && (type == "folder" || type == "file")) {
+    chooseWidgetPath(*added, type == "folder");
+  }
+}
+
+void DesktopTab::chooseWidgetPath(std::string widgetId, bool folder) {
+  if (m_widgets == nullptr || widgetId.empty()) {
+    return;
+  }
+  FileDialogOptions options;
+  options.mode = folder ? FileDialogMode::SelectFolder : FileDialogMode::Open;
+  options.title = i18n::tr(
+      folder ? "desktop-widgets.editor.dialogs.select-folder" : "desktop-widgets.editor.dialogs.select-file"
+  );
+  const bool opened = FileDialog::open(
+      std::move(options), [this, widgetId](std::optional<std::filesystem::path> result) {
+        if (m_widgets == nullptr) {
+          return;
+        }
+        if (!result.has_value()) {
+          (void)m_widgets->removeWidget(widgetId);
+        } else {
+          (void)m_widgets->setWidgetSetting(widgetId, "path", result->string());
+        }
+        m_lastGridKey.clear();
+        rebuildWidgetGrid();
+        PanelManager::instance().refresh();
+      }
+  );
+  if (!opened) {
+    (void)m_widgets->removeWidget(widgetId);
   }
 }
 

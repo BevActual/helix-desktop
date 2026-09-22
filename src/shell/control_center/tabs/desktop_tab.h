@@ -74,6 +74,7 @@ private:
   void commitHotCornerDelay();
   void applyHotCornerAction(std::string_view corner, std::size_t index);
   void addWidgetType(std::string type);
+  void chooseWidgetPath(std::string widgetId, bool folder);
   void startEdit();
   [[nodiscard]] Tab* hostedTab() const noexcept;
   [[nodiscard]] Flex* hostNode() const noexcept;
@@ -120,6 +121,7 @@ private:
   Flex* m_screenDetails = nullptr;
   Flex* m_hotDetails = nullptr;
   Toggle* m_widgetsEnabled = nullptr;
+  Toggle* m_osdEnabled = nullptr;
   Toggle* m_screenCorners = nullptr;
   Toggle* m_hotCorners = nullptr;
   Slider* m_cornerSize = nullptr;

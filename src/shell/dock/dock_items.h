@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render/animation/animation_manager.h"
+#include "shell/dock/dock_model.h"
 #include "system/desktop_entry.h"
 
 #include <array>
@@ -44,6 +45,7 @@ namespace shell::dock {
   };
 
   struct DockItemAction {
+    DockItemKind kind = DockItemKind::App;
     DesktopEntry entry;
     std::string idLower;
     std::string startupWmClassLower;

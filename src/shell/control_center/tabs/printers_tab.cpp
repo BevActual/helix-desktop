@@ -95,7 +95,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
   well->addChild(

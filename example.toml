@@ -72,11 +72,14 @@ launcher_placement       = "floating" # attached | floating
 control_center_placement = "attached" # attached | floating
 wallpaper_placement      = "attached" # attached | floating
 session_placement        = "attached" # attached | floating
+quick_insert_placement   = "floating" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
+quick_insert_position    = "center"   # auto | center | top_left | … (floating only)
 open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_wallpaper      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_session        = false # for attached/floating placement, follow the bar click instead of bar-center
+open_near_click_quick_insert   = false # for attached/floating placement, follow the bar click instead of bar-center
 
 [shell.launcher]
 categories    = true                    # show category filters in the launcher
@@ -338,6 +341,9 @@ auto_accept = false
 notify_on_receive = true
 port = 53317                      # TCP/UDP LocalSend port
 
+[phone]
+mirror_always_on = true           # keep the iPhone AirPlay receiver + Bluetooth pointer up while an iPhone is paired
+
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
 [audio]
@@ -537,14 +543,13 @@ enabled = false
 
 # ── Control Center ────────────────────────────────────────────────────────────
 
-# Shortcut buttons on Home. Add as many as you like; size = "small" | "wide" | "large".
+# Shortcut buttons pinned to the bottom of Home. Empty by default; add only what you use.
 # [[control_center.shortcuts]]
 # type = "wifi"
 # [[control_center.shortcuts]]
 # type = "bluetooth"
 # [[control_center.shortcuts]]
 # type = "nightlight"
-# size = "wide"
 # [[control_center.shortcuts]]
 # type = "notification"
 # [[control_center.shortcuts]]

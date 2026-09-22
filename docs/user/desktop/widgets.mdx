@@ -34,7 +34,7 @@ flip_y   = false
 format = "{:%H:%M}"
 ```
 
-When enabled, Helix renders each desktop widget as its own tightly-sized layer-shell surface on the `Bottom` layer. The current implementation ships `button`, `calendar`, `clock`, `label`, `audio_visualizer`, `fancy_audio_visualizer`, `sticker`, `weather`, `media_player`, `volume`, and `sysmon` widget types plus an interactive edit mode.
+When enabled, Helix renders each desktop widget as its own tightly-sized layer-shell surface on the `Bottom` layer. The current implementation ships `button`, `calendar`, `clock`, `file`, `folder`, `label`, `audio_visualizer`, `fancy_audio_visualizer`, `sticker`, `weather`, `media_player`, `volume`, and `sysmon` widget types plus an interactive edit mode.
 
 ---
 
@@ -404,6 +404,27 @@ background       = true
 | `variant` | string | `"default"` | Button style: `default`, `primary`, `secondary`, `outline`, `ghost`, `destructive` |
 | `color` | string | *(variant default)* | Label and glyph color role or fixed hex; omit to use the variant's default foreground |
 | `hover_background` | string | `"hover"` | Background color role on hover; fixed hex colors are also supported |
+
+---
+
+### folder and file
+
+Glance tiles for a folder or a file. The tile shows the name and opens it with the default app. Adding one from **Control Center → Desktop → Widgets → Tools**, or from the editor, asks for the path. Right-click empty space in the widget editor opens the widget catalog. A hot corner set to **Widgets** opens that catalog from the desktop.
+
+```toml
+[desktop_widgets.widget.notes]
+type = "folder"
+
+[desktop_widgets.widget.notes.settings]
+path = "/home/me/Notes"
+```
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `path` | string | `""` | Folder or file to open |
+| `label` | string | `""` | Tile text. Empty uses the path's name |
+| `glyph` | string | `""` | Tabler glyph. Empty uses a folder or file icon |
+| `background` | bool | `true` | Show the tile fill. When `false`, only the name and glyph are drawn |
 
 ---
 

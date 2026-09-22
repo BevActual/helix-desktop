@@ -11,6 +11,7 @@ namespace noctalia::config::schema {
   const Schema<WeatherConfig>& weatherSchema();
   const Schema<TailscaleConfig>& tailscaleSchema();
   const Schema<LocalSendConfig>& localsendSchema();
+  const Schema<PhoneConfig>& phoneSchema();
   const Schema<StorageConfig>& storageSchema();
   const Schema<OsdConfig>& osdSchema();
   const Schema<BackdropConfig>& backdropSchema();

@@ -66,6 +66,7 @@
 #include "scripting/plugin_registry.h"
 #include "scripting/plugin_runtime_context.h"
 #include "shell/clipboard/clipboard_paste.h"
+#include "shell/quick_insert/quick_insert_panel.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "system/fedora_upgrade_launcher.h"
@@ -422,6 +423,9 @@ void Application::initInputDispatch() {
     if (m_desktopWidgetsController.onPointerEvent(event)) {
       return;
     }
+    if (m_phoneMirror.onPointerEvent(event)) {
+      return;
+    }
     if (m_wallpaper.onPointerEvent(event)) {
       return;
     }
@@ -478,6 +482,9 @@ void Application::initInputDispatch() {
     }
     if (m_desktopWidgetsController.isEditing()) {
       m_desktopWidgetsController.onKeyboardEvent(event);
+      return;
+    }
+    if (m_phoneMirror.onKeyboardEvent(event)) {
       return;
     }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {
@@ -728,6 +735,23 @@ void Application::initPanelManagerAndPanels() {
     });
     m_launcherPanel = launcherPanel.get();
     m_panelManager.registerPanel("launcher", std::move(launcherPanel));
+  }
+  {
+    auto quickInsert = std::make_unique<QuickInsertPanel>(&m_configService, &m_clipboardService, &m_thumbnailService);
+    quickInsert->setCopiedActivationCallback([this](bool isImage) {
+      const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;
+      if (mode == ClipboardAutoPasteMode::Off) {
+        return;
+      }
+      m_clipboardAutoPasteTimer.stop();
+      m_clipboardAutoPasteTimer.start(std::chrono::milliseconds(Style::animFast + 30), [this, isImage]() {
+        DeferredCall::callLater([this, isImage]() {
+          const ClipboardAutoPasteMode activeMode = m_configService.config().shell.clipboardAutoPaste;
+          (void)clipboard_paste::pasteEntry(isImage, activeMode, m_virtualKeyboardService);
+        });
+      });
+    });
+    m_panelManager.registerPanel("quick-insert", std::move(quickInsert));
   }
   m_configService.addReloadCallback(
       [this]() {
@@ -1041,6 +1065,43 @@ void Application::initWidgetControllersAndCallbacks() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
   m_dock.initialize(m_compositorPlatform, &m_configService, &m_renderContext);
+  m_dock.setPhoneService(m_phoneService.get());
+  if (m_phoneService != nullptr) {
+    // The iPhone mirror window: a manual Start shows it at once with the waiting steps;
+    // an always-on receiver stays invisible until the phone actually streams, and the
+    // window goes away when the phone stops. Closing the window ends the phone's
+    // session (UxPlay restarts when always-on, otherwise stops).
+    m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
+    m_configService.addReloadCallback([this]() {
+      if (m_phoneService != nullptr) {
+        m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
+      }
+    });
+    m_phoneMirrorConn = m_phoneService->changed().connect([this]() {
+      const auto& cast = m_phoneService->castSnapshot();
+      if (cast.airplayRunning && !m_phoneMirror.receiving()) {
+        m_phoneMirror.startReceiving();
+      } else if (!cast.airplayRunning && m_phoneMirror.receiving()) {
+        m_phoneMirror.stopReceiving();
+      }
+      const bool wantWindow = cast.airplayRunning && (cast.mirrorStreaming || !cast.receiverAuto);
+      if (wantWindow && !m_phoneMirror.isOpen()) {
+        m_phoneMirror.open();
+      } else if (!wantWindow && m_phoneMirror.isOpen()) {
+        m_phoneMirror.close();
+      }
+      m_phoneMirror.setStatus(PhoneMirrorStatus{
+          .pointerRunning = cast.pointerRunning,
+          .pointerConnected = cast.pointerConnected,
+          .pointerBondLost = cast.pointerBondLost,
+      });
+    });
+    m_phoneMirror.setClosedByUserCallback([this]() {
+      if (m_phoneService != nullptr) {
+        m_phoneService->restartReceiver();
+      }
+    });
+  }
   const DesktopWidgetScriptDeps desktopWidgetScriptDeps{
       .scriptApi = &m_scriptApi,
       .fileWatcher = &m_fileWatcher,

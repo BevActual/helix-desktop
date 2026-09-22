@@ -25,6 +25,8 @@ namespace desktop_settings {
         {.type = "calendar", .labelKey = "desktop-widgets.editor.types.calendar"},
         {.type = "clock", .labelKey = "desktop-widgets.editor.types.clock"},
         {.type = "fancy_audio_visualizer", .labelKey = "desktop-widgets.editor.types.fancy-audio-visualizer"},
+        {.type = "file", .labelKey = "desktop-widgets.editor.types.file"},
+        {.type = "folder", .labelKey = "desktop-widgets.editor.types.folder"},
         {.type = "label", .labelKey = "desktop-widgets.editor.types.label"},
         {.type = "media_player", .labelKey = "desktop-widgets.editor.types.media-player"},
         {.type = "sticker", .labelKey = "desktop-widgets.editor.types.sticker"},
@@ -340,6 +342,14 @@ namespace desktop_settings {
       add(doubleSpec("opacity", 1.0, 0.0, 1.0, 0.01));
       add(fontFamilySpec());
       add(boolSpec("shadow", true));
+    } else if (type == "folder" || type == "file") {
+      add(baseSpec(
+          "path", type == "folder" ? WidgetControlKind::Folder : WidgetControlKind::File, std::string{}
+      ));
+      add(glyphSpec("glyph", ""));
+      add(stringSpec("label"));
+      add(boolSpec("background", true));
+      add(fontFamilySpec());
     } else if (type == "button") {
       add(boolSpec("background", true));
       add(glyphSpec("glyph", "heart"));

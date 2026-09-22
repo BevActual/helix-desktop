@@ -1053,20 +1053,23 @@ struct ShellConfig {
     PanelPlacement wallpaperPlacement = PanelPlacement::Attached;
     PanelPlacement sessionPlacement = PanelPlacement::Attached;
     PanelPlacement polkitPlacement = PanelPlacement::Floating;
+    PanelPlacement quickInsertPlacement = PanelPlacement::Floating;
     // Floating screen position per panel (one of kPanelPositions). "auto" = bar-relative.
-    // Launcher/clipboard default to "center" (the historical center-screen behavior).
+    // Launcher/clipboard/quick-insert default to "center" (the historical center-screen behavior).
     std::string launcherPosition = "center";
     std::string clipboardPosition = "center";
     std::string controlCenterPosition = "auto";
     std::string wallpaperPosition = "auto";
     std::string sessionPosition = "auto";
     std::string polkitPosition = "center";
+    std::string quickInsertPosition = "center";
     std::int32_t floatingOffset = 8; // logical px gap between a floating/detached panel and the bar edge
     bool openNearClickControlCenter = false;
     bool openNearClickLauncher = false;
     bool openNearClickClipboard = false;
     bool openNearClickWallpaper = false;
     bool openNearClickSession = false;
+    bool openNearClickQuickInsert = false;
 
     bool operator==(const PanelConfig&) const = default;
   };
@@ -1242,6 +1245,14 @@ struct TailscaleConfig {
   std::string adminUrl;
 
   bool operator==(const TailscaleConfig&) const = default;
+};
+
+struct PhoneConfig {
+  // Keep the AirPlay receiver (UxPlay) and the Helix Phone Bluetooth pointer up whenever an
+  // iPhone is paired through KDE Connect, so mirroring is one tap on the phone.
+  bool mirrorAlwaysOn = true;
+
+  bool operator==(const PhoneConfig&) const = default;
 };
 
 struct LocalSendConfig {
@@ -1923,6 +1934,7 @@ struct Config {
   WeatherConfig weather;
   TailscaleConfig tailscale;
   LocalSendConfig localsend;
+  PhoneConfig phone;
   CalendarConfig calendar;
   SystemConfig system;
   AudioConfig audio;

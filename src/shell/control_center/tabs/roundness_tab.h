@@ -74,6 +74,7 @@ private:
   std::string m_barName;
   Catalog m_catalog = Catalog::Shell;
   Catalog m_pinnedCatalog = Catalog::Shell;
+  bool m_hosted = false;
   bool m_catalogSyncing = false;
   bool m_syncing = false;
   bool m_liveDirty = false;

@@ -22,6 +22,7 @@
 #include "shell/desktop/desktop_widget_settings_registry.h"
 #include "shell/desktop/widgets/desktop_login_box_widget.h"
 #include "shell/lockscreen/lockscreen_login_box.h"
+#include "shell/panel/panel_manager.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
@@ -693,6 +694,7 @@ void DesktopWidgetsEditor::rebuildScene(OverlaySurface& surface) {
   backgroundArea->setPosition(0.0F, 0.0F);
   backgroundArea->setFrameSize(root->width(), root->height());
   backgroundArea->setZIndex(1);
+  backgroundArea->setAcceptedButtons(InputArea::buttonMask({BTN_LEFT, BTN_RIGHT}));
   backgroundArea->setOnPress([this, outputName = surface.outputName](const InputArea::PointerData& data) {
     if (data.button != BTN_LEFT) {
       return;
@@ -709,6 +711,12 @@ void DesktopWidgetsEditor::rebuildScene(OverlaySurface& surface) {
     if (m_drag.mode == DragMode::Lasso && m_drag.surfaceOutputName == outputName) {
       updateDrag();
     }
+  });
+  backgroundArea->setOnClick([desktop = !m_profile.showLockscreenLoginPreview](const InputArea::PointerData& data) {
+    if (!desktop || data.button != BTN_RIGHT) {
+      return;
+    }
+    PanelManager::instance().openPanel("control-center", PanelOpenRequest{.context = "widgets"});
   });
   root->addChild(std::move(backgroundArea));
 
@@ -1579,6 +1587,45 @@ void DesktopWidgetsEditor::addWidget(const std::string& outputName, const std::s
     widget.settings.emplace("background", true);
     widget.settings.emplace("glyph", std::string("heart"));
     widget.settings.emplace("variant", std::string("default"));
+  }
+  if (widget.type == "folder" || widget.type == "file") {
+    const bool folder = widget.type == "folder";
+    widget.settings.emplace("background", true);
+    widget.settings.emplace("glyph", std::string(folder ? "folder" : "file"));
+    auto widgetId = widget.id;
+    m_snapshot.widgets.push_back(std::move(widget));
+
+    FileDialogOptions options;
+    options.mode = folder ? FileDialogMode::SelectFolder : FileDialogMode::Open;
+    options.title = i18n::tr(
+        folder ? "desktop-widgets.editor.dialogs.select-folder" : "desktop-widgets.editor.dialogs.select-file"
+    );
+    if (!FileDialog::open(std::move(options), [this, widgetId](std::optional<std::filesystem::path> result) {
+          deferEditorMutation([this, widgetId, result = std::move(result)]() {
+            auto* state = findWidgetState(widgetId);
+            if (state == nullptr) {
+              return;
+            }
+            if (result) {
+              state->settings["path"] = result->string();
+            } else {
+              std::erase_if(m_snapshot.widgets, [&](const auto& w) { return w.id == widgetId; });
+              m_selectedWidgetIds.erase(widgetId);
+              if (m_selectedWidgetId == widgetId) {
+                m_selectedWidgetId = m_selectedWidgetIds.empty() ? "" : *m_selectedWidgetIds.begin();
+              }
+            }
+            requestLayout();
+          });
+        })) {
+      std::erase_if(m_snapshot.widgets, [&](const auto& w) { return w.id == widgetId; });
+      requestLayout();
+      return;
+    }
+
+    setSingleSelection(m_snapshot.widgets.back().id);
+    requestLayout();
+    return;
   }
   if (widget.type == "sysmon") {
     widget.settings.emplace("stat", std::string("cpu_usage"));

@@ -9,6 +9,9 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
 
 class DesktopWidgetsEditor;
 class DesktopWidgetsHost;
@@ -48,7 +51,10 @@ public:
   void enterEdit();
   void exitEdit();
   void toggleEdit();
-  bool addWidget(std::string_view type);
+  // Empty string means the editor accepted the add. A widget id means it was placed on the desktop.
+  [[nodiscard]] std::optional<std::string> addWidget(std::string_view type);
+  bool setWidgetSetting(std::string_view id, const std::string& key, WidgetSettingValue value);
+  bool removeWidget(std::string_view id);
   void setOnEnterEditCallback(std::function<void()> callback);
   void setOnExitEditCallback(std::function<void()> callback);
 

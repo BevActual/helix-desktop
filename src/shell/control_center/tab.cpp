@@ -1,12 +1,14 @@
 #include "shell/control_center/tab.h"
 
 #include "ui/builders.h"
+#include "ui/controls/flex.h"
 #include "ui/controls/select.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "render/core/renderer.h"
+#include "render/scene/node.h"
 
 #include <algorithm>
 #include <cmath>
@@ -262,6 +264,7 @@ namespace control_center {
             .fontSize = Style::fontSizeCaption * scale,
             .fontWeight = FontWeight::Bold,
             .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 1,
         })
     );
     parent.addChild(std::move(header));
@@ -275,7 +278,7 @@ namespace control_center {
             .trackHeight = Style::sliderTrackHeight * scale,
             .thumbSize = Style::sliderThumbSize * scale,
             .controlHeight = Style::controlHeight * scale,
-            .flexGrow = 1.0F,
+            .flexGrow = 0.0F,
             .onValueChanged =
                 [valueOut, format](double next) {
                   if (valueOut != nullptr && *valueOut != nullptr) {
@@ -283,8 +286,20 @@ namespace control_center {
                   }
                 },
             .onDragEnd = std::move(onCommit),
+            .configure = [](Slider& slider) { slider.setFillWidth(true); },
         })
     );
+  }
+
+  void layoutHostedLiveBody(Flex* root, Renderer& renderer, float width) {
+    if (root == nullptr) {
+      return;
+    }
+    LayoutConstraints constraints;
+    constraints.setExactWidth(std::max(1.0F, width));
+    const float height = std::max(1.0F, root->measure(renderer, constraints).height);
+    root->setSize(std::max(1.0F, width), height);
+    root->layout(renderer);
   }
 
 } // namespace control_center

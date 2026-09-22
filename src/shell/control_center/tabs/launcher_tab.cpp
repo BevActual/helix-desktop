@@ -151,7 +151,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, opacity = panelCardOpacity()](Flex& section) { applyCompactCardStyle(section, scale, opacity, false); },
   });
   appearanceCard->addChild(
       ui::button({

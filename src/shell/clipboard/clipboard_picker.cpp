@@ -552,7 +552,7 @@ void ClipboardPicker::setCloseCallback(std::function<void()> callback) {
 void ClipboardPicker::setPanelCardOpacity(float opacity) {
   m_panelCardOpacity = opacity;
   if (m_compactCard != nullptr) {
-    applySectionCardStyle(*m_compactCard, contentScale(), opacity);
+    applyCompactCardStyle(*m_compactCard, contentScale(), opacity, false);
   }
   if (m_filterInput != nullptr) {
     m_filterInput->setSurfaceOpacity(opacity);
@@ -577,7 +577,7 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+          [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
 
   auto sidebarHeader = ui::row(

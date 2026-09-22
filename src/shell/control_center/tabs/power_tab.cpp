@@ -177,7 +177,7 @@ std::unique_ptr<Flex> PowerTab::create() {
         .visible = false,
         .participatesInLayout = false,
         .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-          applySectionCardStyle(card, scale, opacity);
+          applyCompactCardStyle(card, scale, opacity, false);
         },
     });
     buildStatusCard(*well, scale);
@@ -234,6 +234,7 @@ std::unique_ptr<Flex> PowerTab::create() {
 
   syncSessionCard();
   syncLidCloseToggle();
+  syncPowerProfiles();
   syncBatteryWell();
 
   if (m_settings != nullptr) {
@@ -270,7 +271,7 @@ void PowerTab::buildSessionCard(Flex& root, float scale) {
     return;
   }
 
-  // Session actions are shortcut plates, the same module well Home uses. The battery card below is
+  // Session actions are a module well of functional plates. The battery card below is
   // the tab's one glass compact card, so this must not read as a second glass layer.
   auto card = ui::column({
       .out = &m_sessionCard,
@@ -572,51 +573,21 @@ void PowerTab::buildProfilesCard(Flex& root, float scale) {
     return;
   }
 
-  m_profileOrder.clear();
-  const auto& available = m_powerProfiles->profiles();
-  for (const auto& candidate : powerProfileOrder()) {
-    if (std::ranges::find(available, candidate) != available.end()) {
-      m_profileOrder.emplace_back(candidate);
-    }
-  }
-  if (m_profileOrder.empty()) {
-    return;
-  }
-
   auto card = ui::column({
       .out = &m_profilesCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
   });
 
   auto profileRow = makeControlRow(i18n::tr("control-center.power.power-profile"), scale, nullptr, true);
-
-  std::vector<ui::SegmentedOption> options;
-  options.reserve(m_profileOrder.size());
-  for (const auto& profile : m_profileOrder) {
-    options.push_back(
-        {.label = profileLabel(profile),
-         .glyph = std::string(profileGlyphName(profile)),
-         .tooltip = profileTooltip(profile)}
-    );
-  }
-
   profileRow->addChild(
-      ui::segmented({
-          .out = &m_profiles,
-          .options = std::move(options),
-          .fontSize = Style::fontSizeCaption,
-          .scale = scale,
-          .surfaceOpacity = panelCardOpacity(),
-          .surfaceRole = ColorRole::Surface,
-          .equalSegmentWidths = true,
+      ui::row({
+          .out = &m_profilesHost,
+          .align = FlexAlign::Center,
+          .wrap = true,
           .flexGrow = 1.0F,
-          .onChange = [this](std::size_t index) {
-            if (m_syncingProfiles || m_powerProfiles == nullptr || index >= m_profileOrder.size()) {
-              return;
-            }
-            (void)m_powerProfiles->setActiveProfile(m_profileOrder[index]);
-          },
       })
   );
   card->addChild(std::move(profileRow));
@@ -747,7 +718,9 @@ void PowerTab::onClose() {
   m_chargeLimitRows.clear();
   m_lastChargeLimitKey.clear();
   m_profilesCard = nullptr;
+  m_profilesHost = nullptr;
   m_profiles = nullptr;
+  m_profileOrder.clear();
   m_inhibitedRow = nullptr;
   m_inhibitedLabel = nullptr;
   m_healthCard = nullptr;
@@ -1027,13 +1000,65 @@ void PowerTab::syncBatteryStatus() {
 }
 
 void PowerTab::syncPowerProfiles() {
-  if (m_profiles == nullptr || m_powerProfiles == nullptr || m_profileOrder.empty()) {
+  if (m_profilesCard == nullptr || m_profilesHost == nullptr || m_powerProfiles == nullptr) {
     return;
   }
 
+  std::vector<std::string> order;
+  const auto& available = m_powerProfiles->profiles();
+  for (const auto& candidate : powerProfileOrder()) {
+    if (std::ranges::find(available, candidate) != available.end()) {
+      order.emplace_back(candidate);
+    }
+  }
+  if (order.empty()) {
+    (void)setShown(m_profilesCard, false);
+    return;
+  }
+
+  if (order != m_profileOrder || m_profiles == nullptr) {
+    m_profileOrder = std::move(order);
+    if (m_profiles != nullptr) {
+      (void)m_profilesHost->removeChild(m_profiles);
+      m_profiles = nullptr;
+    }
+    const float scale = contentScale();
+    std::vector<ui::SegmentedOption> options;
+    options.reserve(m_profileOrder.size());
+    for (const auto& profile : m_profileOrder) {
+      options.push_back(
+          {.label = profileLabel(profile),
+           .glyph = std::string(profileGlyphName(profile)),
+           .tooltip = profileTooltip(profile)}
+      );
+    }
+    m_profilesHost->addChild(
+        ui::segmented({
+            .out = &m_profiles,
+            .options = std::move(options),
+            .fontSize = Style::fontSizeCaption,
+            .scale = scale,
+            .compact = true,
+            .surfaceOpacity = panelCardOpacity(),
+            .surfaceRole = ColorRole::Surface,
+            .equalSegmentWidths = true,
+            .flexGrow = 1.0F,
+            .onChange =
+                [this](std::size_t index) {
+                  if (m_syncingProfiles || m_powerProfiles == nullptr || index >= m_profileOrder.size()) {
+                    return;
+                  }
+                  (void)m_powerProfiles->setActiveProfile(m_profileOrder[index]);
+                },
+        })
+    );
+  }
+
+  (void)setShown(m_profilesCard, true);
+
   const auto& active = m_powerProfiles->activeProfile();
   const auto it = std::ranges::find(m_profileOrder, active);
-  if (it != m_profileOrder.end()) {
+  if (m_profiles != nullptr && it != m_profileOrder.end()) {
     const auto index = static_cast<std::size_t>(std::distance(m_profileOrder.begin(), it));
     if (index != m_profiles->selectedIndex()) {
       m_syncingProfiles = true;

@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/firewall_tab.h"
 
+#include "config/config_service.h"
 #include "dbus/firewall/firewall_service.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
@@ -11,13 +12,16 @@
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 using namespace control_center;
 
@@ -106,7 +110,23 @@ namespace {
 
 } // namespace
 
-FirewallTab::FirewallTab(const ControlCenterServices& services) : m_service(services.firewall) {
+FirewallTab::Catalog FirewallTab::catalogFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Catalog::Zone : Catalog::Services;
+}
+
+std::size_t FirewallTab::indexFromCatalog(Catalog catalog) noexcept {
+  return catalog == Catalog::Zone ? 1 : 0;
+}
+
+FirewallTab::FirewallTab(const ControlCenterServices& services)
+    : m_service(services.firewall), m_config(services.config) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("firewall_tab", "catalog")) {
+      if (*catalog == "zone") {
+        m_catalog = Catalog::Zone;
+      }
+    }
+  }
   if (m_service != nullptr) {
     m_service->setChangeCallback([this]() {
       syncUi();
@@ -118,27 +138,18 @@ FirewallTab::FirewallTab(const ControlCenterServices& services) : m_service(serv
 std::unique_ptr<Flex> FirewallTab::create() {
   const float scale = contentScale();
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
   well->addChild(
@@ -203,6 +214,46 @@ std::unique_ptr<Flex> FirewallTab::create() {
       })
   );
   well->addChild(std::move(panicRow));
+  well->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "shield-lock",
+                      .tooltip = i18n::tr("control-center.firewall.services"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "map",
+                      .tooltip = i18n::tr("control-center.firewall.zone"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  live->addChild(std::move(well));
+
+  auto leftover = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* leftoverContent = leftover->content();
+  leftoverContent->setDirection(FlexDirection::Vertical);
+  leftoverContent->setAlign(FlexAlign::Stretch);
+  leftoverContent->setGap(Style::spaceMd * scale);
 
   auto zoneCard = ui::column({
       .out = &m_zoneCard,
@@ -256,16 +307,9 @@ std::unique_ptr<Flex> FirewallTab::create() {
               },
       })
   );
-  m_rootLayout->addChild(std::move(well));
-  m_rootLayout->addChild(std::move(zoneCard));
-  m_rootLayout->addChild(std::move(servicesCard));
-
-  auto live = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = 0.0F,
-      .flexGrow = 1.0F,
-  });
-  live->addChild(std::move(liveScroll));
+  leftoverContent->addChild(std::move(zoneCard));
+  leftoverContent->addChild(std::move(servicesCard));
+  live->addChild(std::move(leftover));
   syncUi();
   return live;
 }
@@ -301,6 +345,7 @@ void FirewallTab::onClose() {
   m_startButton = nullptr;
   m_panicRow = nullptr;
   m_panicToggle = nullptr;
+  m_catalogSwitch = nullptr;
   m_zoneCard = nullptr;
   m_zoneSelect = nullptr;
   m_servicesCard = nullptr;
@@ -313,11 +358,52 @@ void FirewallTab::onClose() {
 }
 
 void FirewallTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+}
+
+void FirewallTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+void FirewallTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString(
+      "firewall_tab", "catalog", m_catalog == Catalog::Zone ? "zone" : "services"
+  );
+}
+
+void FirewallTab::syncCatalog() {
+  const bool services = m_catalog == Catalog::Services;
+  (void)setShown(m_servicesCard, services);
+  (void)setShown(m_zoneCard, !services);
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_catalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_catalog));
+    m_catalogSyncing = false;
+  }
+}
+
+void FirewallTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  syncCatalog();
+  PanelManager::instance().requestLayout();
 }
 
 void FirewallTab::syncUi() {
@@ -330,7 +416,12 @@ void FirewallTab::syncUi() {
   const bool running = snap.running;
   const bool showLists = running && !snap.panic;
   const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_panicRow, running) ||
-                            setShown(m_zoneCard, showLists) || setShown(m_servicesCard, showLists);
+                            setShown(m_catalogSwitch, showLists) || setShown(m_liveScroll, showLists);
+  syncCatalog();
+  if (!showLists) {
+    (void)setShown(m_zoneCard, false);
+    (void)setShown(m_servicesCard, false);
+  }
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

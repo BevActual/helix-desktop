@@ -18,6 +18,7 @@ struct wl_output;
 class CompositorPlatform;
 class ConfigService;
 class IpcService;
+class PhoneConnectService;
 class RenderContext;
 struct PointerEvent;
 struct WaylandOutput;
@@ -36,6 +37,7 @@ public:
   ~Dock();
 
   bool initialize(CompositorPlatform& platform, ConfigService* config, RenderContext* renderContext);
+  void setPhoneService(PhoneConnectService* phone);
   void reload();
   void show();
   /// Tears down dock surfaces without changing config (e.g. lockscreen widget editor overlay).
@@ -105,6 +107,8 @@ private:
   shell::dock::DockInstance* m_popupOwnerInstance = nullptr; // instance that owns the current open popup
   std::unique_ptr<shell::dock::DockPopup> m_itemMenu;        // right-click context menu
   Signal<>::ScopedConnection m_appIconColorizeConn;
+  PhoneConnectService* m_phone = nullptr;
+  Signal<>::ScopedConnection m_phoneConn;
   bool m_overlayDisplaySuppressed = false;
   bool m_hadInstancesBeforeOverlaySuppress = false;
   bool m_smartAutoHideReevalQueued = false;

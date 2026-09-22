@@ -41,6 +41,7 @@ private:
   Slider* m_uiScale = nullptr;
   Label* m_uiScaleValue = nullptr;
 
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_liveDirty = false;
 };

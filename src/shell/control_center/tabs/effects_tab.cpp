@@ -176,6 +176,7 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody(bool hosted) {
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
+          .equalSegmentWidths = false,
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
       })
   );

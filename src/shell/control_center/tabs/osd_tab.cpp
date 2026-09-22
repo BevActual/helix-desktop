@@ -104,6 +104,7 @@ std::unique_ptr<Flex> OsdTab::create() {
 }
 
 std::unique_ptr<Flex> OsdTab::createLiveBody(bool hosted) {
+  m_hosted = hosted;
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const float opacity = panelCardOpacity();
@@ -113,23 +114,23 @@ std::unique_ptr<Flex> OsdTab::createLiveBody(bool hosted) {
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
   });
-
-  auto compactCard = ui::column({
-      .configure =
-          [scale, opacity, hosted](Flex& card) {
-            applyCompactCardStyle(card, scale, opacity, hosted);
-          },
-  });
-  m_enabled = addToggleRow(*compactCard, scale, i18n::tr("control-center.osd.enable"), [this](bool value) {
-    applyEnabled(value);
-  });
-  if (m_enabled != nullptr) {
-    m_enabled->setCheckedImmediate(osd.enabled);
-  }
 
   if (!hosted) {
+    auto compactCard = ui::column({
+        .configure =
+            [scale, opacity, hosted](Flex& card) {
+              applyCompactCardStyle(card, scale, opacity, hosted);
+            },
+    });
+    m_enabled = addToggleRow(*compactCard, scale, i18n::tr("control-center.osd.enable"), [this](bool value) {
+      applyEnabled(value);
+    });
+    if (m_enabled != nullptr) {
+      m_enabled->setCheckedImmediate(osd.enabled);
+    }
+
     auto sectionToolbar = ui::column({
         .out = &m_sectionToolbar,
         .align = FlexAlign::Stretch,
@@ -169,15 +170,15 @@ std::unique_ptr<Flex> OsdTab::createLiveBody(bool hosted) {
         })
     );
     compactCard->addChild(std::move(sectionToolbar));
+    live->addChild(std::move(compactCard));
   }
-  live->addChild(std::move(compactCard));
 
   const bool placementOpen = osd.enabled && m_section == Section::Placement;
   auto placementHost = ui::column({
       .out = &m_placementHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = placementOpen,
       .participatesInLayout = placementOpen,
       .configure =
@@ -231,7 +232,7 @@ std::unique_ptr<Flex> OsdTab::createLiveBody(bool hosted) {
       .out = &m_styleHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = styleOpen,
       .participatesInLayout = styleOpen,
       .configure =
@@ -304,6 +305,10 @@ void OsdTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) 
     return;
   }
   if (m_rootLayout == nullptr) {
+    return;
+  }
+  if (m_hosted) {
+    layoutHostedLiveBody(m_rootLayout, renderer, contentWidth);
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);

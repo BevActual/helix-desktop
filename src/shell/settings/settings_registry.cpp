@@ -2038,6 +2038,23 @@ namespace settings {
         "settings.schema.panels.open-near-click-wallpaper.description", cfg.shell.panel.openNearClickWallpaper,
         &ShellConfig::PanelConfig::wallpaperPlacement, &ShellConfig::PanelConfig::wallpaperPosition
     ));
+    entries.push_back(makeEntry(
+        SettingsSection::Panels, "quick-insert", tr("settings.schema.panels.placement-quick-insert.label"),
+        tr("settings.schema.panels.placement-quick-insert.description"), {"shell", "panel", "quick_insert_placement"},
+        asSegmented(enumSelect(kPanelPlacements, cfg.shell.panel.quickInsertPlacement)),
+        "attached floating bar panel quick insert emoji clipboard screenshots"
+    ));
+    entries.push_back(panelPositionEntry(
+        SettingsSection::Panels, "quick-insert", "quick_insert", "settings.schema.panels.position-quick-insert.label",
+        "settings.schema.panels.position-quick-insert.description", cfg.shell.panel.quickInsertPosition,
+        &ShellConfig::PanelConfig::quickInsertPlacement
+    ));
+    entries.push_back(panelBarAlignmentEntry(
+        SettingsSection::Panels, "quick-insert", "quick_insert",
+        "settings.schema.panels.open-near-click-quick-insert.label",
+        "settings.schema.panels.open-near-click-quick-insert.description", cfg.shell.panel.openNearClickQuickInsert,
+        &ShellConfig::PanelConfig::quickInsertPlacement, &ShellConfig::PanelConfig::quickInsertPosition
+    ));
 
     // Control Center
     entries.push_back(makeEntry(
@@ -2115,12 +2132,7 @@ namespace settings {
         ShortcutListSetting{
             .items = cfg.controlCenter.shortcuts, .suggestedOptions = controlCenterShortcutOptions(cfg)
         },
-        "quick settings shortcuts toggles size small wide large wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy ai"
-    ));
-    entries.push_back(makeEntry(
-        SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts-show-labels.label"),
-        tr("settings.schema.panels.home-shortcuts-show-labels.description"), {"control_center", "show_shortcut_labels"},
-        ToggleSetting{cfg.controlCenter.showShortcutLabels}, "shortcuts labels text hide show titles"
+        "quick settings shortcuts toggles pins wifi bluetooth caffeine night light dnd power media weather clipboard screenshot pick color ocr qr screen record tailscale localsend phone syncthing firewall printers cast privacy ai"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-session-button.label"),

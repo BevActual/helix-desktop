@@ -307,7 +307,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       .out = &m_nowCard,
       .gap = Style::spaceMd * scale,
       .fillWidth = true,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
 
   auto playerHost = ui::column({

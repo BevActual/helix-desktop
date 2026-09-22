@@ -12,6 +12,7 @@
 #include "shell/desktop/widgets/desktop_label_widget.h"
 #include "shell/desktop/widgets/desktop_login_box_widget.h"
 #include "shell/desktop/widgets/desktop_media_player_widget.h"
+#include "shell/desktop/widgets/desktop_path_widget.h"
 #include "shell/desktop/widgets/desktop_sticker_widget.h"
 #include "shell/desktop/widgets/desktop_sysmon_widget.h"
 #include "shell/desktop/widgets/desktop_volume_widget.h"
@@ -329,6 +330,19 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
         .shadow = getBoolSetting(settings, "shadow", true),
     });
     applyCommonSettings(*widget, settings);
+    widget->setContentScale(contentScale);
+    return widget;
+  }
+
+  if (type == "folder" || type == "file") {
+    auto widget = std::make_unique<DesktopPathWidget>(DesktopPathWidget::Options{
+        .path = getStringSetting(settings, "path"),
+        .label = getStringSetting(settings, "label"),
+        .glyph = getStringSetting(settings, "glyph"),
+        .preferFolder = type == "folder",
+        .showBackground = getBoolSetting(settings, "background", true),
+    });
+    widget->setFontFamily(getStringSetting(settings, "font_family", ""));
     widget->setContentScale(contentScale);
     return widget;
   }

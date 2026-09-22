@@ -242,6 +242,18 @@
     "auto-paste-unavailable-title": "Could not paste",
     "auto-paste-unavailable-body": "Auto-paste needs a Wayland virtual keyboard. The item is still copied."
   },
+  "quick-insert": {
+    "empty-clipboard": "No matching clipboard items",
+    "empty-emoji": "No matching emoji",
+    "empty-recents": "No recent screenshots",
+    "search-clipboard": "Search clipboard",
+    "search-emoji": "Search emoji",
+    "search-placeholder": "Search emoji, screenshots, or clipboard",
+    "search-recents": "Search screenshots",
+    "source-clipboard": "Clipboard",
+    "source-emoji": "Emoji",
+    "source-recents": "Recents"
+  },
   "common": {
     "actions": {
       "apply": "Apply",
@@ -664,8 +676,20 @@
       "select-avatar": "Select Avatar",
       "status": {
         "caffeine": "Caffeine on",
+        "cast": "Sharing this screen",
+        "ai": "{percent}% used",
+        "battery": "Battery {percent}%",
+        "dnd": "Do Not Disturb",
+        "firewall": "Blocking all traffic",
         "localsend": "Incoming from {name}",
         "night-light": "Night Light on",
+        "phone": "{name}",
+        "phone-battery": "{name}  {percent}%",
+        "phone-offline": "{name} offline",
+        "privacy": "In use",
+        "privacy-camera": "Camera in use",
+        "privacy-microphone": "Mic in use",
+        "privacy-screen": "Screen in use",
         "recording": "Recording {elapsed}",
         "replay": "Replay {elapsed}",
         "updates": "{count} updates waiting"
@@ -1289,6 +1313,7 @@
       "history-received": "Received {file} from {name}",
       "history-sent": "Sent {file} to {name}",
       "incoming": "{name} wants to send files",
+      "incoming-idle": "Waiting for a file from another device.",
       "incoming-title": "Incoming",
       "listening": "Visible as {name} on this network.",
       "nearby": "Nearby devices",
@@ -1317,10 +1342,91 @@
     "phone": {
       "accept": "Accept",
       "available": "Nearby, not paired",
+      "cast-adb-connect-failed": "Could not connect ADB to {host}. Enable wireless debugging on the phone, then try again.",
+      "cast-adb-missing": "Connect with USB debugging, or enter the wireless debugging IP:port below. Optional pairing code is for first-time wireless setup.",
+      "cast-adb-pair-failed": "Could not pair with {host}. Check the pairing code and port on the phone.",
+      "cast-adb-pair-need-connect": "Paired. Enter the Connection IP:port from wireless debugging, leave the code blank, then Connect.",
+      "cast-airplay-hint": "Start AirPlay, then on the iPhone open Control Center → Screen Mirroring → Helix Phone. To click through the mirror, pair Helix Phone under Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-airplay-missing": "Install UxPlay to mirror an iPhone here (AirPlay receiver).",
+      "cast-airplay-start": "Start AirPlay",
+      "cast-airplay-start-failed": "Could not start UxPlay. Check that uxplay is installed and try again.",
+      "cast-airplay-started": "AirPlay is on — pick Helix Phone from Screen Mirroring. Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices for mouse and keyboard; Super is the Globe key (Super+H Home, Super+Space Search).",
+      "cast-airplay-stop": "Stop AirPlay",
+      "cast-airplay-disconnect": "Disconnect iPhone",
+      "cast-airplay-ready": "Ready — on the iPhone, Control Center → Screen Mirroring → {name}. The mirror opens here when the picture starts.",
+      "cast-airplay-streaming": "The iPhone is mirroring. Close the mirror window or Disconnect to end the session; the receiver stays ready.",
+      "cast-always-on": "Keep receiver ready",
+      "cast-airplay-stopped": "AirPlay receiver stopped.",
+      "cast-airplay-waiting": "Waiting for the iPhone… Screen Mirroring → {name}. Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices to move the pointer.",
+      "cast-mirror-waiting": "Waiting for the iPhone.\nControl Center → Screen Mirroring → Helix Phone",
+      "cast-mirror-needs-setup": "This machine is missing something the iPhone mirror needs:",
+      "cast-need-uxplay": "UxPlay (AirPlay receiver)",
+      "cast-need-gstreamer": "GStreamer",
+      "cast-need-decoder": "An H.264 decoder for GStreamer",
+      "cast-need-gst-base": "GStreamer base plugins (videoscale, videoconvert, filesink)",
+      "cast-need-python": "Python 3 with dbus and GObject bindings",
+      "cast-need-bluetooth": "A Bluetooth LE adapter",
+      "cast-need-bluetooth-fix": "The pointer needs Bluetooth; the picture works without it.",
+      "cast-need-bluetoothd": "The Bluetooth service is not running",
+      "cast-mirror-title": "iPhone",
+      "cast-mirror-step-mirror": "On the iPhone: swipe down from the top-right, tap Screen Mirroring, pick Helix Phone.",
+      "cast-mirror-step-pair": "For mouse and keyboard, pair Helix Phone once: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-mirror-pairing-lost": "The iPhone dropped the Helix Phone pointer, or AssistiveTouch is off. Pair again: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-mirror-step-pair-short": "Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices for mouse and keyboard.",
+      "cast-mirror-pointer-ready": "Mouse and keyboard connected",
+      "cast-pointer-lost": "The iPhone dropped the pointer, or AssistiveTouch is off. Pair Helix Phone again under AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-pointer-starting": "Starting the Helix Phone Bluetooth pointer…",
+      "cast-pointer-waiting": "Pointer not connected. On the iPhone: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices → Helix Phone.",
+      "cast-pointer-connected": "Pointer connected. Keys go to the iPhone while the mirror window is focused. Super is the Globe key.",
+      "cast-pointer-typing": "Keyboard captured — keys go to the iPhone. Move off the mirror to release.",
+      "cast-pointer-home": "Home",
+      "cast-pointer-search": "Search",
+      "cast-pointer-library": "App Library",
+      "cast-pointer-control-center": "Control Center",
+      "cast-pointer-setup": "Set up Bluetooth",
+      "cast-pointer-setup-hint": "bluetoothd needs Privacy on and JustWorksRepairing always so the iPhone keeps its pairing. Asks for your password.",
+      "cast-android-only": "Cast My Apps needs an Android phone with storage sharing enabled in KDE Connect.",
+      "cast-apps-empty": "No user apps found on the connected phone.",
+      "cast-connect": "Connect",
+      "cast-connecting": "Connecting ADB to {host}…",
+      "cast-hint": "Tap an app to open it in a floating window on this desktop. Keyboard and pointer go to the phone.",
+      "cast-hint-connected": "Connected as {serial}. Tap cast on an app to open it in a floating window.",
+      "cast-host-placeholder": "IP:port from wireless debugging",
+      "cast-launch": "Cast app",
+      "cast-launching": "Casting {name}…",
+      "cast-loading": "Looking for the phone over ADB…",
+      "cast-mirror": "Mirror phone",
+      "cast-mirroring": "Mirroring phone…",
+      "cast-no-peer": "Pair a phone on the compact card to cast apps.",
+      "cast-open": "Cast My Apps",
+      "cast-pair": "Pair",
+      "cast-pair-placeholder": "Pairing code",
+      "cast-recent-meta": "Recent · {package}",
+      "cast-reconnect": "Reconnect",
+      "cast-search-empty": "No apps match that search.",
+      "cast-search-placeholder": "Search apps",
+      "cast-tools-missing": "Install scrcpy and Android platform-tools (adb) to cast phone apps here.",
+      "cast-unsupported": "Cast needs a paired phone. Android uses Cast My Apps; iPhone uses AirPlay mirroring.",
       "charging": "Charging",
+      "continue-copied": "Copied to clipboard",
+      "continue-empty": "Share a photo or link from your phone to continue it here.",
+      "continue-open": "Open",
+      "copy-code": "Copy code",
+      "code-copied": "Code copied",
       "devices": "Devices",
       "devices-empty": "No phones yet. Open KDE Connect on your phone, then tap Refresh.",
+      "files-empty": "Photos from a paired Android phone show up here. iPhone shares land in Continue.",
+      "files-mount-failed": "Could not open files on this phone.",
+      "files-mounting": "Opening phone storage…",
+      "files-offline": "Bring the phone online to browse files.",
+      "files-pull-failed": "Could not save that photo here.",
+      "files-pulled": "Saved {name} to Pictures",
+      "files-unsupported": "This phone does not share storage. Use Continue for incoming shares.",
       "missing": "Install KDE Connect to pair a phone from Control Center.",
+      "notification-dismiss": "Dismiss",
+      "notifications-empty": "Notifications and SMS codes from this phone show up here.",
+      "notifications-offline": "Bring the phone online to see notifications.",
+      "notifications-unsupported": "This phone is not sharing notifications.",
       "offline": "Offline",
       "online": "Online",
       "pair": "Pair",
@@ -1336,6 +1442,10 @@
       "ring": "Ring",
       "send-clipboard": "Send clipboard",
       "send-file": "Send file",
+      "source-continue": "Continue",
+      "source-cast": "Cast",
+      "source-files": "Files",
+      "source-notifications": "Notifications",
       "start": "Start KDE Connect",
       "starting": "Starting…",
       "status-failed": "Could not list devices from KDE Connect.",
@@ -1641,6 +1751,8 @@
         "trash": "Delete"
       },
       "dialogs": {
+        "select-file": "Choose a file",
+        "select-folder": "Choose a folder",
         "select-sticker-image": "Select Sticker Image"
       },
       "settings": {
@@ -1701,6 +1813,7 @@
         "network-speed-unit-kilobytes": "kB/s",
         "network-speed-unit-megabytes": "MB/s",
         "opacity": "Opacity",
+        "path": "Path",
         "primary-color": "Primary Color",
         "reset-defaults": "Reset to Defaults",
         "reversed": "Reversed",
@@ -1770,6 +1883,8 @@
         "calendar": "Calendar",
         "clock": "Clock",
         "fancy-audio-visualizer": "Fancy Audio Visualizer",
+        "file": "File",
+        "folder": "Folder",
         "label": "Label",
         "login-box": "Login Box",
         "media-player": "Media Player",
@@ -1800,6 +1915,7 @@
       "close-all": "Close All"
     },
     "launcher": "Launcher",
+    "phone": "Phone",
     "missing-app": "Missing app",
     "missing-app-body": "{id} is no longer installed. Unpin it or install the app again.",
     "missing-app-tooltip": "Missing app · {id}"
@@ -2460,6 +2576,7 @@
         "privacy": "Privacy",
         "profile": "Profile",
         "providers": "Providers",
+        "quick-insert": "Quick Insert",
         "screen-corners": "Screen Corners",
         "screen-time": "Screen Time",
         "screenshot": "Screenshot",
@@ -2626,6 +2743,7 @@
       "hot-corners": {
         "command": "Run Command",
         "control-center": "Control Center",
+        "widgets": "Widgets",
         "launcher": "Launcher",
         "none": "None",
         "window-switcher": "Window Switcher"
@@ -3504,6 +3622,10 @@
             "mic-mute": { "label": "Mute microphone" },
             "night-light": { "label": "Night light" },
             "notifications": { "label": "Notifications" },
+            "quick-insert": {
+              "label": "Quick Insert",
+              "description": "Caps Lock. The key is remapped so it opens Quick Insert instead of toggling Caps."
+            },
             "screen-record": { "label": "Screen record" },
             "screenshot-fullscreen": { "label": "Screenshot fullscreen" },
             "screenshot-ocr": { "label": "Screenshot OCR" },
@@ -3812,8 +3934,8 @@
           "label": "Show Header Session Button"
         },
         "home-shortcuts": {
-          "description": "Choose shortcut buttons for the Home tab. Size each tile small, wide, or large.",
-          "label": "Home Shortcuts"
+          "description": "Pin actions to a list at the bottom of Home. Empty by default; add only what you use.",
+          "label": "Home Pins"
         },
         "home-shortcuts-show-labels": {
           "description": "Display text labels under shortcut icons in the home tab",
@@ -3936,6 +4058,10 @@
           "description": "Where the wallpaper picker is positioned when opened by clicking on the bar widget",
           "label": "Along Bar"
         },
+        "open-near-click-quick-insert": {
+          "description": "Where Quick Insert is positioned when opened by clicking on the bar widget",
+          "label": "Along Bar"
+        },
         "panel-anchor-bar": {
           "description": "Bar panels attach to when opened; leave empty to follow the widget, shortcut, or dock that opened them",
           "label": "Anchor Bar"
@@ -3950,6 +4076,10 @@
         },
         "placement-launcher": {
           "description": "Choose whether the launcher attaches to the bar or floats at a chosen screen position",
+          "label": "Placement"
+        },
+        "placement-quick-insert": {
+          "description": "Choose whether Quick Insert attaches to the bar or floats at a chosen screen position",
           "label": "Placement"
         },
         "placement-polkit": {
@@ -3974,6 +4104,10 @@
         },
         "position-launcher": {
           "description": "Where the launcher floats on screen; Follow Bar keeps it near the bar",
+          "label": "Position"
+        },
+        "position-quick-insert": {
+          "description": "Where Quick Insert floats on screen; Follow Bar keeps it near the bar",
           "label": "Position"
         },
         "position-polkit": {

@@ -645,6 +645,7 @@ _noctalia_sources = files(
   'src/shell/lockscreen/lockscreen_widgets_host.cpp',
   'src/shell/desktop/widgets/desktop_audio_visualizer_widget.cpp',
   'src/shell/desktop/widgets/desktop_button_widget.cpp',
+  'src/shell/desktop/widgets/desktop_path_widget.cpp',
   'src/shell/desktop/widgets/desktop_calendar_widget.cpp',
   'src/shell/desktop/widgets/desktop_clock_widget.cpp',
   'src/shell/desktop/widgets/desktop_fancy_audio_visualizer_widget.cpp',
@@ -657,6 +658,8 @@ _noctalia_sources = files(
   'src/shell/desktop/widgets/plugin_desktop_widget.cpp',
   'src/shell/desktop/widgets/desktop_weather_widget.cpp',
   'src/shell/clipboard/clipboard_picker.cpp',
+  'src/shell/quick_insert/quick_insert_panel.cpp',
+  'src/shell/phone_mirror/phone_mirror_window.cpp',
   'src/shell/control_center/tabs/calendar_tab.cpp',
   'src/shell/control_center/tabs/clock_tab.cpp',
   'src/shell/control_center/tabs/clipboard_tab.cpp',
@@ -1020,7 +1023,9 @@ _noctalia_sources = files(
   'src/compositors/niri/niri_workspace_backend.cpp',
   'src/compositors/niri/niri_config_files.cpp',
   'src/compositors/niri/niri_config_binds.cpp',
+  'src/compositors/niri/niri_config_keyboard.cpp',
   'src/compositors/niri/niri_config_outputs.cpp',
+  'src/compositors/niri/niri_phone_cast.cpp',
   'src/compositors/niri/niri_window_rules.cpp',
   'src/compositors/niri/niri_layout_theme.cpp',
   'src/compositors/niri/niri_config_blur.cpp',
@@ -1224,6 +1229,14 @@ install_data(
 install_data(
   'assets/noctalia.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
+)
+
+# Helix Phone: BLE HID pointer for iPhone AssistiveTouch and its bluetoothd setup helper.
+install_data(
+  'scripts/helix-phone-hid.py',
+  'scripts/helix-phone-bluetooth-setup.sh',
+  install_dir: get_option('datadir') / 'noctalia' / 'scripts',
+  install_mode: 'rwxr-xr-x',
 )
 
 executable('noctalia-system-upgrade',

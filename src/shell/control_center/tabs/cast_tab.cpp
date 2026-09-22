@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/cast_tab.h"
 
+#include "config/config_service.h"
 #include "dbus/cast/cast_service.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
@@ -11,13 +12,16 @@
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 #include "wayland/clipboard_service.h"
 
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 using namespace control_center;
 
@@ -60,8 +64,23 @@ namespace {
 
 } // namespace
 
+CastTab::Catalog CastTab::catalogFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Catalog::Displays : Catalog::Wireless;
+}
+
+std::size_t CastTab::indexFromCatalog(Catalog catalog) noexcept {
+  return catalog == Catalog::Displays ? 1 : 0;
+}
+
 CastTab::CastTab(const ControlCenterServices& services)
-    : m_service(services.cast), m_clipboard(services.clipboard) {
+    : m_service(services.cast), m_clipboard(services.clipboard), m_config(services.config) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("cast_tab", "catalog")) {
+      if (*catalog == "displays") {
+        m_catalog = Catalog::Displays;
+      }
+    }
+  }
   if (m_service != nullptr) {
     m_service->setChangeCallback([this]() {
       syncUi();
@@ -73,30 +92,20 @@ CastTab::CastTab(const ControlCenterServices& services)
 std::unique_ptr<Flex> CastTab::create() {
   const float scale = contentScale();
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto well = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
-  addTitle(*well, i18n::tr("control-center.cast.share-title"), scale);
   well->addChild(
       ui::label({
           .out = &m_shareStatus,
@@ -201,9 +210,49 @@ std::unique_ptr<Flex> CastTab::create() {
       })
   );
   well->addChild(std::move(credentialsRow));
-  m_rootLayout->addChild(std::move(well));
+  well->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "screen-share",
+                      .tooltip = i18n::tr("control-center.cast.wireless-title"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "device-tv",
+                      .tooltip = i18n::tr("control-center.cast.displays"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  live->addChild(std::move(well));
+
+  auto leftover = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* leftoverContent = leftover->content();
+  leftoverContent->setDirection(FlexDirection::Vertical);
+  leftoverContent->setAlign(FlexAlign::Stretch);
+  leftoverContent->setGap(Style::spaceMd * scale);
 
   auto wireless = ui::column({
+      .out = &m_wirelessCard,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
@@ -272,15 +321,9 @@ std::unique_ptr<Flex> CastTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(wireless));
-  m_rootLayout->addChild(std::move(sinksCard));
-
-  auto live = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = 0.0F,
-      .flexGrow = 1.0F,
-  });
-  live->addChild(std::move(liveScroll));
+  leftoverContent->addChild(std::move(wireless));
+  leftoverContent->addChild(std::move(sinksCard));
+  live->addChild(std::move(leftover));
   syncUi();
   return live;
 }
@@ -326,6 +369,8 @@ void CastTab::onClose() {
   m_credentialsRow = nullptr;
   m_credentials = nullptr;
   m_copyButton = nullptr;
+  m_catalogSwitch = nullptr;
+  m_wirelessCard = nullptr;
   m_wirelessStatus = nullptr;
   m_wirelessDetail = nullptr;
   m_wirelessStart = nullptr;
@@ -337,11 +382,52 @@ void CastTab::onClose() {
 }
 
 void CastTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+}
+
+void CastTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+void CastTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString(
+      "cast_tab", "catalog", m_catalog == Catalog::Displays ? "displays" : "wireless"
+  );
+}
+
+void CastTab::syncCatalog() {
+  const bool wireless = m_catalog == Catalog::Wireless;
+  (void)setShown(m_wirelessCard, wireless);
+  (void)setShown(m_sinksCard, !wireless);
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_catalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_catalog));
+    m_catalogSyncing = false;
+  }
+}
+
+void CastTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  syncCatalog();
+  PanelManager::instance().requestLayout();
 }
 
 void CastTab::copyShareTarget() {
@@ -368,8 +454,8 @@ void CastTab::syncUi() {
                             setShown(m_viewOnlyRow, sharing) || setShown(m_credentialsRow, sharing) ||
                             setShown(m_copyButton, sharing && !snap.shareAddress.empty()) ||
                             setShown(m_wirelessStart, snap.wirelessInstalled && !wireless) ||
-                            setShown(m_wirelessOpen, snap.wirelessInstalled) ||
-                            setShown(m_sinksCard, wireless);
+                            setShown(m_wirelessOpen, snap.wirelessInstalled);
+  syncCatalog();
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

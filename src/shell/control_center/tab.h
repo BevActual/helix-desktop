@@ -23,7 +23,7 @@ namespace control_center {
 
   // Helix maps Apple HIG Liquid Glass to a hierarchy, not a skin:
   // chrome = panel / sidebar / header (glass), leftover = tab content (solid wells),
-  // modules = Home shortcut plates, widgets = glanceable Home/desktop cards that deep-link.
+  // modules = functional plates (Power session, optional Home pins), widgets = glanceable Home/desktop cards that deep-link.
   // Do not nest glass-on-glass. Compact cards and leftover catalogs stay leftover.
   void applySectionCardStyle(Flex& card, float scale, float fillOpacity);
   // Compact source well. Hosted Theme children skip the well so Theme keeps one card.
@@ -72,6 +72,9 @@ namespace control_center {
       double maxValue, double step, double value, std::function<std::string(double)> format,
       std::function<void()> onCommit
   );
+  // Size a hosted live body to its content height so leftover wells can scroll
+  // instead of stretching sliders and clipping trailing rows.
+  void layoutHostedLiveBody(Flex* root, Renderer& renderer, float width);
 
 } // namespace control_center
 

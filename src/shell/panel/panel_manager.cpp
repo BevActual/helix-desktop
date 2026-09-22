@@ -291,6 +291,9 @@ namespace {
     if (panelId == "polkit") {
       return pc.polkitPosition;
     }
+    if (panelId == "quick-insert") {
+      return pc.quickInsertPosition;
+    }
     return "auto";
   }
 
@@ -299,7 +302,8 @@ namespace {
         || panelId == "launcher"
         || panelId == "session"
         || panelId == "setup-wizard"
-        || panelId == "wallpaper";
+        || panelId == "wallpaper"
+        || panelId == "quick-insert";
   }
 
   [[nodiscard]] LayerShellLayer
@@ -333,6 +337,9 @@ namespace {
     }
     if (panelId == "session") {
       return !pinned(pc.sessionPlacement, pc.sessionPosition) && pc.openNearClickSession;
+    }
+    if (panelId == "quick-insert") {
+      return !pinned(pc.quickInsertPlacement, pc.quickInsertPosition) && pc.openNearClickQuickInsert;
     }
     return false;
   }

@@ -156,7 +156,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
 
   auto compactCard = ui::column({
       .out = &m_compactCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
   compactCard->addChild(
       ui::label({

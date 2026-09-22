@@ -140,6 +140,7 @@ private:
 
   // Power profiles
   Flex* m_profilesCard = nullptr;
+  Flex* m_profilesHost = nullptr;
   Segmented* m_profiles = nullptr;
   Flex* m_inhibitedRow = nullptr;
   Label* m_inhibitedLabel = nullptr;

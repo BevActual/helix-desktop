@@ -233,7 +233,7 @@ std::unique_ptr<Flex> SystemTab::create() {
 
   auto compactCard = ui::column({
       .out = &m_compactCard,
-      .configure = [sc, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, sc, opacity); },
+      .configure = [sc, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, sc, opacity, false); },
   });
   compactCard->addChild(
       ui::label({

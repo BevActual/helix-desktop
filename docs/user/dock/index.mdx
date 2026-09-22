@@ -7,6 +7,8 @@ sidebar:
 
 A standalone application dock that displays pinned and running apps. Disabled by default. Turn it on from **Control Center → Desktop → Dock** (enable, position, auto-hide, running apps, and pinned apps). Header gear on Desktop follows the Dock source for size, shape, monitors, and magnification. `noctalia msg settings-toggle dock` opens Desktop on Dock.
 
+When a phone is paired through KDE Connect, the dock grows a phone icon after the apps. The badge is the notification count. Click it to open **Control Center → Phone**. The icon is not a pinned app and cannot be reordered.
+
 ```toml
 [dock]
 enabled             = false      # set true to activate

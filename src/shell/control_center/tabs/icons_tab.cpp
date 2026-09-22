@@ -160,6 +160,7 @@ std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted) {
           .scale = scale,
           .compact = true,
           .surfaceOpacity = panelCardOpacity(),
+          .equalSegmentWidths = false,
           .onChange = [this](std::size_t index) { applyIconStyle(index == 1); },
       })
   );

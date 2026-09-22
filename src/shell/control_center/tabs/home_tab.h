@@ -21,13 +21,13 @@
 class AccountsService;
 class AsyncTextureCache;
 class Button;
+class CalendarService;
 class CompositorPlatform;
 class HttpClient;
 class IpcService;
 class ConfigService;
 class DependencyService;
 class Glyph;
-class GridView;
 class Image;
 class InputArea;
 class Label;
@@ -36,6 +36,7 @@ class ScrollView;
 class Shortcut;
 class Wallpaper;
 class ClipboardService;
+class UPowerService;
 namespace scripting {
   class ScriptApiContext;
 }
@@ -46,13 +47,6 @@ struct ShortcutPad {
   Button* button = nullptr;
   Glyph* glyph = nullptr;
   Label* label = nullptr;
-  ShortcutSize size = ShortcutSize::Small;
-};
-
-struct ShortcutCluster {
-  Flex* well = nullptr;
-  GridView* grid = nullptr;
-  std::size_t count = 0;
 };
 
 class HomeTab : public Tab {
@@ -105,11 +99,13 @@ private:
   MprisService* m_mpris = nullptr;
   HttpClient* m_httpClient = nullptr;
   WeatherService* m_weather = nullptr;
+  CalendarService* m_calendar = nullptr;
   ConfigService* m_config = nullptr;
   AccountsService* m_accounts = nullptr;
   Wallpaper* m_wallpaper = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
   AsyncTextureCache* m_asyncTextures = nullptr;
+  UPowerService* m_upower = nullptr;
   ShortcutServices m_services;
   std::unique_ptr<SettingsPane> m_settings;
   bool m_active = false;
@@ -118,7 +114,6 @@ private:
   ScrollView* m_liveScroll = nullptr;
   ScrollViewState m_liveScrollState{};
   Flex* m_statusStrip = nullptr;
-  Flex* m_bottomRow = nullptr;
   Flex* m_dateTimeCard = nullptr;
   Flex* m_mediaCard = nullptr;
   Flex* m_mediaText = nullptr;
@@ -132,14 +127,24 @@ private:
   Flex* m_weatherRow = nullptr;
   Glyph* m_weatherGlyph = nullptr;
   Label* m_weatherLine = nullptr;
+  Flex* m_eventRow = nullptr;
+  Glyph* m_eventGlyph = nullptr;
+  Label* m_eventLine = nullptr;
   Label* m_userHost = nullptr;
   Label* m_userUptime = nullptr;
   Button* m_sessionButton = nullptr;
   Button* m_statusUpdates = nullptr;
+  Button* m_statusAi = nullptr;
+  Button* m_statusBattery = nullptr;
   Button* m_statusCapture = nullptr;
   Button* m_statusNightLight = nullptr;
   Button* m_statusCaffeine = nullptr;
+  Button* m_statusDnd = nullptr;
   Button* m_statusLocalSend = nullptr;
+  Button* m_statusPhone = nullptr;
+  Button* m_statusPrivacy = nullptr;
+  Button* m_statusCast = nullptr;
+  Button* m_statusFirewall = nullptr;
   InputArea* m_userCardKeyboardArea = nullptr;
   InputArea* m_userCardArea = nullptr;
   InputArea* m_mediaCardArea = nullptr;
@@ -192,9 +197,8 @@ private:
   Timer m_clockTimer;
 
   Flex* m_shortcutsColumn = nullptr;
-  std::vector<ShortcutCluster> m_shortcutClusters;
   std::vector<ShortcutPad> m_shortcutPads;
-  // Plugin config as of the last shortcut grid build. A plugin shortcut seeds its Luau
+  // Plugin config as of the last pin list build. A plugin shortcut seeds its Luau
   // runtime at construction, so a change here must block instance reuse.
   PluginsConfig m_lastPlugins;
 };

@@ -1,5 +1,6 @@
 #include "shell/control_center/tabs/tailscale_tab.h"
 
+#include "config/config_service.h"
 #include "i18n/i18n.h"
 #include "net/tailscale_service.h"
 #include "render/core/renderer.h"
@@ -12,6 +13,7 @@
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
@@ -20,6 +22,7 @@
 #include "wayland/clipboard_service.h"
 
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -95,9 +98,24 @@ namespace {
 
 } // namespace
 
+TailscaleTab::Catalog TailscaleTab::catalogFromIndex(std::size_t index) noexcept {
+  return index == 1 ? Catalog::Network : Catalog::Devices;
+}
+
+std::size_t TailscaleTab::indexFromCatalog(Catalog catalog) noexcept {
+  return catalog == Catalog::Network ? 1 : 0;
+}
+
 TailscaleTab::TailscaleTab(const ControlCenterServices& services)
-    : m_service(services.tailscale), m_clipboard(services.clipboard),
+    : m_service(services.tailscale), m_clipboard(services.clipboard), m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "tailscale"})) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("tailscale_tab", "catalog")) {
+      if (*catalog == "network") {
+        m_catalog = Catalog::Network;
+      }
+    }
+  }
   if (m_service != nullptr) {
     m_service->setChangeCallback([this]() {
       syncUi();
@@ -109,27 +127,18 @@ TailscaleTab::TailscaleTab(const ControlCenterServices& services)
 std::unique_ptr<Flex> TailscaleTab::create() {
   const float scale = contentScale();
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto statusCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
 
@@ -242,6 +251,46 @@ std::unique_ptr<Flex> TailscaleTab::create() {
       })
   );
   statusCard->addChild(std::move(actions));
+  statusCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "devices",
+                      .tooltip = i18n::tr("control-center.tailscale.peers"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "settings",
+                      .tooltip = i18n::tr("control-center.tailscale.preferences"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  live->addChild(std::move(statusCard));
+
+  auto leftover = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* leftoverContent = leftover->content();
+  leftoverContent->setDirection(FlexDirection::Vertical);
+  leftoverContent->setAlign(FlexAlign::Stretch);
+  leftoverContent->setGap(Style::spaceMd * scale);
 
   auto prefsCard = ui::column({
       .out = &m_prefsCard,
@@ -317,9 +366,9 @@ std::unique_ptr<Flex> TailscaleTab::create() {
           .gap = Style::spaceSm * scale,
       })
   );
-  m_rootLayout->addChild(std::move(statusCard));
-  m_rootLayout->addChild(std::move(prefsCard));
-  m_rootLayout->addChild(std::move(peersCard));
+  leftoverContent->addChild(std::move(prefsCard));
+  leftoverContent->addChild(std::move(peersCard));
+  live->addChild(std::move(leftover));
 
   if (m_shields != nullptr) {
     m_shields->setOnChange([this](bool value) {
@@ -364,12 +413,6 @@ std::unique_ptr<Flex> TailscaleTab::create() {
     });
   }
 
-  auto live = ui::column({
-      .align = FlexAlign::Stretch,
-      .gap = 0.0F,
-      .flexGrow = 1.0F,
-  });
-  live->addChild(std::move(liveScroll));
   auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
   syncUi();
   return wrapped;
@@ -423,6 +466,7 @@ void TailscaleTab::onClose() {
   m_connectButton = nullptr;
   m_copyIpButton = nullptr;
   m_adminButton = nullptr;
+  m_catalogSwitch = nullptr;
   m_shields = nullptr;
   m_routes = nullptr;
   m_ssh = nullptr;
@@ -443,11 +487,52 @@ void TailscaleTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+}
+
+void TailscaleTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+void TailscaleTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  (void)m_config->setStateString(
+      "tailscale_tab", "catalog", m_catalog == Catalog::Network ? "network" : "devices"
+  );
+}
+
+void TailscaleTab::syncCatalog() {
+  const bool devices = m_catalog == Catalog::Devices;
+  (void)setShown(m_peersCard, devices);
+  (void)setShown(m_prefsCard, !devices);
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_catalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_catalog));
+    m_catalogSyncing = false;
+  }
+}
+
+void TailscaleTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  syncCatalog();
+  PanelManager::instance().requestLayout();
 }
 
 void TailscaleTab::addToggleRow(
@@ -498,10 +583,15 @@ void TailscaleTab::syncUi() {
 
   const bool hasIp = !snap.ipv4.empty() || !snap.ipv6.empty();
   const std::string health = joinHealth(snap.health);
-  const bool layoutDirty = setShown(m_prefsCard, installed) || setShown(m_peersCard, installed) ||
-                            setShown(m_ipRow, hasIp) || setShown(m_ipv4, !snap.ipv4.empty()) ||
-                            setShown(m_ipv6, !snap.ipv6.empty()) || setShown(m_copyIpButton, hasIp) ||
-                            setShown(m_actionsRow, installed) || setShown(m_health, !health.empty());
+  const bool layoutDirty = setShown(m_catalogSwitch, installed) || setShown(m_ipRow, hasIp) ||
+                            setShown(m_ipv4, !snap.ipv4.empty()) || setShown(m_ipv6, !snap.ipv6.empty()) ||
+                            setShown(m_copyIpButton, hasIp) || setShown(m_actionsRow, installed) ||
+                            setShown(m_health, !health.empty()) || setShown(m_liveScroll, installed);
+  syncCatalog();
+  if (!installed) {
+    (void)setShown(m_prefsCard, false);
+    (void)setShown(m_peersCard, false);
+  }
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

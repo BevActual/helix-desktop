@@ -35,6 +35,7 @@ public:
   void setSettingsSearchQuery(std::string_view query) override;
   [[nodiscard]] SettingsPane* settingsPane() override;
   void applyOpenSection(std::size_t index) { applySection(index); }
+  void applyEnabled(bool enabled);
   [[nodiscard]] std::size_t currentSectionIndex() const noexcept { return indexFromSection(m_section); }
 
 private:
@@ -45,7 +46,6 @@ private:
   void syncHosts();
   void persistSection();
   void applySection(std::size_t index);
-  void applyEnabled(bool enabled);
   void applyOrientation(std::size_t index);
   void applyPosition(std::size_t index);
   void applyBorder(bool enabled);
@@ -76,6 +76,7 @@ private:
   Toggle* m_border = nullptr;
 
   Section m_section = Section::Placement;
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_sectionSyncing = false;
   bool m_liveDirty = false;

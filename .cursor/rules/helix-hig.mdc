@@ -1,0 +1,29 @@
+---
+description: Helix maps Apple HIG Liquid Glass to chrome vs leftover vs modules vs widgets
+alwaysApply: true
+---
+
+# Helix HIG
+
+Helix is three sibling repos under `Software Projects/`, one product: `noctalia` (Helix Shell, this repo), `helix-niri` (compositor fork; `niri msg helix-capabilities` → `liquid_glass`, `liquid-glass { }` in `noctalia-blur.kdl`), and `helix-greeter` (login; appearance sync carries palette, wallpaper, `corner_radius_scale`, `glass`, `refraction`, font). A change to a contract in one repo lands in the other repos in the same piece of work. Read the sibling `HELIX.md` before touching `src/compositors/niri/` or `src/shell/greeter/`.
+
+Liquid Glass is a hierarchy, not a skin. Do not copy Apple's private Control Center visuals.
+
+- **Chrome**: panel, sidebar, header. `transparency_mode` Solid = opaque, Soft = Regular glass, Glass = Clear glass. Clear needs a dimming layer. Never glass-on-glass.
+- **Leftover**: compact cards and leftover catalogs. Use `applySectionCardStyle` / `applyContentCardStyle` / `applyGroupedListStyle`. Color and type live here.
+- **Modules**: Functional plates via `applyModuleWellStyle` (Power session actions, Home status chips). Not a second glass layer.
+- **Widgets**: Home clock/weather/media and desktop widgets stay glanceable and deep-link. Not mini Control Center pages. Optional Home pins are leftover grouped rows, not modules.
+
+Catalog tabs (Theme palettes, Type, Language, Icons, Wallpaper, Templates) use Wallpaper navigation: icon sources, search, and the current pick sit on the compact card; leftover is only the grid. Theme hosts Palettes, Chrome, Icons, Type, Effects, and Language as compact sources the same way Capture hosts Screenshot and Record. Chrome leftover is Glass, Scale, and Roundness editors. Click sources. Do not hover-preview catalogs. Control Center can be sized like a Settings window; leftover catalogs add columns instead of stretching two tiles.
+
+One glass compact card per tab. The header carries the tab title; do not repeat it on the compact card. Well and settings-group headers are `addTitle` / `makeCardHeaderRow` (body size, bold); `fontSizeTitle` is for values (percent, time, track), not labels.
+
+High Contrast frosts chrome and leftover to opaque and forces a contrasting outline. Motion off is Reduced Motion. Concentric: leftover wells `radius3xl`, grouped lists inside them `radius2xl`.
+
+```cpp
+// BAD: leftover catalog as a second glass card on the glass panel
+applySectionCardStyle(host, scale, opacity);
+
+// GOOD: leftover catalog as grouped content on chrome
+applyContentCardStyle(host, scale);
+```

@@ -1019,32 +1019,45 @@ std::unique_ptr<Flex> ThemeTab::create() {
       .participatesInLayout = chromeOpen,
   });
   chromeToolbar->addChild(
-      ui::segmented({
-          .out = &m_chromeSwitch,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {
-                      .label = "",
-                      .glyph = "glass",
-                      .tooltip = i18n::tr("settings.navigation.sections.glass"),
+      ui::row(
+          {
+              .align = FlexAlign::Center,
+              .wrap = true,
+              .gap = Style::spaceXs * scale,
+          },
+          ui::segmented({
+              .out = &m_chromeSwitch,
+              .options =
+                  std::vector<ui::SegmentedOption>{
+                      {
+                          .label = "",
+                          .glyph = "glass",
+                          .tooltip = i18n::tr("settings.navigation.sections.glass"),
+                      },
+                      {
+                          .label = "",
+                          .glyph = "resize",
+                          .tooltip = i18n::tr("settings.navigation.sections.scale"),
+                      },
+                      {
+                          .label = "",
+                          .glyph = "border-radius",
+                          .tooltip = i18n::tr("settings.navigation.sections.roundness"),
+                      },
                   },
-                  {
-                      .label = "",
-                      .glyph = "resize",
-                      .tooltip = i18n::tr("settings.navigation.sections.scale"),
+              .selectedIndex = indexFromChromeCatalog(m_chromeCatalog),
+              .scale = scale,
+              .compact = true,
+              .surfaceOpacity = opacity,
+              .equalSegmentWidths = false,
+              .onChange = [this](std::size_t index) { applyChromeCatalog(index); },
+              .configure =
+                  [](Segmented& sources) {
+                    sources.setWrap(true);
+                    sources.setFillWidth(false);
                   },
-                  {
-                      .label = "",
-                      .glyph = "border-radius",
-                      .tooltip = i18n::tr("settings.navigation.sections.roundness"),
-                  },
-              },
-          .selectedIndex = indexFromChromeCatalog(m_chromeCatalog),
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = opacity,
-          .onChange = [this](std::size_t index) { applyChromeCatalog(index); },
-      })
+          })
+      )
   );
   compactCard->addChild(std::move(chromeToolbar));
   tab->addChild(std::move(compactCard));
@@ -1111,10 +1124,28 @@ std::unique_ptr<Flex> ThemeTab::create() {
       host = ui::column({
           .out = out,
           .align = FlexAlign::Stretch,
-          .gap = Style::spaceSm * scale,
+          .gap = 0.0F,
           .flexGrow = 1.0F,
           .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
       });
+      auto scroll = ui::scrollView({
+          .contentScale = scale,
+          .scrollbarVisible = true,
+          .viewportPaddingH = 0.0F,
+          .viewportPaddingV = 0.0F,
+          .flexGrow = 1.0F,
+          .configure =
+              [](ScrollView& scrollView) {
+                scrollView.clearFill();
+                scrollView.clearBorder();
+              },
+      });
+      auto* content = scroll->content();
+      content->setDirection(FlexDirection::Vertical);
+      content->setAlign(FlexAlign::Stretch);
+      content->setGap(Style::spaceSm * scale);
+      content->addChild(child->createLiveBody(true));
+      host->addChild(std::move(scroll));
     } else {
       host = ui::column({
           .out = out,
@@ -1122,8 +1153,8 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .gap = 0.0F,
           .flexGrow = 1.0F,
       });
+      host->addChild(child->createLiveBody(true));
     }
-    host->addChild(child->createLiveBody(true));
     tab->addChild(std::move(host));
   };
   addHost(&m_glassHost, m_glass.get(), true);
@@ -1455,8 +1486,14 @@ void ThemeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
   m_rootLayout->layout(renderer);
   if (Tab* child = hostedTab(); child != nullptr) {
     Flex* host = hostNode();
-    const float hostWidth = host != nullptr && host->width() > 1.0F ? host->width() : contentWidth;
-    const float hostHeight = host != nullptr && host->height() > 1.0F ? host->height() : bodyHeight;
+    float hostWidth = contentWidth;
+    float hostHeight = bodyHeight;
+    if (host != nullptr && host->width() > 1.0F) {
+      hostWidth = std::max(1.0F, host->width() - host->paddingLeft() - host->paddingRight());
+    }
+    if (host != nullptr && host->height() > 1.0F) {
+      hostHeight = std::max(1.0F, host->height() - host->paddingTop() - host->paddingBottom());
+    }
     child->layout(renderer, hostWidth, hostHeight);
   }
 }

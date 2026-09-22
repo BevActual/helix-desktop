@@ -1,5 +1,6 @@
 #include "compositors/niri/niri_config_binds.h"
 
+#include "compositors/niri/niri_config_keyboard.h"
 #include "core/input/key_modifiers.h"
 #include "util/string_utils.h"
 
@@ -22,6 +23,7 @@ namespace compositors::niri {
         {.id = "settings", .ipcCommand = "settings-toggle", .key = "Mod+Comma"},
         {.id = "notifications", .ipcCommand = "panel-toggle notifications", .key = "Mod+N"},
         {.id = "clipboard", .ipcCommand = "panel-toggle clipboard", .key = "Mod+V"},
+        {.id = "quick-insert", .ipcCommand = "panel-toggle quick-insert", .key = "F19"},
         {.id = "wallpaper", .ipcCommand = "panel-toggle wallpaper", .key = "Mod+W"},
         {.id = "session", .ipcCommand = "panel-toggle session", .key = "Mod+Shift+P"},
         {.id = "screenshot-region", .ipcCommand = "screenshot-region", .key = "Print", .kind = BindKind::Capture},
@@ -388,14 +390,27 @@ namespace compositors::niri {
       };
     }
 
+    [[nodiscard]] std::string ownedBindKey(const ParsedBind& bind) {
+      if (bind.key == "Caps_Lock" && bind.ipcCommand.find("quick-insert") != std::string::npos) {
+        return "F19";
+      }
+      return bind.key;
+    }
+
+    [[nodiscard]] bool bindDisablesRepeat(std::string_view key) { return key == "F19" || key == "Caps_Lock"; }
+
     [[nodiscard]] std::string writeOwnedBinds(const std::vector<ParsedBind>& managedBinds) {
       std::string body = std::string(kManagedHeader);
       body += "binds {\n";
       for (const auto& bind : managedBinds) {
+        const std::string key = ownedBindKey(bind);
         body += "    ";
-        body += bind.key;
+        body += key;
         if (bind.allowWhenLocked || recommendedAllowWhenLocked(bind.ipcCommand)) {
           body += " allow-when-locked=true";
+        }
+        if (bindDisablesRepeat(key)) {
+          body += " repeat=false";
         }
         body += " { ";
         if (!bind.ipcCommand.empty()) {
@@ -424,6 +439,19 @@ namespace compositors::niri {
       }
       body += "}\n";
       return body;
+    }
+
+    bool commitOwnedBinds(
+        const std::filesystem::path& configFile, const std::filesystem::path& bindsPath,
+        const std::vector<ParsedBind>& managedBinds, std::string& error
+    ) {
+      if (!writeFile(bindsPath, writeOwnedBinds(managedBinds), error)) {
+        return false;
+      }
+      if (!appendInclude(configFile, kBindsIncludeFileName, error)) {
+        return false;
+      }
+      return syncQuickInsertKeyboard(configFile, managedBinds, error);
     }
 
     [[nodiscard]] bool sameBindPath(const std::filesystem::path& a, const std::filesystem::path& b) {
@@ -517,6 +545,9 @@ namespace compositors::niri {
     std::string line = std::string(bind.key);
     if (bind.allowWhenLocked) {
       line += " allow-when-locked=true";
+    }
+    if (bind.key == "F19" || bind.key == "Caps_Lock") {
+      line += " repeat=false";
     }
     line += " { spawn-sh \"noctalia msg " + std::string(bind.ipcCommand) + "\"; }";
     return line;
@@ -749,10 +780,7 @@ namespace compositors::niri {
       ++result.added;
     }
 
-    if (!writeFile(scan.bindsIncludePath, writeOwnedBinds(managedBinds), result.error)) {
-      return result;
-    }
-    if (!appendInclude(configFile, kBindsIncludeFileName, result.error)) {
+    if (!commitOwnedBinds(configFile, scan.bindsIncludePath, managedBinds, result.error)) {
       return result;
     }
     result.ok = true;
@@ -772,7 +800,10 @@ namespace compositors::niri {
       result.error = "unknown niri bind";
       return result;
     }
-    const std::string key = StringUtils::trim(niriKey);
+    std::string key = StringUtils::trim(niriKey);
+    if (id == "quick-insert" && key == "Caps_Lock") {
+      key = "F19";
+    }
     if (key.empty()) {
       result.error = "empty key";
       return result;
@@ -808,10 +839,7 @@ namespace compositors::niri {
     }
     result.added = replaced ? 0 : 1;
 
-    if (!writeFile(scan.bindsIncludePath, writeOwnedBinds(managedBinds), result.error)) {
-      return result;
-    }
-    if (!appendInclude(configFile, kBindsIncludeFileName, result.error)) {
+    if (!commitOwnedBinds(configFile, scan.bindsIncludePath, managedBinds, result.error)) {
       return result;
     }
     result.ok = true;
@@ -846,10 +874,7 @@ namespace compositors::niri {
     }
     result.added = static_cast<int>(before - managedBinds.size());
 
-    if (!writeFile(scan.bindsIncludePath, writeOwnedBinds(managedBinds), result.error)) {
-      return result;
-    }
-    if (!appendInclude(configFile, kBindsIncludeFileName, result.error)) {
+    if (!commitOwnedBinds(configFile, scan.bindsIncludePath, managedBinds, result.error)) {
       return result;
     }
     result.ok = true;
@@ -977,10 +1002,7 @@ namespace compositors::niri {
     }
     result.added = replaced ? 0 : 1;
 
-    if (!writeFile(scan.bindsIncludePath, writeOwnedBinds(managedBinds), result.error)) {
-      return result;
-    }
-    if (!appendInclude(configFile, kBindsIncludeFileName, result.error)) {
+    if (!commitOwnedBinds(configFile, scan.bindsIncludePath, managedBinds, result.error)) {
       return result;
     }
     result.ok = true;
@@ -1017,10 +1039,7 @@ namespace compositors::niri {
     }
     result.added = static_cast<int>(before - managedBinds.size());
 
-    if (!writeFile(scan.bindsIncludePath, writeOwnedBinds(managedBinds), result.error)) {
-      return result;
-    }
-    if (!appendInclude(configFile, kBindsIncludeFileName, result.error)) {
+    if (!commitOwnedBinds(configFile, scan.bindsIncludePath, managedBinds, result.error)) {
       return result;
     }
     result.ok = true;

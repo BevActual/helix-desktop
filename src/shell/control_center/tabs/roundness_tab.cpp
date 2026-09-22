@@ -68,6 +68,7 @@ std::unique_ptr<Flex> RoundnessTab::create() {
 }
 
 std::unique_ptr<Flex> RoundnessTab::createLiveBody(bool hosted) {
+  m_hosted = hosted;
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -75,7 +76,7 @@ std::unique_ptr<Flex> RoundnessTab::createLiveBody(bool hosted) {
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
   });
 
   auto compactCard = ui::column({
@@ -109,15 +110,28 @@ std::unique_ptr<Flex> RoundnessTab::createLiveBody(bool hosted) {
     });
   }
   compactCard->addChild(
-      ui::segmented({
-          .out = &m_catalogSwitch,
-          .options = std::move(catalogOptions),
-          .selectedIndex = indexFromCatalog(m_catalog),
-          .scale = scale,
-          .compact = true,
-          .surfaceOpacity = panelCardOpacity(),
-          .onChange = [this](std::size_t index) { applyCatalog(index); },
-      })
+      ui::row(
+          {
+              .align = FlexAlign::Center,
+              .wrap = true,
+              .gap = Style::spaceXs * scale,
+          },
+          ui::segmented({
+              .out = &m_catalogSwitch,
+              .options = std::move(catalogOptions),
+              .selectedIndex = indexFromCatalog(m_catalog),
+              .scale = scale,
+              .compact = true,
+              .surfaceOpacity = panelCardOpacity(),
+              .equalSegmentWidths = false,
+              .onChange = [this](std::size_t index) { applyCatalog(index); },
+              .configure =
+                  [](Segmented& sources) {
+                    sources.setWrap(true);
+                    sources.setFillWidth(false);
+                  },
+          })
+      )
   );
   auto makeHost = [&](Flex** out, bool visible) {
     return ui::column({
@@ -222,6 +236,10 @@ void RoundnessTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
     return;
   }
   syncCatalog();
+  if (m_hosted) {
+    layoutHostedLiveBody(m_rootLayout, renderer, contentWidth);
+    return;
+  }
   m_rootLayout->setSize(contentWidth, bodyHeight);
   m_rootLayout->layout(renderer);
 }

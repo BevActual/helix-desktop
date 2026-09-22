@@ -113,7 +113,7 @@ std::unique_ptr<Flex> WeatherTab::create() {
 
   auto compactCard = ui::column({
       .out = &m_compactCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
 
   auto currentCard = ui::row({

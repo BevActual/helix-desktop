@@ -13,6 +13,7 @@
 #include "ui/controls/input.h"
 #include "ui/controls/label.h"
 #include "ui/controls/scroll_view.h"
+#include "ui/controls/segmented.h"
 #include "ui/controls/toggle.h"
 #include "ui/dialogs/file_dialog.h"
 #include "ui/palette.h"
@@ -26,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 using namespace control_center;
 
@@ -68,9 +70,41 @@ namespace {
 
 } // namespace
 
+LocalSendTab::Catalog LocalSendTab::catalogFromIndex(std::size_t index) noexcept {
+  switch (index) {
+  case 1:
+    return Catalog::Incoming;
+  case 2:
+    return Catalog::History;
+  default:
+    return Catalog::Nearby;
+  }
+}
+
+std::size_t LocalSendTab::indexFromCatalog(Catalog catalog) noexcept {
+  switch (catalog) {
+  case Catalog::Incoming:
+    return 1;
+  case Catalog::History:
+    return 2;
+  case Catalog::Nearby:
+    break;
+  }
+  return 0;
+}
+
 LocalSendTab::LocalSendTab(const ControlCenterServices& services)
     : m_service(services.localSend), m_clipboard(services.clipboard), m_config(services.config),
       m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "localsend"})) {
+  if (m_config != nullptr) {
+    if (const std::optional<std::string> catalog = m_config->stateString("localsend_tab", "catalog")) {
+      if (*catalog == "incoming") {
+        m_catalog = Catalog::Incoming;
+      } else if (*catalog == "history") {
+        m_catalog = Catalog::History;
+      }
+    }
+  }
   if (m_service != nullptr) {
     m_service->setChangeCallback([this]() {
       syncUi();
@@ -82,27 +116,18 @@ LocalSendTab::LocalSendTab(const ControlCenterServices& services)
 std::unique_ptr<Flex> LocalSendTab::create() {
   const float scale = contentScale();
 
-  auto liveScroll = ui::scrollView({
-      .out = &m_liveScroll,
-      .state = &m_liveScrollState,
-      .contentScale = scale,
-      .scrollbarVisible = true,
+  auto live = ui::column({
+      .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
-      .configure = [](ScrollView& scrollView) {
-        scrollView.clearFill();
-        scrollView.clearBorder();
-      },
   });
-  m_rootLayout = liveScroll->content();
-  m_rootLayout->setDirection(FlexDirection::Vertical);
-  m_rootLayout->setAlign(FlexAlign::Stretch);
-  m_rootLayout->setGap(Style::spaceMd * scale);
 
   auto statusCard = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& section) {
-        applySectionCardStyle(section, scale, opacity);
+        applyCompactCardStyle(section, scale, opacity, false);
       },
   });
   auto enableRow = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
@@ -145,7 +170,58 @@ std::unique_ptr<Flex> LocalSendTab::create() {
           .onChange = [this](const std::string& value) { m_pinText = value; },
       })
   );
-  m_rootLayout->addChild(std::move(statusCard));
+  statusCard->addChild(
+      ui::label({
+          .out = &m_transfer,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  statusCard->addChild(
+      ui::segmented({
+          .out = &m_catalogSwitch,
+          .options =
+              std::vector<ui::SegmentedOption>{
+                  {
+                      .label = "",
+                      .glyph = "devices",
+                      .tooltip = i18n::tr("control-center.localsend.nearby"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "inbox",
+                      .tooltip = i18n::tr("control-center.localsend.incoming-title"),
+                  },
+                  {
+                      .label = "",
+                      .glyph = "history",
+                      .tooltip = i18n::tr("control-center.localsend.history"),
+                  },
+              },
+          .selectedIndex = indexFromCatalog(m_catalog),
+          .scale = scale,
+          .compact = true,
+          .surfaceOpacity = panelCardOpacity(),
+          .onChange = [this](std::size_t index) { applyCatalog(index); },
+      })
+  );
+  live->addChild(std::move(statusCard));
+
+  auto leftover = ui::scrollView({
+      .out = &m_liveScroll,
+      .state = &m_liveScrollState,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& scrollView) {
+        scrollView.clearFill();
+        scrollView.clearBorder();
+      },
+  });
+  auto* leftoverContent = leftover->content();
+  leftoverContent->setDirection(FlexDirection::Vertical);
+  leftoverContent->setAlign(FlexAlign::Stretch);
+  leftoverContent->setGap(Style::spaceMd * scale);
 
   auto incoming = ui::column({
       .out = &m_incomingCard,
@@ -161,7 +237,12 @@ std::unique_ptr<Flex> LocalSendTab::create() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
-  auto incomingRow = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
+  auto incomingRow = ui::row({
+      .out = &m_incomingActions,
+      .align = FlexAlign::Center,
+      .wrap = true,
+      .gap = Style::spaceSm * scale,
+  });
   incomingRow->addChild(
       ui::button({
           .out = &m_acceptButton,
@@ -189,15 +270,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       })
   );
   incoming->addChild(std::move(incomingRow));
-  m_rootLayout->addChild(std::move(incoming));
-
-  m_rootLayout->addChild(
-      ui::label({
-          .out = &m_transfer,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
+  leftoverContent->addChild(std::move(incoming));
 
   auto historyCard = ui::column({
       .out = &m_historyCard,
@@ -207,7 +280,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
   });
   addTitle(*historyCard, i18n::tr("control-center.localsend.history"), scale);
   historyCard->addChild(ui::column({.out = &m_historyList, .align = FlexAlign::Stretch, .gap = Style::spaceXs * scale}));
-  m_rootLayout->addChild(std::move(historyCard));
+  leftoverContent->addChild(std::move(historyCard));
 
   auto peersCard = ui::column({
       .out = &m_peersCard,
@@ -218,7 +291,8 @@ std::unique_ptr<Flex> LocalSendTab::create() {
   });
   addTitle(*peersCard, i18n::tr("control-center.localsend.nearby"), scale);
   peersCard->addChild(ui::column({.out = &m_peerList, .align = FlexAlign::Stretch, .gap = Style::spaceSm * scale}));
-  m_rootLayout->addChild(std::move(peersCard));
+  leftoverContent->addChild(std::move(peersCard));
+  live->addChild(std::move(leftover));
 
   if (m_enabled != nullptr) {
     m_enabled->setOnChange([this](bool value) {
@@ -229,8 +303,6 @@ std::unique_ptr<Flex> LocalSendTab::create() {
     });
   }
 
-  auto live = ui::column({.align = FlexAlign::Stretch, .gap = 0.0F, .flexGrow = 1.0F});
-  live->addChild(std::move(liveScroll));
   auto wrapped = m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
   syncUi();
   return wrapped;
@@ -278,8 +350,10 @@ void LocalSendTab::onClose() {
   m_detail = nullptr;
   m_enabled = nullptr;
   m_pin = nullptr;
+  m_catalogSwitch = nullptr;
   m_incomingCard = nullptr;
   m_incomingLabel = nullptr;
+  m_incomingActions = nullptr;
   m_acceptButton = nullptr;
   m_rejectButton = nullptr;
   m_transfer = nullptr;
@@ -296,11 +370,64 @@ void LocalSendTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  if (m_liveScroll == nullptr) {
+  if (m_rootLayout == nullptr) {
     return;
   }
-  m_liveScroll->setSize(contentWidth, bodyHeight);
-  m_liveScroll->layout(renderer);
+  m_rootLayout->setSize(contentWidth, bodyHeight);
+  m_rootLayout->layout(renderer);
+}
+
+void LocalSendTab::onPanelCardOpacityChanged(float opacity) {
+  if (m_catalogSwitch != nullptr) {
+    m_catalogSwitch->setSurfaceOpacity(opacity);
+  }
+}
+
+void LocalSendTab::persistCatalog() {
+  if (m_config == nullptr) {
+    return;
+  }
+  const char* value = "nearby";
+  switch (m_catalog) {
+  case Catalog::Incoming:
+    value = "incoming";
+    break;
+  case Catalog::History:
+    value = "history";
+    break;
+  case Catalog::Nearby:
+    break;
+  }
+  (void)m_config->setStateString("localsend_tab", "catalog", value);
+}
+
+void LocalSendTab::syncCatalog() {
+  const bool nearby = m_catalog == Catalog::Nearby;
+  const bool incoming = m_catalog == Catalog::Incoming;
+  const bool history = m_catalog == Catalog::History;
+  (void)setShown(m_peersCard, nearby);
+  (void)setShown(m_incomingCard, incoming);
+  (void)setShown(m_historyCard, history);
+  if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_catalog)) {
+    m_catalogSyncing = true;
+    m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_catalog));
+    m_catalogSyncing = false;
+  }
+}
+
+void LocalSendTab::applyCatalog(std::size_t index) {
+  if (m_catalogSyncing) {
+    return;
+  }
+  const Catalog next = catalogFromIndex(index);
+  if (next == m_catalog) {
+    syncCatalog();
+    return;
+  }
+  m_catalog = next;
+  persistCatalog();
+  syncCatalog();
+  PanelManager::instance().requestLayout();
 }
 
 void LocalSendTab::sendFileTo(const std::string& peerKey) {
@@ -366,15 +493,19 @@ void LocalSendTab::syncUi() {
     m_status->setText(snap.alias);
     m_detail->setText(snap.error.empty() ? i18n::tr("control-center.localsend.port-busy") : snap.error);
   }
-  if (m_incomingLabel != nullptr && snap.incoming) {
-    std::string files;
-    for (const auto& file : snap.incoming->files) {
-      if (!files.empty()) {
-        files += ", ";
+  if (m_incomingLabel != nullptr) {
+    if (snap.incoming) {
+      std::string files;
+      for (const auto& file : snap.incoming->files) {
+        if (!files.empty()) {
+          files += ", ";
+        }
+        files += file.fileName;
       }
-      files += file.fileName;
+      m_incomingLabel->setText(std::format("{} · {}", snap.incoming->alias, files));
+    } else {
+      m_incomingLabel->setText(i18n::tr("control-center.localsend.incoming-idle"));
     }
-    m_incomingLabel->setText(std::format("{} · {}", snap.incoming->alias, files));
   }
   if (m_transfer != nullptr) {
     if (!snap.enabled || !snap.transfer) {
@@ -402,9 +533,19 @@ void LocalSendTab::syncUi() {
     }
   }
   const bool showTransfer = snap.enabled && snap.transfer.has_value();
-  const bool layoutDirty = setShown(m_pin, snap.enabled) || setShown(m_historyCard, snap.enabled)
-      || setShown(m_peersCard, snap.enabled) || setShown(m_incomingCard, snap.enabled && snap.incoming.has_value())
-      || setShown(m_transfer, showTransfer);
+  if (snap.enabled && snap.incoming.has_value() && m_catalog != Catalog::Incoming) {
+    m_catalog = Catalog::Incoming;
+    persistCatalog();
+  }
+  const bool layoutDirty = setShown(m_pin, snap.enabled) || setShown(m_catalogSwitch, snap.enabled) ||
+                            setShown(m_incomingActions, snap.enabled && snap.incoming.has_value()) ||
+                            setShown(m_transfer, showTransfer) || setShown(m_liveScroll, snap.enabled);
+  syncCatalog();
+  if (!snap.enabled) {
+    (void)setShown(m_peersCard, false);
+    (void)setShown(m_incomingCard, false);
+    (void)setShown(m_historyCard, false);
+  }
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

@@ -58,6 +58,7 @@ namespace noctalia::config::schema {
         t.push_back(makeSection("weather", &Config::weather, weatherSchema()));
         t.push_back(makeSection("tailscale", &Config::tailscale, tailscaleSchema()));
         t.push_back(makeSection("localsend", &Config::localsend, localsendSchema()));
+        t.push_back(makeSection("phone", &Config::phone, phoneSchema()));
         t.push_back(makeSection("calendar", &Config::calendar, calendarSchema()));
         t.push_back(makeSection("audio", &Config::audio, audioSchema()));
         t.push_back(makeSection("brightness", &Config::brightness, brightnessSchema()));

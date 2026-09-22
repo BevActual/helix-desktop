@@ -1,0 +1,27 @@
+---
+title: Quick Insert
+description: Insert emoji, recent screenshots, or clipboard history into the focused app.
+sidebar:
+  order: 6
+---
+
+Quick Insert is a floating overlay that dumps emoji, recent screenshots, or clipboard history into the app you were typing in. It is the insert well, not a second Control Center Clipboard or Capture tab.
+
+```sh
+noctalia msg panel-toggle quick-insert
+noctalia msg panel-toggle quick-insert emoji
+noctalia msg panel-toggle quick-insert screenshots
+noctalia msg panel-toggle quick-insert clipboard
+```
+
+The recommended bind is the **Caps Lock** key. Helix remaps that key so it does not toggle Caps; niri sees `F19`. Shift still types capitals. Settings → Keybinds can install the bind.
+
+## Layout
+
+Search and the Emoji / Recents / Clipboard sources sit on one compact card. The leftover well is the catalog: an emoji grid, screenshot thumbs from your screenshot folder, or clipboard history. Click a source. Tab / Shift+Tab cycle sources. Arrow keys move the selection. Enter inserts.
+
+Insert copies onto the clipboard, closes the overlay without a close animation (so keyboard focus returns to the app), then sends the same paste shortcut as clipboard auto-paste (`shell.clipboard_auto_paste`). If auto-paste is `off`, the item is still copied.
+
+Recents lists recent `.png` files in `[shell.screenshot].directory` (or Pictures). Activating a thumb pastes that image, it does not open it.
+
+Placement lives under **Settings → Panels → Quick Insert** (`quick_insert_placement`, `quick_insert_position`, `open_near_click_quick_insert`). Default is floating at center, like the launcher.

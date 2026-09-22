@@ -682,7 +682,7 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
       .configure = [scale, opacity = panelCardOpacity()](Flex& card) {
-        applySectionCardStyle(card, scale, opacity);
+        applyCompactCardStyle(card, scale, opacity, false);
       },
   });
   m_dndToggle = addToggleRow(

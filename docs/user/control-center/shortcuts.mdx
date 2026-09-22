@@ -1,11 +1,13 @@
 ---
 title: Shortcuts
-description: Control Center Home shortcut buttons and their configuration.
+description: Optional Home pin list and its configuration.
 sidebar:
   order: 4
 ---
 
-The Home tab displays shortcut buttons beside the media and clock cards. Related shortcuts group into frosted Control Center plates (Wi-Fi with Bluetooth, Do Not Disturb with Caffeine, and so on). Tiles stay quiet on the plate and illuminate when hovered or on. Add as many shortcuts as you want, then size each one **Small** (one cell), **Wide** (a full row), or **Large** (a 2×2 module), like Apple Control Center. You can configure the list in TOML or edit it from **Home → header gear**.
+Home is a glance at this machine, not a second Control Center. Pins are optional actions at the bottom of Home, in the order you list them. They render as leftover grouped rows (icon and label), not Control Center tiles. Size and icon-only labels do not apply. Add only what you reach for; the default list is empty.
+
+Configure the list in TOML or from **Home → header gear**.
 
 ```toml
 [[control_center.shortcuts]]
@@ -16,35 +18,19 @@ type = "bluetooth"
 
 [[control_center.shortcuts]]
 type = "nightlight"
-size = "wide"
 
 [[control_center.shortcuts]]
 type = "notification"
-
-[[control_center.shortcuts]]
-type = "wallpaper"
-
-[[control_center.shortcuts]]
-type = "session"
-size = "large"
 ```
 
-When no `[[control_center.shortcuts]]` entries are defined, the default set is: `wifi`, `bluetooth`, `caffeine`, `nightlight`, `notification`, `power_profile`.
-Set `shortcuts = []` under `[control_center]` to hide all Home shortcut buttons.
-
-Use `show_shortcut_labels` under `[control_center]` to show or hide the text under each shortcut icon (default `true`). When labels are off, the icons scale with the shortcut cell size, which is useful at narrower Control Center widths.
-
-```toml
-[control_center]
-show_shortcut_labels = false
-```
+When no `[[control_center.shortcuts]]` entries are defined, Home has no pin list. Existing configs that already list shortcuts keep them.
 
 ## Entry Fields
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `type` | string | *required* | Shortcut type from the list below |
-| `size` | string | `"small"` | Tile size: `"small"` (1×1), `"wide"` (2×1), or `"large"` (2×2) |
+| `size` | string | `"small"` | Ignored on Home. Kept for older configs. |
 
 ## Types
 

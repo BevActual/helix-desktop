@@ -525,7 +525,7 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   const float controlHeight = Style::controlHeight * scale;
   auto adapterCard = ui::column({
       .out = &m_adapterCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
   auto powerRow = ui::row({
       .align = FlexAlign::Center,

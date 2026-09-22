@@ -72,6 +72,7 @@ private:
   ListEditor* m_pinnedList = nullptr;
 
   Section m_section = Section::Layout;
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_sectionSyncing = false;
   bool m_liveDirty = false;

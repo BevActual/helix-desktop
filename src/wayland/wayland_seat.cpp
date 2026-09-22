@@ -113,6 +113,21 @@ void WaylandSeat::setCursorShape(std::uint32_t serial, std::uint32_t shape) {
   wp_cursor_shape_device_v1_set_shape(m_cursorShapeDevice, effectiveSerial, shape);
 }
 
+void WaylandSeat::hideCursor() {
+  if (m_pointer == nullptr || m_pointerEnterSerial == 0) {
+    return;
+  }
+  // wl_pointer.set_cursor with a null surface; no cursor-shape equivalent exists.
+  // The next enter on another surface goes through the normal shape path again.
+  constexpr std::uint32_t kHiddenShape = 0xFFFFFFFFU;
+  if (m_lastCursorShapeSerial == m_pointerEnterSerial && m_lastCursorShape == kHiddenShape) {
+    return;
+  }
+  m_lastCursorShapeSerial = m_pointerEnterSerial;
+  m_lastCursorShape = kHiddenShape;
+  wl_pointer_set_cursor(m_pointer, m_pointerEnterSerial, nullptr, 0, 0);
+}
+
 void WaylandSeat::forgetSurface(wl_surface* surface) noexcept {
   if (surface == nullptr) {
     return;

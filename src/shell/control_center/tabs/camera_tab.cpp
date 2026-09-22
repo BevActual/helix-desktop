@@ -310,7 +310,7 @@ std::unique_ptr<Flex> CameraTab::create() {
         .out = &m_previewCard,
         .fillWidth = true,
         .configure =
-            [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+            [scale, opacity = panelCardOpacity()](Flex& section) { applyCompactCardStyle(section, scale, opacity, false); },
     });
     emptyCard->addChild(
         ui::label({
@@ -363,7 +363,7 @@ std::unique_ptr<Flex> CameraTab::create() {
       .out = &m_previewCard,
       .fillWidth = true,
       .configure =
-          [scale, opacity = panelCardOpacity()](Flex& section) { applySectionCardStyle(section, scale, opacity); },
+          [scale, opacity = panelCardOpacity()](Flex& section) { applyCompactCardStyle(section, scale, opacity, false); },
   });
 
   if (m_devices.size() > 1) {

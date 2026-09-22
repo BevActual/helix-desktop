@@ -21,7 +21,7 @@ namespace compositors::niri {
         "// Requires niri 26.04 or newer. Refraction requires helix-niri.\n";
 
     constexpr std::string_view kChromeNamespace =
-        "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd|idle-grace|screenshot-region|annotate|overview-launcher)$";
+        "^noctalia-(bar-.+|notification|dock|panel|attached-panel|osd|idle-grace|screenshot-region|annotate|overview-launcher)$";
 
     constexpr std::string_view kDisabledKdl = R"(window-rule {
     background-effect {

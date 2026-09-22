@@ -363,18 +363,18 @@ void DesktopWidgetsController::toggleEdit() {
   }
 }
 
-bool DesktopWidgetsController::addWidget(std::string_view type) {
+std::optional<std::string> DesktopWidgetsController::addWidget(std::string_view type) {
   if (!m_initialized || m_wayland == nullptr || type.empty()) {
-    return false;
+    return std::nullopt;
   }
   if (isEditing() && m_editor != nullptr) {
     m_editor->addWidgetOfType(std::string(type));
-    return true;
+    return std::string{};
   }
 
   const WaylandOutput* output = desktop_widgets::resolveEffectiveOutput(*m_wayland, {});
   if (output == nullptr) {
-    return false;
+    return std::nullopt;
   }
 
   if (!m_snapshot.enabled) {
@@ -404,8 +404,41 @@ bool DesktopWidgetsController::addWidget(std::string_view type) {
   widget.boxHeight = 0.0F;
   widget.enabled = true;
   desktop_settings::applyAllDesktopWidgetDefaultSettings(widget.settings, widget.type);
+  const std::string id = widget.id;
   m_snapshot.widgets.push_back(std::move(widget));
   normalizeSnapshot();
+  saveSnapshotToConfig();
+  applyVisibility();
+  return id;
+}
+
+bool DesktopWidgetsController::setWidgetSetting(
+    std::string_view id, const std::string& key, WidgetSettingValue value
+) {
+  if (!m_initialized || id.empty() || key.empty() || isEditing()) {
+    return false;
+  }
+  for (auto& widget : m_snapshot.widgets) {
+    if (widget.id != id) {
+      continue;
+    }
+    widget.settings.insert_or_assign(key, std::move(value));
+    saveSnapshotToConfig();
+    applyVisibility();
+    return true;
+  }
+  return false;
+}
+
+bool DesktopWidgetsController::removeWidget(std::string_view id) {
+  if (!m_initialized || id.empty() || isEditing()) {
+    return false;
+  }
+  const auto before = m_snapshot.widgets.size();
+  std::erase_if(m_snapshot.widgets, [&](const DesktopWidgetState& widget) { return widget.id == id; });
+  if (m_snapshot.widgets.size() == before) {
+    return false;
+  }
   saveSnapshotToConfig();
   applyVisibility();
   return true;

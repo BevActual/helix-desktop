@@ -108,6 +108,7 @@ std::unique_ptr<Flex> BarTab::create() {
 }
 
 std::unique_ptr<Flex> BarTab::createLiveBody(bool hosted) {
+  m_hosted = hosted;
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const float opacity = panelCardOpacity();
@@ -116,7 +117,7 @@ std::unique_ptr<Flex> BarTab::createLiveBody(bool hosted) {
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
   });
 
   const BarConfig* bar = m_config != nullptr ? firstBar(m_config->config()) : nullptr;
@@ -207,7 +208,7 @@ std::unique_ptr<Flex> BarTab::createLiveBody(bool hosted) {
       .out = &m_layoutHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = layoutOpen,
       .participatesInLayout = layoutOpen,
       .configure =
@@ -278,7 +279,7 @@ std::unique_ptr<Flex> BarTab::createLiveBody(bool hosted) {
       .out = &m_shapeHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = shapeOpen,
       .participatesInLayout = shapeOpen,
       .configure =
@@ -348,6 +349,10 @@ void BarTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) 
     return;
   }
   if (m_rootLayout == nullptr) {
+    return;
+  }
+  if (m_hosted) {
+    layoutHostedLiveBody(m_rootLayout, renderer, contentWidth);
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);

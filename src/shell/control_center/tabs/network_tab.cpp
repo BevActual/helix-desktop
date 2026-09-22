@@ -785,7 +785,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
 
   auto currentCard = ui::column({
       .out = &m_currentCard,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applySectionCardStyle(card, scale, opacity); },
+      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyCompactCardStyle(card, scale, opacity, false); },
   });
 
   auto catalogHost = ui::column({
@@ -1060,7 +1060,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
   auto enterpriseFields = ui::column({
       .out = &m_enterpriseFields,
       // Flex defaults to Center on the cross axis, which collapses each field to
-      // its natural width. The card itself stretches via applySectionCardStyle();
+      // its natural width. The card itself stretches via applyCompactCardStyle();
       // this nested column has to say so for itself.
       .align = FlexAlign::Stretch,
       .visible = false,

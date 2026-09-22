@@ -70,6 +70,7 @@ private:
   Label* m_floatingOffsetValue = nullptr;
 
   Section m_section = Section::Placement;
+  bool m_hosted = false;
   bool m_syncing = false;
   bool m_sectionSyncing = false;
   bool m_liveDirty = false;

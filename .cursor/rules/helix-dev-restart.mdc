@@ -1,0 +1,14 @@
+---
+description: Restart Helix Shell after code changes without asking
+alwaysApply: true
+---
+
+# Helix Shell restart
+
+After changes that need a running shell, restart it yourself:
+
+```sh
+systemctl --user restart helix-shell-dev.service
+```
+
+Do not ask first. Do not tell the user they need to restart.

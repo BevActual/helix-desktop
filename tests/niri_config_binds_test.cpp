@@ -266,6 +266,15 @@ int main() {
   const auto blocked = compositors::niri::setRecommendedKeyInto(userPrintConfig, "screenshot-region", "Print");
   ok = expect(!blocked.ok && blocked.skippedConflicts == 1, "does not steal Print from the user's binds") && ok;
 
+  const auto quickInsertLine = compositors::niri::kdlLine(
+      {.id = "quick-insert", .ipcCommand = "panel-toggle quick-insert", .key = "F19"}
+  );
+  ok = expect(
+           quickInsertLine.find("F19") != std::string::npos && quickInsertLine.find("repeat=false") != std::string::npos,
+           "Quick Insert bind is F19 without key repeat"
+       )
+      && ok;
+
   std::filesystem::remove_all(dir);
   std::filesystem::remove_all(stockDir);
   std::filesystem::remove_all(userPrint);

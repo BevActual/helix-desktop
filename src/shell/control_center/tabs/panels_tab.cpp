@@ -90,6 +90,7 @@ std::unique_ptr<Flex> PanelsTab::create() {
 }
 
 std::unique_ptr<Flex> PanelsTab::createLiveBody(bool hosted) {
+  m_hosted = hosted;
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const float opacity = panelCardOpacity();
@@ -100,7 +101,7 @@ std::unique_ptr<Flex> PanelsTab::createLiveBody(bool hosted) {
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
   });
 
   if (!hosted) {
@@ -149,7 +150,7 @@ std::unique_ptr<Flex> PanelsTab::createLiveBody(bool hosted) {
       .out = &m_placementHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = placementOpen,
       .participatesInLayout = placementOpen,
       .configure =
@@ -195,7 +196,7 @@ std::unique_ptr<Flex> PanelsTab::createLiveBody(bool hosted) {
       .out = &m_chromeHost,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
-      .flexGrow = 1.0F,
+      .flexGrow = hosted ? 0.0F : 1.0F,
       .visible = chromeOpen,
       .participatesInLayout = chromeOpen,
       .configure =
@@ -266,6 +267,10 @@ void PanelsTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
     return;
   }
   if (m_rootLayout == nullptr) {
+    return;
+  }
+  if (m_hosted) {
+    layoutHostedLiveBody(m_rootLayout, renderer, contentWidth);
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
