@@ -506,6 +506,7 @@ _noctalia_sources = files(
   'src/dbus/notification/notification_poll_source.cpp',
   'src/dbus/notification/notification_service.cpp',
   'src/dbus/power/power_profiles_service.cpp',
+  'src/dbus/bus_name_watch.cpp',
   'src/dbus/session_bus.cpp',
   'src/dbus/system_bus.cpp',
   'src/dbus/tray/fcitx_status.cpp',

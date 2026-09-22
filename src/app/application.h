@@ -103,6 +103,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <sdbus-c++/TypeTraits.h> // sdbus::Slot
 #include <optional>
 #include <vector>
 
@@ -337,9 +338,9 @@ private:
   std::unique_ptr<KeyboardBacklightService> m_keyboardBacklightService;
   std::unique_ptr<TrayService> m_trayService;
   std::unique_ptr<NotificationDBusHost> m_notificationDbus;
-  std::unique_ptr<sdbus::IProxy> m_notificationBusNameWatchProxy;
+  sdbus::Slot m_notificationBusNameWatch;
   bool m_notificationBusNameWatchInstalled = false;
-  std::unique_ptr<sdbus::IProxy> m_secretServiceNameWatchProxy;
+  sdbus::Slot m_secretServiceNameWatch;
   bool m_secretServiceNameWatchInstalled = false;
   std::unique_ptr<sdbus::IProxy> m_secretServiceCollectionWatchProxy;
   bool m_secretServiceCollectionWatchInstalled = false;

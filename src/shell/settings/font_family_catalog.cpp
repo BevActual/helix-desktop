@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <string_view>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 
@@ -66,6 +67,10 @@ namespace settings {
   const std::vector<std::string>& discoverFontFamilies() {
     static const std::vector<std::string> kFamilies = discoverFontFamiliesUncached();
     return kFamilies;
+  }
+
+  void prewarmFontFamilies() {
+    std::thread([]() { (void)discoverFontFamilies(); }).detach();
   }
 
   std::vector<WidgetSettingSelectOption> buildFontFamilySelectOptions() {

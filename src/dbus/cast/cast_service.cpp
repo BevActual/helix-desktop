@@ -1,6 +1,8 @@
 #include "dbus/cast/cast_service.h"
 
 #include "cli/schema_msg.h"
+#include "core/deferred_call.h"
+#include "dbus/bus_name_watch.h"
 #include "core/log.h"
 #include "core/process/process.h"
 #include "dbus/network/inetwork_service.h"
@@ -22,6 +24,7 @@
 #include <sdbus-c++/IProxy.h>
 #include <sdbus-c++/Types.h>
 #include <string>
+#include <thread>
 #include <unistd.h>
 #include <utility>
 #include <vector>
@@ -160,6 +163,7 @@ struct CastService::Impl {
   CastService& self;
   SessionBus* bus = nullptr;
   std::unique_ptr<sdbus::IProxy> dbus;
+  sdbus::Slot nameWatch;
   std::unique_ptr<sdbus::IProxy> manager;
   std::shared_ptr<void> lifetime = std::make_shared<int>(0);
   std::map<std::string, std::string> streamUnits;
@@ -212,19 +216,17 @@ void CastService::start() {
   if (m_bus != nullptr) {
     try {
       m_impl->dbus = sdbus::createProxy(m_bus->connection(), kDbusName, kDbusPath);
-      m_impl->dbus->uponSignal("NameOwnerChanged")
-          .onInterface(kDbusInterface)
-          .call([this](const std::string& name, const std::string&, const std::string& newOwner) {
-            if (name != "org.gnome.NetworkDisplays.Manager") {
-              return;
-            }
+      m_impl->nameWatch = dbus_watch::watchBusName(
+          m_bus->connection(), "org.gnome.NetworkDisplays.Manager",
+          [this](const std::string&, const std::string&, const std::string& newOwner) {
             if (newOwner.empty()) {
               m_impl->manager.reset();
             } else {
               m_impl->attachManager();
             }
             refresh();
-          });
+          }
+      );
       bool hasOwner = false;
       m_impl->dbus->callMethod("NameHasOwner")
           .onInterface(kDbusInterface)
@@ -265,21 +267,45 @@ void CastService::finishRefresh(CastSnapshot next) {
   notifyChanged();
 }
 
+// PATH lookups and `grdctl status` fork a process and take ~25ms; at poll cadence that
+// was a hitch in every animation, so the probe runs on a worker and only the D-Bus
+// property read and the snapshot swap happen on the main thread.
 void CastService::refresh() {
-  CastSnapshot next;
-  next.shareInstalled = process::commandExists("grdctl");
-  next.wirelessInstalled =
-      process::commandExists("gnome-network-displays") || process::commandExists("gnome-network-displays-daemon");
-  next.wirelessRunning = m_impl->manager != nullptr;
-
-  if (next.shareInstalled) {
-    const auto status = process::runSync({"grdctl", "status", "--show-credentials"});
-    if (status) {
-      parseGrdctl(status.out, next);
-    } else {
-      parseGrdctl(status.out + status.err, next);
-    }
+  if (m_refreshInFlight) {
+    m_refreshQueued = true;
+    return;
   }
+  m_refreshInFlight = true;
+  std::weak_ptr<void> lifetime = m_lifetime;
+  std::thread([this, lifetime]() {
+    CastSnapshot probed;
+    probed.shareInstalled = process::commandExists("grdctl");
+    probed.wirelessInstalled =
+        process::commandExists("gnome-network-displays") || process::commandExists("gnome-network-displays-daemon");
+    if (probed.shareInstalled) {
+      const auto status = process::runSync({"grdctl", "status", "--show-credentials"});
+      if (status) {
+        parseGrdctl(status.out, probed);
+      } else {
+        parseGrdctl(status.out + status.err, probed);
+      }
+    }
+    DeferredCall::callLater([this, lifetime, probed = std::move(probed)]() mutable {
+      if (lifetime.expired()) {
+        return;
+      }
+      m_refreshInFlight = false;
+      completeRefresh(std::move(probed));
+      if (m_refreshQueued) {
+        m_refreshQueued = false;
+        refresh();
+      }
+    });
+  }).detach();
+}
+
+void CastService::completeRefresh(CastSnapshot next) {
+  next.wirelessRunning = m_impl->manager != nullptr;
 
   if (m_network != nullptr && !m_network->state().ipv4.empty() && next.sharePort > 0) {
     next.shareAddress = std::format("{}:{}", m_network->state().ipv4, next.sharePort);

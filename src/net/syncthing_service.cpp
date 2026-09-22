@@ -408,6 +408,7 @@ void SyncthingService::refresh() {
   health.method = "GET";
   health.url = restUrl("/rest/noauth/health");
   health.allowWhenOffline = true;
+  health.quietTransportErrors = true; // Syncthing is optional; absence is the normal case
   health.allowInsecureTls = m_auth.tls;
   health.timeoutSeconds = kRequestTimeout;
   m_http.request(std::move(health), [this, lifetime, generation, next = std::move(next)](HttpResponse res) mutable {

@@ -109,24 +109,83 @@ SHORTCUTS = {
 }
 
 
-def bonded_devices():
-    """Names of BlueZ devices paired with this adapter (the iPhone once AssistiveTouch pairs)."""
-    try:
-        bus = dbus.SystemBus()
-        manager = dbus.Interface(bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
-        names = []
-        for path, interfaces in manager.GetManagedObjects().items():
-            device = interfaces.get("org.bluez.Device1")
-            if device and str(path).startswith(ADAPTER) and bool(device.get("Paired", False)):
-                names.append({"name": str(device.get("Alias", device.get("Name", ""))),
-                              "connected": bool(device.get("Connected", False))})
-        return names
-    except dbus.exceptions.DBusException:
-        return []
+class BondedDevices:
+    """Paired BlueZ devices on this adapter, kept current from ObjectManager signals.
+
+    Status requests arrive on control-socket threads once a second while the shell
+    mirrors; reading a cached dict there is free, where a GetManagedObjects round-trip
+    per request was a blocking D-Bus call from a thread that does not own the main loop.
+    """
+
+    def __init__(self, bus):
+        self.lock = threading.Lock()
+        self.devices = {}
+        try:
+            manager = dbus.Interface(bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+            for path, interfaces in manager.GetManagedObjects().items():
+                self._added(path, interfaces)
+        except dbus.exceptions.DBusException:
+            pass
+        bus.add_signal_receiver(self._added, dbus_interface="org.freedesktop.DBus.ObjectManager",
+                                signal_name="InterfacesAdded")
+        bus.add_signal_receiver(self._removed, dbus_interface="org.freedesktop.DBus.ObjectManager",
+                                signal_name="InterfacesRemoved")
+        bus.add_signal_receiver(self._changed, dbus_interface="org.freedesktop.DBus.Properties",
+                                signal_name="PropertiesChanged", path_keyword="path")
+
+    def _added(self, path, interfaces):
+        device = interfaces.get("org.bluez.Device1")
+        if device is None or not str(path).startswith(ADAPTER):
+            return
+        with self.lock:
+            self.devices[str(path)] = {
+                "name": str(device.get("Alias", device.get("Name", ""))),
+                "paired": bool(device.get("Paired", False)),
+                "connected": bool(device.get("Connected", False)),
+            }
+
+    def _removed(self, path, interfaces):
+        if "org.bluez.Device1" in interfaces:
+            with self.lock:
+                self.devices.pop(str(path), None)
+
+    def _changed(self, interface, changed, invalidated, path=None):
+        if interface != "org.bluez.Device1" or path is None:
+            return
+        with self.lock:
+            entry = self.devices.get(str(path))
+            if entry is None:
+                return
+            if "Paired" in changed:
+                entry["paired"] = bool(changed["Paired"])
+            if "Connected" in changed:
+                entry["connected"] = bool(changed["Connected"])
+            if "Alias" in changed:
+                entry["name"] = str(changed["Alias"])
+
+    def paired(self):
+        with self.lock:
+            return [{"name": d["name"], "connected": d["connected"]} for d in self.devices.values() if d["paired"]]
+
+
+_CONF_CACHE = {"mtime": None, "missing": []}
 
 
 def bluetooth_conf_missing():
     """Return the [Section] Key=value entries that are not active in main.conf."""
+    try:
+        mtime = os.stat(BLUETOOTH_CONF).st_mtime_ns
+    except OSError:
+        mtime = None
+    if mtime is not None and _CONF_CACHE["mtime"] == mtime:
+        return list(_CONF_CACHE["missing"])
+    missing = _bluetooth_conf_missing_uncached()
+    _CONF_CACHE["mtime"] = mtime
+    _CONF_CACHE["missing"] = list(missing)
+    return missing
+
+
+def _bluetooth_conf_missing_uncached():
     active = {}
     section = None
     try:
@@ -477,11 +536,12 @@ class ControlSocket:
     user moves, clicks, and types over the mirror; the rest is for chips and tests.
     """
 
-    def __init__(self, mouse, absolute, keyboard, consumer):
+    def __init__(self, mouse, absolute, keyboard, consumer, bonded):
         self.mouse = mouse
         self.absolute = absolute
         self.keyboard = keyboard
         self.consumer = consumer
+        self.bonded = bonded
         self.keys = KeyboardState(self._emit)
         self.buttons = 0
         self.lock = threading.Lock()
@@ -625,7 +685,7 @@ class ControlSocket:
                 self._emit(self.absolute, bytes(5))
         elif kind == "status":
             missing = bluetooth_conf_missing()
-            bonded = bonded_devices()
+            bonded = self.bonded.paired()
             return {
                 "connected": self.absolute.notifying,
                 "bonded": bool(bonded),
@@ -780,7 +840,7 @@ def main() -> int:
     missing_conf = bluetooth_conf_missing()
     if missing_conf:
         print("bluetooth config needs: " + "; ".join(missing_conf) + f" (in {BLUETOOTH_CONF})", flush=True)
-    ControlSocket(mouse, absolute, keyboard, consumer).start()
+    ControlSocket(mouse, absolute, keyboard, consumer, BondedDevices(bus)).start()
     print(f"{NAME} is waiting for the iPhone", flush=True)
     try:
         loop.run()

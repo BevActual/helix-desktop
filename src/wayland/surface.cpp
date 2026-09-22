@@ -260,7 +260,7 @@ namespace {
     auto& entry = state.surfaces[&surface];
     if (entry.label.empty()) {
       entry.label = std::format(
-          "{}@{:x} {}x{}", typeid(surface).name(), reinterpret_cast<std::uintptr_t>(&surface), surface.width(),
+          "{}@{:x} {}x{}", surfaceTraceName(surface), reinterpret_cast<std::uintptr_t>(&surface), surface.width(),
           surface.height()
       );
     }

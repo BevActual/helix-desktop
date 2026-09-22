@@ -323,6 +323,7 @@ void HttpClient::request(HttpRequest req, ResponseCallback cb) {
   RequestTransfer transfer{};
   transfer.callback = std::move(cb);
   transfer.url = req.url;
+  transfer.quietTransportErrors = req.quietTransportErrors;
   transfer.body = std::move(req.body);
   transfer.basicUsername = std::move(req.basicUsername);
   transfer.basicPassword = std::move(req.basicPassword);
@@ -762,10 +763,17 @@ void HttpClient::finishRequestTransfer(CURL* easy, CURLcode result) {
   response.effectiveUrl = std::move(effectiveUrl);
   if (!response.transportOk) {
     const char* detail = transfer.errorBuffer[0] != '\0' ? transfer.errorBuffer.data() : curl_easy_strerror(result);
-    kLog.warn(
-        "request failed url={} curl={} http={} error={}", urlForLog(transfer.url), static_cast<int>(result),
-        responseCode, detail
-    );
+    if (transfer.quietTransportErrors) {
+      kLog.debug(
+          "probe failed url={} curl={} http={} error={}", urlForLog(transfer.url), static_cast<int>(result),
+          responseCode, detail
+      );
+    } else {
+      kLog.warn(
+          "request failed url={} curl={} http={} error={}", urlForLog(transfer.url), static_cast<int>(result),
+          responseCode, detail
+      );
+    }
   }
 
   if (transfer.callback) {

@@ -1,5 +1,7 @@
 #include "dbus/kdeconnect/phone_connect_service.h"
 
+#include "dbus/bus_name_watch.h"
+
 #include "cli/schema_msg.h"
 #include "compositors/niri/niri_phone_cast.h"
 #include "core/deferred_call.h"
@@ -202,8 +204,9 @@ namespace {
     return paths::assetsRoot().parent_path() / "scripts" / std::filesystem::path(std::string(name));
   }
 
-  // One JSON line to the Helix Phone control socket, one JSON line back. Local unix socket
-  // with a short timeout, so this is safe on the main thread at poll cadence.
+  // One JSON line to the Helix Phone control socket, one JSON line back. Blocks up to the
+  // socket timeout (and the script answers status with a BlueZ round-trip), so callers on
+  // the main thread go through pollPhonePointer(), which runs this on a worker.
   [[nodiscard]] std::optional<nlohmann::json> phonePointerRequest(const nlohmann::json& request) {
     const int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0) {
@@ -726,6 +729,7 @@ struct PhoneConnectService::Impl {
   PhoneConnectService& self;
   SessionBus& bus;
   std::unique_ptr<sdbus::IProxy> dbus;
+  sdbus::Slot nameWatch;
   std::unique_ptr<sdbus::IProxy> daemon;
   std::unordered_map<std::string, std::unique_ptr<sdbus::IProxy>> deviceProxies;
   std::unordered_map<std::string, std::unique_ptr<sdbus::IProxy>> batteryProxies;
@@ -1474,18 +1478,16 @@ void PhoneConnectService::start() {
     return;
   }
 
-  m_impl->dbus->uponSignal("NameOwnerChanged")
-      .onInterface(kDbusInterface)
-      .call([this](const std::string& name, const std::string& /*oldOwner*/, const std::string& newOwner) {
-        if (name != "org.kde.kdeconnect") {
-          return;
-        }
+  m_impl->nameWatch = dbus_watch::watchBusName(
+      m_bus.connection(), "org.kde.kdeconnect",
+      [this](const std::string& /*name*/, const std::string& /*oldOwner*/, const std::string& newOwner) {
         if (newOwner.empty()) {
           detachDaemon();
         } else {
           attachDaemon();
         }
-      });
+      }
+  );
 
   bool hasOwner = false;
   try {
@@ -1502,7 +1504,7 @@ void PhoneConnectService::start() {
     m_snapshot.available = false;
     notifyChanged();
   }
-  ensurePhonePointer();
+  pollPhonePointer();
 }
 
 void PhoneConnectService::scheduleRefresh() {
@@ -1944,9 +1946,7 @@ void PhoneConnectService::pollAppleMirror() {
     }
     return;
   }
-  if (pollPhonePointer()) {
-    notifyChanged();
-  }
+  pollPhonePointer();
 }
 
 // UxPlay log lines, already on the main thread. Session edges come from RAOP:
@@ -1970,7 +1970,7 @@ void PhoneConnectService::onAirplayLog(std::uint32_t generation, std::string lin
     m_cast.mirrorStreaming = streaming;
     if (streaming) {
       m_pointerLastSeen = std::chrono::steady_clock::now();
-      (void)pollPhonePointer();
+      pollPhonePointer();
     }
     kLog.info("iPhone mirror {}", streaming ? "streaming" : "idle");
     notifyChanged();
@@ -2042,17 +2042,40 @@ void PhoneConnectService::restartReceiver() {
   }
 }
 
-bool PhoneConnectService::pollPhonePointer() {
+// Status probe off the main thread: the socket round-trip plus the script's BlueZ query
+// take tens of milliseconds, which at 1 Hz is a visible hitch in every animation.
+void PhoneConnectService::pollPhonePointer() {
+  if (m_pointerProbeInFlight) {
+    return;
+  }
+  m_pointerProbeInFlight = true;
+  std::weak_ptr<void> lifetime = m_lifetime;
+  std::thread([this, lifetime]() {
+    auto status = phonePointerRequest({{"type", "status"}});
+    if (!status.has_value()) {
+      ensurePhonePointer();
+    }
+    DeferredCall::callLater([this, lifetime, status = std::move(status)]() {
+      if (lifetime.expired()) {
+        return;
+      }
+      m_pointerProbeInFlight = false;
+      if (applyPhonePointerStatus(status)) {
+        notifyChanged();
+      }
+    });
+  }).detach();
+}
+
+bool PhoneConnectService::applyPhonePointerStatus(const std::optional<nlohmann::json>& status) {
   const auto snapshot = std::make_tuple(
       m_cast.pointerRunning, m_cast.pointerConnected, m_cast.pointerKeyboard, m_cast.pointerConfigOk,
       m_cast.pointerBonded, m_cast.pointerBondLost
   );
-  const auto status = phonePointerRequest({{"type", "status"}});
   if (!status.has_value()) {
     m_cast.pointerRunning = false;
     m_cast.pointerConnected = false;
     m_cast.pointerKeyboard = false;
-    ensurePhonePointer();
   } else {
     m_cast.pointerRunning = true;
     m_cast.pointerConnected = status->value("connected", false);
@@ -2099,6 +2122,13 @@ void PhoneConnectService::setupPhonePointerBluetooth() {
       process::RunCallbacks{
           .onExit =
               [this, lifetime](process::RunResult result) {
+                // Still on the process worker: bluetoothd restarted, so the pointer script
+                // must re-register its GATT service before the main thread re-probes it.
+                const auto running = process::runSync({"pgrep", "-f", "helix-phone-hid.py"});
+                if (running.exitCode == 0) {
+                  (void)process::runSync({"pkill", "-f", "helix-phone-hid.py"});
+                }
+                ensurePhonePointer();
                 DeferredCall::callLater([this, lifetime, result = std::move(result)]() {
                   if (lifetime.expired()) {
                     return;
@@ -2107,15 +2137,7 @@ void PhoneConnectService::setupPhonePointerBluetooth() {
                   if (result.exitCode != 0) {
                     kLog.warn("bluetooth setup for Helix Phone failed ({}): {}", result.exitCode, result.err);
                   }
-                  // bluetoothd restarted; the pointer script must re-register its GATT service.
-                  const auto running = process::runSync({"pgrep", "-f", "helix-phone-hid.py"});
-                  if (running.exitCode == 0) {
-                    (void)process::runSync({"pkill", "-f", "helix-phone-hid.py"});
-                  }
-                  ensurePhonePointer();
-                  if (pollPhonePointer()) {
-                    notifyChanged();
-                  }
+                  pollPhonePointer();
                 });
               },
       },
@@ -2356,7 +2378,7 @@ void PhoneConnectService::startAppleMirror(bool automatic) {
   m_cast.airplayName = std::string(compositors::niri::kPhoneMirrorWindowTitle);
   m_cast.error.clear();
   m_pointerLastSeen = std::chrono::steady_clock::now();
-  (void)pollPhonePointer();
+  pollPhonePointer();
   m_airplayPollTimer.startRepeating(std::chrono::seconds{1}, [this]() { pollAppleMirror(); });
   notifyChanged();
 }

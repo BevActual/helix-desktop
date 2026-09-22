@@ -33,9 +33,6 @@ public:
 
 private:
   [[nodiscard]] std::function<bool()> hookFor(std::string_view action) const;
-  [[nodiscard]] bool suspendBlocking() const;
-  [[nodiscard]] bool rebootBlocking() const;
-  [[nodiscard]] bool shutdownBlocking() const;
 
   CompositorPlatform& m_platform;
   LockScreen& m_lockScreen;

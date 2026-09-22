@@ -140,6 +140,8 @@ private:
   void sendMenuEvent(const std::string& itemId, std::int32_t entryId, const std::string& eventName);
   [[nodiscard]] bool ensureItemProxy(const std::string& itemId);
   void removeItemsForBusName(const std::string& busName);
+  void watchItemBusName(const std::string& busName);
+  void pruneItemBusNameWatches();
   void emitChanged();
 
   [[nodiscard]] static std::string busNameFromItemId(const std::string& itemId);
@@ -152,6 +154,9 @@ private:
   std::unique_ptr<sdbus::IObject> m_watcherObject;
   std::unique_ptr<sdbus::IProxy> m_watcherProxy;
   std::unique_ptr<sdbus::IProxy> m_dbusProxy;
+  sdbus::Slot m_watcherNameWatch;
+  std::vector<sdbus::Slot> m_sniNamespaceWatches;
+  std::unordered_map<std::string, sdbus::Slot> m_itemNameWatches;
   std::unordered_map<std::string, TrayItemInfo> m_items;
   std::unordered_map<std::string, std::unique_ptr<sdbus::IProxy>> m_itemProxies;
   std::unordered_map<std::string, MenuCache> m_menuCache;

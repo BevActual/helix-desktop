@@ -681,7 +681,7 @@ void AiUsageService::fetchAll(bool force) {
       [&]() { fetchDeepseek(generation); }
   );
   fetchOllama(generation);
-  fetchLocalRuntimes(generation);
+  fetchLocalRuntimes(generation, force);
 }
 
 void AiUsageService::fetchClaude(std::uint64_t generation, bool force) {
@@ -1113,31 +1113,51 @@ void AiUsageService::fetchOllama(std::uint64_t generation) {
   });
 }
 
-void AiUsageService::fetchLocalRuntimes(std::uint64_t generation) {
+// llama.cpp and vLLM servers are usually not running. A refused connect is the normal
+// answer, so each absent port is re-probed on a doubling schedule (up to ten minutes)
+// instead of every refresh; a forced refresh (tab open) probes everything at once.
+namespace {
+  constexpr std::chrono::seconds kLocalRuntimeInitialBackoff{60};
+  constexpr std::chrono::seconds kLocalRuntimeMaxBackoff{600};
+} // namespace
+
+void AiUsageService::fetchLocalRuntimes(std::uint64_t generation, bool force) {
   if (m_http == nullptr) {
     publishLocalRuntimes({});
     return;
   }
+  const auto now = std::chrono::steady_clock::now();
   std::vector<noctalia::ai_usage::LocalRuntimeKind> kinds;
   kinds.reserve(noctalia::ai_usage::kLocalRuntimeCount);
   for (std::size_t i = 0; i < noctalia::ai_usage::kLocalRuntimeCount; ++i) {
     const auto kind = static_cast<noctalia::ai_usage::LocalRuntimeKind>(i);
-    if (noctalia::ai_usage::localRuntimeIsCli(kind)) {
-      kinds.push_back(kind);
+    if (!noctalia::ai_usage::localRuntimeIsCli(kind)) {
+      continue;
     }
+    if (!force && m_localRuntimeProbes[i].nextProbeAt > now) {
+      continue;
+    }
+    kinds.push_back(kind);
   }
   if (kinds.empty()) {
-    publishLocalRuntimes({});
+    publishLocalRuntimes(m_localRuntimesKnown);
     return;
   }
   auto pending = std::make_shared<std::size_t>(kinds.size());
   auto found = std::make_shared<std::vector<noctalia::ai_usage::LocalRuntime>>();
+  // Ports skipped this round keep their last known answer.
+  for (const auto& runtime : m_localRuntimesKnown) {
+    if (!std::ranges::contains(kinds, runtime.kind)) {
+      found->push_back(runtime);
+    }
+  }
   for (const auto kind : kinds) {
     const auto port = noctalia::ai_usage::localRuntimePort(kind);
     HttpRequest req;
     req.url = std::format("http://127.0.0.1:{}/v1/models", port);
     req.allowWhenOffline = true;
     req.freshConnection = true;
+    req.quietTransportErrors = true;
     req.timeoutSeconds = 2;
     m_http->request(
         std::move(req),
@@ -1145,6 +1165,8 @@ void AiUsageService::fetchLocalRuntimes(std::uint64_t generation) {
           if (generation != m_generation) {
             return;
           }
+          auto& probe = m_localRuntimeProbes[static_cast<std::size_t>(kind)];
+          bool alive = false;
           if (res.transportOk && res.status >= 200 && res.status < 300) {
             if (auto models = noctalia::ai_usage::parseOpenAiModelsJson(res.body)) {
               noctalia::ai_usage::LocalRuntime runtime;
@@ -1153,12 +1175,22 @@ void AiUsageService::fetchLocalRuntimes(std::uint64_t generation) {
               runtime.models = std::move(*models);
               runtime.launchable = false;
               found->push_back(std::move(runtime));
+              alive = true;
             }
+          }
+          if (alive) {
+            probe.backoff = std::chrono::seconds(0);
+            probe.nextProbeAt = {};
+          } else {
+            probe.backoff = probe.backoff.count() == 0 ? kLocalRuntimeInitialBackoff
+                                                       : std::min(probe.backoff * 2, kLocalRuntimeMaxBackoff);
+            probe.nextProbeAt = std::chrono::steady_clock::now() + probe.backoff;
           }
           if (--*pending == 0) {
             std::ranges::sort(*found, [](const auto& a, const auto& b) {
               return static_cast<std::uint8_t>(a.kind) < static_cast<std::uint8_t>(b.kind);
             });
+            m_localRuntimesKnown = *found;
             publishLocalRuntimes(std::move(*found));
           }
         }

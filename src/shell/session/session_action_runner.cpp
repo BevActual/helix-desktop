@@ -22,12 +22,6 @@
 namespace {
 
   constexpr Logger kLog("session");
-  constexpr std::chrono::milliseconds kPowerCommandTimeout{5000};
-
-  enum class PowerLaunchMode {
-    Blocking,
-    Detached,
-  };
 
   [[nodiscard]] const char* valueOrUnset(const char* value) {
     return value != nullptr && value[0] != '\0' ? value : "<unset>";
@@ -53,19 +47,6 @@ namespace {
       label += arg;
     }
     return label.empty() ? "<empty>" : label;
-  }
-
-  void
-  logSessionCommandFailure(std::string_view action, std::string_view commandLabel, const process::RunResult& result) {
-    if (result.timedOut) {
-      kLog.warn("{}: {} timed out after {}ms", action, commandLabel, kPowerCommandTimeout.count());
-    } else if (!result.err.empty()) {
-      kLog.warn("{}: {} failed with code {}: {}", action, commandLabel, result.exitCode, result.err);
-    } else if (!result.out.empty()) {
-      kLog.warn("{}: {} failed with code {}: {}", action, commandLabel, result.exitCode, result.out);
-    } else {
-      kLog.warn("{}: {} failed with code {}", action, commandLabel, result.exitCode);
-    }
   }
 
   [[nodiscard]] const std::vector<std::vector<std::string>>& suspendCommandVariants() {
@@ -101,9 +82,11 @@ namespace {
     return variants;
   }
 
+  // Power commands are always launched detached: the shell must never block its own
+  // main loop on logind/systemctl, and the session is going away anyway.
   [[nodiscard]] bool runResolvedPowerCommand(
       std::string_view action, const std::vector<std::vector<std::string>>& commands,
-      std::optional<std::size_t>& cacheIdx, PowerLaunchMode mode
+      std::optional<std::size_t>& cacheIdx
   ) {
     if (commands.empty()) {
       kLog.warn("{}: no supported command found", action);
@@ -128,23 +111,12 @@ namespace {
 
       attempted = true;
       const std::string label = commandLabel(command);
-      if (mode == PowerLaunchMode::Detached) {
-        if (process::runAsync(command)) {
-          kLog.info("{}: {} launched", action, label);
-          cacheIdx = idx;
-          return true;
-        }
-        kLog.warn("{}: {} failed to launch", action, label);
-        continue;
-      }
-
-      const process::RunResult result = process::runSyncWithTimeout(command, kPowerCommandTimeout);
-      if (result) {
-        kLog.info("{}: {} accepted", action, label);
+      if (process::runAsync(command)) {
+        kLog.info("{}: {} launched", action, label);
         cacheIdx = idx;
         return true;
       }
-      logSessionCommandFailure(action, label, result);
+      kLog.warn("{}: {} failed to launch", action, label);
     }
 
     if (!attempted) {
@@ -156,33 +128,23 @@ namespace {
     return false;
   }
 
-  [[nodiscard]] bool runPowerOverride(std::string_view action, const std::string& command, PowerLaunchMode mode) {
-    if (mode == PowerLaunchMode::Detached) {
-      if (process::runAsync(command)) {
-        kLog.info("{}: custom override launched", action);
-        return true;
-      }
-      kLog.warn("{}: custom override failed to launch", action);
-      return false;
-    }
-
-    const process::RunResult result = process::runSync(command);
-    if (result) {
-      kLog.info("{}: custom override accepted", action);
+  [[nodiscard]] bool runPowerOverride(std::string_view action, const std::string& command) {
+    if (process::runAsync(command)) {
+      kLog.info("{}: custom override launched", action);
       return true;
     }
-    logSessionCommandFailure(action, command, result);
+    kLog.warn("{}: custom override failed to launch", action);
     return false;
   }
 
   [[nodiscard]] bool runPowerActionResolved(
       std::string_view action, const std::optional<std::string>& commandOverride,
-      const std::vector<std::vector<std::string>>& variants, std::optional<std::size_t>& cacheIdx, PowerLaunchMode mode
+      const std::vector<std::vector<std::string>>& variants, std::optional<std::size_t>& cacheIdx
   ) {
     if (commandOverride.has_value()) {
-      return runPowerOverride(action, *commandOverride, mode);
+      return runPowerOverride(action, *commandOverride);
     }
-    return runResolvedPowerCommand(action, variants, cacheIdx, mode);
+    return runResolvedPowerCommand(action, variants, cacheIdx);
   }
 
   [[nodiscard]] bool requestLock(LockScreen& lockScreen) {
@@ -299,8 +261,7 @@ bool SessionActionRunner::requestSuspendDetached() const {
   }
   std::scoped_lock lock(m_powerMutex);
   const bool started = runPowerActionResolved(
-      "suspend", m_suspendCommandOverride, suspendCommandVariants(), m_cachedSuspendAutoStartIdx,
-      PowerLaunchMode::Detached
+      "suspend", m_suspendCommandOverride, suspendCommandVariants(), m_cachedSuspendAutoStartIdx
   );
   if (!started && m_hooks.onPlainSuspendAborted) {
     m_hooks.onPlainSuspendAborted();
@@ -312,7 +273,7 @@ bool SessionActionRunner::requestRebootDetached() const {
   logActionContext("reboot");
   std::scoped_lock lock(m_powerMutex);
   return runPowerActionResolved(
-      "reboot", m_rebootCommandOverride, rebootCommandVariants(), m_cachedRebootAutoStartIdx, PowerLaunchMode::Detached
+      "reboot", m_rebootCommandOverride, rebootCommandVariants(), m_cachedRebootAutoStartIdx
   );
 }
 
@@ -320,8 +281,7 @@ bool SessionActionRunner::requestShutdownDetached() const {
   logActionContext("shutdown");
   std::scoped_lock lock(m_powerMutex);
   return runPowerActionResolved(
-      "shutdown", m_shutdownCommandOverride, shutdownCommandVariants(), m_cachedShutdownAutoStartIdx,
-      PowerLaunchMode::Detached
+      "shutdown", m_shutdownCommandOverride, shutdownCommandVariants(), m_cachedShutdownAutoStartIdx
   );
 }
 
@@ -330,35 +290,3 @@ bool SessionActionRunner::lockThenSuspendDetached() const {
   return true;
 }
 
-bool SessionActionRunner::suspendBlocking() const {
-  logActionContext("suspend");
-  if (m_hooks.onBeforePlainSuspend) {
-    m_hooks.onBeforePlainSuspend();
-  }
-  std::scoped_lock lock(m_powerMutex);
-  const bool started = runPowerActionResolved(
-      "suspend", m_suspendCommandOverride, suspendCommandVariants(), m_cachedSuspendAutoStartIdx,
-      PowerLaunchMode::Blocking
-  );
-  if (!started && m_hooks.onPlainSuspendAborted) {
-    m_hooks.onPlainSuspendAborted();
-  }
-  return started;
-}
-
-bool SessionActionRunner::rebootBlocking() const {
-  logActionContext("reboot");
-  std::scoped_lock lock(m_powerMutex);
-  return runPowerActionResolved(
-      "reboot", m_rebootCommandOverride, rebootCommandVariants(), m_cachedRebootAutoStartIdx, PowerLaunchMode::Blocking
-  );
-}
-
-bool SessionActionRunner::shutdownBlocking() const {
-  logActionContext("shutdown");
-  std::scoped_lock lock(m_powerMutex);
-  return runPowerActionResolved(
-      "shutdown", m_shutdownCommandOverride, shutdownCommandVariants(), m_cachedShutdownAutoStartIdx,
-      PowerLaunchMode::Blocking
-  );
-}

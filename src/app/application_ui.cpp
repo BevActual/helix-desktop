@@ -72,6 +72,7 @@
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "system/fedora_upgrade_launcher.h"
 #include "system/package_kit_service.h"
+#include "shell/settings/font_family_catalog.h"
 #include "shell/launcher/launcher_panel.h"
 #include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
@@ -722,6 +723,8 @@ void Application::initPanelManagerAndPanels() {
       });
   m_controlCenter = controlCenter.get();
   m_panelManager.registerPanel("control-center", std::move(controlCenter));
+  // Type tab and widget font pickers read this list; discover it off the UI thread now.
+  settings::prewarmFontFamilies();
   if (noctalia::packages::tabAvailable()) {
     m_packageUpdateTimer.start(std::chrono::seconds(20), [this]() {
       refreshPackageUpdates();

@@ -1,5 +1,7 @@
 #include "dbus/modem/modem_manager_service.h"
 
+#include "dbus/bus_name_watch.h"
+
 #include "core/log.h"
 #include "dbus/system_bus.h"
 #include "i18n/i18n.h"
@@ -20,9 +22,6 @@ namespace {
 
   const sdbus::ServiceName kMmBusName{"org.freedesktop.ModemManager1"};
   const sdbus::ObjectPath kRootPath{"/org/freedesktop/ModemManager1"};
-  const sdbus::ServiceName kDaemonBusName{"org.freedesktop.DBus"};
-  const sdbus::ObjectPath kDaemonPath{"/org/freedesktop/DBus"};
-  constexpr auto kDaemonInterface = "org.freedesktop.DBus";
   constexpr auto kModemInterface = "org.freedesktop.ModemManager1.Modem";
   constexpr auto kModem3gppInterface = "org.freedesktop.ModemManager1.Modem.Modem3gpp";
   // SignalQuality on the base Modem interface is maintained by ModemManager itself.
@@ -99,7 +98,7 @@ namespace {
 struct ModemManagerService::Impl {
   ModemManagerService& self;
   SystemBus& bus;
-  std::unique_ptr<sdbus::IProxy> daemon; // NameOwnerChanged watch on the bus daemon.
+  sdbus::Slot nameWatch; // arg0-filtered NameOwnerChanged for ModemManager
   std::unique_ptr<sdbus::IProxy> root;   // ObjectManager on "/"
   std::unordered_map<std::string, std::unique_ptr<sdbus::IProxy>> modemProxies;
 
@@ -246,15 +245,12 @@ ModemManagerService::ModemManagerService(SystemBus& bus) : m_impl(std::make_uniq
   // on demand and can die mid-session, e.g. killed while hanging on an unresponsive
   // modem port. Follow the bus name instead of fixing availability at construction,
   // or a shell started while it is down would never offer cellular controls.
-  m_impl->daemon = sdbus::createProxy(bus.connection(), kDaemonBusName, kDaemonPath);
-  m_impl->daemon->uponSignal("NameOwnerChanged")
-      .onInterface(kDaemonInterface)
-      .call([this](const std::string& name, const std::string& /*oldOwner*/, const std::string& newOwner) {
-        if (name != kMmBusName) {
-          return;
-        }
+  m_impl->nameWatch = dbus_watch::watchBusName(
+      bus.connection(), kMmBusName,
+      [this](const std::string& /*name*/, const std::string& /*oldOwner*/, const std::string& newOwner) {
         m_impl->onNameOwnerChanged(newOwner);
-      });
+      }
+  );
 
   if (bus.nameHasOwner(kMmBusName)) {
     m_impl->attach();

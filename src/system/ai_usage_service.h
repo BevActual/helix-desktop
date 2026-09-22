@@ -3,6 +3,7 @@
 #include "core/timer_manager.h"
 #include "system/ai_usage.h"
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <functional>
@@ -67,7 +68,7 @@ private:
   void fetchCursor(std::uint64_t generation);
   void fetchDeepseek(std::uint64_t generation);
   void fetchOllama(std::uint64_t generation);
-  void fetchLocalRuntimes(std::uint64_t generation);
+  void fetchLocalRuntimes(std::uint64_t generation, bool force);
   void spawnOllamaServe();
   void ensureSelectedOllamaModel();
   void unloadLoadedOllamaModels();
@@ -93,6 +94,12 @@ private:
   std::unordered_map<std::string, noctalia::ai_usage::QuotaWarningState> m_warningState;
   std::uint64_t m_generation = 0;
   std::chrono::steady_clock::time_point m_claudeLastProbe{};
+  struct LocalRuntimeProbe {
+    std::chrono::steady_clock::time_point nextProbeAt{};
+    std::chrono::seconds backoff{0};
+  };
+  std::array<LocalRuntimeProbe, noctalia::ai_usage::kLocalRuntimeCount> m_localRuntimeProbes{};
+  std::vector<noctalia::ai_usage::LocalRuntime> m_localRuntimesKnown;
   std::optional<int> m_ollamaServePid;
   bool m_ollamaWantLoad = false;
   bool m_ollamaLoadPending = false;

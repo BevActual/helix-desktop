@@ -36,6 +36,7 @@
 #include "dbus/polkit/polkit_poll_source.h"
 #include "dbus/polkit/polkit_session_support.h"
 #include "dbus/power/power_profiles_service.h"
+#include "dbus/bus_name_watch.h"
 #include "dbus/session_bus.h"
 #include "dbus/session_bus_poll_source.h"
 #include "dbus/system_bus.h"
@@ -299,20 +300,15 @@ void Application::installNotificationBusNameWatch() {
     return;
   }
 
-  m_notificationBusNameWatchProxy = sdbus::createProxy(
-      m_bus->connection(), sdbus::ServiceName{"org.freedesktop.DBus"}, sdbus::ObjectPath{"/org/freedesktop/DBus"}
-  );
-  m_notificationBusNameWatchProxy->uponSignal("NameOwnerChanged")
-      .onInterface("org.freedesktop.DBus")
-      .call([this](const std::string& name, const std::string& /*oldOwner*/, const std::string& /*newOwner*/) {
-        if (name != notification_dbus::kFreedesktopNotificationsBusName) {
-          return;
-        }
+  m_notificationBusNameWatch = dbus_watch::watchBusName(
+      m_bus->connection(), notification_dbus::kFreedesktopNotificationsBusName,
+      [this](const std::string& /*name*/, const std::string& /*oldOwner*/, const std::string& /*newOwner*/) {
         DeferredCall::callLater([this]() {
           m_notificationDaemonInitFailed = false;
           syncNotificationDaemon();
         });
-      });
+      }
+  );
   m_notificationBusNameWatchInstalled = true;
 }
 
@@ -321,15 +317,9 @@ void Application::installSecretServiceNameWatch() {
     return;
   }
 
-  m_secretServiceNameWatchProxy = sdbus::createProxy(
-      m_bus->connection(), sdbus::ServiceName{"org.freedesktop.DBus"}, sdbus::ObjectPath{"/org/freedesktop/DBus"}
-  );
-  m_secretServiceNameWatchProxy->uponSignal("NameOwnerChanged")
-      .onInterface("org.freedesktop.DBus")
-      .call([this](const std::string& name, const std::string& /*oldOwner*/, const std::string& newOwner) {
-        if (name != kSecretServiceBusName) {
-          return;
-        }
+  m_secretServiceNameWatch = dbus_watch::watchBusName(
+      m_bus->connection(), kSecretServiceBusName,
+      [this](const std::string& /*name*/, const std::string& /*oldOwner*/, const std::string& newOwner) {
         m_secretServiceOwned = !newOwner.empty();
         if (!m_secretServiceOwned) {
           return;
@@ -339,14 +329,18 @@ void Application::installSecretServiceNameWatch() {
         m_calendarCredentialAutoRetried = false;
         kLog.info("secret service provider appeared on {}", kSecretServiceBusName);
         DeferredCall::callLater([this]() { retrySecretServiceConsumers(); });
-      });
+      }
+  );
   m_secretServiceNameWatchInstalled = true;
 
   // The provider may have claimed the name between our first lookup and this watch. Consumers are
   // still opening at this point, so their change callbacks drive the actual retry.
   try {
     bool hasOwner = false;
-    m_secretServiceNameWatchProxy->callMethod("NameHasOwner")
+    const auto daemon = sdbus::createProxy(
+        m_bus->connection(), sdbus::ServiceName{"org.freedesktop.DBus"}, sdbus::ObjectPath{"/org/freedesktop/DBus"}
+    );
+    daemon->callMethod("NameHasOwner")
         .onInterface("org.freedesktop.DBus")
         .withArguments(std::string{kSecretServiceBusName})
         .storeResultsTo(hasOwner);

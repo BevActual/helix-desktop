@@ -9,6 +9,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <sdbus-c++/TypeTraits.h> // sdbus::Slot
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -194,6 +195,7 @@ private:
   std::shared_ptr<void> m_aliveGuard = std::make_shared<int>(0);
   std::unique_ptr<sdbus::IObject> m_controlObject;
   std::unique_ptr<sdbus::IProxy> m_dbusProxy;
+  sdbus::Slot m_nameWatch; // arg0namespace-filtered NameOwnerChanged
   std::unordered_map<std::string, std::unique_ptr<sdbus::IProxy>> m_playerProxies;
   std::unordered_map<std::string, MprisPlayerInfo> m_players;
   std::unordered_map<std::string, std::string> m_logicalTrackSignatures;

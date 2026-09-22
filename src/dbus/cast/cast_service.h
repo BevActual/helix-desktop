@@ -72,6 +72,7 @@ private:
 
   void notifyChanged();
   void schedulePoll();
+  void completeRefresh(CastSnapshot next);
   void finishRefresh(CastSnapshot next);
   void applyShareCommands(bool enabled);
 
@@ -81,5 +82,9 @@ private:
   ChangeCallback m_changeCallback;
   Timer m_pollTimer;
   bool m_fastPoll = false;
+  bool m_refreshInFlight = false;
+  bool m_refreshQueued = false;
+  // Outlives nothing: worker completions check this before touching the service.
+  std::shared_ptr<void> m_lifetime = std::make_shared<int>(0);
   std::unique_ptr<Impl> m_impl;
 };

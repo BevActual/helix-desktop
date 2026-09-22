@@ -3,6 +3,8 @@
 #include "core/timer_manager.h"
 #include "ui/signal.h"
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -273,5 +275,7 @@ private:
   void drainCastIconResults();
   void pollAppleMirror();
   void startAppleMirror(bool automatic = false);
-  [[nodiscard]] bool pollPhonePointer();
+  void pollPhonePointer();
+  [[nodiscard]] bool applyPhonePointerStatus(const std::optional<nlohmann::json>& status);
+  bool m_pointerProbeInFlight = false;
 };

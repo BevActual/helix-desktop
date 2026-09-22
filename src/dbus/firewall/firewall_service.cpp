@@ -1,5 +1,7 @@
 #include "dbus/firewall/firewall_service.h"
 
+#include "dbus/bus_name_watch.h"
+
 #include "cli/schema_msg.h"
 #include "core/log.h"
 #include "core/process/process.h"
@@ -30,7 +32,6 @@ namespace {
   const sdbus::ServiceName kSystemdName{"org.freedesktop.systemd1"};
   const sdbus::ObjectPath kSystemdPath{"/org/freedesktop/systemd1"};
 
-  constexpr auto kDbusInterface = "org.freedesktop.DBus";
   constexpr auto kFirewallInterface = "org.fedoraproject.FirewallD1";
   constexpr auto kZoneInterface = "org.fedoraproject.FirewallD1.zone";
   constexpr auto kSystemdManager = "org.freedesktop.systemd1.Manager";
@@ -67,6 +68,7 @@ struct FirewallService::Impl {
   FirewallService& self;
   SystemBus& bus;
   std::unique_ptr<sdbus::IProxy> dbus;
+  sdbus::Slot nameWatch;
   std::unique_ptr<sdbus::IProxy> daemon;
   std::shared_ptr<void> lifetime = std::make_shared<int>(0);
   std::uint64_t generation = 0;
@@ -183,18 +185,16 @@ void FirewallService::start() {
     return;
   }
 
-  m_impl->dbus->uponSignal("NameOwnerChanged")
-      .onInterface(kDbusInterface)
-      .call([this](const std::string& name, const std::string& /*oldOwner*/, const std::string& newOwner) {
-        if (name != "org.fedoraproject.FirewallD1") {
-          return;
-        }
+  m_impl->nameWatch = dbus_watch::watchBusName(
+      m_bus.connection(), "org.fedoraproject.FirewallD1",
+      [this](const std::string& /*name*/, const std::string& /*oldOwner*/, const std::string& newOwner) {
         if (newOwner.empty()) {
           detachDaemon();
         } else {
           attachDaemon();
         }
-      });
+      }
+  );
 
   if (m_bus.nameHasOwner("org.fedoraproject.FirewallD1")) {
     attachDaemon();

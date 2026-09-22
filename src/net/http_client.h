@@ -24,6 +24,8 @@ struct HttpRequest {
   bool freshConnection = false;   // bypass curl's connection cache; needed when the route may have changed
                                   // (e.g. probing the external IP after a VPN toggle), otherwise a reused
                                   // keep-alive connection answers via the old path
+  bool quietTransportErrors = false; // liveness probe of a daemon that is usually absent: log a failed
+                                     // connect at debug, not warn
   std::string basicUsername;
   std::string basicPassword;
   std::filesystem::path uploadPath; // when set, POST this file instead of `body`
@@ -127,6 +129,7 @@ private:
     std::string basicPassword;
     std::string response;
     FILE* uploadFile = nullptr;
+    bool quietTransportErrors = false;
     std::array<char, CURL_ERROR_SIZE> errorBuffer{};
   };
 
