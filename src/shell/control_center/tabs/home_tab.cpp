@@ -16,10 +16,12 @@
 #include "render/core/async_texture_cache.h"
 #include "render/scene/input_area.h"
 #include "scripting/plugin_registry.h"
+#include "shell/control_center/pin_reorder.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/profile/avatar_path.h"
+#include "shell/tooltip/tooltip_manager.h"
 #include "shell/wallpaper/wallpaper.h"
 #include "capture/screen_recorder_service.h"
 #include "dbus/cast/cast_service.h"
@@ -915,7 +917,6 @@ std::unique_ptr<Flex> HomeTab::create() {
     const bool enabled = shortcut->enabled();
     const bool isActive = shortcut->active();
 
-    const std::size_t padIdx = m_shortcutPads.size();
     auto btn = ui::button({
         .text = label,
         .glyph = shortcut->displayIcon(),
@@ -927,18 +928,6 @@ std::unique_ptr<Flex> HomeTab::create() {
         .paddingH = Style::spaceMd * scale,
         .gap = Style::spaceSm * scale,
         .radius = 0.0F,
-        .onClick =
-            [this, padIdx]() {
-              if (padIdx < m_shortcutPads.size()) {
-                m_shortcutPads[padIdx].shortcut->onClick();
-              }
-            },
-        .onRightClick =
-            [this, padIdx]() {
-              if (padIdx < m_shortcutPads.size()) {
-                m_shortcutPads[padIdx].shortcut->onRightClick();
-              }
-            },
         .configure =
             [enabled, isActive, scale](Button& button) {
               button.setDirection(FlexDirection::Horizontal);
@@ -955,21 +944,51 @@ std::unique_ptr<Flex> HomeTab::create() {
             },
     });
 
+    // Callbacks resolve the pad by button: a drag-to-reorder moves pads within the list, so
+    // a captured index would go stale.
     Button* btnPtr = btn.get();
+    btnPtr->setOnClick([this, btnPtr]() {
+      if (m_pinDrag.suppressClick) {
+        m_pinDrag.suppressClick = false;
+        return;
+      }
+      if (auto* pad = padForButton(btnPtr); pad != nullptr) {
+        pad->shortcut->onClick();
+      }
+    });
+    btnPtr->setOnRightClick([this, btnPtr]() {
+      if (m_pinDrag.suppressClick) {
+        m_pinDrag.suppressClick = false;
+        return;
+      }
+      if (auto* pad = padForButton(btnPtr); pad != nullptr) {
+        pad->shortcut->onRightClick();
+      }
+    });
+    if (count > 1) {
+      btnPtr->setOnPress([this, btnPtr](float /*localX*/, float localY, bool pressed) {
+        onPinPress(padIndexForButton(btnPtr), localY, pressed);
+      });
+      btnPtr->setOnPointerMotion([this, btnPtr](float /*localX*/, float localY) {
+        onPinMotion(padIndexForButton(btnPtr), localY);
+      });
+    }
     if (auto* ia = btnPtr->inputArea(); ia != nullptr) {
-      ia->setOnAxisHandler([this, padIdx](const InputArea::PointerData& data) -> bool {
-        if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || padIdx >= m_shortcutPads.size()) {
+      ia->setOnAxisHandler([this, btnPtr](const InputArea::PointerData& data) -> bool {
+        auto* pad = padForButton(btnPtr);
+        if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || pad == nullptr) {
           return false;
         }
         const float steps = data.scrollSteps();
         if (steps == 0.0F) {
           return false;
         }
-        return m_shortcutPads[padIdx].shortcut->onScroll(steps > 0.0F ? -1 : 1);
+        return pad->shortcut->onScroll(steps > 0.0F ? -1 : 1);
       });
     }
     ShortcutPad pad;
     pad.shortcut = std::move(shortcut);
+    pad.type = sc.type;
     pad.button = btnPtr;
     pad.glyph = btnPtr->glyph();
     pad.label = btnPtr->label();
@@ -1286,6 +1305,243 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
   if (m_eventGlyph != nullptr) {
     m_eventGlyph->measure(renderer);
   }
+  // Flex layout just reset every pin to its rest slot; a lifted pin keeps its drag offset.
+  if (m_pinDrag.active) {
+    applyPinDragVisuals();
+  }
+}
+
+// ── Pin drag-to-reorder ─────────────────────────────────────────────────────────
+
+void HomeTab::onPinPress(std::size_t index, float localY, bool pressed) {
+  if (index >= m_shortcutPads.size() || m_shortcutPads[index].button == nullptr) {
+    return;
+  }
+  Button* button = m_shortcutPads[index].button;
+  if (pressed) {
+    // Any new press clears leftovers, including a suppressClick whose click never came
+    // because the drag was released outside the pin.
+    m_pinDrag = {};
+    const auto* ia = button->inputArea();
+    if (ia == nullptr || ia->pressedButton() != BTN_LEFT) {
+      return;
+    }
+    m_pinDrag.pressed = true;
+    m_pinDrag.source = index;
+    m_pinDrag.target = index;
+    m_pinDrag.startPointerY = button->y() + localY;
+    m_pinDrag.pointerY = m_pinDrag.startPointerY;
+    return;
+  }
+  if (!m_pinDrag.pressed || m_pinDrag.source != index) {
+    return;
+  }
+  const bool wasActive = m_pinDrag.active;
+  m_pinDrag.pressed = false;
+  if (!wasActive) {
+    m_pinDrag = {};
+    return;
+  }
+  // The click that follows this release belongs to the drag, not the shortcut.
+  m_pinDrag.suppressClick = true;
+  m_pinDrag.active = false;
+  clearPinDragVisuals();
+  commitPinDrag();
+}
+
+void HomeTab::onPinMotion(std::size_t index, float localY) {
+  if (!m_pinDrag.pressed || m_pinDrag.source != index || index >= m_shortcutPads.size()) {
+    return;
+  }
+  Button* button = m_shortcutPads[index].button;
+  if (button == nullptr) {
+    return;
+  }
+  // `button->y()` already carries the drag offset, so pointer stays in column coordinates.
+  m_pinDrag.pointerY = button->y() + localY;
+  if (!m_pinDrag.active) {
+    if (std::fabs(m_pinDrag.pointerY - m_pinDrag.startPointerY) < Style::dragStartThreshold * contentScale()) {
+      return;
+    }
+    liftPin();
+  }
+  const std::size_t slot = pinDropSlot();
+  if (slot != m_pinDrag.target) {
+    m_pinDrag.target = slot;
+  }
+  applyPinDragVisuals();
+  PanelManager::instance().requestRedraw();
+}
+
+void HomeTab::liftPin() {
+  m_pinDrag.active = true;
+  m_pinDrag.restY.clear();
+  m_pinDrag.restY.reserve(m_shortcutPads.size());
+  for (const auto& pad : m_shortcutPads) {
+    m_pinDrag.restY.push_back(pad.button != nullptr ? pad.button->y() : 0.0F);
+  }
+  TooltipManager::instance().onHoverChange(nullptr, static_cast<zwlr_layer_surface_v1*>(nullptr), nullptr);
+}
+
+std::size_t HomeTab::pinDropSlot() const {
+  const std::size_t count = m_shortcutPads.size();
+  if (!m_pinDrag.active || m_pinDrag.restY.size() != count || count == 0) {
+    return m_pinDrag.source;
+  }
+  std::vector<float> heights;
+  heights.reserve(count);
+  for (const auto& pad : m_shortcutPads) {
+    heights.push_back(pad.button != nullptr ? pad.button->height() : 0.0F);
+  }
+  return shell::control_center::pin_reorder::dropSlot(
+      m_pinDrag.restY, heights, m_pinDrag.source, m_pinDrag.pointerY - m_pinDrag.startPointerY
+  );
+}
+
+void HomeTab::applyPinDragVisuals() {
+  const std::size_t count = m_shortcutPads.size();
+  if (!m_pinDrag.active || m_shortcutsColumn == nullptr || m_pinDrag.restY.size() != count) {
+    return;
+  }
+  const std::size_t source = m_pinDrag.source;
+  const std::size_t target = m_pinDrag.target;
+  Button* dragged = m_shortcutPads[source].button;
+  if (dragged == nullptr) {
+    return;
+  }
+  const float h = dragged->height();
+  const float columnH = m_shortcutsColumn->height();
+  float offset = m_pinDrag.pointerY - m_pinDrag.startPointerY;
+  const float minY = 0.0F;
+  const float maxY = std::max(0.0F, columnH - h);
+  offset = std::clamp(m_pinDrag.restY[source] + offset, minY, maxY) - m_pinDrag.restY[source];
+
+  for (std::size_t i = 0; i < count; ++i) {
+    Button* button = m_shortcutPads[i].button;
+    if (button == nullptr) {
+      continue;
+    }
+    float y = m_pinDrag.restY[i];
+    if (i == source) {
+      y += offset;
+      button->setZIndex(200);
+      button->setOpacity(0.88F);
+    } else {
+      // Neighbours between the lifted pin's old and new slots slide by one row.
+      y += h * static_cast<float>(shell::control_center::pin_reorder::rowShift(i, source, target));
+      button->setZIndex(0);
+      button->setOpacity(1.0F);
+    }
+    button->setPosition(button->x(), y);
+  }
+}
+
+void HomeTab::clearPinDragVisuals() {
+  const std::size_t count = m_shortcutPads.size();
+  for (std::size_t i = 0; i < count; ++i) {
+    Button* button = m_shortcutPads[i].button;
+    if (button == nullptr) {
+      continue;
+    }
+    button->setZIndex(0);
+    button->setOpacity(1.0F);
+    if (i < m_pinDrag.restY.size()) {
+      button->setPosition(button->x(), m_pinDrag.restY[i]);
+    }
+  }
+  m_pinDrag.restY.clear();
+  PanelManager::instance().requestRedraw();
+}
+
+void HomeTab::commitPinDrag() {
+  if (m_config == nullptr) {
+    return;
+  }
+  // Pads only include shortcuts that ShortcutRegistry could create; reorder by config type so
+  // an unknown type in config keeps its place.
+  std::vector<std::string> padIds;
+  padIds.reserve(m_shortcutPads.size());
+  for (const auto& pad : m_shortcutPads) {
+    padIds.push_back(pad.type);
+  }
+  auto next = shell::control_center::pin_reorder::reorder(
+      m_config->config().controlCenter.shortcuts, padIds, m_pinDrag.source, m_pinDrag.target
+  );
+  if (!next.has_value()) {
+    return;
+  }
+  ConfigService* config = m_config;
+  // Defer past the release dispatch that called us: moving the row re-parents the node whose
+  // InputArea is still mid-dispatch, and the override write reloads config.
+  DeferredCall::callLater([this, alive = std::weak_ptr<void>(m_aliveGuard), config, source = m_pinDrag.source,
+                           slot = m_pinDrag.target, order = std::move(*next)]() mutable {
+    if (!alive.expired()) {
+      movePinInPlace(source, slot);
+    }
+    if (config != nullptr) {
+      (void)config->setOverride({"control_center", "shortcuts"}, std::move(order));
+    }
+  });
+}
+
+void HomeTab::movePinInPlace(std::size_t source, std::size_t slot) {
+  const std::size_t count = m_shortcutPads.size();
+  if (m_shortcutsColumn == nullptr || source >= count || slot >= count || slot == source) {
+    return;
+  }
+  Button* button = m_shortcutPads[source].button;
+  if (button == nullptr) {
+    return;
+  }
+  // The column owns non-pad children too (its background box), so place the row relative to
+  // the pad that currently occupies the target slot rather than by pad index.
+  const auto childIndexOf = [this](const Node* target) -> std::optional<std::size_t> {
+    const auto& kids = m_shortcutsColumn->children();
+    for (std::size_t i = 0; i < kids.size(); ++i) {
+      if (kids[i].get() == target) {
+        return i;
+      }
+    }
+    return std::nullopt;
+  };
+  const std::size_t anchorPad = slot < source ? slot : slot + 1; // pad the row lands in front of
+  std::optional<std::size_t> insertAt;
+  if (anchorPad < count) {
+    insertAt = childIndexOf(m_shortcutPads[anchorPad].button);
+  } else if (const auto last = childIndexOf(m_shortcutPads[count - 1].button); last.has_value()) {
+    insertAt = *last + 1;
+  }
+  const auto sourceChild = childIndexOf(button);
+  if (!insertAt.has_value() || !sourceChild.has_value()) {
+    return;
+  }
+  if (*sourceChild < *insertAt) {
+    --*insertAt; // removing the row first shifts everything below it up by one
+  }
+  auto node = m_shortcutsColumn->removeChild(button);
+  if (node == nullptr) {
+    return;
+  }
+  m_shortcutsColumn->insertChildAt(*insertAt, std::move(node));
+  ShortcutPad pad = std::move(m_shortcutPads[source]);
+  m_shortcutPads.erase(m_shortcutPads.begin() + static_cast<std::ptrdiff_t>(source));
+  m_shortcutPads.insert(m_shortcutPads.begin() + static_cast<std::ptrdiff_t>(slot), std::move(pad));
+  PanelManager::instance().requestLayout();
+  PanelManager::instance().requestRedraw();
+}
+
+std::size_t HomeTab::padIndexForButton(const Button* button) const noexcept {
+  for (std::size_t i = 0; i < m_shortcutPads.size(); ++i) {
+    if (m_shortcutPads[i].button == button) {
+      return i;
+    }
+  }
+  return m_shortcutPads.size();
+}
+
+ShortcutPad* HomeTab::padForButton(const Button* button) noexcept {
+  const std::size_t index = padIndexForButton(button);
+  return index < m_shortcutPads.size() ? &m_shortcutPads[index] : nullptr;
 }
 
 InputArea* HomeTab::addCardOverlay(Flex& card, std::function<void()> onActivate) {
@@ -1989,6 +2245,7 @@ void HomeTab::onClose() {
   m_nextRealtimeUpdateAt = {};
   m_lastRealtimeMprisPollAt = {};
   m_shortcutsColumn = nullptr;
+  m_pinDrag = {};
   // Keep Shortcut instances alive; drop only the UI pointers destroyed with the scene.
   for (auto& pad : m_shortcutPads) {
     if (pad.shortcut != nullptr) {

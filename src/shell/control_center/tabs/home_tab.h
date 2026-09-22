@@ -44,6 +44,7 @@ namespace scripting {
 struct ShortcutPad {
   // Survives HomeTab::onClose(); button/glyph/label are nulled with the scene.
   std::unique_ptr<Shortcut> shortcut;
+  std::string type; // config `type` this pad was created from
   Button* button = nullptr;
   Glyph* glyph = nullptr;
   Label* label = nullptr;
@@ -198,6 +199,32 @@ private:
 
   Flex* m_shortcutsColumn = nullptr;
   std::vector<ShortcutPad> m_shortcutPads;
+
+  // Drag-to-reorder for the optional pins (Quick Settings / Control Center edit gesture):
+  // press a pin and move past the drag threshold to lift it; neighbours slide aside to show
+  // the drop slot; release commits the new order to `control_center.shortcuts`.
+  struct PinDrag {
+    bool pressed = false;       // left button held on `source`
+    bool active = false;        // moved past the threshold; pin is lifted
+    bool suppressClick = false; // swallow the click that follows a drag release
+    std::size_t source = 0;
+    std::size_t target = 0;     // insertion slot in [0, count]
+    float startPointerY = 0.0F; // pointer in column coords at press
+    float pointerY = 0.0F;      // latest pointer in column coords
+    std::vector<float> restY;   // each pin's laid-out y at lift time
+  };
+  PinDrag m_pinDrag;
+  void onPinPress(std::size_t index, float localY, bool pressed);
+  void onPinMotion(std::size_t index, float localY);
+  void liftPin();
+  void applyPinDragVisuals();
+  void clearPinDragVisuals();
+  void commitPinDrag();
+  // Moves the pad and its row so the open panel shows the new order without a rebuild.
+  void movePinInPlace(std::size_t source, std::size_t slot);
+  [[nodiscard]] std::size_t pinDropSlot() const;
+  [[nodiscard]] std::size_t padIndexForButton(const Button* button) const noexcept;
+  [[nodiscard]] ShortcutPad* padForButton(const Button* button) noexcept;
   // Plugin config as of the last pin list build. A plugin shortcut seeds its Luau
   // runtime at construction, so a change here must block instance reuse.
   PluginsConfig m_lastPlugins;
