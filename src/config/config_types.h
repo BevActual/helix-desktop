@@ -1265,6 +1265,9 @@ struct PhoneConfig {
   // Mirror iPhone notifications to the desktop over Apple Notification Center Service on the
   // Helix Phone Bluetooth link. The phone has to allow "Share System Notifications" for it.
   bool notifications = true;
+  // Play the Android phone's audio on this computer while it casts (scrcpy audio forwarding,
+  // Android 11+). The phone itself goes quiet for the session, like a cast should.
+  bool castAudio = true;
 
   bool operator==(const PhoneConfig&) const = default;
 };

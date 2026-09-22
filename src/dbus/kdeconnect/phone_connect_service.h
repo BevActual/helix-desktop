@@ -195,6 +195,8 @@ public:
   // [phone] notifications: mirror iPhone notifications to the desktop over ANCS. The
   // script is told on every status poll that disagrees, so a restart self-heals.
   void setPhoneNotifications(bool enabled);
+  // [phone] cast_audio: forward the Android phone's audio through scrcpy while casting.
+  void setCastAudio(bool enabled) noexcept { m_castAudio = enabled; }
   // Ends the phone's current session (UxPlay has no per-client kick) and, when the
   // receiver is always-on, brings it straight back.
   void restartReceiver();
@@ -244,6 +246,7 @@ private:
   std::uint32_t m_airplayGeneration = 0;
   bool m_mirrorAlwaysOn = true;
   bool m_phoneNotifications = true;
+  bool m_castAudio = true;
   bool m_receiverUserStopped = false; // Stop pressed: no auto re-arm until Start
   bool m_armPending = false;
   bool m_destroying = false;

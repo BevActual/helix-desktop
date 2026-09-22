@@ -672,6 +672,35 @@ std::unique_ptr<Flex> PhoneTab::create() {
       })
   );
   castHost->addChild(std::move(castAdbRow));
+  // [phone] cast_audio: leftover grouped row, Android peers only.
+  auto audioRow = ui::row({
+      .out = &m_castAudioRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  audioRow->addChild(ui::label({
+      .text = i18n::tr("control-center.phone.cast-audio"),
+      .fontSize = Style::fontSizeBody * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .flexGrow = 1.0F,
+  }));
+  audioRow->addChild(ui::toggle({
+      .out = &m_castAudio,
+      .checkedImmediate = false,
+      .toggleSize = ToggleSize::Medium,
+      .scale = scale,
+  }));
+  m_castAudio->setOnChange([this](bool value) {
+    if (m_config != nullptr) {
+      (void)m_config->setOverride({"phone", "cast_audio"}, value);
+    }
+    if (m_service != nullptr) {
+      m_service->setCastAudio(value);
+    }
+  });
+  castHost->addChild(std::move(audioRow));
   castHost->addChild(
       ui::input({
           .out = &m_castSearchInput,
@@ -971,6 +1000,8 @@ void PhoneTab::onClose() {
   m_castPointerActions = nullptr;
   m_castPointerSetup = nullptr;
   m_castAdbRow = nullptr;
+  m_castAudioRow = nullptr;
+  m_castAudio = nullptr;
   m_castHostInput = nullptr;
   m_castPairInput = nullptr;
   m_castSearchInput = nullptr;
@@ -1676,6 +1707,10 @@ void PhoneTab::rebuildCast() {
       (void)setShown(m_castEmpty, applePeer || !showSearch || cast.apps.empty());
     }
     (void)setShown(m_castAdbRow, showAdbRow);
+    (void)setShown(m_castAudioRow, showAdbRow);
+    if (m_castAudio != nullptr && m_config != nullptr) {
+      m_castAudio->setChecked(m_config->config().phone.castAudio);
+    }
     (void)setShown(m_castSearchInput, showSearch);
     if (m_castHostInput != nullptr && showAdbRow) {
       const std::string suggested =

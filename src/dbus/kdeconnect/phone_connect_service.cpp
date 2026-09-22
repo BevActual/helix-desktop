@@ -435,7 +435,7 @@ namespace {
   }
 
   [[nodiscard]] std::vector<std::string> scrcpyArgs(
-      const std::string& serial, std::string windowTitle, std::initializer_list<const char*> extra
+      const std::string& serial, std::string windowTitle, bool audio, std::initializer_list<const char*> extra
   ) {
     using compositors::niri::kPhoneMirrorHeight;
     using compositors::niri::kPhoneMirrorWidth;
@@ -447,6 +447,11 @@ namespace {
     }
     for (const char* flag : extra) {
       args.emplace_back(flag);
+    }
+    // scrcpy forwards audio by default on Android 11+ and quietly carries on without it
+    // on older phones; --no-audio is the explicit opt-out.
+    if (!audio) {
+      args.emplace_back("--no-audio");
     }
     args.push_back(std::format("--window-width={}", kPhoneMirrorWidth));
     args.push_back(std::format("--window-height={}", kPhoneMirrorHeight));
@@ -2861,7 +2866,7 @@ void PhoneConnectService::launchCastMirror(const std::string& deviceId) {
     saveCastAdbHost(deviceId, *serial);
   }
   const std::string title = device->name.empty() ? device->id : device->name;
-  auto args = scrcpyArgs(*serial, title, {"--max-size=1080", "--no-audio"});
+  auto args = scrcpyArgs(*serial, title, m_castAudio, {"--max-size=1080"});
   (void)process::runAsync(std::move(args));
 }
 
@@ -2885,7 +2890,7 @@ void PhoneConnectService::launchCastApp(
   }
   recordCastRecent(deviceId, package, label);
   const std::string windowTitle = label.empty() ? package : label;
-  auto args = scrcpyArgs(*serial, windowTitle, {"--new-display=1080x2400", "--no-audio"});
+  auto args = scrcpyArgs(*serial, windowTitle, m_castAudio, {"--new-display=1080x2400"});
   args.push_back("--start-app=" + package);
   (void)process::runAsync(std::move(args));
   if (m_cast.deviceId == deviceId) {

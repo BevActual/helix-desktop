@@ -346,6 +346,7 @@ port = 53317                      # TCP/UDP LocalSend port
 [phone]
 mirror_always_on = true           # keep the iPhone AirPlay receiver + Bluetooth pointer up while an iPhone is paired
 notifications = true              # mirror iPhone notifications to the desktop (ANCS over the Helix Phone Bluetooth link)
+cast_audio = true                 # play the Android phone's audio here while it casts (scrcpy, Android 11+)
 
 # ── Audio ─────────────────────────────────────────────────────────────────────
 

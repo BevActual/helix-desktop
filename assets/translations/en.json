@@ -1114,6 +1114,7 @@
       "cast-airplay-streaming": "The iPhone is mirroring. Close the mirror window or Disconnect to end the session; the receiver stays ready.",
       "cast-airplay-waiting": "Waiting for the iPhone… Screen Mirroring → {name}. Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices to move the pointer.",
       "cast-always-on": "Keep receiver ready",
+      "cast-audio": "Play phone audio here",
       "cast-notifications": "iPhone notifications",
       "cast-notifications-allow": "Connected. On the iPhone, allow them once: Settings → Bluetooth → Helix Phone ⓘ → Share System Notifications.",
       "cast-notifications-starting": "Starting Helix Phone…",
