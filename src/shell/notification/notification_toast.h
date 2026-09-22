@@ -2,6 +2,7 @@
 
 #include "core/timer_manager.h"
 #include "notification/notification.h"
+#include "notification/notification_semantics.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_dispatcher.h"
 #include "system/icon_resolver.h"
@@ -65,8 +66,10 @@ private:
     std::optional<std::string> icon;
     std::optional<NotificationImageData> imageData;
     Urgency urgency = Urgency::Normal;
+    NotificationSemantic semantic = NotificationSemantic::None;
     NotificationDndPolicy dndPolicy = NotificationDndPolicy::Respect;
     int displayDurationMs = 0; // -1 = persistent (no auto-dismiss)
+    std::optional<int> progress; // live activity: the bar shows this instead of a countdown
     int32_t rawTimeoutMs = 0;  // raw DBus timeout; >0 means manager has an auto-expire timer we must coordinate with
     float remainingProgress = 1.0F;
     float y = -1.0F; // stable top position while visible; negative = queued/off-screen
@@ -163,6 +166,9 @@ private:
   void resumeTimeout(uint32_t notificationId, int totalDuration);
   void pauseCountdowns(uint32_t notificationId);
   void resumeCountdowns(uint32_t notificationId);
+  // Live activity: drive the card's bar from entry.progress. Returns false when the entry has no
+  // progress so the caller runs the countdown instead.
+  bool applyLiveProgress(Instance& inst, Instance::CardState& cs, const PopupEntry& entry, bool animateChange);
   void revealQueuedEntries();
   void enforceMaxVisible();
   void collapseStack();

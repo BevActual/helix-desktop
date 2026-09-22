@@ -9,6 +9,9 @@ namespace Style {
   inline constexpr int animFast = 100;
   inline constexpr int animNormal = 200;
   inline constexpr int animSlow = 400;
+  // Settle time for Easing::Spring / SpringBouncy. A spring reaches ~90% by 40% of this, so
+  // it reads as quick as animNormal while the tail is soft.
+  inline constexpr int animSpring = 320;
 
   inline constexpr float radiusSm = 3.0F;
   inline constexpr float radiusMd = 6.0F;

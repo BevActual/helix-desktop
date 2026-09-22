@@ -1,6 +1,7 @@
 #include "render/animation/animation_manager.h"
 #include "render/animation/motion_service.h"
 
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 
@@ -91,6 +92,29 @@ int main() {
     ok &= check(!completed, "timer animation completed early while motion was disabled");
     ok &= check(manager.hasActive(), "timer animation was removed early while motion was disabled");
     manager.cancel(id);
+  }
+
+  {
+    // Springs: both land exactly on the target, Spring never leaves [0,1], SpringBouncy overshoots
+    // once by a few percent and is monotone before its peak.
+    ok &= check(nearlyEqual(applyEasing(Easing::Spring, 0.0F), 0.0F), "Spring starts at 0");
+    ok &= check(nearlyEqual(applyEasing(Easing::Spring, 1.0F), 1.0F), "Spring ends at 1");
+    ok &= check(nearlyEqual(applyEasing(Easing::SpringBouncy, 0.0F), 0.0F), "SpringBouncy starts at 0");
+    ok &= check(nearlyEqual(applyEasing(Easing::SpringBouncy, 1.0F), 1.0F), "SpringBouncy ends at 1");
+
+    float prev = 0.0F;
+    float bouncyMax = 0.0F;
+    bool springMonotone = true;
+    for (int i = 1; i <= 100; ++i) {
+      const float t = static_cast<float>(i) / 100.0F;
+      const float s = applyEasing(Easing::Spring, t);
+      springMonotone &= s >= prev - 1e-5F && s <= 1.0F + 1e-5F;
+      prev = s;
+      bouncyMax = std::max(bouncyMax, applyEasing(Easing::SpringBouncy, t));
+    }
+    ok &= check(springMonotone, "Spring is monotone and never overshoots");
+    ok &= check(bouncyMax > 1.03F && bouncyMax < 1.12F, "SpringBouncy overshoots by a few percent");
+    ok &= check(applyEasing(Easing::Spring, 0.4F) > 0.85F, "Spring reaches ~90% by 40% of its duration");
   }
 
   resetMotion();

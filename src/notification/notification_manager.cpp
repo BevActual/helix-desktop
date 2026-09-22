@@ -241,6 +241,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
   auto& imageData = request.imageData;
   auto& category = request.category;
   auto& desktopEntry = request.desktopEntry;
+  const auto progress = request.progress;
   const auto& forcedId = request.forcedId;
 
   if (actions.size() > kMaxNotificationActions * 2) {
@@ -277,6 +278,13 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
     timeout = kDefaultNotificationTimeout;
   }
 
+  // A live activity (progress below 100) stays until the sender reports completion or closes it,
+  // like Android Live Updates and iOS Live Activities, even under allow_permanent = false: it is
+  // not permanent, the sender ends it. The sender's timeout applies to its final update.
+  if (progress.has_value() && *progress < 100) {
+    timeout = 0;
+  }
+
   if (replacesId != 0) {
     if (m_suppressedIds.contains(replacesId)) {
       if (dispatch.fullySuppress) {
@@ -303,7 +311,8 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
            || n.icon != icon
            || n.imageData != imageData
            || n.category != category
-           || n.desktopEntry != desktopEntry);
+           || n.desktopEntry != desktopEntry
+           || n.progress != progress);
 
       n.origin = origin;
       n.transient = transient;
@@ -318,6 +327,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
       n.imageData = std::move(imageData);
       n.category = std::move(category);
       n.desktopEntry = std::move(desktopEntry);
+      n.progress = progress;
       n.receivedTime = now;
       n.expiryTime = scheduleExpiry(now, timeout);
       n.receivedWallClock = wallNow;
@@ -375,6 +385,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
           .imageData = std::move(imageData),
           .category = std::move(category),
           .desktopEntry = std::move(desktopEntry),
+          .progress = progress,
           .receivedTime = now,
           .expiryTime = scheduleExpiry(now, timeout),
           .receivedWallClock = wallNow,

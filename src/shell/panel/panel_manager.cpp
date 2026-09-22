@@ -2238,8 +2238,8 @@ void PanelManager::startAttachedOpenAnimation() {
 
   m_attachedOpenAnimationPending = false;
   m_animations.animate(
-      m_attachedRevealProgress, 1.0F, Style::animNormal, Easing::EaseOutCubic,
-      [this](float v) { applyAttachedReveal(v); }, {}, m_attachedRevealClipNode
+      m_attachedRevealProgress, 1.0F, Style::animSpring, Easing::Spring, [this](float v) { applyAttachedReveal(v); },
+      {}, m_attachedRevealClipNode
   );
 }
 
@@ -2655,7 +2655,7 @@ void PanelManager::buildScene(std::uint32_t width, std::uint32_t height) {
     } else {
       applyDetachedReveal(0.0F);
       m_animations.animate(
-          0.0F, 1.0F, Style::animNormal, Easing::EaseOutCubic, [this](float v) { applyDetachedReveal(v); }, {},
+          0.0F, 1.0F, Style::animSpring, Easing::Spring, [this](float v) { applyDetachedReveal(v); }, {},
           m_sceneRoot.get()
       );
     }

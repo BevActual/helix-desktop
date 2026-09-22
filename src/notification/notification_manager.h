@@ -60,6 +60,7 @@ struct NotificationRequest {
   std::optional<NotificationImageData> imageData = std::nullopt;
   std::optional<std::string> category = std::nullopt;
   std::optional<std::string> desktopEntry = std::nullopt;
+  std::optional<int> progress = std::nullopt;
   std::optional<uint32_t> forcedId = std::nullopt;
 };
 

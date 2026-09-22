@@ -11,6 +11,7 @@
 #include "net/uri.h"
 #include "notification/notification_display_name.h"
 #include "notification/notification_manager.h"
+#include "notification/notification_semantics.h"
 #include "render/core/texture_manager.h"
 #include "render/render_context.h"
 #include "render/render_target.h"
@@ -296,7 +297,17 @@ namespace {
     });
   }
 
-  ColorSpec toastProgressFillColor(Urgency urgency) {
+  // Top accent bar. Meaning wins over urgency: a `transfer.complete` is green, a `.error` red.
+  // Low urgency with no meaning stays quiet in the foreground color.
+  ColorSpec toastProgressFillColor(Urgency urgency, NotificationSemantic semantic) {
+    if (semantic == NotificationSemantic::Danger) {
+      return colorSpecFromRole(ColorRole::Error);
+    }
+    if (semantic != NotificationSemantic::None) {
+      return fixedColorSpec(
+          semanticAccent(semantic, colorForRole(ColorRole::Primary, 1.0F), colorForRole(ColorRole::Error, 1.0F))
+      );
+    }
     switch (urgency) {
     case Urgency::Critical:
       return colorSpecFromRole(ColorRole::Error);
@@ -308,8 +319,14 @@ namespace {
     }
   }
 
-  bool showToastProgressAccent(Urgency urgency, int displayDurationMs) {
-    return displayDurationMs >= 0 || urgency == Urgency::Critical;
+  bool showToastProgressAccent(Urgency urgency, int displayDurationMs, bool liveProgress, NotificationSemantic semantic) {
+    return liveProgress || displayDurationMs >= 0 || urgency == Urgency::Critical
+        || semantic != NotificationSemantic::None;
+  }
+
+  // A countdown shrinks from both ends; real progress fills left to right.
+  ProgressBarOrientation toastProgressOrientation(bool liveProgress) {
+    return liveProgress ? ProgressBarOrientation::Horizontal : ProgressBarOrientation::HorizontalCentered;
   }
 
   std::vector<std::unique_ptr<Button>>
@@ -351,7 +368,7 @@ namespace {
   float measureToastCardHeight(
       Renderer& renderer, const ConfigService* config, std::string_view appName, std::string_view summary,
       std::string_view body, const std::vector<std::string>& actions, Urgency urgency, int displayDurationMs,
-      int summaryLines, int bodyLines, float scale
+      bool liveProgress, NotificationSemantic semantic, int summaryLines, int bodyLines, float scale
   ) {
     const float cardW = cardWidth(scale);
     const float maxCardHeight = maxToastCardHeight(scale);
@@ -364,14 +381,14 @@ namespace {
     auto card = ui::column(
         {.maxHeight = maxCardHeight, .clipChildren = true, .width = cardW},
         ui::progressBar({
-            .fill = toastProgressFillColor(urgency),
+            .fill = toastProgressFillColor(urgency, semantic),
             .track = clearColorSpec(),
             .radius = progressHeight(scale) * 0.5F,
-            .orientation = ProgressBarOrientation::HorizontalCentered,
+            .orientation = toastProgressOrientation(liveProgress),
             .width = std::max(0.0F, cardW - topProgressInset(scale) * 2.0F),
             .height = progressHeight(scale),
-            .visible = showToastProgressAccent(urgency, displayDurationMs),
-            .participatesInLayout = showToastProgressAccent(urgency, displayDurationMs),
+            .visible = showToastProgressAccent(urgency, displayDurationMs, liveProgress, semantic),
+            .participatesInLayout = showToastProgressAccent(urgency, displayDurationMs, liveProgress, semantic),
             .configure = [scale](ProgressBar& progress) { progress.setPosition(topProgressInset(scale), 0.0F); },
         })
     );
@@ -692,18 +709,27 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
         const float previousHeight = m_entries[i].height;
         const int prevToastBodyLines = m_entries[i].toastBodyLines;
         const bool previouslyPlaced = hasPlacement(m_entries[i]);
+        // Bar orientation and visibility depend on whether progress is present, so a flip rebuilds the card.
+        const bool progressModeChanged = m_entries[i].progress.has_value() != n.progress.has_value();
+        const NotificationSemantic newSemantic = notificationSemantic(n);
+        const bool semanticChanged = m_entries[i].semantic != newSemantic;
+        const bool progressOnlyUpdate = n.progress.has_value() && m_entries[i].progress != n.progress;
         m_entries[i].appName = notificationDisplayAppName(n);
         m_entries[i].summary = n.summary;
+        m_entries[i].progress = n.progress;
         m_entries[i].body = n.body;
         m_entries[i].actions = n.actions;
         m_entries[i].icon = n.icon;
         m_entries[i].imageData = n.imageData;
         m_entries[i].dndPolicy = n.dndPolicy;
+        m_entries[i].semantic = newSemantic;
         refreshEntryGeometry(m_entries[i]);
         m_entries[i].rawTimeoutMs = n.timeout;
         const bool layoutChanged = contentChanged
             || actionSetChanged
             || imageDataChanged
+            || progressModeChanged
+            || semanticChanged
             || std::abs(previousHeight - m_entries[i].height) > 0.5F
             || prevToastBodyLines != m_entries[i].toastBodyLines;
         const bool hovered = m_entries[i].hovered;
@@ -784,7 +810,7 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
               const float targetY = cardSurfaceY(*inst, i);
               Instance* instPtr = inst.get();
               cs.entryAnimId = inst->animations.animate(
-                  preservedReveal, 1.0F, Style::animNormal, Easing::EaseOutCubic,
+                  preservedReveal, 1.0F, Style::animSpring, Easing::Spring,
                   [this, viewport = cs.cardNode, content = cs.cardContent, foreground = cs.cardForeground, targetY,
                    cardHeight = cs.clipHeight, scale = notificationUiScale(m_config),
                    edgePad = horizontalInnerPad(notificationUiScale(m_config))](float v) {
@@ -810,8 +836,12 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
           const int newDuration = resolveDisplayDuration(n.timeout);
           m_entries[i].displayDurationMs = newDuration;
           m_entries[i].remainingProgress = 1.0F;
-          if (newDuration < 0) {
-            cs.progressBar->setOpacity(n.urgency == Urgency::Critical ? 1.0F : 0.0F);
+          if (applyLiveProgress(*inst, cs, m_entries[i], !layoutChanged)) {
+            // bar driven by progress; the manager's expiry timer (if any) handles dismissal
+          } else if (newDuration < 0) {
+            cs.progressBar->setOpacity(
+                (n.urgency == Urgency::Critical || m_entries[i].semantic != NotificationSemantic::None) ? 1.0F : 0.0F
+            );
             cs.progressBar->setProgress(1.0F);
             cs.countdownAnimId = 0;
           } else {
@@ -836,8 +866,9 @@ void NotificationToast::onNotificationEvent(const Notification& n, NotificationE
             }
           }
 
-          // Flash
-          if (cs.cardForeground != nullptr) {
+          // Flash. A live activity ticking its progress is not news; only flash when the words changed.
+          const bool flash = !progressOnlyUpdate || contentChanged || actionSetChanged || imageDataChanged;
+          if (flash && cs.cardForeground != nullptr) {
             cs.cardForeground->setOpacity(0.7F);
             inst->animations.animate(
                 0.7F, 1.0F, Style::animFast, Easing::EaseOutCubic,
@@ -922,8 +953,10 @@ void NotificationToast::addPopup(const Notification& n) {
   entry.icon = n.icon;
   entry.imageData = n.imageData;
   entry.urgency = n.urgency;
+  entry.semantic = notificationSemantic(n);
   entry.dndPolicy = n.dndPolicy;
   entry.displayDurationMs = resolveDisplayDuration(n.timeout);
+  entry.progress = n.progress;
   entry.rawTimeoutMs = n.timeout;
   entry.remainingProgress = 1.0F;
   refreshEntryGeometry(entry);
@@ -1070,7 +1103,7 @@ void NotificationToast::addCardToInstance(Instance& inst, std::size_t entryIndex
 
   // Entry animation
   cs.entryAnimId = inst.animations.animate(
-      0.0F, 1.0F, Style::animNormal, Easing::EaseOutCubic,
+      0.0F, 1.0F, Style::animSpring, Easing::Spring,
       [this, viewport = cs.cardNode, content = cs.cardContent, foreground = cs.cardForeground, targetY,
        cardHeight = cs.clipHeight, scale = notificationUiScale(m_config),
        edgePad = horizontalInnerPad(notificationUiScale(m_config))](float v) {
@@ -1088,9 +1121,13 @@ void NotificationToast::addCardToInstance(Instance& inst, std::size_t entryIndex
   // calls removePopup when it finishes; dismissPopup's `exiting` guard dedupes. Picking
   // a single "driver" instance is unsafe because addCardToInstance skips instances
   // whose surface can't fit the card, so the nominal driver may never have a card at all.
-  if (entry.displayDurationMs < 0) {
+  if (applyLiveProgress(inst, cs, entry, false)) {
+    // bar shows work progress, not time
+  } else if (entry.displayDurationMs < 0) {
     // Persistent — no countdown, no auto-dismiss
-    cs.progressBar->setOpacity(entry.urgency == Urgency::Critical ? 1.0F : 0.0F);
+    cs.progressBar->setOpacity(
+        (entry.urgency == Urgency::Critical || entry.semantic != NotificationSemantic::None) ? 1.0F : 0.0F
+    );
     cs.progressBar->setProgress(1.0F);
     cs.countdownAnimId = 0;
   } else {
@@ -1423,6 +1460,28 @@ void NotificationToast::resumeTimeout(uint32_t notificationId, int totalDuration
   resumeCountdowns(notificationId);
 }
 
+bool NotificationToast::applyLiveProgress(Instance& inst, Instance::CardState& cs, const PopupEntry& entry, bool animateChange) {
+  if (!entry.progress.has_value() || cs.progressBar == nullptr) {
+    return false;
+  }
+  if (cs.countdownAnimId != 0) {
+    inst.animations.cancel(cs.countdownAnimId);
+    cs.countdownAnimId = 0;
+  }
+  const float target = std::clamp(static_cast<float>(*entry.progress) / 100.0F, 0.0F, 1.0F);
+  cs.progressBar->setOpacity(1.0F);
+  const float current = std::clamp(cs.progressBar->progress(), 0.0F, 1.0F);
+  if (!animateChange || std::abs(current - target) < 0.001F) {
+    cs.progressBar->setProgress(target);
+    return true;
+  }
+  inst.animations.animate(
+      current, target, Style::animNormal, Easing::EaseOutCubic,
+      [pb = cs.progressBar](float v) { pb->setProgress(v); }, {}, cs.progressBar
+  );
+  return true;
+}
+
 void NotificationToast::pauseCountdowns(uint32_t notificationId) {
   auto* entry = findEntry(notificationId);
   float remaining = (entry != nullptr) ? std::clamp(entry->remainingProgress, 0.0F, 1.0F) : 1.0F;
@@ -1432,7 +1491,7 @@ void NotificationToast::pauseCountdowns(uint32_t notificationId) {
     if (state == nullptr) {
       continue;
     }
-    if (state->progressBar != nullptr) {
+    if (state->progressBar != nullptr && (entry == nullptr || !entry->progress.has_value())) {
       remaining = std::clamp(state->progressBar->progress(), 0.0F, 1.0F);
     }
     if (state->countdownAnimId == 0) {
@@ -1449,7 +1508,8 @@ void NotificationToast::pauseCountdowns(uint32_t notificationId) {
 
 void NotificationToast::resumeCountdowns(uint32_t notificationId) {
   auto* entry = findEntry(notificationId);
-  if (entry == nullptr || entry->displayDurationMs < 0 || entry->hovered || entry->replyInputFocused) {
+  if (entry == nullptr || entry->displayDurationMs < 0 || entry->hovered || entry->replyInputFocused
+      || entry->progress.has_value()) {
     return;
   }
 
@@ -1694,7 +1754,8 @@ void NotificationToast::refreshEntryGeometry(PopupEntry& entry) const {
       maxToastCardHeight(scale),
       measureToastCardHeight(
           measureRenderer, m_config, entry.appName, entry.summary, entry.body, entry.actions, entry.urgency,
-          entry.displayDurationMs, kMaxSummaryLines, entry.toastBodyLines, scale
+          entry.displayDurationMs, entry.progress.has_value(), entry.semantic, kMaxSummaryLines, entry.toastBodyLines,
+          scale
       )
   );
 }
@@ -1919,7 +1980,7 @@ void NotificationToast::collapseStack() {
         Node* content = cs.cardContent;
         Node* foreground = cs.cardForeground;
         cs.entryAnimId = inst->animations.animate(
-            currentReveal, 1.0F, Style::animNormal, Easing::EaseOutCubic,
+            currentReveal, 1.0F, Style::animSpring, Easing::Spring,
             [this, viewport, content, foreground, newSurfY, cardHeight, scale,
              edgePad = horizontalInnerPad(scale)](float v) {
               applyCardRevealNodes(
@@ -1940,8 +2001,9 @@ void NotificationToast::collapseStack() {
       const float oldSurfY = cs.cardNode->y();
       Node* cardNode = cs.cardNode;
 
+      // Cards closing ranks after a dismissal: a little overshoot reads as weight, like the iOS stack.
       cs.slideAnimId = inst->animations.animate(
-          oldSurfY, newSurfY, Style::animNormal, Easing::EaseInOutQuad,
+          oldSurfY, newSurfY, Style::animSpring, Easing::SpringBouncy,
           [cardNode, px](float v) { cardNode->setPosition(px, v); },
           [this, instPtr, entryId]() {
             if (auto* state = findCardState(*instPtr, entryId); state != nullptr) {
@@ -2363,14 +2425,18 @@ InputArea* NotificationToast::buildCard(
   foreground->addChild(
       ui::progressBar({
           .out = outProgress,
-          .fill = toastProgressFillColor(entry.urgency),
+          .fill = toastProgressFillColor(entry.urgency, entry.semantic),
           .track = clearColorSpec(),
           .radius = progressHeight(scale) * 0.5F,
-          .orientation = ProgressBarOrientation::HorizontalCentered,
+          .orientation = toastProgressOrientation(entry.progress.has_value()),
           .width = std::max(0.0F, cardW - topProgressInset(scale) * 2.0F),
           .height = progressHeight(scale),
-          .visible = showToastProgressAccent(entry.urgency, entry.displayDurationMs),
-          .participatesInLayout = showToastProgressAccent(entry.urgency, entry.displayDurationMs),
+          .visible = showToastProgressAccent(
+              entry.urgency, entry.displayDurationMs, entry.progress.has_value(), entry.semantic
+          ),
+          .participatesInLayout = showToastProgressAccent(
+              entry.urgency, entry.displayDurationMs, entry.progress.has_value(), entry.semantic
+          ),
           .configure = [scale](ProgressBar& progress) { progress.setPosition(topProgressInset(scale), 0.0F); },
       })
   );

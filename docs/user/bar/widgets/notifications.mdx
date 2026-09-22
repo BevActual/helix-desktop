@@ -10,11 +10,45 @@ Shows the pending notification count. Right-clicking toggles transient Do Not Di
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `hide_when_no_unread` | bool | `false` | Hide the widget when there are no unread notifications |
+| `live_max_width` | int | `160` | Width in logical px for the live activity summary; `0` shows only the ring |
 
 ```toml
 [widget.notifications]
 hide_when_no_unread = true
+live_max_width = 200
 ```
+
+## Live activities
+
+A notification that carries the freedesktop `value` hint (0–100) is ongoing work: a copy in Files, a
+download, a system update, a phone transfer. While it is below 100 the bell gives way to a chip with a
+progress ring and the notification's summary, and the toast shows the same progress as a bar instead of
+its dismiss countdown. The notification stays until the sender reports 100 or closes it, whatever timeout
+it asked for; at 100 the sender's timeout applies again. With several running the chip shows the newest
+and a `+N` count. `hide_when_no_unread` never hides a live chip.
+
+```sh
+id=$(notify-send -p -a Files "Copying 'Fedora.iso'" "1.2 GB of 5.4 GB" -h int:value:22 -t 0)
+notify-send -r "$id" -a Files "Copying 'Fedora.iso'" "3.4 GB of 5.4 GB" -h int:value:63 -t 0
+notify-send -r "$id" -a Files "Copied 'Fedora.iso'" "5.4 GB" -h int:value:100 -t 4000
+```
+
+## Semantic accents
+
+The toast's top accent and the live chip's ring take their color from the notification's meaning, the
+same four colors iOS system colors and Android 17's semantic color API agree on. Danger is the palette's
+error color; the others are fixed hues harmonized toward the palette primary so they read as one family
+with the wallpaper.
+
+| Category | Accent |
+|----------|--------|
+| `*.error`, or critical urgency | red (palette error) |
+| `network.disconnected`, `device.removed`, `email.bounced`, `presence.offline` | orange |
+| `transfer.complete`, `network.connected`, `device.added`, `presence.online` | green |
+| other `im.*`, `email.*`, `transfer.*`, `network.*`, `device.*`, `presence.*`, `call.*` | blue |
+| anything else | palette primary |
+
+Send one with `notify-send -c transfer.complete "Copy complete"`.
 
 **Command-line controls:**
 

@@ -10,6 +10,8 @@
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
+
 #include <cstdint>
 #include <tuple>
 #include <unistd.h>
@@ -218,6 +220,40 @@ namespace notification_dbus {
     return false;
   }
 
+  std::optional<int> notifyProgressFromHints(const std::map<std::string, sdbus::Variant>& hints) {
+    const auto it = hints.find("value");
+    if (it == hints.end()) {
+      return std::nullopt;
+    }
+    const auto& v = it->second;
+    std::optional<long long> raw;
+    try {
+      if (v.containsValueOfType<int32_t>()) {
+        raw = v.get<int32_t>();
+      } else if (v.containsValueOfType<uint32_t>()) {
+        raw = v.get<uint32_t>();
+      } else if (v.containsValueOfType<int64_t>()) {
+        raw = v.get<int64_t>();
+      } else if (v.containsValueOfType<uint64_t>()) {
+        raw = static_cast<long long>(std::min<uint64_t>(v.get<uint64_t>(), 100));
+      } else if (v.containsValueOfType<uint8_t>()) {
+        raw = v.get<uint8_t>();
+      } else if (v.containsValueOfType<int16_t>()) {
+        raw = v.get<int16_t>();
+      } else if (v.containsValueOfType<uint16_t>()) {
+        raw = v.get<uint16_t>();
+      } else if (v.containsValueOfType<double>()) {
+        raw = static_cast<long long>(v.get<double>());
+      }
+    } catch (...) {
+      return std::nullopt;
+    }
+    if (!raw.has_value()) {
+      return std::nullopt;
+    }
+    return static_cast<int>(std::clamp<long long>(*raw, 0, 100));
+  }
+
   std::vector<std::string> sanitizeNotifyActions(const std::vector<std::string>& actions) {
     std::vector<std::string> sanitized;
     sanitized.reserve(actions.size() - (actions.size() % 2));
@@ -419,6 +455,7 @@ namespace notification_dbus {
             .imageData = notifyImageDataFromHints(hints),
             .category = notifyCategoryFromHints(hints),
             .desktopEntry = notifyDesktopEntryFromHints(hints),
+            .progress = notifyProgressFromHints(hints),
         }
     );
   }

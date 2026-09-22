@@ -116,6 +116,9 @@
         "nothing-playing": "Nothing Playing",
         "playing": "Playing"
       },
+      "notifications": {
+        "live-more": "+{count}"
+      },
       "network": {
         "active": "Active",
         "band": "Band",

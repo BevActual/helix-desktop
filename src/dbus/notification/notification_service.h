@@ -23,6 +23,9 @@ namespace notification_dbus {
 
   [[nodiscard]] Urgency notifyUrgencyFromHints(const std::map<std::string, sdbus::Variant>& hints);
   [[nodiscard]] bool notifyTransientFromHints(const std::map<std::string, sdbus::Variant>& hints);
+  // `value` hint (int32, clamped to 0..100). Also accepts the KDE/GNOME-era `x-canonical-private-synchronous`
+  // style senders that pass it as uint32 or byte.
+  [[nodiscard]] std::optional<int> notifyProgressFromHints(const std::map<std::string, sdbus::Variant>& hints);
   [[nodiscard]] std::vector<std::string> sanitizeNotifyActions(const std::vector<std::string>& actions);
   [[nodiscard]] std::optional<std::string> notifyIcon(
       const std::string& appName, const std::string& appIcon, const std::map<std::string, sdbus::Variant>& hints

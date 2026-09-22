@@ -598,6 +598,7 @@ enabled = false
 
 # [widget.notifications]
 # hide_when_no_unread = true
+# live_max_width = 160                 # live activity chip summary width; 0 = ring only
 
 # [widget.network_rx]
 # network_speed_unit = "mb"          # auto | kb | mb
