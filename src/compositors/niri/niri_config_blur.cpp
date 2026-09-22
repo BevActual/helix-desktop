@@ -82,15 +82,32 @@ layer-rule {
       return Version{.year = *year, .month = *month};
     }
 
-    [[nodiscard]] std::string liquidGlassChild(float strength) {
-      return std::format(
-          "        liquid-glass {{\n            refraction-strength {:.2f}\n        }}\n",
-          std::clamp(strength, 0.0F, 1.0F)
-      );
+    // An empty param list means the compositor predates parameter reporting; the
+    // default key set is written. Otherwise only listed keys are emitted so a newer
+    // shell never fails the config load on an older helix-niri.
+    [[nodiscard]] bool acceptsLiquidGlassParam(const std::vector<std::string>& params, std::string_view name) {
+      if (params.empty()) {
+        return true;
+      }
+      return std::find(params.begin(), params.end(), name) != params.end();
+    }
+
+    [[nodiscard]] std::string liquidGlassChild(float strength, const std::vector<std::string>& params) {
+      std::string block = "        liquid-glass {\n";
+      if (acceptsLiquidGlassParam(params, "refraction-strength")) {
+        block += std::format("            refraction-strength {:.2f}\n", std::clamp(strength, 0.0F, 1.0F));
+      }
+      block += "        }\n";
+      return block;
     }
 
     [[nodiscard]] std::string backgroundEffectBlock(
-        bool blur, bool xray, bool liquidGlass, float strength, bool blurOff = false
+        bool blur,
+        bool xray,
+        bool liquidGlass,
+        float strength,
+        const std::vector<std::string>& params,
+        bool blurOff = false
     ) {
       std::string block = "    background-effect {\n";
       if (blur) {
@@ -100,7 +117,7 @@ layer-rule {
       }
       block += std::format("        xray {}\n", xray ? "true" : "false");
       if (liquidGlass) {
-        block += liquidGlassChild(strength);
+        block += liquidGlassChild(strength, params);
       }
       block += "    }\n";
       return block;
@@ -144,13 +161,20 @@ layer-rule {
     return false;
   }
 
+  std::vector<std::string> detectLiquidGlassParams(const NiriRuntime* runtime) {
+    if (runtime == nullptr) {
+      return {};
+    }
+    return runtime->helixLiquidGlassParams().value_or(std::vector<std::string>{});
+  }
+
   bool blurIncludeExists(const std::filesystem::path& configFile) {
     const auto path = configFile.empty() ? blurIncludePath() : configFile.parent_path() / std::string(kBlurIncludeFileName);
     std::error_code ec;
     return std::filesystem::exists(path, ec) && !ec;
   }
 
-  BlurSettings blurSettingsFromConfig(const Config& config, bool helixNiri) {
+  BlurSettings blurSettingsFromConfig(const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams) {
     const auto& niri = config.theme.niriLayout;
     const float glass = resolvedPanelGlass(config.shell.panel);
     return BlurSettings{
@@ -162,6 +186,7 @@ layer-rule {
         .helixNiri = helixNiri,
         .highContrast = config.accessibility.highContrast,
         .refractionStrength = glass,
+        .liquidGlassParams = std::move(liquidGlassParams),
     };
   }
 
@@ -180,20 +205,21 @@ layer-rule {
     }
 
     body += "window-rule {\n";
-    body += backgroundEffectBlock(windowBlur, false, false, strength);
+    const auto& params = settings.liquidGlassParams;
+    body += backgroundEffectBlock(windowBlur, false, false, strength, params);
     body += "}\n\n";
 
     body += std::format("layer-rule {{\n    match namespace=\"{}\"\n", kChromeNamespace);
-    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, helixGlass && !chromeBlur);
+    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
     body += "layer-rule {\n    match namespace=\"noctalia-window-switcher\"\n";
-    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, helixGlass && !chromeBlur);
+    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
     if (helixGlass) {
       body += "window-rule {\n    match app-id=\"^dev\\\\.noctalia\\\\.Greeter$\"\n";
-      body += backgroundEffectBlock(false, true, true, strength, true);
+      body += backgroundEffectBlock(false, true, true, strength, params, true);
       body += "}\n\n";
     }
 
@@ -204,7 +230,9 @@ layer-rule {
   }
 
   InstallResult persistBlurFromConfig(const Config& config, const NiriRuntime* runtime) {
-    return saveNiriBlur(blurSettingsFromConfig(config, detectLiquidGlass(runtime)));
+    return saveNiriBlur(
+        blurSettingsFromConfig(config, detectLiquidGlass(runtime), detectLiquidGlassParams(runtime))
+    );
   }
 
   InstallResult saveNiriBlur(const BlurSettings& settings) { return saveNiriBlurInto(configPath(), settings); }

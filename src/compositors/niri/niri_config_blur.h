@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
+#include <vector>
 
 struct Config;
 
@@ -27,15 +28,21 @@ namespace compositors::niri {
     bool helixNiri = false;
     bool highContrast = false;
     float refractionStrength = 1.0F;
+    // `liquid-glass { }` children the compositor accepts. Empty means the build
+    // predates parameter reporting and the default key set is written.
+    std::vector<std::string> liquidGlassParams;
   };
 
   [[nodiscard]] std::filesystem::path blurIncludePath();
   [[nodiscard]] bool versionSupportsBlur(std::string_view version);
   [[nodiscard]] bool versionSupportsLiquidGlass(std::string_view version);
   [[nodiscard]] bool detectLiquidGlass(const NiriRuntime* runtime);
+  [[nodiscard]] std::vector<std::string> detectLiquidGlassParams(const NiriRuntime* runtime);
   [[nodiscard]] bool blurIncludeExists(const std::filesystem::path& configFile = {});
   [[nodiscard]] std::string kdlForBlur(const BlurSettings& settings);
-  [[nodiscard]] BlurSettings blurSettingsFromConfig(const Config& config, bool helixNiri);
+  [[nodiscard]] BlurSettings blurSettingsFromConfig(
+      const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams = {}
+  );
 
   InstallResult persistBlurFromConfig(const Config& config, const NiriRuntime* runtime);
   InstallResult saveNiriBlur(const BlurSettings& settings);

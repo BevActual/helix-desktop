@@ -240,6 +240,8 @@ void GlassTab::persistCompositorGlass() {
   if (m_config == nullptr || !compositors::isNiri()) {
     return;
   }
-  const bool helixNiri = m_platform != nullptr && compositors::niri::detectLiquidGlass(&m_platform->niriRuntime());
-  (void)compositors::niri::saveNiriBlur(compositors::niri::blurSettingsFromConfig(m_config->config(), helixNiri));
+  const compositors::niri::NiriRuntime* runtime = m_platform != nullptr ? &m_platform->niriRuntime() : nullptr;
+  (void)compositors::niri::saveNiriBlur(compositors::niri::blurSettingsFromConfig(
+      m_config->config(), compositors::niri::detectLiquidGlass(runtime), compositors::niri::detectLiquidGlassParams(runtime)
+  ));
 }

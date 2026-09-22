@@ -94,6 +94,26 @@ int main() {
   ok = expect(helixRefraction.find("blur true") == std::string::npos, "helix-niri refraction does not stack niri blur")
       && ok;
 
+  const auto listedParams = compositors::niri::kdlForBlur(
+      {.enabled = false,
+       .refraction = true,
+       .helixNiri = true,
+       .refractionStrength = 0.4F,
+       .liquidGlassParams = {"refraction-strength", "glow-weight"}}
+  );
+  ok = expect(listedParams.find("refraction-strength 0.40") != std::string::npos, "listed param is written") && ok;
+
+  const auto unlistedParams = compositors::niri::kdlForBlur(
+      {.enabled = false,
+       .refraction = true,
+       .helixNiri = true,
+       .refractionStrength = 0.4F,
+       .liquidGlassParams = {"glow-weight"}}
+  );
+  ok = expect(unlistedParams.find("liquid-glass {") != std::string::npos, "unlisted param keeps liquid-glass block")
+      && ok;
+  ok = expect(unlistedParams.find("refraction-strength") == std::string::npos, "unlisted param is not written") && ok;
+
   const auto helixBlurAndGlass = compositors::niri::kdlForBlur(
       {.enabled = true, .refraction = true, .helixNiri = true, .refractionStrength = 0.4F}
   );

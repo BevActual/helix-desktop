@@ -115,12 +115,25 @@ namespace compositors::niri {
   }
 
   std::optional<bool> NiriRuntime::helixLiquidGlassCapability() const {
+    resolveHelixCapabilities();
+    return m_helixLiquidGlass;
+  }
+
+  std::optional<std::vector<std::string>> NiriRuntime::helixLiquidGlassParams() const {
+    resolveHelixCapabilities();
+    if (!m_helixLiquidGlass.value_or(false)) {
+      return std::nullopt;
+    }
+    return m_helixLiquidGlassParams;
+  }
+
+  void NiriRuntime::resolveHelixCapabilities() const {
     if (m_helixLiquidGlassResolved) {
-      return m_helixLiquidGlass;
+      return;
     }
     const auto reply = this->request("\"HelixCapabilities\"\n");
     if (reply.status != IpcReply::Status::Replied || !reply.json.has_value() || !reply.json->is_object()) {
-      return std::nullopt;
+      return;
     }
     const nlohmann::json* caps = nullptr;
     if (reply.json->contains("Ok") && (*reply.json)["Ok"].is_object()
@@ -131,15 +144,22 @@ namespace compositors::niri {
     }
     if (caps != nullptr && caps->is_object() && caps->contains("liquid_glass") && (*caps)["liquid_glass"].is_boolean()) {
       m_helixLiquidGlass = (*caps)["liquid_glass"].get<bool>();
+      m_helixLiquidGlassParams.clear();
+      if (const auto params = caps->find("liquid_glass_params"); params != caps->end() && params->is_array()) {
+        for (const auto& name : *params) {
+          if (name.is_string()) {
+            m_helixLiquidGlassParams.push_back(name.get<std::string>());
+          }
+        }
+      }
       m_helixLiquidGlassResolved = true;
-      return m_helixLiquidGlass;
+      return;
     }
     if (reply.json->contains("Err")) {
       m_helixLiquidGlass = false;
+      m_helixLiquidGlassParams.clear();
       m_helixLiquidGlassResolved = true;
-      return m_helixLiquidGlass;
     }
-    return std::nullopt;
   }
 
   NiriRuntime::IpcReply NiriRuntime::request(std::string_view request) const {

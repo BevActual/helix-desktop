@@ -8,8 +8,8 @@ sidebar:
 Helix is three sibling packages, one product:
 
 - **Helix Shell** (this tree) — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, desktop widgets.
-- **helix-niri** — Helix compositor. Helix Shell detects it with `niri msg helix-capabilities` (`liquid_glass`) and writes `liquid-glass { }` into `noctalia-blur.kdl`.
-- **helix-greeter** — login greeter. Appearance sync carries palette, wallpaper, roundness, glass, refraction, and font.
+- **helix-niri** — Helix compositor. Helix Shell detects it with `niri msg helix-capabilities` (`liquid_glass`) and writes `liquid-glass { }` into `noctalia-blur.kdl`. The reply also lists `liquid_glass_params`; the shell writes only keys the compositor reports, so an older helix-niri never fails its config load on a newer shell.
+- **helix-greeter** — login greeter. Appearance sync carries palette, wallpaper, roundness, glass, refraction, font, high contrast, reduced motion, and UI scale.
 
 Stock niri, Hyprland, and other compositors remain fallbacks. The command, config directory, and IPC stay `noctalia` so existing installs keep working. The name in the UI is Helix Shell.
 

@@ -117,9 +117,10 @@ namespace {
   [[nodiscard]] compositors::niri::BlurSettings niriBlurSettingsFrom(
       const Config& config, CompositorPlatform* platform
   ) {
-    const bool helixNiri =
-        platform != nullptr && compositors::niri::detectLiquidGlass(&platform->niriRuntime());
-    return compositors::niri::blurSettingsFromConfig(config, helixNiri);
+    const compositors::niri::NiriRuntime* runtime = platform != nullptr ? &platform->niriRuntime() : nullptr;
+    return compositors::niri::blurSettingsFromConfig(
+        config, compositors::niri::detectLiquidGlass(runtime), compositors::niri::detectLiquidGlassParams(runtime)
+    );
   }
 
   [[nodiscard]] bool isNiriBlurPersistPath(const std::vector<std::string>& path) {

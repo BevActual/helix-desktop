@@ -445,8 +445,16 @@ namespace {
     appearance.insert_or_assign("scheme", "Synced");
     appearance.insert_or_assign("theme_mode", std::string(resolvedMode));
     appearance.insert_or_assign("corner_radius_scale", static_cast<double>(config.shell.cornerRadiusScale));
+    // `glass` carries the chrome transparency mode (Solid 0, Soft 0.5, Glass 1, or the
+    // explicit amount); the greeter derives its panel fill and dimming veil from it.
     appearance.insert_or_assign("glass", static_cast<double>(resolvedPanelGlass(config.shell.panel)));
     appearance.insert_or_assign("refraction", config.shell.panel.refraction);
+    // Accessibility travels with the look so login matches the session: High Contrast frosts
+    // chrome opaque with a contrasting outline, Reduced Motion drops animations, and the UI
+    // scale keeps type the same size the user reads at.
+    appearance.insert_or_assign("high_contrast", config.accessibility.highContrast);
+    appearance.insert_or_assign("reduced_motion", !config.shell.animation.enabled);
+    appearance.insert_or_assign("ui_scale", static_cast<double>(config.accessibility.uiScale));
     if (!config.shell.fontFamily.empty()) {
       appearance.insert_or_assign("font_family", config.shell.fontFamily);
     }
