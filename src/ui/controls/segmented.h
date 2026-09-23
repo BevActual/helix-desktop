@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -33,6 +34,9 @@ public:
   void setOnHoverEnd(std::function<void()> callback);
 
   void setOptionTooltip(std::size_t index, std::string_view text);
+  // Tooltip of an option (empty when unset). Icon-only catalogs use this to caption the pick.
+  [[nodiscard]] std::string_view optionTooltip(std::size_t index) const noexcept;
+  [[nodiscard]] std::string_view selectedTooltip() const noexcept { return optionTooltip(m_selected); }
   void setCompact(bool compact);
   void clearOptions();
 
@@ -73,6 +77,7 @@ private:
   RovingListNavController m_rovingNav;
   std::vector<Separator*> m_separators;
   std::vector<Button*> m_buttons;
+  std::vector<std::string> m_optionTooltips;
   InputArea* m_focusArea = nullptr;
   std::size_t m_selected = 0;
   std::function<void(std::size_t)> m_onChange;

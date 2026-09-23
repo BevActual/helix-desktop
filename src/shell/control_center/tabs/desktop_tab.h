@@ -58,6 +58,7 @@ private:
   void onPanelCardOpacityChanged(float opacity) override;
   void syncLiveControls();
   void syncHosts();
+  void syncPickCaption();
   void syncSettingsSection();
   void syncChildChrome();
   void persistSection();
@@ -103,6 +104,7 @@ private:
 
   Flex* m_rootLayout = nullptr;
   Segmented* m_sectionSwitch = nullptr;
+  Label* m_pickCaption = nullptr;
   Flex* m_widgetsToolbar = nullptr;
   Flex* m_cornersToolbar = nullptr;
   Flex* m_barToolbar = nullptr;

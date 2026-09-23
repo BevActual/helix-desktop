@@ -324,7 +324,6 @@ void PrintersTab::rebuildPrinters() {
     });
     auto header = ui::row({
         .align = FlexAlign::Center,
-        .wrap = true,
         .gap = Style::spaceSm * scale,
     });
     header->addChild(

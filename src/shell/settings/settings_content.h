@@ -63,6 +63,9 @@ namespace settings {
     std::unordered_map<std::string, std::unordered_set<std::string>>& expandedGroupsByPage;
     // Fixed page title row above the group pills, null when no host exists.
     Flex* pageTitleRow = nullptr;
+    // Control Center already names the tab in its header; hosts set this false so the section
+    // title is not repeated inside the leftover. Search results keep their titles regardless.
+    bool showSectionTitle = true;
     // Sticky pill row above the content scroll view, null when no host exists.
     Flex* groupJumpRow = nullptr;
     // Bindable IPC commands for the gesture action picker: value = command, label = usage,

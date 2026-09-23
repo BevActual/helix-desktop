@@ -598,7 +598,7 @@ void LocalSendTab::rebuildPeers() {
   }
   for (const auto& peer : snap.peers) {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-    auto header = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
+    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     auto titles = ui::column({.align = FlexAlign::Stretch, .gap = 0.0F, .flexGrow = 1.0F});
     titles->addChild(
         ui::label({

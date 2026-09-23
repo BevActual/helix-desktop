@@ -205,9 +205,9 @@ std::unique_ptr<Flex> TypeTab::createLiveBody(bool hosted) {
             applyCompactCardStyle(card, scale, opacity, hosted);
           },
   });
+  // No wrap: wrapped rows skip flexGrow and would pin the search field at its minimum width.
   auto toolbar = ui::row({
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .fillWidth = true,
   });

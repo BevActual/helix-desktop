@@ -506,7 +506,7 @@ void SyncthingTab::rebuildFolders() {
 
   for (const auto& folder : snap.folders) {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-    auto header = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
+    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     header->addChild(
         ui::glyph({
             .glyph = "folder",

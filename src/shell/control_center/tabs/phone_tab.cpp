@@ -622,7 +622,6 @@ std::unique_ptr<Flex> PhoneTab::create() {
   auto castAdbRow = ui::row({
       .out = &m_castAdbRow,
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceSm * scale,
       .visible = false,
       .participatesInLayout = false,
@@ -858,7 +857,6 @@ std::unique_ptr<Flex> PhoneTab::create() {
   auto pointerActions = ui::row({
       .out = &m_castPointerActions,
       .align = FlexAlign::Stretch,
-      .wrap = true,
       .gap = Style::spaceSm * scale,
   });
   const float plateHeight = Style::controlHeight * scale;
@@ -2038,7 +2036,7 @@ void PhoneTab::rebuildDevices() {
 
   for (const auto* device : nearby) {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
-    auto header = ui::row({.align = FlexAlign::Center, .wrap = true, .gap = Style::spaceSm * scale});
+    auto header = ui::row({.align = FlexAlign::Center, .gap = Style::spaceSm * scale});
     header->addChild(
         ui::glyph({
             .glyph = glyphForType(device->type),

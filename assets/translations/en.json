@@ -1624,7 +1624,9 @@
       "stopped": "Stopped",
       "stopping": "Stopping…",
       "title": "Tailscale",
-      "use-exit": "Use as exit"
+      "use-exit": "Use as exit",
+      "peers-empty-title": "No devices",
+      "peers-none-title": "No matches"
     },
     "templates": {
       "apply-failed": "Apply failed",

@@ -981,6 +981,7 @@ settings::SettingsContentContext SettingsPane::makeContentContext(
       .actionsExpandedFor = m_actionsExpandedFor,
       .expandedGroupsByPage = m_expandedGroupsByPage,
       .pageTitleRow = nullptr,
+      .showSectionTitle = false,
       .groupJumpRow = nullptr,
       .actionCatalog = gestureActionCatalog(),
       .requestRebuild = [this]() { queueRebuild(); },

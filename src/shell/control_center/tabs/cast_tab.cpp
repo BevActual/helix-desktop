@@ -185,7 +185,6 @@ std::unique_ptr<Flex> CastTab::create() {
   auto credentialsRow = ui::row({
       .out = &m_credentialsRow,
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceSm * scale,
   });
   credentialsRow->addChild(
@@ -563,7 +562,6 @@ void CastTab::rebuildSinks() {
     auto row = ui::column({.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale});
     auto header = ui::row({
         .align = FlexAlign::Center,
-        .wrap = true,
         .gap = Style::spaceSm * scale,
     });
     header->addChild(

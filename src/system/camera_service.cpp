@@ -8,6 +8,8 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <string>
+#include <string_view>
 
 #include <fcntl.h>
 #include <linux/videodev2.h>
@@ -36,6 +38,26 @@ namespace {
 
   [[nodiscard]] std::string fixedString(const char* data, std::size_t size) {
     return {data, strnlen(data, size)};
+  }
+
+  // UVC cards read "Integrated Camera: Integrated C" — the driver repeats the product name after
+  // the bus name and the 32-byte field truncates it. Show the bus name alone when the tail is a
+  // prefix of it (or vice versa) so the header stays readable.
+  [[nodiscard]] std::string tidyCardName(std::string name) {
+    const auto sep = name.find(": ");
+    if (sep == std::string::npos || sep == 0) {
+      return name;
+    }
+    const std::string_view head{name.data(), sep};
+    std::string_view tail{name};
+    tail.remove_prefix(sep + 2);
+    while (!tail.empty() && tail.back() == ' ') {
+      tail.remove_suffix(1);
+    }
+    if (tail.empty() || head.starts_with(tail) || tail.starts_with(head)) {
+      return std::string(head);
+    }
+    return name;
   }
 
   [[nodiscard]] std::uint8_t clampByte(int value) {
@@ -130,7 +152,7 @@ std::vector<CameraDevice> CameraService::listDevices() const {
       const std::uint32_t caps =
           (cap.capabilities & V4L2_CAP_DEVICE_CAPS) != 0 ? cap.device_caps : cap.capabilities;
       if ((caps & V4L2_CAP_VIDEO_CAPTURE) != 0 && (caps & V4L2_CAP_STREAMING) != 0) {
-        std::string name = fixedString(reinterpret_cast<const char*>(cap.card), sizeof(cap.card));
+        std::string name = tidyCardName(fixedString(reinterpret_cast<const char*>(cap.card), sizeof(cap.card)));
         devices.push_back({.id = path.string(), .name = name.empty() ? path.string() : name});
       }
     }

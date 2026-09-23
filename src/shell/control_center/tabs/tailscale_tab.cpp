@@ -366,7 +366,8 @@ std::unique_ptr<Flex> TailscaleTab::create() {
       ui::column({
           .out = &m_peerList,
           .align = FlexAlign::Stretch,
-          .gap = Style::spaceSm * scale,
+          .gap = Style::spaceXs * scale,
+          .configure = [scale](Flex& host) { applyGroupedListStyle(host, scale); },
       })
   );
   leftoverContent->addChild(std::move(prefsCard));
@@ -763,64 +764,6 @@ void TailscaleTab::rebuildPeers() {
     }
     ++shown;
 
-    auto row = ui::column({
-        .align = FlexAlign::Stretch,
-        .gap = Style::spaceXs * scale,
-    });
-    auto header = ui::row({
-        .align = FlexAlign::Center,
-        .wrap = true,
-        .gap = Style::spaceSm * scale,
-    });
-    header->addChild(
-        ui::label({
-            .text = peer.name,
-            .fontSize = Style::fontSizeBody * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
-        })
-    );
-    header->addChild(
-        ui::label({
-            .text = peer.online ? i18n::tr("control-center.tailscale.online")
-                                : i18n::tr("control-center.tailscale.offline"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(peer.online ? ColorRole::Primary : ColorRole::OnSurfaceVariant),
-        })
-    );
-    if (!peer.ipv4.empty()) {
-      header->addChild(
-          ui::button({
-              .glyph = "copy",
-              .glyphSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.tailscale.copy-ip"),
-              .minHeight = Style::controlHeightSm * scale,
-              .padding = Style::spaceXs * scale,
-              .onClick = [this, ip = peer.ipv4]() { copyText(ip); },
-          })
-      );
-    }
-    if (peer.exitNodeOption && !peer.isExitNode) {
-      header->addChild(
-          ui::button({
-              .text = i18n::tr("control-center.tailscale.use-exit"),
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .minHeight = Style::controlHeightSm * scale,
-              .paddingH = Style::spaceSm * scale,
-              .onClick =
-                  [this, target = peer.ipv4.empty() ? peer.name : peer.ipv4]() {
-                    if (m_service != nullptr) {
-                      m_service->setExitNode(target);
-                    }
-                  },
-          })
-      );
-    }
-    row->addChild(std::move(header));
-
     std::string meta;
     if (!peer.ipv4.empty()) {
       meta = peer.ipv4;
@@ -837,12 +780,76 @@ void TailscaleTab::rebuildPeers() {
       }
       meta += i18n::tr("control-center.tailscale.exit-node");
     }
+
+    // Grouped row: name + meta lead and grow; status, copy, and exit-node actions trail. No wrap,
+    // since wrapped rows skip flexGrow and would leave the trailing controls hugging the name.
+    auto row = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .minHeight = Style::controlHeight * scale,
+        .configure =
+            [scale](Flex& host) {
+              applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None);
+              host.setPadding(Style::spaceXs * scale, Style::spaceSm * scale);
+            },
+    });
+    auto titles = ui::column({.align = FlexAlign::Stretch, .gap = 0.0F, .flexGrow = 1.0F});
+    titles->addChild(
+        ui::label({
+            .text = peer.name,
+            .fontSize = Style::fontSizeBody * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 1,
+        })
+    );
     if (!meta.empty()) {
-      row->addChild(
+      titles->addChild(
           ui::label({
               .text = std::move(meta),
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              .maxLines = 1,
+          })
+      );
+    }
+    row->addChild(std::move(titles));
+    row->addChild(
+        ui::label({
+            .text = peer.online ? i18n::tr("control-center.tailscale.online")
+                                : i18n::tr("control-center.tailscale.offline"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(peer.online ? ColorRole::Primary : ColorRole::OnSurfaceVariant),
+        })
+    );
+    if (peer.exitNodeOption && !peer.isExitNode) {
+      row->addChild(
+          ui::button({
+              .text = i18n::tr("control-center.tailscale.use-exit"),
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .minHeight = Style::controlHeightSm * scale,
+              .paddingH = Style::spaceSm * scale,
+              .onClick =
+                  [this, target = peer.ipv4.empty() ? peer.name : peer.ipv4]() {
+                    if (m_service != nullptr) {
+                      m_service->setExitNode(target);
+                    }
+                  },
+          })
+      );
+    }
+    if (!peer.ipv4.empty()) {
+      row->addChild(
+          ui::button({
+              .glyph = "copy",
+              .glyphSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.tailscale.copy-ip"),
+              .minWidth = Style::controlHeightSm * scale,
+              .minHeight = Style::controlHeightSm * scale,
+              .padding = Style::spaceXs * scale,
+              .onClick = [this, ip = peer.ipv4]() { copyText(ip); },
           })
       );
     }
@@ -850,13 +857,15 @@ void TailscaleTab::rebuildPeers() {
   }
 
   if (shown == 0) {
-    m_peerList->addChild(
-        ui::label({
-            .text = snap.peerCount == 0 ? i18n::tr("control-center.tailscale.peers-empty")
+    m_peerList->addChild(control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = snap.peerCount == 0 ? "devices" : "search-off",
+            .title = snap.peerCount == 0 ? i18n::tr("control-center.tailscale.peers-empty-title")
+                                         : i18n::tr("control-center.tailscale.peers-none-title"),
+            .body = snap.peerCount == 0 ? i18n::tr("control-center.tailscale.peers-empty")
                                         : i18n::tr("control-center.tailscale.peers-none"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
+        }
+    ));
   }
 }

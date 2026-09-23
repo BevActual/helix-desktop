@@ -445,9 +445,9 @@ std::unique_ptr<Flex> DesktopTab::create() {
   if (m_widgetsEnabled != nullptr) {
     m_widgetsEnabled->setCheckedImmediate(widgetsEnabled);
   }
+  // No wrap: wrapped rows skip flexGrow and would pin the search field at its minimum width.
   auto browse = ui::row({
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .flexGrow = 1.0F,
   });
@@ -559,7 +559,11 @@ std::unique_ptr<Flex> DesktopTab::create() {
             .compact = true,
             .surfaceOpacity = opacity,
             .equalSegmentWidths = false,
-            .onChange = std::move(onChange),
+            .onChange =
+                [this, onChange = std::move(onChange)](std::size_t index) {
+                  onChange(index);
+                  syncPickCaption();
+                },
             .configure =
                 [](Segmented& sources) {
                   sources.setWrap(true);
@@ -701,6 +705,15 @@ std::unique_ptr<Flex> DesktopTab::create() {
           m_osdEnabled->setCheckedImmediate(liveCfg != nullptr && liveCfg->osd.enabled);
         }
       }
+  );
+  // Icon-only sources need a readable current pick (Wallpaper navigation): "Dock · Pinned apps".
+  compactCard->addChild(
+      ui::label({
+          .out = &m_pickCaption,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+      })
   );
   live->addChild(std::move(compactCard));
 
@@ -864,6 +877,7 @@ std::unique_ptr<Flex> DesktopTab::createHeaderActions() {
 }
 
 void DesktopTab::onClose() {
+  m_pickCaption = nullptr;
   if (m_bar != nullptr) {
     m_bar->onClose();
   }
@@ -1140,6 +1154,45 @@ void DesktopTab::syncHosts() {
   setShown(m_windowsHost, m_section == Section::Windows);
   setShown(m_panelsHost, m_section == Section::Panels);
   setShown(m_osdHost, m_section == Section::Osd && m_config != nullptr && m_config->config().osd.enabled);
+  syncPickCaption();
+}
+
+void DesktopTab::syncPickCaption() {
+  if (m_pickCaption == nullptr || m_sectionSwitch == nullptr) {
+    return;
+  }
+  const Segmented* nested = nullptr;
+  switch (m_section) {
+  case Section::Widgets:
+    nested = m_widgetCatalogSwitch;
+    break;
+  case Section::Corners:
+    nested = m_cornersCatalogSwitch;
+    break;
+  case Section::Bar:
+    nested = m_barCatalogSwitch;
+    break;
+  case Section::Dock:
+    nested = m_dockCatalogSwitch;
+    break;
+  case Section::Windows:
+    nested = m_windowsCatalogSwitch;
+    break;
+  case Section::Panels:
+    nested = m_panelsCatalogSwitch;
+    break;
+  case Section::Osd:
+    nested = m_osdCatalogSwitch;
+    break;
+  }
+  std::string text(m_sectionSwitch->selectedTooltip());
+  if (nested != nullptr && !nested->selectedTooltip().empty()) {
+    if (!text.empty()) {
+      text += " · ";
+    }
+    text += nested->selectedTooltip();
+  }
+  m_pickCaption->setText(std::move(text));
 }
 
 void DesktopTab::syncSettingsSection() {

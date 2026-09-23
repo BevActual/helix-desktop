@@ -184,7 +184,15 @@ void Segmented::setPadding(float top, float right, float bottom, float left) {
 void Segmented::setOptionTooltip(std::size_t index, std::string_view text) {
   if (index < m_buttons.size() && m_buttons[index] != nullptr) {
     m_buttons[index]->setTooltip(text);
+    if (m_optionTooltips.size() < m_buttons.size()) {
+      m_optionTooltips.resize(m_buttons.size());
+    }
+    m_optionTooltips[index] = std::string(text);
   }
+}
+
+std::string_view Segmented::optionTooltip(std::size_t index) const noexcept {
+  return index < m_optionTooltips.size() ? std::string_view{m_optionTooltips[index]} : std::string_view{};
 }
 
 void Segmented::clearOptions() {
@@ -199,6 +207,7 @@ void Segmented::clearOptions() {
     }
   }
   m_buttons.clear();
+  m_optionTooltips.clear();
   m_separators.clear();
   m_rovingNav.clearItems();
   m_selected = 0;

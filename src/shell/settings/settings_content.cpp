@@ -307,7 +307,7 @@ namespace settings {
       });
       if (ctx.pageTitleRow != nullptr && ctx.searchQuery.empty() && ctx.pageTitleRow->children().empty()) {
         ctx.pageTitleRow->addChild(std::move(titleRow));
-      } else {
+      } else if (ctx.showSectionTitle || !ctx.searchQuery.empty()) {
         section->addChild(std::move(titleRow));
       }
       auto* raw = section.get();

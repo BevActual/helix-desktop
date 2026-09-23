@@ -89,21 +89,10 @@ std::unique_ptr<Flex> KeybindsTab::create() {
   });
 
   live->addChild(
-      ui::label({
-          .out = &m_hint,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
-
-  live->addChild(
       ui::column({
           .out = &m_sectionSwitchHost,
           .align = FlexAlign::Stretch,
-          .gap = 0.0F,
+          .gap = Style::spaceSm * scale,
           .configure =
               [scale, opacity = panelCardOpacity()](Flex& section) {
                 applyCompactCardStyle(section, scale, opacity, false);
@@ -118,6 +107,17 @@ std::unique_ptr<Flex> KeybindsTab::create() {
             .compact = true,
             .surfaceOpacity = panelCardOpacity(),
             .onChange = [this](std::size_t index) { applySection(index); },
+        })
+    );
+    // The recording hint lives on the compact card under the sources, not loose on chrome.
+    m_sectionSwitchHost->addChild(
+        ui::label({
+            .out = &m_hint,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 4,
+            .visible = false,
+            .participatesInLayout = false,
         })
     );
   }
