@@ -521,9 +521,10 @@ void CameraTab::startSelectedDevice() {
 
 void CameraTab::syncPreviewAvailability() {
   const bool preview = m_camera != nullptr && m_camera->previewAvailable();
-  bool layoutDirty = setShown(m_previewBox, preview) || setShown(m_previewImage, preview);
-  layoutDirty = setShown(m_previewUnavailableLabel, !preview && m_camera != nullptr && m_camera->active())
-      || layoutDirty;
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_previewBox, preview);
+  layoutDirty |= setShown(m_previewImage, preview);
+  layoutDirty |= setShown(m_previewUnavailableLabel, !preview && m_camera != nullptr && m_camera->active());
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -803,18 +804,18 @@ void CameraTab::refreshDependentVisibility() {
 
   if (const CameraControl* autoExposure = findControl(controls, ids::exposureAuto); autoExposure != nullptr) {
     if (const auto it = m_controlRows.find(ids::exposureAbsolute); it != m_controlRows.end()) {
-      layoutDirty = setShown(it->second, selectedMenuItemLooksManual(*autoExposure)) || layoutDirty;
+      layoutDirty |= setShown(it->second, selectedMenuItemLooksManual(*autoExposure));
     }
   }
   if (const CameraControl* autoWhiteBalance = findControl(controls, ids::autoWhiteBalance);
       autoWhiteBalance != nullptr) {
     if (const auto it = m_controlRows.find(ids::whiteBalanceTemperature); it != m_controlRows.end()) {
-      layoutDirty = setShown(it->second, autoWhiteBalance->value == 0) || layoutDirty;
+      layoutDirty |= setShown(it->second, autoWhiteBalance->value == 0);
     }
   }
   if (const CameraControl* autoFocus = findControl(controls, ids::focusAuto); autoFocus != nullptr) {
     if (const auto it = m_controlRows.find(ids::focusAbsolute); it != m_controlRows.end()) {
-      layoutDirty = setShown(it->second, autoFocus->value == 0) || layoutDirty;
+      layoutDirty |= setShown(it->second, autoFocus->value == 0);
     }
   }
   if (layoutDirty) {

@@ -1200,7 +1200,7 @@ void PowerTab::syncBatteryWell() {
   const bool leftover =
       shown(m_lidCloseCard) || shown(m_chargingCard) || shown(m_healthCard) || shown(m_peripheralsCard);
   bool changed = setShown(m_batteryWell, live);
-  changed = setShown(m_leftoverScroll, leftover) || changed;
+  changed |= setShown(m_leftoverScroll, leftover);
   if (changed) {
     if (auto* panels = PanelManager::current(); panels != nullptr) {
       panels->requestLayout();

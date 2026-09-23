@@ -2132,10 +2132,17 @@ void AudioTab::syncCatalog() {
   const bool output = m_catalog == Catalog::Output;
   const bool input = m_catalog == Catalog::Input;
   const bool apps = m_catalog == Catalog::Apps;
-  bool dirty = setShown(m_outputHost, output) || setShown(m_outputScroll, output) || setShown(m_outputList, output);
-  dirty = setShown(m_inputHost, input) || setShown(m_inputScroll, input) || setShown(m_inputList, input) || dirty;
-  dirty = setShown(m_appsHost, apps) || setShown(m_programScroll, apps) || setShown(m_programList, apps) || dirty;
-  dirty = syncDetailLabel() || dirty;
+  bool dirty = false;
+  dirty |= setShown(m_outputHost, output);
+  dirty |= setShown(m_outputScroll, output);
+  dirty |= setShown(m_outputList, output);
+  dirty |= setShown(m_inputHost, input);
+  dirty |= setShown(m_inputScroll, input);
+  dirty |= setShown(m_inputList, input);
+  dirty |= setShown(m_appsHost, apps);
+  dirty |= setShown(m_programScroll, apps);
+  dirty |= setShown(m_programList, apps);
+  dirty |= syncDetailLabel();
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
     m_catalogSyncing = true;
     m_catalogSwitch->setSelectedIndex(indexFromCatalog(m_pinnedCatalog));
@@ -2640,7 +2647,9 @@ void AudioTab::rebuildLists(Renderer& renderer) {
       }
     }
 
-    list->layout(renderer);
+    // Lay the scroll view out (not the bare list) so rows are arranged at the viewport width;
+    // a content-only pass would leave grouped rows hugging their labels until the next layout.
+    scroll->layout(renderer);
     lastWidth = width;
     lastKey = nextKey;
   };

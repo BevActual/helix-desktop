@@ -639,11 +639,14 @@ void WeatherTab::syncCatalog() {
   const bool locationReady = weatherOn && m_weather != nullptr && m_weather->locationConfigured();
   const bool details = m_catalog == Catalog::Details;
   const bool forecast = isForecastCatalog(m_catalog);
-  bool layoutDirty = setShown(m_enableRow, !weatherOn) || setShown(m_currentCard, weatherOn)
-      || setShown(m_catalogSwitch, locationReady) || setShown(m_forecastHost, locationReady && forecast)
-      || setShown(m_detailsHost, locationReady && details);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_enableRow, !weatherOn);
+  layoutDirty |= setShown(m_currentCard, weatherOn);
+  layoutDirty |= setShown(m_catalogSwitch, locationReady);
+  layoutDirty |= setShown(m_forecastHost, locationReady && forecast);
+  layoutDirty |= setShown(m_detailsHost, locationReady && details);
   layoutDirty = syncDetailLabel() || layoutDirty;
-  layoutDirty = setShown(m_detailLabel, locationReady) || layoutDirty;
+  layoutDirty |= setShown(m_detailLabel, locationReady);
   if (m_enableToggle != nullptr) {
     m_enableToggle->setChecked(weatherOn);
   }
@@ -928,7 +931,7 @@ void WeatherTab::setForecastVisibleRowCount(std::size_t count) {
   bool layoutDirty = false;
   for (std::size_t i = 0; i < kForecastRowCount; ++i) {
     const bool show = i < visibleCount;
-    layoutDirty = setShown(m_forecastRows[i], show) || layoutDirty;
+    layoutDirty |= setShown(m_forecastRows[i], show);
     if (m_forecastHitAreas[i] != nullptr) {
       m_forecastHitAreas[i]->setVisible(show);
       if (!show) {
@@ -936,7 +939,7 @@ void WeatherTab::setForecastVisibleRowCount(std::size_t count) {
       }
     }
     if (i + 1 < kForecastRowCount) {
-      layoutDirty = setShown(m_forecastSeparators[i], i + 1 < visibleCount) || layoutDirty;
+      layoutDirty |= setShown(m_forecastSeparators[i], i + 1 < visibleCount);
     }
   }
   if (layoutDirty) {

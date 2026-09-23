@@ -799,7 +799,11 @@ void BluetoothTab::syncHeader() {
     if (m_adapterStatus != nullptr) {
       m_adapterStatus->setText(i18n::tr("control-center.bluetooth.unavailable"));
     }
-    if (setShown(m_adapterStatus, true) || setShown(m_discoverableRow, false) || setShown(m_listScroll, false)) {
+    bool unavailableDirty = false;
+    unavailableDirty |= setShown(m_adapterStatus, true);
+    unavailableDirty |= setShown(m_discoverableRow, false);
+    unavailableDirty |= setShown(m_listScroll, false);
+    if (unavailableDirty) {
       PanelManager::instance().requestLayout();
     }
     return;
@@ -846,8 +850,8 @@ void BluetoothTab::syncHeader() {
     m_adapterStatus->setText(status);
   }
   bool layoutDirty = setShown(m_adapterStatus, !status.empty());
-  layoutDirty = setShown(m_discoverableRow, showList) || layoutDirty;
-  layoutDirty = setShown(m_listScroll, showList) || layoutDirty;
+  layoutDirty |= setShown(m_discoverableRow, showList);
+  layoutDirty |= setShown(m_listScroll, showList);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

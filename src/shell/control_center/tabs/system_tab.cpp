@@ -622,8 +622,12 @@ void SystemTab::syncCatalog() {
   const bool gpu = m_catalog == Catalog::Gpu;
   const bool network = m_catalog == Catalog::Network;
   const bool about = m_catalog == Catalog::About;
-  bool layoutDirty = setShown(m_cpuHost, cpu) || setShown(m_ramHost, memory) || setShown(m_gpuHost, gpu)
-      || setShown(m_netHost, network) || setShown(m_aboutHost, about);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_cpuHost, cpu);
+  layoutDirty |= setShown(m_ramHost, memory);
+  layoutDirty |= setShown(m_gpuHost, gpu);
+  layoutDirty |= setShown(m_netHost, network);
+  layoutDirty |= setShown(m_aboutHost, about);
   layoutDirty = syncDetailLabel() || layoutDirty;
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
     m_catalogSyncing = true;

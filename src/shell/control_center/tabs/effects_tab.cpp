@@ -550,9 +550,12 @@ void EffectsTab::syncCatalog() {
   const bool shadows = m_catalog == Catalog::Shadows;
   const bool speed = m_catalog == Catalog::Speed;
   const bool motionOn = m_config != nullptr && m_config->config().shell.animation.enabled;
-  bool dirty = setShown(m_bordersHost, borders) || setShown(m_shadowsHost, shadows) || setShown(m_speedHost, speed);
-  dirty = setShown(m_animationSpeedSection, speed && motionOn) || setShown(m_speedOffCaption, speed && !motionOn)
-      || dirty;
+  bool dirty = false;
+  dirty |= setShown(m_bordersHost, borders);
+  dirty |= setShown(m_shadowsHost, shadows);
+  dirty |= setShown(m_speedHost, speed);
+  dirty |= setShown(m_animationSpeedSection, speed && motionOn);
+  dirty |= setShown(m_speedOffCaption, speed && !motionOn);
   refreshCaption();
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
     m_catalogSyncing = true;

@@ -953,10 +953,10 @@ void MonitorTab::showSelectedDisplayCard() {
     const bool selected = card.displayId == m_layoutMovingName;
     const bool keep = output == nullptr || !output->enabled || selected;
     anySelected = anySelected || selected;
-    dirty = setShown(card.card, keep) || dirty;
+    dirty |= setShown(card.card, keep);
   }
   if (!anySelected && !m_cards.empty()) {
-    dirty = setShown(m_cards.front().card, true) || dirty;
+    dirty |= setShown(m_cards.front().card, true);
   }
   if (dirty) {
     PanelManager::instance().requestLayout();
@@ -1401,7 +1401,7 @@ void MonitorTab::syncNightLight() {
     m_nightLightNightValue->setText(kelvinLabel(nightlight.nightTemperature));
   }
   m_syncingNightLight = false;
-  layoutDirty = setShown(m_nightLightDetails, controlsOn) || layoutDirty;
+  layoutDirty |= setShown(m_nightLightDetails, controlsOn);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

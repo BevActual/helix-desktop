@@ -388,8 +388,12 @@ void BarTab::syncHosts() {
   const bool barOn = hasBar && bar->enabled;
   const bool layoutOpen = barOn && m_section == Section::Layout;
   const bool shapeOpen = barOn && m_section == Section::Shape;
-  bool layoutDirty = setShown(m_empty, !hasBar) || setShown(m_enableRow, hasBar) || setShown(m_sectionToolbar, barOn)
-      || setShown(m_layoutHost, layoutOpen) || setShown(m_shapeHost, shapeOpen);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_empty, !hasBar);
+  layoutDirty |= setShown(m_enableRow, hasBar);
+  layoutDirty |= setShown(m_sectionToolbar, barOn);
+  layoutDirty |= setShown(m_layoutHost, layoutOpen);
+  layoutDirty |= setShown(m_shapeHost, shapeOpen);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

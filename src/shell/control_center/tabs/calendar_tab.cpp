@@ -557,8 +557,9 @@ void CalendarTab::rebuildAccounts() {
 void CalendarTab::syncAccounts() {
   const bool enabled = m_calendar != nullptr && m_calendar->enabled();
   const bool hasAccounts = m_accountsList != nullptr && !m_accountsList->children().empty();
-  const bool layoutDirty =
-      setShown(m_accountsList, enabled && hasAccounts) || setShown(m_accountsEmpty, enabled && !hasAccounts);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_accountsList, enabled && hasAccounts);
+  layoutDirty |= setShown(m_accountsEmpty, enabled && !hasAccounts);
   if (layoutDirty) {
     requestPanelLayout();
   }
@@ -678,8 +679,12 @@ void CalendarTab::syncCatalog() {
   const bool month = m_catalog == Catalog::Month;
   const bool events = m_catalog == Catalog::Events;
   const bool accounts = m_catalog == Catalog::Accounts;
-  bool layoutDirty = setShown(m_monthHost, month) || setShown(m_eventsHost, events) || setShown(m_accountsHost, accounts)
-      || setShown(m_enableRow, !enabled) || setShown(m_accountsAddButton, accounts && enabled);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_monthHost, month);
+  layoutDirty |= setShown(m_eventsHost, events);
+  layoutDirty |= setShown(m_accountsHost, accounts);
+  layoutDirty |= setShown(m_enableRow, !enabled);
+  layoutDirty |= setShown(m_accountsAddButton, accounts && enabled);
   layoutDirty = syncDetailLabel() || layoutDirty;
   if (m_enableToggle != nullptr) {
     m_enableToggle->setChecked(enabled);

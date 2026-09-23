@@ -443,7 +443,7 @@ void PrivacyTab::rebuildCaptures() {
   layoutDirty |= setShown(m_cameraCard, !lists.camera.empty());
   layoutDirty |= setShown(m_cameraDivider, !lists.camera.empty() && !lists.microphone.empty());
   layoutDirty |= setShown(m_screenCard, !lists.screen.empty());
-  layoutDirty |= setShown( m_screenDivider, !lists.screen.empty() && (!lists.microphone.empty() || !lists.camera.empty()) );
+  layoutDirty |= setShown(m_screenDivider, !lists.screen.empty() && (!lists.microphone.empty() || !lists.camera.empty()));
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

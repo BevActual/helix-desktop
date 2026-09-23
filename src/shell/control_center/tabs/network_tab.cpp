@@ -2355,10 +2355,10 @@ void NetworkTab::syncDnsPicker() {
   const bool showCustom = m_dnsProfile == DnsProfile::Custom;
   bool layoutDirty = false;
   if (m_dnsNextDnsRow != nullptr) {
-    layoutDirty = setShown(m_dnsNextDnsRow, showNextDns) || layoutDirty;
+    layoutDirty |= setShown(m_dnsNextDnsRow, showNextDns);
   }
   if (m_dnsCustomRow != nullptr) {
-    layoutDirty = setShown(m_dnsCustomRow, showCustom) || layoutDirty;
+    layoutDirty |= setShown(m_dnsCustomRow, showCustom);
   }
   if (layoutDirty) {
     PanelManager::instance().requestLayout();

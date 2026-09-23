@@ -445,8 +445,11 @@ void RoundnessTab::syncCatalog() {
   const bool bar = m_catalog == Catalog::Bar;
   const bool dock = m_catalog == Catalog::Dock;
   const bool windows = m_catalog == Catalog::Windows;
-  bool dirty = setShown(m_shellHost, shell) || setShown(m_barHost, bar) || setShown(m_dockHost, dock)
-      || setShown(m_windowHost, windows);
+  bool dirty = false;
+  dirty |= setShown(m_shellHost, shell);
+  dirty |= setShown(m_barHost, bar);
+  dirty |= setShown(m_dockHost, dock);
+  dirty |= setShown(m_windowHost, windows);
   dirty = syncDetailLabel() || dirty;
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
     m_catalogSyncing = true;
