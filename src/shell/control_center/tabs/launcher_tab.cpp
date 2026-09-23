@@ -6,6 +6,7 @@
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/control_center_services.h"
+#include "shell/control_center/pinned_app_list.h"
 #include "shell/dock/pinned_apps.h"
 #include "shell/panel/panel_manager.h"
 #include "system/desktop_entry.h"
@@ -212,6 +213,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
   auto pinnedList = std::make_unique<ListEditor>();
   m_pinnedList = pinnedList.get();
   m_pinnedList->setScale(scale);
+  m_pinnedIcons.attach(*m_pinnedList, scale);
   m_pinnedList->setAddPlaceholder(i18n::tr("control-center.launcher.add-app"));
   m_pinnedList->setOnAddRequested([this](std::string value) {
     if (m_syncing || m_config == nullptr || value.empty()) {
@@ -266,6 +268,7 @@ void LauncherTab::onClose() {
   m_typeToLaunch = nullptr;
   m_providerGlobal = {};
   m_pinnedList = nullptr;
+  m_pinnedIcons.clear();
 }
 
 void LauncherTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -288,13 +291,15 @@ void LauncherTab::doLayout(Renderer& renderer, float contentWidth, float bodyHei
 }
 
 void LauncherTab::doUpdate(Renderer& renderer) {
-  (void)renderer;
   if (m_settings != nullptr && m_settings->configureMode()) {
     return;
   }
   if (m_liveDirty) {
     m_liveDirty = false;
     syncLiveControls();
+  }
+  if (m_config != nullptr) {
+    m_pinnedIcons.load(renderer, m_config->config().shell.launcher.pinned, contentScale());
   }
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shell/control_center/pinned_app_list.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -45,6 +46,7 @@ private:
   Toggle* m_typeToLaunch = nullptr;
   std::array<Toggle*, 5> m_providerGlobal{};
   ListEditor* m_pinnedList = nullptr;
+  control_center::PinnedAppList m_pinnedIcons;
 
   bool m_syncing = false;
   bool m_liveDirty = false;

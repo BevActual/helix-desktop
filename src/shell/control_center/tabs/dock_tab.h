@@ -1,5 +1,6 @@
 #pragma once
 
+#include "shell/control_center/pinned_app_list.h"
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"
 #include "ui/signal.h"
@@ -70,6 +71,7 @@ private:
   Segmented* m_autoHide = nullptr;
   Toggle* m_showRunning = nullptr;
   ListEditor* m_pinnedList = nullptr;
+  control_center::PinnedAppList m_pinnedIcons;
 
   Section m_section = Section::Layout;
   bool m_hosted = false;

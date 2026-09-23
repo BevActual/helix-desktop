@@ -2,7 +2,10 @@
 
 #include "ui/controls/flex.h"
 
+class Button;
+
 #include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -14,6 +17,10 @@ struct ListEditorOption {
   std::string label;
 };
 
+// Compact is the settings-pane density (fixed label cell, caption text). Grouped renders each item
+// as a full-width grouped-list row: leading node, body-size label, then the actions on the right.
+enum class ListEditorPresentation : std::uint8_t { Compact, Grouped };
+
 class ListEditor : public Flex {
 public:
   ListEditor();
@@ -23,6 +30,12 @@ public:
   void setAddPlaceholder(std::string_view placeholder);
   void setScale(float scale);
   void setMaxItems(std::size_t maxItems);
+  void setPresentation(ListEditorPresentation presentation);
+  [[nodiscard]] ListEditorPresentation presentation() const noexcept { return m_presentation; }
+  // Leading node per item row (an app icon, a swatch); Grouped rows reserve its slot.
+  void setItemLeading(std::function<std::unique_ptr<Node>(std::size_t)> leading);
+  // Styles each item row after it is built (grouped-list row fill, radius, hover).
+  void setRowConfigure(std::function<void(Flex&)> configure);
   void setItemAccessory(std::function<std::unique_ptr<Node>(std::size_t)> accessory);
   void setOnAddRequested(std::function<void(std::string)> callback);
   void setOnRemoveRequested(std::function<void(std::size_t)> callback);
@@ -35,8 +48,9 @@ private:
   [[nodiscard]] std::string labelForValue(std::string_view value) const;
   [[nodiscard]] std::vector<ListEditorOption> remainingOptions() const;
   void rebuildRows();
-  void addGhostIconButton(
-      Flex& row, std::string_view glyph, float size, std::string_view tooltip, std::function<void()> callback
+  Button* addGhostIconButton(
+      Flex& row, std::string_view glyph, float glyphSize, float buttonSize, std::string_view tooltip,
+      std::function<void()> callback
   );
 
   std::vector<std::string> m_items;
@@ -44,6 +58,9 @@ private:
   std::string m_addPlaceholder;
   std::size_t m_maxItems = 0;
   std::function<std::unique_ptr<Node>(std::size_t)> m_itemAccessory;
+  std::function<std::unique_ptr<Node>(std::size_t)> m_itemLeading;
+  std::function<void(Flex&)> m_rowConfigure;
+  ListEditorPresentation m_presentation = ListEditorPresentation::Compact;
   std::function<void(std::string)> m_onAddRequested;
   std::function<void(std::size_t)> m_onRemoveRequested;
   std::function<void(std::size_t, std::size_t)> m_onMoveRequested;

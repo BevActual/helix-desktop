@@ -699,6 +699,7 @@ _noctalia_sources = files(
   'src/shell/control_center/plugin_shortcut.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
   'src/shell/control_center/pin_reorder.cpp',
+  'src/shell/control_center/pinned_app_list.cpp',
   'src/shell/control_center/tabs/packages_tab.cpp',
   'src/shell/control_center/tabs/plugins_tab.cpp',
   'src/shell/control_center/tabs/system_tab.cpp',

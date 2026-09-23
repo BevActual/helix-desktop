@@ -2,6 +2,7 @@
 
 #include "i18n/i18n.h"
 #include "ui/builders.h"
+#include "ui/controls/button.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
@@ -17,11 +18,14 @@ namespace {
   constexpr float kSuggestedAddHeight = 30.0F;
   constexpr float kVerticalGap = 2.0F;
 
-  std::unique_ptr<Label> makeListLabel(std::string_view text, float scale) {
+  std::unique_ptr<Label> makeListLabel(std::string_view text, float scale, bool grouped) {
     return ui::label({
         .text = std::string(text),
-        .fontSize = Style::fontSizeCaption * scale,
+        .fontSize = (grouped ? Style::fontSizeBody : Style::fontSizeCaption) * scale,
         .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxLines = 1,
+        .ellipsize = TextEllipsize::End,
+        .flexGrow = grouped ? 1.0F : 0.0F,
     });
   }
 
@@ -64,6 +68,24 @@ void ListEditor::setItemAccessory(std::function<std::unique_ptr<Node>(std::size_
   rebuildRows();
 }
 
+void ListEditor::setPresentation(ListEditorPresentation presentation) {
+  if (m_presentation == presentation) {
+    return;
+  }
+  m_presentation = presentation;
+  rebuildRows();
+}
+
+void ListEditor::setItemLeading(std::function<std::unique_ptr<Node>(std::size_t)> leading) {
+  m_itemLeading = std::move(leading);
+  rebuildRows();
+}
+
+void ListEditor::setRowConfigure(std::function<void(Flex&)> configure) {
+  m_rowConfigure = std::move(configure);
+  rebuildRows();
+}
+
 void ListEditor::setOnAddRequested(std::function<void(std::string)> callback) {
   m_onAddRequested = std::move(callback);
 }
@@ -101,9 +123,13 @@ void ListEditor::rebuildRows() {
     removeChild(children().back().get());
   }
 
+  const bool grouped = m_presentation == ListEditorPresentation::Grouped;
   const float labelCellWidth = (m_itemAccessory ? 132.0F : kLabelCellWidth) * m_scale;
-  const float itemRowHeight = (m_itemAccessory ? Style::controlHeightSm : kItemRowHeight) * m_scale;
-  const float suggestedAddHeight = kSuggestedAddHeight * m_scale;
+  const float itemRowHeight =
+      (grouped ? Style::controlHeight : (m_itemAccessory ? Style::controlHeightSm : kItemRowHeight)) * m_scale;
+  const float suggestedAddHeight = (grouped ? Style::controlHeight : kSuggestedAddHeight) * m_scale;
+  const float actionSize = (grouped ? Style::controlHeightSm : kItemRowHeight) * m_scale;
+  const float actionGlyph = (grouped ? Style::fontSizeBody : Style::fontSizeCaption) * m_scale;
 
   std::unique_ptr<Flex> addRow;
   const bool atCapacity = m_maxItems > 0 && m_items.size() >= m_maxItems;
@@ -127,16 +153,17 @@ void ListEditor::rebuildRows() {
             .out = &selectPtr,
             .options = std::move(remainingLabels),
             .placeholder = m_addPlaceholder,
-            .fontSize = Style::fontSizeCaption * m_scale,
+            .fontSize = (grouped ? Style::fontSizeBody : Style::fontSizeCaption) * m_scale,
             .controlHeight = suggestedAddHeight,
-            .glyphSize = Style::fontSizeCaption * m_scale,
-            .width = labelCellWidth,
+            .glyphSize = (grouped ? Style::fontSizeBody : Style::fontSizeCaption) * m_scale,
+            .width = grouped ? std::optional<float>{} : std::optional<float>{labelCellWidth},
             .height = suggestedAddHeight,
+            .flexGrow = grouped ? 1.0F : 0.0F,
         });
 
         auto addBtn = ui::button({
             .glyph = "add",
-            .glyphSize = Style::fontSizeCaption * m_scale,
+            .glyphSize = (grouped ? Style::fontSizeBody : Style::fontSizeCaption) * m_scale,
             .enabled = !atCapacity,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("settings.controls.list.add"),
@@ -218,18 +245,28 @@ void ListEditor::rebuildRows() {
   for (std::size_t i = 0; i < m_items.size(); ++i) {
     auto itemRow = ui::row({
         .align = FlexAlign::Center,
-        .gap = Style::spaceXs * m_scale,
+        .gap = (grouped ? Style::spaceSm : Style::spaceXs) * m_scale,
         .minHeight = itemRowHeight,
     });
 
-    auto labelCell = ui::row(
-        {
-            .align = FlexAlign::Center,
-            .minWidth = labelCellWidth,
-        },
-        makeListLabel(labelForValue(m_items[i]), m_scale)
-    );
-    itemRow->addChild(std::move(labelCell));
+    if (m_itemLeading) {
+      if (auto leading = m_itemLeading(i)) {
+        itemRow->addChild(std::move(leading));
+      }
+    }
+
+    if (grouped) {
+      itemRow->addChild(makeListLabel(labelForValue(m_items[i]), m_scale, true));
+    } else {
+      auto labelCell = ui::row(
+          {
+              .align = FlexAlign::Center,
+              .minWidth = labelCellWidth,
+          },
+          makeListLabel(labelForValue(m_items[i]), m_scale, false)
+      );
+      itemRow->addChild(std::move(labelCell));
+    }
 
     if (m_itemAccessory) {
       if (auto accessory = m_itemAccessory(i)) {
@@ -237,53 +274,70 @@ void ListEditor::rebuildRows() {
       }
     }
 
-    addGhostIconButton(*itemRow, "close", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.remove"), [this, i] {
-      if (m_onRemoveRequested) {
-        m_onRemoveRequested(i);
+    // Grouped rows keep the move arrows in fixed slots so the remove button never shifts.
+    const auto addMoveButton = [&](bool up) {
+      const bool enabled = up ? i > 0 : i + 1 < m_items.size();
+      if (!grouped && !enabled) {
+        return;
       }
-    });
-
-    if (i > 0) {
-      addGhostIconButton(
-          *itemRow, "chevron-up", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.move-up"),
-          [this, i] {
+      auto* button = addGhostIconButton(
+          *itemRow, up ? "chevron-up" : "chevron-down", actionGlyph, actionSize,
+          i18n::tr(up ? "settings.controls.list.move-up" : "settings.controls.list.move-down"),
+          [this, i, up] {
             if (m_onMoveRequested) {
-              m_onMoveRequested(i, i - 1);
+              m_onMoveRequested(i, up ? i - 1 : i + 1);
             }
           }
       );
+      if (button != nullptr && !enabled) {
+        button->setEnabled(false);
+      }
+    };
+
+    if (grouped) {
+      addMoveButton(true);
+      addMoveButton(false);
     }
-    if (i + 1 < m_items.size()) {
-      addGhostIconButton(
-          *itemRow, "chevron-down", Style::fontSizeCaption * m_scale, i18n::tr("settings.controls.list.move-down"),
-          [this, i] {
-            if (m_onMoveRequested) {
-              m_onMoveRequested(i, i + 1);
-            }
+    addGhostIconButton(
+        *itemRow, "close", actionGlyph, actionSize, i18n::tr("settings.controls.list.remove"),
+        [this, i] {
+          if (m_onRemoveRequested) {
+            m_onRemoveRequested(i);
           }
-      );
+        }
+    );
+    if (!grouped) {
+      addMoveButton(true);
+      addMoveButton(false);
     }
 
+    if (m_rowConfigure) {
+      m_rowConfigure(*itemRow);
+    }
     addChild(std::move(itemRow));
   }
 
   markLayoutDirty();
 }
 
-void ListEditor::addGhostIconButton(
-    Flex& row, std::string_view glyph, float size, std::string_view tooltip, std::function<void()> callback
+Button* ListEditor::addGhostIconButton(
+    Flex& row, std::string_view glyph, float glyphSize, float buttonSize, std::string_view tooltip,
+    std::function<void()> callback
 ) {
+  Button* out = nullptr;
   row.addChild(
       ui::button({
+          .out = &out,
           .glyph = std::string(glyph),
-          .glyphSize = size,
+          .glyphSize = glyphSize,
           .variant = ButtonVariant::Ghost,
           .tooltip = std::string(tooltip),
-          .minWidth = kItemRowHeight * m_scale,
-          .minHeight = kItemRowHeight * m_scale,
+          .minWidth = buttonSize,
+          .minHeight = buttonSize,
           .padding = Style::spaceXs * m_scale,
           .radius = Style::scaledRadiusSm(m_scale),
           .onClick = std::move(callback),
       })
   );
+  return out;
 }
