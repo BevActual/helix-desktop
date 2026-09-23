@@ -133,6 +133,16 @@ std::unique_ptr<Flex> PluginsTab::create() {
           .onChange = [this](std::size_t index) { applyView(index); },
       })
   );
+  // Store search and filters land here so they sit on the compact card with the view switch.
+  toolbar->addChild(
+      ui::column({
+          .out = &m_storeToolbarHost,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
   live->addChild(std::move(toolbar));
 
   live->addChild(
@@ -256,6 +266,7 @@ void PluginsTab::onClose() {
   m_status = nullptr;
   m_installedHost = nullptr;
   m_storeHost = nullptr;
+  m_storeToolbarHost = nullptr;
   m_refreshButton = nullptr;
   m_backButton = nullptr;
   m_pageButton = nullptr;
@@ -342,6 +353,9 @@ void PluginsTab::syncLiveControls() {
   const bool detail = store && m_store != nullptr && m_store->isDetailView();
   setShown(m_installedHost, !store);
   setShown(m_storeHost, store);
+  const bool storeToolbar =
+      store && !detail && m_storeToolbarHost != nullptr && !m_storeToolbarHost->children().empty();
+  setShown(m_storeToolbarHost, storeToolbar);
   setShown(m_refreshButton, !detail);
   setShown(m_backButton, detail);
   const auto pageUrl = detail ? m_store->detailPageUrl() : std::optional<std::string>{};
@@ -420,6 +434,9 @@ void PluginsTab::invalidateStore(bool resetContent) {
   }
   m_storePopulated = false;
   clearChildren(m_storeHost);
+  if (m_storeToolbarHost != nullptr) {
+    m_storeToolbarHost->clearContent();
+  }
   PanelManager::instance().requestLayout();
 }
 
@@ -516,6 +533,7 @@ void PluginsTab::ensureStore() {
                 return m_pluginManager != nullptr && m_pluginManager->isMaterialized(id);
               },
           .scale = contentScale(),
+          .toolbarHost = m_storeToolbarHost,
       },
       &m_fileCache, &m_storeScroll
   );
@@ -538,7 +556,11 @@ void PluginsTab::populateStoreIfNeeded(Renderer& renderer) {
     m_store.reset();
   }
   clearChildren(m_storeHost);
+  if (m_storeToolbarHost != nullptr) {
+    m_storeToolbarHost->clearContent();
+  }
   if (!m_storeLoaded) {
+    syncLiveControls();
     return;
   }
   ensureStore();

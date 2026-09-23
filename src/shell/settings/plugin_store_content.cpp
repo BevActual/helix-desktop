@@ -396,6 +396,9 @@ namespace settings {
   }
 
   void PluginStoreContent::populateBody(Flex& body, Renderer& renderer, AsyncTextureCache* textureCache) {
+    if (m_callbacks.toolbarHost != nullptr) {
+      m_callbacks.toolbarHost->clearContent();
+    }
     if (m_detailIndex.has_value()) {
       buildDetailView(body, renderer, textureCache);
     } else {
@@ -407,8 +410,9 @@ namespace settings {
     m_renderer = &renderer;
     m_textureCache = textureCache;
     const float scale = m_callbacks.scale;
+    Flex& toolbarHost = m_callbacks.toolbarHost != nullptr ? *m_callbacks.toolbarHost : body;
 
-    body.addChild(
+    toolbarHost.addChild(
         ui::input({
             .value = m_searchQuery,
             .placeholder = i18n::tr("settings.plugins.store.search-placeholder"),
@@ -544,7 +548,7 @@ namespace settings {
         })
     );
 
-    body.addChild(std::move(toolbar));
+    toolbarHost.addChild(std::move(toolbar));
 
     if (!m_tagFiltersCollapsed) {
       auto tagRows = ui::row({
@@ -557,9 +561,9 @@ namespace settings {
       for (auto& btn : tagButtons) {
         tagRows->addChild(std::move(btn));
       }
-      body.addChild(std::move(tagRows));
+      toolbarHost.addChild(std::move(tagRows));
 
-      body.addChild(std::move(toolbarBottom));
+      toolbarHost.addChild(std::move(toolbarBottom));
     }
 
     auto adapter = std::make_unique<PluginStoreAdapter>(scale);

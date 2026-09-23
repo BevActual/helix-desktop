@@ -50,6 +50,9 @@ namespace settings {
     // install keeps offering the add action instead of claiming the plugin is there.
     std::function<bool(const std::string& id)> isInstalled;
     float scale = 1.0F;
+    // When set, the search field and filter rows are built into this host (the tab's compact
+    // card) instead of the body, so the body holds only the grid.
+    Flex* toolbarHost = nullptr;
   };
 
   class PluginStoreContent {

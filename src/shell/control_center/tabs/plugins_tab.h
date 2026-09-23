@@ -76,6 +76,7 @@ private:
   Label* m_status = nullptr;
   Flex* m_installedHost = nullptr;
   Flex* m_storeHost = nullptr;
+  Flex* m_storeToolbarHost = nullptr;
   Button* m_refreshButton = nullptr;
   Button* m_backButton = nullptr;
   Button* m_pageButton = nullptr;
