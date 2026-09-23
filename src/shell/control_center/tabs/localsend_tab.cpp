@@ -167,6 +167,8 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       ui::input({
           .out = &m_pin,
           .placeholder = i18n::tr("control-center.localsend.their-pin"),
+          .fontSize = Style::fontSizeBody * scale,
+          .controlHeight = Style::controlHeight * scale,
           .onChange = [this](const std::string& value) { m_pinText = value; },
       })
   );
@@ -586,14 +588,22 @@ void LocalSendTab::rebuildPeers() {
   }
   const float scale = contentScale();
   if (snap.peers.empty()) {
-    m_peerList->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.localsend.nearby-empty"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 3,
-        })
-    );
+    m_peerList->addChild(control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "devices",
+            .title = i18n::tr("control-center.localsend.nearby-empty-title"),
+            .body = i18n::tr("control-center.localsend.nearby-empty"),
+            .actionLabel = i18n::tr("control-center.localsend.announce"),
+            .actionGlyph = "refresh",
+            .onAction =
+                [this]() {
+                  if (m_service != nullptr) {
+                    m_service->announce();
+                  }
+                },
+        }
+    ));
     return;
   }
   for (const auto& peer : snap.peers) {
@@ -669,13 +679,14 @@ void LocalSendTab::rebuildHistory() {
   }
   const float scale = contentScale();
   if (snap.history.empty()) {
-    m_historyList->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.localsend.history-empty"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
+    m_historyList->addChild(control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "history",
+            .title = i18n::tr("control-center.localsend.history-empty-title"),
+            .body = i18n::tr("control-center.localsend.history-empty"),
+        }
+    ));
     return;
   }
   for (const auto& item : snap.history) {
