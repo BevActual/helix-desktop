@@ -27,6 +27,8 @@ using namespace control_center;
 namespace {
 
   constexpr float kGraphLineWidth = 0.75F;
+  // Content width (logical px) from which the About well shows System and Resources side by side.
+  constexpr float kAboutTwoColumnMinWidth = 720.0F;
   constexpr float kGraphFillOpacity = 0.15F;
   constexpr double kNetMinScaleBps = 10000.0;
   constexpr std::size_t kMaxDiskRows = 4;
@@ -126,20 +128,20 @@ namespace {
             {.out = &row, .align = FlexAlign::Center, .gap = Style::spaceXs * scale},
             ui::glyph({
                 .glyph = glyphName,
-                .glyphSize = Style::fontSizeMini * scale,
+                .glyphSize = Style::fontSizeCaption * scale,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
             }),
             ui::label({
                 .out = &nameLabel,
                 .text = name,
-                .fontSize = Style::fontSizeMini * scale,
+                .fontSize = Style::fontSizeCaption * scale,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
                 .maxLines = 1,
                 .flexGrow = 1.0F,
             }),
             ui::label({
                 .out = &value,
-                .fontSize = Style::fontSizeMini * scale,
+                .fontSize = Style::fontSizeCaption * scale,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
                 .maxLines = 1,
             })
@@ -162,7 +164,10 @@ namespace {
       Flex& parent, const std::string& title, float scale, float grow, float fillOpacity, Label** outLines,
       int lineCount, const char* const* glyphs
   ) {
+    // Stretch so each row spans the card: names sit left, values right, instead of every row
+    // shrinking to its text and floating centred in a wide well.
     auto card = ui::column({
+        .align = FlexAlign::Stretch,
         .flexGrow = grow,
         .configure =
             [scale, fillOpacity](Flex& section) {
@@ -179,12 +184,12 @@ namespace {
               {.align = FlexAlign::Center, .gap = Style::spaceXs * scale},
               ui::glyph({
                   .glyph = glyphs[i],
-                  .glyphSize = Style::fontSizeMini * scale,
+                  .glyphSize = Style::fontSizeCaption * scale,
                   .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               }),
               ui::label({
                   .out = &outLines[i],
-                  .fontSize = Style::fontSizeMini * scale,
+                  .fontSize = Style::fontSizeCaption * scale,
                   .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
                   .maxLines = 1,
                   .flexGrow = 1.0F,
@@ -374,10 +379,19 @@ std::unique_ptr<Flex> SystemTab::create() {
       .flexGrow = 1.0F,
       .configure = [sc](Flex& host) { applyContentCardStyle(host, sc); },
   });
+  // System and Resources sit side by side when the well is wide (Control Center sized like a
+  // Settings window) and stack in the compact panel; doLayout flips the direction.
+  Flex* aboutColumns = nullptr;
+  aboutHost->addChild(ui::row({
+      .out = &aboutColumns,
+      .align = FlexAlign::Start,
+      .gap = Style::spaceLg * sc,
+  }));
+  m_aboutColumns = aboutColumns;
   static constexpr const char* kSystemGlyphs[] = {"cpu-usage",        "video",      "device-desktop",
                                                   "layers-intersect", "app-window", "clock"};
   auto* systemCard = makeInfoCard(
-      *aboutHost, i18n::tr("control-center.system.titles.system"), sc, 1.0F, panelCardOpacity(), m_systemLines,
+      *aboutColumns, i18n::tr("control-center.system.titles.system"), sc, 1.0F, panelCardOpacity(), m_systemLines,
       kSystemLines, kSystemGlyphs
   );
   if (m_upgradeAvailable && m_upgradeAvailable()) {
@@ -414,7 +428,8 @@ std::unique_ptr<Flex> SystemTab::create() {
   }
 
   auto* resourcesCard = makeInfoCard(
-      *aboutHost, i18n::tr("control-center.system.titles.resources"), sc, 1.0F, panelCardOpacity(), nullptr, 0, nullptr
+      *aboutColumns, i18n::tr("control-center.system.titles.resources"), sc, 1.0F, panelCardOpacity(), nullptr, 0,
+      nullptr
   );
   m_resourcesLines[0] = addResourceRow(
       *resourcesCard, "activity", i18n::tr("control-center.system.labels.load"), sc, nullptr,
@@ -437,12 +452,12 @@ std::unique_ptr<Flex> SystemTab::create() {
             {.align = FlexAlign::Center, .gap = Style::spaceXs * sc},
             ui::glyph({
                 .glyph = "storage",
-                .glyphSize = Style::fontSizeMini * sc,
+                .glyphSize = Style::fontSizeCaption * sc,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
             }),
             ui::label({
                 .text = mountPoint,
-                .fontSize = Style::fontSizeMini * sc,
+                .fontSize = Style::fontSizeCaption * sc,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
                 .maxLines = 1,
                 .ellipsize = TextEllipsize::Start,
@@ -451,7 +466,7 @@ std::unique_ptr<Flex> SystemTab::create() {
             }),
             ui::label({
                 .out = &usageLabel,
-                .fontSize = Style::fontSizeMini * sc,
+                .fontSize = Style::fontSizeCaption * sc,
                 .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
                 .maxLines = 1,
             })
@@ -683,6 +698,7 @@ void SystemTab::onClose() {
   m_gpuHost = nullptr;
   m_netHost = nullptr;
   m_aboutHost = nullptr;
+  m_aboutColumns = nullptr;
   m_cpuLegend = nullptr;
   m_ramLegend = nullptr;
   m_gpuLegend = nullptr;
@@ -772,6 +788,18 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
   const float sc = contentScale();
 
   syncCatalog();
+  if (m_aboutColumns != nullptr) {
+    const bool wide = contentWidth >= kAboutTwoColumnMinWidth * sc;
+    m_aboutColumns->setDirection(wide ? FlexDirection::Horizontal : FlexDirection::Vertical);
+    m_aboutColumns->setAlign(wide ? FlexAlign::Start : FlexAlign::Stretch);
+    for (const auto& child : m_aboutColumns->children()) {
+      if (auto* column = dynamic_cast<Flex*>(child.get()); column != nullptr) {
+        // Equal columns side by side; natural height stacked.
+        column->setFlexGrow(wide ? 1.0F : 0.0F);
+        column->setFillWidth(!wide);
+      }
+    }
+  }
   m_root->setSize(contentWidth, bodyHeight);
   m_root->layout(renderer);
 

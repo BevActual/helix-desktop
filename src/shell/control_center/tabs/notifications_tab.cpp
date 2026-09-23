@@ -16,6 +16,7 @@
 #include "shell/panel/panel_manager.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
+#include "ui/controls/glyph.h"
 #include "ui/controls/toggle.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -782,31 +783,28 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       })
   );
 
-  tab->addChild(
-      ui::column(
-          {
-              .out = &m_emptyCard,
-              .align = FlexAlign::Center,
-              .justify = FlexJustify::Center,
-              .gap = Style::spaceSm * scale,
-              .flexGrow = 1.0F,
-              .visible = false,
-              .participatesInLayout = false,
-              .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
-          },
-          ui::label({
-              .out = &m_emptyTitle,
-              .fontSize = Style::fontSizeBody * scale,
-              .fontWeight = FontWeight::Bold,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-          }),
-          ui::label({
-              .out = &m_emptyBody,
-              .fontSize = Style::fontSizeBody * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          })
-      )
-  );
+  {
+    control_center::EmptyStateParts parts;
+    auto empty = control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "bell-off",
+            .title = i18n::tr("control-center.notifications.empty-title"),
+            .body = i18n::tr("control-center.notifications.empty-body"),
+        },
+        &parts
+    );
+    m_emptyCard = empty.get();
+    m_emptyTitle = parts.title;
+    m_emptyBody = parts.body;
+    m_emptyGlyph = parts.glyph;
+    applyContentCardStyle(*empty, scale);
+    empty->setAlign(FlexAlign::Center);
+    empty->setJustify(FlexJustify::Center);
+    empty->setVisible(false);
+    empty->setParticipatesInLayout(false);
+    tab->addChild(std::move(empty));
+  }
 
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
 }
@@ -870,6 +868,7 @@ void NotificationsTab::onClose() {
   m_emptyCard = nullptr;
   m_emptyTitle = nullptr;
   m_emptyBody = nullptr;
+  m_emptyGlyph = nullptr;
   m_filter = nullptr;
   m_clearAllButton = nullptr;
   m_dndToggle = nullptr;
@@ -1137,9 +1136,15 @@ void NotificationsTab::updateEmptyState(bool hasHistory, bool hasFiltered) {
   if (hasHistory) {
     m_emptyTitle->setText(i18n::tr("control-center.notifications.filter-empty-title"));
     m_emptyBody->setText(i18n::tr("control-center.notifications.filter-empty-body"));
+    if (m_emptyGlyph != nullptr) {
+      m_emptyGlyph->setGlyph("filter");
+    }
   } else {
     m_emptyTitle->setText(i18n::tr("control-center.notifications.empty-title"));
     m_emptyBody->setText(i18n::tr("control-center.notifications.empty-body"));
+    if (m_emptyGlyph != nullptr) {
+      m_emptyGlyph->setGlyph("bell-off");
+    }
   }
 }
 

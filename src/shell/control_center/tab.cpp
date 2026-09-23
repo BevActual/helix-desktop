@@ -1,7 +1,10 @@
 #include "shell/control_center/tab.h"
 
 #include "ui/builders.h"
+#include "ui/controls/button.h"
 #include "ui/controls/flex.h"
+#include "ui/controls/glyph.h"
+#include "ui/controls/label.h"
 #include "ui/controls/select.h"
 #include "ui/controls/slider.h"
 #include "ui/controls/toggle.h"
@@ -18,6 +21,78 @@
 #include <vector>
 
 namespace control_center {
+
+  std::unique_ptr<Flex> makeEmptyState(float scale, const EmptyStateSpec& spec, EmptyStateParts* parts) {
+    EmptyStateParts local;
+    EmptyStateParts& out = parts != nullptr ? *parts : local;
+    const float disc = Style::controlHeightLg * 1.4F * scale;
+    const float textWidth = 360.0F * scale;
+
+    auto root = ui::column({
+        .out = &out.root,
+        .align = FlexAlign::Center,
+        .justify = FlexJustify::Center,
+        .gap = Style::spaceSm * scale,
+        .paddingV = Style::spaceLg * scale,
+        .paddingH = Style::spaceMd * scale,
+        .flexGrow = 1.0F,
+    });
+
+    root->addChild(ui::column(
+        {
+            .align = FlexAlign::Center,
+            .justify = FlexJustify::Center,
+            .fill = colorSpecFromRole(ColorRole::Primary, 0.14F),
+            .radius = disc * 0.5F,
+            .minWidth = disc,
+            .minHeight = disc,
+            .maxWidth = disc,
+            .width = disc,
+            .height = disc,
+        },
+        ui::glyph({
+            .out = &out.glyph,
+            .glyph = spec.glyph,
+            .glyphSize = Style::fontSizeHeader * 1.2F * scale,
+            .color = colorSpecFromRole(ColorRole::Primary),
+        })
+    ));
+    root->addChild(ui::label({
+        .out = &out.title,
+        .text = spec.title,
+        .fontSize = Style::fontSizeBody * scale,
+        .fontWeight = FontWeight::Bold,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxWidth = textWidth,
+        .maxLines = 2,
+        .textAlign = TextAlign::Center,
+    }));
+    root->addChild(ui::label({
+        .out = &out.body,
+        .text = spec.body,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .maxWidth = textWidth,
+        .maxLines = 4,
+        .textAlign = TextAlign::Center,
+        .visible = !spec.body.empty(),
+    }));
+    if (!spec.actionLabel.empty()) {
+      root->addChild(ui::button({
+          .out = &out.action,
+          .text = spec.actionLabel,
+          .glyph = spec.actionGlyph,
+          .fontSize = Style::fontSizeBody * scale,
+          .variant = ButtonVariant::Primary,
+          .minHeight = Style::controlHeight * scale,
+          .paddingV = Style::spaceSm * scale,
+          .paddingH = Style::spaceLg * scale,
+          .radius = Style::scaledRadiusXl(scale),
+          .onClick = spec.onAction,
+      }));
+    }
+    return root;
+  }
 
   float sectionCardFillOpacity(float panelCardOpacity) noexcept {
     if (Style::highContrastEnabled()) {
@@ -91,6 +166,9 @@ namespace control_center {
     card.setPadding(Style::spaceMd * scale);
     card.setGap(Style::spaceSm * scale);
     card.setAlign(FlexAlign::Stretch);
+    // A content card stacks header, text, actions. Flex defaults to Horizontal, so a card
+    // built as a bare Flex (virtual-list rows) must be told, as applySectionCardStyle does.
+    card.setDirection(FlexDirection::Vertical);
   }
 
   void applyModuleWellStyle(Flex& well, float scale) {
@@ -128,7 +206,10 @@ namespace control_center {
       row.setFill(colorSpecFromRole(ColorRole::Primary, 0.18F));
       break;
     case GroupedListRowEmphasis::Hover:
-      row.setFill(colorSpecFromRole(ColorRole::Hover));
+      // A quiet surface tint, like Home pins and settings rows. The palette's Hover role is an
+      // opaque accent meant for small buttons; painted across a full list row it reads as a
+      // second selection colour.
+      row.setFill(colorSpecFromRole(ColorRole::OnSurface, 0.10F));
       break;
     case GroupedListRowEmphasis::Selected:
       row.setFill(colorSpecFromRole(ColorRole::Primary, 0.12F));

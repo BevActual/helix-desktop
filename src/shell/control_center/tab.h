@@ -12,7 +12,9 @@
 #include <string_view>
 #include <vector>
 
+class Button;
 class Flex;
+class Glyph;
 class Label;
 class Renderer;
 class Select;
@@ -75,6 +77,27 @@ namespace control_center {
   // Size a hosted live body to its content height so leftover wells can scroll
   // instead of stretching sliders and clipping trailing rows.
   void layoutHostedLiveBody(Flex* root, Renderer& renderer, float width);
+
+  // Empty state for a leftover well: a tinted glyph disc, a bold one-line title, a caption
+  // explaining what fills the well, and an optional primary action. Centred in the well so
+  // the user reads it as "nothing here yet", not as a stray settings row. Callers keep the
+  // returned pointers to retitle it (e.g. filter-specific copy) and toggle visibility.
+  struct EmptyStateSpec {
+    std::string glyph;
+    std::string title;
+    std::string body;
+    std::string actionLabel; // empty = no button
+    std::string actionGlyph;
+    std::function<void()> onAction;
+  };
+  struct EmptyStateParts {
+    Flex* root = nullptr;
+    Glyph* glyph = nullptr;
+    Label* title = nullptr;
+    Label* body = nullptr;
+    Button* action = nullptr;
+  };
+  std::unique_ptr<Flex> makeEmptyState(float scale, const EmptyStateSpec& spec, EmptyStateParts* parts = nullptr);
 
 } // namespace control_center
 

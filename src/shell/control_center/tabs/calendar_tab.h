@@ -95,7 +95,7 @@ private:
   Flex* m_accountsCard = nullptr;
   Button* m_accountsAddButton = nullptr;
   Flex* m_accountsList = nullptr;
-  Label* m_accountsEmpty = nullptr;
+  Flex* m_accountsEmpty = nullptr;
   std::string m_lastAccountsKey;
   calendar_view::EventListState m_eventListState;
   Catalog m_catalog = Catalog::Month;

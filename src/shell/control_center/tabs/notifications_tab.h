@@ -21,6 +21,7 @@ class Button;
 class Segmented;
 class Toggle;
 class VirtualListView;
+class Glyph;
 class Label;
 class NotificationHistoryAdapter;
 
@@ -68,6 +69,7 @@ private:
   Flex* m_emptyCard = nullptr;
   Label* m_emptyTitle = nullptr;
   Label* m_emptyBody = nullptr;
+  Glyph* m_emptyGlyph = nullptr;
   Button* m_clearAllButton = nullptr;
   Toggle* m_dndToggle = nullptr;
   Segmented* m_filter = nullptr;

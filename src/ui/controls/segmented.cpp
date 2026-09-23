@@ -10,6 +10,7 @@
 #include "ui/style.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <utility>
 
@@ -350,8 +351,40 @@ void Segmented::applyOuterStyle() {
 }
 
 void Segmented::doLayout(Renderer& renderer) {
+  syncEqualSegmentMinWidths(renderer);
   Flex::doLayout(renderer);
   m_rovingNav.layoutOverlay(width(), height());
+}
+
+LayoutSize Segmented::doMeasure(Renderer& renderer, const LayoutConstraints& constraints) {
+  syncEqualSegmentMinWidths(renderer);
+  return Flex::doMeasure(renderer, constraints);
+}
+
+void Segmented::syncEqualSegmentMinWidths(Renderer& renderer) {
+  if (!m_equalSegmentWidths) {
+    for (Button* b : m_buttons) {
+      if (b != nullptr) {
+        b->setMinWidth(0.0F);
+      }
+    }
+    return;
+  }
+  float widest = 0.0F;
+  for (Button* b : m_buttons) {
+    if (b == nullptr) {
+      continue;
+    }
+    // Intrinsic width: clear last pass's floor so a previously assigned narrow box cannot
+    // feed back into the measurement.
+    b->setMinWidth(0.0F);
+    widest = std::max(widest, b->measure(renderer, LayoutConstraints{}).width);
+  }
+  for (Button* b : m_buttons) {
+    if (b != nullptr) {
+      b->setMinWidth(std::ceil(widest));
+    }
+  }
 }
 
 float Segmented::effectiveFontSize() const noexcept {

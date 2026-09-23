@@ -517,6 +517,7 @@
         "disabled": "Calendar sync is off",
         "disabled-events": "Turn on Calendar to sync events.",
         "empty": "Add an account to see events here.",
+        "empty-title": "No calendar accounts",
         "title": "Accounts"
       },
       "all-day": "All day",

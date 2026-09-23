@@ -52,7 +52,13 @@ public:
 
   void doLayout(Renderer& renderer) override;
 
+protected:
+  LayoutSize doMeasure(Renderer& renderer, const LayoutConstraints& constraints) override;
+
 private:
+  // Equal widths mean equal at rest too: every segment is at least as wide as the widest
+  // label, so a group at its natural size never ellipsizes the longer options.
+  void syncEqualSegmentMinWidths(Renderer& renderer);
   [[nodiscard]] std::unique_ptr<Separator> makeSegmentSeparator();
   [[nodiscard]] std::unique_ptr<Button>
   makeSegmentButton(std::string_view label, std::string_view glyph, std::size_t index);

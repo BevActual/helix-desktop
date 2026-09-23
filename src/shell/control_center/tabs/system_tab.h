@@ -103,6 +103,7 @@ private:
   Flex* m_gpuHost = nullptr;
   Flex* m_netHost = nullptr;
   Flex* m_aboutHost = nullptr;
+  Flex* m_aboutColumns = nullptr;
 
   Flex* m_cpuLegend = nullptr;
   Flex* m_ramLegend = nullptr;

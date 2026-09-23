@@ -416,27 +416,22 @@ std::unique_ptr<Flex> MonitorTab::create() {
   buildArrangementCard(*m_cardsLayout, scale);
   buildNightLightCard(*m_cardsLayout, scale);
 
-  m_cardsLayout->addChild(ui::column(
-      {
-          .out = &m_emptyState,
-          .align = FlexAlign::Stretch,
-          .gap = Style::spaceSm * scale,
-          .visible = false,
-          .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
-      },
-      ui::label({
-          .text = i18n::tr("control-center.display.no-displays"),
-          .fontSize = Style::fontSizeBody * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 2,
-      }),
-      ui::label({
-          .text = i18n::tr("control-center.display.no-displays-hint"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 3,
-      })
-  ));
+  {
+    auto empty = control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "device-desktop-off",
+            .title = i18n::tr("control-center.display.no-displays"),
+            .body = i18n::tr("control-center.display.no-displays-hint"),
+        }
+    );
+    m_emptyState = empty.get();
+    applyContentCardStyle(*empty, scale);
+    empty->setAlign(FlexAlign::Center);
+    empty->setJustify(FlexJustify::Center);
+    empty->setVisible(false);
+    m_cardsLayout->addChild(std::move(empty));
+  }
 
   tab->addChild(std::move(cardsScroll));
 

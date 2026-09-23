@@ -421,15 +421,23 @@ void CalendarTab::buildAccountsCard(Flex& parent, float scale) {
       .gap = Style::spaceSm * scale,
       .flexGrow = 1.0F,
   });
-  card->addChild(
-      ui::label({
-          .out = &m_accountsEmpty,
-          .text = i18n::tr("control-center.calendar.accounts.empty"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
-      })
-  );
+  {
+    control_center::EmptyStateParts parts;
+    card->addChild(control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "calendar",
+            .title = i18n::tr("control-center.calendar.accounts.empty-title"),
+            .body = i18n::tr("control-center.calendar.accounts.empty"),
+            .actionLabel = i18n::tr("control-center.calendar.accounts.add"),
+            .actionGlyph = "plus",
+            .onAction = [this]() { openAccount(std::nullopt); },
+        },
+        &parts
+    ));
+    m_accountsEmpty = parts.root;
+    m_accountsEmpty->setVisible(false);
+  }
   auto listScroll = ui::scrollView({
       .contentScale = scale,
       .scrollbarVisible = true,
