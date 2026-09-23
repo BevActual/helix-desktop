@@ -23,7 +23,10 @@ public:
   ~TypeTab() override;
 
   std::unique_ptr<Flex> create() override;
-  [[nodiscard]] std::unique_ptr<Flex> createLiveBody(bool hosted = false);
+  // When compactHost is set (hosted inside Theme), the compact toolbar is added to that card
+  // instead of this body, so sources/search/current pick stay on the one glass compact card.
+  [[nodiscard]] std::unique_ptr<Flex> createLiveBody(bool hosted = false, Flex* compactHost = nullptr);
+  [[nodiscard]] Flex* hostedCompact() const noexcept { return m_hostedCompact; }
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setConfigureMode(bool show) override;
@@ -45,6 +48,7 @@ private:
   std::unique_ptr<VirtualGridAdapter> m_fontAdapter;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_hostedCompact = nullptr;
   Label* m_fontName = nullptr;
   Input* m_filter = nullptr;
   VirtualGridView* m_grid = nullptr;

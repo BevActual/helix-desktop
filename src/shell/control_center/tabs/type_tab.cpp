@@ -186,7 +186,7 @@ std::unique_ptr<Flex> TypeTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> TypeTab::createLiveBody(bool hosted) {
+std::unique_ptr<Flex> TypeTab::createLiveBody(bool hosted, Flex* compactHost) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -247,7 +247,13 @@ std::unique_ptr<Flex> TypeTab::createLiveBody(bool hosted) {
       })
   );
   compactCard->addChild(std::move(toolbar));
-  tab->addChild(std::move(compactCard));
+  if (compactHost != nullptr) {
+    m_hostedCompact = compactCard.get();
+    compactHost->addChild(std::move(compactCard));
+  } else {
+    m_hostedCompact = nullptr;
+    tab->addChild(std::move(compactCard));
+  }
 
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
@@ -306,6 +312,7 @@ std::unique_ptr<Flex> TypeTab::createHeaderActions() {
 }
 
 void TypeTab::onClose() {
+  m_hostedCompact = nullptr;
   if (m_settings != nullptr) {
     m_settings->onClose();
   }

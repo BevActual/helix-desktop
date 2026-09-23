@@ -786,9 +786,9 @@ std::unique_ptr<Flex> ThemeTab::create() {
       .participatesInLayout = palettesOpen,
   });
 
+  // No wrap: wrapped rows skip flexGrow, which pinned the palette search at its minimum width.
   auto browse = ui::row({
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .flexGrow = 1.0F,
   });
@@ -928,7 +928,6 @@ std::unique_ptr<Flex> ThemeTab::create() {
   auto toolbar = ui::row({
       .out = &m_catalogToolbar,
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .fillWidth = true,
   });
@@ -1063,6 +1062,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       )
   );
   compactCard->addChild(std::move(chromeToolbar));
+  Flex* compactHost = compactCard.get();
   tab->addChild(std::move(compactCard));
 
   auto palettesHost = ui::column({
@@ -1122,6 +1122,15 @@ std::unique_ptr<Flex> ThemeTab::create() {
   tab->addChild(std::move(palettesHost));
 
   auto addHost = [&]<typename Hosted>(Flex** out, Hosted* child, bool leftoverWell) {
+    // Catalog sources keep their toolbar on the Theme compact card; only the leftover lands in the
+    // host. Chrome editors have no toolbar of their own.
+    auto makeBody = [&]() -> std::unique_ptr<Flex> {
+      if constexpr (requires { child->createLiveBody(true, compactHost); }) {
+        return child->createLiveBody(true, leftoverWell ? nullptr : compactHost);
+      } else {
+        return child->createLiveBody(true);
+      }
+    };
     std::unique_ptr<Flex> host;
     if (leftoverWell) {
       host = ui::column({
@@ -1147,7 +1156,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       content->setDirection(FlexDirection::Vertical);
       content->setAlign(FlexAlign::Stretch);
       content->setGap(Style::spaceSm * scale);
-      content->addChild(child->createLiveBody(true));
+      content->addChild(makeBody());
       host->addChild(std::move(scroll));
     } else {
       host = ui::column({
@@ -1156,7 +1165,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
           .gap = 0.0F,
           .flexGrow = 1.0F,
       });
-      host->addChild(child->createLiveBody(true));
+      host->addChild(makeBody());
     }
     tab->addChild(std::move(host));
   };
@@ -1387,6 +1396,18 @@ void ThemeTab::syncHosts() {
   setShown(m_typeHost, m_section == Section::Type);
   setShown(m_effectsHost, m_section == Section::Effects);
   setShown(m_languageHost, m_section == Section::Language);
+  if (m_icons != nullptr) {
+    setShown(m_icons->hostedCompact(), m_section == Section::Icons);
+  }
+  if (m_type != nullptr) {
+    setShown(m_type->hostedCompact(), m_section == Section::Type);
+  }
+  if (m_effects != nullptr) {
+    setShown(m_effects->hostedCompact(), m_section == Section::Effects);
+  }
+  if (m_language != nullptr) {
+    setShown(m_language->hostedCompact(), m_section == Section::Language);
+  }
 }
 
 void ThemeTab::syncSettingsSection() {

@@ -93,7 +93,7 @@ std::unique_ptr<Flex> LanguageTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> LanguageTab::createLiveBody(bool hosted) {
+std::unique_ptr<Flex> LanguageTab::createLiveBody(bool hosted, Flex* compactHost) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
 
@@ -160,7 +160,13 @@ std::unique_ptr<Flex> LanguageTab::createLiveBody(bool hosted) {
           .maxLines = 2,
       })
   );
-  tab->addChild(std::move(compactCard));
+  if (compactHost != nullptr) {
+    m_hostedCompact = compactCard.get();
+    compactHost->addChild(std::move(compactCard));
+  } else {
+    m_hostedCompact = nullptr;
+    tab->addChild(std::move(compactCard));
+  }
 
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
@@ -216,6 +222,7 @@ std::unique_ptr<Flex> LanguageTab::createHeaderActions() {
 }
 
 void LanguageTab::onClose() {
+  m_hostedCompact = nullptr;
   if (m_settings != nullptr) {
     m_settings->onClose();
   }

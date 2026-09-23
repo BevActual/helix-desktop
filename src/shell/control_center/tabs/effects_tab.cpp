@@ -106,7 +106,7 @@ std::unique_ptr<Flex> EffectsTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> EffectsTab::createLiveBody(bool hosted) {
+std::unique_ptr<Flex> EffectsTab::createLiveBody(bool hosted, Flex* compactHost) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   m_syncing = true;
@@ -189,7 +189,13 @@ std::unique_ptr<Flex> EffectsTab::createLiveBody(bool hosted) {
           .maxLines = 2,
       })
   );
-  tab->addChild(std::move(compactCard));
+  if (compactHost != nullptr) {
+    m_hostedCompact = compactCard.get();
+    compactHost->addChild(std::move(compactCard));
+  } else {
+    m_hostedCompact = nullptr;
+    tab->addChild(std::move(compactCard));
+  }
 
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
@@ -320,6 +326,7 @@ std::unique_ptr<Flex> EffectsTab::createHeaderActions() {
 }
 
 void EffectsTab::onClose() {
+  m_hostedCompact = nullptr;
   if (m_settings != nullptr) {
     m_settings->onClose();
   }

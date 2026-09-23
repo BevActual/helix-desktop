@@ -116,7 +116,7 @@ std::unique_ptr<Flex> IconsTab::create() {
   return m_settings->wrapLive(createLiveBody(), contentScale(), panelCardOpacity());
 }
 
-std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted) {
+std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted, Flex* compactHost) {
   const float scale = contentScale();
   const float captionSize = Style::fontSizeCaption * scale;
   const bool tinted = m_config != nullptr && m_config->config().shell.appIconColorize;
@@ -198,7 +198,13 @@ std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted) {
           .maxLines = 2,
       })
   );
-  tab->addChild(std::move(compactCard));
+  if (compactHost != nullptr) {
+    m_hostedCompact = compactCard.get();
+    compactHost->addChild(std::move(compactCard));
+  } else {
+    m_hostedCompact = nullptr;
+    tab->addChild(std::move(compactCard));
+  }
 
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
@@ -266,6 +272,7 @@ std::unique_ptr<Flex> IconsTab::createHeaderActions() {
 }
 
 void IconsTab::onClose() {
+  m_hostedCompact = nullptr;
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
