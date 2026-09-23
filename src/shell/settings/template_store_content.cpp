@@ -394,9 +394,9 @@ namespace settings {
     body.setGap(Style::spaceXs * scale);
     body.setPadding(m_callbacks.inset ? Style::spaceMd * scale : 0.0F);
 
+    // No wrap: wrapped rows skip flexGrow, which would pin the search field at its minimum.
     auto browse = ui::row({
         .align = FlexAlign::Center,
-        .wrap = true,
         .gap = Style::spaceXs * scale,
         .fillWidth = true,
     });
@@ -474,7 +474,13 @@ namespace settings {
             .onClick = [this]() { cycleSortMode(); },
         })
     );
-    body.addChild(std::move(browse));
+    Flex* toolbarHost = m_callbacks.toolbarHost != nullptr ? m_callbacks.toolbarHost : &body;
+    if (toolbarHost != &body) {
+      while (!toolbarHost->children().empty()) {
+        toolbarHost->removeChild(toolbarHost->children().back().get());
+      }
+    }
+    toolbarHost->addChild(std::move(browse));
 
     if (!m_categoryFiltersCollapsed) {
       auto chipRow = ui::row({
@@ -507,7 +513,7 @@ namespace settings {
       for (const auto& category : m_allCategories) {
         makeFilterChip(category, category);
       }
-      body.addChild(std::move(chipRow));
+      toolbarHost->addChild(std::move(chipRow));
     }
 
     auto adapter = std::make_unique<TemplateStoreAdapter>(scale);

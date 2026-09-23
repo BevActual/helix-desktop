@@ -36,6 +36,9 @@ namespace settings {
     float scale = 1.0F;
     // Sheet bodies keep default padding; Control Center embeds the store flush.
     bool inset = true;
+    // When set, the search / filters / sort row is rebuilt into this host instead of the body,
+    // so Control Center can keep it on the compact card while the grid stays leftover.
+    Flex* toolbarHost = nullptr;
     // When the catalog has no entries. Empty uses the community-store empty copy.
     std::string emptyCatalogText;
     // When set, user-template tiles show a trailing edit control that opens this callback.

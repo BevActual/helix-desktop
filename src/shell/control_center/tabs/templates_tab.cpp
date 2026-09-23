@@ -374,6 +374,15 @@ std::unique_ptr<Flex> TemplatesTab::create() {
   );
   gtkFollow->addChild(std::move(gtkRow));
   sectionCard->addChild(std::move(gtkFollow));
+  // Store search, filters, and sort rebuild into this host so they sit on the compact card
+  // (Wallpaper navigation); the grid alone stays leftover.
+  sectionCard->addChild(
+      ui::column({
+          .out = &m_storeToolbarHost,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+      })
+  );
   sectionCard->addChild(
       ui::label({
           .out = &m_hint,
@@ -448,6 +457,7 @@ void TemplatesTab::onClose() {
   m_enable = nullptr;
   m_hint = nullptr;
   m_storeHost = nullptr;
+  m_storeToolbarHost = nullptr;
   m_applyButton = nullptr;
   m_folderButton = nullptr;
   m_newButton = nullptr;
@@ -563,6 +573,7 @@ void TemplatesTab::syncLiveControls() {
   const bool showHint = gtkMissingTheme || applyFailureCount > 0 || !enabled;
   setShown(m_hint, showHint);
   setShown(m_storeHost, enabled);
+  setShown(m_storeToolbarHost, enabled);
   setShown(m_folderButton, userSource);
 
   const std::string nextCatalog = catalogKey();
@@ -657,6 +668,7 @@ void TemplatesTab::invalidateStore(bool resetContent) {
   }
   m_storePopulated = false;
   clearChildren(m_storeHost);
+  clearChildren(m_storeToolbarHost);
   PanelManager::instance().requestLayout();
 }
 
@@ -725,6 +737,7 @@ void TemplatesTab::ensureStore() {
           .setSelected = std::move(setSelected),
           .scale = contentScale(),
           .inset = false,
+          .toolbarHost = m_storeToolbarHost,
           .emptyCatalogText = std::move(emptyText),
           .onEditUser =
               m_sourceKind == Source::User
@@ -757,6 +770,7 @@ void TemplatesTab::populateStoreIfNeeded(Renderer& renderer) {
     m_store.reset();
   }
   clearChildren(m_storeHost);
+  clearChildren(m_storeToolbarHost);
   ensureStore();
   if (m_store == nullptr) {
     return;

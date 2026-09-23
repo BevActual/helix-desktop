@@ -77,6 +77,7 @@ private:
   Toggle* m_enable = nullptr;
   Label* m_hint = nullptr;
   Flex* m_storeHost = nullptr;
+  Flex* m_storeToolbarHost = nullptr;
   Button* m_applyButton = nullptr;
   Button* m_folderButton = nullptr;
   Button* m_newButton = nullptr;
