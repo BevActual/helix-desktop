@@ -1,5 +1,6 @@
 #pragma once
 
+#include "render/core/render_styles.h"
 #include "render/scene/node.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -85,6 +86,9 @@ public:
   Node* addChild(std::unique_ptr<Node> child) override;
   Node* insertChildAt(std::size_t index, std::unique_ptr<Node> child) override;
   std::unique_ptr<Node> removeChild(Node* child) override;
+  // Remove every content child but keep the background chrome (fill, border, radius). Use this
+  // instead of draining children() when rebuilding a styled list or well.
+  void clearContent();
 
   [[nodiscard]] FlexDirection direction() const noexcept { return m_direction; }
   [[nodiscard]] bool wrap() const noexcept { return m_wrap; }
@@ -123,10 +127,14 @@ public:
 
 private:
   void ensureBackground();
+  void restoreDetachedBackground();
   void applyPalette();
   LayoutSize runLayout(Renderer& renderer, const LayoutConstraints& constraints, bool arrangeChildren);
 
   RectNode* m_background = nullptr;
+  // Style of a background that a caller removed while draining children(); re-applied when content
+  // comes back so the chrome survives a rebuild and m_background never dangles.
+  std::optional<RoundedRectStyle> m_detachedBackgroundStyle;
   ColorSpec m_fill = clearColorSpec();
   ColorSpec m_border = clearColorSpec();
   Signal<>::ScopedConnection m_paletteConn;

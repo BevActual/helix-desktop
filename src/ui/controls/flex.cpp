@@ -351,12 +351,14 @@ void Flex::setChildGapExcluded(Node* child, bool excluded) {
 }
 
 Node* Flex::addChild(std::unique_ptr<Node> child) {
+  restoreDetachedBackground();
   Node* raw = Node::addChild(std::move(child));
   m_gapExcludedChildren.erase(raw);
   return raw;
 }
 
 Node* Flex::insertChildAt(std::size_t index, std::unique_ptr<Node> child) {
+  restoreDetachedBackground();
   Node* raw = Node::insertChildAt(index, std::move(child));
   m_gapExcludedChildren.erase(raw);
   return raw;
@@ -364,7 +366,38 @@ Node* Flex::insertChildAt(std::size_t index, std::unique_ptr<Node> child) {
 
 std::unique_ptr<Node> Flex::removeChild(Node* child) {
   m_gapExcludedChildren.erase(child);
+  if (child != nullptr && child == m_background) {
+    // A caller draining children() has reached the chrome. Let it go so the drain terminates, but
+    // remember the style and drop the pointer: a dangling m_background can alias the next child
+    // added at the same address and silently exclude it from layout.
+    m_detachedBackgroundStyle = m_background->style();
+    m_background = nullptr;
+  }
   return Node::removeChild(child);
+}
+
+void Flex::clearContent() {
+  std::vector<Node*> content;
+  content.reserve(children().size());
+  for (const auto& child : children()) {
+    if (child.get() != m_background) {
+      content.push_back(child.get());
+    }
+  }
+  for (Node* child : content) {
+    (void)removeChild(child);
+  }
+}
+
+void Flex::restoreDetachedBackground() {
+  if (m_background != nullptr || !m_detachedBackgroundStyle.has_value()) {
+    return;
+  }
+  const RoundedRectStyle style = *m_detachedBackgroundStyle;
+  m_detachedBackgroundStyle.reset();
+  ensureBackground();
+  m_background->setStyle(style);
+  applyPalette();
 }
 
 void Flex::ensureBackground() {

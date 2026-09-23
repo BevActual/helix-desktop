@@ -15,9 +15,13 @@
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
+#include "system/icon_resolver.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/select.h"
+#include "ui/palette.h"
 #include "ui/visuals/audio_visualizer.h"
 
 #include <algorithm>
@@ -103,6 +107,226 @@ namespace {
     return changed;
   }
 
+  constexpr float kMediaAppIconSize = 28.0F;
+  constexpr std::size_t kMediaAppLimit = 8;
+
+  // App icons for the media-apps list. Function-local so the icon-theme walk
+  // does not run at static-init time on every CLI invocation.
+  [[nodiscard]] IconResolver& mediaAppIconResolver() {
+    static IconResolver resolver;
+    return resolver;
+  }
+
+  [[nodiscard]] bool hasCategory(const std::vector<std::string_view>& tokens, std::string_view wanted) {
+    return std::ranges::find(tokens, wanted) != tokens.end();
+  }
+
+  // Players and music apps only: editors, recorders, mixers, and utilities that
+  // merely tag themselves AudioVideo would not start playback.
+  [[nodiscard]] bool isMediaPlayerEntry(const DesktopEntry& entry) {
+    if (entry.noDisplay || entry.hidden || entry.exec.empty()) {
+      return false;
+    }
+    std::vector<std::string_view> tokens;
+    std::string_view rest = entry.categoriesLower;
+    while (!rest.empty()) {
+      const auto sep = rest.find(';');
+      const std::string_view token = rest.substr(0, sep);
+      if (!token.empty()) {
+        tokens.push_back(token);
+      }
+      if (sep == std::string_view::npos) {
+        break;
+      }
+      rest.remove_prefix(sep + 1);
+    }
+    for (const auto excluded :
+         {"audiovideoediting", "recorder", "mixer", "tuner", "midi", "sequencer", "discburning", "utility",
+          "settings", "development"}) {
+      if (hasCategory(tokens, excluded)) {
+        return false;
+      }
+    }
+    if (hasCategory(tokens, "player") || hasCategory(tokens, "music")) {
+      return true;
+    }
+    return hasCategory(tokens, "audiovideo") && (hasCategory(tokens, "audio") || hasCategory(tokens, "video"));
+  }
+
+  [[nodiscard]] std::vector<const DesktopEntry*> mediaPlayerEntries() {
+    std::vector<const DesktopEntry*> out;
+    for (const auto& entry : desktopEntries()) {
+      if (isMediaPlayerEntry(entry)) {
+        out.push_back(&entry);
+      }
+    }
+    std::ranges::sort(out, [](const DesktopEntry* a, const DesktopEntry* b) { return a->nameLower < b->nameLower; });
+    if (out.size() > kMediaAppLimit) {
+      out.resize(kMediaAppLimit);
+    }
+    return out;
+  }
+
+  // Grouped row that launches a desktop entry. The icon resolves lazily on the
+  // first layout because image decoding needs the renderer.
+  class MediaAppRow : public Flex {
+  public:
+    MediaAppRow(const DesktopEntry& entry, float scale) : m_scale(scale), m_iconName(entry.icon) {
+      setDirection(FlexDirection::Horizontal);
+      setAlign(FlexAlign::Center);
+      setGap(Style::spaceSm * scale);
+      setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
+      setMinHeight(Style::controlHeight * scale);
+      applyGroupedListRowStyle(*this, scale, GroupedListRowEmphasis::None);
+
+      const float iconSize = kMediaAppIconSize * scale;
+      auto iconSlot = ui::column({
+          .out = &m_iconSlot,
+          .align = FlexAlign::Center,
+          .justify = FlexJustify::Center,
+          .width = iconSize,
+          .height = iconSize,
+      });
+      iconSlot->addChild(
+          ui::glyph({
+              .out = &m_iconFallback,
+              .glyph = "music",
+              .glyphSize = Style::fontSizeTitle * scale,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          })
+      );
+      iconSlot->addChild(
+          ui::image({
+              .out = &m_icon,
+              .fit = ImageFit::Contain,
+              .width = iconSize,
+              .height = iconSize,
+              .visible = false,
+              .participatesInLayout = false,
+          })
+      );
+      addChild(std::move(iconSlot));
+
+      auto titles = ui::column({.align = FlexAlign::Start, .gap = 0.0F, .flexGrow = 1.0F});
+      titles->addChild(
+          ui::label({
+              .out = &m_title,
+              .text = entry.name,
+              .fontSize = Style::fontSizeBody * scale,
+              .fontWeight = FontWeight::Bold,
+              .color = colorSpecFromRole(ColorRole::OnSurface),
+              .maxLines = 1,
+              .ellipsize = TextEllipsize::End,
+          })
+      );
+      if (!entry.genericName.empty() && entry.genericName != entry.name) {
+        titles->addChild(
+            ui::label({
+                .out = &m_subtitle,
+                .text = entry.genericName,
+                .fontSize = Style::fontSizeCaption * scale,
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                .maxLines = 1,
+                .ellipsize = TextEllipsize::End,
+            })
+        );
+      }
+      addChild(std::move(titles));
+
+      addChild(
+          ui::glyph({
+              .glyph = "player-play",
+              .glyphSize = Style::fontSizeBody * scale,
+              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          })
+      );
+
+      auto area = ui::inputArea({
+          .cursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+          .tooltip = i18n::tr("control-center.media.open-app", "name", entry.name),
+      });
+      area->setPropagateEvents(true);
+      area->setOnEnter([this](const InputArea::PointerData&) { applyState(); });
+      area->setOnLeave([this]() { applyState(); });
+      area->setOnPress([this](const InputArea::PointerData&) { applyState(); });
+      area->setOnClick([this, entry = entry](const InputArea::PointerData&) {
+        if (!desktop_entry_launch::launchEntry(entry)) {
+          kLog.warn("failed to launch media app '{}'", entry.id);
+        }
+      });
+      m_inputArea = static_cast<InputArea*>(addChild(std::move(area)));
+
+      applyState();
+      m_paletteConn = paletteChanged().connect([this] { applyState(); });
+    }
+
+    void doLayout(Renderer& renderer) override {
+      loadIcon(renderer);
+      if (m_inputArea != nullptr) {
+        m_inputArea->setVisible(false);
+      }
+      Flex::doLayout(renderer);
+      if (m_inputArea != nullptr) {
+        m_inputArea->setVisible(true);
+        m_inputArea->setPosition(0.0F, 0.0F);
+        m_inputArea->setSize(width(), height());
+      }
+      if (m_icon != nullptr && m_iconSlot != nullptr) {
+        m_icon->setPosition(0.0F, 0.0F);
+        m_icon->setSize(m_iconSlot->width(), m_iconSlot->height());
+      }
+      applyState();
+    }
+
+    LayoutSize doMeasure(Renderer& renderer, const LayoutConstraints& constraints) override {
+      return measureByLayout(renderer, constraints);
+    }
+
+    void doArrange(Renderer& renderer, const LayoutRect& rect) override { arrangeByLayout(renderer, rect); }
+
+  private:
+    void loadIcon(Renderer& renderer) {
+      if (m_iconTried || m_icon == nullptr) {
+        return;
+      }
+      m_iconTried = true;
+      if (m_iconName.empty()) {
+        return;
+      }
+      const int targetPx = static_cast<int>(std::round(kMediaAppIconSize * m_scale));
+      std::string path = m_iconName;
+      if (!path.starts_with('/')) {
+        path = mediaAppIconResolver().resolve(m_iconName, targetPx);
+      }
+      const bool ok = !path.empty() && m_icon->setSourceFile(renderer, path, targetPx, true);
+      m_icon->setVisible(ok);
+      if (m_iconFallback != nullptr) {
+        m_iconFallback->setVisible(!ok);
+      }
+    }
+
+    void applyState() {
+      GroupedListRowEmphasis emphasis = GroupedListRowEmphasis::None;
+      if (m_inputArea != nullptr && m_inputArea->pressed()) {
+        emphasis = GroupedListRowEmphasis::Pressed;
+      } else if (m_inputArea != nullptr && m_inputArea->hovered()) {
+        emphasis = GroupedListRowEmphasis::Hover;
+      }
+      applyGroupedListRowStyle(*this, m_scale, emphasis);
+    }
+
+    float m_scale = 1.0F;
+    std::string m_iconName;
+    bool m_iconTried = false;
+    Flex* m_iconSlot = nullptr;
+    Glyph* m_iconFallback = nullptr;
+    Image* m_icon = nullptr;
+    Label* m_title = nullptr;
+    Label* m_subtitle = nullptr;
+    InputArea* m_inputArea = nullptr;
+    Signal<>::ScopedConnection m_paletteConn;
+  };
+
 } // namespace
 
 MediaTab::MediaTab(
@@ -176,6 +400,11 @@ bool MediaTab::syncPlaybackChrome(bool hasPlayer, bool showVisualizer) {
     }
   }
   dirty |= setShown(m_artworkWell, hasPlayer);
+  if (!hasPlayer && m_appsList != nullptr && m_appsEntriesVersion != desktopEntriesVersion()) {
+    populateMediaApps(contentScale());
+    dirty = true;
+  }
+  dirty |= setShown(m_appsWell, !hasPlayer && !m_appsListEmpty);
   if (m_artworkWell != nullptr) {
     const float grow = hasPlayer ? 1.0F : 0.0F;
     if (std::abs(m_artworkWell->flexGrow() - grow) > 0.01F) {
@@ -256,6 +485,19 @@ void MediaTab::openPlayer() {
     return;
   }
   (void)m_mpris->raiseActive();
+}
+
+void MediaTab::populateMediaApps(float scale) {
+  if (m_appsList == nullptr) {
+    return;
+  }
+  m_appsEntriesVersion = desktopEntriesVersion();
+  m_appsList->clearContent();
+  const auto entries = mediaPlayerEntries();
+  for (const DesktopEntry* entry : entries) {
+    m_appsList->addChild(std::make_unique<MediaAppRow>(*entry, scale));
+  }
+  m_appsListEmpty = entries.empty();
 }
 
 void MediaTab::hideActivePlayer() {
@@ -706,6 +948,29 @@ std::unique_ptr<Flex> MediaTab::create() {
   leftover->addChild(std::move(artworkHost));
   live->addChild(std::move(leftover));
 
+  // While nothing plays, the leftover offers the installed players so playback
+  // can start from here instead of a bare "open an app" hint.
+  auto appsWell = ui::column({
+      .out = &m_appsWell,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  addTitle(*appsWell, i18n::tr("control-center.media.players"), scale);
+  appsWell->addChild(
+      ui::column({
+          .out = &m_appsList,
+          .align = FlexAlign::Stretch,
+          .gap = Style::spaceXs * scale,
+          .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+      })
+  );
+  live->addChild(std::move(appsWell));
+  m_appsEntriesVersion = 0;
+  populateMediaApps(scale);
+
   return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
 }
 
@@ -907,6 +1172,10 @@ void MediaTab::onClose() {
   m_volumeHost = nullptr;
   m_volumeSlider = nullptr;
   m_volumeValue = nullptr;
+  m_appsWell = nullptr;
+  m_appsList = nullptr;
+  m_appsEntriesVersion = 0;
+  m_appsListEmpty = true;
   m_lastArtPath.clear();
   m_lastBusName.clear();
   m_lastPlaybackStatus.clear();

@@ -58,6 +58,7 @@ private:
   void hideActivePlayer();
   void commitVolume(double percent);
   [[nodiscard]] bool syncPlaybackChrome(bool hasPlayer, bool showVisualizer);
+  void populateMediaApps(float scale);
 
   // Guard token for deferred callbacks that run on the next main-loop tick.
   // Callbacks capture a weak_ptr so they can detect destruction without
@@ -104,6 +105,11 @@ private:
   Flex* m_volumeHost = nullptr;
   Slider* m_volumeSlider = nullptr;
   Label* m_volumeValue = nullptr;
+  // Leftover shown while nothing is playing: installed players the user can start from here.
+  Flex* m_appsWell = nullptr;
+  Flex* m_appsList = nullptr;
+  std::uint64_t m_appsEntriesVersion = 0;
+  bool m_appsListEmpty = true;
 
   std::string m_lastArtPath;
   std::string m_lastBusName;
