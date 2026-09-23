@@ -586,10 +586,15 @@ void TailscaleTab::syncUi() {
 
   const bool hasIp = !snap.ipv4.empty() || !snap.ipv6.empty();
   const std::string health = joinHealth(snap.health);
-  const bool layoutDirty = setShown(m_catalogSwitch, installed) || setShown(m_ipRow, hasIp) ||
-                            setShown(m_ipv4, !snap.ipv4.empty()) || setShown(m_ipv6, !snap.ipv6.empty()) ||
-                            setShown(m_copyIpButton, hasIp) || setShown(m_actionsRow, installed) ||
-                            setShown(m_health, !health.empty()) || setShown(m_liveScroll, installed);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_catalogSwitch, installed);
+  layoutDirty |= setShown(m_ipRow, hasIp);
+  layoutDirty |= setShown(m_ipv4, !snap.ipv4.empty());
+  layoutDirty |= setShown(m_ipv6, !snap.ipv6.empty());
+  layoutDirty |= setShown(m_copyIpButton, hasIp);
+  layoutDirty |= setShown(m_actionsRow, installed);
+  layoutDirty |= setShown(m_health, !health.empty());
+  layoutDirty |= setShown(m_liveScroll, installed);
   syncCatalog();
   if (!installed) {
     (void)setShown(m_prefsCard, false);

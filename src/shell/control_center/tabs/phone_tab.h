@@ -84,8 +84,11 @@ private:
   Flex* m_continueHost = nullptr;
   Flex* m_castHost = nullptr;
   Label* m_filesEmpty = nullptr;
+  Flex* m_filesEmptyRoot = nullptr;
   Label* m_notificationsEmpty = nullptr;
+  Flex* m_notificationsEmptyRoot = nullptr;
   Label* m_continueEmpty = nullptr;
+  Flex* m_continueEmptyRoot = nullptr;
   Label* m_castEmpty = nullptr;
   Button* m_castMirrorButton = nullptr;
   Flex* m_castAlwaysOnRow = nullptr;

@@ -488,7 +488,9 @@ void MonitorTab::setSettingsSearchQuery(std::string_view query) { m_settings->se
 void MonitorTab::syncHeaderActions() {
   const bool niri = m_displayConfig != nullptr && m_displayConfig->available();
   const bool ddc = m_configService != nullptr && m_configService->config().brightness.enableDdcutil;
-  const bool layoutDirty = setShown(m_rescanButton, ddc || niri) || setShown(m_saveButton, niri);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_rescanButton, ddc || niri);
+  layoutDirty |= setShown(m_saveButton, niri);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -508,8 +510,9 @@ void MonitorTab::syncStatusLabels() {
     const std::string error = m_displayConfig != nullptr ? m_displayConfig->lastError() : std::string{};
     m_errorLabel->setText(error);
   }
-  const bool layoutDirty = setShown(m_noteLabel, niri) ||
-                            setShown(m_errorLabel, m_errorLabel != nullptr && !m_errorLabel->text().empty());
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_noteLabel, niri);
+  layoutDirty |= setShown(m_errorLabel, m_errorLabel != nullptr && !m_errorLabel->text().empty());
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

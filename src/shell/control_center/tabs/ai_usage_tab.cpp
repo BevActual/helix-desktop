@@ -493,7 +493,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
   });
   toggleRow->addChild(
       ui::label({
-          .text = i18n::tr("control-center.ai-usage.ollama.title"),
+          .text = i18n::tr("control-center.ai-usage.ollama.service"),
           .fontSize = Style::fontSizeBody * scale,
           .color = colorSpecFromRole(ColorRole::OnSurface),
           .flexGrow = 1.0F,

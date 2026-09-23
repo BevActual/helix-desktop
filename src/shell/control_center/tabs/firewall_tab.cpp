@@ -417,8 +417,11 @@ void FirewallTab::syncUi() {
   const FirewallSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
   const bool showLists = running && !snap.panic;
-  const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_panicRow, running) ||
-                            setShown(m_catalogSwitch, showLists) || setShown(m_liveScroll, showLists);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_startButton, !running);
+  layoutDirty |= setShown(m_panicRow, running);
+  layoutDirty |= setShown(m_catalogSwitch, showLists);
+  layoutDirty |= setShown(m_liveScroll, showLists);
   syncCatalog();
   if (!showLists) {
     (void)setShown(m_zoneCard, false);

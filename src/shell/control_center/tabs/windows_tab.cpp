@@ -269,7 +269,9 @@ void WindowsTab::onPanelCardOpacityChanged(float opacity) {
 
 void WindowsTab::syncHosts() {
   const bool spacingOpen = m_section == Section::Spacing;
-  const bool layoutDirty = setShown(m_spacingHost, spacingOpen) || setShown(m_columnsHost, !spacingOpen);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_spacingHost, spacingOpen);
+  layoutDirty |= setShown(m_columnsHost, !spacingOpen);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

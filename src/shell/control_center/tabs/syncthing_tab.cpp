@@ -409,9 +409,13 @@ void SyncthingTab::syncUi() {
   const SyncthingSnapshot empty;
   const SyncthingSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
-  const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_stopButton, running) ||
-                            setShown(m_guiButton, running) || setShown(m_copyIdButton, running && !snap.myId.empty()) ||
-                            setShown(m_catalogSwitch, running) || setShown(m_liveScroll, running);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_startButton, !running);
+  layoutDirty |= setShown(m_stopButton, running);
+  layoutDirty |= setShown(m_guiButton, running);
+  layoutDirty |= setShown(m_copyIdButton, running && !snap.myId.empty());
+  layoutDirty |= setShown(m_catalogSwitch, running);
+  layoutDirty |= setShown(m_liveScroll, running);
   syncCatalog();
   if (!running) {
     (void)setShown(m_foldersCard, false);

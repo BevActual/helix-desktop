@@ -1226,7 +1226,10 @@
       "stopped": "KDE Connect is not running",
       "title": "Phone",
       "unpair": "Unpair",
-      "visible-as": "Visible as {name}"
+      "visible-as": "Visible as {name}",
+      "files-empty-title": "No photos",
+      "notifications-empty-title": "No notifications",
+      "continue-empty-title": "Nothing to continue"
     },
     "plugins": {
       "installed": "Installed",
@@ -1300,7 +1303,8 @@
       "status-failed": "Could not list printers.",
       "stopped": "Printing is not running",
       "title": "Printers",
-      "write-failed": "Could not update the printer. Confirm the password prompt if it appears."
+      "write-failed": "Could not update the printer. Confirm the password prompt if it appears.",
+      "empty-title": "No printers"
     },
     "privacy": {
       "auto-locate": "Approximate location",

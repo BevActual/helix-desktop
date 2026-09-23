@@ -342,8 +342,10 @@ void OsdTab::syncHosts() {
   const bool enabled = m_config != nullptr && m_config->config().osd.enabled;
   const bool placementOpen = enabled && m_section == Section::Placement;
   const bool styleOpen = enabled && m_section == Section::Style;
-  const bool layoutDirty = setShown(m_sectionToolbar, enabled) || setShown(m_placementHost, placementOpen)
-      || setShown(m_styleHost, styleOpen);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_sectionToolbar, enabled);
+  layoutDirty |= setShown(m_placementHost, placementOpen);
+  layoutDirty |= setShown(m_styleHost, styleOpen);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

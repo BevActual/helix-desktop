@@ -241,8 +241,10 @@ void PrintersTab::syncUi() {
   const PrinterSnapshot empty;
   const PrinterSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool running = snap.running;
-  const bool layoutDirty = setShown(m_startButton, !running) || setShown(m_openButton, running) ||
-                            setShown(m_printersCard, running);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_startButton, !running);
+  layoutDirty |= setShown(m_openButton, running);
+  layoutDirty |= setShown(m_printersCard, running);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -299,14 +301,17 @@ void PrintersTab::rebuildPrinters() {
   }
   const float scale = contentScale();
   if (snap.printers.empty()) {
-    m_printerList->addChild(
-        ui::label({
-            .text = i18n::tr("control-center.printers.empty"),
-            .fontSize = Style::fontSizeCaption * scale,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-            .maxLines = 3,
-        })
-    );
+    m_printerList->addChild(control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "printer",
+            .title = i18n::tr("control-center.printers.empty-title"),
+            .body = i18n::tr("control-center.printers.empty"),
+            .actionLabel = i18n::tr("control-center.printers.open"),
+            .actionGlyph = "external-link",
+            .onAction = []() { (void)net::openInBrowser("http://localhost:631"); },
+        }
+    ));
     PanelManager::instance().requestLayout();
     return;
   }

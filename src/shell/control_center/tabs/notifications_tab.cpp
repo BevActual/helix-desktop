@@ -1125,7 +1125,9 @@ void NotificationsTab::syncDndToggle() {
 }
 
 void NotificationsTab::updateEmptyState(bool hasHistory, bool hasFiltered) {
-  const bool layoutDirty = setShown(m_list, hasFiltered) || setShown(m_emptyCard, !hasFiltered);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_list, hasFiltered);
+  layoutDirty |= setShown(m_emptyCard, !hasFiltered);
   if (layoutDirty) {
     requestPanelLayout();
   }

@@ -386,8 +386,10 @@ void DockTab::syncHosts() {
   const bool enabled = m_config != nullptr && m_config->config().dock.enabled;
   const bool layoutOpen = enabled && m_section == Section::Layout;
   const bool pinnedOpen = enabled && m_section == Section::Pinned;
-  const bool layoutDirty = setShown(m_sectionToolbar, enabled) || setShown(m_layoutHost, layoutOpen)
-      || setShown(m_pinnedHost, pinnedOpen);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_sectionToolbar, enabled);
+  layoutDirty |= setShown(m_layoutHost, layoutOpen);
+  layoutDirty |= setShown(m_pinnedHost, pinnedOpen);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

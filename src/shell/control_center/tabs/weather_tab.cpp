@@ -921,8 +921,10 @@ void WeatherTab::setForecastVisibleRowCount(std::size_t count) {
 }
 
 void WeatherTab::showLocationPrompt(bool show) {
-  const bool layoutDirty = setShown(m_locationPrompt, show) || setShown(m_glyphColumn, !show) ||
-                            setShown(m_currentText, !show);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_locationPrompt, show);
+  layoutDirty |= setShown(m_glyphColumn, !show);
+  layoutDirty |= setShown(m_currentText, !show);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

@@ -436,16 +436,14 @@ void PrivacyTab::rebuildCaptures() {
   m_captureSignature = signature;
   const bool anyCaptures =
       !lists.microphone.empty() || !lists.camera.empty() || !lists.screen.empty();
-  const bool layoutDirty = setShown(m_capturesLeftover, anyCaptures) ||
-                            setShown(m_micCard, !lists.microphone.empty()) ||
-                            setShown(m_micDivider, false) ||
-                            setShown(m_cameraCard, !lists.camera.empty()) ||
-                            setShown(m_cameraDivider, !lists.camera.empty() && !lists.microphone.empty()) ||
-                            setShown(m_screenCard, !lists.screen.empty()) ||
-                            setShown(
-                                m_screenDivider,
-                                !lists.screen.empty() && (!lists.microphone.empty() || !lists.camera.empty())
-                            );
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_capturesLeftover, anyCaptures);
+  layoutDirty |= setShown(m_micCard, !lists.microphone.empty());
+  layoutDirty |= setShown(m_micDivider, false);
+  layoutDirty |= setShown(m_cameraCard, !lists.camera.empty());
+  layoutDirty |= setShown(m_cameraDivider, !lists.camera.empty() && !lists.microphone.empty());
+  layoutDirty |= setShown(m_screenCard, !lists.screen.empty());
+  layoutDirty |= setShown( m_screenDivider, !lists.screen.empty() && (!lists.microphone.empty() || !lists.camera.empty()) );
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

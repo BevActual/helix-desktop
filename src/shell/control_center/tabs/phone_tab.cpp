@@ -499,12 +499,16 @@ std::unique_ptr<Flex> PhoneTab::create() {
       .flexGrow = 1.0F,
   });
   filesHost->addChild(
-      ui::label({
-          .out = &m_filesEmpty,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-      })
+      [&]() {
+        control_center::EmptyStateParts parts;
+        auto node = control_center::makeEmptyState(
+            scale, {.glyph = "photo", .title = i18n::tr("control-center.phone.files-empty-title"),
+             .body = i18n::tr("control-center.phone.files-empty")}, &parts
+        );
+        m_filesEmptyRoot = parts.root;
+        m_filesEmpty = parts.body;
+        return node;
+      }()
   );
   filesHost->addChild(ui::virtualGridView({
       .out = &m_filesGrid,
@@ -531,12 +535,16 @@ std::unique_ptr<Flex> PhoneTab::create() {
       .participatesInLayout = false,
   });
   notificationsHost->addChild(
-      ui::label({
-          .out = &m_notificationsEmpty,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-      })
+      [&]() {
+        control_center::EmptyStateParts parts;
+        auto node = control_center::makeEmptyState(
+            scale, {.glyph = "bell", .title = i18n::tr("control-center.phone.notifications-empty-title"),
+             .body = i18n::tr("control-center.phone.notifications-empty")}, &parts
+        );
+        m_notificationsEmptyRoot = parts.root;
+        m_notificationsEmpty = parts.body;
+        return node;
+      }()
   );
   auto notificationsScroll = ui::scrollView({
       .out = &m_notificationsScroll,
@@ -566,12 +574,16 @@ std::unique_ptr<Flex> PhoneTab::create() {
       .participatesInLayout = false,
   });
   continueHost->addChild(
-      ui::label({
-          .out = &m_continueEmpty,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 4,
-      })
+      [&]() {
+        control_center::EmptyStateParts parts;
+        auto node = control_center::makeEmptyState(
+            scale, {.glyph = "share", .title = i18n::tr("control-center.phone.continue-empty-title"),
+             .body = i18n::tr("control-center.phone.continue-empty")}, &parts
+        );
+        m_continueEmptyRoot = parts.root;
+        m_continueEmpty = parts.body;
+        return node;
+      }()
   );
   auto continueScroll = ui::scrollView({
       .out = &m_leftoverScroll,
@@ -992,8 +1004,11 @@ void PhoneTab::onClose() {
   m_continueHost = nullptr;
   m_castHost = nullptr;
   m_filesEmpty = nullptr;
+  m_filesEmptyRoot = nullptr;
   m_notificationsEmpty = nullptr;
+  m_notificationsEmptyRoot = nullptr;
   m_continueEmpty = nullptr;
+  m_continueEmptyRoot = nullptr;
   m_castEmpty = nullptr;
   m_castMirrorButton = nullptr;
   m_castAlwaysOnRow = nullptr;
@@ -1181,7 +1196,8 @@ void PhoneTab::refreshFiles() {
     }
     if (m_filesEmpty != nullptr) {
       m_filesEmpty->setText(i18n::tr("control-center.phone.files-empty"));
-      (void)setShown(m_filesEmpty, true);
+      (void)setShown(m_filesEmptyRoot, true);
+      (void)setShown(m_filesGrid, !(true));
     }
     return;
   }
@@ -1217,7 +1233,8 @@ void PhoneTab::refreshFiles() {
     signature += path;
   }
   if (signature == m_filesSignature) {
-    (void)setShown(m_filesEmpty, m_filePaths.empty());
+    (void)setShown(m_filesEmptyRoot, m_filePaths.empty());
+    (void)setShown(m_filesGrid, !(m_filePaths.empty()));
     return;
   }
   m_filesSignature = std::move(signature);
@@ -1249,7 +1266,8 @@ void PhoneTab::refreshFiles() {
   if (m_filesGrid != nullptr) {
     m_filesGrid->notifyDataChanged();
   }
-  (void)setShown(m_filesEmpty, m_filePaths.empty());
+  (void)setShown(m_filesEmptyRoot, m_filePaths.empty());
+  (void)setShown(m_filesGrid, !(m_filePaths.empty()));
 }
 
 void PhoneTab::pullRemoteFile(const std::string& path) {
@@ -1341,8 +1359,10 @@ void PhoneTab::syncUi() {
   const PhoneSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool available = snap.available;
 
-  const bool layoutDirty = setShown(m_deviceList, available) || setShown(m_activateButton, !available)
-      || setShown(m_catalogSwitch, available);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_deviceList, available);
+  layoutDirty |= setShown(m_activateButton, !available);
+  layoutDirty |= setShown(m_catalogSwitch, available);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
@@ -1400,7 +1420,8 @@ void PhoneTab::rebuildContinue() {
     signature += '|';
   }
   if (signature == m_continueSignature && !m_continueList->children().empty()) {
-    (void)setShown(m_continueEmpty, items.empty());
+    (void)setShown(m_continueEmptyRoot, items.empty());
+    (void)setShown(m_leftoverScroll, !(items.empty()));
     return;
   }
   m_continueSignature = std::move(signature);
@@ -1408,7 +1429,8 @@ void PhoneTab::rebuildContinue() {
     m_continueList->removeChild(m_continueList->children().front().get());
   }
   const float scale = contentScale();
-  (void)setShown(m_continueEmpty, items.empty());
+  (void)setShown(m_continueEmptyRoot, items.empty());
+  (void)setShown(m_leftoverScroll, !(items.empty()));
   if (m_continueEmpty != nullptr) {
     m_continueEmpty->setText(i18n::tr("control-center.phone.continue-empty"));
   }
@@ -1488,7 +1510,8 @@ void PhoneTab::rebuildNotifications() {
     signature += '|';
   }
   if (signature == m_notificationsSignature && !m_notificationsList->children().empty()) {
-    (void)setShown(m_notificationsEmpty, items.empty());
+    (void)setShown(m_notificationsEmptyRoot, items.empty());
+    (void)setShown(m_notificationsScroll, !(items.empty()));
     return;
   }
   m_notificationsSignature = std::move(signature);
@@ -1496,7 +1519,8 @@ void PhoneTab::rebuildNotifications() {
     m_notificationsList->removeChild(m_notificationsList->children().front().get());
   }
   const float scale = contentScale();
-  (void)setShown(m_notificationsEmpty, items.empty());
+  (void)setShown(m_notificationsEmptyRoot, items.empty());
+  (void)setShown(m_notificationsScroll, !(items.empty()));
   if (m_notificationsEmpty != nullptr) {
     if (peer != nullptr && !peer->reachable) {
       m_notificationsEmpty->setText(i18n::tr("control-center.phone.notifications-offline"));

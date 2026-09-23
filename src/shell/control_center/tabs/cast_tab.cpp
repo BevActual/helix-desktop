@@ -258,7 +258,8 @@ std::unique_ptr<Flex> CastTab::create() {
       .gap = Style::spaceSm * scale,
       .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
   });
-  addTitle(*wireless, i18n::tr("control-center.cast.wireless-title"), scale);
+  // The status headline ("Wireless displays off" / "Looking for displays") leads the card; a
+  // separate "Wireless displays" title would repeat the segment tooltip right above it.
   wireless->addChild(
       ui::label({
           .out = &m_wirelessStatus,
@@ -453,11 +454,13 @@ void CastTab::syncUi() {
   const CastSnapshot& snap = m_service != nullptr ? m_service->snapshot() : empty;
   const bool sharing = snap.shareEnabled;
   const bool wireless = snap.wirelessRunning;
-  const bool layoutDirty = setShown(m_shareToggleRow, snap.shareInstalled) ||
-                            setShown(m_viewOnlyRow, sharing) || setShown(m_credentialsRow, sharing) ||
-                            setShown(m_copyButton, sharing && !snap.shareAddress.empty()) ||
-                            setShown(m_wirelessStart, snap.wirelessInstalled && !wireless) ||
-                            setShown(m_wirelessOpen, snap.wirelessInstalled);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_shareToggleRow, snap.shareInstalled);
+  layoutDirty |= setShown(m_viewOnlyRow, sharing);
+  layoutDirty |= setShown(m_credentialsRow, sharing);
+  layoutDirty |= setShown(m_copyButton, sharing && !snap.shareAddress.empty());
+  layoutDirty |= setShown(m_wirelessStart, snap.wirelessInstalled && !wireless);
+  layoutDirty |= setShown(m_wirelessOpen, snap.wirelessInstalled);
   syncCatalog();
   if (layoutDirty) {
     PanelManager::instance().requestLayout();

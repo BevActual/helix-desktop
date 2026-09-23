@@ -557,8 +557,10 @@ void ScreenRecordTab::syncUi() {
       m_status->setText({});
     }
   }
-  const bool layoutDirty = setShown(m_elapsed, recording) || setShown(m_backend, !available) ||
-                            setShown(m_status, counting);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_elapsed, recording);
+  layoutDirty |= setShown(m_backend, !available);
+  layoutDirty |= setShown(m_status, counting);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

@@ -1375,8 +1375,9 @@ void NetworkTab::syncPasswordCard() {
   if (m_passwordCard == nullptr) {
     return;
   }
-  const bool layoutDirty = setShown(m_passwordCard, m_hasPendingSecret) ||
-                            setShown(m_enterpriseFields, m_hasPendingSecret && m_pendingEnterprise);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_passwordCard, m_hasPendingSecret);
+  layoutDirty |= setShown(m_enterpriseFields, m_hasPendingSecret && m_pendingEnterprise);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }

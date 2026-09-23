@@ -539,9 +539,12 @@ void LocalSendTab::syncUi() {
     m_catalog = Catalog::Incoming;
     persistCatalog();
   }
-  const bool layoutDirty = setShown(m_pin, snap.enabled) || setShown(m_catalogSwitch, snap.enabled) ||
-                            setShown(m_incomingActions, snap.enabled && snap.incoming.has_value()) ||
-                            setShown(m_transfer, showTransfer) || setShown(m_liveScroll, snap.enabled);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_pin, snap.enabled);
+  layoutDirty |= setShown(m_catalogSwitch, snap.enabled);
+  layoutDirty |= setShown(m_incomingActions, snap.enabled && snap.incoming.has_value());
+  layoutDirty |= setShown(m_transfer, showTransfer);
+  layoutDirty |= setShown(m_liveScroll, snap.enabled);
   syncCatalog();
   if (!snap.enabled) {
     (void)setShown(m_peersCard, false);

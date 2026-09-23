@@ -715,14 +715,20 @@ void ScreenTimeTab::syncEnabledUi() {
   const bool enabled = m_screenTime != nullptr && m_screenTime->enabled();
   const bool inDetail = !m_detailDayKey.empty();
   const bool showUsage = enabled;
-  const bool layoutDirty = setShown(m_disabledRow, !enabled) || setShown(m_disabledLabel, !enabled) ||
-                            setShown(m_enableToggle, !enabled) ||
-                            setShown(m_rangePicker, showUsage && !inDetail) ||
-                            setShown(m_detailBar, showUsage && inDetail) || setShown(m_totalLabel, showUsage) ||
-                            setShown(m_topAppLabel, showUsage) || setShown(m_detailLabel, showUsage && !inDetail) ||
-                            setShown(m_leftoverHost, showUsage) || setShown(m_scroll, showUsage) ||
-                            setShown(m_chartPlotRow, showUsage) || setShown(m_chartLabelRow, showUsage) ||
-                            setShown(m_mostUsedSection, showUsage);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_disabledRow, !enabled);
+  layoutDirty |= setShown(m_disabledLabel, !enabled);
+  layoutDirty |= setShown(m_enableToggle, !enabled);
+  layoutDirty |= setShown(m_rangePicker, showUsage && !inDetail);
+  layoutDirty |= setShown(m_detailBar, showUsage && inDetail);
+  layoutDirty |= setShown(m_totalLabel, showUsage);
+  layoutDirty |= setShown(m_topAppLabel, showUsage);
+  layoutDirty |= setShown(m_detailLabel, showUsage && !inDetail);
+  layoutDirty |= setShown(m_leftoverHost, showUsage);
+  layoutDirty |= setShown(m_scroll, showUsage);
+  layoutDirty |= setShown(m_chartPlotRow, showUsage);
+  layoutDirty |= setShown(m_chartLabelRow, showUsage);
+  layoutDirty |= setShown(m_mostUsedSection, showUsage);
   if (m_enableToggle != nullptr) {
     m_enableToggle->setChecked(enabled);
   }

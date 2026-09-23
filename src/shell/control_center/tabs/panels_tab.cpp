@@ -299,7 +299,9 @@ void PanelsTab::onPanelCardOpacityChanged(float opacity) {
 
 void PanelsTab::syncHosts() {
   const bool placementOpen = m_section == Section::Placement;
-  const bool layoutDirty = setShown(m_placementHost, placementOpen) || setShown(m_chromeHost, !placementOpen);
+  bool layoutDirty = false;
+  layoutDirty |= setShown(m_placementHost, placementOpen);
+  layoutDirty |= setShown(m_chromeHost, !placementOpen);
   if (layoutDirty) {
     PanelManager::instance().requestLayout();
   }
