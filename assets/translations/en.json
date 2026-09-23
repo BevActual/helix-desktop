@@ -632,9 +632,16 @@
     },
     "clock": {
       "empty": "Add extra timezones to compare with local time.",
+      "empty-title": "No world clocks",
       "invalid": "Unknown IANA timezone.",
       "no-match": "No matching timezones",
       "placeholder": "Search timezones…",
+      "relative": {
+        "same-time": "Same time",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "yesterday": "Yesterday"
+      },
       "remove": "Remove timezone"
     },
     "desktop": {
@@ -1377,7 +1384,7 @@
       "hour-12": "12 PM",
       "hour-18": "6 PM",
       "hour-6": "6 AM",
-      "most-used": "MOST USED",
+      "most-used": "Most Used",
       "range": {
         "14-days": "14 days",
         "14-days-tooltip": "Daily totals for the last two weeks",

@@ -89,6 +89,7 @@ std::unique_ptr<Flex> ScreenshotTab::createCompactBody() {
             .out = &button,
             .text = i18n::tr(textKey),
             .glyph = glyph,
+            .fontSize = Style::fontSizeBody * scale,
             .enabled = available,
             .variant = variant,
             .tooltip = !available && missingKey != nullptr ? std::optional<std::string>{i18n::tr(missingKey)}
@@ -143,6 +144,7 @@ std::unique_ptr<Flex> ScreenshotTab::createCompactBody() {
       ui::button({
           .text = i18n::tr("control-center.screenshot.open-folder"),
           .glyph = "folder",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,

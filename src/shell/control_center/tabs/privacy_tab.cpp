@@ -163,6 +163,7 @@ std::unique_ptr<Flex> PrivacyTab::create() {
       ui::button({
           .out = &m_muteButton,
           .glyph = "microphone-mute",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.privacy.mute-microphone"),
           .minWidth = Style::controlHeightSm * scale,

@@ -701,6 +701,7 @@ std::unique_ptr<Flex> NotificationsTab::create() {
       ui::button({
           .out = &m_clearAllButton,
           .glyph = "trash",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Destructive,
           .tooltip = i18n::tr("control-center.notifications.clear-all"),
           .minWidth = Style::controlHeightSm * scale,

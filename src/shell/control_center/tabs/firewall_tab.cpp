@@ -173,6 +173,7 @@ std::unique_ptr<Flex> FirewallTab::create() {
           .out = &m_startButton,
           .text = i18n::tr("control-center.firewall.start"),
           .glyph = "shield-lock",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -295,6 +296,7 @@ std::unique_ptr<Flex> FirewallTab::create() {
       ui::button({
           .out = &m_saveButton,
           .text = i18n::tr("control-center.firewall.save"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.firewall.save-tooltip"),
           .minHeight = Style::controlHeight * scale,

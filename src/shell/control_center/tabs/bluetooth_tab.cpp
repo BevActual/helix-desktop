@@ -467,6 +467,7 @@ std::unique_ptr<Flex> BluetoothTab::create() {
       ui::button({
           .out = &m_pairingAccept,
           .text = i18n::tr("control-center.bluetooth.accept"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Default,
           .onClick =
               [this]() {
@@ -509,6 +510,7 @@ std::unique_ptr<Flex> BluetoothTab::create() {
       ui::button({
           .out = &m_pairingReject,
           .text = i18n::tr("control-center.bluetooth.reject"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .onClick = [this]() {
             if (m_agent != nullptr) {

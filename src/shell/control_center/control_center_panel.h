@@ -128,6 +128,7 @@ private:
   void applySettingsSearch(std::string value);
   void syncActiveTabSearch();
   [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
+  void revealSettingsSearch();
   [[nodiscard]] bool isTabSearchActive() const;
   [[nodiscard]] std::string bestTabSearchId() const;
   [[nodiscard]] bool groupHasShownTab(TabGroup group) const;
@@ -160,6 +161,7 @@ private:
   Node* m_behaviorHeader = nullptr;
   Node* m_advancedHeader = nullptr;
   Input* m_searchInput = nullptr;
+  Button* m_searchButton = nullptr;
   std::string m_searchQuery;
   Flex* m_content = nullptr;
   InputArea* m_contentDismissArea = nullptr;

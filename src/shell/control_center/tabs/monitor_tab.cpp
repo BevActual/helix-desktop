@@ -396,15 +396,6 @@ std::unique_ptr<Flex> MonitorTab::create() {
 
   m_cardsLayout->addChild(
       ui::label({
-          .out = &m_noteLabel,
-          .text = i18n::tr("control-center.display.temporary"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
-      })
-  );
-  m_cardsLayout->addChild(
-      ui::label({
           .out = &m_errorLabel,
           .text = "",
           .fontSize = Style::fontSizeCaption * scale,
@@ -773,6 +764,16 @@ void MonitorTab::buildArrangementCard(Flex& parent, float scale) {
       }
   );
   section->addChild(std::move(referenceRow));
+  // Persistence state reads as the arrangement card's footer, not a stray line above the cards.
+  section->addChild(
+      ui::label({
+          .out = &m_noteLabel,
+          .text = i18n::tr("control-center.display.temporary"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .visible = false,
+      })
+  );
   parent.addChild(std::move(section));
 }
 

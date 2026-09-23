@@ -219,6 +219,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
           ui::button({
               .out = &m_compactAction,
               .text = i18n::tr("control-center.ai-usage.open"),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .minHeight = Style::controlHeightSm * scale,
               .padding = Style::spaceXs * scale,
@@ -444,6 +445,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
           ui::button({
               .out = &m_ollamaOpen,
               .text = i18n::tr("control-center.ai-usage.open"),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .minHeight = Style::controlHeightSm * scale,
               .padding = Style::spaceXs * scale,
@@ -718,6 +720,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
         ui::button({
             .out = &runtime.open,
             .text = i18n::tr("control-center.ai-usage.open"),
+            .fontSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .minHeight = Style::controlHeightSm * scale,
             .padding = Style::spaceXs * scale,
@@ -905,6 +908,7 @@ std::unique_ptr<Flex> AiUsageTab::create() {
             ui::button({
                 .out = &widgets.openButton,
                 .text = i18n::tr("control-center.ai-usage.open"),
+                .fontSize = Style::fontSizeBody * scale,
                 .variant = ButtonVariant::Ghost,
                 .minHeight = Style::controlHeightSm * scale,
                 .padding = Style::spaceXs * scale,

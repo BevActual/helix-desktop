@@ -474,6 +474,7 @@ namespace ui {
     std::optional<std::string> selectedValue = std::nullopt;
     std::optional<std::vector<SearchPickerOption>> options = std::nullopt;
     std::optional<bool> enabled = std::nullopt;
+    std::optional<float> scale = std::nullopt;
     std::optional<float> width = std::nullopt;
     std::optional<float> height = std::nullopt;
     std::optional<float> flexGrow = std::nullopt;

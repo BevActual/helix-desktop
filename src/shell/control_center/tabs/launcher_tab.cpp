@@ -157,6 +157,7 @@ std::unique_ptr<Flex> LauncherTab::create() {
       ui::button({
           .text = i18n::tr("control-center.launcher.open"),
           .glyph = "rocket",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .onClick = []() { PanelManager::instance().togglePanel("launcher"); },
       })

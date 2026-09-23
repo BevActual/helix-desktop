@@ -321,6 +321,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_hidePlayerButton,
           .glyph = "eye-off",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.media.hide-player"),
@@ -488,6 +489,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_repeatButton,
           .glyph = "repeat",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.media.repeat"),
@@ -513,6 +515,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_prevButton,
           .glyph = "media-prev",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.media.previous"),
@@ -536,6 +539,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_playPauseButton,
           .glyph = "media-play",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Primary,
           .tooltip = i18n::tr("control-center.media.play"),
@@ -559,6 +563,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_nextButton,
           .glyph = "media-next",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.media.next"),
@@ -582,6 +587,7 @@ std::unique_ptr<Flex> MediaTab::create() {
       ui::button({
           .out = &m_shuffleButton,
           .glyph = "shuffle",
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = false,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.media.shuffle"),

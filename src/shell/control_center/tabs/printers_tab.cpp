@@ -119,6 +119,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .out = &m_startButton,
           .text = i18n::tr("control-center.printers.start"),
           .glyph = "printer",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -135,6 +136,7 @@ std::unique_ptr<Flex> PrintersTab::create() {
           .out = &m_openButton,
           .text = i18n::tr("control-center.printers.open"),
           .glyph = "external-link",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -348,6 +350,7 @@ void PrintersTab::rebuildPrinters() {
     header->addChild(
         ui::button({
             .glyph = "star",
+            .glyphSize = Style::fontSizeBody * scale,
             .enabled = !printer.isDefault,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.printers.set-default"),
@@ -365,6 +368,7 @@ void PrintersTab::rebuildPrinters() {
     header->addChild(
         ui::button({
             .glyph = printer.enabled ? "player-pause" : "player-play",
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr(
                 printer.enabled ? "control-center.printers.pause" : "control-center.printers.resume"
@@ -383,6 +387,7 @@ void PrintersTab::rebuildPrinters() {
     header->addChild(
         ui::button({
             .glyph = "paperclip",
+            .glyphSize = Style::fontSizeBody * scale,
             .enabled = printer.enabled,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.printers.print-file"),
@@ -395,6 +400,7 @@ void PrintersTab::rebuildPrinters() {
     header->addChild(
         ui::button({
             .glyph = "x",
+            .glyphSize = Style::fontSizeBody * scale,
             .enabled = printer.jobCount > 0,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.printers.cancel-jobs"),

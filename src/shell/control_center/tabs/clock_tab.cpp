@@ -18,7 +18,9 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
+#include <format>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -53,9 +55,42 @@ namespace {
     return formatTimezoneTime(format, tzName);
   }
 
+  // "Tomorrow · +16:00": the day relation and offset from local time, the way world clocks read
+  // at a glance. Empty when the zone cannot be resolved.
+  [[nodiscard]] std::string timezoneRelativeText(std::string_view tzName) {
+    try {
+      using namespace std::chrono;
+      const auto now = system_clock::now();
+      const time_zone* zone = locate_zone(tzName);
+      const time_zone* local = current_zone();
+      if (zone == nullptr || local == nullptr) {
+        return {};
+      }
+      const auto zoneLocal = zone->to_local(now);
+      const auto homeLocal = local->to_local(now);
+      const int dayDelta = static_cast<int>((floor<days>(zoneLocal) - floor<days>(homeLocal)).count());
+      const char* dayKey = dayDelta > 0   ? "control-center.clock.relative.tomorrow"
+                           : dayDelta < 0 ? "control-center.clock.relative.yesterday"
+                                          : "control-center.clock.relative.today";
+      const seconds diff = zone->get_info(now).offset - local->get_info(now).offset;
+      if (diff.count() == 0) {
+        return i18n::tr(dayKey) + " · " + i18n::tr("control-center.clock.relative.same-time");
+      }
+      const auto absDiff = diff.count() < 0 ? -diff : diff;
+      const auto h = duration_cast<hours>(absDiff);
+      const auto m = duration_cast<minutes>(absDiff - h);
+      return std::format(
+          "{} · {}{}:{:02}", i18n::tr(dayKey), diff.count() < 0 ? "−" : "+", h.count(), m.count()
+      );
+    } catch (...) {
+      return {};
+    }
+  }
+
+  // Leading marker keeps an empty list distinct from "never built", so the empty state shows.
   [[nodiscard]] std::string timezoneListKey(const std::vector<std::string>& timezones) {
-    std::string key;
-    key.reserve(timezones.size() * 24);
+    std::string key = "#";
+    key.reserve(timezones.size() * 24 + 1);
     for (const auto& zone : timezones) {
       key += zone;
       key.push_back('\n');
@@ -189,6 +224,8 @@ std::unique_ptr<Flex> ClockTab::create() {
   );
   tab->addChild(std::move(compactCard));
 
+  // Leftover: the timezone search sits on top so typing reveals matches right under the field;
+  // the comparison list (or its empty state) fills the rest of the well.
   auto leftover = ui::column({
       .align = FlexAlign::Stretch,
       .gap = Style::spaceSm * scale,
@@ -196,48 +233,11 @@ std::unique_ptr<Flex> ClockTab::create() {
       .configure = [scale](Flex& host) { applyContentCardStyle(host, scale); },
   });
   leftover->addChild(
-      ui::label({
-          .out = &m_emptyLabel,
-          .text = i18n::tr("control-center.clock.empty"),
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
-  auto listScroll = ui::scrollView({
-      .contentScale = scale,
-      .scrollbarVisible = true,
-      .viewportPaddingH = 0.0F,
-      .viewportPaddingV = 0.0F,
-      .flexGrow = 1.0F,
-      .configure =
-          [](ScrollView& scrollView) {
-            scrollView.clearFill();
-            scrollView.clearBorder();
-          },
-  });
-  m_zoneList = listScroll->content();
-  if (m_zoneList != nullptr) {
-    applyGroupedListStyle(*m_zoneList, scale);
-    m_zoneList->setPadding(Style::spaceXs * scale);
-  }
-  leftover->addChild(std::move(listScroll));
-  leftover->addChild(
-      ui::label({
-          .out = &m_timezoneError,
-          .text = "",
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::Error),
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
-  leftover->addChild(
       ui::searchPicker({
           .out = &m_timezonePicker,
           .placeholder = i18n::tr("control-center.clock.placeholder"),
           .emptyText = i18n::tr("control-center.clock.no-match"),
+          .scale = scale,
           .height = Style::controlHeight * 4.5F * scale,
           .onActivated =
               [this](const SearchPickerOption& option) {
@@ -251,9 +251,57 @@ std::unique_ptr<Flex> ClockTab::create() {
                 picker.clearBorder();
                 picker.setRadius(0.0F);
                 picker.setPadding(0.0F);
+                picker.setClipChildren(true);
               },
       })
   );
+  leftover->addChild(
+      ui::label({
+          .out = &m_timezoneError,
+          .text = "",
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::Error),
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  {
+    auto empty = control_center::makeEmptyState(
+        scale,
+        {
+            .glyph = "world-search",
+            .title = i18n::tr("control-center.clock.empty-title"),
+            .body = i18n::tr("control-center.clock.empty"),
+        }
+    );
+    m_emptyState = empty.get();
+    empty->setJustify(FlexJustify::Center);
+    empty->setFlexGrow(1.0F);
+    empty->setVisible(false);
+    empty->setParticipatesInLayout(false);
+    leftover->addChild(std::move(empty));
+  }
+  auto listScroll = ui::scrollView({
+      .out = &m_zoneScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure =
+          [](ScrollView& scrollView) {
+            scrollView.clearFill();
+            scrollView.clearBorder();
+          },
+  });
+  m_zoneList = listScroll->content();
+  if (m_zoneList != nullptr) {
+    m_zoneList->setDirection(FlexDirection::Vertical);
+    m_zoneList->setAlign(FlexAlign::Stretch);
+    applyGroupedListStyle(*m_zoneList, scale);
+    m_zoneList->setPadding(Style::spaceXs * scale);
+  }
+  leftover->addChild(std::move(listScroll));
   tab->addChild(std::move(leftover));
 
   rebuildZones();
@@ -281,6 +329,16 @@ void ClockTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
   rebuildZones();
+  if (m_timezonePicker != nullptr) {
+    // Matches drop down only while there is a query; an idle field stays a single row so the
+    // world-clock list (or its empty state) owns the well.
+    const float scale = contentScale();
+    const float target = m_timezonePicker->filter().empty() ? Style::controlHeight * scale
+                                                            : Style::controlHeight * 4.5F * scale;
+    if (std::abs(m_timezonePicker->height() - target) > 0.5F) {
+      m_timezonePicker->setSize(m_timezonePicker->width(), target);
+    }
+  }
   m_rootLayout->layout(renderer);
 }
 
@@ -313,7 +371,8 @@ void ClockTab::onClose() {
   m_localDate = nullptr;
   m_localZone = nullptr;
   m_zoneList = nullptr;
-  m_emptyLabel = nullptr;
+  m_emptyState = nullptr;
+  m_zoneScroll = nullptr;
   m_timezoneError = nullptr;
   m_timezonePicker = nullptr;
   m_zoneRows.clear();
@@ -358,19 +417,28 @@ void ClockTab::rebuildZones() {
         .gap = Style::spaceSm * scale,
         .configure = [scale](Flex& host) { applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None); },
     });
-    item->addChild(
+    item->addChild(ui::column(
+        {.align = FlexAlign::Start, .flexGrow = 1.0F},
         ui::label({
             .text = timezoneDisplayName(zone),
             .fontSize = Style::fontSizeBody * scale,
             .color = colorSpecFromRole(ColorRole::OnSurface),
-            .flexGrow = 1.0F,
+            .maxLines = 1,
+            .ellipsize = TextEllipsize::End,
+        }),
+        ui::label({
+            .out = &row.relativeLabel,
+            .text = timezoneRelativeText(zone),
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
         })
-    );
+    ));
     item->addChild(
         ui::label({
             .out = &row.timeLabel,
             .text = timezoneTimeText(m_config, zone),
-            .fontSize = Style::fontSizeBody * scale,
+            .fontSize = Style::fontSizeTitle * scale,
             .fontWeight = FontWeight::Bold,
             .color = colorSpecFromRole(ColorRole::OnSurface),
         })
@@ -379,6 +447,7 @@ void ClockTab::rebuildZones() {
     item->addChild(
         ui::button({
             .glyph = "trash",
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.clock.remove"),
             .minWidth = Style::controlHeightSm * scale,
@@ -392,7 +461,8 @@ void ClockTab::rebuildZones() {
   }
 
   m_lastTimezoneKey = key;
-  (void)setShown(m_emptyLabel, timezones.empty());
+  (void)setShown(m_emptyState, timezones.empty());
+  (void)setShown(m_zoneScroll, !timezones.empty());
   syncPicker();
 }
 
@@ -409,6 +479,9 @@ void ClockTab::syncZoneTimes() {
   for (auto& row : m_zoneRows) {
     if (row.timeLabel != nullptr) {
       row.timeLabel->setText(timezoneTimeText(m_config, row.zone));
+    }
+    if (row.relativeLabel != nullptr) {
+      row.relativeLabel->setText(timezoneRelativeText(row.zone));
     }
   }
 }

@@ -926,6 +926,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
           ui::button({
               .out = &m_dnsApplyButton,
               .text = i18n::tr("control-center.network.dns-apply"),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .minHeight = controlHeight,
               .onClick = [this]() { applySelectedDnsProfile(); },
@@ -1181,12 +1182,14 @@ std::unique_ptr<Flex> NetworkTab::create() {
       }),
       ui::button({
           .text = i18n::tr("control-center.network.connect"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Default,
           .onClick =
               [this]() { submitPasswordPrompt(m_passwordInput != nullptr ? m_passwordInput->value() : std::string{}); },
       }),
       ui::button({
           .text = i18n::tr("common.actions.cancel"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .onClick = [this]() { cancelPasswordPrompt(); },
       })

@@ -907,6 +907,9 @@ namespace ui {
     if (props.enabled.has_value()) {
       control->setEnabled(*props.enabled);
     }
+    if (props.scale.has_value()) {
+      control->setContentScale(*props.scale);
+    }
     applyNodeProps(*control, props);
     if (props.configure) {
       props.configure(*control);

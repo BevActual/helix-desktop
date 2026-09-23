@@ -326,6 +326,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       ui::button({
           .out = &m_previousButton,
           .glyph = Style::rtl() ? "chevron-right" : "chevron-left",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.calendar.previous-month"),
           .minWidth = kCalendarNavButtonSize * scale,
@@ -348,6 +349,7 @@ std::unique_ptr<Flex> CalendarTab::create() {
       ui::button({
           .out = &m_nextButton,
           .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.calendar.next-month"),
           .minWidth = kCalendarNavButtonSize * scale,
@@ -528,6 +530,7 @@ void CalendarTab::rebuildAccounts() {
     row->addChild(
         ui::button({
             .glyph = glyph,
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr(buttonKey),
             .minWidth = Style::controlHeightSm * scale,

@@ -201,6 +201,7 @@ std::unique_ptr<Flex> CastTab::create() {
       ui::button({
           .out = &m_copyButton,
           .glyph = "copy",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.cast.copy"),
           .minWidth = Style::controlHeightSm * scale,
@@ -279,6 +280,7 @@ std::unique_ptr<Flex> CastTab::create() {
           .out = &m_wirelessStart,
           .text = i18n::tr("control-center.cast.wireless-start"),
           .glyph = "screen-share",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -295,6 +297,7 @@ std::unique_ptr<Flex> CastTab::create() {
           .out = &m_wirelessOpen,
           .text = i18n::tr("control-center.cast.wireless-open"),
           .glyph = "external-link",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -589,6 +592,7 @@ void CastTab::rebuildSinks() {
     header->addChild(
         ui::button({
             .glyph = streaming ? "player-stop" : "player-play",
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr(streaming ? "control-center.cast.stop" : "control-center.cast.start-stream"),
             .minWidth = iconSize,

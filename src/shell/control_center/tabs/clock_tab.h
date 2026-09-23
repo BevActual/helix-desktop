@@ -13,6 +13,7 @@
 class ConfigService;
 class Flex;
 class Label;
+class ScrollView;
 class SearchPicker;
 struct ControlCenterServices;
 
@@ -49,12 +50,14 @@ private:
   Label* m_localDate = nullptr;
   Label* m_localZone = nullptr;
   Flex* m_zoneList = nullptr;
-  Label* m_emptyLabel = nullptr;
+  Flex* m_emptyState = nullptr;
+  ScrollView* m_zoneScroll = nullptr;
   Label* m_timezoneError = nullptr;
   SearchPicker* m_timezonePicker = nullptr;
   struct ZoneRow {
     std::string zone;
     Label* timeLabel = nullptr;
+    Label* relativeLabel = nullptr;
   };
   std::vector<ZoneRow> m_zoneRows;
   std::string m_lastTimezoneKey;

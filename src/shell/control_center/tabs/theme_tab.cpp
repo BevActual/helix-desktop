@@ -882,6 +882,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       ui::button({
           .out = &m_saveCustomButton,
           .glyph = "device-floppy",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.appearance.save-custom-tooltip"),
           .minWidth = Style::controlHeightSm * scale,
@@ -895,6 +896,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       ui::button({
           .out = &m_openWallpaperButton,
           .glyph = "photo",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.appearance.open-wallpaper"),
           .minWidth = Style::controlHeightSm * scale,
@@ -910,6 +912,7 @@ std::unique_ptr<Flex> ThemeTab::create() {
       ui::button({
           .out = &m_openPalettesButton,
           .glyph = "folder",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.appearance.open-palettes-folder"),
           .minWidth = Style::controlHeightSm * scale,

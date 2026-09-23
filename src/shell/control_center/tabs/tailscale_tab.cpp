@@ -196,6 +196,7 @@ std::unique_ptr<Flex> TailscaleTab::create() {
       ui::button({
           .out = &m_copyIpButton,
           .glyph = "copy",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.tailscale.copy-ip"),
           .minHeight = Style::controlHeightSm * scale,
@@ -223,6 +224,7 @@ std::unique_ptr<Flex> TailscaleTab::create() {
           .out = &m_connectButton,
           .text = i18n::tr("control-center.tailscale.connect"),
           .glyph = "circles",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -239,6 +241,7 @@ std::unique_ptr<Flex> TailscaleTab::create() {
           .out = &m_adminButton,
           .text = i18n::tr("control-center.tailscale.open-admin"),
           .glyph = "external-link",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -785,6 +788,7 @@ void TailscaleTab::rebuildPeers() {
       header->addChild(
           ui::button({
               .glyph = "copy",
+              .glyphSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .tooltip = i18n::tr("control-center.tailscale.copy-ip"),
               .minHeight = Style::controlHeightSm * scale,
@@ -797,6 +801,7 @@ void TailscaleTab::rebuildPeers() {
       header->addChild(
           ui::button({
               .text = i18n::tr("control-center.tailscale.use-exit"),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .minHeight = Style::controlHeightSm * scale,
               .paddingH = Style::spaceSm * scale,

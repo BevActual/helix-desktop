@@ -247,6 +247,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       ui::button({
           .out = &m_acceptButton,
           .text = i18n::tr("control-center.localsend.accept"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .onClick =
               [this]() {
@@ -260,6 +261,7 @@ std::unique_ptr<Flex> LocalSendTab::create() {
       ui::button({
           .out = &m_rejectButton,
           .text = i18n::tr("control-center.localsend.decline"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Destructive,
           .onClick =
               [this]() {
@@ -617,6 +619,7 @@ void LocalSendTab::rebuildPeers() {
                       ) {
       return ui::button({
           .glyph = std::move(glyph),
+          .glyphSize = Style::fontSizeBody * scale,
           .enabled = enabled,
           .variant = ButtonVariant::Ghost,
           .tooltip = std::move(tooltip),

@@ -41,7 +41,6 @@ namespace {
   constexpr float kAppIconSize = 28.0F;
   constexpr float kUsageBarHeight = 4.0F;
   constexpr float kLegendSwatch = 6.0F;
-  constexpr float kUsageDurationFontScale = 0.85F;
 
   // App icons for the usage list. Must stay function-local: at TU scope its
   // icon-theme walk runs before main(), on every CLI invocation.
@@ -76,9 +75,8 @@ namespace {
     return key;
   }
 
-  [[nodiscard]] float usageDurationFontSize(float scale) {
-    return Style::fontSizeMini * scale * kUsageDurationFontScale;
-  }
+  // Durations are values next to body-size app names; Caption keeps them readable at arm's length.
+  [[nodiscard]] float usageDurationFontSize(float scale) { return Style::fontSizeCaption * scale; }
 
   [[nodiscard]] bool setShown(Node* node, bool shown) {
     if (node == nullptr) {
@@ -218,6 +216,7 @@ std::unique_ptr<Flex> ScreenTimeTab::create() {
           ui::button({
               .out = &m_detailBackButton,
               .text = i18n::tr("control-center.screen-time.back"),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Outline,
               .onClick = [this]() { clearDayDetail(); },
           }),

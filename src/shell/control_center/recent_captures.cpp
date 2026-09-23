@@ -198,6 +198,7 @@ namespace control_center {
       meta->addChild(
           ui::button({
               .text = entry.name,
+              .fontSize = Style::fontSizeBody * scale,
               .contentAlign = ButtonContentAlign::Start,
               .variant = ButtonVariant::Ghost,
               .tooltip = formatFileTime(entry.mtime),
@@ -214,14 +215,16 @@ namespace control_center {
                   },
           })
       );
-      meta->addChild(
+      // Indent the timestamp by the name button's padding so both lines share a left edge.
+      meta->addChild(ui::row(
+          {.align = FlexAlign::Center, .paddingH = Style::spaceSm * scale},
           ui::label({
               .text = formatFileTime(entry.mtime),
               .fontSize = Style::fontSizeCaption * scale,
               .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
               .maxLines = 1,
           })
-      );
+      ));
 
       auto actions = ui::row({
           .align = FlexAlign::Center,

@@ -421,6 +421,7 @@ std::unique_ptr<Flex> PhoneTab::create() {
           .out = &m_activateButton,
           .text = i18n::tr("control-center.phone.start"),
           .glyph = "device-mobile",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -657,6 +658,7 @@ std::unique_ptr<Flex> PhoneTab::create() {
           .out = &m_castConnectButton,
           .text = i18n::tr("control-center.phone.cast-connect"),
           .glyph = "plug-connected",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Secondary,
           .minHeight = Style::controlHeight * scale,
           .onClick =
@@ -723,6 +725,7 @@ std::unique_ptr<Flex> PhoneTab::create() {
           .out = &m_castMirrorButton,
           .text = i18n::tr("control-center.phone.cast-mirror"),
           .glyph = "cast",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Secondary,
           .minHeight = Style::controlHeight * scale,
           .visible = false,
@@ -848,10 +851,11 @@ std::unique_ptr<Flex> PhoneTab::create() {
   });
   const float plateHeight = Style::controlHeight * scale;
   const float platePad = Style::spaceMd * scale;
-  auto pointerPlate = [this, plateHeight, platePad](const char* key, const char* glyph, const char* shortcut) {
+  auto pointerPlate = [this, scale, plateHeight, platePad](const char* key, const char* glyph, const char* shortcut) {
     return ui::button({
         .text = i18n::tr(key),
         .glyph = glyph,
+        .fontSize = Style::fontSizeBody * scale,
         .variant = ButtonVariant::Ghost,
         .minHeight = plateHeight,
         .paddingH = platePad,
@@ -876,6 +880,7 @@ std::unique_ptr<Flex> PhoneTab::create() {
           .out = &m_castPointerSetup,
           .text = i18n::tr("control-center.phone.cast-pointer-setup"),
           .glyph = "bluetooth",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Secondary,
           .tooltip = i18n::tr("control-center.phone.cast-pointer-setup-hint"),
           .minHeight = plateHeight,
@@ -1451,6 +1456,7 @@ void PhoneTab::rebuildContinue() {
     row->addChild(
         ui::button({
             .glyph = "arrow-up-right",
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.phone.continue-open"),
             .minWidth = Style::controlHeightSm * scale,
@@ -1552,6 +1558,7 @@ void PhoneTab::rebuildNotifications() {
       row->addChild(
           ui::button({
               .glyph = "clipboard",
+              .glyphSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .tooltip = i18n::tr("control-center.phone.copy-code"),
               .minWidth = Style::controlHeightSm * scale,
@@ -1564,6 +1571,7 @@ void PhoneTab::rebuildNotifications() {
       row->addChild(
           ui::button({
               .glyph = "x",
+              .glyphSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .tooltip = i18n::tr("control-center.phone.notification-dismiss"),
               .minWidth = Style::controlHeightSm * scale,
@@ -1858,6 +1866,7 @@ void PhoneTab::rebuildCast() {
     row->addChild(
         ui::button({
             .glyph = "cast",
+            .glyphSize = Style::fontSizeBody * scale,
             .enabled = cast.adbConnected,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.phone.cast-launch"),
@@ -1927,6 +1936,7 @@ void PhoneTab::rebuildDevices() {
                     ) {
     return ui::button({
         .glyph = std::move(glyph),
+        .glyphSize = Style::fontSizeBody * scale,
         .enabled = enabled,
         .variant = ButtonVariant::Ghost,
         .tooltip = std::move(tooltip),
@@ -1993,6 +2003,7 @@ void PhoneTab::rebuildDevices() {
           ui::button({
               .text = label,
               .glyph = glyphForType(device->type),
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Ghost,
               .onClick = [this, id = device->id]() { selectPeer(id); },
           })
@@ -2035,6 +2046,7 @@ void PhoneTab::rebuildDevices() {
           ui::button({
               .text = i18n::tr("control-center.phone.accept"),
               .glyph = "check",
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Primary,
               .onClick = [this, id = device->id]() {
                 if (m_service != nullptr) {
@@ -2047,6 +2059,7 @@ void PhoneTab::rebuildDevices() {
           ui::button({
               .text = i18n::tr("control-center.phone.reject"),
               .glyph = "x",
+              .fontSize = Style::fontSizeBody * scale,
               .variant = ButtonVariant::Destructive,
               .onClick = [this, id = device->id]() {
                 if (m_service != nullptr) {
@@ -2062,6 +2075,7 @@ void PhoneTab::rebuildDevices() {
           ui::button({
               .text = i18n::tr("control-center.phone.pair"),
               .glyph = "link",
+              .fontSize = Style::fontSizeBody * scale,
               .enabled = device->reachable,
               .onClick = [this, id = device->id]() {
                 if (m_service != nullptr) {

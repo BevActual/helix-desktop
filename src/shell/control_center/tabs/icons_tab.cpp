@@ -242,6 +242,7 @@ std::unique_ptr<Flex> IconsTab::createLiveBody(bool hosted) {
       ui::button({
           .out = &m_customTint,
           .glyph = "palette",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.appearance.custom-tint-tooltip"),
           .minWidth = swatchSize,

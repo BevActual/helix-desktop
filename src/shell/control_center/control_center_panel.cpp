@@ -675,7 +675,7 @@ void ControlCenterPanel::create() {
     // height and a hairline separates it from the content (macOS 27's edge-to-edge sidebar).
     auto sidebar = ui::column({
         .out = &m_sidebar,
-        .align = FlexAlign::Stretch,
+        .align = m_compact ? FlexAlign::Start : FlexAlign::Stretch,
         .gap = Style::spaceXs * scale,
         .padding = 0.0F,
         .fillWidth = false,
@@ -688,7 +688,29 @@ void ControlCenterPanel::create() {
     m_sidebarScrollArea = sidebarScrollArea.get();
     wireSidebarScroll(m_sidebarScrollArea);
     sidebar->addChild(std::move(sidebarScrollArea));
-    sidebar->addChild(createSettingsSearchInput(scale));
+    if (m_compact) {
+      // The compact rail is one icon wide, so the search field cannot live here. A search glyph
+      // sits where the field would be and reveals the field under the content header.
+      sidebar->addChild(
+          ui::button({
+              .out = &m_searchButton,
+              .glyph = "search",
+              .glyphSize = 21.0F * scale,
+              .contentAlign = ButtonContentAlign::Center,
+              .variant = ButtonVariant::Tab,
+              .tooltip = i18n::tr("control-center.settings.search-placeholder"),
+              .minWidth = Style::controlHeightSm * scale,
+              .minHeight = Style::controlHeight * scale,
+              .paddingV = Style::spaceXs * scale,
+              .paddingH = Style::spaceXs * scale,
+              .radius = Style::scaledRadiusXl(scale),
+              .onClick = [this]() { revealSettingsSearch(); },
+              .configure = [this](Button& button) { wireSidebarScroll(button.inputArea()); },
+          })
+      );
+    } else {
+      sidebar->addChild(createSettingsSearchInput(scale));
+    }
 
     const std::optional<float> sidebarScrollWidth =
         m_compact ? std::optional<float>{Style::controlHeightSm * scale} : std::nullopt;
@@ -826,8 +848,20 @@ void ControlCenterPanel::create() {
   header->addChild(std::move(headerActions));
 
   content->addChild(std::move(header));
-  if (!m_showSidebar) {
-    content->addChild(createSettingsSearchInput(scale));
+  if (!m_showSidebar || m_compact) {
+    auto search = createSettingsSearchInput(scale);
+    if (m_compact) {
+      // Hidden until the rail's search glyph (or `/`, Ctrl+F) asks for it; it folds away again
+      // when it loses focus with nothing typed.
+      search->setVisible(false);
+      search->setOnFocusLoss([this]() {
+        if (m_searchInput != nullptr && m_searchInput->visible() && StringUtils::trim(m_searchQuery).empty()) {
+          m_searchInput->setVisible(false);
+          PanelManager::instance().requestLayout();
+        }
+      });
+    }
+    content->addChild(std::move(search));
   }
 
   auto bodies = ui::column({
@@ -1225,7 +1259,7 @@ bool ControlCenterPanel::handleGlobalKey(std::uint32_t sym, std::uint32_t modifi
       const bool ctrlF = (modifiers & KeyMod::Ctrl) != 0 && (modifiers & ~KeyMod::Ctrl) == 0
           && (sym == XKB_KEY_f || sym == XKB_KEY_F);
       if ((slash || ctrlF) && m_searchInput->inputArea() != nullptr) {
-        dispatcher.setFocus(m_searchInput->inputArea());
+        revealSettingsSearch();
         return true;
       }
     }
@@ -1277,6 +1311,7 @@ void ControlCenterPanel::onClose() {
   m_behaviorHeader = nullptr;
   m_advancedHeader = nullptr;
   m_searchInput = nullptr;
+  m_searchButton = nullptr;
   m_searchQuery.clear();
   m_content = nullptr;
   m_contentDismissArea = nullptr;
@@ -1916,6 +1951,17 @@ ControlCenterSidebarMode ControlCenterPanel::sidebarModeForOpen(std::string_view
   return isDirectSectionOpenContext(context) ? cc.sidebarSectionMode : cc.sidebarMode;
 }
 
+void ControlCenterPanel::revealSettingsSearch() {
+  if (m_searchInput == nullptr || m_searchInput->inputArea() == nullptr) {
+    return;
+  }
+  if (!m_searchInput->visible()) {
+    m_searchInput->setVisible(true);
+    PanelManager::instance().requestLayout();
+  }
+  PanelManager::instance().inputDispatcher().setFocus(m_searchInput->inputArea());
+}
+
 std::unique_ptr<Input> ControlCenterPanel::createSettingsSearchInput(float scale) {
   return ui::input({
       .out = &m_searchInput,
@@ -2072,7 +2118,7 @@ void ControlCenterPanel::layoutFullSidebarWidth(Renderer& renderer) {
       maxTabWidth = std::max(maxTabWidth, paddingH + glyphW + gap + text.width);
     }
   }
-  if (m_searchInput != nullptr) {
+  if (m_searchInput != nullptr && !m_compact) {
     maxTabWidth = std::max(maxTabWidth, 168.0F * scale);
   }
 
@@ -2089,7 +2135,7 @@ void ControlCenterPanel::layoutFullSidebarWidth(Renderer& renderer) {
     }
   }
 
-  if (m_searchInput != nullptr) {
+  if (m_searchInput != nullptr && !m_compact) {
     const float searchHeight = Style::controlHeight * scale;
     if (std::abs(m_searchInput->width() - targetWidth) > 0.5F
         || std::abs(m_searchInput->height() - searchHeight) > 0.5F) {

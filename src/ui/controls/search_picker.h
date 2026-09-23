@@ -38,6 +38,10 @@ public:
   void setEnabled(bool enabled);
   [[nodiscard]] bool enabled() const noexcept { return m_enabled; }
 
+  // Scales chrome, the filter field, and row metrics; hosts inside scaled panels call this.
+  void setContentScale(float scale);
+  [[nodiscard]] float contentScale() const noexcept { return m_scale; }
+
   [[nodiscard]] const std::string& filter() const noexcept { return m_filter; }
   [[nodiscard]] InputArea* filterInputArea() const noexcept;
 
@@ -74,4 +78,5 @@ private:
   std::function<void(const SearchPickerOption&)> m_onActivated;
   std::function<void()> m_onCancel;
   bool m_enabled = true;
+  float m_scale = 1.0F;
 };

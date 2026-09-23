@@ -24,10 +24,8 @@ namespace {
     SearchPickerRow() {
       setDirection(FlexDirection::Horizontal);
       setAlign(FlexAlign::Center);
-      setGap(Style::spaceSm);
-      setPadding(Style::spaceXs, Style::spaceSm);
-      setRadius(Style::scaledRadiusMd());
       setFillWidth(true);
+      applyScale(1.0F);
 
       auto preview = std::make_unique<ColorSwatchPreviewStrip>();
       preview->setVisible(false);
@@ -66,6 +64,26 @@ namespace {
       addChild(std::move(text));
     }
 
+    void applyScale(float scale) {
+      if (m_scale == scale && m_scaleApplied) {
+        return;
+      }
+      m_scale = scale;
+      m_scaleApplied = true;
+      setGap(Style::spaceSm * scale);
+      setPadding(Style::spaceXs * scale, Style::spaceSm * scale);
+      setRadius(Style::scaledRadiusMd(scale));
+      if (m_icon != nullptr) {
+        m_icon->setGlyphSize(Style::baseGlyphSize * scale);
+      }
+      if (m_title != nullptr) {
+        m_title->setFontSize(Style::fontSizeBody * scale);
+      }
+      if (m_detail != nullptr) {
+        m_detail->setFontSize(Style::fontSizeCaption * scale);
+      }
+    }
+
     void bind(const SearchPickerOption& option, bool highlighted, bool selected, bool hovered) {
       const bool hasDetail = !option.description.empty();
       const bool hasIcon = !option.icon.empty();
@@ -93,7 +111,7 @@ namespace {
       }
 
       if (m_preview != nullptr) {
-        m_preview->setMetricsFromFontSize(Style::fontSizeBody);
+        m_preview->setMetricsFromFontSize(Style::fontSizeBody * m_scale);
         m_preview->setPreview(option.preview);
         m_preview->setVisible(hasPreview);
         m_preview->setParticipatesInLayout(hasPreview);
@@ -125,6 +143,8 @@ namespace {
     Flex* m_text = nullptr;
     Label* m_title = nullptr;
     Label* m_detail = nullptr;
+    float m_scale = 1.0F;
+    bool m_scaleApplied = false;
   };
 
 } // namespace
@@ -302,11 +322,11 @@ bool SearchPicker::itemInteractive(std::size_t index) const {
 
 float SearchPicker::measureItem(Renderer& /*renderer*/, std::size_t index, float /*width*/) {
   if (index >= m_visible.size()) {
-    return Style::controlHeight;
+    return Style::controlHeight * m_scale;
   }
   const auto sourceIndex = m_visible[index];
   const bool hasDetail = sourceIndex < m_options.size() && !m_options[sourceIndex].description.empty();
-  return hasDetail ? Style::controlHeightLg : Style::controlHeight;
+  return (hasDetail ? Style::controlHeightLg : Style::controlHeight) * m_scale;
 }
 
 std::unique_ptr<Node> SearchPicker::createItem() { return std::make_unique<SearchPickerRow>(); }
@@ -324,7 +344,35 @@ void SearchPicker::bindItem(Renderer& /*renderer*/, Node& item, std::size_t inde
   const auto& option = m_options[sourceIndex];
   const bool highlighted = index == m_highlightedVisibleIndex;
   const bool selected = option.value == m_selectedValue;
+  row->applyScale(m_scale);
   row->bind(option, highlighted, selected, hovered);
+}
+
+void SearchPicker::setContentScale(float scale) {
+  const float pinned = scale > 0.0F ? scale : 1.0F;
+  if (m_scale == pinned) {
+    return;
+  }
+  m_scale = pinned;
+  setGap(Style::spaceSm * pinned);
+  setPadding(Style::spaceSm * pinned);
+  setRadius(Style::scaledRadiusMd(pinned));
+  if (m_input != nullptr) {
+    m_input->setControlHeight(Style::controlHeight * pinned);
+    m_input->setFontSize(Style::fontSizeBody * pinned);
+    m_input->setHorizontalPadding(Style::spaceSm * pinned);
+  }
+  if (m_emptyLabel != nullptr) {
+    m_emptyLabel->setFontSize(Style::fontSizeBody * pinned);
+  }
+  if (m_list != nullptr) {
+    m_list->setItemGap(Style::spaceXs * pinned);
+    m_list->setContentScale(pinned);
+  }
+  ++m_revision;
+  if (m_list != nullptr) {
+    m_list->notifyDataChanged();
+  }
 }
 
 void SearchPicker::onActivate(std::size_t index) {

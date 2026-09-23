@@ -517,6 +517,7 @@ std::unique_ptr<Flex> DesktopTab::create() {
       ui::button({
           .out = &m_edit,
           .glyph = "pencil",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.desktop.edit-tooltip"),
           .minWidth = Style::controlHeightSm * scale,

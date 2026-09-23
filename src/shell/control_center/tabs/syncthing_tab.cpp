@@ -160,6 +160,7 @@ std::unique_ptr<Flex> SyncthingTab::create() {
           .out = &m_startButton,
           .text = i18n::tr("control-center.syncthing.start"),
           .glyph = "folder",
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Primary,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -175,6 +176,7 @@ std::unique_ptr<Flex> SyncthingTab::create() {
       ui::button({
           .out = &m_stopButton,
           .text = i18n::tr("control-center.syncthing.stop"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -190,6 +192,7 @@ std::unique_ptr<Flex> SyncthingTab::create() {
       ui::button({
           .out = &m_guiButton,
           .text = i18n::tr("control-center.syncthing.open"),
+          .fontSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .minHeight = Style::controlHeight * scale,
           .paddingH = Style::spaceMd * scale,
@@ -205,6 +208,7 @@ std::unique_ptr<Flex> SyncthingTab::create() {
       ui::button({
           .out = &m_copyIdButton,
           .glyph = "copy",
+          .glyphSize = Style::fontSizeBody * scale,
           .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.syncthing.copy-id"),
           .minHeight = Style::controlHeightSm * scale,
@@ -528,6 +532,7 @@ void SyncthingTab::rebuildFolders() {
     header->addChild(
         ui::button({
             .glyph = "refresh",
+            .glyphSize = Style::fontSizeBody * scale,
             .enabled = !folder.paused,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr("control-center.syncthing.scan"),
@@ -545,6 +550,7 @@ void SyncthingTab::rebuildFolders() {
     header->addChild(
         ui::button({
             .glyph = folder.paused ? "player-play" : "player-pause",
+            .glyphSize = Style::fontSizeBody * scale,
             .variant = ButtonVariant::Ghost,
             .tooltip = i18n::tr(
                 folder.paused ? "control-center.syncthing.resume" : "control-center.syncthing.pause"
