@@ -12,6 +12,7 @@
 #include <string_view>
 #include <vector>
 
+class Box;
 class Flex;
 class Glyph;
 class Graph;
@@ -141,4 +142,16 @@ private:
   Label* m_swapLabel = nullptr;
   std::vector<std::string> m_diskMountPoints;
   std::vector<Label*> m_diskLabels;
+
+  // Thin used/total bars under RAM, swap, and each disk row; fill width follows the track after
+  // layout, so syncUsageBars() runs from both the stats update and doLayout.
+  struct UsageBar {
+    Box* track = nullptr;
+    Box* fill = nullptr;
+    float fraction = 0.0F;
+  };
+  void syncUsageBars();
+  UsageBar m_ramBar;
+  UsageBar m_swapBar;
+  std::vector<UsageBar> m_diskBars;
 };

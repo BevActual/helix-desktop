@@ -114,6 +114,34 @@ namespace {
     return FormatUnits::formatBinaryBytesAsGib(*stats.gpuVramUsedBytes);
   }
 
+  constexpr float kUsageBarHeight = 4.0F;
+  constexpr float kUsageBarWarnFraction = 0.9F;
+
+  // Thin used/total track under a resource row. The track stretches to the card width; the fill is
+  // sized later from the measured track (see SystemTab::syncUsageBars).
+  void addUsageBar(Flex& card, float scale, Box** outTrack, Box** outFill) {
+    const float h = std::max(2.0F, kUsageBarHeight * scale);
+    Box* track = nullptr;
+    auto trackNode = ui::box({
+        .out = &track,
+        .fill = colorSpecFromRole(ColorRole::Outline, 0.45F),
+        .radius = h * 0.5F,
+        .height = h,
+    });
+    Box* fill = nullptr;
+    auto fillNode = ui::box({
+        .out = &fill,
+        .fill = colorSpecFromRole(ColorRole::Primary),
+        .radius = h * 0.5F,
+        .participatesInLayout = false,
+    });
+    fill->setFrameSize(0.0F, h);
+    track->addChild(std::move(fillNode));
+    card.addChild(std::move(trackNode));
+    *outTrack = track;
+    *outFill = fill;
+  }
+
   // Resource row: glyph + name (grows, left) + value (natural width, right-aligned).
   // A non-empty tooltip is attached to the row's text (labels opt out of hit-testing by default).
   Label* addResourceRow(
@@ -436,15 +464,19 @@ std::unique_ptr<Flex> SystemTab::create() {
       i18n::tr("control-center.system.tooltips.load")
   );
   m_resourcesLines[1] = addResourceRow(*resourcesCard, "memory", i18n::tr("control-center.system.labels.ram"), sc);
+  addUsageBar(*resourcesCard, sc, &m_ramBar.track, &m_ramBar.fill);
   m_swapLabel = addResourceRow(
       *resourcesCard, "arrows-exchange", i18n::tr("control-center.system.labels.swap"), sc, &m_swapRow
   );
+  addUsageBar(*resourcesCard, sc, &m_swapBar.track, &m_swapBar.fill);
   m_diskMountPoints = physicalDiskMountPoints();
   if (m_diskMountPoints.size() > kMaxDiskRows) {
     m_diskMountPoints.resize(kMaxDiskRows);
   }
   m_diskLabels.clear();
   m_diskLabels.reserve(m_diskMountPoints.size());
+  m_diskBars.clear();
+  m_diskBars.reserve(m_diskMountPoints.size());
   for (const auto& mountPoint : m_diskMountPoints) {
     Label* usageLabel = nullptr;
     resourcesCard->addChild(
@@ -473,6 +505,9 @@ std::unique_ptr<Flex> SystemTab::create() {
         )
     );
     m_diskLabels.push_back(usageLabel);
+    UsageBar bar;
+    addUsageBar(*resourcesCard, sc, &bar.track, &bar.fill);
+    m_diskBars.push_back(bar);
   }
   tab->addChild(std::move(aboutHost));
 
@@ -735,6 +770,9 @@ void SystemTab::onClose() {
   m_swapLabel = nullptr;
   m_diskLabels.clear();
   m_diskMountPoints.clear();
+  m_ramBar = {};
+  m_swapBar = {};
+  m_diskBars.clear();
   m_graphInitialized = false;
   m_gpuVisible = false;
   m_lastSampleAt = {};
@@ -828,6 +866,28 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
   sizeGraph(m_netGraph, m_netHost, m_netLegend);
 
   m_root->layout(renderer);
+  syncUsageBars();
+}
+
+void SystemTab::syncUsageBars() {
+  const auto apply = [](const UsageBar& bar) {
+    if (bar.track == nullptr || bar.fill == nullptr) {
+      return;
+    }
+    const float trackW = std::max(0.0F, bar.track->width());
+    const float h = bar.track->height();
+    const float fillW = bar.fraction > 0.0F ? std::max(h, trackW * std::clamp(bar.fraction, 0.0F, 1.0F)) : 0.0F;
+    bar.fill->setPosition(0.0F, 0.0F);
+    bar.fill->setFrameSize(std::min(fillW, trackW), h);
+    bar.fill->setFill(
+        colorSpecFromRole(bar.fraction >= kUsageBarWarnFraction ? ColorRole::Error : ColorRole::Primary)
+    );
+  };
+  apply(m_ramBar);
+  apply(m_swapBar);
+  for (const auto& bar : m_diskBars) {
+    apply(bar);
+  }
 }
 
 void SystemTab::doUpdate(Renderer& renderer) {
@@ -1204,18 +1264,30 @@ void SystemTab::syncLabels() {
   if (m_resourcesLines[1] != nullptr) {
     m_resourcesLines[1]->setText(formatMemoryUsedTotal(stats));
   }
+  m_ramBar.fraction =
+      stats.ramTotalMb > 0 ? static_cast<float>(stats.ramUsedMb) / static_cast<float>(stats.ramTotalMb) : 0.0F;
   if (m_swapRow != nullptr) {
     const bool hasSwap = stats.swapTotalMb > 0;
-    (void)setShown(m_swapRow, hasSwap);
+    bool swapDirty = setShown(m_swapRow, hasSwap);
+    swapDirty |= setShown(m_swapBar.track, hasSwap);
+    if (swapDirty) {
+      PanelManager::instance().requestLayout();
+    }
     if (hasSwap && m_swapLabel != nullptr) {
       m_swapLabel->setText(FormatUnits::formatBinaryMibUsageAsGib(stats.swapUsedMb, stats.swapTotalMb));
     }
+    m_swapBar.fraction =
+        hasSwap ? static_cast<float>(stats.swapUsedMb) / static_cast<float>(stats.swapTotalMb) : 0.0F;
   }
   for (std::size_t i = 0; i < m_diskLabels.size(); ++i) {
     if (m_diskLabels[i] != nullptr) {
       m_diskLabels[i]->setText(diskUsageLabel(m_diskMountPoints[i]));
     }
+    if (i < m_diskBars.size()) {
+      m_diskBars[i].fraction = diskUsageFraction(m_diskMountPoints[i]).value_or(0.0F);
+    }
   }
+  syncUsageBars();
 }
 
 float SystemTab::scrollProgressForSample(std::chrono::steady_clock::time_point sampledAt) const {

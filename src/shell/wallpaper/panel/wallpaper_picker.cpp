@@ -513,10 +513,11 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
           },
   });
 
+  // No wrap: wrapped rows skip flexGrow, which left the search field at its minimum width
+  // with the current-pick controls hugging it instead of trailing at the card edge.
   auto toolbar = ui::row({
       .out = &m_toolbar,
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .fillWidth = true,
   });
@@ -535,7 +536,6 @@ std::unique_ptr<Flex> WallpaperPicker::create() {
 
   auto searchRow = ui::row({
       .align = FlexAlign::Center,
-      .wrap = true,
       .gap = Style::spaceXs * scale,
       .flexGrow = 1.0F,
   });
