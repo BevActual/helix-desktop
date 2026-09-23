@@ -2529,6 +2529,10 @@ InputArea* NotificationToast::buildCard(
             .configure = [](Image& image) { image.setPosition(0.0F, 0.0F); },
         });
         if (appIcon->setSourceFile(renderer, iconPath, static_cast<int>(std::round(iconSize)))) {
+          if (iconPath.contains("symbolic")) {
+            // Symbolic theme icons are dark alpha masks; recolor so they read on the toast.
+            appIcon->setForegroundTint(colorSpecFromRole(ColorRole::OnSurfaceVariant));
+          }
           iconSlot->addChild(std::move(appIcon));
           iconAssigned = true;
         } else {

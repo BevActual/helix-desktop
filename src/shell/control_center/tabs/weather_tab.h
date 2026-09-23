@@ -12,6 +12,7 @@
 #include <string_view>
 
 class EffectNode;
+class Box;
 class Flex;
 class Glyph;
 class InputArea;
@@ -116,6 +117,8 @@ private:
   std::array<Label*, kForecastRowCount> m_forecastMetas{};
   std::array<Label*, kForecastRowCount> m_forecastDescs{};
   std::array<Label*, kForecastRowCount> m_forecastTemps{};
+  std::array<Box*, kForecastRowCount> m_forecastRangeTracks{};
+  std::array<Box*, kForecastRowCount> m_forecastRangeFills{};
   std::array<InputArea*, kForecastRowCount> m_forecastHitAreas{};
   EffectNode* m_effectNode = nullptr;
   EffectType m_activeEffect = EffectType::None;

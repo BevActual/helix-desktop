@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <ctime>
 #include <format>
 #include <memory>
@@ -30,6 +31,8 @@
 using namespace control_center;
 
 namespace {
+  // Width of the daily low→high range bar between the day label and the temperatures.
+  constexpr float kForecastRangeTrackWidth = 96.0F;
 
   // Set to a specific effect to bypass weather-code detection. Reset to None when done testing.
   constexpr EffectType kTestEffect = EffectType::None;
@@ -447,6 +450,27 @@ std::unique_ptr<Flex> WeatherTab::create() {
         .gap = Style::spaceSm * scale,
     });
     topRow->addChild(std::move(daySlot));
+
+    // Range bar: the week's coldest→hottest span is the track; this day's low→high is the fill.
+    const float trackW = kForecastRangeTrackWidth * scale;
+    const float trackH = std::max(4.0F, Style::spaceXs * scale);
+    auto track = ui::box({
+        .out = &m_forecastRangeTracks[i],
+        .fill = colorSpecFromRole(ColorRole::Outline, 0.45F),
+        .radius = trackH * 0.5F,
+        .width = trackW,
+        .height = trackH,
+    });
+    m_forecastRangeTracks[i]->setFrameSize(trackW, trackH);
+    auto fill = ui::box({
+        .out = &m_forecastRangeFills[i],
+        .fill = colorSpecFromRole(ColorRole::Primary),
+        .radius = trackH * 0.5F,
+        .participatesInLayout = false,
+    });
+    m_forecastRangeFills[i]->setFrameSize(trackW, trackH);
+    track->addChild(std::move(fill));
+    topRow->addChild(std::move(track));
 
     topRow->addChild(
         ui::label({
@@ -1228,12 +1252,32 @@ void WeatherTab::syncDailyForecast(Renderer& renderer, const WeatherSnapshot& sn
   const std::string timeFormat = m_config != nullptr && !m_config->config().shell.timeFormat.empty()
       ? m_config->config().shell.timeFormat
       : std::string("%H:%M");
+  // Week span for the range bars (includes today so the scale matches the hero card).
+  double weekMin = std::numeric_limits<double>::infinity();
+  double weekMax = -std::numeric_limits<double>::infinity();
+  for (const auto& day : snapshot.forecastDays) {
+    weekMin = std::min(weekMin, day.temperatureMinC);
+    weekMax = std::max(weekMax, day.temperatureMaxC);
+  }
+  const double weekSpan = std::isfinite(weekMin) && std::isfinite(weekMax) ? std::max(1.0, weekMax - weekMin) : 1.0;
+  const float scale = contentScale();
+  const float trackW = kForecastRangeTrackWidth * scale;
+  const float trackH = std::max(4.0F, Style::spaceXs * scale);
   for (std::size_t i = 0; i < kForecastRowCount; ++i) {
     if (i >= visibleForecastCount) {
       continue;
     }
 
     const auto& day = snapshot.forecastDays[i + forecastStart];
+    if (m_forecastRangeFills[i] != nullptr && std::isfinite(weekMin)) {
+      const double startFrac = std::clamp((day.temperatureMinC - weekMin) / weekSpan, 0.0, 1.0);
+      const double endFrac = std::clamp((day.temperatureMaxC - weekMin) / weekSpan, 0.0, 1.0);
+      const float x = std::round(static_cast<float>(startFrac) * trackW);
+      const float w = std::max(trackH, std::round(static_cast<float>(endFrac - startFrac) * trackW));
+      m_forecastRangeFills[i]->setPosition(std::min(x, trackW - w), 0.0F);
+      m_forecastRangeFills[i]->setFrameSize(w, trackH);
+      m_forecastRangeFills[i]->setFill(colorSpecFromRole(ColorRole::Primary));
+    }
     const std::string condition = WeatherService::shortDescriptionForCode(day.weatherCode);
     const std::string tempHigh = std::format(
         "{}{}", static_cast<int>(std::lround(m_weather->displayTemperature(day.temperatureMaxC))),

@@ -554,6 +554,9 @@ namespace {
             );
           }
           if (ready) {
+            m_image->setForegroundTint(std::nullopt);
+            m_image->setFit(ImageFit::Cover);
+            m_image->setPadding(0.0F);
             m_imageKind = ImageKind::Raw;
             m_rawImageKey = key;
             m_image->setVisible(true);
@@ -569,6 +572,15 @@ namespace {
       if (!iconPath.empty()) {
         const bool ready = m_image->setSourceFile(renderer, iconPath, targetSize);
         if (ready) {
+          // Symbolic theme icons ship as dark alpha masks; recolor them so they read on the card
+          // instead of rendering as a dark square.
+          const bool symbolic = iconPath.contains("symbolic");
+          m_image->setForegroundTint(
+              symbolic ? std::optional{colorSpecFromRole(ColorRole::OnSurfaceVariant)} : std::nullopt
+          );
+          // Symbolic glyphs are not square artwork; keep them whole and inset like the bell fallback.
+          m_image->setFit(symbolic ? ImageFit::Contain : ImageFit::Cover);
+          m_image->setPadding(symbolic ? std::round((kHistoryIconSize - kHistoryIconGlyphSize) * 0.5F * m_scale) : 0.0F);
           m_imageKind = ImageKind::File;
           m_rawImageKey = 0;
           m_image->setVisible(true);
