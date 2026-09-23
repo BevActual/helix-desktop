@@ -335,28 +335,9 @@ namespace {
     return kind;
   }
 
+  // Bucket headers match Bluetooth's Connected/Paired/Available rows: body size, bold.
   std::unique_ptr<Flex> makeWifiBucketHeaderRow(const std::string& title, float scale) {
-    auto row = ui::row({
-        .align = FlexAlign::Center,
-    });
-
-    auto pill = ui::row({
-        .align = FlexAlign::Center,
-        .paddingV = Style::spaceXs * 0.5F * scale,
-        .paddingH = Style::spaceSm * scale,
-        .fill = colorSpecFromRole(ColorRole::SurfaceVariant, 0.8F),
-        .radius = Style::scaledRadiusSm(scale),
-    });
-    pill->addChild(
-        ui::label({
-            .text = title,
-            .fontSize = Style::fontSizeMini * scale,
-            .fontWeight = FontWeight::Bold,
-            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-        })
-    );
-    row->addChild(std::move(pill));
-    return row;
+    return makeCardHeaderRow(title, scale);
   }
 
   // Active first, then by signal band, then by name. Ordering on the raw strength —
