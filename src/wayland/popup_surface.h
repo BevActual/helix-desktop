@@ -61,7 +61,7 @@ private:
   void destroyRoleObjects();
   // Decide whether to take xdg_popup_grab vs. enroll in the active focus_grab
   // host. Sets m_enrolledInGrabHost when we registered with the host.
-  void wireGrab();
+  void wireGrab(xdg_surface* parentXdgSurface);
   void unenrollFromGrabHost();
 
   PopupSurfaceConfig m_config;

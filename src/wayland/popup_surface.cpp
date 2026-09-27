@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -48,6 +49,19 @@ namespace {
     return positioner;
   }
 
+  // Popups holding an explicit xdg_popup_grab, oldest first. xdg-shell only allows a new
+  // grab on a popup whose parent is the topmost grabbing popup; violating that is a fatal
+  // protocol error (niri: "xdg_popup was not created on the topmost popup").
+  std::vector<const PopupSurface*>& grabStack() {
+    static std::vector<const PopupSurface*> stack;
+    return stack;
+  }
+
+  void removeFromGrabStack(const PopupSurface* popup) {
+    auto& stack = grabStack();
+    stack.erase(std::remove(stack.begin(), stack.end(), popup), stack.end());
+  }
+
 } // namespace
 
 PopupSurface::PopupSurface(WaylandConnection& connection) : Surface(connection) {}
@@ -59,7 +73,7 @@ PopupSurface::~PopupSurface() {
   destroyRoleObjects();
 }
 
-void PopupSurface::wireGrab() {
+void PopupSurface::wireGrab(xdg_surface* parentXdgSurface) {
   // When a focus_grab host is active, xdg_popup_grab conflicts with it on
   // Hyprland (the compositor sends popup_done shortly after the focus_grab
   // commit, tearing this popup down). Enroll with the host instead so its
@@ -74,7 +88,15 @@ void PopupSurface::wireGrab() {
     return;
   }
   if (m_config.grab && m_config.serial != 0 && m_connection.seat() != nullptr && m_popup != nullptr) {
+    const auto& stack = grabStack();
+    if (!stack.empty() && (parentXdgSurface == nullptr || stack.back()->m_xdgSurface != parentXdgSurface)) {
+      // Another component's grabbing popup is still open (e.g. input queued up across a
+      // stall/resume). Show this one without a grab rather than killing the connection.
+      kLog.warn("popup: skipping xdg_popup_grab, another grabbing popup is still open");
+      return;
+    }
     xdg_popup_grab(m_popup, m_connection.seat(), m_config.serial);
+    grabStack().push_back(this);
   }
 }
 
@@ -145,7 +167,7 @@ bool PopupSurface::initialize(zwlr_layer_surface_v1* parentLayerSurface, wl_outp
   xdg_popup_add_listener(m_popup, &kPopupListener, this);
   zwlr_layer_surface_v1_get_popup(parentLayerSurface, m_popup);
 
-  wireGrab();
+  wireGrab(nullptr);
 
   wl_surface_commit(m_surface);
   // Flush before the roundtrip to ensure any pending destroy messages from a previous
@@ -271,6 +293,7 @@ void PopupSurface::handlePopupDone(void* data, xdg_popup* popup) {
     return;
   }
   self->setRunning(false);
+  removeFromGrabStack(self);
   auto callback = std::move(self->m_dismissedCallback);
   if (callback) {
     callback();
@@ -334,7 +357,7 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
 
   xdg_popup_add_listener(m_popup, &kPopupListener, this);
 
-  wireGrab();
+  wireGrab(parentXdgSurface);
 
   wl_surface_commit(m_surface);
   wl_display_flush(m_connection.display());
@@ -359,6 +382,7 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
 }
 
 void PopupSurface::destroyRoleObjects() {
+  removeFromGrabStack(this);
   if (m_popup != nullptr) {
     xdg_popup* popup = m_popup;
     m_popup = nullptr;
