@@ -1375,6 +1375,7 @@ if build_tests
     'plugin_process',
     'plugin_source_locks',
     'plugin_source_paths',
+    'popup_dismiss_order',
     'process',
     'scheme',
     'scrollbar_geometry',

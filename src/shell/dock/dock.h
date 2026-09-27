@@ -106,6 +106,9 @@ private:
   shell::dock::DockInstance* m_hoveredInstance = nullptr;
   shell::dock::DockInstance* m_popupOwnerInstance = nullptr; // instance that owns the current open popup
   std::unique_ptr<shell::dock::DockPopup> m_itemMenu;        // right-click context menu
+  // Set while createItemMenu runs: its init roundtrip dispatches queued input, and a second
+  // right-click there would open a menu closeItemMenu() cannot see yet.
+  bool m_openingItemMenu = false;
   Signal<>::ScopedConnection m_appIconColorizeConn;
   PhoneConnectService* m_phone = nullptr;
   Signal<>::ScopedConnection m_phoneConn;

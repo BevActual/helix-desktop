@@ -63,10 +63,15 @@ private:
   // host. Sets m_enrolledInGrabHost when we registered with the host.
   void wireGrab(xdg_surface* parentXdgSurface);
   void unenrollFromGrabHost();
+  // Dismisses every other live popup that is not `keepParent` or one of its ancestors, as if
+  // the compositor had sent popup_done, so a new grab lands on the topmost popup.
+  void dismissPopupsOutsideChainOf(PopupSurface* keepParent);
 
   PopupSurfaceConfig m_config;
   xdg_surface* m_xdgSurface = nullptr;
   xdg_popup* m_popup = nullptr;
+  // The popup this one was created on, when its parent is another PopupSurface.
+  PopupSurface* m_parentPopup = nullptr;
   std::function<void()> m_dismissedCallback;
   std::uint32_t m_pendingWidth = 0;
   std::uint32_t m_pendingHeight = 0;

@@ -1253,6 +1253,10 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
   if (action.kind == shell::dock::DockItemKind::Phone) {
     return;
   }
+  if (m_openingItemMenu) {
+    kLog.debug("dock: ignoring item menu request while another is still opening");
+    return;
+  }
 
   closeItemMenu();
 
@@ -1314,10 +1318,13 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
 
   auto* layerSurface =
       instance.surface != nullptr ? m_platform->layerSurfaceFor(instance.surface->wlSurface()) : nullptr;
-  m_itemMenu = shell::dock::createItemMenu(
+  m_openingItemMenu = true;
+  auto menu = shell::dock::createItemMenu(
       *m_platform, *m_config, *m_renderContext, layerSurface, instance.output, m_config->config().dock, action.entry,
       windows, callbacks
   );
+  m_openingItemMenu = false;
+  m_itemMenu = std::move(menu);
   if (m_itemMenu == nullptr) {
     m_popupOwnerInstance = nullptr;
   }

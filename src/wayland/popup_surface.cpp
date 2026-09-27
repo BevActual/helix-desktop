@@ -3,11 +3,13 @@
 #include "core/log.h"
 #include "wayland/hyprland/focus_grab_service.h"
 #include "wayland/hyprland/popup_grab_host.h"
+#include "wayland/popup_dismiss_order.h"
 #include "wayland/wayland_connection.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -62,12 +64,22 @@ namespace {
     stack.erase(std::remove(stack.begin(), stack.end(), popup), stack.end());
   }
 
+  // Every popup with a live xdg_popup, grabbing or not, so a new grab can clear the popups
+  // of other components (dock, tray, bar menus, tooltips) before it asks for the grab.
+  std::vector<PopupSurface*>& livePopups() {
+    static std::vector<PopupSurface*> popups;
+    return popups;
+  }
+
 } // namespace
 
 PopupSurface::PopupSurface(WaylandConnection& connection) : Surface(connection) {}
 
 PopupSurface::~PopupSurface() {
   *m_alive = false;
+  if (m_popup != nullptr) {
+    kLog.debug("popup {}: destroyed while mapped", static_cast<const void*>(this));
+  }
   unenrollFromGrabHost();
   m_connection.unregisterSurface(m_surface);
   destroyRoleObjects();
@@ -88,15 +100,70 @@ void PopupSurface::wireGrab(xdg_surface* parentXdgSurface) {
     return;
   }
   if (m_config.grab && m_config.serial != 0 && m_connection.seat() != nullptr && m_popup != nullptr) {
-    const auto& stack = grabStack();
-    if (!stack.empty() && (parentXdgSurface == nullptr || stack.back()->m_xdgSurface != parentXdgSurface)) {
-      // Another component's grabbing popup is still open (e.g. input queued up across a
-      // stall/resume). Show this one without a grab rather than killing the connection.
-      kLog.warn("popup: skipping xdg_popup_grab, another grabbing popup is still open");
+    auto grabIsLegal = [parentXdgSurface]() {
+      const auto& stack = grabStack();
+      return stack.empty() || (parentXdgSurface != nullptr && stack.back()->m_xdgSurface == parentXdgSurface);
+    };
+    if (!grabIsLegal()) {
+      // Another component's grabbing popup is still open (the dock opening its menu while a
+      // bar or tray menu is up, or input queued across a stall/resume). Dismiss everything
+      // outside this popup's parent chain, as the compositor would on an outside click.
+      dismissPopupsOutsideChainOf(m_parentPopup);
+    }
+    if (!grabIsLegal()) {
+      // Still not on the topmost grab (parent is a non-grabbing popup under a grab). Show
+      // this one without a grab rather than killing the connection.
+      kLog.warn("popup: skipping xdg_popup_grab, parent is not the topmost grabbing popup");
       return;
     }
     xdg_popup_grab(m_popup, m_connection.seat(), m_config.serial);
     grabStack().push_back(this);
+    kLog.debug(
+        "popup {}: grab serial={} parent={} grabs={}", static_cast<const void*>(this), m_config.serial,
+        static_cast<const void*>(m_parentPopup), grabStack().size()
+    );
+  }
+}
+
+void PopupSurface::dismissPopupsOutsideChainOf(PopupSurface* keepParent) {
+  std::vector<PopupSurface*> others;
+  for (PopupSurface* popup : livePopups()) {
+    if (popup != this) {
+      others.push_back(popup);
+    }
+  }
+
+  std::vector<popup_dismiss_order::Node> nodes(others.size());
+  std::optional<std::size_t> keepIndex;
+  for (std::size_t i = 0; i < others.size(); ++i) {
+    if (others[i] == keepParent) {
+      keepIndex = i;
+    }
+    const auto parent = std::find(others.begin(), others.end(), others[i]->m_parentPopup);
+    if (parent != others.end()) {
+      nodes[i].parent = static_cast<std::size_t>(parent - others.begin());
+    }
+  }
+
+  // Tear down every conflicting xdg_popup first (deepest first, which is the only legal
+  // order), then tell the owners. Some owners (tray) close synchronously and could otherwise
+  // destroy a parent before we got to its children.
+  std::vector<std::function<void()>> callbacks;
+  for (std::size_t index : popup_dismiss_order::conflicting(nodes, keepIndex)) {
+    PopupSurface* popup = others[index];
+    popup->setRunning(false);
+    popup->unenrollFromGrabHost();
+    popup->destroyRoleObjects();
+    if (popup->m_dismissedCallback) {
+      callbacks.push_back(std::move(popup->m_dismissedCallback));
+      popup->m_dismissedCallback = nullptr;
+    }
+  }
+  if (!callbacks.empty()) {
+    kLog.debug("popup: dismissed {} popup(s) to open a new grabbing popup", callbacks.size());
+  }
+  for (auto& callback : callbacks) {
+    callback();
   }
 }
 
@@ -166,6 +233,8 @@ bool PopupSurface::initialize(zwlr_layer_surface_v1* parentLayerSurface, wl_outp
 
   xdg_popup_add_listener(m_popup, &kPopupListener, this);
   zwlr_layer_surface_v1_get_popup(parentLayerSurface, m_popup);
+  m_parentPopup = nullptr;
+  livePopups().push_back(this);
 
   wireGrab(nullptr);
 
@@ -179,6 +248,12 @@ bool PopupSurface::initialize(zwlr_layer_surface_v1* parentLayerSurface, wl_outp
   auto alive = m_alive;
   const int roundtripResult = wl_display_roundtrip(m_connection.display());
   if (!*alive) {
+    return false;
+  }
+  if (roundtripResult >= 0 && m_popup == nullptr) {
+    // Dismissed during setup (a popup opened re-entrantly from queued input took the grab).
+    kLog.debug("popup {}: dismissed before setup finished", static_cast<const void*>(this));
+    destroySurface();
     return false;
   }
   if (roundtripResult < 0) {
@@ -292,6 +367,7 @@ void PopupSurface::handlePopupDone(void* data, xdg_popup* popup) {
   if (self->m_popup == nullptr || self->m_popup != popup) {
     return;
   }
+  kLog.debug("popup {}: popup_done", static_cast<const void*>(self));
   self->setRunning(false);
   removeFromGrabStack(self);
   auto callback = std::move(self->m_dismissedCallback);
@@ -356,6 +432,14 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
   }
 
   xdg_popup_add_listener(m_popup, &kPopupListener, this);
+  m_parentPopup = nullptr;
+  for (PopupSurface* popup : livePopups()) {
+    if (popup->m_xdgSurface == parentXdgSurface) {
+      m_parentPopup = popup;
+      break;
+    }
+  }
+  livePopups().push_back(this);
 
   wireGrab(parentXdgSurface);
 
@@ -367,6 +451,12 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
   auto alive = m_alive;
   const int roundtripResult = wl_display_roundtrip(m_connection.display());
   if (!*alive) {
+    return false;
+  }
+  if (roundtripResult >= 0 && m_popup == nullptr) {
+    // Dismissed during setup (a popup opened re-entrantly from queued input took the grab).
+    kLog.debug("popup {}: dismissed before setup finished", static_cast<const void*>(this));
+    destroySurface();
     return false;
   }
   if (roundtripResult < 0) {
@@ -383,6 +473,13 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
 
 void PopupSurface::destroyRoleObjects() {
   removeFromGrabStack(this);
+  auto& live = livePopups();
+  live.erase(std::remove(live.begin(), live.end(), this), live.end());
+  for (PopupSurface* popup : live) {
+    if (popup->m_parentPopup == this) {
+      popup->m_parentPopup = nullptr;
+    }
+  }
   if (m_popup != nullptr) {
     xdg_popup* popup = m_popup;
     m_popup = nullptr;
