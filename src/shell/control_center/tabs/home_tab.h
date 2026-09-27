@@ -31,9 +31,13 @@ class Glyph;
 class Image;
 class InputArea;
 class Label;
+class BrightnessService;
+class PipeWireService;
+class SessionActionRunner;
 class ProgressBar;
 class ScrollView;
 class Shortcut;
+class Slider;
 class Wallpaper;
 class ClipboardService;
 class UPowerService;
@@ -93,11 +97,24 @@ private:
   void syncShortcuts();
   void syncHeaderActions();
   void syncStatusStrip();
+  void buildQuickSurface(Flex& tab, float scale);
+  void buildPinList(Flex& tab, float scale);
+  void syncQuickControls();
+  void runSessionAction(std::string_view action);
   bool resizeMediaArtToCard();
   [[nodiscard]] bool mediaExpanded() const;
   void onPanelCardOpacityChanged(float opacity) override;
 
+  struct QuickToggleRow {
+    std::unique_ptr<Shortcut> shortcut;
+    Button* button = nullptr;
+    std::string openTab;
+  };
+
   MprisService* m_mpris = nullptr;
+  PipeWireService* m_audio = nullptr;
+  BrightnessService* m_brightness = nullptr;
+  SessionActionRunner* m_session = nullptr;
   HttpClient* m_httpClient = nullptr;
   WeatherService* m_weather = nullptr;
   CalendarService* m_calendar = nullptr;
@@ -199,6 +216,21 @@ private:
 
   Flex* m_shortcutsColumn = nullptr;
   std::vector<ShortcutPad> m_shortcutPads;
+  std::vector<QuickToggleRow> m_quickToggles;
+  std::unique_ptr<Shortcut> m_volumeShortcut;
+  Slider* m_volumeSlider = nullptr;
+  Slider* m_brightnessSlider = nullptr;
+  Label* m_volumeValue = nullptr;
+  Label* m_brightnessValue = nullptr;
+  Button* m_volumeButton = nullptr;
+  Flex* m_brightnessRow = nullptr;
+  Flex* m_sessionWell = nullptr;
+  Button* m_lockButton = nullptr;
+  Button* m_suspendButton = nullptr;
+  Button* m_logoutButton = nullptr;
+  Button* m_rebootButton = nullptr;
+  Button* m_shutdownButton = nullptr;
+  bool m_syncingQuickSliders = false;
 
   // Drag-to-reorder for the optional pins (Quick Settings / Control Center edit gesture):
   // press a pin and move past the drag threshold to lift it; neighbours slide aside to show

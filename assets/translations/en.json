@@ -4149,7 +4149,7 @@
           "label": "Control Center Height"
         },
         "control-center-sidebar": {
-          "description": "Choose how to display the sidebar",
+          "description": "Sidebar in the Settings window. Home is always a menu.",
           "label": "Sidebar"
         },
         "control-center-sidebar-section": {
@@ -4177,11 +4177,11 @@
           "label": "Glass"
         },
         "home-session-button": {
-          "description": "Show the Power tab button in the Home tab header",
-          "label": "Show Header Session Button"
+          "description": "Show lock, suspend, log out, restart, and shut down on Home",
+          "label": "Session Actions"
         },
         "home-shortcuts": {
-          "description": "Pin actions to a list at the bottom of Home. Empty by default; add only what you use.",
+          "description": "Extra actions under the Home modules. Empty by default; add only what you use.",
           "label": "Home Pins"
         },
         "home-shortcuts-show-labels": {

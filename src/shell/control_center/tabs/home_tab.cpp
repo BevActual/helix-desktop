@@ -19,6 +19,8 @@
 #include "shell/control_center/pin_reorder.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/panel/panel_button_style.h"
+#include "shell/session/session_action_meta.h"
+#include "shell/session/session_action_runner.h"
 #include "shell/panel/panel_manager.h"
 #include "shell/profile/avatar_path.h"
 #include "shell/tooltip/tooltip_manager.h"
@@ -33,6 +35,7 @@
 #include "pipewire/pipewire_service.h"
 #include "system/ai_usage_service.h"
 #include "system/battery_warning_monitor.h"
+#include "system/brightness_service.h"
 #include "system/distro_info.h"
 #include "system/gamma_service.h"
 #include "system/package_kit_service.h"
@@ -166,20 +169,6 @@ namespace {
 
   float homeAvatarSize(float scale) { return Style::controlHeightLg * kHomeAvatarScale * scale; }
 
-  std::filesystem::path avatarStartDirectory(const AccountsService* accounts, const ConfigService* config) {
-    const std::string currentPath =
-        config != nullptr ? shell::resolvedAvatarPath(accounts, config->config()) : std::string{};
-    const std::filesystem::path current(currentPath);
-    std::error_code ec;
-    if (!current.empty() && std::filesystem::exists(current, ec) && current.has_parent_path()) {
-      return current.parent_path();
-    }
-    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
-      return std::filesystem::path(home) / "Pictures";
-    }
-    return {};
-  }
-
   void openControlCenterTab(std::string_view tab) {
     PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = tab});
   }
@@ -190,29 +179,6 @@ namespace {
     }
     node->setVisible(shown);
     node->setParticipatesInLayout(shown);
-  }
-
-  std::unique_ptr<Button> makeStatusChip(
-      Button** out, float scale, float surfaceOpacity, std::function<void()> onClick
-  ) {
-    const float height = Style::controlHeightSm * scale;
-    return ui::button({
-        .out = out,
-        .fontSize = Style::fontSizeCaption * scale,
-        .glyphSize = Style::fontSizeBody * scale,
-        .contentAlign = ButtonContentAlign::Center,
-        .variant = ButtonVariant::Ghost,
-        .surfaceOpacity = surfaceOpacity,
-        .minHeight = height,
-        .paddingV = Style::spaceXs * scale,
-        .paddingH = Style::spaceSm * scale,
-        .gap = Style::spaceXs * scale,
-        .radius = height * 0.5F,
-        .visible = false,
-        .participatesInLayout = false,
-        .onClick = std::move(onClick),
-        .configure = [](Button& button) { button.setSoftness(1.0F); },
-    });
   }
 
   std::string formatShellTime(const ConfigService* config) {
@@ -355,27 +321,22 @@ namespace {
     });
   }
 
-  void applyAvatarChrome(Image* avatar, bool highlighted) {
-    if (avatar == nullptr) {
-      return;
-    }
-    const float borderWidth = Style::emphasizedBorderWidth;
-    if (highlighted) {
-      avatar->setBorder(colorSpecFromRole(ColorRole::Hover), borderWidth);
-      return;
-    }
-    avatar->setBorder(colorSpecFromRole(ColorRole::OnSurface, 0.45F), borderWidth);
-  }
-
 } // namespace
 
 HomeTab::HomeTab(const ControlCenterServices& services)
-    : m_mpris(services.mpris), m_httpClient(services.httpClient), m_weather(services.weather),
-      m_calendar(services.calendar), m_config(services.config), m_accounts(services.accounts),
-      m_wallpaper(services.wallpaper), m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures),
-      m_upower(services.upower), m_services(services.shortcutServices()),
+    : m_mpris(services.mpris), m_audio(services.audio), m_brightness(services.brightness),
+      m_session(services.session),
+      m_httpClient(services.httpClient), m_weather(services.weather), m_calendar(services.calendar),
+      m_config(services.config), m_accounts(services.accounts), m_wallpaper(services.wallpaper),
+      m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures), m_upower(services.upower),
+      m_services(services.shortcutServices()),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "control-center", .includedGroups = {"home"}}
+          services,
+          SettingsPaneOptions{
+              .section = "control-center",
+              .includedGroups = {"home"},
+              .showConfigureButton = false,
+          }
       )) {
   if (m_thumbnails != nullptr) {
     m_thumbnailPendingSub = m_thumbnails->subscribePendingUpload([this]() {
@@ -407,10 +368,442 @@ HomeTab::~HomeTab() {
   }
 }
 
+void HomeTab::buildQuickSurface(Flex& tab, float scale) {
+  for (auto& row : m_quickToggles) {
+    if (row.shortcut != nullptr) {
+      row.shortcut->onPanelClose();
+    }
+  }
+  m_quickToggles.clear();
+  if (m_volumeShortcut != nullptr) {
+    m_volumeShortcut->onPanelClose();
+    m_volumeShortcut.reset();
+  }
+
+  auto well = ui::column({
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .configure =
+          [scale](Flex& host) {
+            applyModuleWellStyle(host, scale);
+            host.setDirection(FlexDirection::Vertical);
+            host.setGap(Style::spaceSm * scale);
+            host.setPadding(Style::spaceSm * scale);
+          },
+  });
+
+  m_volumeShortcut = ShortcutRegistry::create("audio", m_services);
+  if (m_volumeShortcut != nullptr) {
+    m_volumeShortcut->onPanelOpen();
+  }
+  auto volumeRow = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+  });
+  volumeRow->addChild(
+      ui::button({
+          .out = &m_volumeButton,
+          .glyph = m_volumeShortcut != nullptr ? m_volumeShortcut->displayIcon() : std::string("volume-high"),
+          .tooltip = i18n::tr("control-center.shortcuts.audio"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick =
+              [this]() {
+                if (m_volumeShortcut != nullptr) {
+                  m_volumeShortcut->onClick();
+                }
+                PanelManager::instance().refresh();
+              },
+          .onRightClick = []() { openControlCenterTab("audio"); },
+          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+      })
+  );
+  volumeRow->addChild(
+      ui::slider({
+          .out = &m_volumeSlider,
+          .minValue = 0.0,
+          .maxValue = 1.5,
+          .step = 0.01,
+          .trackHeight = Style::sliderTrackHeight * scale,
+          .thumbSize = Style::sliderThumbSize * scale,
+          .controlHeight = Style::controlHeightSm * scale,
+          .wheelAdjustEnabled = true,
+          .flexGrow = 1.0F,
+          .onValueChanged =
+              [this](double value) {
+                if (m_syncingQuickSliders || m_audio == nullptr) {
+                  return;
+                }
+                m_audio->setVolume(static_cast<float>(value));
+                if (m_volumeValue != nullptr) {
+                  m_volumeValue->setText(std::format("{:.0F}%", value * 100.0));
+                }
+              },
+      })
+  );
+  volumeRow->addChild(
+      ui::label({
+          .out = &m_volumeValue,
+          .text = "0%",
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Bold,
+          .minWidth = 48.0F * scale,
+          .textAlign = TextAlign::End,
+      })
+  );
+  well->addChild(std::move(volumeRow));
+
+  auto brightnessRow = ui::row({
+      .out = &m_brightnessRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+  });
+  brightnessRow->addChild(
+      ui::button({
+          .glyph = "brightness-high",
+          .tooltip = i18n::tr("control-center.display.brightness"),
+          .minWidth = Style::controlHeightSm * scale,
+          .minHeight = Style::controlHeightSm * scale,
+          .padding = Style::spaceXs * scale,
+          .radius = Style::scaledRadiusMd(scale),
+          .onClick = []() { openControlCenterTab("monitor"); },
+          .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+      })
+  );
+  brightnessRow->addChild(
+      ui::slider({
+          .out = &m_brightnessSlider,
+          .minValue = 0.0,
+          .maxValue = 1.0,
+          .step = 0.01,
+          .trackHeight = Style::sliderTrackHeight * scale,
+          .thumbSize = Style::sliderThumbSize * scale,
+          .controlHeight = Style::controlHeightSm * scale,
+          .wheelAdjustEnabled = true,
+          .flexGrow = 1.0F,
+          .onValueChanged =
+              [this](double value) {
+                if (m_syncingQuickSliders || m_brightness == nullptr) {
+                  return;
+                }
+                m_brightness->setAllBrightness(static_cast<float>(value));
+                if (m_brightnessValue != nullptr) {
+                  m_brightnessValue->setText(std::format("{:.0F}%", value * 100.0));
+                }
+              },
+      })
+  );
+  brightnessRow->addChild(
+      ui::label({
+          .out = &m_brightnessValue,
+          .text = "100%",
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::Bold,
+          .minWidth = 48.0F * scale,
+          .textAlign = TextAlign::End,
+      })
+  );
+  well->addChild(std::move(brightnessRow));
+  tab.addChild(std::move(well));
+
+  auto list = ui::column({
+      .align = FlexAlign::Stretch,
+      .fillWidth = true,
+      .configure = [scale](Flex& host) { applyGroupedListStyle(host, scale); },
+  });
+  const auto addToggle = [&](std::string_view type, std::string openTab, std::string tooltipKey) {
+    auto shortcut = ShortcutRegistry::create(type, m_services);
+    if (shortcut == nullptr) {
+      return;
+    }
+    shortcut->onPanelOpen();
+    if (!m_quickToggles.empty()) {
+      list->addChild(ui::separator());
+    }
+    Button* button = nullptr;
+    Shortcut* const shortcutPtr = shortcut.get();
+    const std::string tabId = openTab;
+    auto row = ui::row({
+        .align = FlexAlign::Center,
+        .fillWidth = true,
+    });
+    row->addChild(
+        ui::button({
+            .out = &button,
+            .text = shortcut->displayLabel(),
+            .glyph = shortcut->displayIcon(),
+            .glyphSize = Style::fontSizeHeader * scale,
+            .contentAlign = ButtonContentAlign::Start,
+            .tooltip = shortcut->displayLabel(),
+            .minHeight = Style::controlHeightLg * scale,
+            .paddingV = Style::spaceSm * scale,
+            .paddingH = Style::spaceMd * scale,
+            .gap = Style::spaceSm * scale,
+            .radius = 0.0F,
+            .flexGrow = 1.0F,
+            .onClick =
+                [this, shortcutPtr]() {
+                  if (shortcutPtr != nullptr) {
+                    shortcutPtr->onClick();
+                  }
+                  PanelManager::instance().refresh();
+                },
+            .configure =
+                [scale](Button& control) {
+                  control.setDirection(FlexDirection::Horizontal);
+                  control.setAlign(FlexAlign::Center);
+                  control.setJustify(FlexJustify::Start);
+                  control.setFillWidth(true);
+                  if (control.label() != nullptr) {
+                    control.label()->setFontSize(Style::fontSizeBody * scale);
+                    control.label()->setMaxLines(1);
+                    control.label()->setTextAlign(TextAlign::Start);
+                    control.label()->setEllipsize(TextEllipsize::End);
+                  }
+                },
+        })
+    );
+    row->addChild(
+        ui::button({
+            .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
+            .tooltip = i18n::tr(tooltipKey),
+            .minWidth = Style::controlHeightLg * scale,
+            .minHeight = Style::controlHeightLg * scale,
+            .radius = 0.0F,
+            .onClick = [tabId]() { openControlCenterTab(tabId); },
+            .configure = [scale](Button& control) { panel_button_style::configureHeaderIconButton(control, scale); },
+        })
+    );
+    list->addChild(std::move(row));
+    m_quickToggles.push_back({
+        .shortcut = std::move(shortcut),
+        .button = button,
+        .openTab = std::move(openTab),
+    });
+  };
+  addToggle("wifi", "network", "control-center.tabs.network");
+  addToggle("bluetooth", "bluetooth", "control-center.tabs.bluetooth");
+  addToggle("nightlight", "monitor", "control-center.tabs.monitor");
+  addToggle("notification", "notifications", "control-center.tabs.notifications");
+  tab.addChild(std::move(list));
+
+  const float actionSize = Style::controlHeight * scale;
+  const auto sessionButton = [scale, actionSize](Button** out, std::string glyph, std::string tooltip,
+                                                  ButtonVariant variant, std::function<void()> onClick) {
+    return ui::button({
+        .out = out,
+        .glyph = std::move(glyph),
+        .glyphSize = Style::fontSizeHeader * scale,
+        .variant = variant,
+        .tooltip = std::move(tooltip),
+        .minWidth = actionSize,
+        .minHeight = actionSize,
+        .flexGrow = 1.0F,
+        .onClick = std::move(onClick),
+        .configure =
+            [](Button& button) {
+              button.setSoftness(1.0F);
+              button.setJustify(FlexJustify::Center);
+            },
+    });
+  };
+  auto session = ui::row({
+      .out = &m_sessionWell,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .configure =
+          [scale](Flex& host) {
+            applyModuleWellStyle(host, scale);
+            host.setGap(Style::spaceSm * scale);
+            host.setPadding(Style::spaceSm * scale);
+          },
+  });
+  session->addChild(sessionButton(
+      &m_lockButton, std::string(session_action::defaultGlyph("lock")), i18n::tr("session.actions.lock"),
+      ButtonVariant::Ghost,
+      [this]() {
+        PanelManager::instance().close();
+        if (m_session != nullptr) {
+          (void)m_session->lock();
+        }
+      }
+  ));
+  session->addChild(sessionButton(
+      &m_suspendButton, std::string(session_action::defaultGlyph("suspend")), i18n::tr("session.actions.suspend"),
+      ButtonVariant::Ghost, [this]() { runSessionAction("suspend"); }
+  ));
+  session->addChild(sessionButton(
+      &m_logoutButton, std::string(session_action::defaultGlyph("logout")), i18n::tr("session.actions.logout"),
+      ButtonVariant::Ghost, [this]() { runSessionAction("logout"); }
+  ));
+  session->addChild(sessionButton(
+      &m_rebootButton, std::string(session_action::defaultGlyph("reboot")), i18n::tr("session.actions.reboot"),
+      ButtonVariant::Destructive, [this]() { runSessionAction("reboot"); }
+  ));
+  session->addChild(sessionButton(
+      &m_shutdownButton, std::string(session_action::defaultGlyph("shutdown")), i18n::tr("session.actions.shutdown"),
+      ButtonVariant::Destructive, [this]() { runSessionAction("shutdown"); }
+  ));
+  session->addChild(sessionButton(
+      nullptr, Style::rtl() ? std::string("chevron-left") : std::string("chevron-right"),
+      i18n::tr("control-center.home.open-power"), ButtonVariant::Ghost, []() { openControlCenterTab("power"); }
+  ));
+  tab.addChild(std::move(session));
+}
+
+void HomeTab::buildPinList(Flex& tab, float scale) {
+  const auto& shortcuts =
+      m_config != nullptr ? m_config->config().controlCenter.shortcuts : std::vector<ShortcutConfig>{};
+  std::vector<std::unique_ptr<Shortcut>> previous;
+  previous.reserve(m_shortcutPads.size());
+  for (auto& pad : m_shortcutPads) {
+    if (pad.shortcut != nullptr) {
+      pad.shortcut->onPanelClose();
+    }
+    previous.push_back(std::move(pad.shortcut));
+  }
+  m_shortcutPads.clear();
+  m_shortcutsColumn = nullptr;
+  if (shortcuts.empty()) {
+    return;
+  }
+
+  const bool pluginsChanged = m_config != nullptr && !(m_config->config().plugins == m_lastPlugins);
+  if (m_config != nullptr) {
+    m_lastPlugins = m_config->config().plugins;
+  }
+  auto takeReusable = [&previous, pluginsChanged](std::string_view type) -> std::unique_ptr<Shortcut> {
+    for (auto it = previous.begin(); it != previous.end(); ++it) {
+      if (*it == nullptr || (*it)->id() != type) {
+        continue;
+      }
+      if (pluginsChanged && scripting::isPluginEntryOfKind(type, scripting::PluginEntryKind::Shortcut)) {
+        continue;
+      }
+      auto found = std::move(*it);
+      previous.erase(it);
+      return found;
+    }
+    return nullptr;
+  };
+
+  auto column = ui::column({
+      .out = &m_shortcutsColumn,
+      .align = FlexAlign::Stretch,
+      .fillWidth = true,
+      .configure = [scale](Flex& host) { applyGroupedListStyle(host, scale); },
+  });
+  bool first = true;
+  for (const auto& sc : shortcuts) {
+    auto shortcut = takeReusable(sc.type);
+    const bool reused = shortcut != nullptr;
+    if (!reused) {
+      shortcut = ShortcutRegistry::create(sc.type, m_services);
+    }
+    if (shortcut == nullptr) {
+      continue;
+    }
+    shortcut->onPanelOpen();
+    if (!first) {
+      column->addChild(ui::separator());
+    }
+    first = false;
+    Button* button = nullptr;
+    Shortcut* const shortcutPtr = shortcut.get();
+    column->addChild(
+        ui::button({
+            .out = &button,
+            .text = shortcut->displayLabel(),
+            .glyph = shortcut->displayIcon(),
+            .glyphSize = Style::fontSizeHeader * scale,
+            .contentAlign = ButtonContentAlign::Start,
+            .tooltip = shortcut->displayLabel(),
+            .minHeight = Style::controlHeightLg * scale,
+            .paddingV = Style::spaceSm * scale,
+            .paddingH = Style::spaceMd * scale,
+            .gap = Style::spaceSm * scale,
+            .radius = 0.0F,
+            .onClick =
+                [shortcutPtr]() {
+                  if (shortcutPtr != nullptr) {
+                    shortcutPtr->onClick();
+                  }
+                  PanelManager::instance().refresh();
+                },
+            .onRightClick =
+                [shortcutPtr]() {
+                  if (shortcutPtr != nullptr) {
+                    shortcutPtr->onRightClick();
+                  }
+                },
+            .configure =
+                [scale](Button& control) {
+                  control.setDirection(FlexDirection::Horizontal);
+                  control.setAlign(FlexAlign::Center);
+                  control.setJustify(FlexJustify::Start);
+                  control.setFillWidth(true);
+                  if (control.label() != nullptr) {
+                    control.label()->setFontSize(Style::fontSizeBody * scale);
+                    control.label()->setMaxLines(1);
+                    control.label()->setTextAlign(TextAlign::Start);
+                    control.label()->setEllipsize(TextEllipsize::End);
+                  }
+                },
+        })
+    );
+    if (auto* area = button != nullptr ? button->inputArea() : nullptr; area != nullptr) {
+      area->setOnAxisHandler([shortcutPtr](const InputArea::PointerData& data) -> bool {
+        if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || shortcutPtr == nullptr) {
+          return false;
+        }
+        const float steps = data.scrollSteps();
+        if (steps == 0.0F) {
+          return false;
+        }
+        return shortcutPtr->onScroll(steps > 0.0F ? -1 : 1);
+      });
+    }
+    ShortcutPad pad;
+    pad.shortcut = std::move(shortcut);
+    pad.type = sc.type;
+    pad.button = button;
+    pad.glyph = button != nullptr ? button->glyph() : nullptr;
+    pad.label = button != nullptr ? button->label() : nullptr;
+    m_shortcutPads.push_back(std::move(pad));
+  }
+  if (m_shortcutPads.empty()) {
+    m_shortcutsColumn = nullptr;
+    return;
+  }
+  tab.addChild(std::move(column));
+}
+
+void HomeTab::runSessionAction(std::string_view action) {
+  PanelManager::instance().close();
+  if (m_session == nullptr) {
+    return;
+  }
+  if (m_config != nullptr) {
+    for (const auto& cfg : m_config->config().shell.session.actions) {
+      if (cfg.enabled && cfg.action == action) {
+        m_session->invoke(cfg);
+        return;
+      }
+    }
+  }
+  SessionPanelActionConfig cfg;
+  cfg.action = std::string(action);
+  m_session->invoke(cfg);
+}
+
 std::unique_ptr<Flex> HomeTab::create() {
   const float scale = contentScale();
-  const std::string displayName = sessionDisplayName();
-
   auto tab = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
@@ -418,222 +811,8 @@ std::unique_ptr<Flex> HomeTab::create() {
       .fillWidth = true,
   });
 
-  // --- User card ---
-  auto userCard = ui::column({
-      .out = &m_userCard,
-      .justify = FlexJustify::Center,
-      .fillHeight = false,
-      .clipChildren = true,
-      .flexGrow = 0.0F,
-      .configure = [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeCardStyle(card, scale, opacity); },
-  });
-
-  {
-    const float wallpaperRadius = std::max(0.0F, Style::scaledRadius3xl(scale) - Style::borderWidth);
-    userCard->addChild(
-        ui::image({
-            .out = &m_wallpaperPlaceholder,
-            .fit = ImageFit::Cover,
-            .radius = wallpaperRadius,
-            .participatesInLayout = false,
-            .configure = [](Image& image) { image.setZIndex(-2); },
-        })
-    );
-
-    userCard->addChild(
-        ui::image({
-            .out = &m_wallpaperBg,
-            .fit = ImageFit::Cover,
-            .radius = wallpaperRadius,
-            .participatesInLayout = false,
-            .configure = [](Image& image) {
-              image.setZIndex(-1);
-              image.setOpacity(0.0F);
-            },
-        })
-    );
-  }
-
-  const float avatarSize = homeAvatarSize(scale);
-  const auto openAvatarPicker = [this]() {
-    if (m_config == nullptr) {
-      return;
-    }
-
-    FileDialogOptions options;
-    options.mode = FileDialogMode::Open;
-    options.defaultViewMode = FileDialogViewMode::Grid;
-    options.title = i18n::tr("control-center.home.select-avatar");
-    options.extensions = DirectoryScanner::imageExtensionFilter(false);
-    options.startDirectory = avatarStartDirectory(m_accounts, m_config);
-
-    (void)FileDialog::open(std::move(options), [this](std::optional<std::filesystem::path> pickedPath) {
-      if (!pickedPath.has_value() || m_config == nullptr) {
-        return;
-      }
-      const auto applyResult = shell::applyAvatarPath(m_accounts, m_config, pickedPath->string());
-      if (applyResult.success()) {
-        DeferredCall::callLater([]() {
-          PanelManager::instance().refresh();
-          PanelManager::instance().requestRedraw();
-        });
-        return;
-      }
-      notify::error(
-          "Helix", i18n::tr("control-center.home.avatar-error-title"),
-          i18n::tr(shell::avatarApplyErrorTranslationKey(applyResult.error))
-      );
-    });
-  };
-
-  auto avatarArea = ui::inputArea({});
-  avatarArea->setSize(avatarSize, avatarSize);
-  avatarArea->setHitShape(InputArea::HitShape::Circle);
-  avatarArea->setFocusable(true);
-  avatarArea->setCursorShape(WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER);
-  avatarArea->setOnClick([openAvatarPicker](const InputArea::PointerData&) { openAvatarPicker(); });
-  avatarArea->setOnKeyDown([openAvatarPicker](const InputArea::KeyData& key) {
-    if (key.pressed && KeybindMatcher::matches(KeybindAction::Validate, key.sym, key.modifiers)) {
-      openAvatarPicker();
-    }
-  });
-  m_userAvatarArea = avatarArea.get();
-  avatarArea->addChild(
-      ui::image({
-          .out = &m_userAvatar,
-          .fit = ImageFit::Cover,
-          .radius = avatarSize * 0.5F,
-          .padding = 1.0F * scale,
-          .width = avatarSize,
-          .height = avatarSize,
-          .configure = [](Image& image) {
-            image.setBorder(colorSpecFromRole(ColorRole::OnSurface, 0.45F), Style::emphasizedBorderWidth);
-            image.setHitTestVisible(false);
-            image.setAsyncReadyCallback([]() { PanelManager::instance().refresh(); });
-          },
-      })
-  );
-  const auto syncAvatarChrome = [this]() {
-    const bool highlighted =
-        m_userAvatarArea != nullptr && (m_userAvatarArea->focused() || m_userAvatarArea->hovered());
-    applyAvatarChrome(m_userAvatar, highlighted);
-    PanelManager::instance().requestRedraw();
-  };
-  avatarArea->setOnEnter([syncAvatarChrome](const InputArea::PointerData&) { syncAvatarChrome(); });
-  avatarArea->setOnLeave([syncAvatarChrome]() { syncAvatarChrome(); });
-  avatarArea->setOnFocusGain(syncAvatarChrome);
-  avatarArea->setOnFocusLoss(syncAvatarChrome);
-  const auto configureUserDetailLabel = [scale](Label& label) {
-    label.setShadow(colorSpecFromRole(ColorRole::Shadow, 0.36F), 0.0F, 1.0F * scale);
-  };
-  auto userRow = ui::row(
-      {.align = FlexAlign::Center, .gap = Style::spaceMd * scale}, std::move(avatarArea),
-      ui::column(
-          {.out = &m_userMain,
-           .align = FlexAlign::Stretch,
-           .justify = FlexJustify::Center,
-           .gap = Style::spaceXs * 0.5F * scale,
-           .minHeight = avatarSize,
-           .width = 0.0F,
-           .height = avatarSize,
-           .flexGrow = 1.0F},
-          ui::label({
-              .text = displayName,
-              .fontSize = Style::fontSizeTitle * 1.12F * scale,
-              .fontWeight = FontWeight::Bold,
-              .color = colorSpecFromRole(ColorRole::OnSurface),
-              .configure = [scale](
-                               Label& label
-                           ) { label.setShadow(colorSpecFromRole(ColorRole::Shadow, 0.42F), 0.0F, 1.0F * scale); },
-          }),
-          ui::label({
-              .out = &m_userHost,
-              .text = userHostLine(),
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .configure = configureUserDetailLabel,
-          }),
-          ui::label({
-              .out = &m_userUptime,
-              .text = "…",
-              .fontSize = Style::fontSizeCaption * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .configure = configureUserDetailLabel,
-          })
-      )
-  );
-  userCard->addChild(std::move(userRow));
-
-  // Wallpaper panel: full-card keyboard target; carved pointer target leaves the avatar clickable.
-  const auto openWallpaperPanel = []() { PanelManager::instance().togglePanel("wallpaper"); };
-  m_userCardKeyboardArea =
-      addCardOverlay(*m_userCard, openWallpaperPanel, {.keyboardFocus = true, .pointerHitTest = false});
-  m_userCardArea = addCardOverlay(*m_userCard, openWallpaperPanel, {.keyboardFocus = false, .pointerHitTest = true});
-  if (m_userAvatarArea != nullptr) {
-    m_userAvatarArea->setTooltip(i18n::tr("control-center.home.change-avatar"));
-  }
-  if (m_userCardArea != nullptr) {
-    m_userCardArea->setTooltip(i18n::tr("control-center.home.change-wallpaper"));
-  }
-  if (m_userCardKeyboardArea != nullptr) {
-    m_userCardKeyboardArea->setTooltip(i18n::tr("control-center.home.change-wallpaper"));
-  }
-
-  tab->addChild(std::move(userCard));
-
-  auto statusWell = ui::column({
-      .out = &m_statusStrip,
-      .fillWidth = true,
-      .flexGrow = 0.0F,
-      .visible = false,
-      .participatesInLayout = false,
-      .configure = [scale](Flex& well) { applyModuleWellStyle(well, scale); },
-  });
-  auto statusChips = ui::row({
-      .align = FlexAlign::Center,
-      .wrap = true,
-      .gap = Style::spaceXs * scale,
-      .fillWidth = true,
-  });
-  const float chipOpacity = panelCardOpacity();
-  statusChips->addChild(makeStatusChip(&m_statusUpdates, scale, chipOpacity, []() {
-    openControlCenterTab("packages");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusAi, scale, chipOpacity, []() {
-    openControlCenterTab("ai");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusBattery, scale, chipOpacity, []() {
-    openControlCenterTab("power");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusCapture, scale, chipOpacity, []() {
-    openControlCenterTab("screen-record");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusNightLight, scale, chipOpacity, []() {
-    openControlCenterTab("monitor");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusCaffeine, scale, chipOpacity, []() {
-    openControlCenterTab("power");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusDnd, scale, chipOpacity, []() {
-    openControlCenterTab("notifications");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusLocalSend, scale, chipOpacity, []() {
-    openControlCenterTab("localsend");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusPhone, scale, chipOpacity, []() {
-    openControlCenterTab("phone");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusPrivacy, scale, chipOpacity, []() {
-    openControlCenterTab("privacy");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusCast, scale, chipOpacity, []() {
-    openControlCenterTab("cast");
-  }));
-  statusChips->addChild(makeStatusChip(&m_statusFirewall, scale, chipOpacity, []() {
-    openControlCenterTab("firewall");
-  }));
-  statusWell->addChild(std::move(statusChips));
-  tab->addChild(std::move(statusWell));
+  buildQuickSurface(*tab, scale);
+  buildPinList(*tab, scale);
 
   // --- Now Playing: only participates when a player is active ---
   auto mediaCard = ui::column({
@@ -770,249 +949,7 @@ std::unique_ptr<Flex> HomeTab::create() {
     m_mediaCardArea->setTooltip(i18n::tr("control-center.home.open-media"));
   }
 
-  // --- Clock leftover: stacked glanceable widget filling remaining height ---
-  auto dateTimeCard = ui::column(
-      {.out = &m_dateTimeCard,
-       .align = FlexAlign::Start,
-       .justify = FlexJustify::Center,
-       .gap = Style::spaceSm * scale,
-       .fillWidth = true,
-       .fillHeight = true,
-       .flexGrow = 1.0F,
-       .configure =
-           [scale, opacity = panelCardOpacity()](Flex& card) { applyHomeClockCardStyle(card, scale, opacity); }},
-      ui::label({
-          .out = &m_timeLabel,
-          .text = formatShellTime(m_config),
-          .fontSize = homeTimeFontSize(scale, 0.0F, false),
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurface),
-          .maxLines = 1,
-      }),
-      ui::label({
-          .out = &m_dateLabel,
-          .text = formatShellDate(m_config),
-          .fontSize = Style::fontSizeBody * 0.95F * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      }),
-      ui::row(
-          {.out = &m_eventRow,
-           .align = FlexAlign::Center,
-           .gap = Style::spaceSm * scale,
-           .fillWidth = true,
-           .visible = false,
-           .participatesInLayout = false},
-          ui::glyph({
-              .out = &m_eventGlyph,
-              .glyph = "calendar-event",
-              .glyphSize = Style::fontSizeTitle * scale,
-              .color = colorSpecFromRole(ColorRole::Primary),
-          }),
-          ui::label({
-              .out = &m_eventLine,
-              .text = "",
-              .fontSize = Style::fontSizeBody * 0.95F * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .maxLines = 1,
-              .ellipsize = TextEllipsize::End,
-              .flexGrow = 1.0F,
-          })
-      ),
-      ui::row(
-          {.out = &m_weatherRow,
-           .align = FlexAlign::Center,
-           .gap = Style::spaceSm * scale,
-           .fillWidth = true},
-          ui::glyph({
-              .out = &m_weatherGlyph,
-              .glyph = "weather-cloud-sun",
-              .glyphSize = Style::fontSizeTitle * scale,
-              .color = colorSpecFromRole(ColorRole::Primary),
-          }),
-          ui::label({
-              .out = &m_weatherLine,
-              .text = "",
-              .fontSize = Style::fontSizeBody * 0.95F * scale,
-              .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-              .maxLines = 1,
-              .ellipsize = TextEllipsize::End,
-              .flexGrow = 1.0F,
-          })
-      )
-  );
-
-  // Date and time open Calendar; the weather line keeps Weather.
-  m_dateTimeCardArea = addCardOverlay(*m_dateTimeCard, []() { openControlCenterTab("calendar"); });
-  m_weatherCardArea = addCardOverlay(
-      *m_dateTimeCard, []() { openControlCenterTab("weather"); },
-      {.keyboardFocus = false, .pointerHitTest = true}
-  );
-  if (m_dateTimeCardArea != nullptr) {
-    m_dateTimeCardArea->setTooltip(i18n::tr("control-center.home.open-calendar"));
-  }
-  if (m_weatherCardArea != nullptr) {
-    m_weatherCardArea->setZIndex(4);
-    m_weatherCardArea->setTooltip(i18n::tr("control-center.home.open-weather"));
-  }
-
   tab->addChild(std::move(mediaCard));
-  tab->addChild(std::move(dateTimeCard));
-
-  // --- Optional pins: leftover grouped list, user order, no Control Center cell sizes ---
-  const auto& shortcuts =
-      m_config != nullptr ? m_config->config().controlCenter.shortcuts : std::vector<ShortcutConfig>{};
-  const std::size_t count = shortcuts.size();
-
-  // Keep Shortcut instances across open/close so plugin file watches and runtimes
-  // are not recreated on every Control Center open. Match by id/type from config.
-  std::vector<std::unique_ptr<Shortcut>> previous;
-  previous.reserve(m_shortcutPads.size());
-  for (auto& pad : m_shortcutPads) {
-    previous.push_back(std::move(pad.shortcut));
-  }
-  m_shortcutPads.clear();
-  m_shortcutsColumn = nullptr;
-
-  auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
-    for (auto it = previous.begin(); it != previous.end(); ++it) {
-      if (*it != nullptr && (*it)->id() == type) {
-        auto found = std::move(*it);
-        previous.erase(it);
-        return found;
-      }
-    }
-    return nullptr;
-  };
-
-  // A plugin shortcut seeds its Luau runtime once, at construction. Plugin settings changed
-  // since the last build means every reusable plugin instance is stale, so drop it and let
-  // ShortcutRegistry::create() re-seed from the current config.
-  const bool pluginsChanged = m_config != nullptr && !(m_config->config().plugins == m_lastPlugins);
-  if (m_config != nullptr) {
-    m_lastPlugins = m_config->config().plugins;
-  }
-
-  std::vector<std::unique_ptr<Button>> pendingButtons;
-  for (std::size_t i = 0; i < count; ++i) {
-    const auto& sc = shortcuts[i];
-    auto shortcut = takeReusable(sc.type);
-    if (shortcut != nullptr
-        && pluginsChanged
-        && scripting::isPluginEntryOfKind(sc.type, scripting::PluginEntryKind::Shortcut)) {
-      shortcut.reset();
-    }
-    const bool reused = shortcut != nullptr;
-    if (!reused) {
-      shortcut = ShortcutRegistry::create(sc.type, m_services);
-    }
-    if (shortcut == nullptr) {
-      continue;
-    }
-    if (reused) {
-      shortcut->onPanelOpen();
-    }
-
-    const std::string label = shortcut->displayLabel();
-    const bool enabled = shortcut->enabled();
-    const bool isActive = shortcut->active();
-
-    auto btn = ui::button({
-        .text = label,
-        .glyph = shortcut->displayIcon(),
-        .glyphSize = Style::fontSizeHeader * scale,
-        .contentAlign = ButtonContentAlign::Start,
-        .tooltip = label,
-        .minHeight = Style::controlHeightLg * scale,
-        .paddingV = Style::spaceSm * scale,
-        .paddingH = Style::spaceMd * scale,
-        .gap = Style::spaceSm * scale,
-        .radius = 0.0F,
-        .configure =
-            [enabled, isActive, scale](Button& button) {
-              button.setDirection(FlexDirection::Horizontal);
-              button.setAlign(FlexAlign::Center);
-              button.setJustify(FlexJustify::Start);
-              button.setFillWidth(true);
-              if (button.label() != nullptr) {
-                button.label()->setFontSize(Style::fontSizeBody * scale);
-                button.label()->setMaxLines(1);
-                button.label()->setTextAlign(TextAlign::Start);
-                button.label()->setEllipsize(TextEllipsize::End);
-              }
-              applyShortcutButtonStyle(button, enabled, isActive);
-            },
-    });
-
-    // Callbacks resolve the pad by button: a drag-to-reorder moves pads within the list, so
-    // a captured index would go stale.
-    Button* btnPtr = btn.get();
-    btnPtr->setOnClick([this, btnPtr]() {
-      if (m_pinDrag.suppressClick) {
-        m_pinDrag.suppressClick = false;
-        return;
-      }
-      if (auto* pad = padForButton(btnPtr); pad != nullptr) {
-        pad->shortcut->onClick();
-      }
-    });
-    btnPtr->setOnRightClick([this, btnPtr]() {
-      if (m_pinDrag.suppressClick) {
-        m_pinDrag.suppressClick = false;
-        return;
-      }
-      if (auto* pad = padForButton(btnPtr); pad != nullptr) {
-        pad->shortcut->onRightClick();
-      }
-    });
-    if (count > 1) {
-      btnPtr->setOnPress([this, btnPtr](float /*localX*/, float localY, bool pressed) {
-        onPinPress(padIndexForButton(btnPtr), localY, pressed);
-      });
-      btnPtr->setOnPointerMotion([this, btnPtr](float /*localX*/, float localY) {
-        onPinMotion(padIndexForButton(btnPtr), localY);
-      });
-    }
-    if (auto* ia = btnPtr->inputArea(); ia != nullptr) {
-      ia->setOnAxisHandler([this, btnPtr](const InputArea::PointerData& data) -> bool {
-        auto* pad = padForButton(btnPtr);
-        if (data.axis != WL_POINTER_AXIS_VERTICAL_SCROLL || pad == nullptr) {
-          return false;
-        }
-        const float steps = data.scrollSteps();
-        if (steps == 0.0F) {
-          return false;
-        }
-        return pad->shortcut->onScroll(steps > 0.0F ? -1 : 1);
-      });
-    }
-    ShortcutPad pad;
-    pad.shortcut = std::move(shortcut);
-    pad.type = sc.type;
-    pad.button = btnPtr;
-    pad.glyph = btnPtr->glyph();
-    pad.label = btnPtr->label();
-    m_shortcutPads.push_back(std::move(pad));
-    pendingButtons.push_back(std::move(btn));
-  }
-
-  if (!pendingButtons.empty()) {
-    auto column = ui::column({
-        .out = &m_shortcutsColumn,
-        .align = FlexAlign::Stretch,
-        .fillWidth = true,
-        .flexGrow = 0.0F,
-        .configure =
-            [scale](Flex& list) {
-              applyGroupedListStyle(list, scale);
-            },
-    });
-    for (auto& btn : pendingButtons) {
-      column->addChild(std::move(btn));
-    }
-    tab->addChild(std::move(column));
-  }
-
 
   auto liveScroll = ui::scrollView({
       .out = &m_liveScroll,
@@ -1041,10 +978,14 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
   auto live = ui::row(
       {.align = FlexAlign::Center, .gap = Style::spaceSm * scale},
       ui::button({
-          .out = &m_sessionButton,
-          .glyph = "shutdown",
-          .tooltip = i18n::tr("control-center.home.open-power"),
-          .onClick = []() { openControlCenterTab("power"); },
+          .glyph = "settings",
+          .tooltip = i18n::tr("control-center.settings.configure"),
+          .onClick =
+              []() {
+                PanelManager::instance().togglePanel(
+                    "control-center", PanelOpenRequest{.context = "settings:control-center"}
+                );
+              },
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
@@ -1086,7 +1027,11 @@ void HomeTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight)
 
   const float scale = contentScale();
   const bool playing = mediaExpanded();
+  const bool mediaWasShown = m_mediaCard != nullptr && m_mediaCard->visible();
   setShown(m_mediaCard, playing);
+  if (mediaWasShown != playing && PanelManager::instance().isOpenPanel("control-center")) {
+    PanelManager::instance().relayoutActivePanelPreferredSize();
+  }
 
   const float userCardHeight = homeAvatarSize(scale) + 2.0F * Style::spaceMd * scale;
   const bool statusVisible = m_statusStrip != nullptr && m_statusStrip->visible();
@@ -2197,6 +2142,32 @@ void HomeTab::onClose() {
   m_userHost = nullptr;
   m_userUptime = nullptr;
   m_sessionButton = nullptr;
+  m_volumeSlider = nullptr;
+  m_brightnessSlider = nullptr;
+  m_volumeValue = nullptr;
+  m_brightnessValue = nullptr;
+  m_volumeButton = nullptr;
+  m_brightnessRow = nullptr;
+  m_sessionWell = nullptr;
+  m_lockButton = nullptr;
+  m_suspendButton = nullptr;
+  m_logoutButton = nullptr;
+  m_rebootButton = nullptr;
+  m_shutdownButton = nullptr;
+  for (auto& pad : m_shortcutPads) {
+    pad.button = nullptr;
+    pad.glyph = nullptr;
+    pad.label = nullptr;
+  }
+  for (auto& row : m_quickToggles) {
+    if (row.shortcut != nullptr) {
+      row.shortcut->onPanelClose();
+    }
+    row.button = nullptr;
+  }
+  if (m_volumeShortcut != nullptr) {
+    m_volumeShortcut->onPanelClose();
+  }
   m_statusUpdates = nullptr;
   m_statusAi = nullptr;
   m_statusBattery = nullptr;
@@ -2318,7 +2289,79 @@ void HomeTab::syncScaledFonts() {
   }
 }
 
+void HomeTab::syncQuickControls() {
+  if (m_volumeButton != nullptr && m_volumeShortcut != nullptr) {
+    m_volumeButton->setGlyph(m_volumeShortcut->displayIcon());
+    applyShortcutButtonStyle(*m_volumeButton, m_volumeShortcut->enabled(), m_volumeShortcut->active());
+  }
+  if (m_volumeSlider != nullptr && !m_volumeSlider->dragging()) {
+    const AudioNode* sink = m_audio != nullptr ? m_audio->defaultSink() : nullptr;
+    m_syncingQuickSliders = true;
+    if (sink != nullptr) {
+      m_volumeSlider->setEnabled(true);
+      m_volumeSlider->setValue(std::clamp(static_cast<double>(sink->volume), 0.0, 1.5));
+      if (m_volumeValue != nullptr) {
+        m_volumeValue->setText(std::format("{:.0F}%", sink->volume * 100.0F));
+      }
+    } else {
+      m_volumeSlider->setEnabled(false);
+    }
+    m_syncingQuickSliders = false;
+  }
+
+  const BrightnessDisplay* shown = nullptr;
+  if (m_brightness != nullptr) {
+    for (const BrightnessDisplay& display : m_brightness->displays()) {
+      if (display.controllable) {
+        shown = &display;
+        break;
+      }
+    }
+  }
+  if (m_brightnessRow != nullptr) {
+    m_brightnessRow->setVisible(shown != nullptr);
+    m_brightnessRow->setParticipatesInLayout(shown != nullptr);
+  }
+  if (shown != nullptr && m_brightnessSlider != nullptr && !m_brightnessSlider->dragging()) {
+    m_syncingQuickSliders = true;
+    m_brightnessSlider->setValue(shown->brightness);
+    m_syncingQuickSliders = false;
+    if (m_brightnessValue != nullptr) {
+      m_brightnessValue->setText(std::format("{:.0F}%", shown->brightness * 100.0F));
+    }
+  }
+
+  for (auto& row : m_quickToggles) {
+    if (row.shortcut == nullptr || row.button == nullptr) {
+      continue;
+    }
+    row.button->setText(row.shortcut->displayLabel());
+    row.button->setGlyph(row.shortcut->displayIcon());
+    applyShortcutButtonStyle(*row.button, row.shortcut->enabled(), row.shortcut->active());
+  }
+
+  const bool showSession = m_config == nullptr || m_config->config().controlCenter.showSessionButton;
+  setShown(m_sessionWell, showSession);
+  const auto actionEnabled = [this](std::string_view action) {
+    if (m_session == nullptr || m_config == nullptr) {
+      return m_session != nullptr;
+    }
+    for (const auto& cfg : m_config->config().shell.session.actions) {
+      if (cfg.action == action) {
+        return cfg.enabled;
+      }
+    }
+    return true;
+  };
+  setShown(m_lockButton, showSession && m_session != nullptr && m_config != nullptr && m_config->isLockScreenEnabled());
+  setShown(m_suspendButton, showSession && m_session != nullptr);
+  setShown(m_logoutButton, showSession && actionEnabled("logout"));
+  setShown(m_rebootButton, showSession && actionEnabled("reboot"));
+  setShown(m_shutdownButton, showSession && actionEnabled("shutdown"));
+}
+
 void HomeTab::sync(Renderer& renderer) {
+  syncQuickControls();
   syncScaledFonts();
   syncShortcuts();
   syncStatusStrip();

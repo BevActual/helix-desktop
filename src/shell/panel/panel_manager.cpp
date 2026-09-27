@@ -421,6 +421,10 @@ void PanelManager::openSettings(std::string context) {
     }
   }
   if (isOpenPanel("control-center") && m_activePanel != nullptr) {
+    if (m_activePanel->requiresRecreateForContext(ccContext)) {
+      openPanel("control-center", PanelOpenRequest{.context = ccContext});
+      return;
+    }
     m_activePanel->onOpen(ccContext);
     return;
   }
@@ -1562,8 +1566,10 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
         return;
       }
       // Panels placed near the clicked widget must fully reopen so geometry
-      // and bar decoration track the new anchor.
-      if (request.hasAnchorPosition && openNearClickEnabled(m_activePanel, panelId, m_config)) {
+      // and bar decoration track the new anchor. Quick Home and Settings also
+      // differ in size and sidebar, so that switch rebuilds the surface.
+      if (m_activePanel->requiresRecreateForContext(request.context)
+          || (request.hasAnchorPosition && openNearClickEnabled(m_activePanel, panelId, m_config))) {
         openPanel(panelId, request);
         return;
       }
@@ -2931,7 +2937,14 @@ void PanelManager::registerIpc(IpcService& ipc) {
           return unknownPanelError(panelId);
         }
 
+        if (panelId == "control-center" && context.empty()) {
+          context = "settings";
+        }
         if (isOpen() && !m_closing && m_activePanelId == panelId) {
+          if (m_activePanel != nullptr && m_activePanel->requiresRecreateForContext(context)) {
+            openPanel(panelId, PanelOpenRequest{.context = context});
+            return "ok\n";
+          }
           if (!context.empty() && m_activePanel != nullptr) {
             m_activePanel->onOpen(context);
             refresh();

@@ -67,6 +67,7 @@ public:
   void onClose() override;
   [[nodiscard]] bool dismissTransientUi() override;
   [[nodiscard]] bool isContextActive(std::string_view context) const override;
+  [[nodiscard]] bool requiresRecreateForContext(std::string_view context) const override;
   [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   [[nodiscard]] bool deferExternalRefresh() const override;
   [[nodiscard]] bool deferPointerRelayout() const override;
@@ -137,6 +138,7 @@ private:
   [[nodiscard]] bool isTabShown(std::string_view id) const;
   [[nodiscard]] std::string firstVisibleTab() const;
   [[nodiscard]] bool isDirectSectionOpenContext(std::string_view context) const;
+  [[nodiscard]] static bool isQuickHomeContext(std::string_view context) noexcept;
   [[nodiscard]] ControlCenterSidebarMode sidebarModeForOpen(std::string_view context) const;
 
   std::vector<TabSlot> m_slots;

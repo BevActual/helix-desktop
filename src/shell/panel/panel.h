@@ -38,6 +38,11 @@ public:
     (void)context;
     return false;
   }
+  // True when showing `context` needs a new surface (size or chrome), not an in-place tab switch.
+  [[nodiscard]] virtual bool requiresRecreateForContext(std::string_view context) const {
+    (void)context;
+    return false;
+  }
   [[nodiscard]] virtual bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
     (void)sym;
     (void)modifiers;

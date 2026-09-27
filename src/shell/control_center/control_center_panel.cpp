@@ -393,8 +393,11 @@ namespace {
         || context == "palettes") {
       return "theme";
     }
-    if (context.empty() || context == "home") {
+    if (context == "home") {
       return "home";
+    }
+    if (context.empty()) {
+      return "theme";
     }
     if (context == "screenshot" || context == "screen-record" || context == "capture") {
       return "capture";
@@ -595,7 +598,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add(
       "control-center",
       std::make_unique<SettingsTab>(
-          services, "control-center", std::unordered_set<std::string>{"layout", "navigation"}
+          services, "control-center", std::unordered_set<std::string>{"home", "layout", "navigation"}
       )
   );
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
@@ -607,6 +610,10 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
 float ControlCenterPanel::preferredWidth() const {
   const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.width)
                                              : static_cast<float>(ControlCenterConfig::kDefaultWidth);
+  if (isQuickHomeContext(pendingOpenContext())) {
+    constexpr float kQuickHomeWidth = 460.0F;
+    return (fullSize < kQuickHomeWidth ? fullSize : kQuickHomeWidth) * m_contentScale;
+  }
   switch (sidebarModeForOpen(pendingOpenContext())) {
   case ControlCenterSidebarMode::Full:
     return fullSize * m_contentScale;
@@ -621,6 +628,19 @@ float ControlCenterPanel::preferredWidth() const {
 float ControlCenterPanel::preferredHeight() const {
   const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.height)
                                              : static_cast<float>(ControlCenterConfig::kDefaultHeight);
+  if (isQuickHomeContext(pendingOpenContext())) {
+    constexpr float kQuickHomeHeight = 470.0F;
+    constexpr float kQuickHomeMediaExtra = 120.0F;
+    constexpr float kQuickHomePinRow = 48.0F;
+    float height = kQuickHomeHeight;
+    if (m_mpris != nullptr && m_mpris->activePlayer().has_value()) {
+      height += kQuickHomeMediaExtra;
+    }
+    if (m_config != nullptr) {
+      height += static_cast<float>(m_config->config().controlCenter.shortcuts.size()) * kQuickHomePinRow;
+    }
+    return (fullSize < height ? fullSize : height) * m_contentScale;
+  }
   return fullSize * m_contentScale;
 }
 
@@ -758,6 +778,9 @@ void ControlCenterPanel::create() {
 
     TabGroup lastHeader = TabGroup::Home;
     for (auto& slot : m_slots) {
+      if (slot.id == "home") {
+        continue;
+      }
       if (slot.group != TabGroup::Home && slot.group != lastHeader) {
         addSidebarGroupHeader(*sidebarNav, slot.group, scale);
         lastHeader = slot.group;
@@ -848,7 +871,7 @@ void ControlCenterPanel::create() {
   header->addChild(std::move(headerActions));
 
   content->addChild(std::move(header));
-  if (!m_showSidebar || m_compact) {
+  if (!isQuickHomeContext(pendingOpenContext()) && (!m_showSidebar || m_compact)) {
     auto search = createSettingsSearchInput(scale);
     if (m_compact) {
       // Hidden until the rail's search glyph (or `/`, Ctrl+F) asks for it; it folds away again
@@ -1182,7 +1205,7 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
     }
     return true;
   }
-  const std::string requested = context.empty() ? "home" : std::string(context);
+  const std::string requested = std::string(context);
   const std::string tabId = resolveOpenTabId(requested);
   if (m_activeTabId != tabId) {
     return false;
@@ -1356,6 +1379,9 @@ bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
 }
 
 bool ControlCenterPanel::isTabVisible(std::string_view id) const {
+  if (id == "home" && !isQuickHomeContext(pendingOpenContext())) {
+    return false;
+  }
   if (!isTabFeatureAvailable(id)) {
     return false;
   }
@@ -1793,7 +1819,7 @@ void ControlCenterPanel::wireSidebarScroll(InputArea* area) {
 }
 
 void ControlCenterPanel::selectAdjacentVisibleTab(int direction) {
-  if (direction == 0) {
+  if (direction == 0 || isQuickHomeContext(pendingOpenContext())) {
     return;
   }
 
@@ -1943,11 +1969,24 @@ bool ControlCenterPanel::isDirectSectionOpenContext(std::string_view context) co
   return false;
 }
 
+bool ControlCenterPanel::isQuickHomeContext(std::string_view context) noexcept { return context == "home"; }
+
+bool ControlCenterPanel::requiresRecreateForContext(std::string_view context) const {
+  return isQuickHomeContext(context) != isQuickHomeContext(pendingOpenContext());
+}
+
 ControlCenterSidebarMode ControlCenterPanel::sidebarModeForOpen(std::string_view context) const {
+  if (isQuickHomeContext(context)) {
+    return ControlCenterSidebarMode::None;
+  }
   if (m_config == nullptr) {
     return ControlCenterSidebarMode::Compact;
   }
   const auto& cc = m_config->config().controlCenter;
+  const auto settings = parseSettingsOpenContext(context);
+  if (context.empty() || settings.isSettings) {
+    return cc.sidebarMode;
+  }
   return isDirectSectionOpenContext(context) ? cc.sidebarSectionMode : cc.sidebarMode;
 }
 

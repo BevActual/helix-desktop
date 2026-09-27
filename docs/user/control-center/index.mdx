@@ -5,13 +5,14 @@ sidebar:
   order: 3
 ---
 
-The Control Center is Helix's hybrid of Apple Control Center and Apple apps. **Home** is the live Control Center: frosted modules that light up, status, and shortcuts on Liquid Glass chrome. Every other sidebar page is an Apple-app-style live tab (Weather, Calendar, Settings, and so on): leftover content on the same glass panel, state and primary actions on the page, policy in the header gear. Open it from the control-center bar widget, by right-clicking empty space on a bar, or with IPC:
+Control Center is two surfaces. **Home** is the quick menu: sound, brightness, network, Bluetooth, night light, Do Not Disturb, and media, with no sidebar. **Settings** is the sidebar window: Appearance, Desktop, Device, Services, and the rest. Open Home from the control-center bar widget or by right-clicking empty space on a bar. Open Settings with IPC and no tab name:
 
 ```sh
 noctalia msg panel-toggle control-center
+noctalia msg panel-toggle control-center home
 ```
 
-Pass a context to jump straight to a tab:
+Pass a context to jump straight to a Settings page:
 
 ```sh
 noctalia msg panel-toggle control-center audio
@@ -21,8 +22,8 @@ noctalia msg panel-toggle control-center author/plugin:displays
 
 ## Sidebar
 
-Set `sidebar` under `[control_center]` for tab navigation when Control Center opens on **Home** (control center widget, bar background click, or `noctalia msg panel-toggle control-center` with no tab name).
-Use `"full"` for icons and labels, `"compact"` for icon-only tabs, or `"none"` to hide the sidebar.
+Set `sidebar` under `[control_center]` for tab navigation in the **Settings** window (`noctalia msg panel-toggle control-center` with no tab name, or the gear on Home).
+Use `"full"` for icons and labels, `"compact"` for icon-only tabs, or `"none"` to hide the sidebar. Home is always a menu and does not use this setting.
 The full sidebar carries the pages-and-settings search field; in compact mode a search glyph at the top of the rail (or `/` / Ctrl+F) reveals the field under the tab header, and it folds away again when it loses focus with nothing typed.
 
 Set `sidebar_section` for opens that jump straight to a tab (volume, network, and media bar widgets, or `noctalia msg panel-toggle control-center audio`).
@@ -41,12 +42,12 @@ sidebar = "compact"
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `sidebar` | string | `"compact"` | Sidebar on Home / general open: `"full"`, `"compact"`, or `"none"` |
+| `sidebar` | string | `"compact"` | Sidebar in the Settings window: `"full"`, `"compact"`, or `"none"` |
 | `sidebar_section` | string | `"compact"` | Sidebar when opening straight to a tab: `"full"`, `"compact"`, or `"none"` |
 | `width` | int | `700` | Control Center width in pixels (`600`–`1600`). This is the full-sidebar width; the compact and no-sidebar modes scale down from it. Size it like a Settings window when you want leftover catalogs to spread out. |
 | `height` | int | `700` | Control Center height in pixels (`480`–`1200`). Leftover catalogs, grids, and specimens fill the extra space. |
-| `show_session_button` | bool | `true` | Show the Power tab button in the Home tab header. |
-| `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from the Control Center. Empty shows every available tab. Editable from **Control Center → Control Center**. The Home tab cannot be hidden. |
+| `show_session_button` | bool | `true` | Show lock, suspend, log out, restart, and shut down on Home. |
+| `hidden_tabs` | array | `[]` | Tab [context IDs](#sidebar-tabs) to hide from Settings. Empty shows every available tab. Editable from **Settings → Control Center**. Home is the quick menu and is not a sidebar tab. |
 
 The full sidebar shows group captions: **Appearance** (theme, wallpaper, templates), **Desktop** (desktop), **Device** (network, bluetooth, audio, media, displays, power, notifications, screen time, calendar, clock, weather, camera, system), **Services** (privacy, firewall, security, printers, cast, Phone, Syncthing, packages, and similar tools), **Input** (launcher, keybinds, shell), then **General** (Control Center, niri, hooks, plugins). Compact mode uses separators between those groups instead of captions.
 
@@ -123,8 +124,8 @@ Helix follows Apple Human Interface Guidelines as a hierarchy, not a skin. Liqui
 |-------|----------|---------------|
 | Chrome | Panel, sidebar, header | `[shell.panel].glass` 0–1 (solid → clear) plus `[shell.panel].refraction`. Clear needs a dimming layer so type stays readable. Do not nest glass-on-glass. helix-niri writes `liquid-glass`; stock niri maps refraction to chrome blur. |
 | Leftover | Compact cards, leftover catalogs, grouped lists | Solid wells (`applySectionCardStyle`, `applyContentCardStyle`). Color and type live here. |
-| Modules | Power session plate, Home status chips | Frosted functional plates (`applyModuleWellStyle`), not a second glass layer. |
-| Widgets | Home clock/weather/media, desktop widgets | Glanceable. Deep-link into Calendar, Weather, Media. Not mini Control Center pages. |
+| Modules | Power session plate, Home sound and brightness | Frosted functional plates (`applyModuleWellStyle`), not a second glass layer. |
+| Widgets | Home media, desktop widgets | Glanceable. Deep-link into Media. Not mini Control Center pages. |
 
 **High Contrast** on Effects maps to Increased Contrast and Reduced Transparency: palette stretch, opaque chrome and leftover, contrasting outlines, and no module softness. **Motion** maps to Reduced Motion. Concentric rounding uses `radius3xl` on leftover wells and `radius2xl` on grouped lists inside them.
 
@@ -134,19 +135,15 @@ Catalog tabs follow Wallpaper: icon sources, search, and the current pick on the
 
 ## Home
 
-The Home tab is the Control Center landing view: glanceable identity, attention, Now Playing when something is playing, and a leftover clock/weather widget. Pins are optional and empty by default. Other tabs are Apple-app pages with live controls. The panel chrome stays Liquid Glass; Home cards use leftover surfaces, so content is not nested glass-on-glass.
+Home is the quick Control Center. The control-center bar widget and a right-click on empty bar space open it at menu size, without a sidebar. `noctalia msg panel-toggle control-center home` does the same. The window hugs the modules. The panel chrome stays Liquid Glass. Sound and brightness sit in a module well. Network, Bluetooth, night light, and Do Not Disturb are a grouped list: the row toggles in place, and the chevron opens that page in Settings. Lock, suspend, log out, restart, and shut down sit in a session well; the chevron on that well opens **Power**.
 
-When something needs attention, a status row appears between the user card and Now Playing / clock: pending package updates (opens Packages), an AI quota at or above the usage warning (opens AI), a laptop battery at or below the warning threshold (opens Power), an active recording or replay buffer (opens Capture → Record), night light currently warming the display (opens Monitor), caffeine/idle-inhibit on (opens Power), Do Not Disturb on (opens Notifications), an incoming LocalSend transfer waiting to be accepted (opens LocalSend), an app using the microphone, camera, or screen share (opens Privacy), this screen being shared (opens Cast), and firewall panic blocking traffic (opens Firewall). The row hides when everything is idle. Pins stay for actions you add; the chips only report state.
+While something is playing, Now Playing sits under the toggles and the menu grows to fit it. Click the card to open **Media**. When nothing is playing the card hides.
 
-Click the avatar to pick a custom image, or the rest of the user card to open **Wallpaper**. The card shows your name, `user@host`, and uptime; version and hardware live on **System**. Click the media card to open **Media**; while something is playing it is a Now Playing widget with artwork, track, progress, and previous / play-pause / next beside the art. When nothing is playing the card hides so the clock keeps leftover height. The clock stacks time, date, the next calendar event when one is coming up, and a one-line weather caption like a Lock Screen widget. Click the date, time, or event to open **Calendar**. Extra timezones live on **Clock**. Click the weather line to open **Weather**. Hover media and clock to illuminate those widgets from within. Helix saves the selected avatar path as `[shell].avatar_path`.
+Pins you add show as a grouped list under the session well. The header gear opens Settings on the Control Center page (pins, sidebar, size). `noctalia msg panel-toggle control-center` with no tab opens Settings on Theme. `noctalia msg settings-toggle` with no section still opens Theme.
 
-When AccountsService is available, Helix also writes the selected avatar to `org.freedesktop.Accounts` as your user's `IconFile`. That is what Helix Greeter reads for the login user list. On distros where this is not enabled by default, install and enable **accountsservice** (usually the `accounts-daemon` service) if you want the same avatar in both the shell and the greeter.
+The pin list is configured on that Control Center settings page; see [Control Center shortcuts](/noctalia/control-center/shortcuts/).
 
-The pin list is configured separately; see [Control Center shortcuts](/noctalia/control-center/shortcuts/).
-
-Header gear opens Home pins and the session-button setting. Layout, sidebar mode, width, and hidden tabs stay on the **Control Center** tab in Advanced (`noctalia msg panel-toggle control-center control-center` or `noctalia msg settings-toggle control-center`). `noctalia msg settings-toggle` with no section still opens Theme.
-
-Set `show_session_button = false` under `[control_center]` to hide the Power button in the Home tab header. Hover the header button for **Open Power**. This does not affect Home pins configured with `type = "session"` or session widgets on the bar. The header button and the `session` pin open the Power tab; custom session actions stay on the session panel behind Power's gear.
+Set `show_session_button = false` under `[control_center]` to hide the session well. This does not affect Home pins configured with `type = "session"` or session widgets on the bar. Custom session actions stay on the session panel behind Power's gear.
 
 ## Theme
 
