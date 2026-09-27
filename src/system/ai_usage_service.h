@@ -44,6 +44,19 @@ public:
   [[nodiscard]] bool canLaunchOllama() const;
   [[nodiscard]] bool canLaunchLocalRuntime(noctalia::ai_usage::LocalRuntimeKind kind) const;
 
+  // LocalAI: the desktop's AI service layer.
+  void startLocalAi();
+  void stopLocalAi();
+  void launchLocalAi(); // WebUI in the browser (or the desktop app when installed)
+  void selectLocalAiModel(std::string name);
+  void loadLocalAiGallery(bool force);
+  void setLocalAiGalleryQuery(std::string query);
+  void installLocalAiModel(std::string galleryId);
+  void deleteLocalAiModel(std::string name);
+  void dismissLocalAiJob();
+  [[nodiscard]] bool canLaunchLocalAi() const;
+  [[nodiscard]] std::string localAiBaseUrl() const;
+
   [[nodiscard]] const noctalia::ai_usage::Snapshot& snapshot() const noexcept { return m_snapshot; }
   [[nodiscard]] int attentionPercent() const;
 
@@ -85,6 +98,15 @@ private:
   [[nodiscard]] bool launchDesktopIds(std::span<const std::string_view> ids) const;
   [[nodiscard]] std::string ollamaBaseUrl() const;
   [[nodiscard]] bool ollamaHostIsLocal() const;
+  void fetchLocalAi(std::uint64_t generation, bool force);
+  void publishLocalAi(noctalia::ai_usage::LocalAiSnapshot snap);
+  void dropShadowedLocalRuntimes();
+  [[nodiscard]] bool localAiHostIsLocal() const;
+  void spawnLocalAiRun();
+  void pollLocalAiJob();
+  void finishLocalAiJob(bool ok, std::string error);
+  void postLocalAiApply(std::string galleryId);
+  void postLocalAiDelete(std::string name);
 
   ConfigService* m_config = nullptr;
   HttpClient* m_http = nullptr;
@@ -101,6 +123,14 @@ private:
   std::array<LocalRuntimeProbe, noctalia::ai_usage::kLocalRuntimeCount> m_localRuntimeProbes{};
   std::vector<noctalia::ai_usage::LocalRuntime> m_localRuntimesKnown;
   std::optional<int> m_ollamaServePid;
+  LocalRuntimeProbe m_localAiProbe;
+  std::optional<int> m_localAiRunPid;
+  Timer m_localAiJobTimer;
+  Timer m_localAiStartTimer;
+  std::uint64_t m_localAiGalleryGeneration = 0;
+  std::uint64_t m_localAiJobGeneration = 0;
+  std::string m_pendingLocalAiInstall;
+  std::string m_pendingLocalAiDelete;
   bool m_ollamaWantLoad = false;
   bool m_ollamaLoadPending = false;
   bool m_started = false;

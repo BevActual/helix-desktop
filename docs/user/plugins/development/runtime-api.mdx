@@ -201,13 +201,23 @@ and an entry's position is not necessarily its core id.
 | `noctalia.aiUsage()` | table | Read-only snapshot of AI CLIs and local CLI servers on this machine. Requires <PluginApiBadge feature="ai-usage" />. |
 
 Use this instead of fetching provider tokens or probing loopback ports from a plugin. The table is a copy of the host's
-latest sample; it never includes credentials. Percents are utilization, not currency. `ollama` is absent when Ollama is
-not visible. `localRuntimes` lists OpenAI-compatible CLI servers that answered `GET /v1/models` on loopback
-(llama.cpp, vLLM). Editor apps and GUI local servers are omitted unless Always on.
+latest sample; it never includes credentials. Percents are utilization, not currency. `localai` is the desktop's AI
+service layer: an OpenAI-compatible endpoint whose models carry capabilities, so a plugin asks for `transcript` or
+`embeddings` instead of shipping its own runtime. `ollama` is absent when Ollama is not visible. `localRuntimes` lists
+OpenAI-compatible CLI servers that answered `GET /v1/models` on loopback (llama.cpp, vLLM). Editor apps and GUI local
+servers are omitted unless Always on.
 
 ```lua
 local ai = noctalia.aiUsage()
-if ai.hot ~= nil then
+if ai.localai ~= nil and ai.localai.status == "running" then
+  -- Pick a model that can transcribe, then call ai.localai.url .. "/v1/audio/transcriptions" with it.
+  for _, model in ipairs(ai.localai.models) do
+    if table.find(model.capabilities, "transcript") then
+      noctalia.log("speech to text via " .. model.id .. " at " .. ai.localai.url)
+      break
+    end
+  end
+elseif ai.hot ~= nil then
   noctalia.log(string.format("%s %s %.0f%%", ai.hot.provider, ai.hot.window, ai.hot.percent))
 elseif ai.ollama ~= nil then
   noctalia.log("ollama " .. ai.ollama.status)
@@ -222,6 +232,8 @@ end
 | `hot` | table | Hottest quota: `provider`, `window`, `percent`. Absent when no rate-limit window is visible. |
 | `providers` | array | Visible assistants only. Each has `id`, `status`, optional `plan`, `stale`, and `windows`. |
 | `providers[].windows[]` | table | `id`, `percent`, optional `used` / `max` counts, optional `resetsAtMs`. |
+| `localai` | table | `status` (`stopped` / `running` / `error`), `url` (base URL, e.g. `http://127.0.0.1:8080`), optional `version`, optional `model` (the pinned default for chat), `backends` (installed backend names), and `models`. Absent when LocalAI is hidden. Requires <PluginApiBadge feature="ai-usage-localai" />. |
+| `localai.models[]` | table | `id`, optional `backend`, `loaded` (resident in memory), optional `contextSize`, `capabilities` (`chat`, `vision`, `tools`, `thinking`, `transcript`, `tts`, `embeddings`, `image`, `video`, `sound`, `vad`, `rerank`, `detection`, `other`), `inputModalities`, `outputModalities`. |
 | `ollama` | table | `status` (`stopped` / `running` / `error`), optional `version`, optional `model` (Helix's selected Ollama model), `models` with `name`, `size`, `loaded`, and optional `vram` when the model is in memory. Absent when Ollama is hidden. |
 | `localRuntimes` | array | Running CLI servers: `id` (`llamacpp`, `vllm`), `port`, and model id strings. |
 

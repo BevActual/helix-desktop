@@ -276,8 +276,68 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgAiUsageOllamaModelPositionals{
       Positional{"name", {}, {}, true, false, false},
   };
+  inline constexpr std::array kMsgAiUsageLocalAiInstallPositionals{
+      Positional{"id", "Gallery id such as localai@qwen3-4b", {}, true, false, false},
+  };
+  inline constexpr std::array kMsgAiUsageLocalAiCapabilityChoices{
+      std::string_view{"chat"},       std::string_view{"vision"}, std::string_view{"tools"},
+      std::string_view{"transcript"}, std::string_view{"tts"},    std::string_view{"embeddings"},
+      std::string_view{"image"},      std::string_view{"video"},  std::string_view{"sound"},
+  };
+  inline constexpr std::array kMsgAiUsageLocalAiEndpointPositionals{
+      Positional{"capability", {}, kMsgAiUsageLocalAiCapabilityChoices, false, false, false},
+  };
 
   namespace msg {
+    inline constexpr Command aiUsageLocalAiDelete{
+        "ai-usage-localai-delete",
+        "Remove an installed LocalAI model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiEndpoint{
+        "ai-usage-localai-endpoint",
+        "Print the LocalAI base URL and the model to use, optionally for one capability",
+        {},
+        {},
+        {},
+        kMsgAiUsageLocalAiEndpointPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiInstall{
+        "ai-usage-localai-install",
+        "Install a model from the LocalAI gallery",
+        {},
+        {},
+        {},
+        kMsgAiUsageLocalAiInstallPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiModel{
+        "ai-usage-localai-model",
+        "Persist a LocalAI model as the desktop's default chat model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiOpen{
+        "ai-usage-localai-open", "Open the LocalAI web interface", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageLocalAiStart{
+        "ai-usage-localai-start", "Start the local LocalAI server", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageLocalAiStop{
+        "ai-usage-localai-stop", "Stop the local LocalAI server", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command aiUsageOllamaCancel{
         "ai-usage-ollama-cancel", "Cancel an in-progress Ollama model download", {}, {}, {}, {}, {}, false
     };
@@ -1032,6 +1092,13 @@ namespace noctalia::cli {
   } // namespace msg
 
   inline constexpr std::array kMsgSubcommands{
+      msg::aiUsageLocalAiDelete,
+      msg::aiUsageLocalAiEndpoint,
+      msg::aiUsageLocalAiInstall,
+      msg::aiUsageLocalAiModel,
+      msg::aiUsageLocalAiOpen,
+      msg::aiUsageLocalAiStart,
+      msg::aiUsageLocalAiStop,
       msg::aiUsageOllamaCancel,
       msg::aiUsageOllamaDelete,
       msg::aiUsageOllamaModel,

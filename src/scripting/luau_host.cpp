@@ -503,9 +503,14 @@ namespace {
   //   { refreshing, hot? = { provider, window, percent },
   //     providers = { { id, status, plan?, stale, windows = { { id, percent, used?, max?, resetsAtMs? } } } },
   //     ollama? = { status, version?, model?, models = { { name, size, loaded, vram? } } },
+  //     localai? = { status, url, version?, model?, backends = { id, ... },
+  //                  models = { { id, backend?, loaded, contextSize?, capabilities = { "chat", ... },
+  //                               inputModalities = { ... }, outputModalities = { ... } } } },
   //     localRuntimes = { { id, port, models = { id, ... } } } }
   //
   // Read-only. No credentials or tokens. Absent ollama means Ollama is not visible on this machine.
+  // `localai.url` is an OpenAI-compatible base URL; pick a model by capability for speech, images,
+  // transcription, or embeddings and call `url .. "/v1/..."` with it.
   int luau_aiUsage(lua_State* L) {
     auto* host = hostForState(L);
     if (host == nullptr) {
@@ -574,6 +579,48 @@ namespace {
       }
       lua_setfield(L, -2, "models");
       lua_setfield(L, -2, "ollama");
+    }
+
+    if (snap.localai.has_value()) {
+      const auto& localai = *snap.localai;
+      const auto pushStrings = [L](const std::vector<std::string>& values, const char* field) {
+        lua_createtable(L, static_cast<int>(values.size()), 0);
+        int index = 1;
+        for (const auto& value : values) {
+          lua_pushlstring(L, value.data(), value.size());
+          lua_rawseti(L, -2, index++);
+        }
+        lua_setfield(L, -2, field);
+      };
+      lua_createtable(L, 0, 6);
+      setTableString(L, "status", localai.status);
+      setTableString(L, "url", localai.url);
+      if (!localai.version.empty()) {
+        setTableString(L, "version", localai.version);
+      }
+      if (!localai.model.empty()) {
+        setTableString(L, "model", localai.model);
+      }
+      pushStrings(localai.backends, "backends");
+      lua_createtable(L, static_cast<int>(localai.models.size()), 0);
+      int modelIndex = 1;
+      for (const auto& model : localai.models) {
+        lua_createtable(L, 0, 7);
+        setTableString(L, "id", model.id);
+        if (!model.backend.empty()) {
+          setTableString(L, "backend", model.backend);
+        }
+        setTableBool(L, "loaded", model.loaded);
+        if (model.contextSize > 0) {
+          setTableNumber(L, "contextSize", static_cast<double>(model.contextSize));
+        }
+        pushStrings(model.capabilities, "capabilities");
+        pushStrings(model.inputModalities, "inputModalities");
+        pushStrings(model.outputModalities, "outputModalities");
+        lua_rawseti(L, -2, modelIndex++);
+      }
+      lua_setfield(L, -2, "models");
+      lua_setfield(L, -2, "localai");
     }
 
     lua_createtable(L, static_cast<int>(snap.localRuntimes.size()), 0);

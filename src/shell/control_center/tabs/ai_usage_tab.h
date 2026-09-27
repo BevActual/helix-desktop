@@ -48,8 +48,10 @@ private:
   static constexpr std::size_t kMaxOllamaModels = 16;
   static constexpr std::size_t kMaxLibraryHits = 16;
   static constexpr std::size_t kMaxLocalRuntimes = noctalia::ai_usage::kLocalRuntimeCount;
+  static constexpr std::size_t kMaxLocalAiModels = 16;
+  static constexpr std::size_t kMaxGalleryHits = 24;
 
-  enum class SourceKind : std::uint8_t { Provider, Ollama };
+  enum class SourceKind : std::uint8_t { Provider, Ollama, LocalAi };
   enum class LocalCatalog : std::uint8_t { Installed, Library };
 
   struct Source {
@@ -107,6 +109,29 @@ private:
     std::string id;
   };
 
+  struct LocalAiModelWidgets {
+    Flex* row = nullptr;
+    InputArea* hit = nullptr;
+    RadioButton* radio = nullptr;
+    Label* name = nullptr;
+    Label* caption = nullptr;
+    Label* meta = nullptr;
+    Button* remove = nullptr;
+    std::string id;
+  };
+
+  struct GalleryHitWidgets {
+    Flex* row = nullptr;
+    InputArea* hit = nullptr;
+    Label* name = nullptr;
+    Label* summary = nullptr;
+    Label* meta = nullptr;
+    ProgressBar* bar = nullptr;
+    Button* action = nullptr;
+    std::string id;        // gallery id sent to /models/apply
+    std::string modelName; // installed model name
+  };
+
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void onPanelCardOpacityChanged(float opacity) override;
   [[nodiscard]] static std::string sourceKey(const Source& source);
@@ -122,6 +147,13 @@ private:
   void activateLibraryHit(const LibraryHitWidgets& hit);
   void removeOllamaModelRow(const OllamaModelWidgets& model);
   void clearPendingRemove();
+  void syncCatalogSwitchLabels(bool localAi);
+  void selectLocalAiModelRow(const LocalAiModelWidgets& model);
+  void removeLocalAiModelRow(const LocalAiModelWidgets& model);
+  void toggleLocalAiService();
+  void installGalleryHit(const GalleryHitWidgets& hit);
+  void ensureLocalAiGallery();
+  void syncLocalAi(const noctalia::ai_usage::Snapshot* snapshot, bool selected, bool galleryCatalog);
   void syncSourceSwitch(bool showLocal, const noctalia::ai_usage::Snapshot* snapshot);
   void syncSourceSwitchTooltips(const noctalia::ai_usage::Snapshot* snapshot);
   void syncCompact(bool any, const noctalia::ai_usage::Snapshot* snapshot);
@@ -169,6 +201,26 @@ private:
   std::array<LocalRuntimeWidgets, kMaxLocalRuntimes> m_localRuntimes{};
   Label* m_ollamaMore = nullptr;
   Label* m_libraryMore = nullptr;
+  // LocalAI
+  Flex* m_localAiCard = nullptr;
+  Label* m_localAiVersion = nullptr;
+  Button* m_localAiOpen = nullptr;
+  Label* m_localAiStatus = nullptr;
+  Flex* m_localAiModelsHost = nullptr;
+  Flex* m_localAiToggleRow = nullptr;
+  InputArea* m_localAiToggleHit = nullptr;
+  Toggle* m_localAiToggle = nullptr;
+  std::array<LocalAiModelWidgets, kMaxLocalAiModels> m_localAiModels{};
+  Label* m_localAiMore = nullptr;
+  Label* m_localAiBackends = nullptr;
+  Flex* m_galleryCard = nullptr;
+  Label* m_galleryStatus = nullptr;
+  Flex* m_galleryHitsHost = nullptr;
+  std::array<GalleryHitWidgets, kMaxGalleryHits> m_galleryHits{};
+  Label* m_galleryMore = nullptr;
+  bool m_catalogSwitchLocalAi = false;
+  bool m_localAiSyncing = false;
+  std::optional<std::string> m_pendingLocalAiRemove;
   Label* m_empty = nullptr;
   Label* m_emptyHint = nullptr;
   Label* m_updated = nullptr;
@@ -176,6 +228,8 @@ private:
   std::array<ProviderWidgets, noctalia::ai_usage::kProviderCount> m_providers{};
   std::vector<Source> m_sources;
   std::optional<Source> m_source;
+  // Persisted pick that is not visible yet (probe still running); restored once its source appears.
+  std::optional<Source> m_restoreSource;
   LocalCatalog m_localCatalog = LocalCatalog::Installed;
   bool m_localCatalogPersisted = false;
   bool m_sourceSyncing = false;

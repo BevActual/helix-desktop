@@ -197,6 +197,30 @@ namespace {
       }
       out.ollama = std::move(ollama);
     }
+    if (noctalia::ai_usage::localAiVisible(snapshot.localAi.status)) {
+      scripting::ScriptApiContext::AiUsageLocalAi localai;
+      localai.status = std::string(noctalia::ai_usage::localAiStatusKey(snapshot.localAi.status));
+      localai.version = snapshot.localAi.version;
+      localai.url = snapshot.localAi.baseUrl;
+      localai.model = std::string(noctalia::ai_usage::effectiveLocalAiModel(snapshot.localAi));
+      localai.backends = snapshot.localAi.backends;
+      localai.models.reserve(snapshot.localAi.models.size());
+      for (const auto& model : snapshot.localAi.models) {
+        scripting::ScriptApiContext::AiUsageLocalAiModel row;
+        row.id = model.id;
+        row.backend = model.backend;
+        row.capabilities.reserve(model.capabilities.size());
+        for (const auto capability : model.capabilities) {
+          row.capabilities.emplace_back(noctalia::ai_usage::localAiCapabilityKey(capability));
+        }
+        row.inputModalities = model.inputModalities;
+        row.outputModalities = model.outputModalities;
+        row.contextSize = model.contextSize;
+        row.loaded = model.loaded;
+        localai.models.push_back(std::move(row));
+      }
+      out.localai = std::move(localai);
+    }
     out.localRuntimes.reserve(snapshot.localRuntimes.size());
     for (const auto& runtime : snapshot.localRuntimes) {
       out.localRuntimes.push_back({

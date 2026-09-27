@@ -40,7 +40,7 @@ namespace control_center {
         {"power", "battery batteries sleep suspend lock caffeine idle profile health charging peripherals shutdown reboot logout"},
         {"capture", "screenshot screen-shot shot record recorder recording screen-record"},
         {"screen-time", "screentime usage"},
-        {"ai", "ai-usage ai llm tokens quota claude cursor copilot codex gemini ollama"},
+        {"ai", "ai-usage ai llm tokens quota claude cursor copilot codex gemini ollama localai models gallery speech"},
         {"system", "resources cpu memory ram disk"},
         {"tailscale", "vpn tailnet"},
         {"localsend", "nearby share airdrop send files"},

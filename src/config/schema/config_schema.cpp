@@ -554,12 +554,15 @@ namespace noctalia::config::schema {
           enumField(&ControlCenterConfig::AiUsageTabConfig::cursor, "cursor", kAiUsageProviderModes),
           enumField(&ControlCenterConfig::AiUsageTabConfig::deepseek, "deepseek", kAiUsageProviderModes),
           enumField(&ControlCenterConfig::AiUsageTabConfig::ollama, "ollama", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::localai, "localai", kAiUsageProviderModes),
           field(
               &ControlCenterConfig::AiUsageTabConfig::geminiDailyLimit, "gemini_daily_limit", kAiUsageDailyLimitRange
           ),
           field(&ControlCenterConfig::AiUsageTabConfig::qwenDailyLimit, "qwen_daily_limit", kAiUsageDailyLimitRange),
           field(&ControlCenterConfig::AiUsageTabConfig::ollamaHost, "ollama_host"),
           field(&ControlCenterConfig::AiUsageTabConfig::ollamaModel, "ollama_model"),
+          field(&ControlCenterConfig::AiUsageTabConfig::localaiHost, "localai_host"),
+          field(&ControlCenterConfig::AiUsageTabConfig::localaiModel, "localai_model"),
           field(&ControlCenterConfig::AiUsageTabConfig::warnPercent, "warn_percent", kAiUsageWarnPercentRange),
           field(
               &ControlCenterConfig::AiUsageTabConfig::warnResetMinutes, "warn_reset_minutes",

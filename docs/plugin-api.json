@@ -190,5 +190,11 @@
     "noctaliaVersion": null,
     "feature": "ai-usage",
     "introduced": "`noctalia.aiUsage()` for a read-only snapshot of AI CLIs and local CLI servers on this machine."
+  },
+  {
+    "level": 35,
+    "noctaliaVersion": null,
+    "feature": "ai-usage-localai",
+    "introduced": "`noctalia.aiUsage().localai`: the LocalAI service layer with its base `url`, pinned `model`, `backends`, and `models` carrying `capabilities` such as `chat`, `transcript`, `tts`, `embeddings`, and `image`."
   }
 ]

@@ -37,6 +37,7 @@
 #include <vector>
 
 using namespace control_center;
+using noctalia::ai_usage::LocalAiStatus;
 using noctalia::ai_usage::OllamaStatus;
 using noctalia::ai_usage::ProviderId;
 using noctalia::ai_usage::Status;
@@ -99,6 +100,23 @@ namespace {
   [[nodiscard]] bool hiddenStatus(Status status) { return !noctalia::ai_usage::providerVisible(status); }
 
   [[nodiscard]] bool ollamaHidden(OllamaStatus status) { return !noctalia::ai_usage::ollamaVisible(status); }
+
+  constexpr std::string_view kLocalAiGlyph = "stack-2";
+
+  [[nodiscard]] std::string localAiStatusText(LocalAiStatus status) {
+    return noctalia::ai_usage::localAiStatusLabel(status);
+  }
+
+  [[nodiscard]] bool localAiModelSelectable(const noctalia::ai_usage::LocalAiSnapshot& localAi) {
+    return !localAi.busy && localAi.deleting.empty();
+  }
+
+  [[nodiscard]] std::string galleryErrorText(std::string_view error) {
+    if (error == "stopped") {
+      return i18n::tr("control-center.ai-usage.localai.gallery-stopped");
+    }
+    return i18n::tr("control-center.ai-usage.localai.gallery-error");
+  }
 
   [[nodiscard]] bool ollamaModelSelectable(const noctalia::ai_usage::OllamaSnapshot& ollama) {
     if (ollama.busy) {
@@ -239,8 +257,32 @@ std::unique_ptr<Flex> AiUsageTab::create() {
                       m_service->pullOllamaModel(failed->name);
                       return;
                     }
+                    if (noctalia::ai_usage::activeLocalAiJob(snapshot) != nullptr) {
+                      m_service->launchLocalAi();
+                      return;
+                    }
+                    if (const auto* failed = noctalia::ai_usage::failedLocalAiJob(snapshot)) {
+                      if (failed->deletion) {
+                        m_service->dismissLocalAiJob();
+                      } else {
+                        const std::string id = failed->galleryId;
+                        m_service->dismissLocalAiJob();
+                        m_service->installLocalAiModel(id);
+                      }
+                      return;
+                    }
                     if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
                       m_service->launchProvider(hit->provider);
+                      return;
+                    }
+                    if (noctalia::ai_usage::glanceableLocalAi(snapshot)) {
+                      const auto& localAi = snapshot.localAi;
+                      if (localAi.hasCli && localAi.local && localAi.status == LocalAiStatus::Stopped
+                          && !localAi.busy) {
+                        m_service->startLocalAi();
+                        return;
+                      }
+                      m_service->launchLocalAi();
                       return;
                     }
                     if (noctalia::ai_usage::glanceableOllama(snapshot)) {
@@ -869,6 +911,367 @@ std::unique_ptr<Flex> AiUsageTab::create() {
   libraryCard->addChild(std::move(libraryHits));
   list->addChild(std::move(libraryCard));
 
+  // LocalAI: installed models with capabilities, the service toggle, and backends.
+  auto localAiCard = ui::column({
+      .out = &m_localAiCard,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  localAiCard->addChild(
+      ui::row(
+          {.align = FlexAlign::Center, .gap = Style::spaceSm * scale, .fillWidth = true},
+          ui::glyph({
+              .glyph = std::string(kLocalAiGlyph),
+              .glyphSize = Style::fontSizeTitle * scale,
+              .color = colorSpecFromRole(ColorRole::Primary),
+          }),
+          ui::label({
+              .text = i18n::tr("control-center.ai-usage.localai.title"),
+              .fontSize = Style::fontSizeBody * scale,
+              .fontWeight = FontWeight::Bold,
+              .color = colorSpecFromRole(ColorRole::OnSurface),
+              .maxLines = 1,
+              .flexGrow = 1.0F,
+          }),
+          ui::label({
+              .out = &m_localAiVersion,
+              .fontSize = Style::fontSizeCaption * scale,
+              .fontWeight = FontWeight::Medium,
+              .color = colorSpecFromRole(ColorRole::Primary),
+              .maxLines = 1,
+              .visible = false,
+          }),
+          ui::button({
+              .out = &m_localAiOpen,
+              .text = i18n::tr("control-center.ai-usage.open"),
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .minHeight = Style::controlHeightSm * scale,
+              .padding = Style::spaceXs * scale,
+              .visible = false,
+              .onClick =
+                  [this]() {
+                    if (m_service != nullptr) {
+                      m_service->launchLocalAi();
+                    }
+                  },
+          })
+      )
+  );
+  localAiCard->addChild(
+      ui::label({
+          .out = &m_localAiStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  auto localAiModels = ui::column({
+      .out = &m_localAiModelsHost,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale](Flex& host) {
+            applyGroupedListStyle(host, scale);
+            host.setPadding(Style::spaceXs * scale);
+          },
+  });
+  auto localAiToggleRow = ui::row({
+      .out = &m_localAiToggleRow,
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale](Flex& host) {
+            applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None);
+            host.setPadding(0.0F, Style::spaceSm * scale);
+          },
+  });
+  localAiToggleRow->addChild(
+      ui::label({
+          .text = i18n::tr("control-center.ai-usage.ollama.service"),
+          .fontSize = Style::fontSizeBody * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurface),
+          .flexGrow = 1.0F,
+      })
+  );
+  localAiToggleRow->addChild(
+      ui::toggle({
+          .out = &m_localAiToggle,
+          .checkedImmediate = false,
+          .toggleSize = ToggleSize::Medium,
+          .scale = scale,
+          .onChange =
+              [this](bool on) {
+                if (m_localAiSyncing || m_service == nullptr) {
+                  return;
+                }
+                if (on) {
+                  m_service->startLocalAi();
+                } else {
+                  m_service->stopLocalAi();
+                }
+              },
+      })
+  );
+  localAiToggleRow->addChild(
+      ui::inputArea({
+          .out = &m_localAiToggleHit,
+          .propagateEvents = false,
+          .zIndex = 1,
+          .participatesInLayout = false,
+          .onClick = [this](const InputArea::PointerData&) { toggleLocalAiService(); },
+      })
+  );
+  localAiModels->addChild(std::move(localAiToggleRow));
+  for (auto& model : m_localAiModels) {
+    auto row = ui::row({
+        .out = &model.row,
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .fillWidth = true,
+        .visible = false,
+        .participatesInLayout = false,
+        .configure =
+            [scale](Flex& host) {
+              applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None);
+              host.setPadding(Style::spaceXs * scale, Style::spaceSm * scale);
+            },
+    });
+    row->addChild(
+        ui::radioButton({
+            .out = &model.radio,
+            .scale = scale,
+            .onChange =
+                [this, modelPtr = &model](bool checked) {
+                  if (!checked) {
+                    return;
+                  }
+                  selectLocalAiModelRow(*modelPtr);
+                },
+        })
+    );
+    row->addChild(
+        ui::column(
+            {.align = FlexAlign::Stretch, .gap = 0.0F, .flexGrow = 1.0F},
+            ui::label({
+                .out = &model.name,
+                .fontSize = Style::fontSizeBody * scale,
+                .color = colorSpecFromRole(ColorRole::OnSurface),
+                .maxLines = 1,
+                .ellipsize = TextEllipsize::End,
+            }),
+            ui::label({
+                .out = &model.caption,
+                .fontSize = Style::fontSizeCaption * scale,
+                .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+                .maxLines = 1,
+                .ellipsize = TextEllipsize::End,
+                .visible = false,
+                .participatesInLayout = false,
+            })
+        )
+    );
+    row->addChild(
+        ui::label({
+            .out = &model.meta,
+            .fontSize = Style::fontSizeCaption * scale,
+            .fontWeight = FontWeight::Medium,
+            .color = colorSpecFromRole(ColorRole::Primary),
+            .maxLines = 1,
+            .visible = false,
+            .participatesInLayout = false,
+        })
+    );
+    row->addChild(
+        ui::button({
+            .out = &model.remove,
+            .text = i18n::tr("control-center.ai-usage.ollama.remove"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .contentAlign = ButtonContentAlign::Center,
+            .variant = ButtonVariant::Destructive,
+            .minHeight = Style::controlHeightSm * scale,
+            .paddingV = Style::spaceXs * scale,
+            .paddingH = Style::spaceSm * scale,
+            .radius = Style::scaledRadiusMd(scale),
+            .visible = false,
+            .participatesInLayout = false,
+            .onClick = [this, modelPtr = &model]() { removeLocalAiModelRow(*modelPtr); },
+            .configure = [](Button& button) { button.setZIndex(2); },
+        })
+    );
+    row->addChild(
+        ui::inputArea({
+            .out = &model.hit,
+            .propagateEvents = false,
+            .zIndex = 1,
+            .participatesInLayout = false,
+            .onClick =
+                [this, modelPtr = &model](const InputArea::PointerData&) { selectLocalAiModelRow(*modelPtr); },
+        })
+    );
+    localAiModels->addChild(std::move(row));
+  }
+  localAiCard->addChild(std::move(localAiModels));
+  localAiCard->addChild(
+      ui::label({
+          .out = &m_localAiMore,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  localAiCard->addChild(
+      ui::label({
+          .out = &m_localAiBackends,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+          .ellipsize = TextEllipsize::End,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  list->addChild(std::move(localAiCard));
+
+  auto galleryCard = ui::column({
+      .out = &m_galleryCard,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure = [scale](Flex& section) { applyContentCardStyle(section, scale); },
+  });
+  galleryCard->addChild(
+      ui::label({
+          .out = &m_galleryStatus,
+          .text = i18n::tr("control-center.ai-usage.localai.gallery-hint"),
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  auto galleryHits = ui::column({
+      .out = &m_galleryHitsHost,
+      .align = FlexAlign::Stretch,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale](Flex& host) {
+            applyGroupedListStyle(host, scale);
+            host.setPadding(Style::spaceXs * scale);
+          },
+  });
+  for (auto& hit : m_galleryHits) {
+    auto row = ui::column({
+        .out = &hit.row,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * scale,
+        .fillWidth = true,
+        .visible = false,
+        .participatesInLayout = false,
+        .configure =
+            [scale](Flex& host) {
+              applyGroupedListRowStyle(host, scale, GroupedListRowEmphasis::None);
+              host.setPadding(Style::spaceSm * scale);
+            },
+    });
+    auto header = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .fillWidth = true,
+    });
+    header->addChild(
+        ui::label({
+            .out = &hit.name,
+            .fontSize = Style::fontSizeBody * scale,
+            .fontWeight = FontWeight::Bold,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 1,
+            .ellipsize = TextEllipsize::End,
+            .flexGrow = 1.0F,
+        })
+    );
+    header->addChild(
+        ui::button({
+            .out = &hit.action,
+            .text = i18n::tr("control-center.ai-usage.ollama.install"),
+            .fontSize = Style::fontSizeCaption * scale,
+            .contentAlign = ButtonContentAlign::Center,
+            .variant = ButtonVariant::Default,
+            .minHeight = Style::controlHeightSm * scale,
+            .paddingV = Style::spaceXs * scale,
+            .paddingH = Style::spaceSm * scale,
+            .radius = Style::scaledRadiusMd(scale),
+            .onClick = [this, hitPtr = &hit]() { installGalleryHit(*hitPtr); },
+            .configure = [](Button& button) { button.setZIndex(2); },
+        })
+    );
+    row->addChild(std::move(header));
+    row->addChild(
+        ui::label({
+            .out = &hit.summary,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurface),
+            .maxLines = 2,
+            .ellipsize = TextEllipsize::End,
+            .visible = false,
+            .participatesInLayout = false,
+        })
+    );
+    row->addChild(
+        ui::progressBar({
+            .out = &hit.bar,
+            .fill = colorSpecFromRole(ColorRole::Primary),
+            .track = colorSpecFromRole(ColorRole::SurfaceVariant),
+            .radius = Style::sliderTrackHeight * scale * 0.5F,
+            .progress = 0.0F,
+            .height = Style::sliderTrackHeight * scale,
+            .visible = false,
+            .participatesInLayout = false,
+        })
+    );
+    row->addChild(
+        ui::label({
+            .out = &hit.meta,
+            .fontSize = Style::fontSizeCaption * scale,
+            .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+            .maxLines = 1,
+            .ellipsize = TextEllipsize::End,
+            .visible = false,
+            .participatesInLayout = false,
+        })
+    );
+    row->addChild(
+        ui::inputArea({
+            .out = &hit.hit,
+            .propagateEvents = false,
+            .zIndex = 1,
+            .participatesInLayout = false,
+            .onClick = [this, hitPtr = &hit](const InputArea::PointerData&) { installGalleryHit(*hitPtr); },
+        })
+    );
+    galleryHits->addChild(std::move(row));
+  }
+  galleryHits->addChild(
+      ui::label({
+          .out = &m_galleryMore,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
+  galleryCard->addChild(std::move(galleryHits));
+  list->addChild(std::move(galleryCard));
+
   for (std::size_t i = 0; i < m_providers.size(); ++i) {
     auto& widgets = m_providers[i];
     const auto id = static_cast<ProviderId>(i);
@@ -1064,6 +1467,25 @@ void AiUsageTab::onClose() {
   m_localRuntimes = {};
   m_ollamaMore = nullptr;
   m_libraryMore = nullptr;
+  m_localAiCard = nullptr;
+  m_localAiVersion = nullptr;
+  m_localAiOpen = nullptr;
+  m_localAiStatus = nullptr;
+  m_localAiModelsHost = nullptr;
+  m_localAiToggleRow = nullptr;
+  m_localAiToggleHit = nullptr;
+  m_localAiToggle = nullptr;
+  m_localAiModels = {};
+  m_localAiMore = nullptr;
+  m_localAiBackends = nullptr;
+  m_galleryCard = nullptr;
+  m_galleryStatus = nullptr;
+  m_galleryHitsHost = nullptr;
+  m_galleryHits = {};
+  m_galleryMore = nullptr;
+  m_catalogSwitchLocalAi = false;
+  m_localAiSyncing = false;
+  m_pendingLocalAiRemove.reset();
   m_empty = nullptr;
   m_emptyHint = nullptr;
   m_updated = nullptr;
@@ -1119,6 +1541,99 @@ void AiUsageTab::layoutOllamaModelHits() {
   for (auto& hit : m_libraryHits) {
     layoutHit(hit.row, hit.hit);
   }
+  layoutHit(m_localAiToggleRow, m_localAiToggleHit);
+  for (auto& model : m_localAiModels) {
+    layoutHit(model.row, model.hit);
+  }
+  for (auto& hit : m_galleryHits) {
+    layoutHit(hit.row, hit.hit);
+  }
+}
+
+void AiUsageTab::selectLocalAiModelRow(const LocalAiModelWidgets& model) {
+  if (m_localAiSyncing || m_service == nullptr || model.id.empty()) {
+    return;
+  }
+  clearPendingRemove();
+  m_service->selectLocalAiModel(model.id);
+}
+
+void AiUsageTab::removeLocalAiModelRow(const LocalAiModelWidgets& model) {
+  if (m_service == nullptr || model.id.empty()) {
+    return;
+  }
+  if (!m_pendingLocalAiRemove.has_value() || *m_pendingLocalAiRemove != model.id) {
+    m_pendingLocalAiRemove = model.id;
+    if (model.remove != nullptr) {
+      model.remove->setText(i18n::tr("control-center.ai-usage.ollama.remove-confirm"));
+    }
+    return;
+  }
+  m_pendingLocalAiRemove.reset();
+  m_service->deleteLocalAiModel(model.id);
+}
+
+void AiUsageTab::toggleLocalAiService() {
+  if (m_localAiSyncing || m_service == nullptr || m_localAiToggle == nullptr || !m_localAiToggle->enabled()) {
+    return;
+  }
+  if (m_localAiToggle->checked()) {
+    m_service->stopLocalAi();
+  } else {
+    m_service->startLocalAi();
+  }
+}
+
+void AiUsageTab::installGalleryHit(const GalleryHitWidgets& hit) {
+  if (m_service == nullptr || hit.id.empty()) {
+    return;
+  }
+  const auto& snapshot = m_service->snapshot();
+  if (const auto* failed = noctalia::ai_usage::failedLocalAiJob(snapshot);
+      failed != nullptr && failed->galleryId == hit.id) {
+    m_service->dismissLocalAiJob();
+    m_service->installLocalAiModel(hit.id);
+    return;
+  }
+  if (noctalia::ai_usage::localAiModelInstalled(snapshot.localAi, hit.modelName)) {
+    m_localCatalogPersisted = true;
+    m_localCatalog = LocalCatalog::Installed;
+    persistLocalCatalog();
+    m_service->selectLocalAiModel(hit.modelName);
+    syncUi();
+    PanelManager::instance().requestLayout();
+    return;
+  }
+  if (noctalia::ai_usage::activeLocalAiJob(snapshot) != nullptr) {
+    return;
+  }
+  m_service->installLocalAiModel(hit.id);
+}
+
+void AiUsageTab::ensureLocalAiGallery() {
+  if (m_service == nullptr) {
+    return;
+  }
+  const auto& gallery = m_service->snapshot().localAiGallery;
+  if (gallery.loading || (gallery.loaded && gallery.error.empty())) {
+    return;
+  }
+  m_service->loadLocalAiGallery(false);
+}
+
+void AiUsageTab::syncCatalogSwitchLabels(bool localAi) {
+  if (m_localCatalogSwitch == nullptr || m_catalogSwitchLocalAi == localAi) {
+    return;
+  }
+  m_catalogSwitchLocalAi = localAi;
+  m_catalogSyncing = true;
+  m_localCatalogSwitch->clearOptions();
+  (void)m_localCatalogSwitch->addOption(i18n::tr("control-center.ai-usage.ollama.installed"));
+  (void)m_localCatalogSwitch->addOption(
+      i18n::tr(localAi ? "control-center.ai-usage.localai.gallery" : "control-center.ai-usage.ollama.library")
+  );
+  m_localCatalogSwitch->setSelectedIndex(m_localCatalog == LocalCatalog::Library ? 1 : 0);
+  m_catalogSyncing = false;
 }
 
 void AiUsageTab::selectOllamaModelRow(const OllamaModelWidgets& model) {
@@ -1167,12 +1682,18 @@ std::string AiUsageTab::sourceKey(const Source& source) {
   if (source.kind == SourceKind::Ollama) {
     return "ollama";
   }
+  if (source.kind == SourceKind::LocalAi) {
+    return "localai";
+  }
   return std::string(noctalia::ai_usage::providerKey(source.provider));
 }
 
 std::optional<AiUsageTab::Source> AiUsageTab::sourceFromKey(std::string_view key) {
   if (key == "ollama") {
     return Source{.kind = SourceKind::Ollama};
+  }
+  if (key == "localai") {
+    return Source{.kind = SourceKind::LocalAi};
   }
   for (std::size_t i = 0; i < noctalia::ai_usage::kProviderCount; ++i) {
     const auto id = static_cast<ProviderId>(i);
@@ -1191,9 +1712,12 @@ void AiUsageTab::applySource(std::size_t index) {
     return;
   }
   m_source = m_sources[index];
+  m_restoreSource.reset();
   persistSource();
   if (m_source->kind == SourceKind::Ollama && m_localCatalog == LocalCatalog::Library) {
     ensureLibrarySearch();
+  } else if (m_source->kind == SourceKind::LocalAi && m_localCatalog == LocalCatalog::Library) {
+    ensureLocalAiGallery();
   }
   syncUi();
   PanelManager::instance().requestLayout();
@@ -1218,7 +1742,11 @@ void AiUsageTab::applyLocalCatalog(std::size_t index) {
   m_localCatalogPersisted = true;
   persistLocalCatalog();
   if (m_localCatalog == LocalCatalog::Library) {
-    ensureLibrarySearch();
+    if (m_source.has_value() && m_source->kind == SourceKind::LocalAi) {
+      ensureLocalAiGallery();
+    } else {
+      ensureLibrarySearch();
+    }
   }
   syncUi();
   PanelManager::instance().requestLayout();
@@ -1249,7 +1777,12 @@ void AiUsageTab::ensureLibrarySearch() {
 }
 
 void AiUsageTab::onLibrarySearchChanged() {
-  if (m_localCatalog == LocalCatalog::Installed) {
+  const bool localAi = m_source.has_value() && m_source->kind == SourceKind::LocalAi;
+  if (m_localCatalog == LocalCatalog::Installed || localAi) {
+    // Installed lists and the LocalAI gallery filter a local catalog; no request to debounce.
+    if (localAi && m_service != nullptr && m_librarySearch != nullptr) {
+      m_service->setLocalAiGalleryQuery(m_librarySearch->value());
+    }
     syncUi();
     PanelManager::instance().requestLayout();
     return;
@@ -1262,7 +1795,11 @@ void AiUsageTab::applyLibrarySearch(bool force) {
   if (m_service == nullptr) {
     return;
   }
-  if (m_localCatalog == LocalCatalog::Installed) {
+  const bool localAi = m_source.has_value() && m_source->kind == SourceKind::LocalAi;
+  if (m_localCatalog == LocalCatalog::Installed || localAi) {
+    if (localAi && m_librarySearch != nullptr) {
+      m_service->setLocalAiGalleryQuery(m_librarySearch->value());
+    }
     syncUi();
     PanelManager::instance().requestLayout();
     return;
@@ -1336,20 +1873,32 @@ void AiUsageTab::syncSourceSwitch(bool showLocal, const noctalia::ai_usage::Snap
       }
     }
   }
+  const bool showLocalAi = snapshot != nullptr && noctalia::ai_usage::localAiVisible(snapshot->localAi.status);
+  if (showLocalAi) {
+    next.push_back(Source{.kind = SourceKind::LocalAi});
+  }
   if (showLocal) {
     next.push_back(Source{.kind = SourceKind::Ollama});
   }
 
-  bool selectedVisible = false;
-  if (m_source.has_value()) {
-    for (const auto& source : next) {
-      if (source == *m_source) {
-        selectedVisible = true;
-        break;
+  const auto visible = [&next](const Source& source) {
+    for (const auto& candidate : next) {
+      if (candidate == source) {
+        return true;
       }
     }
+    return false;
+  };
+  if (m_restoreSource.has_value() && visible(*m_restoreSource)) {
+    // The persisted pick's source finished probing; go back to it.
+    m_source = *m_restoreSource;
+    m_restoreSource.reset();
   }
+  const bool selectedVisible = m_source.has_value() && visible(*m_source);
   if (!selectedVisible) {
+    if (m_source.has_value() && !m_restoreSource.has_value()) {
+      m_restoreSource = m_source;
+    }
     if (next.empty()) {
       m_source.reset();
     } else {
@@ -1363,6 +1912,14 @@ void AiUsageTab::syncSourceSwitch(bool showLocal, const noctalia::ai_usage::Snap
             }
           }
         }
+        if (!preferred.has_value() && showLocalAi && noctalia::ai_usage::glanceableLocalAi(*snapshot)) {
+          for (const auto& source : next) {
+            if (source.kind == SourceKind::LocalAi) {
+              preferred = source;
+              break;
+            }
+          }
+        }
         if (!preferred.has_value() && showLocal) {
           for (const auto& source : next) {
             if (source.kind == SourceKind::Ollama) {
@@ -1371,9 +1928,17 @@ void AiUsageTab::syncSourceSwitch(bool showLocal, const noctalia::ai_usage::Snap
             }
           }
         }
+        if (!preferred.has_value() && showLocalAi) {
+          for (const auto& source : next) {
+            if (source.kind == SourceKind::LocalAi) {
+              preferred = source;
+              break;
+            }
+          }
+        }
       }
+      // A fallback pick is not the user's; keep their persisted choice for when its source returns.
       m_source = preferred.value_or(next.front());
-      persistSource();
     }
   }
 
@@ -1388,7 +1953,10 @@ void AiUsageTab::syncSourceSwitch(bool showLocal, const noctalia::ai_usage::Snap
       m_sourceSwitch->clearOptions();
       std::size_t selected = 0;
       for (std::size_t i = 0; i < m_sources.size(); ++i) {
-        if (m_sources[i].kind == SourceKind::Ollama) {
+        if (m_sources[i].kind == SourceKind::LocalAi) {
+          m_sourceSwitch->addOption("", kLocalAiGlyph);
+          m_sourceSwitch->setOptionTooltip(i, i18n::tr("control-center.ai-usage.localai.title"));
+        } else if (m_sources[i].kind == SourceKind::Ollama) {
           m_sourceSwitch->addOption("", "server");
           const bool hasCompat = snapshot != nullptr && !snapshot->localRuntimes.empty();
           m_sourceSwitch->setOptionTooltip(
@@ -1421,7 +1989,17 @@ void AiUsageTab::syncSourceSwitchTooltips(const noctalia::ai_usage::Snapshot* sn
   for (std::size_t i = 0; i < m_sources.size(); ++i) {
     const auto& source = m_sources[i];
     std::string tooltip;
-    if (source.kind == SourceKind::Ollama) {
+    if (source.kind == SourceKind::LocalAi) {
+      tooltip = i18n::tr("control-center.ai-usage.localai.title");
+      if (snapshot != nullptr && noctalia::ai_usage::localAiVisible(snapshot->localAi.status)) {
+        tooltip += " · " + localAiStatusText(snapshot->localAi.status);
+        if (const std::string_view model = noctalia::ai_usage::effectiveLocalAiModel(snapshot->localAi);
+            !model.empty()) {
+          tooltip += " · ";
+          tooltip += model;
+        }
+      }
+    } else if (source.kind == SourceKind::Ollama) {
       const bool hasCompat = snapshot != nullptr && !snapshot->localRuntimes.empty();
       tooltip = i18n::tr(hasCompat ? "control-center.ai-usage.local.title" : "control-center.ai-usage.ollama.title");
       if (snapshot != nullptr && noctalia::ai_usage::ollamaVisible(snapshot->ollama.status)) {
@@ -1476,6 +2054,24 @@ void AiUsageTab::syncCompact(bool any, const noctalia::ai_usage::Snapshot* snaps
       headline = failed->name;
       caption = failed->status.empty() ? i18n::tr("control-center.ai-usage.ollama.library-error") : failed->status;
       actionRetry = true;
+    } else if (const auto* job = noctalia::ai_usage::activeLocalAiJob(*snapshot)) {
+      headline = noctalia::ai_usage::snapshotGlanceLabel(*snapshot);
+      caption = i18n::tr(
+          job->deletion ? "control-center.ai-usage.ollama.removing" : "control-center.ai-usage.ollama.installing"
+      );
+      if (!job->model.empty()) {
+        caption += " · " + job->model;
+      }
+      if (const std::string progress = noctalia::ai_usage::formatLocalAiJobProgress(*job);
+          !progress.empty() && (job->totalBytes > 0 || job->progress > 0.0F)) {
+        caption += " · " + progress;
+      }
+      actionOpen = m_service != nullptr && m_service->canLaunchLocalAi();
+    } else if (const auto* failedJob = noctalia::ai_usage::failedLocalAiJob(*snapshot)) {
+      headline = failedJob->model;
+      caption = failedJob->message.empty() ? i18n::tr("control-center.ai-usage.localai.apply-failed")
+                                           : failedJob->message;
+      actionRetry = true;
     } else if (const auto hit = noctalia::ai_usage::hottestQuota(*snapshot)) {
       headline = std::format("{:.0f}%", static_cast<double>(hit->window.percent));
       headlineRole = barRole(hit->window.percent, attention);
@@ -1485,6 +2081,39 @@ void AiUsageTab::syncCompact(bool any, const noctalia::ai_usage::Snapshot* snaps
       }
       const auto index = static_cast<std::size_t>(hit->provider);
       actionOpen = index < snapshot->providers.size() && snapshot->providers[index].launchable;
+    } else if (noctalia::ai_usage::glanceableLocalAi(*snapshot)) {
+      const auto& localAi = snapshot->localAi;
+      headline = noctalia::ai_usage::localAiGlanceLabel(localAi);
+      if (localAi.busy && localAi.status != LocalAiStatus::Running) {
+        headline = i18n::tr("control-center.ai-usage.ollama.starting");
+        caption = localAi.version;
+      } else if (localAi.busy) {
+        caption = i18n::tr("control-center.ai-usage.ollama.stopping");
+      } else if (!localAi.deleting.empty()) {
+        caption = i18n::tr("control-center.ai-usage.ollama.removing");
+      } else if (localAi.status == LocalAiStatus::Running && localAi.models.empty()) {
+        caption = i18n::tr("control-center.ai-usage.ollama.empty-models");
+      } else if (headline == localAiStatusText(localAi.status)) {
+        caption = localAi.version.empty() ? i18n::tr("control-center.ai-usage.localai.title") : localAi.version;
+      } else {
+        caption = localAiStatusText(localAi.status);
+        std::size_t loaded = 0;
+        for (const auto& model : localAi.models) {
+          loaded += model.loaded ? 1 : 0;
+        }
+        caption += " · "
+            + i18n::tr(
+                  "control-center.ai-usage.localai.models-count", "count", std::to_string(localAi.models.size())
+              );
+        if (loaded > 0) {
+          caption += " · " + i18n::tr("control-center.ai-usage.localai.loaded-count", "count", std::to_string(loaded));
+        }
+      }
+      if (localAi.hasCli && localAi.local && localAi.status == LocalAiStatus::Stopped && !localAi.busy) {
+        actionStart = true;
+      } else if (m_service != nullptr && m_service->canLaunchLocalAi() && !localAi.busy) {
+        actionOpen = true;
+      }
     } else if (noctalia::ai_usage::glanceableOllama(*snapshot)) {
       const auto& ollama = snapshot->ollama;
       headline = noctalia::ai_usage::ollamaGlanceLabel(ollama);
@@ -1632,19 +2261,39 @@ void AiUsageTab::syncUi() {
   syncSourceSwitch(showLocal, snapshot);
   const bool selectedOllama =
       showLocal && m_source.has_value() && m_source->kind == SourceKind::Ollama;
+  const auto* localAi = snapshot != nullptr ? &snapshot->localAi : nullptr;
+  const bool showLocalAi = localAi != nullptr && noctalia::ai_usage::localAiVisible(localAi->status);
+  const bool selectedLocalAi = showLocalAi && m_source.has_value() && m_source->kind == SourceKind::LocalAi;
   if (selectedOllama && !m_localCatalogPersisted && ollama != nullptr && ollama->models.empty()) {
     m_localCatalog = LocalCatalog::Library;
   }
+  if (selectedLocalAi && !m_localCatalogPersisted && localAi != nullptr && localAi->models.empty()
+      && localAi->status == LocalAiStatus::Running) {
+    m_localCatalog = LocalCatalog::Library;
+  }
   const bool libraryCatalog = selectedOllama && m_localCatalog == LocalCatalog::Library;
-  (void)setShown(m_localCatalogSwitch, selectedOllama);
-  if (m_localCatalogSwitch != nullptr && selectedOllama) {
+  const bool galleryCatalog = selectedLocalAi && m_localCatalog == LocalCatalog::Library;
+  const bool selectedLocal = selectedOllama || selectedLocalAi;
+  (void)setShown(m_localCatalogSwitch, selectedLocal);
+  if (m_localCatalogSwitch != nullptr && selectedLocal) {
+    syncCatalogSwitchLabels(selectedLocalAi);
     m_catalogSyncing = true;
-    m_localCatalogSwitch->setSelectedIndex(libraryCatalog ? 1 : 0);
+    m_localCatalogSwitch->setSelectedIndex((libraryCatalog || galleryCatalog) ? 1 : 0);
     m_catalogSyncing = false;
   }
-  (void)setShown(m_librarySearchHost, selectedOllama);
+  (void)setShown(m_librarySearchHost, selectedLocal);
+  if (m_librarySearch != nullptr) {
+    m_librarySearch->setPlaceholder(
+        i18n::tr(
+            galleryCatalog       ? "control-center.ai-usage.localai.gallery-search"
+                : selectedLocalAi ? "control-center.ai-usage.localai.installed-search"
+                                  : "control-center.ai-usage.ollama.library-search"
+        )
+    );
+  }
   if (m_librarySpinner != nullptr) {
-    const bool spinning = libraryCatalog && snapshot != nullptr && snapshot->library.searching;
+    const bool spinning = snapshot != nullptr
+        && ((libraryCatalog && snapshot->library.searching) || (galleryCatalog && snapshot->localAiGallery.loading));
     m_librarySpinner->setVisible(spinning);
     if (spinning) {
       m_librarySpinner->start();
@@ -1654,10 +2303,20 @@ void AiUsageTab::syncUi() {
   }
   (void)setShown(m_ollamaCard, selectedOllama && !libraryCatalog);
   (void)setShown(m_libraryCard, libraryCatalog);
+  (void)setShown(m_localAiCard, selectedLocalAi && !galleryCatalog);
+  (void)setShown(m_galleryCard, galleryCatalog);
   if (libraryCatalog && snapshot != nullptr && !snapshot->library.searching && snapshot->library.hits.empty()
       && snapshot->library.error.empty() && (m_librarySearch == nullptr || m_librarySearch->value().empty())) {
     DeferredCall::callLater([this]() { ensureLibrarySearch(); });
   }
+  if (galleryCatalog && snapshot != nullptr && !snapshot->localAiGallery.loading && !snapshot->localAiGallery.loaded
+      && snapshot->localAiGallery.error.empty()) {
+    DeferredCall::callLater([this]() { ensureLocalAiGallery(); });
+  }
+  if (showLocalAi) {
+    any = true;
+  }
+  syncLocalAi(snapshot, selectedLocalAi, galleryCatalog);
   if (showLocal) {
     any = true;
     const bool hasCompat = snapshot != nullptr && !snapshot->localRuntimes.empty();
@@ -2135,6 +2794,336 @@ void AiUsageTab::syncUi() {
   (void)setShown(m_scroll, any && m_source.has_value());
   syncCompact(any, snapshot);
   if (m_refreshButton != nullptr && snapshot != nullptr) {
-    m_refreshButton->setEnabled(!snapshot->refreshing && (ollama == nullptr || !ollama->busy));
+    m_refreshButton->setEnabled(
+        !snapshot->refreshing && (ollama == nullptr || !ollama->busy) && (localAi == nullptr || !localAi->busy)
+    );
+  }
+}
+
+void AiUsageTab::syncLocalAi(const noctalia::ai_usage::Snapshot* snapshot, bool selected, bool galleryCatalog) {
+  const auto* localAi = snapshot != nullptr ? &snapshot->localAi : nullptr;
+  const bool show = selected && localAi != nullptr;
+  if (!show) {
+    (void)setShown(m_localAiStatus, false);
+    (void)setShown(m_localAiVersion, false);
+    (void)setShown(m_localAiOpen, false);
+    (void)setShown(m_localAiToggleRow, false);
+    (void)setShown(m_localAiModelsHost, false);
+    (void)setShown(m_localAiMore, false);
+    (void)setShown(m_localAiBackends, false);
+    (void)setShown(m_galleryHitsHost, false);
+    (void)setShown(m_galleryStatus, false);
+    (void)setShown(m_galleryMore, false);
+    return;
+  }
+  const float scale = contentScale();
+  const auto* job = noctalia::ai_usage::activeLocalAiJob(*snapshot);
+  const auto* failed = noctalia::ai_usage::failedLocalAiJob(*snapshot);
+  const bool showToggle = localAi->hasCli && localAi->local
+      && (localAi->status == LocalAiStatus::Stopped || localAi->status == LocalAiStatus::Running);
+
+  // Installed
+  if (m_localAiStatus != nullptr) {
+    std::string status;
+    if (!localAi->deleting.empty()) {
+      status = i18n::tr("control-center.ai-usage.ollama.removing") + " · " + localAi->deleting;
+    } else if (job != nullptr) {
+      status = i18n::tr("control-center.ai-usage.ollama.installing") + " · " + job->model;
+      if (const std::string progress = noctalia::ai_usage::formatLocalAiJobProgress(*job); !progress.empty()) {
+        status += " · " + progress;
+      }
+    } else if (failed != nullptr) {
+      status = failed->message.empty() ? i18n::tr("control-center.ai-usage.localai.apply-failed") : failed->message;
+      if (!failed->model.empty()) {
+        status += " · " + failed->model;
+      }
+    } else if (localAi->busy && localAi->status != LocalAiStatus::Running) {
+      status = i18n::tr("control-center.ai-usage.ollama.starting");
+    } else if (localAi->busy) {
+      status = i18n::tr("control-center.ai-usage.ollama.stopping");
+    } else if (localAi->status == LocalAiStatus::Running) {
+      status = i18n::tr("control-center.ai-usage.localai.running-hint");
+    } else {
+      status = localAiStatusText(localAi->status);
+    }
+    m_localAiStatus->setText(std::move(status));
+    (void)setShown(m_localAiStatus, !galleryCatalog);
+  }
+  if (m_localAiVersion != nullptr) {
+    std::string version = localAi->version;
+    if (!localAi->baseUrl.empty()) {
+      std::string_view host = localAi->baseUrl;
+      if (host.starts_with("http://")) {
+        host.remove_prefix(7);
+      } else if (host.starts_with("https://")) {
+        host.remove_prefix(8);
+      }
+      if (!version.empty()) {
+        version += " · ";
+      }
+      version += host;
+    }
+    m_localAiVersion->setText(version);
+    (void)setShown(m_localAiVersion, !version.empty() && !galleryCatalog);
+  }
+  if (m_localAiOpen != nullptr) {
+    const bool canOpen = m_service != nullptr && m_service->canLaunchLocalAi();
+    (void)setShown(m_localAiOpen, canOpen && !galleryCatalog);
+    m_localAiOpen->setEnabled(canOpen && !localAi->busy);
+  }
+  (void)setShown(m_localAiToggleRow, showToggle && !galleryCatalog);
+  if (m_localAiToggle != nullptr) {
+    m_localAiSyncing = true;
+    m_localAiToggle->setEnabled(showToggle && !localAi->busy);
+    m_localAiToggle->setCheckedImmediate(localAi->status == LocalAiStatus::Running);
+    m_localAiSyncing = false;
+  }
+  if (m_localAiToggleHit != nullptr) {
+    m_localAiToggleHit->setEnabled(showToggle && !localAi->busy);
+  }
+  const std::string installedQuery =
+      !galleryCatalog && m_librarySearch != nullptr ? StringUtils::trim(m_librarySearch->value()) : std::string{};
+  std::vector<const noctalia::ai_usage::LocalAiModel*> models;
+  if (!galleryCatalog) {
+    models.reserve(localAi->models.size());
+    for (const auto& model : localAi->models) {
+      if (noctalia::ai_usage::localAiModelMatchesQuery(model, installedQuery)) {
+        models.push_back(&model);
+      }
+    }
+  }
+  const std::size_t shown = std::min(models.size(), m_localAiModels.size());
+  (void)setShown(m_localAiModelsHost, !galleryCatalog && (showToggle || shown > 0 || !installedQuery.empty()));
+  const std::string_view inUse = noctalia::ai_usage::effectiveLocalAiModel(*localAi);
+  const bool canSelect = localAiModelSelectable(*localAi);
+  m_localAiSyncing = true;
+  for (std::size_t i = 0; i < m_localAiModels.size(); ++i) {
+    auto& row = m_localAiModels[i];
+    const bool showRow = i < shown;
+    (void)setShown(row.row, showRow);
+    if (!showRow) {
+      row.id.clear();
+      continue;
+    }
+    const auto& model = *models[i];
+    row.id = model.id;
+    const bool isSelected = !inUse.empty() && model.id == inUse;
+    if (row.row != nullptr) {
+      applyGroupedListRowStyle(
+          *row.row, scale, isSelected ? GroupedListRowEmphasis::Selected : GroupedListRowEmphasis::None
+      );
+      row.row->setPadding(Style::spaceXs * scale, Style::spaceSm * scale);
+    }
+    if (row.radio != nullptr) {
+      row.radio->setChecked(isSelected);
+      row.radio->setEnabled(canSelect);
+    }
+    if (row.hit != nullptr) {
+      row.hit->setEnabled(canSelect);
+    }
+    if (row.name != nullptr) {
+      row.name->setText(model.id);
+    }
+    if (row.caption != nullptr) {
+      const std::string summary = noctalia::ai_usage::localAiModelSummary(model);
+      row.caption->setText(summary);
+      (void)setShown(row.caption, !summary.empty());
+    }
+    if (row.meta != nullptr) {
+      std::string meta;
+      if (!localAi->deleting.empty() && model.id == localAi->deleting) {
+        meta = i18n::tr("control-center.ai-usage.ollama.removing");
+      } else if (isSelected) {
+        meta = i18n::tr("control-center.ai-usage.localai.default");
+      } else if (model.loaded) {
+        meta = i18n::tr("control-center.ai-usage.ollama.loaded");
+      }
+      row.meta->setText(meta);
+      (void)setShown(row.meta, !meta.empty());
+    }
+    if (row.remove != nullptr) {
+      const bool showRemove = localAi->local && !model.id.empty();
+      (void)setShown(row.remove, showRemove);
+      const bool pending = m_pendingLocalAiRemove.has_value() && *m_pendingLocalAiRemove == model.id;
+      row.remove->setText(
+          pending ? i18n::tr("control-center.ai-usage.ollama.remove-confirm")
+                  : i18n::tr("control-center.ai-usage.ollama.remove")
+      );
+      row.remove->setEnabled(
+          showRemove && !localAi->busy && localAi->deleting.empty() && job == nullptr
+          && localAi->status == LocalAiStatus::Running
+      );
+    }
+  }
+  m_localAiSyncing = false;
+  if (m_localAiMore != nullptr) {
+    if (galleryCatalog) {
+      (void)setShown(m_localAiMore, false);
+    } else if (localAi->models.empty() && localAi->status == LocalAiStatus::Running) {
+      m_localAiMore->setText(i18n::tr("control-center.ai-usage.localai.empty-models"));
+      (void)setShown(m_localAiMore, true);
+    } else if (models.empty() && !installedQuery.empty()) {
+      m_localAiMore->setText(i18n::tr("control-center.ai-usage.ollama.library-empty"));
+      (void)setShown(m_localAiMore, true);
+    } else if (models.size() > shown) {
+      m_localAiMore->setText(
+          i18n::tr("control-center.ai-usage.ollama.more", "count", std::to_string(models.size() - shown))
+      );
+      (void)setShown(m_localAiMore, true);
+    } else {
+      (void)setShown(m_localAiMore, false);
+    }
+  }
+  if (m_localAiBackends != nullptr) {
+    std::string backends;
+    for (const auto& backend : localAi->backends) {
+      if (!backends.empty()) {
+        backends += ", ";
+      }
+      backends += backend;
+    }
+    if (!backends.empty()) {
+      m_localAiBackends->setText(i18n::tr("control-center.ai-usage.localai.backends", "list", backends));
+    }
+    (void)setShown(m_localAiBackends, !galleryCatalog && !backends.empty());
+  }
+
+  // Gallery
+  if (!galleryCatalog) {
+    (void)setShown(m_galleryHitsHost, false);
+    (void)setShown(m_galleryStatus, false);
+    (void)setShown(m_galleryMore, false);
+    return;
+  }
+  const auto& gallery = snapshot->localAiGallery;
+  const std::string query = m_librarySearch != nullptr ? StringUtils::trim(m_librarySearch->value()) : gallery.query;
+  const auto hits = noctalia::ai_usage::filterLocalAiGallery(gallery, query, m_galleryHits.size() + 1);
+  const std::size_t hitsShown = std::min(hits.size(), m_galleryHits.size());
+  if (m_galleryStatus != nullptr) {
+    std::string status;
+    if (gallery.loading) {
+      status = i18n::tr("control-center.ai-usage.localai.gallery-loading");
+    } else if (!gallery.error.empty()) {
+      status = galleryErrorText(gallery.error);
+    } else if (job != nullptr) {
+      status = i18n::tr("control-center.ai-usage.ollama.installing") + " · " + job->model;
+      if (const std::string progress = noctalia::ai_usage::formatLocalAiJobProgress(*job); !progress.empty()) {
+        status += " · " + progress;
+      }
+    } else if (failed != nullptr && !failed->deletion) {
+      status = failed->message.empty() ? i18n::tr("control-center.ai-usage.localai.apply-failed") : failed->message;
+      if (!failed->model.empty()) {
+        status += " · " + failed->model;
+      }
+    } else if (gallery.loaded && hits.empty()) {
+      status = query.empty() ? i18n::tr("control-center.ai-usage.localai.gallery-hint")
+                             : i18n::tr("control-center.ai-usage.ollama.library-empty");
+    } else if (gallery.loaded && query.empty()) {
+      status = i18n::tr(
+          "control-center.ai-usage.localai.gallery-count", "count", std::to_string(gallery.hits.size())
+      );
+    } else {
+      status = i18n::tr("control-center.ai-usage.localai.gallery-hint");
+    }
+    m_galleryStatus->setText(std::move(status));
+    (void)setShown(m_galleryStatus, true);
+  }
+  (void)setShown(m_galleryHitsHost, hitsShown > 0);
+  const bool canInstall = localAi->local && localAi->status == LocalAiStatus::Running && !localAi->busy;
+  for (std::size_t i = 0; i < m_galleryHits.size(); ++i) {
+    auto& row = m_galleryHits[i];
+    const bool showRow = i < hitsShown;
+    (void)setShown(row.row, showRow);
+    if (!showRow) {
+      row.id.clear();
+      row.modelName.clear();
+      continue;
+    }
+    const auto& hit = *hits[i];
+    row.id = hit.id;
+    row.modelName = hit.name;
+    const bool installed = hit.installed || noctalia::ai_usage::localAiModelInstalled(*localAi, hit.name);
+    const bool thisJob = job != nullptr && (job->galleryId == hit.id || job->model == hit.name);
+    const bool thisFailed = failed != nullptr && !failed->deletion
+        && (failed->galleryId == hit.id || failed->model == hit.name);
+    if (row.name != nullptr) {
+      row.name->setText(hit.name);
+    }
+    if (row.summary != nullptr) {
+      row.summary->setText(hit.description);
+      (void)setShown(row.summary, !hit.description.empty());
+    }
+    std::string meta;
+    if (thisJob) {
+      meta = noctalia::ai_usage::formatLocalAiJobProgress(*job);
+    } else if (installed) {
+      meta = i18n::tr("control-center.ai-usage.ollama.installed");
+    }
+    const auto append = [&meta](std::string_view part) {
+      if (part.empty()) {
+        return;
+      }
+      if (!meta.empty()) {
+        meta += " · ";
+      }
+      meta += part;
+    };
+    append(hit.size);
+    append(hit.backend);
+    if (!thisJob) {
+      append(hit.license);
+      std::size_t tags = 0;
+      for (const auto& tag : hit.tags) {
+        if (tags >= 3) {
+          break;
+        }
+        if (tag.empty() || StringUtils::toLower(tag) == StringUtils::toLower(hit.backend)) {
+          continue;
+        }
+        append(tag);
+        ++tags;
+      }
+    }
+    if (row.meta != nullptr) {
+      row.meta->setText(meta);
+      (void)setShown(row.meta, !meta.empty());
+    }
+    if (row.bar != nullptr) {
+      const bool showBar = thisJob && (job->totalBytes > 0 || job->progress > 0.0F);
+      (void)setShown(row.bar, showBar);
+      if (showBar) {
+        row.bar->setProgress(noctalia::ai_usage::localAiJobFraction(*job));
+      }
+    }
+    if (row.action != nullptr) {
+      if (thisJob) {
+        row.action->setText(i18n::tr("control-center.ai-usage.ollama.installing"));
+        row.action->setEnabled(false);
+        row.action->setVariant(ButtonVariant::Default);
+      } else if (thisFailed) {
+        row.action->setText(i18n::tr("control-center.ai-usage.ollama.retry"));
+        row.action->setEnabled(canInstall);
+        row.action->setVariant(ButtonVariant::Primary);
+      } else if (installed) {
+        row.action->setText(i18n::tr("control-center.ai-usage.ollama.select"));
+        row.action->setEnabled(true);
+        row.action->setVariant(ButtonVariant::Default);
+      } else {
+        row.action->setText(i18n::tr("control-center.ai-usage.ollama.install"));
+        row.action->setEnabled(canInstall && job == nullptr);
+        row.action->setVariant(ButtonVariant::Default);
+      }
+    }
+    if (row.hit != nullptr) {
+      row.hit->setEnabled(installed || thisFailed || (canInstall && job == nullptr));
+    }
+  }
+  if (m_galleryMore != nullptr) {
+    if (hits.size() > hitsShown) {
+      m_galleryMore->setText(i18n::tr("control-center.ai-usage.localai.gallery-more"));
+      (void)setShown(m_galleryMore, true);
+    } else {
+      (void)setShown(m_galleryMore, false);
+    }
   }
 }

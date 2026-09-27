@@ -327,5 +327,181 @@ int main() {
   dumpLib.ollama.deleting = "phi";
   ok = expect(formatSnapshotDump(dumpLib).find("deleting=phi") != std::string::npos, "dump deleting") && ok;
 
+  // LocalAI
+  ok = expect(parseLocalAiWellKnownVersion(R"({"version":"v3.10.0","endpoints":{}})") == "v3.10.0", "localai version")
+      && ok;
+  const auto localAiModels = parseLocalAiModelsJson(R"({
+    "object": "list",
+    "data": [
+      {"id": "qwen3-4b", "object": "model", "backend": "llama-cpp",
+       "capabilities": ["chat", "tools", "thinking"], "input_modalities": ["text"], "output_modalities": ["text"],
+       "context_size": 32768},
+      {"id": "whisper-1", "object": "model", "capabilities": ["transcript"], "input_modalities": ["audio"],
+       "output_modalities": ["text"]},
+      {"id": "loose.gguf", "object": "model"},
+      {"object": "model"}
+    ]
+  })");
+  ok = expect(localAiModels.has_value() && localAiModels->size() == 3, "localai models count") && ok;
+  ok = expect(
+           localAiModels && (*localAiModels)[0].id == "qwen3-4b" && (*localAiModels)[0].backend == "llama-cpp"
+               && (*localAiModels)[0].contextSize == 32768
+               && localAiModelHas((*localAiModels)[0], LocalAiCapability::Chat)
+               && localAiModelHas((*localAiModels)[0], LocalAiCapability::Tools)
+               && localAiModelHas((*localAiModels)[0], LocalAiCapability::Thinking),
+           "localai chat model"
+       )
+      && ok;
+  ok = expect(
+           localAiModels && localAiModelHas((*localAiModels)[1], LocalAiCapability::Transcript)
+               && !localAiModelHas((*localAiModels)[1], LocalAiCapability::Chat)
+               && (*localAiModels)[1].inputModalities == std::vector<std::string>{"audio"},
+           "localai transcript model"
+       )
+      && ok;
+  ok = expect(
+           localAiModels && localAiModelHas((*localAiModels)[2], LocalAiCapability::Chat),
+           "bare /v1/models entry is a chat model"
+       )
+      && ok;
+  ok = expect(!parseLocalAiModelsJson(R"({"models":[]})").has_value(), "localai models wrong shape") && ok;
+
+  LocalAiSnapshot localAi;
+  localAi.status = LocalAiStatus::Running;
+  localAi.models = *localAiModels;
+  applyLocalAiSystemJson(localAi, R"({
+    "backends": ["llama-cpp", "whisper", "piper"],
+    "loaded_models": [{"id": "whisper-1", "backend": "whisper"}]
+  })");
+  ok = expect(localAi.backends.size() == 3 && localAi.backends[0] == "llama-cpp", "localai backends") && ok;
+  ok = expect(
+           !localAi.models[0].loaded && localAi.models[1].loaded && localAi.models[1].backend == "whisper",
+           "localai loaded models"
+       )
+      && ok;
+  ok = expect(effectiveLocalAiModel(localAi) == "qwen3-4b", "default model prefers chat") && ok;
+  localAi.selected = "loose.gguf";
+  ok = expect(effectiveLocalAiModel(localAi) == "loose.gguf", "default model honours pick") && ok;
+  ok = expect(
+           localAiModelFor(localAi, LocalAiCapability::Transcript) != nullptr
+               && localAiModelFor(localAi, LocalAiCapability::Transcript)->id == "whisper-1"
+               && localAiModelFor(localAi, LocalAiCapability::Tts) == nullptr,
+           "model by capability"
+       )
+      && ok;
+  ok = expect(
+           localAiModelFor(localAi, LocalAiCapability::Chat) != nullptr
+               && localAiModelFor(localAi, LocalAiCapability::Chat)->id == "loose.gguf",
+           "chat lookup prefers the pinned model"
+       )
+      && ok;
+  ok = expect(localAiModelInstalled(localAi, "whisper-1") && !localAiModelInstalled(localAi, "whisper"), "installed exact")
+      && ok;
+  ok = expect(
+           localAiModelMatchesQuery(localAi.models[1], "transcript") && localAiModelMatchesQuery(localAi.models[0], "LLAMA")
+               && !localAiModelMatchesQuery(localAi.models[1], "chat"),
+           "installed filter matches capability and backend"
+       )
+      && ok;
+  sortLocalAiModels(localAi.models, localAi.selected);
+  ok = expect(localAi.models[0].id == "loose.gguf" && localAi.models[1].id == "whisper-1", "sort pinned then loaded")
+      && ok;
+  ok = expect(
+           localAiCapabilityFromKey("chat") == LocalAiCapability::Chat
+               && localAiCapabilityFromKey("text-to-speech") == LocalAiCapability::Tts
+               && localAiCapabilityFromKey("stt") == LocalAiCapability::Transcript
+               && !localAiCapabilityFromKey("bogus").has_value(),
+           "capability keys and aliases"
+       )
+      && ok;
+
+  const auto gallery = parseLocalAiGalleryJson(R"([
+    {"name": "qwen3-4b", "description": "Qwen3 4B chat", "gallery": {"name": "localai"}, "installed": false,
+     "tags": ["llm", "gguf", "qwen"], "backend": "llama-cpp", "size": "2.6GB", "license": "apache-2.0"},
+    {"name": "whisper-1", "description": "Speech to text", "gallery": {"name": "localai"},
+     "tags": ["whisper", "audio"], "backend": "whisper"},
+    {"name": "stablediffusion", "description": "Image generation", "gallery": {"name": "localai"},
+     "tags": ["image", "diffusion"]},
+    {"description": "no name"}
+  ])", localAi);
+  ok = expect(gallery.has_value() && gallery->size() == 3, "gallery count") && ok;
+  ok = expect(
+           gallery && (*gallery)[0].id == "localai@qwen3-4b" && (*gallery)[0].size == "2.6GB"
+               && (*gallery)[0].license == "apache-2.0" && !(*gallery)[2].installed,
+           "gallery entry"
+       )
+      && ok;
+  ok = expect(gallery && (*gallery)[0].installed && (*gallery)[1].installed, "gallery marks installed from snapshot")
+      && ok;
+  ok = expect(!parseLocalAiGalleryJson(R"({"data":[]})", localAi).has_value(), "gallery wrong shape") && ok;
+  LocalAiGallery catalog;
+  catalog.hits = *gallery;
+  const auto filtered = filterLocalAiGallery(catalog, "whisper", 10);
+  ok = expect(filtered.size() == 1 && filtered[0]->name == "whisper-1", "gallery filter by name/tag") && ok;
+  const auto byTag = filterLocalAiGallery(catalog, "image", 10);
+  ok = expect(byTag.size() == 1 && byTag[0]->name == "stablediffusion", "gallery filter by tag") && ok;
+  const auto all = filterLocalAiGallery(catalog, "", 2);
+  ok = expect(all.size() == 2 && all[0]->installed, "gallery empty query lists installed first, capped") && ok;
+  const auto ranked = filterLocalAiGallery(catalog, "qwen", 10);
+  ok = expect(ranked.size() == 1 && ranked[0]->name == "qwen3-4b", "gallery rank exact prefix") && ok;
+
+  ok = expect(parseLocalAiApplyUuid(R"({"uuid":"abc-123","status":"http://x/models/jobs/abc-123"})") == "abc-123", "apply uuid")
+      && ok;
+  ok = expect(localAiApplyJson("localai@qwen3-4b").find("\"id\":\"localai@qwen3-4b\"") != std::string::npos, "apply json")
+      && ok;
+  ok = expect(localAiModelNameValid("localai@qwen3-4b") && localAiModelNameValid("whisper-1")
+                  && !localAiModelNameValid("../etc") && !localAiModelNameValid("a b") && !localAiModelNameValid(""),
+              "localai name validation")
+      && ok;
+
+  const auto job = parseLocalAiJobJson(R"({
+    "gallery_element_name": "qwen3-4b", "message": "downloading", "progress": 42.5,
+    "current_bytes": 1000, "total_bytes": 4000, "processed": false, "deletion": false, "cancellable": false,
+    "file_name": "qwen3-4b.gguf"
+  })", "abc-123");
+  ok = expect(job && job->uuid == "abc-123" && job->model == "qwen3-4b" && !job->processed && !job->error, "job parse")
+      && ok;
+  ok = expect(job && localAiJobFraction(*job) == 0.25F, "job fraction prefers bytes") && ok;
+  ok = expect(job && formatLocalAiJobProgress(*job).find("25%") != std::string::npos, "job progress text") && ok;
+  const auto jobDone = parseLocalAiJobJson(R"({"gallery_element_name":"qwen3-4b","processed":true,"progress":100})", "abc");
+  ok = expect(jobDone && jobDone->processed && !jobDone->error && localAiJobFraction(*jobDone) == 1.0F, "job done") && ok;
+  const auto jobFailed = parseLocalAiJobJson(R"({"gallery_element_name":"x","processed":true,"error":"no space left","message":""})", "abc");
+  ok = expect(jobFailed && jobFailed->error && jobFailed->message == "no space left", "job error string") && ok;
+  const auto jobNullError = parseLocalAiJobJson(R"({"processed":true,"error":null})", "abc");
+  ok = expect(jobNullError && !jobNullError->error, "job null error is fine") && ok;
+
+  Snapshot withLocalAi;
+  withLocalAi.localAi = localAi;
+  withLocalAi.localAi.baseUrl = "http://127.0.0.1:8080";
+  ok = expect(glanceableLocalAi(withLocalAi) && !glanceableOllama(withLocalAi), "localai glance wins when running")
+      && ok;
+  ok = expect(snapshotGlanceLabel(withLocalAi) == "loose.gguf", "glance label is the pinned model") && ok;
+  const std::string localAiDump = formatSnapshotDump(withLocalAi);
+  ok = expect(
+           localAiDump.find("localai running url=http://127.0.0.1:8080") != std::string::npos
+               && localAiDump.find("models=3 loaded=1 backends=3 model=loose.gguf") != std::string::npos
+               && localAiDump.find("localai-model whisper-1 backend=whisper capabilities=transcript loaded") != std::string::npos,
+           "dump localai"
+       )
+      && ok;
+  withLocalAi.localAi.job = *job;
+  ok = expect(activeLocalAiJob(withLocalAi) != nullptr && snapshotGlanceLabel(withLocalAi) == "25%", "glance job") && ok;
+  withLocalAi.localAi.job = *jobFailed;
+  ok = expect(activeLocalAiJob(withLocalAi) == nullptr && failedLocalAiJob(withLocalAi) != nullptr, "failed job") && ok;
+  withLocalAi.localAi.job.reset();
+  withLocalAi.localAi.status = LocalAiStatus::Stopped;
+  withLocalAi.ollama.status = OllamaStatus::Running;
+  ok = expect(!glanceableLocalAi(withLocalAi) && glanceableOllama(withLocalAi), "running ollama beats stopped localai")
+      && ok;
+  withLocalAi.ollama.status = OllamaStatus::Stopped;
+  ok = expect(glanceableLocalAi(withLocalAi) && !glanceableOllama(withLocalAi), "both stopped: localai is the glance")
+      && ok;
+  withLocalAi.localRuntimes.push_back(LocalRuntime{.kind = LocalRuntimeKind::LlamaCpp, .port = 8080});
+  ok = expect(!glanceableLocalAi(withLocalAi) && glanceableLocalRuntime(withLocalAi) != nullptr, "running runtime beats stopped localai")
+      && ok;
+  withLocalAi.localAi.status = LocalAiStatus::Running;
+  ok = expect(glanceableLocalRuntime(withLocalAi) == nullptr && glanceableLocalAi(withLocalAi), "running localai hides runtimes")
+      && ok;
+
   return ok ? 0 : 1;
 }

@@ -96,10 +96,16 @@ void AiWidget::sync(Renderer& renderer) {
     if (noctalia::ai_usage::activeOllamaPull(*snapshot) != nullptr) {
       glyph = "server";
       text = noctalia::ai_usage::snapshotGlanceLabel(*snapshot);
+    } else if (noctalia::ai_usage::activeLocalAiJob(*snapshot) != nullptr) {
+      glyph = "stack-2";
+      text = noctalia::ai_usage::snapshotGlanceLabel(*snapshot);
     } else if (hit.has_value()) {
       glyph = std::string(noctalia::ai_usage::providerGlyph(hit->provider));
       text = std::format("{:.0f}%", static_cast<double>(hit->window.percent));
       hot = hit->window.percent + 0.5F >= static_cast<float>(m_aiUsage->attentionPercent());
+    } else if (noctalia::ai_usage::glanceableLocalAi(*snapshot)) {
+      glyph = "stack-2";
+      text = noctalia::ai_usage::localAiGlanceLabel(snapshot->localAi);
     } else if (noctalia::ai_usage::glanceableOllama(*snapshot)) {
       glyph = "server";
       text = noctalia::ai_usage::ollamaGlanceLabel(snapshot->ollama);
@@ -145,7 +151,8 @@ void AiWidget::sync(Renderer& renderer) {
 
   const bool showLocal = snapshot != nullptr
       && (noctalia::ai_usage::activeOllamaPull(*snapshot) != nullptr
-          || noctalia::ai_usage::glanceableOllama(*snapshot)
+          || noctalia::ai_usage::activeLocalAiJob(*snapshot) != nullptr
+          || noctalia::ai_usage::glanceableLocalAi(*snapshot) || noctalia::ai_usage::glanceableOllama(*snapshot)
           || noctalia::ai_usage::glanceableLocalRuntime(*snapshot) != nullptr);
   if (snapshot == nullptr || (!hit.has_value() && !showLocal)) {
     m_area->clearTooltip();
@@ -173,6 +180,22 @@ void AiWidget::sync(Renderer& renderer) {
     rows.push_back(
         {i18n::tr("bar.widgets.ai.tooltip.model"), noctalia::ai_usage::activeOllamaPull(*snapshot)->name}
     );
+  } else if (const auto* job = noctalia::ai_usage::activeLocalAiJob(*snapshot)) {
+    rows.push_back(
+        {i18n::tr("control-center.ai-usage.localai.title"),
+         i18n::tr(
+             job->deletion ? "control-center.ai-usage.ollama.removing" : "control-center.ai-usage.ollama.installing"
+         )}
+    );
+    rows.push_back({i18n::tr("bar.widgets.ai.tooltip.model"), job->model});
+  } else if (noctalia::ai_usage::glanceableLocalAi(*snapshot)) {
+    rows.push_back(
+        {i18n::tr("control-center.ai-usage.localai.title"),
+         noctalia::ai_usage::localAiStatusLabel(snapshot->localAi.status)}
+    );
+    if (const std::string_view model = noctalia::ai_usage::effectiveLocalAiModel(snapshot->localAi); !model.empty()) {
+      rows.push_back({i18n::tr("bar.widgets.ai.tooltip.model"), std::string(model)});
+    }
   } else if (noctalia::ai_usage::glanceableOllama(*snapshot)) {
     rows.push_back(
         {i18n::tr("bar.widgets.ai.tooltip.ollama"), noctalia::ai_usage::ollamaStatusLabel(snapshot->ollama.status)}

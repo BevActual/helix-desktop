@@ -262,7 +262,7 @@
       "as-of": "As of {time}",
       "attention-tooltip": "{provider} {window} is at {percent}%",
       "balance-only": "Prepaid balance. No rate-limit windows.",
-      "empty": "No AI CLIs detected. Install Claude Code, Codex, Gemini CLI, Qwen Code, or Ollama, or run llama.cpp or vLLM locally.",
+      "empty": "No AI CLIs detected. Install Claude Code, Codex, Gemini CLI, Qwen Code, LocalAI, or Ollama, or run llama.cpp or vLLM locally.",
       "empty-hint": "Use header gear to keep a provider Always on.",
       "local": {
         "jan": "Jan",
@@ -270,6 +270,46 @@
         "lmstudio": "LM Studio",
         "title": "Local",
         "vllm": "vLLM"
+      },
+      "localai": {
+        "absent": "LocalAI is not installed",
+        "apply-failed": "Install failed",
+        "backends": "Backends: {list}",
+        "capability": {
+          "chat": "Chat",
+          "detection": "Detection",
+          "embeddings": "Embeddings",
+          "image": "Images",
+          "other": "Other",
+          "rerank": "Rerank",
+          "sound": "Sound",
+          "thinking": "Thinking",
+          "tools": "Tools",
+          "transcript": "Transcription",
+          "tts": "Speech",
+          "vad": "Voice detection",
+          "video": "Video",
+          "vision": "Vision"
+        },
+        "default": "Default",
+        "delete-failed": "Remove failed",
+        "empty-models": "No models installed. Install one from the Gallery.",
+        "error": "Could not reach LocalAI",
+        "gallery": "Gallery",
+        "gallery-count": "{count} models in the gallery. Search by name, task, or backend.",
+        "gallery-error": "Could not load the LocalAI gallery",
+        "gallery-hint": "Browse the LocalAI gallery and install chat, speech, image, video, and embedding models.",
+        "gallery-loading": "Loading the gallery…",
+        "gallery-more": "Keep typing to narrow the list",
+        "gallery-search": "Search the gallery",
+        "gallery-stopped": "Start LocalAI to browse the gallery",
+        "installed-search": "Filter models",
+        "loaded-count": "{count} loaded",
+        "models-count": "{count} models",
+        "queued": "Queued…",
+        "running-hint": "Desktop tools and plugins use this endpoint. The default model answers chat requests.",
+        "start-failed": "Could not start LocalAI",
+        "title": "LocalAI"
       },
       "now": "now",
       "ollama": {
@@ -3064,6 +3104,19 @@
           "description": "Requests per day on your Gemini plan (1000 on the free tier). Used to compute today's percentage.",
           "label": "Gemini Daily Request Quota"
         },
+        "localai": {
+          "label": "LocalAI"
+        },
+        "localai-host": {
+          "description": "LocalAI HTTP endpoint. Empty uses LOCALAI_ADDRESS or 127.0.0.1:8080. Desktop tools and plugins send OpenAI-compatible requests here.",
+          "label": "LocalAI Host",
+          "placeholder": "127.0.0.1:8080"
+        },
+        "localai-model": {
+          "description": "Default chat model for desktop AI tools. Empty picks the first chat-capable model LocalAI reports. The AI tab Installed list picks it; Gallery installs more.",
+          "label": "LocalAI Model",
+          "placeholder": "qwen3-4b"
+        },
         "ollama": {
           "label": "Ollama"
         },
@@ -3078,7 +3131,7 @@
           "placeholder": "llama3.2:latest"
         },
         "provider-mode": {
-          "description": "Auto shows a CLI when it is on PATH. Always on keeps the row even if the CLI is missing. Cursor, Copilot, and DeepSeek are editor apps and stay hidden unless Always on."
+          "description": "Auto shows a CLI when it is on PATH. Always on keeps the row even if the CLI is missing. Cursor, Copilot, and DeepSeek are editor apps and stay hidden unless Always on. LocalAI is probed on its port even without the CLI."
         },
         "qwen": {
           "label": "Qwen Code"
@@ -5182,6 +5235,34 @@
       "actions": {
         "command-placeholder": "Shell command",
         "commands": {
+          "ai-usage-localai-delete": {
+            "description": "Remove an installed LocalAI model",
+            "label": "Remove LocalAI model"
+          },
+          "ai-usage-localai-endpoint": {
+            "description": "Print the LocalAI base URL and the model to use, optionally for one capability",
+            "label": "LocalAI endpoint"
+          },
+          "ai-usage-localai-install": {
+            "description": "Install a model from the LocalAI gallery",
+            "label": "Install LocalAI model"
+          },
+          "ai-usage-localai-model": {
+            "description": "Persist a LocalAI model as the desktop's default chat model",
+            "label": "Set LocalAI model"
+          },
+          "ai-usage-localai-open": {
+            "description": "Open the LocalAI web interface",
+            "label": "Open LocalAI"
+          },
+          "ai-usage-localai-start": {
+            "description": "Start the local LocalAI server",
+            "label": "Start LocalAI"
+          },
+          "ai-usage-localai-stop": {
+            "description": "Stop the local LocalAI server",
+            "label": "Stop LocalAI"
+          },
           "ai-usage-ollama-cancel": {
             "description": "Cancel an in-progress Ollama model download",
             "label": "Cancel Ollama download"

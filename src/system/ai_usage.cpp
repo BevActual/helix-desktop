@@ -446,6 +446,19 @@ namespace noctalia::ai_usage {
         return pull->name;
       }
     }
+    if (const auto* job = activeLocalAiJob(snapshot)) {
+      if (job->totalBytes > 0 || job->progress > 0.0F) {
+        char buf[16]{};
+        std::snprintf(buf, sizeof(buf), "%.0f%%", 100.0 * static_cast<double>(localAiJobFraction(*job)));
+        return buf;
+      }
+      if (!job->model.empty()) {
+        return job->model;
+      }
+    }
+    if (glanceableLocalAi(snapshot)) {
+      return localAiGlanceLabel(snapshot.localAi);
+    }
     return ollamaGlanceLabel(snapshot.ollama);
   }
 
@@ -683,6 +696,80 @@ namespace noctalia::ai_usage {
       }
       out += '\n';
     }
+    if (localAiVisible(snapshot.localAi.status)) {
+      const auto& localAi = snapshot.localAi;
+      out += "localai ";
+      out += localAiStatusKey(localAi.status);
+      if (!localAi.baseUrl.empty()) {
+        out += " url=";
+        out += localAi.baseUrl;
+      }
+      if (!localAi.version.empty()) {
+        out += " version=";
+        out += localAi.version;
+      }
+      std::size_t loaded = 0;
+      for (const auto& model : localAi.models) {
+        if (model.loaded) {
+          ++loaded;
+        }
+      }
+      out += " models=";
+      out += std::to_string(localAi.models.size());
+      out += " loaded=";
+      out += std::to_string(loaded);
+      out += " backends=";
+      out += std::to_string(localAi.backends.size());
+      if (!localAi.selected.empty()) {
+        out += " model=";
+        out += localAi.selected;
+      }
+      if (!localAi.deleting.empty()) {
+        out += " deleting=";
+        out += localAi.deleting;
+      }
+      if (localAi.busy) {
+        out += " busy";
+      }
+      out += '\n';
+      for (const auto& model : localAi.models) {
+        out += "localai-model ";
+        out += model.id;
+        if (!model.backend.empty()) {
+          out += " backend=";
+          out += model.backend;
+        }
+        out += " capabilities=";
+        bool first = true;
+        for (const auto capability : model.capabilities) {
+          if (!first) {
+            out += ',';
+          }
+          first = false;
+          out += localAiCapabilityKey(capability);
+        }
+        if (model.loaded) {
+          out += " loaded";
+        }
+        out += '\n';
+      }
+      if (localAi.job.has_value()) {
+        out += "localai-job ";
+        out += localAi.job->model;
+        out += localAi.job->deletion ? " delete" : " install";
+        if (localAi.job->processed) {
+          out += localAi.job->error ? " failed" : " done";
+        } else {
+          out += ' ';
+          out += formatLocalAiJobProgress(*localAi.job);
+        }
+        if (!localAi.job->message.empty()) {
+          out += " message=";
+          out += localAi.job->message;
+        }
+        out += '\n';
+      }
+    }
     if (snapshot.library.searching || !snapshot.library.hits.empty() || snapshot.library.pull.has_value()
         || !snapshot.library.error.empty()) {
       out += "library hits=";
@@ -728,18 +815,21 @@ namespace noctalia::ai_usage {
   }
 
   bool localInferenceVisible(const Snapshot& snapshot) noexcept {
-    return ollamaVisible(snapshot.ollama.status) || !snapshot.localRuntimes.empty();
+    return ollamaVisible(snapshot.ollama.status) || localAiVisible(snapshot.localAi.status)
+        || !snapshot.localRuntimes.empty();
   }
 
   const LocalRuntime* glanceableLocalRuntime(const Snapshot& snapshot) noexcept {
-    if (snapshot.ollama.status == OllamaStatus::Running || snapshot.localRuntimes.empty()) {
+    if (snapshot.ollama.status == OllamaStatus::Running || snapshot.localAi.status == LocalAiStatus::Running
+        || snapshot.localRuntimes.empty()) {
       return nullptr;
     }
     return &snapshot.localRuntimes.front();
   }
 
   bool glanceableOllama(const Snapshot& snapshot) noexcept {
-    return ollamaVisible(snapshot.ollama.status) && glanceableLocalRuntime(snapshot) == nullptr;
+    return ollamaVisible(snapshot.ollama.status) && !glanceableLocalAi(snapshot)
+        && glanceableLocalRuntime(snapshot) == nullptr;
   }
 
   const Window* hottestWindow(const ProviderSnapshot& provider) noexcept {
@@ -1597,6 +1687,619 @@ namespace noctalia::ai_usage {
       return 0.0F;
     }
     return clampPercent(100.0 * static_cast<double>(pull.completed) / static_cast<double>(pull.total)) / 100.0F;
+  }
+
+  // ---------------------------------------------------------------------------
+  // LocalAI
+
+  std::string_view localAiStatusKey(LocalAiStatus status) noexcept {
+    switch (status) {
+    case LocalAiStatus::Absent:
+      return "absent";
+    case LocalAiStatus::Disabled:
+      return "disabled";
+    case LocalAiStatus::Stopped:
+      return "stopped";
+    case LocalAiStatus::Running:
+      return "running";
+    case LocalAiStatus::Error:
+      return "error";
+    }
+    return "unknown";
+  }
+
+  std::string localAiStatusLabel(LocalAiStatus status) {
+    switch (status) {
+    case LocalAiStatus::Absent:
+      return i18n::tr("control-center.ai-usage.localai.absent");
+    case LocalAiStatus::Disabled:
+      return i18n::tr("control-center.ai-usage.ollama.disabled");
+    case LocalAiStatus::Stopped:
+      return i18n::tr("control-center.ai-usage.ollama.stopped");
+    case LocalAiStatus::Running:
+      return i18n::tr("control-center.ai-usage.ollama.running");
+    case LocalAiStatus::Error:
+      return i18n::tr("control-center.ai-usage.localai.error");
+    }
+    return {};
+  }
+
+  std::string localAiGlanceLabel(const LocalAiSnapshot& localAi) {
+    if (localAi.job.has_value() && !localAi.job->processed && !localAi.job->model.empty()) {
+      return localAi.job->model;
+    }
+    if (!localAi.deleting.empty()) {
+      return localAi.deleting;
+    }
+    if (localAi.status == LocalAiStatus::Running) {
+      if (const std::string_view model = effectiveLocalAiModel(localAi); !model.empty()) {
+        return std::string(model);
+      }
+    }
+    return localAiStatusLabel(localAi.status);
+  }
+
+  bool localAiVisible(LocalAiStatus status) noexcept {
+    return status != LocalAiStatus::Absent && status != LocalAiStatus::Disabled;
+  }
+
+  bool glanceableLocalAi(const Snapshot& snapshot) noexcept {
+    if (!localAiVisible(snapshot.localAi.status)) {
+      return false;
+    }
+    // LocalAI is the service layer, so it wins the glance unless something else is actually up
+    // while it is stopped.
+    if (snapshot.localAi.status != LocalAiStatus::Running
+        && (snapshot.ollama.status == OllamaStatus::Running || !snapshot.localRuntimes.empty())) {
+      return false;
+    }
+    return true;
+  }
+
+  const LocalAiJob* activeLocalAiJob(const Snapshot& snapshot) noexcept {
+    if (!snapshot.localAi.job.has_value()) {
+      return nullptr;
+    }
+    const auto& job = *snapshot.localAi.job;
+    if (job.processed || job.error || job.cancelled) {
+      return nullptr;
+    }
+    return &job;
+  }
+
+  const LocalAiJob* failedLocalAiJob(const Snapshot& snapshot) noexcept {
+    if (!snapshot.localAi.job.has_value()) {
+      return nullptr;
+    }
+    const auto& job = *snapshot.localAi.job;
+    return job.error ? &job : nullptr;
+  }
+
+  std::string_view localAiCapabilityKey(LocalAiCapability capability) noexcept {
+    switch (capability) {
+    case LocalAiCapability::Chat:
+      return "chat";
+    case LocalAiCapability::Vision:
+      return "vision";
+    case LocalAiCapability::Tools:
+      return "tools";
+    case LocalAiCapability::Thinking:
+      return "thinking";
+    case LocalAiCapability::Transcript:
+      return "transcript";
+    case LocalAiCapability::Tts:
+      return "tts";
+    case LocalAiCapability::Embeddings:
+      return "embeddings";
+    case LocalAiCapability::Image:
+      return "image";
+    case LocalAiCapability::Video:
+      return "video";
+    case LocalAiCapability::Sound:
+      return "sound";
+    case LocalAiCapability::Vad:
+      return "vad";
+    case LocalAiCapability::Rerank:
+      return "rerank";
+    case LocalAiCapability::Detection:
+      return "detection";
+    case LocalAiCapability::Other:
+      return "other";
+    }
+    return "other";
+  }
+
+  std::string localAiCapabilityLabel(LocalAiCapability capability) {
+    std::string key = "control-center.ai-usage.localai.capability.";
+    key += localAiCapabilityKey(capability);
+    return i18n::tr(key);
+  }
+
+  std::string_view localAiCapabilityGlyph(LocalAiCapability capability) noexcept {
+    switch (capability) {
+    case LocalAiCapability::Chat:
+      return "message";
+    case LocalAiCapability::Vision:
+      return "eye";
+    case LocalAiCapability::Tools:
+      return "tool";
+    case LocalAiCapability::Thinking:
+      return "brain";
+    case LocalAiCapability::Transcript:
+      return "microphone";
+    case LocalAiCapability::Tts:
+      return "volume";
+    case LocalAiCapability::Embeddings:
+      return "vector";
+    case LocalAiCapability::Image:
+      return "photo";
+    case LocalAiCapability::Video:
+      return "video";
+    case LocalAiCapability::Sound:
+      return "music";
+    case LocalAiCapability::Vad:
+      return "wave-sine";
+    case LocalAiCapability::Rerank:
+      return "sort-descending";
+    case LocalAiCapability::Detection:
+      return "focus-2";
+    case LocalAiCapability::Other:
+      return "cube";
+    }
+    return "cube";
+  }
+
+  std::optional<LocalAiCapability> localAiCapabilityFromKey(std::string_view key) noexcept {
+    const std::string lower = StringUtils::toLower(StringUtils::trim(key));
+    for (std::size_t i = 0; i < kLocalAiCapabilityCount; ++i) {
+      const auto capability = static_cast<LocalAiCapability>(i);
+      if (localAiCapabilityKey(capability) == lower) {
+        return capability;
+      }
+    }
+    // LocalAI aliases seen in gallery/usecase strings.
+    if (lower == "llm" || lower == "completion" || lower == "text-to-text") {
+      return LocalAiCapability::Chat;
+    }
+    if (lower == "transcription" || lower == "speech-to-text" || lower == "stt") {
+      return LocalAiCapability::Transcript;
+    }
+    if (lower == "text-to-speech" || lower == "speech") {
+      return LocalAiCapability::Tts;
+    }
+    if (lower == "embedding" || lower == "text-to-embedding") {
+      return LocalAiCapability::Embeddings;
+    }
+    if (lower == "text-to-image" || lower == "image-generation" || lower == "diffusion") {
+      return LocalAiCapability::Image;
+    }
+    if (lower == "text-to-video") {
+      return LocalAiCapability::Video;
+    }
+    if (lower == "multimodal" || lower == "image-to-text") {
+      return LocalAiCapability::Vision;
+    }
+    if (lower == "function-calling" || lower == "functions") {
+      return LocalAiCapability::Tools;
+    }
+    if (lower == "reasoning") {
+      return LocalAiCapability::Thinking;
+    }
+    return std::nullopt;
+  }
+
+  bool localAiModelHas(const LocalAiModel& model, LocalAiCapability capability) noexcept {
+    return std::ranges::contains(model.capabilities, capability);
+  }
+
+  std::string_view effectiveLocalAiModel(const LocalAiSnapshot& localAi) noexcept {
+    if (!localAi.selected.empty()) {
+      return localAi.selected;
+    }
+    if (const auto* chat = localAiModelFor(localAi, LocalAiCapability::Chat)) {
+      return chat->id;
+    }
+    for (const auto& model : localAi.models) {
+      if (model.loaded) {
+        return model.id;
+      }
+    }
+    return {};
+  }
+
+  const LocalAiModel* localAiModelFor(const LocalAiSnapshot& localAi, LocalAiCapability capability) noexcept {
+    const LocalAiModel* best = nullptr;
+    for (const auto& model : localAi.models) {
+      if (!localAiModelHas(model, capability)) {
+        continue;
+      }
+      // Prefer the pinned model, then whatever is already resident, then the first match.
+      if (!localAi.selected.empty() && model.id == localAi.selected) {
+        return &model;
+      }
+      if (best == nullptr || (model.loaded && !best->loaded)) {
+        best = &model;
+      }
+    }
+    return best;
+  }
+
+  bool localAiModelInstalled(const LocalAiSnapshot& localAi, std::string_view name) noexcept {
+    if (name.empty()) {
+      return false;
+    }
+    for (const auto& model : localAi.models) {
+      if (model.id == name) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool localAiModelMatchesQuery(const LocalAiModel& model, std::string_view query) noexcept {
+    const std::string needle = StringUtils::toLower(StringUtils::trim(query));
+    if (needle.empty()) {
+      return true;
+    }
+    auto has = [&](std::string_view text) { return StringUtils::toLower(text).find(needle) != std::string::npos; };
+    if (has(model.id) || has(model.backend)) {
+      return true;
+    }
+    for (const auto capability : model.capabilities) {
+      if (has(localAiCapabilityKey(capability))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool localAiGalleryMatchesQuery(const LocalAiGalleryHit& hit, std::string_view query) noexcept {
+    const std::string needle = StringUtils::toLower(StringUtils::trim(query));
+    if (needle.empty()) {
+      return true;
+    }
+    auto has = [&](std::string_view text) { return StringUtils::toLower(text).find(needle) != std::string::npos; };
+    if (has(hit.name) || has(hit.backend)) {
+      return true;
+    }
+    for (const auto& tag : hit.tags) {
+      if (has(tag)) {
+        return true;
+      }
+    }
+    return has(hit.description);
+  }
+
+  std::vector<const LocalAiGalleryHit*>
+  filterLocalAiGallery(const LocalAiGallery& gallery, std::string_view query, std::size_t limit) {
+    std::vector<const LocalAiGalleryHit*> out;
+    const std::string needle = StringUtils::toLower(StringUtils::trim(query));
+    // Rank: exact name, name prefix, name contains, tag, then description. Stable within a tier.
+    std::vector<std::pair<int, const LocalAiGalleryHit*>> ranked;
+    for (const auto& hit : gallery.hits) {
+      if (!localAiGalleryMatchesQuery(hit, query)) {
+        continue;
+      }
+      int tier = 4;
+      if (!needle.empty()) {
+        const std::string name = StringUtils::toLower(hit.name);
+        if (name == needle) {
+          tier = 0;
+        } else if (name.starts_with(needle)) {
+          tier = 1;
+        } else if (name.find(needle) != std::string::npos) {
+          tier = 2;
+        } else {
+          bool tagHit = false;
+          for (const auto& tag : hit.tags) {
+            if (StringUtils::toLower(tag).find(needle) != std::string::npos) {
+              tagHit = true;
+              break;
+            }
+          }
+          tier = tagHit ? 3 : 4;
+        }
+      }
+      ranked.emplace_back(tier, &hit);
+    }
+    std::ranges::stable_sort(ranked, [](const auto& a, const auto& b) {
+      if (a.first != b.first) {
+        return a.first < b.first;
+      }
+      if (a.second->installed != b.second->installed) {
+        return a.second->installed;
+      }
+      return false;
+    });
+    out.reserve(std::min(ranked.size(), limit));
+    for (const auto& [tier, hit] : ranked) {
+      if (out.size() >= limit) {
+        break;
+      }
+      out.push_back(hit);
+    }
+    return out;
+  }
+
+  bool localAiModelNameValid(std::string_view name) noexcept {
+    if (name.empty() || name.size() > 160) {
+      return false;
+    }
+    const auto ok = [](unsigned char ch) {
+      return std::isalnum(ch) != 0 || ch == '.' || ch == '_' || ch == '-' || ch == ':' || ch == '/' || ch == '@'
+          || ch == '+';
+    };
+    if (std::isalnum(static_cast<unsigned char>(name.front())) == 0) {
+      return false;
+    }
+    for (char ch : name) {
+      if (!ok(static_cast<unsigned char>(ch))) {
+        return false;
+      }
+    }
+    return name.find("..") == std::string_view::npos && name.find("//") == std::string_view::npos;
+  }
+
+  void sortLocalAiModels(std::vector<LocalAiModel>& models, std::string_view selected) {
+    std::ranges::stable_sort(models, [&](const LocalAiModel& a, const LocalAiModel& b) {
+      const bool aSelected = !selected.empty() && a.id == selected;
+      const bool bSelected = !selected.empty() && b.id == selected;
+      if (aSelected != bSelected) {
+        return aSelected;
+      }
+      if (a.loaded != b.loaded) {
+        return a.loaded;
+      }
+      return a.id < b.id;
+    });
+  }
+
+  std::string localAiModelSummary(const LocalAiModel& model) {
+    std::string out;
+    for (const auto capability : model.capabilities) {
+      if (!out.empty()) {
+        out += " · ";
+      }
+      out += localAiCapabilityLabel(capability);
+    }
+    if (!model.backend.empty()) {
+      if (!out.empty()) {
+        out += " · ";
+      }
+      out += model.backend;
+    }
+    if (model.contextSize > 0) {
+      if (!out.empty()) {
+        out += " · ";
+      }
+      if (model.contextSize >= 1024) {
+        out += std::to_string(model.contextSize / 1024) + "k ctx";
+      } else {
+        out += std::to_string(model.contextSize) + " ctx";
+      }
+    }
+    return out;
+  }
+
+  std::string formatLocalAiJobProgress(const LocalAiJob& job) {
+    if (job.error) {
+      return job.message;
+    }
+    if (job.processed) {
+      return "success";
+    }
+    if (job.totalBytes > 0) {
+      char buf[16]{};
+      std::snprintf(buf, sizeof(buf), "%.0f%%", 100.0 * static_cast<double>(localAiJobFraction(job)));
+      return formatByteSize(job.currentBytes) + " / " + formatByteSize(job.totalBytes) + " · " + buf;
+    }
+    if (job.progress > 0.0F) {
+      char buf[16]{};
+      std::snprintf(buf, sizeof(buf), "%.0f%%", static_cast<double>(clampPercent(job.progress)));
+      return buf;
+    }
+    if (!job.phase.empty()) {
+      return job.phase;
+    }
+    return job.message;
+  }
+
+  float localAiJobFraction(const LocalAiJob& job) noexcept {
+    if (job.totalBytes > 0) {
+      return clampPercent(100.0 * static_cast<double>(job.currentBytes) / static_cast<double>(job.totalBytes))
+          / 100.0F;
+    }
+    return clampPercent(job.progress) / 100.0F;
+  }
+
+  std::span<const std::string_view> localAiDesktopIds() noexcept {
+    static constexpr std::string_view kIds[] = {"local-ai", "localai", "io.localai.LocalAI", "LocalAI"};
+    return kIds;
+  }
+
+  std::string parseLocalAiWellKnownVersion(std::string_view text) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_object()) {
+      return {};
+    }
+    return jsonString(*parsed, "version");
+  }
+
+  namespace {
+    void appendCapability(std::vector<LocalAiCapability>& out, std::string_view key) {
+      const auto capability = localAiCapabilityFromKey(key);
+      if (!capability.has_value() || std::ranges::contains(out, *capability)) {
+        return;
+      }
+      out.push_back(*capability);
+    }
+
+    [[nodiscard]] std::vector<std::string> jsonStringArray(const json& object, const char* key) {
+      std::vector<std::string> out;
+      if (!object.is_object() || !object.contains(key) || !object[key].is_array()) {
+        return out;
+      }
+      for (const auto& entry : object[key]) {
+        if (entry.is_string()) {
+          out.push_back(entry.get<std::string>());
+        }
+      }
+      return out;
+    }
+  } // namespace
+
+  std::optional<std::vector<LocalAiModel>> parseLocalAiModelsJson(std::string_view text) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_object() || !parsed->contains("data") || !(*parsed)["data"].is_array()) {
+      return std::nullopt;
+    }
+    std::vector<LocalAiModel> models;
+    for (const auto& entry : (*parsed)["data"]) {
+      if (!entry.is_object()) {
+        continue;
+      }
+      LocalAiModel model;
+      model.id = jsonString(entry, "id");
+      if (model.id.empty()) {
+        continue;
+      }
+      model.backend = jsonString(entry, "backend");
+      for (const auto& capability : jsonStringArray(entry, "capabilities")) {
+        appendCapability(model.capabilities, capability);
+      }
+      model.inputModalities = jsonStringArray(entry, "input_modalities");
+      model.outputModalities = jsonStringArray(entry, "output_modalities");
+      if (const auto context = jsonNumber(entry, "context_size"); context.has_value() && *context > 0) {
+        model.contextSize = static_cast<std::int64_t>(*context);
+      }
+      // Older servers only answer /v1/models; treat a bare entry as a chat model so it stays usable.
+      if (model.capabilities.empty() && !entry.contains("capabilities")) {
+        model.capabilities.push_back(LocalAiCapability::Chat);
+      }
+      std::ranges::sort(model.capabilities);
+      models.push_back(std::move(model));
+    }
+    return models;
+  }
+
+  void applyLocalAiSystemJson(LocalAiSnapshot& localAi, std::string_view text) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_object()) {
+      return;
+    }
+    localAi.backends = jsonStringArray(*parsed, "backends");
+    std::ranges::sort(localAi.backends);
+    for (auto& model : localAi.models) {
+      model.loaded = false;
+    }
+    if (!parsed->contains("loaded_models") || !(*parsed)["loaded_models"].is_array()) {
+      return;
+    }
+    for (const auto& entry : (*parsed)["loaded_models"]) {
+      std::string id;
+      std::string backend;
+      if (entry.is_string()) {
+        id = entry.get<std::string>();
+      } else if (entry.is_object()) {
+        id = jsonString(entry, "id");
+        backend = jsonString(entry, "backend");
+      }
+      if (id.empty()) {
+        continue;
+      }
+      for (auto& model : localAi.models) {
+        if (model.id == id) {
+          model.loaded = true;
+          if (model.backend.empty()) {
+            model.backend = backend;
+          }
+        }
+      }
+    }
+  }
+
+  std::optional<std::vector<LocalAiGalleryHit>>
+  parseLocalAiGalleryJson(std::string_view text, const LocalAiSnapshot& installed) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_array()) {
+      return std::nullopt;
+    }
+    std::vector<LocalAiGalleryHit> hits;
+    hits.reserve(parsed->size());
+    for (const auto& entry : *parsed) {
+      if (!entry.is_object()) {
+        continue;
+      }
+      LocalAiGalleryHit hit;
+      hit.name = jsonString(entry, "name");
+      if (hit.name.empty()) {
+        continue;
+      }
+      if (const json* gallery = objectField(entry, "gallery")) {
+        hit.gallery = jsonString(*gallery, "name");
+      }
+      hit.id = hit.gallery.empty() ? hit.name : hit.gallery + "@" + hit.name;
+      hit.description = StringUtils::trim(jsonString(entry, "description"));
+      hit.backend = jsonString(entry, "backend");
+      hit.size = jsonString(entry, "size");
+      hit.license = jsonString(entry, "license");
+      hit.tags = jsonStringArray(entry, "tags");
+      hit.installed = jsonBool(entry, "installed") || localAiModelInstalled(installed, hit.name);
+      hits.push_back(std::move(hit));
+    }
+    return hits;
+  }
+
+  std::optional<LocalAiJob> parseLocalAiJobJson(std::string_view text, std::string_view uuid) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_object()) {
+      return std::nullopt;
+    }
+    LocalAiJob job;
+    job.uuid = std::string(uuid);
+    job.model = jsonString(*parsed, "gallery_element_name");
+    job.message = StringUtils::trim(jsonString(*parsed, "message"));
+    job.phase = jsonString(*parsed, "phase");
+    job.fileName = jsonString(*parsed, "file_name");
+    if (const auto progress = jsonNumber(*parsed, "progress")) {
+      job.progress = clampPercent(*progress);
+    }
+    job.currentBytes = jsonSize(*parsed, "current_bytes");
+    job.totalBytes = jsonSize(*parsed, "total_bytes");
+    job.processed = jsonBool(*parsed, "processed");
+    job.deletion = jsonBool(*parsed, "deletion");
+    job.cancelled = jsonBool(*parsed, "cancelled");
+    if (parsed->contains("error")) {
+      const json& error = (*parsed)["error"];
+      if (error.is_string()) {
+        job.error = !error.get<std::string>().empty();
+        if (job.error && job.message.empty()) {
+          job.message = error.get<std::string>();
+        }
+      } else if (error.is_object() || error.is_array()) {
+        job.error = !error.empty();
+      } else if (!error.is_null()) {
+        job.error = true;
+      }
+    }
+    if (job.processed && job.progress <= 0.0F && !job.error) {
+      job.progress = 100.0F;
+    }
+    return job;
+  }
+
+  std::string parseLocalAiApplyUuid(std::string_view text) {
+    const auto parsed = parseJson(text);
+    if (!parsed.has_value() || !parsed->is_object()) {
+      return {};
+    }
+    return jsonString(*parsed, "uuid");
+  }
+
+  std::string localAiApplyJson(std::string_view galleryId) {
+    nlohmann::json body;
+    body["id"] = galleryId;
+    return body.dump();
   }
 
 } // namespace noctalia::ai_usage

@@ -34,7 +34,8 @@ namespace scripting {
   inline constexpr std::uint32_t kContainerTooltipPluginApiVersion = 32;
   inline constexpr std::uint32_t kControlCenterTabPluginApiVersion = 33;
   inline constexpr std::uint32_t kAiUsagePluginApiVersion = 34;
-  inline constexpr std::uint32_t kCurrentPluginApiVersion = kAiUsagePluginApiVersion;
+  inline constexpr std::uint32_t kAiUsageLocalAiPluginApiVersion = 35;
+  inline constexpr std::uint32_t kCurrentPluginApiVersion = kAiUsageLocalAiPluginApiVersion;
 
   static_assert(kOldestSupportedPluginApiVersion <= kCurrentPluginApiVersion);
 

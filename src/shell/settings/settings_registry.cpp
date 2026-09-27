@@ -2196,6 +2196,10 @@ namespace settings {
     providerMode(
         cfg.controlCenter.aiUsage.ollama, "ollama", "settings.schema.ai-usage.ollama.label", "ai ollama local models"
     );
+    providerMode(
+        cfg.controlCenter.aiUsage.localai, "localai", "settings.schema.ai-usage.localai.label",
+        "ai localai local models service layer openai compatible"
+    );
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.gemini-daily-limit.label"),
         tr("settings.schema.ai-usage.gemini-daily-limit.description"),
@@ -2229,6 +2233,26 @@ namespace settings {
             .browseFileExtensions = {}
         },
         "ai ollama model local inference"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.localai-host.label"),
+        tr("settings.schema.ai-usage.localai-host.description"), {"control_center", "ai_usage", "localai_host"},
+        TextSetting{
+            .value = cfg.controlCenter.aiUsage.localaiHost,
+            .placeholder = tr("settings.schema.ai-usage.localai-host.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "ai localai host url local endpoint"
+    ));
+    entries.push_back(makeEntry(
+        SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.localai-model.label"),
+        tr("settings.schema.ai-usage.localai-model.description"), {"control_center", "ai_usage", "localai_model"},
+        TextSetting{
+            .value = cfg.controlCenter.aiUsage.localaiModel,
+            .placeholder = tr("settings.schema.ai-usage.localai-model.placeholder"),
+            .browseFileExtensions = {}
+        },
+        "ai localai model default chat"
     ));
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "ai-usage", tr("settings.schema.ai-usage.warn-percent.label"),

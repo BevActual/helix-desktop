@@ -130,6 +130,28 @@ namespace scripting {
       std::vector<AiUsageOllamaModel> models;
     };
 
+    struct AiUsageLocalAiModel {
+      std::string id;
+      std::string backend;
+      std::vector<std::string> capabilities; // chat, vision, tools, thinking, transcript, tts, embeddings, image, video…
+      std::vector<std::string> inputModalities;
+      std::vector<std::string> outputModalities;
+      std::int64_t contextSize = 0;
+      bool loaded = false;
+    };
+
+    // LocalAI: the desktop's OpenAI-compatible service layer. `url` is the base URL to point any
+    // OpenAI client at; `model` is the user's default chat model; `models` carry capabilities so a
+    // plugin can pick one for speech, images, or embeddings without guessing.
+    struct AiUsageLocalAi {
+      std::string status;
+      std::string version;
+      std::string url;
+      std::string model;
+      std::vector<std::string> backends;
+      std::vector<AiUsageLocalAiModel> models;
+    };
+
     struct AiUsageLocalRuntime {
       std::string id;
       std::uint16_t port = 0;
@@ -147,6 +169,7 @@ namespace scripting {
       std::optional<AiUsageHot> hot;
       std::vector<AiUsageProvider> providers;
       std::optional<AiUsageOllama> ollama;
+      std::optional<AiUsageLocalAi> localai;
       std::vector<AiUsageLocalRuntime> localRuntimes;
     };
 

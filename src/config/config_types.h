@@ -1821,10 +1821,13 @@ struct ControlCenterConfig {
     AiUsageProviderMode cursor = AiUsageProviderMode::Auto;
     AiUsageProviderMode deepseek = AiUsageProviderMode::Auto;
     AiUsageProviderMode ollama = AiUsageProviderMode::Auto;
+    AiUsageProviderMode localai = AiUsageProviderMode::Auto;
     std::int32_t geminiDailyLimit = 1000;
     std::int32_t qwenDailyLimit = 2000;
     std::string ollamaHost;
     std::string ollamaModel;
+    std::string localaiHost;  // empty = LOCALAI_ADDRESS or 127.0.0.1:8080
+    std::string localaiModel; // default chat model for desktop AI tools; empty = first chat-capable
     std::int32_t warnPercent = 90;
     std::int32_t warnResetMinutes = 30;
     bool operator==(const AiUsageTabConfig&) const = default;

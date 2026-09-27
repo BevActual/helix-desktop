@@ -9,6 +9,7 @@
 #include "ipc/ipc_arg_parse.h"
 #include "ipc/ipc_service.h"
 #include "net/http_client.h"
+#include "net/url_open.h"
 #include "notification/notifications.h"
 #include "system/app_identity.h"
 #include "system/desktop_entry.h"
@@ -109,6 +110,57 @@ namespace {
       host = "http://" + host;
     }
     return stripTrailingSlash(std::move(host));
+  }
+
+  // LocalAI listens on LOCALAI_ADDRESS (":8080" or "host:port") and defaults to 8080.
+  [[nodiscard]] std::string normalizeLocalAiBase(std::string host) {
+    host = StringUtils::trim(host);
+    if (host.empty()) {
+      if (const char* env = std::getenv("LOCALAI_ADDRESS"); env != nullptr && env[0] != '\0') {
+        host = StringUtils::trim(env);
+      }
+    }
+    if (host.empty()) {
+      host = "127.0.0.1:8080";
+    }
+    if (host.front() == ':') {
+      host = "127.0.0.1" + host;
+    } else if (host.starts_with("0.0.0.0:")) {
+      host = "127.0.0.1" + host.substr(7);
+    }
+    if (!host.starts_with("http://") && !host.starts_with("https://")) {
+      host = "http://" + host;
+    }
+    return stripTrailingSlash(std::move(host));
+  }
+
+  [[nodiscard]] std::uint16_t portOfBase(std::string_view base) {
+    std::string_view rest = base;
+    if (rest.starts_with("http://")) {
+      rest.remove_prefix(7);
+    } else if (rest.starts_with("https://")) {
+      rest.remove_prefix(8);
+    }
+    const auto slash = rest.find('/');
+    if (slash != std::string_view::npos) {
+      rest = rest.substr(0, slash);
+    }
+    const auto colon = rest.rfind(':');
+    const auto bracket = rest.find(']');
+    if (colon == std::string_view::npos || (bracket != std::string_view::npos && bracket > colon)) {
+      return base.starts_with("https://") ? 443 : 80;
+    }
+    int port = 0;
+    for (char ch : rest.substr(colon + 1)) {
+      if (ch < '0' || ch > '9') {
+        return 0;
+      }
+      port = port * 10 + (ch - '0');
+      if (port > 65535) {
+        return 0;
+      }
+    }
+    return static_cast<std::uint16_t>(port);
   }
 
   [[nodiscard]] bool hostLooksLocal(std::string_view base) {
@@ -335,6 +387,8 @@ AiUsageService::AiUsageService(ConfigService& config, HttpClient& http) : m_conf
 
 AiUsageService::~AiUsageService() {
   m_timer.stop();
+  m_localAiJobTimer.stop();
+  m_localAiStartTimer.stop();
   if (m_http != nullptr && m_pullStream != 0) {
     m_http->cancelStream(m_pullStream);
     m_pullStream = 0;
@@ -425,6 +479,85 @@ void AiUsageService::registerIpc(IpcService& ipc) {
     }
     deleteOllamaModel(words.front());
     return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiStart, [this](const std::string& args) -> std::string {
+    if (!noctalia::ipc::splitWords(args).empty()) {
+      return "error: ai-usage-localai-start takes no arguments\n";
+    }
+    startLocalAi();
+    return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiStop, [this](const std::string& args) -> std::string {
+    if (!noctalia::ipc::splitWords(args).empty()) {
+      return "error: ai-usage-localai-stop takes no arguments\n";
+    }
+    stopLocalAi();
+    return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiOpen, [this](const std::string& args) -> std::string {
+    if (!noctalia::ipc::splitWords(args).empty()) {
+      return "error: ai-usage-localai-open takes no arguments\n";
+    }
+    launchLocalAi();
+    return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiModel, [this](const std::string& args) -> std::string {
+    const auto words = noctalia::ipc::splitWords(args);
+    if (words.size() != 1) {
+      return "error: ai-usage-localai-model requires a model name\n";
+    }
+    selectLocalAiModel(words.front());
+    return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiInstall, [this](const std::string& args) -> std::string {
+    const auto words = noctalia::ipc::splitWords(args);
+    if (words.size() != 1) {
+      return "error: ai-usage-localai-install requires a gallery id such as localai@qwen3-4b\n";
+    }
+    installLocalAiModel(words.front());
+    return "ok\n";
+  });
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiDelete, [this](const std::string& args) -> std::string {
+    const auto words = noctalia::ipc::splitWords(args);
+    if (words.size() != 1) {
+      return "error: ai-usage-localai-delete requires a model name\n";
+    }
+    deleteLocalAiModel(words.front());
+    return "ok\n";
+  });
+  // The endpoint line lets scripts and desktop tools point an OpenAI client at LocalAI:
+  //   url=<base> model=<default chat model> models=<n>
+  ipc.bind(noctalia::cli::msg::aiUsageLocalAiEndpoint, [this](const std::string& args) -> std::string {
+    const auto words = noctalia::ipc::splitWords(args);
+    if (words.size() > 1) {
+      return "error: ai-usage-localai-endpoint takes an optional capability (chat, tts, transcript, image, "
+             "embeddings, vision)\n";
+    }
+    const auto& localAi = m_snapshot.localAi;
+    if (!noctalia::ai_usage::localAiVisible(localAi.status)) {
+      return "error: LocalAI is not available\n";
+    }
+    std::string out = "url=" + localAiBaseUrl();
+    out += " status=";
+    out += noctalia::ai_usage::localAiStatusKey(localAi.status);
+    std::string_view model;
+    if (words.empty()) {
+      model = noctalia::ai_usage::effectiveLocalAiModel(localAi);
+    } else {
+      const auto capability = noctalia::ai_usage::localAiCapabilityFromKey(words.front());
+      if (!capability.has_value()) {
+        return "error: unknown capability '" + words.front() + "'\n";
+      }
+      if (const auto* hit = noctalia::ai_usage::localAiModelFor(localAi, *capability)) {
+        model = hit->id;
+      }
+    }
+    if (!model.empty()) {
+      out += " model=";
+      out += model;
+    }
+    out += " models=" + std::to_string(localAi.models.size()) + "\n";
+    return out;
   });
 }
 
@@ -571,6 +704,7 @@ void AiUsageService::publishOllama(noctalia::ai_usage::OllamaSnapshot snap) {
 
 void AiUsageService::publishLocalRuntimes(std::vector<noctalia::ai_usage::LocalRuntime> runtimes) {
   m_snapshot.localRuntimes = std::move(runtimes);
+  dropShadowedLocalRuntimes();
   m_snapshot.fetchedAt = std::chrono::system_clock::now();
   m_snapshot.refreshing = false;
   notifyChanged();
@@ -681,6 +815,7 @@ void AiUsageService::fetchAll(bool force) {
       [&]() { fetchDeepseek(generation); }
   );
   fetchOllama(generation);
+  fetchLocalAi(generation, force);
   fetchLocalRuntimes(generation, force);
 }
 
@@ -1721,4 +1856,648 @@ void AiUsageService::finishOllamaDelete(bool ok) {
   }
   notifyChanged();
   refresh(true);
+}
+
+// ---------------------------------------------------------------------------
+// LocalAI
+
+namespace {
+  constexpr auto kLocalAiJobPoll = std::chrono::milliseconds(900);
+  constexpr int kLocalAiGalleryTimeoutSeconds = 45;
+
+  [[nodiscard]] bool httpOk(const HttpResponse& res) {
+    return res.transportOk && res.status >= 200 && res.status < 300;
+  }
+
+  [[nodiscard]] std::string galleryDisplayName(std::string_view galleryId) {
+    const auto at = galleryId.find('@');
+    return std::string(at == std::string_view::npos ? galleryId : galleryId.substr(at + 1));
+  }
+} // namespace
+
+std::string AiUsageService::localAiBaseUrl() const {
+  if (m_config == nullptr) {
+    return normalizeLocalAiBase({});
+  }
+  return normalizeLocalAiBase(m_config->config().controlCenter.aiUsage.localaiHost);
+}
+
+bool AiUsageService::localAiHostIsLocal() const { return hostLooksLocal(localAiBaseUrl()); }
+
+bool AiUsageService::canLaunchLocalAi() const {
+  return noctalia::ai_usage::localAiVisible(m_snapshot.localAi.status);
+}
+
+void AiUsageService::launchLocalAi() {
+  if (launchDesktopIds(noctalia::ai_usage::localAiDesktopIds())) {
+    return;
+  }
+  (void)net::openInBrowser(localAiBaseUrl() + "/");
+}
+
+// llama.cpp's default port is LocalAI's default port. When LocalAI answers, the generic
+// OpenAI probe on the same port is LocalAI wearing a different name; drop that row.
+void AiUsageService::dropShadowedLocalRuntimes() {
+  if (m_snapshot.localAi.status != noctalia::ai_usage::LocalAiStatus::Running || !localAiHostIsLocal()) {
+    return;
+  }
+  const std::uint16_t port = portOfBase(localAiBaseUrl());
+  if (port == 0) {
+    return;
+  }
+  std::erase_if(m_snapshot.localRuntimes, [port](const noctalia::ai_usage::LocalRuntime& runtime) {
+    return runtime.port == port;
+  });
+}
+
+void AiUsageService::publishLocalAi(noctalia::ai_usage::LocalAiSnapshot snap) {
+  using noctalia::ai_usage::LocalAiStatus;
+  const auto& previous = m_snapshot.localAi;
+  snap.busy = previous.busy;
+  snap.deleting = previous.deleting;
+  snap.job = previous.job;
+  snap.baseUrl = localAiBaseUrl();
+  if (m_config != nullptr) {
+    snap.selected = m_config->config().controlCenter.aiUsage.localaiModel;
+  }
+  if (snap.models.empty() && (snap.status == LocalAiStatus::Stopped || snap.status == LocalAiStatus::Error)
+      && !previous.models.empty()) {
+    snap.models = previous.models;
+    for (auto& model : snap.models) {
+      model.loaded = false;
+    }
+  }
+  if (snap.version.empty()) {
+    snap.version = previous.version;
+  }
+  noctalia::ai_usage::sortLocalAiModels(snap.models, snap.selected);
+  if (snap.status == LocalAiStatus::Running) {
+    for (auto& hit : m_snapshot.localAiGallery.hits) {
+      hit.installed = noctalia::ai_usage::localAiModelInstalled(snap, hit.name);
+    }
+    // A failed install whose model is now present (finished server-side, or installed elsewhere) is history.
+    if (snap.job.has_value() && snap.job->error && !snap.job->deletion
+        && noctalia::ai_usage::localAiModelInstalled(snap, snap.job->model)) {
+      snap.job.reset();
+    }
+  }
+  m_snapshot.localAi = std::move(snap);
+  dropShadowedLocalRuntimes();
+  m_snapshot.fetchedAt = std::chrono::system_clock::now();
+  m_snapshot.refreshing = false;
+  notifyChanged();
+
+  const bool running = m_snapshot.localAi.status == LocalAiStatus::Running;
+  if (running && m_snapshot.localAiGallery.error == "stopped") {
+    loadLocalAiGallery(true);
+  }
+  if (!m_pendingLocalAiInstall.empty()) {
+    if (running && !m_snapshot.localAi.busy) {
+      std::string id = std::move(m_pendingLocalAiInstall);
+      m_pendingLocalAiInstall.clear();
+      postLocalAiApply(std::move(id));
+    } else if (!m_snapshot.localAi.busy) {
+      m_pendingLocalAiInstall.clear();
+      finishLocalAiJob(false, i18n::tr("control-center.ai-usage.localai.start-failed"));
+    }
+  }
+  if (!m_pendingLocalAiDelete.empty()) {
+    if (running && !m_snapshot.localAi.busy) {
+      std::string name = std::move(m_pendingLocalAiDelete);
+      m_pendingLocalAiDelete.clear();
+      postLocalAiDelete(std::move(name));
+    } else if (!m_snapshot.localAi.busy) {
+      m_pendingLocalAiDelete.clear();
+      m_snapshot.localAi.deleting.clear();
+      notifyChanged();
+    }
+  }
+}
+
+void AiUsageService::fetchLocalAi(std::uint64_t generation, bool force) {
+  using noctalia::ai_usage::LocalAiSnapshot;
+  using noctalia::ai_usage::LocalAiStatus;
+  if (m_config == nullptr) {
+    return;
+  }
+  const auto mode = m_config->config().controlCenter.aiUsage.localai;
+  const bool hasCli = process::commandExists("local-ai");
+  const bool local = localAiHostIsLocal();
+  const bool hostConfigured = !m_config->config().controlCenter.aiUsage.localaiHost.empty();
+  if (mode == AiUsageProviderMode::Off) {
+    LocalAiSnapshot snap;
+    snap.status = LocalAiStatus::Disabled;
+    snap.hasCli = hasCli;
+    snap.local = local;
+    publishLocalAi(std::move(snap));
+    return;
+  }
+  // LocalAI often runs in a container with no CLI on PATH, so Auto still probes the port —
+  // quietly, on a backoff, like the other local servers.
+  const bool speculative = mode == AiUsageProviderMode::Auto && !hasCli && !hostConfigured;
+  const auto now = std::chrono::steady_clock::now();
+  if (speculative && !force && m_localAiProbe.nextProbeAt > now) {
+    return;
+  }
+  if (m_http == nullptr) {
+    LocalAiSnapshot snap;
+    snap.status = hasCli ? LocalAiStatus::Stopped : LocalAiStatus::Error;
+    snap.hasCli = hasCli;
+    snap.local = local;
+    publishLocalAi(std::move(snap));
+    return;
+  }
+  const std::string base = localAiBaseUrl();
+  const auto absent = [this, hasCli, local, hostConfigured, speculative]() {
+    if (speculative) {
+      m_localAiProbe.backoff = m_localAiProbe.backoff.count() == 0
+          ? kLocalRuntimeInitialBackoff
+          : std::min(m_localAiProbe.backoff * 2, kLocalRuntimeMaxBackoff);
+      m_localAiProbe.nextProbeAt = std::chrono::steady_clock::now() + m_localAiProbe.backoff;
+    }
+    LocalAiSnapshot snap;
+    snap.status = hasCli ? LocalAiStatus::Stopped : ((hostConfigured || !local) ? LocalAiStatus::Error
+                                                                              : LocalAiStatus::Absent);
+    snap.hasCli = hasCli;
+    snap.local = local;
+    publishLocalAi(std::move(snap));
+  };
+  const auto makeRequest = [local](std::string url) {
+    HttpRequest req;
+    req.url = std::move(url);
+    req.allowWhenOffline = local;
+    req.freshConnection = true;
+    req.quietTransportErrors = true;
+    req.timeoutSeconds = 4;
+    return req;
+  };
+
+  // /v1/models/capabilities is LocalAI-specific, which also tells LocalAI apart from a bare
+  // llama.cpp server on the same port. Older releases fall back to /system + /v1/models.
+  m_http->request(
+      makeRequest(base + "/v1/models/capabilities"),
+      [this, generation, hasCli, local, base, absent, makeRequest](HttpResponse capRes) {
+        if (generation != m_generation) {
+          return;
+        }
+        if (!capRes.transportOk) {
+          absent();
+          return;
+        }
+        auto finish = [this, generation, hasCli, local, base, makeRequest](std::vector<noctalia::ai_usage::LocalAiModel> models, std::string systemBody) {
+          m_http->request(
+              makeRequest(base + "/.well-known/localai.json"),
+              [this, generation, hasCli, local, models = std::move(models), systemBody = std::move(systemBody)](
+                  HttpResponse wellKnown
+              ) mutable {
+                if (generation != m_generation) {
+                  return;
+                }
+                LocalAiSnapshot snap;
+                snap.status = LocalAiStatus::Running;
+                snap.hasCli = hasCli;
+                snap.local = local;
+                snap.models = std::move(models);
+                noctalia::ai_usage::applyLocalAiSystemJson(snap, systemBody);
+                if (httpOk(wellKnown)) {
+                  snap.version = noctalia::ai_usage::parseLocalAiWellKnownVersion(wellKnown.body);
+                }
+                m_localAiProbe.backoff = std::chrono::seconds(0);
+                m_localAiProbe.nextProbeAt = {};
+                publishLocalAi(std::move(snap));
+              }
+          );
+        };
+        if (httpOk(capRes)) {
+          auto models = noctalia::ai_usage::parseLocalAiModelsJson(capRes.body);
+          if (!models.has_value()) {
+            absent();
+            return;
+          }
+          m_http->request(
+              makeRequest(base + "/system"),
+              [generation, this, finish, models = std::move(*models)](HttpResponse sysRes) mutable {
+                if (generation != m_generation) {
+                  return;
+                }
+                finish(std::move(models), httpOk(sysRes) ? sysRes.body : std::string{});
+              }
+          );
+          return;
+        }
+        // Not a LocalAI that knows capabilities. /system is still LocalAI-only.
+        m_http->request(
+            makeRequest(base + "/system"),
+            [this, generation, base, absent, makeRequest, finish](HttpResponse sysRes) {
+              if (generation != m_generation) {
+                return;
+              }
+              if (!httpOk(sysRes)) {
+                absent();
+                return;
+              }
+              m_http->request(
+                  makeRequest(base + "/v1/models"),
+                  [this, generation, finish, absent, systemBody = sysRes.body](HttpResponse modelsRes) {
+                    if (generation != m_generation) {
+                      return;
+                    }
+                    auto models = noctalia::ai_usage::parseLocalAiModelsJson(httpOk(modelsRes) ? modelsRes.body : "");
+                    if (!models.has_value()) {
+                      absent();
+                      return;
+                    }
+                    finish(std::move(*models), systemBody);
+                  }
+              );
+            }
+        );
+      }
+  );
+}
+
+void AiUsageService::spawnLocalAiRun() {
+  m_localAiRunPid = process::launchDetachedTracked(std::vector<std::string>{"local-ai", "run"});
+  // The binary loads backends before it listens; give it a moment before the first probe.
+  m_localAiStartTimer.start(std::chrono::seconds(3), [this]() {
+    m_snapshot.localAi.busy = false;
+    refresh(true);
+  });
+}
+
+void AiUsageService::startLocalAi() {
+  if (!process::commandExists("local-ai") || !localAiHostIsLocal()) {
+    return;
+  }
+  if (m_snapshot.localAi.busy) {
+    return;
+  }
+  m_snapshot.localAi.busy = true;
+  notifyChanged();
+  if (process::runAsync(
+          std::vector<std::string>{"systemctl", "--user", "start", "local-ai"},
+          process::RunCallbacks{
+              .onExit =
+                  [this](process::RunResult result) {
+                    DeferredCall::callLater([this, ok = static_cast<bool>(result)]() {
+                      if (ok) {
+                        m_localAiStartTimer.start(std::chrono::seconds(2), [this]() {
+                          m_snapshot.localAi.busy = false;
+                          refresh(true);
+                        });
+                        return;
+                      }
+                      spawnLocalAiRun();
+                    });
+                  },
+          },
+          process::RunOptions{.timeout = kCliTimeout}
+      )) {
+    return;
+  }
+  spawnLocalAiRun();
+}
+
+void AiUsageService::stopLocalAi() {
+  if (!localAiHostIsLocal()) {
+    return;
+  }
+  m_pendingLocalAiInstall.clear();
+  m_pendingLocalAiDelete.clear();
+  m_localAiJobTimer.stop();
+  m_localAiStartTimer.stop();
+  ++m_localAiJobGeneration;
+  m_snapshot.localAi.job.reset();
+  m_snapshot.localAi.deleting.clear();
+  m_snapshot.localAi.busy = true;
+  notifyChanged();
+  if (m_localAiRunPid.has_value()) {
+    process::terminateTracked(*m_localAiRunPid);
+    m_localAiRunPid.reset();
+  }
+  if (!process::runAsync(
+          std::vector<std::string>{"systemctl", "--user", "stop", "local-ai"},
+          process::RunCallbacks{
+              .onExit =
+                  [this](process::RunResult) {
+                    DeferredCall::callLater([this]() {
+                      m_snapshot.localAi.busy = false;
+                      refresh(true);
+                    });
+                  },
+          },
+          process::RunOptions{.timeout = kCliTimeout}
+      )) {
+    m_snapshot.localAi.busy = false;
+    refresh(true);
+  }
+}
+
+void AiUsageService::selectLocalAiModel(std::string name) {
+  name = StringUtils::trim(name);
+  if (m_config == nullptr || !noctalia::ai_usage::localAiModelNameValid(name)) {
+    return;
+  }
+  (void)m_config->setOverride({"control_center", "ai_usage", "localai_model"}, name);
+  m_snapshot.localAi.selected = std::move(name);
+  noctalia::ai_usage::sortLocalAiModels(m_snapshot.localAi.models, m_snapshot.localAi.selected);
+  notifyChanged();
+}
+
+void AiUsageService::setLocalAiGalleryQuery(std::string query) {
+  query = StringUtils::trim(query);
+  if (m_snapshot.localAiGallery.query == query) {
+    return;
+  }
+  m_snapshot.localAiGallery.query = std::move(query);
+  notifyChanged();
+}
+
+void AiUsageService::loadLocalAiGallery(bool force) {
+  auto& gallery = m_snapshot.localAiGallery;
+  if (gallery.loading) {
+    return;
+  }
+  if (!force && gallery.loaded && gallery.error.empty()) {
+    return;
+  }
+  if (m_snapshot.localAi.status != noctalia::ai_usage::LocalAiStatus::Running) {
+    gallery.error = "stopped";
+    notifyChanged();
+    if (!m_snapshot.localAi.busy && m_snapshot.localAi.hasCli && m_snapshot.localAi.local) {
+      startLocalAi();
+    }
+    return;
+  }
+  if (m_http == nullptr) {
+    gallery.error = "offline";
+    notifyChanged();
+    return;
+  }
+  gallery.loading = true;
+  gallery.error.clear();
+  notifyChanged();
+  HttpRequest req;
+  req.url = localAiBaseUrl() + "/models/available";
+  req.allowWhenOffline = m_snapshot.localAi.local;
+  req.freshConnection = true;
+  req.timeoutSeconds = kLocalAiGalleryTimeoutSeconds;
+  const auto generation = ++m_localAiGalleryGeneration;
+  m_http->request(std::move(req), [this, generation](HttpResponse res) {
+    if (generation != m_localAiGalleryGeneration) {
+      return;
+    }
+    auto& catalog = m_snapshot.localAiGallery;
+    catalog.loading = false;
+    if (!httpOk(res)) {
+      catalog.error = "http";
+      notifyChanged();
+      return;
+    }
+    auto hits = noctalia::ai_usage::parseLocalAiGalleryJson(res.body, m_snapshot.localAi);
+    if (!hits.has_value()) {
+      catalog.error = "parse";
+      notifyChanged();
+      return;
+    }
+    catalog.hits = std::move(*hits);
+    catalog.loaded = true;
+    notifyChanged();
+  });
+}
+
+void AiUsageService::installLocalAiModel(std::string galleryId) {
+  galleryId = StringUtils::trim(galleryId);
+  if (!noctalia::ai_usage::localAiModelNameValid(galleryId) || !m_snapshot.localAi.local) {
+    return;
+  }
+  if (const auto* active = noctalia::ai_usage::activeLocalAiJob(m_snapshot); active != nullptr) {
+    return;
+  }
+  const std::string name = galleryDisplayName(galleryId);
+  if (noctalia::ai_usage::localAiModelInstalled(m_snapshot.localAi, name)) {
+    selectLocalAiModel(name);
+    return;
+  }
+  ++m_localAiJobGeneration;
+  m_localAiJobTimer.stop();
+  noctalia::ai_usage::LocalAiJob job;
+  job.galleryId = galleryId;
+  job.model = name;
+  job.phase = i18n::tr("control-center.ai-usage.localai.queued");
+  m_snapshot.localAi.job = std::move(job);
+  if (m_snapshot.localAi.status != noctalia::ai_usage::LocalAiStatus::Running) {
+    m_pendingLocalAiInstall = galleryId;
+    notifyChanged();
+    if (!m_snapshot.localAi.busy && m_snapshot.localAi.hasCli) {
+      startLocalAi();
+    }
+    return;
+  }
+  postLocalAiApply(std::move(galleryId));
+}
+
+void AiUsageService::postLocalAiApply(std::string galleryId) {
+  if (m_http == nullptr) {
+    finishLocalAiJob(false, "offline");
+    return;
+  }
+  notifyChanged();
+  HttpRequest req;
+  req.method = "POST";
+  req.url = localAiBaseUrl() + "/models/apply";
+  req.headers = {"Content-Type: application/json"};
+  req.body = noctalia::ai_usage::localAiApplyJson(galleryId);
+  req.allowWhenOffline = true;
+  req.freshConnection = true;
+  req.timeoutSeconds = 30;
+  const auto generation = m_localAiJobGeneration;
+  m_http->request(std::move(req), [this, generation](HttpResponse res) {
+    if (generation != m_localAiJobGeneration || !m_snapshot.localAi.job.has_value()) {
+      return;
+    }
+    if (!httpOk(res)) {
+      finishLocalAiJob(false, i18n::tr("control-center.ai-usage.localai.apply-failed"));
+      return;
+    }
+    const std::string uuid = noctalia::ai_usage::parseLocalAiApplyUuid(res.body);
+    if (uuid.empty()) {
+      finishLocalAiJob(false, i18n::tr("control-center.ai-usage.localai.apply-failed"));
+      return;
+    }
+    m_snapshot.localAi.job->uuid = uuid;
+    m_snapshot.localAi.job->phase.clear();
+    notifyChanged();
+    m_localAiJobTimer.startRepeating(kLocalAiJobPoll, [this]() { pollLocalAiJob(); });
+  });
+}
+
+void AiUsageService::pollLocalAiJob() {
+  if (m_http == nullptr || !m_snapshot.localAi.job.has_value() || m_snapshot.localAi.job->uuid.empty()) {
+    m_localAiJobTimer.stop();
+    return;
+  }
+  HttpRequest req;
+  req.url = localAiBaseUrl() + "/models/jobs/" + m_snapshot.localAi.job->uuid;
+  req.allowWhenOffline = true;
+  req.quietTransportErrors = true;
+  req.timeoutSeconds = 5;
+  const auto generation = m_localAiJobGeneration;
+  m_http->request(std::move(req), [this, generation](HttpResponse res) {
+    if (generation != m_localAiJobGeneration || !m_snapshot.localAi.job.has_value()) {
+      return;
+    }
+    if (!httpOk(res)) {
+      // One missed poll is fine; a dead server is not.
+      if (!res.transportOk && m_snapshot.localAi.status != noctalia::ai_usage::LocalAiStatus::Running) {
+        finishLocalAiJob(false, i18n::tr("control-center.ai-usage.localai.error"));
+      }
+      return;
+    }
+    auto parsed = noctalia::ai_usage::parseLocalAiJobJson(res.body, m_snapshot.localAi.job->uuid);
+    if (!parsed.has_value()) {
+      return;
+    }
+    auto& job = *m_snapshot.localAi.job;
+    parsed->galleryId = job.galleryId;
+    if (parsed->model.empty()) {
+      parsed->model = job.model;
+    }
+    parsed->deletion = parsed->deletion || job.deletion;
+    job = std::move(*parsed);
+    if (job.processed || job.error || job.cancelled) {
+      finishLocalAiJob(!job.error && !job.cancelled, job.error ? job.message : std::string{});
+      return;
+    }
+    notifyChanged();
+  });
+}
+
+void AiUsageService::finishLocalAiJob(bool ok, std::string error) {
+  ++m_localAiJobGeneration;
+  m_localAiJobTimer.stop();
+  if (!m_snapshot.localAi.job.has_value()) {
+    if (!error.empty()) {
+      kLog.warn("LocalAI job failed: {}", error);
+    }
+    notifyChanged();
+    return;
+  }
+  auto& job = *m_snapshot.localAi.job;
+  const bool deletion = job.deletion;
+  const std::string model = job.model;
+  if (ok) {
+    m_snapshot.localAi.job.reset();
+    if (deletion) {
+      m_snapshot.localAi.deleting.clear();
+      std::erase_if(m_snapshot.localAi.models, [&](const noctalia::ai_usage::LocalAiModel& entry) {
+        return entry.id == model;
+      });
+      for (auto& hit : m_snapshot.localAiGallery.hits) {
+        if (hit.name == model) {
+          hit.installed = false;
+        }
+      }
+    } else if (!model.empty()) {
+      for (auto& hit : m_snapshot.localAiGallery.hits) {
+        if (hit.name == model) {
+          hit.installed = true;
+        }
+      }
+      if (m_snapshot.localAi.selected.empty()) {
+        selectLocalAiModel(model);
+      }
+    }
+    notifyChanged();
+    refresh(true);
+    return;
+  }
+  job.error = true;
+  job.processed = true;
+  if (!error.empty()) {
+    job.message = std::move(error);
+  }
+  if (deletion) {
+    m_snapshot.localAi.deleting.clear();
+  }
+  notifyChanged();
+}
+
+void AiUsageService::dismissLocalAiJob() {
+  if (noctalia::ai_usage::activeLocalAiJob(m_snapshot) != nullptr) {
+    // LocalAI has no cancel for gallery jobs; stop watching and let the server finish on its own.
+    m_pendingLocalAiInstall.clear();
+    ++m_localAiJobGeneration;
+    m_localAiJobTimer.stop();
+  }
+  m_snapshot.localAi.job.reset();
+  notifyChanged();
+  refresh(true);
+}
+
+void AiUsageService::deleteLocalAiModel(std::string name) {
+  name = StringUtils::trim(name);
+  if (!noctalia::ai_usage::localAiModelNameValid(name) || !m_snapshot.localAi.local) {
+    return;
+  }
+  if (noctalia::ai_usage::activeLocalAiJob(m_snapshot) != nullptr) {
+    return;
+  }
+  if (m_config != nullptr && m_config->config().controlCenter.aiUsage.localaiModel == name) {
+    (void)m_config->setOverride({"control_center", "ai_usage", "localai_model"}, std::string{});
+    m_snapshot.localAi.selected.clear();
+  }
+  if (m_snapshot.localAi.deleting == name) {
+    return;
+  }
+  m_snapshot.localAi.deleting = name;
+  ++m_localAiJobGeneration;
+  m_localAiJobTimer.stop();
+  noctalia::ai_usage::LocalAiJob job;
+  job.galleryId = name;
+  job.model = name;
+  job.deletion = true;
+  m_snapshot.localAi.job = std::move(job);
+  if (m_snapshot.localAi.status != noctalia::ai_usage::LocalAiStatus::Running) {
+    m_pendingLocalAiDelete = name;
+    notifyChanged();
+    if (!m_snapshot.localAi.busy && m_snapshot.localAi.hasCli) {
+      startLocalAi();
+    }
+    return;
+  }
+  postLocalAiDelete(std::move(name));
+}
+
+void AiUsageService::postLocalAiDelete(std::string name) {
+  if (m_http == nullptr) {
+    finishLocalAiJob(false, "offline");
+    return;
+  }
+  notifyChanged();
+  HttpRequest req;
+  req.method = "POST";
+  req.url = localAiBaseUrl() + "/models/delete/" + name;
+  req.allowWhenOffline = true;
+  req.freshConnection = true;
+  req.timeoutSeconds = 60;
+  const auto generation = m_localAiJobGeneration;
+  m_http->request(std::move(req), [this, generation, name](HttpResponse res) {
+    if (generation != m_localAiJobGeneration || m_snapshot.localAi.deleting != name) {
+      return;
+    }
+    if (!httpOk(res)) {
+      finishLocalAiJob(false, i18n::tr("control-center.ai-usage.localai.delete-failed"));
+      return;
+    }
+    const std::string uuid = noctalia::ai_usage::parseLocalAiApplyUuid(res.body);
+    if (uuid.empty() || !m_snapshot.localAi.job.has_value()) {
+      // Older servers delete synchronously and answer without a job.
+      finishLocalAiJob(true, {});
+      return;
+    }
+    m_snapshot.localAi.job->uuid = uuid;
+    notifyChanged();
+    m_localAiJobTimer.startRepeating(kLocalAiJobPoll, [this]() { pollLocalAiJob(); });
+  });
 }

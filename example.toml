@@ -315,6 +315,9 @@ deepseek            = "auto"            # API key; Auto stays hidden
 ollama              = "auto"
 # ollama_host       = "127.0.0.1:11434"
 # ollama_model      = "llama3.2:latest"
+localai             = "auto"            # LocalAI: the desktop's AI service layer (chat, speech, images, embeddings)
+# localai_host      = "127.0.0.1:8080"
+# localai_model     = "qwen3-4b"        # default chat model for desktop tools; empty = first chat-capable
 # gemini_daily_limit = 1000
 # qwen_daily_limit   = 2000
 warn_percent        = 90                # 0 disables usage warnings

@@ -136,9 +136,103 @@ namespace noctalia::ai_usage {
     std::vector<std::string> models;
   };
 
+  // LocalAI (localai.io): one OpenAI-compatible endpoint that fronts chat, vision, speech,
+  // transcription, image, video, and embedding backends. Helix treats it as the desktop's
+  // AI service layer: the tab manages the daemon, its models and gallery, and plugins read
+  // `models` (with capabilities) to pick an endpoint for a given job.
+  enum class LocalAiStatus : std::uint8_t {
+    Absent = 0,
+    Disabled,
+    Stopped,
+    Running,
+    Error,
+  };
+
+  enum class LocalAiCapability : std::uint8_t {
+    Chat = 0,
+    Vision,
+    Tools,
+    Thinking,
+    Transcript,
+    Tts,
+    Embeddings,
+    Image,
+    Video,
+    Sound,
+    Vad,
+    Rerank,
+    Detection,
+    Other,
+  };
+
+  inline constexpr std::size_t kLocalAiCapabilityCount = 14;
+
+  struct LocalAiModel {
+    std::string id;
+    std::string backend;
+    std::vector<LocalAiCapability> capabilities;
+    std::vector<std::string> inputModalities;
+    std::vector<std::string> outputModalities;
+    std::int64_t contextSize = 0;
+    bool loaded = false;
+  };
+
+  // One in-flight or finished gallery operation (`GET /models/jobs/{uuid}`).
+  struct LocalAiJob {
+    std::string uuid;
+    std::string galleryId; // what was sent to /models/apply; retry re-sends this
+    std::string model;
+    std::string message;
+    std::string phase;
+    std::string fileName;
+    float progress = 0.0F; // 0..100
+    std::uint64_t currentBytes = 0;
+    std::uint64_t totalBytes = 0;
+    bool processed = false;
+    bool deletion = false;
+    bool cancelled = false;
+    bool error = false;
+  };
+
+  struct LocalAiSnapshot {
+    LocalAiStatus status = LocalAiStatus::Absent;
+    bool hasCli = false;
+    bool local = true;
+    bool busy = false;
+    std::string version;
+    std::string baseUrl;
+    std::string selected;
+    std::string deleting;
+    std::vector<std::string> backends;
+    std::vector<LocalAiModel> models;
+    std::optional<LocalAiJob> job;
+  };
+
+  struct LocalAiGalleryHit {
+    std::string id; // "<gallery>@<name>", what `POST /models/apply` wants
+    std::string name;
+    std::string gallery;
+    std::string description;
+    std::string backend;
+    std::string size;
+    std::string license;
+    std::vector<std::string> tags;
+    bool installed = false;
+  };
+
+  struct LocalAiGallery {
+    std::string query;
+    std::vector<LocalAiGalleryHit> hits; // the full catalog; filter with localAiGalleryMatchesQuery
+    bool loading = false;
+    bool loaded = false;
+    std::string error;
+  };
+
   struct Snapshot {
     std::vector<ProviderSnapshot> providers;
     OllamaSnapshot ollama;
+    LocalAiSnapshot localAi;
+    LocalAiGallery localAiGallery;
     std::vector<LocalRuntime> localRuntimes;
     LibrarySnapshot library;
     bool refreshing = false;
@@ -234,6 +328,41 @@ namespace noctalia::ai_usage {
   [[nodiscard]] std::string ollamaDeleteJson(std::string_view model);
   [[nodiscard]] std::string formatOllamaPullProgress(const PullProgress& pull);
   [[nodiscard]] float ollamaPullFraction(const PullProgress& pull) noexcept;
+  // LocalAI
+  [[nodiscard]] std::string_view localAiStatusKey(LocalAiStatus status) noexcept;
+  [[nodiscard]] std::string localAiStatusLabel(LocalAiStatus status);
+  [[nodiscard]] std::string localAiGlanceLabel(const LocalAiSnapshot& localAi);
+  [[nodiscard]] bool localAiVisible(LocalAiStatus status) noexcept;
+  [[nodiscard]] bool glanceableLocalAi(const Snapshot& snapshot) noexcept;
+  [[nodiscard]] const LocalAiJob* activeLocalAiJob(const Snapshot& snapshot) noexcept;
+  [[nodiscard]] const LocalAiJob* failedLocalAiJob(const Snapshot& snapshot) noexcept;
+  [[nodiscard]] std::string_view localAiCapabilityKey(LocalAiCapability capability) noexcept;
+  [[nodiscard]] std::string localAiCapabilityLabel(LocalAiCapability capability);
+  [[nodiscard]] std::string_view localAiCapabilityGlyph(LocalAiCapability capability) noexcept;
+  [[nodiscard]] std::optional<LocalAiCapability> localAiCapabilityFromKey(std::string_view key) noexcept;
+  [[nodiscard]] bool localAiModelHas(const LocalAiModel& model, LocalAiCapability capability) noexcept;
+  [[nodiscard]] std::string_view effectiveLocalAiModel(const LocalAiSnapshot& localAi) noexcept;
+  [[nodiscard]] const LocalAiModel* localAiModelFor(const LocalAiSnapshot& localAi, LocalAiCapability capability) noexcept;
+  [[nodiscard]] bool localAiModelInstalled(const LocalAiSnapshot& localAi, std::string_view name) noexcept;
+  [[nodiscard]] bool localAiModelMatchesQuery(const LocalAiModel& model, std::string_view query) noexcept;
+  [[nodiscard]] bool localAiGalleryMatchesQuery(const LocalAiGalleryHit& hit, std::string_view query) noexcept;
+  [[nodiscard]] std::vector<const LocalAiGalleryHit*>
+  filterLocalAiGallery(const LocalAiGallery& gallery, std::string_view query, std::size_t limit);
+  [[nodiscard]] bool localAiModelNameValid(std::string_view name) noexcept;
+  void sortLocalAiModels(std::vector<LocalAiModel>& models, std::string_view selected);
+  [[nodiscard]] std::string localAiModelSummary(const LocalAiModel& model);
+  [[nodiscard]] std::string formatLocalAiJobProgress(const LocalAiJob& job);
+  [[nodiscard]] float localAiJobFraction(const LocalAiJob& job) noexcept;
+  [[nodiscard]] std::span<const std::string_view> localAiDesktopIds() noexcept;
+  [[nodiscard]] std::string parseLocalAiWellKnownVersion(std::string_view json);
+  [[nodiscard]] std::optional<std::vector<LocalAiModel>> parseLocalAiModelsJson(std::string_view json);
+  void applyLocalAiSystemJson(LocalAiSnapshot& localAi, std::string_view json);
+  [[nodiscard]] std::optional<std::vector<LocalAiGalleryHit>>
+  parseLocalAiGalleryJson(std::string_view json, const LocalAiSnapshot& installed);
+  [[nodiscard]] std::optional<LocalAiJob> parseLocalAiJobJson(std::string_view json, std::string_view uuid);
+  [[nodiscard]] std::string parseLocalAiApplyUuid(std::string_view json);
+  [[nodiscard]] std::string localAiApplyJson(std::string_view galleryId);
+
   [[nodiscard]] std::optional<std::string> jwtSubject(std::string_view token);
   [[nodiscard]] std::string cursorUserId(std::string_view subject);
   [[nodiscard]] int countPromptEvents(std::string_view raw, bool jsonl, std::string_view todayIso);
