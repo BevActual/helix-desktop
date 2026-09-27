@@ -793,6 +793,7 @@ void Application::initIpc() {
   m_localSendService.registerIpc(m_ipcService);
   m_syncthingService.registerIpc(m_ipcService);
   m_aiUsageService.registerIpc(m_ipcService);
+  m_desktopAiService.registerIpc(m_ipcService);
   if (m_phoneService != nullptr) {
     m_phoneService->registerIpc(m_ipcService);
   }

@@ -76,6 +76,7 @@
 #include "system/lock_keys_service.h"
 #include "system/screen_time_service.h"
 #include "system/ai_usage_service.h"
+#include "system/desktop_ai.h"
 #include "system/telemetry_service.h"
 #include "system/weather_poll_source.h"
 #include "system/weather_service.h"
@@ -356,6 +357,7 @@ private:
   TelemetryService m_telemetryService;
   ScreenTimeService m_screenTimeService;
   AiUsageService m_aiUsageService{m_configService, m_httpClient};
+  DesktopAiService m_desktopAiService{m_aiUsageService, m_httpClient, m_clipboardService};
 
   GlSharedContext m_glShared;
   SharedTextureCache m_sharedTextureCache;

@@ -1648,6 +1648,7 @@ void Application::initBrightnessAndPipewire() {
     m_easyEffectsService->refreshActiveEffectsProfiles();
     m_pipewireSpectrum = std::make_unique<PipeWireSpectrum>(*m_pipewireService);
     m_soundPlayer = std::make_shared<SoundPlayer>(m_pipewireService->loop());
+    m_desktopAiService.setSoundPlayer(m_soundPlayer.get());
 
     auto applySoundConfig = [this]() {
       if (m_soundPlayer == nullptr) {

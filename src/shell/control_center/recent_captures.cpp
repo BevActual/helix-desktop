@@ -249,6 +249,44 @@ namespace control_center {
             })
         );
       }
+      if (images && m_host.onRead) {
+        actions->addChild(
+            ui::button({
+                .glyph = "text-recognition",
+                .glyphSize = Style::fontSizeBody * scale,
+                .variant = ButtonVariant::Ghost,
+                .tooltip = i18n::tr("control-center.screenshot.read"),
+                .minWidth = Style::controlHeightSm * scale,
+                .minHeight = Style::controlHeightSm * scale,
+                .padding = Style::spaceXs * scale,
+                .onClick =
+                    [this, path]() {
+                      m_pendingDeletePath.clear();
+                      applyDeleteChrome();
+                      m_host.onRead(path);
+                    },
+            })
+        );
+      }
+      if (images && m_host.onDescribe) {
+        actions->addChild(
+            ui::button({
+                .glyph = "eye",
+                .glyphSize = Style::fontSizeBody * scale,
+                .variant = ButtonVariant::Ghost,
+                .tooltip = i18n::tr("control-center.screenshot.describe"),
+                .minWidth = Style::controlHeightSm * scale,
+                .minHeight = Style::controlHeightSm * scale,
+                .padding = Style::spaceXs * scale,
+                .onClick =
+                    [this, path]() {
+                      m_pendingDeletePath.clear();
+                      applyDeleteChrome();
+                      m_host.onDescribe(path);
+                    },
+            })
+        );
+      }
       actions->addChild(
           ui::button({
               .out = &row.deleteButton,

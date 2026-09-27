@@ -284,6 +284,9 @@ namespace noctalia::cli {
       std::string_view{"transcript"}, std::string_view{"tts"},    std::string_view{"embeddings"},
       std::string_view{"image"},      std::string_view{"video"},  std::string_view{"sound"},
   };
+  inline constexpr std::array kMsgDesktopAiPathPositionals{
+      Positional{"path", {}, {}, true, false, false},
+  };
   inline constexpr std::array kMsgAiUsageLocalAiEndpointPositionals{
       Positional{"capability", {}, kMsgAiUsageLocalAiCapabilityChoices, false, false, false},
   };
@@ -514,6 +517,30 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command configReload{"config-reload", "Reload the config file", {}, {}, {}, {}, {}, false};
+    inline constexpr Command desktopAiDescribe{
+        "desktop-ai-describe", "Describe a screenshot with the LocalAI vision model", {}, {}, {}, kMsgDesktopAiPathPositionals, {}, false
+    };
+    inline constexpr Command desktopAiDictate{
+        "desktop-ai-dictate", "Start or stop microphone dictation through LocalAI", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiRead{
+        "desktop-ai-read", "Read the text in an image with the LocalAI vision model", {}, {}, {}, kMsgDesktopAiPathPositionals, {}, false
+    };
+    inline constexpr Command desktopAiRewrite{
+        "desktop-ai-rewrite", "Rewrite the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiSpeak{
+        "desktop-ai-speak", "Read the clipboard text aloud with LocalAI", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiStatus{
+        "desktop-ai-status", "Print the desktop LocalAI action state and last result", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiSummarize{
+        "desktop-ai-summarize", "Summarize the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiTranslate{
+        "desktop-ai-translate", "Translate the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command desktopWidgetsEdit{
         "desktop-widgets-edit", "Open the desktop widgets editor", {}, {}, {}, {}, {}, false
     };
@@ -1134,6 +1161,14 @@ namespace noctalia::cli {
       msg::colorSchemeGet,
       msg::colorSchemeSet,
       msg::configReload,
+      msg::desktopAiDescribe,
+      msg::desktopAiDictate,
+      msg::desktopAiRead,
+      msg::desktopAiRewrite,
+      msg::desktopAiSpeak,
+      msg::desktopAiStatus,
+      msg::desktopAiSummarize,
+      msg::desktopAiTranslate,
       msg::desktopWidgetsEdit,
       msg::desktopWidgetsExit,
       msg::desktopWidgetsHide,

@@ -32,6 +32,8 @@ namespace control_center {
       bool showAnnotate = false;
       std::function<void(const std::string& path)> onOpen;
       std::function<void(const std::string& path)> onAnnotate;
+      std::function<void(const std::string& path)> onRead;
+      std::function<void(const std::string& path)> onDescribe;
       std::function<void(std::string_view message)> onStatus;
     };
 

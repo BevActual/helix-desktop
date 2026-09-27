@@ -16,6 +16,7 @@
 #include "render/animation/animation_manager.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
+#include "system/desktop_ai.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/flex.h"
@@ -549,6 +550,17 @@ void ClipboardPicker::setCloseCallback(std::function<void()> callback) {
   m_closeCallback = std::move(callback);
 }
 
+void ClipboardPicker::setDesktopAi(DesktopAiService* desktopAi) {
+  m_desktopAi = desktopAi;
+  if (m_desktopAi == nullptr) {
+    return;
+  }
+  m_desktopAi->addChangeCallback([this]() {
+    syncDesktopAi();
+    PanelManager::instance().requestLayout();
+  });
+}
+
 void ClipboardPicker::setPanelCardOpacity(float opacity) {
   m_panelCardOpacity = opacity;
   if (m_compactCard != nullptr) {
@@ -788,6 +800,66 @@ std::unique_ptr<Flex> ClipboardPicker::create() {
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
       })
   );
+  preview->addChild(ui::row(
+      {
+          .out = &m_aiRow,
+          .align = FlexAlign::Center,
+          .gap = Style::spaceXs * scale,
+          .visible = false,
+          .participatesInLayout = false,
+      },
+      makeCompactIconButton(
+          &m_summarizeButton, "notes", ButtonVariant::Default, scale, [this]() {
+            if (m_desktopAi != nullptr) {
+              m_desktopAi->summarize(selectedText());
+            }
+          },
+          i18n::tr("clipboard.actions.summarize")
+      ),
+      makeCompactIconButton(
+          &m_translateButton, "language", ButtonVariant::Default, scale, [this]() {
+            if (m_desktopAi != nullptr) {
+              m_desktopAi->translate(selectedText());
+            }
+          },
+          i18n::tr("clipboard.actions.translate")
+      ),
+      makeCompactIconButton(
+          &m_rewriteButton, "pencil", ButtonVariant::Default, scale, [this]() {
+            if (m_desktopAi != nullptr) {
+              m_desktopAi->rewrite(selectedText());
+            }
+          },
+          i18n::tr("clipboard.actions.rewrite")
+      ),
+      makeCompactIconButton(
+          &m_speakButton, "volume", ButtonVariant::Default, scale, [this]() {
+            if (m_desktopAi != nullptr) {
+              m_desktopAi->speak(selectedText());
+            }
+          },
+          i18n::tr("clipboard.actions.speak")
+      ),
+      makeCompactIconButton(
+          &m_dictateButton, "microphone", ButtonVariant::Default, scale,
+          [this]() {
+            if (m_desktopAi != nullptr) {
+              m_desktopAi->toggleDictation();
+            }
+          },
+          i18n::tr("clipboard.actions.dictate")
+      )
+  ));
+  preview->addChild(
+      ui::label({
+          .out = &m_aiStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 3,
+          .visible = false,
+          .participatesInLayout = false,
+      })
+  );
 
   auto deleteConfirmPanel = makeInlineConfirmPanel(&m_deleteConfirmPanel, scale);
   deleteConfirmPanel->addChild(
@@ -992,6 +1064,13 @@ void ClipboardPicker::onClose() {
   m_pinButton = nullptr;
   m_copyButton = nullptr;
   m_deleteEntryButton = nullptr;
+  m_aiRow = nullptr;
+  m_summarizeButton = nullptr;
+  m_translateButton = nullptr;
+  m_rewriteButton = nullptr;
+  m_speakButton = nullptr;
+  m_dictateButton = nullptr;
+  m_aiStatus = nullptr;
   m_deleteConfirmPanel = nullptr;
   m_previewScrollView = nullptr;
   m_previewContent = nullptr;
@@ -1162,6 +1241,103 @@ void ClipboardPicker::updatePreviewActions() {
     m_pinButton->setGlyph(pinned ? "unpin" : "pin");
     m_pinButton->setVariant(pinned ? ButtonVariant::Primary : ButtonVariant::Default);
     m_pinButton->setTooltip(i18n::tr(pinned ? "clipboard.actions.unpin" : "clipboard.actions.pin"));
+  }
+  syncDesktopAi();
+}
+
+std::string ClipboardPicker::selectedText() {
+  if (m_clipboard == nullptr) {
+    return {};
+  }
+  const std::size_t historyIndex = selectedHistoryIndex();
+  const auto& history = m_clipboard->history();
+  if (historyIndex == static_cast<std::size_t>(-1) || historyIndex >= history.size() || history[historyIndex].isImage()) {
+    return {};
+  }
+  (void)m_clipboard->ensureEntryLoaded(historyIndex);
+  const auto& entry = m_clipboard->history()[historyIndex];
+  std::string text(entry.data.begin(), entry.data.end());
+  if (StringUtils::trim(text).empty()) {
+    text = entry.textPreview;
+  }
+  return text;
+}
+
+void ClipboardPicker::syncDesktopAi() {
+  const bool show = m_desktopAi != nullptr;
+  bool hasText = false;
+  if (show && m_clipboard != nullptr) {
+    const std::size_t historyIndex = selectedHistoryIndex();
+    const auto& history = m_clipboard->history();
+    hasText = historyIndex != static_cast<std::size_t>(-1) && historyIndex < history.size()
+        && !history[historyIndex].isImage();
+  }
+  if (m_aiRow != nullptr) {
+    m_aiRow->setVisible(show);
+    m_aiRow->setParticipatesInLayout(show);
+  }
+  const auto enable = [&](Button* button, noctalia::ai_usage::LocalAiCapability capability, bool needsText) {
+    if (button == nullptr) {
+      return;
+    }
+    const bool relevant = show && (!needsText || hasText);
+    button->setVisible(relevant);
+    button->setParticipatesInLayout(relevant);
+    if (!relevant || m_desktopAi == nullptr) {
+      return;
+    }
+    const bool recording = m_desktopAi->state().recording;
+    const std::string reason = m_desktopAi->unavailableReason(capability);
+    const bool enabled = reason.empty() && !recording;
+    button->setEnabled(enabled);
+    if (!enabled) {
+      button->setTooltip(reason.empty() ? i18n::tr("desktop-ai.busy") : reason);
+    }
+  };
+  // Tooltips are replaced when disabled. Restore the action name when the model is ready.
+  if (m_summarizeButton != nullptr) {
+    m_summarizeButton->setTooltip(i18n::tr("clipboard.actions.summarize"));
+  }
+  if (m_translateButton != nullptr) {
+    m_translateButton->setTooltip(i18n::tr("clipboard.actions.translate"));
+  }
+  if (m_rewriteButton != nullptr) {
+    m_rewriteButton->setTooltip(i18n::tr("clipboard.actions.rewrite"));
+  }
+  if (m_speakButton != nullptr) {
+    m_speakButton->setTooltip(i18n::tr("clipboard.actions.speak"));
+  }
+  if (m_dictateButton != nullptr) {
+    m_dictateButton->setTooltip(i18n::tr("clipboard.actions.dictate"));
+  }
+  enable(m_summarizeButton, noctalia::ai_usage::LocalAiCapability::Chat, true);
+  enable(m_translateButton, noctalia::ai_usage::LocalAiCapability::Chat, true);
+  enable(m_rewriteButton, noctalia::ai_usage::LocalAiCapability::Chat, true);
+  enable(m_speakButton, noctalia::ai_usage::LocalAiCapability::Tts, true);
+  if (m_dictateButton != nullptr && show) {
+    const bool recording = m_desktopAi->state().recording;
+    const std::string reason = m_desktopAi->unavailableReason(noctalia::ai_usage::LocalAiCapability::Transcript);
+    m_dictateButton->setEnabled(recording || reason.empty());
+    m_dictateButton->setGlyph(recording ? "player-stop" : "microphone");
+    m_dictateButton->setVariant(recording ? ButtonVariant::Primary : ButtonVariant::Default);
+    if (!recording && !reason.empty()) {
+      m_dictateButton->setTooltip(reason);
+    }
+  }
+  if (m_aiStatus != nullptr) {
+    std::string status;
+    if (show && m_desktopAi->state().surface == DesktopAiSurface::Clipboard) {
+      const auto& state = m_desktopAi->state();
+      status = !state.busy && !state.recording && !state.result.empty() ? state.result : state.status;
+      constexpr std::size_t kMaxStatus = 180;
+      if (status.size() > kMaxStatus) {
+        status.resize(kMaxStatus);
+      }
+    }
+    m_aiStatus->setText(status);
+    const bool showStatus = !status.empty();
+    m_aiStatus->setVisible(showStatus);
+    m_aiStatus->setParticipatesInLayout(showStatus);
   }
 }
 

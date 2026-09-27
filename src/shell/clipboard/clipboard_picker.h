@@ -13,6 +13,7 @@ class AnimationManager;
 class Button;
 class AsyncTextureCache;
 class ClipboardService;
+class DesktopAiService;
 class Flex;
 class Image;
 class Input;
@@ -41,6 +42,7 @@ public:
 
   void setActivateCallback(std::function<void(const ClipboardEntry&)> callback);
   void setCloseCallback(std::function<void()> callback);
+  void setDesktopAi(DesktopAiService* desktopAi);
 
   void setContentScale(float scale) noexcept { m_contentScale = scale; }
   void setPanelCardOpacity(float opacity);
@@ -61,6 +63,8 @@ private:
   void schedulePreviewPayloadRefresh(bool debounced);
   void updateListState();
   void updatePreviewActions();
+  void syncDesktopAi();
+  [[nodiscard]] std::string selectedText();
   void rebuildPreview(Renderer& renderer, float width, float height);
   void selectIndex(std::size_t index);
   void selectByStorageId(std::string storageId);
@@ -119,6 +123,14 @@ private:
   Button* m_pinButton = nullptr;
   Button* m_copyButton = nullptr;
   Button* m_deleteEntryButton = nullptr;
+  Flex* m_aiRow = nullptr;
+  Button* m_summarizeButton = nullptr;
+  Button* m_translateButton = nullptr;
+  Button* m_rewriteButton = nullptr;
+  Button* m_speakButton = nullptr;
+  Button* m_dictateButton = nullptr;
+  Label* m_aiStatus = nullptr;
+  DesktopAiService* m_desktopAi = nullptr;
   Flex* m_deleteConfirmPanel = nullptr;
   ScrollView* m_previewScrollView = nullptr;
   Flex* m_previewContent = nullptr;

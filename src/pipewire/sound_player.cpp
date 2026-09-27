@@ -273,6 +273,15 @@ SoundPlayer::loadPluginSound(std::uint64_t ownerId, const std::string& name, con
 
 void SoundPlayer::unloadPluginSounds(std::uint64_t ownerId) { m_pluginBuffers.erase(ownerId); }
 
+void SoundPlayer::playFile(const fs::path& path) {
+  SoundBuffer decoded;
+  if (const auto error = decode(path, decoded)) {
+    kLog.warn("failed to play {}: {}", path.string(), *error);
+    return;
+  }
+  playBuffer(path.string(), std::make_shared<const SoundBuffer>(std::move(decoded)));
+}
+
 void SoundPlayer::play(const std::string& name) {
   const auto it = m_buffers.find(name);
   if (it == m_buffers.end()) {

@@ -674,6 +674,7 @@ void Application::initPanelManagerAndPanels() {
           .sysmon = m_systemMonitor.get(),
           .screenTime = &m_screenTimeService,
           .aiUsage = &m_aiUsageService,
+          .desktopAi = &m_desktopAiService,
           .nightLight = &m_gammaService,
           .theme = &m_themeService,
           .templateApply = &m_templateApplyService,
@@ -759,7 +760,9 @@ void Application::initPanelManagerAndPanels() {
     m_panelManager.registerPanel("launcher", std::move(launcherPanel));
   }
   {
-    auto quickInsert = std::make_unique<QuickInsertPanel>(&m_configService, &m_clipboardService, &m_thumbnailService);
+    auto quickInsert = std::make_unique<QuickInsertPanel>(
+        &m_configService, &m_clipboardService, &m_thumbnailService, &m_desktopAiService
+    );
     quickInsert->setCopiedActivationCallback([this](bool isImage) {
       const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;
       if (mode == ClipboardAutoPasteMode::Off) {

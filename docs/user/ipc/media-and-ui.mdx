@@ -279,6 +279,7 @@ Built-in AI status reads AI CLIs on this machine (`claude`, `codex`, `gemini`, `
 | Install LocalAI model | <IpcCommand command="ai-usage-localai-install" /> | Apply a gallery entry (`POST /models/apply`; a bare name means `gallery@NAME`) and follow the job until it lands. Queues until LocalAI is running. |
 | Remove LocalAI model | <IpcCommand command="ai-usage-localai-delete" /> | Delete an installed model (`POST /models/delete/NAME`). |
 | Open LocalAI | <IpcCommand command="ai-usage-localai-open" /> | Open the LocalAI web UI in the browser. |
+| Desktop AI | <IpcCommand command="desktop-ai-status" /> | One-shot LocalAI tools. `desktop-ai-summarize`, `desktop-ai-translate`, `desktop-ai-rewrite`, and `desktop-ai-speak` use the clipboard. `desktop-ai-dictate` toggles the microphone. `desktop-ai-read PATH` and `desktop-ai-describe PATH` use a vision model. Results are copied to the clipboard. `desktop-ai-status` prints the in-flight state and the last result. |
 
 Percents are utilization, not currency. Extra usage for Claude is a percent even when the OAuth payload includes credit fields. Codex prefers live `codex app-server` limits and falls back to the newest session `.jsonl`. Open the tab with `noctalia msg panel-toggle control-center ai`.
 

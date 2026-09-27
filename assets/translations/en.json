@@ -210,9 +210,14 @@
       "close": "Close",
       "copy": "Copy",
       "delete-item": "Delete item",
+      "dictate": "Dictate",
       "image-action": "Open image",
       "keep-pinned": "Keep pinned",
       "pin": "Pin",
+      "rewrite": "Rewrite",
+      "speak": "Read aloud",
+      "summarize": "Summarize",
+      "translate": "Translate",
       "unpin": "Unpin"
     },
     "auto-paste-unavailable-body": "Auto-paste needs a Wayland virtual keyboard. The item is still copied.",
@@ -1458,6 +1463,7 @@
       "delay-5s-tooltip": "Wait 5 seconds after Control Center closes",
       "delay-none": "Now",
       "delay-none-tooltip": "Capture as soon as Control Center closes",
+      "describe": "Describe with LocalAI",
       "fullscreen": "Fullscreen",
       "hint": "Control Center closes first so the overlay can take the screen.",
       "ocr": "Scan text",
@@ -1473,6 +1479,7 @@
       "qr-empty": "No QR code found in that region.",
       "qr-failed": "Could not scan a QR code.",
       "qr-missing": "Install ZBar to scan QR codes.",
+      "read": "Read with LocalAI",
       "recent": "Recent screenshots",
       "recent-empty": "No screenshots in the save folder yet.",
       "region": "Select region",
@@ -1790,6 +1797,24 @@
       "spacing-title": "Spacing",
       "spacing-tooltip": "Gaps and outer padding"
     }
+  },
+  "desktop-ai": {
+    "busy": "LocalAI is already working on something.",
+    "copied": "Copied to the clipboard.",
+    "dictate-missing": "Install pw-record, parecord, or ffmpeg to dictate.",
+    "dictate-start": "Listening…",
+    "dictate-stop": "Transcribing…",
+    "done": "Done.",
+    "empty": "Nothing to send.",
+    "failed": "LocalAI could not finish that.",
+    "needs-chat": "Install a chat model in the AI gallery.",
+    "needs-transcript": "Install a transcription model in the AI gallery.",
+    "needs-tts": "Install a speech model in the AI gallery.",
+    "needs-vision": "Install a vision model in the AI gallery.",
+    "speaking": "Speaking…",
+    "stopped": "LocalAI is not running.",
+    "too-large": "That image is too large for LocalAI.",
+    "working": "Asking LocalAI…"
   },
   "desktop-widgets": {
     "editor": {
@@ -5394,6 +5419,38 @@
           "config-reload": {
             "description": "Reload the config file",
             "label": "Reload config"
+          },
+          "desktop-ai-describe": {
+            "description": "Describe a screenshot with the LocalAI vision model",
+            "label": "Describe image"
+          },
+          "desktop-ai-dictate": {
+            "description": "Start or stop microphone dictation through LocalAI",
+            "label": "Dictate"
+          },
+          "desktop-ai-read": {
+            "description": "Read the text in an image with the LocalAI vision model",
+            "label": "Read image"
+          },
+          "desktop-ai-rewrite": {
+            "description": "Rewrite the clipboard text with LocalAI and copy the result",
+            "label": "Rewrite clipboard"
+          },
+          "desktop-ai-speak": {
+            "description": "Read the clipboard text aloud with LocalAI",
+            "label": "Read clipboard aloud"
+          },
+          "desktop-ai-status": {
+            "description": "Print the desktop LocalAI action state and last result",
+            "label": "Desktop AI status"
+          },
+          "desktop-ai-summarize": {
+            "description": "Summarize the clipboard text with LocalAI and copy the result",
+            "label": "Summarize clipboard"
+          },
+          "desktop-ai-translate": {
+            "description": "Translate the clipboard text with LocalAI and copy the result",
+            "label": "Translate clipboard"
           },
           "desktop-widgets-edit": {
             "description": "Open the desktop widgets editor",
