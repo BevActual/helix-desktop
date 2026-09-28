@@ -1476,7 +1476,8 @@ AudioTab::AudioTab(
     : m_audio(audio), m_easyEffects(easyEffects), m_mpris(mpris), m_config(config), m_wayland(wayland),
       m_renderContext(renderContext),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "services", .includedGroups = {"audio"}}
+          services,
+          SettingsPaneOptions{.section = "services", .includedGroups = {"audio"}, .inlineSettings = true}
       )) {
   if (m_config != nullptr) {
     if (const std::optional<std::string> catalog = m_config->stateString("audio_tab", "catalog")) {
@@ -1977,43 +1978,53 @@ std::unique_ptr<Flex> AudioTab::create() {
   );
   tab->addChild(std::move(compactCard));
 
+  // Below the compact card the page is one scroll, like a macOS pane: the device (or app)
+  // list, then Sound's settings (inlineSettings). The lists grow to their content instead of
+  // scrolling on their own, so the settings never squeeze them.
+  ScrollView* pageScroll = nullptr;
+  auto page = ui::scrollView({
+      .out = &pageScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure =
+          [](ScrollView& view) {
+            view.clearFill();
+            view.clearBorder();
+          },
+  });
+  Flex* pageContent = page->content();
+  pageContent->setDirection(FlexDirection::Vertical);
+  pageContent->setAlign(FlexAlign::Stretch);
+  pageContent->setGap(Style::spaceMd * scale);
+
   auto leftoverHost = ui::column({
       .align = FlexAlign::Stretch,
-      .flexGrow = 1.0F,
   });
   auto addListHost = [&](Flex** hostOut, ScrollView** scrollOut, Flex** listOut) {
     auto host = ui::column({
         .out = hostOut,
         .align = FlexAlign::Stretch,
-        .flexGrow = 1.0F,
         .visible = false,
         .participatesInLayout = false,
         .configure = [scale](Flex& column) { applyContentCardStyle(column, scale); },
     });
-    auto scroll = ui::scrollView({
-        .out = scrollOut,
-        .contentScale = scale,
-        .scrollbarVisible = true,
-        .viewportPaddingH = 0.0F,
-        .viewportPaddingV = 0.0F,
-        .flexGrow = 1.0F,
-        .configure =
-            [](ScrollView& view) {
-              view.clearFill();
-              view.clearBorder();
-            },
-    });
-    *listOut = scroll->content();
-    (*listOut)->setDirection(FlexDirection::Vertical);
-    (*listOut)->setAlign(FlexAlign::Stretch);
-    (*listOut)->setGap(0.0F);
-    host->addChild(std::move(scroll));
+    host->addChild(ui::column({
+        .out = listOut,
+        .align = FlexAlign::Stretch,
+        .gap = 0.0F,
+    }));
+    *scrollOut = pageScroll;
     leftoverHost->addChild(std::move(host));
   };
   addListHost(&m_outputHost, &m_outputScroll, &m_outputList);
   addListHost(&m_inputHost, &m_inputScroll, &m_inputList);
   addListHost(&m_appsHost, &m_programScroll, &m_programList);
-  tab->addChild(std::move(leftoverHost));
+  pageContent->addChild(std::move(leftoverHost));
+  pageContent->addChild(m_settings->createInline(scale, panelCardOpacity()));
+  tab->addChild(std::move(page));
   syncCatalog();
 
   if (m_wayland != nullptr && m_renderContext != nullptr) {
@@ -2133,14 +2144,12 @@ void AudioTab::syncCatalog() {
   const bool input = m_catalog == Catalog::Input;
   const bool apps = m_catalog == Catalog::Apps;
   bool dirty = false;
+  // m_*Scroll all point at the shared page scroll, which stays shown.
   dirty |= setShown(m_outputHost, output);
-  dirty |= setShown(m_outputScroll, output);
   dirty |= setShown(m_outputList, output);
   dirty |= setShown(m_inputHost, input);
-  dirty |= setShown(m_inputScroll, input);
   dirty |= setShown(m_inputList, input);
   dirty |= setShown(m_appsHost, apps);
-  dirty |= setShown(m_programScroll, apps);
   dirty |= setShown(m_programList, apps);
   dirty |= syncDetailLabel();
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
@@ -2588,7 +2597,7 @@ void AudioTab::rebuildLists(Renderer& renderer) {
   const float scale = contentScale();
   auto rebuild = [&](ScrollView* scroll, Flex* list, float& lastWidth, std::string& lastKey,
                      std::span<const AudioNode> devices, std::uint32_t defaultId, bool isOutput) {
-    if (scroll == nullptr || list == nullptr || !scroll->visible()) {
+    if (scroll == nullptr || list == nullptr || !list->visible()) {
       return;
     }
     const float width = scroll->contentViewportWidth();

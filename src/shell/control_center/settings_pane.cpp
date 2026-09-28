@@ -187,7 +187,8 @@ SettingsPane::SettingsPane(const ControlCenterServices& services, SettingsPaneOp
       m_actions(services.settingsActions), m_openStore(std::move(options.openStore)),
       m_selectedSection(std::move(options.section)),
       m_includedGroups(std::move(options.includedGroups)), m_compact(options.compact),
-      m_showConfigureButton(options.showConfigureButton) {
+      m_showConfigureButton(options.showConfigureButton && !options.inlineSettings),
+      m_inlineSettings(options.inlineSettings) {
   m_showAdvanced = m_config != nullptr ? m_config->config().shell.settingsShowAdvanced : true;
   if (services.settingsInvalidated != nullptr) {
     m_settingsInvalidatedConn = services.settingsInvalidated->connect([this]() { onExternalChanged(); });
@@ -487,6 +488,7 @@ void SettingsPane::onClose() {
   m_statusBanner = nullptr;
   m_scroll = nullptr;
   m_content = nullptr;
+  m_inlineContent = nullptr;
   m_advancedToggle = nullptr;
   m_actionsMenuButton = nullptr;
   m_layoutRenderer = nullptr;
@@ -595,7 +597,7 @@ void SettingsPane::queueRebuild() {
   m_rebuildQueued = true;
   DeferredCall::callLater([this]() {
     m_rebuildQueued = false;
-    if (m_content == nullptr) {
+    if (m_content == nullptr && m_inlineContent == nullptr) {
       return;
     }
     rebuildContent();
@@ -603,18 +605,38 @@ void SettingsPane::queueRebuild() {
   });
 }
 
+void SettingsPane::rebuildInto(Flex& content) {
+  while (!content.children().empty()) {
+    content.removeChild(content.children().back().get());
+  }
+  content.setDirection(FlexDirection::Vertical);
+  content.setAlign(FlexAlign::Stretch);
+  content.setGap(Style::spaceMd * m_scale);
+  fillContent(content);
+}
+
+std::unique_ptr<Flex> SettingsPane::createInline(float scale, float panelCardOpacity) {
+  m_scale = scale;
+  m_panelCardOpacity = panelCardOpacity;
+  m_showAdvanced = m_config != nullptr ? m_config->config().shell.settingsShowAdvanced : m_showAdvanced;
+  auto inlineContent = ui::column({
+      .out = &m_inlineContent,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+  });
+  rebuildInto(*m_inlineContent);
+  return inlineContent;
+}
+
 void SettingsPane::rebuildContent() {
   uiAssertNotRendering("SettingsPane::rebuildContent");
+  if (m_inlineContent != nullptr) {
+    rebuildInto(*m_inlineContent);
+  }
   if (m_content == nullptr) {
     return;
   }
-  while (!m_content->children().empty()) {
-    m_content->removeChild(m_content->children().back().get());
-  }
-  m_content->setDirection(FlexDirection::Vertical);
-  m_content->setAlign(FlexAlign::Stretch);
-  m_content->setGap(Style::spaceMd * m_scale);
-  fillContent(*m_content);
+  rebuildInto(*m_content);
   if (m_statusBanner != nullptr && m_statusLabel != nullptr) {
     settings::updateSettingsStatusBanner(*m_statusBanner, *m_statusLabel, m_statusMessage, m_statusIsError);
   }

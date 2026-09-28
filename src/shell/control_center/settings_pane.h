@@ -52,6 +52,9 @@ struct SettingsPaneOptions {
   bool compact = false;
   std::function<void()> openStore;
   bool showConfigureButton = true;
+  // The tab shows its settings in the page (createInline), macOS-pane style, so the header
+  // Settings button is hidden. Search and `settings:` contexts still open the full view.
+  bool inlineSettings = false;
 };
 
 class SettingsPane {
@@ -61,6 +64,9 @@ public:
 
   [[nodiscard]] std::unique_ptr<Flex> create(float scale, float panelCardOpacity);
   [[nodiscard]] std::unique_ptr<Flex> createHeaderActions(float scale);
+  // The pane's settings rows in a plain (non-scrolling) column, for tabs that show their
+  // settings under the live content. Rebuilt with the full view.
+  [[nodiscard]] std::unique_ptr<Flex> createInline(float scale, float panelCardOpacity);
   [[nodiscard]] std::unique_ptr<Flex> wrapLive(std::unique_ptr<Flex> live, float scale, float panelCardOpacity);
   [[nodiscard]] std::unique_ptr<Flex> embedHeader(std::unique_ptr<Flex> liveActions, float scale);
 
@@ -86,6 +92,7 @@ private:
   void rebuildContent();
   void queueRebuild();
   void fillContent(Flex& content);
+  void rebuildInto(Flex& content);
   [[nodiscard]] settings::RegistryEnvironment buildRegistryEnvironment() const;
   [[nodiscard]] std::vector<settings::SelectOption> batteryDeviceOptions() const;
   [[nodiscard]] std::vector<settings::GestureActionOption> gestureActionCatalog() const;
@@ -145,6 +152,7 @@ private:
   std::unordered_set<std::string> m_includedGroups;
   bool m_compact = false;
   bool m_showConfigureButton = true;
+  bool m_inlineSettings = false;
   std::string m_searchQuery;
   // Installed-plugins list filter (Plugins tab), debounced so typing does not rebuild per key.
   std::string m_pluginSearchQuery;
@@ -199,6 +207,7 @@ private:
   ScrollView* m_scroll = nullptr;
   ScrollViewState m_scrollState{};
   Flex* m_content = nullptr;
+  Flex* m_inlineContent = nullptr;
   Toggle* m_advancedToggle = nullptr;
   Button* m_actionsMenuButton = nullptr;
   Renderer* m_layoutRenderer = nullptr;

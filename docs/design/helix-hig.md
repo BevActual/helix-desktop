@@ -127,6 +127,11 @@ clusters, settings shown in context, and sub-tabs only where one tab has several
   devices and input; sharing; apps; advanced (hooks, compositor).
 - **Search** finds individual settings and opens the tab and sub-tab that shows them
   (`tabIdForSettingsGroup`).
+- **Settings in the pane.** Tabs that are mostly controls (Sound first; Displays, Power,
+  Network, Bluetooth, Notifications next) show their settings under the live content, and
+  the page below the compact card scrolls as one list: `SettingsPaneOptions::inlineSettings`
+  plus `SettingsPane::createInline`. App-like tabs (Weather, Calendar, Media) keep a separate
+  settings view behind a labeled **Settings** / **Done** header button.
 
 ## Accessibility
 
@@ -159,8 +164,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. **Settings still hides most settings behind each tab's header gear.** They should show in
-   the tab (macOS panes are scrolling lists). Hub sub-tabs can't be hidden individually with
+3. **Most control tabs still keep settings behind the Settings button.** Only Sound shows
+   them inline so far. Hub sub-tabs can't be hidden individually with
    `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.
