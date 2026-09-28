@@ -26,7 +26,7 @@ The name in the UI, notifications, generated niri includes, template display nam
 
 ## Design
 
-Liquid Glass is a hierarchy, not a skin. Chrome, leftover, modules, and widgets are documented in `.cursor/rules/helix-hig.mdc`. Control Center follows Apple HIG structure without copying private Control Center visuals.
+Liquid Glass is a hierarchy, not a skin. The full design language (tiers, color, shape, type, motion, menus, accessibility, and known gaps) is in `docs/design/helix-hig.md`. Control Center follows Apple HIG structure without copying private Control Center visuals.
 
 ## Lineage
 
