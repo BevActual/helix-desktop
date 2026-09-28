@@ -453,16 +453,18 @@ std::unique_ptr<Flex> SettingsPane::embedHeader(std::unique_ptr<Flex> liveAction
   }
   if (m_showConfigureButton) {
     row->addChild(
+        // Labeled, not an icon: most settings live behind this switch, so it has to be found.
         ui::button({
             .out = &m_configureButton,
+            .text = m_configureMode ? i18n::tr("control-center.settings.done")
+                                    : i18n::tr("control-center.settings.configure"),
             .glyph = "settings",
             .selected = m_configureMode,
-            .tooltip = i18n::tr("control-center.settings.configure"),
             .onClick =
                 [this]() {
                   setConfigureMode(!m_configureMode);
                 },
-            .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
+            .configure = [scale](Button& button) { panel_button_style::configureHeaderTextButton(button, scale); },
         })
     );
   }
@@ -580,6 +582,9 @@ void SettingsPane::applyConfigureVisibility() {
   }
   if (m_configureButton != nullptr) {
     m_configureButton->setSelected(m_configureMode);
+    m_configureButton->setText(
+        m_configureMode ? i18n::tr("control-center.settings.done") : i18n::tr("control-center.settings.configure")
+    );
   }
 }
 

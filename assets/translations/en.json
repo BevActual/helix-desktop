@@ -1488,7 +1488,8 @@
     },
     "settings": {
       "configure": "Settings",
-      "search-placeholder": "Search pages and settings"
+      "search-placeholder": "Search pages and settings",
+      "done": "Done"
     },
     "shortcuts": {
       "ai": "AI",
