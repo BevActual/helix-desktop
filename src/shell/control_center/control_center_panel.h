@@ -108,6 +108,11 @@ private:
   void selectAdjacentVisibleTab(int direction);
   [[nodiscard]] TabSlot* slotById(std::string_view id);
   [[nodiscard]] const TabSlot* slotById(std::string_view id) const;
+  // Page for an id, looking inside hub groups (HubTab) for sub-tab ids such as "audio".
+  [[nodiscard]] Tab* tabForId(std::string_view id);
+  [[nodiscard]] const Tab* tabForId(std::string_view id) const;
+  // True when `id` (a sidebar tab or a hub sub-tab) is what the panel is showing.
+  [[nodiscard]] bool isTabIdActive(std::string_view id) const;
   void wireSidebarScroll(InputArea* area);
   void scrollFocusedInputIntoView(InputArea* area) override;
   void scrollSidebarNodeIntoView(const Node* node);

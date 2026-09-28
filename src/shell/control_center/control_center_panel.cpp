@@ -24,6 +24,7 @@
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/theme_tab.h"
 #include "shell/control_center/tabs/desktop_tab.h"
+#include "shell/control_center/hub_tab.h"
 #include "shell/control_center/tabs/launcher_tab.h"
 #include "shell/control_center/tabs/ai_usage_tab.h"
 #include "shell/control_center/tabs/audio_tab.h"
@@ -159,9 +160,7 @@ namespace {
       {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Layout},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
-      {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Status},
-      {"media", "control-center.tabs.media", "disc-filled", true, TabGroup::Status},
-      {"monitor", "control-center.tabs.monitor", "device-desktop", true, TabGroup::Status},
+      {"sound-display", "control-center.tabs.sound-display", "volume", true, TabGroup::Status},
       {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
       {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
@@ -193,6 +192,31 @@ namespace {
       {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Advanced},
   };
 
+  // Sidebar groups that host existing tabs as sub-tabs (HubTab). Child ids stay valid open
+  // contexts everywhere (`panel-open control-center audio`, Home links, search); the panel
+  // resolves them to the hub and selects the child.
+  struct HubChildSpec {
+    const char* childId;
+    const char* hubId;
+    const char* titleKey;
+    const char* glyph;
+  };
+
+  constexpr HubChildSpec kHubChildren[] = {
+      {"audio", "sound-display", "control-center.tabs.audio", "volume"},
+      {"media", "sound-display", "control-center.tabs.media", "disc-filled"},
+      {"monitor", "sound-display", "control-center.tabs.monitor", "device-desktop"},
+  };
+
+  [[nodiscard]] std::optional<std::string_view> hubIdForChild(std::string_view id) {
+    for (const auto& spec : kHubChildren) {
+      if (id == spec.childId) {
+        return spec.hubId;
+      }
+    }
+    return std::nullopt;
+  }
+
   // Sidebar icon color per tab, the way macOS sidebars carry a tint per section: appearance tabs
   // take the accent itself, connectivity blue, power green, alerts red, media pink, tools yellow.
   // Fixed hues are harmonized toward the palette primary. Advanced and plain utilities stay neutral.
@@ -222,7 +246,7 @@ namespace {
     if (id == "power" || id == "system") {
       return fixed(kGreen);
     }
-    if (id == "audio" || id == "packages") {
+    if (id == "audio" || id == "sound-display" || id == "packages") {
       return fixed(kOrange);
     }
     if (id == "notifications" || id == "calendar") {
@@ -354,6 +378,7 @@ namespace {
         || id == "calendar"
         || id == "clock"
         || id == "audio"
+        || id == "sound-display"
         || id == "monitor"
         || id == "wallpaper"
         || id == "templates"
@@ -553,18 +578,34 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("desktop", std::make_unique<DesktopTab>(services));
   add("network", std::make_unique<NetworkTab>(services));
   add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
-  add(
-      "audio",
-      std::make_unique<AudioTab>(
-          services.audio, services.easyEffects, services.mpris, services.config, wayland,
-          PanelManager::instance().renderContext(), services
-      )
-  );
-  add(
-      "media",
-      std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services)
-  );
-  add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
+  {
+    auto hubChild = [](std::string_view id, std::unique_ptr<Tab> tab) {
+      for (const auto& spec : kHubChildren) {
+        if (id == spec.childId) {
+          return HubTab::Child{
+              .id = spec.childId, .title = i18n::tr(spec.titleKey), .glyph = spec.glyph, .tab = std::move(tab)
+          };
+        }
+      }
+      return HubTab::Child{.id = std::string(id), .title = std::string(id), .glyph = {}, .tab = std::move(tab)};
+    };
+    std::vector<HubTab::Child> soundDisplay;
+    soundDisplay.push_back(hubChild(
+        "audio",
+        std::make_unique<AudioTab>(
+            services.audio, services.easyEffects, services.mpris, services.config, wayland,
+            PanelManager::instance().renderContext(), services
+        )
+    ));
+    soundDisplay.push_back(hubChild(
+        "media", std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services)
+    ));
+    soundDisplay.push_back(hubChild(
+        "monitor",
+        std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services)
+    ));
+    add("sound-display", std::make_unique<HubTab>(std::move(soundDisplay)));
+  }
   add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
   add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
   add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
@@ -1089,31 +1130,31 @@ void ControlCenterPanel::onOpen(std::string_view context) {
     desktopSection = desktopSectionForContext(context);
   }
   selectTab(tabId, animateTabSwitch);
-  if (auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
-    if (auto* capture = dynamic_cast<CaptureTab*>(slot->tab.get()); capture != nullptr && captureView.has_value()) {
+  if (Tab* openedTab = tabForId(tabId); openedTab != nullptr) {
+    if (auto* capture = dynamic_cast<CaptureTab*>(openedTab); capture != nullptr && captureView.has_value()) {
       capture->applyOpenView(*captureView);
     }
-    if (auto* theme = dynamic_cast<ThemeTab*>(slot->tab.get()); theme != nullptr && themeSection.has_value()) {
+    if (auto* theme = dynamic_cast<ThemeTab*>(openedTab); theme != nullptr && themeSection.has_value()) {
       if (settingsTarget.isSettings) {
         theme->applyOpenContext(settingsTarget.section);
       } else {
         theme->applyOpenContext(context);
       }
     }
-    if (auto* desktop = dynamic_cast<DesktopTab*>(slot->tab.get()); desktop != nullptr && desktopSection.has_value()) {
+    if (auto* desktop = dynamic_cast<DesktopTab*>(openedTab); desktop != nullptr && desktopSection.has_value()) {
       if (settingsTarget.isSettings) {
         desktop->applyOpenContext(settingsTarget.section);
       } else {
         desktop->applyOpenContext(context);
       }
     }
-    if (auto* wallpaper = dynamic_cast<WallpaperTab*>(slot->tab.get()); wallpaper != nullptr) {
+    if (auto* wallpaper = dynamic_cast<WallpaperTab*>(openedTab); wallpaper != nullptr) {
       wallpaper->applyOpenContext(wallpaperPickerContext(context));
     }
     if (settingsTarget.isSettings && tabId != "theme" && !desktopSection.has_value()) {
-      slot->tab->setConfigureMode(true);
+      openedTab->setConfigureMode(true);
     } else if (isLiveSettingsHost(tabId)) {
-      slot->tab->setConfigureMode(false);
+      openedTab->setConfigureMode(false);
     }
   }
   maybeOpenPendingEditor();
@@ -1171,30 +1212,31 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
       return isSettingsEditorTab(m_activeTabId) || m_activeTabId == "theme";
     }
     const std::string tabId = tabIdForSettingsSection(settingsTarget.section);
-    if (m_activeTabId != tabId) {
+    if (!isTabIdActive(tabId)) {
       return false;
     }
     if (isLiveSettingsHost(tabId)) {
-      if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
-        if (!slot->tab->configureMode()) {
+      // Settings panes are non-const; sub-tabs of hub groups are found through tabForId.
+      if (Tab* tab = const_cast<ControlCenterPanel*>(this)->tabForId(tabId); tab != nullptr) {
+        if (!tab->configureMode()) {
           return false;
         }
         if (tabId == "capture") {
-          if (const auto* pane = slot->tab->settingsPane(); pane != nullptr) {
+          if (const auto* pane = tab->settingsPane(); pane != nullptr) {
             return pane->section() == settingsTarget.section;
           }
           return false;
         }
         if (tabId == "theme") {
           if (themeSectionForContext(settingsTarget.section).has_value()) {
-            if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
+            if (const auto* theme = dynamic_cast<const ThemeTab*>(tab)) {
               return theme->matchesOpenContext(settingsTarget.section);
             }
           }
         }
         if (tabId == "desktop") {
           if (desktopSectionForContext(settingsTarget.section).has_value()) {
-            if (const auto* desktop = dynamic_cast<const DesktopTab*>(slot->tab.get())) {
+            if (const auto* desktop = dynamic_cast<const DesktopTab*>(tab)) {
               return desktop->matchesOpenContext(settingsTarget.section);
             }
           }
@@ -1207,7 +1249,7 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
   }
   const std::string requested = std::string(context);
   const std::string tabId = resolveOpenTabId(requested);
-  if (m_activeTabId != tabId) {
+  if (!isTabIdActive(tabId)) {
     return false;
   }
   if (tabId == "wallpaper") {
@@ -1355,11 +1397,10 @@ void ControlCenterPanel::onClose() {
 }
 
 bool ControlCenterPanel::deferExternalRefresh() const {
-  if (m_activeTabId != "audio") {
+  if (!isTabIdActive("audio")) {
     return false;
   }
-  const auto* slot = slotById("audio");
-  const auto* audioTab = slot != nullptr ? dynamic_cast<const AudioTab*>(slot->tab.get()) : nullptr;
+  const auto* audioTab = dynamic_cast<const AudioTab*>(tabForId("audio"));
   return audioTab != nullptr && audioTab->dragging();
 }
 
@@ -1453,6 +1494,11 @@ std::vector<ControlCenterPanel::LauncherTabEntry> ControlCenterPanel::visibleTab
       continue;
     }
     out.push_back({.key = slot.id, .title = slot.title, .glyph = slot.glyph});
+    if (const auto* hub = dynamic_cast<const HubTab*>(slot.tab.get()); hub != nullptr) {
+      for (const auto& child : hub->children()) {
+        out.push_back({.key = child.id, .title = child.title, .glyph = child.glyph});
+      }
+    }
   }
   return out;
 }
@@ -1885,6 +1931,11 @@ void ControlCenterPanel::ensureTabUi(TabSlot& slot) {
 
 void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
   std::string target(id);
+  std::string hubChild;
+  if (const auto hubId = hubIdForChild(id); hubId.has_value()) {
+    hubChild = std::string(id);
+    target = std::string(*hubId);
+  }
   if (slotById(target) == nullptr || !isTabFeatureAvailable(target)) {
     target = firstVisibleTab();
   }
@@ -1895,6 +1946,11 @@ void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
 
   if (auto* slot = slotById(target); slot != nullptr) {
     ensureTabUi(*slot);
+    if (!hubChild.empty()) {
+      if (auto* hub = dynamic_cast<HubTab*>(slot->tab.get()); hub != nullptr) {
+        (void)hub->selectChild(hubChild);
+      }
+    }
   }
   if (tabChanged && animated) {
     if (auto* previousSlot = slotById(previous); previousSlot != nullptr) {
@@ -1923,7 +1979,7 @@ void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
     resetTabContainerTransforms();
   }
 
-  scheduleMprisRefreshFor(target);
+  scheduleMprisRefreshFor(hubChild.empty() ? std::string_view(target) : std::string_view(hubChild));
   syncActiveTabSearch();
 }
 
@@ -2132,6 +2188,15 @@ std::string ControlCenterPanel::bestTabSearchId() const {
       bestScore = score;
       bestId = slot.id;
     }
+    if (const auto* hub = dynamic_cast<const HubTab*>(slot.tab.get()); hub != nullptr) {
+      for (const auto& child : hub->children()) {
+        const int childScore = control_center::tabSearchScore(child.id, child.title, m_searchQuery);
+        if (childScore > bestScore) {
+          bestScore = childScore;
+          bestId = child.id;
+        }
+      }
+    }
   }
   return bestId;
 }
@@ -2288,4 +2353,30 @@ const ControlCenterPanel::TabSlot* ControlCenterPanel::slotById(std::string_view
     }
   }
   return nullptr;
+}
+
+Tab* ControlCenterPanel::tabForId(std::string_view id) {
+  return const_cast<Tab*>(std::as_const(*this).tabForId(id));
+}
+
+const Tab* ControlCenterPanel::tabForId(std::string_view id) const {
+  if (const auto hubId = hubIdForChild(id); hubId.has_value()) {
+    const auto* slot = slotById(*hubId);
+    const auto* hub = slot != nullptr ? dynamic_cast<const HubTab*>(slot->tab.get()) : nullptr;
+    return hub != nullptr ? hub->child(id) : nullptr;
+  }
+  const auto* slot = slotById(id);
+  return slot != nullptr ? slot->tab.get() : nullptr;
+}
+
+bool ControlCenterPanel::isTabIdActive(std::string_view id) const {
+  if (const auto hubId = hubIdForChild(id); hubId.has_value()) {
+    if (m_activeTabId != *hubId) {
+      return false;
+    }
+    const auto* slot = slotById(*hubId);
+    const auto* hub = slot != nullptr ? dynamic_cast<const HubTab*>(slot->tab.get()) : nullptr;
+    return hub != nullptr && hub->activeChildId() == id;
+  }
+  return m_activeTabId == id;
 }

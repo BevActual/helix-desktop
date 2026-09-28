@@ -107,6 +107,26 @@ Escape to close, arrow keys to move, and closing whatever other menu was open. O
 menu must never take an xdg_popup grab that isn't on the topmost grabbing popup (see
 `PopupSurface::wireGrab`).
 
+## Settings structure
+
+Settings follows what macOS, KDE, COSMIC, and Windows 11 converge on: a short sidebar of
+goal-named groups, each holding its pages as sub-tabs, with settings shown in context.
+
+- **Two levels only:** sidebar group, then sub-tab. A group is a `HubTab`
+  (`src/shell/control_center/hub_tab.h`): a chip row on top and the active page below. Pages
+  inside a hub are ordinary tabs and do not know they are hosted.
+- **Old ids keep working.** A page's id (`audio`, `media`, `monitor`, ...) stays a valid open
+  context for IPC, Home links, the launcher's Panels provider, and search; the panel maps it
+  to its group and selects the sub-tab (`kHubChildren` in `control_center_panel.cpp`).
+- **Chips, not a nested sidebar**, so groups work in the compact (icon-only) sidebar too.
+- **Keep chip rows short** (about six); split a group rather than crowd it.
+- **Planned groups:** Appearance; Desktop (Bar, Dock, Widgets, Corners, Windows); Launcher and
+  alerts (Launcher, Notifications, OSD, Lock screen); Network and devices; Sound and display
+  (Audio, Media, Displays, built as the pilot); Power and system; Privacy and security;
+  Services; Time and region; Input and automation. Names are working titles.
+- **Search** finds individual settings and opens the group and sub-tab that shows them
+  (`tabIdForSettingsGroup`).
+
 ## Accessibility
 
 - **High Contrast** maps to Increased Contrast and Reduced Transparency: palette stretch,
@@ -138,5 +158,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
+3. **Settings still has ~37 sidebar entries.** Only Sound and display is a group so far;
+   the rest move per the plan above. Hub sub-tabs can't be hidden individually with
+   `hidden_tabs` yet.
+4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.
