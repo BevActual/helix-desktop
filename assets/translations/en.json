@@ -1068,7 +1068,13 @@
       "filter-empty-title": "Nothing here",
       "history": "History",
       "remove": "Remove",
-      "untitled": "Untitled notification"
+      "untitled": "Untitled notification",
+      "pages": {
+        "general": "Alerts",
+        "toasts": "Toasts",
+        "history": "History",
+        "filters": "Filters"
+      }
     },
     "osd": {
       "border": "Border",

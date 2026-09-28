@@ -1,4 +1,6 @@
 #include "shell/control_center/tabs/notifications_tab.h"
+#include "core/input/keybind_matcher.h"
+#include "ui/controls/scroll_view.h"
 
 #include "compositors/compositor_platform.h"
 #include "core/log.h"
@@ -678,14 +680,38 @@ NotificationsTab::NotificationsTab(
     NotificationManager* notifications, CompositorPlatform* platform, const ControlCenterServices& services
 )
     : m_notifications(notifications), m_platform(platform),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "notifications"})) {}
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "notifications", .inlineSettings = true}
+      )) {
+  const auto groupPane = [&services](const char* group) {
+    return std::make_unique<SettingsPane>(
+        services,
+        SettingsPaneOptions{.section = "notifications", .includedGroups = {group}, .inlineSettings = true}
+    );
+  };
+  m_generalPane = groupPane("general");
+  m_toastsPane = groupPane("toasts");
+  m_historyPane = groupPane("history");
+  m_filtersPane = groupPane("filtering");
+}
 
 NotificationsTab::~NotificationsTab() = default;
 
 std::unique_ptr<Flex> NotificationsTab::create() {
   const float scale = contentScale();
-  auto tab = ui::column({
+  auto outer = ui::column({
       .out = &m_root,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  outer->addChild(std::move(subHeader));
+
+  // Main page: live card, navigation rows into the settings sub-panes, then history.
+  auto tab = ui::column({
+      .out = &m_rootPage,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
@@ -778,6 +804,24 @@ std::unique_ptr<Flex> NotificationsTab::create() {
   tab->addChild(std::move(liveCard));
   syncDndToggle();
 
+  {
+    auto nav = ui::column({
+        .align = FlexAlign::Stretch,
+        .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+    });
+    const auto addNav = [&](const char* glyph, const char* titleKey, Page page) {
+      if (!nav->children().empty()) {
+        nav->addChild(ui::separator());
+      }
+      nav->addChild(makeNavRow(scale, glyph, i18n::tr(titleKey), [this, page]() { openPage(page); }));
+    };
+    addNav("bell", "control-center.notifications.pages.general", Page::General);
+    addNav("message", "control-center.notifications.pages.toasts", Page::Toasts);
+    addNav("history", "control-center.notifications.pages.history", Page::History);
+    addNav("filter", "control-center.notifications.pages.filters", Page::Filters);
+    tab->addChild(std::move(nav));
+  }
+
   m_adapter = std::make_unique<NotificationHistoryAdapter>(*this, scale);
 
   tab->addChild(
@@ -818,8 +862,38 @@ std::unique_ptr<Flex> NotificationsTab::create() {
     empty->setParticipatesInLayout(false);
     tab->addChild(std::move(empty));
   }
+  outer->addChild(std::move(tab));
 
-  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
+  // Settings sub-panes, one group each, in one scroll.
+  auto subScroll = ui::scrollView({
+      .out = &m_subScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure =
+          [](ScrollView& view) {
+            view.clearFill();
+            view.clearBorder();
+          },
+  });
+  Flex* subContent = subScroll->content();
+  subContent->setDirection(FlexDirection::Vertical);
+  subContent->setAlign(FlexAlign::Stretch);
+  const auto addPage = [&](SettingsPane& pane, Flex** out) {
+    auto page = pane.createInline(scale, panelCardOpacity());
+    *out = page.get();
+    subContent->addChild(std::move(page));
+  };
+  addPage(*m_generalPane, &m_generalPage);
+  addPage(*m_toastsPane, &m_toastsPage);
+  addPage(*m_historyPane, &m_historyPage);
+  addPage(*m_filtersPane, &m_filtersPage);
+  outer->addChild(std::move(subScroll));
+  syncPage();
+
+  return m_settings->wrapLive(std::move(outer), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> NotificationsTab::createHeaderActions() {
@@ -870,8 +944,79 @@ void NotificationsTab::doUpdate(Renderer& renderer) {
   }
 }
 
+void NotificationsTab::syncPage() {
+  const auto shown = [](Node* node, bool visible) {
+    if (node != nullptr && (node->visible() != visible || node->participatesInLayout() != visible)) {
+      node->setVisible(visible);
+      node->setParticipatesInLayout(visible);
+    }
+  };
+  const bool root = m_page == Page::Root;
+  shown(m_rootPage, root);
+  shown(m_subHeader, !root);
+  shown(m_subScroll, !root);
+  shown(m_generalPage, m_page == Page::General);
+  shown(m_toastsPage, m_page == Page::Toasts);
+  shown(m_historyPage, m_page == Page::History);
+  shown(m_filtersPage, m_page == Page::Filters);
+  if (m_subTitle != nullptr && !root) {
+    const char* key = "control-center.notifications.pages.general";
+    if (m_page == Page::Toasts) {
+      key = "control-center.notifications.pages.toasts";
+    } else if (m_page == Page::History) {
+      key = "control-center.notifications.pages.history";
+    } else if (m_page == Page::Filters) {
+      key = "control-center.notifications.pages.filters";
+    }
+    m_subTitle->setText(i18n::tr(key));
+  }
+  PanelManager::instance().requestLayout();
+}
+
+void NotificationsTab::openPage(Page page) {
+  if (page == m_page) {
+    return;
+  }
+  m_page = page;
+  if (m_subScroll != nullptr) {
+    m_subScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+}
+
+void NotificationsTab::setActive(bool active) {
+  const bool becameActive = active && !m_active;
+  m_active = active;
+  if (becameActive && m_page != Page::Root) {
+    m_page = Page::Root;
+    syncPage();
+  }
+}
+
+bool NotificationsTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  // Cancel (Escape by default) backs out of a sub-pane before it would close the panel.
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
+}
+
 void NotificationsTab::onClose() {
   m_settings->onClose();
+  m_generalPane->onClose();
+  m_toastsPane->onClose();
+  m_historyPane->onClose();
+  m_filtersPane->onClose();
+  m_rootPage = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_subScroll = nullptr;
+  m_generalPage = nullptr;
+  m_toastsPage = nullptr;
+  m_historyPage = nullptr;
+  m_filtersPage = nullptr;
   cancelFilterSlide();
   if (m_list != nullptr) {
     m_list->setAdapter(nullptr);

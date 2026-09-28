@@ -131,7 +131,7 @@ clusters, settings shown in context, and sub-tabs only where one tab has several
   chevron) and replace the pane in place, with a back header; Cancel (Escape) goes back, and
   the pane reopens on its main page. A sub-pane can be a live page (a device list) or a
   settings-only page of toggles and sliders (`SettingsPane::createInline` for one group).
-  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound and Displays are the references.
+  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound, Displays, and Notifications are the references; a tab with several settings groups gives each group its own sub-pane (one `SettingsPane` per group).
 - **Chip sub-tabs only for peers you switch between often** and that share one purpose
   (Privacy & Security today); prefer sub-panes otherwise.
 - **Settings in the pane.** A tab with a single page shows its settings under the live
@@ -171,8 +171,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. **Most control tabs still keep settings behind the Settings button.** Sound and Displays
-   use sub-panes so far; Notifications and Power are next. Hub sub-tabs can't be hidden individually with
+3. **Most control tabs still keep settings behind the Settings button.** Sound, Displays,
+   and Notifications use sub-panes so far; Power is next. Hub sub-tabs can't be hidden individually with
    `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.

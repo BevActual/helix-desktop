@@ -23,6 +23,7 @@ class Toggle;
 class VirtualListView;
 class Glyph;
 class Label;
+class ScrollView;
 class NotificationHistoryAdapter;
 
 class NotificationsTab : public Tab {
@@ -33,12 +34,19 @@ public:
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
+  void setActive(bool active) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
   [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
+  // macOS-style sub-panes: the main page (live card, navigation rows, history) and one
+  // settings page per group.
+  enum class Page : std::uint8_t { Root, General, Toasts, History, Filters };
+  void openPage(Page page);
+  void syncPage();
   void onPanelCardOpacityChanged(float opacity) override;
   friend class NotificationHistoryAdapter;
 
@@ -61,6 +69,20 @@ private:
   NotificationManager* m_notifications = nullptr;
   CompositorPlatform* m_platform = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_generalPane;
+  std::unique_ptr<SettingsPane> m_toastsPane;
+  std::unique_ptr<SettingsPane> m_historyPane;
+  std::unique_ptr<SettingsPane> m_filtersPane;
+  Page m_page = Page::Root;
+  bool m_active = false;
+  Flex* m_rootPage = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  ScrollView* m_subScroll = nullptr;
+  Flex* m_generalPage = nullptr;
+  Flex* m_toastsPage = nullptr;
+  Flex* m_historyPage = nullptr;
+  Flex* m_filtersPage = nullptr;
   IconResolver m_iconResolver;
   std::unique_ptr<NotificationHistoryAdapter> m_adapter;
   std::vector<const NotificationHistoryEntry*> m_filtered;
