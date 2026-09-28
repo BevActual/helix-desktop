@@ -21,6 +21,41 @@ namespace {
   // on the main thread, so this holds only while setPalette() is main-thread-only.
   std::mutex g_paletteMutex;
 
+  // Hover is a state, not a hue: a neutral surface tinted toward the accent, with normal
+  // text on top. palette.hover stays as authored so templates export it unchanged; only the
+  // shell's own Hover/OnHover roles resolve to the derived pair. Cached on the inputs so
+  // palette animations and direct palette writes stay in sync.
+  constexpr float kHoverAccentDark = 0.22F;
+  constexpr float kHoverAccentLight = 0.16F;
+
+  struct UiHover {
+    Color surfaceVariant;
+    Color primary;
+    Color onSurface;
+    bool light = false;
+    bool valid = false;
+    Color hover;
+    Color onHover;
+  };
+
+  const UiHover& uiHover() noexcept {
+    static UiHover cache;
+    if (!cache.valid || cache.surfaceVariant != palette.surfaceVariant || cache.primary != palette.primary
+        || cache.onSurface != palette.onSurface || cache.light != g_resolvedThemeLight) {
+      cache.surfaceVariant = palette.surfaceVariant;
+      cache.primary = palette.primary;
+      cache.onSurface = palette.onSurface;
+      cache.light = g_resolvedThemeLight;
+      cache.hover = lerpColor(
+          palette.surfaceVariant, palette.primary, g_resolvedThemeLight ? kHoverAccentLight : kHoverAccentDark
+      );
+      cache.hover.a = 1.0F;
+      cache.onHover = palette.onSurface;
+      cache.valid = true;
+    }
+    return cache;
+  }
+
   std::string normalizedRoleToken(std::string_view token) {
     std::string normalized = StringUtils::trim(token);
     StringUtils::toLowerInPlace(normalized);
@@ -60,9 +95,9 @@ const Color& colorForRole(ColorRole role) noexcept {
   case ColorRole::Shadow:
     return palette.shadow;
   case ColorRole::Hover:
-    return palette.hover;
+    return uiHover().hover;
   case ColorRole::OnHover:
-    return palette.onHover;
+    return uiHover().onHover;
   }
 
   return palette.onSurface;

@@ -302,7 +302,7 @@ void Slider::applyVisualState() {
   } else if (focused) {
     thumbBorder = resolveColorSpec(focusRingColorSpec());
   } else if (hovering) {
-    thumbBorder = resolved(ColorRole::Hover);
+    thumbBorder = resolved(ColorRole::Primary);
   }
 
   auto trackStyle = solidStyle(trackColor, m_trackHeight * 0.5F);

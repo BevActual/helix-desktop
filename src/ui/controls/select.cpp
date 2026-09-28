@@ -351,7 +351,7 @@ void Select::applyVisualState() {
     triggerText = colorSpecFromRole(ColorRole::OnSurface, 0.55F);
   } else if (triggerHovered || triggerPressed) {
     triggerBg = resolved(ColorRole::SurfaceVariant, m_surfaceOpacity);
-    triggerBorder = resolved(ColorRole::Hover);
+    triggerBorder = resolved(ColorRole::Primary);
   } else if (triggerFocused) {
     triggerBorder = resolveColorSpec(focusRingColorSpec());
   }

@@ -335,7 +335,7 @@ void RangeSlider::applyVisualState() {
   } else if (focused) {
     thumbBorder = resolveColorSpec(focusRingColorSpec());
   } else if (hovering) {
-    thumbBorder = resolved(ColorRole::Hover);
+    thumbBorder = resolved(ColorRole::Primary);
   }
 
   m_track->setStyle(solidStyle(trackColor, m_trackHeight * 0.5F));
