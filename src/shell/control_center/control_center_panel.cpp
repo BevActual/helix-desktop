@@ -152,45 +152,48 @@ namespace {
     TabGroup group;
   };
 
+  // Sidebar order and clusters (docs/design/helix-hig.md, Settings structure). Live "app"
+  // pages sit in the Apps cluster near the bottom, like third-party panes on macOS.
   constexpr BuiltinTabSpec kBuiltinTabs[] = {
       {"home", "control-center.tabs.home", "home", false, TabGroup::Home},
-      {"theme", "settings.navigation.sections.theme", "palette", true, TabGroup::Appearance},
-      {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true, TabGroup::Appearance},
-      {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Appearance},
-      {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Layout},
-      {"network", "control-center.tabs.network", "wifi", true, TabGroup::Status},
-      {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Status},
-      {"sound-display", "control-center.tabs.sound-display", "volume", true, TabGroup::Status},
-      {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Status},
-      {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Status},
-      {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Status},
-      {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Status},
-      {"clock", "control-center.tabs.clock", "clock", true, TabGroup::Status},
-      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Status},
-      {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Status},
-      {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::Status},
-      {"privacy", "control-center.tabs.privacy", "eye-off", true, TabGroup::Services},
-      {"firewall", "control-center.tabs.firewall", "shield-lock", true, TabGroup::Services},
-      {"security", "settings.navigation.sections.security", "shield-lock", true, TabGroup::Services},
-      {"printers", "control-center.tabs.printers", "printer", true, TabGroup::Services},
-      {"cast", "control-center.tabs.cast", "screen-share", true, TabGroup::Services},
-      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Services},
-      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Services},
-      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Services},
-      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Services},
-      {"packages", "control-center.tabs.packages", "package", true, TabGroup::Services},
-      {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Services},
-      {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Services},
-      {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Services},
-      {"launcher", "settings.navigation.sections.launcher", "rocket", true, TabGroup::Behavior},
-      {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true, TabGroup::Behavior},
-      {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Behavior},
-      {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::Advanced},
+      {"network", "control-center.tabs.network", "wifi", true, TabGroup::Connectivity},
+      {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Connectivity},
+      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Connectivity},
+      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Connectivity},
+      {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Attention},
+      {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Attention},
+      {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Attention},
+      {"theme", "settings.navigation.sections.theme", "palette", true, TabGroup::System},
+      {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::System},
+      {"launcher", "settings.navigation.sections.launcher", "rocket", true, TabGroup::System},
+      {"privacy-security", "control-center.tabs.privacy-security", "shield-lock", true, TabGroup::System},
+      {"system", "control-center.tabs.system", "activity-heartbeat", true, TabGroup::System},
+      {"packages", "control-center.tabs.packages", "package", true, TabGroup::System},
+      {"clock", "control-center.tabs.clock", "clock", true, TabGroup::System},
+      {"desktop", "settings.navigation.sections.desktop", "layout-board", true, TabGroup::Desktop},
+      {"monitor", "control-center.tabs.monitor", "device-desktop", true, TabGroup::Desktop},
+      {"wallpaper", "settings.navigation.sections.wallpaper", "paint", true, TabGroup::Desktop},
+      {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Desktop},
+      {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true, TabGroup::Devices},
+      {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Devices},
+      {"printers", "control-center.tabs.printers", "printer", true, TabGroup::Devices},
+      {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Devices},
+      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Sharing},
+      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Sharing},
+      {"cast", "control-center.tabs.cast", "screen-share", true, TabGroup::Sharing},
+      {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Apps},
+      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Apps},
+      {"media", "control-center.tabs.media", "disc-filled", true, TabGroup::Apps},
+      {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Apps},
+      {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Apps},
+      {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Apps},
+      {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Apps},
+      {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Apps},
+      {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
       {"umbriel", "settings.navigation.sections.umbriel", "umbriel", true, TabGroup::Advanced},
-      {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
-      {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Advanced},
   };
+
 
   // Sidebar groups that host existing tabs as sub-tabs (HubTab). Child ids stay valid open
   // contexts everywhere (`panel-open control-center audio`, Home links, search); the panel
@@ -203,9 +206,9 @@ namespace {
   };
 
   constexpr HubChildSpec kHubChildren[] = {
-      {"audio", "sound-display", "control-center.tabs.audio", "volume"},
-      {"media", "sound-display", "control-center.tabs.media", "disc-filled"},
-      {"monitor", "sound-display", "control-center.tabs.monitor", "device-desktop"},
+      {"privacy", "privacy-security", "control-center.tabs.privacy", "eye-off"},
+      {"firewall", "privacy-security", "control-center.tabs.firewall", "flame"},
+      {"security", "privacy-security", "settings.navigation.sections.security", "lock"},
   };
 
   [[nodiscard]] std::optional<std::string_view> hubIdForChild(std::string_view id) {
@@ -233,10 +236,10 @@ namespace {
     const auto fixed = [](const Color& c) { return fixedColorSpec(harmonizeToPrimary(c)); };
     const auto neutral = colorSpecFromRole(ColorRole::OnSurfaceVariant);
 
-    if (group == TabGroup::Home || group == TabGroup::Appearance) {
+    if (group == TabGroup::Home || id == "theme" || id == "wallpaper" || id == "templates") {
       return colorSpecFromRole(ColorRole::Primary);
     }
-    if (group == TabGroup::Layout) {
+    if (id == "desktop") {
       return colorSpecFromRole(ColorRole::Tertiary);
     }
     if (id == "network" || id == "bluetooth" || id == "tailscale" || id == "syncthing" || id == "localsend"
@@ -246,7 +249,7 @@ namespace {
     if (id == "power" || id == "system") {
       return fixed(kGreen);
     }
-    if (id == "audio" || id == "sound-display" || id == "packages") {
+    if (id == "audio" || id == "packages") {
       return fixed(kOrange);
     }
     if (id == "notifications" || id == "calendar") {
@@ -255,7 +258,8 @@ namespace {
     if (id == "media" || id == "capture" || id == "launcher") {
       return fixed(kPink);
     }
-    if (id == "screen-time" || id == "clock" || id == "privacy" || id == "firewall" || id == "security") {
+    if (id == "screen-time" || id == "clock" || id == "privacy-security" || id == "privacy" || id == "firewall"
+        || id == "security") {
       return fixed(kIndigo);
     }
     if (id == "ai") {
@@ -267,31 +271,12 @@ namespace {
     if (id == "clipboard") {
       return fixed(kYellow);
     }
-    if (group == TabGroup::Services) {
-      return colorSpecFromRole(ColorRole::Secondary); // plugins and the rest of the service catalog
+    if (group == TabGroup::Apps) {
+      return colorSpecFromRole(ColorRole::Secondary); // plugin tabs and the rest of the app catalog
     }
     return neutral;
   }
 
-  std::string groupCaption(TabGroup group) {
-    switch (group) {
-    case TabGroup::Appearance:
-      return i18n::tr("control-center.sidebar.appearance");
-    case TabGroup::Layout:
-      return i18n::tr("control-center.sidebar.layout");
-    case TabGroup::Status:
-      return i18n::tr("control-center.sidebar.status");
-    case TabGroup::Services:
-      return i18n::tr("control-center.sidebar.services");
-    case TabGroup::Behavior:
-      return i18n::tr("control-center.sidebar.behavior");
-    case TabGroup::Advanced:
-      return i18n::tr("control-center.sidebar.advanced");
-    case TabGroup::Home:
-      break;
-    }
-    return {};
-  }
 
   struct PluginTabChrome {
     std::string title;
@@ -378,7 +363,8 @@ namespace {
         || id == "calendar"
         || id == "clock"
         || id == "audio"
-        || id == "sound-display"
+        || id == "privacy-security"
+        || id == "privacy"
         || id == "monitor"
         || id == "wallpaper"
         || id == "templates"
@@ -571,63 +557,58 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
     m_slots.push_back(std::move(slot));
   };
 
+  auto hubChild = [](std::string_view id, std::unique_ptr<Tab> tab) {
+    for (const auto& spec : kHubChildren) {
+      if (id == spec.childId) {
+        return HubTab::Child{
+            .id = spec.childId, .title = i18n::tr(spec.titleKey), .glyph = spec.glyph, .tab = std::move(tab)
+        };
+      }
+    }
+    return HubTab::Child{.id = std::string(id), .title = std::string(id), .glyph = {}, .tab = std::move(tab)};
+  };
+
   add("home", std::make_unique<HomeTab>(services));
-  add("theme", std::make_unique<ThemeTab>(services));
-  add("wallpaper", std::make_unique<WallpaperTab>(services));
-  add("templates", std::make_unique<TemplatesTab>(services));
-  add("desktop", std::make_unique<DesktopTab>(services));
+
   add("network", std::make_unique<NetworkTab>(services));
   add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
-  {
-    auto hubChild = [](std::string_view id, std::unique_ptr<Tab> tab) {
-      for (const auto& spec : kHubChildren) {
-        if (id == spec.childId) {
-          return HubTab::Child{
-              .id = spec.childId, .title = i18n::tr(spec.titleKey), .glyph = spec.glyph, .tab = std::move(tab)
-          };
-        }
-      }
-      return HubTab::Child{.id = std::string(id), .title = std::string(id), .glyph = {}, .tab = std::move(tab)};
-    };
-    std::vector<HubTab::Child> soundDisplay;
-    soundDisplay.push_back(hubChild(
-        "audio",
-        std::make_unique<AudioTab>(
-            services.audio, services.easyEffects, services.mpris, services.config, wayland,
-            PanelManager::instance().renderContext(), services
-        )
-    ));
-    soundDisplay.push_back(hubChild(
-        "media", std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services)
-    ));
-    soundDisplay.push_back(hubChild(
-        "monitor",
-        std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services)
-    ));
-    add("sound-display", std::make_unique<HubTab>(std::move(soundDisplay)));
-  }
-  add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
-  add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
-  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
-  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
-  add("clock", std::make_unique<ClockTab>(services));
-  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
-  add("camera", std::make_unique<CameraTab>(services));
-  add("system", std::make_unique<SystemTab>(services.sysmon, services));
-  add("privacy", std::make_unique<PrivacyTab>(services));
-  add("firewall", std::make_unique<FirewallTab>(services));
-  add("security", std::make_unique<SettingsTab>(services, "security"));
-  add("printers", std::make_unique<PrintersTab>(services));
-  add("cast", std::make_unique<CastTab>(services));
-  add("localsend", std::make_unique<LocalSendTab>(services));
-  add("phone", std::make_unique<PhoneTab>(services));
   add("tailscale", std::make_unique<TailscaleTab>(services));
-  add("syncthing", std::make_unique<SyncthingTab>(services));
-  add("packages", std::make_unique<PackagesTab>(services));
-  add("ai", std::make_unique<AiUsageTab>(services));
-  add("capture", std::make_unique<CaptureTab>(services));
-  add("clipboard", std::make_unique<ClipboardTab>(services));
+  add("phone", std::make_unique<PhoneTab>(services));
+
+  add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
+  add(
+      "audio",
+      std::make_unique<AudioTab>(
+          services.audio, services.easyEffects, services.mpris, services.config, wayland,
+          PanelManager::instance().renderContext(), services
+      )
+  );
+  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
+
+  add("theme", std::make_unique<ThemeTab>(services));
+  add(
+      "control-center",
+      std::make_unique<SettingsTab>(
+          services, "control-center", std::unordered_set<std::string>{"home", "layout", "navigation"}
+      )
+  );
   add("launcher", std::make_unique<LauncherTab>(services));
+  {
+    std::vector<HubTab::Child> privacySecurity;
+    privacySecurity.push_back(hubChild("privacy", std::make_unique<PrivacyTab>(services)));
+    privacySecurity.push_back(hubChild("firewall", std::make_unique<FirewallTab>(services)));
+    privacySecurity.push_back(hubChild("security", std::make_unique<SettingsTab>(services, "security")));
+    add("privacy-security", std::make_unique<HubTab>(std::move(privacySecurity)));
+  }
+  add("system", std::make_unique<SystemTab>(services.sysmon, services));
+  add("packages", std::make_unique<PackagesTab>(services));
+  add("clock", std::make_unique<ClockTab>(services));
+
+  add("desktop", std::make_unique<DesktopTab>(services));
+  add("monitor", std::make_unique<MonitorTab>(services.brightness, services.config, services.displayConfig, services));
+  add("wallpaper", std::make_unique<WallpaperTab>(services));
+  add("power", std::make_unique<PowerTab>(services.upower, services.powerProfiles, &services));
+
   add("keybinds", std::make_unique<KeybindsTab>(services));
   add(
       "shell",
@@ -636,16 +617,25 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
           std::unordered_set<std::string>{"general", "keyboard-layout", "window-switcher"}
       )
   );
-  add(
-      "control-center",
-      std::make_unique<SettingsTab>(
-          services, "control-center", std::unordered_set<std::string>{"home", "layout", "navigation"}
-      )
-  );
+  add("printers", std::make_unique<PrintersTab>(services));
+  add("camera", std::make_unique<CameraTab>(services));
+
+  add("localsend", std::make_unique<LocalSendTab>(services));
+  add("syncthing", std::make_unique<SyncthingTab>(services));
+  add("cast", std::make_unique<CastTab>(services));
+
+  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
+  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
+  add("media", std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services));
+  add("capture", std::make_unique<CaptureTab>(services));
+  add("clipboard", std::make_unique<ClipboardTab>(services));
+  add("ai", std::make_unique<AiUsageTab>(services));
+  add("templates", std::make_unique<TemplatesTab>(services));
+  add("plugins", std::make_unique<PluginsTab>(services));
+
+  add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
   add("umbriel", std::make_unique<SettingsTab>(services, "umbriel"));
-  add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
-  add("plugins", std::make_unique<PluginsTab>(services));
 }
 
 float ControlCenterPanel::preferredWidth() const {
@@ -810,12 +800,7 @@ void ControlCenterPanel::create() {
     }
     sidebarNav->setGap(Style::spaceXs * scale);
     m_sidebarNav = sidebarNav.get();
-    m_appearanceHeader = nullptr;
-    m_layoutHeader = nullptr;
-    m_statusHeader = nullptr;
-    m_servicesHeader = nullptr;
-    m_behaviorHeader = nullptr;
-    m_advancedHeader = nullptr;
+    m_groupDividers.fill(nullptr);
 
     TabGroup lastHeader = TabGroup::Home;
     for (auto& slot : m_slots) {
@@ -823,7 +808,9 @@ void ControlCenterPanel::create() {
         continue;
       }
       if (slot.group != TabGroup::Home && slot.group != lastHeader) {
-        addSidebarGroupHeader(*sidebarNav, slot.group, scale);
+        if (lastHeader != TabGroup::Home) {
+          addSidebarGroupHeader(*sidebarNav, slot.group, scale);
+        }
         lastHeader = slot.group;
       }
       addSidebarTabButton(*sidebarNav, slot, scale);
@@ -1369,12 +1356,7 @@ void ControlCenterPanel::onClose() {
   m_sidebarScrollState = {};
   m_sidebarNav = nullptr;
   m_sidebarScrollArea = nullptr;
-  m_appearanceHeader = nullptr;
-  m_layoutHeader = nullptr;
-  m_statusHeader = nullptr;
-  m_servicesHeader = nullptr;
-  m_behaviorHeader = nullptr;
-  m_advancedHeader = nullptr;
+  m_groupDividers.fill(nullptr);
   m_searchInput = nullptr;
   m_searchButton = nullptr;
   m_searchQuery.clear();
@@ -1522,53 +1504,14 @@ bool ControlCenterPanel::groupHasShownTab(TabGroup group) const {
 }
 
 void ControlCenterPanel::addSidebarGroupHeader(RovingListNavHost& nav, TabGroup group, float scale) {
-  Node** out = nullptr;
-  switch (group) {
-  case TabGroup::Appearance:
-    out = &m_appearanceHeader;
-    break;
-  case TabGroup::Layout:
-    out = &m_layoutHeader;
-    break;
-  case TabGroup::Status:
-    out = &m_statusHeader;
-    break;
-  case TabGroup::Services:
-    out = &m_servicesHeader;
-    break;
-  case TabGroup::Behavior:
-    out = &m_behaviorHeader;
-    break;
-  case TabGroup::Advanced:
-    out = &m_advancedHeader;
-    break;
-  case TabGroup::Home:
+  // Clusters are unlabeled, like macOS System Settings: a divider, not a caption.
+  const auto index = static_cast<std::size_t>(group);
+  if (group == TabGroup::Home || index >= m_groupDividers.size()) {
     return;
   }
-
-  if (m_compact) {
-    auto sep = ui::separator({.spacing = Style::spaceXs * scale});
-    *out = sep.get();
-    nav.addChild(std::move(sep));
-    return;
-  }
-
-  auto header = ui::column({
-      .paddingV = Style::spaceXs * scale,
-      .paddingH = Style::spaceXs * scale,
-      .fillWidth = true,
-  });
-  header->addChild(
-      ui::label({
-          .text = groupCaption(group),
-          .fontSize = Style::fontSizeCaption * scale,
-          .fontWeight = FontWeight::Bold,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 1,
-      })
-  );
-  *out = header.get();
-  nav.addChild(std::move(header));
+  auto sep = ui::separator({.spacing = Style::spaceXs * scale});
+  m_groupDividers[index] = sep.get();
+  nav.addChild(std::move(sep));
 }
 
 void ControlCenterPanel::addSidebarTabButton(RovingListNavHost& nav, TabSlot& slot, float scale) {
@@ -1669,12 +1612,9 @@ void ControlCenterPanel::syncTabVisibility() {
     node->setVisible(visible);
     node->setParticipatesInLayout(visible);
   };
-  setHeaderVisible(m_appearanceHeader, groupHasShownTab(TabGroup::Appearance));
-  setHeaderVisible(m_layoutHeader, groupHasShownTab(TabGroup::Layout));
-  setHeaderVisible(m_statusHeader, groupHasShownTab(TabGroup::Status));
-  setHeaderVisible(m_servicesHeader, groupHasShownTab(TabGroup::Services));
-  setHeaderVisible(m_behaviorHeader, groupHasShownTab(TabGroup::Behavior));
-  setHeaderVisible(m_advancedHeader, groupHasShownTab(TabGroup::Advanced));
+  for (std::size_t i = 0; i < m_groupDividers.size(); ++i) {
+    setHeaderVisible(m_groupDividers[i], groupHasShownTab(static_cast<TabGroup>(i)));
+  }
 }
 
 void ControlCenterPanel::updateTabChrome(std::string_view id) {
@@ -2316,7 +2256,7 @@ void ControlCenterPanel::rebuildPluginSlots() {
     slot.glyph = chrome.glyph;
     slot.hideable = true;
     slot.plugin = true;
-    slot.group = TabGroup::Services;
+    slot.group = TabGroup::Apps;
     slot.tab = std::make_unique<PluginControlCenterTab>(scripting::PluginRuntimeContext{
         .entryId = slot.id,
         .sourcePath = resolved.sourcePath,
@@ -2331,8 +2271,8 @@ void ControlCenterPanel::rebuildPluginSlots() {
     pluginSlots.push_back(std::move(slot));
   }
 
-  auto insertAt =
-      std::ranges::find_if(m_slots, [](const TabSlot& slot) { return slot.group == TabGroup::Behavior; });
+  // Plugin tabs join the Apps cluster, just before the Plugins store.
+  auto insertAt = std::ranges::find_if(m_slots, [](const TabSlot& slot) { return slot.id == "plugins"; });
   m_slots.insert(
       insertAt, std::make_move_iterator(pluginSlots.begin()), std::make_move_iterator(pluginSlots.end())
   );

@@ -9,6 +9,8 @@
 #include "ui/controls/scroll_view.h"
 
 #include <chrono>
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -81,7 +83,19 @@ public:
   void queueBarWidget(std::string barName, std::string widgetName);
   void invalidatePluginSource(const std::string& sourceName);
 
-  enum class TabGroup : std::uint8_t { Home, Appearance, Layout, Status, Services, Behavior, Advanced };
+  // Sidebar clusters, macOS System Settings style: unlabeled and separated by dividers.
+  enum class TabGroup : std::uint8_t {
+    Home,
+    Connectivity,
+    Attention,
+    System,
+    Desktop,
+    Devices,
+    Sharing,
+    Apps,
+    Advanced,
+  };
+  static constexpr std::size_t kTabGroupCount = static_cast<std::size_t>(TabGroup::Advanced) + 1;
 
 private:
   void onPanelCardOpacityChanged(float opacity) override;
@@ -96,7 +110,7 @@ private:
     Button* button = nullptr;
     Flex* container = nullptr;
     Flex* headerActions = nullptr;
-    TabGroup group = TabGroup::Status;
+    TabGroup group = TabGroup::System;
     bool hideable = true;
     bool plugin = false;
   };
@@ -161,12 +175,7 @@ private:
   ScrollViewState m_sidebarScrollState{};
   RovingListNavHost* m_sidebarNav = nullptr;
   InputArea* m_sidebarScrollArea = nullptr;
-  Node* m_appearanceHeader = nullptr;
-  Node* m_layoutHeader = nullptr;
-  Node* m_statusHeader = nullptr;
-  Node* m_servicesHeader = nullptr;
-  Node* m_behaviorHeader = nullptr;
-  Node* m_advancedHeader = nullptr;
+  std::array<Node*, kTabGroupCount> m_groupDividers{};
   Input* m_searchInput = nullptr;
   Button* m_searchButton = nullptr;
   std::string m_searchQuery;

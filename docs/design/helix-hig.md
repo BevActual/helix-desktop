@@ -109,22 +109,23 @@ menu must never take an xdg_popup grab that isn't on the topmost grabbing popup 
 
 ## Settings structure
 
-Settings follows what macOS, KDE, COSMIC, and Windows 11 converge on: a short sidebar of
-goal-named groups, each holding its pages as sub-tabs, with settings shown in context.
+Settings is organized like macOS System Settings: a flat sidebar of named tabs in unlabeled
+clusters, settings shown in context, and sub-tabs only where one tab has several facets.
 
-- **Two levels only:** sidebar group, then sub-tab. A group is a `HubTab`
-  (`src/shell/control_center/hub_tab.h`): a chip row on top and the active page below. Pages
-  inside a hub are ordinary tabs and do not know they are hosted.
-- **Old ids keep working.** A page's id (`audio`, `media`, `monitor`, ...) stays a valid open
-  context for IPC, Home links, the launcher's Panels provider, and search; the panel maps it
-  to its group and selects the sub-tab (`kHubChildren` in `control_center_panel.cpp`).
-- **Chips, not a nested sidebar**, so groups work in the compact (icon-only) sidebar too.
-- **Keep chip rows short** (about six); split a group rather than crowd it.
-- **Planned groups:** Appearance; Desktop (Bar, Dock, Widgets, Corners, Windows); Launcher and
-  alerts (Launcher, Notifications, OSD, Lock screen); Network and devices; Sound and display
-  (Audio, Media, Displays, built as the pilot); Power and system; Privacy and security;
-  Services; Time and region; Input and automation. Names are working titles.
-- **Search** finds individual settings and opens the group and sub-tab that shows them
+- **More main tabs, not hidden hubs.** No "General" catch-all; a thing gets its own sidebar
+  tab. Clusters are separated by dividers, not captions.
+- **Sub-tabs for facets of one concept** (Privacy & Security → Privacy | Firewall |
+  Security; Desktop & Dock → Bar | Dock | Widgets ...), as chips under the tab title. Never
+  to merge unrelated things (Sound and Displays stay separate). A multi-page tab is a
+  `HubTab` (`src/shell/control_center/hub_tab.h`); pages inside it are ordinary tabs.
+- **Old ids keep working.** A page's id stays a valid open context for IPC, Home links, the
+  launcher's Panels provider, and search; `kHubChildren` in `control_center_panel.cpp` maps it
+  to its tab and sub-tab.
+- **Live "app" pages** (Calendar, Weather, Media, Capture, Clipboard, AI, Templates, plugin
+  tabs) sit in the Apps cluster near the bottom, like third-party panes on macOS.
+- **Clusters** (`TabGroup`, `kBuiltinTabs`): connectivity; attention; system; desktop;
+  devices and input; sharing; apps; advanced (hooks, compositor).
+- **Search** finds individual settings and opens the tab and sub-tab that shows them
   (`tabIdForSettingsGroup`).
 
 ## Accessibility
@@ -158,8 +159,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. **Settings still has ~37 sidebar entries.** Only Sound and display is a group so far;
-   the rest move per the plan above. Hub sub-tabs can't be hidden individually with
-   `hidden_tabs` yet.
+3. **Settings still hides most settings behind each tab's header gear.** They should show in
+   the tab (macOS panes are scrolling lists). Hub sub-tabs can't be hidden individually with
+   `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.
