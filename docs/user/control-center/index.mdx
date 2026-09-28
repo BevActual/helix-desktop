@@ -60,7 +60,7 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 
 | Context | Tab | What it shows |
 |---------|-----|---------------|
-| `home` | Home | User card (name, host, uptime), optional status strip, Now Playing only while a player is active, and a leftover clock with date, next calendar event, and weather. Optional pins sit as a grouped list under the clock. Avatar opens the avatar picker; the rest of the user card opens Wallpaper. Media opens Media; while playing, previous / play-pause / next stay beside the art. Date, time, and event open Calendar; the weather line opens Weather. Header gear opens Home pins and the session-button setting. |
+| `home` | Home | The quick menu, at menu size with no sidebar: sound and brightness, then network, Bluetooth, night light, and Do Not Disturb as a grouped list (the row toggles, the chevron opens that page), lock/suspend/log out/restart/shut down in a session well, Now Playing while something plays, and optional pins. See [Home](#home). Header gear opens Settings on the Control Center page. |
 | `theme` | Theme | Palettes, Chrome, Icons, Type, Effects, and Language as compact sources, like Capture hosts Screenshot and Record. Palettes leftover matches Wallpaper: sources, Dark/Light/Auto, search, save, and the current palette share the same compact card as the domain switch; leftover is a uniform swatch grid. Chrome leftover catalogs Glass, Scale, and Roundness pack to the chips; leftover wells scroll the editors. Header gear follows the active source. `appearance`, `glass`, `icons`, `type`, `scale`, `roundness`, `effects`, and `language` still open the matching source. |
 | `wallpaper` | Wallpaper | One compact card: icon sources, search, and Filters on the left; current wallpaper, Display, star, and lock-screen on the right. Flatten, sort, color, and Wallhaven filters open from Filters. The thumbnail grid sits under the card. Header gear opens folders, fill mode, automation, Wallhaven, Daily source settings, and on niri the overview wallpaper preset and backdrop blur/tint. |
 | `templates` | Templates | Built-in, community, and user app-theme catalogs. Icon sources for Built-In, Community, and User sit with Enable on one card; the catalog grid sits under it. User hides Enable. Header Apply rerenders enabled templates. Header + creates or enables a template for an installed app. On User, a folder button opens `~/.config/noctalia/templates/`. Header gear opens greeter sync when the greeter is installed. |
@@ -94,17 +94,18 @@ Use these context IDs with `noctalia msg panel-toggle control-center <context>` 
 | `dock` | Desktop → Dock | Alias for the Dock source on Desktop. Layout leftover is edge, auto-hide, and running apps. Pinned leftover is the app catalog. Header gear opens monitors, layer, size, shape, and magnification. |
 | `panels` | Desktop → Panels | Alias for the Panels source on Desktop. Placement leftover is layer and floating offset. Chrome leftover is borders, shadow, and list-row tint. Header gear repeats those plus per-panel placement. Solid/Soft/Glass live on Glass. |
 | `launcher` | Launcher | Open launcher on the compact card. Overview Type to Launch (niri), always-in-search providers, and pinned apps are leftover wells. Header gear opens appearance, placement, prefixes, auto-paste, and currency. |
-| `control-center` | Control Center | Sidebar, width, height, and hidden tabs. Home pins stay on Home gear; AI settings stay on AI gear. |
+| `control-center` | Control Center | Home (pins and session actions), sidebar, width, height, and hidden tabs. Home's header gear opens this page. AI settings stay on AI gear. |
 | `osd` | Desktop → OSD | Alias for the OSD source on Desktop. Enable sits on the compact card with Placement and Style. Placement leftover is orientation and screen position. Style leftover is size, opacity, and border. Header gear opens popup kinds, monitors, and offsets. |
 | `shell` | Shell | Avatar, time and date formats, app launch, keyboard layout labels, and window switcher. Clipboard settings stay on Clipboard gear. Settings groups here, on Security, Hooks, Niri, Control Center, and in every header gear are leftover wells, not glass cards. |
 | `keybinds` | Keybinds | On niri: click Attention, Open, Apps, Capture, Sound, and Session chips. Header Copy / Add / Restore / folder. Gear holds in-panel navigation chords. |
-| `security` | Security | Lock screen and authentication |
+| `security` | Security | Lock screen, authentication, greeter, offline mode and telemetry, and the privacy capture-name filters (also on Privacy gear). Lid-close behavior lives on Power. |
 | `hooks` | Hooks | Commands at startup and on shell events |
 | `niri` | Niri | niri setup only: copy missing snippets and install `noctalia-setup.kdl`. Shown only in a niri session. Decorations and blur live on Theme; gaps/outer padding/columns on Windows; overview wallpaper and backdrop on Wallpaper; type-to-launch on Launcher. |
+| `umbriel` | Umbriel | Umbriel integration: overview type-to-launch. Shown only in an Umbriel session. See [Umbriel](/noctalia/compositor-settings/umbriel/). |
 | `plugins` | Plugins | Click Installed and Store chips to swap leftover. Header gear opens catalog sources. |
 | `packages` | Packages | Click Fedora, Flatpak, and firmware chips to switch source. Search, Updates, and Installed stay labeled. The Packages sidebar badge and Control Center bar dot include pending counts from every available source. |
 
-`niri` is listed only in a niri session. The Windows source on Desktop is also niri-only. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
+`niri` is listed only in a niri session, and `umbriel` only in an Umbriel session. The Windows source on Desktop is also niri-only. The Weather, System, Power, Screen Time, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, and Privacy tabs stay available so you can turn those features on from the tab itself. Weather enable is on the live view when it is off; location and units stay under Weather gear.
 
 Enabled plugins that declare a `[[control_center_tab]]` are the same kind of sidebar entry as the built-in pages:
 they appear in **Services**, each with an id. Built-in ids stay short (`monitor`, `audio`); plugin tabs use the full entry id
@@ -113,8 +114,6 @@ See [Control Center tabs](/noctalia/plugins/development/manifest/#control-center
 
 Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
 Every available tab except Home that isn't hidden also gets its own row in the launcher's [Panels provider](/noctalia/launcher/#panels) (`/pan`), so you can jump straight to, say, Bluetooth without landing on Home first. Home remains available through the main Control Center row.
-
-Any tab except Home can also be hidden manually with [`hidden_tabs`](#sidebar) (use the context ID, e.g. `"monitor"`). Hidden tabs drop from both the sidebar and keyboard navigation.
 
 ## Design language
 
