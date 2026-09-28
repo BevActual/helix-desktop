@@ -13,9 +13,10 @@ namespace {
 
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
-  settings::SettingEntry entry(settings::SettingsSection section, std::string searchText) {
+  settings::SettingEntry entry(settings::SettingsSection section, std::string searchText, std::string group = {}) {
     settings::SettingEntry out;
     out.section = section;
+    out.group = std::move(group);
     out.searchText = std::move(searchText);
     return out;
   }
@@ -24,6 +25,7 @@ namespace {
 
 int main() {
   using control_center::resolveSettingsSearchTarget;
+  using control_center::tabIdForSettingsGroup;
   using control_center::tabIdForSettingsSection;
 
   const std::vector<settings::SettingEntry> registry{
@@ -32,6 +34,10 @@ int main() {
       entry(settings::SettingsSection::Screenshot, "screenshot delay timer"),
       entry(settings::SettingsSection::ScreenRecord, "screen-record audio bitrate"),
       entry(settings::SettingsSection::Dock, "dock autohide pinned position"),
+      entry(settings::SettingsSection::Services, "sound volume step overdrive", "audio"),
+      entry(settings::SettingsSection::Services, "calendar week start", "calendar"),
+      entry(settings::SettingsSection::Shell, "clipboard history entries", "clipboard"),
+      entry(settings::SettingsSection::Location, "night light warmth schedule", "night-light"),
   };
 
   bool ok = true;
@@ -115,6 +121,32 @@ int main() {
   const auto dockFromHome = resolveSettingsSearchTarget("home", true, std::vector<std::string>{"control-center"}, registry, "autohide");
   ok = expect(!dockFromHome.stayOnCurrent, "home autohide jumps") && ok;
   ok = expect(dockFromHome.tabId == "desktop", "home autohide -> desktop") && ok;
+
+  // Shared sections route by group to the tab that shows the group.
+  ok = expect(tabIdForSettingsGroup("services", "audio") == "audio", "services/audio -> audio") && ok;
+  ok = expect(tabIdForSettingsGroup("services", "media") == "media", "services/media -> media") && ok;
+  ok = expect(tabIdForSettingsGroup("services", "brightness") == "monitor", "services/brightness -> monitor") && ok;
+  ok = expect(tabIdForSettingsGroup("services", "calendar") == "calendar", "services/calendar -> calendar") && ok;
+  ok = expect(tabIdForSettingsGroup("system", "screen-time") == "screen-time", "system/screen-time") && ok;
+  ok = expect(tabIdForSettingsGroup("system", "battery") == "system", "system/battery stays") && ok;
+  ok = expect(tabIdForSettingsGroup("shell", "clipboard") == "clipboard", "shell/clipboard") && ok;
+  ok = expect(tabIdForSettingsGroup("shell", "general") == "shell", "shell/general stays") && ok;
+  ok = expect(tabIdForSettingsGroup("location", "night-light") == "monitor", "night-light -> monitor") && ok;
+  ok = expect(tabIdForSettingsGroup("location", "weather") == "weather", "location/weather -> weather") && ok;
+  ok = expect(tabIdForSettingsGroup("control-center", "ai-usage") == "ai", "ai-usage group -> ai") && ok;
+  ok = expect(tabIdForSettingsGroup("security", "privacy") == "privacy", "security/privacy -> privacy") && ok;
+  ok = expect(tabIdForSettingsGroup("dock", "") == "desktop", "no group falls back to section") && ok;
+
+  // Searching for an audio setting used to open Calendar (section "services" -> calendar).
+  const auto volumeFromPackages = resolveSettingsSearchTarget("packages", false, noSections, registry, "volume");
+  ok = expect(volumeFromPackages.tabId == "audio", "volume -> audio, not calendar") && ok;
+  ok = expect(volumeFromPackages.sectionId == "services", "volume keeps its section") && ok;
+  const auto weekFromPackages = resolveSettingsSearchTarget("packages", false, noSections, registry, "week start");
+  ok = expect(weekFromPackages.tabId == "calendar", "week start -> calendar") && ok;
+  const auto historyFromPackages = resolveSettingsSearchTarget("packages", false, noSections, registry, "clipboard");
+  ok = expect(historyFromPackages.tabId == "clipboard", "clipboard -> clipboard, not shell") && ok;
+  const auto warmthFromPackages = resolveSettingsSearchTarget("packages", false, noSections, registry, "warmth");
+  ok = expect(warmthFromPackages.tabId == "monitor", "night light -> monitor, not weather") && ok;
 
   return ok ? 0 : 1;
 }

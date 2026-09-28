@@ -45,6 +45,33 @@ namespace control_center {
       return false;
     }
 
+    // Matches per tab, using the entry's group so shared sections (services, system, shell,
+    // location, control-center, security) route to the tab that actually shows the group.
+    // Also records the best-matching section inside each tab for hub tabs (Theme, Desktop).
+    struct TabMatches {
+      int count = 0;
+      std::unordered_map<std::string, int> sections;
+    };
+
+    std::unordered_map<std::string, TabMatches> tabMatchCounts(
+        std::span<const settings::SettingEntry> registry, std::string_view normalizedQuery
+    ) {
+      std::unordered_map<std::string, TabMatches> counts;
+      if (normalizedQuery.empty()) {
+        return counts;
+      }
+      for (const auto& entry : registry) {
+        if (!settings::matchesNormalizedSettingQuery(entry, normalizedQuery)) {
+          continue;
+        }
+        const std::string_view section = settings::settingsSectionId(entry.section);
+        auto& tab = counts[tabIdForSettingsGroup(section, entry.group)];
+        ++tab.count;
+        ++tab.sections[std::string(section)];
+      }
+      return counts;
+    }
+
     std::string bestMatchingSectionId(const std::unordered_map<std::string, int>& counts) {
       int bestCount = 0;
       std::string bestSection;
@@ -102,6 +129,36 @@ namespace control_center {
     return std::string(section);
   }
 
+  std::string tabIdForSettingsGroup(std::string_view section, std::string_view group) {
+    if (section == "services") {
+      if (group == "audio") {
+        return "audio";
+      }
+      if (group == "media") {
+        return "media";
+      }
+      if (group == "brightness") {
+        return "monitor";
+      }
+    }
+    if (section == "system" && group == "screen-time") {
+      return "screen-time";
+    }
+    if (section == "shell" && group == "clipboard") {
+      return "clipboard";
+    }
+    if (section == "location" && group == "night-light") {
+      return "monitor";
+    }
+    if (section == "control-center" && group == "ai-usage") {
+      return "ai";
+    }
+    if (section == "security" && group == "privacy") {
+      return "privacy";
+    }
+    return tabIdForSettingsSection(section);
+  }
+
   SettingsSearchTarget resolveSettingsSearchTarget(
       std::string_view currentTabId, bool hasSettingsPane, std::span<const std::string> currentSectionIds,
       std::span<const settings::SettingEntry> registry, std::string_view query
@@ -109,8 +166,17 @@ namespace control_center {
     const std::string normalized = settings::normalizedSettingQuery(query);
     const auto counts = sectionMatchCounts(registry, normalized);
     const bool localMatch = currentSectionMatches(counts, currentTabId, currentSectionIds);
-    const std::string bestSection = bestMatchingSectionId(counts);
-    const std::string bestTab = bestSection.empty() ? std::string{} : tabIdForSettingsSection(bestSection);
+
+    std::string bestTab;
+    std::string bestSection;
+    int bestTabCount = 0;
+    for (const auto& [tabId, matches] : tabMatchCounts(registry, normalized)) {
+      if (matches.count > bestTabCount) {
+        bestTabCount = matches.count;
+        bestTab = tabId;
+        bestSection = bestMatchingSectionId(matches.sections);
+      }
+    }
 
     SettingsSearchTarget out;
     out.tabId = std::string(currentTabId);

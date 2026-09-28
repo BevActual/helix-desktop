@@ -18,6 +18,9 @@ namespace control_center {
 
   // Maps a settings registry section id to the Control Center tab that hosts it.
   [[nodiscard]] std::string tabIdForSettingsSection(std::string_view section);
+  // Like tabIdForSettingsSection, but routes groups of shared sections to the tab that shows
+  // them (services/audio -> audio, shell/clipboard -> clipboard, ...).
+  [[nodiscard]] std::string tabIdForSettingsGroup(std::string_view section, std::string_view group);
 
   // Stay on the current tab's gear sheet when that section matches. Jump to the
   // best matching section only when the current one has no hits. Never dump onto
