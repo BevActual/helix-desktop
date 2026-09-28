@@ -171,8 +171,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. **Most control tabs still keep settings behind the Settings button.** Sound, Displays,
-   and Notifications use sub-panes so far; Power is next. Hub sub-tabs can't be hidden individually with
+3. **Many tabs still keep settings behind the Settings button.** Sound, Displays,
+   Notifications, and Power use sub-panes so far. Hub sub-tabs can't be hidden individually with
    `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.

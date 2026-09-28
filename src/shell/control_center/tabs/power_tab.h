@@ -33,6 +33,8 @@ public:
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
+  void setActive(bool active) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
@@ -40,6 +42,12 @@ public:
 
 private:
   friend class PowerTabTestAccess;
+
+  // macOS-style sub-panes: the main page and one settings page per group (lid close is
+  // already a live card on the main page).
+  enum class Page : std::uint8_t { Root, Session, Idle };
+  void openPage(Page page);
+  void syncPage();
 
   enum class ChargeLimitMode : std::uint8_t {
     Unsupported,
@@ -89,6 +97,16 @@ private:
   IdleInhibitor* m_idleInhibitor = nullptr;
   SessionActionRunner* m_session = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_sessionPane;
+  std::unique_ptr<SettingsPane> m_idlePane;
+  Page m_page = Page::Root;
+  bool m_active = false;
+  Flex* m_rootPage = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  ScrollView* m_subScroll = nullptr;
+  Flex* m_sessionPage = nullptr;
+  Flex* m_idlePage = nullptr;
 
   Flex* m_root = nullptr;
 

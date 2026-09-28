@@ -1,4 +1,5 @@
 #include "shell/control_center/tabs/power_tab.h"
+#include "core/input/keybind_matcher.h"
 
 #include "config/config_service.h"
 #include "dbus/power/power_profiles_service.h"
@@ -153,15 +154,33 @@ PowerTab::PowerTab(UPowerService* upower, PowerProfilesService* powerProfiles, c
     m_config = services->config;
     m_idleInhibitor = services->idleInhibitor;
     m_session = services->session;
-    m_settings = std::make_unique<SettingsPane>(*services, SettingsPaneOptions{.section = "power"});
+    m_settings =
+        std::make_unique<SettingsPane>(*services, SettingsPaneOptions{.section = "power", .inlineSettings = true});
+    m_sessionPane = std::make_unique<SettingsPane>(
+        *services,
+        SettingsPaneOptions{.section = "power", .includedGroups = {"session-panel"}, .inlineSettings = true}
+    );
+    m_idlePane = std::make_unique<SettingsPane>(
+        *services, SettingsPaneOptions{.section = "power", .includedGroups = {"idle"}, .inlineSettings = true}
+    );
   }
 }
 
 std::unique_ptr<Flex> PowerTab::create() {
   const float scale = contentScale();
 
-  auto tab = ui::column({
+  auto outer = ui::column({
       .out = &m_root,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  outer->addChild(std::move(subHeader));
+
+  auto tab = ui::column({
+      .out = &m_rootPage,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
@@ -232,15 +251,59 @@ std::unique_ptr<Flex> PowerTab::create() {
     tab->addChild(std::move(leftover));
   }
 
+  // Navigation rows into the settings sub-panes, after the live cards.
+  if (m_sessionPane != nullptr && m_idlePane != nullptr) {
+    auto nav = ui::column({
+        .align = FlexAlign::Stretch,
+        .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+    });
+    nav->addChild(makeNavRow(scale, "power", i18n::tr("control-center.power.pages.session"), [this]() {
+      openPage(Page::Session);
+    }));
+    nav->addChild(ui::separator());
+    nav->addChild(makeNavRow(scale, "moon", i18n::tr("control-center.power.pages.idle"), [this]() {
+      openPage(Page::Idle);
+    }));
+    tab->addChild(std::move(nav));
+  }
+  outer->addChild(std::move(tab));
+
+  if (m_sessionPane != nullptr && m_idlePane != nullptr) {
+    auto subScroll = ui::scrollView({
+        .out = &m_subScroll,
+        .contentScale = scale,
+        .scrollbarVisible = true,
+        .viewportPaddingH = 0.0F,
+        .viewportPaddingV = 0.0F,
+        .flexGrow = 1.0F,
+        .configure =
+            [](ScrollView& view) {
+              view.clearFill();
+              view.clearBorder();
+            },
+    });
+    Flex* subContent = subScroll->content();
+    subContent->setDirection(FlexDirection::Vertical);
+    subContent->setAlign(FlexAlign::Stretch);
+    auto sessionPage = m_sessionPane->createInline(scale, panelCardOpacity());
+    m_sessionPage = sessionPage.get();
+    subContent->addChild(std::move(sessionPage));
+    auto idlePage = m_idlePane->createInline(scale, panelCardOpacity());
+    m_idlePage = idlePage.get();
+    subContent->addChild(std::move(idlePage));
+    outer->addChild(std::move(subScroll));
+  }
+
   syncSessionCard();
   syncLidCloseToggle();
   syncPowerProfiles();
   syncBatteryWell();
+  syncPage();
 
   if (m_settings != nullptr) {
-    return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
+    return m_settings->wrapLive(std::move(outer), contentScale(), panelCardOpacity());
   }
-  return tab;
+  return outer;
 }
 
 std::unique_ptr<Flex> PowerTab::createHeaderActions() {
@@ -691,10 +754,71 @@ void PowerTab::buildPeripheralsCard(Flex& root, float scale) {
   root.addChild(std::move(card));
 }
 
+void PowerTab::syncPage() {
+  const bool root = m_page == Page::Root;
+  bool changed = setShown(m_rootPage, root);
+  changed |= setShown(m_subHeader, !root);
+  changed |= setShown(m_subScroll, !root);
+  changed |= setShown(m_sessionPage, m_page == Page::Session);
+  changed |= setShown(m_idlePage, m_page == Page::Idle);
+  if (m_subTitle != nullptr && !root) {
+    m_subTitle->setText(
+        i18n::tr(m_page == Page::Session ? "control-center.power.pages.session" : "control-center.power.pages.idle")
+    );
+  }
+  if (changed) {
+    if (auto* panels = PanelManager::current(); panels != nullptr) {
+      panels->requestLayout();
+    }
+  }
+}
+
+void PowerTab::openPage(Page page) {
+  if (page == m_page) {
+    return;
+  }
+  m_page = page;
+  if (m_subScroll != nullptr) {
+    m_subScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+}
+
+void PowerTab::setActive(bool active) {
+  const bool becameActive = active && !m_active;
+  m_active = active;
+  if (becameActive && m_page != Page::Root) {
+    m_page = Page::Root;
+    syncPage();
+  }
+}
+
+bool PowerTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  // Cancel (Escape by default) backs out of a sub-pane before it would close the panel.
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
+}
+
 void PowerTab::onClose() {
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
+  if (m_sessionPane != nullptr) {
+    m_sessionPane->onClose();
+  }
+  if (m_idlePane != nullptr) {
+    m_idlePane->onClose();
+  }
+  m_rootPage = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_subScroll = nullptr;
+  m_sessionPage = nullptr;
+  m_idlePage = nullptr;
   m_root = nullptr;
   m_sessionCard = nullptr;
   m_lockButton = nullptr;
