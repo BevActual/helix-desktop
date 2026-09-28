@@ -127,10 +127,13 @@ clusters, settings shown in context, and sub-tabs only where one tab has several
   devices and input; sharing; apps; advanced (hooks, compositor).
 - **Search** finds individual settings and opens the tab and sub-tab that shows them
   (`tabIdForSettingsGroup`).
-- **Labeled sub-tabs inside a tab**, like macOS Sound's Output / Input. A sub-tab can be a
-  live page (a device list) or a settings-only page of toggles and sliders, which is fine
-  (Sound → Sound Effects is `SettingsPane::createInline` for one settings group). Sub-tab
-  labels are words, not bare icons.
+- **Sub-panes, macOS style.** A pane's extra pages open from navigation rows (glyph, title,
+  chevron) and replace the pane in place, with a back header; Cancel (Escape) goes back, and
+  the pane reopens on its main page. A sub-pane can be a live page (a device list) or a
+  settings-only page of toggles and sliders (`SettingsPane::createInline` for one group).
+  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound is the reference.
+- **Chip sub-tabs only for peers you switch between often** and that share one purpose
+  (Privacy & Security today); prefer sub-panes otherwise.
 - **Settings in the pane.** A tab with a single page shows its settings under the live
   content, and the page scrolls as one list (`SettingsPaneOptions::inlineSettings`). A
   hosted page with one settings group drops the group heading, since the tab or sub-tab
@@ -168,8 +171,8 @@ What doesn't follow these rules yet, roughly in order:
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-3. **Most control tabs still keep settings behind the Settings button.** Only Sound has
-   sub-tabs with a settings page so far; Displays, Notifications, and Power are next. Hub sub-tabs can't be hidden individually with
+3. **Most control tabs still keep settings behind the Settings button.** Only Sound uses
+   sub-panes so far; Displays, Notifications, and Power are next. Hub sub-tabs can't be hidden individually with
    `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.

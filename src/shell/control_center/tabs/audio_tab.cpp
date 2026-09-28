@@ -1,4 +1,5 @@
 #include "shell/control_center/tabs/audio_tab.h"
+#include "core/input/keybind_matcher.h"
 
 #include "config/config_service.h"
 #include "core/log.h"
@@ -1479,12 +1480,6 @@ AudioTab::AudioTab(
           services,
           SettingsPaneOptions{.section = "services", .includedGroups = {"audio"}, .inlineSettings = true}
       )) {
-  if (m_config != nullptr) {
-    if (const std::optional<std::string> catalog = m_config->stateString("audio_tab", "catalog")) {
-      m_catalog = catalogFromState(*catalog);
-      m_pinnedCatalog = m_catalog;
-    }
-  }
 }
 
 AudioTab::~AudioTab() = default;
@@ -1941,25 +1936,10 @@ std::unique_ptr<Flex> AudioTab::create() {
       )
   );
   tab->addChild(std::move(compactCard));
-  // Labeled sub-tabs at the top, like macOS Sound's Output / Input tabs: three live lists and
-  // Sound Effects, a settings-only page. The volume card stays under them on every sub-tab.
-  tab->insertChildAt(
-      0,
-      ui::segmented({
-          .out = &m_catalogSwitch,
-          .options =
-              std::vector<ui::SegmentedOption>{
-                  {.label = i18n::tr("control-center.audio.tabs.output"), .glyph = "volume-high"},
-                  {.label = i18n::tr("control-center.audio.tabs.input"), .glyph = "microphone"},
-                  {.label = i18n::tr("control-center.audio.tabs.apps"), .glyph = "apps"},
-                  {.label = i18n::tr("control-center.audio.tabs.effects"), .glyph = "music"},
-              },
-          .selectedIndex = indexFromCatalog(m_catalog),
-          .scale = scale,
-          .surfaceOpacity = panelCardOpacity(),
-          .onChange = [this](std::size_t index) { applyCatalog(index, true); },
-      })
-  );
+  // Sub-pane header (back chevron + title), shown above the card while a sub-pane is open.
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Catalog::Root); });
+  m_subHeader = subHeader.get();
+  tab->insertChildAt(0, std::move(subHeader));
 
   // Below the compact card the page is one scroll, like a macOS pane: the device (or app)
   // list, then Sound's settings (inlineSettings). The lists grow to their content instead of
@@ -1982,6 +1962,24 @@ std::unique_ptr<Flex> AudioTab::create() {
   pageContent->setDirection(FlexDirection::Vertical);
   pageContent->setAlign(FlexAlign::Stretch);
   pageContent->setGap(Style::spaceMd * scale);
+
+  // Main page: navigation rows into the sub-panes, as one grouped list.
+  auto rootNav = ui::column({
+      .out = &m_rootNav,
+      .align = FlexAlign::Stretch,
+      .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+  });
+  const auto addNav = [&](std::string glyph, const char* titleKey, Catalog page) {
+    if (!rootNav->children().empty()) {
+      rootNav->addChild(ui::separator());
+    }
+    rootNav->addChild(makeNavRow(scale, std::move(glyph), i18n::tr(titleKey), [this, page]() { openPage(page); }));
+  };
+  addNav("volume-high", "control-center.audio.pages.output", Catalog::Output);
+  addNav("microphone", "control-center.audio.pages.input", Catalog::Input);
+  addNav("apps", "control-center.audio.pages.apps", Catalog::Apps);
+  addNav("music", "control-center.audio.pages.effects", Catalog::Effects);
+  pageContent->addChild(std::move(rootNav));
 
   auto leftoverHost = ui::column({
       .align = FlexAlign::Stretch,
@@ -2038,13 +2036,10 @@ void AudioTab::setActive(bool active) {
   if (!active) {
     return;
   }
-  if (m_config != nullptr) {
-    if (const std::optional<std::string> catalog = m_config->stateString("audio_tab", "catalog")) {
-      m_catalog = catalogFromState(*catalog);
-      m_pinnedCatalog = m_catalog;
-      syncCatalog();
-    }
-  }
+  // Like a macOS pane, Sound opens on its main page.
+  m_catalog = Catalog::Root;
+  m_pinnedCatalog = Catalog::Root;
+  syncCatalog();
 }
 
 void AudioTab::onPanelCardOpacityChanged(float opacity) {
@@ -2063,7 +2058,10 @@ AudioTab::Catalog AudioTab::catalogFromState(std::string_view value) noexcept {
   if (value == "effects") {
     return Catalog::Effects;
   }
-  return Catalog::Apps;
+  if (value == "apps") {
+    return Catalog::Apps;
+  }
+  return Catalog::Root;
 }
 
 std::string_view AudioTab::catalogState(Catalog catalog) noexcept {
@@ -2076,8 +2074,10 @@ std::string_view AudioTab::catalogState(Catalog catalog) noexcept {
     return "apps";
   case Catalog::Effects:
     return "effects";
+  case Catalog::Root:
+    return "root";
   }
-  return "apps";
+  return "root";
 }
 
 std::size_t AudioTab::indexFromCatalog(Catalog catalog) noexcept {
@@ -2090,8 +2090,10 @@ std::size_t AudioTab::indexFromCatalog(Catalog catalog) noexcept {
     return 2;
   case Catalog::Effects:
     return 3;
+  case Catalog::Root:
+    return 4;
   }
-  return 2;
+  return 4;
 }
 
 AudioTab::Catalog AudioTab::catalogFromIndex(std::size_t index) noexcept {
@@ -2100,10 +2102,12 @@ AudioTab::Catalog AudioTab::catalogFromIndex(std::size_t index) noexcept {
     return Catalog::Output;
   case 1:
     return Catalog::Input;
+  case 2:
+    return Catalog::Apps;
   case 3:
     return Catalog::Effects;
   default:
-    return Catalog::Apps;
+    return Catalog::Root;
   }
 }
 
@@ -2128,6 +2132,7 @@ bool AudioTab::syncDetailLabel() {
     break;
   case Catalog::Apps:
   case Catalog::Effects:
+  case Catalog::Root:
     break;
   }
   m_detailLabel->setText(i18n::tr(key));
@@ -2139,7 +2144,23 @@ void AudioTab::syncCatalog() {
   const bool input = m_catalog == Catalog::Input;
   const bool apps = m_catalog == Catalog::Apps;
   const bool effects = m_catalog == Catalog::Effects;
+  const bool root = m_catalog == Catalog::Root;
   bool dirty = false;
+  dirty |= setShown(m_rootNav, root);
+  dirty |= setShown(m_subHeader, !root);
+  // The volume card belongs with device choice; app volumes and sound effects don't need it.
+  dirty |= setShown(m_compactCard, root || output || input);
+  if (m_subTitle != nullptr && !root) {
+    const char* key = "control-center.audio.pages.effects";
+    if (output) {
+      key = "control-center.audio.pages.output";
+    } else if (input) {
+      key = "control-center.audio.pages.input";
+    } else if (apps) {
+      key = "control-center.audio.pages.apps";
+    }
+    m_subTitle->setText(i18n::tr(key));
+  }
   // m_*Scroll all point at the shared page scroll, which stays shown.
   dirty |= setShown(m_outputHost, output);
   dirty |= setShown(m_outputList, output);
@@ -2158,6 +2179,27 @@ void AudioTab::syncCatalog() {
     m_lastOutputWidth = -1.0F;
     m_lastInputWidth = -1.0F;
   }
+}
+
+void AudioTab::openPage(Catalog page) {
+  if (page == m_catalog) {
+    return;
+  }
+  (void)dismissTransientUi();
+  m_catalog = page;
+  m_pinnedCatalog = page;
+  syncCatalog();
+  requestPanelLayout();
+}
+
+bool AudioTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  // Cancel (Escape by default) backs out of a sub-pane before it would close the panel.
+  if (!pressed || preedit || configureMode() || m_catalog == Catalog::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Catalog::Root);
+  return true;
 }
 
 void AudioTab::applyCatalog(std::size_t index, bool persist) {
@@ -2337,6 +2379,9 @@ void AudioTab::onClose() {
   m_lastInputListKey.clear();
   m_programScroll = nullptr;
   m_effectsHost = nullptr;
+  m_rootNav = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
   m_programList = nullptr;
   m_programRows.clear();
   m_lastProgramListKey.clear();

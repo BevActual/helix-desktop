@@ -99,6 +99,13 @@ namespace control_center {
   };
   std::unique_ptr<Flex> makeEmptyState(float scale, const EmptyStateSpec& spec, EmptyStateParts* parts = nullptr);
 
+  // macOS-style drill-down. A navigation row (glyph, title, trailing chevron) opens a sub-pane
+  // in place; the sub-pane starts with a header whose back chevron returns to the main page.
+  // Use these instead of tabs when a pane's extra pages are occasional (device pickers,
+  // settings pages): the main page stays one calm list.
+  std::unique_ptr<Flex> makeNavRow(float scale, std::string glyph, std::string title, std::function<void()> onOpen);
+  std::unique_ptr<Flex> makeSubPaneHeader(float scale, Label** titleOut, std::function<void()> onBack);
+
 } // namespace control_center
 
 class Tab {

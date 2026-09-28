@@ -47,6 +47,7 @@ public:
   void onClose() override;
   void setActive(bool active) override;
   bool dismissTransientUi() override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   [[nodiscard]] bool dragging() const noexcept;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
@@ -82,8 +83,9 @@ private:
     std::function<void()> toggleMute;
   };
 
-  // Labeled sub-tabs: three live lists and a settings-only page (Sound Effects).
-  enum class Catalog : std::uint8_t { Output, Input, Apps, Effects };
+  // macOS-style drill-down: Root is the main page (volume card + navigation rows); the rest
+  // are sub-panes opened from those rows, with a back header.
+  enum class Catalog : std::uint8_t { Root, Output, Input, Apps, Effects };
 
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
@@ -92,6 +94,7 @@ private:
   void rebuildLists(Renderer& renderer);
   void rebuildProgramVolumes(Renderer& renderer);
   void applyCatalog(std::size_t index, bool persist = true);
+  void openPage(Catalog page);
   void persistCatalog();
   void syncCatalog();
   [[nodiscard]] bool syncDetailLabel();
@@ -131,10 +134,13 @@ private:
   Flex* m_inputList = nullptr;
   ScrollView* m_programScroll = nullptr;
   Flex* m_effectsHost = nullptr;
+  Flex* m_rootNav = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
   Flex* m_programList = nullptr;
   bool m_catalogSyncing = false;
-  Catalog m_catalog = Catalog::Apps;
-  Catalog m_pinnedCatalog = Catalog::Apps;
+  Catalog m_catalog = Catalog::Root;
+  Catalog m_pinnedCatalog = Catalog::Root;
   std::vector<Flex*> m_programRows;
   std::string m_lastProgramListKey;
   float m_lastProgramSliderMax = -1.0F;

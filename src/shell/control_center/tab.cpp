@@ -16,7 +16,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <functional>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -384,6 +386,68 @@ namespace control_center {
     const float height = std::max(1.0F, root->measure(renderer, constraints).height);
     root->setSize(std::max(1.0F, width), height);
     root->layout(renderer);
+  }
+
+  std::unique_ptr<Flex> makeNavRow(float scale, std::string glyph, std::string title, std::function<void()> onOpen) {
+    return ui::button({
+        .text = std::move(title),
+        .glyph = std::move(glyph),
+        .glyphSize = Style::fontSizeTitle * scale,
+        .contentAlign = ButtonContentAlign::Start,
+        .minHeight = Style::controlHeightLg * scale,
+        .paddingV = Style::spaceSm * scale,
+        .paddingH = Style::spaceMd * scale,
+        .gap = Style::spaceSm * scale,
+        .radius = 0.0F,
+        .onClick = std::move(onOpen),
+        .configure =
+            [scale](Button& row) {
+              row.setDirection(FlexDirection::Horizontal);
+              row.setAlign(FlexAlign::Center);
+              row.setJustify(FlexJustify::Start);
+              row.setFillWidth(true);
+              if (row.label() != nullptr) {
+                row.label()->setFontSize(Style::fontSizeBody * scale);
+                row.label()->setMaxLines(1);
+                row.label()->setTextAlign(TextAlign::Start);
+                row.label()->setEllipsize(TextEllipsize::End);
+                row.label()->setFlexGrow(1.0F);
+              }
+              row.addChild(ui::glyph({
+                  .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
+                  .glyphSize = Style::fontSizeBody * scale,
+                  .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+              }));
+            },
+    });
+  }
+
+  std::unique_ptr<Flex> makeSubPaneHeader(float scale, Label** titleOut, std::function<void()> onBack) {
+    auto row = ui::row({
+        .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+    });
+    row->addChild(ui::button({
+        .glyph = Style::rtl() ? "chevron-right" : "chevron-left",
+        .onClick = std::move(onBack),
+        .configure =
+            [scale](Button& button) {
+              button.setVariant(ButtonVariant::Default);
+              button.setGlyphSize(Style::fontSizeBody * scale);
+              button.setMinWidth(Style::controlHeightSm * scale);
+              button.setMinHeight(Style::controlHeightSm * scale);
+              button.setPadding(Style::spaceXs * scale);
+              button.setRadius(Style::scaledRadiusMd(scale));
+            },
+    }));
+    row->addChild(ui::label({
+        .out = titleOut,
+        .fontSize = Style::fontSizeTitle * scale,
+        .fontWeight = FontWeight::Bold,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxLines = 1,
+    }));
+    return row;
   }
 
 } // namespace control_center

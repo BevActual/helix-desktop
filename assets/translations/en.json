@@ -499,10 +499,10 @@
       "unavailable-body": "Audio is not active.",
       "unavailable-title": "Audio unavailable",
       "unmute": "Unmute",
-      "tabs": {
-        "output": "Output",
-        "input": "Input",
-        "apps": "Apps",
+      "pages": {
+        "output": "Output devices",
+        "input": "Input devices",
+        "apps": "App volumes",
         "effects": "Sound Effects"
       }
     },
