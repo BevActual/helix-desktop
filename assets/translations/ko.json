@@ -2366,10 +2366,6 @@
           "description": "홈 탭의 단축키 버튼 최대 6개 선택",
           "label": "홈 단축키"
         },
-        "home-shortcuts-show-labels": {
-          "description": "홈 탭의 바로가기 아이콘 아래에 텍스트 레이블 표시",
-          "label": "바로가기 레이블 보이기"
-        },
         "launcher-app-actions": {
           "label": "앱 작업 표시"
         },

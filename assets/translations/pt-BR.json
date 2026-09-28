@@ -2455,10 +2455,6 @@
           "description": "Escolha até seis botões de atalho para a guia inicial",
           "label": "Atalhos do Início"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Mostrar rótulos de texto sob ícones de atalho na aba de início",
-          "label": "Mostra Rótulos de Atalhos"
-        },
         "launcher-app-actions": {
           "description": "Mostrar ações de aplicação junto com as aplicações",
           "label": "Mostrar Ações de Aplicação"

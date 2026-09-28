@@ -1085,10 +1085,6 @@
           "description": "ホームタブのショートカットを最大6個まで選択",
           "label": "ホーム用ショートカット"
         },
-        "home-shortcuts-show-labels": {
-          "description": "ホームタブのショートカットアイコン下に文字ラベルを表示",
-          "label": "ショートカット名を表示"
-        },
         "launcher-app-actions": {
           "description": "検索結果でアプリと並べてアプリ操作項目を表示",
           "label": "アプリの操作を表示"

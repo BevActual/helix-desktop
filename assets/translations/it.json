@@ -2455,10 +2455,6 @@
           "description": "Scegli fino a sei pulsanti scorciatoia per la scheda home",
           "label": "Scorciatoie home"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Visualizza le etichette di testo sotto le icone di collegamento nella scheda Home",
-          "label": "Mostra etichette di scelta rapida"
-        },
         "launcher-app-actions": {
           "description": "Mostra le voci delle azioni accanto alle applicazioni nei risultati",
           "label": "Mostra azioni app"

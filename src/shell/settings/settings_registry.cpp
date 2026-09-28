@@ -2414,16 +2414,6 @@ namespace settings {
     }
     {
       auto e = makeEntry(
-          SettingsSection::Security, "lock-screen",
-          tr("settings.schema.lockscreen.lid-close-keep-external-displays.label"),
-          tr("settings.schema.lockscreen.lid-close-keep-external-displays.description"),
-          {"lockscreen", "lid_close_keep_external_displays"}, ToggleSetting{cfg.lockscreen.lidCloseKeepExternalDisplays},
-          "lid close clamshell external display monitor laptop dock suspend lock screen"
-      );
-      entries.push_back(std::move(e));
-    }
-    {
-      auto e = makeEntry(
           SettingsSection::Security, "lock-screen", tr("settings.schema.lockscreen.fingerprint.label"),
           tr("settings.schema.lockscreen.fingerprint.description"), {"lockscreen", "fingerprint"},
           ToggleSetting{cfg.lockscreen.fingerprint}, "lock screen fingerprint fprintd biometric"
@@ -3830,7 +3820,7 @@ namespace settings {
         SettingsSection::Power, "lid", tr("settings.schema.lockscreen.lid-close-keep-external-displays.label"),
         tr("settings.schema.lockscreen.lid-close-keep-external-displays.description"),
         {"lockscreen", "lid_close_keep_external_displays"}, ToggleSetting{cfg.lockscreen.lidCloseKeepExternalDisplays},
-        "lid close clamshell external display monitor laptop dock suspend"
+        "lid close clamshell external display monitor laptop dock suspend lock screen"
     ));
 
     // Idle

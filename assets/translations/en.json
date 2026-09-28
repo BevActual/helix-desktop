@@ -4209,10 +4209,6 @@
           "description": "Extra actions under the Home modules. Empty by default; add only what you use.",
           "label": "Home Pins"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Display text labels under shortcut icons in the home tab",
-          "label": "Show Shortcut Labels"
-        },
         "launcher-app-actions": {
           "description": "Show application action entries alongside applications in results",
           "label": "Show App Actions"

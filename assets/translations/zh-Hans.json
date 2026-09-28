@@ -2455,10 +2455,6 @@
           "description": "选择主页选项卡的快捷按钮",
           "label": "主页快捷项"
         },
-        "home-shortcuts-show-labels": {
-          "description": "在主页选项卡的快捷项图标下方显示文本标签",
-          "label": "显示快捷项标签"
-        },
         "launcher-app-actions": {
           "description": "在搜索结果中同时显示应用及其操作项",
           "label": "显示应用操作"

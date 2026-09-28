@@ -2305,10 +2305,6 @@
           "description": "Tria fins a sis botons de drecera per a la pestanya d'inici",
           "label": "Dreceres d'inici"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Mostra etiquetes de text sota les icones de drecera a la pestanya d'inici",
-          "label": "Mostra les etiquetes de dreceres"
-        },
         "launcher-app-actions": {
           "description": "Mostra entrades d'accions d'aplicació al costat de les aplicacions als resultats",
           "label": "Mostra les accions d'aplicació"

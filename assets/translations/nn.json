@@ -2326,10 +2326,6 @@
           "description": "Vel opp til seks snarvegsknappar på heimefana",
           "label": "Heimesnarvegar"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Vis tekstmerkelappar under snarvegmerke i heimfana",
-          "label": "Vis snarvegmerkelappar"
-        },
         "launcher-app-grid": {
           "description": "Vis ei rutenett med appmerke med namn under når søket gjev berre appar",
           "label": "Apprutenett"

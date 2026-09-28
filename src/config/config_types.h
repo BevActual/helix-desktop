@@ -1839,7 +1839,6 @@ struct ControlCenterConfig {
   ControlCenterSidebarMode sidebarSectionMode = ControlCenterSidebarMode::Compact;
   std::int32_t width = kDefaultWidth; // full-sidebar logical width; compact/none modes scale down from this
   std::int32_t height = kDefaultHeight; // logical height; leftover catalogs fill the extra space
-  bool showShortcutLabels = true;
   bool showSessionButton = true;
   CalendarTabConfig calendarTab;
   ClockTabConfig clockTab;

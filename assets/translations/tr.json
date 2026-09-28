@@ -2338,10 +2338,6 @@
           "description": "Ana sekme için en fazla altı kısayol butonu seçin",
           "label": "Ana Sekme Kısayolları"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Ana sekmedeki kısayol ikonlarının altında metin etiketlerini göster",
-          "label": "Kısayol Etiketlerini Göster"
-        },
         "launcher-app-actions": {
           "description": "Sonuçlarda uygulamaların yanında uygulama eylem girdilerini de göster",
           "label": "Uygulama Eylemlerini Göster"

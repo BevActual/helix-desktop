@@ -29,6 +29,7 @@ namespace noctalia::config {
     constexpr int kCalendarEventFormatsMigrationVersion = 14;
     constexpr int kLaunchAppsAsSystemdServicesMigrationVersion = 15;
     constexpr int kClockTimezonesMigrationVersion = 16;
+    constexpr int kControlCenterShortcutLabelsMigrationVersion = 17;
     constexpr std::int64_t kMaxBarRadius = 500;
     constexpr std::array<std::string_view, 5> kBarRadiusKeys = {
         "radius", "radius_top_left", "radius_top_right", "radius_bottom_left", "radius_bottom_right",
@@ -750,6 +751,23 @@ namespace noctalia::config {
       onChanged("control_center.calendar.timezones", keptCanonical);
     }
 
+    // Home pins became labeled grouped-list rows, so show_shortcut_labels no longer does anything.
+    template <typename OnChanged> void migrateControlCenterShortcutLabels(toml::table& root, OnChanged&& onChanged) {
+      auto* section = root["control_center"].as_table();
+      if (section == nullptr) {
+        return;
+      }
+      if (section->erase("show_shortcut_labels") > 0) {
+        onChanged("control_center.show_shortcut_labels");
+      }
+    }
+
+    void migrateControlCenterShortcutLabelsSidecar(toml::table& root, schema::Diagnostics& diag) {
+      migrateControlCenterShortcutLabels(root, [&diag](const std::string& path) {
+        diag.warn(path, "removed show_shortcut_labels; Home pins always show labels");
+      });
+    }
+
     void migrateCalendarTimezonesToClockSidecar(toml::table& root, schema::Diagnostics& diag) {
       migrateCalendarTimezonesToClock(root, [&diag](const std::string& path, bool keptCanonical) {
         diag.warn(
@@ -898,6 +916,11 @@ namespace noctalia::config {
             .toVersion = kClockTimezonesMigrationVersion,
             .summary = "control-center: move world-clock timezones to the Clock tab",
             .apply = migrateCalendarTimezonesToClockSidecar,
+        },
+        {
+            .toVersion = kControlCenterShortcutLabelsMigrationVersion,
+            .summary = "control-center: drop show_shortcut_labels (Home pins always show labels)",
+            .apply = migrateControlCenterShortcutLabelsSidecar,
         },
     };
     return migrations;
@@ -1061,6 +1084,13 @@ namespace noctalia::config {
           .message = keptCanonical
               ? "world-clock timezones are deprecated; move them to [control_center.clock] and keep the existing canonical value"
               : "world-clock timezones are deprecated; move them to [control_center.clock]",
+      });
+    });
+    migrateControlCenterShortcutLabels(root, [&issues](const std::string& path) {
+      issues.push_back({
+          .migrationVersion = kControlCenterShortcutLabelsMigrationVersion,
+          .path = path,
+          .message = "show_shortcut_labels no longer does anything; Home pins always show labels",
       });
     });
   }

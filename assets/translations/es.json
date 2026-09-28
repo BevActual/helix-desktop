@@ -2455,10 +2455,6 @@
           "description": "Elige hasta seis botones de acceso directo para la pestaña de inicio",
           "label": "Accesos directos de inicio"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Mostrar etiquetas de texto debajo de los iconos de acceso directo en la pestaña de inicio",
-          "label": "Mostrar etiquetas de atajos"
-        },
         "launcher-app-actions": {
           "description": "Mostrar entradas de acciones de la aplicación junto a las aplicaciones en los resultados",
           "label": "Mostrar acciones de la aplicación"

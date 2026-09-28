@@ -2333,10 +2333,6 @@
           "description": "Wähle bis zu sechs Shortcuts für den Start-Tab",
           "label": "Start-Shortcuts"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Zeige Textbeschriftungen unter Shortcut-Icons im Start-Tab an",
-          "label": "Shortcut-Beschriftungen anzeigen"
-        },
         "launcher-app-actions": {
           "description": "Zeige App-Aktionseinträge neben Apps in den Ergebnissen an",
           "label": "App-Aktionen anzeigen"

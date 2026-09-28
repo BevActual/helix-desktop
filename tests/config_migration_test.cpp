@@ -944,6 +944,34 @@ timezones = ["Asia/Tokyo"]
     expect(hasIssuePath(issues, "control_center.calendar.timezones"), "legacy clock timezone issue was missing");
   }
 
+  void checkControlCenterShortcutLabelsMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 16
+[control_center]
+show_shortcut_labels = false
+width = 700
+)");
+    noctalia::config::schema::Diagnostics diagnostics;
+    const int applied = noctalia::config::applyPendingConfigMigrations(sidecar, 16, diagnostics);
+    expect(applied == noctalia::config::currentConfigVersion(), "shortcut labels migration was not applied");
+    const auto* controlCenter = sidecar["control_center"].as_table();
+    expect(
+        controlCenter != nullptr && controlCenter->get("show_shortcut_labels") == nullptr,
+        "show_shortcut_labels was not removed"
+    );
+    expect(sidecar["control_center"]["width"].value<std::int64_t>() == 700, "other control_center keys were touched");
+
+    toml::table legacyConfig = toml::parse(R"(
+[control_center]
+show_shortcut_labels = true
+)");
+    noctalia::config::LegacyConfigIssues issues;
+    noctalia::config::normalizeLegacyConfig(legacyConfig, issues);
+    expect(
+        hasIssuePath(issues, "control_center.show_shortcut_labels"), "legacy show_shortcut_labels issue was missing"
+    );
+  }
+
   void checkVersionGating() {
     toml::table legacy = toml::parse(R"(
 [bar.main]
@@ -1092,6 +1120,7 @@ int main() {
   checkCalendarEventFormatsMigration();
   checkLaunchAppsAsSystemdServicesMigration();
   checkClockTimezonesMigration();
+  checkControlCenterShortcutLabelsMigration();
   checkSysmonPresentationMigration();
   checkKeyboardLayoutShowGlyphMigration();
   checkKeyboardLayoutCustomLabelsMigration();
