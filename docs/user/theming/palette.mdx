@@ -13,11 +13,11 @@ User-facing color settings reference these 16 roles with lowercase `snake_case` 
 
 | Role | Palette field | Description |
 |------|---------------|-------------|
-| `primary` | `mPrimary` | Primary accent for buttons, links, highlights, and active states. |
+| `primary` | `mPrimary` | The accent: selection, checked controls, progress, links, and the keyboard focus ring. Change this to change your accent color. |
 | `on_primary` | `mOnPrimary` | Text and icons placed on primary surfaces. |
-| `secondary` | `mSecondary` | Secondary accent color. |
+| `secondary` | `mSecondary` | Supporting color for meaning, not interaction: categories, badges, charts, and status. |
 | `on_secondary` | `mOnSecondary` | Text and icons placed on secondary surfaces. |
-| `tertiary` | `mTertiary` | Tertiary accent color. |
+| `tertiary` | `mTertiary` | Second supporting color for meaning: charts, categories, and status. |
 | `on_tertiary` | `mOnTertiary` | Text and icons placed on tertiary surfaces. |
 | `error` | `mError` | Error and destructive-action color. |
 | `on_error` | `mOnError` | Text and icons placed on error surfaces. |
@@ -27,8 +27,8 @@ User-facing color settings reference these 16 roles with lowercase `snake_case` 
 | `on_surface_variant` | `mOnSurfaceVariant` | Secondary text and icon color on variant surfaces. |
 | `outline` | `mOutline` | Borders, separators, and subtle outlines. |
 | `shadow` | `mShadow` | Shadow color. |
-| `hover` | `mHover` | Hover and interactive highlight background. |
-| `on_hover` | `mOnHover` | Text and icons placed on hover surfaces. |
+| `hover` | `mHover` | Exported to [templates](/noctalia/theming/templates/) as the palette's hover color. The shell's own hover highlight is derived instead: `surface_variant` tinted toward `primary`, so it always matches your accent. |
+| `on_hover` | `mOnHover` | Exported to templates. In the shell, text on a hover highlight uses `on_surface`. |
 
 Settings role pickers expose these role names first. Template files access these roles and the full Material token set through the [Template Reference](/noctalia/theming/templates/#available-color-tokens). Plugins can query the active theme's colors at runtime using [`noctalia.getColor(role)`](/noctalia/plugins/development/runtime-api/#runtime-and-settings).
 
