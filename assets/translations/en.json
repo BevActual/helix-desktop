@@ -761,7 +761,11 @@
       "transform-flipped-90": "Flipped 90°",
       "transform-normal": "Normal",
       "unknown-resolution": "Unknown resolution",
-      "vrr": "Variable refresh rate"
+      "vrr": "Variable refresh rate",
+      "pages": {
+        "night-light": "Night Light",
+        "advanced": "Advanced"
+      }
     },
     "dock": {
       "add-app": "Add an app",

@@ -43,8 +43,14 @@ public:
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
 
 private:
+  // macOS Displays style: the main page (arrangement, display settings, navigation rows) and
+  // sub-panes for Night Light and Advanced (brightness service settings).
+  enum class Page : std::uint8_t { Root, NightLight, Advanced };
+  void openPage(Page page);
+  void syncPage();
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
   void syncHeaderActions();
@@ -112,6 +118,15 @@ private:
   Label* m_noteLabel = nullptr;
   Label* m_errorLabel = nullptr;
   Flex* m_nightLightCard = nullptr;
+  Page m_page = Page::Root;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  Flex* m_rootPage = nullptr;
+  Flex* m_displayCards = nullptr;
+  Flex* m_nightLightNav = nullptr;
+  Node* m_nightLightNavSeparator = nullptr;
+  Flex* m_nightLightPage = nullptr;
+  Flex* m_advancedPage = nullptr;
   Flex* m_nightLightDetails = nullptr;
   Label* m_nightLightStatus = nullptr;
   Toggle* m_nightLightEnabled = nullptr;

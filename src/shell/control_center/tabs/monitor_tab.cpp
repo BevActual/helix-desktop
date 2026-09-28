@@ -4,6 +4,7 @@
 #include "compositors/niri/niri_config_outputs.h"
 #include "config/config_service.h"
 #include "config/config_types.h"
+#include "core/input/keybind_matcher.h"
 #include "i18n/i18n.h"
 #include "notification/notifications.h"
 #include "render/core/renderer.h"
@@ -370,7 +371,8 @@ MonitorTab::MonitorTab(
     : m_brightness(brightness), m_configService(config), m_displayConfig(displayConfig),
       m_platform(services.platform), m_nightLight(services.nightLight),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "services", .includedGroups = {"brightness"}}
+          services,
+          SettingsPaneOptions{.section = "services", .includedGroups = {"brightness"}, .inlineSettings = true}
       )) {}
 
 std::unique_ptr<Flex> MonitorTab::create() {
@@ -410,8 +412,15 @@ std::unique_ptr<Flex> MonitorTab::create() {
       })
   );
 
-  buildArrangementCard(*m_cardsLayout, scale);
-  buildNightLightCard(*m_cardsLayout, scale);
+  // Main page: arrangement, the selected display's settings, then navigation rows.
+  auto rootPage = ui::column({
+      .out = &m_rootPage,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+  });
+  buildArrangementCard(*rootPage, scale);
+  Flex* rootPagePtr = rootPage.get();
+  m_cardsLayout->addChild(std::move(rootPage));
 
   {
     auto empty = control_center::makeEmptyState(
@@ -427,10 +436,50 @@ std::unique_ptr<Flex> MonitorTab::create() {
     empty->setAlign(FlexAlign::Center);
     empty->setJustify(FlexJustify::Center);
     empty->setVisible(false);
-    m_cardsLayout->addChild(std::move(empty));
+    rootPagePtr->addChild(std::move(empty));
+  }
+  rootPagePtr->addChild(ui::column({
+      .out = &m_displayCards,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+  }));
+  {
+    auto nav = ui::column({
+        .align = FlexAlign::Stretch,
+        .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+    });
+    nav->addChild(makeNavRow(scale, "adjustments", i18n::tr("control-center.display.pages.advanced"), [this]() {
+      openPage(Page::Advanced);
+    }));
+    auto separator = ui::separator();
+    m_nightLightNavSeparator = separator.get();
+    nav->addChild(std::move(separator));
+    auto nightLightRow =
+        makeNavRow(scale, "sun-moon", i18n::tr("control-center.display.pages.night-light"), [this]() {
+          openPage(Page::NightLight);
+        });
+    m_nightLightNav = nightLightRow.get();
+    nav->addChild(std::move(nightLightRow));
+    rootPagePtr->addChild(std::move(nav));
   }
 
+  // Sub-panes.
+  auto nightLightPage = ui::column({
+      .out = &m_nightLightPage,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+  });
+  buildNightLightCard(*nightLightPage, scale);
+  m_cardsLayout->addChild(std::move(nightLightPage));
+  auto advancedPage = m_settings->createInline(scale, panelCardOpacity());
+  m_advancedPage = advancedPage.get();
+  m_cardsLayout->addChild(std::move(advancedPage));
+
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  tab->addChild(std::move(subHeader));
   tab->addChild(std::move(cardsScroll));
+  syncPage();
 
   syncStatusLabels();
   return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
@@ -524,9 +573,50 @@ void MonitorTab::syncStatusLabels() {
   }
 }
 
+void MonitorTab::syncPage() {
+  bool dirty = false;
+  dirty |= setShown(m_rootPage, m_page == Page::Root);
+  dirty |= setShown(m_nightLightPage, m_page == Page::NightLight);
+  dirty |= setShown(m_advancedPage, m_page == Page::Advanced);
+  dirty |= setShown(m_subHeader, m_page != Page::Root);
+  if (m_subTitle != nullptr && m_page != Page::Root) {
+    m_subTitle->setText(i18n::tr(
+        m_page == Page::NightLight ? "control-center.display.pages.night-light" : "control-center.display.pages.advanced"
+    ));
+  }
+  if (dirty) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void MonitorTab::openPage(Page page) {
+  if (page == m_page) {
+    return;
+  }
+  m_page = page;
+  if (m_cardsScroll != nullptr) {
+    m_cardsScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+}
+
+bool MonitorTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  // Cancel (Escape by default) backs out of a sub-pane before it would close the panel.
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
+}
+
 void MonitorTab::setActive(bool active) {
   const bool becameActive = active && !m_active;
   m_active = active;
+  if (becameActive) {
+    m_page = Page::Root;
+    syncPage();
+  }
   if (becameActive && m_brightness != nullptr) {
     m_brightness->requestDdcRefresh();
   }
@@ -560,6 +650,14 @@ void MonitorTab::onClose() {
   m_rescanButton = nullptr;
   m_saveButton = nullptr;
   m_nightLightCard = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_rootPage = nullptr;
+  m_displayCards = nullptr;
+  m_nightLightNav = nullptr;
+  m_nightLightNavSeparator = nullptr;
+  m_nightLightPage = nullptr;
+  m_advancedPage = nullptr;
   m_nightLightDetails = nullptr;
   m_nightLightStatus = nullptr;
   m_nightLightEnabled = nullptr;
@@ -1365,6 +1463,8 @@ void MonitorTab::buildNightLightCard(Flex& parent, float scale) {
 void MonitorTab::syncNightLight() {
   const bool available = m_platform != nullptr && m_platform->hasGammaControl();
   bool layoutDirty = setShown(m_nightLightCard, available);
+  layoutDirty |= setShown(m_nightLightNav, available);
+  layoutDirty |= setShown(m_nightLightNavSeparator, available);
   if (!available) {
     if (layoutDirty) {
       PanelManager::instance().requestLayout();
@@ -1468,7 +1568,7 @@ void MonitorTab::commitNightLightTemperatures(bool fromDaySlider) {
 }
 
 void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
-  if (m_cardsLayout == nullptr) {
+  if (m_cardsLayout == nullptr || m_displayCards == nullptr) {
     return;
   }
 
@@ -1487,7 +1587,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
 
   for (auto& card : m_cards) {
     if (card.card != nullptr) {
-      m_cardsLayout->removeChild(card.card);
+      m_displayCards->removeChild(card.card);
     }
   }
   m_cards.clear();
@@ -1733,7 +1833,7 @@ void MonitorTab::rebuildCards(Renderer& /*renderer*/) {
     }
 
     auto* cardPtr = card.get();
-    m_cardsLayout->addChild(std::move(card));
+    m_displayCards->addChild(std::move(card));
     m_cards.push_back(
         DisplayCard{
             .displayId = source.id,
