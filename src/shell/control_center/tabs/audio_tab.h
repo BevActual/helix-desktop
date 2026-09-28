@@ -82,7 +82,8 @@ private:
     std::function<void()> toggleMute;
   };
 
-  enum class Catalog : std::uint8_t { Output, Input, Apps };
+  // Labeled sub-tabs: three live lists and a settings-only page (Sound Effects).
+  enum class Catalog : std::uint8_t { Output, Input, Apps, Effects };
 
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
@@ -129,6 +130,7 @@ private:
   Flex* m_outputList = nullptr;
   Flex* m_inputList = nullptr;
   ScrollView* m_programScroll = nullptr;
+  Flex* m_effectsHost = nullptr;
   Flex* m_programList = nullptr;
   bool m_catalogSyncing = false;
   Catalog m_catalog = Catalog::Apps;

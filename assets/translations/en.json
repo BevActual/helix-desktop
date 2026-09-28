@@ -498,7 +498,13 @@
       },
       "unavailable-body": "Audio is not active.",
       "unavailable-title": "Audio unavailable",
-      "unmute": "Unmute"
+      "unmute": "Unmute",
+      "tabs": {
+        "output": "Output",
+        "input": "Input",
+        "apps": "Apps",
+        "effects": "Sound Effects"
+      }
     },
     "bar": {
       "auto-hide": "Auto-hide",

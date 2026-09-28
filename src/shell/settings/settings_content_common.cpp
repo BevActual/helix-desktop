@@ -192,19 +192,22 @@ namespace settings {
 
   Flex* addSettingsCard(Flex& parent, std::string_view title, float scale) {
     Flex* bodyRaw = nullptr;
-    auto card = ui::column(
-        {
-            .align = FlexAlign::Stretch,
-            .gap = Style::spaceSm * scale,
-            .configure = [scale](Flex& container) { applySettingsWellStyle(container, scale); },
-        },
-        makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold),
-        ui::column({
-            .out = &bodyRaw,
-            .align = FlexAlign::Stretch,
-            .gap = Style::spaceSm * scale,
-        })
-    );
+    auto card = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+        .configure = [scale](Flex& container) { applySettingsWellStyle(container, scale); },
+    });
+    // An empty title means the host already names the page (a tab or sub-tab title).
+    if (!title.empty()) {
+      card->addChild(
+          makeLabel(title, Style::fontSizeBody * scale, colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold)
+      );
+    }
+    card->addChild(ui::column({
+        .out = &bodyRaw,
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceSm * scale,
+    }));
     parent.addChild(std::move(card));
     return bodyRaw;
   }

@@ -1940,43 +1940,26 @@ std::unique_ptr<Flex> AudioTab::create() {
           })
       )
   );
-  compactCard->addChild(
+  tab->addChild(std::move(compactCard));
+  // Labeled sub-tabs at the top, like macOS Sound's Output / Input tabs: three live lists and
+  // Sound Effects, a settings-only page. The volume card stays under them on every sub-tab.
+  tab->insertChildAt(
+      0,
       ui::segmented({
           .out = &m_catalogSwitch,
           .options =
               std::vector<ui::SegmentedOption>{
-                  {
-                      .label = "",
-                      .glyph = "volume-high",
-                      .tooltip = i18n::tr("control-center.audio.output-device-prefix"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "microphone",
-                      .tooltip = i18n::tr("control-center.audio.input-device-prefix"),
-                  },
-                  {
-                      .label = "",
-                      .glyph = "apps",
-                      .tooltip = i18n::tr("control-center.audio.application-volumes"),
-                  },
+                  {.label = i18n::tr("control-center.audio.tabs.output"), .glyph = "volume-high"},
+                  {.label = i18n::tr("control-center.audio.tabs.input"), .glyph = "microphone"},
+                  {.label = i18n::tr("control-center.audio.tabs.apps"), .glyph = "apps"},
+                  {.label = i18n::tr("control-center.audio.tabs.effects"), .glyph = "music"},
               },
           .selectedIndex = indexFromCatalog(m_catalog),
           .scale = scale,
-          .compact = true,
           .surfaceOpacity = panelCardOpacity(),
           .onChange = [this](std::size_t index) { applyCatalog(index, true); },
       })
   );
-  compactCard->addChild(
-      ui::label({
-          .out = &m_detailLabel,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
-  tab->addChild(std::move(compactCard));
 
   // Below the compact card the page is one scroll, like a macOS pane: the device (or app)
   // list, then Sound's settings (inlineSettings). The lists grow to their content instead of
@@ -2023,7 +2006,9 @@ std::unique_ptr<Flex> AudioTab::create() {
   addListHost(&m_inputHost, &m_inputScroll, &m_inputList);
   addListHost(&m_appsHost, &m_programScroll, &m_programList);
   pageContent->addChild(std::move(leftoverHost));
-  pageContent->addChild(m_settings->createInline(scale, panelCardOpacity()));
+  auto effects = m_settings->createInline(scale, panelCardOpacity());
+  m_effectsHost = effects.get();
+  pageContent->addChild(std::move(effects));
   tab->addChild(std::move(page));
   syncCatalog();
 
@@ -2075,6 +2060,9 @@ AudioTab::Catalog AudioTab::catalogFromState(std::string_view value) noexcept {
   if (value == "input") {
     return Catalog::Input;
   }
+  if (value == "effects") {
+    return Catalog::Effects;
+  }
   return Catalog::Apps;
 }
 
@@ -2086,6 +2074,8 @@ std::string_view AudioTab::catalogState(Catalog catalog) noexcept {
     return "input";
   case Catalog::Apps:
     return "apps";
+  case Catalog::Effects:
+    return "effects";
   }
   return "apps";
 }
@@ -2098,6 +2088,8 @@ std::size_t AudioTab::indexFromCatalog(Catalog catalog) noexcept {
     return 1;
   case Catalog::Apps:
     return 2;
+  case Catalog::Effects:
+    return 3;
   }
   return 2;
 }
@@ -2108,6 +2100,8 @@ AudioTab::Catalog AudioTab::catalogFromIndex(std::size_t index) noexcept {
     return Catalog::Output;
   case 1:
     return Catalog::Input;
+  case 3:
+    return Catalog::Effects;
   default:
     return Catalog::Apps;
   }
@@ -2133,6 +2127,7 @@ bool AudioTab::syncDetailLabel() {
     key = "control-center.audio.sections.input-caption";
     break;
   case Catalog::Apps:
+  case Catalog::Effects:
     break;
   }
   m_detailLabel->setText(i18n::tr(key));
@@ -2143,6 +2138,7 @@ void AudioTab::syncCatalog() {
   const bool output = m_catalog == Catalog::Output;
   const bool input = m_catalog == Catalog::Input;
   const bool apps = m_catalog == Catalog::Apps;
+  const bool effects = m_catalog == Catalog::Effects;
   bool dirty = false;
   // m_*Scroll all point at the shared page scroll, which stays shown.
   dirty |= setShown(m_outputHost, output);
@@ -2151,6 +2147,7 @@ void AudioTab::syncCatalog() {
   dirty |= setShown(m_inputList, input);
   dirty |= setShown(m_appsHost, apps);
   dirty |= setShown(m_programList, apps);
+  dirty |= setShown(m_effectsHost, effects);
   dirty |= syncDetailLabel();
   if (m_catalogSwitch != nullptr && m_catalogSwitch->selectedIndex() != indexFromCatalog(m_pinnedCatalog)) {
     m_catalogSyncing = true;
@@ -2339,6 +2336,7 @@ void AudioTab::onClose() {
   m_lastOutputListKey.clear();
   m_lastInputListKey.clear();
   m_programScroll = nullptr;
+  m_effectsHost = nullptr;
   m_programList = nullptr;
   m_programRows.clear();
   m_lastProgramListKey.clear();

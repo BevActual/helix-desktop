@@ -1509,7 +1509,10 @@ namespace settings {
         }
       }
     }
-    const bool collapsibleGroups = ctx.searchQuery.empty() && !pageGroupKeys.empty();
+    // A hosted page (tab or sub-tab) showing one group: the host's title already names it, so
+    // the group is a plain untitled card instead of a collapsible, titled one.
+    const bool singleHostedGroup = !ctx.showSectionTitle && pageGroupKeys.size() == 1;
+    const bool collapsibleGroups = ctx.searchQuery.empty() && !pageGroupKeys.empty() && !singleHostedGroup;
     std::unordered_set<std::string>* expandedGroups = nullptr;
     if (collapsibleGroups) {
       auto [pageIt, fresh] = ctx.expandedGroupsByPage.try_emplace(pageKey);
@@ -1591,7 +1594,8 @@ namespace settings {
                 }
             );
           } else if (!entry.group.empty()) {
-            activeGroupBody = addSettingsCard(*activeSection, groupLabel(entry.group), scale);
+            activeGroupBody =
+                addSettingsCard(*activeSection, singleHostedGroup ? std::string{} : groupLabel(entry.group), scale);
           } else {
             addGroupLabel(*activeSection, groupLabel(entry.group), isFirstGroup);
             activeGroupBody = activeSection;
