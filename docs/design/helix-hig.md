@@ -59,7 +59,7 @@ Colors come from the palette (`src/ui/palette.h`); use roles, never literal colo
 `src/theme/`.
 
 - **One accent.** `Primary` is the only accent: selection, the checked state, progress, and
-  focus. `OnPrimary` sits on it.
+  the keyboard focus ring (`focusRingColorSpec()`). `OnPrimary` sits on it.
 - **Hover is a state, not a hue.** `Hover` resolves to the surface tinted toward the accent
   (`surface_variant` mixed with `primary`, 22% dark and 16% light) and `OnHover` to normal
   text. This gives one visible order, selected (full accent) > hovered (tint) > resting,
@@ -134,11 +134,9 @@ contract lands in all three in the same piece of work.
 
 What doesn't follow these rules yet, roughly in order:
 
-1. **Focus ring uses `Secondary`** (`focusRingColorSpec()` in `src/ui/palette.h`); it should
-   use `Primary`.
-2. **Three menu implementations:** `ContextMenuPopup`, the dock's `DockPopup`, and the tray's
+1. **Three menu implementations:** `ContextMenuPopup`, the dock's `DockPopup`, and the tray's
    `TrayMenu`. Dock and tray should move onto `ContextMenuPopup`.
-3. **Tier pass on each surface** in the table above that predates this document: OSD,
+2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
-4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
+3. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.

@@ -145,7 +145,7 @@ void setPalette(const Palette& p);
 [[nodiscard]] inline ColorSpec scrollbarThumbColor() noexcept {
   return colorSpecFromRole(ColorRole::OnSurfaceVariant, 0.5F);
 }
-[[nodiscard]] inline ColorSpec focusRingColorSpec() noexcept { return colorSpecFromRole(ColorRole::Secondary); }
+[[nodiscard]] inline ColorSpec focusRingColorSpec() noexcept { return colorSpecFromRole(ColorRole::Primary); }
 
 // Fired after setPalette() writes. Controls subscribe in their constructor
 // and re-apply palette-derived colors to their scene nodes on each emit.
