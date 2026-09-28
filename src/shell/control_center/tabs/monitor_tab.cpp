@@ -304,15 +304,21 @@ namespace {
       std::function<void(double)> onChange, std::function<void()> onCommit
   ) {
     auto header = makeControlRow(title, scale, nullptr, false);
+    // The slider callback keeps the label itself. Callers pass `valueOut` as the address of a
+    // local (rebuildCards), so capturing it would leave a dangling Label** once they return.
+    Label* valueLabel = nullptr;
     header->addChild(
         ui::label({
-            .out = valueOut,
+            .out = &valueLabel,
             .text = format(value),
             .fontSize = Style::fontSizeCaption * scale,
             .fontWeight = FontWeight::Bold,
             .color = colorSpecFromRole(ColorRole::OnSurface),
         })
     );
+    if (valueOut != nullptr) {
+      *valueOut = valueLabel;
+    }
     parent.addChild(std::move(header));
     parent.addChild(
         ui::slider({
@@ -327,9 +333,9 @@ namespace {
             .controlHeight = Style::controlHeight * scale,
             .flexGrow = 1.0F,
             .onValueChanged =
-                [valueOut, format, callback = std::move(onChange)](double next) {
-                  if (valueOut != nullptr && *valueOut != nullptr) {
-                    (*valueOut)->setText(format(next));
+                [valueLabel, format, callback = std::move(onChange)](double next) {
+                  if (valueLabel != nullptr) {
+                    valueLabel->setText(format(next));
                   }
                   if (callback) {
                     callback(next);
