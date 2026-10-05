@@ -9,6 +9,9 @@ on:
 jobs:
   aur-sync:
     name: Sync PKGBUILD with release
+    # This workflow belongs to upstream Noctalia. A Helix tag must not publish
+    # into upstream's AUR package, even if an AUR key is configured here.
+    if: ${{ github.repository == 'noctalia-dev/noctalia' }}
     runs-on: ubuntu-latest
     container:
       image: archlinux:latest

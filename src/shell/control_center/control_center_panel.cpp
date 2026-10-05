@@ -9,6 +9,7 @@
 #include "config/config_service.h"
 #include "core/deferred_call.h"
 #include "core/log.h"
+#include "core/process/process.h"
 #include "core/input/key_modifiers.h"
 #include "core/input/key_symbols.h"
 #include "dbus/mpris/mpris_service.h"
@@ -67,6 +68,9 @@
 #include "wayland/wayland_seat.h"
 #include "system/ai_usage_service.h"
 #include "system/dependency_service.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
+#include "desktop/settings_routes.h"
 #include "system/easyeffects_service.h"
 #include "system/package_kit_service.h"
 #include "system/screen_time_service.h"
@@ -105,6 +109,26 @@ namespace {
   constexpr auto kMprisRefreshMinInterval = std::chrono::milliseconds(750);
   constexpr float kTabViewportClipInset = 1.0F;
   constexpr float kScrollEdgeFadePx = 28.0F;
+
+  struct NativeDestination {
+    std::string_view application;
+    std::string_view page;
+  };
+
+  std::optional<NativeDestination> nativeDestinationForTab(std::string_view tab) {
+    if (tab == "system") return NativeDestination{"helix-system-monitor", "overview"};
+    if (tab == "screen-time") return NativeDestination{"helix-system-monitor", "screen-time"};
+    if (tab == "audio") return NativeDestination{"helix-settings", "sound"};
+    if (tab == "network" || tab == "tailscale") return NativeDestination{"helix-settings", "network"};
+    if (tab == "bluetooth") return NativeDestination{"helix-settings", "bluetooth"};
+    if (tab == "theme" || tab == "wallpaper") return NativeDestination{"helix-settings", "appearance"};
+    if (tab == "privacy-security") return NativeDestination{"helix-settings", "privacy-security"};
+    if (tab == "notifications") return NativeDestination{"helix-settings", "notifications"};
+    if (tab == "power") return NativeDestination{"helix-settings", "system"};
+    if (tab == "desktop" || tab == "launcher" || tab == "control-center")
+      return NativeDestination{"helix-settings", "desktop-dock"};
+    return std::nullopt;
+  }
 
   void styleScrollEdgeFade(Box& box, ColorRole role, float opacity, bool fromTop) {
     const Color opaque = resolveColorSpec(colorSpecFromRole(role, opacity));
@@ -531,9 +555,8 @@ ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
   m_platform = services.platform;
   m_pluginManager = services.pluginManager;
   m_asyncTextures = services.asyncTextures;
-  m_hostedEditors = std::make_unique<settings::HostedEditors>();
   ControlCenterServices tabServices = services;
-  tabServices.hostedEditors = m_hostedEditors.get();
+  tabServices.hostedEditors = nullptr;
   tabServices.modalHost = &m_modalHost;
   appendBuiltinSlots(tabServices);
 }
@@ -660,7 +683,7 @@ float ControlCenterPanel::preferredHeight() const {
   const float fullSize = m_config != nullptr ? static_cast<float>(m_config->config().controlCenter.height)
                                              : static_cast<float>(ControlCenterConfig::kDefaultHeight);
   if (isQuickHomeContext(pendingOpenContext())) {
-    constexpr float kQuickHomeHeight = 470.0F;
+    constexpr float kQuickHomeHeight = 526.0F;
     constexpr float kQuickHomeMediaExtra = 120.0F;
     constexpr float kQuickHomePinRow = 48.0F;
     float height = kQuickHomeHeight;
@@ -888,6 +911,29 @@ void ControlCenterPanel::create() {
       .gap = Style::spaceSm * scale,
   });
 
+  headerActions->addChild(ui::button({
+      .out = &m_nativeApplicationButton,
+      .text = i18n::tr("control-center.open-settings"),
+      .glyph = "settings",
+      .tooltip = i18n::tr("control-center.open-settings"),
+      .onClick = [this]() {
+        const auto destination = nativeDestinationForTab(m_activeTabId);
+        if (!destination.has_value()) return;
+        const bool monitor = destination->application == "helix-system-monitor";
+        DesktopEntry entry;
+        entry.id = monitor ? "org.helix.SystemMonitor" : "org.helix.Settings";
+        entry.name = monitor ? "Helix System Monitor" : "Helix Settings";
+        entry.exec = std::string(destination->application) + " --page " + std::string(destination->page);
+        desktop_entry_launch::LaunchOptions options;
+        if (m_platform != nullptr && m_platform->hasXdgActivation()) {
+          options.activationToken = m_platform->requestActivationToken(nullptr);
+        }
+        if (desktop_entry_launch::launchEntry(entry, options)) {
+          PanelManager::instance().close();
+        }
+      },
+  }));
+
   m_contentHeaderActions->addChild(
       ui::button({
           .out = &m_closeButton,
@@ -1095,6 +1141,10 @@ void ControlCenterPanel::onFrameTick(float deltaMs) {
 }
 
 void ControlCenterPanel::onOpen(std::string_view context) {
+  if (context == "settings" || context.starts_with("settings:") || settings::isRetiredSettingsTab(context)) {
+    DeferredCall::callLater([section = std::string(context)] { PanelManager::instance().openSettings(section); });
+    return;
+  }
   if (m_dependencies != nullptr) {
     m_dependencies->rescan();
   }
@@ -1366,6 +1416,7 @@ void ControlCenterPanel::onClose() {
   m_contentHeaderActions = nullptr;
   m_contentTitle = nullptr;
   m_closeButton = nullptr;
+  m_nativeApplicationButton = nullptr;
   m_tabBodies = nullptr;
   m_sidebarEdgeFade = nullptr;
   m_contentEdgeFade = nullptr;
@@ -1402,6 +1453,7 @@ bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
 }
 
 bool ControlCenterPanel::isTabVisible(std::string_view id) const {
+  if (settings::isRetiredSettingsTab(id)) return false;
   if (id == "home" && !isQuickHomeContext(pendingOpenContext())) {
     return false;
   }
@@ -1618,6 +1670,22 @@ void ControlCenterPanel::syncTabVisibility() {
 }
 
 void ControlCenterPanel::updateTabChrome(std::string_view id) {
+  if (m_nativeApplicationButton != nullptr) {
+    const auto destination = nativeDestinationForTab(id);
+    const bool monitor = destination.has_value() && destination->application == "helix-system-monitor";
+    const auto* activeSlot = slotById(id);
+    const bool hasSettingsLink = activeSlot != nullptr && activeSlot->tab != nullptr && activeSlot->tab->settingsPane() != nullptr;
+    const bool showNativeButton = destination.has_value() && (monitor || !hasSettingsLink);
+    const bool available = destination.has_value()
+        && process::commandExists(monitor ? "helix-system-monitor" : "helix-settings");
+    const auto label = i18n::tr(monitor ? "control-center.open-system-monitor" : "control-center.open-settings");
+    m_nativeApplicationButton->setVisible(showNativeButton);
+    m_nativeApplicationButton->setParticipatesInLayout(showNativeButton);
+    m_nativeApplicationButton->setText(label);
+    m_nativeApplicationButton->setEnabled(available);
+    m_nativeApplicationButton->setTooltip(available ? label : i18n::tr(monitor ? "control-center.install-system-monitor" : "control-center.install-settings"));
+    m_nativeApplicationButton->setGlyph(monitor ? "activity-heartbeat" : "settings");
+  }
   for (auto& slot : m_slots) {
     const bool tabEnabled = isTabShown(slot.id);
     const bool active = tabEnabled && slot.id == id;
@@ -1870,6 +1938,10 @@ void ControlCenterPanel::ensureTabUi(TabSlot& slot) {
 }
 
 void ControlCenterPanel::selectTab(std::string_view id, bool animated) {
+  if (settings::isRetiredSettingsTab(id) || id == "security") {
+    DeferredCall::callLater([section = std::string(id)] { PanelManager::instance().openSettings(section); });
+    return;
+  }
   std::string target(id);
   std::string hubChild;
   if (const auto hubId = hubIdForChild(id); hubId.has_value()) {

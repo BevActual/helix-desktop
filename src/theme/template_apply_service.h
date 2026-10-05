@@ -44,6 +44,7 @@ namespace noctalia::theme {
     void setFailuresChangedCallback(std::function<void()> callback) const;
     void registerIpc(IpcService& ipc);
     [[nodiscard]] bool reapplyLast() const;
+    void setRemoteSource(bool remote) { m_remoteSource = remote; }
     [[nodiscard]] std::unordered_map<std::string, std::string> lastFailures() const;
 
   private:
@@ -76,6 +77,7 @@ namespace noctalia::theme {
     void workerLoop();
     [[nodiscard]] bool requestSuperseded(std::uint64_t generation) const;
 
+    bool m_remoteSource = false;
     ConfigService& m_config;
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_cv;

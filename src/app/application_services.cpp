@@ -1,4 +1,6 @@
 #include "app/main_loop.h"
+#include "desktop/client.h"
+#include "desktop/remote_network.h"
 #include "application.h"
 #include "application_internal.h"
 #include "compositors/compositor_detect.h"
@@ -641,6 +643,41 @@ void Application::syncStorageKeyProvider() {
 }
 
 void Application::initServices() {
+  // Installed sessions activate over D-Bus. Development builds can launch the sibling binary.
+  if (!helix::desktopClient().available()) {
+    std::error_code error;
+    auto sibling = std::filesystem::read_symlink("/proc/self/exe", error).parent_path() / "helix-service";
+    if (!error && std::filesystem::is_regular_file(sibling)) (void)process::runAsync(std::vector<std::string>{sibling.string()});
+  }
+  m_configService.setOverrideCommitHandler([](std::string baseline, std::string candidate, std::string& error) {
+    try {
+      helix::desktopClient().call("configuration", "CommitOverrides", g_variant_new("(ss)", baseline.c_str(), candidate.c_str()));
+      return true;
+    } catch (...) { error = "Helix services are unavailable or settings changed in another client. Refresh and try again."; return false; }
+  });
+  m_themeService.setRemoteSource(true);
+  m_templateApplyService.setRemoteSource(true);
+  auto registerDesktop = [this] {
+    if (!helix::desktopClient().available()) return;
+    try {
+      const auto state = helix::desktopClient().call("configuration", "GetSnapshot");
+      if (!state.value("helix-desktop", false)) {
+        helix::desktopClient().call("configuration", "RegisterDesktop");
+        m_themeService.apply();
+      }
+    } catch (...) {}
+  };
+  registerDesktop();
+  m_desktopServiceObserver = helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json& args) {
+    if (interface == helix::appearanceInterface) {
+      if (signal == "Changed") m_themeService.onConfigReload();
+      else if (signal == "Applied" && args.size() > 1 && args.at(1) == true) m_hookManager.fire(HookKind::ColorsChanged);
+    }
+  });
+  m_desktopServiceTimer.startRepeating(std::chrono::milliseconds(100), [registerDesktop, count = 0u]() mutable {
+    for (int i = 0; i < 16 && g_main_context_pending(nullptr); ++i) g_main_context_iteration(nullptr, false);
+    if (++count % 30 == 0) registerDesktop();
+  });
   if (!security::initializeSecurityPrimitives()) {
     kLog.error("libsodium initialization failed; encrypted persistence is unavailable");
   }
@@ -853,9 +890,8 @@ void Application::initStyleThemeAndWayland() {
   m_templateApplyService.setFailuresChangedCallback([this]() { m_settingsInvalidated.emit(); });
 
   m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{},
-                                      lastGeneratedPalette = std::optional<noctalia::theme::GeneratedPalette>{},
                                       syncScriptApiWallpaperDirectory](
-                                         const noctalia::theme::GeneratedPalette& generated, std::string_view mode
+                                         const noctalia::theme::GeneratedPalette&, std::string_view mode
                                      ) mutable {
     const std::string resolvedMode(mode);
     const std::string configuredMode(enumToKey(kThemeModes, m_themeService.configuredMode()));
@@ -863,9 +899,7 @@ void Application::initStyleThemeAndWayland() {
     syncScriptApiWallpaperDirectory();
     const std::optional<std::string> previousMode = lastResolvedThemeMode;
     lastResolvedThemeMode = resolvedMode;
-    const bool colorsChanged = !lastGeneratedPalette.has_value() || *lastGeneratedPalette != generated;
-    lastGeneratedPalette = generated;
-    m_templateApplyService.apply(generated, mode, /*force=*/false, /*paletteChanged=*/colorsChanged);
+    // Appearance exports are owned by helix-service. The shell handles only UI and hooks.
     if (previousMode.has_value() && *previousMode != resolvedMode) {
       m_hookManager.fire(
           HookKind::ThemeModeChanged,
@@ -876,7 +910,7 @@ void Application::initStyleThemeAndWayland() {
     }
   });
   m_themeService.apply();
-  syncGSettingsColorScheme(m_themeService.resolvedMode());
+  // Desktop-wide appearance exports are performed by helix-service.
   syncScriptApiWallpaperDirectory();
   syncScriptApiShellTimeFormats();
   m_configService.addReloadCallback([this]() { m_themeService.onConfigReload(); }, "theme");
@@ -1424,64 +1458,14 @@ void Application::initSystemBusServices() {
       m_keyboardBacklightService.reset();
     }
 
-    try {
-      m_networkService = std::make_unique<NetworkManagerService>(*m_systemBus);
-      m_networkService->setChangeCallback(
-          [this, shouldRefreshControlCenter](const NetworkState& state, NetworkChangeOrigin origin) {
-            onNetworkStateChangedForEvents(state, origin);
-            m_externalIpService.onNetworkChanged();
-            m_bar.refresh();
-            if (shouldRefreshControlCenter()) {
-              m_panelManager.refresh();
-            }
-          }
-      );
-      if (m_networkService->hasStateSnapshot()) {
-        m_prevWirelessEnabledForEvents = m_networkService->state().wirelessEnabled;
-      }
-      kLog.info("network service active");
-    } catch (const std::exception& e) {
-      kLog.warn("NetworkManager unavailable ({}), trying wpa_supplicant", e.what());
-      try {
-        m_networkService = std::make_unique<WpaSupplicantService>(*m_systemBus);
-        m_networkService->setChangeCallback(
-            [this, shouldRefreshControlCenter](const NetworkState& state, NetworkChangeOrigin origin) {
-              onNetworkStateChangedForEvents(state, origin);
-              m_externalIpService.onNetworkChanged();
-              m_bar.refresh();
-              if (shouldRefreshControlCenter()) {
-                m_panelManager.refresh();
-              }
-            }
-        );
-        if (m_networkService->hasStateSnapshot()) {
-          m_prevWirelessEnabledForEvents = m_networkService->state().wirelessEnabled;
-        }
-        kLog.info("network service active (wpa_supplicant)");
-      } catch (const std::exception& e2) {
-        kLog.warn("wpa_supplicant unavailable ({}), trying iwd", e2.what());
-        try {
-          m_networkService = std::make_unique<IwdService>(*m_systemBus);
-          m_networkService->setChangeCallback(
-              [this, shouldRefreshControlCenter](const NetworkState& state, NetworkChangeOrigin origin) {
-                onNetworkStateChangedForEvents(state, origin);
-                m_externalIpService.onNetworkChanged();
-                m_bar.refresh();
-                if (shouldRefreshControlCenter()) {
-                  m_panelManager.refresh();
-                }
-              }
-          );
-          if (m_networkService->hasStateSnapshot()) {
-            m_prevWirelessEnabledForEvents = m_networkService->state().wirelessEnabled;
-          }
-          kLog.info("network service active (iwd)");
-        } catch (const std::exception& e3) {
-          kLog.warn("network service disabled: {}", e3.what());
-          m_networkService.reset();
-        }
-      }
-    }
+    m_networkService = std::make_unique<helix::RemoteNetwork>();
+    m_networkService->setChangeCallback(
+        [this, shouldRefreshControlCenter](const NetworkState& state, NetworkChangeOrigin origin) {
+          onNetworkStateChangedForEvents(state, origin);
+          m_externalIpService.onNetworkChanged();
+          m_bar.refresh();
+          if (shouldRefreshControlCenter()) m_panelManager.refresh();
+        });
 
     if (m_networkService != nullptr) {
       m_externalIpService.setNetworkService(m_networkService.get());
@@ -1497,7 +1481,7 @@ void Application::initSystemBusServices() {
 
     if (m_networkService != nullptr && m_networkService->supportsSecretAgent()) {
       try {
-        m_networkSecretAgent = std::make_unique<NetworkSecretAgent>(*m_systemBus);
+        m_networkSecretAgent = std::make_unique<NetworkSecretAgent>(*m_systemBus, true);
       } catch (const std::exception& e) {
         kLog.warn("network secret agent disabled: {}", e.what());
         m_networkSecretAgent.reset();
@@ -1516,7 +1500,7 @@ void Application::initSystemBusServices() {
     }
 
     try {
-      m_bluetoothService = std::make_unique<BluetoothService>(*m_systemBus, m_upowerService.get());
+      m_bluetoothService = std::make_unique<BluetoothService>(*m_systemBus, m_upowerService.get(), true);
       auto refreshBluetoothUi = [this, shouldRefreshControlCenter]() {
         m_bar.refresh();
         if (shouldRefreshControlCenter()) {
@@ -1543,7 +1527,7 @@ void Application::initSystemBusServices() {
 
     if (m_bluetoothService != nullptr) {
       try {
-        m_bluetoothAgent = std::make_unique<BluetoothAgent>(*m_systemBus);
+        m_bluetoothAgent = std::make_unique<BluetoothAgent>(*m_systemBus, true);
         m_bluetoothAgent->setRequestCallback([this,
                                               shouldRefreshControlCenter](const BluetoothPairingRequest& /*request*/) {
           if (shouldRefreshControlCenter()) {
@@ -1638,11 +1622,8 @@ void Application::initBrightnessAndPipewire() {
 
   try {
     m_pipewireService = std::make_unique<PipeWireService>();
-    m_wirePlumberMixer = std::make_unique<WirePlumberMixer>();
-    m_pipewireService->setWirePlumberMixer(m_wirePlumberMixer.get());
-    m_wirePlumberMixer->setChangeCallback([svc = m_pipewireService.get()](std::uint32_t id, float volume, bool muted) {
-      svc->onMixerVolumeChanged(id, volume, muted);
-    });
+    // The shell retains a PipeWire observation/playback loop; control ownership lives in helix-service.
+    m_pipewireService->setRemoteControl(true);
     m_easyEffectsService = std::make_unique<EasyEffectsService>();
     m_easyEffectsService->refreshProfiles();
     m_easyEffectsService->refreshActiveEffectsProfiles();

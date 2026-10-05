@@ -1,4 +1,5 @@
 #include "theme/theme_service.h"
+#include "desktop/client.h"
 
 #include "config/config_service.h"
 #include "core/deferred_call.h"
@@ -505,6 +506,23 @@ namespace noctalia::theme {
   }
 
   void ThemeService::resolveAndSet(bool animate) {
+    if (m_remoteSource) {
+      try {
+        const auto snapshot = helix::desktopClient().call("appearance", "GetSnapshot");
+        if (!snapshot.value("available", false)) return;
+        GeneratedPalette generated;
+        generated.dark = snapshot.at("dark").get<decltype(generated.dark)>();
+        generated.light = snapshot.at("light").get<decltype(generated.light)>();
+        m_isLightMode = snapshot.value("mode", "dark") == "light";
+        m_isShellLightMode = snapshot.value("shell-mode", "dark") == "light";
+        setResolvedThemeLight(m_isShellLightMode);
+        const auto target = mapGeneratedPaletteMode(m_isShellLightMode ? generated.light : generated.dark);
+        queueResolvedCallback(generated, m_isLightMode ? "light" : "dark");
+        if (animate) startTransition(target);
+        else { setPalette(target); if (m_changeCallback) m_changeCallback(); flushResolvedCallback(false); }
+      } catch (...) {}
+      return;
+    }
     profiling::ScopedTimer t(kLog, "theme: resolveAndSet");
     const auto& cfg = m_config.config().theme;
     // [theme].mode is the app-facing mode; the shell either follows it or runs its own.
@@ -671,6 +689,14 @@ namespace noctalia::theme {
   }
 
   bool ThemeService::saveWallpaperPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut) {
+    if (m_remoteSource) {
+      try {
+        const auto name = helix::desktopClient().call("appearance", "SavePalette", g_variant_new("(s)", "wallpaper"));
+        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        return true;
+      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+    }
+
     auto fail = [errorOut](std::string message) {
       if (errorOut != nullptr) {
         *errorOut = std::move(message);
@@ -709,6 +735,14 @@ namespace noctalia::theme {
   }
 
   bool ThemeService::saveCurrentPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut) {
+    if (m_remoteSource) {
+      try {
+        const auto name = helix::desktopClient().call("appearance", "SavePalette", g_variant_new("(s)", "current"));
+        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        return true;
+      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+    }
+
     auto fail = [errorOut](std::string message) {
       if (errorOut != nullptr) {
         *errorOut = std::move(message);
@@ -750,6 +784,15 @@ namespace noctalia::theme {
   bool ThemeService::saveRoleColorAsCustom(
       ColorRole role, const ::Color& color, std::string* paletteNameOut, std::string* errorOut
   ) {
+    if (m_remoteSource) {
+      try {
+        const auto rgb = std::format("#{:02x}{:02x}{:02x}", unsigned(std::clamp(color.r, 0.0F, 1.0F) * 255), unsigned(std::clamp(color.g, 0.0F, 1.0F) * 255), unsigned(std::clamp(color.b, 0.0F, 1.0F) * 255));
+        const auto name = helix::desktopClient().call("appearance", "SetRole", g_variant_new("(us)", unsigned(role), rgb.c_str()));
+        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        return true;
+      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+    }
+
     auto fail = [errorOut](std::string message) {
       if (errorOut != nullptr) {
         *errorOut = std::move(message);

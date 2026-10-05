@@ -1,4 +1,5 @@
 #include "theme/template_apply_service.h"
+#include "desktop/client.h"
 
 #include "config/config_export.h"
 #include "config/config_service.h"
@@ -201,6 +202,7 @@ namespace noctalia::theme {
   void TemplateApplyService::apply(
       const GeneratedPalette& palette, std::string_view defaultMode, bool force, bool paletteChanged
   ) const {
+    if (m_remoteSource) { if (force) (void)reapplyLast(); return; }
     ApplyRequest request = makeRequest(palette, defaultMode);
     bool queued = false;
     std::function<void()> undeliverable;
@@ -241,6 +243,9 @@ namespace noctalia::theme {
   }
 
   bool TemplateApplyService::reapplyLast() const {
+    if (m_remoteSource) {
+      try { helix::desktopClient().call("appearance", "Reapply"); return true; } catch (...) { return false; }
+    }
     GeneratedPalette palette;
     std::string defaultMode;
     {

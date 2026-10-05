@@ -1,4 +1,5 @@
 #include "application.h"
+#include "desktop/client.h"
 
 #include "app/main_loop.h"
 #include "ui/controls/select_dropdown_popup.h"
@@ -189,6 +190,8 @@ Application::Application()
 }
 
 Application::~Application() {
+  m_desktopServiceTimer.stop();
+  helix::desktopClient().unobserve(m_desktopServiceObserver);
   ColorPickerDialog::setPresenter(nullptr);
   GlyphPickerDialog::setPresenter(nullptr);
   FileDialog::setPresenter(nullptr);

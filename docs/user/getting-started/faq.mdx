@@ -7,15 +7,15 @@ sidebar:
 
 import FaqItem from '../../../../components/FaqItem.astro';
 
-Find answers to common setup and troubleshooting questions for Helix Shell. The command and packages still use `noctalia`.
+Find answers to common setup and troubleshooting questions for Helix Shell. The installed command still uses `noctalia`.
 
 ## Setup
 
 <FaqItem question="What distributions are supported?">
 
-Helix Shell currently installs from `noctalia` packages on Arch Linux, NixOS, Fedora, openSUSE, and Void Linux. You can also build this tree on other Linux distributions if the required build and runtime dependencies are available.
+Helix Shell currently installs from this repository's source on Linux distributions with the required build and runtime dependencies. Distribution packages named `noctalia` generally install upstream Noctalia, not Helix Shell. The Nix flake in this repository provides a Helix package for Nix users.
 
-See the [Installation guide](/noctalia/getting-started/installation/) for distro-specific commands and manual install steps.
+See the [Installation guide](/noctalia/getting-started/installation/) for the source install steps and distribution-specific build dependencies.
 
 </FaqItem>
 

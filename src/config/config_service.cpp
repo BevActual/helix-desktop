@@ -1,4 +1,5 @@
 #include "config/config_service.h"
+#include "desktop/client.h"
 
 #include "compositors/compositor_detect.h"
 #include "config/atomic_file.h"
@@ -674,22 +675,50 @@ bool ConfigService::shouldRunSetupWizard() const {
 }
 
 std::optional<bool> ConfigService::stateBool(std::string_view owner, std::string_view key) const {
+  if (m_overrideCommitHandler) {
+    try {
+      auto value = helix::desktopClient().call("configuration", "GetState", g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "boolean"));
+      if (value.at("present").get<bool>()) return value.at("value").get<bool>();
+    } catch (...) {}
+    return std::nullopt;
+  }
   return m_stateStore.boolValue(owner, key);
 }
 
 bool ConfigService::setStateBool(std::string_view owner, std::string_view key, bool value) {
+  if (m_overrideCommitHandler) {
+    try { helix::desktopClient().call("configuration", "SetState", g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_boolean(value))); return true; }
+    catch (...) { return false; }
+  }
   return m_stateStore.setBool(owner, key, value);
 }
 
 std::optional<std::string> ConfigService::stateString(std::string_view owner, std::string_view key) const {
+  if (m_overrideCommitHandler) {
+    try {
+      auto value = helix::desktopClient().call("configuration", "GetState", g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "string"));
+      if (value.at("present").get<bool>()) return value.at("value").get<std::string>();
+    } catch (...) {}
+    return std::nullopt;
+  }
   return m_stateStore.stringValue(owner, key);
 }
 
 bool ConfigService::setStateString(std::string_view owner, std::string_view key, std::string_view value) {
+  if (m_overrideCommitHandler) {
+    try { helix::desktopClient().call("configuration", "SetState", g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_string(std::string(value).c_str()))); return true; }
+    catch (...) { return false; }
+  }
   return m_stateStore.setString(owner, key, value);
 }
 
-bool ConfigService::clearStateOwner(std::string_view owner) { return m_stateStore.clearOwner(owner); }
+bool ConfigService::clearStateOwner(std::string_view owner) {
+  if (m_overrideCommitHandler) {
+    try { helix::desktopClient().call("configuration", "ClearState", g_variant_new("(s)", std::string(owner).c_str())); return true; }
+    catch (...) { return false; }
+  }
+  return m_stateStore.clearOwner(owner);
+}
 
 std::string ConfigService::buildSupportReport() const {
   toml::table root;
@@ -1350,6 +1379,9 @@ void ConfigService::deepMerge(toml::table& base, const toml::table& overlay) {
     if (const auto* overlayTbl = v.as_table()) {
       if (auto* baseNode = base.get(k)) {
         if (auto* baseTbl = baseNode->as_table()) {
+          if (k == "notification" && (*overlayTbl)["filter_replace"].value<bool>().value_or(false)) {
+            baseTbl->erase("filter"); baseTbl->erase("filter_order");
+          }
           if (k == "session") {
             if (const auto* overlayActions = (*overlayTbl)["actions"].as_array()) {
               mergeSessionActions(*baseTbl, *overlayActions);

@@ -84,6 +84,12 @@ public:
 
   void registerIpc(IpcService& ipc);
 
+  // Shell replicas delegate persistence to the independent desktop service.
+  using OverrideCommitHandler = std::function<bool(std::string, std::string, std::string&)>;
+  void setOverrideCommitHandler(OverrideCommitHandler handler) { m_overrideCommitHandler = std::move(handler); }
+  bool commitRemoteOverrides(std::string_view baseline, std::string_view candidate);
+
+
   // Persisted wallpaper paths (written to settings.toml, app-managed).
   [[nodiscard]] std::string getWallpaperPath(const std::string& connectorName) const;
   [[nodiscard]] const std::unordered_map<std::string, std::string>& monitorWallpaperPaths() const {
@@ -244,6 +250,7 @@ private:
 
   // App-writable settings file (state dir): lives outside config dir so it
   // can still be written when the config dir is read-only (e.g. NixOS).
+  OverrideCommitHandler m_overrideCommitHandler;
   std::string m_overridesPath;
   // App-owned UI/runtime state. This is not a config layer and is never
   // deep-merged into Config.

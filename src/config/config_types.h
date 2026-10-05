@@ -803,6 +803,7 @@ struct OsdConfig {
 };
 
 struct NotificationConfig {
+  bool filterReplace = false; // explicit whole-list override; otherwise merge named rules
   bool enableDaemon = true;
   bool showAppName = true;
   bool showActions = true;

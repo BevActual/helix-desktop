@@ -1,11 +1,13 @@
 #include "shell/control_center/tabs/home_tab.h"
 
 #include "config/config_service.h"
+#include "compositors/compositor_platform.h"
 #include "calendar/calendar_service.h"
 #include "core/deferred_call.h"
 #include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
 #include "core/log.h"
+#include "core/process/process.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "dbus/accounts/accounts_service.h"
 #include "dbus/mpris/mpris_art.h"
@@ -35,12 +37,15 @@
 #include "pipewire/pipewire_service.h"
 #include "system/ai_usage_service.h"
 #include "system/battery_warning_monitor.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
 #include "system/brightness_service.h"
 #include "system/distro_info.h"
 #include "system/gamma_service.h"
 #include "system/package_kit_service.h"
 #include "system/weather_service.h"
 #include "net/localsend_service.h"
+#include "net/tailscale_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -171,6 +176,24 @@ namespace {
 
   void openControlCenterTab(std::string_view tab) {
     PanelManager::instance().togglePanel("control-center", PanelOpenRequest{.context = tab});
+  }
+
+  void openDetails(std::string_view page, std::string_view fallbackTab, CompositorPlatform* platform) {
+    if (process::commandExists("helix-settings")) {
+      DesktopEntry entry;
+      entry.id = "org.helix.Settings";
+      entry.name = "Helix Settings";
+      entry.exec = "helix-settings --page " + std::string(page);
+      desktop_entry_launch::LaunchOptions options;
+      if (platform != nullptr && platform->hasXdgActivation()) {
+        options.activationToken = platform->requestActivationToken(nullptr);
+      }
+      if (desktop_entry_launch::launchEntry(entry, options)) {
+        PanelManager::instance().close();
+        return;
+      }
+    }
+    openControlCenterTab(fallbackTab);
   }
 
   void setShown(Node* node, bool shown) {
@@ -418,10 +441,19 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
                 }
                 PanelManager::instance().refresh();
               },
-          .onRightClick = []() { openControlCenterTab("audio"); },
+          .onRightClick = [this]() { openDetails("sound", "audio", m_services.platform); },
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
+  volumeRow->addChild(ui::label({
+      .text = i18n::tr("control-center.tabs.audio"),
+      .fontSize = Style::fontSizeBody * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .minWidth = Style::controlHeightLg * 2.0F * scale,
+      .maxWidth = Style::controlHeightLg * 2.0F * scale,
+      .maxLines = 1,
+      .ellipsize = TextEllipsize::End,
+  }));
   volumeRow->addChild(
       ui::slider({
           .out = &m_volumeSlider,
@@ -457,8 +489,13 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
   );
   well->addChild(std::move(volumeRow));
 
-  auto brightnessRow = ui::row({
+  auto brightness = ui::column({
       .out = &m_brightnessRow,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceXs * scale,
+      .fillWidth = true,
+  });
+  auto brightnessRow = ui::row({
       .align = FlexAlign::Center,
       .gap = Style::spaceSm * scale,
       .fillWidth = true,
@@ -475,6 +512,15 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
           .configure = [scale](Button& button) { panel_button_style::configureHeaderIconButton(button, scale); },
       })
   );
+  brightnessRow->addChild(ui::label({
+      .text = i18n::tr("control-center.display.brightness"),
+      .fontSize = Style::fontSizeBody * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .minWidth = Style::controlHeightLg * 2.0F * scale,
+      .maxWidth = Style::controlHeightLg * 2.0F * scale,
+      .maxLines = 1,
+      .ellipsize = TextEllipsize::End,
+  }));
   brightnessRow->addChild(
       ui::slider({
           .out = &m_brightnessSlider,
@@ -508,7 +554,8 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
           .textAlign = TextAlign::End,
       })
   );
-  well->addChild(std::move(brightnessRow));
+  brightness->addChild(std::move(brightnessRow));
+  well->addChild(std::move(brightness));
   tab.addChild(std::move(well));
 
   auto list = ui::column({
@@ -526,78 +573,119 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
       list->addChild(ui::separator());
     }
     Button* button = nullptr;
+    Label* status = nullptr;
     Shortcut* const shortcutPtr = shortcut.get();
     const std::string tabId = openTab;
+    const std::string settingsPage = tabId == "bluetooth" ? "bluetooth" : "network";
+    const bool nativeDetails = tabId == "network" || tabId == "bluetooth" || tabId == "tailscale";
+    const auto showDetails = [this, tabId, settingsPage, nativeDetails]() {
+      if (nativeDetails) openDetails(settingsPage, tabId, m_services.platform);
+      else openControlCenterTab(tabId);
+    };
     auto row = ui::row({
         .align = FlexAlign::Center,
+        .gap = Style::spaceSm * scale,
+        .padding = Style::spaceXs * scale,
         .fillWidth = true,
     });
-    row->addChild(
-        ui::button({
-            .out = &button,
-            .text = shortcut->displayLabel(),
-            .glyph = shortcut->displayIcon(),
-            .glyphSize = Style::fontSizeHeader * scale,
-            .contentAlign = ButtonContentAlign::Start,
-            .tooltip = shortcut->displayLabel(),
-            .minHeight = Style::controlHeightLg * scale,
-            .paddingV = Style::spaceSm * scale,
-            .paddingH = Style::spaceMd * scale,
-            .gap = Style::spaceSm * scale,
-            .radius = 0.0F,
-            .flexGrow = 1.0F,
-            .onClick =
-                [this, shortcutPtr]() {
-                  if (shortcutPtr != nullptr) {
-                    shortcutPtr->onClick();
-                  }
-                  PanelManager::instance().refresh();
-                },
-            .configure =
-                [scale](Button& control) {
-                  control.setDirection(FlexDirection::Horizontal);
-                  control.setAlign(FlexAlign::Center);
-                  control.setJustify(FlexJustify::Start);
-                  control.setFillWidth(true);
-                  if (control.label() != nullptr) {
-                    control.label()->setFontSize(Style::fontSizeBody * scale);
-                    control.label()->setMaxLines(1);
-                    control.label()->setTextAlign(TextAlign::Start);
-                    control.label()->setEllipsize(TextEllipsize::End);
-                  }
-                },
-        })
-    );
-    row->addChild(
-        ui::button({
-            .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
-            .tooltip = i18n::tr(tooltipKey),
-            .minWidth = Style::controlHeightLg * scale,
-            .minHeight = Style::controlHeightLg * scale,
-            .radius = 0.0F,
-            .onClick = [tabId]() { openControlCenterTab(tabId); },
-            .configure = [scale](Button& control) { panel_button_style::configureHeaderIconButton(control, scale); },
-        })
-    );
+    row->addChild(ui::button({
+        .out = &button,
+        .glyph = shortcut->displayIcon(),
+        .glyphSize = Style::fontSizeHeader * scale,
+        .tooltip = shortcut->defaultLabel(),
+        .minWidth = Style::controlHeight * scale,
+        .minHeight = Style::controlHeight * scale,
+        .radius = Style::scaledRadiusXl(scale),
+        .onClick = [shortcutPtr]() {
+          shortcutPtr->onClick();
+          PanelManager::instance().refresh();
+        },
+        .onRightClick = showDetails,
+    }));
+    auto names = ui::column({
+        .align = FlexAlign::Stretch,
+        .gap = Style::spaceXs * 0.5F * scale,
+        .flexGrow = 1.0F,
+    });
+    names->addChild(ui::label({
+        .text = type == "notification" ? i18n::tr("control-center.notifications.dnd") : shortcut->defaultLabel(),
+        .fontSize = Style::fontSizeBody * scale,
+        .fontWeight = FontWeight::Bold,
+        .color = colorSpecFromRole(ColorRole::OnSurface),
+        .maxLines = 1,
+        .ellipsize = TextEllipsize::End,
+    }));
+    names->addChild(ui::label({
+        .out = &status,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .maxLines = 1,
+        .ellipsize = TextEllipsize::End,
+    }));
+    row->addChild(std::move(names));
+    row->addChild(ui::button({
+        .glyph = Style::rtl() ? "chevron-left" : "chevron-right",
+        .variant = ButtonVariant::Ghost,
+        .tooltip = i18n::tr(tooltipKey),
+        .minWidth = Style::controlHeight * scale,
+        .minHeight = Style::controlHeight * scale,
+        .radius = Style::scaledRadiusMd(scale),
+        .onClick = showDetails,
+    }));
     list->addChild(std::move(row));
     m_quickToggles.push_back({
         .shortcut = std::move(shortcut),
         .button = button,
+        .status = status,
         .openTab = std::move(openTab),
     });
   };
   addToggle("wifi", "network", "control-center.tabs.network");
   addToggle("bluetooth", "bluetooth", "control-center.tabs.bluetooth");
+  if (m_services.tailscale != nullptr && (m_services.tailscale->installed() || m_services.tailscale->running())) {
+    addToggle("tailscale", "tailscale", "control-center.tabs.tailscale");
+  }
   addToggle("nightlight", "monitor", "control-center.tabs.monitor");
   addToggle("notification", "notifications", "control-center.tabs.notifications");
   tab.addChild(std::move(list));
+
+  auto destinations = ui::row({
+      .align = FlexAlign::Center,
+      .gap = Style::spaceSm * scale,
+      .fillWidth = true,
+      .configure = [scale](Flex& host) {
+        applyModuleWellStyle(host, scale);
+        host.setGap(Style::spaceSm * scale);
+        host.setPadding(Style::spaceSm * scale);
+      },
+  });
+  const auto destinationButton = [scale](std::string_view tabId, std::string label, std::string glyph) {
+    return ui::button({
+        .text = label,
+        .glyph = std::move(glyph),
+        .fontSize = Style::fontSizeBody * scale,
+        .glyphSize = Style::fontSizeBody * scale,
+        .variant = ButtonVariant::Ghost,
+        .tooltip = label,
+        .minHeight = Style::controlHeight * scale,
+        .flexGrow = 1.0F,
+        .onClick = [tab = std::string(tabId)]() { openControlCenterTab(tab); },
+    });
+  };
+  destinations->addChild(destinationButton("capture", i18n::tr("control-center.tabs.capture"), "screenshot"));
+  if (m_services.phone != nullptr) {
+    destinations->addChild(destinationButton("phone", i18n::tr("control-center.tabs.phone"), "device-mobile"));
+  }
+  tab.addChild(std::move(destinations));
 
   const float actionSize = Style::controlHeight * scale;
   const auto sessionButton = [scale, actionSize](Button** out, std::string glyph, std::string tooltip,
                                                   ButtonVariant variant, std::function<void()> onClick) {
     return ui::button({
         .out = out,
+        .text = tooltip,
         .glyph = std::move(glyph),
+        .fontSize = Style::fontSizeBody * scale,
         .glyphSize = Style::fontSizeHeader * scale,
         .variant = variant,
         .tooltip = std::move(tooltip),
@@ -639,20 +727,8 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
       ButtonVariant::Ghost, [this]() { runSessionAction("suspend"); }
   ));
   session->addChild(sessionButton(
-      &m_logoutButton, std::string(session_action::defaultGlyph("logout")), i18n::tr("session.actions.logout"),
-      ButtonVariant::Ghost, [this]() { runSessionAction("logout"); }
-  ));
-  session->addChild(sessionButton(
-      &m_rebootButton, std::string(session_action::defaultGlyph("reboot")), i18n::tr("session.actions.reboot"),
-      ButtonVariant::Destructive, [this]() { runSessionAction("reboot"); }
-  ));
-  session->addChild(sessionButton(
-      &m_shutdownButton, std::string(session_action::defaultGlyph("shutdown")), i18n::tr("session.actions.shutdown"),
-      ButtonVariant::Destructive, [this]() { runSessionAction("shutdown"); }
-  ));
-  session->addChild(sessionButton(
-      nullptr, Style::rtl() ? std::string("chevron-left") : std::string("chevron-right"),
-      i18n::tr("control-center.home.open-power"), ButtonVariant::Ghost, []() { openControlCenterTab("power"); }
+      nullptr, "power", i18n::tr("control-center.tabs.power"), ButtonVariant::Ghost,
+      []() { openControlCenterTab("power"); }
   ));
   tab.addChild(std::move(session));
 }
@@ -990,7 +1066,7 @@ std::unique_ptr<Flex> HomeTab::createHeaderActions() {
       })
   );
   syncHeaderActions();
-  return m_settings->embedHeader(std::move(live), scale);
+  return live;
 }
 
 void HomeTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
@@ -2151,9 +2227,6 @@ void HomeTab::onClose() {
   m_sessionWell = nullptr;
   m_lockButton = nullptr;
   m_suspendButton = nullptr;
-  m_logoutButton = nullptr;
-  m_rebootButton = nullptr;
-  m_shutdownButton = nullptr;
   for (auto& pad : m_shortcutPads) {
     pad.button = nullptr;
     pad.glyph = nullptr;
@@ -2335,29 +2408,24 @@ void HomeTab::syncQuickControls() {
     if (row.shortcut == nullptr || row.button == nullptr) {
       continue;
     }
-    row.button->setText(row.shortcut->displayLabel());
+    const std::string label = row.shortcut->displayLabel();
+    const std::string state = !row.shortcut->enabled()
+        ? i18n::tr("control-center.home.quick-unavailable")
+        : label != row.shortcut->defaultLabel() ? label
+        : i18n::tr(row.shortcut->active() ? "control-center.home.quick-on" : "control-center.home.quick-off");
+    if (row.status != nullptr) {
+      row.status->setText(state);
+    }
+    row.button->setTooltip(row.shortcut->defaultLabel() + ": " + state);
     row.button->setGlyph(row.shortcut->displayIcon());
     applyShortcutButtonStyle(*row.button, row.shortcut->enabled(), row.shortcut->active());
   }
 
   const bool showSession = m_config == nullptr || m_config->config().controlCenter.showSessionButton;
   setShown(m_sessionWell, showSession);
-  const auto actionEnabled = [this](std::string_view action) {
-    if (m_session == nullptr || m_config == nullptr) {
-      return m_session != nullptr;
-    }
-    for (const auto& cfg : m_config->config().shell.session.actions) {
-      if (cfg.action == action) {
-        return cfg.enabled;
-      }
-    }
-    return true;
-  };
   setShown(m_lockButton, showSession && m_session != nullptr && m_config != nullptr && m_config->isLockScreenEnabled());
   setShown(m_suspendButton, showSession && m_session != nullptr);
-  setShown(m_logoutButton, showSession && actionEnabled("logout"));
-  setShown(m_rebootButton, showSession && actionEnabled("reboot"));
-  setShown(m_shutdownButton, showSession && actionEnabled("shutdown"));
+
 }
 
 void HomeTab::sync(Renderer& renderer) {

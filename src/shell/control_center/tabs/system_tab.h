@@ -15,6 +15,7 @@
 class Box;
 class Flex;
 class Glyph;
+class InputArea;
 class Graph;
 class Label;
 class Button;
@@ -22,6 +23,9 @@ class ClipboardService;
 class ConfigService;
 class Segmented;
 class SystemMonitorService;
+class UPowerService;
+class Separator;
+class ScrollView;
 struct ControlCenterServices;
 
 class SystemTab : public Tab {
@@ -33,6 +37,7 @@ public:
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setActive(bool active) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   void onFrameTick(float deltaMs) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
@@ -41,6 +46,10 @@ public:
 
 private:
   enum class Catalog : std::uint8_t { Cpu, Memory, Gpu, Network, About };
+  enum class Page : std::uint8_t { Root, Battery, Monitoring };
+  void openPage(Page page);
+  void syncPage();
+  void syncBatteryNav();
 
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
   void doUpdate(Renderer& renderer) override;
@@ -63,12 +72,16 @@ private:
   [[nodiscard]] static Catalog catalogFromIndex(std::size_t index) noexcept;
 
   SystemMonitorService* m_monitor;
+  UPowerService* m_upower = nullptr;
   ClipboardService* m_clipboard = nullptr;
   ConfigService* m_config = nullptr;
   std::function<void()> m_upgradeShell;
   std::function<bool()> m_upgradeAvailable;
   std::function<bool()> m_upgradeBusy;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_batteryPane;
+  std::unique_ptr<SettingsPane> m_monitoringPane;
+  Page m_page = Page::Root;
   bool m_active = false;
   bool m_statsRetained = false;
   bool m_graphInitialized = false;
@@ -87,6 +100,15 @@ private:
   double m_netPeak = 0.0;
 
   Flex* m_root = nullptr;
+  Flex* m_hostRoot = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  ScrollView* m_subScroll = nullptr;
+  Flex* m_batteryPage = nullptr;
+  Flex* m_monitoringPage = nullptr;
+  InputArea* m_returnFocus = nullptr;
+  Flex* m_batteryNav = nullptr;
+  Separator* m_batteryNavDivider = nullptr;
   Flex* m_compactCard = nullptr;
   Segmented* m_catalogSwitch = nullptr;
   Label* m_titleLabel = nullptr;

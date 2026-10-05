@@ -2,6 +2,7 @@
 
 #include "config/config_service.h"
 #include "config/config_types.h"
+#include "core/input/keybind_matcher.h"
 #include "core/ui_phase.h"
 #include "dbus/modem/modem_manager_service.h"
 #include "dbus/network/external_ip_service.h"
@@ -12,6 +13,7 @@
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
 #include "render/scene/input_area.h"
+#include "render/scene/input_dispatcher.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
@@ -20,10 +22,12 @@
 #include "ui/builders.h"
 #include "ui/controls/image.h"
 #include "ui/controls/input.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/controls/select.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "ui/split_pane_focus.h"
 #include "util/qr_code.h"
 #include "util/string_utils.h"
 #include "wayland/clipboard_service.h"
@@ -726,7 +730,12 @@ NetworkTab::NetworkTab(const ControlCenterServices& services)
     : m_network(services.network), m_secrets(services.networkSecrets), m_externalIpService(services.externalIp),
       m_modem(services.modem), m_config(services.config), m_http(services.httpClient), m_sysmon(services.sysmon),
       m_clipboard(services.clipboard),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "network"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "network", .inlineSettings = true}
+      )),
+      m_wifiSettingsPane(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "network", .includedGroups = {"wifi"}, .inlineSettings = true}
+      )) {
   if (m_config != nullptr) {
     if (const std::optional<std::string> source = m_config->stateString("network_tab", "catalog")) {
       if (*source == "vpn") {
@@ -757,8 +766,18 @@ std::unique_ptr<Flex> NetworkTab::create() {
   const float scale = contentScale();
   const float controlHeight = Style::controlHeight * scale;
 
-  auto live = ui::column({
+  auto outer = ui::column({
       .out = &m_rootLayout,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  outer->addChild(std::move(subHeader));
+
+  auto live = ui::column({
+      .out = &m_rootPage,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
       .flexGrow = 1.0F,
@@ -801,7 +820,7 @@ std::unique_ptr<Flex> NetworkTab::create() {
           .out = &m_disconnectButton,
           .glyph = "plug-off",
           .glyphSize = Style::baseGlyphSize * scale,
-          .variant = ButtonVariant::Destructive,
+          .variant = ButtonVariant::Ghost,
           .tooltip = i18n::tr("control-center.network.disconnect"),
           .minHeight = controlHeight,
           .paddingH = Style::spaceMd * scale,
@@ -824,187 +843,14 @@ std::unique_ptr<Flex> NetworkTab::create() {
   currentCard->addChild(std::move(connRow));
   currentCard->addChild(
       ui::label({
-          .out = &m_currentDetail,
+          .out = &m_connectionStatus,
           .fontSize = Style::fontSizeCaption * scale,
           .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
           .maxLines = 2,
       })
   );
-  currentCard->addChild(
-      ui::label({
-          .out = &m_throughputLabel,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  addWellDivider(*currentCard, scale);
-  m_dnsProfilePicker = addSelectRow(
-      *currentCard, scale, i18n::tr("control-center.network.dns-label"),
-      {
-          i18n::tr("control-center.network.dns-automatic"),
-          i18n::tr("control-center.network.dns-google"),
-          i18n::tr("control-center.network.dns-cloudflare"),
-          i18n::tr("control-center.network.dns-nextdns"),
-          i18n::tr("control-center.network.dns-custom"),
-      },
-      panelCardOpacity(),
-      [this](std::size_t index) {
-        if (m_dnsSyncing || index > static_cast<std::size_t>(DnsProfile::Custom)) {
-          return;
-        }
-        m_dnsProfile = static_cast<DnsProfile>(index);
-        syncDnsPicker();
-        if (m_dnsProfile == DnsProfile::Custom) {
-          if (m_dnsCustomInput != nullptr && m_dnsCustomInput->value().empty()) {
-            if (m_config != nullptr && !m_config->config().controlCenter.networkTab.customDns.empty()) {
-              m_dnsCustomInput->setValue(m_config->config().controlCenter.networkTab.customDns);
-            }
-          }
-          PanelManager::instance().requestLayout();
-          return;
-        }
-        applySelectedDnsProfile();
-      }
-  );
-  currentCard->addChild(
-      ui::label({
-          .out = &m_dnsLabel,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-      })
-  );
-  currentCard->addChild(
-      ui::row(
-          {.out = &m_dnsNextDnsRow,
-           .align = FlexAlign::Center,
-           .gap = Style::spaceSm * scale,
-           .visible = false,
-           .participatesInLayout = false},
-          ui::input({
-              .out = &m_dnsNextDnsInput,
-              .placeholder = i18n::tr("control-center.network.dns-nextdns-placeholder"),
-              .surfaceOpacity = panelCardOpacity(),
-              .flexGrow = 1.0F,
-              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
-          })
-      )
-  );
-  currentCard->addChild(
-      ui::row(
-          {.out = &m_dnsCustomRow,
-           .align = FlexAlign::Center,
-           .gap = Style::spaceSm * scale,
-           .visible = false,
-           .participatesInLayout = false},
-          ui::input({
-              .out = &m_dnsCustomInput,
-              .placeholder = i18n::tr("control-center.network.dns-custom-placeholder"),
-              .surfaceOpacity = panelCardOpacity(),
-              .flexGrow = 1.0F,
-              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
-          }),
-          ui::button({
-              .out = &m_dnsApplyButton,
-              .text = i18n::tr("control-center.network.dns-apply"),
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .minHeight = controlHeight,
-              .onClick = [this]() { applySelectedDnsProfile(); },
-          })
-      )
-  );
-  addWellDivider(*currentCard, scale);
-  currentCard->addChild(
-      ui::row(
-          {.align = FlexAlign::Center, .justify = FlexJustify::End, .gap = Style::spaceXs * scale},
-          ui::button({
-              .out = &m_pingButton,
-              .glyph = "activity-heartbeat",
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.ping"),
-              .minHeight = controlHeight,
-              .paddingH = Style::spaceMd * scale,
-              .onClick = [this]() { startPing(); },
-          }),
-          ui::button({
-              .out = &m_speedButton,
-              .glyph = "arrow-down",
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.speed-test"),
-              .minHeight = controlHeight,
-              .paddingH = Style::spaceMd * scale,
-              .onClick = [this]() { startSpeedTest(); },
-          }),
-          ui::button({
-              .out = &m_copyIpButton,
-              .glyph = "copy",
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.copy-ip"),
-              .minHeight = controlHeight,
-              .paddingH = Style::spaceMd * scale,
-              .onClick = [this]() { copyIpv4(); },
-          }),
-          ui::button({
-              .out = &m_shareButton,
-              .glyph = "qrcode",
-              .fontSize = Style::fontSizeBody * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.share-wifi"),
-              .minHeight = controlHeight,
-              .paddingH = Style::spaceMd * scale,
-              .onClick = [this]() { shareWifi(); },
-          })
-      )
-  );
-  currentCard->addChild(
-      ui::label({
-          .out = &m_toolsStatus,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  auto qrBlock = ui::column({
-      .out = &m_qrBlock,
-      .align = FlexAlign::Stretch,
-      .gap = Style::spaceSm * scale,
-      .visible = false,
-  });
-  qrBlock->addChild(
-      ui::row(
-          {.align = FlexAlign::Start, .gap = Style::spaceSm * scale},
-          ui::image({
-              .out = &m_qrImage,
-              .fit = ImageFit::Contain,
-              .width = 180.0F * scale,
-              .height = 180.0F * scale,
-          }),
-          ui::button({
-              .out = &m_qrCloseButton,
-              .glyph = "x",
-              .glyphSize = Style::baseGlyphSize * scale,
-              .variant = ButtonVariant::Ghost,
-              .tooltip = i18n::tr("control-center.network.hide-wifi-qr"),
-              .minWidth = Style::controlHeightSm * scale,
-              .minHeight = Style::controlHeightSm * scale,
-              .padding = Style::spaceXs * scale,
-              .onClick = [this]() { hideWifiQr(); },
-          })
-      )
-  );
-  qrBlock->addChild(
-      ui::label({
-          .out = &m_qrHint,
-          .fontSize = Style::fontSizeCaption * scale,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-      })
-  );
-  currentCard->addChild(std::move(qrBlock));
 
-  m_rootLayout->addChild(std::move(currentCard));
+  live->addChild(std::move(currentCard));
 
   auto passwordCard = ui::column({
       .out = &m_passwordCard,
@@ -1177,7 +1023,20 @@ std::unique_ptr<Flex> NetworkTab::create() {
   );
 
   passwordCard->addChild(std::move(inputRow));
-  m_rootLayout->addChild(std::move(passwordCard));
+  live->addChild(std::move(passwordCard));
+
+  auto nav = ui::column({
+      .align = FlexAlign::Stretch,
+      .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+  });
+  nav->addChild(makeNavRow(scale, "info-circle", i18n::tr("control-center.network.connection-details"), [this]() {
+    openPage(Page::ConnectionDetails);
+  }));
+  nav->addChild(ui::separator());
+  nav->addChild(makeNavRow(scale, "wifi", i18n::tr("control-center.network.wifi-settings"), [this]() {
+    openPage(Page::WifiSettings);
+  }));
+  live->addChild(std::move(nav));
 
   auto listScroll = ui::scrollView({
       .out = &m_liveScroll,
@@ -1196,7 +1055,205 @@ std::unique_ptr<Flex> NetworkTab::create() {
   m_list->setDirection(FlexDirection::Vertical);
   m_list->setAlign(FlexAlign::Stretch);
   m_list->setGap(Style::spaceMd * scale);
-  m_rootLayout->addChild(std::move(listScroll));
+  live->addChild(std::move(listScroll));
+
+  auto details = ui::column({
+      .out = &m_connectionDetailsPage,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .configure = [scale](Flex& card) { applyContentCardStyle(card, scale); },
+  });
+  details->addChild(ui::label({
+      .out = &m_detailsTitle,
+      .fontSize = Style::fontSizeBody * scale,
+      .fontWeight = FontWeight::Bold,
+      .color = colorSpecFromRole(ColorRole::OnSurface),
+      .maxLines = 2,
+  }));
+  details->addChild(ui::label({
+      .out = &m_currentDetail,
+      .fontSize = Style::fontSizeCaption * scale,
+      .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      .maxLines = 3,
+  }));
+  details->addChild(
+      ui::label({
+          .out = &m_throughputLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  addWellDivider(*details, scale);
+  m_dnsProfilePicker = addSelectRow(
+      *details, scale, i18n::tr("control-center.network.dns-label"),
+      {
+          i18n::tr("control-center.network.dns-automatic"),
+          i18n::tr("control-center.network.dns-google"),
+          i18n::tr("control-center.network.dns-cloudflare"),
+          i18n::tr("control-center.network.dns-nextdns"),
+          i18n::tr("control-center.network.dns-custom"),
+      },
+      panelCardOpacity(),
+      [this](std::size_t index) {
+        if (m_dnsSyncing || index > static_cast<std::size_t>(DnsProfile::Custom)) {
+          return;
+        }
+        m_dnsProfile = static_cast<DnsProfile>(index);
+        syncDnsPicker();
+        if (m_dnsProfile == DnsProfile::Custom) {
+          if (m_dnsCustomInput != nullptr && m_dnsCustomInput->value().empty()) {
+            if (m_config != nullptr && !m_config->config().controlCenter.networkTab.customDns.empty()) {
+              m_dnsCustomInput->setValue(m_config->config().controlCenter.networkTab.customDns);
+            }
+          }
+          PanelManager::instance().requestLayout();
+          return;
+        }
+        applySelectedDnsProfile();
+      }
+  );
+  details->addChild(
+      ui::label({
+          .out = &m_dnsLabel,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 2,
+      })
+  );
+  details->addChild(
+      ui::row(
+          {.out = &m_dnsNextDnsRow,
+           .align = FlexAlign::Center,
+           .gap = Style::spaceSm * scale,
+           .visible = false,
+           .participatesInLayout = false},
+          ui::input({
+              .out = &m_dnsNextDnsInput,
+              .placeholder = i18n::tr("control-center.network.dns-nextdns-placeholder"),
+              .surfaceOpacity = panelCardOpacity(),
+              .flexGrow = 1.0F,
+              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
+          })
+      )
+  );
+  details->addChild(
+      ui::row(
+          {.out = &m_dnsCustomRow,
+           .align = FlexAlign::Center,
+           .gap = Style::spaceSm * scale,
+           .visible = false,
+           .participatesInLayout = false},
+          ui::input({
+              .out = &m_dnsCustomInput,
+              .placeholder = i18n::tr("control-center.network.dns-custom-placeholder"),
+              .surfaceOpacity = panelCardOpacity(),
+              .flexGrow = 1.0F,
+              .onSubmit = [this](const std::string&) { applySelectedDnsProfile(); },
+          }),
+          ui::button({
+              .out = &m_dnsApplyButton,
+              .text = i18n::tr("control-center.network.dns-apply"),
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .minHeight = controlHeight,
+              .onClick = [this]() { applySelectedDnsProfile(); },
+          })
+      )
+  );
+  addWellDivider(*details, scale);
+  details->addChild(
+      ui::column(
+          {.align = FlexAlign::Stretch, .gap = Style::spaceXs * scale},
+          ui::button({
+              .out = &m_pingButton,
+              .text = i18n::tr("control-center.network.ping"),
+              .glyph = "activity-heartbeat",
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.ping"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
+              .onClick = [this]() { startPing(); },
+          }),
+          ui::button({
+              .out = &m_speedButton,
+              .text = i18n::tr("control-center.network.speed-test"),
+              .glyph = "arrow-down",
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.speed-test"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
+              .onClick = [this]() { startSpeedTest(); },
+          }),
+          ui::button({
+              .out = &m_copyIpButton,
+              .text = i18n::tr("control-center.network.copy-ip"),
+              .glyph = "copy",
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.copy-ip"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
+              .onClick = [this]() { copyIpv4(); },
+          }),
+          ui::button({
+              .out = &m_shareButton,
+              .text = i18n::tr("control-center.network.share-wifi"),
+              .glyph = "qrcode",
+              .fontSize = Style::fontSizeBody * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.share-wifi"),
+              .minHeight = controlHeight,
+              .paddingH = Style::spaceMd * scale,
+              .onClick = [this]() { shareWifi(); },
+          })
+      )
+  );
+  details->addChild(
+      ui::label({
+          .out = &m_toolsStatus,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  auto qrBlock = ui::column({
+      .out = &m_qrBlock,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceSm * scale,
+      .visible = false,
+  });
+  qrBlock->addChild(
+      ui::row(
+          {.align = FlexAlign::Start, .gap = Style::spaceSm * scale},
+          ui::image({
+              .out = &m_qrImage,
+              .fit = ImageFit::Contain,
+              .width = 180.0F * scale,
+              .height = 180.0F * scale,
+          }),
+          ui::button({
+              .out = &m_qrCloseButton,
+              .glyph = "x",
+              .glyphSize = Style::baseGlyphSize * scale,
+              .variant = ButtonVariant::Ghost,
+              .tooltip = i18n::tr("control-center.network.hide-wifi-qr"),
+              .minWidth = Style::controlHeightSm * scale,
+              .minHeight = Style::controlHeightSm * scale,
+              .padding = Style::spaceXs * scale,
+              .onClick = [this]() { hideWifiQr(); },
+          })
+      )
+  );
+  qrBlock->addChild(
+      ui::label({
+          .out = &m_qrHint,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+      })
+  );
+  details->addChild(std::move(qrBlock));
+
 
   if (m_config != nullptr) {
     const auto& networkTab = m_config->config().controlCenter.networkTab;
@@ -1208,7 +1265,30 @@ std::unique_ptr<Flex> NetworkTab::create() {
     }
   }
   syncDnsPicker();
-  return m_settings->wrapLive(std::move(live), contentScale(), panelCardOpacity());
+  outer->addChild(std::move(live));
+
+  auto subScroll = ui::scrollView({
+      .out = &m_subScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& view) {
+        view.clearFill();
+        view.clearBorder();
+      },
+  });
+  Flex* subContent = subScroll->content();
+  subContent->setDirection(FlexDirection::Vertical);
+  subContent->setAlign(FlexAlign::Stretch);
+  auto wifiSettingsPage = m_wifiSettingsPane->createInline(scale, panelCardOpacity());
+  m_wifiSettingsPage = wifiSettingsPage.get();
+  subContent->addChild(std::move(wifiSettingsPage));
+  subContent->addChild(std::move(details));
+  outer->addChild(std::move(subScroll));
+  syncPage();
+  return m_settings->wrapLive(std::move(outer), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> NetworkTab::createHeaderActions() {
@@ -1223,11 +1303,18 @@ void NetworkTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
 }
 
+SettingsPane* NetworkTab::settingsPane() { return m_settings.get(); }
+
 void NetworkTab::setActive(bool active) {
   if (m_active == active) {
     return;
   }
   m_active = active;
+  if (m_active && m_page != Page::Root) {
+    m_page = Page::Root;
+    m_returnFocus = nullptr;
+    syncPage();
+  }
   if (m_active && m_network != nullptr) {
     m_network->requestScan();
     refreshDnsOverride();
@@ -1250,6 +1337,12 @@ void NetworkTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
+  if (m_page != Page::Root) {
+    syncCurrentCard();
+    uploadQr(renderer);
+    m_rootLayout->layout(renderer);
+    return;
+  }
   m_rootLayout->layout(renderer);
   syncPasswordCard();
   rebuildApList(renderer);
@@ -1262,6 +1355,11 @@ void NetworkTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeig
 
 void NetworkTab::doUpdate(Renderer& renderer) {
   if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
+  if (m_page != Page::Root) {
+    syncCurrentCard();
+    uploadQr(renderer);
     return;
   }
   syncPasswordCard();
@@ -1278,16 +1376,81 @@ void NetworkTab::doUpdate(Renderer& renderer) {
   uploadQr(renderer);
 }
 
+void NetworkTab::syncPage() {
+  const bool root = m_page == Page::Root;
+  bool changed = setShown(m_rootPage, root);
+  changed |= setShown(m_subHeader, !root);
+  changed |= setShown(m_subScroll, !root);
+  changed |= setShown(m_wifiSettingsPage, m_page == Page::WifiSettings);
+  changed |= setShown(m_connectionDetailsPage, m_page == Page::ConnectionDetails);
+  if (m_subTitle != nullptr && !root) {
+    m_subTitle->setText(i18n::tr(m_page == Page::ConnectionDetails
+        ? "control-center.network.connection-details" : "control-center.network.wifi-settings"));
+  }
+  if (changed) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void NetworkTab::openPage(Page page) {
+  if (m_page == page) {
+    return;
+  }
+  auto& dispatcher = PanelManager::instance().inputDispatcher();
+  InputArea* const focused = dispatcher.focusedArea();
+  const bool returning = page == Page::Root;
+  const bool transferFocus = returning
+      ? isNodeInSubtree(focused, m_subHeader) || isNodeInSubtree(focused, m_subScroll)
+      : isNodeInSubtree(focused, m_rootPage);
+  if (!returning) {
+    m_returnFocus = transferFocus ? focused : nullptr;
+  }
+  m_page = page;
+  if (m_subScroll != nullptr) {
+    m_subScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+  if (transferFocus) {
+    focusSubPane(
+        returning ? static_cast<Node*>(m_rootPage) : static_cast<Node*>(m_subHeader),
+        returning ? m_returnFocus : nullptr, returning ? nullptr : static_cast<Node*>(m_subScroll)
+    );
+  }
+  if (returning) {
+    m_returnFocus = nullptr;
+  }
+}
+
+bool NetworkTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
+}
+
 void NetworkTab::onClose() {
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
+  m_wifiSettingsPane->onClose();
   ++m_pingGeneration;
   m_pingRunning = false;
   ++m_shareGeneration;
   m_shareRunning = false;
   cancelSpeedTest();
+  m_page = Page::Root;
+  m_returnFocus = nullptr;
   m_rootLayout = nullptr;
+  m_rootPage = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_subScroll = nullptr;
+  m_wifiSettingsPage = nullptr;
+  m_connectionDetailsPage = nullptr;
+  m_connectionStatus = nullptr;
+  m_detailsTitle = nullptr;
   m_currentCard = nullptr;
   m_catalogHost = nullptr;
   m_catalogSwitch = nullptr;
@@ -1430,6 +1593,7 @@ void NetworkTab::showPasswordPrompt(const NetworkSecretAgent::SecretRequest& req
   // NM is asking for one secret against a profile it already holds, so only the
   // password is missing; the rest of the 802.1X form would have nothing to fill.
   m_pendingEnterprise = false;
+  openPage(Page::Root);
   PanelManager::instance().requestLayout();
 }
 
@@ -1439,6 +1603,7 @@ void NetworkTab::showPasswordPrompt(const AccessPointInfo& ap) {
   m_pendingSsid = ap.ssid;
   m_pendingAccessPoint = ap;
   m_pendingEnterprise = ap.isEnterprise();
+  openPage(Page::Root);
   if (m_pendingEnterprise) {
     // Say up front when this network cannot be joined with a password, rather
     // than after the user has filled in the whole form.
@@ -1523,10 +1688,15 @@ void NetworkTab::syncCurrentCard() {
   }
   if (m_network == nullptr) {
     m_currentTitle->setText(i18n::tr("control-center.network.unavailable-title"));
+    m_detailsTitle->setText(i18n::tr("control-center.network.unavailable-title"));
     m_currentDetail->setText(i18n::tr("control-center.network.unavailable-detail"));
-    if (m_currentRow != nullptr) {
-    (void)setShown(m_currentRow, false);
+    m_connectionStatus->setText(i18n::tr("control-center.network.unavailable-detail"));
+    for (Button* button : {m_disconnectButton, m_pingButton, m_speedButton, m_copyIpButton, m_shareButton}) {
+      if (button != nullptr) {
+        button->setEnabled(false);
+      }
     }
+    syncDnsPicker();
     return;
   }
   const NetworkState& s = m_network->state();
@@ -1551,13 +1721,17 @@ void NetworkTab::syncCurrentCard() {
   static const std::string kNoExternalIp;
   const std::string& externalIp = m_externalIpService != nullptr ? m_externalIpService->externalIp() : kNoExternalIp;
   const CellularModemInfo* modem = m_modem != nullptr ? m_modem->primaryModem() : nullptr;
-  m_currentTitle->setText(currentTitle(s, modem));
+  const std::string title = currentTitle(s, modem);
+  m_currentTitle->setText(title);
+  m_detailsTitle->setText(title);
+  m_connectionStatus->setText(i18n::tr(s.connected ? "control-center.network.connected"
+      : s.wirelessEnabled ? "control-center.network.choose-network" : "control-center.network.wifi-off"));
   m_currentDetail->setText(currentDetail(s, externalIp, modem));
   if (m_disconnectButton != nullptr) {
     const bool canReconnectWired = !s.connected && m_network->canActivateWiredConnection();
     (void)setShown(m_disconnectButton, s.connected || canReconnectWired || m_actionPending);
     m_disconnectButton->setGlyph(s.connected ? "plug-off" : "plug");
-    m_disconnectButton->setVariant(s.connected ? ButtonVariant::Destructive : ButtonVariant::Default);
+    m_disconnectButton->setVariant(s.connected ? ButtonVariant::Ghost : ButtonVariant::Default);
     m_disconnectButton->setTooltip(
         i18n::tr(s.connected ? "control-center.network.disconnect" : "control-center.network.connect")
     );

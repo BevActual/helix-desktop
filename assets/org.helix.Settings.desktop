@@ -1,0 +1,34 @@
+[Desktop Entry]
+Type=Application
+Name=Helix Settings
+Comment=Configure your desktop and devices
+Exec=helix-settings
+Icon=preferences-system
+Terminal=false
+Categories=Settings;System;
+StartupNotify=true
+Actions=Appearance;Palettes;Wallpapers;Sound;Network;Bluetooth;
+
+[Desktop Action Appearance]
+Name=Appearance
+Exec=helix-settings --page appearance
+
+[Desktop Action Sound]
+Name=Sound
+Exec=helix-settings --page sound
+
+[Desktop Action Wallpapers]
+Name=Wallpapers
+Exec=helix-settings --wallpapers library
+
+[Desktop Action Palettes]
+Name=Palettes
+Exec=helix-settings --palettes
+
+[Desktop Action Network]
+Name=Network
+Exec=helix-settings --page network
+
+[Desktop Action Bluetooth]
+Name=Bluetooth
+Exec=helix-settings --page bluetooth

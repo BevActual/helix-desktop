@@ -1,0 +1,590 @@
+{
+  "version": 1,
+  "cutover": false,
+  "legacy-settings-editors-retired": true,
+  "retirement-policy": "User requested removal of all legacy Settings editors on 2026-10-05, accepting unavailable advanced editors until native replacements are built. Existing configuration and compatibility contexts remain supported.",
+  "entries": [
+    {
+      "kind": "tab",
+      "id": "home",
+      "destination": "shell:control-center",
+      "status": "partial",
+      "compatibility-context": "home"
+    },
+    {
+      "kind": "tab",
+      "id": "network",
+      "destination": "settings:network",
+      "status": "partial",
+      "compatibility-context": "network"
+    },
+    {
+      "kind": "tab",
+      "id": "bluetooth",
+      "destination": "settings:bluetooth",
+      "status": "partial",
+      "compatibility-context": "bluetooth"
+    },
+    {
+      "kind": "tab",
+      "id": "tailscale",
+      "destination": "settings:network",
+      "status": "partial",
+      "compatibility-context": "tailscale"
+    },
+    {
+      "kind": "tab",
+      "id": "phone",
+      "destination": "app:phone",
+      "status": "pending",
+      "compatibility-context": "phone"
+    },
+    {
+      "kind": "tab",
+      "id": "notifications",
+      "destination": "settings:notifications",
+      "status": "partial",
+      "compatibility-context": "notifications"
+    },
+    {
+      "kind": "tab",
+      "id": "audio",
+      "destination": "settings:sound",
+      "status": "partial",
+      "compatibility-context": "audio"
+    },
+    {
+      "kind": "tab",
+      "id": "screen-time",
+      "destination": "app:system-monitor",
+      "status": "partial",
+      "compatibility-context": "screen-time"
+    },
+    {
+      "kind": "tab",
+      "id": "theme",
+      "destination": "settings:appearance",
+      "status": "partial",
+      "compatibility-context": "theme"
+    },
+    {
+      "kind": "tab",
+      "id": "control-center",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "control-center"
+    },
+    {
+      "kind": "tab",
+      "id": "launcher",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "launcher"
+    },
+    {
+      "kind": "tab",
+      "id": "privacy-security",
+      "destination": "settings:privacy-security",
+      "status": "partial",
+      "compatibility-context": "privacy-security"
+    },
+    {
+      "kind": "tab",
+      "id": "system",
+      "destination": "app:system-monitor",
+      "status": "partial",
+      "compatibility-context": "system"
+    },
+    {
+      "kind": "tab",
+      "id": "packages",
+      "destination": "app:software",
+      "status": "pending",
+      "compatibility-context": "packages"
+    },
+    {
+      "kind": "tab",
+      "id": "clock",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "clock"
+    },
+    {
+      "kind": "tab",
+      "id": "desktop",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "desktop"
+    },
+    {
+      "kind": "tab",
+      "id": "monitor",
+      "destination": "settings:displays",
+      "status": "pending",
+      "compatibility-context": "monitor"
+    },
+    {
+      "kind": "tab",
+      "id": "wallpaper",
+      "destination": "settings:appearance",
+      "status": "partial",
+      "compatibility-context": "wallpaper"
+    },
+    {
+      "kind": "tab",
+      "id": "power",
+      "destination": "settings:system",
+      "status": "partial",
+      "compatibility-context": "power"
+    },
+    {
+      "kind": "tab",
+      "id": "keybinds",
+      "destination": "settings:keyboard",
+      "status": "pending",
+      "compatibility-context": "keybinds"
+    },
+    {
+      "kind": "tab",
+      "id": "shell",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "shell"
+    },
+    {
+      "kind": "tab",
+      "id": "printers",
+      "destination": "settings:devices",
+      "status": "pending",
+      "compatibility-context": "printers"
+    },
+    {
+      "kind": "tab",
+      "id": "camera",
+      "destination": "settings:devices",
+      "status": "pending",
+      "compatibility-context": "camera"
+    },
+    {
+      "kind": "tab",
+      "id": "localsend",
+      "destination": "app:phone",
+      "status": "pending",
+      "compatibility-context": "localsend"
+    },
+    {
+      "kind": "tab",
+      "id": "syncthing",
+      "destination": "app:phone",
+      "status": "pending",
+      "compatibility-context": "syncthing"
+    },
+    {
+      "kind": "tab",
+      "id": "cast",
+      "destination": "app:phone",
+      "status": "pending",
+      "compatibility-context": "cast"
+    },
+    {
+      "kind": "tab",
+      "id": "calendar",
+      "destination": "app:calendar",
+      "status": "pending",
+      "compatibility-context": "calendar"
+    },
+    {
+      "kind": "tab",
+      "id": "weather",
+      "destination": "app:weather",
+      "status": "pending",
+      "compatibility-context": "weather"
+    },
+    {
+      "kind": "tab",
+      "id": "media",
+      "destination": "shell:media",
+      "status": "pending",
+      "compatibility-context": "media"
+    },
+    {
+      "kind": "tab",
+      "id": "capture",
+      "destination": "shell:capture",
+      "status": "pending",
+      "compatibility-context": "capture"
+    },
+    {
+      "kind": "tab",
+      "id": "clipboard",
+      "destination": "shell:clipboard",
+      "status": "pending",
+      "compatibility-context": "clipboard"
+    },
+    {
+      "kind": "tab",
+      "id": "ai",
+      "destination": "app:agent-center",
+      "status": "pending",
+      "compatibility-context": "ai"
+    },
+    {
+      "kind": "tab",
+      "id": "templates",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "templates"
+    },
+    {
+      "kind": "tab",
+      "id": "plugins",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "plugins"
+    },
+    {
+      "kind": "tab",
+      "id": "hooks",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "hooks"
+    },
+    {
+      "kind": "tab",
+      "id": "niri",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "niri"
+    },
+    {
+      "kind": "tab",
+      "id": "umbriel",
+      "destination": "remove-at-cutover:unsupported-compositor",
+      "status": "pending",
+      "compatibility-context": "umbriel"
+    },
+    {
+      "kind": "tab",
+      "id": "privacy",
+      "destination": "settings:privacy-security",
+      "status": "pending",
+      "compatibility-context": "privacy"
+    },
+    {
+      "kind": "tab",
+      "id": "firewall",
+      "destination": "settings:privacy-security",
+      "status": "pending",
+      "compatibility-context": "firewall"
+    },
+    {
+      "kind": "tab",
+      "id": "security",
+      "destination": "settings:privacy-security",
+      "status": "partial",
+      "compatibility-context": "security"
+    },
+    {
+      "kind": "settings-section",
+      "id": "theme",
+      "destination": "settings:appearance",
+      "status": "partial",
+      "compatibility-context": "settings:theme"
+    },
+    {
+      "kind": "settings-section",
+      "id": "type",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:type"
+    },
+    {
+      "kind": "settings-section",
+      "id": "scale",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:scale"
+    },
+    {
+      "kind": "settings-section",
+      "id": "roundness",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:roundness"
+    },
+    {
+      "kind": "settings-section",
+      "id": "glass",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:glass"
+    },
+    {
+      "kind": "settings-section",
+      "id": "icons",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:icons"
+    },
+    {
+      "kind": "settings-section",
+      "id": "effects",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:effects"
+    },
+    {
+      "kind": "settings-section",
+      "id": "language",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "settings:language"
+    },
+    {
+      "kind": "settings-section",
+      "id": "wallpaper",
+      "destination": "settings:appearance",
+      "status": "partial",
+      "compatibility-context": "settings:wallpaper"
+    },
+    {
+      "kind": "settings-section",
+      "id": "templates",
+      "destination": "settings:appearance",
+      "status": "pending",
+      "compatibility-context": "settings:templates"
+    },
+    {
+      "kind": "settings-section",
+      "id": "desktop",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "settings:desktop"
+    },
+    {
+      "kind": "settings-section",
+      "id": "dock",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "settings:dock"
+    },
+    {
+      "kind": "settings-section",
+      "id": "panels",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:panels"
+    },
+    {
+      "kind": "settings-section",
+      "id": "launcher",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:launcher"
+    },
+    {
+      "kind": "settings-section",
+      "id": "control-center",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
+      "compatibility-context": "settings:control-center"
+    },
+    {
+      "kind": "settings-section",
+      "id": "notifications",
+      "destination": "settings:notifications",
+      "status": "partial",
+      "compatibility-context": "settings:notifications"
+    },
+    {
+      "kind": "settings-section",
+      "id": "osd",
+      "destination": "shell:osd",
+      "status": "pending",
+      "compatibility-context": "settings:osd"
+    },
+    {
+      "kind": "settings-section",
+      "id": "screenshot",
+      "destination": "shell:capture",
+      "status": "pending",
+      "compatibility-context": "settings:screenshot"
+    },
+    {
+      "kind": "settings-section",
+      "id": "screen-record",
+      "destination": "shell:capture",
+      "status": "pending",
+      "compatibility-context": "settings:screen-record"
+    },
+    {
+      "kind": "settings-section",
+      "id": "shell",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:shell"
+    },
+    {
+      "kind": "settings-section",
+      "id": "keybinds",
+      "destination": "settings:keyboard",
+      "status": "pending",
+      "compatibility-context": "settings:keybinds"
+    },
+    {
+      "kind": "settings-section",
+      "id": "security",
+      "destination": "settings:privacy-security",
+      "status": "partial",
+      "compatibility-context": "settings:security"
+    },
+    {
+      "kind": "settings-section",
+      "id": "system",
+      "destination": "settings:system",
+      "status": "partial",
+      "compatibility-context": "settings:system"
+    },
+    {
+      "kind": "settings-section",
+      "id": "services",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "settings:services"
+    },
+    {
+      "kind": "settings-section",
+      "id": "network",
+      "destination": "settings:network",
+      "status": "partial",
+      "compatibility-context": "settings:network"
+    },
+    {
+      "kind": "settings-section",
+      "id": "bluetooth",
+      "destination": "settings:bluetooth",
+      "status": "partial",
+      "compatibility-context": "settings:bluetooth"
+    },
+    {
+      "kind": "settings-section",
+      "id": "tailscale",
+      "destination": "settings:network",
+      "status": "pending",
+      "compatibility-context": "settings:tailscale"
+    },
+    {
+      "kind": "settings-section",
+      "id": "localsend",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "settings:localsend"
+    },
+    {
+      "kind": "settings-section",
+      "id": "location",
+      "destination": "settings:privacy-security",
+      "status": "pending",
+      "compatibility-context": "settings:location"
+    },
+    {
+      "kind": "settings-section",
+      "id": "power",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "settings:power"
+    },
+    {
+      "kind": "settings-section",
+      "id": "hooks",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:hooks"
+    },
+    {
+      "kind": "settings-section",
+      "id": "niri",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:niri"
+    },
+    {
+      "kind": "settings-section",
+      "id": "windows",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:windows"
+    },
+    {
+      "kind": "settings-section",
+      "id": "umbriel",
+      "destination": "remove-at-cutover:unsupported-compositor",
+      "status": "pending",
+      "compatibility-context": "settings:umbriel"
+    },
+    {
+      "kind": "settings-section",
+      "id": "bar",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:bar"
+    },
+    {
+      "kind": "settings-section",
+      "id": "plugins",
+      "destination": "settings:desktop-dock",
+      "status": "pending",
+      "compatibility-context": "settings:plugins"
+    },
+    {
+      "kind": "settings-section",
+      "id": "camera",
+      "destination": "settings:devices",
+      "status": "pending",
+      "compatibility-context": "settings:camera"
+    },
+    {
+      "kind": "settings-section",
+      "id": "clock",
+      "destination": "settings:system",
+      "status": "pending",
+      "compatibility-context": "settings:clock"
+    },
+    {
+      "kind": "dynamic",
+      "id": "plugin-pages",
+      "destination": "settings:desktop-dock/extensions",
+      "status": "pending"
+    },
+    {
+      "kind": "dynamic",
+      "id": "plugin-settings",
+      "destination": "settings:desktop-dock/extensions",
+      "status": "pending"
+    },
+    {
+      "kind": "dynamic",
+      "id": "bar-widget-editors",
+      "destination": "settings:desktop-dock",
+      "status": "pending"
+    },
+    {
+      "kind": "dynamic",
+      "id": "desktop-widget-editors",
+      "destination": "settings:desktop-dock",
+      "status": "pending"
+    },
+    {
+      "kind": "dynamic",
+      "id": "launcher-panel-results",
+      "destination": "destination-router",
+      "status": "pending"
+    },
+    {
+      "kind": "dynamic",
+      "id": "ipc-open-contexts",
+      "destination": "destination-router",
+      "status": "pending"
+    }
+  ]
+}

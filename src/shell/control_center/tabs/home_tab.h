@@ -108,6 +108,7 @@ private:
   struct QuickToggleRow {
     std::unique_ptr<Shortcut> shortcut;
     Button* button = nullptr;
+    Label* status = nullptr;
     std::string openTab;
   };
 
@@ -227,9 +228,6 @@ private:
   Flex* m_sessionWell = nullptr;
   Button* m_lockButton = nullptr;
   Button* m_suspendButton = nullptr;
-  Button* m_logoutButton = nullptr;
-  Button* m_rebootButton = nullptr;
-  Button* m_shutdownButton = nullptr;
   bool m_syncingQuickSliders = false;
 
   // Drag-to-reorder for the optional pins (Quick Settings / Control Center edit gesture):

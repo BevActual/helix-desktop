@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/controls/scroll_view.h"
 
 #include "shell/control_center/settings_pane.h"
 #include "shell/control_center/tab.h"

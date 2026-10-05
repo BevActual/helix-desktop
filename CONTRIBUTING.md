@@ -9,9 +9,9 @@ For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md
 
 ## Design Principles
 
-- Direct Wayland + OpenGL ES only -- no toolkit overhead
+- Shell: custom Wayland/OpenGL renderer, aligned with GTK4/libadwaita controls
 - Minimal scene graph, domain-specific to shell UI
-- Packaging should work across all major Linux distros: Arch, NixOS, Fedora, Gentoo, Debian, Void, OpenSuse
+- Shell: Fedora with helix-niri. Applications: portable, adaptive GTK4/libadwaita on desktop and mobile Linux.
 
 ## Stack
 
@@ -280,8 +280,8 @@ Install the source-build dependencies for your distribution using the commands i
 [BUILDING.md](BUILDING.md#dependencies), then clone the repository:
 
 ```sh
-git clone https://github.com/noctalia-dev/noctalia.git
-cd noctalia
+git clone https://github.com/BevActual/helix-shell.git
+cd helix-shell
 ```
 
 Stop the Helix instance started by your compositor, then configure and build ASan:

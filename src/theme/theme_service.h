@@ -30,6 +30,7 @@ namespace noctalia::theme {
 
     // Snaps the palette to the resolved theme (no fade). Used at startup.
     void apply();
+    void setRemoteSource(bool remote) { m_remoteSource = remote; }
 
     // Resolves the target theme and cross-fades to it.
     void onConfigReload();
@@ -72,6 +73,7 @@ namespace noctalia::theme {
     );
 
   private:
+    bool m_remoteSource = false;
     void resolveAndSet(bool animate);
     // Decodes + generates the wallpaper palette, memoized on (path, mtime, scheme)
     // so repeated resolves for an unchanged wallpaper skip the ~100ms image decode.

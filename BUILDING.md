@@ -1,7 +1,7 @@
 # Building Helix Shell from source
 
 This guide covers source dependencies, distro-specific package installation, build modes, and install layouts.
-The installed command is still `noctalia`. For prebuilt packages and other installation methods, see
+The installed command is still `noctalia`. For the Helix source installation path, see
 [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
 
 ## Dependencies
@@ -195,9 +195,10 @@ just build
 just run
 ```
 
-Unit tests are not compiled by `just build`, which targets only the Helix executable. Build and run them explicitly
+Unit tests are not compiled by `just build`, which targets the Helix executable and its installed system-upgrade helper. Build and run them explicitly
 with `just test` (use `just test release` to force them on for a release build). Direct Meson users can control test
 target generation with the `-Dtests=enabled|disabled|auto` option.
+Run `just test-install` to stage the installation in a temporary directory and check its required files and CLI without changing the host installation.
 Production sources compile once into an internal static library shared by the shell and test executables.
 
 Meson installs the binary and shipped assets using the normal prefix layout:
@@ -228,3 +229,28 @@ bundle/
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for the full runtime asset lookup order.
+
+## Helix services and adaptive applications
+
+Install `gtk4-devel` and `libadwaita-devel` on Fedora to build Settings. GTK 4.12 and libadwaita
+1.7 or newer are required. `-Ddesktop_apps=enabled` requires them; `auto` builds the app when found,
+and `disabled` builds only the shell and service. GTK is not a dependency of the shell executable.
+
+Build `helix-service`, `helix-settings` and `helix-system-monitor` with
+`meson compile -C build-debug helix-service helix-settings helix-system-monitor -j2`.
+For work on the running desktop, `just build-settings` compiles only Settings and
+its service at lower CPU and disk priority with two jobs. `just build-desktop`
+includes the shell, upgrade helper and System Monitor. Neither recipe builds test
+targets. Install the completed build with `sudo just install debug`; this uses
+`--no-rebuild` so installation does not start an unrelated parallel build.
+Installed sessions activate the service through D-Bus. For an uninstalled application, run
+`build-debug/helix-service` before `build-debug/helix-settings`. The development shell can launch the
+service executable next to itself. Do not run an old shell and the migrated service in the same
+session during development, because the old shell still owns the original device backends.
+
+The service does not require a display server. Run integration tests in an isolated D-Bus session;
+the test redirects both session and system buses and all configuration paths to temporary locations.
+
+System Monitor runs independently: `build-debug/helix-system-monitor`. Use `--snapshot`
+for local resource diagnostics without a display server. Its source lives in
+`src/apps/system_monitor` alongside Settings in this Software Projects repository.

@@ -1101,6 +1101,8 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
 )
 
+_noctalia_sources += files('src/desktop/protocol.cpp', 'src/desktop/client.cpp', 'src/desktop/remote_network.cpp')
+
 if sanitize
   _noctalia_sources += files('src/core/lsan_suppressions.cpp')
 endif
@@ -1476,3 +1478,99 @@ if build_tests
     workdir: meson.current_source_dir(),
   )
 endif # build_tests
+
+
+# Independent desktop service and adaptive applications. GTK never enters shell dependencies.
+helix_service = executable('helix-service',
+  sources: files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp'),
+  dependencies: noctalia_core_dep,
+  cpp_args: _noctalia_cpp_args,
+  install: true,
+)
+helix_service_config = configuration_data()
+helix_service_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
+configure_file(input: 'assets/services/org.helix.Desktop.service.in',
+  output: 'org.helix.Desktop.service', configuration: helix_service_config,
+  install_dir: get_option('datadir') / 'dbus-1' / 'services')
+configure_file(input: 'assets/services/helix-service.service.in',
+  output: 'helix-service.service', configuration: helix_service_config,
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
+
+gtk4_dep = dependency('gtk4', version: '>=4.12', required: get_option('desktop_apps'))
+adwaita_dep = dependency('libadwaita-1', version: '>=1.7', required: get_option('desktop_apps'))
+if gtk4_dep.found() and adwaita_dep.found()
+  helix_settings = executable('helix-settings',
+    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
+    include_directories: include_directories('src'),
+    dependencies: [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep],
+    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
+    install: true,
+  )
+  install_data('assets/org.helix.Settings.desktop', install_dir: get_option('datadir') / 'applications')
+  helix_monitor = executable('helix-system-monitor',
+    sources: files('src/apps/system_monitor/main.cpp', 'src/apps/system_monitor/proc_reader.cpp',
+      'src/apps/system_monitor/report_reader.cpp', 'src/desktop/protocol.cpp'),
+    include_directories: include_directories('src'),
+    dependencies: [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep],
+    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
+    install: true,
+  )
+  install_data('assets/org.helix.SystemMonitor.desktop', install_dir: get_option('datadir') / 'applications')
+  install_data('assets/org.helix.SystemMonitor.svg', install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps')
+endif
+
+if build_tests
+  helix_monitor_test = executable('desktop_monitor_test',
+    sources: files('tests/desktop_monitor_test.cpp', 'src/apps/system_monitor/proc_reader.cpp'),
+    include_directories: include_directories('src'), override_options: ['b_ndebug=false'])
+  test('desktop_monitor', helix_monitor_test)
+  helix_wallpaper_test = executable('desktop_wallpaper_catalog_test',
+    sources: files('tests/desktop_wallpaper_catalog_test.cpp', 'src/apps/settings/wallpaper_catalog.cpp'),
+    include_directories: include_directories('src'), override_options: ['b_ndebug=false'])
+  test('desktop_wallpaper_catalog', helix_wallpaper_test)
+  helix_wallhaven_test = executable('desktop_wallhaven_test',
+    sources: files('tests/desktop_wallhaven_test.cpp'), dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'])
+  test('desktop_wallhaven', helix_wallhaven_test)
+  helix_monitor_reports_test = executable('desktop_monitor_reports_test',
+    sources: files('tests/desktop_monitor_reports_test.cpp', 'src/apps/system_monitor/report_reader.cpp'),
+    include_directories: include_directories('src'), dependencies: [nlohmann_dep], override_options: ['b_ndebug=false'])
+  test('desktop_monitor_reports', helix_monitor_reports_test)
+  helix_dns_test = executable('desktop_dns_validation_test',
+    sources: files('tests/desktop_dns_validation_test.cpp'),
+    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
+    override_options: ['b_ndebug=false'])
+  test('desktop_dns_validation', helix_dns_test)
+  helix_meter_test = executable('desktop_input_meter_test',
+    sources: files('tests/desktop_input_meter_test.cpp', 'src/desktop/input_meter.cpp'),
+    include_directories: include_directories('src'), dependencies: [pipewire_dep],
+    override_options: ['b_ndebug=false'])
+  test('desktop_input_meter', helix_meter_test)
+  helix_protocol_test = executable('desktop_protocol_test',
+    sources: files('tests/desktop_protocol_test.cpp', 'src/desktop/protocol.cpp'),
+    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
+    override_options: ['b_ndebug=false'])
+  test('desktop_protocol', helix_protocol_test)
+  helix_service_test = executable('desktop_service_test',
+    sources: files('tests/desktop_service_test.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
+    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
+    override_options: ['b_ndebug=false'])
+  helix_dbus_session = find_program('dbus-run-session', required: false)
+  if helix_dbus_session.found()
+    test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
+    meter_python = find_program('python3')
+    meter_tools = [find_program('pipewire', required: false), find_program('pw-cli', required: false),
+      find_program('pw-link', required: false), find_program('pw-dump', required: false)]
+    have_meter_tools = true
+    foreach tool : meter_tools
+      have_meter_tools = have_meter_tools and tool.found()
+    endforeach
+    if have_meter_tools and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+      test('desktop_audio_meter_integration', helix_dbus_session,
+        args: [meter_python, meson.project_source_root() / 'tests/desktop_audio_meter_integration.py',
+          helix_service, meson.project_source_root() / 'tests/desktop_audio/pipewire.conf'], timeout: 60)
+    endif
+  endif
+  test('desktop_migration_inventory', find_program('python3'),
+    args: [meson.project_source_root() / 'tests/desktop_migration_test.py', meson.project_source_root()])
+endif

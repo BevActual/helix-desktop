@@ -15,7 +15,9 @@
 class Button;
 class Flex;
 class Glyph;
+class InputArea;
 class Label;
+class Node;
 class Renderer;
 class Select;
 class Slider;
@@ -105,6 +107,9 @@ namespace control_center {
   // settings pages): the main page stays one calm list.
   std::unique_ptr<Flex> makeNavRow(float scale, std::string glyph, std::string title, std::function<void()> onOpen);
   std::unique_ptr<Flex> makeSubPaneHeader(float scale, Label** titleOut, std::function<void()> onBack);
+  // After a page switch, focus the preferred control if it remains visible;
+  // otherwise focus the first control on the new page.
+  void focusSubPane(Node* destination, InputArea* preferred = nullptr, Node* fallback = nullptr);
 
 } // namespace control_center
 

@@ -79,7 +79,7 @@ public:
   using StateFeedbackCallback = std::function<void(bool enabled)>;
 
   // upowerService may be null when UPower is unavailable; it must outlive this service.
-  explicit BluetoothService(SystemBus& bus, UPowerService* upowerService);
+  explicit BluetoothService(SystemBus& bus, UPowerService* upowerService, bool remote = false);
   ~BluetoothService();
 
   BluetoothService(const BluetoothService&) = delete;
@@ -110,6 +110,9 @@ public:
   void refreshBatteryFromUPower();
 
 private:
+  bool m_remote = false;
+  Timer m_remoteRefresh;
+  bool remoteAction(const char* action, const std::string& path = {}, std::optional<bool> value = std::nullopt);
   struct Impl;
   friend struct Impl;
 

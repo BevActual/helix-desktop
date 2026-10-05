@@ -636,6 +636,7 @@ namespace {
             table.insert_or_assign(key, std::move(filterTable));
             if (key == "filter") {
               table.insert_or_assign("filter_order", std::move(filterOrder));
+              table.insert_or_assign("filter_replace", true);
             }
           } else if constexpr (std::is_same_v<T, std::vector<KeyChord>>) {
             toml::array array;
@@ -849,6 +850,7 @@ namespace {
   }
 
   bool overridePresenceIsSemantic(const std::vector<std::string>& path) {
+    if (path == std::vector<std::string>{"notification", "filter"}) return true;
     if (path.size() == 3 && path[0] == "widget" && path[2] == "type") {
       return true;
     }
@@ -1907,6 +1909,10 @@ bool ConfigService::mutateOverrides(
 
   const auto erasePath = [this](toml::table& table, const std::vector<std::string>& path) {
     const bool erased = eraseOverridePath(table, path, overridePreserveDepthForPath(path));
+    if (erased && path == std::vector<std::string>{"notification", "filter"}) {
+      eraseOverridePath(table, {"notification", "filter_order"}, 0);
+      eraseOverridePath(table, {"notification", "filter_replace"}, 0);
+    }
     if (erased && path.size() == 2 && path[0] == "idle" && path[1] == "behavior") {
       eraseOverridePath(table, {"idle", "behavior_order"}, overridePreserveDepthForPath(path));
     }
@@ -2712,10 +2718,35 @@ bool ConfigService::writeOverridesToFile() {
     m_overridesTable = m_persistedOverridesTable;
     return false;
   }
+  if (m_overrideCommitHandler) {
+    std::ostringstream baseline;
+    baseline << toml::toml_formatter{m_persistedOverridesTable};
+    if (!m_overrideCommitHandler(baseline.str(), out.str(), m_lastMutationError)) {
+      m_overridesTable = m_persistedOverridesTable;
+      return false;
+    }
+    m_persistedOverridesTable = m_overridesTable;
+    return true;
+  }
   if (!writeTextFileAtomic(m_overridesPath, out.str())) {
     m_overridesTable = m_persistedOverridesTable;
     return false;
   }
   m_persistedOverridesTable = m_overridesTable;
   return true;
+}
+
+// Optimistic concurrency prevents a stale shell replica overwriting another client.
+bool ConfigService::commitRemoteOverrides(std::string_view baseline, std::string_view candidate) {
+  forceReload();
+  try {
+    if (toml::parse(baseline) != m_persistedOverridesTable) {
+      m_lastMutationError = "Settings changed in another client. Refresh and try again.";
+      return false;
+    }
+    return commitOverrideTable(toml::parse(candidate), nullptr);
+  } catch (const toml::parse_error&) {
+    m_lastMutationError = "Invalid settings document";
+    return false;
+  }
 }

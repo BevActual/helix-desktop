@@ -2,7 +2,7 @@
 
 Helix is a niri-first Linux desktop: login, compositor, and shell as one product. **Helix Shell** is the desktop shell — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets — built directly on Wayland and OpenGL ES with no Qt or GTK dependency.
 
-The other two packages are [helix-niri](../helix-niri) (compositor) and [helix-greeter](../helix-greeter) (login). Stock niri, Hyprland, and other compositors remain fallbacks.
+The other two packages are [helix-niri](https://github.com/BevActual/helix-niri) (compositor) and [helix-greeter](https://github.com/BevActual/helix-greeter) (login). Stock niri, Hyprland, and other compositors remain fallbacks.
 
 It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, Privacy, and similar tools).
 
@@ -11,7 +11,7 @@ The command, config directory, and IPC stay `noctalia` so existing installs keep
 <p><br/></p>
 
 <p align="center">
-  <img src="https://assets.noctalia.dev/noctalia-logo.svg?v=2" alt="Helix Shell" style="width: 192px" />
+  <img src="assets/noctalia.svg" alt="Helix Shell" style="width: 192px" />
 </p>
 
 <p><br/></p>
@@ -41,7 +41,7 @@ sidebar with a start or empty card, the same pattern as Tailscale and Phone.
 
 ## Wayland Compositor Support
 
-Helix Shell is built for [helix-niri](../helix-niri). It also supports Wayland compositors that provide the layer-shell
+Helix Shell is built for [helix-niri](https://github.com/BevActual/helix-niri). It also supports Wayland compositors that provide the layer-shell
 protocols it needs for shell surfaces. Workspace integration works through compositor-native backends where needed, or
 through `ext-workspace-v1` on compositors that implement it.
 
@@ -97,3 +97,14 @@ Distro packaging notes (description, deps, install layout, Meson options) live i
 
 This tree started from [Noctalia](https://github.com/noctalia-dev/noctalia). Helix keeps that on-disk command and config
 layout so existing setups keep working.
+
+### Native desktop applications
+
+Helix Settings (`helix-settings`) and Helix System Monitor (`helix-system-monitor`)
+are independent GTK4/libadwaita applications built in this repository under `src/apps`.
+Settings uses the desktop service and hides Helix-only preferences on other desktops.
+System Monitor reads local Linux resources without the shell or service, with live
+CPU/memory graphs, searchable processes and saved screen-time reports. Native controls
+and adaptive navigation are shared; graphical content adds palette, wallpaper and data
+previews. Advanced migration is ongoing and existing Control Center destinations remain
+available. See `docs/design/desktop-service.md` for coverage and remaining work.

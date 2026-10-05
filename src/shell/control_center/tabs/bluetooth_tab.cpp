@@ -1,17 +1,21 @@
 #include "shell/control_center/tabs/bluetooth_tab.h"
 
 #include "config/config_service.h"
+#include "core/input/keybind_matcher.h"
 #include "core/ui_phase.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
+#include "render/scene/input_dispatcher.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/collapsible.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
 #include "ui/palette.h"
 #include "ui/style.h"
+#include "ui/split_pane_focus.h"
 #include "wayland/clipboard_service.h"
 
 #include <algorithm>
@@ -381,7 +385,15 @@ private:
 
 BluetoothTab::BluetoothTab(BluetoothService* service, BluetoothAgent* agent, const ControlCenterServices& services)
     : m_service(service), m_agent(agent), m_config(services.config), m_clipboard(services.clipboard),
-      m_settings(std::make_unique<SettingsPane>(services, SettingsPaneOptions{.section = "bluetooth"})) {
+      m_settings(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "bluetooth", .inlineSettings = true}
+      )),
+      m_devicesPane(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "bluetooth", .includedGroups = {"devices"}, .inlineSettings = true}
+      )),
+      m_discoveryPane(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "bluetooth", .includedGroups = {"discovery"}, .inlineSettings = true}
+      )) {
   if (m_config != nullptr) {
     if (const std::optional<std::string> source = m_config->stateString("bluetooth_tab", "catalog")) {
       if (*source == "nearby") {
@@ -396,10 +408,21 @@ BluetoothTab::~BluetoothTab() = default;
 std::unique_ptr<Flex> BluetoothTab::create() {
   const float scale = contentScale();
 
-  auto tab = ui::column({
+  auto outer = ui::column({
       .out = &m_rootLayout,
       .align = FlexAlign::Stretch,
       .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
+  });
+  auto subHeader = makeSubPaneHeader(scale, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  outer->addChild(std::move(subHeader));
+
+  auto tab = ui::column({
+      .out = &m_rootPage,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * scale,
+      .flexGrow = 1.0F,
   });
 
   auto pairingCard = ui::column({
@@ -642,6 +665,19 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   adapterCard->addChild(std::move(discoverableHost));
   tab->addChild(std::move(adapterCard));
 
+  auto nav = ui::column({
+      .align = FlexAlign::Stretch,
+      .configure = [scale](Flex& list) { applyGroupedListStyle(list, scale); },
+  });
+  nav->addChild(makeNavRow(scale, "bluetooth", i18n::tr("control-center.bluetooth.pages.devices"), [this]() {
+    openPage(Page::Devices);
+  }));
+  nav->addChild(ui::separator());
+  nav->addChild(makeNavRow(scale, "radar", i18n::tr("control-center.bluetooth.pages.discovery"), [this]() {
+    openPage(Page::Discovery);
+  }));
+  tab->addChild(std::move(nav));
+
   auto listScroll = ui::scrollView({
       .out = &m_listScroll,
       .contentScale = contentScale(),
@@ -660,7 +696,32 @@ std::unique_ptr<Flex> BluetoothTab::create() {
   m_list->setGap(Style::spaceMd * scale);
 
   tab->addChild(std::move(listScroll));
-  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
+  outer->addChild(std::move(tab));
+
+  auto subScroll = ui::scrollView({
+      .out = &m_subScroll,
+      .contentScale = scale,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& view) {
+        view.clearFill();
+        view.clearBorder();
+      },
+  });
+  Flex* subContent = subScroll->content();
+  subContent->setDirection(FlexDirection::Vertical);
+  subContent->setAlign(FlexAlign::Stretch);
+  auto devicesPage = m_devicesPane->createInline(scale, panelCardOpacity());
+  m_devicesPage = devicesPage.get();
+  subContent->addChild(std::move(devicesPage));
+  auto discoveryPage = m_discoveryPane->createInline(scale, panelCardOpacity());
+  m_discoveryPage = discoveryPage.get();
+  subContent->addChild(std::move(discoveryPage));
+  outer->addChild(std::move(subScroll));
+  syncPage();
+  return m_settings->wrapLive(std::move(outer), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> BluetoothTab::createHeaderActions() {
@@ -675,6 +736,8 @@ void BluetoothTab::setSettingsSearchQuery(std::string_view query) {
   m_settings->setSearchQuery(std::string(query));
 }
 
+SettingsPane* BluetoothTab::settingsPane() { return m_settings.get(); }
+
 void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeight) {
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
@@ -683,6 +746,10 @@ void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
     return;
   }
   m_rootLayout->setSize(contentWidth, bodyHeight);
+  if (m_page != Page::Root) {
+    m_rootLayout->layout(renderer);
+    return;
+  }
   syncPairingCard();
   syncHeader();
   m_rootLayout->layout(renderer);
@@ -693,6 +760,9 @@ void BluetoothTab::doLayout(Renderer& renderer, float contentWidth, float bodyHe
 
 void BluetoothTab::doUpdate(Renderer& renderer) {
   if (m_settings != nullptr && m_settings->configureMode()) {
+    return;
+  }
+  if (m_page != Page::Root) {
     return;
   }
   syncDiscoveryLease();
@@ -706,17 +776,88 @@ void BluetoothTab::doUpdate(Renderer& renderer) {
 }
 
 void BluetoothTab::setActive(bool active) {
+  const bool becameActive = active && !m_active;
+  m_active = active;
   if (!active) {
     stopRequestedDiscovery();
+  } else if (becameActive && m_page != Page::Root) {
+    m_page = Page::Root;
+    m_returnFocus = nullptr;
+    syncPage();
   }
+}
+
+void BluetoothTab::syncPage() {
+  const bool root = m_page == Page::Root;
+  bool changed = setShown(m_rootPage, root);
+  changed |= setShown(m_subHeader, !root);
+  changed |= setShown(m_subScroll, !root);
+  changed |= setShown(m_devicesPage, m_page == Page::Devices);
+  changed |= setShown(m_discoveryPage, m_page == Page::Discovery);
+  if (m_subTitle != nullptr && !root) {
+    m_subTitle->setText(i18n::tr(
+        m_page == Page::Devices ? "control-center.bluetooth.pages.devices" : "control-center.bluetooth.pages.discovery"
+    ));
+  }
+  if (changed) {
+    PanelManager::instance().requestLayout();
+  }
+}
+
+void BluetoothTab::openPage(Page page) {
+  if (m_page == page) {
+    return;
+  }
+  auto& dispatcher = PanelManager::instance().inputDispatcher();
+  InputArea* const focused = dispatcher.focusedArea();
+  const bool returning = page == Page::Root;
+  const bool transferFocus = returning
+      ? isNodeInSubtree(focused, m_subHeader) || isNodeInSubtree(focused, m_subScroll)
+      : isNodeInSubtree(focused, m_rootPage);
+  if (!returning) {
+    m_returnFocus = transferFocus ? focused : nullptr;
+  }
+  m_page = page;
+  if (m_subScroll != nullptr) {
+    m_subScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+  if (transferFocus) {
+    focusSubPane(
+        returning ? static_cast<Node*>(m_rootPage) : static_cast<Node*>(m_subHeader),
+        returning ? m_returnFocus : nullptr, returning ? nullptr : static_cast<Node*>(m_subScroll)
+    );
+  }
+  if (returning) {
+    m_returnFocus = nullptr;
+  }
+}
+
+bool BluetoothTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
 }
 
 void BluetoothTab::onClose() {
   if (m_settings != nullptr) {
     m_settings->onClose();
   }
+  m_devicesPane->onClose();
+  m_discoveryPane->onClose();
   stopRequestedDiscovery();
+  m_page = Page::Root;
+  m_returnFocus = nullptr;
   m_rootLayout = nullptr;
+  m_rootPage = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_subScroll = nullptr;
+  m_devicesPage = nullptr;
+  m_discoveryPage = nullptr;
   m_pairingCard = nullptr;
   m_pairingTitle = nullptr;
   m_pairingDetail = nullptr;

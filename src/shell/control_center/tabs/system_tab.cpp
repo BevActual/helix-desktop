@@ -2,7 +2,10 @@
 
 #include "config/config_service.h"
 #include "core/build_info.h"
+#include "core/input/keybind_matcher.h"
+#include "dbus/upower/upower_service.h"
 #include "i18n/i18n.h"
+#include "render/scene/input_dispatcher.h"
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_button_style.h"
@@ -14,7 +17,9 @@
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/graph.h"
+#include "ui/controls/scroll_view.h"
 #include "ui/controls/segmented.h"
+#include "ui/split_pane_focus.h"
 #include "wayland/clipboard_service.h"
 
 #include <algorithm>
@@ -234,7 +239,7 @@ namespace {
 } // namespace
 
 SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices& services)
-    : m_monitor(monitor), m_clipboard(services.clipboard), m_config(services.config),
+    : m_monitor(monitor), m_upower(services.upower), m_clipboard(services.clipboard), m_config(services.config),
       m_upgradeShell(services.upgradeShell), m_upgradeAvailable(services.upgradeAvailable),
       m_upgradeBusy(services.upgradeBusy),
       m_settings(std::make_unique<SettingsPane>(
@@ -242,6 +247,18 @@ SystemTab::SystemTab(SystemMonitorService* monitor, const ControlCenterServices&
           SettingsPaneOptions{
               .section = "system",
               .includedGroups = {"battery", "monitor", "monitor-polling", "monitor-thresholds"},
+              .inlineSettings = true,
+          }
+      )),
+      m_batteryPane(std::make_unique<SettingsPane>(
+          services, SettingsPaneOptions{.section = "system", .includedGroups = {"battery"}, .inlineSettings = true}
+      )),
+      m_monitoringPane(std::make_unique<SettingsPane>(
+          services,
+          SettingsPaneOptions{
+              .section = "system",
+              .includedGroups = {"monitor", "monitor-polling", "monitor-thresholds"},
+              .inlineSettings = true,
           }
       )) {
   if (m_config != nullptr) {
@@ -256,6 +273,16 @@ SystemTab::~SystemTab() { retainStats(false); }
 
 std::unique_ptr<Flex> SystemTab::create() {
   const float sc = contentScale();
+
+  auto outer = ui::column({
+      .out = &m_hostRoot,
+      .align = FlexAlign::Stretch,
+      .gap = Style::spaceMd * sc,
+      .flexGrow = 1.0F,
+  });
+  auto subHeader = makeSubPaneHeader(sc, &m_subTitle, [this]() { openPage(Page::Root); });
+  m_subHeader = subHeader.get();
+  outer->addChild(std::move(subHeader));
 
   auto tab = ui::column({
       .out = &m_root,
@@ -511,8 +538,49 @@ std::unique_ptr<Flex> SystemTab::create() {
   }
   tab->addChild(std::move(aboutHost));
 
+  auto nav = ui::column({
+      .align = FlexAlign::Stretch,
+      .configure = [sc](Flex& list) { applyGroupedListStyle(list, sc); },
+  });
+  auto batteryNav = makeNavRow(sc, "battery", i18n::tr("control-center.system.pages.battery"), [this]() {
+    openPage(Page::Battery);
+  });
+  m_batteryNav = batteryNav.get();
+  nav->addChild(std::move(batteryNav));
+  nav->addChild(ui::separator({.out = &m_batteryNavDivider}));
+  nav->addChild(makeNavRow(sc, "activity", i18n::tr("control-center.system.pages.monitoring"), [this]() {
+    openPage(Page::Monitoring);
+  }));
+  tab->addChild(std::move(nav));
+  outer->addChild(std::move(tab));
+
+  auto subScroll = ui::scrollView({
+      .out = &m_subScroll,
+      .contentScale = sc,
+      .scrollbarVisible = true,
+      .viewportPaddingH = 0.0F,
+      .viewportPaddingV = 0.0F,
+      .flexGrow = 1.0F,
+      .configure = [](ScrollView& view) {
+        view.clearFill();
+        view.clearBorder();
+      },
+  });
+  Flex* subContent = subScroll->content();
+  subContent->setDirection(FlexDirection::Vertical);
+  subContent->setAlign(FlexAlign::Stretch);
+  auto batteryPage = m_batteryPane->createInline(sc, panelCardOpacity());
+  m_batteryPage = batteryPage.get();
+  subContent->addChild(std::move(batteryPage));
+  auto monitoringPage = m_monitoringPane->createInline(sc, panelCardOpacity());
+  m_monitoringPage = monitoringPage.get();
+  subContent->addChild(std::move(monitoringPage));
+  outer->addChild(std::move(subScroll));
+
   syncCatalog();
-  return m_settings->wrapLive(std::move(tab), contentScale(), panelCardOpacity());
+  syncBatteryNav();
+  syncPage();
+  return m_settings->wrapLive(std::move(outer), contentScale(), panelCardOpacity());
 }
 
 std::unique_ptr<Flex> SystemTab::createHeaderActions() {
@@ -530,7 +598,10 @@ std::unique_ptr<Flex> SystemTab::createHeaderActions() {
   return m_settings->embedHeader(std::move(live), scale);
 }
 
-void SystemTab::setConfigureMode(bool show) { m_settings->setConfigureMode(show); }
+void SystemTab::setConfigureMode(bool show) {
+  m_settings->setConfigureMode(show);
+  retainStats(m_active && m_page == Page::Root && !show);
+}
 
 bool SystemTab::configureMode() const { return m_settings->configureMode(); }
 
@@ -682,8 +753,14 @@ void SystemTab::onPanelCardOpacityChanged(float opacity) {
 }
 
 void SystemTab::setActive(bool active) {
+  const bool becameActive = active && !m_active;
   m_active = active;
-  retainStats(active);
+  if (becameActive && m_page != Page::Root) {
+    m_page = Page::Root;
+    m_returnFocus = nullptr;
+    syncPage();
+  }
+  retainStats(active && m_page == Page::Root && !configureMode());
   if (!active) {
     m_redrawLimiter.reset();
     return;
@@ -695,6 +772,73 @@ void SystemTab::setActive(bool active) {
       syncCatalog();
     }
   }
+}
+
+void SystemTab::syncBatteryNav() {
+  const bool available = m_upower != nullptr && !m_upower->batteryDevices().empty();
+  bool changed = setShown(m_batteryNav, available);
+  changed |= setShown(m_batteryNavDivider, available);
+  if (!available && m_page == Page::Battery) {
+    openPage(Page::Root);
+  } else if (changed) {
+    requestPanelLayout();
+  }
+}
+
+void SystemTab::syncPage() {
+  const bool root = m_page == Page::Root;
+  bool changed = setShown(m_root, root);
+  changed |= setShown(m_subHeader, !root);
+  changed |= setShown(m_subScroll, !root);
+  changed |= setShown(m_batteryPage, m_page == Page::Battery);
+  changed |= setShown(m_monitoringPage, m_page == Page::Monitoring);
+  if (m_subTitle != nullptr && !root) {
+    m_subTitle->setText(i18n::tr(
+        m_page == Page::Battery ? "control-center.system.pages.battery" : "control-center.system.pages.monitoring"
+    ));
+  }
+  if (changed) {
+    requestPanelLayout();
+  }
+}
+
+void SystemTab::openPage(Page page) {
+  if (m_page == page) {
+    return;
+  }
+  auto& dispatcher = PanelManager::instance().inputDispatcher();
+  InputArea* const focused = dispatcher.focusedArea();
+  const bool returning = page == Page::Root;
+  const bool transferFocus = returning
+      ? isNodeInSubtree(focused, m_subHeader) || isNodeInSubtree(focused, m_subScroll)
+      : isNodeInSubtree(focused, m_root);
+  if (!returning) {
+    m_returnFocus = transferFocus ? focused : nullptr;
+  }
+  m_page = page;
+  retainStats(m_active && page == Page::Root && !configureMode());
+  if (m_subScroll != nullptr) {
+    m_subScroll->setScrollOffset(0.0F);
+  }
+  syncPage();
+  if (transferFocus) {
+    focusSubPane(
+        returning ? static_cast<Node*>(m_root) : static_cast<Node*>(m_subHeader),
+        returning ? m_returnFocus : nullptr, returning ? nullptr : static_cast<Node*>(m_subScroll)
+    );
+  }
+  if (returning) {
+    m_returnFocus = nullptr;
+  }
+}
+
+bool SystemTab::handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) {
+  if (!pressed || preedit || configureMode() || m_page == Page::Root
+      || !KeybindMatcher::matches(KeybindAction::Cancel, sym, modifiers)) {
+    return false;
+  }
+  openPage(Page::Root);
+  return true;
 }
 
 // The control center is built once at startup and lives for the whole session, so retaining for
@@ -721,7 +865,19 @@ void SystemTab::retainStats(bool retain) {
 
 void SystemTab::onClose() {
   m_settings->onClose();
+  m_batteryPane->onClose();
+  m_monitoringPane->onClose();
+  m_page = Page::Root;
+  m_returnFocus = nullptr;
   m_root = nullptr;
+  m_hostRoot = nullptr;
+  m_subHeader = nullptr;
+  m_subTitle = nullptr;
+  m_subScroll = nullptr;
+  m_batteryPage = nullptr;
+  m_monitoringPage = nullptr;
+  m_batteryNav = nullptr;
+  m_batteryNavDivider = nullptr;
   m_compactCard = nullptr;
   m_catalogSwitch = nullptr;
   m_titleLabel = nullptr;
@@ -787,7 +943,7 @@ void SystemTab::onClose() {
 void SystemTab::onFrameTick(float deltaMs) {
   (void)deltaMs;
 
-  if (!m_active || m_monitor == nullptr || !m_monitor->isRunning()) {
+  if (!m_active || m_page != Page::Root || configureMode() || m_monitor == nullptr || !m_monitor->isRunning()) {
     m_redrawLimiter.reset();
     return;
   }
@@ -823,7 +979,13 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
   if (m_settings != nullptr && m_settings->layoutEmbedded(renderer, contentWidth, bodyHeight)) {
     return;
   }
-  if (m_root == nullptr) {
+  if (m_hostRoot == nullptr) {
+    return;
+  }
+
+  m_hostRoot->setSize(contentWidth, bodyHeight);
+  if (m_page != Page::Root) {
+    m_hostRoot->layout(renderer);
     return;
   }
 
@@ -842,8 +1004,7 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
       }
     }
   }
-  m_root->setSize(contentWidth, bodyHeight);
-  m_root->layout(renderer);
+  m_hostRoot->layout(renderer);
 
   auto sizeGraph = [&](Graph* g, Flex* host, Flex* legend) {
     if (g == nullptr || host == nullptr || !host->visible()) {
@@ -865,7 +1026,7 @@ void SystemTab::doLayout(Renderer& renderer, float contentWidth, float bodyHeigh
   sizeGraph(m_gpuGraph, m_gpuHost, m_gpuLegend);
   sizeGraph(m_netGraph, m_netHost, m_netLegend);
 
-  m_root->layout(renderer);
+  m_hostRoot->layout(renderer);
   syncUsageBars();
 }
 
@@ -892,6 +1053,10 @@ void SystemTab::syncUsageBars() {
 
 void SystemTab::doUpdate(Renderer& renderer) {
   if (!m_active) {
+    return;
+  }
+  syncBatteryNav();
+  if (m_page != Page::Root || configureMode()) {
     return;
   }
 

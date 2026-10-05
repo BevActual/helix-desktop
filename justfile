@@ -22,7 +22,14 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} noctalia
+    meson compile -C build-{{m}} noctalia noctalia-system-upgrade
+
+# Focused, lower-priority builds for work on the running desktop. No test targets.
+build-desktop m=mode jobs="2": (_ensure-configured m)
+    nice -n 10 ionice -c 3 meson compile -C build-{{m}} noctalia noctalia-system-upgrade helix-service helix-settings helix-system-monitor -j {{jobs}}
+
+build-settings m=mode jobs="2": (_ensure-configured m)
+    nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
 
 _ensure-configured m=mode:
     #!/usr/bin/env bash
@@ -56,6 +63,10 @@ test m=mode *args: (_ensure-configured m)
 # Regressions for the GitHub workflow scripts. Pure Python, builds nothing.
 test-workflows:
     python3 -m unittest discover -s .github/workflows/scripts -p 'test_*.py'
+
+# Stage an installation in a temporary directory and exercise its installed CLI.
+test-install m=mode: (build m)
+    sh tests/install_layout_test.sh build-{{m}}
 
 install m:
     #!/usr/bin/env bash

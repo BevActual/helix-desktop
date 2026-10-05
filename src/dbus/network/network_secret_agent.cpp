@@ -1,4 +1,5 @@
 #include "dbus/network/network_secret_agent.h"
+#include "desktop/client.h"
 
 #include "core/log.h"
 #include "dbus/system_bus.h"
@@ -144,7 +145,18 @@ struct NetworkSecretAgent::Impl {
   }
 };
 
-NetworkSecretAgent::NetworkSecretAgent(SystemBus& bus) : m_impl(std::make_unique<Impl>(bus)) {
+NetworkSecretAgent::NetworkSecretAgent(SystemBus& bus, bool remote) : m_remote(remote), m_impl(std::make_unique<Impl>(bus)) {
+  if (m_remote) {
+    m_remoteObserver = helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json& value) {
+      if (interface != helix::networkInterface) return;
+      if (signal == "Completed") { m_remotePending = false; return; }
+      if (signal != "Prompt") return;
+      m_remotePending = true;
+      if (m_remoteCallback) m_remoteCallback({value.at(0).at("ssid"), value.at(0).at("setting")});
+    });
+    return;
+  }
+
   m_impl->object = sdbus::createObject(bus.connection(), kAgentObjectPath);
 
   m_impl->object
@@ -189,6 +201,7 @@ NetworkSecretAgent::NetworkSecretAgent(SystemBus& bus) : m_impl(std::make_unique
 }
 
 NetworkSecretAgent::~NetworkSecretAgent() {
+  if (m_remote) { helix::desktopClient().unobserve(m_remoteObserver); return; }
   if (m_impl == nullptr) {
     return;
   }
@@ -202,23 +215,32 @@ NetworkSecretAgent::~NetworkSecretAgent() {
 }
 
 void NetworkSecretAgent::setRequestCallback(RequestCallback callback) {
+  if (m_remote) { m_remoteCallback = std::move(callback); return; }
   if (m_impl != nullptr) {
     m_impl->requestCallback = std::move(callback);
   }
 }
 
 void NetworkSecretAgent::submitSecret(const std::string& secret) {
+  if (m_remote) { replyRemote(secret, false); return; }
   if (m_impl != nullptr) {
     m_impl->submitPending(secret);
   }
 }
 
 void NetworkSecretAgent::cancelSecret() {
+  if (m_remote) { replyRemote("", true); return; }
   if (m_impl != nullptr) {
     m_impl->cancelPending("user canceled");
   }
 }
 
 bool NetworkSecretAgent::hasPendingRequest() const noexcept {
-  return m_impl != nullptr && m_impl->pendingResult.has_value();
+  return m_remote ? m_remotePending : m_impl != nullptr && m_impl->pendingResult.has_value();
+}
+
+void NetworkSecretAgent::replyRemote(const std::string& response, bool cancel) {
+  if (!m_remotePending) return;
+  try { helix::desktopClient().call("network", "Reply", g_variant_new("(sb)", response.c_str(), cancel)); m_remotePending = false; }
+  catch (...) {}
 }

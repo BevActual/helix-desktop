@@ -1,4 +1,5 @@
 #pragma once
+#include "ui/controls/scroll_view.h"
 
 #include "core/timer_manager.h"
 #include "dbus/network/dns_override.h"
@@ -27,6 +28,7 @@ class ExternalIpService;
 class Flex;
 class HttpClient;
 class Image;
+class InputArea;
 class Input;
 class Label;
 class ModemManagerService;
@@ -47,10 +49,12 @@ public:
   std::unique_ptr<Flex> create() override;
   std::unique_ptr<Flex> createHeaderActions() override;
   void setActive(bool active) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   void onClose() override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -99,6 +103,9 @@ private:
   void persistCatalog();
   void syncCatalogBar(bool hasVpns, bool hasCellular);
   [[nodiscard]] std::vector<Catalog> catalogOrder(bool hasVpns, bool hasCellular) const;
+  enum class Page : std::uint8_t { Root, WifiSettings, ConnectionDetails };
+  void openPage(Page page);
+  void syncPage();
 
   INetworkService* m_network = nullptr;
   NetworkSecretAgent* m_secrets = nullptr;
@@ -109,8 +116,19 @@ private:
   SystemMonitorService* m_sysmon = nullptr;
   ClipboardService* m_clipboard = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_wifiSettingsPane;
+  Page m_page = Page::Root;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_rootPage = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  ScrollView* m_subScroll = nullptr;
+  Flex* m_wifiSettingsPage = nullptr;
+  Flex* m_connectionDetailsPage = nullptr;
+  Label* m_connectionStatus = nullptr;
+  Label* m_detailsTitle = nullptr;
+  InputArea* m_returnFocus = nullptr;
   Flex* m_currentCard = nullptr;
   Flex* m_catalogHost = nullptr;
   Segmented* m_catalogSwitch = nullptr;

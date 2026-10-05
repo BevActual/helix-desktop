@@ -5,9 +5,27 @@ Control Center, notifications, OSD, lock screen, and desktop widgets. When a cha
 something looks, it should point back to a rule here. When a rule here is wrong, change the rule
 first.
 
-Helix takes its structure from Apple's Human Interface Guidelines and its identity from two
-things of its own: wallpaper-derived color and the liquid-glass material helix-niri draws. It
-does not copy Apple's visuals.
+Helix uses GTK4/libadwaita as its shared control and application design baseline. Apple-inspired
+craftsmanship means restrained presentation, clear navigation and polished behavior within native
+libadwaita conventions. Applications remain adaptive and portable across Linux desktops and mobile
+Linux devices. The custom shell renderer follows the same visual grammar and targets helix-niri only.
+
+## Shared application and shell contract
+
+- Prefer standard GTK/libadwaita controls, navigation, focus states and accessible geometry.
+- Application styling is limited to semantic colors and branding. Do not replace native control shapes.
+- Use images, previews and data charts to make applications more graphical where they help users
+  understand or choose. These are application content; controls and navigation remain native.
+  Keep textual equivalents for chart values, native high-contrast colors and responsive layouts.
+- Shell controls approximate the same geometry and behavior with the existing custom renderer.
+- Glass is reserved for floating shell chrome. Application content and control groups are solid.
+- Desktop windows use adaptive navigation: sidebar and content become a single-page flow below 600sp.
+- Essential actions are visible without hover. Touch, keyboard, pointer, portrait and on-screen keyboards
+  are first-class inputs. Validate 360, 768 and 1280 logical-pixel widths.
+- Helix appearance tokens map to toolkit-supported roles. Native appearance is the fallback when Helix
+  services are unavailable. System high contrast takes precedence over custom application colors.
+- Compositor capabilities are explicit. Applications run without the shell or helix-niri; desktop-only
+  pages are omitted when their capabilities are absent.
 
 ## Principles
 
@@ -30,7 +48,7 @@ Liquid Glass is a hierarchy, not a skin. Every surface belongs to exactly one ti
 |------|------------|----------|---------|
 | **Chrome** | The frame that floats over your work: panels, sidebars, headers, menus | Glass per `transparency_mode` (Solid, Soft = regular glass, Glass = clear glass). Clear glass always gets a dimming layer. | Panel chrome, `popup_chrome` |
 | **Leftover** | Content sitting on chrome: cards, catalogs, grouped lists | Solid wells. Color and type live here. | `applySectionCardStyle`, `applyContentCardStyle`, `applyGroupedListStyle`, `applyGroupedListRowStyle` |
-| **Modules** | Functional plates you operate: session actions, quick toggles, sound and brightness | Frosted plate, not a second glass layer | `applyModuleWellStyle` |
+| **Modules** | Functional plates you operate: session actions, quick toggles, sound and brightness | Solid native-style control group | `applyModuleWellStyle` |
 | **Widgets** | Glanceable information that deep-links somewhere: clock, weather, media | Stands alone; not a mini settings page | Desktop and Home widgets |
 
 Rules:
@@ -47,7 +65,8 @@ Rules:
 | Dock | Chrome | Items are icons; running state is a dot, not a fill. |
 | Menus and popovers (context, dock, tray, dropdowns) | Chrome | One component (see Menus). |
 | Launcher | Chrome frame, leftover results | Results are grouped-list rows. |
-| Control Center, Settings | Chrome frame, leftover pages | Home uses modules for quick controls. |
+| Control Center | Floating chrome, solid controls | Quick session actions. |
+| Settings and applications | Native libadwaita chrome and solid content | Adaptive persistent windows. |
 | Notifications (toasts and history) | Leftover on chrome | Actions are buttons, not links. |
 | OSD (volume, brightness) | Module | Value first, glyph second. |
 | Lock screen and greeter | Chrome over a dimmed wallpaper | Clock is a widget. Must match helix-greeter. |
@@ -77,7 +96,7 @@ Colors come from the palette (`src/ui/palette.h`); use roles, never literal colo
 
 - Radii come from `Style::radius*`: `Sm` 3, `Md` 6, `Lg` 9, `Xl` 12, `2xl` 18, `3xl` 24.
 - **Concentric corners.** An inner radius is the outer radius minus the padding between them.
-  Leftover wells use `radius3xl`; grouped lists inside them `radius2xl`.
+  Control Center wells and grouped lists use `radiusXl`; avoid oversized nested rounding.
 - Spacing comes from `Style::space*`: `Xs` 4, `Sm` 8, `Md` 12, `Lg` 16. No raw numbers in
   `setGap`, `setPadding`, or `setRadius`.
 - Control heights: `controlHeightSm` 32, `controlHeight` 38, `controlHeightLg` 44.
@@ -109,8 +128,11 @@ menu must never take an xdg_popup grab that isn't on the topmost grabbing popup 
 
 ## Settings structure
 
-Settings is organized like macOS System Settings: a flat sidebar of named tabs in unlabeled
-clusters, settings shown in context, and sub-tabs only where one tab has several facets.
+The standalone Settings application uses standard libadwaita preference groups and adaptive sidebar
+navigation. The independent desktop service owns settings persistence and migrated device backends.
+The current shell-hosted pages remain accessible during migration; remove them only after every
+entry in `desktop-migration.json` has a working destination. No transitional legacy tools window
+is introduced. The following rules describe the current shell-hosted pages until cutover.
 
 - **More main tabs, not hidden hubs.** No "General" catch-all; a thing gets its own sidebar
   tab. Clusters are separated by dividers, not captions.
@@ -129,9 +151,10 @@ clusters, settings shown in context, and sub-tabs only where one tab has several
   (`tabIdForSettingsGroup`).
 - **Sub-panes, macOS style.** A pane's extra pages open from navigation rows (glyph, title,
   chevron) and replace the pane in place, with a back header; Cancel (Escape) goes back, and
-  the pane reopens on its main page. A sub-pane can be a live page (a device list) or a
+  the pane reopens on its main page. Keyboard focus moves to Back on entry and returns to
+  the originating row when possible. A sub-pane can be a live page (a device list) or a
   settings-only page of toggles and sliders (`SettingsPane::createInline` for one group).
-  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound, Displays, and Notifications are the references; a tab with several settings groups gives each group its own sub-pane (one `SettingsPane` per group).
+  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound, Displays, Notifications, Power, Bluetooth, Network, and System are the references. Related settings groups can share one sub-pane when one group's switch controls the others, as in System → Monitoring.
 - **Chip sub-tabs only for peers you switch between often** and that share one purpose
   (Privacy & Security today); prefer sub-panes otherwise.
 - **Settings in the pane.** A tab with a single page shows its settings under the live
@@ -148,6 +171,31 @@ clusters, settings shown in context, and sub-tabs only where one tab has several
 - **Keyboard:** every interactive element is reachable, shows a focus ring, and responds to
   Enter/Space; every popup closes on Escape.
 - **Contrast:** text on any fill meets WCAG AA (4.5:1 body, 3:1 large text and glyphs).
+
+## Everyday controls and connection details
+
+Home is the quick Control Center. Keep the control name stable and show its current state
+on a secondary line: a connected network name must not replace the Wi-Fi label. The glyph
+button toggles the feature, and its adjacent chevron opens the related native
+Settings page for Wi-Fi, Bluetooth, and VPN. If Settings is unavailable, the
+chevron opens the existing Control Center details. Navigation to Settings closes
+Control Center. Shell-only controls continue to open their shell details.
+Apply the active accent to the toggle, keeping the surrounding labels and surface neutral.
+Sound and brightness have visible labels as well as glyphs and values.
+
+Home offers labeled Lock, Suspend, and Power actions. Power opens the full session controls;
+restart, logout, and shutdown do not compete with everyday controls on Home.
+Capture and Phone have labeled, visible Home actions that open their existing
+shell surfaces. Phone is shown only when its service is present. The quick panel
+may scroll when media and optional pins expand it; controls remain keyboard
+reachable without hover.
+
+Network opens on connection status and the network list. **Connection Details** contains
+addresses, throughput, DNS, and labeled diagnostic and sharing actions. It is a live
+sub-pane: status changes and QR results keep updating while it is open. **Wi-Fi Settings**
+contains filtering preferences. Both pages use the same Back and Escape behavior and return
+keyboard focus to the originating navigation row. A missing backend retains a readable
+explanation and disables actions that cannot run.
 
 ## Catalog tabs
 
@@ -172,7 +220,29 @@ What doesn't follow these rules yet, roughly in order:
 2. **Tier pass on each surface** in the table above that predates this document: OSD,
    notifications, dock, bar.
 3. **Many tabs still keep settings behind the Settings button.** Sound, Displays,
-   Notifications, and Power use sub-panes so far. Hub sub-tabs can't be hidden individually with
+   Notifications, Power, Bluetooth, Network, and System use sub-panes so far. Hub sub-tabs can't be hidden individually with
    `hidden_tabs` yet, and there is no account card at the top of the sidebar.
 4. About 45 raw radius and spacing numbers and about 50 literal colors remain in `src/shell`
    and `src/ui`.
+
+## Native operation feedback and microphone tests
+
+Standalone Settings shows ongoing connection and pairing operations in a native preference
+row with a spinner and an explicit Cancel action when the backend can cancel the operation.
+Completion comes from the service, rather than treating request acceptance as success.
+Backend loss clears pending feedback and retains a reconnectable unavailable state.
+
+Microphone testing is explicit: each input device has labeled Test and Stop controls and a
+native level bar. Capture stops when leaving Sound, closing Settings, losing the backend,
+or allowing the short client lease to expire. Show that the microphone is active and that
+samples are not saved; do not start capture simply because the Sound page is visible.
+
+Native Appearance exposes palette catalogs through standard selection controls, with explicit
+Refresh and Save Current Palette actions. Do not offer an unavailable palette source or replace
+native controls with a custom editor merely to reproduce shell-specific styling. Native Network
+shows wired, mobile and VPN controls only when those backend capabilities are available.
+
+Native wallpaper catalogs use ordinary toggle buttons for selectable thumbnails,
+with filenames or source IDs visible below each image. Selection and application
+are separate actions. Search, filters, paging and cancellation remain visible and
+keyboard reachable. Local scanning and remote downloads never block the UI thread.

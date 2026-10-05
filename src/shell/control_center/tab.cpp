@@ -1,5 +1,9 @@
 #include "shell/control_center/tab.h"
 
+#include "i18n/i18n.h"
+#include "render/scene/input_area.h"
+#include "render/scene/input_dispatcher.h"
+#include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/flex.h"
@@ -128,7 +132,7 @@ namespace control_center {
     } else {
       card.clearBorder();
     }
-    card.setRadius(Style::scaledRadius3xl(scale));
+    card.setRadius(Style::scaledRadiusXl(scale));
     card.setDirection(FlexDirection::Vertical);
     card.setAlign(FlexAlign::Stretch);
     card.setGap(Style::spaceSm * scale);
@@ -157,14 +161,14 @@ namespace control_center {
     } else {
       host.clearBorder();
     }
-    host.setRadius(Style::scaledRadius2xl(scale));
+    host.setRadius(Style::scaledRadiusXl(scale));
     host.setGap(0.0F);
     host.setClipChildren(true);
   }
 
   void applyContentCardStyle(Flex& card, float scale) {
     applyGroupedListStyle(card, scale);
-    card.setRadius(Style::scaledRadius3xl(scale));
+    card.setRadius(Style::scaledRadiusXl(scale));
     card.setPadding(Style::spaceMd * scale);
     card.setGap(Style::spaceSm * scale);
     card.setAlign(FlexAlign::Stretch);
@@ -176,11 +180,11 @@ namespace control_center {
   void applyModuleWellStyle(Flex& well, float scale) {
     applyGroupedListStyle(well, scale);
     well.setClipChildren(false);
-    well.setFill(colorSpecFromRole(ColorRole::SurfaceVariant, Style::highContrastEnabled() ? 1.0F : 0.84F));
-    well.setRadius(Style::scaledRadius3xl(scale));
+    well.setFill(colorSpecFromRole(ColorRole::SurfaceVariant));
+    well.setRadius(Style::scaledRadiusXl(scale));
     well.setPadding(Style::spaceXs * scale);
     well.setGap(0.0F);
-    well.setSoftness(Style::highContrastEnabled() ? 0.0F : 1.0F);
+    well.setSoftness(0.0F);
     if (!Style::highContrastEnabled()) {
       well.clearBorder();
     }
@@ -429,6 +433,7 @@ namespace control_center {
     });
     row->addChild(ui::button({
         .glyph = Style::rtl() ? "chevron-right" : "chevron-left",
+        .tooltip = i18n::tr("control-center.back"),
         .onClick = std::move(onBack),
         .configure =
             [scale](Button& button) {
@@ -448,6 +453,31 @@ namespace control_center {
         .maxLines = 1,
     }));
     return row;
+  }
+
+  void focusSubPane(Node* destination, InputArea* preferred, Node* fallback) {
+    auto& dispatcher = PanelManager::instance().inputDispatcher();
+    InputArea* target = nullptr;
+    if (preferred != nullptr && preferred->enabled() && preferred->focusable()) {
+      bool inDestination = false;
+      bool visible = true;
+      for (const Node* node = preferred; node != nullptr; node = node->parent()) {
+        visible = visible && node->visible();
+        if (node == destination) {
+          inDestination = true;
+        }
+      }
+      if (inDestination && visible) {
+        target = preferred;
+      }
+    }
+    if (target == nullptr) {
+      target = dispatcher.firstTabFocusUnder(destination);
+    }
+    if (target == nullptr) {
+      target = dispatcher.firstTabFocusUnder(fallback);
+    }
+    dispatcher.setFocus(target);
   }
 
 } // namespace control_center

@@ -276,6 +276,7 @@ namespace noctalia::config::schema {
 
   const Schema<NotificationConfig>& notificationSchema() {
     static const Schema<NotificationConfig> s = {
+        field(&NotificationConfig::filterReplace, "filter_replace"),
         field(&NotificationConfig::enableDaemon, "enable_daemon"),
         field(&NotificationConfig::showAppName, "show_app_name"),
         field(&NotificationConfig::showActions, "show_actions"),

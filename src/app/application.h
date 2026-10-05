@@ -263,6 +263,8 @@ private:
   ClipboardService m_clipboardService{m_storageKeyProvider};
   TextInputService m_textInputService;
   VirtualKeyboardService m_virtualKeyboardService;
+  Timer m_desktopServiceTimer;
+  unsigned m_desktopServiceObserver = 0;
   ConfigService m_configService;
   HttpClient m_httpClient;
   FileWatcher m_fileWatcher;

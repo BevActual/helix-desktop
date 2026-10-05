@@ -17,6 +17,9 @@
 #include "shell/panel/panel.h"
 #include "shell/panel/panel_surface_style.h"
 #include "shell/screen_position.h"
+#include "desktop/settings_routes.h"
+#include "system/desktop_entry.h"
+#include "system/desktop_entry_launch.h"
 #include "shell/surface/shadow.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "ui/builders.h"
@@ -412,23 +415,18 @@ void PanelManager::setCloseDesktopWidgetsEditorCallback(std::function<void()> ca
 }
 
 void PanelManager::openSettings(std::string context) {
-  std::string ccContext = "settings";
-  if (!context.empty() && context != "settings") {
-    if (context.starts_with("settings:")) {
-      ccContext = std::move(context);
-    } else {
-      ccContext = "settings:" + context;
-    }
+  DesktopEntry entry;
+  entry.id = "org.helix.Settings";
+  entry.name = "Helix Settings";
+  entry.exec = "helix-settings --page " + std::string(settings::nativePageForSection(context));
+  if (const auto section = settings::nativeSectionForContext(context); !section.empty()) entry.exec += " --section " + std::string(section);
+  desktop_entry_launch::LaunchOptions options;
+  if (m_platform != nullptr && m_platform->hasXdgActivation()) options.activationToken = m_platform->requestActivationToken(nullptr);
+  if (desktop_entry_launch::launchEntry(entry, options)) {
+    DeferredCall::callLater([] { PanelManager::instance().closeSettings(); });
+  } else {
+    kLog.error("Helix Settings could not be opened; install helix-settings");
   }
-  if (isOpenPanel("control-center") && m_activePanel != nullptr) {
-    if (m_activePanel->requiresRecreateForContext(ccContext)) {
-      openPanel("control-center", PanelOpenRequest{.context = ccContext});
-      return;
-    }
-    m_activePanel->onOpen(ccContext);
-    return;
-  }
-  openPanel("control-center", PanelOpenRequest{.context = std::move(ccContext)});
 }
 
 bool PanelManager::openPluginSettings(const std::string& pluginId) {
@@ -448,15 +446,7 @@ void PanelManager::closeSettings() {
 }
 
 void PanelManager::toggleSettings(std::string context) {
-  std::string ccContext = "settings";
-  if (!context.empty() && context != "settings") {
-    if (context.starts_with("settings:")) {
-      ccContext = std::move(context);
-    } else {
-      ccContext = "settings:" + context;
-    }
-  }
-  togglePanel("control-center", PanelOpenRequest{.context = std::move(ccContext)});
+  openSettings(std::move(context));
 }
 
 void PanelManager::setAttachedPanelGeometryCallback(
@@ -535,6 +525,13 @@ void PanelManager::unregisterPanel(const std::string& id) {
 }
 
 void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "control-center") {
+    if (request.context == "settings" || request.context.starts_with("settings:") || settings::isRetiredSettingsTab(request.context)) {
+      openSettings(std::string(request.context));
+      return;
+    }
+    if (request.context.empty()) request.context = "home";
+  }
   if (panelId == "clipboard") {
     request.context = "clipboard";
     openPanel("control-center", request);
@@ -1545,6 +1542,13 @@ void PanelManager::destroyPanel() {
 }
 
 void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "control-center") {
+    if (request.context == "settings" || request.context.starts_with("settings:") || settings::isRetiredSettingsTab(request.context)) {
+      openSettings(std::string(request.context));
+      return;
+    }
+    if (request.context.empty()) request.context = "home";
+  }
   if (panelId == "clipboard") {
     request.context = "clipboard";
     togglePanel("control-center", request);

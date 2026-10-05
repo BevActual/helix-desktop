@@ -263,6 +263,7 @@
     }
   },
   "control-center": {
+    "back": "Back",
     "ai-usage": {
       "as-of": "As of {time}",
       "attention-tooltip": "{provider} {window} is at {percent}%",
@@ -540,6 +541,10 @@
       "on": "On",
       "pair": "Pair",
       "pair-title": "Pair {device}",
+      "pages": {
+        "devices": "Device filtering",
+        "discovery": "Discovery"
+      },
       "pairing-detail": {
         "authorize": "Accept the incoming pairing request?",
         "authorize-service": "Allow access to service {uuid}?",
@@ -823,6 +828,9 @@
       "zone-workstation": "Workstation"
     },
     "home": {
+      "quick-on": "On",
+      "quick-off": "Off",
+      "quick-unavailable": "Unavailable",
       "avatar-error-title": "Avatar not updated",
       "change-avatar": "Change avatar",
       "change-wallpaper": "Change wallpaper",
@@ -876,6 +884,7 @@
       "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
       "install-tooltip": "Add the missing recommended keys",
       "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
+      "open-folder-failed": "Could not open the compositor config folder.",
       "open-folder-tooltip": "Open the compositor config folder",
       "reset-tooltip": "Restore managed binds to the recommended keys",
       "tab-apps": "Apps",
@@ -962,6 +971,9 @@
       "volume": "Volume"
     },
     "network": {
+      "choose-network": "Choose a network to connect.",
+      "connected": "Connected",
+      "connection-details": "Connection Details",
       "anonymous-identity": "Anonymous identity (optional)",
       "available": "Available",
       "ca-certificate": "CA certificate path (optional)",
@@ -1043,6 +1055,7 @@
       "wifi": "Wi-Fi",
       "wifi-off": "Wi-Fi is off",
       "wifi-on": "Wi-Fi is on",
+      "wifi-settings": "Wi-Fi Settings",
       "wired-connection": "Wired connection"
     },
     "notifications": {
@@ -1599,6 +1612,10 @@
     },
     "system": {
       "copy-info": "Copy system info",
+      "pages": {
+        "battery": "Battery Alerts",
+        "monitoring": "Monitoring"
+      },
       "labels": {
         "load": "CPU Load",
         "ram": "RAM",
@@ -1818,7 +1835,11 @@
       "spacing-description": "Gaps between tiled windows and extra outer padding on all four sides.",
       "spacing-title": "Spacing",
       "spacing-tooltip": "Gaps and outer padding"
-    }
+    },
+    "install-settings": "Install Helix Settings to open this application.",
+    "install-system-monitor": "Install Helix System Monitor to open this application.",
+    "open-system-monitor": "Open System Monitor",
+    "open-settings": "Open Settings"
   },
   "desktop-ai": {
     "busy": "LocalAI is already working on something.",

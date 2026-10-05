@@ -185,6 +185,7 @@ private:
   Flex* m_contentHeaderActions = nullptr;
   Label* m_contentTitle = nullptr;
   Button* m_closeButton = nullptr;
+  Button* m_nativeApplicationButton = nullptr;
   Flex* m_tabBodies = nullptr;
   Box* m_sidebarEdgeFade = nullptr;
   Box* m_contentEdgeFade = nullptr;

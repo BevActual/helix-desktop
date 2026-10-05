@@ -11,6 +11,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  translations:
+    name: Check translation keys
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check English catalog references
+        run: python3 tools/i18n-check.py
+
   format:
     name: clang-format
     runs-on: ubuntu-latest
@@ -54,6 +62,9 @@ jobs:
 
       - name: Build
         run: just build
+
+      - name: Check staged installation
+        run: just test-install
 
       - name: Test
         run: just test debug --print-errorlogs

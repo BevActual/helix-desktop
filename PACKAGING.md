@@ -36,7 +36,7 @@ Helix currently builds from this tree. Keep the `noctalia` command and config pa
 |---|---|
 | Product | Helix Shell |
 | Command | `noctalia` |
-| Homepage | this tree (lineage: https://github.com/noctalia-dev/noctalia) |
+| Homepage | https://github.com/BevActual/helix-shell |
 | Docs | [`docs/user/`](docs/user/) |
 | License | MIT ([LICENSE](LICENSE)); also see vendored licenses under `third_party/` for SPDX completeness |
 | Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
@@ -216,5 +216,21 @@ you maintain a `-git` / nightly package on purpose.
 
 ## Contact
 
-This tree is Helix Shell. Upstream lineage and issue tracker:
-https://github.com/noctalia-dev/noctalia
+Report Helix Shell issues at https://github.com/BevActual/helix-shell/issues.
+The upstream Noctalia project is at https://github.com/noctalia-dev/noctalia.
+
+## Helix desktop service and Settings
+
+Install the `helix-service` binary, `org.helix.Desktop.service` D-Bus activation file and
+`helix-service.service` systemd user unit together with the migrated shell. They must share the
+same prefix. The service is activated on demand; no globally enabled user unit is required.
+
+`helix-settings` has its own application entry, GTK4/libadwaita runtime dependencies and no dependency
+on the Helix compositor or shell. It requires the matching desktop service for live state and edits.
+Other Linux desktops expose portable capabilities; Helix Desktop & Dock is omitted outside a Helix
+session. Install the Settings desktop entry only when the application target is built.
+
+`helix-system-monitor` is built with the same GTK4/libadwaita application option. Install
+`org.helix.SystemMonitor.desktop` with its binary. It needs Linux procfs for resource
+metrics and runs independently of the shell, compositor and desktop service. Appearance
+integration is optional and does not activate a service.

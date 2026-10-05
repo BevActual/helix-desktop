@@ -1,5 +1,5 @@
 ---
-description: Helix maps Apple HIG Liquid Glass to chrome vs leftover vs modules vs widgets
+description: Helix follows GTK4/libadwaita control conventions with shell-specific floating chrome
 alwaysApply: true
 ---
 
@@ -9,9 +9,9 @@ The full guidelines live in `docs/design/helix-hig.md`. Read it before changing 
 
 Short version:
 
-- Liquid Glass is a hierarchy, not a skin. Every surface is one tier: **Chrome** (panels, sidebars, headers, menus; glass per `transparency_mode`), **Leftover** (solid content: `applySectionCardStyle` / `applyContentCardStyle` / `applyGroupedListStyle`), **Modules** (`applyModuleWellStyle` plates), **Widgets** (glanceable, deep-link). Never glass-on-glass.
+- GTK4/libadwaita defines the shared controls and styling constraints. Every surface is one tier: **Chrome** (panels, sidebars, headers, menus; glass per `transparency_mode`), **Leftover** (solid content: `applySectionCardStyle` / `applyContentCardStyle` / `applyGroupedListStyle`), **Modules** (`applyModuleWellStyle` solid controls), **Widgets** (glanceable, deep-link). Never glass-on-glass.
 - One accent: `Primary` for selection, checked, progress, focus. `Hover` is a state (surface tinted toward the accent, derived in `src/ui/palette.cpp`), not a hue; hover borders use `Primary`. Secondary/tertiary are for meaning (charts, badges, status), never interaction.
-- Roles, `Style::radius*`, `Style::space*`, `Style::fontSize*`, `Style::anim*` only; no literal colors or sizes. Concentric corners: leftover wells `radius3xl`, grouped lists inside `radius2xl`.
+- Roles, `Style::radius*`, `Style::space*`, `Style::fontSize*`, `Style::anim*` only; no literal colors or sizes. Control Center content and groups use `radiusXl`, solid fills, and no module softness.
 - One compact card per tab; the header carries the title. Well and group headers are Body bold; `fontSizeTitle` is for values.
 - Sibling repos (helix-niri, helix-greeter) change together when a shared contract changes; read their `HELIX.md` first.
 

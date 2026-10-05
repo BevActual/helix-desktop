@@ -1,0 +1,469 @@
+#include "desktop/client.h"
+#include "desktop/notification_rules.h"
+#include <cassert>
+#include <chrono>
+#include <csignal>
+#include <filesystem>
+#include <fstream>
+#include <thread>
+#include <sys/wait.h>
+#include <unistd.h>
+
+using helix::Json;
+namespace {
+struct Child {
+  pid_t pid = -1;
+  ~Child() { stop(); }
+  void stop() { if (pid > 0) { kill(pid, SIGTERM); waitpid(pid, nullptr, 0); pid = -1; } }
+  void start(const char* executable, const char* argument = nullptr) {
+    pid = fork();
+    if (pid == 0) { execl(executable, executable, argument, nullptr); _exit(127); }
+    assert(pid > 0);
+  }
+};
+bool rejects(helix::DesktopClient& client, const char* domain, const char* method, GVariant* args) {
+  try { client.call(domain, method, args); return false; } catch (...) { return true; }
+}
+void waitForService(helix::DesktopClient& client) {
+  for (unsigned i = 0; i < 200; ++i) {
+    try { if (client.available() && client.call("configuration", "GetSnapshot").contains("available")) return; }
+    catch (...) {}
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  }
+  assert(false && "Desktop service did not become ready");
+}
+Json setting(helix::DesktopClient& client, const std::string& id) {
+  auto values = client.call("configuration", "GetSettings");
+  for (const auto& value : values) if (value.at("id") == id) return value;
+  assert(false); return {};
+}
+}
+// A controllable BlueZ replacement on the private test bus. No hardware access.
+int fakeBluez() {
+  auto* bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
+  assert(bus);
+  const char* xml = R"(<node>
+    <interface name="org.freedesktop.DBus.ObjectManager"><method name="GetManagedObjects"><arg type="a{oa{sa{sv}}}" direction="out"/></method></interface>
+    <interface name="org.bluez.AgentManager1"><method name="RegisterAgent"><arg type="o" direction="in"/><arg type="s" direction="in"/></method><method name="RequestDefaultAgent"><arg type="o" direction="in"/></method><method name="UnregisterAgent"><arg type="o" direction="in"/></method></interface>
+    <interface name="org.bluez.Device1"><method name="Pair"/><method name="CancelPairing"/><method name="GetCancelCount"><arg type="u" direction="out"/></method></interface>
+    </node>)";
+  auto* info = g_dbus_node_info_new_for_xml(xml, nullptr); assert(info);
+  unsigned cancels = 0;
+  const GDBusInterfaceVTable table = {+[](GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar* method, GVariant*, GDBusMethodInvocation* invocation, gpointer data) {
+    auto& cancels = *static_cast<unsigned*>(data);
+    if (std::string(method) == "GetManagedObjects") {
+      const char* objects = "{'/org/bluez/hci0': {'org.bluez.Adapter1': {'Powered': <false>, 'Alias': <'Test Adapter'>}}, '/org/bluez/hci0/dev_FAKE': {'org.bluez.Device1': {'Address': <'00:00:00:00:00:01'>, 'Alias': <'Test Device'>, 'Paired': <false>, 'Connected': <false>}}}";
+      auto* value = g_variant_parse(G_VARIANT_TYPE("a{oa{sa{sv}}}"), objects, nullptr, nullptr, nullptr); assert(value);
+      g_dbus_method_invocation_return_value(invocation, g_variant_new("(@a{oa{sa{sv}}})", value));
+    } else if (std::string(method) == "GetCancelCount") g_dbus_method_invocation_return_value(invocation, g_variant_new("(u)", cancels));
+    else { if (std::string(method) == "CancelPairing") ++cancels; g_dbus_method_invocation_return_value(invocation, nullptr); }
+  }, nullptr, nullptr, {nullptr}};
+  assert(g_dbus_connection_register_object(bus, "/", info->interfaces[0], &table, &cancels, nullptr, nullptr));
+  assert(g_dbus_connection_register_object(bus, "/org/bluez", info->interfaces[1], &table, &cancels, nullptr, nullptr));
+  assert(g_dbus_connection_register_object(bus, "/org/bluez/hci0/dev_FAKE", info->interfaces[2], &table, &cancels, nullptr, nullptr));
+  g_bus_own_name_on_connection(bus, "org.bluez", G_BUS_NAME_OWNER_FLAGS_NONE, nullptr, nullptr, nullptr, nullptr);
+  g_main_loop_run(g_main_loop_new(nullptr, false)); return 0;
+}
+int main(int argc, char** argv) {
+  assert(argc == 2);
+  if (std::string(argv[1]) == "--fake-bluez") return fakeBluez();
+  const auto root = std::filesystem::temp_directory_path() / ("helix-service-test-" + std::to_string(getpid()));
+  std::filesystem::create_directories(root / "config/noctalia");
+  const auto source = root / "config/noctalia/config.toml";
+  { std::ofstream file(source); file << "[theme]\nmode = \"dark\"\n[control_center]\nhidden_tabs = [\"plugin:test-hidden\", \"ai-usage\", \"screenshot\", \"screen-record\"]\n[[control_center.shortcuts]]\ntype = \"author/plugin:pin\"\nsize = \"wide\"\n"; }
+  setenv("NOCTALIA_CONFIG_HOME", (root / "config").c_str(), 1);
+  setenv("XDG_STATE_HOME", (root / "state").c_str(), 1);
+  setenv("XDG_CACHE_HOME", (root / "cache").c_str(), 1);
+  setenv("XDG_DATA_HOME", (root / "data").c_str(), 1);
+  setenv("GSETTINGS_BACKEND", "memory", 1);
+  // Never inspect or change the user's hardware in this integration test.
+  setenv("DBUS_SYSTEM_BUS_ADDRESS", getenv("DBUS_SESSION_BUS_ADDRESS"), 1);
+  unsetenv("WAYLAND_DISPLAY"); unsetenv("DISPLAY");
+  setenv("PIPEWIRE_REMOTE", "helix-test-no-audio", 1);
+  Child service; service.start(argv[1]);
+  helix::DesktopClient client;
+  waitForService(client);
+  auto snapshot = client.call("configuration", "GetSnapshot");
+  assert(!snapshot.at("helix-desktop").get<bool>());
+  const auto appearance = client.call("appearance", "GetSnapshot");
+  assert(appearance.at("wallpaper") == "");
+  const auto& palettePreviews = appearance.at("palette-previews");
+  assert(palettePreviews.is_array() && palettePreviews.size() >= 10);
+  for (const auto& preview : palettePreviews) {
+    assert(preview.at("source").is_string() && preview.at("name").is_string());
+    for (const char* mode : {"dark", "light"}) {
+      const auto& variant = preview.at(mode);
+      assert(variant.at("surface").is_number_unsigned());
+      assert(variant.at("accents").is_array() && !variant.at("accents").empty());
+    }
+  }
+  assert(!client.call("appearance", "GetSnapshot").at("wallhaven-online").get<bool>());
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant(Json::object()))));
+  assert(!snapshot.at("network").get<bool>());
+  assert(snapshot.at("system").at("os").is_string());
+  assert(snapshot.at("system").at("architecture").is_string());
+  for (const auto& item : client.call("configuration", "GetSettings"))
+    assert(item.at("page") != "notifications" && item.at("page") != "accessibility" && item.at("page") != "system" && item.at("page") != "privacy-security" && item.at("page") != "desktop-dock");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.show_actions", g_variant_new_boolean(false))));
+  assert(!snapshot.at("bluetooth").get<bool>());
+  Child bluez; bluez.start(argv[0], "--fake-bluez");
+  auto waitBluetooth = [&](bool available) {
+    for (unsigned i = 0; i < 240; ++i) {
+      if (client.call("bluetooth", "GetSnapshot").value("available", false) == available) return;
+      std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+    assert(false && "Bluetooth backend capability did not recover");
+  };
+  waitBluetooth(true);
+  std::map<std::uint64_t, Json> completions;
+  const auto observer = client.observe([&](std::string_view interface, std::string_view signal, const Json& value) {
+    if (interface == helix::bluetoothInterface && signal == "Completed") completions[value.at(0).get<std::uint64_t>()] = value;
+  });
+  const auto waitCompletion = [&](std::uint64_t id) {
+    for (unsigned i = 0; i < 80 && !completions.contains(id); ++i) {
+      while (g_main_context_pending(nullptr)) g_main_context_iteration(nullptr, false);
+      std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    }
+    assert(completions.contains(id)); return completions.at(id);
+  };
+  const auto operation = client.call("bluetooth", "Action", g_variant_new("(s@a{sv})", "pair", helix::toVariant({{"path", "/org/bluez/hci0/dev_FAKE"}}))).get<std::uint64_t>();
+  auto* other = g_dbus_connection_new_for_address_sync(getenv("DBUS_SESSION_BUS_ADDRESS"), GDBusConnectionFlags(G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION), nullptr, nullptr, nullptr);
+  GError* denied = nullptr;
+  auto* rejected = g_dbus_connection_call_sync(other, helix::busName, helix::objectPath, helix::bluetoothInterface, "Cancel", g_variant_new("(t)", operation), nullptr, G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, &denied);
+  assert(!rejected && denied); g_error_free(denied); g_dbus_connection_close_sync(other, nullptr, nullptr); g_object_unref(other);
+  client.call("bluetooth", "Cancel", g_variant_new("(t)", operation));
+  assert(rejects(client, "bluetooth", "Cancel", g_variant_new("(t)", operation)));
+  assert(waitCompletion(operation).at(1) == false);
+  assert(completions.at(operation).at(2) == "Cancelled");
+  auto* testBus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
+  auto* count = g_dbus_connection_call_sync(testBus, "org.bluez", "/org/bluez/hci0/dev_FAKE", "org.bluez.Device1", "GetCancelCount", nullptr, nullptr, G_DBUS_CALL_FLAGS_NONE, 2000, nullptr, nullptr);
+  assert(count && helix::fromVariant(count).at(0) == 1); g_variant_unref(count); g_object_unref(testBus);
+  const auto interrupted = client.call("bluetooth", "Action", g_variant_new("(s@a{sv})", "pair", helix::toVariant({{"path", "/org/bluez/hci0/dev_FAKE"}}))).get<std::uint64_t>();
+  bluez.stop(); waitBluetooth(false);
+  assert(waitCompletion(interrupted).at(1) == false);
+  assert(completions.at(interrupted).at(2) == "Device service disconnected");
+  bluez.start(argv[0], "--fake-bluez"); waitBluetooth(true);
+  bluez.stop(); waitBluetooth(false);
+  client.unobserve(observer);
+  assert(rejects(client, "audio", "StartInputMeter", g_variant_new("(u)", 999u)));
+  client.call("audio", "StopInputMeter");
+  assert(setting(client, "theme.mode").at("value") == "dark");
+  client.call("configuration", "Update", g_variant_new("(sv)", "theme.mode", g_variant_new_string("light")));
+  assert(setting(client, "theme.mode").at("value") == "light");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "theme.mode", g_variant_new_string("invalid"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "theme.mode", g_variant_new_boolean(true))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "missing", g_variant_new_string("value"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "dock.enabled", g_variant_new_boolean(true))));
+  assert(rejects(client, "network", "Action", g_variant_new("(s@a{sv})", "connect", helix::toVariant({{"path", "/missing"}, {"secret", "never-log-this-password"}}))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "theme.mode"));
+  assert(setting(client, "theme.mode").at("value") == "dark");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.enabled", g_variant_new_boolean(false))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "dock.launcher_position", g_variant_new_string("start"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.width", g_variant_new_int64(900))));
+  client.call("configuration", "RegisterDesktop");
+  auto shortcuts = setting(client, "control_center.shortcuts").at("value");
+  assert(shortcuts == Json::array({{{"type", "author/plugin:pin"}, {"size", "wide"}}}));
+  auto updateShortcuts = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "control_center.shortcuts", helix::toVariant(before), helix::toVariant(after));
+  };
+  auto pinned = shortcuts; pinned.push_back({{"type", "wifi"}, {"size", "large"}});
+  client.call("configuration", "UpdateOrderedList", updateShortcuts(shortcuts, pinned));
+  assert(setting(client, "control_center.shortcuts").at("value") == pinned);
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(shortcuts, Json::array())));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array({{{"type", "unknown"}, {"size", "small"}}}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array({{{"type", "wifi"}, {"size", "invalid"}}}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array({{{"type", "wifi"}, {"size", "small"}, {"command", "unsupported"}}}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array({true}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array({{{"type", "screen_time"}, {"size", "small"}}}))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.shortcuts", helix::toVariant(pinned))));
+  std::swap(pinned.at(0), pinned.at(1)); pinned.at(1)["size"] = "large";
+  client.call("configuration", "UpdateOrderedList", updateShortcuts(setting(client, "control_center.shortcuts").at("value"), pinned));
+  assert(setting(client, "control_center.shortcuts").at("value") == pinned);
+  client.call("configuration", "UpdateOrderedList", updateShortcuts(pinned, Json::array()));
+  assert(setting(client, "control_center.shortcuts").at("value").empty());
+  client.call("configuration", "Reset", g_variant_new("(s)", "control_center.shortcuts"));
+  assert(setting(client, "control_center.shortcuts").at("value") == shortcuts);
+  auto pages = setting(client, "control_center.visible_tabs");
+  assert(pages.at("type") == "tab-list");
+  assert(std::find(pages.at("options").begin(), pages.at("options").end(), Json("home")) == pages.at("options").end());
+  auto visiblePages = pages.at("value");
+  assert(std::find(visiblePages.begin(), visiblePages.end(), Json("ai")) == visiblePages.end());
+  assert(std::find(visiblePages.begin(), visiblePages.end(), Json("capture")) == visiblePages.end());
+  auto updatePages = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "control_center.visible_tabs", helix::toVariant(before), helix::toVariant(after));
+  };
+  assert(rejects(client, "configuration", "UpdateOrderedList", updatePages(visiblePages, Json::array({"home"}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updatePages(visiblePages, Json::array({"network", "network"}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updatePages(visiblePages, Json::array({true}))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.visible_tabs", helix::toVariant(pages.at("options")))));
+  client.call("configuration", "UpdateOrderedList", updatePages(visiblePages, pages.at("options")));
+  assert(setting(client, "control_center.visible_tabs").at("value") == pages.at("options"));
+  { std::ifstream file(root / "state/noctalia/settings.toml"); std::string contents((std::istreambuf_iterator<char>(file)), {});
+    assert(contents.find("plugin:test-hidden") != std::string::npos);
+    assert(contents.find("ai-usage") == std::string::npos && contents.find("screenshot") == std::string::npos && contents.find("screen-record") == std::string::npos);
+  }
+  assert(rejects(client, "configuration", "UpdateOrderedList", updatePages(visiblePages, Json::array())));
+  client.call("configuration", "UpdateOrderedList", updatePages(pages.at("options"), Json::array()));
+  assert(setting(client, "control_center.visible_tabs").at("value").empty());
+  client.call("configuration", "Reset", g_variant_new("(s)", "control_center.visible_tabs"));
+  assert(setting(client, "control_center.visible_tabs").at("value") == visiblePages);
+  assert(setting(client, "control_center.sidebar").at("options") == Json::array({"full", "compact", "none"}));
+  assert(setting(client, "shell.panel.control_center_placement").at("options") == Json::array({"attached", "floating"}));
+  client.call("configuration", "Update", g_variant_new("(sv)", "control_center.sidebar", g_variant_new_string("none")));
+  client.call("configuration", "Update", g_variant_new("(sv)", "control_center.width", g_variant_new_int64(900)));
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.panel.control_center_placement", g_variant_new_string("floating")));
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.panel.control_center_position", g_variant_new_string("center_right")));
+  assert(setting(client, "control_center.sidebar").at("value") == "none");
+  assert(setting(client, "control_center.width").at("value") == 900);
+  assert(setting(client, "shell.panel.control_center_placement").at("value") == "floating");
+  assert(setting(client, "shell.panel.control_center_position").at("value") == "center_right");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.sidebar", g_variant_new_string("invalid"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.width", g_variant_new_int64(200))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.panel.control_center_position", g_variant_new_string("elsewhere"))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "control_center.sidebar"));
+  client.call("configuration", "Reset", g_variant_new("(s)", "control_center.width"));
+  client.call("configuration", "Reset", g_variant_new("(s)", "shell.panel.control_center_placement"));
+  client.call("configuration", "Reset", g_variant_new("(s)", "shell.panel.control_center_position"));
+  assert(setting(client, "control_center.sidebar").at("value") == "compact");
+  assert(setting(client, "control_center.width").at("value") == 700);
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant({{"page", 0}}))));
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant({{"sort", 7}}))));
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant({{"width", 1920}}))));
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant({{"page", 1.5}}))));
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant({{"nsfw", true}}))));
+  assert(rejects(client, "appearance", "GetWallhaven", g_variant_new("(t)", std::uint64_t(999))));
+  assert(rejects(client, "appearance", "DownloadWallhaven", g_variant_new("(ts)", std::uint64_t(999), "abc123")));
+  assert(rejects(client, "appearance", "SetWallhavenApiKey", g_variant_new("(s)", "invalid\nkey")));
+  client.call("appearance", "SetWallhavenApiKey", g_variant_new("(s)", "TestWallhavenKey987"));
+  assert(client.call("appearance", "GetSnapshot").at("wallhaven-key-available") == true);
+  assert(client.call("appearance", "GetSnapshot").dump().find("TestWallhavenKey987") == std::string::npos);
+  assert(client.call("configuration", "GetSettings").dump().find("TestWallhavenKey987") == std::string::npos);
+  const auto previewFile = root / "preview.ppm";
+  std::ofstream(previewFile) << "P3\n1 1\n255\n80 100 200\n";
+  client.call("appearance", "SetWallpaper", g_variant_new("(s)", previewFile.c_str()));
+  assert(client.call("appearance", "GetSnapshot").at("wallpaper") == previewFile.string());
+
+  for (const auto& item : client.call("configuration", "GetSettings")) {
+    const auto type = item.at("type").get<std::string>();
+    if (type == "boolean") assert(item.at("value").is_boolean());
+    else if (type == "integer") assert(item.at("value").is_number_integer());
+    else if (type == "number") assert(item.at("value").is_number());
+    else if (type == "application-list" || type == "widget-list" || type == "display-list" || type == "notification-rules" || type == "tab-list" || type == "shortcut-list") assert(item.at("value").is_array());
+    else assert(item.at("value").is_string());
+  }
+  assert(setting(client, "dock.icon_size").at("value").is_number_integer());
+  assert(setting(client, "audio.sound_volume").at("value").is_number());
+  assert(setting(client, "idle:lock:timeout").at("page") == "system");
+  client.call("configuration", "Update", g_variant_new("(sv)", "idle:lock:timeout", g_variant_new_double(420)));
+  assert(setting(client, "idle:lock:timeout").at("value") == 420);
+  assert(setting(client, "idle:lock:action").at("value") == "lock");
+  assert(setting(client, "idle:screen-off:action").at("value") == "screen_off");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "idle:lock:timeout", g_variant_new_double(-1))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "idle:lock:action", g_variant_new_string("unknown"))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "idle:lock:locked_timeout", g_variant_new_double(0)));
+  client.call("configuration", "Update", g_variant_new("(sv)", "battery.warning_threshold", g_variant_new_int64(25)));
+  assert(setting(client, "battery.warning_threshold").at("value") == 25);
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "battery.warning_threshold", g_variant_new_int64(101))));
+
+  assert(setting(client, "shell.offline_mode").at("page") == "privacy-security");
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.offline_mode", g_variant_new_boolean(true)));
+  assert(setting(client, "shell.offline_mode").at("value") == true);
+  assert(!client.call("appearance", "GetSnapshot").at("wallhaven-online").get<bool>());
+  assert(rejects(client, "appearance", "SearchWallhaven", g_variant_new("(@a{sv})", helix::toVariant(Json::object()))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.password_style", g_variant_new_string("random")));
+  assert(setting(client, "shell.password_style").at("value") == "random");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.password_style", g_variant_new_string("invalid"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "lockscreen.blur_intensity", g_variant_new_double(1.1))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.telemetry_enabled", g_variant_new_string("yes"))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "shell.offline_mode"));
+
+  client.call("configuration", "Update", g_variant_new("(sv)", "hot_corners.top_left.action", g_variant_new_string("launcher")));
+  assert(setting(client, "hot_corners.top_left.action").at("value") == "launcher");
+  client.call("configuration", "Update", g_variant_new("(sv)", "hot_corners.delay_ms", g_variant_new_int64(300)));
+  assert(setting(client, "hot_corners.delay_ms").at("value") == 300);
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "hot_corners.delay_ms", g_variant_new_int64(2001))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "hot_corners.top_left.action", g_variant_new_string("invalid"))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "hot_corners.top_left.command", g_variant_new_string("existing-command")));
+  client.call("configuration", "Reset", g_variant_new("(s)", "hot_corners.top_left.action"));
+  assert(setting(client, "hot_corners.top_left.command").at("value") == "existing-command");
+
+  assert(setting(client, "shell.screen_time_enabled").at("value") == false);
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.screen_time_enabled", g_variant_new_boolean(true)));
+  assert(setting(client, "shell.screen_time_enabled").at("value") == true);
+  client.call("configuration", "Reset", g_variant_new("(s)", "shell.screen_time_enabled"));
+  assert(setting(client, "shell.screen_time_enabled").at("value") == false);
+
+  NotificationFilterConfig firstRule; firstRule.name = "test-first"; firstRule.match = "test-app";
+  firstRule.matchContent = "urgent"; firstRule.showToast = false; firstRule.overrideDuration = 1234; firstRule.allowedUrgencies = {"critical"};
+  auto rule = helix::notificationRule(firstRule); auto rules = setting(client, "notification.filter").at("value");
+  auto updateRules = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "notification.filter", helix::toVariant(before), helix::toVariant(after));
+  };
+  client.call("configuration", "UpdateOrderedList", updateRules(rules, Json::array({rule})));
+  assert(setting(client, "notification.filter").at("value") == Json::array({rule}));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array())));
+  rules = setting(client, "notification.filter").at("value");
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({rule, rule}))));
+  auto invalidRule = rule; invalidRule["match_content"] = "[";
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({invalidRule}))));
+  invalidRule = rule; invalidRule["play_sound"] = "true";
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({invalidRule}))));
+  invalidRule = rule; invalidRule["allowed_urgencies"] = Json::array({"emergency"});
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({invalidRule}))));
+  invalidRule = rule; invalidRule["override_duration"] = 2147483648LL;
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({invalidRule}))));
+  invalidRule = rule; invalidRule["match"] = ""; invalidRule["match_content"] = "";
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateRules(rules, Json::array({invalidRule}))));
+  auto secondRule = rule; secondRule["name"] = "test-second"; secondRule["match"] = "other-app";
+  client.call("configuration", "UpdateOrderedList", updateRules(rules, Json::array({secondRule, rule})));
+
+  auto displays = setting(client, "notification.monitors").at("value");
+  auto updateDisplays = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "notification.monitors", helix::toVariant(before), helix::toVariant(after));
+  };
+  client.call("configuration", "UpdateOrderedList", updateDisplays(displays, Json::array({"DP-1", "eDP-1"})));
+  assert(setting(client, "notification.monitors").at("value") == Json::array({"DP-1", "eDP-1"}));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateDisplays(displays, Json::array({"stale-display"}))));
+  displays = setting(client, "notification.monitors").at("value");
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateDisplays(displays, Json::array({"DP-1", "DP-1"}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateDisplays(displays, Json::array({42}))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.background_opacity", g_variant_new_double(1.2))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "osd.orientation", g_variant_new_string("vertical")));
+  assert(setting(client, "osd.orientation").at("value") == "vertical");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "osd.orientation", g_variant_new_string("diagonal"))));
+
+  assert(setting(client, "accessibility.high_contrast").at("page") == "accessibility");
+  assert(setting(client, "notification.position").at("page") == "notifications");
+  client.call("configuration", "Update", g_variant_new("(sv)", "notification.position", g_variant_new_string("bottom_center")));
+  assert(setting(client, "notification.position").at("value") == "bottom_center");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.position", g_variant_new_string("middle"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.max_visible", g_variant_new_int64(21))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.keep_dismissed_in_history", g_variant_new_string("true"))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "notification.history_retention_hours", g_variant_new_int64(48)));
+
+  auto widgets = setting(client, "bar:default:center").at("value");
+  auto updateWidgets = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "bar:default:center", helix::toVariant(before), helix::toVariant(after));
+  };
+  client.call("configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"volume", "clock"})));
+  assert(setting(client, "bar:default:center").at("value") == Json::array({"volume", "clock"}));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"clock"}))));
+  widgets = setting(client, "bar:default:center").at("value");
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"missing-widget"}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"clock", "clock"}))));
+  assert(rejects(client, "configuration", "UpdateOrderedList", g_variant_new("(s@av@av)", "dock.enabled", helix::toVariant(Json::array()), helix::toVariant(Json::array()))));
+
+  auto favorites = setting(client, "dock.pinned").at("value");
+  auto updateFavorites = [&](const Json& before, const Json& after) {
+    return g_variant_new("(s@av@av)", "dock.pinned", helix::toVariant(before), helix::toVariant(after));
+  };
+  client.call("configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({"test-first", "test-second"})));
+  assert(setting(client, "dock.pinned").at("value") == Json::array({"test-first", "test-second"}));
+  assert(rejects(client, "configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({"stale"}))));
+  favorites = setting(client, "dock.pinned").at("value");
+  assert(rejects(client, "configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({"duplicate", "duplicate"}))));
+  assert(rejects(client, "configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({true}))));
+  assert(rejects(client, "configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({"/invalid/path"}))));
+  client.call("configuration", "UpdateApplicationList", updateFavorites(favorites, Json::array({"test-second", "test-first"})));
+  assert(setting(client, "dock.pinned").at("value") == Json::array({"test-second", "test-first"}));
+
+  client.call("configuration", "Update", g_variant_new("(sv)", "dock.launcher_position", g_variant_new_string("start")));
+  assert(setting(client, "dock.launcher_position").at("value") == "start");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "dock.launcher_position", g_variant_new_string("middle"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "dock.magnification_scale", g_variant_new_double(3))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.launcher.app_grid", g_variant_new_boolean(true)));
+  assert(setting(client, "shell.launcher.app_grid").at("value") == true);
+  client.call("configuration", "Update", g_variant_new("(sv)", "bar:default:thickness", g_variant_new_int64(52)));
+  assert(setting(client, "bar:default:thickness").at("value") == 52);
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "bar:default:thickness", g_variant_new_int64(301))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "bar:default:reserve_space", g_variant_new_string("true"))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "bar:default:reserve_space", g_variant_new_boolean(false)));
+  assert(setting(client, "bar:default:reserve_space").at("value") == false);
+  client.call("configuration", "Reset", g_variant_new("(s)", "bar:default:reserve_space"));
+  assert(!setting(client, "bar:default:reserve_space").at("overridden").get<bool>());
+
+  assert(setting(client, "wallpaper.automation.interval_seconds").at("value").is_number_integer());
+  client.call("configuration", "Update", g_variant_new("(sv)", "wallpaper.fill_mode", g_variant_new_string("fit")));
+  assert(setting(client, "wallpaper.fill_mode").at("value") == "fit");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.fill_mode", g_variant_new_string("invalid"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.automation.interval_seconds", g_variant_new_int64(0))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.automation.interval_seconds", g_variant_new_double(60.5))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "wallpaper.directory", g_variant_new_string(root.c_str())));
+  assert(setting(client, "wallpaper.directory").at("value") == root.string());
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.directory", g_variant_new_string("relative-folder"))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "wallpaper.directory", g_variant_new_string(source.c_str()))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "wallpaper.directory"));
+  assert(!setting(client, "wallpaper.directory").at("overridden").get<bool>());
+
+  client.call("configuration", "Update", g_variant_new("(sv)", "dock.enabled", g_variant_new_boolean(true)));
+  assert(setting(client, "dock.enabled").at("value") == true);
+  client.call("configuration", "Update", g_variant_new("(sv)", "bar:default:position", g_variant_new_string("bottom")));
+  assert(setting(client, "bar:default:position").at("value") == "bottom");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "bar:default:position", g_variant_new_string("invalid"))));
+  assert(rejects(client, "configuration", "CommitOverrides", g_variant_new("(ss)", "", "[dock]\nenabled=false\n")));
+  assert(setting(client, "dock.enabled").at("value") == true);
+  { std::ofstream file(source); file << "[theme]\nmode = \"light\"\n"; }
+  for (unsigned i = 0; i < 50 && setting(client, "theme.mode").at("value") != "light"; ++i)
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  assert(setting(client, "theme.mode").at("value") == "light");
+  service.stop();
+  assert(!client.available());
+  service.start(argv[1]); waitForService(client);
+  assert(!client.call("configuration", "GetSnapshot").at("helix-desktop").get<bool>());
+  assert(setting(client, "theme.mode").at("value") == "light");
+  client.call("configuration", "RegisterDesktop");
+  assert(setting(client, "dock.enabled").at("value") == true);
+  assert(setting(client, "wallpaper.fill_mode").at("value") == "fit");
+  assert(setting(client, "bar:default:thickness").at("value") == 52);
+  assert(setting(client, "dock.launcher_position").at("value") == "start");
+  assert(setting(client, "dock.pinned").at("value") == Json::array({"test-second", "test-first"}));
+  client.call("configuration", "Reset", g_variant_new("(s)", "dock.pinned"));
+  assert(!setting(client, "dock.pinned").at("overridden").get<bool>());
+  assert(setting(client, "bar:default:center").at("value") == Json::array({"volume", "clock"}));
+  client.call("configuration", "Reset", g_variant_new("(s)", "bar:default:center"));
+  assert(!setting(client, "bar:default:center").at("overridden").get<bool>());
+  assert(setting(client, "notification.position").at("value") == "bottom_center");
+  assert(setting(client, "notification.history_retention_hours").at("value") == 48);
+  client.call("configuration", "Reset", g_variant_new("(s)", "notification.position"));
+  assert(!setting(client, "notification.position").at("overridden").get<bool>());
+  assert(setting(client, "notification.monitors").at("value") == Json::array({"DP-1", "eDP-1"}));
+  assert(setting(client, "osd.orientation").at("value") == "vertical");
+  client.call("configuration", "Reset", g_variant_new("(s)", "notification.monitors"));
+  assert(!setting(client, "notification.monitors").at("overridden").get<bool>());
+  assert(setting(client, "notification.filter").at("value") == Json::array({secondRule, rule}));
+  client.call("configuration", "UpdateOrderedList", updateRules(Json::array({secondRule, rule}), Json::array()));
+  assert(setting(client, "notification.filter").at("value").empty());
+  client.call("configuration", "Reset", g_variant_new("(s)", "notification.filter"));
+  { std::ofstream file(source); file << "[theme]\nmode = \"light\"\n[notification.filter.base]\nmatch = \"base-app\"\n"; }
+  // Force a configuration read through an unrelated validated mutation.
+  client.call("configuration", "Update", g_variant_new("(sv)", "audio.enable_sounds", g_variant_new_boolean(false)));
+  auto baseRules = setting(client, "notification.filter").at("value");
+  assert(baseRules.size() == 1 && baseRules.at(0).at("name") == "base");
+  client.call("configuration", "UpdateOrderedList", updateRules(baseRules, Json::array()));
+  assert(setting(client, "notification.filter").at("value").empty());
+  client.call("configuration", "Reset", g_variant_new("(s)", "notification.filter"));
+  assert(setting(client, "notification.filter").at("value").size() == 1);
+
+  assert(!setting(client, "notification.filter").at("overridden").get<bool>());
+  assert(setting(client, "idle:lock:timeout").at("value") == 420);
+  assert(setting(client, "battery.warning_threshold").at("value") == 25);
+  client.call("configuration", "Reset", g_variant_new("(s)", "idle.behavior"));
+  assert(!setting(client, "idle:lock:timeout").at("group-overridden").get<bool>());
+  { std::ofstream file(source, std::ios::app); file << "\n[idle.behavior.custom]\nenabled = false\ntimeout = 90\naction = \"command\"\ncommand = \"existing-command\"\nresume_command = \"existing-resume\"\n"; }
+  client.call("configuration", "Update", g_variant_new("(sv)", "idle:custom:timeout", g_variant_new_double(120)));
+  assert(setting(client, "idle:custom:action").at("value") == "command");
+  { std::ifstream file(root / "state/noctalia/settings.toml"); std::string content((std::istreambuf_iterator<char>(file)), {});
+    assert(content.find("existing-command") != std::string::npos && content.find("existing-resume") != std::string::npos); }
+  client.call("configuration", "Reset", g_variant_new("(s)", "idle.behavior"));
+  assert(setting(client, "idle:custom:timeout").at("value") == 90);
+  const auto savedPalette = client.call("appearance", "SavePalette", g_variant_new("(s)", "current"));
+  assert(savedPalette.is_string() && !savedPalette.get<std::string>().empty());
+  assert(setting(client, "theme.source").at("value") == "custom");
+  const auto custom = setting(client, "theme.custom_palette");
+  assert(custom.at("value") == savedPalette);
+  assert(std::ranges::find(custom.at("options"), savedPalette) != custom.at("options").end());
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "theme.custom_palette", g_variant_new_string("missing-palette"))));
+  service.stop();
+  std::filesystem::remove_all(root);
+  return 0;
+}

@@ -18,6 +18,7 @@ class Button;
 class ClipboardService;
 class ConfigService;
 class Flex;
+class InputArea;
 class Input;
 class Label;
 class ScrollView;
@@ -35,9 +36,11 @@ public:
   std::unique_ptr<Flex> createHeaderActions() override;
   void onClose() override;
   void setActive(bool active) override;
+  [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
   void setConfigureMode(bool show) override;
   [[nodiscard]] bool configureMode() const override;
   void setSettingsSearchQuery(std::string_view query) override;
+  [[nodiscard]] SettingsPane* settingsPane() override;
 
 private:
   void doLayout(Renderer& renderer, float contentWidth, float bodyHeight) override;
@@ -69,6 +72,9 @@ private:
   void applyDeviceFilters(std::vector<BluetoothDeviceInfo>& devices) const;
   void applyCatalog(std::size_t index);
   void persistCatalog();
+  enum class Page : std::uint8_t { Root, Devices, Discovery };
+  void openPage(Page page);
+  void syncPage();
 
   enum class Catalog : std::uint8_t { Paired, Nearby };
 
@@ -77,8 +83,19 @@ private:
   ConfigService* m_config = nullptr;
   ClipboardService* m_clipboard = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
+  std::unique_ptr<SettingsPane> m_devicesPane;
+  std::unique_ptr<SettingsPane> m_discoveryPane;
+  Page m_page = Page::Root;
+  bool m_active = false;
 
   Flex* m_rootLayout = nullptr;
+  Flex* m_rootPage = nullptr;
+  Flex* m_subHeader = nullptr;
+  Label* m_subTitle = nullptr;
+  ScrollView* m_subScroll = nullptr;
+  Flex* m_devicesPage = nullptr;
+  Flex* m_discoveryPage = nullptr;
+  InputArea* m_returnFocus = nullptr;
 
   Flex* m_pairingCard = nullptr;
   Label* m_pairingTitle = nullptr;
