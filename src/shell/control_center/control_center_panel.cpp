@@ -23,13 +23,10 @@
 #include "shell/control_center/plugin_control_center_tab.h"
 #include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
-#include "shell/control_center/tabs/theme_tab.h"
 #include "shell/control_center/tabs/desktop_tab.h"
 #include "shell/control_center/hub_tab.h"
 #include "shell/control_center/tabs/launcher_tab.h"
 #include "shell/control_center/tabs/ai_usage_tab.h"
-#include "shell/control_center/tabs/audio_tab.h"
-#include "shell/control_center/tabs/bluetooth_tab.h"
 #include "shell/control_center/tabs/calendar_tab.h"
 #include "shell/control_center/tabs/camera_tab.h"
 #include "shell/control_center/tabs/clock_tab.h"
@@ -38,22 +35,18 @@
 #include "shell/control_center/tabs/keybinds_tab.h"
 #include "shell/control_center/tabs/media_tab.h"
 #include "shell/control_center/tabs/monitor_tab.h"
-#include "shell/control_center/tabs/network_tab.h"
-#include "shell/control_center/tabs/notifications_tab.h"
 #include "shell/control_center/tabs/capture_tab.h"
 #include "shell/control_center/tabs/plugins_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
-#include "shell/control_center/tabs/screen_time_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
-#include "shell/control_center/tabs/system_tab.h"
 #include "shell/control_center/tabs/localsend_tab.h"
+#include "shell/control_center/tabs/native_redirect_tab.h"
 #include "shell/control_center/tabs/phone_tab.h"
 #include "shell/control_center/tabs/syncthing_tab.h"
 #include "shell/control_center/tabs/firewall_tab.h"
 #include "shell/control_center/tabs/printers_tab.h"
 #include "shell/control_center/tabs/cast_tab.h"
 #include "shell/control_center/tabs/privacy_tab.h"
-#include "shell/control_center/tabs/tailscale_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
 #include "shell/control_center/tabs/weather_tab.h"
@@ -495,21 +488,6 @@ namespace {
     return true;
   }
 
-  [[nodiscard]] std::optional<ThemeTab::Section> themeSectionForContext(std::string_view context) {
-    if (context == "glass"
-        || context == "icons"
-        || context == "type"
-        || context == "scale"
-        || context == "roundness"
-        || context == "effects"
-        || context == "language"
-        || context == "palettes"
-        || context == "chrome") {
-      return ThemeTab::sectionFromId(context);
-    }
-    return std::nullopt;
-  }
-
   [[nodiscard]] std::optional<CaptureTab::View> captureViewForContext(std::string_view context) {
     if (context == "screenshot") {
       return CaptureTab::View::Screenshot;
@@ -589,22 +567,16 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
 
   add("home", std::make_unique<HomeTab>(services));
 
-  add("network", std::make_unique<NetworkTab>(services));
-  add("bluetooth", std::make_unique<BluetoothTab>(services.bluetooth, services.bluetoothAgent, services));
-  add("tailscale", std::make_unique<TailscaleTab>(services));
+  add("network", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.network", services.platform));
+  add("bluetooth", std::make_unique<NativeRedirectTab>("helix-settings", "bluetooth", "control-center.tabs.bluetooth", services.platform));
+  add("tailscale", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.tailscale", services.platform));
   add("phone", std::make_unique<PhoneTab>(services));
 
-  add("notifications", std::make_unique<NotificationsTab>(services.notifications, services.platform, services));
-  add(
-      "audio",
-      std::make_unique<AudioTab>(
-          services.audio, services.easyEffects, services.mpris, services.config, wayland,
-          PanelManager::instance().renderContext(), services
-      )
-  );
-  add("screen-time", std::make_unique<ScreenTimeTab>(services.screenTime, services));
+  add("notifications", std::make_unique<NativeRedirectTab>("helix-settings", "notifications", "control-center.tabs.notifications", services.platform));
+  add("audio", std::make_unique<NativeRedirectTab>("helix-settings", "sound", "control-center.tabs.audio", services.platform));
+  add("screen-time", std::make_unique<NativeRedirectTab>("helix-system-monitor", "screen-time", "control-center.tabs.screen-time", services.platform));
 
-  add("theme", std::make_unique<ThemeTab>(services));
+  add("theme", std::make_unique<NativeRedirectTab>("helix-settings", "appearance", "settings.navigation.sections.theme", services.platform));
   add(
       "control-center",
       std::make_unique<SettingsTab>(
@@ -619,7 +591,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
     privacySecurity.push_back(hubChild("security", std::make_unique<SettingsTab>(services, "security")));
     add("privacy-security", std::make_unique<HubTab>(std::move(privacySecurity)));
   }
-  add("system", std::make_unique<SystemTab>(services.sysmon, services));
+  add("system", std::make_unique<NativeRedirectTab>("helix-system-monitor", "overview", "control-center.tabs.system", services.platform));
   add("clock", std::make_unique<ClockTab>(services));
 
   add("desktop", std::make_unique<DesktopTab>(services));
@@ -913,18 +885,7 @@ void ControlCenterPanel::create() {
       .onClick = [this]() {
         const auto destination = nativeDestinationForTab(m_activeTabId);
         if (!destination.has_value()) return;
-        const bool monitor = destination->application == "helix-system-monitor";
-        DesktopEntry entry;
-        entry.id = monitor ? "org.helix.SystemMonitor" : "org.helix.Settings";
-        entry.name = monitor ? "Helix System Monitor" : "Helix Settings";
-        entry.exec = std::string(destination->application) + " --page " + std::string(destination->page);
-        desktop_entry_launch::LaunchOptions options;
-        if (m_platform != nullptr && m_platform->hasXdgActivation()) {
-          options.activationToken = m_platform->requestActivationToken(nullptr);
-        }
-        if (desktop_entry_launch::launchEntry(entry, options)) {
-          PanelManager::instance().close();
-        }
+        (void)NativeRedirectTab::launch(destination->application, destination->page, m_platform);
       },
   }));
 
@@ -1141,30 +1102,20 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   const auto settingsTarget = parseSettingsOpenContext(context);
   std::string tabId;
   std::optional<CaptureTab::View> captureView;
-  std::optional<ThemeTab::Section> themeSection;
   std::optional<DesktopTab::Section> desktopSection;
   if (settingsTarget.isSettings) {
     tabId = tabIdForSettingsSection(settingsTarget.section);
     captureView = captureViewForContext(settingsTarget.section);
-    themeSection = themeSectionForContext(settingsTarget.section);
     desktopSection = desktopSectionForContext(settingsTarget.section);
   } else {
     tabId = resolveOpenTabId(context);
     captureView = captureViewForContext(context);
-    themeSection = themeSectionForContext(context);
     desktopSection = desktopSectionForContext(context);
   }
   selectTab(tabId, animateTabSwitch);
   if (Tab* openedTab = tabForId(tabId); openedTab != nullptr) {
     if (auto* capture = dynamic_cast<CaptureTab*>(openedTab); capture != nullptr && captureView.has_value()) {
       capture->applyOpenView(*captureView);
-    }
-    if (auto* theme = dynamic_cast<ThemeTab*>(openedTab); theme != nullptr && themeSection.has_value()) {
-      if (settingsTarget.isSettings) {
-        theme->applyOpenContext(settingsTarget.section);
-      } else {
-        theme->applyOpenContext(context);
-      }
     }
     if (auto* desktop = dynamic_cast<DesktopTab*>(openedTab); desktop != nullptr && desktopSection.has_value()) {
       if (settingsTarget.isSettings) {
@@ -1248,13 +1199,6 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
           }
           return false;
         }
-        if (tabId == "theme") {
-          if (themeSectionForContext(settingsTarget.section).has_value()) {
-            if (const auto* theme = dynamic_cast<const ThemeTab*>(tab)) {
-              return theme->matchesOpenContext(settingsTarget.section);
-            }
-          }
-        }
         if (tabId == "desktop") {
           if (desktopSectionForContext(settingsTarget.section).has_value()) {
             if (const auto* desktop = dynamic_cast<const DesktopTab*>(tab)) {
@@ -1291,18 +1235,6 @@ bool ControlCenterPanel::isContextActive(std::string_view context) const {
       if (const auto* capture = dynamic_cast<const CaptureTab*>(slot->tab.get())) {
         if (const auto view = captureViewForContext(requested)) {
           return capture->currentView() == *view;
-        }
-      }
-    }
-  }
-  if (tabId == "theme") {
-    if (const auto* slot = slotById(tabId); slot != nullptr && slot->tab != nullptr) {
-      if (slot->tab->configureMode()) {
-        return false;
-      }
-      if (const auto* theme = dynamic_cast<const ThemeTab*>(slot->tab.get())) {
-        if (themeSectionForContext(requested).has_value()) {
-          return theme->matchesOpenContext(requested);
         }
       }
     }
@@ -1410,13 +1342,7 @@ void ControlCenterPanel::onClose() {
   clearReleasedRoot();
 }
 
-bool ControlCenterPanel::deferExternalRefresh() const {
-  if (!isTabIdActive("audio")) {
-    return false;
-  }
-  const auto* audioTab = dynamic_cast<const AudioTab*>(tabForId("audio"));
-  return audioTab != nullptr && audioTab->dragging();
-}
+bool ControlCenterPanel::deferExternalRefresh() const { return false; }
 
 bool ControlCenterPanel::deferPointerRelayout() const { return deferExternalRefresh(); }
 
@@ -2003,7 +1929,7 @@ bool ControlCenterPanel::isDirectSectionOpenContext(std::string_view context) co
   if (context == "settings" || context.find(':') != std::string_view::npos) {
     return true;
   }
-  if (context == "appearance" || themeSectionForContext(context).has_value()
+  if (context == "appearance"
       || captureViewForContext(context).has_value() || desktopSectionForContext(context).has_value()) {
     return true;
   }
@@ -2074,11 +2000,6 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
     }
     if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
       const std::string query = StringUtils::trim(m_searchQuery);
-      if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get())) {
-        if (themeSectionForContext(query).has_value()) {
-          theme->applyOpenContext(query, false);
-        }
-      }
       if (auto* desktop = dynamic_cast<DesktopTab*>(active->tab.get())) {
         if (desktopSectionForContext(query).has_value()) {
           desktop->applyOpenContext(query, false);
@@ -2120,12 +2041,6 @@ void ControlCenterPanel::applySettingsSearch(std::string value) {
       selectTab(target.tabId, false);
     }
     if (auto* active = slotById(m_activeTabId); active != nullptr && active->tab != nullptr) {
-      if (auto* theme = dynamic_cast<ThemeTab*>(active->tab.get());
-          theme != nullptr && !target.sectionId.empty()) {
-        if (themeSectionForContext(target.sectionId).has_value()) {
-          theme->applyOpenContext(target.sectionId, false);
-        }
-      }
       if (auto* desktop = dynamic_cast<DesktopTab*>(active->tab.get())) {
         const std::string query = StringUtils::trim(m_searchQuery);
         if (desktopSectionForContext(query).has_value()) {

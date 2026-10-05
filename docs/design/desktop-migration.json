@@ -580,5 +580,19 @@
       "compatibility-context": "online-accounts"
     }
   ],
-  "legacy-software-panel-retired": true
+  "legacy-software-panel-retired": true,
+  "legacy-control-center-tabs-retired": {
+    "date": "2026-10-05",
+    "tabs": [
+      "network",
+      "bluetooth",
+      "tailscale",
+      "notifications",
+      "audio",
+      "screen-time",
+      "theme",
+      "system"
+    ],
+    "policy": "Live pages removed; each tab id is kept as a redirect to its destination app. Rebuild the capability in the destination, not here."
+  }
 }
