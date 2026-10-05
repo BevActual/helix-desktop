@@ -1,7 +1,6 @@
 #include "shell/bar/widget_gesture_defaults.h"
 
 #include "core/log.h"
-#include "scripting/plugin_registry.h"
 #include "shell/bar/widgets/volume_widget_definition.h"
 
 #include <array>
@@ -142,29 +141,6 @@ namespace noctalia::bar {
 
     constexpr Logger kLog("bar.actions");
 
-    // A plugin [[widget]] entry declares its defaults in plugin.toml, where the settings GUI can
-    // read them too. The manifest parser keeps them as strings, so the vocabulary is checked here.
-    std::vector<GestureBinding> pluginGestureDefaults(std::string_view type) {
-      auto& registry = scripting::PluginRegistry::instance();
-      registry.ensureScanned();
-      const auto resolved = registry.resolve(type);
-      if (!resolved.has_value() || resolved->entry->kind != scripting::PluginEntryKind::Widget) {
-        return {};
-      }
-
-      std::vector<GestureBinding> bindings;
-      bindings.reserve(resolved->entry->widgetActions.size());
-      for (const auto& [gestureKey, action] : resolved->entry->widgetActions) {
-        const auto gesture = parseGestureKey(gestureKey);
-        if (!gesture.has_value()) {
-          kLog.error("{}: [widget.actions] '{}' is not a gesture", type, gestureKey);
-          continue;
-        }
-        bindings.push_back(GestureBinding{*gesture, action});
-      }
-      return bindings;
-    }
-
   } // namespace
 
   std::span<const GestureBinding> builtinGestureDefaults() noexcept { return kBuiltinDefaults; }
@@ -188,7 +164,7 @@ namespace noctalia::bar {
         return collect(entry.bindings);
       }
     }
-    return pluginGestureDefaults(type);
+    return {};
   }
 
   GestureMask reservedGesturesForType(std::string_view type) noexcept {

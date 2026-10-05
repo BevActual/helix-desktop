@@ -1848,68 +1848,6 @@ struct ControlCenterConfig {
   bool operator==(const ControlCenterConfig&) const = default;
 };
 
-// A plugin source: where plugin code comes from. `Git` is a repo URL the host
-// caches, updates, and exports plugin runtime files from; `Path` is an
-// immutable local directory (e.g. a Nix store path) the host treats read-only
-// (update/auto-update/remove are no-ops).
-enum class PluginSourceKind : std::uint8_t {
-  Git = 0,
-  Path = 1,
-};
-
-constexpr EnumOption<PluginSourceKind> kPluginSourceKinds[] = {
-    {PluginSourceKind::Git, "git", "settings.options.plugins.source.git"},
-    {PluginSourceKind::Path, "path", "settings.options.plugins.source.path"},
-};
-
-// Background auto-update scope for git plugin sources.
-enum class PluginAutoUpdateMode : std::uint8_t {
-  None = 0,     // never auto-update
-  Official = 1, // only the built-in "official" source
-  All = 2,      // every enabled git source
-};
-
-constexpr EnumOption<PluginAutoUpdateMode> kPluginAutoUpdateModes[] = {
-    {PluginAutoUpdateMode::All, "all", "settings.options.plugins.auto-update.all"},
-    {PluginAutoUpdateMode::Official, "official", "settings.options.plugins.auto-update.official"},
-    {PluginAutoUpdateMode::None, "none", "settings.options.plugins.auto-update.none"},
-};
-
-struct PluginSourceConfig {
-  PluginSourceKind kind = PluginSourceKind::Git;
-  std::string name;     // stable handle (also the clone subdir for git sources)
-  std::string location; // git URL or local path
-  bool enabled = true;  // disabled sources are not scanned; their clone is kept
-  bool operator==(const PluginSourceConfig&) const = default;
-};
-
-// Distribution config: where plugins come from and which are turned on. User
-// intent → config (declarative-friendly); clones live under the state dir.
-struct PluginsConfig {
-  std::vector<PluginSourceConfig> sources;
-  std::vector<std::string> enabled; // active plugin ids ("author/plugin"); opt-in for every source
-  PluginAutoUpdateMode autoUpdate = PluginAutoUpdateMode::All; // background auto-update scope (startup + every 6h)
-  // Plugin-level setting overrides, keyed by plugin id then setting key. Seeded
-  // into every entry runtime of the plugin (widget/shortcut/service). Open-ended
-  // (validated against the manifest schema), so compared via configEqual rather
-  // than the defaulted operator== (which lacks int/double coercion).
-  std::unordered_map<std::string, std::unordered_map<std::string, WidgetSettingValue>> pluginSettings;
-  bool operator==(const PluginsConfig&) const = default;
-};
-
-// Default sources seeded when [plugins] declares no [[plugins.source]]: the
-// official + community plugin repos.
-[[nodiscard]] std::vector<PluginSourceConfig> defaultPluginSources();
-[[nodiscard]] bool isDefaultPluginSourceName(std::string_view name);
-// Whether the background auto-update mode covers `source` (kind, enabled state, and
-// official identity for PluginAutoUpdateMode::Official). The official source matches
-// by name AND location, so a user-added source that reuses the name is not the
-// official source. Pure, so the auto-update tick and its tests share one decision.
-[[nodiscard]] bool sourceInAutoUpdateScope(const PluginSourceConfig& source, PluginAutoUpdateMode mode);
-// Source names are stable user-facing handles and git source storage directory names.
-// Keep them flat so they can never escape the plugin source cache.
-[[nodiscard]] bool isValidPluginSourceName(std::string_view name);
-
 struct AccessibilityConfig {
   float uiScale = 1.0F;
   bool highContrast = false;
@@ -1965,7 +1903,6 @@ struct Config {
   HooksConfig hooks;
   ThemeConfig theme;
   ControlCenterConfig controlCenter;
-  PluginsConfig plugins;
   AccessibilityConfig accessibility;
 };
 // Which top-level config sections changed across a reload. Default-constructed
@@ -1998,7 +1935,6 @@ struct ConfigChangeSet {
   bool hooks = true;
   bool theme = true;
   bool controlCenter = true;
-  bool plugins = true;
   bool hotCorners = true;
   bool storage = true;
   bool accessibility = true;
@@ -2030,7 +1966,6 @@ struct ConfigChangeSet {
         || hooks
         || theme
         || controlCenter
-        || plugins
         || hotCorners
         || storage
         || accessibility;

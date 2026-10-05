@@ -13,7 +13,6 @@ class ConfigService;
 class IpcService;
 
 namespace tailscale {
-  inline constexpr std::string_view kPluginId = "davemhammer/tailscale";
 }
 
 struct TailscalePeer {

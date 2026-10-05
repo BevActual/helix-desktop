@@ -41,9 +41,6 @@ class Slider;
 class Wallpaper;
 class ClipboardService;
 class UPowerService;
-namespace scripting {
-  class ScriptApiContext;
-}
 
 struct ShortcutPad {
   // Survives HomeTab::onClose(); button/glyph/label are nulled with the scene.
@@ -255,7 +252,4 @@ private:
   [[nodiscard]] std::size_t pinDropSlot() const;
   [[nodiscard]] std::size_t padIndexForButton(const Button* button) const noexcept;
   [[nodiscard]] ShortcutPad* padForButton(const Button* button) noexcept;
-  // Plugin config as of the last pin list build. A plugin shortcut seeds its Luau
-  // runtime at construction, so a change here must block instance reuse.
-  PluginsConfig m_lastPlugins;
 };

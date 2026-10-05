@@ -114,16 +114,7 @@ void VideoWallpaperService::onConfigChanged() {
 bool VideoWallpaperService::available() const { return wallpaper::video::binaryAvailable(); }
 
 std::filesystem::path VideoWallpaperService::directory() const {
-  std::string configured = m_config.config().wallpaper.video.directory;
-  if (StringUtils::trim(configured).empty()) {
-    const auto pluginIt = m_config.config().plugins.pluginSettings.find(std::string(wallpaper::video::kPluginId));
-    if (pluginIt != m_config.config().plugins.pluginSettings.end()) {
-      const auto dirIt = pluginIt->second.find("video_directory");
-      if (dirIt != pluginIt->second.end()) {
-        configured = noctalia::config::widgetSettingValueAs<std::string>(dirIt->second).value_or("");
-      }
-    }
-  }
+  const std::string configured = m_config.config().wallpaper.video.directory;
   return wallpaper::video::resolveDirectory(configured);
 }
 

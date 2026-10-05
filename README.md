@@ -64,9 +64,8 @@ start card, not a reason to leave the feature out of Helix.
 
 Login lives in helix-greeter. Helix Shell syncs appearance to that greeter; it does not replace greetd.
 
-The plugin system is still available for user-installed extras: additional bar widgets, launcher providers, desktop
-widgets, panels, shortcuts, and hardware-specific controls. Prefer a first-party tab when the service matches how
-Helix already works (a native C++ service, a live snapshot, and a hideable sidebar entry).
+The Luau plugin system was removed (2026-10-05). Extra bar widgets, launcher providers, panels and shortcuts will
+return as first-party features or as a new extension mechanism.
 
 ## Build from source
 

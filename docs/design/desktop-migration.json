@@ -236,11 +236,12 @@
       "compatibility-context": "templates"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "plugins",
       "destination": "settings:desktop-dock",
       "status": "pending",
-      "compatibility-context": "plugins"
+      "compatibility-context": "plugins",
+      "note": "Plugin system removed 2026-10-05; add extensions back as a Settings page or app."
     },
     {
       "kind": "tab",
@@ -594,5 +595,15 @@
       "system"
     ],
     "policy": "Live pages removed; each tab id is kept as a redirect to its destination app. Rebuild the capability in the destination, not here."
+  },
+  "plugin-system-retired": {
+    "date": "2026-10-05",
+    "removed": [
+      "src/scripting (Luau host, plugin manager, registry)",
+      "vendored third_party/luau",
+      "plugin widgets, shortcuts, panels, launcher providers, desktop widgets",
+      "`noctalia plugins` and `noctalia msg plugin(s)` commands",
+      "[plugins] and [plugin_settings] config sections"
+    ]
   }
 }

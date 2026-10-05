@@ -167,7 +167,6 @@ namespace settings {
     const auto pickerEntries = widgetPickerEntries(request.config);
     std::vector<SearchPickerOption> normalOptions;
     std::vector<SearchPickerOption> instanceOptions;
-    std::unordered_set<std::string> pluginEntries;
     normalOptions.reserve(pickerEntries.size());
     instanceOptions.reserve(pickerEntries.size());
 
@@ -181,10 +180,6 @@ namespace settings {
               .icon = entry.icon,
           }
       );
-
-      if (entry.kind == WidgetReferenceKind::Plugin) {
-        pluginEntries.insert(entry.value);
-      }
 
       if (entry.kind != WidgetReferenceKind::BuiltIn) {
         continue;
@@ -221,7 +216,6 @@ namespace settings {
     m_config = &request.config;
     m_normalOptions = std::move(normalOptions);
     m_instanceOptions = std::move(instanceOptions);
-    m_pluginEntries = std::move(pluginEntries);
     m_lanePath = std::move(request.lanePath);
     m_root = nullptr;
     m_createActions = nullptr;
@@ -431,29 +425,6 @@ namespace settings {
                   if (option.value.empty()) {
                     return;
                   }
-                  // Plugin [[widget]] entry: one-click add, no naming form. The widget's type is
-                  // the entry id ("author/plugin:entry"); the instance gets a clean auto name
-                  // derived from the entry's short id (config keys can't hold '/' or ':').
-                  if (m_pluginEntries.contains(option.value)) {
-                    std::string base = option.value;
-                    if (const auto pos = base.find_last_of("/:"); pos != std::string::npos) {
-                      base = base.substr(pos + 1);
-                    }
-                    const std::string instanceId = m_config != nullptr && !widgetReferenceNameExists(*m_config, base)
-                        ? base
-                        : suggestedInstanceId(base);
-                    if (m_onSelect) {
-                      m_onSelect(m_lanePath, option.value, option.value, instanceId, {});
-                    }
-                    const std::weak_ptr<void> aliveGuard = m_aliveGuard;
-                    DeferredCall::callLater([this, aliveGuard]() {
-                      if (aliveGuard.expired()) {
-                        return;
-                      }
-                      close();
-                    });
-                    return;
-                  }
                   if (m_instanceModeEnabled || widgetTypeRequiresNamedConfig(option.value)) {
                     beginCreateFlow(option);
                     return;
@@ -661,7 +632,6 @@ namespace settings {
     }
     m_normalOptions.clear();
     m_instanceOptions.clear();
-    m_pluginEntries.clear();
     m_config = nullptr;
     m_parent = {};
     m_lanePath.clear();

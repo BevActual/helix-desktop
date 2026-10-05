@@ -11,20 +11,12 @@
 #include <utility>
 #include <vector>
 
-namespace scripting {
-  struct ManifestField;
-  struct PluginEntry;
-  class PluginRegistry;
-  class PluginTranslationCatalog;
-} // namespace scripting
-
 namespace settings {
 
   enum class WidgetReferenceKind : std::uint8_t {
     BuiltIn,
     Named,
     Unknown,
-    Plugin, // a plugin [[widget]] entry from the plugin registry
   };
 
   struct WidgetTypeSpec {
@@ -42,7 +34,7 @@ namespace settings {
   };
 
   struct WidgetPickerEntry {
-    std::string value; // for Plugin entries this is the entry id "author/plugin:entry"
+    std::string value;
     std::string label;
     std::string description;
     std::string icon;
@@ -142,8 +134,6 @@ namespace settings {
 
   [[nodiscard]] const std::vector<WidgetTypeSpec>& widgetTypeSpecs();
   [[nodiscard]] bool isBuiltInWidgetType(std::string_view type);
-  // Whether `type` names a plugin [[widget]] entry ("author/plugin:entry").
-  [[nodiscard]] bool isPluginWidgetType(std::string_view type);
   [[nodiscard]] bool widgetTypeRequiresNamedConfig(std::string_view type);
   [[nodiscard]] std::string widgetTypeForReference(const Config& cfg, std::string_view name);
   [[nodiscard]] std::string titleFromWidgetKey(std::string_view key);
@@ -152,8 +142,7 @@ namespace settings {
   [[nodiscard]] std::vector<WidgetPickerEntry> widgetPickerEntries(const Config& cfg);
   [[nodiscard]] std::vector<WidgetSettingSpec>
   commonWidgetSettingSpecs(std::string_view shellFontFamily, bool populateFontCatalogs = true);
-  // `config` resolves a plugin [[widget]] type to its manifest-driven settings, and supplies the
-  // discriminator for types whose gesture defaults depend on a setting (a volume widget bound to
+  // `config` supplies the discriminator for types whose gesture defaults depend on a setting (a volume widget bound to
   // the microphone). May be null when neither applies.
   [[nodiscard]] std::vector<WidgetSettingSpec> widgetSettingSpecs(
       std::string_view type, const WidgetConfig* config, std::string_view shellFontFamily,
@@ -163,19 +152,11 @@ namespace settings {
       const Config& config, std::string_view widgetName, const WidgetSettingSpec& spec,
       const std::vector<WidgetSettingSpec>& allSpecs, const WidgetSettingCapabilities& capabilities
   );
-  // Build settings specs from a plugin entry's declared setting schema.
-  [[nodiscard]] std::vector<WidgetSettingSpec> manifestSettingSpecs(
-      const std::vector<scripting::ManifestField>& fields,
-      const scripting::PluginTranslationCatalog* translations = nullptr
-  );
-  [[nodiscard]] std::vector<WidgetSettingSpec> pluginPanelShellSettingSpecs(const scripting::PluginEntry& entry);
-
   // Schema projection (the validity half of the specs), consumed by the config
-  // layer (e.g. `config validate`). For plugin widgets the type alone resolves the
-  // manifest, so the config arg is no longer required for them.
+  // layer (e.g. `config validate`).
   [[nodiscard]] noctalia::config::schema::WidgetSettingSchema widgetSettingSchema(std::string_view type);
   [[nodiscard]] noctalia::config::schema::WidgetSettingSchema widgetSettingSchema(
-      std::string_view type, const WidgetConfig* config, scripting::PluginRegistry* pluginRegistry = nullptr
+      std::string_view type, const WidgetConfig* config
   );
   // Semantic cross-field validation for a widget config entry. Nullopt means the
   // resolved options are valid or the widget type declares no semantic rule.
@@ -196,12 +177,6 @@ namespace settings {
   [[nodiscard]] bool widgetSettingOverrideIsEffective(
       std::string_view widgetName, std::string_view settingKey, const Config& withOverride,
       const Config& withoutOverride
-  );
-  // Effectiveness of a [plugin_settings."author/plugin"] override: absent values
-  // resolve to the manifest-declared default, so an override equal to the plugin
-  // default is not "effective".
-  [[nodiscard]] bool pluginSettingOverrideIsEffective(
-      std::string_view pluginId, std::string_view settingKey, const Config& withOverride, const Config& withoutOverride
   );
 
 } // namespace settings

@@ -1,8 +1,6 @@
 #include "launcher/panel_catalog.h"
 
 #include "i18n/i18n.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_registry.h"
 
 #include <algorithm>
 #include <array>
@@ -42,24 +40,7 @@ namespace panel_catalog {
       return Description{.title = i18n::tr(builtin->titleKey), .subtitle = {}, .glyph = std::string(builtin->glyph)};
     }
 
-    const auto colon = panelId.find(':');
-    if (colon == std::string_view::npos) {
-      return Description{.title = std::string(panelId), .subtitle = {}, .glyph = std::string(kFallbackGlyph)};
-    }
-
-    const std::string_view pluginId = panelId.substr(0, colon);
-    const std::string_view entryId = panelId.substr(colon + 1);
-    const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
-    if (manifest == nullptr) {
-      return Description{
-          .title = std::string(pluginId), .subtitle = std::string(entryId), .glyph = std::string(kFallbackGlyph)
-      };
-    }
-    return Description{
-        .title = manifest->name,
-        .subtitle = std::string(entryId),
-        .glyph = manifest->icon.empty() ? std::string(kFallbackGlyph) : manifest->icon
-    };
+    return Description{.title = std::string(panelId), .subtitle = {}, .glyph = std::string(kFallbackGlyph)};
   }
 
   std::vector<std::string> allKnownIds() {
@@ -67,10 +48,6 @@ namespace panel_catalog {
     ids.reserve(kBuiltinPanels.size());
     for (const auto& meta : kBuiltinPanels) {
       ids.emplace_back(meta.id);
-    }
-    for (const auto& resolved :
-         scripting::PluginRegistry::instance().entriesOfKind(scripting::PluginEntryKind::Panel)) {
-      ids.push_back(resolved.fullId());
     }
     return ids;
   }

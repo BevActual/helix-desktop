@@ -24,10 +24,6 @@ public:
   void show(const LockscreenWidgetsSnapshot& snapshot, LockScreen& lockScreen);
   void hide();
   void rebuild(const LockscreenWidgetsSnapshot& snapshot, LockScreen& lockScreen);
-  // Destroy and recreate every plugin-backed instance so its Luau runtime is re-seeded.
-  // Needed because plugin-level settings live outside the widget snapshot, so syncSurfaces()
-  // cannot see them change.
-  void reloadPluginWidgets(LockScreen& lockScreen);
   void onOutputChange(LockScreen& lockScreen);
   void onSecondTick();
   void prepareFrame(LockSurface& surface, bool needsUpdate, bool needsLayout);

@@ -29,9 +29,6 @@ class ClipboardService;
 namespace noctalia::theme {
   class ThemeService;
 }
-namespace scripting {
-  class ScriptApiContext;
-}
 
 struct ShortcutServices {
   INetworkService* network = nullptr;
@@ -57,8 +54,6 @@ struct ShortcutServices {
   PrinterService* printers = nullptr;
   CastService* cast = nullptr;
   AiUsageService* aiUsage = nullptr;
-  // Plugin shortcut runtime dependencies.
-  scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;
   HttpClient* httpClient = nullptr;
   ClipboardService* clipboard = nullptr;

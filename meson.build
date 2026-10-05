@@ -218,88 +218,6 @@ libjxl_threads_dep  = dependency('libjxl_threads', required: true)
 # ── System: libsndfile (sound effect decoding) ───────────────────────────────
 sndfile_dep = dependency('sndfile', required: true)
 
-# ── Vendored: Luau (Roblox's Lua fork) ────────────────────────────────────────
-# Built as a quiet static library; only VM + Compiler + Bytecode + Ast + Common are vendored.
-_luau_sources = files(
-  'third_party/luau/Common/src/BytecodeWire.cpp',
-  'third_party/luau/Common/src/StringUtils.cpp',
-  'third_party/luau/Common/src/TimeTrace.cpp',
-  'third_party/luau/Ast/src/Allocator.cpp',
-  'third_party/luau/Ast/src/Ast.cpp',
-  'third_party/luau/Ast/src/Confusables.cpp',
-  'third_party/luau/Ast/src/Cst.cpp',
-  'third_party/luau/Ast/src/Lexer.cpp',
-  'third_party/luau/Ast/src/Location.cpp',
-  'third_party/luau/Ast/src/Parser.cpp',
-  'third_party/luau/Ast/src/PrettyPrinter.cpp',
-  'third_party/luau/Bytecode/src/BytecodeBuilder.cpp',
-  'third_party/luau/Bytecode/src/BytecodeGraph.cpp',
-  'third_party/luau/Compiler/src/BuiltinFolding.cpp',
-  'third_party/luau/Compiler/src/Builtins.cpp',
-  'third_party/luau/Compiler/src/Compiler.cpp',
-  'third_party/luau/Compiler/src/ConstantFolding.cpp',
-  'third_party/luau/Compiler/src/CostModel.cpp',
-  'third_party/luau/Compiler/src/lcode.cpp',
-  'third_party/luau/Compiler/src/TableShape.cpp',
-  'third_party/luau/Compiler/src/Types.cpp',
-  'third_party/luau/Compiler/src/ValueTracking.cpp',
-  'third_party/luau/VM/src/lapi.cpp',
-  'third_party/luau/VM/src/laux.cpp',
-  'third_party/luau/VM/src/lbaselib.cpp',
-  'third_party/luau/VM/src/lbitlib.cpp',
-  'third_party/luau/VM/src/lbuffer.cpp',
-  'third_party/luau/VM/src/lbuflib.cpp',
-  'third_party/luau/VM/src/lbuiltins.cpp',
-  'third_party/luau/VM/src/lcorolib.cpp',
-  'third_party/luau/VM/src/ldblib.cpp',
-  'third_party/luau/VM/src/ldebug.cpp',
-  'third_party/luau/VM/src/ldo.cpp',
-  'third_party/luau/VM/src/lfunc.cpp',
-  'third_party/luau/VM/src/lgc.cpp',
-  'third_party/luau/VM/src/lgcdebug.cpp',
-  'third_party/luau/VM/src/linit.cpp',
-  'third_party/luau/VM/src/lintlib.cpp',
-  'third_party/luau/VM/src/lclass.cpp',
-  'third_party/luau/VM/src/lclasslib.cpp',
-  'third_party/luau/VM/src/lmathlib.cpp',
-  'third_party/luau/VM/src/lmem.cpp',
-  'third_party/luau/VM/src/lnumprint.cpp',
-  'third_party/luau/VM/src/lobject.cpp',
-  'third_party/luau/VM/src/loslib.cpp',
-  'third_party/luau/VM/src/lperf.cpp',
-  'third_party/luau/VM/src/lstate.cpp',
-  'third_party/luau/VM/src/lstring.cpp',
-  'third_party/luau/VM/src/lstrlib.cpp',
-  'third_party/luau/VM/src/ltable.cpp',
-  'third_party/luau/VM/src/ltablib.cpp',
-  'third_party/luau/VM/src/ltm.cpp',
-  'third_party/luau/VM/src/ludata.cpp',
-  'third_party/luau/VM/src/lutf8lib.cpp',
-  'third_party/luau/VM/src/lveclib.cpp',
-  'third_party/luau/VM/src/lvmexecute.cpp',
-  'third_party/luau/VM/src/lvmload.cpp',
-  'third_party/luau/VM/src/lvmutils.cpp',
-)
-_luau_inc = include_directories(
-  'third_party/luau/Common/include',
-  'third_party/luau/Ast/include',
-  'third_party/luau/Bytecode/include',
-  'third_party/luau/Compiler/include',
-  'third_party/luau/VM/include',
-  'third_party/luau/VM/src',
-  is_system: true,
-)
-_luau_lib = static_library('luau',
-  _luau_sources,
-  include_directories: _luau_inc,
-  cpp_args: ['-w'],
-  override_options: ['warning_level=0'],
-)
-luau_dep = declare_dependency(
-  link_whole: _luau_lib,
-  include_directories: _luau_inc,
-)
-
 # Tests link vendored archives selectively. The application keeps link_whole so
 # release LTO sees every member, but propagating that policy to every small test
 # would embed all vendored code in every test executable.
@@ -310,10 +228,6 @@ _fzy_selective_dep = declare_dependency(
 _mcu_selective_dep = declare_dependency(
   link_with: _mcu_lib,
   include_directories: include_directories('third_party/material_color_utilities', is_system: true),
-)
-_luau_selective_dep = declare_dependency(
-  link_with: _luau_lib,
-  include_directories: _luau_inc,
 )
 
 # ── Wayland protocol generation ───────────────────────────────────────────────
@@ -430,7 +344,6 @@ _noctalia_sources = files(
   'src/app/application.cpp',
   'src/app/application_events.cpp',
   'src/app/application_ipc.cpp',
-  'src/app/application_plugins.cpp',
   'src/app/application_poll_sources.cpp',
   'src/app/application_services.cpp',
   'src/app/application_ui.cpp',
@@ -528,7 +441,6 @@ _noctalia_sources = files(
   'src/launcher/math_provider.cpp',
   'src/launcher/panel_catalog.cpp',
   'src/launcher/panel_provider.cpp',
-  'src/launcher/plugin_launcher_provider.cpp',
   'src/launcher/session_provider.cpp',
   'src/launcher/wallpaper_provider.cpp',
   'src/launcher/window_provider.cpp',
@@ -598,26 +510,6 @@ _noctalia_sources = files(
   'src/render/text/font_weight_catalog.cpp',
   'src/render/text/cairo_glyph_renderer.cpp',
   'src/render/wallpaper_renderer.cpp',
-  'src/scripting/luau_host.cpp',
-  'src/scripting/plugin_catalog.cpp',
-  'src/scripting/plugin_file_cache.cpp',
-  'src/scripting/plugin_git.cpp',
-  'src/scripting/plugin_i18n.cpp',
-  'src/scripting/plugin_ipc.cpp',
-  'src/scripting/plugin_lint.cpp',
-  'src/scripting/plugin_manager.cpp',
-  'src/scripting/plugin_manifest.cpp',
-  'src/scripting/plugin_panel_shell.cpp',
-  'src/scripting/plugin_registry.cpp',
-  'src/scripting/plugin_script_watcher.cpp',
-  'src/scripting/plugin_service_host.cpp',
-  'src/scripting/plugin_source_locks.cpp',
-  'src/scripting/plugin_source_paths.cpp',
-  'src/scripting/plugin_state_store.cpp',
-  'src/scripting/script_io_pool.cpp',
-  'src/scripting/script_runtime.cpp',
-  'src/scripting/script_worker_pool.cpp',
-  'src/scripting/plugin_bindings.cpp',
   'src/security/encrypted_file_store.cpp',
   'src/security/secret_store.cpp',
   'src/security/secure_buffer.cpp',
@@ -655,7 +547,6 @@ _noctalia_sources = files(
   'src/shell/desktop/widgets/desktop_sticker_widget.cpp',
   'src/shell/desktop/widgets/desktop_sysmon_widget.cpp',
   'src/shell/desktop/widgets/desktop_volume_widget.cpp',
-  'src/shell/desktop/widgets/plugin_desktop_widget.cpp',
   'src/shell/desktop/widgets/desktop_weather_widget.cpp',
   'src/shell/clipboard/clipboard_picker.cpp',
   'src/shell/quick_insert/quick_insert_panel.cpp',
@@ -684,12 +575,9 @@ _noctalia_sources = files(
   'src/shell/control_center/settings_pane.cpp',
   'src/shell/control_center/tabs/settings_tab.cpp',
   'src/shell/control_center/tabs/home_tab.cpp',
-  'src/shell/control_center/plugin_control_center_tab.cpp',
-  'src/shell/control_center/plugin_shortcut.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
   'src/shell/control_center/pin_reorder.cpp',
   'src/shell/control_center/pinned_app_list.cpp',
-  'src/shell/control_center/tabs/plugins_tab.cpp',
   'src/shell/control_center/tabs/localsend_tab.cpp',
   'src/shell/control_center/tabs/native_redirect_tab.cpp',
   'src/shell/control_center/tabs/phone_tab.cpp',
@@ -746,7 +634,6 @@ _noctalia_sources = files(
   'src/shell/panel/panel_click_shield.cpp',
   'src/shell/panel/panel_manager.cpp',
   'src/shell/panel/persistent_panel_host.cpp',
-  'src/shell/panel/plugin_panel.cpp',
   'src/shell/polkit/polkit_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
   'src/shell/session/session_action_runner.cpp',
@@ -760,10 +647,7 @@ _noctalia_sources = files(
   'src/shell/settings/config_export_dialog_modal.cpp',
   'src/shell/settings/settings_content.cpp',
   'src/shell/settings/settings_content_common.cpp',
-  'src/shell/settings/settings_content_plugins.cpp',
   'src/shell/settings/path_browse.cpp',
-  'src/shell/settings/plugin_store_content.cpp',
-  'src/shell/settings/plugin_store_tile.cpp',
   'src/shell/settings/template_store_content.cpp',
   'src/shell/settings/template_store_tile.cpp',
   'src/shell/settings/settings_control_factory.cpp',
@@ -842,7 +726,6 @@ _noctalia_sources = files(
   'src/shell/bar/widgets/network_widget_definition.cpp',
   'src/shell/bar/widgets/notification_widget.cpp',
   'src/shell/bar/widgets/notification_widget_definition.cpp',
-  'src/shell/bar/widgets/plugin_widget.cpp',
   'src/shell/bar/widgets/power_profile_widget.cpp',
   'src/shell/bar/widgets/power_profile_widget_definition.cpp',
   'src/shell/bar/widgets/privacy_widget.cpp',
@@ -1132,14 +1015,12 @@ _noctalia_system_dependencies = [
 _noctalia_dependencies = _noctalia_system_dependencies + [
   fzy_dep,
   mcu_dep,
-  luau_dep,
   qrcodegen_dep,
 ]
 
 _noctalia_test_dependencies = _noctalia_system_dependencies + [
   _fzy_selective_dep,
   _mcu_selective_dep,
-  _luau_selective_dep,
 ]
 
 noctalia_system_upgrade_path = join_paths(get_option('prefix'), get_option('libexecdir'), 'noctalia-system-upgrade')
@@ -1321,15 +1202,6 @@ if build_tests
     'package_spec',
     'path_browse',
     'pin_reorder',
-    'plugin_bindings',
-    'plugin_catalog',
-    'plugin_git_export',
-    'plugin_i18n',
-    'plugin_lifecycle',
-    'plugin_manifest',
-    'plugin_process',
-    'plugin_source_locks',
-    'plugin_source_paths',
     'popup_dismiss_order',
     'process',
     'scheme',
@@ -1364,14 +1236,10 @@ if build_tests
     'webp_decoder',
     'widget_action',
     'widget_definition',
-    'widget_settings_schema',
     'workspace_alert_service',
   ]
 
   foreach test_name : _cpp_test_names
-    if test_name == 'plugin_git_export' and not git_program.found()
-      continue
-    endif
     test_exe = executable(test_name + '_test',
       sources: files('tests' / (test_name + '_test.cpp')),
       dependencies: noctalia_core_dep,

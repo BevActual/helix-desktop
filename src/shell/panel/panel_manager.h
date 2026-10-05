@@ -63,14 +63,8 @@ public:
 
   // Optional: invoked from shell UI (e.g. control center) to open settings in Control Center.
   void setOpenWidgetSettingsCallback(std::function<void(std::string barName, std::string widgetName)> callback);
-  // Returns false when the plugin is unknown, disabled, or exposes no settings.
-  void setOpenPluginSettingsCallback(std::function<bool(std::string pluginId)> callback);
   void setCloseDesktopWidgetsEditorCallback(std::function<void()> callback);
   void openSettings(std::string context = "");
-  // Closes any other open panel, then opens Control Center at the plugin's settings.
-  // False when Control Center is unavailable, or the plugin is unknown, disabled, or
-  // exposes no settings.
-  [[nodiscard]] bool openPluginSettings(const std::string& pluginId);
   void closeSettings();
   void toggleSettings(std::string context = "");
   void setAttachedPanelGeometryCallback(
@@ -207,7 +201,6 @@ private:
   ConfigService* m_config = nullptr;
   RenderContext* m_renderContext = nullptr;
   std::function<void(std::string, std::string)> m_openWidgetSettings;
-  std::function<bool(std::string)> m_openPluginSettings;
   std::function<void()> m_closeDesktopWidgetsEditor;
   std::function<void(wl_output*, std::string_view, std::optional<AttachedPanelGeometry>)>
       m_attachedPanelGeometryCallback;

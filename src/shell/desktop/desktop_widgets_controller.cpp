@@ -564,11 +564,6 @@ void DesktopWidgetsController::handleConfigReload() {
       if (calendarChanged) {
         m_host->requestLayout();
       }
-      // Plugin-level settings live in [plugin_settings], outside the widget snapshot, so
-      // the host's instance diff cannot see them change.
-      if (m_config != nullptr && m_config->lastChange().plugins) {
-        m_host->reloadPluginWidgets();
-      }
     }
   } else if (calendarChanged && m_editor != nullptr) {
     m_editor->requestLayout();

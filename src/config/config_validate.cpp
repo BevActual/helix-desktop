@@ -9,10 +9,6 @@
 #include "config/schema/engine.h"
 #include "config/widget_config.h"
 #include "launcher/launcher_provider.h"
-#include "scripting/plugin_id.h"
-#include "scripting/plugin_manager.h"
-#include "scripting/plugin_panel_shell.h"
-#include "scripting/plugin_registry.h"
 #include "shell/bar/widget_action.h"
 #include "shell/bar/widget_gesture.h"
 #include "shell/desktop/desktop_widget_settings_registry.h"
@@ -108,8 +104,8 @@ namespace noctalia::config {
     }
 
     // Launcher provider tables are keyed by provider id, which the schema can't enumerate.
-    // Warn on an empty common prefix, on providers that name nothing real (or a disabled
-    // plugin, or the fixed Applications provider), and on two providers sharing a prefix.
+    // Warn on an empty common prefix, on providers that name nothing real (or the fixed
+    // Applications provider), and on two providers sharing a prefix.
     void validateLauncherProviders(const toml::table& merged, schema::Diagnostics& diag) {
       const auto* shellTbl = merged["shell"].as_table();
       const auto* launcherTbl = shellTbl != nullptr ? (*shellTbl)["launcher"].as_table() : nullptr;
@@ -126,16 +122,6 @@ namespace noctalia::config {
         return;
       }
       std::unordered_map<std::string, std::string> seenPrefixes;
-      std::unordered_set<std::string> enabledPlugins;
-      if (const auto* pluginsTbl = merged["plugins"].as_table()) {
-        if (const auto* enabledArr = (*pluginsTbl)["enabled"].as_array()) {
-          for (const auto& node : *enabledArr) {
-            if (const auto* strVal = node.as_string()) {
-              enabledPlugins.insert(StringUtils::toLower(strVal->get()));
-            }
-          }
-        }
-      }
       for (const auto& [key, node] : *providersTbl) {
         const auto* provTbl = node.as_table();
         if (provTbl == nullptr) {
@@ -150,25 +136,8 @@ namespace noctalia::config {
         }
         const auto isBuiltin = std::ranges::contains(launcher::kBuiltinProviders, providerName);
         if (!isBuiltin) {
-          const std::size_t colon = providerName.find(':');
-          bool isPlugin = false;
-          std::string pluginIdStr;
-          if (colon != std::string::npos) {
-            std::string_view pluginId = std::string_view(providerName).substr(0, colon);
-            std::string_view entryName = std::string_view(providerName).substr(colon + 1);
-            if (scripting::isValidPluginId(pluginId) && scripting::isValidPluginIdSegment(entryName)) {
-              isPlugin = true;
-              pluginIdStr = std::string(pluginId);
-            }
-          }
-          if (!isPlugin) {
-            diag.warn("shell.launcher.providers." + providerName, "provider is nonexistent");
-            continue;
-          }
-          if (!enabledPlugins.contains(pluginIdStr)) {
-            diag.warn("shell.launcher.providers." + providerName, "plugin '" + pluginIdStr + "' is not enabled");
-            continue;
-          }
+          diag.warn("shell.launcher.providers." + providerName, "provider is nonexistent");
+          continue;
         }
         const auto* prefixVal = (*provTbl)["prefix"].as_string();
         if (prefixVal == nullptr || prefixVal->get().empty()) {
@@ -420,49 +389,7 @@ namespace noctalia::config {
       }
     }
 
-    void validatePluginSettings(
-        const toml::table& root, schema::Diagnostics& diag, scripting::PluginRegistry& pluginRegistry
-    ) {
-      const auto* pluginSettings = root["plugin_settings"].as_table();
-      if (pluginSettings == nullptr) {
-        return;
-      }
-      for (const auto& [pluginId, node] : *pluginSettings) {
-        const auto* perPlugin = node.as_table();
-        if (perPlugin == nullptr) {
-          continue;
-        }
-        const std::string idStr(pluginId.str());
-        const std::string base = "plugin_settings." + idStr;
-        const scripting::PluginManifest* manifest = pluginRegistry.findManifest(idStr);
-        if (manifest == nullptr) {
-          diag.warn(base, "no loaded plugin with this id");
-          continue;
-        }
-        schema::WidgetSettingSchema fields;
-        for (const auto& spec : settings::manifestSettingSpecs(manifest->settings)) {
-          fields.push_back(spec.schema);
-        }
-        for (const auto& entry : manifest->entries) {
-          if (entry.kind != scripting::PluginEntryKind::Panel) {
-            continue;
-          }
-          for (const auto& spec : settings::pluginPanelShellSettingSpecs(entry)) {
-            fields.push_back(spec.schema);
-          }
-          for (const auto& spec : settings::manifestSettingSpecs(entry.settings)) {
-            if (scripting::isPanelShellSettingKey(entry.id, spec.schema.key)) {
-              continue;
-            }
-            fields.push_back(spec.schema);
-          }
-        }
-        validateSettingsMap(*perPlugin, fields, base, /*flagUnknown=*/true, diag);
-      }
-    }
-
-    void
-    validateBarWidgets(const toml::table& root, schema::Diagnostics& diag, scripting::PluginRegistry& pluginRegistry) {
+    void validateBarWidgets(const toml::table& root, schema::Diagnostics& diag) {
       const auto* widgets = root["widget"].as_table();
       if (widgets == nullptr) {
         return;
@@ -478,17 +405,12 @@ namespace noctalia::config {
         const std::string base = "widget." + nameStr;
         WidgetConfig wc = readBarWidgetConfig(nameStr, *tbl, resolvedConfig);
         const std::string type = wc.type;
-        const auto pluginEntry = pluginRegistry.resolve(type);
-        const bool isPluginWidget =
-            pluginEntry.has_value() && pluginEntry->entry->kind == scripting::PluginEntryKind::Widget;
-        if (!settings::isBuiltInWidgetType(type) && !isPluginWidget) {
+        if (!settings::isBuiltInWidgetType(type)) {
           diag.warn(base, "unrecognized widget type \"" + type + "\"");
           resolvedConfig.widgets[nameStr] = std::move(wc);
           continue;
         }
-        const auto fields = settings::widgetSettingSchema(type, &wc, &pluginRegistry);
-        // Plugin widgets resolve their settings from a static plugin.toml manifest, so
-        // unknown keys are flagged like any other widget.
+        const auto fields = settings::widgetSettingSchema(type, &wc);
         validateSettingsMap(*tbl, fields, base, /*flagUnknown=*/true, diag, /*ignoreKeys=*/{"type"}, base);
         if (auto error = settings::validateWidgetSemantics(type, &wc); error.has_value()) {
           diag.componentError(base, base, *error);
@@ -505,9 +427,7 @@ namespace noctalia::config {
       }
     }
 
-    void validateDesktopWidgets(
-        const toml::table& root, schema::Diagnostics& diag, scripting::PluginRegistry& pluginRegistry
-    ) {
+    void validateDesktopWidgets(const toml::table& root, schema::Diagnostics& diag) {
       const auto* dw = root["desktop_widgets"].as_table();
       if (dw == nullptr) {
         return;
@@ -562,10 +482,7 @@ namespace noctalia::config {
             std::ranges::any_of(desktop_settings::desktopWidgetTypeSpecs(), [type](const auto& spec) {
               return spec.type == type;
             });
-        const auto pluginEntry = pluginRegistry.resolve(type);
-        const bool isPluginWidget =
-            pluginEntry.has_value() && pluginEntry->entry->kind == scripting::PluginEntryKind::DesktopWidget;
-        if (!isBuiltIn && !isPluginWidget) {
+        if (!isBuiltIn) {
           diag.warn(base, "unrecognized desktop widget type \"" + type + "\"");
           continue;
         }
@@ -574,7 +491,7 @@ namespace noctalia::config {
           continue;
         }
         validateSettingsMap(
-            *settingsTbl, desktop_settings::desktopWidgetSettingSchema(type, &pluginRegistry), base + ".settings",
+            *settingsTbl, desktop_settings::desktopWidgetSettingSchema(type), base + ".settings",
             /*flagUnknown=*/true, diag, {}, base
         );
         if (type == "clock") {
@@ -588,9 +505,7 @@ namespace noctalia::config {
       }
     }
 
-    void validateLockscreenWidgets(
-        const toml::table& root, schema::Diagnostics& diag, scripting::PluginRegistry& pluginRegistry
-    ) {
+    void validateLockscreenWidgets(const toml::table& root, schema::Diagnostics& diag) {
       const auto* section = root["lockscreen_widgets"].as_table();
       if (section == nullptr) {
         return;
@@ -643,10 +558,7 @@ namespace noctalia::config {
             std::ranges::any_of(desktop_settings::desktopWidgetTypeSpecs(), [type](const auto& spec) {
               return spec.type == type;
             });
-        const auto pluginEntry = pluginRegistry.resolve(type);
-        const bool isPluginWidget =
-            pluginEntry.has_value() && pluginEntry->entry->kind == scripting::PluginEntryKind::DesktopWidget;
-        if (type != lockscreen_login_box::kWidgetType && !isBuiltIn && !isPluginWidget) {
+        if (type != lockscreen_login_box::kWidgetType && !isBuiltIn) {
           diag.warn(base, "unrecognized lockscreen widget type \"" + type + "\"");
           continue;
         }
@@ -655,7 +567,7 @@ namespace noctalia::config {
           continue;
         }
         validateSettingsMap(
-            *settingsTbl, desktop_settings::desktopWidgetSettingSchema(type, &pluginRegistry), base + ".settings",
+            *settingsTbl, desktop_settings::desktopWidgetSettingSchema(type), base + ".settings",
             /*flagUnknown=*/true, diag, {}, base
         );
         if (type == "clock") {
@@ -728,29 +640,11 @@ namespace noctalia::config {
       validateCalendarSyntax(merged, diag);
       validateLauncherProviders(merged, diag);
 
-      // Resolve the candidate's plugin catalog without mutating the live registry.
-      scripting::PluginRegistry pluginRegistry;
-      {
-        PluginsConfig pc;
-        schema::Diagnostics sink; // schema issues are already reported by checkSection above
-        if (const auto* pluginsTbl = merged["plugins"].as_table()) {
-          const bool sourcesConfigured = (*pluginsTbl)["source"].as_array() != nullptr;
-          schema::readInto(*pluginsTbl, pc, schema::pluginsSchema(), "plugins", sink);
-          if (!sourcesConfigured && pc.sources.empty()) {
-            pc.sources = defaultPluginSources();
-          }
-        } else {
-          pc.sources = defaultPluginSources();
-        }
-        scripting::applyPluginSourcesToRegistry(pluginRegistry, pc);
-      }
-
       validateLocation(merged, diag);
       validateBars(merged, diag);
-      validateBarWidgets(merged, diag, pluginRegistry);
-      validatePluginSettings(merged, diag, pluginRegistry);
-      validateDesktopWidgets(merged, diag, pluginRegistry);
-      validateLockscreenWidgets(merged, diag, pluginRegistry);
+      validateBarWidgets(merged, diag);
+      validateDesktopWidgets(merged, diag);
+      validateLockscreenWidgets(merged, diag);
       validateIncludeShape(merged, diag);
 
       // Unknown top-level keys.

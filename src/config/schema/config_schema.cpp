@@ -7,7 +7,6 @@
 #include "config/schema/ranges.h"
 #include "core/input/key_chord.h"
 #include "notification/notification_filter.h"
-#include "scripting/plugin_id.h"
 #include "util/file_utils.h"
 
 #include <algorithm>
@@ -591,81 +590,6 @@ namespace noctalia::config::schema {
             &ControlCenterConfig::shortcuts, "shortcuts", shortcutSchema(),
             [](const ShortcutConfig& sc) { return !sc.type.empty(); }
         ),
-    };
-    return s;
-  }
-
-  namespace {
-    const Schema<PluginSourceConfig>& pluginSourceSchema() {
-      static const Schema<PluginSourceConfig> s = {
-          field(&PluginSourceConfig::name, "name"),
-          enumField(&PluginSourceConfig::kind, "kind", kPluginSourceKinds),
-          field(&PluginSourceConfig::location, "location"),
-          field(&PluginSourceConfig::enabled, "enabled"),
-          finalize<PluginSourceConfig>([](PluginSourceConfig& src, std::string_view parentPath, Diagnostics& diag) {
-            if (!src.name.empty() && !isValidPluginSourceName(src.name)) {
-              diag.warn(
-                  joinPath(parentPath, "name"),
-                  "invalid plugin source name; use letters, digits, '.', '_' or '-', starting with a letter or digit"
-              );
-            }
-          }),
-      };
-      return s;
-    }
-  } // namespace
-
-  const Schema<PluginsConfig>& pluginsSchema() {
-    static const Schema<PluginsConfig> s = {
-        arrayOf<PluginsConfig, PluginSourceConfig>(
-            &PluginsConfig::sources, "source", pluginSourceSchema(),
-            [](const PluginSourceConfig& src) { return isValidPluginSourceName(src.name); }
-        ),
-        field(&PluginsConfig::enabled, "enabled"),
-        // auto_update accepts only "all"|"official"|"none"
-        custom<PluginsConfig>(
-            "auto_update",
-            [](const toml::table& tbl, PluginsConfig& out, std::string_view parentPath, Diagnostics& diag) {
-              if (auto v = tbl["auto_update"].value<std::string>()) {
-                const std::string trimmed = StringUtils::trim(*v);
-                if (auto parsed = enumFromKey(kPluginAutoUpdateModes, trimmed)) {
-                  out.autoUpdate = *parsed;
-                } else {
-                  diag.error(
-                      joinPath(parentPath, "auto_update"), "unknown value \"" + *v + "\"; expected all|official|none"
-                  );
-                }
-              } else if (tbl.contains("auto_update")) {
-                diag.error(joinPath(parentPath, "auto_update"), "expected all|official|none");
-              }
-            },
-            [](toml::table& tbl, const PluginsConfig& in) {
-              tbl.insert_or_assign("auto_update", std::string(enumToKey(kPluginAutoUpdateModes, in.autoUpdate)));
-            }
-        ),
-        finalize<PluginsConfig>([](PluginsConfig& plugins, std::string_view parentPath, Diagnostics& diag) {
-          for (auto it = plugins.enabled.begin(); it != plugins.enabled.end();) {
-            if (scripting::isValidPluginId(*it)) {
-              ++it;
-              continue;
-            }
-            diag.warn(joinPath(parentPath, "enabled"), "invalid plugin id \"" + *it + "\"; expected author/plugin");
-            it = plugins.enabled.erase(it);
-          }
-          // Duplicate names would share one checkout on disk: keep the first, error on the rest.
-          std::unordered_set<std::string> seen;
-          for (auto it = plugins.sources.begin(); it != plugins.sources.end();) {
-            if (seen.insert(it->name).second) {
-              ++it;
-              continue;
-            }
-            diag.error(
-                joinPath(parentPath, "source"),
-                "duplicate plugin source name \"" + it->name + "\"; source names must be unique"
-            );
-            it = plugins.sources.erase(it);
-          }
-        }),
     };
     return s;
   }
@@ -2000,12 +1924,6 @@ namespace noctalia::config::schema {
 
     if (section == "desktop_widgets" && isKnownDesktopWidgetPath(path)) {
       return true;
-    }
-
-    // [plugin_settings."author/plugin"].<key>, open schema; keys validate against
-    // the manifest in config_validate's validatePluginSettings, not here.
-    if (section == "plugin_settings") {
-      return path.size() <= 3;
     }
 
     if (path.size() < 2) {

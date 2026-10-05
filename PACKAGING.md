@@ -151,7 +151,7 @@ Notes packagers hit often:
 
 ### Vendored (no system package)
 
-Shipped under `third_party/`: Wuffs, Luau, fzy, Material Color Utilities.
+Shipped under `third_party/`: Wuffs, fzy, Material Color Utilities.
 Each carries its own license file beside the code.
 
 ### Runtime
@@ -161,7 +161,6 @@ Each carries its own license file beside the code.
 | PipeWire **daemon** (+ WirePlumber 0.5) | Audio, volume OSD, privacy indicators, spectrum. Libraries alone are not enough; without a running daemon those features stay off. |
 | PAM (`login` service by default) | Lock screen authentication |
 | Fontconfig / fonts | Text rendering (users still need usable fonts installed) |
-| `git` | Plugin git sources / auto-update invoke `git` on `PATH` |
 | `upower` | Optional: battery / power devices |
 | `ddcutil` | Optional: external monitor brightness |
 | Secret Service provider | Optional but recommended for credential / encrypted-state persistence (GNOME Keyring, KWallet, KeePassXC, ...). `libsecret` is only the client library; without a session provider those features cannot persist secrets. |

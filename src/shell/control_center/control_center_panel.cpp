@@ -1,7 +1,3 @@
-#include "scripting/plugin_i18n.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
 #include "shell/control_center/control_center_panel.h"
 
 #include "compositors/compositor_detect.h"
@@ -20,7 +16,6 @@
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
-#include "shell/control_center/plugin_control_center_tab.h"
 #include "shell/control_center/settings_search_target.h"
 #include "shell/control_center/tab_search.h"
 #include "shell/control_center/tabs/desktop_tab.h"
@@ -36,7 +31,6 @@
 #include "shell/control_center/tabs/media_tab.h"
 #include "shell/control_center/tabs/monitor_tab.h"
 #include "shell/control_center/tabs/capture_tab.h"
-#include "shell/control_center/tabs/plugins_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/localsend_tab.h"
@@ -54,7 +48,6 @@
 #include "shell/wallpaper/wallhaven_client.h"
 #include "shell/panel/panel_button_style.h"
 #include "shell/panel/panel_manager.h"
-#include "shell/settings/settings_content_plugins.h"
 #include "shell/settings/settings_registry.h"
 #include "shell/panel/panel_manager.h"
 #include "wayland/wayland_seat.h"
@@ -204,7 +197,6 @@ namespace {
       {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Apps},
       {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Apps},
       {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Apps},
-      {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Apps},
       {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
   };
@@ -287,43 +279,11 @@ namespace {
       return fixed(kYellow);
     }
     if (group == TabGroup::Apps) {
-      return colorSpecFromRole(ColorRole::Secondary); // plugin tabs and the rest of the app catalog
+      return colorSpecFromRole(ColorRole::Secondary); // the rest of the app catalog
     }
     return neutral;
   }
 
-
-  struct PluginTabChrome {
-    std::string title;
-    std::string glyph;
-  };
-
-  bool isSupersededPluginControlCenterTab(const scripting::ResolvedPluginEntry& resolved) {
-    return resolved.manifest != nullptr
-        && (resolved.manifest->id == wallpaper::wallhaven::kPluginId
-            || resolved.manifest->id == wallpaper::video::kPluginId
-            || resolved.manifest->id == tailscale::kPluginId);
-  }
-
-  PluginTabChrome pluginTabChrome(const scripting::ResolvedPluginEntry& resolved) {
-    PluginTabChrome chrome;
-    chrome.title = resolved.manifest != nullptr ? resolved.manifest->name : std::string{};
-    if (resolved.entry != nullptr && !resolved.entry->tabTitleKey.empty()) {
-      scripting::PluginTranslationCatalog catalog;
-      catalog.load(resolved.pluginDir);
-      if (catalog.has(resolved.entry->tabTitleKey)) {
-        chrome.title = catalog.translate(resolved.entry->tabTitleKey);
-      }
-    }
-    if (resolved.entry != nullptr && !resolved.entry->tabGlyph.empty()) {
-      chrome.glyph = resolved.entry->tabGlyph;
-    } else if (resolved.manifest != nullptr && !resolved.manifest->icon.empty()) {
-      chrome.glyph = resolved.manifest->icon;
-    } else {
-      chrome.glyph = "puzzle";
-    }
-    return chrome;
-  }
 
   const BuiltinTabSpec* specById(std::string_view id) {
     for (const auto& spec : kBuiltinTabs) {
@@ -398,7 +358,6 @@ namespace {
         || id == "printers"
         || id == "cast"
         || id == "privacy"
-        || id == "plugins"
         || id == "home"
         || id == "desktop"
         || id == "camera"
@@ -523,12 +482,10 @@ ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
   m_mpris = services.mpris;
   m_notificationManager = services.notifications;
   m_dependencies = services.dependencies;
-  m_scriptApi = services.scriptApi;
   m_fileWatcher = services.fileWatcher;
   m_httpClient = services.httpClient;
   m_clipboard = services.clipboard;
   m_platform = services.platform;
-  m_pluginManager = services.pluginManager;
   m_asyncTextures = services.asyncTextures;
   ControlCenterServices tabServices = services;
   tabServices.modalHost = &m_modalHost;
@@ -550,7 +507,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
     slot.tab = std::move(tab);
     slot.hideable = spec->hideable;
     slot.group = spec->group;
-    slot.plugin = false;
     m_slots.push_back(std::move(slot));
   };
 
@@ -621,7 +577,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("clipboard", std::make_unique<ClipboardTab>(services));
   add("ai", std::make_unique<AiUsageTab>(services));
   add("templates", std::make_unique<TemplatesTab>(services));
-  add("plugins", std::make_unique<PluginsTab>(services));
 
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
@@ -686,19 +641,15 @@ void ControlCenterPanel::create() {
   m_compact = sidebarMode == ControlCenterSidebarMode::Compact;
   m_showSidebar = sidebarMode != ControlCenterSidebarMode::None;
 
-  rebuildPluginSlots();
-
   for (auto& slot : m_slots) {
     if (slot.tab != nullptr) {
       slot.tab->setContentScale(scale);
       slot.tab->setPanelCardOpacity(panelCardOpacity());
     }
-    if (!slot.plugin) {
-      for (const auto& spec : kBuiltinTabs) {
-        if (slot.id == spec.id) {
-          slot.title = builtinTitle(spec);
-          break;
-        }
+    for (const auto& spec : kBuiltinTabs) {
+      if (slot.id == spec.id) {
+        slot.title = builtinTitle(spec);
+        break;
       }
     }
   }
@@ -1136,31 +1087,12 @@ void ControlCenterPanel::onOpen(std::string_view context) {
   maybeOpenPendingEditor();
 }
 
-void ControlCenterPanel::queuePluginSettings(std::string pluginId) {
-  m_pendingOpenPluginSettingsId = std::move(pluginId);
-  m_pendingOpenWidgetInspectorName.clear();
-  m_pendingOpenBarName.clear();
-}
-
 void ControlCenterPanel::queueBarWidget(std::string barName, std::string widgetName) {
   m_pendingOpenBarName = std::move(barName);
   m_pendingOpenWidgetInspectorName = std::move(widgetName);
-  m_pendingOpenPluginSettingsId.clear();
 }
 
-void ControlCenterPanel::invalidatePluginSource(const std::string&) {}
-
 void ControlCenterPanel::maybeOpenPendingEditor() {
-  if (!m_pendingOpenPluginSettingsId.empty()) {
-    std::string pluginId = std::move(m_pendingOpenPluginSettingsId);
-    m_pendingOpenPluginSettingsId.clear();
-    if (auto* slot = slotById("plugins"); slot != nullptr && slot->tab != nullptr) {
-      if (auto* pane = slot->tab->settingsPane(); pane != nullptr) {
-        pane->openPluginSettings(std::move(pluginId));
-      }
-    }
-    return;
-  }
   if (!m_pendingOpenWidgetInspectorName.empty()) {
     std::string barName = std::move(m_pendingOpenBarName);
     std::string widgetName = std::move(m_pendingOpenWidgetInspectorName);
@@ -1315,7 +1247,6 @@ void ControlCenterPanel::onClose() {
     slot.container = nullptr;
     slot.headerActions = nullptr;
   }
-  std::erase_if(m_slots, [](const TabSlot& slot) { return slot.plugin; });
   m_rootLayout = nullptr;
   m_sidebar = nullptr;
   m_sidebarScrollView = nullptr;
@@ -1411,15 +1342,6 @@ std::vector<ControlCenterPanel::TabCatalogEntry> ControlCenterPanel::hideableTab
       continue;
     }
     out.push_back({.key = spec.id, .title = builtinTitle(spec)});
-  }
-  auto& registry = scripting::PluginRegistry::instance();
-  registry.ensureScanned();
-  for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
-    if (resolved.manifest == nullptr || resolved.entry == nullptr || isSupersededPluginControlCenterTab(resolved)) {
-      continue;
-    }
-    const auto chrome = pluginTabChrome(resolved);
-    out.push_back({.key = resolved.fullId(), .title = chrome.title});
   }
   return out;
 }
@@ -2183,67 +2105,6 @@ void ControlCenterPanel::scrollFocusedInputIntoView(InputArea* area) {
   if (ScrollView* scrollView = findEnclosingScrollView(area)) {
     scrollNodeIntoScrollView(*scrollView, nullptr, *area, Style::spaceMd * contentScale());
     PanelManager::instance().requestLayout();
-  }
-}
-
-void ControlCenterPanel::rebuildPluginSlots() {
-  const std::string previouslyActive = m_activeTabId;
-  std::erase_if(m_slots, [](const TabSlot& slot) { return slot.plugin; });
-  if (m_scriptApi == nullptr) {
-    if (slotById(previouslyActive) == nullptr) {
-      m_activeTabId = firstVisibleTab();
-    }
-    return;
-  }
-
-  auto& registry = scripting::PluginRegistry::instance();
-  registry.ensureScanned();
-  const auto& pluginSettings =
-      m_config != nullptr ? m_config->config().plugins.pluginSettings
-                          : std::unordered_map<std::string, std::unordered_map<std::string, WidgetSettingValue>>{};
-  static const std::unordered_map<std::string, WidgetSettingValue> kNoOverrides;
-
-  std::vector<TabSlot> pluginSlots;
-  for (const auto& resolved : registry.entriesOfKind(scripting::PluginEntryKind::ControlCenterTab)) {
-    if (resolved.entry == nullptr || resolved.manifest == nullptr || isSupersededPluginControlCenterTab(resolved)) {
-      continue;
-    }
-    const auto psIt = pluginSettings.find(resolved.manifest->id);
-    const auto& overrides = psIt != pluginSettings.end() ? psIt->second : kNoOverrides;
-    auto seeded = scripting::seedEntrySettings(*resolved.entry, overrides);
-    scripting::mergePluginSettings(*resolved.manifest, overrides, seeded);
-
-    const auto chrome = pluginTabChrome(resolved);
-
-    TabSlot slot;
-    slot.id = resolved.fullId();
-    slot.title = chrome.title;
-    slot.glyph = chrome.glyph;
-    slot.hideable = true;
-    slot.plugin = true;
-    slot.group = TabGroup::Apps;
-    slot.tab = std::make_unique<PluginControlCenterTab>(scripting::PluginRuntimeContext{
-        .entryId = slot.id,
-        .sourcePath = resolved.sourcePath,
-        .pluginDir = resolved.pluginDir,
-        .settings = std::move(seeded),
-        .scriptApi = *m_scriptApi,
-        .fileWatcher = m_fileWatcher,
-        .httpClient = m_httpClient,
-        .clipboard = m_clipboard,
-        .platform = m_platform,
-    });
-    pluginSlots.push_back(std::move(slot));
-  }
-
-  // Plugin tabs join the Apps cluster, just before the Plugins store.
-  auto insertAt = std::ranges::find_if(m_slots, [](const TabSlot& slot) { return slot.id == "plugins"; });
-  m_slots.insert(
-      insertAt, std::make_move_iterator(pluginSlots.begin()), std::make_move_iterator(pluginSlots.end())
-  );
-
-  if (slotById(previouslyActive) == nullptr) {
-    m_activeTabId = firstVisibleTab();
   }
 }
 

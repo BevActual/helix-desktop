@@ -12,7 +12,6 @@ namespace wallpaper::video {
 
   inline constexpr std::string_view kBinary = "mpvpaper";
   inline constexpr std::string_view kWildcardConnector = "*";
-  inline constexpr std::string_view kPluginId = "noctalia/mpvpaper";
 
   struct LaunchSpec {
     std::string connector;

@@ -49,7 +49,6 @@
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
-#include "launcher/plugin_launcher_provider.h"
 #include "launcher/session_provider.h"
 #include "launcher/wallpaper_provider.h"
 #include "launcher/window_provider.h"
@@ -64,15 +63,9 @@
 #include "render/backend/render_backend.h"
 #include "render/core/texture_manager.h"
 #include "render/text/font_weight_catalog.h"
-#include "scripting/plugin_ipc.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_panel_shell.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
-#include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
@@ -194,11 +187,6 @@ Application::~Application() {
   ColorPickerDialog::setPresenter(nullptr);
   GlyphPickerDialog::setPresenter(nullptr);
   FileDialog::setPresenter(nullptr);
-  // m_systemMonitor is declared after the plugin hosts, so it is destroyed first; drop the script
-  // API's pointer to it here, while both are still alive, or a plugin that used noctalia.cpuCores
-  // releases its reference through a dangling pointer as its host is torn down.
-  m_scriptApi.setSystemMonitor(nullptr);
-  m_scriptApi.setAiUsageSnapshot({});
   TooltipManager::instance().shutdown();
   m_notificationManager.flushPersistedHistory();
   m_wayland.setClipboardService(nullptr);
@@ -212,56 +200,7 @@ void Application::run(std::function<void()> startupReadyCallback) {
   initLogLevelFromEnvironment();
   kLog.info("Helix Shell {}", noctalia::build_info::displayVersion());
   runStartupPhase("initServices", [this]() { initServices(); });
-  runStartupPhase("initPlugins", [this]() {
-    // Configure the plugin registry from [plugins] before any UI consumes it, and
-    // re-apply on reload. Registered first so the registry updates ahead of bar /
-    // control-center rebuilds when a plugin is enabled or disabled.
-    m_pluginManager.refresh();
-    m_configService.addReloadCallback([this]() { m_pluginManager.refresh(); });
-    // Opt-in auto-update: pull each flagged git source in the background, once now
-    // and then every 6h so a long-running session isn't stuck on the startup snapshot.
-    runPluginAutoUpdate();
-    m_pluginAutoUpdateTimer.startRepeating(std::chrono::hours(6), [this]() { runPluginAutoUpdate(); });
-  });
   runStartupPhase("initUi", [this]() { initUi(); });
-  runStartupPhase("initPluginServices", [this]() {
-    // Outputs are enumerated by now (wallpaper created its surfaces in initUi); refresh
-    // the script-visible output snapshot before any service/panel reads noctalia.outputs().
-    if (m_syncScriptApiOutputs) {
-      m_syncScriptApiOutputs();
-    }
-    m_pluginServiceHost.start(m_configService.config().plugins.pluginSettings);
-    // Reconcile services when plugin settings change (start new, stop removed, re-seed
-    // changed). Guarded by the plugins change flag so unrelated reloads don't churn.
-    m_configService.addReloadCallback([this]() {
-      if (m_configService.lastChange().plugins) {
-        m_pluginServiceHost.refresh(m_configService.config().plugins.pluginSettings);
-        reloadPluginLauncherProviders();
-        reloadPluginPanels();
-        m_settingsInvalidated.emit();
-      }
-    });
-    // Plugins materialized after the bar was built (first-run clone/export) or a git
-    // update() advance a source without a config change, so they bypass the config-reload
-    // path. reload() rebuilds the bar widget tree against the now-populated registry —
-    // refresh() only repaints, leaving newly available plugin widgets uncreated.
-    m_pluginManager.setOnChanged([this]() {
-      m_pluginServiceHost.refresh(m_configService.config().plugins.pluginSettings);
-      m_bar.reload();
-      reloadPluginLauncherProviders();
-      reloadPluginPanels();
-      m_settingsInvalidated.emit();
-    });
-    // A git-source enable exports on a worker thread; redraw the plugins list so the
-    // row swaps between its spinner and toggle as the export starts and finishes.
-    m_pluginManager.setOnEnablingChanged([this]() { m_settingsInvalidated.emit(); });
-    m_pluginManager.setOnSourceUpdated([this](const std::string& sourceName) {
-      if (m_controlCenter != nullptr) {
-        m_controlCenter->invalidatePluginSource(sourceName);
-      }
-    });
-    m_pluginManager.setOnEnabled([this](std::string_view pluginId) { m_pluginServiceHost.enablePlugin(pluginId); });
-  });
   runStartupPhase("initIpc", [this]() { initIpc(); });
   runStartupPhase("buildPollSources", [this]() { (void)buildPollSources(); });
 

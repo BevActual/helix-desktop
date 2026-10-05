@@ -27,8 +27,6 @@
 #include "shell/bar/widgets/debug_indicator_widget.h"
 #endif
 #include "capture/screenshot_service.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_registry.h"
 #include "shell/bar/widgets/idle_inhibitor_widget.h"
 #include "shell/bar/widgets/keyboard_layout_widget.h"
 #include "shell/bar/widgets/keyboard_layout_widget_definition.h"
@@ -43,7 +41,6 @@
 #include "shell/bar/widgets/nightlight_widget.h"
 #include "shell/bar/widgets/notification_widget.h"
 #include "shell/bar/widgets/notification_widget_definition.h"
-#include "shell/bar/widgets/plugin_widget.h"
 #include "shell/bar/widgets/power_profile_widget.h"
 #include "shell/bar/widgets/privacy_widget.h"
 #include "shell/bar/widgets/privacy_widget_definition.h"
@@ -107,10 +104,7 @@ WidgetFactory::WidgetFactory(const BarServices& services)
       m_aiUsage(services.aiUsage),
       m_nightLight(services.nightLight), m_themeService(services.theme), m_bluetooth(services.bluetooth),
       m_brightness(services.brightness), m_lockKeys(services.lockKeys), m_clipboard(services.clipboard),
-      m_fileWatcher(services.fileWatcher), m_screenshots(services.screenshots), m_renderContext(services.renderContext),
-      m_scriptApi(services.scriptApi) {
-  scripting::PluginRegistry::instance().ensureScanned();
-}
+      m_fileWatcher(services.fileWatcher), m_screenshots(services.screenshots), m_renderContext(services.renderContext) {}
 
 WidgetFactory::~WidgetFactory() = default;
 
@@ -392,52 +386,6 @@ std::unique_ptr<Widget> WidgetFactory::create(
   if (const auto builtin = std::ranges::find(kBuiltinWidgets, type, &BuiltinWidget::type);
       builtin != kBuiltinWidgets.end()) {
     return builtin->create(*this, context);
-  }
-
-  if (auto pluginEntry = scripting::PluginRegistry::instance().resolve(type);
-      pluginEntry.has_value() && pluginEntry->entry->kind == scripting::PluginEntryKind::Widget) {
-    if (m_scriptApi == nullptr) {
-      return nullptr;
-    }
-    const auto* outputInfo = m_platform.findOutputByWl(output);
-    const std::string outputName = outputInfo != nullptr ? outputInfo->connectorName : std::string{};
-    std::unordered_map<std::string, WidgetSettingValue> overrides;
-    if (wc != nullptr) {
-      overrides = wc->settings;
-      for (const auto& field : pluginEntry->entry->settings) {
-        if (field.type != scripting::ManifestFieldType::StringMap) {
-          continue;
-        }
-        if (const auto tableIt = wc->tables.find(field.key); tableIt != wc->tables.end()) {
-          overrides.insert_or_assign(field.key, tableIt->second);
-        }
-      }
-    }
-    auto seeded = scripting::seedEntrySettings(*pluginEntry->entry, overrides);
-    const auto& pluginSettings = m_config.plugins.pluginSettings;
-    const auto psIt = pluginSettings.find(pluginEntry->manifest->id);
-    static const std::unordered_map<std::string, WidgetSettingValue> kNoPluginOverrides;
-    scripting::mergePluginSettings(
-        *pluginEntry->manifest, psIt != pluginSettings.end() ? psIt->second : kNoPluginOverrides, seeded
-    );
-    auto widget = std::make_unique<PluginWidget>(
-        scripting::PluginRuntimeContext{
-            .entryId = pluginEntry->fullId(),
-            .sourcePath = pluginEntry->sourcePath,
-            .pluginDir = pluginEntry->pluginDir,
-            .settings = std::move(seeded),
-            .scriptApi = *m_scriptApi,
-            .fileWatcher = m_fileWatcher,
-            .httpClient = m_httpClient,
-            .clipboard = m_clipboard,
-            .platform = &m_platform,
-            .audioSpectrum = m_audioSpectrum,
-            .mpris = m_mpris,
-        },
-        barName, outputName, context.verticalBar, enableScroll
-    );
-    widget->setContentScale(contentScale);
-    return widget;
   }
 
   kLog.warn("widget factory: unknown widget \"{}\"", name);

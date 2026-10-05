@@ -335,8 +335,6 @@ namespace settings {
         return "box";
       case WidgetReferenceKind::Named:
         return "tag";
-      case WidgetReferenceKind::Plugin:
-        return "puzzle";
       case WidgetReferenceKind::Unknown:
         return "help-circle";
       }
@@ -348,7 +346,6 @@ namespace settings {
       case WidgetReferenceKind::BuiltIn:
         return colorSpecFromRole(ColorRole::Primary);
       case WidgetReferenceKind::Named:
-      case WidgetReferenceKind::Plugin:
         return colorSpecFromRole(ColorRole::Secondary);
       case WidgetReferenceKind::Unknown:
         return colorSpecFromRole(ColorRole::Error);

@@ -59,10 +59,6 @@ namespace noctalia::theme {
   class ThemeService;
   class TemplateApplyService;
 }
-namespace scripting {
-  class ScriptApiContext;
-  class PluginManager;
-}
 namespace settings {
   class SettingsModalHost;
 }
@@ -102,7 +98,6 @@ struct ControlCenterServices {
   IpcService* ipc = nullptr;
   Wallpaper* wallpaper = nullptr;
   CalendarService* calendar = nullptr;
-  scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;
   ClipboardService* clipboard = nullptr;
   std::function<void(bool isImage)> scheduleClipboardAutoPaste;
@@ -110,7 +105,6 @@ struct ControlCenterServices {
   ThumbnailService* thumbnails = nullptr;
   WallpaperScanner* wallpaperScanner = nullptr;
   AsyncTextureCache* asyncTextures = nullptr;
-  scripting::PluginManager* pluginManager = nullptr;
   VideoWallpaperService* videoWallpaper = nullptr;
   ScreenRecorderService* screenRecorder = nullptr;
   TailscaleService* tailscale = nullptr;
@@ -154,7 +148,6 @@ struct ControlCenterServices {
         .printers = printers,
         .cast = cast,
         .aiUsage = aiUsage,
-        .scriptApi = scriptApi,
         .fileWatcher = fileWatcher,
         .httpClient = httpClient,
         .clipboard = clipboard,

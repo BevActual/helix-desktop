@@ -3540,35 +3540,13 @@ std::string WallpaperPicker::wallhavenApiKey() const {
   if (m_config == nullptr) {
     return {};
   }
-  const std::string configured = StringUtils::trim(m_config->config().wallpaper.wallhaven.apiKey);
-  if (!configured.empty()) {
-    return configured;
-  }
-  const auto pluginIt = m_config->config().plugins.pluginSettings.find(std::string(wallpaper::wallhaven::kPluginId));
-  if (pluginIt == m_config->config().plugins.pluginSettings.end()) {
-    return {};
-  }
-  const auto keyIt = pluginIt->second.find("api_key");
-  if (keyIt == pluginIt->second.end()) {
-    return {};
-  }
-  return noctalia::config::widgetSettingValueAs<std::string>(keyIt->second).value_or("");
+  return StringUtils::trim(m_config->config().wallpaper.wallhaven.apiKey);
 }
 
 std::filesystem::path WallpaperPicker::wallhavenDownloadDirectory() const {
   std::string configured;
   if (m_config != nullptr) {
     configured = m_config->config().wallpaper.wallhaven.downloadDir;
-    if (StringUtils::trim(configured).empty()) {
-      const auto pluginIt =
-          m_config->config().plugins.pluginSettings.find(std::string(wallpaper::wallhaven::kPluginId));
-      if (pluginIt != m_config->config().plugins.pluginSettings.end()) {
-        const auto dirIt = pluginIt->second.find("download_dir");
-        if (dirIt != pluginIt->second.end()) {
-          configured = noctalia::config::widgetSettingValueAs<std::string>(dirIt->second).value_or("");
-        }
-      }
-    }
   }
   return wallpaper::wallhaven::resolveDownloadDir(configured, rootDirectoryForSelection().string());
 }

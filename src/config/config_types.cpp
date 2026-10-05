@@ -54,51 +54,6 @@ std::vector<ShortcutConfig> defaultControlCenterShortcuts() {
   return {};
 }
 
-std::vector<PluginSourceConfig> defaultPluginSources() {
-  return {
-      {.kind = PluginSourceKind::Git,
-       .name = "official",
-       .location = "https://github.com/noctalia-dev/official-plugins"},
-      {.kind = PluginSourceKind::Git,
-       .name = "community",
-       .location = "https://github.com/noctalia-dev/community-plugins"},
-  };
-}
-
-bool isDefaultPluginSourceName(std::string_view name) {
-  const auto sources = defaultPluginSources();
-  return std::ranges::contains(sources, name, &PluginSourceConfig::name);
-}
-
-bool sourceInAutoUpdateScope(const PluginSourceConfig& source, PluginAutoUpdateMode mode) {
-  if (mode == PluginAutoUpdateMode::None || source.kind != PluginSourceKind::Git || !source.enabled) {
-    return false;
-  }
-  if (mode == PluginAutoUpdateMode::All) {
-    return true;
-  }
-  const auto official = defaultPluginSources()[0];
-  return source.name == official.name && source.location == official.location;
-}
-
-bool isValidPluginSourceName(std::string_view name) {
-  if (name.empty()) {
-    return false;
-  }
-  const auto first = static_cast<unsigned char>(name.front());
-  if (std::isalnum(first) == 0) {
-    return false;
-  }
-  for (const char ch : name) {
-    const auto c = static_cast<unsigned char>(ch);
-    if (std::isalnum(c) != 0 || ch == '_' || ch == '-' || ch == '.') {
-      continue;
-    }
-    return false;
-  }
-  return name != "." && name != "..";
-}
-
 std::vector<SessionPanelActionConfig> defaultSessionPanelActions() {
   return {
       SessionPanelActionConfig{

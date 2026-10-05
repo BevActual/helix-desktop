@@ -17,7 +17,6 @@
 #include "shell/bar/bar_reserved_zone.h"
 #include "shell/bar/widget.h"
 #include "shell/bar/widget_gesture_defaults.h"
-#include "shell/bar/widgets/plugin_widget.h"
 #include "shell/bar/widgets/taskbar_widget.h"
 #include "shell/bar/widgets/tray_widget.h"
 #include "shell/panel/panel_manager.h"
@@ -1451,21 +1450,18 @@ bool Bar::initialize(const BarServices& services) {
   m_clipboard = services.clipboard;
   m_fileWatcher = services.fileWatcher;
   m_screenshots = services.screenshots;
-  m_scriptApi = services.scriptApi;
 
   m_widgetFactory = std::make_unique<WidgetFactory>(services);
 
   m_lastBars = m_config->config().bars;
   m_lastWidgets = m_config->config().widgets;
   m_lastShadow = m_config->config().shell.shadow;
-  m_lastPlugins = m_config->config().plugins;
   m_config->addReloadCallback(
       [this]() {
         const auto& cfg = m_config->config();
         if (cfg.bars == m_lastBars
             && cfg.widgets == m_lastWidgets
-            && cfg.shell.shadow == m_lastShadow
-            && cfg.plugins == m_lastPlugins) {
+            && cfg.shell.shadow == m_lastShadow) {
           return;
         }
         reload();
@@ -1505,7 +1501,6 @@ BarServices Bar::services() const {
       .clipboard = m_clipboard,
       .fileWatcher = m_fileWatcher,
       .screenshots = m_screenshots,
-      .scriptApi = m_scriptApi,
   };
 }
 
@@ -1526,7 +1521,6 @@ void Bar::reload() {
   m_lastBars = m_config->config().bars;
   m_lastWidgets = m_config->config().widgets;
   m_lastShadow = m_config->config().shell.shadow;
-  m_lastPlugins = m_config->config().plugins;
   m_widgetFactory = std::make_unique<WidgetFactory>(services());
 
   if (recreateForOrder) {
@@ -2634,12 +2628,6 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
           surface->requestFrameTick();
         }
       });
-      if (auto* plugin = dynamic_cast<PluginWidget*>(widget.get()); plugin != nullptr) {
-        plugin->setUpdateDeferralCallback([]() {
-          auto* panel = PanelManager::current();
-          return panel != nullptr && panel->isPanelTransitionActive();
-        });
-      }
       widget->setPanelToggleCallback([this, inst = &instance](
                                          std::string_view panelId, std::string_view context,
                                          std::optional<float> anchorSurfaceX, std::optional<float> anchorSurfaceY,

@@ -52,7 +52,6 @@
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
-#include "launcher/plugin_launcher_provider.h"
 #include "launcher/session_provider.h"
 #include "launcher/wallpaper_provider.h"
 #include "launcher/window_provider.h"
@@ -67,16 +66,9 @@
 #include "render/backend/render_backend.h"
 #include "render/core/texture_manager.h"
 #include "render/text/font_weight_catalog.h"
-#include "scripting/plugin_ipc.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_panel_shell.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
-#include "scripting/script_runtime.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
-#include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
@@ -128,7 +120,6 @@ namespace {
 
   void signal_handler(int signum) {
     if (signum == SIGTERM || signum == SIGINT) {
-      scripting::ScriptRuntime::setShutdownSignal(signum);
       Application::s_shutdownRequested = true;
     }
   }
@@ -151,87 +142,6 @@ namespace {
     }
   }
 
-  scripting::ScriptApiContext::AiUsageSnapshot scriptAiUsageFrom(const noctalia::ai_usage::Snapshot& snapshot) {
-    scripting::ScriptApiContext::AiUsageSnapshot out;
-    out.refreshing = snapshot.refreshing;
-    if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
-      out.hot = scripting::ScriptApiContext::AiUsageHot{
-          .provider = std::string(noctalia::ai_usage::providerKey(hit->provider)),
-          .window = std::string(noctalia::ai_usage::windowKeyId(hit->window.key)),
-          .percent = static_cast<double>(hit->window.percent),
-      };
-    }
-    out.providers.reserve(snapshot.providers.size());
-    for (const auto& provider : snapshot.providers) {
-      if (!noctalia::ai_usage::providerVisible(provider.status)) {
-        continue;
-      }
-      scripting::ScriptApiContext::AiUsageProvider row;
-      row.id = std::string(noctalia::ai_usage::providerKey(provider.id));
-      row.status = std::string(noctalia::ai_usage::statusKey(provider.status));
-      row.plan = provider.plan;
-      row.stale = provider.stale;
-      row.windows.reserve(provider.windows.size());
-      for (const auto& window : provider.windows) {
-        scripting::ScriptApiContext::AiUsageWindow w;
-        w.id = std::string(noctalia::ai_usage::windowKeyId(window.key));
-        w.percent = static_cast<double>(window.percent);
-        w.used = window.used;
-        w.max = window.max;
-        if (window.reset.has_value()) {
-          w.resetsAtMs = std::chrono::duration<double, std::milli>(window.reset->time_since_epoch()).count();
-        }
-        row.windows.push_back(std::move(w));
-      }
-      out.providers.push_back(std::move(row));
-    }
-    if (noctalia::ai_usage::ollamaVisible(snapshot.ollama.status)) {
-      scripting::ScriptApiContext::AiUsageOllama ollama;
-      ollama.status = std::string(noctalia::ai_usage::ollamaStatusKey(snapshot.ollama.status));
-      ollama.version = snapshot.ollama.version;
-      ollama.model = snapshot.ollama.selected;
-      ollama.models.reserve(snapshot.ollama.models.size());
-      for (const auto& model : snapshot.ollama.models) {
-        ollama.models.push_back(
-            {.name = model.name, .size = model.size, .loaded = model.loaded, .vram = model.vram}
-        );
-      }
-      out.ollama = std::move(ollama);
-    }
-    if (noctalia::ai_usage::localAiVisible(snapshot.localAi.status)) {
-      scripting::ScriptApiContext::AiUsageLocalAi localai;
-      localai.status = std::string(noctalia::ai_usage::localAiStatusKey(snapshot.localAi.status));
-      localai.version = snapshot.localAi.version;
-      localai.url = snapshot.localAi.baseUrl;
-      localai.model = std::string(noctalia::ai_usage::effectiveLocalAiModel(snapshot.localAi));
-      localai.backends = snapshot.localAi.backends;
-      localai.models.reserve(snapshot.localAi.models.size());
-      for (const auto& model : snapshot.localAi.models) {
-        scripting::ScriptApiContext::AiUsageLocalAiModel row;
-        row.id = model.id;
-        row.backend = model.backend;
-        row.capabilities.reserve(model.capabilities.size());
-        for (const auto capability : model.capabilities) {
-          row.capabilities.emplace_back(noctalia::ai_usage::localAiCapabilityKey(capability));
-        }
-        row.inputModalities = model.inputModalities;
-        row.outputModalities = model.outputModalities;
-        row.contextSize = model.contextSize;
-        row.loaded = model.loaded;
-        localai.models.push_back(std::move(row));
-      }
-      out.localai = std::move(localai);
-    }
-    out.localRuntimes.reserve(snapshot.localRuntimes.size());
-    for (const auto& runtime : snapshot.localRuntimes) {
-      out.localRuntimes.push_back({
-          .id = std::string(noctalia::ai_usage::localRuntimeKey(runtime.kind)),
-          .port = runtime.port,
-          .models = runtime.models,
-      });
-    }
-    return out;
-  }
 } // namespace
 
 void Application::scheduleNotificationShellRefresh() {
@@ -729,17 +639,11 @@ void Application::initStyleThemeAndWayland() {
   applyStyleConfig();
   applyPasswordMaskStyle();
   m_httpClient.setOfflineMode(m_configService.config().shell.offlineMode);
-  m_scriptApi.setConfigSnapshot(
-      std::make_shared<const toml::table>(config_export::serialize(m_configService.config()))
-  );
   m_configService.addReloadCallback(applyMotionConfig);
   m_configService.addReloadCallback(applyStyleConfig);
   m_configService.addReloadCallback(applyPasswordMaskStyle);
   m_configService.addReloadCallback([this]() {
     m_httpClient.setOfflineMode(m_configService.config().shell.offlineMode);
-    m_scriptApi.setConfigSnapshot(
-        std::make_shared<const toml::table>(config_export::serialize(m_configService.config()))
-    );
   });
   m_configService.addReloadCallback([this]() { syncClipboardService(); });
   m_configService.addReloadCallback([this]() { syncScreenTimeService(); });
@@ -784,84 +688,6 @@ void Application::initStyleThemeAndWayland() {
   });
 
   // Apply theme before any UI constructs palette-dependent scene nodes.
-  auto syncScriptApiWallpaperDirectory = [this]() {
-    // Wallpapers are a shell surface, so they follow Noctalia's own mode.
-    const ThemeMode mode = m_themeService.isLightMode() ? ThemeMode::Light : ThemeMode::Dark;
-    m_scriptApi.setWallpaperDirectory(
-        wallpaper::resolveGlobalWallpaperDirectory(m_configService.config().wallpaper, mode)
-    );
-  };
-
-  auto syncScriptApiShellTimeFormats = [this]() {
-    m_scriptApi.setTimeFormat(m_configService.config().shell.timeFormat);
-    m_scriptApi.setDateFormat(m_configService.config().shell.dateFormat);
-  };
-
-  // Publish the connected outputs to plugin scripts (noctalia.outputs()), refreshed on every
-  // output change so the worker-thread binding reads a race-free copy.
-  m_syncScriptApiOutputs = [this]() {
-    std::vector<scripting::ScriptOutputInfo> infos;
-    std::unordered_map<std::string, std::string> wallpaperPaths;
-    wl_output* const focused = m_compositorPlatform.preferredInteractiveOutput();
-    for (const auto& out : m_wayland.outputs()) {
-      if (!out.done || out.connectorName.empty()) {
-        continue;
-      }
-      infos.push_back({
-          .name = out.connectorName,
-          .description = out.description,
-          .width = out.effectiveLogicalWidth(),
-          .height = out.effectiveLogicalHeight(),
-          .x = out.logicalX,
-          .y = out.logicalY,
-          .scale = out.scale,
-          .focused = out.output == focused,
-      });
-      wallpaperPaths.insert_or_assign(out.connectorName, m_configService.getWallpaperPath(out.connectorName));
-    }
-    m_scriptApi.setOutputs(std::move(infos));
-    m_scriptApi.setWallpaperPaths(std::move(wallpaperPaths));
-  };
-  m_syncScriptApiOutputs();
-
-  // Let a plugin (e.g. mpvpaper) take over an output's wallpaper surface.
-  m_scriptApi.setWallpaperEnabledHook([this](const std::string& connector, bool enabled) {
-    m_wallpaper.setOutputExternallyManaged(connector, !enabled);
-  });
-
-  // Let a plugin apply a wallpaper image (e.g. wallhaven)
-  m_scriptApi.setWallpaperHook([this](const std::string& connector, const std::string& path) {
-    const std::optional<std::string> target = connector.empty() ? std::nullopt : std::optional<std::string>{connector};
-    if (!m_wallpaper.applyWallpaperImage(target, path)) {
-      kLog.warn("plugin setWallpaper failed for \"{}\"", path);
-    }
-  });
-
-  m_scriptApi.setWallpaperMaskHook([this](
-                                       std::uint64_t ownerId, const std::string& outputName, const std::string& path,
-                                       const std::string& wallpaperPath
-                                   ) {
-    if (path.empty()) {
-      m_desktopWidgetsController.setWallpaperMask(ownerId, outputName, std::nullopt);
-      return;
-    }
-    m_desktopWidgetsController.setWallpaperMask(
-        ownerId, outputName, OutputWallpaperMask{.ownerId = ownerId, .path = path, .wallpaperPath = wallpaperPath}
-    );
-  });
-  m_scriptApi.setClearWallpaperMasksHook([this](std::uint64_t ownerId) {
-    m_desktopWidgetsController.clearWallpaperMasks(ownerId);
-  });
-
-  // Let a plugin toggle one of its own panels.
-  m_scriptApi.setTogglePanelHook([this](const std::string& panelId) { m_panelManager.togglePanel(panelId); });
-
-  m_scriptApi.setOpenPluginSettingsHook([this](const std::string& pluginId) {
-    if (!m_panelManager.openPluginSettings(pluginId)) {
-      kLog.warn("plugin openSettings ignored: \"{}\" has no settings", pluginId);
-    }
-  });
-
   // Runs once per applied generation: the gsettings color-scheme write has to land after the
   // gtk-theme templates, and colors_changed only concerns a palette that actually changed.
   m_templateApplyService.setAfterApplyCallback([this](std::string_view appliedMode, bool paletteChanged) {
@@ -872,14 +698,11 @@ void Application::initStyleThemeAndWayland() {
   });
   m_templateApplyService.setFailuresChangedCallback([this]() { m_settingsInvalidated.emit(); });
 
-  m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{},
-                                      syncScriptApiWallpaperDirectory](
+  m_themeService.setResolvedCallback([this, lastResolvedThemeMode = std::optional<std::string>{}](
                                          const noctalia::theme::GeneratedPalette&, std::string_view mode
                                      ) mutable {
     const std::string resolvedMode(mode);
     const std::string configuredMode(enumToKey(kThemeModes, m_themeService.configuredMode()));
-    m_scriptApi.setDarkMode(!m_themeService.isLightMode());
-    syncScriptApiWallpaperDirectory();
     const std::optional<std::string> previousMode = lastResolvedThemeMode;
     lastResolvedThemeMode = resolvedMode;
     // Appearance exports are owned by helix-service. The shell handles only UI and hooks.
@@ -894,11 +717,7 @@ void Application::initStyleThemeAndWayland() {
   });
   m_themeService.apply();
   // Desktop-wide appearance exports are performed by helix-service.
-  syncScriptApiWallpaperDirectory();
-  syncScriptApiShellTimeFormats();
   m_configService.addReloadCallback([this]() { m_themeService.onConfigReload(); }, "theme");
-  m_configService.addReloadCallback(syncScriptApiWallpaperDirectory, "wallpaper");
-  m_configService.addReloadCallback(syncScriptApiShellTimeFormats, "shell-time-formats");
   {
     static ShellAppIconColorizationSettings lastAppIconColorization =
         shellAppIconColorizationSettings(m_configService.config().shell);
@@ -988,23 +807,17 @@ void Application::initWaylandCallbacks() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
   m_wayland.setOutputChangeCallback([this]() {
-    if (m_syncScriptApiOutputs) {
-      m_syncScriptApiOutputs();
-    }
     if (m_brightnessService != nullptr) {
       m_brightnessService->onOutputsChanged();
     }
     m_gammaService.onOutputsChanged();
-    m_pluginServiceHost.onOutputChange();
     reconcileOutputSurfaces();
   });
   m_clipboardService.setChangeCallback([this]() {
-    m_scriptApi.setClipboardText(m_clipboardService.clipboardText());
     if (m_panelManager.isOpenPanel("clipboard")) {
       m_panelManager.refresh();
     }
   });
-  m_scriptApi.setClipboardText(m_clipboardService.clipboardText());
   m_compositorPlatform.setWorkspaceAlertService(&m_workspaceAlertService);
   m_compositorPlatform.setWorkspaceChangeCallback([this]() {
     // Clear alerts for the workspace the user just switched to. Limit to the
@@ -1102,9 +915,6 @@ void Application::initAuxServicesAndHooks() {
   // Register all wallpaper consumers in the single-callback slot.
   m_configService.setWallpaperChangeCallback([this]() {
     const auto wallpaperChanges = m_wallpaper.onStateChange();
-    if (m_syncScriptApiOutputs) {
-      m_syncScriptApiOutputs();
-    }
     m_backdrop.onStateChange();
     m_lockScreen.onWallpaperChanged();
     m_themeService.onWallpaperChange();
@@ -1145,7 +955,6 @@ void Application::initAuxServicesAndHooks() {
 
   try {
     m_systemMonitor = std::make_unique<SystemMonitorService>(m_configService.config().system.monitor);
-    m_scriptApi.setSystemMonitor(m_systemMonitor.get());
     if (m_systemMonitor->isRunning()) {
       kLog.info("system monitor service active");
     } else {
@@ -1175,7 +984,6 @@ void Application::initAuxServicesAndHooks() {
     });
   } catch (const std::exception& e) {
     kLog.warn("system monitor service disabled: {}", e.what());
-    m_scriptApi.setSystemMonitor(nullptr);
     m_systemMonitor.reset();
   }
 }
@@ -1621,28 +1429,6 @@ void Application::initBrightnessAndPipewire() {
     m_wirePlumberMixer.reset();
   }
 
-  const std::weak_ptr<SoundPlayer> soundPlayer = m_soundPlayer;
-  m_scriptApi.setLoadSoundHook(
-      [soundPlayer](
-          std::uint64_t ownerId, const std::string& name, const std::string& path
-      ) -> std::optional<std::string> {
-        const auto player = soundPlayer.lock();
-        if (player == nullptr) {
-          return "sound playback is unavailable";
-        }
-        return player->loadPluginSound(ownerId, name, std::filesystem::path(path));
-      }
-  );
-  m_scriptApi.setPlaySoundHook([soundPlayer](std::uint64_t ownerId, const std::string& name) {
-    if (const auto player = soundPlayer.lock()) {
-      player->playPluginSound(ownerId, name);
-    }
-  });
-  m_scriptApi.setUnloadPluginSoundsHook([soundPlayer](std::uint64_t ownerId) {
-    if (const auto player = soundPlayer.lock()) {
-      player->unloadPluginSounds(ownerId);
-    }
-  });
 }
 
 void Application::initCamera() { m_cameraService = std::make_unique<CameraService>(); }
@@ -1752,10 +1538,7 @@ void Application::initSessionBusServices() {
   m_localSendService.start();
   m_syncthingService.start();
   m_aiUsageService.start();
-  auto publishAiUsage = [this]() { m_scriptApi.setAiUsageSnapshot(scriptAiUsageFrom(m_aiUsageService.snapshot())); };
-  publishAiUsage();
-  m_aiUsageService.addChangeCallback([this, publishAiUsage, shouldRefreshControlCenter]() {
-    publishAiUsage();
+  m_aiUsageService.addChangeCallback([this, shouldRefreshControlCenter]() {
     m_bar.refresh();
     m_desktopWidgetsController.requestLayout();
     if (shouldRefreshControlCenter()) {

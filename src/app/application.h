@@ -33,9 +33,6 @@
 #include "render/core/thumbnail_service.h"
 #include "render/gl_shared_context.h"
 #include "render/render_context.h"
-#include "scripting/plugin_manager.h"
-#include "scripting/plugin_service_host.h"
-#include "scripting/script_api_context.h"
 #include "security/secret_store.h"
 #include "security/storage_key_provider.h"
 #include "shell/backdrop/backdrop.h"
@@ -202,15 +199,8 @@ private:
   // and on every output change so first-run stacking matches hot reload.
   void reconcileOutputSurfaces();
   void initIpc();
-  // (Re)register plugin-backed launcher providers from the enabled plugin set.
-  void reloadPluginLauncherProviders();
   // (Re)register config-driven dmenu launcher providers ([shell.launcher.dmenu.entry.*]).
   void reloadDmenuProviders();
-  // (Re)register plugin-backed panels from the enabled plugin set.
-  void reloadPluginPanels();
-  // When [plugins].auto_update is on, pull git sources per the configured mode. Run once at
-  // startup and on a 6h repeating timer so long-lived sessions pick up new plugin versions.
-  void runPluginAutoUpdate();
   void refreshPackageUpdates();
   void startTrayService();
   void syncNotificationDaemon();
@@ -272,10 +262,6 @@ private:
   noctalia::theme::CommunityTemplateService m_communityTemplateService{m_httpClient};
   noctalia::theme::ThemeService m_themeService{m_configService, m_httpClient};
   noctalia::theme::TemplateApplyService m_templateApplyService{m_configService};
-  scripting::ScriptApiContext m_scriptApi;
-  std::function<void()> m_syncScriptApiOutputs;
-  scripting::PluginManager m_pluginManager{m_configService};
-  scripting::PluginServiceHost m_pluginServiceHost{m_scriptApi, &m_httpClient, &m_clipboardService, &m_fileWatcher};
   TimeService m_timeService;
   LockKeysService m_lockKeysService;
   NotificationManager m_notificationManager;
@@ -373,11 +359,8 @@ private:
   LockscreenWidgetsController m_lockscreenWidgetsController;
   SessionActionRunner m_sessionActionRunner{m_compositorPlatform, m_lockScreen};
   PanelManager m_panelManager;
-  // Owned by m_panelManager; kept raw so plugin launcher providers can be re-applied.
+  // Owned by m_panelManager.
   LauncherPanel* m_launcherPanel = nullptr;
-  // Ids of plugin-backed panels currently registered with m_panelManager, so a
-  // reload can retire the previous set before registering the new one.
-  std::vector<std::string> m_pluginPanelIds;
   WindowSwitcher m_windowSwitcher;
   OverviewLauncherCapture m_overviewLauncherCapture;
   NotificationToast m_notificationToast;
@@ -444,7 +427,6 @@ private:
   Timer m_greeterAutoSyncTimer;
   Timer m_clipboardAutoPasteTimer;
   Timer m_launcherAutoPasteTimer;
-  Timer m_pluginAutoUpdateTimer;
   Timer m_packageUpdateTimer;
   Timer m_graphicsRecoveryTimer;
   std::uint64_t m_greeterSyncGeneration = 0;

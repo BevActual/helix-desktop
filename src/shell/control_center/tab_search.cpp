@@ -35,7 +35,6 @@ namespace control_center {
         {"network", "wifi wi-fi wireless internet ethernet vpn cellular"},
         {"notifications", "notify notification dnd do-not-disturb history clear filter today yesterday"},
         {"packages", "package packages updates rpm dnf pkcon store flatpak firmware fwupd"},
-        {"plugins", "plugin extension extensions addons"},
         {"power", "battery batteries sleep suspend lock caffeine idle profile health charging peripherals shutdown reboot logout"},
         {"capture", "screenshot screen-shot shot record recorder recording screen-record"},
         {"screen-time", "screentime usage"},

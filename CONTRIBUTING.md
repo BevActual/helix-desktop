@@ -46,7 +46,6 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 | Markdown | `md4c` |
 | Fuzzy matching | `fzy` (vendored) |
 | Math expressions | `libqalculate` |
-| Scripting | `Luau` (vendored) |
 | Theme generation | Material Color Utilities (vendored) |
 | Memory allocation | `jemalloc` (optional) |
 
@@ -182,7 +181,7 @@ src/
   i18n/             Translation catalog and language tag handling
   idle/             Idle manager, inhibitor, grace overlay
   ipc/              IPC client/service and CLI command parsing
-  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows, plugins)
+  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows)
   net/              HTTP client, URI parsing, URL opening
   notification/     Notification model, manager, filtering, history
   pipewire/         PipeWire audio service, sound playback, spectrum analyzer
@@ -193,7 +192,6 @@ src/
     programs/       GLES shader programs
     scene/          Scene graph nodes and pointer input dispatch
     text/           Cairo/Pango text and glyph rendering
-  scripting/        Luau plugin runtime, manifests, registry, source management, bindings
   shell/
     backdrop/       Backdrop layer surfaces
     bar/            Bar surface, instance, widget base/factory
@@ -243,7 +241,6 @@ nix/                Nix package, module, and dev shell definitions
 third_party/
   wuffs/          Raster image decoding (vendored)
   fzy/            Fuzzy matching (vendored)
-  luau/           Plugin scripting runtime (vendored)
   material_color_utilities/ Material Design color generation (vendored)
 ```
 

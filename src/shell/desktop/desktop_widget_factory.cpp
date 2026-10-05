@@ -2,8 +2,6 @@
 
 #include "config/config_service.h"
 #include "core/log.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
 #include "shell/desktop/widgets/desktop_audio_visualizer_widget.h"
 #include "shell/desktop/widgets/desktop_button_widget.h"
 #include "shell/desktop/widgets/desktop_calendar_widget.h"
@@ -17,7 +15,6 @@
 #include "shell/desktop/widgets/desktop_sysmon_widget.h"
 #include "shell/desktop/widgets/desktop_volume_widget.h"
 #include "shell/desktop/widgets/desktop_weather_widget.h"
-#include "shell/desktop/widgets/plugin_desktop_widget.h"
 #include "system/format_units.h"
 #include "ui/controls/button.h"
 
@@ -457,40 +454,6 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
   if (type == "login_box") {
     auto widget = std::make_unique<DesktopLoginBoxWidget>();
     widget->setSettings(settings);
-    widget->setContentScale(contentScale);
-    return widget;
-  }
-
-  if (auto pluginEntry = scripting::PluginRegistry::instance().resolve(type);
-      pluginEntry.has_value() && pluginEntry->entry->kind == scripting::PluginEntryKind::DesktopWidget) {
-    if (m_scriptDeps.scriptApi == nullptr) {
-      kLog.warn("desktop widget factory: plugin widget \"{}\" requires script support in this host", type);
-      return nullptr;
-    }
-    auto seeded = scripting::seedEntrySettings(*pluginEntry->entry, settings);
-    static const std::unordered_map<std::string, WidgetSettingValue> kNoPluginOverrides;
-    const auto* pluginOverrides = &kNoPluginOverrides;
-    if (m_scriptDeps.configService != nullptr) {
-      const auto& pluginSettings = m_scriptDeps.configService->config().plugins.pluginSettings;
-      if (const auto psIt = pluginSettings.find(pluginEntry->manifest->id); psIt != pluginSettings.end()) {
-        pluginOverrides = &psIt->second;
-      }
-    }
-    scripting::mergePluginSettings(*pluginEntry->manifest, *pluginOverrides, seeded);
-    auto widget = std::make_unique<PluginDesktopWidget>(
-        scripting::PluginRuntimeContext{
-            .entryId = pluginEntry->fullId(),
-            .sourcePath = pluginEntry->sourcePath,
-            .pluginDir = pluginEntry->pluginDir,
-            .settings = std::move(seeded),
-            .scriptApi = *m_scriptDeps.scriptApi,
-            .fileWatcher = m_scriptDeps.fileWatcher,
-            .httpClient = m_httpClient,
-            .clipboard = m_scriptDeps.clipboard,
-        },
-        std::string{}
-    );
-    applyCommonSettings(*widget, settings);
     widget->setContentScale(contentScale);
     return widget;
   }

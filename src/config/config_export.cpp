@@ -100,37 +100,6 @@ namespace config_export {
       return table;
     }
 
-    // [plugin_settings."author/plugin"] — the per-plugin override maps, keyed by plugin
-    // id. Open-ended (validated against each plugin's manifest), so it is emitted from
-    // the parsed values rather than a schema.
-    toml::table pluginSettingsTable(const PluginsConfig& plugins) {
-      toml::table table;
-      std::vector<std::string> pluginIds;
-      pluginIds.reserve(plugins.pluginSettings.size());
-      for (const auto& [pluginId, settings] : plugins.pluginSettings) {
-        (void)settings;
-        pluginIds.push_back(pluginId);
-      }
-      std::ranges::sort(pluginIds);
-
-      for (const auto& pluginId : pluginIds) {
-        const auto& settings = plugins.pluginSettings.at(pluginId);
-        toml::table perPlugin;
-        std::vector<std::string> keys;
-        keys.reserve(settings.size());
-        for (const auto& [key, value] : settings) {
-          (void)value;
-          keys.push_back(key);
-        }
-        std::ranges::sort(keys);
-        for (const auto& key : keys) {
-          insertWidgetSettingValue(perPlugin, key, settings.at(key));
-        }
-        table.insert_or_assign(pluginId, std::move(perPlugin));
-      }
-      return table;
-    }
-
     BarConfig applyMonitorOverride(const BarConfig& base, const BarMonitorOverride& ovr) {
       BarConfig resolved = base;
       if (ovr.position)
@@ -367,7 +336,6 @@ namespace config_export {
       widgetRoot.insert_or_assign(name, widgetConfigTable(config.widgets.at(name)));
     }
     root.insert_or_assign("widget", std::move(widgetRoot));
-    root.insert_or_assign("plugin_settings", pluginSettingsTable(config.plugins));
 
     return root;
   }

@@ -46,7 +46,6 @@
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
 #include "launcher/panel_provider.h"
-#include "launcher/plugin_launcher_provider.h"
 #include "launcher/session_provider.h"
 #include "launcher/wallpaper_provider.h"
 #include "launcher/window_provider.h"
@@ -60,11 +59,6 @@
 #include "render/backend/render_backend.h"
 #include "render/core/texture_manager.h"
 #include "render/text/font_weight_catalog.h"
-#include "scripting/plugin_ipc.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_panel_shell.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
 #include "shell/clipboard/clipboard_paste.h"
 #include "shell/quick_insert/quick_insert_panel.h"
 #include "shell/control_center/control_center_panel.h"
@@ -73,11 +67,9 @@
 #include "system/package_kit_service.h"
 #include "shell/settings/font_family_catalog.h"
 #include "shell/launcher/launcher_panel.h"
-#include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
-#include "shell/settings/settings_content_plugins.h"
 #include "shell/settings/settings_runtime.h"
 #include "shell/setup_wizard/setup_wizard_panel.h"
 #include "shell/test/test_panel.h"
@@ -123,6 +115,23 @@ namespace {
     return false;
   }
 } // namespace
+
+void Application::reloadDmenuProviders() {
+  if (m_launcherPanel == nullptr) {
+    return;
+  }
+  m_launcherPanel->clearProvidersWithIdPrefix("dmenu.");
+  for (const auto& entry : m_configService.config().shell.launcher.dmenu.entries) {
+    if (entry.command.empty() && !entry.freeform) {
+      kLog.warn("[{}] missing command, skipping", entry.id);
+      continue;
+    }
+    if (entry.prefix.value_or("").empty() && !entry.global) {
+      kLog.warn("[{}] no prefix and global=false; unreachable until configured", entry.id);
+    }
+    m_launcherPanel->addProvider(std::make_unique<DmenuProvider>(entry, &m_clipboardService));
+  }
+}
 
 void Application::initUi() {
   initUiRenderSurfacesAndSettings();
@@ -682,7 +691,6 @@ void Application::initPanelManagerAndPanels() {
           .ipc = &m_ipcService,
           .wallpaper = &m_wallpaper,
           .calendar = &m_calendarService,
-          .scriptApi = &m_scriptApi,
           .fileWatcher = &m_fileWatcher,
           .clipboard = &m_clipboardService,
           .scheduleClipboardAutoPaste =
@@ -701,7 +709,6 @@ void Application::initPanelManagerAndPanels() {
           .thumbnails = &m_thumbnailService,
           .wallpaperScanner = &m_wallpaperScanner,
           .asyncTextures = &m_asyncTextureCache,
-          .pluginManager = &m_pluginManager,
           .videoWallpaper = &m_videoWallpaper,
           .screenRecorder = &m_screenRecorder,
           .tailscale = &m_tailscaleService,
@@ -783,9 +790,7 @@ void Application::initPanelManagerAndPanels() {
       },
       "launcher-usage"
   );
-  reloadPluginLauncherProviders();
   reloadDmenuProviders();
-  reloadPluginPanels();
   m_overviewLauncherCapture.initialize(m_wayland, &m_renderContext, m_compositorPlatform, m_panelManager);
   m_overviewLauncherCapture.setEnabled(overviewTypeToLaunchEnabled(m_configService));
   m_overviewLauncherCapture.setOpenLauncherCallback(
@@ -986,7 +991,6 @@ void Application::initBarDockAndLayout() {
       .clipboard = &m_clipboardService,
       .fileWatcher = &m_fileWatcher,
       .screenshots = &m_screenshotService,
-      .scriptApi = &m_scriptApi,
   });
   m_idleInhibitor.setAnchorSurfacesProvider([this]() { return m_bar.caffeineAnchorSurfaces(); });
   m_panelManager.setOpenWidgetSettingsCallback([this](std::string barName, std::string widgetName) {
@@ -994,17 +998,6 @@ void Application::initBarDockAndLayout() {
       m_controlCenter->queueBarWidget(std::move(barName), std::move(widgetName));
     }
     m_panelManager.openSettings("bar");
-  });
-  m_panelManager.setOpenPluginSettingsCallback([this](std::string pluginId) {
-    const auto* manifest = scripting::PluginRegistry::instance().findManifest(pluginId);
-    if (manifest == nullptr || !settings::pluginHasSettings(*manifest)) {
-      return false;
-    }
-    if (m_controlCenter != nullptr) {
-      m_controlCenter->queuePluginSettings(std::move(pluginId));
-    }
-    m_panelManager.openSettings("plugins");
-    return true;
   });
   m_panelManager.setAttachedPanelGeometryCallback(
       [this](wl_output* output, std::string_view barName, std::optional<AttachedPanelGeometry> geometry) {
@@ -1129,7 +1122,6 @@ void Application::initWidgetControllersAndCallbacks() {
     });
   }
   const DesktopWidgetScriptDeps desktopWidgetScriptDeps{
-      .scriptApi = &m_scriptApi,
       .fileWatcher = &m_fileWatcher,
       .clipboard = &m_clipboardService,
       .configService = &m_configService,

@@ -12,7 +12,6 @@
 namespace wallpaper::wallhaven {
 
   inline constexpr std::string_view kApiSearchUrl = "https://wallhaven.cc/api/v1/search";
-  inline constexpr std::string_view kPluginId = "noctalia/wallhaven";
 
   enum class Sort : std::uint8_t {
     Relevance,

@@ -17,7 +17,6 @@
 #include "render/animation/animation_manager.h"
 #include "render/core/async_texture_cache.h"
 #include "render/scene/input_area.h"
-#include "scripting/plugin_registry.h"
 #include "shell/control_center/pin_reorder.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/panel/panel_button_style.h"
@@ -750,16 +749,9 @@ void HomeTab::buildPinList(Flex& tab, float scale) {
     return;
   }
 
-  const bool pluginsChanged = m_config != nullptr && !(m_config->config().plugins == m_lastPlugins);
-  if (m_config != nullptr) {
-    m_lastPlugins = m_config->config().plugins;
-  }
-  auto takeReusable = [&previous, pluginsChanged](std::string_view type) -> std::unique_ptr<Shortcut> {
+  auto takeReusable = [&previous](std::string_view type) -> std::unique_ptr<Shortcut> {
     for (auto it = previous.begin(); it != previous.end(); ++it) {
       if (*it == nullptr || (*it)->id() != type) {
-        continue;
-      }
-      if (pluginsChanged && scripting::isPluginEntryOfKind(type, scripting::PluginEntryKind::Shortcut)) {
         continue;
       }
       auto found = std::move(*it);

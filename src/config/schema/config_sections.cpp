@@ -70,7 +70,6 @@ namespace noctalia::config::schema {
         t.push_back(makeSection("dock", &Config::dock, dockSchema()));
         t.push_back(makeSection("hot_corners", &Config::hotCorners, hotCornersSchema()));
         t.push_back(makeSection("control_center", &Config::controlCenter, controlCenterSchema()));
-        t.push_back(makeSection("plugins", &Config::plugins, pluginsSchema()));
         t.push_back(makeSection("hooks", &Config::hooks, hooksSchema()));
 
         return t;
@@ -89,12 +88,11 @@ namespace noctalia::config::schema {
   }
 
   std::span<const std::string_view> customRootKeys() {
-    static constexpr std::array<std::string_view, 8> kKeys = {
+    static constexpr std::array<std::string_view, 7> kKeys = {
         "bar",
         "widget",
         "desktop_widgets",
         "lockscreen_widgets",
-        "plugin_settings",
         "include",
         "config_version",
         // Template palette files (e.g. user-templates.toml) use [config.custom_colors].

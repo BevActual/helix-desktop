@@ -37,9 +37,6 @@ class GammaService;
 namespace noctalia::theme {
   class ThemeService;
 }
-namespace scripting {
-  class ScriptApiContext;
-}
 
 class WidgetFactory {
 public:
@@ -80,5 +77,4 @@ private:
   FileWatcher* m_fileWatcher;
   ScreenshotService* m_screenshots;
   RenderContext* m_renderContext = nullptr;
-  scripting::ScriptApiContext* m_scriptApi = nullptr;
 };

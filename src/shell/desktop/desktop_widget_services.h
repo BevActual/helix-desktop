@@ -14,14 +14,8 @@ class SystemMonitorService;
 class WaylandConnection;
 class WeatherService;
 
-namespace scripting {
-  class ScriptApiContext;
-}
-
-// Dependencies for plugin-backed (`[[desktop_widget]]`) widgets. All-null means
-// plugin desktop widgets are unavailable in this factory (e.g. tests).
+// Shared dependencies several desktop widgets read directly.
 struct DesktopWidgetScriptDeps {
-  scripting::ScriptApiContext* scriptApi = nullptr;
   FileWatcher* fileWatcher = nullptr;
   ClipboardService* clipboard = nullptr;
   ConfigService* configService = nullptr;

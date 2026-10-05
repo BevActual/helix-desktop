@@ -112,7 +112,7 @@ sudo moss install meson gcc clang just \
 ```
 
 Vendored dependencies, with no system package needed: `Wuffs`,
-`Luau`, `fzy`, and Material Color Utilities.
+`fzy`, and Material Color Utilities.
 
 System packages required beyond the Wayland/GL stack: `libwebp` handles WebP decoding and thumbnail encoding,
 `libjxl` handles JPEG XL decoding, `libsndfile` decodes shell sound effects (WAV, FLAC, Ogg/Vorbis, Opus, MP3, and

@@ -7,9 +7,6 @@
 #include <unordered_map>
 #include <vector>
 
-namespace scripting {
-  class PluginRegistry;
-}
 
 namespace desktop_settings {
 
@@ -24,7 +21,6 @@ namespace desktop_settings {
   };
 
   // One pickable widget type for the editor: built-in types (label translated)
-  // plus every plugin [[desktop_widget]] entry (value = "author/plugin:entry").
   struct DesktopWidgetTypeOption {
     std::string value;
     std::string label;
@@ -37,7 +33,7 @@ namespace desktop_settings {
   [[nodiscard]] std::vector<settings::WidgetSettingSpec> commonDesktopWidgetSettingSpecs(std::string_view type = {});
   // Schema projection (per-type + common settings), consumed by `config validate`.
   [[nodiscard]] noctalia::config::schema::WidgetSettingSchema
-  desktopWidgetSettingSchema(std::string_view type, scripting::PluginRegistry* pluginRegistry = nullptr);
+  desktopWidgetSettingSchema(std::string_view type);
   void applyDesktopWidgetDefaultSettings(
       std::unordered_map<std::string, WidgetSettingValue>& settings, std::string_view type,
       DesktopWidgetSettingsScope scope

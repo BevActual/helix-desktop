@@ -122,10 +122,8 @@ private:
   }
   std::string setting(const char* name, const std::string& configured) const {
     if (!StringUtils::trim(configured).empty()) return StringUtils::trim(configured);
-    const auto plugin = config.config().plugins.pluginSettings.find(std::string(wh::kPluginId));
-    if (plugin == config.config().plugins.pluginSettings.end()) return {};
-    const auto value = plugin->second.find(name);
-    return value == plugin->second.end() ? std::string{} : noctalia::config::widgetSettingValueAs<std::string>(value->second).value_or("");
+    (void)name;
+    return {};
   }
   void thumbnail(const std::shared_ptr<Job>& job, std::size_t index, std::uint64_t id) {
     if (job->cancelled || index >= job->items.size()) return;

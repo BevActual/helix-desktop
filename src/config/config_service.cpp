@@ -19,7 +19,6 @@
 #include "ipc/ipc_service.h"
 #include "launcher/launcher_provider.h"
 #include "notification/notification_manager.h"
-#include "scripting/plugin_id.h"
 #include "shell/desktop/desktop_widget_settings_registry.h"
 #include "shell/settings/widget_settings_registry.h"
 #include "system/distro_info.h"
@@ -647,7 +646,6 @@ void ConfigService::fireReloadCallbacks() {
     add(m_lastChange.hooks, "hooks");
     add(m_lastChange.theme, "theme");
     add(m_lastChange.controlCenter, "controlCenter");
-    add(m_lastChange.plugins, "plugins");
     add(m_lastChange.accessibility, "accessibility");
     kLog.info("reload: changed sections = [{}]", changed.empty() ? "none" : changed);
   }
@@ -866,7 +864,6 @@ Config ConfigService::makeDefaultConfig() {
   config.bars.push_back(BarConfig{});
   config.controlCenter.shortcuts = defaultControlCenterShortcuts();
   config.shell.session.actions = defaultSessionPanelActions();
-  config.plugins.sources = defaultPluginSources();
   return config;
 }
 
@@ -1724,30 +1721,17 @@ void ConfigService::parseConfigTable(
   if (!hasExplicitArray("control_center", "shortcuts") && config.controlCenter.shortcuts.empty()) {
     config.controlCenter.shortcuts = defaultControlCenterShortcuts();
   }
-  if (!hasExplicitArray("plugins", "source") && config.plugins.sources.empty()) {
-    config.plugins.sources = defaultPluginSources();
-  }
   if (config.idle.behaviors.empty()) {
     config.idle.behaviors = defaultIdleBehaviors();
   }
 
   // Launcher providers are resolved after the registry pass, once config.shell is
   // populated. An empty common prefix falls back to '/', and providers that name
-  // nothing real (or a disabled plugin, or the fixed Applications provider) are
+  // nothing real (or the fixed Applications provider) are
   // dropped loudly rather than silently ignored.
   if (config.shell.launcher.providerPrefix.empty()) {
     schemaDiag.warn("shell.launcher.provider_prefix", "is empty, falling back to '/'");
     config.shell.launcher.providerPrefix = "/";
-  }
-  std::unordered_set<std::string> enabledPlugins;
-  if (const auto* pluginsTbl = tbl["plugins"].as_table()) {
-    if (const auto* enabledArr = (*pluginsTbl)["enabled"].as_array()) {
-      for (const auto& node : *enabledArr) {
-        if (const auto* strVal = node.as_string()) {
-          enabledPlugins.insert(StringUtils::toLower(strVal->get()));
-        }
-      }
-    }
   }
   std::erase_if(config.shell.launcher.providers, [&](const LauncherProviderConfig& provider) {
     if (provider.name == "applications") {
@@ -1758,25 +1742,8 @@ void ConfigService::parseConfigTable(
     }
     const auto isBuiltin = std::ranges::contains(launcher::kBuiltinProviders, provider.name);
     if (!isBuiltin) {
-      const std::size_t colon = provider.name.find(':');
-      bool isPlugin = false;
-      std::string pluginIdStr;
-      if (colon != std::string::npos) {
-        std::string_view pluginId = std::string_view(provider.name).substr(0, colon);
-        std::string_view entryName = std::string_view(provider.name).substr(colon + 1);
-        if (scripting::isValidPluginId(pluginId) && scripting::isValidPluginIdSegment(entryName)) {
-          isPlugin = true;
-          pluginIdStr = std::string(pluginId);
-        }
-      }
-      if (!isPlugin) {
-        schemaDiag.warn("shell.launcher.providers." + provider.name, "provider is nonexistent");
-        return true;
-      }
-      if (!enabledPlugins.contains(pluginIdStr)) {
-        schemaDiag.warn("shell.launcher.providers." + provider.name, "plugin '" + pluginIdStr + "' is not enabled");
-        return true;
-      }
+      schemaDiag.warn("shell.launcher.providers." + provider.name, "provider is nonexistent");
+      return true;
     }
     return false;
   });
@@ -1805,24 +1772,6 @@ void ConfigService::parseConfigTable(
     parseWidgetsPlacementSection(
         *lockscreenWidgetsTbl, lockscreenWidgets.grid, lockscreenWidgets.widgets, "lockscreen_widgets"
     );
-  }
-
-  // Parse [plugin_settings."author/plugin"] — open-ended per-plugin setting maps,
-  // validated against the manifest schema (not the static pluginsSchema). Keys may
-  // contain '/', so this is a top-level table rather than nested under [plugins].
-  if (auto* pluginSettingsTbl = tbl["plugin_settings"].as_table()) {
-    for (const auto& [pluginId, pluginNode] : *pluginSettingsTbl) {
-      const auto* perPlugin = pluginNode.as_table();
-      if (perPlugin == nullptr) {
-        continue;
-      }
-      auto& bucket = config.plugins.pluginSettings[std::string(pluginId.str())];
-      for (const auto& [key, value] : *perPlugin) {
-        if (auto parsed = noctalia::config::readWidgetSettingValue(value); parsed.has_value()) {
-          bucket[std::string(key.str())] = std::move(*parsed);
-        }
-      }
-    }
   }
 
   if (config.bars.empty()) {

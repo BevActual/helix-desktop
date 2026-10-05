@@ -46,7 +46,6 @@
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
-#include "launcher/plugin_launcher_provider.h"
 #include "launcher/session_provider.h"
 #include "launcher/wallpaper_provider.h"
 #include "launcher/window_provider.h"
@@ -60,15 +59,9 @@
 #include "render/backend/render_backend.h"
 #include "render/core/texture_manager.h"
 #include "render/text/font_weight_catalog.h"
-#include "scripting/plugin_ipc.h"
-#include "scripting/plugin_manifest.h"
-#include "scripting/plugin_panel_shell.h"
-#include "scripting/plugin_registry.h"
-#include "scripting/plugin_runtime_context.h"
 #include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
-#include "shell/panel/plugin_panel.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
@@ -658,107 +651,6 @@ void Application::initIpc() {
     return "ok\n";
   });
   m_configService.registerIpc(m_ipcService);
-  scripting::PluginIpcRouter::instance().setPlatform(&m_compositorPlatform);
-  m_ipcService.bind(noctalia::cli::msg::plugin, [](const std::string& args) -> std::string {
-    return scripting::PluginIpcRouter::instance().dispatch(args);
-  });
-  m_ipcService.bind(
-      noctalia::cli::msg::plugins,
-      [this](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
-        if (parts.empty()) {
-          return "error: plugins <list|enable|disable> [author/plugin]\n";
-        }
-        const std::string& cmd = parts[0];
-        if (cmd == "list") {
-          std::string out;
-          // Local-only: IPC handlers run on the main loop, so the listing must never
-          // clone or lazy-fetch; it reflects the last-fetched local catalog.
-          for (const auto& s : m_pluginManager.list(scripting::CatalogAccess::LocalOnly)) {
-            const std::string dependencies =
-                s.dependencies.empty() ? std::string{} : " requires " + StringUtils::join(s.dependencies, ", ");
-            const std::string heldBack = s.heldBack
-                ? std::format(" held-back (v{} needs plugin API {})", s.latestVersion, s.latestPluginApiVersion)
-                : std::string{};
-            out += std::format(
-                "{} [{}] {} {}{}{}{}{}\n", s.id, s.source, s.version.empty() ? "-" : s.version,
-                s.enabled ? "enabled" : "disabled", s.compatible ? "" : " incompatible", heldBack,
-                s.deprecated ? " deprecated" : "", dependencies
-            );
-          }
-          return out.empty() ? "(no plugins)\n" : out;
-        }
-        if (cmd == "enable") {
-          if (parts.size() != 2) {
-            return "error: plugins enable <author/plugin>\n";
-          }
-          const auto res = m_pluginManager.enable(parts[1]);
-          if (!res.ok) {
-            return "error: " + res.error + "\n";
-          }
-          return m_pluginManager.isEnabling(parts[1]) ? "ok (exporting in background)\n" : "ok\n";
-        }
-        if (cmd == "disable") {
-          if (parts.size() != 2) {
-            return "error: plugins disable <author/plugin>\n";
-          }
-          m_pluginManager.disable(parts[1]);
-          return "ok\n";
-        }
-        if (cmd == "update") {
-          if (parts.size() != 2) {
-            return "error: plugins update <source-name>\n";
-          }
-          m_pluginManager.update(parts[1]);
-          return "ok (updating in background)\n";
-        }
-        if (cmd == "source") {
-          if (parts.size() < 2) {
-            return "error: plugins source <list|add|remove> ...\n";
-          }
-          const std::string& sub = parts[1];
-          if (sub == "list") {
-            std::string out;
-            for (const auto& s : m_configService.config().plugins.sources) {
-              out += std::format("{} {} {}\n", s.name, enumToKey(kPluginSourceKinds, s.kind), s.location);
-            }
-            return out.empty() ? "(no sources)\n" : out;
-          }
-          if (sub == "add") {
-            if (parts.size() < 5) {
-              return "error: plugins source add <name> <git|path> <location>\n";
-            }
-            const auto kind = enumFromKey(kPluginSourceKinds, parts[3]);
-            if (!kind.has_value()) {
-              return "error: source kind must be 'git' or 'path'\n";
-            }
-            if (!isValidPluginSourceName(parts[2])) {
-              return "error: source name must use letters, digits, '.', '_' or '-', starting with a letter or digit\n";
-            }
-            PluginSourceConfig source{
-                .kind = *kind,
-                .name = parts[2],
-                .location = parts[4],
-            };
-            m_pluginManager.addSource(source);
-            return "ok\n";
-          }
-          if (sub == "remove") {
-            if (parts.size() != 3) {
-              return "error: plugins source remove <name>\n";
-            }
-            if (isDefaultPluginSourceName(parts[2])) {
-              return "error: built-in plugin sources cannot be removed from IPC\n";
-            }
-            m_pluginManager.removeSource(parts[2]);
-            return "ok\n";
-          }
-          return "error: unknown plugins source subcommand '" + sub + "'\n";
-        }
-        return "error: unknown plugins subcommand '" + cmd + "'\n";
-      },
-      IpcService::HandlerOptions{.actionEditorVisibility = IpcService::ActionEditorVisibility::Hidden}
-  );
   m_bar.registerIpc(m_ipcService);
   m_desktopWidgetsController.registerIpc(m_ipcService);
   m_lockscreenWidgetsController.registerIpc(m_ipcService);

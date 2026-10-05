@@ -35,10 +35,6 @@ class NotificationManager;
 class ClipboardService;
 class FileWatcher;
 
-namespace scripting {
-  class ScriptApiContext;
-  class PluginManager;
-}
 
 class ControlCenterPanel : public Panel {
 public:
@@ -46,7 +42,7 @@ public:
 
   // Tabs the user may hide from the Settings GUI (every tab except Home).
   // Keys match the [control_center] hidden_tabs entries: built-in ids like
-  // "monitor" and plugin entry ids like "author/plugin:displays".
+  // "monitor".
   struct TabCatalogEntry {
     std::string key;
     std::string title;
@@ -78,9 +74,7 @@ public:
   [[nodiscard]] float cornerRadius() const noexcept override;
   [[nodiscard]] bool showsSidebar() const noexcept { return m_showSidebar; }
 
-  void queuePluginSettings(std::string pluginId);
   void queueBarWidget(std::string barName, std::string widgetName);
-  void invalidatePluginSource(const std::string& sourceName);
 
   // Sidebar clusters, macOS System Settings style: unlabeled and separated by dividers.
   enum class TabGroup : std::uint8_t {
@@ -111,11 +105,9 @@ private:
     Flex* headerActions = nullptr;
     TabGroup group = TabGroup::System;
     bool hideable = true;
-    bool plugin = false;
   };
 
   void appendBuiltinSlots(const ControlCenterServices& services);
-  void rebuildPluginSlots();
   void ensureTabUi(TabSlot& slot);
   void selectTab(std::string_view id, bool animated = false);
   void selectAdjacentVisibleTab(int direction);
@@ -162,7 +154,6 @@ private:
   std::vector<TabSlot> m_slots;
   std::string m_activeTabId = "home";
   bool m_activeTabForced = false;
-  scripting::ScriptApiContext* m_scriptApi = nullptr;
   FileWatcher* m_fileWatcher = nullptr;
   HttpClient* m_httpClient = nullptr;
   ClipboardService* m_clipboard = nullptr;
@@ -205,13 +196,11 @@ private:
   bool m_firstOpenAfterCreate = false;
   bool m_modalAttached = false;
   settings::SettingsModalHost m_modalHost;
-  scripting::PluginManager* m_pluginManager = nullptr;
   AsyncTextureCache* m_asyncTextures = nullptr;
 
   void attachModalHost(Renderer& renderer, float width, float height);
   void maybeOpenPendingEditor();
 
-  std::string m_pendingOpenPluginSettingsId;
   std::string m_pendingOpenBarName;
   std::string m_pendingOpenWidgetInspectorName;
 };

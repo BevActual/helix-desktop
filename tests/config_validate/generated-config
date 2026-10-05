@@ -26,15 +26,3 @@ type = "sysmon"
 
 [desktop_widgets.widget.gpu_vram.settings]
 stat = "gpu_vram_used"
-
-[plugins]
-enabled = ["noctalia/wallhaven"]
-
-[[plugins.source]]
-name = "test"
-kind = "path"
-location = "tests/config_validate/plugin-source"
-
-[plugin_settings."noctalia/wallhaven"]
-browser_placement = "floating"
-browser_position = "center"
