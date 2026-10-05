@@ -1,4 +1,5 @@
 #include "desktop/dns_update.h"
+#include "desktop/display_inventory.h"
 #include "desktop/wallhaven.h"
 #include "theme/community_palettes.h"
 #include "theme/custom_palettes.h"
@@ -41,6 +42,10 @@
 namespace helix {
 namespace {
 const char* introspection = R"XML(<node>
+<interface name="org.helix.Desktop.Displays1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <signal name="Changed"/>
+</interface>
 <interface name="org.helix.Desktop.Configuration1">
  <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
  <method name="GetSettings"><arg type="av" direction="out"/></method>
@@ -50,6 +55,7 @@ const char* introspection = R"XML(<node>
  <method name="Reset"><arg name="id" type="s" direction="in"/></method>
  <method name="CommitOverrides"><arg name="baseline" type="s" direction="in"/><arg name="candidate" type="s" direction="in"/></method>
  <method name="RegisterDesktop"/>
+ <method name="RegisterCapabilities"><arg type="a{sv}" direction="in"/></method>
  <method name="GetState"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="a{sv}" direction="out"/></method>
  <method name="SetState"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="v" direction="in"/></method>
  <method name="ClearState"><arg type="s" direction="in"/></method>
@@ -182,10 +188,12 @@ public:
   std::chrono::steady_clock::time_point nextMeterUpdate{};
   GDBusConnection* bus = nullptr;
   std::string desktopOwner;
+  Json desktopCapabilities = Json::object();
   std::string networkOwner;
   std::string bluetoothOwner;
   std::vector<Operation> operations;
   std::uint64_t nextOperation = 1;
+  std::shared_ptr<DisplayInventory> displays = std::make_shared<DisplayInventory>();
   Json appearance = {{"available", false}};
   GMainLoop* loop = nullptr;
   guint ownerWatch = 0;
@@ -311,6 +319,7 @@ public:
     theme.apply();
   }
   ~Service() {
+    displays->shutdown();
     meters.clear();
     if (audioHealthListening) spa_hook_remove(&audioHealthListener);
     if (source) g_source_remove(source);
@@ -326,7 +335,9 @@ public:
   }
   void changed(const char* interface) { emit(interface, "Changed"); }
   bool desktop() const { return !desktopOwner.empty(); }
+  bool gammaAvailable() const { return desktop() && desktopCapabilities.value("gamma-control", false); }
   Json snapshot(const std::string& interface) {
+    if (interface == displaysInterface) { displays->refresh(desktop()); return displays->snapshot(); }
     static const Json systemInfo = [] {
       Json details;
       auto* os = g_get_os_info(G_OS_INFO_KEY_PRETTY_NAME);
@@ -335,7 +346,7 @@ public:
       if (uname(&kernel) == 0) { details["kernel"] = kernel.release; details["architecture"] = kernel.machine; }
       return details;
     }();
-    if (interface == configurationInterface) return {{"available", true}, {"helix-desktop", desktop()},
+    if (interface == configurationInterface) return {{"available", true}, {"helix-desktop", desktop()}, {"desktop-capabilities", desktopCapabilities},
       {"network", network != nullptr}, {"bluetooth", bluetooth != nullptr}, {"audio", audio != nullptr && !audioBroken}, {"system", systemInfo}};
     if (interface == appearanceInterface) {
       auto current = appearance; current["helix-desktop"] = desktop();
@@ -582,10 +593,17 @@ public:
           } else if (!config.clearStateOwner(owner)) throw std::runtime_error("Runtime state could not be cleared");
           g_dbus_method_invocation_return_value(invocation, nullptr); return;
         }
-        if (name == "GetSettings") { g_dbus_method_invocation_return_value(invocation, g_variant_new("(@av)", toVariant(settingsCatalog(config, desktop())))); return; }
+        if (name == "GetSettings") { g_dbus_method_invocation_return_value(invocation, g_variant_new("(@av)", toVariant(settingsCatalog(config, desktop(), gammaAvailable())))); return; }
         if (name == "RegisterDesktop") {
           if (!desktopOwner.empty() && desktopOwner != sender) throw std::runtime_error("A Helix desktop is already registered");
           desktopOwner = sender; theme.apply(); changed(configurationInterface);
+        } else if (name == "RegisterCapabilities") {
+          if (desktopOwner != sender) throw std::invalid_argument("Only the registered desktop may report capabilities");
+          const auto capabilities = args.at(0);
+          if (!capabilities.is_object()) throw std::invalid_argument("Capabilities must be an object");
+          for (const auto& [key, value] : capabilities.items())
+            if (key != "gamma-control" || !value.is_boolean()) throw std::invalid_argument("Unknown desktop capability");
+          if (desktopCapabilities != capabilities) { desktopCapabilities = capabilities; changed(configurationInterface); }
         } else if (name == "CommitOverrides") {
           if (desktopOwner != sender) throw std::invalid_argument("Only the registered shell may commit a configuration replica");
           if (!config.commitRemoteOverrides(args.at(0).get<std::string>(), args.at(1).get<std::string>())) throw std::runtime_error(config.lastMutationError());
@@ -594,14 +612,14 @@ public:
           if (!desktop()) throw std::invalid_argument("Ordered desktop lists require Helix desktop");
           bool supported = false;
           Json setting;
-          for (const auto& entry : settingsCatalog(config, true)) if (entry.at("id") == id) {
+          for (const auto& entry : settingsCatalog(config, true, gammaAvailable())) if (entry.at("id") == id) {
             setting = entry;
-            supported = entry.at("type") == "application-list" || (name == "UpdateOrderedList" && (entry.at("type") == "widget-list" || entry.at("type") == "display-list" || entry.at("type") == "notification-rules" || entry.at("type") == "tab-list" || entry.at("type") == "shortcut-list"));
+            supported = entry.at("type") == "application-list" || (name == "UpdateOrderedList" && (entry.at("type") == "widget-list" || entry.at("type") == "display-list" || entry.at("type") == "notification-rules" || entry.at("type") == "tab-list" || entry.at("type") == "shortcut-list" || entry.at("type") == "key-chords"));
           }
           if (!supported) throw std::invalid_argument("Unknown ordered desktop list");
           config.forceReload();
-          validateSettingValue(config, id, args.at(2), true);
-          for (const auto& entry : settingsCatalog(config, true)) if (entry.at("id") == id && entry.at("value") != args.at(1))
+          validateSettingValue(config, id, args.at(2), true, gammaAvailable());
+          for (const auto& entry : settingsCatalog(config, true, gammaAvailable())) if (entry.at("id") == id && entry.at("value") != args.at(1))
             throw std::invalid_argument("The list changed. Refresh and try again");
           bool saved = false;
           if (setting.at("type") == "tab-list") {
@@ -618,11 +636,24 @@ public:
         } else if (name == "Update" || name == "Reset") {
           const auto id = args.at(0).get<std::string>();
           if (!desktop() && !isPortableSetting(id)) throw std::invalid_argument("This setting requires Helix desktop");
+          if (id.starts_with("nightlight.") && !gammaAvailable()) throw std::invalid_argument("Night Light is unavailable on this desktop");
           config.forceReload();
+          if (name == "Update" && id.starts_with("keybinds.")) throw std::invalid_argument("Keyboard shortcuts require UpdateOrderedList");
           if (name == "Update" && id == "control_center.shortcuts") throw std::invalid_argument("Quick shortcuts require UpdateOrderedList");
-          if (name == "Update") validateSettingValue(config, id, args.at(1), desktop());
+          if (name == "Update") validateSettingValue(config, id, args.at(1), desktop(), gammaAvailable());
           bool ok;
-          if (name == "Update" && id.starts_with("idle:")) {
+          if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") {
+            if (!gammaAvailable()) throw std::invalid_argument("Night Light is unavailable on this desktop");
+            if (name == "Reset") {
+              bool changed = false;
+              ok = config.clearOverrides({{"nightlight", "temperature_day"}, {"nightlight", "temperature_night"}}, &changed);
+            } else {
+              std::int64_t day = config.config().nightlight.dayTemperature, night = config.config().nightlight.nightTemperature;
+              if (id == "nightlight.temperature_day") { day = args.at(1).get<std::int64_t>(); night = std::min(night, day - NightLightConfig::kTemperatureGap); }
+              else { night = args.at(1).get<std::int64_t>(); day = std::max(day, night + NightLightConfig::kTemperatureGap); }
+              ok = config.setOverrides({{{"nightlight", "temperature_day"}, day}, {{"nightlight", "temperature_night"}, night}});
+            }
+          } else if (name == "Update" && id.starts_with("idle:")) {
             const auto path = settingPath(id); auto behaviors = config.config().idle.behaviors;
             for (auto& behavior : behaviors) if (behavior.name == path.at(2)) {
               const auto& value = args.at(1); const auto& field = path.at(3);
@@ -723,6 +754,7 @@ public:
   }
   void tick() {
     try {
+      displays->refresh(desktop());
       const auto backendNow = std::chrono::steady_clock::now();
       if (backendNow >= nextBackendCheck) {
         nextBackendCheck = backendNow + std::chrono::seconds(3); recoverBackends();
@@ -761,6 +793,7 @@ public:
   }
   void start(GDBusConnection* connection) {
     bus = G_DBUS_CONNECTION(g_object_ref(connection));
+    displays->changed = [this] { changed(displaysInterface); };
     initialize();
     GError* error = nullptr;
     info = g_dbus_node_info_new_for_xml(introspection, &error);
@@ -784,7 +817,7 @@ public:
         g_variant_get(value, "(&s&s&s)", &name, &oldOwner, &newOwner);
         if (*newOwner) return;
         service.wallhaven.disconnect(name);
-        if (service.desktopOwner == name) { service.desktopOwner.clear(); service.changed(configurationInterface); }
+        if (service.desktopOwner == name) { service.desktopOwner.clear(); service.desktopCapabilities = Json::object(); service.changed(configurationInterface); }
         if (service.networkOwner == name) { if (service.secrets) service.secrets->cancelSecret(); service.networkOwner.clear(); }
         if (service.bluetoothOwner == name) { if (service.pairing) service.pairing->cancelPending(); service.bluetoothOwner.clear(); }
         service.meters.erase(name);

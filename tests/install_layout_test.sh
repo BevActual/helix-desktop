@@ -38,6 +38,13 @@ if [ -x "$prefix/bin/helix-settings" ]; then
   [ -f "$prefix/share/applications/org.helix.SystemMonitor.desktop" ] || fail 'System Monitor desktop entry is missing'
   [ -f "$prefix/share/icons/hicolor/scalable/apps/org.helix.SystemMonitor.svg" ] || fail 'System Monitor icon is missing'
   "$prefix/bin/helix-system-monitor" --snapshot > /dev/null || fail 'System Monitor could not read local resources'
+  for app in Software Phone; do
+    case "$app" in Software) executable=helix-software ;; Phone) executable=helix-phone ;; esac
+    [ -x "$prefix/bin/$executable" ] || fail "$app application is missing"
+    [ -f "$prefix/share/applications/org.helix.$app.desktop" ] || fail "$app desktop entry is missing"
+    "$prefix/bin/$executable" --help > /dev/null || fail "$app command-line entry could not start"
+  done
+
 fi
 
 version_output=$("$binary" --version) || fail 'installed shell --version failed'

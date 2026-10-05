@@ -34,6 +34,7 @@ struct PhoneDevice {
   bool hasBattery = false;
   int charge = -1;
   bool charging = false;
+  bool ringPlugin = false;
   bool sharePlugin = false;
   bool sftpPlugin = false;
   bool notificationsPlugin = false;
@@ -142,7 +143,7 @@ class PhoneConnectService {
 public:
   using ChangeCallback = std::function<void()>;
 
-  explicit PhoneConnectService(SessionBus& bus);
+  explicit PhoneConnectService(SessionBus& bus, bool manageDesktopIntegration = true);
   ~PhoneConnectService();
 
   PhoneConnectService(const PhoneConnectService&) = delete;
@@ -244,6 +245,7 @@ private:
   std::shared_ptr<std::atomic<bool>> m_airplayCancel;
   bool m_airplayAlive = false;
   std::uint32_t m_airplayGeneration = 0;
+  bool m_manageDesktopIntegration = true;
   bool m_mirrorAlwaysOn = true;
   bool m_phoneNotifications = true;
   bool m_castAudio = true;

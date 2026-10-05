@@ -37,6 +37,11 @@ int main() {
   ok = expect(isProtectedPackage("noctalia"), "noctalia") && ok;
   ok = expect(isProtectedPackage("noctalia-greeter"), "greeter") && ok;
   ok = expect(isProtectedPackage("helix-shell"), "helix-shell") && ok;
+  ok = expect(isProtectedPackage("filesystem"), "essential filesystem protected") && ok;
+  ok = expect(isProtectedPackage("systemd"), "session manager protected") && ok;
+  ok = expect(isProtectedPackage("helix-niri"), "active compositor protected") && ok;
+  ok = expect(!isProtectedPackage("systemd-devel"), "development package removable") && ok;
+
   ok = expect(!isProtectedPackage("helix"), "editor") && ok;
 
   const auto installed = parsePkconLine("Installed    helix-25.07.1-11.fc44.x86_64 (fedora)");

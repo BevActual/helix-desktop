@@ -329,4 +329,23 @@ labels and actions. These are explicitly illustrative rather than exact multi-di
 renderings. Both diagrams update in place, retaining native control focus, and have
 textual descriptions for accessibility. Native contrast colors remain authoritative.
 
-Settings accepts `--section control-center|dock|launcher|osd|hot-corners` to open the corresponding Desktop & Dock group. It may be combined with `--page desktop-dock`; other page combinations and unknown sections are rejected. Shell compatibility contexts use these destinations when available.
+Settings accepts `--section control-center|dock|bar|launcher|osd|hot-corners` to open the corresponding Desktop & Dock group. It may be combined with `--page desktop-dock`; other page combinations and unknown sections are rejected. Shell compatibility contexts use these destinations when available.
+
+Settings accepts `--search TEXT` for single-instance search activation, optionally with `--page ID`.
+An empty search clears the query. Search is incompatible with section or browser activation.
+`--inspect-layout` includes the active query and displayed preference-group titles.
+
+The Power page owns Helix battery-warning, suspend/lid and idle-timer configuration. System retains
+navigation to Power and About. Power, idle and session compatibility contexts target Power.
+Privacy & Security exposes desktop-only clipboard retention, current-selection preservation, history
+limit, deletion confirmation, automatic paste and image-command policy; clipboard contents and
+encrypted-storage recovery remain in the dedicated shell surface. `--section clipboard` navigates
+to that group on Privacy & Security, including when launched from the clipboard surface.
+
+`org.helix.Desktop.Displays1` provides `GetSnapshot` and `Changed` for a read-only helix-niri
+display inventory. Snapshots contain availability, capability IDs (`inventory`), and sanitized
+output records with connector/name, enabled state, mode, logical size/position, scale, transform
+and VRR state. Device serial numbers are not exported. Querying requires a registered Helix
+desktop and compositor socket; it is asynchronous, bounded to two seconds, retries automatically
+and clears stale outputs when unavailable. No display mutations are exposed through this interface
+yet. The native Displays page opens existing shell editing controls while migration continues.

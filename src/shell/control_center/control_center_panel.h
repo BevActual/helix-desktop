@@ -4,7 +4,6 @@
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel.h"
-#include "shell/settings/settings_hosted_editors.h"
 #include "shell/settings/settings_modal_host.h"
 #include "ui/controls/scroll_view.h"
 
@@ -206,7 +205,6 @@ private:
   bool m_firstOpenAfterCreate = false;
   bool m_modalAttached = false;
   settings::SettingsModalHost m_modalHost;
-  std::unique_ptr<settings::HostedEditors> m_hostedEditors;
   scripting::PluginManager* m_pluginManager = nullptr;
   AsyncTextureCache* m_asyncTextures = nullptr;
 

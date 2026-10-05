@@ -130,9 +130,16 @@ menu must never take an xdg_popup grab that isn't on the topmost grabbing popup 
 
 The standalone Settings application uses standard libadwaita preference groups and adaptive sidebar
 navigation. The independent desktop service owns settings persistence and migrated device backends.
-The current shell-hosted pages remain accessible during migration; remove them only after every
-entry in `desktop-migration.json` has a working destination. No transitional legacy tools window
-is introduced. The following rules describe the current shell-hosted pages until cutover.
+The old shell Settings editors were retired by explicit user direction, including advanced editors
+whose native replacements are unfinished. Preserve existing configuration and show clear unavailable
+states for those editors. Remaining live tool pages continue during migration; full desktop cutover
+still requires every inventory entry to have a working destination. No transitional legacy tools
+window is introduced. The following shell rules apply to the remaining live tool pages.
+
+Native Desktop & Dock places visible section-navigation buttons before its layout preview and
+settings groups. These use standard GTK buttons in an adaptive flow layout, move keyboard focus
+to the destination controls, and retain the full scrollable page. Unfinished editor notices follow
+the working settings, rather than interrupting everyday configuration.
 
 - **More main tabs, not hidden hubs.** No "General" catch-all; a thing gets its own sidebar
   tab. Clusters are separated by dividers, not captions.
@@ -246,3 +253,26 @@ Native wallpaper catalogs use ordinary toggle buttons for selectable thumbnails,
 with filenames or source IDs visible below each image. Selection and application
 are separate actions. Search, filters, paging and cancellation remain visible and
 keyboard reachable. Local scanning and remote downloads never block the UI thread.
+
+Native Appearance keeps palette, accent and wallpaper library actions beside the current preview
+in a wrapping GTK flow layout. Palette maintenance and wallpaper sources use grouped native rows;
+avoid repeating the same browser action elsewhere in the normal page. Search exposes matching
+action rows as well as configuration fields, omits unrelated actions and hides illustrative previews.
+
+GNOME Settings and the [GNOME HIG](https://developer.gnome.org/hig/index.html) are explicit
+design references. Follow its [boxed-list guidance](https://developer.gnome.org/hig/patterns/containers/boxed-lists.html)
+for semantic grouping, native row controls and whole-row activation when a row has one action.
+Use its [navigation guidance](https://developer.gnome.org/hig/guidelines/navigation.html) when
+extracting long settings groups into adaptive subpages. Preserve Helix branding and capability boundaries.
+
+Native Displays includes an illustrative arrangement diagram with connector labels and textual
+equivalents below. Until native display editing supports safe apply/revert, expose inventory and
+a clearly labeled link to the working shell display controls; do not present inactive mode controls
+as if they applied changes.
+
+Online Accounts uses GOA-provided identity, branding and account-management dialogs. Group
+configured accounts separately from available providers; place branded providers first and sort
+names using locale-aware comparison. Keep native whole-row actions and explain unavailable
+providers. Account operations remain usable without Helix configuration services; do not rebuild
+the page or cancel authentication when an unrelated service changes. Never duplicate credential
+fields or expose tokens in Helix snapshots or logs.

@@ -64,7 +64,6 @@ namespace scripting {
   class PluginManager;
 }
 namespace settings {
-  class HostedEditors;
   class SettingsModalHost;
 }
 
@@ -126,7 +125,6 @@ struct ControlCenterServices {
   std::function<bool()> upgradeAvailable;
   std::function<bool()> upgradeBusy;
   std::function<void(std::function<void(bool)>)> ensurePolkit;
-  settings::HostedEditors* hostedEditors = nullptr;
   settings::SettingsModalHost* modalHost = nullptr;
   Signal<>* settingsInvalidated = nullptr;
   settings::RuntimeActions settingsActions;

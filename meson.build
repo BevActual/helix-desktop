@@ -701,7 +701,6 @@ _noctalia_sources = files(
   'src/shell/control_center/shortcut_registry.cpp',
   'src/shell/control_center/pin_reorder.cpp',
   'src/shell/control_center/pinned_app_list.cpp',
-  'src/shell/control_center/tabs/packages_tab.cpp',
   'src/shell/control_center/tabs/plugins_tab.cpp',
   'src/shell/control_center/tabs/system_tab.cpp',
   'src/shell/control_center/tabs/tailscale_tab.cpp',
@@ -794,10 +793,6 @@ _noctalia_sources = files(
   'src/shell/settings/widget_settings_registry.cpp',
   'src/shell/settings/widget_add_popup.cpp',
   'src/shell/settings/settings_modal_host.cpp',
-  'src/shell/settings/settings_sheet.cpp',
-  'src/shell/settings/settings_sheet_modal.cpp',
-  'src/shell/settings/settings_hosted_editors.cpp',
-  'src/shell/settings/settings_hosted_editors_extra.cpp',
   'src/shell/test/test_panel.cpp',
   'src/shell/tray/tray_drawer_panel.cpp',
   'src/shell/tray/tray_settings.cpp',
@@ -1499,14 +1494,37 @@ configure_file(input: 'assets/services/helix-service.service.in',
 gtk4_dep = dependency('gtk4', version: '>=4.12', required: get_option('desktop_apps'))
 adwaita_dep = dependency('libadwaita-1', version: '>=1.7', required: get_option('desktop_apps'))
 if gtk4_dep.found() and adwaita_dep.found()
+  goa_backend_dep = dependency('goa-backend-1.0', version: '>=3.56', required: false)
+  settings_deps = [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep]
+  settings_args = ['-Wall', '-Wextra', '-Wno-missing-field-initializers']
+  if goa_backend_dep.found()
+    settings_deps += goa_backend_dep
+    settings_args += '-DHELIX_HAVE_GOA'
+  endif
   helix_settings = executable('helix-settings',
     sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
     include_directories: include_directories('src'),
-    dependencies: [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep],
-    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
+    dependencies: settings_deps,
+    cpp_args: settings_args,
     install: true,
   )
   install_data('assets/org.helix.Settings.desktop', install_dir: get_option('datadir') / 'applications')
+  helix_software = executable('helix-software',
+    sources: files('src/apps/software/main.cpp'),
+    dependencies: [noctalia_core_dep, gtk4_dep, adwaita_dep, gio_dep],
+    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
+    install: true,
+  )
+  install_data('assets/org.helix.Software.desktop', install_dir: get_option('datadir') / 'applications')
+  helix_phone = executable('helix-phone',
+    sources: files('src/apps/phone/main.cpp'),
+    dependencies: [noctalia_core_dep, gtk4_dep, adwaita_dep, gio_dep],
+    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
+    install: true,
+  )
+  install_data('assets/org.helix.Phone.desktop', install_dir: get_option('datadir') / 'applications')
+
+
   helix_monitor = executable('helix-system-monitor',
     sources: files('src/apps/system_monitor/main.cpp', 'src/apps/system_monitor/proc_reader.cpp',
       'src/apps/system_monitor/report_reader.cpp', 'src/desktop/protocol.cpp'),
@@ -1551,6 +1569,12 @@ if build_tests
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   test('desktop_protocol', helix_protocol_test)
+  helix_displays_test = executable('desktop_displays_test',
+    sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop/protocol.cpp'),
+    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
+    override_options: ['b_ndebug=false'])
+  test('desktop_displays', helix_displays_test, timeout: 30)
+
   helix_service_test = executable('desktop_service_test',
     sources: files('tests/desktop_service_test.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],

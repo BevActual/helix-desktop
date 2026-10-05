@@ -254,3 +254,8 @@ the test redirects both session and system buses and all configuration paths to 
 System Monitor runs independently: `build-debug/helix-system-monitor`. Use `--snapshot`
 for local resource diagnostics without a display server. Its source lives in
 `src/apps/system_monitor` alongside Settings in this Software Projects repository.
+
+Online Accounts support uses optional `goa-backend-1.0 >= 3.56`. On Fedora install
+`gnome-online-accounts` and `gnome-online-accounts-devel` for the activation daemon and
+provider dialogs. Builds without GOA retain an explanatory unavailable page. The account
+provider owns authentication, credentials and service permissions; Helix does not replicate them.

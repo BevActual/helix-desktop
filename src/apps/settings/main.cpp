@@ -1,9 +1,11 @@
+#include "apps/common/inspection_guard.h"
 #include "apps/common/appearance.h"
 #include "apps/common/image_preview.h"
 #include "apps/common/preview_export.h"
 #include "apps/settings/wallpaper_browser.h"
 #include "apps/settings/layout_preview.h"
 #include "apps/settings/palette_browser.h"
+#include "apps/settings/accounts_page.h"
 #include "util/file_utils.h"
 #include "desktop/dns_update.h"
 #include "desktop/notification_rules.h"
@@ -15,6 +17,7 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -29,7 +32,11 @@ constexpr Page pages[] = {
   {"sound", "Sound", "audio-volume-high-symbolic"},
   {"network", "Network", "network-wireless-symbolic"},
   {"bluetooth", "Bluetooth", "bluetooth-symbolic"},
+  {"online-accounts", "Online Accounts", "goa-panel-symbolic"},
   {"privacy-security", "Privacy & Security", "security-high-symbolic", true},
+  {"keyboard", "Keyboard", "input-keyboard-symbolic", true},
+  {"displays", "Displays", "video-display-symbolic", true},
+  {"power", "Power", "battery-symbolic", true},
   {"system", "System", "preferences-system-symbolic", true},
   {"about", "About", "help-about-symbolic"},
 };
@@ -49,6 +56,10 @@ GtkWidget* button(const char* title, Callback callback) {
   gtk_widget_set_valign(widget, GTK_ALIGN_CENTER);
   onSignal(widget, "clicked", std::move(callback));
   return widget;
+}
+void singleAction(AdwActionRow* row, GtkWidget* action) {
+  adw_action_row_add_suffix(row, action);
+  adw_action_row_set_activatable_widget(row, action);
 }
 void title(AdwPreferencesRow* row, const std::string& value) {
   adw_preferences_row_set_use_markup(row, false);
@@ -79,10 +90,12 @@ struct Settings {
   bool ready = false;
   unsigned pending = 0;
   std::string requestedPage;
+  std::optional<std::string> requestedQuery;
   std::string requestedSection;
   std::string section;
   std::map<std::string, GtkWidget*> sectionGroups;
   guint sectionTick = 0;
+  unsigned sectionFrames = 0;
   std::string page = "appearance";
   std::string rendered;
   std::string query;
@@ -92,6 +105,7 @@ struct Settings {
   std::map<std::string, GtkToggleButton*> appearanceModes;
   std::weak_ptr<helix::settings::WallpaperBrowser> wallpaperBrowser;
   std::weak_ptr<helix::settings::PaletteBrowser> paletteBrowser;
+  std::shared_ptr<helix::settings::AccountsPage> accountsPage;
   std::string requestedBrowser;
   bool requestedPalette = false;
   AdwDialog* details = nullptr;
@@ -122,6 +136,7 @@ struct Settings {
 
   explicit Settings(AdwApplication* application) : app(application) {}
   ~Settings() {
+    if (accountsPage) accountsPage->shutdown();
     stopMeter();
     if (sectionTick && scroller) gtk_widget_remove_tick_callback(scroller, sectionTick);
     if (poll) g_source_remove(poll);
@@ -142,12 +157,12 @@ struct Settings {
   }
   void refresh() {
     if (refreshing || !window) return;
-    refreshing = true; refreshFailed = false; pending = 6;
+    refreshing = true; refreshFailed = false; pending = 7;
     client.callAsync("configuration", "GetSettings", nullptr, [this](Json value, std::string error) {
       if (error.empty()) catalog = std::move(value);
       finish(error);
     });
-    for (const std::string domain : {"configuration", "appearance", "audio", "network", "bluetooth"}) {
+    for (const std::string domain : {"configuration", "appearance", "audio", "network", "bluetooth", "displays"}) {
       client.callAsync(domain, "GetSnapshot", nullptr, [this, domain](Json value, std::string error) {
         if (error.empty()) snapshots[domain] = std::move(value);
         finish(error);
@@ -158,10 +173,10 @@ struct Settings {
     if (!error.empty()) { stopMeter(); operations.clear(); earlyCompletions.clear(); refreshFailed = true; connected = false; adw_banner_set_title(banner, "Helix services are unavailable. You can retry the connection."); adw_banner_set_revealed(banner, true); }
     if (--pending) return;
     refreshing = false;
-    // A complete refresh requires all five domains, including unavailable backend snapshots.
+    // Backend snapshots include explicit unavailable states.
     connected = !refreshFailed && snapshots.contains("configuration") && snapshots["configuration"].value("available", false) &&
       client.available();
-    adw_banner_set_revealed(banner, !connected);
+    adw_banner_set_revealed(banner, !connected && page != "online-accounts");
     const bool desktop = connected && snapshots["configuration"].value("helix-desktop", false);
     for (const auto& item : pages) if (item.desktop) {
       // An outage does not establish that desktop capabilities have disappeared.
@@ -174,8 +189,18 @@ struct Settings {
     if (!requestedPage.empty()) {
       const auto target = requestedPage; requestedPage.clear(); select(target);
     }
-    if (!requestedSection.empty() && page == "desktop-dock") {
+    if (!requestedSection.empty() && page == settings::nativePageForTargetSection(requestedSection)) {
       section = std::move(requestedSection); requestedSection.clear(); navigateSection();
+    }
+    if (requestedQuery) {
+      query = std::move(*requestedQuery); requestedQuery.reset();
+      gtk_editable_set_text(GTK_EDITABLE(search), query.c_str());
+      section.clear();
+      if (sectionTick) { gtk_widget_remove_tick_callback(scroller, sectionTick); sectionTick = 0; }
+      rendered.clear(); render();
+      gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroller)), 0);
+      adw_navigation_split_view_set_show_content(split, true);
+      gtk_widget_grab_focus(GTK_WIDGET(search));
     }
     applyAppearance();
     if (auto browser = wallpaperBrowser.lock(); browser && !browser->isClosed()) browser->update(snapshots["appearance"], connected);
@@ -269,25 +294,52 @@ struct Settings {
       wallpaperPreview = GTK_PICTURE(gtk_widget_get_first_child(image));
       adw_preferences_group_add(preview, image);
     }
-    auto* actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_box_append(GTK_BOX(actions), button("Palettes", [this] { choosePalette(); }));
-    gtk_box_append(GTK_BOX(actions), button("Accent", [this] { chooseAccent(); }));
-    if (appearance.value("helix-desktop", false)) gtk_box_append(GTK_BOX(actions), button("Wallpaper", [this] { chooseWallpaper(); }));
+    auto* actions = gtk_flow_box_new();
+    gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(actions), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(actions), 1);
+    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(actions), 3);
+    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(actions), true);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(actions), 8);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(actions), 8);
+    for (const auto& [label, callback] : std::vector<std::pair<const char*, Callback>>{
+          {"Palette Library", [this] { choosePalette(); }},
+          {"Accent Color", [this] { chooseAccent(); }}}) {
+      auto* action = button(label, callback); gtk_widget_set_hexpand(action, true);
+      gtk_flow_box_append(GTK_FLOW_BOX(actions), action);
+    }
+    if (appearance.value("helix-desktop", false)) {
+      auto* wallpaperAction = button("Wallpaper Library", [this] { chooseWallpaper(); });
+      gtk_widget_set_hexpand(wallpaperAction, true); gtk_flow_box_append(GTK_FLOW_BOX(actions), wallpaperAction);
+    }
     adw_preferences_group_add(preview, actions);
   }
   void navigateSection() {
     if (sectionTick) gtk_widget_remove_tick_callback(scroller, sectionTick);
+    sectionFrames = 0;
     sectionTick = gtk_widget_add_tick_callback(scroller, +[](GtkWidget*, GdkFrameClock*, gpointer data) -> gboolean {
       auto& self = *static_cast<Settings*>(data);
+      // Tick callbacks precede allocation; let rebuilt groups settle before scrolling.
+      if (++self.sectionFrames < 3) return G_SOURCE_CONTINUE;
       const auto target = self.sectionGroups.find(std::string(settings::nativeGroupForSection(self.section)));
       if (target == self.sectionGroups.end()) { self.sectionTick = 0; return G_SOURCE_REMOVE; }
       graphene_rect_t bounds;
       if (!gtk_widget_compute_bounds(target->second, GTK_WIDGET(self.body), &bounds) || bounds.size.height <= 0) return G_SOURCE_CONTINUE;
       auto* adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self.scroller));
+      gtk_widget_child_focus(target->second, GTK_DIR_TAB_FORWARD);
       gtk_adjustment_set_value(adjustment, std::max(0.0, double(bounds.origin.y) - 12));
       self.sectionTick = 0;
       return G_SOURCE_REMOVE;
     }, this, nullptr);
+  }
+  void openApplication(const char* command) {
+    GError* error = nullptr;
+    auto* info = g_app_info_create_from_commandline(command, nullptr, G_APP_INFO_CREATE_SUPPORTS_STARTUP_NOTIFICATION, &error);
+    if (info) {
+      auto* context = gdk_display_get_app_launch_context(gtk_widget_get_display(GTK_WIDGET(window)));
+      if (!g_app_info_launch(info, nullptr, G_APP_LAUNCH_CONTEXT(context), &error)) toast("The application could not be opened. Check that it is installed.");
+      g_object_unref(context); g_object_unref(info);
+    } else toast("The application could not be opened.");
+    if (error) g_error_free(error);
   }
   void select(const std::string& id) {
     auto it = pageRows.find(id);
@@ -298,6 +350,7 @@ struct Settings {
     if (sectionTick) { gtk_widget_remove_tick_callback(scroller, sectionTick); sectionTick = 0; }
     query.clear(); gtk_editable_set_text(GTK_EDITABLE(search), "");
     page = id;
+    adw_banner_set_revealed(banner, !connected && page != "online-accounts");
     gtk_list_box_select_row(sidebar, it->second);
     for (const auto& item : pages) if (id == item.id) adw_navigation_page_set_title(contentPage, item.title);
     rendered.clear(); render();
@@ -323,6 +376,7 @@ struct Settings {
     adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(widget), name.c_str());
     gtk_box_append(body, widget);
     sectionGroups[name] = widget;
+    if (name.starts_with("Bar · ")) sectionGroups.try_emplace("Bar", widget);
     return ADW_PREFERENCES_GROUP(widget);
   }
   AdwActionRow* row(AdwPreferencesGroup* group, const std::string& name, const std::string& subtitle = {}) {
@@ -346,6 +400,7 @@ struct Settings {
     const auto type = setting.at("type").get<std::string>();
     const auto name = setting.at("title").get<std::string>();
     GtkWidget* widget;
+    if (type == "key-chords") { keyShortcuts(group, setting); return; }
     if (type == "notification-rules") { ruleList(group, setting); return; }
     if (type == "shortcut-list") { shortcutList(group, setting); return; }
     if (type == "tab-list") { tabVisibility(group, setting); return; }
@@ -381,7 +436,7 @@ struct Settings {
         if (selected < options.size()) update(id, options[selected]);
       }, true);
     } else if (type == "number" || type == "integer") {
-      widget = adw_spin_row_new_with_range(setting.at("minimum"), setting.at("maximum"), type == "integer" ? 1 : 0.05);
+      widget = adw_spin_row_new_with_range(setting.at("minimum"), setting.at("maximum"), setting.value("step", type == "integer" ? 1.0 : 0.05));
       title(ADW_PREFERENCES_ROW(widget), name);
       adw_spin_row_set_digits(ADW_SPIN_ROW(widget), type == "integer" ? 0 : 2);
       setters[id] = [widget](const Json& value) { adw_spin_row_set_value(ADW_SPIN_ROW(widget), value.get<double>()); };
@@ -511,6 +566,44 @@ struct Settings {
   void saveApplications(const std::string& id, const Json& baseline, const Json& candidate) {
     client.callAsync("configuration", "UpdateOrderedList", g_variant_new("(s@av@av)", id.c_str(), helix::toVariant(baseline), helix::toVariant(candidate)),
       [this](Json, std::string error) { if (!error.empty()) toast("The list changed or could not be saved. Refresh and try again."); scheduleRefresh(); });
+  }
+  void keyShortcuts(AdwPreferencesGroup* fields, const Json& setting) {
+    const auto id = setting.at("id").get<std::string>();
+    const auto values = setting.at("value");
+    std::string shortcutText;
+    for (const auto& value : values) { if (!shortcutText.empty()) shortcutText += "; "; shortcutText += value.get<std::string>(); }
+    auto* item = row(fields, setting.at("title"), shortcutText);
+    singleAction(item, button("Edit", [this, id, values, shortcutText] {
+      auto* dialog = adw_alert_dialog_new("Shell Navigation Shortcuts", "Enter key names such as Ctrl+c or Shift+Tab. Separate alternatives with semicolons. Super shortcuts belong to compositor bindings.");
+      auto* entry = adw_entry_row_new(); title(ADW_PREFERENCES_ROW(entry), "Shortcuts");
+      gtk_editable_set_text(GTK_EDITABLE(entry), shortcutText.c_str());
+      auto* group = adw_preferences_group_new(); adw_preferences_group_add(ADW_PREFERENCES_GROUP(group), entry);
+      adw_alert_dialog_set_extra_child(ADW_ALERT_DIALOG(dialog), group);
+      adw_alert_dialog_add_responses(ADW_ALERT_DIALOG(dialog), "cancel", "Cancel", "save", "Save", nullptr);
+      adw_alert_dialog_set_default_response(ADW_ALERT_DIALOG(dialog), "save");
+      adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "cancel");
+      struct Edit { Settings* settings; std::string id; Json baseline; GtkWidget* entry; };
+      adw_alert_dialog_choose(ADW_ALERT_DIALOG(dialog), GTK_WIDGET(window), nullptr,
+        +[](GObject* source, GAsyncResult* result, gpointer data) {
+          std::unique_ptr<Edit> edit(static_cast<Edit*>(data));
+          if (std::string(adw_alert_dialog_choose_finish(ADW_ALERT_DIALOG(source), result)) != "save") return;
+          Json candidate = Json::array(); auto** parts = g_strsplit(gtk_editable_get_text(GTK_EDITABLE(edit->entry)), ";", -1);
+          for (auto** part = parts; *part; ++part) { auto* trimmed = g_strstrip(*part); if (*trimmed) candidate.push_back(trimmed); }
+          g_strfreev(parts);
+          if (candidate.empty() || candidate.size() > 16) { edit->settings->toast("Enter between one and sixteen shortcuts."); return; }
+          edit->settings->client.callAsync("configuration", "UpdateOrderedList", g_variant_new("(s@av@av)", edit->id.c_str(), helix::toVariant(edit->baseline), helix::toVariant(candidate)),
+            [self = edit->settings](Json, std::string error) {
+              if (!error.empty()) self->toast("Shortcuts could not be saved. Use valid, distinct keys with Ctrl, Alt or Shift, then refresh and retry.");
+              self->scheduleRefresh();
+            });
+        }, new Edit{this, id, values, entry});
+    }));
+    if (setting.value("overridden", false)) adw_action_row_add_suffix(item, button("Reset", [this, id] {
+      client.callAsync("configuration", "Reset", g_variant_new("(s)", id.c_str()), [this](Json, std::string error) {
+        if (!error.empty()) toast("The configured shortcuts could not be restored.");
+        scheduleRefresh();
+      });
+    }));
   }
   void ruleEditor(const Json& baseline, std::size_t index, Json initial) {
     auto* dialog = adw_alert_dialog_new(index < baseline.size() ? "Edit Notification Rule" : "Add Notification Rule", "The first matching enabled rule applies. Application matches ignore case; content expressions use regular expressions.");
@@ -1016,6 +1109,88 @@ struct Settings {
       }, new Request{this, input, identity, anonymous, certificate, domain, method, phase, network});
   }
 
+  void displayDevices() {
+    if (page != "displays" || !query.empty()) return;
+    if (!snapshots.contains("displays")) return;
+    const auto& state = snapshots.at("displays");
+    if (!state.value("available", false)) {
+      auto* status = adw_status_page_new();
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "Displays Unavailable");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), state.value("reason", "Waiting for the display backend.").c_str());
+      gtk_box_append(body, status);
+    } else {
+      auto* overview = group("Connected Displays");
+      adw_preferences_group_set_description(overview, "Current display state from helix-niri. Arrangement and mode changes use the existing display controls.");
+      const auto outputs = state.value("outputs", Json::array());
+      if (outputs.empty()) row(overview, "No displays reported");
+      else row(overview, "Detected displays", std::to_string(outputs.size()));
+      if (std::ranges::any_of(outputs, [](const Json& item) { return item.value("enabled", false); })) {
+        auto* diagram = gtk_drawing_area_new();
+        gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(diagram), 180);
+        gtk_accessible_update_property(GTK_ACCESSIBLE(diagram), GTK_ACCESSIBLE_PROPERTY_LABEL,
+          "Display arrangement preview. Connection, resolution and position are listed below.", -1);
+        gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(diagram), +[](GtkDrawingArea* area, cairo_t* cr, int width, int height, gpointer data) {
+          const auto& outputs = *static_cast<Json*>(data);
+          double left = 0, top = 0, right = 0, bottom = 0; bool first = true;
+          for (const auto& output : outputs) if (output.value("enabled", false)) {
+            const double x = output.value("x", 0), y = output.value("y", 0);
+            const double w = output.value("logical-width", 0), h = output.value("logical-height", 0);
+            if (w <= 0 || h <= 0) continue;
+            if (first) { left = x; top = y; right = x + w; bottom = y + h; first = false; }
+            else { left = std::min(left, x); top = std::min(top, y); right = std::max(right, x + w); bottom = std::max(bottom, y + h); }
+          }
+          if (first) return;
+          const double factor = std::min((width - 24.0) / std::max(1.0, right - left), (height - 24.0) / std::max(1.0, bottom - top));
+          const double offsetX = (width - (right - left) * factor) / 2, offsetY = (height - (bottom - top) * factor) / 2;
+          GdkRGBA foreground; gtk_widget_get_color(GTK_WIDGET(area), &foreground);
+          for (const auto& output : outputs) if (output.value("enabled", false)) {
+            const double w = output.value("logical-width", 0) * factor, h = output.value("logical-height", 0) * factor;
+            if (w <= 0 || h <= 0) continue;
+            const double x = offsetX + (output.value("x", 0) - left) * factor, y = offsetY + (output.value("y", 0) - top) * factor;
+            cairo_rectangle(cr, x + 2, y + 2, std::max(1.0, w - 4), std::max(1.0, h - 4));
+            cairo_set_source_rgba(cr, foreground.red, foreground.green, foreground.blue, .12); cairo_fill_preserve(cr);
+            cairo_set_source_rgba(cr, foreground.red, foreground.green, foreground.blue, foreground.alpha); cairo_set_line_width(cr, 1); cairo_stroke(cr);
+            const auto name = output.value("name", "Display");
+            auto* text = gtk_widget_create_pango_layout(GTK_WIDGET(area), name.c_str());
+            pango_layout_set_width(text, int(std::max(1.0, w - 16) * PANGO_SCALE)); pango_layout_set_ellipsize(text, PANGO_ELLIPSIZE_MIDDLE);
+            pango_layout_set_alignment(text, PANGO_ALIGN_CENTER);
+            int textHeight = 0; pango_layout_get_pixel_size(text, nullptr, &textHeight);
+            cairo_save(cr); cairo_rectangle(cr, x, y, w, h); cairo_clip(cr);
+            cairo_move_to(cr, x + 8, y + (h - textHeight) / 2); pango_cairo_show_layout(cr, text); cairo_restore(cr); g_object_unref(text);
+          }
+        }, new Json(outputs), +[](gpointer data) { delete static_cast<Json*>(data); });
+        adw_preferences_group_add(overview, diagram);
+      }
+
+      for (const auto& output : outputs) {
+        const auto name = output.value("name", "");
+        const auto label = output.value("label", name);
+        auto* fields = group(label);
+        row(fields, "Connection", name + (output.value("enabled", false) ? " · Enabled" : " · Disabled"));
+        if (!output.value("enabled", false)) continue;
+        const auto resolution = std::to_string(output.value("width", 0)) + " × " + std::to_string(output.value("height", 0));
+        row(fields, "Resolution", resolution);
+        auto* refresh = g_strdup_printf("%.2f Hz", output.value("refresh-millihertz", 0u) / 1000.0);
+        row(fields, "Refresh rate", refresh); g_free(refresh);
+        auto* scale = g_strdup_printf("%.0f%%", output.value("scale", 1.0) * 100);
+        row(fields, "Scale", scale); g_free(scale);
+        row(fields, "Position", std::to_string(output.value("x", 0)) + ", " + std::to_string(output.value("y", 0)));
+        row(fields, "Orientation", output.value("transform", "Normal"));
+        if (output.value("vrr-supported", false)) row(fields, "Variable refresh rate", output.value("vrr-enabled", false) ? "Enabled" : "Disabled");
+      }
+    }
+    if (snapshots.contains("configuration") && !snapshots.at("configuration").value("desktop-capabilities", Json::object()).value("gamma-control", false)) {
+      auto* unavailable = row(group("Night Light"), "Night Light unavailable", "This compositor connection does not report gamma control. Display colors cannot be changed here.");
+      gtk_widget_set_sensitive(GTK_WIDGET(unavailable), false);
+    }
+    auto* controls = row(group("Display Configuration"), "Resolution & Arrangement", "Open the current Helix display controls. Native editing is still being migrated.");
+    singleAction(controls, button("Open", [this] {
+      GError* error = nullptr;
+      if (!g_spawn_command_line_async("noctalia msg panel-open control-center monitor", &error)) {
+        toast("Display controls could not be opened"); if (error) g_error_free(error);
+      }
+    }));
+  }
   void devices() {
     if (page != "sound" && page != "network" && page != "bluetooth") return;
     const std::string domain = page == "sound" ? "audio" : page;
@@ -1132,7 +1307,7 @@ struct Settings {
     if (!body) return;
     Json shape = {{"meter", meterSource}, {"pending-operations", Json::array()}, {"page", page}, {"query", query}, {"connected", connected}, {"settings", catalog}};
     for (const auto& [id, operation] : operations) shape["pending-operations"].push_back(id);
-    for (auto& setting : shape["settings"]) if (setting.value("type", "") != "application-list" && setting.value("type", "") != "widget-list" && setting.value("type", "") != "display-list" && setting.value("type", "") != "notification-rules" && setting.value("type", "") != "tab-list" && setting.value("type", "") != "shortcut-list") setting.erase("value");
+    for (auto& setting : shape["settings"]) if (setting.value("type", "") != "application-list" && setting.value("type", "") != "widget-list" && setting.value("type", "") != "display-list" && setting.value("type", "") != "notification-rules" && setting.value("type", "") != "tab-list" && setting.value("type", "") != "shortcut-list" && setting.value("type", "") != "key-chords") setting.erase("value");
     const std::string domain = page == "sound" ? "audio" : page;
     if (snapshots.contains(domain)) {
       shape["devices"] = snapshots.at(domain);
@@ -1141,9 +1316,12 @@ struct Settings {
       if (domain == "network" || domain == "bluetooth") shape["devices"].erase("enabled");
     }
     if (page == "about" && snapshots.contains("configuration")) shape["system"] = snapshots.at("configuration");
+    // GOA is independent: Helix service changes must not cancel an account dialog.
+    if (page == "online-accounts" && query.empty()) shape = {{"page", page}, {"query", query}};
     const auto fingerprint = shape.dump();
     syncing = true;
     if (fingerprint != rendered) {
+      if (accountsPage) { accountsPage->shutdown(); accountsPage.reset(); }
       rendered = fingerprint; setters.clear(); meterBar = nullptr; meterRow = nullptr;
       paletteSwatches = 0; wallpaperPreview = nullptr;
       layoutPreview = nullptr;
@@ -1164,8 +1342,37 @@ struct Settings {
           }));
         }
       }
+      if (page == "online-accounts" && query.empty()) {
+        accountsPage = helix::settings::AccountsPage::create(GTK_WINDOW(window), [this](const std::string& message) { toast(message); });
+        gtk_box_append(body, accountsPage->widget());
+      }
+      displayDevices();
       devices();
       if (page == "appearance") appearancePreview();
+      if (page == "desktop-dock" && query.empty() && connected &&
+          snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
+        auto* navigation = group("Desktop Controls");
+        auto* links = gtk_flow_box_new();
+        gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(links), GTK_SELECTION_NONE);
+        gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(links), 1);
+        gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(links), 3);
+        gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(links), 8);
+        gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(links), 8);
+        for (const auto& [id, label] : std::vector<std::pair<std::string, const char*>>{
+            {"dock", "Dock"}, {"bar", "Bar"}, {"launcher", "Launcher"}, {"control-center", "Control Center"},
+            {"osd", "On-Screen Indicators"}, {"hot-corners", "Hot Corners"}}) {
+          const auto groupName = settings::nativeGroupForSection(id);
+          if (!std::ranges::any_of(catalog, [&](const Json& item) {
+                const auto name = item.value("group", "");
+                return item.value("page", "") == page && (name == groupName || (id == "bar" && name.starts_with("Bar · ")));
+              })) continue;
+          auto* link = button(label, [this, id] { section = id; navigateSection(); });
+          gtk_widget_set_hexpand(link, true);
+          gtk_flow_box_insert(GTK_FLOW_BOX(links), link, -1);
+        }
+        adw_preferences_group_add(navigation, links);
+      }
+
       if (query.empty() && (page == "desktop-dock" || page == "notifications") &&
           snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
         auto* preview = group(page == "notifications" ? "Notification Preview" : "Your Desktop Layout");
@@ -1175,21 +1382,26 @@ struct Settings {
         layoutPreview = helix::settings::LayoutPreview::create(page == "notifications");
         adw_preferences_group_add(preview, layoutPreview);
       }
-      if (page == "system" && std::ranges::any_of(catalog, [](const Json& item) { return item.value("group-overridden", false); })) {
+      if (page == "power" && std::ranges::any_of(catalog, [](const Json& item) { return item.value("group-overridden", false); })) {
         auto* reset = row(group("Idle Timers"), "Restore configured idle timers", "Resets the timer collection, including its original commands and order.");
         adw_action_row_add_suffix(reset, button("Reset", [this] {
           client.callAsync("configuration", "Reset", g_variant_new("(s)", "idle.behavior"), [this](Json, std::string error) { if (!error.empty()) toast("Idle timers could not be reset"); scheduleRefresh(); });
         }));
       }
-      if (page == "desktop-dock" && connected && snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
-        if (matches("Extensions Widgets Automation Hooks Niri Keyboard Agents Advanced Desktop Settings")) {
-          auto* pending = group("Advanced Desktop Settings");
-          adw_preferences_group_set_description(pending, "Your existing configuration remains active. These controls are not yet available in Settings.");
-          for (const auto& name : {"Extension, widget and automation editors", "Keyboard shortcuts and advanced Niri configuration"}) {
-            auto* item = row(pending, name, "Not yet available");
-            gtk_widget_set_sensitive(GTK_WIDGET(item), false);
-          }
-        }
+      if (page == "keyboard" && query.empty()) {
+        auto* scope = row(group("Shortcut Scope"), "Helix Shell", "These bindings control shell navigation. GTK applications keep their standard shortcuts. Global desktop and workspace bindings remain in your Niri configuration.");
+        adw_action_row_set_subtitle_lines(scope, 0);
+      }
+      if (page == "system" && query.empty()) {
+        auto* destinations = group("System Settings");
+        auto* power = row(destinations, "Power", "Battery warnings, suspend behavior and idle timers.");
+        singleAction(power, button("Open", [this] { select("power"); }));
+        auto* software = row(destinations, "Helix Software", "Browse Flatpak applications and manage Fedora packages.");
+        singleAction(software, button("Open", [this] { openApplication("helix-software --page installed"); }));
+        auto* phone = row(destinations, "Helix Phone", "Pair devices, find your phone and send files.");
+        singleAction(phone, button("Open", [this] { openApplication("helix-phone"); }));
+        auto* about = row(destinations, "About", "Operating system, kernel and Helix service availability.");
+        singleAction(about, button("Open", [this] { select("about"); }));
       }
       if (page == "about" && snapshots.contains("configuration")) {
         const auto& state = snapshots.at("configuration"); auto* system = group("System");
@@ -1218,40 +1430,71 @@ struct Settings {
         std::stable_sort(orderedCatalog.begin(), orderedCatalog.end(), [&](const Json& a, const Json& b) { return rank(a) < rank(b); });
       }
       for (const auto& setting : orderedCatalog) {
+        if (query.empty() && page == "appearance" && !appearanceModes.empty() && setting.value("id", "") == "theme.mode") continue;
         if ((query.empty() && setting.value("page", "") != page) || !matches(setting.value("title", "") + " " + setting.value("group", "") + " " + setting.value("page", ""))) continue;
         const auto name = (query.empty() ? std::string{} : setting.value("page", "") + " · ") + setting.at("group").get<std::string>();
         if (!groups.contains(name)) groups[name] = group(name);
         addSetting(groups[name], setting);
       }
-      if (page == "appearance") {
-        auto* palette = row(group("Browse Palettes"), "Palette Library", "Compare built-in, community and custom palettes before applying one.");
-        adw_action_row_add_suffix(palette, button("Browse", [this] { choosePalette(); }));
-        auto* catalogActions = row(group("Palette Catalogs"), "Community Palettes", "Refresh available palettes from the community catalog.");
-        adw_action_row_add_suffix(catalogActions, button("Refresh", [this] {
-          client.callAsync("appearance", "RefreshPalettes", nullptr, [this](Json, std::string error) {
-            toast(error.empty() ? "Refreshing the palette catalog" : "Palette catalog could not be refreshed"); scheduleRefresh();
-          });
-        }));
-        auto* save = row(group("Custom Palettes"), "Save Current Palette");
-        adw_action_row_add_suffix(save, button("Save", [this] {
-          client.callAsync("appearance", "SavePalette", g_variant_new("(s)", "current"), [this](Json, std::string error) {
-            toast(error.empty() ? "Palette saved" : "Palette could not be saved"); scheduleRefresh();
-          });
-        }));
-        auto* accent = row(group("Accent"), "Accent Color", "Creates a custom palette from the current appearance.");
-        adw_action_row_add_suffix(accent, button("Choose", [this] { chooseAccent(); }));
+      if (page == "desktop-dock" && connected && snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
+        if (matches("Extensions Widgets Automation Hooks Niri Keyboard Agents Advanced Desktop Settings")) {
+          auto* pending = group("Advanced Desktop Settings");
+          adw_preferences_group_set_description(pending, "Your existing configuration remains active. These controls are not yet available in Settings.");
+          for (const auto& name : {"Extension, widget and automation editors", "Global compositor shortcuts and advanced Niri configuration"}) {
+            auto* item = row(pending, name, "Not yet available");
+            gtk_widget_set_sensitive(GTK_WIDGET(item), false);
+          }
+        }
       }
-      if (page == "appearance" && snapshots.contains("configuration") && snapshots["configuration"].value("helix-desktop", false)) {
+      if (page == "appearance" || !query.empty()) {
+        AdwPreferencesGroup* palettes = nullptr;
+        auto paletteGroup = [&] { if (!palettes) palettes = group("Palette Management"); return palettes; };
+        // Browsing actions already sit beside the preview in the normal page.
+        // Include matching action rows in search, where that preview is omitted.
+        if (!query.empty() && matches("Appearance Palette Library Browse Colors")) {
+          auto* palette = row(paletteGroup(), "Palette Library", "Compare built-in, community and custom palettes before applying one.");
+          singleAction(palette, button("Browse", [this] { choosePalette(); }));
+        }
+        if (matches("Appearance Community Palettes Refresh Catalog")) {
+          auto* catalogActions = row(paletteGroup(), "Community Palettes", "Refresh available palettes from the community catalog.");
+          singleAction(catalogActions, button("Refresh", [this] {
+            client.callAsync("appearance", "RefreshPalettes", nullptr, [this](Json, std::string error) {
+              toast(error.empty() ? "Refreshing the palette catalog" : "Palette catalog could not be refreshed"); scheduleRefresh();
+            });
+          }));
+        }
+        if (matches("Appearance Custom Palettes Save Current Palette")) {
+          auto* save = row(paletteGroup(), "Save Current Palette", "Keep a copy of the current colors in your custom palette library.");
+          singleAction(save, button("Save", [this] {
+            client.callAsync("appearance", "SavePalette", g_variant_new("(s)", "current"), [this](Json, std::string error) {
+              toast(error.empty() ? "Palette saved" : "Palette could not be saved"); scheduleRefresh();
+            });
+          }));
+        }
+        if (!query.empty() && matches("Appearance Accent Color Choose")) {
+          auto* accent = row(paletteGroup(), "Accent Color", "Creates a custom palette from the current appearance.");
+          singleAction(accent, button("Choose", [this] { chooseAccent(); }));
+        }
+      }
+      if ((page == "appearance" || !query.empty()) && snapshots.contains("configuration") && snapshots["configuration"].value("helix-desktop", false)) {
+        AdwPreferencesGroup* wallpapers = nullptr;
+        auto wallpaperGroup = [&] { if (!wallpapers) wallpapers = group("Wallpaper Sources"); return wallpapers; };
+        if (!query.empty() && matches("Appearance Desktop Wallpaper Library Browse")) {
+          auto* wallpaper = row(wallpaperGroup(), "Wallpaper Library", "Browse wallpapers from your configured folders.");
+          singleAction(wallpaper, button("Browse", [this] { chooseWallpaper(); }));
+        }
+        if (matches("Appearance Wallpaper Files Choose Local File Image Video")) {
+          auto* file = row(wallpaperGroup(), "Choose a Local File", "Use an image or video supported by Helix Shell.");
+          singleAction(file, button("Choose", [this] { chooseWallpaperFile(); }));
+        }
+        if (matches("Appearance Wallpaper Wallhaven Browse Online")) {
+          auto* wallhaven = row(wallpaperGroup(), "Wallhaven", "Search online wallpapers using your existing preferences and credentials.");
+          singleAction(wallhaven, button("Browse", [this] { chooseWallpaper(true); }));
+        }
         if (matches("Templates Icons Advanced Appearance")) {
           auto* pending = row(group("Advanced Appearance"), "Icon and template editors", "Not yet available in Settings. Your existing configuration remains active.");
           gtk_widget_set_sensitive(GTK_WIDGET(pending), false);
         }
-        auto* wallpaper = row(group("Wallpaper"), "Desktop Wallpaper");
-        adw_action_row_add_suffix(wallpaper, button("Browse", [this] { chooseWallpaper(); }));
-        auto* file = row(group("Wallpaper Files"), "Choose a Local File", "Use an image or video supported by Helix Shell.");
-        adw_action_row_add_suffix(file, button("Choose", [this] { chooseWallpaperFile(); }));
-        auto* wallhaven = row(group("Wallhaven"), "Browse Wallhaven", "Search online wallpapers using your existing Wallhaven preferences and credentials.");
-        adw_action_row_add_suffix(wallhaven, button("Browse", [this] { chooseWallpaper(true); }));
       }
       if (!gtk_widget_get_first_child(GTK_WIDGET(body))) {
         auto* status = adw_status_page_new(); adw_status_page_set_title(ADW_STATUS_PAGE(status), connected ? "No Matching Settings" : "Connect to Helix Services");
@@ -1271,7 +1514,7 @@ struct Settings {
       }
     for (const std::string kind : {"network", "bluetooth"}) if (setters.contains(kind + "-enabled")) setters.at(kind + "-enabled")(snapshots.at(kind).at("enabled"));
     if (layoutPreview) helix::settings::LayoutPreview::update(layoutPreview, catalog);
-    gtk_widget_set_sensitive(GTK_WIDGET(body), connected);
+    gtk_widget_set_sensitive(GTK_WIDGET(body), connected || page == "online-accounts");
     syncing = false;
   }
   void create() {
@@ -1291,7 +1534,16 @@ struct Settings {
     auto* leftBox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     search = GTK_SEARCH_ENTRY(gtk_search_entry_new()); gtk_widget_set_margin_start(GTK_WIDGET(search), 12); gtk_widget_set_margin_end(GTK_WIDGET(search), 12); gtk_widget_set_margin_bottom(GTK_WIDGET(search), 12);
     gtk_box_append(GTK_BOX(leftBox), GTK_WIDGET(search));
-    onSignal(search, "search-changed", [this] { query = gtk_editable_get_text(GTK_EDITABLE(search)); rendered.clear(); render(); });
+    onSignal(search, "search-changed", [this] {
+      const std::string nextQuery = gtk_editable_get_text(GTK_EDITABLE(search));
+      if (query == nextQuery) return;
+      query = nextQuery;
+      if (!query.empty()) {
+        section.clear(); requestedSection.clear();
+        if (sectionTick) { gtk_widget_remove_tick_callback(scroller, sectionTick); sectionTick = 0; }
+      }
+      rendered.clear(); render();
+    });
     sidebar = GTK_LIST_BOX(gtk_list_box_new()); gtk_widget_add_css_class(GTK_WIDGET(sidebar), "navigation-sidebar");
     for (const auto& item : pages) {
       auto* itemRow = gtk_list_box_row_new();
@@ -1362,8 +1614,10 @@ struct Settings {
 }
 int main(int argc, char** argv) {
   auto* app = adw_application_new("org.helix.Settings", G_APPLICATION_HANDLES_COMMAND_LINE);
+  helix::apps::guardInspection(G_APPLICATION(app));
   Settings settings(app);
-  g_application_add_main_option(G_APPLICATION(app), "section", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Open a Desktop & Dock section", "ID");
+  g_application_add_main_option(G_APPLICATION(app), "search", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Find settings", "TEXT");
+  g_application_add_main_option(G_APPLICATION(app), "section", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Open a Settings section", "ID");
   g_application_add_main_option(G_APPLICATION(app), "page", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Open a Settings page", "ID");
   g_application_add_main_option(G_APPLICATION(app), "wallpapers", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Open the library or wallhaven wallpaper browser", "SOURCE");
   g_application_add_main_option(G_APPLICATION(app), "palettes", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_NONE, "Open the palette browser", nullptr);
@@ -1373,7 +1627,7 @@ int main(int argc, char** argv) {
     auto& self = *static_cast<Settings*>(data); if (!self.window) self.create(); gtk_window_present(GTK_WINDOW(self.window));
   }), &settings);
   g_signal_connect(app, "command-line", G_CALLBACK((+[](GApplication* application, GApplicationCommandLine* command, gpointer data) -> int {
-    auto& self = *static_cast<Settings*>(data); const gchar *page = nullptr, *preview = nullptr, *wallpapers = nullptr, *section = nullptr;
+    auto& self = *static_cast<Settings*>(data); const gchar *page = nullptr, *preview = nullptr, *wallpapers = nullptr, *section = nullptr, *search = nullptr;
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "wallpapers", "&s", &wallpapers);
     if (wallpapers && std::string(wallpapers) != "library" && std::string(wallpapers) != "wallhaven") {
       g_application_command_line_printerr(command, "Wallpaper source must be library or wallhaven\n"); return 2;
@@ -1385,19 +1639,28 @@ int main(int argc, char** argv) {
     }
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "page", "&s", &page);
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "section", "&s", &section);
-    if (section && (settings::nativeGroupForSection(section).empty() || (page && std::string_view(page) != "desktop-dock"))) {
-      g_application_command_line_printerr(command, "Section must be control-center, dock, launcher, osd or hot-corners on desktop-dock\n"); return 2;
+    if (section && (settings::nativeGroupForSection(section).empty() || (page && std::string_view(page) != settings::nativePageForTargetSection(section)))) {
+      g_application_command_line_printerr(command, "Section must be clipboard on privacy-security, or control-center, dock, bar, launcher, osd or hot-corners on desktop-dock\n"); return 2;
+    }
+    g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "search", "&s", &search);
+    if (search && (section || wallpapers || g_variant_dict_contains(g_application_command_line_get_options_dict(command), "palettes"))) {
+      g_application_command_line_printerr(command, "Search cannot be combined with a section or browser\n"); return 2;
     }
     gboolean inspect = false;
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "inspect-layout", "b", &inspect);
+    if (inspect && (!self.window)) { g_application_command_line_printerr(command, "Open Settings before inspecting its layout\n"); return 1; }
     if (inspect && self.window) {
       Json layout = {{"width", gtk_widget_get_width(GTK_WIDGET(self.window))}, {"height", gtk_widget_get_height(GTK_WIDGET(self.window))},
         {"collapsed", bool(adw_navigation_split_view_get_collapsed(self.split))}, {"page", self.page},
         {"desktop-page", bool(gtk_widget_get_visible(GTK_WIDGET(self.pageRows.at("desktop-dock"))))}, {"connected", self.connected},
         {"content-width", gtk_widget_get_width(GTK_WIDGET(self.body))},
-        {"section", self.section}, {"scroll-position", gtk_adjustment_get_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self.scroller)))},
+        {"query", self.query}, {"section", self.section}, {"scroll-position", gtk_adjustment_get_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self.scroller)))},
         {"mutations-enabled", bool(gtk_widget_get_sensitive(GTK_WIDGET(self.body)))},
         {"palette-swatches", self.paletteSwatches}, {"wallpaper-preview", self.wallpaperPreview && gtk_picture_get_paintable(self.wallpaperPreview) != nullptr}};
+      layout["groups"] = Json::array();
+      for (auto* child = gtk_widget_get_first_child(GTK_WIDGET(self.body)); child; child = gtk_widget_get_next_sibling(child))
+        if (ADW_IS_PREFERENCES_GROUP(child)) layout["groups"].push_back(adw_preferences_group_get_title(ADW_PREFERENCES_GROUP(child)));
+      if (self.accountsPage) layout["online-accounts"] = self.accountsPage->inspect();
       if (auto browser = self.wallpaperBrowser.lock(); browser && !browser->isClosed()) layout["wallpaper-browser"] = browser->inspect();
       if (auto browser = self.paletteBrowser.lock(); browser && !browser->isClosed()) layout["palette-browser"] = browser->inspect();
       if (self.layoutPreview) layout["layout-preview"] = helix::settings::LayoutPreview::description(self.layoutPreview);
@@ -1406,13 +1669,14 @@ int main(int argc, char** argv) {
       return 0;
     }
     if (page) self.requestedPage = page;
+    if (search) self.requestedQuery = search;
     self.requestedSection = section ? section : "";
-    if (section) self.requestedPage = "desktop-dock";
+    if (section) self.requestedPage = settings::nativePageForTargetSection(section);
     if (wallpapers) { self.requestedPage = "appearance"; self.requestedBrowser = wallpapers; }
     gboolean palettes = false; g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "palettes", "b", &palettes);
     if (palettes) { self.requestedPage = "appearance"; self.requestedPalette = true; }
     g_application_activate(application);
-    if (page || section || wallpapers || palettes) self.scheduleRefresh();
+    if (page || section || wallpapers || palettes || search) self.scheduleRefresh();
     return 0;
   })), &settings);
   const int result = g_application_run(G_APPLICATION(app), argc, argv);

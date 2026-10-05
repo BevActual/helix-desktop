@@ -67,6 +67,7 @@ std::string interfaceFor(std::string_view domain) {
   if (domain == "audio") return audioInterface;
   if (domain == "network") return networkInterface;
   if (domain == "bluetooth") return bluetoothInterface;
+  if (domain == "displays") return displaysInterface;
   throw std::invalid_argument("Unknown desktop domain");
 }
 }

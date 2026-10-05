@@ -26,10 +26,12 @@ build m=mode: (_ensure-configured m)
 
 # Focused, lower-priority builds for work on the running desktop. No test targets.
 build-desktop m=mode jobs="2": (_ensure-configured m)
-    nice -n 10 ionice -c 3 meson compile -C build-{{m}} noctalia noctalia-system-upgrade helix-service helix-settings helix-system-monitor -j {{jobs}}
+    mkdir -p build-{{m}}/helix-tmp
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} noctalia noctalia-system-upgrade helix-service helix-settings helix-system-monitor helix-software helix-phone -j {{jobs}}
 
 build-settings m=mode jobs="2": (_ensure-configured m)
-    nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
+    mkdir -p build-{{m}}/helix-tmp
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
 
 _ensure-configured m=mode:
     #!/usr/bin/env bash

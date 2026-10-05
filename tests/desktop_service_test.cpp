@@ -78,13 +78,16 @@ int main(int argc, char** argv) {
   setenv("GSETTINGS_BACKEND", "memory", 1);
   // Never inspect or change the user's hardware in this integration test.
   setenv("DBUS_SYSTEM_BUS_ADDRESS", getenv("DBUS_SESSION_BUS_ADDRESS"), 1);
-  unsetenv("WAYLAND_DISPLAY"); unsetenv("DISPLAY");
+  unsetenv("WAYLAND_DISPLAY"); unsetenv("DISPLAY"); unsetenv("NIRI_SOCKET");
   setenv("PIPEWIRE_REMOTE", "helix-test-no-audio", 1);
   Child service; service.start(argv[1]);
   helix::DesktopClient client;
   waitForService(client);
   auto snapshot = client.call("configuration", "GetSnapshot");
   assert(!snapshot.at("helix-desktop").get<bool>());
+  const auto displayInventorySnapshot = client.call("displays", "GetSnapshot");
+  assert(!displayInventorySnapshot.at("available").get<bool>() && displayInventorySnapshot.at("outputs").empty());
+  assert(rejects(client, "displays", "Action", g_variant_new("(s)", "unsupported")));
   const auto appearance = client.call("appearance", "GetSnapshot");
   assert(appearance.at("wallpaper") == "");
   const auto& palettePreviews = appearance.at("palette-previews");
@@ -103,7 +106,7 @@ int main(int argc, char** argv) {
   assert(snapshot.at("system").at("os").is_string());
   assert(snapshot.at("system").at("architecture").is_string());
   for (const auto& item : client.call("configuration", "GetSettings"))
-    assert(item.at("page") != "notifications" && item.at("page") != "accessibility" && item.at("page") != "system" && item.at("page") != "privacy-security" && item.at("page") != "desktop-dock");
+    assert(item.at("page") != "notifications" && item.at("page") != "accessibility" && item.at("page") != "keyboard" && item.at("page") != "system" && item.at("page") != "power" && item.at("page") != "privacy-security" && item.at("page") != "desktop-dock");
   assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.show_actions", g_variant_new_boolean(false))));
   assert(!snapshot.at("bluetooth").get<bool>());
   Child bluez; bluez.start(argv[0], "--fake-bluez");
@@ -161,6 +164,24 @@ int main(int argc, char** argv) {
   assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "dock.launcher_position", g_variant_new_string("start"))));
   assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.width", g_variant_new_int64(900))));
   client.call("configuration", "RegisterDesktop");
+  client.call("configuration", "RegisterCapabilities", g_variant_new("(@a{sv})", helix::toVariant({{"gamma-control", true}})));
+  assert(setting(client, "nightlight.enabled").at("page") == "displays");
+  const auto originalDay = setting(client, "nightlight.temperature_day").at("value");
+  const auto originalNight = setting(client, "nightlight.temperature_night").at("value");
+  client.call("configuration", "Update", g_variant_new("(sv)", "nightlight.temperature_night", g_variant_new_int64(9000)));
+  assert(setting(client, "nightlight.temperature_night").at("value") == 9000);
+  assert(setting(client, "nightlight.temperature_day").at("value").get<int>() >= 9100);
+  client.call("configuration", "Update", g_variant_new("(sv)", "nightlight.temperature_day", g_variant_new_int64(2000)));
+  assert(setting(client, "nightlight.temperature_day").at("value") == 2000);
+  assert(setting(client, "nightlight.temperature_night").at("value").get<int>() <= 1900);
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "nightlight.temperature_day", g_variant_new_int64(1000))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "nightlight.temperature_night"));
+  assert(setting(client, "nightlight.temperature_day").at("value") == originalDay);
+  assert(setting(client, "nightlight.temperature_night").at("value") == originalNight);
+  assert(rejects(client, "configuration", "RegisterCapabilities", g_variant_new("(@a{sv})", helix::toVariant({{"unknown", true}}))));
+  client.call("configuration", "RegisterCapabilities", g_variant_new("(@a{sv})", helix::toVariant({{"gamma-control", false}})));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "nightlight.enabled", g_variant_new_boolean(true))));
+
   auto shortcuts = setting(client, "control_center.shortcuts").at("value");
   assert(shortcuts == Json::array({{{"type", "author/plugin:pin"}, {"size", "wide"}}}));
   auto updateShortcuts = [&](const Json& before, const Json& after) {
@@ -248,12 +269,12 @@ int main(int argc, char** argv) {
     if (type == "boolean") assert(item.at("value").is_boolean());
     else if (type == "integer") assert(item.at("value").is_number_integer());
     else if (type == "number") assert(item.at("value").is_number());
-    else if (type == "application-list" || type == "widget-list" || type == "display-list" || type == "notification-rules" || type == "tab-list" || type == "shortcut-list") assert(item.at("value").is_array());
+    else if (type == "application-list" || type == "widget-list" || type == "display-list" || type == "notification-rules" || type == "tab-list" || type == "shortcut-list" || type == "key-chords") assert(item.at("value").is_array());
     else assert(item.at("value").is_string());
   }
   assert(setting(client, "dock.icon_size").at("value").is_number_integer());
   assert(setting(client, "audio.sound_volume").at("value").is_number());
-  assert(setting(client, "idle:lock:timeout").at("page") == "system");
+  assert(setting(client, "idle:lock:timeout").at("page") == "power");
   client.call("configuration", "Update", g_variant_new("(sv)", "idle:lock:timeout", g_variant_new_double(420)));
   assert(setting(client, "idle:lock:timeout").at("value") == 420);
   assert(setting(client, "idle:lock:action").at("value") == "lock");
@@ -292,6 +313,48 @@ int main(int argc, char** argv) {
   assert(setting(client, "shell.screen_time_enabled").at("value") == true);
   client.call("configuration", "Reset", g_variant_new("(s)", "shell.screen_time_enabled"));
   assert(setting(client, "shell.screen_time_enabled").at("value") == false);
+
+  const auto copyKeys = setting(client, "keybinds.copy").at("value");
+  assert(setting(client, "keybinds.copy").at("page") == "keyboard");
+  auto keyUpdate = [&](const Json& before, const Json& after) { return g_variant_new("(s@av@av)", "keybinds.copy", helix::toVariant(before), helix::toVariant(after)); };
+  const auto editedKeys = Json::array({"Alt+F9", "Ctrl+F8"});
+  client.call("configuration", "UpdateOrderedList", keyUpdate(copyKeys, editedKeys));
+  assert(setting(client, "keybinds.copy").at("value") == editedKeys);
+  assert(rejects(client, "configuration", "UpdateOrderedList", keyUpdate(copyKeys, Json::array({"Ctrl+c"}))));
+  for (const auto& invalid : {Json::array(), Json::array({"not-a-key"}), Json::array({"Super+c"}), Json::array({"Ctrl+c", "Ctrl+c"}), Json::array({42})})
+    assert(rejects(client, "configuration", "UpdateOrderedList", keyUpdate(editedKeys, invalid)));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "keybinds.copy", helix::toVariant(editedKeys))));
+  client.call("configuration", "Reset", g_variant_new("(s)", "keybinds.copy"));
+  assert(setting(client, "keybinds.copy").at("value") == copyKeys);
+
+  // Clipboard policy is desktop-only configuration, never a clipboard-content snapshot.
+  assert(setting(client, "battery.warning_threshold").at("page") == "power");
+  auto clipboardPolicy = setting(client, "shell.clipboard_enabled");
+  assert(clipboardPolicy.at("page") == "privacy-security" && clipboardPolicy.at("group") == "Clipboard");
+  const auto retained = clipboardPolicy.at("value");
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_enabled", g_variant_new_boolean(false)));
+  assert(setting(client, "shell.clipboard_enabled").at("value") == false);
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_keep_from_closed_apps", g_variant_new_boolean(false)));
+  assert(setting(client, "shell.clipboard_keep_from_closed_apps").at("value") == false);
+  assert(setting(client, "shell.clipboard_enabled").at("value") == false);
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_history_max_entries", g_variant_new_int64(250)));
+  assert(setting(client, "shell.clipboard_history_max_entries").at("value") == 250);
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.clipboard_history_max_entries", g_variant_new_int64(9))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.clipboard_history_max_entries", g_variant_new_int64(10001))));
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.clipboard_enabled", g_variant_new_string("yes"))));
+  const auto paste = setting(client, "shell.clipboard_auto_paste").at("value");
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_auto_paste", g_variant_new_string("off")));
+  assert(setting(client, "shell.clipboard_auto_paste").at("value") == "off");
+  assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "shell.clipboard_auto_paste", g_variant_new_string("invalid"))));
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_confirm_clear_history", g_variant_new_boolean(false)));
+  assert(setting(client, "shell.clipboard_confirm_clear_history").at("value") == false);
+  client.call("configuration", "Update", g_variant_new("(sv)", "shell.clipboard_image_action_command", g_variant_new_string("existing-editor {path}")));
+  assert(setting(client, "shell.clipboard_image_action_command").at("value") == "existing-editor {path}");
+  for (const auto* id : {"shell.clipboard_enabled", "shell.clipboard_keep_from_closed_apps", "shell.clipboard_history_max_entries",
+      "shell.clipboard_confirm_clear_history", "shell.clipboard_auto_paste", "shell.clipboard_image_action_command"})
+    client.call("configuration", "Reset", g_variant_new("(s)", id));
+  assert(setting(client, "shell.clipboard_enabled").at("value") == retained);
+  assert(setting(client, "shell.clipboard_auto_paste").at("value") == paste);
 
   NotificationFilterConfig firstRule; firstRule.name = "test-first"; firstRule.match = "test-app";
   firstRule.matchContent = "urgent"; firstRule.showToast = false; firstRule.overrideDuration = 1234; firstRule.allowedUrgencies = {"critical"};

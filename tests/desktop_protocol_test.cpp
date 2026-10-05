@@ -12,6 +12,7 @@ int main() {
   assert(g_variant_is_of_type(value, G_VARIANT_TYPE_VARDICT));
   assert(helix::fromVariant(value) == expected);
   g_variant_unref(value);
+  assert(helix::interfaceFor("displays") == helix::displaysInterface);
   bool rejected = false;
   try { (void)helix::toVariant(nullptr); } catch (const std::invalid_argument&) { rejected = true; }
   assert(rejected);

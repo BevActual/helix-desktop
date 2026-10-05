@@ -41,7 +41,6 @@
 #include "shell/control_center/tabs/network_tab.h"
 #include "shell/control_center/tabs/notifications_tab.h"
 #include "shell/control_center/tabs/capture_tab.h"
-#include "shell/control_center/tabs/packages_tab.h"
 #include "shell/control_center/tabs/plugins_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/screen_time_tab.h"
@@ -124,7 +123,7 @@ namespace {
     if (tab == "theme" || tab == "wallpaper") return NativeDestination{"helix-settings", "appearance"};
     if (tab == "privacy-security") return NativeDestination{"helix-settings", "privacy-security"};
     if (tab == "notifications") return NativeDestination{"helix-settings", "notifications"};
-    if (tab == "power") return NativeDestination{"helix-settings", "system"};
+    if (tab == "power") return NativeDestination{"helix-settings", "power"};
     if (tab == "desktop" || tab == "launcher" || tab == "control-center")
       return NativeDestination{"helix-settings", "desktop-dock"};
     return std::nullopt;
@@ -556,7 +555,6 @@ ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
   m_pluginManager = services.pluginManager;
   m_asyncTextures = services.asyncTextures;
   ControlCenterServices tabServices = services;
-  tabServices.hostedEditors = nullptr;
   tabServices.modalHost = &m_modalHost;
   appendBuiltinSlots(tabServices);
 }
@@ -624,7 +622,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
     add("privacy-security", std::make_unique<HubTab>(std::move(privacySecurity)));
   }
   add("system", std::make_unique<SystemTab>(services.sysmon, services));
-  add("packages", std::make_unique<PackagesTab>(services));
   add("clock", std::make_unique<ClockTab>(services));
 
   add("desktop", std::make_unique<DesktopTab>(services));
@@ -993,9 +990,6 @@ void ControlCenterPanel::create() {
       []() { PanelManager::instance().requestLayout(); },
       []() { PanelManager::instance().requestUpdateOnly(); }
   );
-  if (m_hostedEditors != nullptr) {
-    m_hostedEditors->initialize(m_modalHost, []() {});
-  }
   m_modalAttached = false;
 
   syncTabVisibility();
@@ -1113,9 +1107,6 @@ void ControlCenterPanel::attachModalHost(Renderer& renderer, float width, float 
   } else {
     m_modalHost.resize(renderer, width, height);
   }
-  if (m_hostedEditors != nullptr) {
-    m_hostedEditors->setLayoutRenderer(&renderer);
-  }
 }
 
 void ControlCenterPanel::doUpdate(Renderer& renderer) {
@@ -1209,11 +1200,7 @@ void ControlCenterPanel::queueBarWidget(std::string barName, std::string widgetN
   m_pendingOpenPluginSettingsId.clear();
 }
 
-void ControlCenterPanel::invalidatePluginSource(const std::string& sourceName) {
-  if (m_hostedEditors != nullptr) {
-    m_hostedEditors->invalidatePluginSource(sourceName);
-  }
-}
+void ControlCenterPanel::invalidatePluginSource(const std::string&) {}
 
 void ControlCenterPanel::maybeOpenPendingEditor() {
   if (!m_pendingOpenPluginSettingsId.empty()) {
@@ -1420,9 +1407,6 @@ void ControlCenterPanel::onClose() {
   m_tabBodies = nullptr;
   m_sidebarEdgeFade = nullptr;
   m_contentEdgeFade = nullptr;
-  if (m_hostedEditors != nullptr) {
-    m_hostedEditors->close();
-  }
   m_modalHost.closeAll();
   m_modalHost.detach();
   m_modalAttached = false;

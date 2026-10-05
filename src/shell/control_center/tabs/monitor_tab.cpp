@@ -372,7 +372,7 @@ MonitorTab::MonitorTab(
       m_platform(services.platform), m_nightLight(services.nightLight),
       m_settings(std::make_unique<SettingsPane>(
           services,
-          SettingsPaneOptions{.section = "services", .includedGroups = {"brightness"}, .inlineSettings = true}
+          SettingsPaneOptions{.section = "displays", .includedGroups = {"brightness"}, .inlineSettings = true}
       )) {}
 
 std::unique_ptr<Flex> MonitorTab::create() {

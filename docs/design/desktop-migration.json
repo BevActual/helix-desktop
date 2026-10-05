@@ -36,7 +36,7 @@
       "kind": "tab",
       "id": "phone",
       "destination": "app:phone",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "phone"
     },
     {
@@ -99,7 +99,7 @@
       "kind": "tab",
       "id": "packages",
       "destination": "app:software",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "packages"
     },
     {
@@ -119,8 +119,8 @@
     {
       "kind": "tab",
       "id": "monitor",
-      "destination": "settings:displays",
-      "status": "pending",
+      "destination": "settings:displays (inventory); shell:displays (editing)",
+      "status": "partial",
       "compatibility-context": "monitor"
     },
     {
@@ -133,7 +133,7 @@
     {
       "kind": "tab",
       "id": "power",
-      "destination": "settings:system",
+      "destination": "settings:power",
       "status": "partial",
       "compatibility-context": "power"
     },
@@ -141,7 +141,7 @@
       "kind": "tab",
       "id": "keybinds",
       "destination": "settings:keyboard",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "keybinds"
     },
     {
@@ -217,8 +217,8 @@
     {
       "kind": "tab",
       "id": "clipboard",
-      "destination": "shell:clipboard",
-      "status": "pending",
+      "destination": "shell:clipboard; settings:privacy-security (policy)",
+      "status": "partial",
       "compatibility-context": "clipboard"
     },
     {
@@ -428,7 +428,7 @@
       "kind": "settings-section",
       "id": "keybinds",
       "destination": "settings:keyboard",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:keybinds"
     },
     {
@@ -490,8 +490,8 @@
     {
       "kind": "settings-section",
       "id": "power",
-      "destination": "settings:system",
-      "status": "pending",
+      "destination": "settings:power",
+      "status": "partial",
       "compatibility-context": "settings:power"
     },
     {
@@ -585,6 +585,14 @@
       "id": "ipc-open-contexts",
       "destination": "destination-router",
       "status": "pending"
+    },
+    {
+      "kind": "native-page",
+      "id": "online-accounts",
+      "destination": "settings:online-accounts",
+      "status": "partial",
+      "compatibility-context": "online-accounts"
     }
-  ]
+  ],
+  "legacy-software-panel-retired": true
 }

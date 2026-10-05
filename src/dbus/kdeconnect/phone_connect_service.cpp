@@ -1077,6 +1077,7 @@ struct PhoneConnectService::Impl {
   }
 
   void probePlugins(const std::string& id) {
+    probePlugin(id, "kdeconnect_findmyphone", &PhoneDevice::ringPlugin);
     probePlugin(id, kSharePlugin, &PhoneDevice::sharePlugin);
     probePlugin(id, kSftpPlugin, &PhoneDevice::sftpPlugin);
     probePlugin(id, kNotificationsPlugin, &PhoneDevice::notificationsPlugin);
@@ -1367,7 +1368,7 @@ struct PhoneConnectService::Impl {
       const std::weak_ptr<void> alive = token();
       daemon->callMethodAsync(method)
           .onInterface(kDaemonInterface)
-          .withArguments(std::string{kDiscoveryToken})
+          .withArguments(std::string{self.m_manageDesktopIntegration ? kDiscoveryToken : "helix-phone"})
           .uponReplyInvoke([alive, method](std::optional<sdbus::Error> err) {
             if (alive.expired() || !err.has_value()) {
               return;
@@ -1411,8 +1412,10 @@ struct PhoneConnectService::Impl {
   }
 };
 
-PhoneConnectService::PhoneConnectService(SessionBus& bus)
+PhoneConnectService::PhoneConnectService(SessionBus& bus, bool manageDesktopIntegration)
     : m_bus(bus), m_impl(std::make_unique<Impl>(*this, bus)) {
+  m_manageDesktopIntegration = manageDesktopIntegration;
+  if (!manageDesktopIntegration) { m_mirrorAlwaysOn = false; m_phoneNotifications = false; }
   loadContinueHistory();
   loadCastState();
 }
@@ -1653,6 +1656,8 @@ void PhoneConnectService::saveContinueHistory() {
 }
 
 void PhoneConnectService::recordShare(const std::string& deviceId, std::string url) {
+  // The standalone client leaves shell-owned history persistence to its current owner.
+  if (!m_manageDesktopIntegration) return;
   if (url.empty()) {
     return;
   }
@@ -2018,6 +2023,7 @@ void PhoneConnectService::restartReceiver() {
 // Status probe off the main thread: the socket round-trip plus the script's BlueZ query
 // take tens of milliseconds, which at 1 Hz is a visible hitch in every animation.
 void PhoneConnectService::pollPhonePointer() {
+  if (!m_manageDesktopIntegration) return;
   if (m_pointerProbeInFlight) {
     return;
   }

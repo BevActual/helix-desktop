@@ -1,3 +1,4 @@
+#include "apps/common/inspection_guard.h"
 #include "apps/system_monitor/proc_reader.h"
 #include "apps/system_monitor/report_reader.h"
 #include "apps/common/appearance.h"
@@ -527,6 +528,7 @@ int main(int argc, char** argv) {
     std::puts(output.dump().c_str()); return 0;
   }
   auto* app = adw_application_new("org.helix.SystemMonitor", G_APPLICATION_HANDLES_COMMAND_LINE);
+  helix::apps::guardInspection(G_APPLICATION(app));
   Monitor monitor(app);
   g_application_add_main_option(G_APPLICATION(app), "page", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Open overview, processes or screen-time", "ID");
   g_application_add_main_option(G_APPLICATION(app), "search", 0, G_OPTION_FLAG_NONE, G_OPTION_ARG_STRING, "Search process names or PIDs", "QUERY");
@@ -545,6 +547,7 @@ int main(int argc, char** argv) {
     }
     g_variant_dict_lookup(options, "page", "&s", &page); g_variant_dict_lookup(options, "inspect-layout", "b", &inspect);
     g_variant_dict_lookup(options, "search", "&s", &search);
+    if (inspect && (!self.window)) { g_application_command_line_printerr(command, "Open System Monitor before inspecting its layout\n"); return 1; }
     if (inspect && self.window) {
       const Json state = {{"page", self.page}, {"width", gtk_widget_get_width(GTK_WIDGET(self.window))},
         {"height", gtk_widget_get_height(GTK_WIDGET(self.window))}, {"collapsed", bool(adw_navigation_split_view_get_collapsed(self.split))},

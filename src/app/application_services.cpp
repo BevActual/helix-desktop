@@ -665,6 +665,9 @@ void Application::initServices() {
         helix::desktopClient().call("configuration", "RegisterDesktop");
         m_themeService.apply();
       }
+      const helix::Json capabilities = {{"gamma-control", m_compositorPlatform.hasGammaControl()}};
+      if (state.value("desktop-capabilities", helix::Json::object()) != capabilities)
+        helix::desktopClient().call("configuration", "RegisterCapabilities", g_variant_new("(@a{sv})", helix::toVariant(capabilities)));
     } catch (...) {}
   };
   registerDesktop();

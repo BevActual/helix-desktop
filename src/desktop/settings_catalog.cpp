@@ -2,6 +2,7 @@
 #include "desktop/settings_routes.h"
 #include "desktop/shortcuts.h"
 #include "desktop/notification_rules.h"
+#include "core/input/key_chord.h"
 #include "config/config_export.h"
 #include "theme/builtin_palettes.h"
 #include "theme/community_palettes.h"
@@ -26,6 +27,21 @@ struct Setting {
   double maximum = 0;
 };
 constexpr Setting settings[] = {
+  {"nightlight.enabled", "displays", "Night Light", "Night Light", "boolean", true},
+  {"nightlight.force", "displays", "Keep Night Light on", "Night Light", "boolean", true},
+  {"nightlight.temperature_day", "displays", "Day temperature (Kelvin)", "Night Light", "integer", true, 1100, 25000},
+  {"nightlight.temperature_night", "displays", "Night temperature (Kelvin)", "Night Light", "integer", true, 1000, 24900},
+  {"keybinds.validate", "keyboard", "Confirm or activate", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.cancel", "keyboard", "Cancel or close", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.left", "keyboard", "Move left", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.right", "keyboard", "Move right", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.up", "keyboard", "Move up", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.down", "keyboard", "Move down", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.tab_next", "keyboard", "Next tab", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.tab_previous", "keyboard", "Previous tab", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.copy", "keyboard", "Copy selected item", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.save", "keyboard", "Save selected item", "Helix Shell Navigation", "key-chords", true},
+  {"keybinds.delete", "keyboard", "Delete selected item", "Helix Shell Navigation", "key-chords", true},
   {"control_center.shortcuts", "desktop-dock", "Quick shortcuts", "Control Center", "shortcut-list", true},
   {"control_center.visible_tabs", "desktop-dock", "Visible pages", "Control Center", "tab-list", true},
   {"control_center.sidebar", "desktop-dock", "Sidebar", "Control Center", "sidebar-mode", true},
@@ -50,16 +66,23 @@ constexpr Setting settings[] = {
   {"shell.external_ip_enabled", "privacy-security", "Look up public IP address", "Network Privacy", "boolean", true},
   {"shell.telemetry_enabled", "privacy-security", "Anonymous startup ping", "Network Privacy", "boolean", true},
   {"shell.screen_time_enabled", "privacy-security", "Record application screen time", "Activity Privacy", "boolean", true},
+  {"shell.clipboard_enabled", "privacy-security", "Keep clipboard history", "Clipboard", "boolean", true},
+  {"shell.clipboard_keep_from_closed_apps", "privacy-security", "Keep copied items after apps close", "Clipboard", "boolean", true},
+  {"shell.clipboard_history_max_entries", "privacy-security", "History size", "Clipboard", "integer", true,
+    double(noctalia::config::kClipboardHistoryMinEntries), double(noctalia::config::kClipboardHistoryMaxEntries)},
+  {"shell.clipboard_confirm_clear_history", "privacy-security", "Confirm history deletion", "Clipboard", "boolean", true},
+  {"shell.clipboard_auto_paste", "privacy-security", "Paste selected items automatically", "Clipboard", "clipboard-paste", true},
+  {"shell.clipboard_image_action_command", "privacy-security", "Image editor command", "Clipboard", "string", true},
   {"shell.password_style", "privacy-security", "Password masking", "Authentication", "password-mask", true},
   {"lockscreen.fingerprint", "privacy-security", "Use fingerprint authentication", "Authentication", "boolean", true},
   {"lockscreen.blurred_desktop", "privacy-security", "Use blurred desktop background", "Lock Screen", "boolean", true},
   {"lockscreen.blur_intensity", "privacy-security", "Background blur", "Lock Screen", "number", true, 0, 1},
   {"lockscreen.tint_intensity", "privacy-security", "Background tint", "Lock Screen", "number", true, 0, 1},
   {"lockscreen.monitors", "privacy-security", "Lock-screen displays", "Lock Screen", "display-list", true},
-  {"battery.warning_threshold", "system", "Low battery warning (%)", "Power", "integer", true, 0, 100},
-  {"lockscreen.lock_before_suspend", "system", "Lock before system suspend", "Session", "boolean", true},
-  {"lockscreen.lid_close_keep_external_displays", "system", "Keep external displays active when closing the lid", "Session", "boolean", true},
-  {"idle.pre_action_fade_seconds", "system", "Fade before idle actions (seconds)", "Idle", "number", true, 0, 120},
+  {"battery.warning_threshold", "power", "Low battery warning (%)", "Power", "integer", true, 0, 100},
+  {"lockscreen.lock_before_suspend", "power", "Lock before system suspend", "Session", "boolean", true},
+  {"lockscreen.lid_close_keep_external_displays", "power", "Keep external displays active when closing the lid", "Session", "boolean", true},
+  {"idle.pre_action_fade_seconds", "power", "Fade before idle actions (seconds)", "Idle", "number", true, 0, 120},
   {"notification.filter", "notifications", "Application Rules", "Application Rules", "notification-rules", true},
   {"notification.monitors", "notifications", "Notification displays", "Displays", "display-list", true},
   {"notification.layer", "notifications", "Popup layer", "Popups", "shell-layer", true},
@@ -207,11 +230,12 @@ ConfigOverrideValue settingValue(const Json& value, std::string_view id) {
   if (value.is_string()) return value.get<std::string>();
   throw std::invalid_argument("Setting must have a primitive value");
 }
-Json settingsCatalog(ConfigService& config, bool helixDesktop) {
+Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailable) {
   auto table = config_export::serialize(config.config());
   Json result = Json::array();
   for (const auto& setting : settings) {
     if (setting.desktop && !helixDesktop) continue;
+    if (std::string_view(setting.id).starts_with("nightlight.") && !gammaAvailable) continue;
     auto path = settingPath(setting.id);
     if (std::string_view(setting.type) == "shortcut-list") {
       Json values = Json::array(), options = Json::array(), labels = Json::array();
@@ -283,6 +307,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
     if (type == "daily-provider") options = {"bing", "nasa"};
     if (type == "video-pause") options = {"off", "max", "full"};
     if (type == "hot-corner-action") options = {"none", "launcher", "control_center", "window_switcher", "command"};
+    if (type == "clipboard-paste") options = {"off", "auto", "ctrl_v", "ctrl_shift_v", "shift_insert"};
     if (type == "password-mask") options = {"default", "random"};
     if (type == "material") options = {"solid", "soft", "glass"};
     if (type == "position") options = {"bottom", "left", "right", "top"};
@@ -310,6 +335,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
     if (type == "sidebar-mode") labels = {"Full sidebar", "Compact sidebar", "No sidebar"};
     if (type == "panel-placement") labels = {"Attached to bar", "Floating"};
     if (type == "panel-position") labels = {"Automatic", "Center", "Top left", "Top center", "Top right", "Center left", "Center right", "Bottom left", "Bottom center", "Bottom right"};
+    if (type == "clipboard-paste") labels = {"Off", "Automatic", "Ctrl+V", "Ctrl+Shift+V", "Shift+Insert"};
     if (type == "orientation") labels = {"Horizontal", "Vertical"};
     if (type == "screen-position") labels = {"Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right"};
     if (type == "dock-launcher") labels = {"Hidden", "Start", "End"};
@@ -324,6 +350,11 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
   }
   for (auto& entry : result) {
     const auto id = entry.at("id").get<std::string>();
+    if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") entry["step"] = 100;
+    if (id == "shell.clipboard_history_max_entries") entry["step"] = noctalia::config::kClipboardHistoryStepEntries;
+    if (id == "nightlight.enabled") entry["description"] = "Use warmer display colors through the Helix compositor's gamma-control capability.";
+    if (id == "nightlight.force") entry["description"] = "Use the night temperature all day. Otherwise Night Light follows the existing location-based schedule.";
+    if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") entry["description"] = "Lower values are warmer. Temperatures stay at least 100 K apart; changing one adjusts the other when necessary. Reset restores both configured temperatures.";
     if (id == "control_center.sidebar") entry["description"] = "Controls the navigation sidebar in the full Control Center. The quick Home panel stays compact.";
     if (id == "control_center.sidebar_section") entry["description"] = "Controls the sidebar when opening a detail view directly from a bar control or command.";
     if (id == "control_center.width") entry["description"] = "Maximum width of the full Control Center. Compact and sidebar-free views scale from this value.";
@@ -338,6 +369,12 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
     if (entry.at("id") == "shell.offline_mode") entry["description"] = "Blocks Helix Shell HTTP requests. Does not disconnect the network or restrict other applications.";
     if (entry.at("id") == "shell.external_ip_enabled") entry["description"] = "Uses an external service to resolve your public address. Unavailable while shell network requests are restricted.";
     if (entry.at("id") == "shell.telemetry_enabled") entry["description"] = "Sends an anonymous ping when Helix Shell starts. Unavailable while shell network requests are restricted.";
+    if (entry.at("id") == "shell.clipboard_enabled") entry["description"] = "Retain copied items in Helix clipboard history. Turning this off stops history retention; ordinary copy and paste remain available.";
+    if (entry.at("id") == "shell.clipboard_keep_from_closed_apps") entry["description"] = "Keep the current copied item available after its source app exits, even when history retention is off.";
+    if (entry.at("id") == "shell.clipboard_history_max_entries") entry["description"] = "Maximum unpinned history entries. Pinned items are exempt. Used while history retention is enabled.";
+    if (entry.at("id") == "shell.clipboard_confirm_clear_history") entry["description"] = "Ask before clearing history or deleting an unpinned item. Pinned items always require confirmation.";
+    if (entry.at("id") == "shell.clipboard_auto_paste") entry["description"] = "Paste an item selected from Helix clipboard history into the active app. Off copies it without simulating a paste shortcut.";
+    if (entry.at("id") == "shell.clipboard_image_action_command") entry["description"] = "Command offered for image history entries. Use {path} for the image file, {stdin} for standard input, or leave blank to disable the action.";
     if (entry.at("id") == "shell.screen_time_enabled") entry["description"] = "Records focused-application usage locally while Helix is running. Saved reports are available in Helix System Monitor. Disabling recording preserves existing history.";
     if (entry.at("id") == "lockscreen.fingerprint") entry["description"] = "Allows fingerprint unlock when a configured reader and fprintd are available. Password unlock remains available.";
     if (entry.at("id") == "lockscreen.blurred_desktop") entry["description"] = "Uses compositor screen capture where supported by helix-niri.";
@@ -361,7 +398,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
         if (!behavior.command.empty() || behavior.action == "command") { options.push_back("command"); labels.push_back("Existing custom command"); }
       }
       const bool time = field == "timeout" || field == "locked_timeout";
-      Json entry = {{"id", id}, {"page", "system"}, {"group", "Idle · " + behavior.name},
+      Json entry = {{"id", id}, {"page", "power"}, {"group", "Idle · " + behavior.name},
         {"title", field == "enabled" ? "Enable timer" : field == "timeout" ? "Idle delay (seconds)" : field == "locked_timeout" ? "Delay while locked (seconds)" : field == "action" ? "Action" : "Lock before suspending"},
         {"type", field == "action" ? "idle-action" : time ? "number" : "boolean"}, {"value", value}, {"options", options}, {"option-labels", labels},
         {"minimum", 0}, {"maximum", time ? 86400 : 0}, {"overridden", false}, {"group-overridden", config.hasOverride({"idle", "behavior"})}};
@@ -402,11 +439,21 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop) {
 }
 
 namespace helix {
-void validateSettingValue(ConfigService& config, std::string_view id, const Json& value, bool desktop) {
-  for (const auto& entry : settingsCatalog(config, desktop)) {
+void validateSettingValue(ConfigService& config, std::string_view id, const Json& value, bool desktop, bool gammaAvailable) {
+  for (const auto& entry : settingsCatalog(config, desktop, gammaAvailable)) {
     if (entry.at("id") != id) continue;
     const auto type = entry.at("type").get<std::string>();
-    if (type == "shortcut-list") {
+    if (type == "key-chords") {
+      if (!value.is_array() || value.empty() || value.size() > 16) throw std::invalid_argument("Provide between one and sixteen key shortcuts");
+      std::vector<KeyChord> seen;
+      for (const auto& item : value) {
+        if (!item.is_string() || item.get_ref<const std::string&>().size() > 128) throw std::invalid_argument("Key shortcuts must be short text values");
+        const auto chord = parseKeyChordSpec(item.get_ref<const std::string&>());
+        if (!chord) throw std::invalid_argument("Invalid key shortcut");
+        if (std::ranges::find(seen, *chord) != seen.end()) throw std::invalid_argument("Duplicate key shortcut");
+        seen.push_back(*chord);
+      }
+    } else if (type == "shortcut-list") {
       const auto shortcuts = shortcutValues(value);
       for (const auto& shortcut : shortcuts) if (std::ranges::find(entry.at("options"), Json(shortcut.type)) == entry.at("options").end())
         throw std::invalid_argument("Unknown or disabled shortcut");

@@ -418,14 +418,22 @@ void PanelManager::openSettings(std::string context) {
   DesktopEntry entry;
   entry.id = "org.helix.Settings";
   entry.name = "Helix Settings";
-  entry.exec = "helix-settings --page " + std::string(settings::nativePageForSection(context));
-  if (const auto section = settings::nativeSectionForContext(context); !section.empty()) entry.exec += " --section " + std::string(section);
+  if (settings::isSoftwareContext(context)) {
+    entry.id = "org.helix.Software"; entry.name = "Helix Software";
+    const auto page = context.find("updates") != std::string::npos ? "updates" : context.find("installed") != std::string::npos ? "installed" : "browse";
+    entry.exec = std::string("helix-software --page ") + page;
+    if (context.find("flatpak") != std::string::npos) entry.exec += " --source flatpak";
+    else if (context.find("firmware") != std::string::npos) entry.exec += " --source firmware";
+  } else {
+    entry.exec = "helix-settings --page " + std::string(settings::nativePageForSection(context));
+    if (const auto section = settings::nativeSectionForContext(context); !section.empty()) entry.exec += " --section " + std::string(section);
+  }
   desktop_entry_launch::LaunchOptions options;
   if (m_platform != nullptr && m_platform->hasXdgActivation()) options.activationToken = m_platform->requestActivationToken(nullptr);
   if (desktop_entry_launch::launchEntry(entry, options)) {
     DeferredCall::callLater([] { PanelManager::instance().closeSettings(); });
   } else {
-    kLog.error("Helix Settings could not be opened; install helix-settings");
+    kLog.error("{} could not be opened; check that it is installed", entry.name);
   }
 }
 

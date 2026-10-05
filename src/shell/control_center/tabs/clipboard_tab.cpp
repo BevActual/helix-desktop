@@ -13,7 +13,7 @@ ClipboardTab::ClipboardTab(const ControlCenterServices& services)
           ClipboardPicker::Options{.showTitle = false, .showCloseButton = false, .closeHostWhenEmpty = false}
       ),
       m_settings(std::make_unique<SettingsPane>(
-          services, SettingsPaneOptions{.section = "shell", .includedGroups = {"clipboard"}}
+          services, SettingsPaneOptions{.section = "clipboard", .includedGroups = {"clipboard"}}
       )) {
   m_picker.setDesktopAi(services.desktopAi);
   m_picker.setCloseCallback([]() { PanelManager::instance().close(); });

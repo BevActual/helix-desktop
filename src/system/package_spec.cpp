@@ -17,6 +17,24 @@ namespace noctalia::packages {
         std::string_view{"helix-shell"},
         std::string_view{"noctalia"},
         std::string_view{"noctalia-greeter"},
+        std::string_view{"helix-greeter"},
+        std::string_view{"helix-niri"},
+        std::string_view{"niri"},
+        std::string_view{"filesystem"},
+        std::string_view{"setup"},
+        std::string_view{"kernel"},
+        std::string_view{"kernel-core"},
+        std::string_view{"kernel-modules"},
+        std::string_view{"kernel-modules-core"},
+        std::string_view{"kernel-modules-extra"},
+        std::string_view{"glibc"},
+        std::string_view{"systemd"},
+        std::string_view{"systemd-libs"},
+        std::string_view{"systemd-udev"},
+        std::string_view{"rpm"},
+        std::string_view{"dnf"},
+        std::string_view{"dnf5"},
+
     };
 
     constexpr std::array kInfoLabels = {
