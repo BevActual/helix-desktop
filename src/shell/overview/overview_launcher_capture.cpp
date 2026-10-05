@@ -3,7 +3,6 @@
 #include "compositors/compositor_detect.h"
 #include "compositors/compositor_platform.h"
 #include "compositors/niri/niri_runtime.h"
-#include "compositors/umbriel/umbriel_runtime.h"
 #include "core/input/key_modifiers.h"
 #include "core/input/key_symbols.h"
 #include "core/log.h"
@@ -61,7 +60,7 @@ namespace {
 bool OverviewLauncherCapture::initialize(
     WaylandConnection& wayland, RenderContext* renderContext, CompositorPlatform& platform, PanelManager& panelManager
 ) {
-  if ((!compositors::isNiri() && !compositors::isUmbriel()) || !platform.tracksOverviewState()) {
+  if (!compositors::isNiri() || !platform.tracksOverviewState()) {
     return true;
   }
 
@@ -187,9 +186,6 @@ bool OverviewLauncherCapture::sendOverviewAction(const char* actionName) const {
   if (m_platform == nullptr || actionName == nullptr || actionName[0] == '\0') {
     return false;
   }
-  if (compositors::isUmbriel()) {
-    return m_platform->umbrielRuntime().requestAction(actionName);
-  }
   if (compositors::isNiri()) {
     return m_platform->niriRuntime().requestAction(nlohmann::json{{actionName, nlohmann::json::object()}});
   }
@@ -200,30 +196,28 @@ bool OverviewLauncherCapture::handleOverviewKey(const KeyboardEvent& event) cons
   if (!event.pressed || event.preedit) {
     return false;
   }
-  const bool isUmbriel = compositors::isUmbriel();
-
   if (KeySymbol::isEnter(event.sym) || KeySymbol::isEscape(event.sym)) {
-    const auto* action = isUmbriel ? "overview-toggle" : "ToggleOverview";
+    const auto* action = "ToggleOverview";
     (void)sendOverviewAction(action);
     return true;
   }
   if (KeySymbol::isLeft(event.sym)) {
-    const auto* action = isUmbriel ? "window-focus-left" : "FocusColumnLeft";
+    const auto* action = "FocusColumnLeft";
     (void)sendOverviewAction(action);
     return true;
   }
   if (KeySymbol::isRight(event.sym)) {
-    const auto* action = isUmbriel ? "window-focus-right" : "FocusColumnRight";
+    const auto* action = "FocusColumnRight";
     (void)sendOverviewAction(action);
     return true;
   }
   if (KeySymbol::isUp(event.sym)) {
-    const auto* action = isUmbriel ? "window-focus-or-workspace-up" : "FocusWorkspaceUp";
+    const auto* action = "FocusWorkspaceUp";
     (void)sendOverviewAction(action);
     return true;
   }
   if (KeySymbol::isDown(event.sym)) {
-    const auto* action = isUmbriel ? "window-focus-or-workspace-down" : "FocusWorkspaceDown";
+    const auto* action = "FocusWorkspaceDown";
     (void)sendOverviewAction(action);
     return true;
   }

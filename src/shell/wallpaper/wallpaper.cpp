@@ -252,59 +252,6 @@ namespace {
     return tryParseHexColor(path.substr(kPrefix.size()), out);
   }
 
-  void
-  notifyKdePlasmaWallpaper(const std::string& imagePath, const std::string& connector, const WaylandOutput* output) {
-    if (!compositors::isKde()) {
-      return;
-    }
-    if (imagePath.starts_with("color:")) {
-      return;
-    }
-
-    kLog.info("syncing wallpaper to KDE Plasma: {} (connector: {})", imagePath, connector);
-
-    std::string script;
-    if (output == nullptr) {
-      script = "var d = desktops();"
-               "for (var i = 0; i < d.length; i++) {"
-               "  d[i].wallpaperPlugin = 'org.kde.image';"
-               "  d[i].currentConfigGroup = ['Wallpaper', 'org.kde.image', 'General'];"
-               "  d[i].writeConfig('Image', 'file://"
-          + imagePath
-          + "');"
-            "}";
-    } else {
-      script = "var d = desktops();"
-               "for (var i = 0; i < d.length; i++) {"
-               "  var g = screenGeometry(d[i].screen);"
-               "  if (g.x == "
-          + std::to_string(output->logicalX)
-          + " && g.y == "
-          + std::to_string(output->logicalY)
-          + " && g.width == "
-          + std::to_string(output->logicalWidth)
-          + " && g.height == "
-          + std::to_string(output->logicalHeight)
-          + ") {"
-            "    d[i].wallpaperPlugin = 'org.kde.image';"
-            "    d[i].currentConfigGroup = ['Wallpaper', 'org.kde.image', 'General'];"
-            "    d[i].writeConfig('Image', 'file://"
-          + imagePath
-          + "');"
-            "  }"
-            "}";
-    }
-
-    const bool launched = process::runAsync(
-        {"dbus-send", "--session", "--dest=org.kde.plasmashell", "--type=method_call", "/PlasmaShell",
-         "org.kde.PlasmaShell.evaluateScript", "string:" + script}
-    );
-
-    if (!launched) {
-      kLog.warn("failed to launch dbus-send to sync plasma wallpaper");
-    }
-  }
-
 } // namespace
 
 Wallpaper::Wallpaper() {
@@ -570,7 +517,6 @@ std::vector<WallpaperChange> Wallpaper::onStateChange() {
         }
       }
     }
-    notifyKdePlasmaWallpaper(newPath, inst->connectorName, output);
   }
 
   // Any wallpaper change (manual selection, IPC, or automation) restarts the
@@ -618,7 +564,6 @@ void Wallpaper::applyResolvedWallpaper(const std::optional<std::string>& connect
       }
     }
   }
-  notifyKdePlasmaWallpaper(resolvedPath, connector.value_or(""), output);
 
   if (const WallpaperFavorite* favorite = m_config->wallpaperFavorite(resolvedPath); favorite != nullptr) {
     if (connector.has_value()) {

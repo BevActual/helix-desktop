@@ -31,7 +31,6 @@ namespace {
   constexpr auto kDbusInterface = "org.freedesktop.DBus";
 
   constexpr uint32_t kNameFlagAllowReplacement = 1U;
-  constexpr uint32_t kNameFlagReplaceExisting = 2U;
   constexpr uint32_t kNameFlagDoNotQueue = 4U;
 
   constexpr uint32_t kNameReplyPrimaryOwner = 1U;
@@ -44,9 +43,6 @@ namespace {
   }
 
   [[nodiscard]] uint32_t notificationNameRequestFlags() {
-    if (compositors::isKde()) {
-      return kNameFlagAllowReplacement | kNameFlagReplaceExisting | kNameFlagDoNotQueue;
-    }
     return kNameFlagAllowReplacement | kNameFlagDoNotQueue;
   }
 

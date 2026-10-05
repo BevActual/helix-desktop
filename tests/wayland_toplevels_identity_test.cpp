@@ -30,10 +30,7 @@ int main() {
   using wayland_protocol_policy::shouldBindExtForeignToplevelList;
 
   TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Niri));
-  TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Hyprland));
-  TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Kde));
   TEST_CHECK(!shouldBindExtForeignToplevelList(CompositorKind::Unknown));
-  TEST_CHECK(!shouldBindExtForeignToplevelList(CompositorKind::Sway));
 
   WaylandToplevels toplevels;
   auto* handle = reinterpret_cast<zwlr_foreign_toplevel_handle_v1*>(0x1);

@@ -352,24 +352,6 @@ bool AppProvider::activate(const LauncherResult& result) {
         .dbusAppId = entry.id,
     };
 
-    if (m_platform != nullptr) {
-      wl_output* launchOutput = nullptr;
-
-      if (PanelManager& panelManager = PanelManager::instance(); panelManager.isOpenPanel("launcher")) {
-        launchOutput = panelManager.attachedPanelOutput();
-      }
-
-      if (launchOutput == nullptr) {
-        if (wl_surface* pointerSurface = m_platform->lastPointerSurface(); pointerSurface != nullptr) {
-          launchOutput = m_platform->outputForSurface(pointerSurface);
-        }
-      }
-      if (launchOutput == nullptr) {
-        launchOutput = m_platform->preferredInteractiveOutput();
-      }
-      m_platform->prepareAppLaunchOnOutput(launchOutput);
-    }
-
     const bool launched = chosen != nullptr
         ? desktop_entry_launch::launchAction(*chosen, entry.id, entry.workingDir, entry.terminal, launchOptions)
         : desktop_entry_launch::launchEntry(entry, launchOptions);

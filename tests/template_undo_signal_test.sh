@@ -69,7 +69,6 @@ ghostty/undo.sh:ghostty/themes/noctalia
 kitty/undo.sh:kitty/themes/noctalia.conf
 btop/undo.sh:btop/themes/noctalia.theme
 cava/undo.sh:cava/themes/noctalia
-mango/undo.sh:mango/noctalia.conf
 "
 
 for entry in $cases; do

@@ -105,8 +105,7 @@ namespace {
 
   [[nodiscard]] bool canActivateWindow(const ToplevelInfo& window) {
     return window.handle != nullptr
-        || !window.identifier.empty()
-        || (compositors::isKde() && (!window.title.empty() || !window.appId.empty()));
+        || !window.identifier.empty();
   }
 
   [[nodiscard]] const ToplevelInfo* newestActivatableWindow(const std::vector<ToplevelInfo>& windows) {
@@ -1167,10 +1166,6 @@ void Dock::tryFulfillPendingLaunchFocus() {
       return;
     }
     window = *candidate;
-    // Landed off the launch monitor; relocate before activate.
-    if (pending.targetOutput != nullptr) {
-      m_platform->moveToplevelToOutput(*window, pending.targetOutput);
-    }
   }
 
   m_pendingLaunchFocus.reset();
@@ -1206,7 +1201,6 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
         .targetOutput = instance.output,
         .deadline = std::chrono::steady_clock::now() + std::chrono::seconds(8),
     };
-    m_platform->prepareAppLaunchOnOutput(instance.output);
     (void)desktop_entry_launch::launchEntry(action.entry, dockLaunchOptions(*m_platform, *m_config, action.entry));
     return;
   }
@@ -1289,9 +1283,7 @@ void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::
             }
           },
       .launchAction =
-          [this, entryId, entryWorkingDir, entryTerminal, entryForPin,
-           output = instance.output](const DesktopAction& desktopAction) {
-            m_platform->prepareAppLaunchOnOutput(output);
+          [this, entryId, entryWorkingDir, entryTerminal, entryForPin](const DesktopAction& desktopAction) {
             (void)desktop_entry_launch::launchAction(
                 desktopAction, entryId, entryWorkingDir, entryTerminal,
                 dockLaunchOptions(*m_platform, *m_config, entryForPin)

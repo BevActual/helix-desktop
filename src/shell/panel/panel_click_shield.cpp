@@ -42,7 +42,7 @@ namespace {
   // hyprland_focus_grab_v1 protocol when available and only fall back to the
   // shield path here.
   LayerShellKeyboard shieldKeyboardMode() {
-    return compositors::isHyprland() ? LayerShellKeyboard::Exclusive : LayerShellKeyboard::None;
+    return LayerShellKeyboard::None;
   }
 
 } // namespace

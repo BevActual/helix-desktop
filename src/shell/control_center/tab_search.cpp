@@ -19,7 +19,6 @@ namespace control_center {
          "appearance color palette colours colors look custom customize accent dark light auto "
          "glass icons type scale roundness effects language"},
         {"niri", "setup compositor autostart"},
-        {"umbriel", "compositor overview type-to-launch"},
         {"audio", "sound volume mic microphone speaker"},
         {"bluetooth", "bt nearby paired"},
         {"calendar", "date accounts caldav google ical ics vdir"},

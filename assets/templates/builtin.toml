@@ -48,37 +48,13 @@ category = "system"
 name = "Kitty"
 category = "terminal"
 
-[catalog.labwc]
-name = "Labwc"
-category = "compositor"
-
 [catalog.niri]
 name = "Niri"
-category = "compositor"
-
-[catalog.hyprland]
-name = "Hyprland"
-category = "compositor"
-
-[catalog.mango]
-name = "Mango"
 category = "compositor"
 
 [catalog.qt]
 name = "Qt"
 category = "system"
-
-[catalog.scroll]
-name = "Scroll"
-category = "compositor"
-
-[catalog.sway]
-name = "Sway"
-category = "compositor"
-
-[catalog.umbriel]
-name = "Umbriel"
-category = "compositor"
 
 [catalog.starship]
 name = "Starship"
@@ -167,52 +143,16 @@ output_path = "$XDG_CONFIG_HOME/kitty/themes/noctalia.conf"
 post_hook = "bash '{{ config_dir }}/kitty/apply.sh'"
 undo_hook = "bash '{{ config_dir }}/kitty/undo.sh'"
 
-[templates.labwc]
-input_path = "./labwc/labwc.conf"
-output_path = "$XDG_CONFIG_HOME/labwc/noctalia.conf"
-post_hook = "bash '{{ config_dir }}/labwc/apply.sh'"
-undo_hook = "bash '{{ config_dir }}/labwc/undo.sh'"
-
 [templates.niri]
 input_path = "./niri/niri.kdl"
 output_path_dynamic = "bash '{{ config_dir }}/niri/apply.sh' output"
 post_hook = "bash '{{ config_dir }}/niri/apply.sh' apply"
 undo_hook = "bash '{{ config_dir }}/niri/undo.sh'"
 
-[templates.hyprland]
-input_path_dynamic = "bash '{{ config_dir }}/hyprland/apply.sh' input"
-output_path_dynamic = "bash '{{ config_dir }}/hyprland/apply.sh' output"
-post_hook = "bash '{{ config_dir }}/hyprland/apply.sh' apply"
-undo_hook = "bash '{{ config_dir }}/hyprland/undo.sh'"
-
-[templates.mango]
-input_path = "./mango/mango.conf"
-output_path = "$XDG_CONFIG_HOME/mango/noctalia.conf"
-post_hook = "bash '{{ config_dir }}/mango/apply.sh'"
-undo_hook = "bash '{{ config_dir }}/mango/undo.sh'"
-
 [templates.qt]
 input_path = "./qt/qtct.conf"
 output_path = ["$XDG_CONFIG_HOME/qt5ct/colors/noctalia.conf", "$XDG_CONFIG_HOME/qt6ct/colors/noctalia.conf"]
 undo_hook = "bash '{{ config_dir }}/qt/undo.sh'"
-
-[templates.scroll]
-input_path = "./scroll/scroll"
-output_path = "$XDG_CONFIG_HOME/scroll/noctalia"
-post_hook = "bash '{{ config_dir }}/scroll/apply.sh'"
-undo_hook = "bash '{{ config_dir }}/scroll/undo.sh'"
-
-[templates.sway]
-input_path = "./sway/sway"
-output_path = "$XDG_CONFIG_HOME/sway/noctalia"
-post_hook = "bash '{{ config_dir }}/sway/apply.sh'"
-undo_hook = "bash '{{ config_dir }}/sway/undo.sh'"
-
-[templates.umbriel]
-input_path = "./umbriel/umbriel.toml"
-output_path = "$XDG_CONFIG_HOME/umbriel/noctalia.toml"
-post_hook = "bash '{{ config_dir }}/umbriel/apply.sh'"
-undo_hook = "bash '{{ config_dir }}/umbriel/undo.sh'"
 
 [templates.starship]
 input_path = "./starship/starship.toml"

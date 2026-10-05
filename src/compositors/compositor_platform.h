@@ -18,22 +18,11 @@
 struct wl_output;
 struct wl_surface;
 struct ext_workspace_manager_v1;
-struct org_kde_plasma_virtual_desktop_management;
-struct zdwl_ipc_manager_v2;
-struct hyprland_toplevel_mapping_manager_v1;
 struct zwlr_foreign_toplevel_handle_v1;
 struct ext_foreign_toplevel_handle_v1;
 class OutputProbe;
 class SessionBus;
 class WaylandWorkspaces;
-
-namespace compositors::kde {
-  class KwinActiveWindow;
-}
-
-namespace compositors::hyprland {
-  class HyprlandToplevelMapping;
-}
 
 namespace compositors {
   class CompositorRuntimeRegistry;
@@ -41,9 +30,6 @@ namespace compositors {
   class OutputPowerBackend;
   namespace niri {
     class NiriRuntime;
-  }
-  namespace umbriel {
-    class UmbrielRuntime;
   }
 } // namespace compositors
 
@@ -60,7 +46,6 @@ public:
   CompositorPlatform& operator=(const CompositorPlatform&) = delete;
 
   void initialize();
-  void startKdeActiveWindow(SessionBus& bus);
   void cleanup();
 
   [[nodiscard]] WaylandConnection& wayland() noexcept { return m_wayland; }
@@ -120,23 +105,7 @@ public:
   void closeToplevelInfo(const ToplevelInfo& window);
   void focusCompositorWindow(const std::string& windowId, bool warpPointer = false) const;
 
-  // Focus `output` before spawning (Hyprland) so clients follow the launch monitor.
-  void prepareAppLaunchOnOutput(wl_output* output);
-
-  // Move a toplevel onto `output` when supported (Hyprland).
-  void moveToplevelToOutput(const ToplevelInfo& window, wl_output* output);
-
-  void activateKdeWindow(const std::string& title, const std::string& appId, const std::string& uuid = {});
-
   void setToplevelChangeCallback(ChangeCallback callback);
-  void bindHyprlandToplevelMappingManager(hyprland_toplevel_mapping_manager_v1* manager);
-  void syncHyprlandToplevelMappings();
-  [[nodiscard]] std::optional<std::string> compositorWindowIdForToplevel(zwlr_foreign_toplevel_handle_v1* handle) const;
-  [[nodiscard]] std::optional<std::string>
-  compositorWindowIdForExtToplevel(ext_foreign_toplevel_handle_v1* handle) const;
-  [[nodiscard]] std::optional<std::string> compositorWindowIdForToplevelInfo(const ToplevelInfo& info) const;
-  [[nodiscard]] zwlr_foreign_toplevel_handle_v1* toplevelHandleForCompositorWindowId(std::string_view windowId) const;
-  [[nodiscard]] bool isCompositorWindowIdKnown(std::string_view windowId) const;
   [[nodiscard]] std::optional<std::string> focusedCompositorWindowId() const;
 
   void setWorkspaceChangeCallback(ChangeCallback callback);
@@ -188,9 +157,6 @@ public:
   [[nodiscard]] compositors::niri::NiriRuntime& niriRuntime() noexcept;
   [[nodiscard]] const compositors::niri::NiriRuntime& niriRuntime() const noexcept;
 
-  [[nodiscard]] compositors::umbriel::UmbrielRuntime& umbrielRuntime() noexcept;
-  [[nodiscard]] const compositors::umbriel::UmbrielRuntime& umbrielRuntime() const noexcept;
-
 private:
   struct WorkspaceModelSnapshot {
     std::uint32_t outputName = 0;
@@ -199,8 +165,6 @@ private:
   };
 
   void bindExtWorkspace(ext_workspace_manager_v1* manager);
-  void bindKdeVirtualDesktop(org_kde_plasma_virtual_desktop_management* management);
-  void bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager);
   void notifyToplevelsChanged();
   void onOutputAdded(wl_output* output);
   void onOutputRemoved(wl_output* output);
@@ -224,8 +188,6 @@ private:
   ChangeCallback m_overviewChangeCallback;
   ChangeCallback m_keyboardLayoutChangeCallback;
   ChangeCallback m_toplevelChangeCallback;
-  std::unique_ptr<compositors::hyprland::HyprlandToplevelMapping> m_hyprlandToplevelMapping;
-  std::unique_ptr<compositors::kde::KwinActiveWindow> m_kwinActiveWindow;
   std::unique_ptr<OutputProbe> m_outputProbe;
   std::vector<WorkspaceModelSnapshot> m_lastWorkspaceModelSnapshot;
   std::optional<std::string> m_lastFocusedCompositorWindowId;

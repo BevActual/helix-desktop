@@ -25,7 +25,6 @@
 #include "dbus/network/network_manager_service.h"
 #include "dbus/network/network_secret_agent.h"
 #include "dbus/network/wpa_supplicant_service.h"
-#include "dbus/notification/kde_notification_client.h"
 #include "dbus/notification/notification_dbus_host.h"
 #include "dbus/notification/notification_service.h"
 #include "dbus/polkit/polkit_agent.h"
@@ -118,9 +117,7 @@ namespace {
   constexpr Logger kLog("app");
 
   [[nodiscard]] bool overviewTypeToLaunchEnabled(const ConfigService& configService) {
-    if (compositors::isUmbriel()) {
-      return configService.config().shell.umbrielOverviewTypeToLaunchEnabled;
-    } else if (compositors::isNiri()) {
+    if (compositors::isNiri()) {
       return configService.config().shell.niriOverviewTypeToLaunchEnabled;
     }
     return false;

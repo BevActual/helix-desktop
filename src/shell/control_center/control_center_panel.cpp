@@ -214,7 +214,6 @@ namespace {
       {"plugins", "settings.navigation.sections.plugins", "puzzle", true, TabGroup::Apps},
       {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
-      {"umbriel", "settings.navigation.sections.umbriel", "umbriel", true, TabGroup::Advanced},
   };
 
 
@@ -366,7 +365,6 @@ namespace {
         || id == "security"
         || id == "hooks"
         || id == "niri"
-        || id == "umbriel"
         || id == "control-center";
   }
 
@@ -655,7 +653,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
 
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
   add("niri", std::make_unique<SettingsTab>(services, "niri"));
-  add("umbriel", std::make_unique<SettingsTab>(services, "umbriel"));
 }
 
 float ControlCenterPanel::preferredWidth() const {
@@ -1426,9 +1423,6 @@ bool ControlCenterPanel::deferPointerRelayout() const { return deferExternalRefr
 bool ControlCenterPanel::isTabFeatureAvailable(std::string_view id) const {
   if (id == "niri" || id == "windows") {
     return compositors::isNiri();
-  }
-  if (id == "umbriel") {
-    return compositors::isUmbriel();
   }
   if (id == "packages") {
     return noctalia::packages::tabAvailable();

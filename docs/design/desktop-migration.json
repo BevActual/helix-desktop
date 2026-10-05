@@ -258,13 +258,6 @@
     },
     {
       "kind": "tab",
-      "id": "umbriel",
-      "destination": "remove-at-cutover:unsupported-compositor",
-      "status": "pending",
-      "compatibility-context": "umbriel"
-    },
-    {
-      "kind": "tab",
       "id": "privacy",
       "destination": "settings:privacy-security",
       "status": "pending",
@@ -514,13 +507,6 @@
       "destination": "settings:desktop-dock",
       "status": "pending",
       "compatibility-context": "settings:windows"
-    },
-    {
-      "kind": "settings-section",
-      "id": "umbriel",
-      "destination": "remove-at-cutover:unsupported-compositor",
-      "status": "pending",
-      "compatibility-context": "settings:umbriel"
     },
     {
       "kind": "settings-section",
