@@ -1,7 +1,7 @@
 #pragma once
 #include "apps/common/image_preview.h"
 #include "apps/settings/wallpaper_catalog.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include <adwaita.h>
 #include <algorithm>
 #include <functional>

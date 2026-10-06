@@ -1,6 +1,6 @@
 #include "shell/agent/agent_confirmation_queue.h"
 
-#include "desktop/display_text.h"
+#include "desktop_api/display_text.h"
 
 #include <algorithm>
 

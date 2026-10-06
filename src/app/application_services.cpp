@@ -1,5 +1,5 @@
 #include "app/main_loop.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include "desktop/remote_network.h"
 #include "application.h"
 #include "application_internal.h"

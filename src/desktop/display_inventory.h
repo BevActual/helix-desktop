@@ -1,6 +1,6 @@
 #pragma once
 
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "system/display_config.h"
 #include <chrono>
 #include <functional>

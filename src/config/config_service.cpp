@@ -1,5 +1,5 @@
 #include "config/config_service.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 
 #include "compositors/compositor_detect.h"
 #include "config/atomic_file.h"

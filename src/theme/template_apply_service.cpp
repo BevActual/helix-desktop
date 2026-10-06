@@ -1,5 +1,5 @@
 #include "theme/template_apply_service.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 
 #include "config/config_export.h"
 #include "config/config_service.h"

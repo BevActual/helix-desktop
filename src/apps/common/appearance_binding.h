@@ -1,7 +1,7 @@
 #pragma once
 
 #include "apps/common/appearance.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include <memory>
 
 namespace helix::apps {

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "desktop/client.h"
-#include "desktop/display_text.h"
+#include "desktop_api/client.h"
+#include "desktop_api/display_text.h"
 
 #include <adwaita.h>
 #include <algorithm>

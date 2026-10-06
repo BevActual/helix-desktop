@@ -1,5 +1,5 @@
 #include "dbus/network/network_secret_agent.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 
 #include "core/log.h"
 #include "dbus/system_bus.h"

@@ -1,7 +1,7 @@
 #pragma once
 #include "dbus/network/inetwork_service.h"
 #include "core/timer_manager.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 
 namespace helix {
 class RemoteNetwork final : public INetworkService {

@@ -7,7 +7,7 @@
 #include <pipewire/pipewire.h>
 #include <cerrno>
 #include "desktop/input_meter.h"
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "desktop/settings_catalog.h"
 #include "config/config_service.h"
 #include "core/deferred_call.h"

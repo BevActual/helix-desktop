@@ -1,4 +1,4 @@
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include <stdexcept>
 
 namespace helix {

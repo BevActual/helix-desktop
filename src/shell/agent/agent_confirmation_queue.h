@@ -1,6 +1,6 @@
 #pragma once
 
-#include "desktop/display_text.h"
+#include "desktop_api/display_text.h"
 
 #include <cstddef>
 #include <cstdint>

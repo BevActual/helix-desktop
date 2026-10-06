@@ -1,4 +1,4 @@
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include <stdexcept>
 
 namespace helix {

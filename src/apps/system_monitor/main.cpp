@@ -3,7 +3,7 @@
 #include "apps/system_monitor/report_reader.h"
 #include "apps/common/appearance.h"
 #include "apps/common/preview_export.h"
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 
 #include <adwaita.h>
 #include <nlohmann/json.hpp>

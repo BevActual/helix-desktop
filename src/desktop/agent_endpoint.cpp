@@ -1,6 +1,6 @@
 #include "desktop/agent_endpoint.h"
 
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "ipc/ipc_client.h"
 #include "util/file_utils.h"
 

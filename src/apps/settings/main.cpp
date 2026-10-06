@@ -12,7 +12,7 @@
 #include "util/file_utils.h"
 #include "desktop/dns_update.h"
 #include "desktop/notification_rules.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include "desktop/settings_routes.h"
 #include <adwaita.h>
 #include <algorithm>

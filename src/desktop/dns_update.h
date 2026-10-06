@@ -1,5 +1,5 @@
 #pragma once
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "dbus/network/dns_override.h"
 #include <stdexcept>
 namespace helix {

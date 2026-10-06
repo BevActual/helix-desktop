@@ -1,7 +1,7 @@
 #include "shell/agent/agent_confirm_panel.h"
 
 #include "core/input/keybind_matcher.h"
-#include "desktop/display_text.h"
+#include "desktop_api/display_text.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"

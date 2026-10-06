@@ -1,5 +1,5 @@
 #include "pipewire/pipewire_service.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 
 #include "config/config_service.h"
 #include "core/log.h"

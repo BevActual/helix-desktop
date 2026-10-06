@@ -1,5 +1,5 @@
 #include "application.h"
-#include "desktop/client.h"
+#include "desktop_api/client.h"
 #include "shell/agent/agent_confirmation_queue.h"
 
 #include "app/main_loop.h"

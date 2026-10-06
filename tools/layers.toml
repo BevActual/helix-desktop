@@ -1,0 +1,21 @@
+# Layering rules for src/, checked by tools/check-layers.py (meson test `layering`).
+#
+# A module may include its own layer and the layers below it, in this order:
+#   base < platform < display < shell
+# Independent-process code (the desktop service and the apps) may include base, platform and each other, but not the
+# shell's renderer, UI toolkit or shell-only services: it must be able to run without them.
+#
+# desktop_api is the client library for the desktop service (protocol, client, display text). Every process uses it.
+#
+# Existing violations are recorded in tools/layers-baseline.txt. The check fails on any NEW violation and on baseline
+# entries that no longer exist, so the list can only shrink. Fix a violation, then remove its line.
+
+[layers]
+base = ["util", "core", "i18n", "time"]
+platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api"]
+display = ["wayland", "render", "ui", "compositors"]
+shell = ["shell", "launcher", "capture", "app"]
+
+[independent]
+modules = ["desktop", "apps"]
+may_include = ["base", "platform", "independent"]

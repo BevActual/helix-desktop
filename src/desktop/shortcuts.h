@@ -1,5 +1,5 @@
 #pragma once
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "config/config_types.h"
 #include <algorithm>
 #include <stdexcept>

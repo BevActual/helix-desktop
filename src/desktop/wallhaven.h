@@ -1,5 +1,5 @@
 #pragma once
-#include "desktop/protocol.h"
+#include "desktop_api/protocol.h"
 #include "shell/wallpaper/wallhaven_client.h"
 #include "config/config_service.h"
 #include "net/http_client.h"

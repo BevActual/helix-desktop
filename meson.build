@@ -563,7 +563,7 @@ _noctalia_sources = files(
   'src/shell/panel/panel_manager.cpp',
   'src/shell/panel/persistent_panel_host.cpp',
   'src/shell/polkit/polkit_panel.cpp',
-  'src/desktop/display_text.cpp',
+  'src/desktop_api/display_text.cpp',
   'src/shell/agent/agent_confirmation_queue.cpp',
   'src/shell/agent/agent_confirm_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
@@ -850,7 +850,7 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
 )
 
-_noctalia_sources += files('src/desktop/protocol.cpp', 'src/desktop/client.cpp', 'src/desktop/remote_network.cpp')
+_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop/remote_network.cpp')
 
 if sanitize
   _noctalia_sources += files('src/core/lsan_suppressions.cpp')
@@ -1203,7 +1203,7 @@ if gtk4_dep.found() and adwaita_dep.found()
     settings_args += '-DHELIX_HAVE_GOA'
   endif
   helix_settings = executable('helix-settings',
-    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp', 'src/desktop/display_text.cpp'),
+    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/display_text.cpp'),
     include_directories: include_directories('src'),
     dependencies: settings_deps,
     cpp_args: settings_args,
@@ -1222,7 +1222,7 @@ if gtk4_dep.found() and adwaita_dep.found()
 
   helix_monitor = executable('helix-system-monitor',
     sources: files('src/apps/system_monitor/main.cpp', 'src/apps/system_monitor/proc_reader.cpp',
-      'src/apps/system_monitor/report_reader.cpp', 'src/desktop/protocol.cpp'),
+      'src/apps/system_monitor/report_reader.cpp', 'src/desktop_api/protocol.cpp'),
     include_directories: include_directories('src'),
     dependencies: [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep],
     cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
@@ -1260,7 +1260,7 @@ if build_tests
     override_options: ['b_ndebug=false'])
   test('desktop_input_meter', helix_meter_test)
   helix_protocol_test = executable('desktop_protocol_test',
-    sources: files('tests/desktop_protocol_test.cpp', 'src/desktop/protocol.cpp'),
+    sources: files('tests/desktop_protocol_test.cpp', 'src/desktop_api/protocol.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   test('desktop_protocol', helix_protocol_test)
@@ -1277,19 +1277,19 @@ if build_tests
   )
   test('desktop_agent_broker', helix_agent_broker_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
-    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop/display_text.cpp'),
+    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: noctalia_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('agent_confirmation_queue', helix_confirmation_queue_unit)
   helix_displays_test = executable('desktop_displays_test',
-    sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop/protocol.cpp'),
+    sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop_api/protocol.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   test('desktop_displays', helix_displays_test, timeout: 30)
 
   helix_service_test = executable('desktop_service_test',
-    sources: files('tests/desktop_service_test.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
+    sources: files('tests/desktop_service_test.cpp', 'src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   helix_dbus_session = find_program('dbus-run-session', required: false)
@@ -1324,6 +1324,8 @@ if build_tests
     test('helix_agent_policy', find_program(_agent_python),
       args: [meson.project_source_root() / 'tests/helix_agent_policy_test.py', meson.project_source_root()])
   endif
+  test('layering', find_program('python3'),
+    args: [meson.project_source_root() / 'tools/check-layers.py', meson.project_source_root()])
   test('msg_risk_policy', find_program('python3'),
     args: [meson.project_source_root() / 'tests/msg_risk_policy_test.py', meson.project_source_root(), noctalia_exe])
   test('desktop_dbus_contract', find_program('python3'),
