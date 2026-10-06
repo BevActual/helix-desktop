@@ -13,14 +13,12 @@
 #include "ext-session-lock-v1-client-protocol.h"
 #include "ext-workspace-v1-client-protocol.h"
 #include "fractional-scale-v1-client-protocol.h"
-#include "hyprland-focus-grab-v1-client-protocol.h"
 #include "idle-inhibit-unstable-v1-client-protocol.h"
 #include "text-input-unstable-v3-client-protocol.h"
 #include "util/string_utils.h"
 #include "viewporter-client-protocol.h"
 #include "virtual-keyboard-unstable-v1-client-protocol.h"
 #include "wayland/clipboard_service.h"
-#include "wayland/hyprland/focus_grab_service.h"
 #include "wayland/text_input_service.h"
 #include "wayland/virtual_keyboard_service.h"
 #include "wayland/wayland_protocol_policy.h"
@@ -64,7 +62,6 @@ namespace {
   // version 1.45 generates zero for blur although the corrected v1 wire mask is 1.
   constexpr std::uint32_t kExtBackgroundEffectBlurCapabilityMask = 1U;
   constexpr std::uint32_t kFractionalScaleManagerVersion = 1;
-  constexpr std::uint32_t kHyprlandFocusGrabManagerVersion = 1;
   constexpr std::uint32_t kViewporterVersion = 1;
   constexpr std::uint32_t kOutputVersion = 4;
   constexpr std::uint32_t kTextInputManagerVersion = 2;
@@ -357,9 +354,6 @@ bool WaylandConnection::connect() {
     cleanup();
     throw std::runtime_error(std::format("failed during Wayland output discovery roundtrip: {}", detail));
   }
-
-  m_focusGrabService = std::make_unique<FocusGrabService>();
-  m_focusGrabService->initialize(m_hyprlandFocusGrabManager);
 
   logStartupSummary();
   return true;
@@ -765,10 +759,6 @@ wp_fractional_scale_manager_v1* WaylandConnection::fractionalScaleManager() cons
   return m_fractionalScaleManager;
 }
 
-hyprland_focus_grab_manager_v1* WaylandConnection::hyprlandFocusGrabManager() const noexcept {
-  return m_hyprlandFocusGrabManager;
-}
-FocusGrabService* WaylandConnection::focusGrabService() const noexcept { return m_focusGrabService.get(); }
 wp_viewporter* WaylandConnection::viewporter() const noexcept { return m_viewporter; }
 
 void WaylandConnection::onBackgroundEffectCapabilities(std::uint32_t capabilities) noexcept {
@@ -1116,14 +1106,6 @@ void WaylandConnection::bindGlobal(
     return;
   }
 
-  if (interfaceName == hyprland_focus_grab_manager_v1_interface.name) {
-    const auto bindVersion = std::min(version, kHyprlandFocusGrabManagerVersion);
-    m_hyprlandFocusGrabManager = static_cast<hyprland_focus_grab_manager_v1*>(
-        wl_registry_bind(registry, name, &hyprland_focus_grab_manager_v1_interface, bindVersion)
-    );
-    return;
-  }
-
   if (interfaceName == ext_data_control_manager_v1_interface.name) {
     if (m_dataControlManager != nullptr && m_dataControlOps != extDataControlOps()) {
       m_dataControlOps->destroyManager(m_dataControlManager);
@@ -1329,11 +1311,6 @@ void WaylandConnection::cleanup() {
   if (m_fractionalScaleManager != nullptr) {
     wp_fractional_scale_manager_v1_destroy(m_fractionalScaleManager);
     m_fractionalScaleManager = nullptr;
-  }
-
-  if (m_hyprlandFocusGrabManager != nullptr) {
-    hyprland_focus_grab_manager_v1_destroy(m_hyprlandFocusGrabManager);
-    m_hyprlandFocusGrabManager = nullptr;
   }
 
   if (m_gammaControlManager != nullptr) {

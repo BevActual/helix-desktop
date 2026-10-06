@@ -41,7 +41,6 @@ struct zwlr_foreign_toplevel_handle_v1;
 struct ext_workspace_manager_v1;
 struct zwp_virtual_keyboard_manager_v1;
 struct zwp_text_input_manager_v3;
-struct hyprland_focus_grab_manager_v1;
 struct zwlr_gamma_control_manager_v1;
 struct zwlr_screencopy_manager_v1;
 struct ext_image_copy_capture_manager_v1;
@@ -52,7 +51,6 @@ struct zwlr_output_manager_v1;
 struct zwlr_output_head_v1;
 struct zwlr_output_mode_v1;
 class ClipboardService;
-class FocusGrabService;
 struct DataControlOps;
 class TextInputService;
 class VirtualKeyboardService;
@@ -181,8 +179,6 @@ public:
   [[nodiscard]] zwlr_gamma_control_manager_v1* gammaControlManager() const noexcept;
   [[nodiscard]] ext_background_effect_manager_v1* backgroundEffectManager() const noexcept;
   [[nodiscard]] wp_fractional_scale_manager_v1* fractionalScaleManager() const noexcept;
-  [[nodiscard]] hyprland_focus_grab_manager_v1* hyprlandFocusGrabManager() const noexcept;
-  [[nodiscard]] FocusGrabService* focusGrabService() const noexcept;
   [[nodiscard]] TextInputService* textInputService() const noexcept { return m_textInputService; }
   [[nodiscard]] wp_viewporter* viewporter() const noexcept;
   [[nodiscard]] wl_display* display() const noexcept;
@@ -306,7 +302,6 @@ private:
   zwp_idle_inhibit_manager_v1* m_idleInhibitManager = nullptr;
   ext_background_effect_manager_v1* m_backgroundEffectManager = nullptr;
   wp_fractional_scale_manager_v1* m_fractionalScaleManager = nullptr;
-  hyprland_focus_grab_manager_v1* m_hyprlandFocusGrabManager = nullptr;
   zwlr_gamma_control_manager_v1* m_gammaControlManager = nullptr;
   zwlr_screencopy_manager_v1* m_screencopyManager = nullptr;
   ext_image_copy_capture_manager_v1* m_imageCopyCaptureManager = nullptr;
@@ -314,7 +309,6 @@ private:
   zwlr_output_manager_v1* m_outputManager = nullptr;
   std::unordered_map<zwlr_output_head_v1*, WaylandOutputHeadInfo> m_outputHeads;
   std::unordered_set<zwlr_output_mode_v1*> m_outputModes;
-  std::unique_ptr<FocusGrabService> m_focusGrabService;
   wp_viewporter* m_viewporter = nullptr;
   bool m_backgroundEffectBlurSupported = false;
   void* m_dataControlManager = nullptr;

@@ -706,13 +706,6 @@ void TrayMenu::ensureSurface() {
     anchorX = placement.anchorX;
     anchorY = placement.anchorY;
   }
-  // On Hyprland, hyprland_focus_grab_v1 conflicts with xdg_popup_grab — the
-  // compositor sends popup_done shortly after we commit our focus grab,
-  // tearing the popup down. Skip xdg_popup_grab when we'll be using
-  // focus_grab; outside-click dismissal is handled by the focus grab's
-  // `cleared` event instead.
-  auto* grabService = m_wayland->focusGrabService();
-  const bool useFocusGrab = grabService != nullptr && grabService->available();
   inst->submenuDirection = placement.submenuDirection;
   inst->chrome = chrome;
   auto popupConfig = PopupSurfaceConfig{
@@ -728,22 +721,19 @@ void TrayMenu::ensureSurface() {
       .offsetX = placement.offsetX,
       .offsetY = placement.offsetY,
       .serial = serial,
-      .grab = !useFocusGrab,
+      .grab = true,
   };
   popup_chrome::applyToConfig(popupConfig, chrome, placement.chromeAttachment);
 
   // Layer-shell popups inherit their parent's keyboard interactivity. The bar is
   // None, so without this the grabbing popup would get no keyboard focus and ESC
-  // could not reach it. Flip the bar to OnDemand before the popup maps; the
-  // focus-grab path carries keyboard itself, so only the plain grab path needs it.
-  if (!useFocusGrab) {
-    m_keyboardBarLayerSurface = parentLayerSurface;
-    m_keyboardBarWlSurface = parentWlSurface;
-    zwlr_layer_surface_v1_set_keyboard_interactivity(
-        parentLayerSurface, static_cast<std::uint32_t>(LayerShellKeyboard::OnDemand)
-    );
-    wl_surface_commit(parentWlSurface);
-  }
+  // could not reach it. Flip the bar to OnDemand before the popup maps.
+  m_keyboardBarLayerSurface = parentLayerSurface;
+  m_keyboardBarWlSurface = parentWlSurface;
+  zwlr_layer_surface_v1_set_keyboard_interactivity(
+      parentLayerSurface, static_cast<std::uint32_t>(LayerShellKeyboard::OnDemand)
+  );
+  wl_surface_commit(parentWlSurface);
 
   if (!inst->surface->initialize(parentLayerSurface, output, popupConfig)) {
     kLog.debug("tray menu: failed to create popup surface");
@@ -754,45 +744,6 @@ void TrayMenu::ensureSurface() {
   popup_chrome::setContentInputRegion(*inst->surface, inst->chrome);
   inst->wlSurface = inst->surface->wlSurface();
   m_instance = std::move(inst);
-
-  // Hyprland: without an active focus grab covering the popup, the compositor
-  // only delivers pointer events after a click transfers focus from the bar's
-  // OnDemand layer surface, so hover never reaches the popup. Whitelisting the
-  // popup (and the parent bar so re-clicking other tray icons keeps working)
-  // eagerly routes motion to the popup. Defer to the next tick — Hyprland's
-  // focus_grab needs the whitelisted surfaces to be mapped, which only happens
-  // after the configure round-trip completes; committing the grab synchronously
-  // here makes the compositor fire `cleared` immediately and the menu never
-  // appears.
-  DeferredCall::callLater([this]() {
-    if (!m_visible || m_instance == nullptr || m_wayland == nullptr) {
-      return;
-    }
-    auto* svc = m_wayland->focusGrabService();
-    if (svc == nullptr || !svc->available()) {
-      return;
-    }
-
-    // When the menu is opened from an attached panel (e.g. the tray drawer),
-    // this popup is already enrolled into the panel's existing focus grab.
-    // Creating another grab here would clear the panel grab, dismissing the
-    // parent panel.
-    if (svc->popupGrabHost() != nullptr) {
-      return;
-    }
-
-    m_focusGrab = svc->createGrab();
-    if (m_focusGrab == nullptr) {
-      return;
-    }
-    m_focusGrab->setOnCleared([this]() {
-      if (m_visible) {
-        close();
-      }
-    });
-    m_focusGrab->addSurface(m_instance->wlSurface);
-    m_focusGrab->commit();
-  });
 }
 
 void TrayMenu::resizeMainSurfaceToEntries() {
@@ -822,7 +773,6 @@ void TrayMenu::destroySurface() {
     m_instance->inputDispatcher.setSceneRoot(nullptr);
   }
   m_instance.reset();
-  m_focusGrab.reset();
   restoreBarKeyboardInteractivity();
 }
 
@@ -1062,10 +1012,6 @@ void TrayMenu::closeSubmenusFrom(std::size_t levelIndex) {
     auto& level = m_submenuLevels[idx - 1];
     if (level.instance != nullptr) {
       level.instance->inputDispatcher.setSceneRoot(nullptr);
-      if (m_focusGrab != nullptr && level.instance->wlSurface != nullptr) {
-        m_focusGrab->removeSurface(level.instance->wlSurface);
-        m_focusGrab->commit();
-      }
     }
     if (m_tray != nullptr && !m_activeItemId.empty() && level.parentEntryId != 0) {
       m_tray->notifyMenuClosed(m_activeItemId, level.parentEntryId);
@@ -1190,7 +1136,7 @@ void TrayMenu::openSubmenuAtLevel(std::size_t levelIndex, std::int32_t parentEnt
       .offsetX = offsetX,
       .offsetY = 0,
       .serial = m_wayland->lastInputSerial(),
-      .grab = (m_focusGrab == nullptr),
+      .grab = true,
   };
   popup_chrome::applyToConfig(popupConfig, chrome, chromeAttachment);
 
@@ -1205,11 +1151,6 @@ void TrayMenu::openSubmenuAtLevel(std::size_t levelIndex, std::int32_t parentEnt
   popup_chrome::setContentInputRegion(*inst->surface, inst->chrome);
   inst->wlSurface = inst->surface->wlSurface();
   level.instance = std::move(inst);
-
-  if (m_focusGrab != nullptr && level.instance->wlSurface != nullptr) {
-    m_focusGrab->addSurface(level.instance->wlSurface);
-    m_focusGrab->commit();
-  }
 }
 
 void TrayMenu::prepareSubmenuFrame(std::size_t levelIndex, MenuInstance& inst, bool /*needsUpdate*/, bool needsLayout) {

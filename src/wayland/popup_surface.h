@@ -59,10 +59,7 @@ public:
 
 private:
   void destroyRoleObjects();
-  // Decide whether to take xdg_popup_grab vs. enroll in the active focus_grab
-  // host. Sets m_enrolledInGrabHost when we registered with the host.
   void wireGrab(xdg_surface* parentXdgSurface);
-  void unenrollFromGrabHost();
   // Dismisses every other live popup that is not `keepParent` or one of its ancestors, as if
   // the compositor had sent popup_done, so a new grab lands on the topmost popup.
   void dismissPopupsOutsideChainOf(PopupSurface* keepParent);
@@ -78,7 +75,6 @@ private:
   std::uint32_t m_repositionToken = 0;
   std::int32_t m_configuredX = 0;
   std::int32_t m_configuredY = 0;
-  bool m_enrolledInGrabHost = false;
   // Set false by the destructor. The init roundtrip re-enters event dispatch and can
   // destroy this popup mid-init; a captured copy of this token lets init detect that
   // and avoid touching freed `this`.

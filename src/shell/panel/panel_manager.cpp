@@ -29,7 +29,6 @@
 #include "ui/style.h"
 #include "util/string_utils.h"
 #include "util/sys_utils.h"
-#include "wayland/hyprland/focus_grab_service.h"
 #include "wayland/layer_surface.h"
 #include "wayland/wayland_connection.h"
 #include "wayland/wayland_seat.h"
@@ -55,22 +54,12 @@ namespace {
   };
 
   // A panel asking for None never takes keyboard focus, so the app the user is
-  // typing into keeps it. Everything else reproduces the per-path behavior the
-  // compositor workarounds need: a focus grab maps Exclusive so the panel wins the
-  // keyboard from the grab and hands it back once settled, and an attached panel
-  // takes focus only after the bar-anchored map, which the reveal would otherwise
-  // race. `mode` therefore only selects between OnDemand and Exclusive on the
-  // detached path of a compositor without focus-grab support.
-  PanelKeyboardPlan
-  resolvePanelKeyboardPlan(LayerShellKeyboard mode, bool hasFocusGrab, bool grabWillActivate, bool attached) {
+  // typing into keeps it. An attached panel takes focus only after the bar-anchored
+  // map, which the reveal would otherwise race; `mode` selects between OnDemand and
+  // Exclusive on the detached path.
+  PanelKeyboardPlan resolvePanelKeyboardPlan(LayerShellKeyboard mode, bool attached) {
     if (mode == LayerShellKeyboard::None) {
       return {.initial = LayerShellKeyboard::None, .relaxed = std::nullopt};
-    }
-    if (hasFocusGrab) {
-      return {
-          .initial = LayerShellKeyboard::Exclusive,
-          .relaxed = grabWillActivate ? std::optional{LayerShellKeyboard::OnDemand} : std::nullopt
-      };
     }
     if (attached) {
       return {.initial = LayerShellKeyboard::None, .relaxed = LayerShellKeyboard::Exclusive};
@@ -450,10 +439,6 @@ void PanelManager::setAttachedPanelGeometryCallback(
 
 void PanelManager::setClickShieldExcludeRectsProvider(std::function<std::vector<InputRect>(wl_output*)> provider) {
   m_clickShieldExcludeRectsProvider = std::move(provider);
-}
-
-void PanelManager::setFocusGrabBarSurfacesProvider(std::function<std::vector<wl_surface*>()> provider) {
-  m_focusGrabBarSurfacesProvider = std::move(provider);
 }
 
 void PanelManager::setPanelClosedCallback(std::function<void()> callback) {
@@ -859,19 +844,16 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
       useAttachedPlacement ? layerShellLayerFromConfig(barConfig.layer) : floatingPanelLayer;
   m_panelLayer = panelLayer;
 
-  const bool hasFocusGrab =
-      m_platform != nullptr && m_platform->focusGrabService() != nullptr && m_platform->focusGrabService()->available();
-  // Neither outside-click mechanism works for a panel that must not take keyboard
-  // focus: the click shield swallows the click meant for the app below, and the
-  // compositor focus grab takes the keyboard.
+  // The click shield swallows the click meant for the app below, so it cannot serve a
+  // panel that must not take keyboard focus.
   const bool wantsOutsideDismiss =
       m_activePanel->dismissOnOutsideClick() && m_activePanel->keyboardMode() != LayerShellKeyboard::None;
   // Two plans: the attached branch falls back to the standalone surface when its
   // layer-shell init fails, and that surface is placed detached.
   const PanelKeyboardPlan keyboardPlan =
-      resolvePanelKeyboardPlan(m_activePanel->keyboardMode(), hasFocusGrab, hasFocusGrab && wantsOutsideDismiss, false);
+      resolvePanelKeyboardPlan(m_activePanel->keyboardMode(), false);
   const PanelKeyboardPlan attachedKeyboardPlan =
-      resolvePanelKeyboardPlan(m_activePanel->keyboardMode(), hasFocusGrab, hasFocusGrab && wantsOutsideDismiss, true);
+      resolvePanelKeyboardPlan(m_activePanel->keyboardMode(), true);
 
   if (wantsOutsideDismiss) {
     activateClickShield(panelLayer);
@@ -1161,9 +1143,6 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
       m_surface->setBlurRegion({});
       publishAttachedPanelGeometry(m_attachedRevealProgress);
       m_surface->requestRedraw();
-      if (hasFocusGrab && wantsOutsideDismiss) {
-        activateFocusGrab();
-      }
       if (attachedKeyboardPlan.relaxed.has_value()) {
         const std::uint64_t gen = m_destroyGeneration;
         const LayerShellKeyboard relaxed = *attachedKeyboardPlan.relaxed;
@@ -1250,10 +1229,6 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
       {InputRect{m_panelInsetX, m_panelInsetY, static_cast<int>(panelWidth), static_cast<int>(panelHeight)}}
   );
   m_surface->setBlurRegion({});
-  // Activate outside-click dismissal (focus grab or click shield).
-  if (hasFocusGrab && wantsOutsideDismiss) {
-    activateFocusGrab();
-  }
   if (keyboardPlan.relaxed.has_value()) {
     const std::uint64_t gen = m_destroyGeneration;
     const LayerShellKeyboard relaxed = *keyboardPlan.relaxed;
@@ -1274,12 +1249,6 @@ void PanelManager::activateClickShield(LayerShellLayer layer) {
   if (m_activePanel == nullptr || m_platform == nullptr) {
     return;
   }
-  // Hyprland: prefer the native focus-grab path. Skip the shield and let
-  // activateFocusGrab handle it later.
-  auto* grabService = m_platform->focusGrabService();
-  if (grabService != nullptr && grabService->available()) {
-    return;
-  }
   std::vector<wl_output*> outputs;
   outputs.reserve(m_platform->outputs().size());
   for (const auto& wlOutput : m_platform->outputs()) {
@@ -1290,126 +1259,15 @@ void PanelManager::activateClickShield(LayerShellLayer layer) {
   m_clickShield.activate(outputs, layer, m_clickShieldExcludeRectsProvider);
 }
 
-void PanelManager::activateFocusGrab() {
-  if (m_platform == nullptr || m_wlSurface == nullptr) {
-    return;
-  }
-  auto* grabService = m_platform->focusGrabService();
-  if (grabService == nullptr || !grabService->available()) {
-    return;
-  }
-  // Whitelist the panel, bars, and panel-owned popups. Clicks on whitelisted
-  // surfaces pass through normally. Clicks anywhere else clear the grab and
-  // close the panel.
-  m_focusGrab = grabService->createGrab();
-  if (m_focusGrab == nullptr) {
-    return;
-  }
-  m_focusGrab->setOnCleared([this]() {
-    if (isOpen() && !m_closing) {
-      closePanel();
-    }
-  });
-  grabService->setPopupGrabHost(this);
-
-  // Start with the panel as the sole surface so the compositor cannot choose a
-  // bar as the initial keyboard target.
-  m_focusGrab->addSurface(m_wlSurface);
-  m_focusGrab->commit();
-  addFocusGrabWhitelistSurfaces(*m_focusGrab, m_wlSurface);
-  m_focusGrab->commit();
-}
-
 void PanelManager::applyKeyboardRelaxation(LayerShellKeyboard mode) {
   if (m_layerSurface == nullptr) {
     return;
   }
-  if (m_focusGrab == nullptr) {
-    m_layerSurface->setKeyboardInteractivity(mode);
-    return;
-  }
-  if (m_platform == nullptr || m_wlSurface == nullptr) {
-    return;
-  }
-
-  auto* grabService = m_platform->focusGrabService();
-  if (grabService == nullptr || !grabService->available()) {
-    return;
-  }
-
-  auto replacement = grabService->createGrab();
-  if (replacement == nullptr) {
-    return;
-  }
-  replacement->setOnCleared([this]() {
-    if (isOpen() && !m_closing) {
-      closePanel();
-    }
-  });
-
-  wl_surface* focusSurface = m_wlSurface;
-  if (wl_surface* current = m_platform->lastKeyboardSurface(); isFocusGrabWhitelistSurface(current)) {
-    focusSurface = current;
-  }
-  replacement->addSurface(focusSurface);
-
-  // A fresh grab must start after the layer commit so its keyboard refocus wins
-  // over compositors applying follow-mouse focus during Exclusive -> OnDemand.
-  m_focusGrab.reset();
   m_layerSurface->setKeyboardInteractivity(mode);
-  m_focusGrab = std::move(replacement);
-  grabService->setPopupGrabHost(this);
-
-  // Keep the first commit limited to the previous focus surface. The
-  // compositor may choose any surface when a grab first becomes active.
-  m_focusGrab->commit();
-
-  addFocusGrabWhitelistSurfaces(*m_focusGrab, focusSurface);
-  m_focusGrab->commit();
-}
-
-void PanelManager::addFocusGrabWhitelistSurfaces(FocusGrab& grab, wl_surface* excludedSurface) {
-  const auto addSurface = [&grab, excludedSurface](wl_surface* surface) {
-    if (surface != nullptr && surface != excludedSurface) {
-      grab.addSurface(surface);
-    }
-  };
-
-  addSurface(m_wlSurface);
-  if (m_focusGrabBarSurfacesProvider) {
-    auto bars = m_focusGrabBarSurfacesProvider();
-    for (auto* surface : bars) {
-      addSurface(surface);
-    }
-  }
-  for (auto* surface : m_focusGrabPopupSurfaces) {
-    addSurface(surface);
-  }
-}
-
-bool PanelManager::isFocusGrabWhitelistSurface(wl_surface* surface) const {
-  if (surface == nullptr) {
-    return false;
-  }
-  if (surface == m_wlSurface || m_focusGrabPopupSurfaces.contains(surface)) {
-    return true;
-  }
-  if (m_focusGrabBarSurfacesProvider == nullptr) {
-    return false;
-  }
-  const auto bars = m_focusGrabBarSurfacesProvider();
-  return std::ranges::find(bars, surface) != bars.end();
 }
 
 void PanelManager::deactivateOutsideClickHandlers() {
   m_clickShield.deactivate();
-  if (m_platform != nullptr) {
-    if (auto* svc = m_platform->focusGrabService(); svc != nullptr && svc->popupGrabHost() == this) {
-      svc->setPopupGrabHost(nullptr);
-    }
-  }
-  m_focusGrab.reset();
-  m_focusGrabPopupSurfaces.clear();
 }
 
 void PanelManager::closePanel(bool animateClose) {
@@ -1944,30 +1802,6 @@ void PanelManager::setActivePopup(ContextMenuPopup* popup) {
 }
 
 void PanelManager::clearActivePopup() { m_activePopup = nullptr; }
-
-void PanelManager::registerPopupSurface(wl_surface* surface) {
-  if (surface == nullptr) {
-    return;
-  }
-  const bool inserted = m_focusGrabPopupSurfaces.insert(surface).second;
-  if (!inserted || m_focusGrab == nullptr) {
-    return;
-  }
-  m_focusGrab->addSurface(surface);
-  m_focusGrab->commit();
-}
-
-void PanelManager::unregisterPopupSurface(wl_surface* surface) {
-  if (surface == nullptr) {
-    return;
-  }
-  const bool removed = m_focusGrabPopupSurfaces.erase(surface) != 0;
-  if (!removed || m_focusGrab == nullptr) {
-    return;
-  }
-  m_focusGrab->removeSurface(surface);
-  m_focusGrab->commit();
-}
 
 void PanelManager::beginAttachedPopup(wl_surface* surface) {
   if (surface == nullptr || surface != m_wlSurface) {

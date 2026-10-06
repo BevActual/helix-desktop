@@ -1007,7 +1007,6 @@ void Application::initBarDockAndLayout() {
   m_panelManager.setClickShieldExcludeRectsProvider([this](wl_output* output) {
     return m_bar.surfaceRectsForOutput(output);
   });
-  m_panelManager.setFocusGrabBarSurfacesProvider([this]() { return m_bar.allBarSurfaces(); });
   m_panelManager.setAttachedPanelAvailabilityCallback([this](wl_output* output, std::string_view barName) {
     return m_bar.canAttachPanelToBar(output, barName);
   });

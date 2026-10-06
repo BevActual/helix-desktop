@@ -1,8 +1,6 @@
 #include "wayland/popup_surface.h"
 
 #include "core/log.h"
-#include "wayland/hyprland/focus_grab_service.h"
-#include "wayland/hyprland/popup_grab_host.h"
 #include "wayland/popup_dismiss_order.h"
 #include "wayland/wayland_connection.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
@@ -80,25 +78,11 @@ PopupSurface::~PopupSurface() {
   if (m_popup != nullptr) {
     kLog.debug("popup {}: destroyed while mapped", static_cast<const void*>(this));
   }
-  unenrollFromGrabHost();
   m_connection.unregisterSurface(m_surface);
   destroyRoleObjects();
 }
 
 void PopupSurface::wireGrab(xdg_surface* parentXdgSurface) {
-  // When a focus_grab host is active, xdg_popup_grab conflicts with it on
-  // Hyprland (the compositor sends popup_done shortly after the focus_grab
-  // commit, tearing this popup down). Enroll with the host instead so its
-  // whitelist covers this popup, and skip xdg_popup_grab.
-  PopupGrabHost* host = nullptr;
-  if (auto* svc = m_connection.focusGrabService(); svc != nullptr) {
-    host = svc->popupGrabHost();
-  }
-  if (host != nullptr && m_surface != nullptr) {
-    host->registerPopupSurface(m_surface);
-    m_enrolledInGrabHost = true;
-    return;
-  }
   if (m_config.grab && m_config.serial != 0 && m_connection.seat() != nullptr && m_popup != nullptr) {
     auto grabIsLegal = [parentXdgSurface]() {
       const auto& stack = grabStack();
@@ -152,7 +136,6 @@ void PopupSurface::dismissPopupsOutsideChainOf(PopupSurface* keepParent) {
   for (std::size_t index : popup_dismiss_order::conflicting(nodes, keepIndex)) {
     PopupSurface* popup = others[index];
     popup->setRunning(false);
-    popup->unenrollFromGrabHost();
     popup->destroyRoleObjects();
     if (popup->m_dismissedCallback) {
       callbacks.push_back(std::move(popup->m_dismissedCallback));
@@ -164,18 +147,6 @@ void PopupSurface::dismissPopupsOutsideChainOf(PopupSurface* keepParent) {
   }
   for (auto& callback : callbacks) {
     callback();
-  }
-}
-
-void PopupSurface::unenrollFromGrabHost() {
-  if (!m_enrolledInGrabHost) {
-    return;
-  }
-  m_enrolledInGrabHost = false;
-  if (auto* svc = m_connection.focusGrabService(); svc != nullptr) {
-    if (auto* host = svc->popupGrabHost(); host != nullptr && m_surface != nullptr) {
-      host->unregisterPopupSurface(m_surface);
-    }
   }
 }
 
@@ -258,7 +229,6 @@ bool PopupSurface::initialize(zwlr_layer_surface_v1* parentLayerSurface, wl_outp
   }
   if (roundtripResult < 0) {
     kLog.warn("popup: initial roundtrip failed (compositor protocol error)");
-    unenrollFromGrabHost();
     destroyRoleObjects();
     destroySurface();
     return false;
@@ -461,7 +431,6 @@ bool PopupSurface::initializeAsChild(xdg_surface* parentXdgSurface, wl_output* o
   }
   if (roundtripResult < 0) {
     kLog.warn("submenu popup: initial roundtrip failed (compositor protocol error)");
-    unenrollFromGrabHost();
     destroyRoleObjects();
     destroySurface();
     return false;

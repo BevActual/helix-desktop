@@ -7,7 +7,6 @@
 #include "ui/controls/context_menu.h"
 #include "ui/controls/scroll_view.h"
 #include "ui/popup_chrome.h"
-#include "wayland/hyprland/focus_grab_service.h"
 #include "wayland/popup_surface.h"
 
 #include <chrono>
@@ -112,7 +111,6 @@ private:
   // Hyprland-only: keeps the popup surfaces in the focus whitelist so motion
   // events (hover) reach the popup eagerly instead of waiting for a click to
   // transfer focus from the bar's OnDemand layer surface.
-  std::unique_ptr<FocusGrab> m_focusGrab;
 
   Timer m_retryTimer;
   std::function<void()> m_closedCallback;

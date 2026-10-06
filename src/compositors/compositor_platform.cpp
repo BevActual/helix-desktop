@@ -301,8 +301,6 @@ wl_output* CompositorPlatform::outputForSurface(wl_surface* surface) const noexc
   return m_wayland.outputForSurface(surface);
 }
 
-FocusGrabService* CompositorPlatform::focusGrabService() const noexcept { return m_wayland.focusGrabService(); }
-
 bool CompositorPlatform::hasPointerPosition() const noexcept { return m_wayland.hasPointerPosition(); }
 
 wl_surface* CompositorPlatform::lastPointerSurface() const noexcept { return m_wayland.lastPointerSurface(); }

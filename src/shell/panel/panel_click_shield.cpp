@@ -35,12 +35,6 @@ namespace {
       .closed = &PanelClickShield::handleClosed,
   };
 
-  // Hyprland refuses to deliver pointer events to layer-shell surfaces with
-  // keyboard_interactivity == None. Exclusive is what unlocks pointer delivery
-  // there. Bar exclusion via input region doesn't actually work on Hyprland
-  // (clicks on bars still hit the shield); on Hyprland we prefer the
-  // hyprland_focus_grab_v1 protocol when available and only fall back to the
-  // shield path here.
   LayerShellKeyboard shieldKeyboardMode() {
     return LayerShellKeyboard::None;
   }

@@ -58,7 +58,6 @@ public:
   [[nodiscard]] const std::vector<WaylandOutput>& outputs() const noexcept;
   [[nodiscard]] const WaylandOutput* findOutputByWl(wl_output* output) const;
   [[nodiscard]] wl_output* outputForSurface(wl_surface* surface) const noexcept;
-  [[nodiscard]] FocusGrabService* focusGrabService() const noexcept;
   [[nodiscard]] bool hasPointerPosition() const noexcept;
   [[nodiscard]] wl_surface* lastPointerSurface() const noexcept;
   [[nodiscard]] wl_surface* lastKeyboardSurface() const noexcept;
