@@ -449,7 +449,7 @@ _noctalia_sources = files(
   'src/render/backend/gles_texture_manager.cpp',
   'src/render/backend/render_backend.cpp',
   'src/render/core/async_texture_cache.cpp',
-  'src/render/core/color.cpp',
+  'src/core/color.cpp',
   'src/render/core/image_file_loader.cpp',
   'src/render/core/shader_program.cpp',
   'src/render/core/stb_image_resize_impl.cpp',

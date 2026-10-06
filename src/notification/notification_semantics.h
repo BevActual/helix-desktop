@@ -6,7 +6,7 @@
 // for notifications that carry no meaning beyond "something happened".
 
 #include "notification/notification.h"
-#include "render/core/color.h"
+#include "core/color.h"
 
 #include <cstdint>
 #include <optional>

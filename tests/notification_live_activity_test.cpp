@@ -3,7 +3,7 @@
 
 #include "notification/notification_manager.h"
 #include "notification/notification_semantics.h"
-#include "render/core/color.h"
+#include "core/color.h"
 
 #include <cmath>
 #include <iostream>

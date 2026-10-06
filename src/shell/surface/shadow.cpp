@@ -1,6 +1,6 @@
 #include "shell/surface/shadow.h"
 
-#include "render/core/color.h"
+#include "core/color.h"
 
 #include <algorithm>
 

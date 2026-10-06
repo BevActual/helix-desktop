@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/shader_program.h"
 
 #include <GLES2/gl2.h>

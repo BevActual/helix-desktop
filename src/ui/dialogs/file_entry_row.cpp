@@ -2,7 +2,7 @@
 
 #include "core/files/directory_scanner.h"
 #include "i18n/i18n.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/renderer.h"
 #include "time/time_format.h"
 #include "ui/builders.h"

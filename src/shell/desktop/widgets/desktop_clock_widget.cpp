@@ -1,6 +1,6 @@
 #include "shell/desktop/widgets/desktop_clock_widget.h"
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"

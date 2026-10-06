@@ -1,6 +1,6 @@
 #include "theme/fixed_palette.h"
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "theme/color.h"
 #include "theme/contrast.h"
 

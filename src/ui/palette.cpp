@@ -1,7 +1,7 @@
 #include "ui/palette.h"
 
 #include "cpp/blend/blend.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "theme/builtin_palettes.h"
 #include "util/string_utils.h"
 

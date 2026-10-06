@@ -2,7 +2,7 @@
 
 #include "core/files/directory_scanner.h"
 #include "render/animation/animation_manager.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/render_context.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"

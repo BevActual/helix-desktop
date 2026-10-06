@@ -8,7 +8,7 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "render/animation/animation.h"
 #include "render/animation/animation_manager.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/render_styles.h"
 #include "render/core/renderer.h"
 #include "render/scene/glyph_node.h"

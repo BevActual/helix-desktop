@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/mat3.h"
 #include "render/core/render_styles.h"
 #include "render/core/shader_program.h"

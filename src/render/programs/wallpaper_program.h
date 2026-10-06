@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/config_types.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/mat3.h"
 #include "render/core/shader_program.h"
 #include "render/core/texture_handle.h"

@@ -10,7 +10,7 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
 #include "render/core/async_texture_cache.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
 #include "render/animation/animation_manager.h"

@@ -7,7 +7,7 @@
 #include "core/process/process.h"
 #include "dbus/polkit/polkit_session_support.h"
 #include "ipc/ipc_service.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "shell/session/session_action_meta.h"
 #include "ui/palette.h"
 #include "util/file_utils.h"

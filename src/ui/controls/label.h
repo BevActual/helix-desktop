@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/scene/input_area.h"
 #include "render/scene/text_node.h"
 #include "ui/palette.h"

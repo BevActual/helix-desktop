@@ -2,7 +2,7 @@
 
 #include "core/input/keybind_matcher.h"
 #include "render/animation/animation_manager.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/render_styles.h"
 #include "render/scene/input_area.h"
 #include "render/scene/rect_node.h"

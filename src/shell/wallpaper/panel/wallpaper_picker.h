@@ -2,7 +2,7 @@
 
 #include "config/config_types.h"
 #include "core/timer_manager.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/thumbnail_service.h"
 #include "shell/wallpaper/daily_wallpaper.h"
 #include "shell/wallpaper/panel/wallpaper_scanner.h"

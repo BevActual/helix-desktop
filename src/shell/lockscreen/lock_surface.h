@@ -4,7 +4,7 @@
 #include "config/config_service.h"
 #include "render/animation/animation_manager.h"
 #include "render/core/blur_cache.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/texture_manager.h"
 #include "render/scene/input_dispatcher.h"
 #include "render/scene/node.h"

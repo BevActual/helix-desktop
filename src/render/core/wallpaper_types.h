@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/mat3.h"
 #include "render/core/texture_handle.h"
 

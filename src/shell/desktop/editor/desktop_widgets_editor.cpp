@@ -10,7 +10,7 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
 #include "render/backend/render_backend.h"
-#include "render/core/color.h"
+#include "core/color.h"
 #include "render/core/shared_texture_cache.h"
 #include "render/core/texture_manager.h"
 #include "render/core/wallpaper_types.h"

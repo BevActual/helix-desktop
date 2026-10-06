@@ -1,6 +1,6 @@
 #pragma once
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "theme/color_roles.h"
 #include "ui/signal.h"
 #include "ui/style.h"
@@ -28,7 +28,7 @@ constexpr bool operator==(const ColorSpec& a, const ColorSpec& b) noexcept {
 }
 
 // Multiplies a spec's alpha, keeping any color role intact so theme switches still resolve.
-// Distinct from withAlpha(Color, float) in render/core/color.h, which replaces the alpha of an
+// Distinct from withAlpha(Color, float) in core/color.h, which replaces the alpha of an
 // already-resolved color and therefore cannot preserve the role.
 [[nodiscard]] constexpr ColorSpec scaleAlpha(const ColorSpec& color, float factor) noexcept {
   ColorSpec out = color;
