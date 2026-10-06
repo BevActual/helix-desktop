@@ -21,7 +21,7 @@
 #include "shell/bar/widgets/taskbar_widget.h"
 #include "shell/bar/widgets/tray_widget.h"
 #include "shell/panel/panel_manager.h"
-#include "shell/surface/shadow.h"
+#include "ui/shadow.h"
 #include "shell/tooltip/tooltip_manager.h"
 #include "ui/builders.h"
 #include "ui/palette.h"

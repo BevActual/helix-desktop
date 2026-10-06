@@ -571,7 +571,7 @@ _noctalia_sources = files(
   'src/shell/session/session_ipc.cpp',
   'src/shell/session/session_panel.cpp',
   'src/shell/setup_wizard/setup_wizard_panel.cpp',
-  'src/shell/surface/shadow.cpp',
+  'src/ui/shadow.cpp',
   'src/shell/settings/bar_widget_editor.cpp',
   'src/shell/settings/color_spec_picker.cpp',
   'src/shell/settings/config_export_dialog_modal.cpp',
@@ -852,7 +852,7 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
 )
 
-_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop/remote_network.cpp')
+_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp')
 
 if sanitize
   _noctalia_sources += files('src/core/lsan_suppressions.cpp')

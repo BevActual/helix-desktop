@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/config_types.h"
-#include "shell/surface/shadow.h"
+#include "ui/shadow.h"
 
 #include <cstdint>
 

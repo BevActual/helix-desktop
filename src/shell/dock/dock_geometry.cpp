@@ -1,6 +1,6 @@
 #include "shell/dock/dock_geometry.h"
 
-#include "shell/surface/shadow.h"
+#include "ui/shadow.h"
 #include "wayland/layer_surface.h"
 
 #include <algorithm>

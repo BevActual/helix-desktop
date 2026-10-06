@@ -2,7 +2,7 @@
 
 #include "config/config_service.h"
 #include "config/config_types.h"
-#include "shell/surface/shadow.h"
+#include "ui/shadow.h"
 #include "ui/style.h"
 
 #include <algorithm>

@@ -1,5 +1,5 @@
 #include "desktop/settings_catalog.h"
-#include "desktop/settings_routes.h"
+#include "desktop_api/settings_routes.h"
 #include "desktop/shortcuts.h"
 #include "desktop/notification_rules.h"
 #include "core/input/key_chord.h"

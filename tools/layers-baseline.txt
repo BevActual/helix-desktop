@@ -1,4 +1,3 @@
-src/app/application_services.cpp -> desktop/remote_network.h
 src/config/cli.cpp -> shell/settings/settings_registry.h
 src/config/config_overrides.cpp -> shell/settings/widget_settings_registry.h
 src/config/config_service.cpp -> shell/desktop/desktop_widget_settings_registry.h
@@ -6,13 +5,8 @@ src/config/config_service.cpp -> shell/settings/widget_settings_registry.h
 src/config/config_validate.cpp -> shell/desktop/desktop_widget_settings_registry.h
 src/config/config_validate.cpp -> shell/lockscreen/lockscreen_login_box.h
 src/config/config_validate.cpp -> shell/settings/widget_settings_registry.h
-src/core/input/keybind_matcher.h -> config/config_types.h
-src/render/scene/input_area.h -> shell/tooltip/tooltip_content.h
-src/shell/panel/panel_manager.cpp -> desktop/settings_routes.h
 src/theme/theme_service.cpp -> ui/app_icon_colorization.h
 src/theme/theme_service.h -> render/animation/animation_manager.h
-src/ui/controls/virtual_grid_view.h -> shell/tooltip/tooltip_content.h
-src/ui/popup_chrome.h -> shell/surface/shadow.h
 src/wayland/surface.cpp -> render/animation/animation_manager.h
 src/wayland/surface.cpp -> render/render_context.h
 src/wayland/surface.cpp -> render/scene/node.h

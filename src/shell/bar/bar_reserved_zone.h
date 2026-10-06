@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shell/surface/shadow.h"
+#include "ui/shadow.h"
 
 #include <algorithm>
 #include <cstdint>
