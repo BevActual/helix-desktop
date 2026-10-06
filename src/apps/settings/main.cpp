@@ -4,6 +4,8 @@
 #include "apps/common/preview_export.h"
 #include "apps/settings/wallpaper_browser.h"
 #include "apps/settings/layout_preview.h"
+#include "apps/settings/choice_preview.h"
+#include "apps/settings/hub_navigation.h"
 #include "apps/settings/palette_browser.h"
 #include "apps/settings/accounts_page.h"
 #include "util/file_utils.h"
@@ -71,12 +73,29 @@ struct Settings {
   AdwApplicationWindow* window = nullptr;
   AdwNavigationSplitView* split = nullptr;
   AdwNavigationPage* contentPage = nullptr;
+  AdwNavigationView* hubNav = nullptr;
+  AdwNavigationPage* overviewPage = nullptr;
   AdwToastOverlay* toasts = nullptr;
   AdwBanner* banner = nullptr;
   GtkListBox* sidebar = nullptr;
   GtkSearchEntry* search = nullptr;
   GtkBox* body = nullptr;
+  GtkBox* overviewBody = nullptr;
+  GtkBox* paneBody = nullptr;
   GtkWidget* scroller = nullptr;
+  GtkWidget* overviewScroller = nullptr;
+  GtkWidget* paneScroller = nullptr;
+  AdwNavigationPage* hubPanePage = nullptr;
+  GtkWidget* hubPaneHeader = nullptr;
+  std::string hubPane;
+  std::string hubOriginPane;
+  std::map<std::string, GtkWidget*> hubNavRows;
+  std::map<std::string, GtkWidget*> privacyChips;
+  std::string privacyChip = "privacy";
+  bool restorePrivacyFocus = false;
+  bool suppressingHubPop = false;
+  guint focusIdle = 0;
+  std::vector<GtkWidget*> choicePreviews;
   GtkCssProvider* css = nullptr;
   GDBusConnection* bus = nullptr;
   guint subscription = 0;
@@ -138,6 +157,7 @@ struct Settings {
   ~Settings() {
     if (accountsPage) accountsPage->shutdown();
     stopMeter();
+    if (focusIdle) g_source_remove(focusIdle);
     if (sectionTick && scroller) gtk_widget_remove_tick_callback(scroller, sectionTick);
     if (poll) g_source_remove(poll);
     if (refreshIdle) g_source_remove(refreshIdle);
@@ -219,12 +239,7 @@ struct Settings {
     if (!query.empty() || !snapshots.contains("appearance")) return;
     const auto& appearance = snapshots.at("appearance");
     if (!appearance.value("available", false)) return;
-    auto* preview = group("Current Appearance");
-    adw_preferences_group_set_description(preview, appearance.value("high-contrast", false) ?
-      "High contrast is active. The selected palette is shown below; controls use native contrast." :
-      "Preview the current palette and desktop background.");
-    // Native toggle buttons contain illustrative samples of the actual palette.
-    // Geometry and keyboard/selected behavior remain entirely toolkit-owned.
+    auto* preview = group("Appearance");
     auto* modes = gtk_flow_box_new(); gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(modes), GTK_SELECTION_NONE);
     gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(modes), true); gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(modes), 1);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(modes), 3); gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(modes), 8); gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(modes), 8);
@@ -261,59 +276,48 @@ struct Settings {
       gtk_flow_box_append(GTK_FLOW_BOX(modes), mode);
     }
     adw_preferences_group_add(preview, modes);
-    const auto tokens = appearance.value(appearance.value("mode", "dark") == "light" ? "light" : "dark", Json::object());
-    auto* colors = gtk_flow_box_new(); gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(colors), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(colors), 1); gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(colors), 5);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(colors), true); gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(colors), 12);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(colors), 12);
-    for (const auto& [token, label] : std::vector<std::pair<const char*, const char*>>{
-      {"primary", "Accent"}, {"surface", "Background"}, {"surface_variant", "Card"}, {"on_surface", "Text"}, {"outline", "Outline"}}) {
-      if (!tokens.contains(token) || !tokens.at(token).is_number_unsigned()) continue;
-      const auto color = tokens.at(token).get<unsigned>() & 0xffffff;
-      auto* item = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6); auto* swatch = gtk_drawing_area_new();
-      gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(swatch), 48); gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(swatch), 48);
-      gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(swatch), +[](GtkDrawingArea* area, cairo_t* context, int width, int height, gpointer data) {
-        const auto color = GPOINTER_TO_UINT(data);
-        const double radius = std::min(width, height) / 2.0 - 2;
-        cairo_arc(context, width / 2.0, height / 2.0, radius, 0, 6.283185307);
-        cairo_set_source_rgb(context, double((color >> 16) & 255) / 255, double((color >> 8) & 255) / 255, double(color & 255) / 255);
-        cairo_fill_preserve(context); GdkRGBA foreground; gtk_widget_get_color(GTK_WIDGET(area), &foreground);
-        cairo_set_source_rgba(context, foreground.red, foreground.green, foreground.blue, .35); cairo_set_line_width(context, 1); cairo_stroke(context);
-      }, GUINT_TO_POINTER(color), nullptr);
-      auto* hex = g_strdup_printf("%s #%06x", label, color);
-      gtk_accessible_update_property(GTK_ACCESSIBLE(swatch), GTK_ACCESSIBLE_PROPERTY_LABEL, hex, -1); g_free(hex);
-      gtk_box_append(GTK_BOX(item), swatch); gtk_box_append(GTK_BOX(item), gtk_label_new(label));
-      auto* child = gtk_flow_box_child_new(); gtk_flow_box_child_set_child(GTK_FLOW_BOX_CHILD(child), item);
-      gtk_widget_set_focusable(child, false); gtk_flow_box_append(GTK_FLOW_BOX(colors), child);
-      ++paletteSwatches;
-    }
-    adw_preferences_group_add(preview, colors);
-    const auto wallpaper = appearance.value("wallpaper", "");
-    if (appearance.value("helix-desktop", false) && !wallpaper.empty()) {
-      auto* image = helix::apps::imagePreview(wallpaper, "Desktop wallpaper preview");
-      wallpaperPreview = GTK_PICTURE(gtk_widget_get_first_child(image));
-      adw_preferences_group_add(preview, image);
-    }
     auto* actions = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(actions), GTK_SELECTION_NONE);
     gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(actions), 1);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(actions), 3);
+    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(actions), 2);
     gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(actions), true);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(actions), 8);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(actions), 8);
-    for (const auto& [label, callback] : std::vector<std::pair<const char*, Callback>>{
-          {"Palette Library", [this] { choosePalette(); }},
-          {"Accent Color", [this] { chooseAccent(); }}}) {
-      auto* action = button(label, callback); gtk_widget_set_hexpand(action, true);
-      gtk_flow_box_append(GTK_FLOW_BOX(actions), action);
-    }
+    auto* paletteAction = button("Palette Library", [this] { choosePalette(); });
+    gtk_widget_set_hexpand(paletteAction, true);
+    gtk_flow_box_append(GTK_FLOW_BOX(actions), paletteAction);
     if (appearance.value("helix-desktop", false)) {
       auto* wallpaperAction = button("Wallpaper Library", [this] { chooseWallpaper(); });
-      gtk_widget_set_hexpand(wallpaperAction, true); gtk_flow_box_append(GTK_FLOW_BOX(actions), wallpaperAction);
+      gtk_widget_set_hexpand(wallpaperAction, true);
+      gtk_flow_box_append(GTK_FLOW_BOX(actions), wallpaperAction);
     }
     adw_preferences_group_add(preview, actions);
   }
   void navigateSection() {
+    if (helix::settings::isHubPage(page) && query.empty()) {
+      const auto paneId = std::string(helix::settings::paneIdForSection(section));
+      if (helix::settings::usesChipHub(page)) {
+        if (helix::settings::findPane(page, paneId)) {
+          privacyChip = paneId;
+          hubPane.clear();
+          popHubToOverview();
+          rendered.clear();
+          render();
+        }
+        return;
+      }
+      if (helix::settings::findPane(page, paneId)) {
+        const auto scrollId = section;
+        openHubPane(paneId);
+        section = scrollId;
+        scheduleSectionScroll();
+        return;
+      }
+    }
+    scheduleSectionScroll();
+  }
+  void scheduleSectionScroll() {
+    if (!scroller) return;
     if (sectionTick) gtk_widget_remove_tick_callback(scroller, sectionTick);
     sectionFrames = 0;
     sectionTick = gtk_widget_add_tick_callback(scroller, +[](GtkWidget*, GdkFrameClock*, gpointer data) -> gboolean {
@@ -331,6 +335,218 @@ struct Settings {
       return G_SOURCE_REMOVE;
     }, this, nullptr);
   }
+  void popHubToOverview() {
+    if (!hubNav) return;
+    suppressingHubPop = true;
+    while (adw_navigation_view_get_navigation_stack(hubNav) &&
+           g_list_model_get_n_items(adw_navigation_view_get_navigation_stack(hubNav)) > 1)
+      adw_navigation_view_pop(hubNav);
+    suppressingHubPop = false;
+    hubPanePage = nullptr;
+    hubPaneHeader = nullptr;
+    paneBody = nullptr;
+    paneScroller = nullptr;
+    body = overviewBody;
+    scroller = overviewScroller;
+  }
+  void openHubPane(const std::string& paneId) {
+    const auto* spec = helix::settings::findPane(page, paneId);
+    if (!spec || helix::settings::usesChipHub(page) || !query.empty()) return;
+    hubPane = paneId;
+    hubOriginPane = paneId;
+    section = paneId;
+    if (!rendered.empty()) {
+      try {
+        auto shape = Json::parse(rendered);
+        shape["hub-pane"] = hubPane;
+        rendered = shape.dump();
+      } catch (...) {}
+    }
+    if (hubPanePage && adw_navigation_view_get_visible_page(hubNav) == hubPanePage) {
+      body = paneBody;
+      scroller = paneScroller;
+      buildHubPane(*spec);
+      return;
+    }
+    popHubToOverview();
+    auto* toolbar = adw_toolbar_view_new();
+    hubPaneHeader = adw_header_bar_new();
+    adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(toolbar), hubPaneHeader);
+    auto [scroll, box] = makeScrollBody();
+    paneScroller = scroll;
+    paneBody = box;
+    adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), scroll);
+    hubPanePage = adw_navigation_page_new(toolbar, spec->title);
+    body = paneBody;
+    scroller = paneScroller;
+    buildHubPane(*spec);
+    adw_navigation_view_push(hubNav, hubPanePage);
+    gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroller)), 0);
+    scheduleHubBackFocus();
+  }
+  void scheduleHubBackFocus() {
+    if (focusIdle) g_source_remove(focusIdle);
+    focusIdle = g_idle_add([](gpointer data) -> gboolean {
+      auto& self = *static_cast<Settings*>(data);
+      self.focusIdle = 0;
+      if (self.hubPaneHeader) gtk_widget_child_focus(self.hubPaneHeader, GTK_DIR_TAB_FORWARD);
+      return G_SOURCE_REMOVE;
+    }, this);
+  }
+  void focusHubNavRow(const std::string& paneId) {
+    if (paneId.empty()) return;
+    const auto found = hubNavRows.find(paneId);
+    if (found == hubNavRows.end() || !found->second) return;
+    gtk_widget_grab_focus(found->second);
+    graphene_rect_t bounds;
+    if (overviewBody && gtk_widget_compute_bounds(found->second, GTK_WIDGET(overviewBody), &bounds)) {
+      auto* adjustment = gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(overviewScroller));
+      gtk_adjustment_set_value(adjustment, std::max(0.0, double(bounds.origin.y) - 12));
+    }
+  }
+  void schedulePrivacyChipFocus() {
+    if (focusIdle) g_source_remove(focusIdle);
+    focusIdle = g_idle_add([](gpointer data) -> gboolean {
+      auto& self = *static_cast<Settings*>(data);
+      self.focusIdle = 0;
+      const auto found = self.privacyChips.find(self.privacyChip);
+      if (found != self.privacyChips.end() && found->second) gtk_widget_grab_focus(found->second);
+      return G_SOURCE_REMOVE;
+    }, this);
+  }
+  void showEmptyState() {
+    auto* status = adw_status_page_new();
+    if (!connected && page != "online-accounts") {
+      adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "network-offline-symbolic");
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "Connect to Helix Services");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), "Settings will appear when the service becomes available.");
+    } else if (!query.empty()) {
+      adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "edit-find-symbolic");
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "No Matching Settings");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), "Try a different search.");
+      auto* clear = button("Clear Search", [this] {
+        query.clear();
+        gtk_editable_set_text(GTK_EDITABLE(search), "");
+        rendered.clear();
+        render();
+      });
+      gtk_widget_add_css_class(clear, "pill");
+      adw_status_page_set_child(ADW_STATUS_PAGE(status), clear);
+    } else if (helix::settings::usesChipHub(page)) {
+      adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "security-high-symbolic");
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "Nothing in This Facet");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), "Choose another facet above.");
+    } else {
+      adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "preferences-system-symbolic");
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "No Settings Here");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), "This page has no settings to show right now.");
+    }
+    gtk_box_append(body, status);
+  }
+  std::pair<GtkWidget*, GtkBox*> makeScrollBody() {
+    auto* scroll = gtk_scrolled_window_new();
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    auto* clamp = adw_clamp_new();
+    adw_clamp_set_maximum_size(ADW_CLAMP(clamp), 760);
+    auto* box = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 24));
+    for (auto side : {"margin-start", "margin-end", "margin-top", "margin-bottom"}) g_object_set(box, side, 18, nullptr);
+    adw_clamp_set_child(ADW_CLAMP(clamp), GTK_WIDGET(box));
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), clamp);
+    return {scroll, box};
+  }
+  void addChoicePreview(AdwPreferencesGroup* host, helix::settings::ChoicePreview::Kind kind) {
+    auto* preview = helix::settings::ChoicePreview::create(kind);
+    choicePreviews.push_back(preview);
+    adw_preferences_group_add(host, preview);
+    helix::settings::ChoicePreview::update(preview, catalog);
+  }
+  void buildHubPane(const helix::settings::HubPaneSpec& pane) {
+    sectionGroups.clear();
+    choicePreviews.clear();
+    layoutPreview = nullptr;
+    while (auto* child = gtk_widget_get_first_child(GTK_WIDGET(body))) gtk_box_remove(body, child);
+    if (page == "desktop-dock" && std::string_view(pane.id) == "dock") {
+      auto* preview = group("Shape Preview", false);
+      addChoicePreview(preview, helix::settings::ChoicePreview::Kind::DockShape);
+    }
+    if (page == "appearance" && std::string_view(pane.id) == "wallpaper") {
+      auto* preview = group("Fill Preview", false);
+      addChoicePreview(preview, helix::settings::ChoicePreview::Kind::WallpaperFill);
+    }
+    std::map<std::string, AdwPreferencesGroup*> groups;
+    const int distinct = helix::settings::matchingGroupCount(catalog, page, pane);
+    for (const auto& setting : catalog) {
+      if (setting.value("page", "") != page || !helix::settings::settingMatchesPane(setting, pane)) continue;
+      if (page == "appearance" && !appearanceModes.empty() && setting.value("id", "") == "theme.mode") continue;
+      const auto name = setting.at("group").get<std::string>();
+      if (!groups.contains(name)) {
+        const auto display = helix::settings::paneGroupTitle(name, pane, distinct);
+        auto* fields = group(name, false);
+        if (!display.empty()) adw_preferences_group_set_title(fields, display.c_str());
+        groups[name] = fields;
+      }
+      addSetting(groups[name], setting);
+    }
+    if (page == "appearance" && std::string_view(pane.id) == "wallpaper" &&
+        snapshots.contains("configuration") && snapshots["configuration"].value("helix-desktop", false)) {
+      AdwPreferencesGroup* wallpapers = nullptr;
+      auto wallpaperGroup = [&] {
+        if (!wallpapers) wallpapers = group("Wallpaper Sources");
+        return wallpapers;
+      };
+      if (matches("Appearance Wallpaper Files Choose Local File Image Video")) {
+        auto* file = row(wallpaperGroup(), "Choose a Local File", "Use an image or video supported by Helix Shell.");
+        singleAction(file, button("Choose", [this] { chooseWallpaperFile(); }));
+      }
+      if (matches("Appearance Wallpaper Wallhaven Browse Online")) {
+        auto* wallhaven = row(wallpaperGroup(), "Wallhaven", "Search online wallpapers using your existing preferences and credentials.");
+        singleAction(wallhaven, button("Browse", [this] { chooseWallpaper(true); }));
+      }
+    }
+    if (page == "appearance" && std::string_view(pane.id) == "colors") {
+      AdwPreferencesGroup* palettes = nullptr;
+      auto paletteGroup = [&] {
+        if (!palettes) palettes = group("Palette Management");
+        return palettes;
+      };
+      if (matches("Appearance Palette Library Browse Colors")) {
+        auto* palette = row(paletteGroup(), "Palette Library", "Compare built-in, community and custom palettes before applying one.");
+        singleAction(palette, button("Browse", [this] { choosePalette(); }));
+      }
+      if (matches("Appearance Accent Color Choose")) {
+        auto* accent = row(paletteGroup(), "Accent Color", "Creates a custom palette from the current appearance.");
+        singleAction(accent, button("Choose", [this] { chooseAccent(); }));
+      }
+      if (matches("Appearance Community Palettes Refresh Catalog")) {
+        auto* catalogActions = row(paletteGroup(), "Community Palettes", "Refresh available palettes from the community catalog.");
+        singleAction(catalogActions, button("Refresh", [this] {
+          client.callAsync("appearance", "RefreshPalettes", nullptr, [this](Json, std::string error) {
+            toast(error.empty() ? "Refreshing the palette catalog" : "Palette catalog could not be refreshed"); scheduleRefresh();
+          });
+        }));
+      }
+      if (matches("Appearance Custom Palettes Save Current Palette")) {
+        auto* save = row(paletteGroup(), "Save Current Palette", "Keep a copy of the current colors in your custom palette library.");
+        singleAction(save, button("Save", [this] {
+          client.callAsync("appearance", "SavePalette", g_variant_new("(s)", "current"), [this](Json, std::string error) {
+            toast(error.empty() ? "Palette saved" : "Palette could not be saved"); scheduleRefresh();
+          });
+        }));
+      }
+    }
+    if (!gtk_widget_get_first_child(GTK_WIDGET(body))) {
+      auto* status = adw_status_page_new();
+      adw_status_page_set_icon_name(ADW_STATUS_PAGE(status), "preferences-system-symbolic");
+      adw_status_page_set_title(ADW_STATUS_PAGE(status), "Nothing Here");
+      adw_status_page_set_description(ADW_STATUS_PAGE(status), "This section has no settings right now.");
+      gtk_box_append(body, status);
+    }
+    for (const auto& setting : catalog) {
+      const auto id = setting.at("id").get<std::string>();
+      if (setters.contains(id)) setters.at(id)(setting.at("value"));
+    }
+    for (auto* preview : choicePreviews) helix::settings::ChoicePreview::update(preview, catalog);
+  }
   void openApplication(const char* command) {
     GError* error = nullptr;
     auto* info = g_app_info_create_from_commandline(command, nullptr, G_APP_INFO_CREATE_SUPPORTS_STARTUP_NOTIFICATION, &error);
@@ -347,12 +563,19 @@ struct Settings {
     if (!gtk_widget_get_visible(GTK_WIDGET(it->second))) { toast("This page requires a Helix desktop session"); return; }
     if (id != "sound") stopMeter();
     section.clear();
+    hubPane.clear();
+    hubOriginPane.clear();
+    privacyChip = "privacy";
     if (sectionTick) { gtk_widget_remove_tick_callback(scroller, sectionTick); sectionTick = 0; }
+    popHubToOverview();
     query.clear(); gtk_editable_set_text(GTK_EDITABLE(search), "");
     page = id;
     adw_banner_set_revealed(banner, !connected && page != "online-accounts");
     gtk_list_box_select_row(sidebar, it->second);
-    for (const auto& item : pages) if (id == item.id) adw_navigation_page_set_title(contentPage, item.title);
+    for (const auto& item : pages) if (id == item.id) {
+      adw_navigation_page_set_title(contentPage, item.title);
+      if (overviewPage) adw_navigation_page_set_title(overviewPage, item.title);
+    }
     rendered.clear(); render();
     gtk_adjustment_set_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(scroller)), 0);
     adw_navigation_split_view_set_show_content(split, true);
@@ -371,12 +594,17 @@ struct Settings {
         scheduleRefresh();
       });
   }
-  AdwPreferencesGroup* group(const std::string& name) {
+  AdwPreferencesGroup* group(const std::string& name, bool titled = true) {
     auto* widget = adw_preferences_group_new();
-    adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(widget), name.c_str());
+    if (titled) adw_preferences_group_set_title(ADW_PREFERENCES_GROUP(widget), name.c_str());
     gtk_box_append(body, widget);
     sectionGroups[name] = widget;
     if (name.starts_with("Bar · ")) sectionGroups.try_emplace("Bar", widget);
+    if (name.starts_with("Dock")) sectionGroups.try_emplace("Dock", widget);
+    if (name.starts_with("Screenshot") || name == "Screen Record") sectionGroups.try_emplace("Capture", widget);
+    if (name.starts_with("Automation · ")) sectionGroups.try_emplace("Automation", widget);
+    if (name.starts_with("Panels · ")) sectionGroups.try_emplace("Panels", widget);
+    if (name.starts_with("Niri ")) sectionGroups.try_emplace("Niri", widget);
     return ADW_PREFERENCES_GROUP(widget);
   }
   AdwActionRow* row(AdwPreferencesGroup* group, const std::string& name, const std::string& subtitle = {}) {
@@ -395,6 +623,12 @@ struct Settings {
     bool hit = std::string(haystack).find(needle) != std::string::npos;
     g_free(haystack); g_free(needle); return hit;
   }
+  bool matchesSetting(const Json& setting) const {
+    if (query.empty()) return true;
+    return matches(setting.value("title", "") + " " + setting.value("group", "") + " " +
+                   setting.value("page", "") + " " + setting.value("id", "") + " " +
+                   setting.value("description", ""));
+  }
   void addSetting(AdwPreferencesGroup* group, const Json& setting) {
     const auto id = setting.at("id").get<std::string>();
     const auto type = setting.at("type").get<std::string>();
@@ -404,7 +638,7 @@ struct Settings {
     if (type == "notification-rules") { ruleList(group, setting); return; }
     if (type == "shortcut-list") { shortcutList(group, setting); return; }
     if (type == "tab-list") { tabVisibility(group, setting); return; }
-    if (type == "application-list" || type == "widget-list" || type == "display-list") { applicationList(group, setting); return; }
+    if (type == "application-list" || type == "widget-list" || type == "display-list" || type == "template-list" || type == "transition-list") { applicationList(group, setting); return; }
     if (type == "directory") {
       widget = adw_action_row_new(); title(ADW_PREFERENCES_ROW(widget), name);
       adw_action_row_set_subtitle_lines(ADW_ACTION_ROW(widget), 2);
@@ -435,6 +669,26 @@ struct Settings {
         auto selected = adw_combo_row_get_selected(ADW_COMBO_ROW(widget));
         if (selected < options.size()) update(id, options[selected]);
       }, true);
+      if (type == "color") {
+        adw_action_row_add_suffix(ADW_ACTION_ROW(widget), button("Custom", [this, id] {
+          auto* dialog = gtk_color_dialog_new(); gtk_color_dialog_set_title(dialog, "Icon Tint Color");
+          gtk_color_dialog_set_with_alpha(dialog, false);
+          gtk_color_dialog_choose_rgba(dialog, GTK_WINDOW(window), nullptr, nullptr,
+            [](GObject* source, GAsyncResult* result, gpointer data) {
+              auto* payload = static_cast<std::pair<Settings*, std::string>*>(data);
+              auto& self = *payload->first; const auto id = payload->second; delete payload;
+              GError* error = nullptr;
+              auto* color = gtk_color_dialog_choose_rgba_finish(GTK_COLOR_DIALOG(source), result, &error);
+              if (color) {
+                auto* text = g_strdup_printf("#%02x%02x%02x", unsigned(color->red * 255), unsigned(color->green * 255), unsigned(color->blue * 255));
+                self.update(id, std::string(text));
+                g_free(text); gdk_rgba_free(color);
+              }
+              if (error) g_error_free(error);
+            }, new std::pair<Settings*, std::string>{this, id});
+          g_object_unref(dialog);
+        }));
+      }
     } else if (type == "number" || type == "integer") {
       widget = adw_spin_row_new_with_range(setting.at("minimum"), setting.at("maximum"), setting.value("step", type == "integer" ? 1.0 : 0.05));
       title(ADW_PREFERENCES_ROW(widget), name);
@@ -726,6 +980,44 @@ struct Settings {
     adw_alert_dialog_add_responses(ADW_ALERT_DIALOG(dialog), "close", "Close", nullptr);
     adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "close"); adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window));
   }
+  void templatePicker(const Json& setting) {
+    const auto id = setting.at("id").get<std::string>(); const auto values = setting.at("value");
+    auto* dialog = adw_alert_dialog_new("Add Template", "Choose a template. Saving applies it the next time Helix writes theme files.");
+    auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    auto* search = gtk_search_entry_new(); gtk_search_entry_set_placeholder_text(GTK_SEARCH_ENTRY(search), "Search templates");
+    gtk_box_append(GTK_BOX(box), search);
+    auto* fields = ADW_PREFERENCES_GROUP(adw_preferences_group_new());
+    auto* scroll = gtk_scrolled_window_new();
+    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_min_content_height(GTK_SCROLLED_WINDOW(scroll), 180);
+    gtk_scrolled_window_set_max_content_height(GTK_SCROLLED_WINDOW(scroll), 320);
+    gtk_scrolled_window_set_propagate_natural_height(GTK_SCROLLED_WINDOW(scroll), true);
+    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), GTK_WIDGET(fields)); gtk_box_append(GTK_BOX(box), scroll);
+    std::vector<std::pair<GtkWidget*, std::string>> rows;
+    const auto labels = setting.value("option-labels", Json::array());
+    bool any = false;
+    for (std::size_t i = 0; i < setting.at("options").size(); ++i) {
+      const auto option = setting.at("options").at(i);
+      if (std::ranges::find(values, option) != values.end()) continue;
+      const auto name = option.get<std::string>();
+      const auto label = i < labels.size() ? labels.at(i).get<std::string>() : name;
+      auto* item = row(fields, label, name); rows.emplace_back(GTK_WIDGET(item), label + " " + name); any = true;
+      adw_action_row_add_suffix(item, button("Add", [this, dialog, id, values, name] {
+        auto next = values; next.push_back(name); saveApplications(id, values, next); adw_dialog_close(ADW_DIALOG(dialog));
+      }));
+    }
+    if (!any) row(fields, "No additional templates", "Every available template is already selected, or none are installed.");
+    onSignal(search, "search-changed", [search, rows] {
+      auto* query = g_utf8_casefold(gtk_editable_get_text(GTK_EDITABLE(search)), -1);
+      for (const auto& [widget, name] : rows) {
+        auto* text = g_utf8_casefold(name.c_str(), -1); gtk_widget_set_visible(widget, std::string(text).find(query) != std::string::npos); g_free(text);
+      } g_free(query);
+    });
+    adw_alert_dialog_set_extra_child(ADW_ALERT_DIALOG(dialog), box);
+    adw_alert_dialog_add_responses(ADW_ALERT_DIALOG(dialog), "close", "Close", nullptr);
+    adw_alert_dialog_set_close_response(ADW_ALERT_DIALOG(dialog), "close");
+    adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(window));
+  }
   void applicationPicker(const std::string& id, const Json& baseline) {
     auto* dialog = adw_alert_dialog_new("Add Application", "Choose an installed application to pin.");
     auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -897,13 +1189,20 @@ struct Settings {
     const auto id = setting.at("id").get<std::string>(); const auto values = setting.at("value");
     const bool widgets = setting.at("type") == "widget-list";
     const bool displays = setting.at("type") == "display-list";
-    auto* header = row(fields, setting.at("title"), values.empty() ? (displays ? "All displays" : widgets ? "No widgets in this section" : "No pinned applications") : "Items appear in this order.");
-    adw_action_row_add_suffix(header, button("Add", [this, id, values, widgets, displays, setting] { if (displays) displayPicker(id, values); else if (widgets) widgetPicker(setting); else applicationPicker(id, values); }));
+    const bool templates = setting.at("type") == "template-list" || setting.at("type") == "transition-list";
+    const bool transitions = setting.at("type") == "transition-list";
+    const std::string fallback = values.empty() ? (displays ? "All displays" : widgets ? "No widgets in this section" : transitions ? "No transitions selected" : templates ? "No templates selected" : "No pinned applications") : "Items appear in this order.";
+    auto* header = row(fields, setting.at("title"), templates && setting.contains("description") ? setting.at("description").get<std::string>() : fallback);
+    adw_action_row_add_suffix(header, button("Add", [this, id, values, widgets, displays, templates, setting] { if (displays) displayPicker(id, values); else if (widgets) widgetPicker(setting); else if (templates) templatePicker(setting); else applicationPicker(id, values); }));
     if (setting.value("overridden", false)) adw_action_row_add_suffix(header, button("Reset", [this, id] {
       client.callAsync("configuration", "Reset", g_variant_new("(s)", id.c_str()), [this](Json, std::string error) { if (!error.empty()) toast("Favorites could not be reset"); scheduleRefresh(); });
     }));
     std::map<std::string, std::string> names;
-    auto* apps = widgets || displays ? nullptr : g_app_info_get_all();
+    if (templates && setting.contains("option-labels")) {
+      const auto& options = setting.at("options"); const auto& labels = setting.at("option-labels");
+      for (std::size_t i = 0; i < options.size() && i < labels.size(); ++i) names[options.at(i).get<std::string>()] = labels.at(i).get<std::string>();
+    }
+    auto* apps = widgets || displays || templates ? nullptr : g_app_info_get_all();
     for (auto* node = apps; node; node = node->next) {
       auto* app = G_APP_INFO(node->data); const auto* raw = g_app_info_get_id(app); if (!raw) continue;
       std::string key(raw); if (key.ends_with(".desktop")) key.resize(key.size() - 8);
@@ -911,12 +1210,12 @@ struct Settings {
     } g_list_free_full(apps, g_object_unref);
     for (std::size_t i = 0; i < values.size(); ++i) {
       const auto appId = values.at(i).get<std::string>();
-      auto* item = row(fields, names.contains(appId) ? names.at(appId) : appId, widgets ? (std::ranges::find(setting.at("options"), Json(appId)) == setting.at("options").end() ? "Widget is unavailable; its position is retained." : "Configured widget instance") : displays ? "Display selector" : names.contains(appId) ? appId : "Application is unavailable; its saved position is retained.");
+      auto* item = row(fields, names.contains(appId) ? names.at(appId) : appId, widgets ? (std::ranges::find(setting.at("options"), Json(appId)) == setting.at("options").end() ? "Widget is unavailable; its position is retained." : "Configured widget instance") : transitions ? "Wallpaper transition style" : templates ? (std::ranges::find(setting.at("options"), Json(appId)) == setting.at("options").end() ? "Template is unavailable; its selection is retained." : "Writes theme files for this template") : displays ? "Display selector" : names.contains(appId) ? appId : "Application is unavailable; its saved position is retained.");
       adw_action_row_set_title_lines(item, 1);
       gtk_widget_set_tooltip_text(GTK_WIDGET(item), appId.c_str());
       auto* menu = gtk_menu_button_new(); gtk_menu_button_set_icon_name(GTK_MENU_BUTTON(menu), "view-more-symbolic");
-      gtk_widget_set_tooltip_text(menu, "Edit favorite"); gtk_widget_set_valign(menu, GTK_ALIGN_CENTER);
-      gtk_accessible_update_property(GTK_ACCESSIBLE(menu), GTK_ACCESSIBLE_PROPERTY_LABEL, "Edit favorite", -1);
+      gtk_widget_set_tooltip_text(menu, transitions ? "Edit transition" : templates ? "Edit template" : displays ? "Edit display" : widgets ? "Edit widget" : "Edit favorite"); gtk_widget_set_valign(menu, GTK_ALIGN_CENTER);
+      gtk_accessible_update_property(GTK_ACCESSIBLE(menu), GTK_ACCESSIBLE_PROPERTY_LABEL, transitions ? "Edit transition" : templates ? "Edit template" : displays ? "Edit display" : widgets ? "Edit widget" : "Edit favorite", -1);
       auto* popover = gtk_popover_new(); auto* actions = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
       gtk_popover_set_child(GTK_POPOVER(popover), actions); gtk_menu_button_set_popover(GTK_MENU_BUTTON(menu), popover);
       adw_action_row_add_suffix(item, menu);
@@ -932,7 +1231,7 @@ struct Settings {
       };
       if (i) control("go-up-symbolic", "Move earlier", -1);
       if (i + 1 < values.size()) control("go-down-symbolic", "Move later", 1);
-      control("list-remove-symbolic", displays ? "Remove display" : widgets ? "Remove widget" : "Remove favorite", 0);
+      control("list-remove-symbolic", displays ? "Remove display" : widgets ? "Remove widget" : templates ? "Remove template" : "Remove favorite", 0);
     }
   }
   void chooseFolder(const std::string& id) {
@@ -1307,7 +1606,7 @@ struct Settings {
     if (!body) return;
     Json shape = {{"meter", meterSource}, {"pending-operations", Json::array()}, {"page", page}, {"query", query}, {"connected", connected}, {"settings", catalog}};
     for (const auto& [id, operation] : operations) shape["pending-operations"].push_back(id);
-    for (auto& setting : shape["settings"]) if (setting.value("type", "") != "application-list" && setting.value("type", "") != "widget-list" && setting.value("type", "") != "display-list" && setting.value("type", "") != "notification-rules" && setting.value("type", "") != "tab-list" && setting.value("type", "") != "shortcut-list" && setting.value("type", "") != "key-chords") setting.erase("value");
+    for (auto& setting : shape["settings"]) if (setting.value("type", "") != "application-list" && setting.value("type", "") != "widget-list" && setting.value("type", "") != "display-list" && setting.value("type", "") != "notification-rules" && setting.value("type", "") != "tab-list" && setting.value("type", "") != "shortcut-list" && setting.value("type", "") != "key-chords" && setting.value("type", "") != "template-list" && setting.value("type", "") != "transition-list") setting.erase("value");
     const std::string domain = page == "sound" ? "audio" : page;
     if (snapshots.contains(domain)) {
       shape["devices"] = snapshots.at(domain);
@@ -1318,16 +1617,29 @@ struct Settings {
     if (page == "about" && snapshots.contains("configuration")) shape["system"] = snapshots.at("configuration");
     // GOA is independent: Helix service changes must not cancel an account dialog.
     if (page == "online-accounts" && query.empty()) shape = {{"page", page}, {"query", query}};
+    else {
+      shape["hub-pane"] = hubPane;
+      shape["privacy-chip"] = privacyChip;
+    }
     const auto fingerprint = shape.dump();
     syncing = true;
     if (fingerprint != rendered) {
       if (accountsPage) { accountsPage->shutdown(); accountsPage.reset(); }
+      const bool wantPane = !hubPane.empty() && helix::settings::isHubPage(page) &&
+          !helix::settings::usesChipHub(page) && query.empty();
+      if (!wantPane) popHubToOverview();
+      body = overviewBody;
+      scroller = overviewScroller;
       rendered = fingerprint; setters.clear(); meterBar = nullptr; meterRow = nullptr;
       paletteSwatches = 0; wallpaperPreview = nullptr;
       layoutPreview = nullptr;
       appearanceModes.clear();
       sectionGroups.clear();
+      choicePreviews.clear();
       while (auto* child = gtk_widget_get_first_child(GTK_WIDGET(body))) gtk_box_remove(body, child);
+      const bool hubOverview = helix::settings::isHubPage(page) && query.empty();
+      const auto* chipPane = helix::settings::usesChipHub(page) && query.empty()
+          ? helix::settings::findPane(page, privacyChip) : nullptr;
       if (!operations.empty()) {
         auto* progress = group("In Progress");
         for (const auto& [id, operation] : operations) {
@@ -1348,39 +1660,76 @@ struct Settings {
       }
       displayDevices();
       devices();
-      if (page == "appearance") appearancePreview();
-      if (page == "desktop-dock" && query.empty() && connected &&
-          snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
-        auto* navigation = group("Desktop Controls");
-        auto* links = gtk_flow_box_new();
-        gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(links), GTK_SELECTION_NONE);
-        gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(links), 1);
-        gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(links), 3);
-        gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(links), 8);
-        gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(links), 8);
-        for (const auto& [id, label] : std::vector<std::pair<std::string, const char*>>{
-            {"dock", "Dock"}, {"bar", "Bar"}, {"launcher", "Launcher"}, {"control-center", "Control Center"},
-            {"osd", "On-Screen Indicators"}, {"hot-corners", "Hot Corners"}}) {
-          const auto groupName = settings::nativeGroupForSection(id);
-          if (!std::ranges::any_of(catalog, [&](const Json& item) {
-                const auto name = item.value("group", "");
-                return item.value("page", "") == page && (name == groupName || (id == "bar" && name.starts_with("Bar · ")));
-              })) continue;
-          auto* link = button(label, [this, id] { section = id; navigateSection(); });
-          gtk_widget_set_hexpand(link, true);
-          gtk_flow_box_insert(GTK_FLOW_BOX(links), link, -1);
-        }
-        adw_preferences_group_add(navigation, links);
+      if (page == "sound" && query.empty()) {
+        auto* preview = group("Volume Preview", false);
+        addChoicePreview(preview, helix::settings::ChoicePreview::Kind::VolumeOverdrive);
       }
-
+      if (page == "appearance" && query.empty()) appearancePreview();
       if (query.empty() && (page == "desktop-dock" || page == "notifications") &&
           snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
-        auto* preview = group(page == "notifications" ? "Notification Preview" : "Your Desktop Layout");
-        adw_preferences_group_set_description(preview, page == "notifications" ?
-          "See popup placement and visible actions as you adjust the settings below." :
-          "See your bar, dock and active corners. This is an illustration; display-specific layouts may differ.");
+        auto* preview = group(page == "notifications" ? "Notification Preview" : "Layout", false);
         layoutPreview = helix::settings::LayoutPreview::create(page == "notifications");
         adw_preferences_group_add(preview, layoutPreview);
+      }
+      if (page == "privacy-security" && query.empty()) {
+        privacyChips.clear();
+        auto* chipsHost = group("Facets", false);
+        auto* chips = gtk_flow_box_new();
+        gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(chips), GTK_SELECTION_NONE);
+        gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(chips), 1);
+        gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(chips), 4);
+        gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(chips), 6);
+        gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(chips), 6);
+        GtkToggleButton* chipGroup = nullptr;
+        for (const auto& pane : helix::settings::privacyPanes()) {
+          if (!helix::settings::paneHasSettings(catalog, page, pane)) continue;
+          auto* chip = GTK_TOGGLE_BUTTON(gtk_toggle_button_new_with_label(pane.title));
+          if (!chipGroup) chipGroup = chip;
+          else gtk_toggle_button_set_group(chip, chipGroup);
+          gtk_widget_add_css_class(GTK_WIDGET(chip), "pill");
+          gtk_widget_set_tooltip_text(GTK_WIDGET(chip), pane.subtitle);
+          gtk_toggle_button_set_active(chip, privacyChip == pane.id);
+          const std::string id = pane.id;
+          privacyChips[id] = GTK_WIDGET(chip);
+          onSignal(chip, "toggled", [this, id, chip] {
+            if (!gtk_toggle_button_get_active(chip) || privacyChip == id) return;
+            privacyChip = id;
+            section = id;
+            restorePrivacyFocus = true;
+            rendered.clear();
+            render();
+          });
+          gtk_flow_box_append(GTK_FLOW_BOX(chips), GTK_WIDGET(chip));
+        }
+        adw_preferences_group_add(chipsHost, chips);
+        if (restorePrivacyFocus) {
+          restorePrivacyFocus = false;
+          schedulePrivacyChipFocus();
+        }
+      }
+      if (page == "system" && query.empty()) {
+        auto* destinations = group("Apps & Destinations");
+        auto addDestination = [&](const char* icon, const char* title, const char* subtitle, Callback activate) {
+          adw_preferences_group_add(destinations, helix::settings::makeNavRow(icon, title, subtitle, std::move(activate)));
+        };
+        addDestination("battery-symbolic", "Power", "Battery warnings, suspend behavior and idle timers.", [this] { select("power"); });
+        addDestination("application-x-executable-symbolic", "Helix Software", "Browse Flatpak applications and manage Fedora packages.", [this] { openApplication("helix-software --page installed"); });
+        addDestination("utilities-system-monitor-symbolic", "System Monitor", "Processes, resources and service health.", [this] { openApplication("helix-system-monitor"); });
+        addDestination("phone-symbolic", "Helix Phone", "Pair devices, find your phone and send files.", [this] { openApplication("helix-phone"); });
+        addDestination("help-about-symbolic", "About", "Operating system, kernel and Helix service availability.", [this] { select("about"); });
+      }
+      if (hubOverview && !helix::settings::usesChipHub(page)) {
+        const char* fallback = page == "network" ? "Preferences"
+            : page == "system" ? "More"
+            : page == "appearance" ? "Appearance Settings"
+            : "Desktop Settings";
+        hubNavRows.clear();
+        helix::settings::populateHubNav(catalog, page, fallback,
+          [this](const char* title) { return group(title); },
+          [this](const helix::settings::HubPaneSpec& pane) { openHubPane(pane.id); },
+          [this](const helix::settings::HubPaneSpec& pane, GtkWidget* row) {
+            hubNavRows[pane.id] = row;
+          });
       }
       if (page == "power" && std::ranges::any_of(catalog, [](const Json& item) { return item.value("group-overridden", false); })) {
         auto* reset = row(group("Idle Timers"), "Restore configured idle timers", "Resets the timer collection, including its original commands and order.");
@@ -1391,17 +1740,6 @@ struct Settings {
       if (page == "keyboard" && query.empty()) {
         auto* scope = row(group("Shortcut Scope"), "Helix Shell", "These bindings control shell navigation. GTK applications keep their standard shortcuts. Global desktop and workspace bindings remain in your Niri configuration.");
         adw_action_row_set_subtitle_lines(scope, 0);
-      }
-      if (page == "system" && query.empty()) {
-        auto* destinations = group("System Settings");
-        auto* power = row(destinations, "Power", "Battery warnings, suspend behavior and idle timers.");
-        singleAction(power, button("Open", [this] { select("power"); }));
-        auto* software = row(destinations, "Helix Software", "Browse Flatpak applications and manage Fedora packages.");
-        singleAction(software, button("Open", [this] { openApplication("helix-software --page installed"); }));
-        auto* phone = row(destinations, "Helix Phone", "Pair devices, find your phone and send files.");
-        singleAction(phone, button("Open", [this] { openApplication("helix-phone"); }));
-        auto* about = row(destinations, "About", "Operating system, kernel and Helix service availability.");
-        singleAction(about, button("Open", [this] { select("about"); }));
       }
       if (page == "about" && snapshots.contains("configuration")) {
         const auto& state = snapshots.at("configuration"); auto* system = group("System");
@@ -1414,44 +1752,44 @@ struct Settings {
       }
       std::map<std::string, AdwPreferencesGroup*> groups;
       auto orderedCatalog = catalog;
-      if (query.empty() && page == "desktop-dock") {
-        auto rank = [](const Json& setting) {
-          const auto name = setting.value("group", "");
-          if (name == "Dock") return 0;
-          if (name == "Dock Favorites") return 1;
-          if (name == "Dock Layout") return 2;
-          if (name.starts_with("Bar · ")) return 3;
-          if (name == "Launcher" || name == "Launcher Favorites") return 4;
-          if (name == "Control Center") return 5;
-          if (name == "On-Screen Indicators" || name == "Indicator Events") return 6;
-          if (name == "Hot Corners") return 7;
-          return 8;
-        };
-        std::stable_sort(orderedCatalog.begin(), orderedCatalog.end(), [&](const Json& a, const Json& b) { return rank(a) < rank(b); });
-      }
+      const int chipDistinct = chipPane ? helix::settings::matchingGroupCount(catalog, page, *chipPane) : -1;
       for (const auto& setting : orderedCatalog) {
         if (query.empty() && page == "appearance" && !appearanceModes.empty() && setting.value("id", "") == "theme.mode") continue;
-        if ((query.empty() && setting.value("page", "") != page) || !matches(setting.value("title", "") + " " + setting.value("group", "") + " " + setting.value("page", ""))) continue;
+        if ((query.empty() && setting.value("page", "") != page) || !matchesSetting(setting)) continue;
+        if (hubOverview && !helix::settings::usesChipHub(page)) {
+          if (helix::settings::paneForSettingGroup(page, setting.value("group", ""))) continue;
+        }
+        if (chipPane && !helix::settings::settingMatchesPane(setting, *chipPane)) continue;
         const auto name = (query.empty() ? std::string{} : setting.value("page", "") + " · ") + setting.at("group").get<std::string>();
-        if (!groups.contains(name)) groups[name] = group(name);
+        if (page == "displays" && query.empty() && setting.value("group", "") == "Brightness" && !groups.contains("_brightness-preview")) {
+          auto* preview = group("Brightness Sync", false);
+          addChoicePreview(preview, helix::settings::ChoicePreview::Kind::BrightnessSync);
+          groups["_brightness-preview"] = preview;
+        }
+        if (!groups.contains(name)) {
+          if (chipPane) {
+            const auto display = helix::settings::paneGroupTitle(setting.at("group").get<std::string>(), *chipPane, chipDistinct);
+            auto* fields = group(name, false);
+            if (!display.empty()) adw_preferences_group_set_title(fields, display.c_str());
+            groups[name] = fields;
+          } else groups[name] = group(name);
+        }
         addSetting(groups[name], setting);
       }
-      if (page == "desktop-dock" && connected && snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
-        if (matches("Widgets Automation Hooks Niri Keyboard Agents Advanced Desktop Settings")) {
+      if (page == "desktop-dock" && connected && snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false) && query.empty()) {
+        if (matches("Widgets Extensions Editors Advanced Desktop Settings")) {
           auto* pending = group("Advanced Desktop Settings");
-          adw_preferences_group_set_description(pending, "Your existing configuration remains active. These controls are not yet available in Settings.");
-          for (const auto& name : {"Extension, widget and automation editors", "Global compositor shortcuts and advanced Niri configuration"}) {
+          adw_preferences_group_set_description(pending, "Per-widget editors are not in Settings yet. Extensions are retired; existing configuration stays active until those editors land.");
+          for (const auto& name : {"Per-widget settings editors", "Extensions (retired)"}) {
             auto* item = row(pending, name, "Not yet available");
             gtk_widget_set_sensitive(GTK_WIDGET(item), false);
           }
         }
       }
-      if (page == "appearance" || !query.empty()) {
+      if (!query.empty()) {
         AdwPreferencesGroup* palettes = nullptr;
         auto paletteGroup = [&] { if (!palettes) palettes = group("Palette Management"); return palettes; };
-        // Browsing actions already sit beside the preview in the normal page.
-        // Include matching action rows in search, where that preview is omitted.
-        if (!query.empty() && matches("Appearance Palette Library Browse Colors")) {
+        if (matches("Appearance Palette Library Browse Colors")) {
           auto* palette = row(paletteGroup(), "Palette Library", "Compare built-in, community and custom palettes before applying one.");
           singleAction(palette, button("Browse", [this] { choosePalette(); }));
         }
@@ -1471,34 +1809,31 @@ struct Settings {
             });
           }));
         }
-        if (!query.empty() && matches("Appearance Accent Color Choose")) {
+        if (matches("Appearance Accent Color Choose")) {
           auto* accent = row(paletteGroup(), "Accent Color", "Creates a custom palette from the current appearance.");
           singleAction(accent, button("Choose", [this] { chooseAccent(); }));
         }
-      }
-      if ((page == "appearance" || !query.empty()) && snapshots.contains("configuration") && snapshots["configuration"].value("helix-desktop", false)) {
-        AdwPreferencesGroup* wallpapers = nullptr;
-        auto wallpaperGroup = [&] { if (!wallpapers) wallpapers = group("Wallpaper Sources"); return wallpapers; };
-        if (!query.empty() && matches("Appearance Desktop Wallpaper Library Browse")) {
-          auto* wallpaper = row(wallpaperGroup(), "Wallpaper Library", "Browse wallpapers from your configured folders.");
-          singleAction(wallpaper, button("Browse", [this] { chooseWallpaper(); }));
-        }
-        if (matches("Appearance Wallpaper Files Choose Local File Image Video")) {
-          auto* file = row(wallpaperGroup(), "Choose a Local File", "Use an image or video supported by Helix Shell.");
-          singleAction(file, button("Choose", [this] { chooseWallpaperFile(); }));
-        }
-        if (matches("Appearance Wallpaper Wallhaven Browse Online")) {
-          auto* wallhaven = row(wallpaperGroup(), "Wallhaven", "Search online wallpapers using your existing preferences and credentials.");
-          singleAction(wallhaven, button("Browse", [this] { chooseWallpaper(true); }));
-        }
-        if (matches("Templates Icons Advanced Appearance")) {
-          auto* pending = row(group("Advanced Appearance"), "Icon and template editors", "Not yet available in Settings. Your existing configuration remains active.");
-          gtk_widget_set_sensitive(GTK_WIDGET(pending), false);
+        if (snapshots.contains("configuration") && snapshots["configuration"].value("helix-desktop", false)) {
+          AdwPreferencesGroup* wallpapers = nullptr;
+          auto wallpaperGroup = [&] { if (!wallpapers) wallpapers = group("Wallpaper Sources"); return wallpapers; };
+          if (matches("Appearance Desktop Wallpaper Library Browse")) {
+            auto* wallpaper = row(wallpaperGroup(), "Wallpaper Library", "Browse wallpapers from your configured folders.");
+            singleAction(wallpaper, button("Browse", [this] { chooseWallpaper(); }));
+          }
+          if (matches("Appearance Wallpaper Files Choose Local File Image Video")) {
+            auto* file = row(wallpaperGroup(), "Choose a Local File", "Use an image or video supported by Helix Shell.");
+            singleAction(file, button("Choose", [this] { chooseWallpaperFile(); }));
+          }
+          if (matches("Appearance Wallpaper Wallhaven Browse Online")) {
+            auto* wallhaven = row(wallpaperGroup(), "Wallhaven", "Search online wallpapers using your existing preferences and credentials.");
+            singleAction(wallhaven, button("Browse", [this] { chooseWallpaper(true); }));
+          }
         }
       }
-      if (!gtk_widget_get_first_child(GTK_WIDGET(body))) {
-        auto* status = adw_status_page_new(); adw_status_page_set_title(ADW_STATUS_PAGE(status), connected ? "No Matching Settings" : "Connect to Helix Services");
-        adw_status_page_set_description(ADW_STATUS_PAGE(status), connected ? "Try a different search." : "Settings will appear when the service becomes available."); gtk_box_append(body, status);
+      if (!gtk_widget_get_first_child(GTK_WIDGET(body))) showEmptyState();
+      if (wantPane) {
+        const auto paneId = hubPane;
+        openHubPane(paneId);
       }
     }
     for (const auto& setting : catalog) {
@@ -1514,7 +1849,9 @@ struct Settings {
       }
     for (const std::string kind : {"network", "bluetooth"}) if (setters.contains(kind + "-enabled")) setters.at(kind + "-enabled")(snapshots.at(kind).at("enabled"));
     if (layoutPreview) helix::settings::LayoutPreview::update(layoutPreview, catalog);
-    gtk_widget_set_sensitive(GTK_WIDGET(body), connected || page == "online-accounts");
+    for (auto* preview : choicePreviews) helix::settings::ChoicePreview::update(preview, catalog);
+    gtk_widget_set_sensitive(GTK_WIDGET(overviewBody), connected || page == "online-accounts");
+    if (paneBody) gtk_widget_set_sensitive(GTK_WIDGET(paneBody), connected || page == "online-accounts");
     syncing = false;
   }
   void create() {
@@ -1539,8 +1876,9 @@ struct Settings {
       if (query == nextQuery) return;
       query = nextQuery;
       if (!query.empty()) {
-        section.clear(); requestedSection.clear();
+        section.clear(); requestedSection.clear(); hubPane.clear();
         if (sectionTick) { gtk_widget_remove_tick_callback(scroller, sectionTick); sectionTick = 0; }
+        popHubToOverview();
       }
       rendered.clear(); render();
     });
@@ -1560,17 +1898,38 @@ struct Settings {
     gtk_box_append(GTK_BOX(leftBox), GTK_WIDGET(sidebar));
     adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(left), leftBox);
     adw_navigation_split_view_set_sidebar(split, adw_navigation_page_new(left, "Settings"));
-    auto* right = adw_toolbar_view_new(); adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(right), adw_header_bar_new());
     banner = ADW_BANNER(adw_banner_new("Connecting to Helix services…")); adw_banner_set_button_label(banner, "Retry");
-    adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(right), GTK_WIDGET(banner));
     onSignal(banner, "button-clicked", [this] { scheduleRefresh(); });
-    scroller = gtk_scrolled_window_new(); gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-    auto* clamp = adw_clamp_new(); adw_clamp_set_maximum_size(ADW_CLAMP(clamp), 760);
-    body = GTK_BOX(gtk_box_new(GTK_ORIENTATION_VERTICAL, 24));
-    for (auto side : {"margin-start", "margin-end", "margin-top", "margin-bottom"}) g_object_set(body, side, 18, nullptr);
-    adw_clamp_set_child(ADW_CLAMP(clamp), GTK_WIDGET(body)); gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller), clamp);
-    adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(right), scroller);
-    contentPage = adw_navigation_page_new(right, "Appearance"); adw_navigation_split_view_set_content(split, contentPage);
+    hubNav = ADW_NAVIGATION_VIEW(adw_navigation_view_new());
+    auto* overviewToolbar = adw_toolbar_view_new();
+    adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(overviewToolbar), adw_header_bar_new());
+    adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(overviewToolbar), GTK_WIDGET(banner));
+    auto [scroll, box] = makeScrollBody();
+    overviewScroller = scroll;
+    overviewBody = box;
+    body = overviewBody;
+    scroller = overviewScroller;
+    adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(overviewToolbar), overviewScroller);
+    overviewPage = adw_navigation_page_new(overviewToolbar, "Appearance");
+    adw_navigation_view_push(hubNav, overviewPage);
+    g_signal_connect(hubNav, "popped", G_CALLBACK(+[](AdwNavigationView*, AdwNavigationPage*, gpointer data) {
+      auto& self = *static_cast<Settings*>(data);
+      if (self.suppressingHubPop) return;
+      const auto restore = self.hubOriginPane.empty() ? self.hubPane : self.hubOriginPane;
+      self.hubPane.clear();
+      self.section.clear();
+      self.hubPanePage = nullptr;
+      self.hubPaneHeader = nullptr;
+      self.paneBody = nullptr;
+      self.paneScroller = nullptr;
+      self.body = self.overviewBody;
+      self.scroller = self.overviewScroller;
+      self.rendered.clear();
+      self.render();
+      self.focusHubNavRow(restore);
+    }), this);
+    contentPage = adw_navigation_page_new(GTK_WIDGET(hubNav), "Appearance");
+    adw_navigation_split_view_set_content(split, contentPage);
     adw_toast_overlay_set_child(toasts, GTK_WIDGET(split)); adw_application_window_set_content(window, GTK_WIDGET(toasts));
     css = gtk_css_provider_new(); gtk_style_context_add_provider_for_display(gtk_widget_get_display(GTK_WIDGET(window)), GTK_STYLE_PROVIDER(css), GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
     bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, nullptr);
@@ -1640,7 +1999,7 @@ int main(int argc, char** argv) {
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "page", "&s", &page);
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "section", "&s", &section);
     if (section && (settings::nativeGroupForSection(section).empty() || (page && std::string_view(page) != settings::nativePageForTargetSection(section)))) {
-      g_application_command_line_printerr(command, "Section must be clipboard on privacy-security, or control-center, dock, bar, launcher, osd or hot-corners on desktop-dock\n"); return 2;
+      g_application_command_line_printerr(command, "Section must match its page\n"); return 2;
     }
     g_variant_dict_lookup(g_application_command_line_get_options_dict(command), "search", "&s", &search);
     if (search && (section || wallpapers || g_variant_dict_contains(g_application_command_line_get_options_dict(command), "palettes"))) {
@@ -1652,6 +2011,7 @@ int main(int argc, char** argv) {
     if (inspect && self.window) {
       Json layout = {{"width", gtk_widget_get_width(GTK_WIDGET(self.window))}, {"height", gtk_widget_get_height(GTK_WIDGET(self.window))},
         {"collapsed", bool(adw_navigation_split_view_get_collapsed(self.split))}, {"page", self.page},
+        {"hub-pane", self.hubPane}, {"privacy-chip", self.privacyChip},
         {"desktop-page", bool(gtk_widget_get_visible(GTK_WIDGET(self.pageRows.at("desktop-dock"))))}, {"connected", self.connected},
         {"content-width", gtk_widget_get_width(GTK_WIDGET(self.body))},
         {"query", self.query}, {"section", self.section}, {"scroll-position", gtk_adjustment_get_value(gtk_scrolled_window_get_vadjustment(GTK_SCROLLED_WINDOW(self.scroller)))},

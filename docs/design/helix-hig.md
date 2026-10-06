@@ -118,6 +118,12 @@ reveal), `Slow` 400 ms (large layout changes), `Spring` 320 ms. Motion explains 
 something came from; it never delays a result. With Motion off (Reduced Motion), transitions
 become cross-fades or are skipped.
 
+Standalone apps (Helix Software, Settings) use libadwaita `AdwTimedAnimation` via
+`apps/common/motion.h`: short fade-and-rise reveals for Explore sections and detail
+blocks, staggered so hierarchy reads top-down. Replays only when the user re-enters that
+surface—not on every catalog refresh. Carousels use `Style::animSlow` scroll reveals and
+respect `adw_get_enable_animations`.
+
 ## Menus
 
 Every menu, whether context, dock, tray, or dropdown, should look and behave the same: chrome
@@ -129,46 +135,55 @@ menu must never take an xdg_popup grab that isn't on the topmost grabbing popup 
 ## Settings structure
 
 The standalone Settings application uses standard libadwaita preference groups and adaptive sidebar
-navigation. The independent desktop service owns settings persistence and migrated device backends.
+navigation. Hub pages wrap content in `AdwNavigationView` (same pattern as Helix Software): the
+overview is the root page; sub-panes are pushed `AdwNavigationPage`s with a Back header and Escape
+to return. Helpers live in `src/apps/settings/hub_navigation.h`. The independent desktop service
+owns settings persistence and migrated device backends.
 The old shell Settings editors were retired by explicit user direction, including advanced editors
 whose native replacements are unfinished. Preserve existing configuration and show clear unavailable
 states for those editors. Remaining live tool pages continue during migration; full desktop cutover
 still requires every inventory entry to have a working destination. No transitional legacy tools
 window is introduced. The following shell rules apply to the remaining live tool pages.
 
-Native Desktop & Dock places visible section-navigation buttons before its layout preview and
-settings groups. These use standard GTK buttons in an adaptive flow layout, move keyboard focus
-to the destination controls, and retain the full scrollable page. Unfinished editor notices follow
-the working settings, rather than interrupting everyday configuration.
+Native hubs (Desktop & Dock, Appearance, Network, System) keep overviews light: a short
+preview or live surface, then clustered navigation rows (glyph, title, chevron) that push
+sub-panes. Desktop clusters Layout / Shell / Capture; Appearance clusters Colors & Chrome /
+Wallpaper / Type & Templates; System clusters Time & Language / Sharing & Setup. Privacy &
+Security uses wrapping chip sub-tabs for peer facets. Sound keeps Sounds under the live mixer.
+Choice illustrations use one caption layer; unfinished editor notices stay last.
 
 - **More main tabs, not hidden hubs.** No "General" catch-all; a thing gets its own sidebar
   tab. Clusters are separated by dividers, not captions.
-- **Sub-tabs for facets of one concept** (Privacy & Security → Privacy | Firewall |
-  Security; Desktop & Dock → Bar | Dock | Widgets ...), as chips under the tab title. Never
+- **Sub-tabs for facets of one concept** (Privacy & Security → Privacy | Lock Screen |
+  Location … as chips; Desktop & Dock → Dock | Bar | … as pushed sub-panes). Never
   to merge unrelated things (Sound and Displays stay separate). A multi-page tab is a
   `HubTab` (`src/shell/control_center/hub_tab.h`); pages inside it are ordinary tabs.
 - **Old ids keep working.** A page's id stays a valid open context for IPC, Home links, the
   launcher's Panels provider, and search; `kHubChildren` in `control_center_panel.cpp` maps it
-  to its tab and sub-tab.
+  to its tab and sub-tab. Native `--section` ids push the matching hub pane (or select the
+  Privacy chip).
 - **Live "app" pages** (Calendar, Weather, Media, Capture, Clipboard, AI, Templates, plugin
   tabs) sit in the Apps cluster near the bottom, like third-party panes on macOS.
 - **Clusters** (`TabGroup`, `kBuiltinTabs`): connectivity; attention; system; desktop;
   devices and input; sharing; apps; advanced (hooks, compositor).
 - **Search** finds individual settings and opens the tab and sub-tab that shows them
-  (`tabIdForSettingsGroup`).
+  (`tabIdForSettingsGroup`). In native Settings, search matches title, group, page, setting
+  id and description, and lists hits flat across pages; `--section` and nav rows push the
+  pane that owns the group. Escape / Back restores focus to the originating hub nav row.
 - **Sub-panes, macOS style.** A pane's extra pages open from navigation rows (glyph, title,
   chevron) and replace the pane in place, with a back header; Cancel (Escape) goes back, and
   the pane reopens on its main page. Keyboard focus moves to Back on entry and returns to
   the originating row when possible. A sub-pane can be a live page (a device list) or a
-  settings-only page of toggles and sliders (`SettingsPane::createInline` for one group).
-  Helpers: `makeNavRow` and `makeSubPaneHeader` in `tab.h`. Sound, Displays, Notifications, Power, Bluetooth, Network, and System are the references. Related settings groups can share one sub-pane when one group's switch controls the others, as in System → Monitoring.
+  settings-only page of toggles and sliders. Native Settings uses `makeNavRow` /
+  `populateHubNav` in `hub_navigation.h` (shell editors used `tab.h`). Related settings
+  groups can share one sub-pane when one group's switch controls the others.
 - **Chip sub-tabs only for peers you switch between often** and that share one purpose
   (Privacy & Security today); prefer sub-panes otherwise.
 - **Settings in the pane.** A tab with a single page shows its settings under the live
-  content, and the page scrolls as one list (`SettingsPaneOptions::inlineSettings`). A
-  hosted page with one settings group drops the group heading, since the tab or sub-tab
-  already names it. App-like tabs (Weather, Calendar, Media) keep a separate settings view
-  behind a labeled **Settings** / **Done** header button.
+  content, and the page scrolls as one list. A hosted page with one settings group drops the
+  group heading, since the tab or sub-pane title already names it. App-like tabs (Weather,
+  Calendar, Media) keep a separate settings view behind a labeled **Settings** / **Done**
+  header button.
 
 ## Accessibility
 
@@ -210,6 +225,27 @@ Theme palettes, Type, Language, Icons, Wallpaper, and Templates use Wallpaper na
 sources, search, and the current pick sit on the compact card; leftover is only the grid.
 Click sources, don't hover-preview catalogs. When the window grows, catalogs add columns
 instead of stretching tiles.
+
+Helix Software follows the same leftover-grid rule for Flatpak, Fedora, and firmware cards:
+solid content (not glass-on-glass), icon tiles that grow by column count, and a pushed detail
+page for description, metadata, permissions, and screenshots. Craft is Apple-inspired within
+libadwaita: calm hierarchy, one primary action, native buttons and preference groups — not an
+App Store skin. Flatpak Explore is a store home: Featured first (title-1 + short blurb), on-this-device, Browse-by
+pills, Editors’ picks and Verified shelves, then category rows with See all; Recent activity
+last. Search and category pages use filtered grids. Verified Flathub publishers use a small
+emblem on tiles (full “Verified publisher” copy stays on featured/detail) so shelves stay calm. Detail pages lead with a larger icon, subtitle, and pill-shaped Install/Open/Update, then a
+Preview carousel (card-framed screenshots), copy, and an Information-style Details group. Fedora Explore stays search-first with Essentials / Development / More groups;
+Installed defaults to an Apps scope. Flatpak install confirms surface verification and a short
+permission-safety line when known; Flatpak remove offers an optional “Remove All Data” path.
+Firmware empty states stay calm and device-focused. Package failures surface the backend reason
+(compacted). Catalog browsing and tab switching stay available while an install/update runs;
+confirmed installs/updates/removes queue (up to 8) when another operation is already running,
+and Cancel clears the queue. Recent activity persists under the Helix state dir and appears on
+Explore. Deep-link with `helix-software --app=<id>`. A Sources toolbar action opens Flatpak remotes
+(enable/disable/remove, add user Flathub); catalog refresh follows remote changes. Updates badge
+sums all sources; the Updates page hints when another source still has pending updates. Load
+catalogs and media off the UI thread; keep search, paging, and cancel available while a list is
+busy.
 
 ## Sibling repos
 

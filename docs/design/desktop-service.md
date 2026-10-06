@@ -85,16 +85,25 @@ download and application through the service. Per-monitor wallpaper overrides
 and other provider catalogs remain separate migration work.
 
 Desktop & Dock exposes running indicators/window badges, active-display behavior,
-reserved space, launcher-button placement, magnification and spacing. Launcher
-preferences include categories, grid mode, application actions and source indicators.
+reserved space, launcher-button placement, magnification, spacing, monitors, layer,
+shadow, background opacity, corner radius and focused/unfocused icon scale and opacity.
+Launcher preferences include categories, grid mode, application actions, source indicators,
+auto-paste after copy actions, provider prefix and currency rate fetching.
+On-screen indicators include position, scale, opacity, border, margins, displays and
+per-event toggles. Window switcher order and session shortcut visibility are also exposed.
 Control Center preferences include its sidebar mode, direct-detail sidebar mode,
 width, height, attached/floating placement, floating position, pointer-relative
-opening and Home session-action visibility. All use existing configuration
+opening and Home session-action visibility. Panel general settings cover the
+anchor bar and floating panel layer. All use existing configuration
 paths and service validation. Built-in page visibility and quick shortcuts now
 have native editors in Settings.
-Each named bar exposes reserved space, workspace-switch reveal, shadow and thickness
-alongside visibility, position and auto-hide. These preferences remain desktop-only;
-Advanced widget properties and extension editors still need migration.
+Each named bar exposes reserved space, workspace-switch reveal, layer, shadow,
+contact shadow, thickness, content scale, font scale, panel overlap, padding, widget spacing, margins,
+background opacity and corner radius alongside visibility, position and auto-hide.
+Dock launcher chrome includes icon name, optional custom image and colorize.
+Lock-screen widget visibility is available on Privacy & Security.
+These preferences remain desktop-only where noted; per-widget property editors still need migration.
+Extensions are retired.
 
 Dock and launcher favorites use ordered `application-list` metadata.
 `Configuration1.UpdateApplicationList(s id,av baseline,av candidate)` rejects stale
@@ -221,8 +230,9 @@ and docks supporting desktop actions. Settings activation keeps one application 
 The desktop-only native page covers shell HTTP restrictions, external IP lookup, startup
 telemetry, password mask presentation, fingerprint preference, lock-screen blur/tint and
 interactive display selection. Descriptions distinguish preferences from available hardware
-and explain that shell offline mode does not restrict other applications. Firewall, device
-access indicators, location policy and advanced authentication management still use their
+and explain that shell offline mode does not restrict other applications. Location, weather,
+privacy-indicator filters, greeter sync and credential-storage preferences are now catalogued
+on Privacy & Security. Firewall and advanced authentication management still use their
 existing destinations; migration remains partial.
 
 ### Hot corners and connection recovery
@@ -310,9 +320,10 @@ Search bodies, thumbnails and full images have separate size limits. Files are
 written through unique temporary files and renamed only on successful completion.
 The service applies the wallpaper only after the full image download succeeds.
 
-The wallpaper migration remains partial: per-display picking, favorites, daily
-image browsing and advanced media controls still need native destinations. Legacy
-Settings editors have been retired; full desktop migration remains incomplete.
+The wallpaper migration remains partial: per-display picking and favorites still need
+native destinations. Daily provider, video wallpaper, fill color, transitions and
+automation scalars are available in Appearance. Legacy Settings editors have been
+retired; full desktop migration remains incomplete.
 
 Launch the browser with `helix-settings --wallpapers library` or
 `helix-settings --wallpapers wallhaven`; both reuse the existing Settings instance.
@@ -322,14 +333,27 @@ Launch the browser with `helix-settings --wallpapers library` or
 Appearance offers native illustrated Light, Dark and Automatic toggles using the
 current palette. They share the authoritative theme.mode setting with the normal
 preference row and stay synchronized with external configuration changes.
-Desktop & Dock shows a responsive layout illustration for bar/dock placement,
-automatic hiding and active corners; common dock controls precede advanced options.
-Notifications illustrates placement, stacking (up to three samples), application
-labels and actions. These are explicitly illustrative rather than exact multi-display
-renderings. Both diagrams update in place, retaining native control focus, and have
-textual descriptions for accessibility. Native contrast colors remain authoritative.
+Desktop & Dock and Notifications keep responsive layout illustrations on the hub
+overview. Hub sub-panes add choice illustrations for dock/bar shape, wallpaper fill,
+volume overdrive and brightness sync (`choice_preview.h`). These are explicitly
+illustrative rather than exact multi-display renderings. Diagrams update in place,
+retaining native control focus, and have textual captions for accessibility. Native
+contrast colors remain authoritative.
 
-Settings accepts `--section control-center|dock|bar|launcher|osd|hot-corners` to open the corresponding Desktop & Dock group. It may be combined with `--page desktop-dock`; other page combinations and unknown sections are rejected. Shell compatibility contexts use these destinations when available.
+Settings hubs use `AdwNavigationView`: overview root plus pushed sub-panes for Desktop &
+Dock, Appearance, Network and System; Privacy & Security uses chip sub-tabs; Sound keeps
+Sounds inline under the live mixer. `--section` opens the matching pane (or Privacy chip),
+not only scroll position:
+`control-center`, `dock`, `bar`, `launcher`, `osd`, `hot-corners`, `window-switcher`,
+`capture`, `screenshot`, `screen-record`, `hooks`, `panels`, `niri`, `desktop`/`widgets`
+and `media` on Desktop & Dock;
+`colors`, `type`, `roundness`, `glass`, `icons`, `effects`, `templates`, `wallpaper`/`theme`,
+`video-wallpaper` and `backdrop` on Appearance; `wifi-prefs`, `dns` and `tailscale` on
+Network; `clock`, `calendar`, `localsend`, `language`, `setup` and `advanced` on System;
+`sounds` on Sound; `clipboard`, `privacy`/`firewall`/`security`, `lock-screen`, `location`,
+`authentication` and `storage` on Privacy & Security; `scale` on Accessibility. It may be
+combined with the matching `--page`; other page combinations and unknown sections are
+rejected. Shell compatibility contexts use these destinations when available.
 
 Settings accepts `--search TEXT` for single-instance search activation, optionally with `--page ID`.
 An empty search clears the query. Search is incompatible with section or browser activation.

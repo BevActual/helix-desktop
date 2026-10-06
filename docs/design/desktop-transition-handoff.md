@@ -42,21 +42,30 @@ of the replaced pane are saved in the Codex task's `outputs/retired-settings-sou
 
 ## Inventory and next slices
 
-The inventory currently tracks 85 entries: 34 partial and 51 pending. No entry
+The inventory currently tracks 85 entries. No entry
 is verified end to end, and `cutover` is `false`. A destination name in the
 inventory states intent, not that an application or page exists.
 
-1. Finish Control Center Home as a quick surface: check the new capture and
-   phone entries with keyboard, touch and multi-monitor behavior under
-   helix-niri. Add explicit backend-unavailable states where the existing
-   shell destinations need them. Keep detailed shell surfaces until corresponding
-   native destinations work.
+1. Finish Control Center Home as a quick surface: Quick Settings now has labeled
+   sound/brightness, everyday Wi-Fi/Bluetooth/Night Light/DND rows with stable
+   titles + status captions and Settings chevrons, pin tiles from
+   `control_center.shortcuts`, and labeled Lock/Suspend/Power. Still need Capture
+   and Phone Home actions, a media strip, pin reorder, and keyboard/touch/
+   multi-monitor checks under helix-niri. Keep detailed shell surfaces until
+   corresponding native destinations work.
 2. Complete existing Settings pages before marking their entries verified.
-   Appearance still needs icon and template catalogs and advanced editors; the
-   retired shell editors are no longer available as a fallback.
+   Appearance now has roundness, borders, shadows, glass amount, icon tint color,
+   and built-in and community template selection.
    Desktop & Dock now has Control Center placement, size, sidebar and session-action
-   preferences, built-in page visibility and quick shortcut editing, but still needs widget, extension and
-   hook editors.
+   preferences, built-in page visibility, quick shortcut editing, automation hook
+   commands, panel placements for launcher/clipboard/session/wallpaper/polkit/quick
+   insert, panel anchor bar and floating layer, dock layout/effects/focus polish,
+   per-bar layout and effects including font scale and panel overlap, dock launcher
+   icon and custom image, launcher auto-paste/prefix/exchange rates, OSD
+   opacity/border/margins and remaining event kinds, window-switcher order, session
+   shortcut visibility, lock-screen widget visibility, screen corners, desktop-widget
+   visibility and Niri layout/chrome controls, but still needs per-widget settings editors.
+   Extensions are retired.
    Network needs complete connection-profile/Tailscale parity. Sound and
    Bluetooth need real device mutation, pairing and cancellation checks.
 3. Add absent Settings destinations: Displays, Input/Keyboard, Devices,
@@ -155,7 +164,7 @@ service and shell are running; Settings connected with editing enabled on Deskto
 
 ### Native section navigation (2026-10-05)
 
-Shell Settings routes now export finite `--section` destinations for Control Center, Dock, Launcher, On-Screen Indicators and Hot Corners. Native Settings scrolls to the corresponding group while keeping the complete page; normal page activation clears the section and search. Unknown or mismatched section requests return exit code 2. Layout inspection includes section and scroll position.
+Shell Settings routes now export finite `--section` destinations for Control Center, Dock, Launcher, On-Screen Indicators, Hot Corners and other hub panes. Native Settings pushes the corresponding `AdwNavigationView` sub-pane (or Privacy chip); normal page activation clears the section and search. Unknown or mismatched section requests return exit code 2. Layout inspection includes section and scroll position.
 
 Focused shell/Settings build and desktop service/migration tests passed. Direct Control Center navigation was visually verified; page activation reset the scroll position. Narrow/mobile navigation remains unverified.
 
@@ -165,7 +174,7 @@ System-wide installation retry succeeded after administrator authentication. Ins
 
 ### Desktop navigation polish (2026-10-05)
 
-Desktop & Dock now starts with native, adaptive section buttons for Dock, Bar, Launcher, Control Center, On-Screen Indicators and Hot Corners. Buttons are included only when the corresponding settings exist. Unfinished advanced-editor notices are below the working controls. Section navigation moves keyboard focus into the target group, waits for GTK allocation, and avoids redundant search rebuilds that could reset navigation. Bar links target the first configured bar group.
+Desktop & Dock, Appearance, Network, System and Sound hubs use overview navigation rows that push sub-panes. Privacy & Security uses chip sub-tabs. Choice previews cover dock/bar shape, wallpaper fill, volume overdrive and brightness sync. Section activation opens the pane rather than scrolling a flat list.
 
 Focused shell/Settings builds, migration inventory validation and whitespace checks passed. Live helix-niri layouts were inspected at 360, 768 and 1280 logical pixels; the 360-pixel layout collapses correctly and direct Control Center navigation was visually verified there. Bar navigation and ordinary page scroll reset were checked using app inspection. Physical touch, screen readers, on-screen keyboards and mobile hardware remain unverified. System-wide installation succeeded and installed Settings/shell checksums match the build.
 
@@ -256,16 +265,22 @@ is cleared on owner loss. Unsupported edits are rejected; the native page shows 
 Day/night temperature changes are committed as one pair and maintain a 100 K gap; resetting either
 restores both configured temperatures. Wayland gamma application remains in the shell.
 
-Helix Software (`org.helix.Software`, `helix-software`) is now its own adaptive application with
-Flatpak app browsing/search, Fedora package and firmware installed/update lists, reviewed
-install/remove/update actions and Update All Listed. It reuses package backend validation,
-PackageKit/polkit authorization and Flatpak scope handling. Worker results marshal to GTK's main
-thread, rendering is limited to 100 rows per batch, and canceling a request explicitly asks the user
-to refresh to determine final backend state. Essential system/desktop packages are protected from
-removal. Actual installations/removals/firmware updates were not executed during app validation.
-Fedora installed-package enumeration and configured-remote Flatpak search were tested read-only.
-Dependency-resolution details, richer AppStream catalogs/screenshots and transactional failure
-recovery still need refinement. Source: src/apps/software/main.cpp, under Software Projects.
+Helix Software (`org.helix.Software`, `helix-software`) is now its own adaptive application with a
+graphical store UI across Flatpak, Fedora packages, and firmware, plus an `AdwNavigationView`
+detail page. Flatpak Explore is a store home (search suggestion pills, featured carousel,
+on-this-device strip, category rows with See all). It caches the remote catalog for client-side
+search, overlays installed state off the shared package lock, and resolves icons from local
+AppStream caches; Fedora Explore remains search-driven; firmware keeps Explore hidden and uses
+device cards on Installed / Updates. Detail pages open installed apps, copy app IDs / install
+commands, and enrich from AppStream (description, screenshot carousel, links, content rating,
+release notes, Flathub verification), humanized Flatpak permissions with a safety summary
+(including available apps via `remote-info -m`), `flatpak remote-info`, RPM info, and fwupd
+release notes without adding libappstream. Installed/Updates support local search; update cards
+show current→new versions when known and offer Remove beside Update. Mutation progress, Updates
+tab badge, reviewed install/remove/update actions, Update All Listed, PackageKit/polkit
+authorization, Flatpak scope handling, protected packages, batch paging and cancel→refresh
+messaging remain. Dependency-resolution details and transactional failure recovery still need
+refinement. Source: `src/apps/software/`.
 
 Helix Phone (`org.helix.Phone`, `helix-phone`) is now its own adaptive application for discovery,
 reviewed pairing/removal, battery state, find-phone and file sending. Current device/verification
@@ -300,8 +315,13 @@ Software and Phone binaries/desktop entries. Native app reads/layouts were check
 widths; physical touch/mobile, OSK and screen-reader checks remain unverified. Layout inspection
 now returns an error without an open window rather than starting a new primary GUI and hanging.
 
-Migration remains incomplete (cutover=false). Next work includes safe native display mutation/
-rollback and single backend ownership, fuller Power, global Niri/input settings, extensions/hooks/
-widget/template/icon editors, security/device/system destinations, native phone casting/sync,
-and dedicated Calendar/Weather/Agent Center applications. Keep inventory statuses honest; do not
-mark pending destinations verified merely because old editors were retired.
+Migration remains incomplete (cutover=false). Settings catalog now covers Capture,
+location/weather, appearance backdrop/shell-mode/wallpaper automation scalars, sound
+overdrive/theme, brightness, network/bluetooth preferences, clock/calendar formats,
+Tailscale/LocalSend, privacy filters and session power overrides. Complex editors
+(per-widget, launcher providers/dmenu, plugins, per-monitor wallpaper pickers) remain
+stubbed. Next work includes safe native display mutation/rollback and single backend
+ownership, fuller Power/global Niri/input settings, widget/template/icon editors,
+security/device destinations, native phone casting/sync, and dedicated Calendar/Weather/
+Agent Center applications. Keep inventory statuses honest; do not mark pending
+destinations verified merely because old editors were retired.

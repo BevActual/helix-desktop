@@ -92,8 +92,9 @@ public:
   LayoutPreview(GtkWidget* drawing, GtkLabel* label, bool notifications) : area(drawing), caption(label), notifications(notifications) {}
   static GtkWidget* create(bool notifications) {
     auto* box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8); auto* drawing = gtk_drawing_area_new();
-    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing), 240); gtk_widget_set_hexpand(drawing, true); gtk_widget_add_css_class(drawing, "accent");
+    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing), notifications ? 200 : 160); gtk_widget_set_hexpand(drawing, true); gtk_widget_add_css_class(drawing, "accent");
     auto* label = gtk_label_new(""); gtk_label_set_wrap(GTK_LABEL(label), true); gtk_label_set_xalign(GTK_LABEL(label), 0);
+    gtk_widget_add_css_class(label, "dim-label");
     auto* self = new LayoutPreview(drawing, GTK_LABEL(label), notifications);
     g_object_set_data_full(G_OBJECT(box), "layout-preview", self, +[](gpointer data) { delete static_cast<LayoutPreview*>(data); });
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing), +[](GtkDrawingArea*, cairo_t* cr, int w, int h, gpointer data) { static_cast<LayoutPreview*>(data)->draw(cr, w, h); }, self, nullptr);
@@ -106,17 +107,20 @@ public:
     self.values = std::move(values);
     if (self.notifications) {
       const auto maximum = self.value("notification.max_visible", 0);
-      self.summary = self.value("notification.enable_daemon", false) ? "Popups: " + self.text("notification.position", "top_right") +
-        (maximum == 0 ? ". Number limited by available space." : ". Up to " + std::to_string(maximum) + " visible.") : "Notification popups are disabled.";
-      std::ranges::replace(self.summary, '_', ' ');
-      self.summary += " Illustration shows up to three sample notifications.";
+      auto position = self.text("notification.position", "top_right");
+      std::ranges::replace(position, '_', ' ');
+      self.summary = self.value("notification.enable_daemon", false) ?
+        "Popups " + position + (maximum == 0 ? ", fit available space." : ", up to " + std::to_string(maximum) + " visible.") :
+        "Notification popups are disabled.";
     } else {
-      self.summary = self.value("dock.enabled", false) ? "Dock: " + self.text("dock.position", "bottom") + ". " : "Dock is hidden. ";
+      std::string parts;
+      if (self.value("dock.enabled", false)) parts += "Dock " + self.text("dock.position", "bottom");
       for (auto it = self.values.begin(); it != self.values.end(); ++it) if (it.key().starts_with("bar:") && it.key().ends_with(":enabled") && it.value() == true) {
         const auto prefix = it.key().substr(0, it.key().size() - 7);
-        self.summary += "Bar " + prefix.substr(4, prefix.size() - 5) + ": " + self.text(prefix + "position", "top") + ". ";
+        if (!parts.empty()) parts += " · ";
+        parts += "Bar " + self.text(prefix + "position", "top");
       }
-      self.summary += "Dashed outlines indicate automatic hiding. Highlighted corners have actions.";
+      self.summary = parts.empty() ? "Bar and dock placement." : parts + ".";
     }
     gtk_label_set_text(self.caption, self.summary.c_str()); gtk_accessible_update_property(GTK_ACCESSIBLE(self.area), GTK_ACCESSIBLE_PROPERTY_LABEL, self.summary.c_str(), -1);
     gtk_widget_queue_draw(self.area);
