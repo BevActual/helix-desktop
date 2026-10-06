@@ -4,7 +4,6 @@
 #include "core/deferred_call.h"
 #include "i18n/i18n.h"
 #include "launcher/panel_catalog.h"
-#include "shell/control_center/control_center_panel.h"
 #include "shell/panel/panel_manager.h"
 #include "util/fuzzy_match.h"
 #include "util/string_utils.h"
@@ -25,8 +24,8 @@ namespace {
 
 } // namespace
 
-PanelProvider::PanelProvider(PanelManager* panelManager, ControlCenterPanel* controlCenterPanel, ConfigService* config)
-    : m_panelManager(panelManager), m_controlCenterPanel(controlCenterPanel), m_config(config) {}
+PanelProvider::PanelProvider(PanelManager* panelManager, ConfigService* config)
+    : m_panelManager(panelManager), m_config(config) {}
 
 std::string PanelProvider::displayName() const { return i18n::tr("launcher.providers.panel.title"); }
 
@@ -47,16 +46,6 @@ std::vector<LauncherResult> PanelProvider::query(std::string_view text) const {
       continue;
     }
     entries.emplace_back(panelId, panel_catalog::describe(panelId));
-  }
-
-  if (m_controlCenterPanel != nullptr && !std::ranges::contains(ignored, "control-center")) {
-    const std::string controlCenterTitle = i18n::tr("launcher.providers.panel.builtin.control-center");
-    for (const auto& tab : m_controlCenterPanel->visibleTabsForLauncher()) {
-      entries.emplace_back(
-          std::string(kControlCenterTabPrefix) + tab.key,
-          panel_catalog::Description{.title = tab.title, .subtitle = controlCenterTitle, .glyph = tab.glyph}
-      );
-    }
   }
 
   if (entries.empty()) {

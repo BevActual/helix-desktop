@@ -14,7 +14,6 @@
 #include "pipewire/sound_player.h"
 #include "shell/bar/widget_gesture.h"
 #include "shell/bar/widget_gesture_defaults.h"
-#include "shell/control_center/control_center_panel.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/settings/color_spec_picker.h"
 #include "shell/settings/font_weight_catalog.h"
@@ -2125,24 +2124,6 @@ namespace settings {
         asSegmented(enumSelect(kControlCenterSidebarModes, cfg.controlCenter.sidebarSectionMode)),
         "full compact none sidebar icons narrow hidden tab direct widget shortcut"
     ));
-    {
-      MultiSelectSetting tabs;
-      const auto catalog = ControlCenterPanel::hideableTabCatalog();
-      tabs.options.reserve(catalog.size());
-      tabs.selectedValues.reserve(catalog.size());
-      for (const auto& tab : catalog) {
-        tabs.options.push_back(SelectOption{tab.key, tab.title});
-        if (!std::ranges::contains(cfg.controlCenter.hiddenTabs, tab.key)) {
-          tabs.selectedValues.emplace_back(tab.key);
-        }
-      }
-      tabs.persistUnselected = true;
-      entries.push_back(makeEntry(
-          SettingsSection::ControlCenter, "navigation", tr("settings.schema.panels.control-center-tabs.label"),
-          tr("settings.schema.panels.control-center-tabs.description"), {"control_center", "hidden_tabs"},
-          std::move(tabs), "tabs sections visible hide show display brightness media audio network power plugin"
-      ));
-    }
     entries.push_back(makeEntry(
         SettingsSection::ControlCenter, "home", tr("settings.schema.panels.home-shortcuts.label"),
         tr("settings.schema.panels.home-shortcuts.description"), {"control_center", "shortcuts"},

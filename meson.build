@@ -522,44 +522,7 @@ _noctalia_sources = files(
   'src/shell/desktop/widgets/desktop_volume_widget.cpp',
   'src/shell/clipboard/clipboard_picker.cpp',
   'src/shell/quick_insert/quick_insert_panel.cpp',
-  'src/shell/control_center/tabs/clock_tab.cpp',
-  'src/shell/control_center/tabs/clipboard_tab.cpp',
-  'src/shell/control_center/tabs/bar_tab.cpp',
-  'src/shell/control_center/tabs/osd_tab.cpp',
-  'src/shell/control_center/tabs/panels_tab.cpp',
-  'src/shell/control_center/control_center_panel.cpp',
-  'src/shell/control_center/hub_tab.cpp',
-  'src/shell/control_center/tab_search.cpp',
-  'src/shell/control_center/settings_search_target.cpp',
-  'src/shell/control_center/tabs/dock_tab.cpp',
-  'src/shell/control_center/tabs/desktop_tab.cpp',
-  'src/shell/control_center/tabs/launcher_tab.cpp',
-  'src/shell/control_center/tabs/monitor_tab.cpp',
-  'src/shell/control_center/tabs/media_tab.cpp',
-  'src/shell/control_center/tabs/power_tab.cpp',
-  'src/shell/control_center/recent_captures.cpp',
-  'src/shell/control_center/tabs/capture_tab.cpp',
-  'src/shell/control_center/tabs/screenshot_tab.cpp',
-  'src/shell/control_center/tabs/screen_record_tab.cpp',
-  'src/shell/control_center/settings_pane.cpp',
-  'src/shell/control_center/tabs/settings_tab.cpp',
-  'src/shell/control_center/tabs/home_tab.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
-  'src/shell/control_center/pin_reorder.cpp',
-  'src/shell/control_center/pinned_app_list.cpp',
-  'src/shell/control_center/tabs/native_redirect_tab.cpp',
-  'src/shell/control_center/tabs/privacy_tab.cpp',
-  'src/shell/control_center/tabs/type_tab.cpp',
-  'src/shell/control_center/tabs/scale_tab.cpp',
-  'src/shell/control_center/tabs/roundness_tab.cpp',
-  'src/shell/control_center/tabs/glass_tab.cpp',
-  'src/shell/control_center/tabs/icons_tab.cpp',
-  'src/shell/control_center/tabs/effects_tab.cpp',
-  'src/shell/control_center/tabs/language_tab.cpp',
-  'src/shell/control_center/tabs/windows_tab.cpp',
-  'src/shell/control_center/tabs/templates_tab.cpp',
-  'src/shell/control_center/tabs/keybinds_tab.cpp',
-  'src/shell/control_center/tabs/wallpaper_tab.cpp',
   'src/shell/control_center/tab.cpp',
   'src/core/files/directory_scanner.cpp',
   'src/ui/dialogs/color_picker_dialog.cpp',
@@ -1127,7 +1090,6 @@ if build_tests
     'notification_live_activity',
     'package_spec',
     'path_browse',
-    'pin_reorder',
     'popup_dismiss_order',
     'process',
     'scheme',
@@ -1138,8 +1100,6 @@ if build_tests
     'string_utils',
     'surface_blur_region',
     'system_monitor_service',
-    'tab_search',
-    'settings_search_target',
     'taskbar_widget',
     'template_apply_notify',
     'template_hook_async',
@@ -1147,7 +1107,6 @@ if build_tests
     'theme_shell_mode',
     'time_format',
     'tray_identifier',
-    'upower_charge_limit',
     'upower_device_catalog',
     'uri',
     'virtual_grid_view_gesture',
@@ -1177,23 +1136,6 @@ if build_tests
     endif
     test(test_name, test_exe, args: test_args)
   endforeach
-
-  upower_integration_exe = executable('upower_charge_limit_integration_test',
-    sources: files('tests/upower_charge_limit_integration_test.cpp'),
-    dependencies: noctalia_core_dep,
-  )
-  dbus_run_session = find_program('dbus-run-session', required: false)
-  if dbus_run_session.found()
-    test('upower_charge_limit_integration',
-      dbus_run_session,
-      args: [
-        '--', 'sh', '-c',
-        'export DBUS_SYSTEM_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS"; exec "$1"',
-        'sh', upower_integration_exe.full_path(),
-      ],
-      depends: upower_integration_exe,
-    )
-  endif
 
   config_validate_env = environment()
   config_validate_env.set('NOCTALIA_CONFIG_HOME', meson.current_source_dir() / 'tests/config_validate/config-home')

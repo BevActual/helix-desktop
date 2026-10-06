@@ -57,7 +57,6 @@
 #include "render/text/font_weight_catalog.h"
 #include "shell/clipboard/clipboard_paste.h"
 #include "shell/quick_insert/quick_insert_panel.h"
-#include "shell/control_center/control_center_panel.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "system/fedora_upgrade_launcher.h"
 #include "system/package_kit_service.h"
@@ -630,61 +629,6 @@ void Application::initPanelManagerAndPanels() {
             }
           },
   };
-  auto controlCenter = std::make_unique<ControlCenterPanel>(ControlCenterServices{
-      .notifications = &m_notificationManager,
-          .audio = m_pipewireService.get(),
-          .mpris = m_mprisService.get(),
-          .config = &m_configService,
-          .httpClient = &m_httpClient,
-          .spectrum = m_pipewireSpectrum.get(),
-          .upower = m_upowerService.get(),
-          .powerProfiles = m_powerProfilesService.get(),
-          .network = m_networkService.get(),
-          .networkSecrets = m_networkSecretAgent.get(),
-          .bluetooth = m_bluetoothService.get(),
-          .bluetoothAgent = m_bluetoothAgent.get(),
-          .brightness = m_brightnessService.get(),
-          .displayConfig = m_displayConfigService.get(),
-          .sysmon = m_systemMonitor.get(),
-          .nightLight = &m_gammaService,
-          .theme = &m_themeService,
-          .templateApply = &m_templateApplyService,
-          .idleInhibitor = &m_idleInhibitor,
-          .session = &m_sessionActionRunner,
-          .dependencies = &m_dependencyService,
-          .platform = &m_compositorPlatform,
-          .ipc = &m_ipcService,
-          .wallpaper = &m_wallpaper,
-          .fileWatcher = &m_fileWatcher,
-          .clipboard = &m_clipboardService,
-          .scheduleClipboardAutoPaste =
-              [this](bool isImage) {
-                m_clipboardAutoPasteTimer.stop();
-                m_clipboardAutoPasteTimer.start(
-                    std::chrono::milliseconds(Style::animFast + 30), [this, isImage]() {
-                      DeferredCall::callLater([this, isImage]() {
-                        const ClipboardAutoPasteMode activeMode = m_configService.config().shell.clipboardAutoPaste;
-                        (void)clipboard_paste::pasteEntry(isImage, activeMode, m_virtualKeyboardService);
-                      });
-                    }
-                );
-              },
-          .accounts = m_accountsService.get(),
-          .thumbnails = &m_thumbnailService,
-          .wallpaperScanner = &m_wallpaperScanner,
-          .asyncTextures = &m_asyncTextureCache,
-          .videoWallpaper = &m_videoWallpaper,
-          .screenRecorder = &m_screenRecorder,
-          .desktopWidgets = &m_desktopWidgetsController,
-          .upgradeShell = [this]() { performShellUpgrade(); },
-          .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },
-          .upgradeBusy = []() { return noctalia::fedora_upgrade::busy(); },
-          .ensurePolkit = [this](std::function<void(bool)> onReady) { ensurePolkitAgent(std::move(onReady)); },
-          .settingsInvalidated = &m_settingsInvalidated,
-          .settingsActions = std::move(settingsActions),
-      });
-  m_controlCenter = controlCenter.get();
-  m_panelManager.registerPanel("control-center", std::move(controlCenter));
   // Type tab and widget font pickers read this list; discover it off the UI thread now.
   settings::prewarmFontFamilies();
   if (noctalia::packages::tabAvailable()) {
@@ -699,7 +643,7 @@ void Application::initPanelManagerAndPanels() {
     launcherPanel->addProvider(std::make_unique<WallpaperProvider>(&m_configService, &m_wayland, &m_themeService));
     launcherPanel->addProvider(std::make_unique<WindowProvider>(&m_compositorPlatform));
     launcherPanel->addProvider(
-        std::make_unique<PanelProvider>(&m_panelManager, m_controlCenter, &m_configService)
+        std::make_unique<PanelProvider>(&m_panelManager, &m_configService)
     );
     launcherPanel->addProvider(std::make_unique<SessionProvider>(&m_configService, &m_sessionActionRunner));
     launcherPanel->addProvider(std::make_unique<MathProvider>(&m_clipboardService, &m_configService, &m_httpClient));
@@ -946,9 +890,8 @@ void Application::initBarDockAndLayout() {
   });
   m_idleInhibitor.setAnchorSurfacesProvider([this]() { return m_bar.caffeineAnchorSurfaces(); });
   m_panelManager.setOpenWidgetSettingsCallback([this](std::string barName, std::string widgetName) {
-    if (m_controlCenter != nullptr) {
-      m_controlCenter->queueBarWidget(std::move(barName), std::move(widgetName));
-    }
+    (void)barName;
+    (void)widgetName;
     m_panelManager.openSettings("bar");
   });
   m_panelManager.setAttachedPanelGeometryCallback(

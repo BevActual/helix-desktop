@@ -634,5 +634,9 @@
       "AiUsage, DesktopAi, ScreenTime, Telemetry, Camera, EasyEffects",
       "Weather, Location, Calendar"
     ]
+  },
+  "control-center-retired": {
+    "date": "2026-10-05",
+    "note": "The tabbed Control Center (panel, sidebar, all tabs, hub, settings pane, tab search) was deleted. Control Center will be rebuilt as a GNOME-style Quick Settings popover. Its 'control-center' panel id is unregistered until then; shortcut_registry and tab.h helpers remain."
   }
 }

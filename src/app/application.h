@@ -95,7 +95,6 @@ namespace sdbus {
 }
 
 class LauncherPanel;
-class ControlCenterPanel;
 class AccountsService;
 class BluetoothAgent;
 class BluetoothService;
@@ -338,7 +337,6 @@ private:
   DailyWallpaperService m_dailyWallpaper{m_configService, m_httpClient, m_wallpaper};
   Backdrop m_backdrop;
   Signal<> m_settingsInvalidated;
-  ControlCenterPanel* m_controlCenter = nullptr;
   bool m_restoreControlCenterAfterWidgetEditor = false;
   LayerPopupHostRegistry m_layerPopupHosts;
   ColorPickerDialogPopup m_colorPickerDialogPopup;

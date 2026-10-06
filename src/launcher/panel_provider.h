@@ -3,7 +3,6 @@
 #include "launcher/launcher_provider.h"
 
 class PanelManager;
-class ControlCenterPanel;
 class ConfigService;
 
 // Lists every panel PanelManager knows about (built-in or plugin-registered),
@@ -12,7 +11,7 @@ class ConfigService;
 // shell.launcher.panels.ignored are left out.
 class PanelProvider : public LauncherProvider {
 public:
-  PanelProvider(PanelManager* panelManager, ControlCenterPanel* controlCenterPanel, ConfigService* config);
+  PanelProvider(PanelManager* panelManager, ConfigService* config);
 
   [[nodiscard]] std::string_view defaultPrefix() const override { return "pan"; }
   [[nodiscard]] std::string_view id() const override { return "Panels"; }
@@ -26,6 +25,5 @@ public:
 
 private:
   PanelManager* m_panelManager = nullptr;
-  ControlCenterPanel* m_controlCenterPanel = nullptr;
   ConfigService* m_config = nullptr;
 };
