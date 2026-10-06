@@ -99,14 +99,14 @@
       "kind": "tab",
       "id": "packages",
       "destination": "app:software",
-      "status": "partial",
+      "status": "verified",
       "compatibility-context": "packages"
     },
     {
       "kind": "tab",
       "id": "clock",
       "destination": "settings:system",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "clock"
     },
     {
@@ -148,7 +148,7 @@
       "kind": "tab",
       "id": "shell",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "shell"
     },
     {
@@ -169,7 +169,7 @@
       "kind": "retired-tab",
       "id": "localsend",
       "destination": "app:phone",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "localsend"
     },
     {
@@ -210,8 +210,8 @@
     {
       "kind": "tab",
       "id": "capture",
-      "destination": "shell:capture",
-      "status": "pending",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
       "compatibility-context": "capture"
     },
     {
@@ -232,7 +232,7 @@
       "kind": "tab",
       "id": "templates",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "templates"
     },
     {
@@ -247,21 +247,21 @@
       "kind": "tab",
       "id": "hooks",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "hooks"
     },
     {
       "kind": "tab",
       "id": "niri",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "niri"
     },
     {
       "kind": "tab",
       "id": "privacy",
       "destination": "settings:privacy-security",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "privacy"
     },
     {
@@ -289,49 +289,49 @@
       "kind": "settings-section",
       "id": "type",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:type"
     },
     {
       "kind": "settings-section",
       "id": "scale",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:scale"
     },
     {
       "kind": "settings-section",
       "id": "roundness",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:roundness"
     },
     {
       "kind": "settings-section",
       "id": "glass",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:glass"
     },
     {
       "kind": "settings-section",
       "id": "icons",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:icons"
     },
     {
       "kind": "settings-section",
       "id": "effects",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:effects"
     },
     {
       "kind": "settings-section",
       "id": "language",
       "destination": "settings:system",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:language"
     },
     {
@@ -345,7 +345,7 @@
       "kind": "settings-section",
       "id": "templates",
       "destination": "settings:appearance",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:templates"
     },
     {
@@ -366,14 +366,14 @@
       "kind": "settings-section",
       "id": "panels",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:panels"
     },
     {
       "kind": "settings-section",
       "id": "launcher",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:launcher"
     },
     {
@@ -393,29 +393,29 @@
     {
       "kind": "settings-section",
       "id": "osd",
-      "destination": "shell:osd",
-      "status": "pending",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
       "compatibility-context": "settings:osd"
     },
     {
       "kind": "settings-section",
       "id": "screenshot",
-      "destination": "shell:capture",
-      "status": "pending",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
       "compatibility-context": "settings:screenshot"
     },
     {
       "kind": "settings-section",
       "id": "screen-record",
-      "destination": "shell:capture",
-      "status": "pending",
+      "destination": "settings:desktop-dock",
+      "status": "partial",
       "compatibility-context": "settings:screen-record"
     },
     {
       "kind": "settings-section",
       "id": "shell",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:shell"
     },
     {
@@ -464,21 +464,21 @@
       "kind": "settings-section",
       "id": "tailscale",
       "destination": "settings:network",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:tailscale"
     },
     {
       "kind": "settings-section",
       "id": "localsend",
       "destination": "settings:system",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:localsend"
     },
     {
       "kind": "settings-section",
       "id": "location",
       "destination": "settings:privacy-security",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:location"
     },
     {
@@ -492,14 +492,14 @@
       "kind": "settings-section",
       "id": "hooks",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:hooks"
     },
     {
       "kind": "settings-section",
       "id": "niri",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:niri"
     },
     {
@@ -513,15 +513,16 @@
       "kind": "settings-section",
       "id": "bar",
       "destination": "settings:desktop-dock",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:bar"
     },
     {
       "kind": "retired-settings-section",
       "id": "plugins",
       "destination": "settings:desktop-dock",
-      "status": "pending",
-      "compatibility-context": "settings:plugins"
+      "status": "partial",
+      "compatibility-context": "settings:plugins",
+      "note": "Extensions are retired; Settings shows an honest Advanced Desktop stub."
     },
     {
       "kind": "settings-section",
@@ -534,7 +535,7 @@
       "kind": "settings-section",
       "id": "clock",
       "destination": "settings:system",
-      "status": "pending",
+      "status": "partial",
       "compatibility-context": "settings:clock"
     },
     {
@@ -637,6 +638,6 @@
   },
   "control-center-retired": {
     "date": "2026-10-05",
-    "note": "The tabbed Control Center (panel, sidebar, all tabs, hub, settings pane, tab search) was deleted. Control Center will be rebuilt as a GNOME-style Quick Settings popover. Its 'control-center' panel id is unregistered until then; shortcut_registry and tab.h helpers remain."
+    "note": "The tabbed Control Center (panel, sidebar, all tabs, hub, settings pane, tab search) was deleted. The control-center panel id is registered again as QuickSettingsPanel (GNOME-style popover with Home polish: labeled sliders, everyday toggle+status+chevron rows, pin tiles, Lock/Suspend/Power). shortcut_registry and tab.h helpers remain. Media strip, Capture/Phone Home actions, and pin reorder are still pending."
   }
 }

@@ -27,7 +27,7 @@ public:
     std::unordered_map<std::string, std::string> effectsProfileGlyphs;
     std::string customImage;
     bool customImageColorize = false;
-    bool showLabel = true;
+    bool showLabel = false; // icon-only in the status capsule (enhanced GNOME)
     bool hideWhenInactive = false;
     ColorSpec muteColor = colorSpecFromRole(ColorRole::Error);
   };
@@ -35,6 +35,11 @@ public:
   VolumeWidget(PipeWireService* audio, Options options);
 
   void create() override;
+  void setBarForceIconOnly(bool force) override {
+    if (force) {
+      m_showLabel = false;
+    }
+  }
 
 private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;

@@ -16,38 +16,38 @@ namespace noctalia::bar {
         GestureBinding{Gesture::Middle, "settings-open-widget"},
     };
 
-    constexpr std::array<GestureBinding, 1> kDeadZoneDefaults{
-        // Right click opens the control center, anchored at the pointer.
-        GestureBinding{Gesture::Right, "panel-toggle control-center home"},
-    };
+    // Empty chrome between widgets does nothing by default (no Control Center on right-click).
+    constexpr std::array<GestureBinding, 0> kDeadZoneDefaults{};
 
     struct TypeDefaults {
       std::string_view type;
       std::span<const GestureBinding> bindings;
     };
 
-    // Widgets whose whole-widget gestures are declared here rather than wired by hand in create().
-    constexpr std::array<GestureBinding, 1> kBattery{{{Gesture::Left, "panel-toggle control-center power"}}};
+    // Status widgets open Control Center (Quick Settings only).
+    // Right-click / scroll keep the quick toggles and adjustments.
+    constexpr std::array<GestureBinding, 1> kBattery{{{Gesture::Left, "panel-toggle control-center home"}}};
     constexpr std::array<GestureBinding, 2> kBluetooth{
-        {{Gesture::Left, "panel-toggle control-center bluetooth"}, {Gesture::Right, "bluetooth-toggle"}}
+        {{Gesture::Left, "panel-toggle control-center home"}, {Gesture::Right, "bluetooth-toggle"}}
     };
     constexpr std::array<GestureBinding, 3> kBrightness{
-        {{Gesture::Left, "panel-toggle control-center monitor"},
+        {{Gesture::Left, "panel-toggle control-center home"},
          {Gesture::ScrollUp, "brightness-up"},
          {Gesture::ScrollDown, "brightness-down"}}
     };
     constexpr std::array<GestureBinding, 1> kClipboard{{{Gesture::Left, "panel-toggle clipboard"}}};
-    constexpr std::array<GestureBinding, 1> kClock{{{Gesture::Left, "panel-toggle control-center home"}}};
+    // Clock and notifications open Notification Center (history only).
+    constexpr std::array<GestureBinding, 1> kClock{{{Gesture::Left, "panel-toggle control-center notifications"}}};
     constexpr std::array<GestureBinding, 1> kControlCenter{{{Gesture::Left, "panel-toggle control-center home"}}};
     constexpr std::array<GestureBinding, 1> kLauncher{{{Gesture::Left, "panel-toggle launcher"}}};
     constexpr std::array<GestureBinding, 2> kNetwork{
-        {{Gesture::Left, "panel-toggle control-center network"}, {Gesture::Right, "network-toggle"}}
+        {{Gesture::Left, "panel-toggle control-center home"}, {Gesture::Right, "network-toggle"}}
     };
     constexpr std::array<GestureBinding, 1> kCaffeine{{{Gesture::Left, "caffeine-toggle"}}};
     constexpr std::array<GestureBinding, 1> kKeyboardLayout{{{Gesture::Left, "keyboard-layout-cycle"}}};
     // Thumb buttons skip tracks; scroll up matches forward.
     constexpr std::array<GestureBinding, 6> kMedia{
-        {{Gesture::Left, "panel-toggle control-center media"},
+        {{Gesture::Left, "panel-toggle control-center home"},
          {Gesture::Right, "media toggle"},
          {Gesture::Back, "media previous"},
          {Gesture::Forward, "media next"},
@@ -81,14 +81,14 @@ namespace noctalia::bar {
     constexpr std::array<GestureBinding, 1> kWallpaper{{{Gesture::Left, "panel-toggle wallpaper"}}};
     constexpr std::array<GestureBinding, 1> kThemeMode{{{Gesture::Left, "theme-mode-toggle"}}};
     constexpr std::array<GestureBinding, 4> kVolumeOutput{
-        {{Gesture::Left, "panel-toggle control-center audio"},
+        {{Gesture::Left, "panel-toggle control-center home"},
          {Gesture::Right, "volume-mute"},
          {Gesture::ScrollUp, "volume-up"},
          {Gesture::ScrollDown, "volume-down"}}
     };
     // A volume widget set to the microphone drives the source, not the sink.
     constexpr std::array<GestureBinding, 4> kVolumeInput{
-        {{Gesture::Left, "panel-toggle control-center audio"},
+        {{Gesture::Left, "panel-toggle control-center home"},
          {Gesture::Right, "mic-mute"},
          {Gesture::ScrollUp, "mic-volume-up"},
          {Gesture::ScrollDown, "mic-volume-down"}}

@@ -17,6 +17,8 @@ namespace noctalia::packages {
     bool cancelled = false;
     std::string error;
     std::vector<PackageHit> hits;
+    std::vector<FlatpakRemote> remotes;
+    PackageDetails details;
   };
 
   using CommandCompletion = std::function<void(CommandResult result)>;
@@ -31,19 +33,27 @@ namespace noctalia::packages {
 
   // Worker-thread completion. Query/name must already be validated.
   [[nodiscard]] bool search(std::string query, CommandCompletion onComplete, Kind kind = Kind::Fedora);
+  [[nodiscard]] bool listCatalog(CommandCompletion onComplete, Kind kind = Kind::Flatpak);
+  [[nodiscard]] bool getDetails(PackageHit hit, CommandCompletion onComplete, Kind kind = Kind::Flatpak);
   [[nodiscard]] bool listUpdates(CommandCompletion onComplete, Kind kind = Kind::Fedora);
   [[nodiscard]] bool listInstalled(CommandCompletion onComplete, Kind kind = Kind::Fedora);
   [[nodiscard]] bool updateAll(CommandCompletion onComplete, ProgressCallback onProgress = {}, Kind kind = Kind::Fedora);
   [[nodiscard]] bool updatePackages(
-      std::vector<std::string> names, CommandCompletion onComplete, ProgressCallback onProgress = {},
+      std::vector<std::string> packageRefs, CommandCompletion onComplete, ProgressCallback onProgress = {},
       Kind kind = Kind::Fedora
   );
   [[nodiscard]] bool mutate(
-      Action action, std::string name, CommandCompletion onComplete, ProgressCallback onProgress = {},
-      Kind kind = Kind::Fedora, std::string installation = {}, std::string remotes = {}
+      Action action, PackageHit hit, CommandCompletion onComplete, ProgressCallback onProgress = {},
+      Kind kind = Kind::Fedora, bool deleteData = false
+  );
+  [[nodiscard]] bool listFlatpakRemotes(CommandCompletion onComplete);
+  [[nodiscard]] bool mutateFlatpakRemote(
+      FlatpakRemoteAction action, FlatpakRemote remote, CommandCompletion onComplete,
+      ProgressCallback onProgress = {}
   );
 
   [[nodiscard]] std::size_t pendingUpdateCount() noexcept;
+  [[nodiscard]] std::size_t pendingUpdateCountFor(Kind kind) noexcept;
   void notePendingUpdates(Kind kind, std::size_t count) noexcept;
   [[nodiscard]] bool refreshPendingUpdateCount(std::function<void()> onComplete = {});
 

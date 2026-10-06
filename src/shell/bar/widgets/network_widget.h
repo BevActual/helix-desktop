@@ -23,13 +23,18 @@ class NetworkWidget : public Widget {
 public:
   struct Options {
     VpnStatusMode vpnStatusMode = VpnStatusMode::Replace;
-    bool showLabel = true;
+    bool showLabel = false; // icon-only in the status capsule (enhanced GNOME)
     bool showVpnLabel = false;
   };
 
   NetworkWidget(INetworkService* network, SystemMonitorService* monitor, wl_output* output, Options options);
 
   void create() override;
+  void setBarForceIconOnly(bool force) override {
+    if (force) {
+      m_showLabel = false;
+    }
+  }
 
 private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;
@@ -39,7 +44,7 @@ private:
 
   INetworkService* m_network = nullptr;
   SystemMonitorService* m_monitor = nullptr;
-  bool m_showLabel = true;
+  bool m_showLabel = false;
   bool m_showVpnLabel = false;
   VpnStatusMode m_vpnStatusMode = VpnStatusMode::Replace;
   Glyph* m_glyph = nullptr;

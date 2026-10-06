@@ -11,7 +11,8 @@ struct wl_output;
 class ClockWidget : public Widget {
 public:
   struct Options {
-    std::string format = "{:%H:%M}";
+    // Menu-bar clock: time then weekday/date, e.g. "10:00  Wed, May 20".
+    std::string format = "{:%H:%M  %a, %b %d}";
     std::string verticalFormat;
     std::string tooltipFormat;
     std::string timezone;

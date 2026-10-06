@@ -106,10 +106,35 @@ public:
   [[nodiscard]] const std::string& labelFontFamily() const noexcept { return m_labelFontFamily; }
   void setConfigName(std::string name) { m_configName = std::move(name); }
   [[nodiscard]] std::string_view configName() const noexcept { return m_configName; }
+  [[nodiscard]] std::string_view widgetType() const noexcept { return m_actionContext.widgetType; }
   void setAnchor(bool anchor) noexcept { m_anchor = anchor; }
   [[nodiscard]] bool isAnchor() const noexcept { return m_anchor; }
 
+  // Lane / capsule identity for hold-drag reorder on the live bar (set by Bar::populateWidgets).
+  struct BarLayoutIdentity {
+    std::string lane; // start | center | end
+    std::size_t laneIndex = 0;
+    std::string groupId; // empty when not a capsule member
+    std::size_t memberIndex = 0;
+    bool reorderable = true;
+  };
+  void setBarLayoutIdentity(BarLayoutIdentity identity) { m_barLayoutIdentity = std::move(identity); }
+  [[nodiscard]] const BarLayoutIdentity& barLayoutIdentity() const noexcept { return m_barLayoutIdentity; }
+
+  // Optional live-bar reorder hooks; installed into the gesture InputArea when set.
+  struct BarReorderHooks {
+    std::function<void(Widget& widget, float localX, float localY, bool pressed)> onPress;
+    std::function<void(Widget& widget, float localX, float localY)> onMotion;
+    std::function<void(Widget& widget)> onCancel;
+    std::function<bool()> suppressClick;
+  };
+  void setBarReorderHooks(BarReorderHooks hooks);
+  void clearBarReorderHooks();
+  [[nodiscard]] bool barReorderSuppressesClick() const;
+
   void setBarCapsuleSpec(WidgetBarCapsuleSpec spec) noexcept { m_barCapsuleSpec = std::move(spec); }
+  // Capsule members (e.g. group:status) stay icon-only; ignore per-widget show_label.
+  virtual void setBarForceIconOnly(bool force) { (void)force; }
   void setWidgetForeground(std::optional<ColorSpec> color) noexcept { m_widgetForeground = color; }
   void setWidgetIconColor(std::optional<ColorSpec> color) noexcept { m_widgetIconColor = color; }
   void setNonInteractive(bool nonInteractive) noexcept;
@@ -171,12 +196,14 @@ protected:
   FontWeight m_labelFontWeight = FontWeight::Medium;
   std::string m_labelFontFamily; // empty = inherit renderer-global family
   std::string m_configName;
+  BarLayoutIdentity m_barLayoutIdentity{};
   bool m_anchor = false;
   AnimationManager* m_animations = nullptr;
   UpdateCallback m_updateCallback;
   RedrawCallback m_redrawCallback;
   FrameTickRequestCallback m_frameTickRequestCallback;
   PanelToggleCallback m_panelToggleCallback;
+  BarReorderHooks m_barReorderHooks{};
   WidgetBarCapsuleSpec m_barCapsuleSpec{};
   std::optional<ColorSpec> m_widgetForeground;
   std::optional<ColorSpec> m_widgetIconColor;
@@ -189,6 +216,7 @@ protected:
 
 private:
   void installGestureHandlers();
+  void wireBarReorderHandlers();
   [[nodiscard]] bool bindingRepeatsEveryScrollStep(noctalia::bar::Gesture gesture) const;
   // An enabled InputArea captures hover (and the highlight) even with no accepted buttons, so the
   // wrapper stays inert until something is actually bound to it.

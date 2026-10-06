@@ -5,10 +5,12 @@ Control Center, notifications, OSD, lock screen, and desktop widgets. When a cha
 something looks, it should point back to a rule here. When a rule here is wrong, change the rule
 first.
 
-Helix uses GTK4/libadwaita as its shared control and application design baseline. Apple-inspired
-craftsmanship means restrained presentation, clear navigation and polished behavior within native
-libadwaita conventions. Applications remain adaptive and portable across Linux desktops and mobile
-Linux devices. The custom shell renderer follows the same visual grammar and targets helix-niri only.
+Helix uses GTK4/libadwaita as its shared control and application design baseline. Restrained craft
+within libadwaita / GNOME conventions means clear navigation and polished behavior without replacing
+native control shapes. The shell is **enhanced GNOME with Apple-style status surfaces**—editable
+Quick Settings separate from Notification Center, floating soft chrome, spatial open-from-click.
+Applications remain adaptive and portable across Linux desktops and mobile Linux devices. The custom
+shell renderer follows the same visual grammar and targets helix-niri only.
 
 ## Shared application and shell contract
 
@@ -39,6 +41,12 @@ Linux devices. The custom shell renderer follows the same visual grammar and tar
    version of a component needs a reason written here.
 5. **Accessible as a baseline.** High Contrast, Reduced Motion, and keyboard navigation work
    everywhere, not just where someone remembered.
+6. **Status and day stay split.** Connectivity, power, volume, and quick toggles open Control
+   Center; the clock and notifications open Notification Center—not one fused shade.
+7. **Personalize in place.** Reorder (and later add/remove) bar chrome and Quick Settings without
+   a scavenger hunt through Settings; Settings remains the accessible and power path.
+8. **Motion explains origin.** Surfaces open near the click; siblings slide when rearranging;
+   Reduced Motion snaps. UI comes from somewhere.
 
 ## Materials and tiers
 
@@ -46,7 +54,7 @@ Liquid Glass is a hierarchy, not a skin. Every surface belongs to exactly one ti
 
 | Tier | What it is | Material | Helpers |
 |------|------------|----------|---------|
-| **Chrome** | The frame that floats over your work: panels, sidebars, headers, menus | Glass per `transparency_mode` (Solid, Soft = regular glass, Glass = clear glass). Clear glass always gets a dimming layer. | Panel chrome, `popup_chrome` |
+| **Chrome** | The frame that floats over your work: panels, sidebars, headers, menus | Glass per `transparency_mode` (Solid, Soft = regular glass, Glass = clear glass). Clear glass always gets a dimming layer. Liquid-glass refraction samples what is actually underneath (windows, workspace), not a wallpaper-only xray. | Panel chrome, `popup_chrome` |
 | **Leftover** | Content sitting on chrome: cards, catalogs, grouped lists | Solid wells. Color and type live here. | `applySectionCardStyle`, `applyContentCardStyle`, `applyGroupedListStyle`, `applyGroupedListRowStyle` |
 | **Modules** | Functional plates you operate: session actions, quick toggles, sound and brightness | Solid native-style control group | `applyModuleWellStyle` |
 | **Widgets** | Glanceable information that deep-links somewhere: clock, weather, media | Stands alone; not a mini settings page | Desktop and Home widgets |
@@ -55,7 +63,8 @@ Rules:
 
 - **Never glass on glass.** Content on a glass panel is leftover (solid), not another glass card.
 - **One compact card per tab**, and the header carries the title; do not repeat it.
-- **Widgets deep-link**, they don't grow controls. Click the clock, get Calendar.
+- **Widgets deep-link**, they don't grow controls. The bar clock and notifications widget open
+  Notification Center; calendar and event management stay in calendar applications.
 
 ### Where each surface sits
 
@@ -65,9 +74,10 @@ Rules:
 | Dock | Chrome | Items are icons; running state is a dot, not a fill. |
 | Menus and popovers (context, dock, tray, dropdowns) | Chrome | One component (see Menus). |
 | Launcher | Chrome frame, leftover results | Results are grouped-list rows. |
-| Control Center | Floating chrome, solid controls | Quick session actions. |
+| Control Center | Floating chrome, solid controls | Quick Settings only (status widgets). |
+| Notification Center | Floating chrome, leftover list | History from clock / notifications widget. |
 | Settings and applications | Native libadwaita chrome and solid content | Adaptive persistent windows. |
-| Notifications (toasts and history) | Leftover on chrome | Actions are buttons, not links. |
+| Notifications (toasts) | Leftover on chrome | Actions are buttons, not links. |
 | OSD (volume, brightness) | Module | Value first, glyph second. |
 | Lock screen and greeter | Chrome over a dimmed wallpaper | Clock is a widget. Must match helix-greeter. |
 | Desktop widgets | Widgets | Glanceable, deep-link. |
@@ -123,6 +133,13 @@ Standalone apps (Helix Software, Settings) use libadwaita `AdwTimedAnimation` vi
 blocks, staggered so hierarchy reads top-down. Replays only when the user re-enters that
 surface—not on every catalog refresh. Carousels use `Style::animSlow` scroll reveals and
 respect `adw_get_enable_animations`.
+
+Helix Software lists use fixed-size pages (Previous / Page N of M / Next) instead of
+unbounded “Show more”. Explore follows Bazaar/Flathub discovery patterns adapted to Helix:
+Featured, Popular, New & noteworthy, a Categories directory into paged grids, Your library,
+Quick search, and Verified publishers—not every category dumped as a shelf. The Installed
+tab is labeled Library. Search and category lists offer Popular / Name sort. App permissions
+lead with a short safety summary and expand for detail.
 
 ## Menus
 
@@ -194,23 +211,69 @@ Choice illustrations use one caption layer; unfinished editor notices stay last.
   Enter/Space; every popup closes on Escape.
 - **Contrast:** text on any fill meets WCAG AA (4.5:1 body, 3:1 large text and glyphs).
 
-## Everyday controls and connection details
+## Status bar, app tray, and Quick Settings dropdown
 
-Home is the quick Control Center. Keep the control name stable and show its current state
-on a secondary line: a connected network name must not replace the Wi-Fi label. The glyph
-button toggles the feature, and its adjacent chevron opens the related native
-Settings page for Wi-Fi, Bluetooth, and VPN. If Settings is unavailable, the
-chevron opens the existing Control Center details. Navigation to Settings closes
-Control Center. Shell-only controls continue to open their shell details.
-Apply the active accent to the toggle, keeping the surrounding labels and surface neutral.
-Sound and brightness have visible labels as well as glyphs and values.
+The top bar is an enhanced GNOME floating panel: soft glass fill, pill corners, margins from
+the screen edge, and a shadow. Clock and date sit on the start; media (when playing),
+notifications, tray, and a status capsule (network, Bluetooth, volume, battery) sit on the
+end. Status widgets are icon-only — no SSID or percent labels in the bar; detail stays in
+tooltips and the dropdown. The status capsule uses a subtle `SurfaceVariant` pill behind the
+icons and forces icon-only even if a member has `show_label` set. Brightness stays in Control
+Center sliders by default (not in the status capsule). Left-clicking a status widget (or an
+optional Control Center glyph) opens **Control Center** (Quick Settings only). Left-clicking
+the clock or notifications widget opens **Notification Center** (history only; unread count
+badge on the bell). Both are floating dropdowns under the bar, horizontally aligned to the
+click (open-near-click), with `floating_offset` as the gap. Right-click and scroll on status
+widgets keep the quick toggles and adjustments. Tray item menus use the same chrome menu
+system and open below the bar widget.
 
-Home offers labeled Lock, Suspend, and Power actions. Power opens the full session controls;
-restart, logout, and shutdown do not compete with everyday controls on Home.
-Capture and Phone have labeled, visible Home actions that open their existing
-shell surfaces. Phone is shown only when its service is present. The quick panel
-may scroll when media and optional pins expand it; controls remain keyboard
-reachable without hover.
+Apps live in the bottom **app tray** (dock): pinned and running icons, launcher affordance,
+optional magnification. Do not put a taskbar of app icons in the top bar. Window tiling and
+mosaic-style arrangement belong to helix-niri; the shell does not draw tiling chrome.
+
+### Rearranging
+
+Hold-drag is the inline editor (no jiggle-mode skin for v1). Short press keeps the usual
+action; ~300 ms hold arms rearrange (same family as the dock); move past
+`Style::dragStartThreshold` to drag; release commits. Touch and pointer are equal—no
+hover-only drag handles for essential rearrange.
+
+- **Bar:** lane tokens and capsule members reorder in place. Dragged chrome glyphs dim
+  (~0.85 opacity) and siblings slide on the main axis. Commit writes `bar.*.start|center|end`
+  and `capsule_group` via config overrides. While a drag is armed or active, do not open
+  the dropdown from that press.
+- **Quick Settings:** the full 2-column tile grid reorders (everyday and pins). Dragged
+  solid module tiles dim; drop cue is a thin `Primary` outline or slot shift—never
+  glass-on-glass. Order persists in `control_center.shortcuts`. Settings → Quick shortcuts
+  remains the accessible and power editor.
+- **Motion:** sibling slides use `Style::animNormal` / spring; Reduced Motion snaps.
+
+### Dropdown content
+
+Control Center and Notification Center are separate surfaces that share chrome (`radius2xl`
+to match the floating bar’s pill language). Opening one while the other is open recreates
+the panel at the new width. There is no in-shell calendar or events board—use a calendar
+app.
+
+**Control Center** keeps a 2-column grid of solid toggle tiles, an optional media strip when
+MPRIS is active, full-width volume / microphone / brightness sliders (glyph + track, volume
+chevron to Sound), and a SystemItem footer. Default everyday tiles are Wi-Fi, Bluetooth,
+Night Light, Dark Mode, and Do Not Disturb; the user may reorder the whole grid. Keep the
+control name stable and show its current state on a secondary line: a connected network
+name must not replace the Wi-Fi label. The tile toggles the feature; everyday tiles keep a
+chevron that opens the related native Settings page. Navigation to Settings closes the
+dropdown. Shell-only pin tiles continue to open their shell details. Active tiles use the
+accent fill with on-primary labels. Opening Control Center does not clear the notification
+badge.
+
+**Notification Center** is notification history: header, clear-all, and the recent list.
+Opening it marks history seen. DND remains available from the notifications widget
+right-click and from the Do Not Disturb tile in Control Center.
+
+The SystemItem row is Settings, Lock, Suspend, and Power as icon buttons. Power opens the
+full session controls; restart, logout, and shutdown do not compete with everyday controls.
+Capture and Phone remain available as optional pin tiles when configured. Controls remain
+keyboard reachable without hover.
 
 Network opens on connection status and the network list. **Connection Details** contains
 addresses, throughput, DNS, and labeled diagnostic and sharing actions. It is a live
@@ -228,9 +291,9 @@ instead of stretching tiles.
 
 Helix Software follows the same leftover-grid rule for Flatpak, Fedora, and firmware cards:
 solid content (not glass-on-glass), icon tiles that grow by column count, and a pushed detail
-page for description, metadata, permissions, and screenshots. Craft is Apple-inspired within
-libadwaita: calm hierarchy, one primary action, native buttons and preference groups — not an
-App Store skin. Flatpak Explore is a store home: Featured first (title-1 + short blurb), on-this-device, Browse-by
+page for description, metadata, permissions, and screenshots. Craft stays calm within
+libadwaita: one primary action, native buttons and preference groups — not an App Store skin.
+Flatpak Explore is a store home: Featured first (title-1 + short blurb), on-this-device, Browse-by
 pills, Editors’ picks and Verified shelves, then category rows with See all; Recent activity
 last. Search and category pages use filtered grids. Verified Flathub publishers use a small
 emblem on tiles (full “Verified publisher” copy stays on featured/detail) so shelves stay calm. Detail pages lead with a larger icon, subtitle, and pill-shaped Install/Open/Update, then a

@@ -131,6 +131,12 @@ private:
   [[nodiscard]] TaskbarWidget* findTaskbarWidget(const IpcInvocationContext& context) const;
   void populateWidgets(BarInstance& instance);
   void attachWidgetsToSections(BarInstance& instance);
+  void wireBarReorderHooks(BarInstance& instance);
+  void resetBarDragReorder(BarInstance& instance);
+  void beginBarDragReorder(BarInstance& instance, Widget& widget, float localX, float localY);
+  void updateBarDragReorder(BarInstance& instance, Widget& widget, float localX, float localY);
+  void endBarDragReorder(BarInstance& instance, bool commit);
+  [[nodiscard]] std::size_t barDragTargetIndex(const BarInstance& instance, float mainPos) const;
   void updateWidgetHoverHighlight(BarInstance& instance, InputArea* hoveredArea);
   void animateWidgetHoverHighlight(BarInstance& instance, Widget& widget, bool hovered);
   void updateAccordionExpansion(BarInstance& instance, InputArea* hoveredArea);

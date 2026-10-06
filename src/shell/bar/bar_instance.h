@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/config_service.h"
+#include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "render/scene/input_area.h"
 #include "render/scene/input_dispatcher.h"
@@ -13,6 +14,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -104,6 +106,23 @@ struct BarInstance {
   // Maps each widget's root node to its Widget so hover-change events resolve to the owning widget.
   std::unordered_map<const Node*, Widget*> widgetByRoot;
   Widget* hoverHighlightWidget = nullptr;
+
+  // Hold-drag reorder of lane entries / capsule members (dock/taskbar gesture family).
+  struct DragReorder {
+    enum class Mode : std::uint8_t { None, Lane, Capsule };
+    bool armed = false;
+    bool active = false;
+    bool suppressClick = false;
+    Mode mode = Mode::None;
+    Widget* source = nullptr;
+    std::string lane;
+    std::string groupId;
+    std::size_t sourceIndex = 0;
+    std::size_t targetIndex = 0;
+    float startMain = 0.0F;
+    float currentMain = 0.0F;
+    Timer holdTimer;
+  } dragReorder;
 
   Signal<>::ScopedConnection paletteConn;
   std::optional<AttachedPanelGeometry> attachedPanelGeometry;

@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <format>
+#include <linux/input-event-codes.h>
 
 namespace {
 
@@ -295,11 +296,15 @@ void Widget::installGestureHandlers() {
 
   if (mask != 0) {
     m_gestureArea->setOnClick([this](const InputArea::PointerData& data) {
+      if (m_barReorderHooks.suppressClick && m_barReorderHooks.suppressClick()) {
+        return;
+      }
       if (const auto gesture = noctalia::bar::gestureForButton(data.button)) {
         dispatchGesture(*gesture);
       }
     });
   }
+  wireBarReorderHandlers();
 
   m_gestureArea->setOnAxisHandler([this](const InputArea::PointerData& data) {
     const auto gesture = noctalia::bar::gestureForScroll(data.axis, data.scrollSteps());
@@ -313,6 +318,51 @@ void Widget::installGestureHandlers() {
       return true;
     }
     return dispatchGesture(*gesture);
+  });
+}
+
+void Widget::setBarReorderHooks(BarReorderHooks hooks) {
+  m_barReorderHooks = std::move(hooks);
+  wireBarReorderHandlers();
+}
+
+void Widget::clearBarReorderHooks() {
+  m_barReorderHooks = {};
+  if (m_gestureArea != nullptr) {
+    m_gestureArea->setOnPress({});
+    m_gestureArea->setOnMotion({});
+    m_gestureArea->setOnCancel({});
+  }
+}
+
+bool Widget::barReorderSuppressesClick() const {
+  return m_barReorderHooks.suppressClick && m_barReorderHooks.suppressClick();
+}
+
+void Widget::wireBarReorderHandlers() {
+  if (m_gestureArea == nullptr) {
+    return;
+  }
+  if (!m_barReorderHooks.onPress && !m_barReorderHooks.onMotion && !m_barReorderHooks.onCancel) {
+    return;
+  }
+  m_gestureArea->setOnPress([this](const InputArea::PointerData& data) {
+    if (data.button != BTN_LEFT) {
+      return;
+    }
+    if (m_barReorderHooks.onPress) {
+      m_barReorderHooks.onPress(*this, data.localX, data.localY, data.pressed);
+    }
+  });
+  m_gestureArea->setOnMotion([this](const InputArea::PointerData& data) {
+    if (m_barReorderHooks.onMotion) {
+      m_barReorderHooks.onMotion(*this, data.localX, data.localY);
+    }
+  });
+  m_gestureArea->setOnCancel([this]() {
+    if (m_barReorderHooks.onCancel) {
+      m_barReorderHooks.onCancel(*this);
+    }
   });
 }
 

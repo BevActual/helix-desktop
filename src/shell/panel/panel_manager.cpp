@@ -503,6 +503,11 @@ void PanelManager::unregisterPanel(const std::string& id) {
 }
 
 void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "notifications") {
+    request.context = "notifications";
+    openPanel("control-center", request);
+    return;
+  }
   if (panelId == "control-center") {
     if (request.context == "settings" || request.context.starts_with("settings:") || settings::isRetiredSettingsTab(request.context)) {
       openSettings(std::string(request.context));
@@ -1393,6 +1398,11 @@ void PanelManager::destroyPanel() {
 }
 
 void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest request) {
+  if (panelId == "notifications") {
+    request.context = "notifications";
+    togglePanel("control-center", request);
+    return;
+  }
   if (panelId == "control-center") {
     if (request.context == "settings" || request.context.starts_with("settings:") || settings::isRetiredSettingsTab(request.context)) {
       openSettings(std::string(request.context));
@@ -1439,6 +1449,10 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
 }
 
 void PanelManager::togglePanel(const std::string& panelId) {
+  if (panelId == "notifications") {
+    togglePanel("control-center", PanelOpenRequest{.context = "notifications"});
+    return;
+  }
   if (panelId == "clipboard") {
     togglePanel("control-center", PanelOpenRequest{.context = "clipboard"});
     return;
@@ -1576,6 +1590,9 @@ bool PanelManager::isOpen() const noexcept { return m_surface != nullptr && m_ac
 bool PanelManager::isOpenPanel(std::string_view panelId) const noexcept {
   if (panelId == "clipboard") {
     return isOpen() && m_activePanelId == "control-center" && isActivePanelContext("clipboard");
+  }
+  if (panelId == "notifications") {
+    return isOpen() && m_activePanelId == "control-center" && isActivePanelContext("notifications");
   }
   if (m_persistentHost.hasPanel(panelId)) {
     return m_persistentHost.isOpen(panelId);
@@ -2295,6 +2312,7 @@ void PanelManager::onConfigReloaded() {
   if (!isOpen() || m_config == nullptr || m_activePanel == nullptr) {
     return;
   }
+  m_activePanel->onConfigReloaded();
   if (!m_attachedToBar && m_layerSurface != nullptr) {
     const LayerShellLayer panelLayer = resolveFloatingPanelLayer(m_config, m_activePanelId, *m_activePanel);
     if (panelLayer != m_panelLayer) {
@@ -2725,23 +2743,29 @@ void PanelManager::registerIpc(IpcService& ipc) {
     return error;
   };
 
-  auto resolveClipboardPanelAlias = [](std::string& panelId, std::string& context) {
-    if (panelId != "clipboard") {
+  auto resolvePanelAliases = [](std::string& panelId, std::string& context) {
+    if (panelId == "clipboard") {
+      panelId = "control-center";
+      context = "clipboard";
       return;
     }
-    panelId = "control-center";
-    context = "clipboard";
+    if (panelId == "notifications") {
+      panelId = "control-center";
+      if (context.empty()) {
+        context = "notifications";
+      }
+    }
   };
 
   ipc.bind(
       noctalia::cli::msg::panelToggle,
-      [this, parseOpenArgs, unknownPanelError, resolveClipboardPanelAlias](const std::string& args) -> std::string {
+      [this, parseOpenArgs, unknownPanelError, resolvePanelAliases](const std::string& args) -> std::string {
         std::string panelId;
         std::string context;
         if (auto error = parseOpenArgs(args, "panel-toggle", panelId, context)) {
           return *error;
         }
-        resolveClipboardPanelAlias(panelId, context);
+        resolvePanelAliases(panelId, context);
         if (!m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)) {
           return unknownPanelError(panelId);
         }
@@ -2757,13 +2781,13 @@ void PanelManager::registerIpc(IpcService& ipc) {
 
   ipc.bind(
       noctalia::cli::msg::panelOpen,
-      [this, parseOpenArgs, unknownPanelError, resolveClipboardPanelAlias](const std::string& args) -> std::string {
+      [this, parseOpenArgs, unknownPanelError, resolvePanelAliases](const std::string& args) -> std::string {
         std::string panelId;
         std::string context;
         if (auto error = parseOpenArgs(args, "panel-open", panelId, context)) {
           return *error;
         }
-        resolveClipboardPanelAlias(panelId, context);
+        resolvePanelAliases(panelId, context);
         if (!m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)) {
           return unknownPanelError(panelId);
         }
@@ -2795,7 +2819,7 @@ void PanelManager::registerIpc(IpcService& ipc) {
       return "error: panel-close accepts at most one panel id\n";
     }
     if (!panelId.empty() && !m_panels.contains(panelId) && !m_persistentHost.hasPanel(panelId)
-        && panelId != "clipboard") {
+        && panelId != "clipboard" && panelId != "notifications") {
       return unknownPanelError(panelId);
     }
 

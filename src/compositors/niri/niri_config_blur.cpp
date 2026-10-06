@@ -209,12 +209,14 @@ layer-rule {
     body += backgroundEffectBlock(windowBlur, false, false, strength, params);
     body += "}\n\n";
 
+    // Shell chrome must sample what is actually underneath (windows, workspace), not the
+    // wallpaper-only xray path. Greeter below keeps xray — it sits over the wallpaper at login.
     body += std::format("layer-rule {{\n    match namespace=\"{}\"\n", kChromeNamespace);
-    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, params, helixGlass && !chromeBlur);
+    body += backgroundEffectBlock(chromeBlur, false, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
     body += "layer-rule {\n    match namespace=\"noctalia-window-switcher\"\n";
-    body += backgroundEffectBlock(chromeBlur, helixGlass, helixGlass, strength, params, helixGlass && !chromeBlur);
+    body += backgroundEffectBlock(chromeBlur, false, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
     if (helixGlass) {

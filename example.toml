@@ -67,17 +67,17 @@ alpha     = 0.55                    # multiplied by each component's background 
 [shell.panel]
 transparency_mode     = "solid"     # kept in sync with glass; solid | soft | glass
 glass                 = 0.0         # 0 = solid chrome, 1 = clear glass fill/dimming
-refraction            = false       # helix-niri liquid-glass; stock niri maps this to chrome blur
+refraction            = false       # helix-niri liquid-glass (real backdrop, not wallpaper xray); stock niri → chrome blur
 borders               = true        # panel shell outline and in-panel section cards
 shadow                = true        # cast the global [shell.shadow] from panel surfaces
 launcher_placement       = "floating" # attached | floating
-control_center_placement = "attached" # attached | floating
+control_center_placement = "floating" # attached | floating — dropdown under the status area
 wallpaper_placement      = "attached" # attached | floating
 session_placement        = "attached" # attached | floating
 quick_insert_placement   = "floating" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
 quick_insert_position    = "center"   # auto | center | top_left | … (floating only)
-open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
+open_near_click_control_center = true  # align Control Center / Notification Center under the click
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_wallpaper      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_session        = false # for attached/floating placement, follow the bar click instead of bar-center
@@ -431,12 +431,12 @@ delete   = ["del"]
 [bar.main]
 position           = "top"          # top | bottom | left | right
 thickness          = 34
-background_opacity = 1.0
-radius             = 12
-margin_ends        = 180
+background_opacity = 0.72           # soft glass floating chrome
+radius             = 18             # pill corners (radius2xl family)
+margin_ends        = 12
 margin_edge        = 10
 padding            = 14
-widget_spacing     = 6
+widget_spacing     = 8
 scale              = 1.0
 font_scale         = 1.0            # text-only scale multiplier across widgets
 shadow             = true
@@ -444,20 +444,33 @@ auto_hide          = false
 # smart_auto_hide    = false       # show when the active workspace is empty; hide when it has windows
 # show_on_workspace_switch = true   # with auto_hide: briefly reveal when the active workspace changes
 reserve_space      = true
-capsule            = false
+capsule            = false          # per-widget capsules off; group:status paints its own pill
 # capsule_fill     = "surface_variant"
 # capsule_radius   = 8.0            # omit/blank in Settings for automatic pill radius; 0.0 = square
 # capsule_opacity  = 1.0
 # capsule_border   = "outline"      # uncomment for a border on all widgets
 
-start  = ["launcher", "wallpaper", "workspaces"]
-center = ["clock"]
-end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "control-center", "session"]
+# Floating glass bar: clock on the start; media / notifications / tray / status capsule on the end.
+# group:status members default to network, bluetooth, volume, battery (icon-only). Brightness,
+# control-center glyph, session, workspaces, etc. are optional extras — not part of the default row.
+start  = ["clock"]
+# center = []
+end    = ["media", "notifications", "tray", "group:status"]
+# Optional extras (uncomment / splice into a lane as needed):
+# start = ["launcher", "workspaces", "clock"]
+# end = ["media", "notifications", "tray", "group:status", "session"]
+# end = ["media", "notifications", "tray", "brightness", "group:status", "control-center"]
 
-# Commands for the bar margin outside widget sections (dead zone):
+# Status capsule membership (defaults match code when omitted):
+# [[bar.main.capsule_group]]
+# id = "status"
+# members = ["network", "bluetooth", "volume", "battery"]
+# opacity = 0.55
+
+# Commands for the bar margin outside widget sections (dead zone). Default: none.
 # [bar.main.dead_zone.actions]
 # left = "panel-toggle launcher"
-# right = "panel-toggle control-center"
+# right = "panel-toggle control-center home"
 # middle = "none"
 # scroll_up = "none"
 # scroll_down = "none"
@@ -472,7 +485,7 @@ end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth",
 # ── Dock ──────────────────────────────────────────────────────────────────────
 
 [dock]
-enabled             = false         # set true to activate
+enabled             = true          # bottom app tray (pinned + running apps)
 position            = "bottom"      # top | bottom | left | right
 icon_size           = 48
 main_axis_padding   = 16

@@ -33,12 +33,12 @@ public:
     int minWidth = 80;
     int artSize = 16;
     MediaTitleScrollMode titleScrollMode = MediaTitleScrollMode::None;
-    bool hideWhenNoMedia = false;
+    bool hideWhenNoMedia = true;
     bool albumArtOnly = false;
     bool hideAlbumArt = false;
     bool hideArtist = false;
     bool artistFirst = false;
-    bool showProgress = false;
+    bool showProgress = true; // thin progress hairline when MPRIS reports track length
   };
 
   MediaWidget(MprisService* mpris, HttpClient* httpClient, wl_output* output, Options options);

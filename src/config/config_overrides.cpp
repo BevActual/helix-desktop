@@ -369,6 +369,10 @@ namespace {
         && a.osd == b.osd
         && a.notification == b.notification
         && a.weather == b.weather
+        && a.tailscale == b.tailscale
+        && a.localsend == b.localsend
+        && a.phone == b.phone
+        && a.storage == b.storage
         && a.calendar == b.calendar
         && a.system == b.system
         && a.audio == b.audio

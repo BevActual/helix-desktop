@@ -15,6 +15,7 @@
 #include "render/scene/input_area.h"
 #include "shell/bar/bar_corner_shape.h"
 #include "shell/bar/bar_reserved_zone.h"
+#include "shell/bar/bar_widget_layout.h"
 #include "shell/bar/widget.h"
 #include "shell/bar/widget_gesture_defaults.h"
 #include "shell/bar/widgets/taskbar_widget.h"
@@ -43,8 +44,27 @@ namespace {
   constexpr Logger kLog("bar");
   constexpr std::chrono::milliseconds kWorkspaceRevealDebounce{80};
   constexpr std::chrono::milliseconds kWorkspacePeekHold{450};
+  constexpr std::chrono::milliseconds kBarDragHoldDelay{300};
   constexpr std::int32_t kAutoHideTriggerPx = 3;
   constexpr float kAutoHideSlideExtraPx = 4.0F;
+  constexpr float kBarDragArmedOpacity = 0.90F;
+  constexpr float kBarDragGhostOpacity = 0.85F;
+
+  [[nodiscard]] bool widgetTypeBlocksBarReorder(std::string_view type) {
+    return type == "taskbar" || type == "tray" || type == "workspaces" || type == "audio_visualizer"
+        || type == "debug_indicator";
+  }
+
+  [[nodiscard]] float pointerMainOnBar(const BarConfig& cfg, Node* node, float localX, float localY) {
+    if (node == nullptr) {
+      return 0.0F;
+    }
+    float absX = 0.0F;
+    float absY = 0.0F;
+    Node::absolutePosition(node, absX, absY);
+    const bool vertical = cfg.position == "left" || cfg.position == "right";
+    return vertical ? absY + localY : absX + localX;
+  }
 
   [[nodiscard]] std::string activeWorkspaceId(const std::vector<Workspace>& workspaces) {
     for (const auto& workspace : workspaces) {
@@ -2521,8 +2541,10 @@ void Bar::populateWidgets(BarInstance& instance) {
   };
 
   // Expands a lane's entries: group tokens become contiguous member widgets sharing the group's capsule.
-  auto createWidgets = [&](const std::vector<std::string>& names, std::vector<std::unique_ptr<Widget>>& dest) {
-    for (const auto& name : names) {
+  auto createWidgets = [&](const std::vector<std::string>& names, std::string_view lane,
+                           std::vector<std::unique_ptr<Widget>>& dest) {
+    for (std::size_t laneIndex = 0; laneIndex < names.size(); ++laneIndex) {
+      const auto& name = names[laneIndex];
       if (isCapsuleGroupToken(name)) {
         const BarCapsuleGroupStyle* group = findBarCapsuleGroupStyle(instance.barConfig, capsuleGroupTokenId(name));
         if (group == nullptr) {
@@ -2533,18 +2555,39 @@ void Bar::populateWidgets(BarInstance& instance) {
           continue;
         }
         const WidgetBarCapsuleSpec groupSpec = capsuleSpecFromGroup(instance.barConfig, *group);
-        for (const auto& member : group->members) {
-          createWidget(member, &groupSpec, &group->foreground, dest);
+        for (std::size_t memberIndex = 0; memberIndex < group->members.size(); ++memberIndex) {
+          const auto before = dest.size();
+          createWidget(group->members[memberIndex], &groupSpec, &group->foreground, dest);
+          if (dest.size() > before) {
+            dest.back()->setBarForceIconOnly(true);
+            dest.back()->setBarLayoutIdentity(Widget::BarLayoutIdentity{
+                .lane = std::string(lane),
+                .laneIndex = laneIndex,
+                .groupId = group->id,
+                .memberIndex = memberIndex,
+                .reorderable = true,
+            });
+          }
         }
         continue;
       }
+      const auto before = dest.size();
       createWidget(name, nullptr, nullptr, dest);
+      if (dest.size() > before) {
+        dest.back()->setBarLayoutIdentity(Widget::BarLayoutIdentity{
+            .lane = std::string(lane),
+            .laneIndex = laneIndex,
+            .groupId = {},
+            .memberIndex = 0,
+            .reorderable = true,
+        });
+      }
     }
   };
 
-  createWidgets(instance.barConfig.startWidgets, instance.startWidgets);
-  createWidgets(instance.barConfig.centerWidgets, instance.centerWidgets);
-  createWidgets(instance.barConfig.endWidgets, instance.endWidgets);
+  createWidgets(instance.barConfig.startWidgets, "start", instance.startWidgets);
+  createWidgets(instance.barConfig.centerWidgets, "center", instance.centerWidgets);
+  createWidgets(instance.barConfig.endWidgets, "end", instance.endWidgets);
 
 #ifndef NDEBUG
   // Prepend a red "debug" pill to the end section if running a debug build
@@ -2881,6 +2924,254 @@ void Bar::attachWidgetsToSections(BarInstance& instance) {
   attach(instance.startWidgets, instance.startCapsuleRuns, instance.startSection);
   attach(instance.centerWidgets, instance.centerCapsuleRuns, instance.centerSection);
   attach(instance.endWidgets, instance.endCapsuleRuns, instance.endSection);
+  wireBarReorderHooks(instance);
+}
+
+void Bar::resetBarDragReorder(BarInstance& instance) {
+  auto& drag = instance.dragReorder;
+  drag.holdTimer.stop();
+  if (drag.source != nullptr) {
+    if (Node* node = drag.source->layoutBoundsNode(); node != nullptr) {
+      node->setOpacity(1.0F);
+      node->setZIndex(0);
+    }
+  }
+  drag = {};
+}
+
+void Bar::wireBarReorderHooks(BarInstance& instance) {
+  resetBarDragReorder(instance);
+  auto wire = [this, inst = &instance](std::vector<std::unique_ptr<Widget>>& widgets) {
+    for (auto& widget : widgets) {
+      if (widget == nullptr || !widget->barLayoutIdentity().reorderable) {
+        continue;
+      }
+      if (widgetTypeBlocksBarReorder(widget->widgetType())) {
+        widget->clearBarReorderHooks();
+        continue;
+      }
+      widget->setBarReorderHooks(Widget::BarReorderHooks{
+          .onPress =
+              [this, inst](Widget& w, float localX, float localY, bool pressed) {
+                // Gesture InputArea may also see non-left buttons; only left hold-drags.
+                if (pressed) {
+                  beginBarDragReorder(*inst, w, localX, localY);
+                  return;
+                }
+                if (inst->dragReorder.source == &w) {
+                  endBarDragReorder(*inst, true);
+                }
+              },
+          .onMotion =
+              [this, inst](Widget& w, float localX, float localY) { updateBarDragReorder(*inst, w, localX, localY); },
+          .onCancel = [this, inst](Widget& w) {
+            if (inst->dragReorder.source == &w) {
+              endBarDragReorder(*inst, false);
+            }
+          },
+          .suppressClick = [inst]() {
+            return inst->dragReorder.active || inst->dragReorder.armed || inst->dragReorder.suppressClick;
+          },
+      });
+    }
+  };
+  wire(instance.startWidgets);
+  wire(instance.centerWidgets);
+  wire(instance.endWidgets);
+}
+
+void Bar::beginBarDragReorder(BarInstance& instance, Widget& widget, float localX, float localY) {
+  resetBarDragReorder(instance);
+  const auto& id = widget.barLayoutIdentity();
+  if (!id.reorderable || id.lane.empty() || widgetTypeBlocksBarReorder(widget.widgetType())) {
+    return;
+  }
+  auto& drag = instance.dragReorder;
+  drag.source = &widget;
+  drag.lane = id.lane;
+  drag.groupId = id.groupId;
+  drag.mode = id.groupId.empty() ? BarInstance::DragReorder::Mode::Lane : BarInstance::DragReorder::Mode::Capsule;
+  drag.sourceIndex = id.groupId.empty() ? id.laneIndex : id.memberIndex;
+  drag.targetIndex = drag.sourceIndex;
+  drag.startMain = pointerMainOnBar(instance.barConfig, widget.outerNode(), localX, localY);
+  drag.currentMain = drag.startMain;
+  drag.holdTimer.start(kBarDragHoldDelay, [inst = &instance, source = &widget]() {
+    if (inst->dragReorder.source == source && !inst->dragReorder.active) {
+      inst->dragReorder.armed = true;
+      if (Node* node = source->layoutBoundsNode(); node != nullptr) {
+        node->setOpacity(kBarDragArmedOpacity);
+      }
+      if (inst->surface != nullptr) {
+        inst->surface->requestRedraw();
+      }
+    }
+  });
+}
+
+void Bar::updateBarDragReorder(BarInstance& instance, Widget& widget, float localX, float localY) {
+  auto& drag = instance.dragReorder;
+  if (drag.source != &widget) {
+    return;
+  }
+  const float main = pointerMainOnBar(instance.barConfig, widget.outerNode(), localX, localY);
+  if (!drag.active) {
+    const bool travelled = std::abs(main - drag.startMain) >= Style::dragStartThreshold * instance.barConfig.scale;
+    if (!drag.armed && !travelled) {
+      return;
+    }
+    drag.holdTimer.stop();
+    drag.armed = true;
+    drag.active = true;
+    drag.suppressClick = true;
+    if (Node* node = widget.layoutBoundsNode(); node != nullptr) {
+      node->setOpacity(kBarDragGhostOpacity);
+      node->setZIndex(200);
+    }
+    if (instance.surface != nullptr) {
+      instance.surface->requestRedraw();
+    }
+  }
+  drag.currentMain = main;
+  drag.targetIndex = barDragTargetIndex(instance, main);
+}
+
+std::size_t Bar::barDragTargetIndex(const BarInstance& instance, float mainPos) const {
+  const auto& drag = instance.dragReorder;
+  if (drag.source == nullptr) {
+    return 0;
+  }
+  const bool vertical = instance.barConfig.position == "left" || instance.barConfig.position == "right";
+  std::size_t target = drag.sourceIndex;
+
+  if (drag.mode == BarInstance::DragReorder::Mode::Capsule) {
+    const auto& groupId = drag.groupId;
+    const auto& widgets = drag.lane == "start"       ? instance.startWidgets
+        : drag.lane == "center"                      ? instance.centerWidgets
+                                                     : instance.endWidgets;
+    std::size_t memberCount = 0;
+    for (const auto& w : widgets) {
+      if (w == nullptr || w->barLayoutIdentity().groupId != groupId) {
+        continue;
+      }
+      Node* node = w->layoutBoundsNode();
+      if (node == nullptr) {
+        continue;
+      }
+      float absX = 0.0F;
+      float absY = 0.0F;
+      Node::absolutePosition(node, absX, absY);
+      const float center = vertical ? absY + node->height() * 0.5F : absX + node->width() * 0.5F;
+      if (mainPos > center) {
+        target = memberCount + 1;
+      }
+      ++memberCount;
+    }
+    if (memberCount == 0) {
+      return drag.sourceIndex;
+    }
+    return std::min(target, memberCount - 1);
+  }
+
+  const std::vector<std::string>* lane = nullptr;
+  if (drag.lane == "start") {
+    lane = &instance.barConfig.startWidgets;
+  } else if (drag.lane == "center") {
+    lane = &instance.barConfig.centerWidgets;
+  } else {
+    lane = &instance.barConfig.endWidgets;
+  }
+  if (lane == nullptr || lane->empty()) {
+    return drag.sourceIndex;
+  }
+
+  // Centers of each lane entry (group shell or loose widget).
+  std::vector<float> centers;
+  centers.reserve(lane->size());
+  const auto& widgets = drag.lane == "start"       ? instance.startWidgets
+      : drag.lane == "center"                      ? instance.centerWidgets
+                                                   : instance.endWidgets;
+  const auto& runs = drag.lane == "start"       ? instance.startCapsuleRuns
+      : drag.lane == "center"                   ? instance.centerCapsuleRuns
+                                                : instance.endCapsuleRuns;
+  for (std::size_t i = 0; i < lane->size(); ++i) {
+    float center = mainPos;
+    if (isCapsuleGroupToken((*lane)[i])) {
+      const std::string id = capsuleGroupTokenId((*lane)[i]);
+      for (const auto& run : runs) {
+        if (run.widgets.empty() || run.shell == nullptr) {
+          continue;
+        }
+        if (run.widgets.front()->barLayoutIdentity().groupId != id) {
+          continue;
+        }
+        float absX = 0.0F;
+        float absY = 0.0F;
+        Node::absolutePosition(run.shell, absX, absY);
+        center = vertical ? absY + run.shell->height() * 0.5F : absX + run.shell->width() * 0.5F;
+        break;
+      }
+    } else {
+      for (const auto& w : widgets) {
+        if (w == nullptr || w->barLayoutIdentity().laneIndex != i || !w->barLayoutIdentity().groupId.empty()) {
+          continue;
+        }
+        Node* node = w->layoutBoundsNode();
+        if (node == nullptr) {
+          continue;
+        }
+        float absX = 0.0F;
+        float absY = 0.0F;
+        Node::absolutePosition(node, absX, absY);
+        center = vertical ? absY + node->height() * 0.5F : absX + node->width() * 0.5F;
+        break;
+      }
+    }
+    centers.push_back(center);
+  }
+  target = 0;
+  for (std::size_t i = 0; i < centers.size(); ++i) {
+    if (mainPos > centers[i]) {
+      target = i;
+    }
+  }
+  return std::min(target, lane->size() - 1);
+}
+
+void Bar::endBarDragReorder(BarInstance& instance, bool commit) {
+  auto& drag = instance.dragReorder;
+  if (drag.source == nullptr) {
+    resetBarDragReorder(instance);
+    return;
+  }
+  const bool wasActive = drag.active;
+  const bool shouldCommit = commit && wasActive && drag.targetIndex != drag.sourceIndex && m_config != nullptr;
+  const auto mode = drag.mode;
+  const std::string lane = drag.lane;
+  const std::string groupId = drag.groupId;
+  const std::size_t from = drag.sourceIndex;
+  const std::size_t to = drag.targetIndex;
+  const std::string barName = instance.barConfig.name;
+  resetBarDragReorder(instance);
+  if (wasActive) {
+    instance.dragReorder.suppressClick = true;
+    DeferredCall::callLater([inst = &instance]() { inst->dragReorder.suppressClick = false; });
+  }
+  if (!shouldCommit) {
+    if (instance.surface != nullptr) {
+      instance.surface->requestRedraw();
+    }
+    return;
+  }
+  const auto path = noctalia::bar::layout::lanePath(barName, lane);
+  bool changed = false;
+  if (mode == BarInstance::DragReorder::Mode::Capsule) {
+    changed = noctalia::bar::layout::reorderCapsuleMember(*m_config, path, groupId, from, to);
+  } else {
+    changed = noctalia::bar::layout::reorderLaneEntry(*m_config, path, from, to);
+  }
+  if (!changed && instance.surface != nullptr) {
+    instance.surface->requestRedraw();
+  }
 }
 
 namespace {

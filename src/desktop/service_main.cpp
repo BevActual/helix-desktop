@@ -614,7 +614,7 @@ public:
           Json setting;
           for (const auto& entry : settingsCatalog(config, true, gammaAvailable())) if (entry.at("id") == id) {
             setting = entry;
-            supported = entry.at("type") == "application-list" || (name == "UpdateOrderedList" && (entry.at("type") == "widget-list" || entry.at("type") == "display-list" || entry.at("type") == "notification-rules" || entry.at("type") == "tab-list" || entry.at("type") == "shortcut-list" || entry.at("type") == "key-chords"));
+            supported = entry.at("type") == "application-list" || (name == "UpdateOrderedList" && (entry.at("type") == "widget-list" || entry.at("type") == "display-list" || entry.at("type") == "notification-rules" || entry.at("type") == "tab-list" || entry.at("type") == "shortcut-list" || entry.at("type") == "key-chords" || entry.at("type") == "template-list" || entry.at("type") == "transition-list"));
           }
           if (!supported) throw std::invalid_argument("Unknown ordered desktop list");
           config.forceReload();
@@ -640,6 +640,8 @@ public:
           config.forceReload();
           if (name == "Update" && id.starts_with("keybinds.")) throw std::invalid_argument("Keyboard shortcuts require UpdateOrderedList");
           if (name == "Update" && id == "control_center.shortcuts") throw std::invalid_argument("Quick shortcuts require UpdateOrderedList");
+          if (name == "Update" && (id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids")) throw std::invalid_argument("Template selections require UpdateOrderedList");
+          if (name == "Update" && id == "wallpaper.transition") throw std::invalid_argument("Wallpaper transitions require UpdateOrderedList");
           if (name == "Update") validateSettingValue(config, id, args.at(1), desktop(), gammaAvailable());
           bool ok;
           if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") {

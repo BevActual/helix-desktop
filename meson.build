@@ -492,6 +492,7 @@ _noctalia_sources = files(
   'src/security/storage_key_provider.cpp',
   'src/system/battery_warning_monitor.cpp',
   'src/shell/bar/bar.cpp',
+  'src/shell/bar/bar_widget_layout.cpp',
   'src/shell/clipboard/clipboard_paste.cpp',
   'src/shell/dock/dock.cpp',
   'src/shell/dock/dock_context_menu.cpp',
@@ -1199,6 +1200,7 @@ if gtk4_dep.found() and adwaita_dep.found()
   install_data('assets/org.helix.Settings.desktop', install_dir: get_option('datadir') / 'applications')
   helix_software = executable('helix-software',
     sources: files('src/apps/software/main.cpp'),
+    include_directories: include_directories('src'),
     dependencies: [noctalia_core_dep, gtk4_dep, adwaita_dep, gio_dep],
     cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
     install: true,

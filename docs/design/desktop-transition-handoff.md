@@ -49,10 +49,11 @@ inventory states intent, not that an application or page exists.
 1. Finish Control Center Home as a quick surface: Quick Settings now has labeled
    sound/brightness, everyday Wi-Fi/Bluetooth/Night Light/DND rows with stable
    titles + status captions and Settings chevrons, pin tiles from
-   `control_center.shortcuts`, and labeled Lock/Suspend/Power. Still need Capture
-   and Phone Home actions, a media strip, pin reorder, and keyboard/touch/
-   multi-monitor checks under helix-niri. Keep detailed shell surfaces until
-   corresponding native destinations work.
+   `control_center.shortcuts`, and labeled Lock/Suspend/Power. Hold-drag reorders
+   the Quick Settings tile grid and top bar widgets. Still need Capture and Phone
+   Home actions, a media strip, and keyboard/touch/multi-monitor checks under
+   helix-niri. Keep detailed shell surfaces until corresponding native destinations
+   work.
 2. Complete existing Settings pages before marking their entries verified.
    Appearance now has roundness, borders, shadows, glass amount, icon tint color,
    and built-in and community template selection.

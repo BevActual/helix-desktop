@@ -23,7 +23,7 @@ public:
     ColorSpec warningColor = colorSpecFromRole(ColorRole::Error);
     BatteryDisplayMode displayMode = BatteryDisplayMode::Glyph;
     BatteryLabelContent labelContent = BatteryLabelContent::Percent;
-    bool showLabel = true;
+    bool showLabel = false; // icon-only in the status capsule (enhanced GNOME)
     bool hideWhenPlugged = false;
     bool hideWhenFull = false;
   };
@@ -31,6 +31,11 @@ public:
   BatteryWidget(UPowerService* upower, Options options);
 
   void create() override;
+  void setBarForceIconOnly(bool force) override {
+    if (force) {
+      m_showLabel = false;
+    }
+  }
 
 private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;
@@ -54,7 +59,7 @@ private:
   ColorSpec m_warningColor;
   BatteryDisplayMode m_displayMode = BatteryDisplayMode::Glyph;
   BatteryLabelContent m_labelContent = BatteryLabelContent::Percent;
-  bool m_showLabel = true;
+  bool m_showLabel = false;
   bool m_hideWhenPlugged = false;
   bool m_hideWhenFull = false;
 

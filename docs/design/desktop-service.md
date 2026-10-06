@@ -207,7 +207,10 @@ Other Settings destinations and extracted applications
 are still pending in the inventory. The quick-controls-only Control Center,
 removal of other compositor integrations, and full desktop cutover have not happened.
 The legacy Settings editors were explicitly retired by the user on 2026-10-05;
-Settings entry points now launch GTK Settings, and Control Center defaults to Home.
+Settings entry points now launch GTK Settings. The top bar is an enhanced GNOME floating
+status area; status widgets open a floating Control Center (Quick Settings only) and the
+clock/notifications widgets open Notification Center, with hold-drag reorder for bar
+widgets and the Quick Settings tile grid.
 Advanced editors without native replacements are unavailable and identified in the app.
 Real Wi-Fi/pairing mutation tests, screen readers, touch/on-screen keyboards,
 non-Helix desktop and Linux mobile hardware, and multi-monitor coverage must be

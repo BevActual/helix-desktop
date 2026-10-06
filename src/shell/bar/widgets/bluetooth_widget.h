@@ -20,6 +20,11 @@ public:
   BluetoothWidget(BluetoothService* bluetooth, wl_output* output, Options options);
 
   void create() override;
+  void setBarForceIconOnly(bool force) override {
+    if (force) {
+      m_showLabel = false;
+    }
+  }
 
 private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;

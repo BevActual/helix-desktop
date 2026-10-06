@@ -10,12 +10,17 @@ struct wl_output;
 class BrightnessWidget : public Widget {
 public:
   struct Options {
-    bool showLabel = true;
+    bool showLabel = false;
   };
 
   BrightnessWidget(BrightnessService* brightness, wl_output* output, Options options);
 
   void create() override;
+  void setBarForceIconOnly(bool force) override {
+    if (force) {
+      m_showLabel = false;
+    }
+  }
 
 private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;
@@ -24,7 +29,7 @@ private:
 
   BrightnessService* m_brightness = nullptr;
   wl_output* m_output = nullptr;
-  bool m_showLabel = true;
+  bool m_showLabel = false;
   Glyph* m_glyph = nullptr;
   Label* m_label = nullptr;
   bool m_lastAvailable = false;

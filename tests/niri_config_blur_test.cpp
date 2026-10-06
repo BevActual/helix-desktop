@@ -86,8 +86,10 @@ int main() {
       && ok;
   ok = expect(helixRefraction.find("refraction-strength 0.40") != std::string::npos, "helix-niri writes glass strength")
       && ok;
-  ok = expect(helixRefraction.find("xray true") != std::string::npos, "helix-niri refraction uses xray") && ok;
+  ok = expect(helixRefraction.find("xray false") != std::string::npos, "chrome refraction samples real backdrop")
+      && ok;
   ok = expect(helixRefraction.find("Greeter") != std::string::npos, "helix-niri refraction covers the greeter") && ok;
+  ok = expect(helixRefraction.find("xray true") != std::string::npos, "greeter keeps wallpaper xray") && ok;
   ok = expect(helixRefraction.find("idle-grace") != std::string::npos, "helix-niri refraction covers idle-grace") && ok;
   ok = expect(helixRefraction.find("blur false") != std::string::npos, "helix-niri refraction turns client blur off")
       && ok;

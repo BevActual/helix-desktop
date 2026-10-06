@@ -139,38 +139,39 @@ struct BarConfig {
   bool reserveSpace = true;  // reserve compositor exclusive zone; applies with or without auto_hide
   std::string layer = "top"; // top | overlay; attached panels use the same layer
   std::int32_t thickness = Style::barThicknessDefault;
-  float backgroundOpacity = 1.0F;
+  // Soft glass fill so the floating bar reads like enhanced GNOME (Blur my Shell / Dynamic Panel).
+  float backgroundOpacity = 0.72F;
   // Inside outline for the bar background; attached panels inherit the resolved values.
   ColorSpec border = colorSpecFromRole(ColorRole::Outline);
   float borderWidth = 0.0F;
-  std::int32_t radius = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusTopLeft = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusTopRight = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusBottomLeft = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusBottomRight = static_cast<std::int32_t>(Style::radiusXl);
-  bool concaveEdgeCorners = true;
-  std::int32_t marginEnds = 100;       // inset from each end of the bar along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the bar when > 0)
+  // Pill radius for a floating bar (edge-docked bars can still override per corner).
+  std::int32_t radius = 18;
+  std::int32_t radiusTopLeft = 18;
+  std::int32_t radiusTopRight = 18;
+  std::int32_t radiusBottomLeft = 18;
+  std::int32_t radiusBottomRight = 18;
+  bool concaveEdgeCorners = false; // floating bars use a full pill, not edge-carved corners
+  std::int32_t marginEnds = 12;        // inset from each end of the bar along its main axis
+  std::int32_t marginEdge = 8;         // distance from the nearest screen edge (floats the bar when > 0)
   std::int32_t marginOppositeEdge = 0; // extra reserved space on the inward side of the bar
-  std::int32_t padding = 14;           // main-axis padding from bar edges to start/end sections
-  std::int32_t widgetSpacing = 6;      // gap between widgets within a section
+  std::int32_t padding = 12;           // main-axis padding from bar edges to start/end sections
+  std::int32_t widgetSpacing = 8;      // gap between widgets within a section
   bool shadow = true;                  // use the global shell shadow
   bool contactShadow = false;          // dark gradient between attached panel and bar
   // Logical px the attached panel overlaps the bar edge so their seam is hidden. The ideal value depends on the
   // compositor and the output's fractional scale (physical-pixel rounding), so it is exposed for per-bar/per-monitor
   // tuning. Negative values pull the panel away from the bar.
   std::int32_t panelOverlap = 1;
-  float capsuleThickness = 0.76F; // capsule cross-size as a fraction of bar thickness
+  float capsuleThickness = 0.72F; // capsule cross-size as a fraction of bar thickness
   float scale = 1.0F;             // content scale multiplier for glyphs and text
   float fontScale = 1.0F;         // font scale multiplier, independent of content scale
   int fontWeight = 500;           // primary label weight for bar widgets
   // Typeface for this bar's widgets; unset inherits shell.font_family. Per-widget `font_family` overrides.
   std::optional<std::string> fontFamily;
-  std::vector<std::string> startWidgets = {"launcher", "wallpaper", "workspaces"};
-  std::vector<std::string> centerWidgets = {"clock"};
-  std::vector<std::string> endWidgets = {"media",   "tray",           "notifications", "clipboard",
-                                         "network", "bluetooth",      "volume",        "brightness",
-                                         "battery", "control-center", "session"};
+  // Enhanced GNOME floating top bar: clock on the start, status cluster on the end.
+  std::vector<std::string> startWidgets = {"clock"};
+  std::vector<std::string> centerWidgets = {};
+  std::vector<std::string> endWidgets = {"media", "notifications", "tray", "group:status"};
   // When true, widgets on this bar use a capsule unless `[widget.*] capsule = false`.
   bool widgetCapsuleDefault = false;
   ColorSpec widgetCapsuleFill = colorSpecFromRole(ColorRole::SurfaceVariant);
@@ -182,13 +183,20 @@ struct BarConfig {
   // Default icon color for all widgets on this bar (same as per-widget `color`); per-widget `color`
   // overrides.
   std::optional<ColorSpec> widgetIconColor;
-  std::vector<BarCapsuleGroupStyle> widgetCapsuleGroups;
+  // GNOME-style status capsule: icon-only connectivity and power indicators.
+  std::vector<BarCapsuleGroupStyle> widgetCapsuleGroups = {
+      BarCapsuleGroupStyle{
+          .id = "status",
+          .members = {"network", "bluetooth", "volume", "battery"},
+          .opacity = 0.55F,
+      },
+  };
   // Inner padding between capsule edge and widget content (logical px), multiplied by widget content scale on the bar.
   float widgetCapsulePadding = Style::barCapsulePadding;
   // Capsule corner radius in logical pixels before content-scale; unset means automatic pill radius.
   std::optional<double> widgetCapsuleRadius;
   // Capsule background opacity multiplier (0.0–1.0).
-  float widgetCapsuleOpacity = 1.0F;
+  float widgetCapsuleOpacity = 0.55F;
   // True when `capsule_border` appears under `[bar.*]` (empty value = no outline for widgets that inherit border).
   bool widgetCapsuleBorderSpecified = false;
   std::optional<ColorSpec> widgetCapsuleBorder;
@@ -674,7 +682,7 @@ constexpr EnumOption<DockLauncherPosition> kDockLauncherPositions[] = {
 };
 
 struct DockConfig {
-  bool enabled = false; // opt-in; dock is hidden by default
+  bool enabled = true; // bottom app tray (macOS Dock / Android desktop taskbar)
   DockEdge position = DockEdge::Bottom;
   bool activeMonitorOnly = false;    // render only on preferred active output
   std::int32_t iconSize = 48;        // icon size in pixels (before ui_scale)
@@ -692,7 +700,7 @@ struct DockConfig {
   std::int32_t radiusBottomRight = 16; // dock background bottom-right corner radius
   bool concaveEdgeCorners = true;      // carve concave corners on the side that touches the screen edge
   std::int32_t marginEnds = 0;         // inset from each end of the dock along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the dock when > 0)
+  std::int32_t marginEdge = 10;        // distance from the nearest screen edge (floats the dock when > 0)
   bool shadow = true;                  // use the global shell shadow
   bool showRunning = true;             // also show running apps not in pinned list
   bool autoHide = false;               // slide out when not hovered (overlay mode)
@@ -707,9 +715,9 @@ struct DockConfig {
   float magnificationScale = 1.45F; // max icon scale multiplier at the pointer center
   float activeOpacity = 1.0F;       // focused app icon opacity
   float inactiveOpacity = 0.85F;    // non-focused app icon opacity
-  bool showDots = false;            // show optional running window dots below app icons
+  bool showDots = true;             // show optional running window dots below app icons
   bool showInstanceCount = true;    // show a badge with count when app has >1 window
-  DockLauncherPosition launcherPosition = DockLauncherPosition::None;
+  DockLauncherPosition launcherPosition = DockLauncherPosition::Start;
   std::string launcherIcon = "grid-dots";   // Tabler glyph name
   std::string launcherCustomImage = "";     // image path; overrides launcherIcon glyph when set
   bool launcherCustomImageColorize = false; // tint the custom image with the icon color role
@@ -1040,17 +1048,18 @@ struct ShellConfig {
   };
 
   struct PanelConfig {
-    PanelTransparencyMode transparencyMode = PanelTransparencyMode::Solid;
+    PanelTransparencyMode transparencyMode = PanelTransparencyMode::Soft;
     // 0 = solid chrome, 1 = clear glass. Unset derives from transparencyMode.
     std::optional<float> glass;
-    bool refraction = false;               // compositor refraction (helix-niri) or chrome blur (stock niri)
+    bool refraction = true;                // compositor refraction (helix-niri) or chrome blur (stock niri)
     bool borders = true;                   // outline on floating panel surfaces
     bool shadow = true;                    // cast the global [shell.shadow] from panel surfaces
     bool listItemBackground = false;       // filled rounded background behind launcher/clipboard list items
     std::string floatingLayer = "overlay"; // top | overlay; attached panels follow their bar
     PanelPlacement launcherPlacement = PanelPlacement::Floating;
     PanelPlacement clipboardPlacement = PanelPlacement::Floating;
-    PanelPlacement controlCenterPlacement = PanelPlacement::Attached;
+    // Floating dropdown under the status area (enhanced GNOME); Attached seams to the bar.
+    PanelPlacement controlCenterPlacement = PanelPlacement::Floating;
     PanelPlacement wallpaperPlacement = PanelPlacement::Attached;
     PanelPlacement sessionPlacement = PanelPlacement::Attached;
     PanelPlacement polkitPlacement = PanelPlacement::Floating;
@@ -1065,7 +1074,8 @@ struct ShellConfig {
     std::string polkitPosition = "center";
     std::string quickInsertPosition = "center";
     std::int32_t floatingOffset = 8; // logical px gap between a floating/detached panel and the bar edge
-    bool openNearClickControlCenter = false;
+    // Align the Quick Settings dropdown under the clicked status widget.
+    bool openNearClickControlCenter = true;
     bool openNearClickLauncher = false;
     bool openNearClickClipboard = false;
     bool openNearClickWallpaper = false;

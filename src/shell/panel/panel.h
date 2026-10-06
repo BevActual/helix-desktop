@@ -32,6 +32,7 @@ public:
   virtual void onFrameTick(float deltaMs) { (void)deltaMs; }
   virtual void onOpen(std::string_view context) { (void)context; }
   virtual void onClose() {}
+  virtual void onConfigReloaded() {}
   virtual void onIconThemeChanged() {}
   virtual void scrollFocusedInputIntoView(InputArea* area) { (void)area; }
   [[nodiscard]] virtual bool isContextActive(std::string_view context) const {
