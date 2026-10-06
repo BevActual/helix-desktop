@@ -17,7 +17,7 @@
 #include "core/scoped_timer.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
-#include "launcher/launcher_provider.h"
+#include "config/launcher_providers.h"
 #include "notification/notification_manager.h"
 #include "shell/desktop/desktop_widget_settings_registry.h"
 #include "shell/settings/widget_settings_registry.h"

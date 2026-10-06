@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ipc/ipc_invocation_context.h"
-#include "shell/bar/widget_action.h"
+#include "config/widget_action.h"
 
 #include <string_view>
 

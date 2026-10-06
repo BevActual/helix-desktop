@@ -12,7 +12,7 @@
 #include "notification/notifications.h"
 #include "launcher/panel_catalog.h"
 #include "pipewire/sound_player.h"
-#include "shell/bar/widget_gesture.h"
+#include "config/widget_gesture.h"
 #include "shell/bar/widget_gesture_defaults.h"
 #include "shell/control_center/shortcut_registry.h"
 #include "shell/settings/color_spec_picker.h"

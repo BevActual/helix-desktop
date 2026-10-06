@@ -2,13 +2,9 @@ src/app/application_services.cpp -> desktop/remote_network.h
 src/config/cli.cpp -> shell/settings/settings_registry.h
 src/config/color_spec.h -> ui/palette.h
 src/config/config_overrides.cpp -> shell/settings/widget_settings_registry.h
-src/config/config_service.cpp -> launcher/launcher_provider.h
 src/config/config_service.cpp -> shell/desktop/desktop_widget_settings_registry.h
 src/config/config_service.cpp -> shell/settings/widget_settings_registry.h
 src/config/config_types.h -> ui/style.h
-src/config/config_validate.cpp -> launcher/launcher_provider.h
-src/config/config_validate.cpp -> shell/bar/widget_action.h
-src/config/config_validate.cpp -> shell/bar/widget_gesture.h
 src/config/config_validate.cpp -> shell/desktop/desktop_widget_settings_registry.h
 src/config/config_validate.cpp -> shell/lockscreen/lockscreen_login_box.h
 src/config/config_validate.cpp -> shell/settings/widget_settings_registry.h

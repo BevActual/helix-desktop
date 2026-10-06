@@ -1,6 +1,6 @@
 #pragma once
 
-#include "shell/bar/widget_gesture.h"
+#include "config/widget_gesture.h"
 
 #include <array>
 #include <cstdint>

@@ -7,6 +7,7 @@
 #include "render/scene/node.h"
 #include "shell/bar/widget_action_dispatcher.h"
 #include "shell/bar/widget_gesture_defaults.h"
+#include "shell/bar/widget_gesture_input.h"
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "util/string_utils.h"

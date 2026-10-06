@@ -6,7 +6,7 @@
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
 #include "render/scene/node.h"
-#include "shell/bar/widget_gesture.h"
+#include "config/widget_gesture.h"
 #include "shell/bar/widget_gesture_defaults.h"
 #include "shell/settings/color_spec_picker.h"
 #include "shell/settings/font_weight_catalog.h"

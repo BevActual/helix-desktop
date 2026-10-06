@@ -5,8 +5,8 @@
 #include "ipc/ipc_invocation_context.h"
 #include "render/core/renderer.h"
 #include "render/scene/node.h"
-#include "shell/bar/widget_action.h"
-#include "shell/bar/widget_gesture.h"
+#include "config/widget_action.h"
+#include "config/widget_gesture.h"
 #include "ui/palette.h"
 
 #include <functional>

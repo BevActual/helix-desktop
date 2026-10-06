@@ -1,4 +1,4 @@
-#include "shell/bar/widget_action.h"
+#include "config/widget_action.h"
 
 #include "config/config_types.h"
 #include "core/log.h"

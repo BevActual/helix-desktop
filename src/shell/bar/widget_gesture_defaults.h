@@ -1,7 +1,7 @@
 #pragma once
 
 #include "config/config_types.h"
-#include "shell/bar/widget_action.h"
+#include "config/widget_action.h"
 
 #include <span>
 #include <string>
