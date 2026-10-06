@@ -8,6 +8,7 @@
 #include "apps/settings/hub_navigation.h"
 #include "apps/settings/palette_browser.h"
 #include "apps/settings/accounts_page.h"
+#include "apps/settings/agents_page.h"
 #include "util/file_utils.h"
 #include "desktop/dns_update.h"
 #include "desktop/notification_rules.h"
@@ -35,6 +36,7 @@ constexpr Page pages[] = {
   {"network", "Network", "network-wireless-symbolic"},
   {"bluetooth", "Bluetooth", "bluetooth-symbolic"},
   {"online-accounts", "Online Accounts", "goa-panel-symbolic"},
+  {"agents", "Agents", "system-run-symbolic"},
   {"privacy-security", "Privacy & Security", "security-high-symbolic", true},
   {"keyboard", "Keyboard", "input-keyboard-symbolic", true},
   {"displays", "Displays", "video-display-symbolic", true},
@@ -125,6 +127,7 @@ struct Settings {
   std::weak_ptr<helix::settings::WallpaperBrowser> wallpaperBrowser;
   std::weak_ptr<helix::settings::PaletteBrowser> paletteBrowser;
   std::shared_ptr<helix::settings::AccountsPage> accountsPage;
+  std::shared_ptr<helix::settings::AgentsPage> agentsPage;
   std::string requestedBrowser;
   bool requestedPalette = false;
   AdwDialog* details = nullptr;
@@ -156,6 +159,7 @@ struct Settings {
   explicit Settings(AdwApplication* application) : app(application) {}
   ~Settings() {
     if (accountsPage) accountsPage->shutdown();
+    if (agentsPage) agentsPage->shutdown();
     stopMeter();
     if (focusIdle) g_source_remove(focusIdle);
     if (sectionTick && scroller) gtk_widget_remove_tick_callback(scroller, sectionTick);
@@ -1625,6 +1629,7 @@ struct Settings {
     syncing = true;
     if (fingerprint != rendered) {
       if (accountsPage) { accountsPage->shutdown(); accountsPage.reset(); }
+      if (agentsPage) { agentsPage->shutdown(); agentsPage.reset(); }
       const bool wantPane = !hubPane.empty() && helix::settings::isHubPage(page) &&
           !helix::settings::usesChipHub(page) && query.empty();
       if (!wantPane) popHubToOverview();
@@ -1657,6 +1662,10 @@ struct Settings {
       if (page == "online-accounts" && query.empty()) {
         accountsPage = helix::settings::AccountsPage::create(GTK_WINDOW(window), [this](const std::string& message) { toast(message); });
         gtk_box_append(body, accountsPage->widget());
+      }
+      if (page == "agents" && query.empty()) {
+        agentsPage = helix::settings::AgentsPage::create([this](const std::string& message) { toast(message); });
+        gtk_box_append(body, agentsPage->widget());
       }
       displayDevices();
       devices();
@@ -2021,6 +2030,7 @@ int main(int argc, char** argv) {
       for (auto* child = gtk_widget_get_first_child(GTK_WIDGET(self.body)); child; child = gtk_widget_get_next_sibling(child))
         if (ADW_IS_PREFERENCES_GROUP(child)) layout["groups"].push_back(adw_preferences_group_get_title(ADW_PREFERENCES_GROUP(child)));
       if (self.accountsPage) layout["online-accounts"] = self.accountsPage->inspect();
+      if (self.agentsPage) layout["agents"] = self.agentsPage->inspect();
       if (auto browser = self.wallpaperBrowser.lock(); browser && !browser->isClosed()) layout["wallpaper-browser"] = browser->inspect();
       if (auto browser = self.paletteBrowser.lock(); browser && !browser->isClosed()) layout["palette-browser"] = browser->inspect();
       if (self.layoutPreview) layout["layout-preview"] = helix::settings::LayoutPreview::description(self.layoutPreview);

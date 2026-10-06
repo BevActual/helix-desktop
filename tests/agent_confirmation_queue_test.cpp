@@ -31,6 +31,18 @@ void checkSanitize() {
   TEST_CHECK(sanitizeForDisplay("\xC3\xA9\xC3\xA9\xC3\xA9", 2) == "\xC3\xA9\xC3\xA9…");           // counts characters, not bytes
 }
 
+void checkFriendlyName() {
+  using helix::agent::friendlyClientName;
+  TEST_CHECK(friendlyClientName("exe:/usr/bin/helix-settings") == "helix-settings");
+  TEST_CHECK(friendlyClientName("exe:/usr/bin/python3.14#/home/u/tools/server.py") == "server.py");
+  // Hostile names cannot read as sentences, hide behind bidi controls or borrow look-alike letters.
+  TEST_CHECK(friendlyClientName(std::string("exe:/tmp/evil\xE2\x80\xAE" "exe.txt\nSettings: all access granted")) == "evil___exe.txt_Settings__all_access_gran...");  // capped at 40 characters
+  TEST_CHECK(friendlyClientName("exe:/tmp/Settings (trusted)") == "Settings__trusted_");
+  TEST_CHECK(friendlyClientName("exe:/tmp/\xD0\xA1ontrol") == "__ontrol");  // Cyrillic 'S' is not a Latin 'C'
+  TEST_CHECK(friendlyClientName("exe:/usr/bin/" + std::string(100, 'a')).size() <= 43);
+  TEST_CHECK(friendlyClientName("") == "unknown" && friendlyClientName("exe:/") == "unknown");
+}
+
 void checkParse() {
   auto request = ConfirmRequest::fromJson(json{{"operation", 7}, {"client", "exe:/x"}, {"tool", "app-launch"},
     {"args", {"Settings"}}, {"reason", "open it\nnow"}, {"tainted", true}});
@@ -53,6 +65,14 @@ void checkParse() {
   for (int i = 0; i < 40; ++i) many.push_back(std::string(500, 'x'));
   auto big = ConfirmRequest::fromJson(json{{"operation", 1}, {"client", "c"}, {"tool", "t"}, {"args", many}});
   TEST_CHECK(big && big->args.size() == 8 && big->args[0].size() <= 124);
+}
+
+void checkClientName() {
+  // A long identity is shortened for display, but the name still comes from its end, not from the cut-off point.
+  const std::string long_id = "exe:/usr/bin/python3.14#/home/someone/a/very/long/path/" + std::string(300, 'd') + "/server.py";
+  auto request = ConfirmRequest::fromJson(json{{"operation", 1}, {"client", long_id}, {"tool", "status"}});
+  TEST_CHECK(request && request->clientName == "server.py");
+  TEST_CHECK(request->client.size() < long_id.size());  // shortened with an ellipsis
 }
 
 void checkQueue() {
@@ -128,7 +148,9 @@ void checkGrantNarrowing() {
 
 int main() {
   checkSanitize();
+  checkFriendlyName();
   checkParse();
+  checkClientName();
   checkQueue();
   checkGrantNarrowing();
   return 0;

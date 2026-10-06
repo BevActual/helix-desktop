@@ -1,5 +1,7 @@
 #pragma once
 
+#include "desktop/display_text.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -18,7 +20,8 @@ struct ConfirmRequest {
 
   std::uint64_t operation = 0;
   Kind kind = Kind::Action;
-  std::string client;                 // verified identity, shown as given by the service
+  std::string client;                 // verified identity from the service, shortened for display
+  std::string clientName;             // short name derived from the full identity before shortening
   std::string label;                  // self-declared app name (grants)
   std::string tool;                   // actions
   std::string reason;                 // the agent's own words; displayed as a quotation, never as a fact
@@ -29,10 +32,6 @@ struct ConfirmRequest {
   // Returns nullopt for a request that is malformed rather than a display problem.
   static std::optional<ConfirmRequest> fromJson(const nlohmann::json& details);
 };
-
-// Display-safe text: control characters and bidi/zero-width controls removed, invalid UTF-8 replaced, shortened to
-// `maxCodepoints` with an ellipsis. Newlines become spaces so one value cannot fake extra lines in a dialog.
-std::string sanitizeForDisplay(const std::string& text, std::size_t maxCodepoints);
 
 // Pending confirmations for the dialog. The service enforces deadlines; this queue limits what a flood can do
 // to the user: a bounded total and a bounded share per client, refused immediately instead of piling up.

@@ -121,7 +121,12 @@ where Enter never approves, Escape denies, Allow stays disabled for 700 ms after
 default to least privilege and closing the panel denies what is pending. It was checked in a nested helix-niri
 session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
 checked: the disabled look of Allow during the arming window, clicking Allow/Deny with a pointer, and the
-confirm-tier action layout. Still missing: the MCP adapter switch to `Agent1` and the Settings page.
+confirm-tier action layout. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
+role): apps with access, per-tier switches, remove, and recent activity. It was checked in a nested session against
+seeded hostile data (markup, bidi controls, newlines in names and arguments): all rendered inert. App names shown
+to the user come from the verified identity only (`friendlyClientName`: ASCII letters, digits and `._+-`, everything
+else `_`), and a self-declared label appears only as "it calls itself". Not yet checked: toggling a switch or
+pressing Remove with a pointer, and the unavailable state.
 
 ## Build order
 

@@ -563,6 +563,7 @@ _noctalia_sources = files(
   'src/shell/panel/panel_manager.cpp',
   'src/shell/panel/persistent_panel_host.cpp',
   'src/shell/polkit/polkit_panel.cpp',
+  'src/desktop/display_text.cpp',
   'src/shell/agent/agent_confirmation_queue.cpp',
   'src/shell/agent/agent_confirm_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
@@ -1202,7 +1203,7 @@ if gtk4_dep.found() and adwaita_dep.found()
     settings_args += '-DHELIX_HAVE_GOA'
   endif
   helix_settings = executable('helix-settings',
-    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp'),
+    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop/protocol.cpp', 'src/desktop/client.cpp', 'src/desktop/display_text.cpp'),
     include_directories: include_directories('src'),
     dependencies: settings_deps,
     cpp_args: settings_args,
@@ -1276,7 +1277,7 @@ if build_tests
   )
   test('desktop_agent_broker', helix_agent_broker_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
-    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp'),
+    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop/display_text.cpp'),
     dependencies: noctalia_core_dep,
     override_options: ['b_ndebug=false'],
   )

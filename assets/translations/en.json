@@ -6,6 +6,7 @@
       "grant-title": "Give an app access?",
       "grant-subject": "{app} is asking to use your desktop",
       "grant-detail": "Choose what it may do. You can change this later in Settings.",
+      "label": "It calls itself “{label}”.",
       "reason": "It says: “{reason}”",
       "tainted": "This app read private content (clipboard, screen or notifications) since you last approved something. That content may be influencing this request.",
       "waiting": "{count} more waiting",

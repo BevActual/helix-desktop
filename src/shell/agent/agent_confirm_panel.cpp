@@ -1,6 +1,7 @@
 #include "shell/agent/agent_confirm_panel.h"
 
 #include "core/input/keybind_matcher.h"
+#include "desktop/display_text.h"
 #include "i18n/i18n.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
@@ -48,7 +49,9 @@ float AgentConfirmPanel::preferredHeight() const {
     std::size_t detail = request.tool.size();
     for (const auto& arg : request.args) detail += arg.size() + 1;
     height += static_cast<float>(lines(detail, perLine, 4)) * bodyLine + gap;
-    if (!request.reason.empty()) height += static_cast<float>(lines(request.reason.size() + 20, perLine, 4)) * captionLine + gap;
+    const bool grantWithLabel = request.kind == ConfirmRequest::Kind::Grant && !request.label.empty();
+    const std::size_t asideChars = grantWithLabel ? request.label.size() + request.client.size() + 30 : (request.reason.empty() ? 0 : request.reason.size() + 20);
+    if (asideChars > 0) height += static_cast<float>(lines(asideChars, perLine, 4)) * captionLine + gap;
     if (request.tainted) height += static_cast<float>(lines(180, perLine, 4)) * captionLine + gap;
     if (request.kind == ConfirmRequest::Kind::Grant) {
       // Checkbox rows are taller than a text line; sized from the control, as measured in the nested session.
@@ -188,13 +191,16 @@ void AgentConfirmPanel::doUpdate(Renderer& /*renderer*/) {
   }
 
   m_titleLabel->setText(i18n::tr(grant ? "agent.confirm.grant-title" : "agent.confirm.action-title"));
-  m_subjectLabel->setText(grant ? i18n::tr("agent.confirm.grant-subject", "app", request.label.empty() ? request.client : request.label)
-                                : i18n::tr("agent.confirm.action-subject", "app", request.client));
+  // The verified identity leads. The app's own label is shown only as something it says about itself.
+  const std::string& app = request.clientName;
+  m_subjectLabel->setText(i18n::tr(grant ? "agent.confirm.grant-subject" : "agent.confirm.action-subject", "app", app));
   std::string detail = request.tool;
   for (const auto& arg : request.args) detail += " " + arg;
   m_detailLabel->setText(grant ? i18n::tr("agent.confirm.grant-detail") : detail);
-  m_reasonLabel->setText(request.reason.empty() ? std::string() : i18n::tr("agent.confirm.reason", "reason", request.reason));
-  m_reasonLabel->setVisible(!request.reason.empty());
+  std::string aside = request.reason.empty() ? std::string() : i18n::tr("agent.confirm.reason", "reason", request.reason);
+  if (grant && !request.label.empty()) aside = i18n::tr("agent.confirm.label", "label", request.label) + "  " + request.client;
+  m_reasonLabel->setText(aside);
+  m_reasonLabel->setVisible(!aside.empty());
   m_warningLabel->setText(i18n::tr("agent.confirm.tainted"));
   m_warningLabel->setVisible(request.tainted && !grant);
   m_waitingLabel->setText(i18n::tr("agent.confirm.waiting", "count", std::to_string(queue->size() - 1)));
