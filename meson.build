@@ -1174,7 +1174,7 @@ helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
 )
 
 helix_service = executable('helix-service',
-  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp'), helix_desktop_introspection_h],
+  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp'), helix_desktop_introspection_h],
   dependencies: noctalia_core_dep,
   cpp_args: _noctalia_cpp_args,
   install: true,
@@ -1260,6 +1260,18 @@ if build_tests
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   test('desktop_protocol', helix_protocol_test)
+  helix_agent_policy_unit = executable('desktop_agent_policy_test',
+    sources: files('tests/desktop_agent_policy_test.cpp', 'src/desktop/agent_policy.cpp'),
+    dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('desktop_agent_policy', helix_agent_policy_unit, args: [meson.project_source_root()])
+  helix_agent_broker_unit = executable('desktop_agent_broker_test',
+    sources: files('tests/desktop_agent_broker_test.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_policy.cpp'),
+    dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('desktop_agent_broker', helix_agent_broker_unit)
   helix_displays_test = executable('desktop_displays_test',
     sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop/protocol.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
