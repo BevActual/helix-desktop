@@ -18,8 +18,8 @@
 #include "system/desktop_entry_launch.h"
 #include "ui/app_icon_colorization.h"
 #include "ui/style.h"
-#include "wayland/layer_surface.h"
-#include "wayland/surface.h"
+#include "render/surface/layer_surface.h"
+#include "render/surface/surface.h"
 #include "wayland/wayland_toplevels.h"
 
 #include <algorithm>

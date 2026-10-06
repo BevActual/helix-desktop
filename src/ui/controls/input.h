@@ -5,7 +5,7 @@
 #include "render/scene/node.h"
 #include "ui/signal.h"
 #include "ui/style.h"
-#include "ui/text_input_client.h"
+#include "core/input/text_input_client.h"
 
 #include <chrono>
 #include <cstddef>

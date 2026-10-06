@@ -5,7 +5,7 @@
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "shell/bar/bar.h"
-#include "wayland/surface.h"
+#include "render/surface/surface.h"
 #include "wayland/wayland_connection.h"
 
 #include <algorithm>

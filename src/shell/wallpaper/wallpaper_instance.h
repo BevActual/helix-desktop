@@ -7,7 +7,7 @@
 #include "render/core/wallpaper_types.h"
 #include "render/scene/node.h"
 #include "render/scene/wallpaper_node.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 
 #include <cstdint>
 #include <memory>

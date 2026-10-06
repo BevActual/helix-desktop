@@ -4,7 +4,7 @@
 #include "core/ui_phase.h"
 #include "render/scene/node.h"
 #include "ui/style.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 
 #include <algorithm>
 #include <cstdint>

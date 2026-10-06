@@ -14,7 +14,7 @@
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
-#include "wayland/surface.h"
+#include "render/surface/surface.h"
 #include "wayland/wayland_connection.h"
 
 #include <algorithm>

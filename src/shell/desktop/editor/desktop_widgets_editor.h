@@ -8,7 +8,7 @@
 #include "shell/desktop/editor/desktop_widgets_editor_types.h"
 #include "ui/controls/select_dropdown_popup.h"
 #include "ui/dialogs/layer_popup_host.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 
 #include <array>
 #include <functional>

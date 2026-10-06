@@ -11,7 +11,7 @@
 #include "shell/wallpaper/wallpaper_geometry.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 #include "wayland/wayland_connection.h"
 #include "wayland/wayland_seat.h"
 

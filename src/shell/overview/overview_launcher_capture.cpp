@@ -7,7 +7,7 @@
 #include "core/input/key_symbols.h"
 #include "core/log.h"
 #include "shell/panel/panel_manager.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 #include "wayland/wayland_connection.h"
 
 #include <nlohmann/json.hpp>

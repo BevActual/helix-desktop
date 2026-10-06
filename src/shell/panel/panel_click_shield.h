@@ -1,6 +1,6 @@
 #pragma once
 
-#include "wayland/surface.h"
+#include "render/surface/surface.h"
 
 #include <cstdint>
 #include <functional>

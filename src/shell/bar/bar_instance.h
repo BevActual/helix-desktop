@@ -9,7 +9,7 @@
 #include "shell/bar/widget.h"
 #include "shell/panel/attached_panel_context.h"
 #include "ui/signal.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 
 #include <cstdint>
 #include <memory>

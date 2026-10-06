@@ -16,7 +16,7 @@
 #include "ui/controls/context_menu.h"
 #include "ui/popup_chrome.h"
 #include "ui/style.h"
-#include "wayland/popup_surface.h"
+#include "render/surface/popup_surface.h"
 #include "wayland/wayland_connection.h"
 #include "wayland/wayland_toplevels.h"
 #include "xdg-shell-client-protocol.h"

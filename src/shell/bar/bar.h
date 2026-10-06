@@ -7,7 +7,7 @@
 #include "shell/bar/widget_action_dispatcher.h"
 #include "shell/bar/widget_factory.h"
 #include "ui/dialogs/layer_popup_host.h"
-#include "wayland/surface.h"
+#include "render/surface/surface.h"
 
 #include <functional>
 #include <memory>

@@ -7,10 +7,4 @@ src/config/config_validate.cpp -> shell/lockscreen/lockscreen_login_box.h
 src/config/config_validate.cpp -> shell/settings/widget_settings_registry.h
 src/theme/theme_service.cpp -> ui/app_icon_colorization.h
 src/theme/theme_service.h -> render/animation/animation_manager.h
-src/wayland/surface.cpp -> render/animation/animation_manager.h
-src/wayland/surface.cpp -> render/render_context.h
-src/wayland/surface.cpp -> render/scene/node.h
-src/wayland/surface.h -> render/core/render_styles.h
-src/wayland/surface.h -> render/core/wallpaper_types.h
-src/wayland/surface.h -> render/render_target.h
-src/wayland/text_input_service.h -> ui/text_input_client.h
+src/wayland/output_probe.cpp -> render/surface/layer_surface.h

@@ -1,7 +1,7 @@
 #include "wayland/output_probe.h"
 
 #include "core/log.h"
-#include "wayland/layer_surface.h"
+#include "render/surface/layer_surface.h"
 #include "wayland/wayland_connection.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 

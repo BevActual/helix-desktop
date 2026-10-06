@@ -13,8 +13,8 @@
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
-#include "wayland/layer_surface.h"
-#include "wayland/surface.h"
+#include "render/surface/layer_surface.h"
+#include "render/surface/surface.h"
 
 #include <cmath>
 

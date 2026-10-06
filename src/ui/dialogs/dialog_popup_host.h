@@ -4,7 +4,7 @@
 #include "render/scene/input_dispatcher.h"
 #include "ui/dialogs/layer_popup_host.h"
 #include "ui/popup_chrome.h"
-#include "wayland/popup_surface.h"
+#include "render/surface/popup_surface.h"
 
 #include <cstdint>
 #include <memory>

@@ -11,7 +11,7 @@
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
-#include "wayland/popup_surface.h"
+#include "render/surface/popup_surface.h"
 #include "wayland/wayland_connection.h"
 #include "xdg-shell-client-protocol.h"
 

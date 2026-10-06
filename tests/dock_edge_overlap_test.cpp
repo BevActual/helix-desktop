@@ -5,7 +5,7 @@
 #include "config/config_types.h"
 #include "shell/dock/dock_geometry.h"
 #include "tests/test_check.h"
-#include "wayland/surface.h"
+#include "render/surface/surface.h"
 
 #include <cstddef>
 
