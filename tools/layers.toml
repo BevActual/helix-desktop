@@ -5,6 +5,10 @@
 # Independent-process code (the desktop service and the apps) may include base, platform and each other, but not the
 # shell's renderer, UI toolkit or shell-only services: it must be able to run without them.
 #
+# wayland and compositors are clients of the display server (connections, protocols, compositor IPC), so they sit in
+# the platform layer. wayland/surface.* and text_input_service are rendering glue that still reaches into render and
+# ui; those entries in the baseline mark where that module needs splitting.
+#
 # desktop_api is the client library for the desktop service (protocol, client, display text). Every process uses it.
 #
 # Existing violations are recorded in tools/layers-baseline.txt. The check fails on any NEW violation and on baseline
@@ -12,8 +16,8 @@
 
 [layers]
 base = ["util", "core", "i18n", "time"]
-platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api"]
-display = ["wayland", "render", "ui", "compositors"]
+platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api", "wayland", "compositors"]
+display = ["render", "ui"]
 shell = ["shell", "launcher", "capture", "app"]
 
 [independent]
