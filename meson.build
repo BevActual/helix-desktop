@@ -523,6 +523,7 @@ _noctalia_sources = files(
   'src/shell/clipboard/clipboard_picker.cpp',
   'src/shell/quick_insert/quick_insert_panel.cpp',
   'src/shell/control_center/shortcut_registry.cpp',
+  'src/shell/quick_settings/quick_settings_panel.cpp',
   'src/shell/control_center/tab.cpp',
   'src/core/files/directory_scanner.cpp',
   'src/ui/dialogs/color_picker_dialog.cpp',

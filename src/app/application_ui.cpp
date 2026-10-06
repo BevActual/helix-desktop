@@ -64,6 +64,7 @@
 #include "shell/launcher/launcher_panel.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
+#include "shell/quick_settings/quick_settings_panel.h"
 #include "shell/session/session_panel.h"
 #include "shell/settings/settings_runtime.h"
 #include "shell/setup_wizard/setup_wizard_panel.h"
@@ -520,6 +521,32 @@ void Application::initPanelManagerAndPanels() {
   m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsInvalidated.emit(); });
   syncClipboardService();
   m_panelManager.registerPanel("session", std::make_unique<SessionPanel>(&m_configService, m_sessionActionRunner));
+  m_panelManager.registerPanel(
+      "control-center",
+      std::make_unique<QuickSettingsPanel>(
+          &m_configService,
+          ShortcutServices{
+              .network = m_networkService.get(),
+              .bluetooth = m_bluetoothService.get(),
+              .nightLight = &m_gammaService,
+              .theme = &m_themeService,
+              .notifications = &m_notificationManager,
+              .idleInhibitor = &m_idleInhibitor,
+              .audio = m_pipewireService.get(),
+              .powerProfiles = m_powerProfilesService.get(),
+              .mpris = m_mprisService.get(),
+              .config = &m_configService,
+              .dependencies = &m_dependencyService,
+              .platform = &m_compositorPlatform,
+              .ipc = &m_ipcService,
+              .screenRecorder = &m_screenRecorder,
+              .fileWatcher = &m_fileWatcher,
+              .httpClient = &m_httpClient,
+              .clipboard = &m_clipboardService,
+          },
+          m_pipewireService.get(), m_brightnessService.get(), &m_sessionActionRunner
+      )
+  );
   m_panelManager.registerPanel("test", std::make_unique<TestPanel>());
   settings::RuntimeActions settingsActions{
       .resetEncryptedStorage =
