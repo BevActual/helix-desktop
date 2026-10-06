@@ -1,6 +1,12 @@
 # Helix Agent Surface v1 — tools exposed over MCP.
 # Dangerous session power actions and synthetic input stay off.
 
+# Which risk tiers (protocols/ipc/msg-risk.toml) this adapter may call. "blocked" is never granted.
+# "confirm" stays granted only until the shell grows a user-confirmation path (Agent1 interface);
+# remove it from this list to make every confirm-tier tool refuse.
+[grants]
+tiers = ["observe", "observe-private", "act", "confirm"]
+
 [tools]
 desktop_status = true
 desktop_capture = true

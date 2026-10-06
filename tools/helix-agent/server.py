@@ -11,9 +11,11 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 ALLOWLIST_PATH = ROOT / "allowlist.toml"
+RISK_POLICY_PATH = ROOT.parents[1] / "protocols" / "ipc" / "msg-risk.toml"
 
 # Prefer the built noctalia next to a common build dir, else PATH.
 def _noctalia_bin() -> str:
@@ -34,24 +36,28 @@ def _noctalia_bin() -> str:
     return "noctalia"
 
 
-def _load_allowlist() -> set[str]:
-    enabled: set[str] = set()
+def _load_config() -> dict:
     if not ALLOWLIST_PATH.is_file():
-        return enabled
-    in_tools = False
-    for raw in ALLOWLIST_PATH.read_text(encoding="utf-8").splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if not line:
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            in_tools = line == "[tools]"
-            continue
-        if not in_tools or "=" not in line:
-            continue
-        key, _, value = line.partition("=")
-        if value.strip().lower() in {"true", "1", "yes"}:
-            enabled.add(key.strip())
-    return enabled
+        return {}
+    return tomllib.loads(ALLOWLIST_PATH.read_text(encoding="utf-8"))
+
+
+def _load_allowlist() -> set[str]:
+    tools = _load_config().get("tools", {})
+    return {name for name, enabled in tools.items() if enabled is True}
+
+
+def _load_granted_tiers() -> set[str]:
+    # "blocked" can never be granted, whatever the config says.
+    tiers = set(_load_config().get("grants", {}).get("tiers", ["observe"]))
+    return tiers - {"blocked"}
+
+
+def _load_risk_policy() -> dict:
+    # Fail closed: without the policy file no `noctalia msg` command is reachable.
+    if not RISK_POLICY_PATH.is_file():
+        return {"tiers": {}, "choices": {}}
+    return tomllib.loads(RISK_POLICY_PATH.read_text(encoding="utf-8"))
 
 
 def _run(cmd: list[str], *, timeout: float = 30.0) -> tuple[int, str, str]:
@@ -71,8 +77,27 @@ def _run(cmd: list[str], *, timeout: float = 30.0) -> tuple[int, str, str]:
     return proc.returncode, proc.stdout, proc.stderr
 
 
-def noctalia_msg(*args: str, timeout: float = 30.0) -> str:
-    code, out, err = _run([_noctalia_bin(), "msg", *args], timeout=timeout)
+def command_tier(args: tuple[str, ...], policy: dict | None = None) -> str:
+    """Risk tier of a `noctalia msg` invocation; unknown commands are blocked."""
+    policy = RISK_POLICY if policy is None else policy
+    if not args:
+        return "blocked"
+    if len(args) > 1:
+        override = policy.get("choices", {}).get(f"{args[0]} {args[1]}")
+        if override:
+            return override
+    return policy.get("tiers", {}).get(args[0], "blocked")
+
+
+def noctalia_msg(*args: str, literal: tuple[str, ...] = (), timeout: float = 30.0) -> str:
+    """Run `noctalia msg`. `literal` is model-supplied text, passed after `--` so it is never read as a flag."""
+    tier = command_tier(args)
+    if tier == "blocked" or tier not in GRANTED_TIERS:
+        return f"error: `{args[0] if args else ''}` is {tier} for agent clients (granted tiers: {sorted(GRANTED_TIERS)})"
+    argv = [_noctalia_bin(), "msg", *args]
+    if literal:
+        argv += ["--", *literal]
+    code, out, err = _run(argv, timeout=timeout)
     text = (out or "") + (("\n" + err) if err and not out.endswith(err) else "")
     text = text.strip()
     if code != 0 and not text.startswith("error:"):
@@ -115,6 +140,8 @@ def niri_focus_window(window_id: int) -> str:
 
 
 ALLOWLIST = _load_allowlist()
+GRANTED_TIERS = _load_granted_tiers()
+RISK_POLICY = _load_risk_policy()
 
 
 def _guard(name: str) -> None:
@@ -149,50 +176,37 @@ def desktop_capture(target: str = "") -> str:
     Returns 'ok <path>' or an error line. Read the PNG path with the Read tool.
     """
     _guard("desktop_capture")
-    args = ["desktop-capture"]
-    if target.strip():
-        args.append(target.strip())
-    return noctalia_msg(*args, timeout=60.0)
+    return noctalia_msg("desktop-capture", literal=(target.strip(),) if target.strip() else (), timeout=60.0)
 
 
 @mcp.tool()
 def panel_toggle(panel_id: str, context: str = "") -> str:
     """Toggle a Helix panel (e.g. control-center, launcher). Optional context (home, notifications)."""
     _guard("panel_toggle")
-    args = ["panel-toggle", panel_id]
-    if context.strip():
-        args.append(context.strip())
-    return noctalia_msg(*args)
+    literal = [panel_id] + ([context.strip()] if context.strip() else [])
+    return noctalia_msg("panel-toggle", literal=tuple(literal))
 
 
 @mcp.tool()
 def panel_open(panel_id: str, context: str = "") -> str:
     """Open a Helix panel. Optional context."""
     _guard("panel_open")
-    args = ["panel-open", panel_id]
-    if context.strip():
-        args.append(context.strip())
-    return noctalia_msg(*args)
+    literal = [panel_id] + ([context.strip()] if context.strip() else [])
+    return noctalia_msg("panel-open", literal=tuple(literal))
 
 
 @mcp.tool()
 def panel_close(panel_id: str = "") -> str:
     """Close the active panel, or a specific panel id when given."""
     _guard("panel_close")
-    args = ["panel-close"]
-    if panel_id.strip():
-        args.append(panel_id.strip())
-    return noctalia_msg(*args)
+    return noctalia_msg("panel-close", literal=(panel_id.strip(),) if panel_id.strip() else ())
 
 
 @mcp.tool()
 def settings_open(context: str = "") -> str:
     """Open Helix Settings (GTK), optionally at a section context."""
     _guard("settings_open")
-    args = ["settings-open"]
-    if context.strip():
-        args.append(context.strip())
-    return noctalia_msg(*args)
+    return noctalia_msg("settings-open", literal=(context.strip(),) if context.strip() else ())
 
 
 @mcp.tool()
@@ -216,7 +230,7 @@ def clipboard_get() -> str:
 def clipboard_set(text: str) -> str:
     """Copy text to the clipboard via Helix."""
     _guard("clipboard_set")
-    return noctalia_msg("clipboard-copy", text)
+    return noctalia_msg("clipboard-copy", literal=(text,))
 
 
 @mcp.tool()
@@ -294,7 +308,7 @@ def app_launch(query: str) -> str:
     query = query.strip()
     if not query:
         return "error: query is required"
-    return noctalia_msg("app-launch", query)
+    return noctalia_msg("app-launch", literal=(query,))
 
 
 @mcp.tool()
@@ -322,7 +336,7 @@ def window_close(window_id: str = "") -> str:
     _guard("window_close")
     window_id = window_id.strip()
     if window_id:
-        return noctalia_msg("window-close", window_id)
+        return noctalia_msg("window-close", literal=(window_id,))
     return noctalia_msg("window-close")
 
 

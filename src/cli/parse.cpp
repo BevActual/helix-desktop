@@ -69,10 +69,17 @@ namespace noctalia::cli {
     ParsedArgs result;
     std::vector<bool> assigned(command.positionals.size(), false);
     std::size_t positionalIndex = 0;
+    bool endOfOptions = false;
 
     for (std::size_t i = 0; i < args.size(); ++i) {
       const std::string_view token{args[i]};
-      if (token == "-h" || token == "--help") {
+      // `--` ends option parsing so callers can pass arbitrary text (for example model-supplied)
+      // that happens to begin with a dash.
+      if (!endOfOptions && token == "--") {
+        endOfOptions = true;
+        continue;
+      }
+      if (!endOfOptions && (token == "-h" || token == "--help")) {
         result.helpRequested = true;
         return result;
       }
@@ -90,7 +97,7 @@ namespace noctalia::cli {
       const Flag* flag = nullptr;
       std::string_view inlineValue;
       bool hasInlineValue = false;
-      if (token.size() > 1 && token.front() == '-') {
+      if (!endOfOptions && token.size() > 1 && token.front() == '-') {
         flag = findFlag(command, token);
         if (flag == nullptr && token.starts_with("--")) {
           const std::size_t equals = token.find('=');

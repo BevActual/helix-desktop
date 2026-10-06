@@ -3,6 +3,7 @@
 #include "auth/pam_authenticator.h"
 #include "cli/completions.h"
 #include "cli/help.h"
+#include "cli/schema_json.h"
 #include "cli/schema_root.h"
 #include "config/cli.h"
 #include "core/build_info.h"
@@ -278,6 +279,9 @@ int main(int argc, char* argv[]) {
       return noctalia::theme::runFirefoxNativeMessagingHost();
     if (std::strcmp(argv[1], "completions") == 0)
       return noctalia::cli::runCompletionsCli(argc, argv);
+    // Hidden: machine-readable msg schema for generated tooling.
+    if (std::strcmp(argv[1], "schema-json") == 0)
+      return noctalia::cli::runSchemaJsonCli(argc, argv);
     if (std::strcmp(argv[1], "firefox-theme") == 0)
       return noctalia::theme::runFirefoxThemeCli(argc, argv);
     if (std::strcmp(argv[1], "theme") == 0)

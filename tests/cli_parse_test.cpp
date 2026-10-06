@@ -37,6 +37,9 @@ namespace {
       "sample", "Sample", {}, {}, kFlags, kPositionals, {}, false,
   };
 
+  constexpr std::array kTextPositionals{noctalia::cli::Positional{"text", "Text", {}, false, false, false}};
+  constexpr noctalia::cli::Command kCopyCommand{"copy", "Copy", {}, {}, {}, kTextPositionals, {}, false};
+
   void checkFlags() {
     Args args{"-v", "--output=result.json", "--render", "a:b", "-r", "c:d", "--mode", "light", "input.png"};
     auto parsed = noctalia::cli::parseArgs(kCommand, args.pointers);
@@ -49,6 +52,22 @@ namespace {
     TEST_CHECK((renders == std::vector<std::string_view>{"a:b", "c:d"}));
     TEST_CHECK(parsed->positionals.size() == 1);
     TEST_CHECK(parsed->positionals[0] == "input.png");
+  }
+
+  void checkEndOfOptions() {
+    Args dashed{"--", "--help"};
+    auto parsed = noctalia::cli::parseArgs(kCopyCommand, dashed.pointers);
+    TEST_CHECK(parsed.has_value());
+    TEST_CHECK(!parsed->helpRequested);
+    TEST_CHECK(parsed->positionals.size() == 1);
+    TEST_CHECK(parsed->positionals[0] == "--help");
+
+    Args plain{"--help"};
+    auto help = noctalia::cli::parseArgs(kCopyCommand, plain.pointers);
+    TEST_CHECK(help.has_value() && help->helpRequested);
+
+    Args unknown{"--bogus"};
+    TEST_CHECK(!noctalia::cli::parseArgs(kCopyCommand, unknown.pointers).has_value());
   }
 
   void checkLastFlagWins() {
@@ -141,6 +160,7 @@ namespace {
 int main() {
   static_assert(noctalia::cli::validateCommand(kCommand));
   checkFlags();
+  checkEndOfOptions();
   checkLastFlagWins();
   checkErrors();
   checkRequiredFlag();

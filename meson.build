@@ -840,6 +840,7 @@ _noctalia_sources = files(
   'src/theme/hook_runner.cpp',
   'src/theme/template_engine.cpp',
   'src/cli/completions.cpp',
+  'src/cli/schema_json.cpp',
   'src/cli/parse.cpp',
   'src/cli/help.cpp',
   'src/theme/cli.cpp',
@@ -1165,8 +1166,15 @@ endif # build_tests
 
 
 # Independent desktop service and adaptive applications. GTK never enters shell dependencies.
+# D-Bus contract: protocols/dbus/*.xml is the single source of truth for interface shapes.
+helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
+  input: 'protocols/dbus/org.helix.Desktop.xml',
+  output: 'helix_desktop_introspection.h',
+  command: [find_program('python3'), files('scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'desktopIntrospectionXml'],
+)
+
 helix_service = executable('helix-service',
-  sources: files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp'),
+  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp'), helix_desktop_introspection_h],
   dependencies: noctalia_core_dep,
   cpp_args: _noctalia_cpp_args,
   install: true,
@@ -1278,6 +1286,15 @@ if build_tests
           helix_service, meson.project_source_root() / 'tests/desktop_audio/pipewire.conf'], timeout: 60)
     endif
   endif
+  _agent_python = meson.project_source_root() / 'tools/helix-agent/.venv/bin/python'
+  if run_command('test', '-x', _agent_python, check: false).returncode() == 0
+    test('helix_agent_policy', find_program(_agent_python),
+      args: [meson.project_source_root() / 'tests/helix_agent_policy_test.py', meson.project_source_root()])
+  endif
+  test('msg_risk_policy', find_program('python3'),
+    args: [meson.project_source_root() / 'tests/msg_risk_policy_test.py', meson.project_source_root(), noctalia_exe])
+  test('desktop_dbus_contract', find_program('python3'),
+    args: [meson.project_source_root() / 'tests/desktop_dbus_contract_test.py', meson.project_source_root()])
   test('desktop_migration_inventory', find_program('python3'),
     args: [meson.project_source_root() / 'tests/desktop_migration_test.py', meson.project_source_root()])
 endif

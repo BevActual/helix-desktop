@@ -23,7 +23,12 @@ namespace noctalia::ipc {
       std::print("{}", cli::renderHelp(cli::kMsgCmd, "noctalia msg"));
       return 0;
     }
-    if (argc >= 4 && (std::string_view(argv[argc - 1]) == "--help" || std::string_view(argv[argc - 1]) == "-h")) {
+    // A `--` before the final argument ends option parsing, so a trailing "--help" is payload.
+    bool endOfOptions = false;
+    for (int i = 3; i < argc - 1; ++i)
+      endOfOptions = endOfOptions || std::string_view(argv[i]) == "--";
+    if (!endOfOptions && argc >= 4
+        && (std::string_view(argv[argc - 1]) == "--help" || std::string_view(argv[argc - 1]) == "-h")) {
       if (const cli::Command* spec = cli::findMsgCommand(command); spec != nullptr) {
         std::string path = "noctalia msg ";
         path.append(command);
@@ -49,7 +54,13 @@ namespace noctalia::ipc {
     }
 
     std::string cmd = argv[2];
+    bool consumedEndOfOptions = false;
     for (int i = 3; i < argc; ++i) {
+      // The first `--` is a client-side marker; the server only receives the payload after it.
+      if (!consumedEndOfOptions && std::string_view(argv[i]) == "--") {
+        consumedEndOfOptions = true;
+        continue;
+      }
       cmd += ' ';
       cmd += argv[i];
     }
