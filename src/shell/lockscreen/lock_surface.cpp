@@ -15,7 +15,6 @@
 #include "shell/lockscreen/lockscreen_widgets_host.h"
 #include "shell/session/session_action_meta.h"
 #include "shell/session/session_action_runner.h"
-#include "system/weather_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -122,29 +121,6 @@ namespace {
       return buttonVariantFor(variant);
     }
     return ButtonVariant::Outline;
-  }
-
-  [[nodiscard]] std::string weekdayAbbrev(const std::string& isoDate) {
-    if (isoDate.size() != 10) {
-      return isoDate;
-    }
-    std::tm tm{};
-    tm.tm_year = std::stoi(isoDate.substr(0, 4)) - 1900;
-    tm.tm_mon = std::stoi(isoDate.substr(5, 2)) - 1;
-    tm.tm_mday = std::stoi(isoDate.substr(8, 2));
-    if (std::mktime(&tm) == -1) {
-      return isoDate;
-    }
-    const std::string weekday = formatStrftime("%a", tm);
-    return weekday.empty() ? isoDate : weekday;
-  }
-
-  [[nodiscard]] std::string todayIso(std::int32_t utcOffsetSeconds) {
-    const auto now = std::chrono::system_clock::now() + std::chrono::seconds{utcOffsetSeconds};
-    const std::time_t time = std::chrono::system_clock::to_time_t(now);
-    std::tm tm{};
-    gmtime_r(&time, &tm);
-    return formatStrftime("%Y-%m-%d", tm);
   }
 
 } // namespace
@@ -569,12 +545,9 @@ LockSurface::~LockSurface() {
   }
 }
 
-void LockSurface::setLoginBoxServices(
-    SessionActionRunner* sessionActions, MprisService* mpris, const WeatherService* weather, HttpClient* httpClient
-) {
+void LockSurface::setLoginBoxServices(SessionActionRunner* sessionActions, MprisService* mpris, HttpClient* httpClient) {
   m_sessionActions = sessionActions;
   m_mpris = mpris;
-  m_weather = weather;
   m_httpClient = httpClient;
   rebuildSessionButtons();
   requestUpdate();
@@ -1028,7 +1001,7 @@ void LockSurface::layoutScene(std::uint32_t width, std::uint32_t height) {
   m_loginPanel->setJustify(regular ? FlexJustify::Start : FlexJustify::Center);
 
   const bool mediaReady = m_mpris != nullptr && m_mpris->activePlayer().has_value();
-  const bool weatherReady = m_weather != nullptr && m_weather->enabled() && m_weather->hasData();
+  const bool weatherReady = false;
   const auto extras = lockscreen_login_box::resolveInfoExtrasVisibility(regular, loginStyle, mediaReady, weatherReady);
   const bool showMedia = extras.showMedia;
   const bool showWeather = extras.showWeather;
@@ -1438,7 +1411,7 @@ void LockSurface::syncRegularExtras(Renderer& renderer) {
   const bool regular =
       m_locked && !m_blackout && isLoginBoxEnabled() && style.layout == lockscreen_login_box::LayoutMode::Regular;
   const bool mediaReady = m_mpris != nullptr && m_mpris->activePlayer().has_value();
-  const bool weatherReady = m_weather != nullptr && m_weather->enabled() && m_weather->hasData();
+  const bool weatherReady = false;
   const auto extras = lockscreen_login_box::resolveInfoExtrasVisibility(regular, style, mediaReady, weatherReady);
 
   if (m_mediaBlock != nullptr && extras.showMedia && m_mediaTitle != nullptr && m_mediaArtist != nullptr) {
@@ -1489,83 +1462,6 @@ void LockSurface::syncRegularExtras(Renderer& renderer) {
       if (m_mediaFallbackGlyph != nullptr) {
         m_mediaFallbackGlyph->setVisible(!hasArt);
       }
-    }
-  }
-
-  if (m_weatherBlock != nullptr) {
-    // Visibility/budgets are owned by layout; only push content when shown.
-    if (extras.showWeather && m_weatherGlyph != nullptr && m_weatherTemp != nullptr && m_weatherMeta != nullptr) {
-      std::string fingerprint;
-      std::string glyphName = "weather-cloud";
-      std::string tempText = "--";
-      std::string metaText;
-      std::vector<std::tuple<std::string, std::string, std::string>> forecast;
-
-      if (weatherReady) {
-        const auto& snapshot = m_weather->snapshot();
-        glyphName = WeatherService::glyphForCode(snapshot.current.weatherCode, snapshot.current.isDay);
-        const int temp = static_cast<int>(std::lround(m_weather->displayTemperature(snapshot.current.temperatureC)));
-        tempText = std::format("{}{}", temp, m_weather->displayTemperatureUnit());
-        const bool imperial = m_weather->useImperial();
-        const double wind = imperial ? snapshot.current.windSpeedKmh * 0.621371 : snapshot.current.windSpeedKmh;
-        const char* windUnit = imperial
-            ? "mph"
-            : (snapshot.currentUnits.windSpeed.empty() ? "km/h" : snapshot.currentUnits.windSpeed.c_str());
-        metaText = std::format("{} {}", static_cast<int>(std::lround(wind)), windUnit);
-        const bool showLocation = m_config == nullptr || m_config->config().shell.showLocation;
-        if (showLocation && !snapshot.locationName.empty()) {
-          metaText = std::format("{} · {}", metaText, snapshot.locationName);
-        }
-
-        const bool weatherAlone = extras.showWeather && !extras.showMedia;
-        const int forecastDayCount = weatherAlone ? kForecastDayCountAlone : kForecastDayCountPaired;
-        const bool firstForecastIsToday = !snapshot.forecastDays.empty()
-            && snapshot.forecastDays.front().dateIso == todayIso(snapshot.utcOffsetSeconds);
-        const std::size_t forecastStart = firstForecastIsToday ? 1 : 0;
-        for (int i = 0; i < forecastDayCount; ++i) {
-          const std::size_t dayIndex = forecastStart + static_cast<std::size_t>(i);
-          if (dayIndex >= snapshot.forecastDays.size()) {
-            break;
-          }
-          const auto& day = snapshot.forecastDays[dayIndex];
-          forecast.emplace_back(
-              weekdayAbbrev(day.dateIso), WeatherService::glyphForCode(day.weatherCode, true),
-              std::format(
-                  "{}°/{}°", static_cast<int>(std::lround(m_weather->displayTemperature(day.temperatureMinC))),
-                  static_cast<int>(std::lround(m_weather->displayTemperature(day.temperatureMaxC)))
-              )
-          );
-        }
-        fingerprint = std::format(
-            "{}|{}|{}|{}|{}|{}", glyphName, tempText, metaText, forecast.size(), showLocation, weatherAlone
-        );
-      } else {
-        fingerprint = "nodata";
-      }
-
-      if (fingerprint != m_lastWeatherFingerprint) {
-        m_lastWeatherFingerprint = fingerprint;
-        m_weatherGlyph->setGlyph(glyphName);
-        m_weatherTemp->setText(tempText);
-        m_weatherMeta->setText(metaText);
-        m_weatherMeta->setVisible(!metaText.empty());
-        for (std::size_t i = 0; i < m_forecastColumns.size(); ++i) {
-          auto& column = m_forecastColumns[i];
-          const bool visible = i < forecast.size();
-          if (column.column != nullptr) {
-            column.column->setVisible(visible);
-          }
-          if (!visible) {
-            continue;
-          }
-          column.day->setText(std::get<0>(forecast[i]));
-          column.glyph->setGlyph(std::get<1>(forecast[i]));
-          column.temps->setText(std::get<2>(forecast[i]));
-          column.temps->setVisible(true);
-        }
-      }
-    } else {
-      m_lastWeatherFingerprint.clear();
     }
   }
 }

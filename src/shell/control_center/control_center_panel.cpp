@@ -10,8 +10,6 @@
 #include "core/input/key_symbols.h"
 #include "dbus/mpris/mpris_service.h"
 #include "i18n/i18n.h"
-#include "net/localsend_service.h"
-#include "net/tailscale_service.h"
 #include "notification/notification_manager.h"
 #include "render/core/renderer.h"
 #include "render/scene/input_area.h"
@@ -21,9 +19,6 @@
 #include "shell/control_center/tabs/desktop_tab.h"
 #include "shell/control_center/hub_tab.h"
 #include "shell/control_center/tabs/launcher_tab.h"
-#include "shell/control_center/tabs/ai_usage_tab.h"
-#include "shell/control_center/tabs/calendar_tab.h"
-#include "shell/control_center/tabs/camera_tab.h"
 #include "shell/control_center/tabs/clock_tab.h"
 #include "shell/control_center/tabs/clipboard_tab.h"
 #include "shell/control_center/tabs/home_tab.h"
@@ -34,12 +29,9 @@
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
 #include "shell/control_center/tabs/native_redirect_tab.h"
-#include "shell/control_center/tabs/firewall_tab.h"
-#include "shell/control_center/tabs/printers_tab.h"
 #include "shell/control_center/tabs/privacy_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
-#include "shell/control_center/tabs/weather_tab.h"
 #include "shell/wallpaper/video_wallpaper.h"
 #include "shell/wallpaper/wallhaven_client.h"
 #include "shell/panel/panel_button_style.h"
@@ -47,14 +39,11 @@
 #include "shell/settings/settings_registry.h"
 #include "shell/panel/panel_manager.h"
 #include "wayland/wayland_seat.h"
-#include "system/ai_usage_service.h"
 #include "system/dependency_service.h"
 #include "system/desktop_entry.h"
 #include "system/desktop_entry_launch.h"
 #include "desktop/settings_routes.h"
-#include "system/easyeffects_service.h"
 #include "system/package_kit_service.h"
-#include "system/screen_time_service.h"
 #include "ui/builders.h"
 #include "ui/controls/box.h"
 #include "ui/controls/button.h"
@@ -98,11 +87,8 @@ namespace {
 
   std::optional<NativeDestination> nativeDestinationForTab(std::string_view tab) {
     if (tab == "system") return NativeDestination{"helix-system-monitor", "overview"};
-    if (tab == "screen-time") return NativeDestination{"helix-system-monitor", "screen-time"};
     if (tab == "audio") return NativeDestination{"helix-settings", "sound"};
-    if (tab == "phone" || tab == "localsend" || tab == "syncthing" || tab == "cast")
-      return NativeDestination{"helix-phone", ""};
-    if (tab == "network" || tab == "tailscale") return NativeDestination{"helix-settings", "network"};
+    if (tab == "network") return NativeDestination{"helix-settings", "network"};
     if (tab == "bluetooth") return NativeDestination{"helix-settings", "bluetooth"};
     if (tab == "theme" || tab == "wallpaper") return NativeDestination{"helix-settings", "appearance"};
     if (tab == "privacy-security") return NativeDestination{"helix-settings", "privacy-security"};
@@ -165,11 +151,8 @@ namespace {
       {"home", "control-center.tabs.home", "home", false, TabGroup::Home},
       {"network", "control-center.tabs.network", "wifi", true, TabGroup::Connectivity},
       {"bluetooth", "control-center.tabs.bluetooth", "bluetooth", true, TabGroup::Connectivity},
-      {"tailscale", "control-center.tabs.tailscale", "circles", true, TabGroup::Connectivity},
-      {"phone", "control-center.tabs.phone", "device-mobile", true, TabGroup::Connectivity},
       {"notifications", "control-center.tabs.notifications", "bell", true, TabGroup::Attention},
       {"audio", "control-center.tabs.audio", "volume", true, TabGroup::Attention},
-      {"screen-time", "control-center.tabs.screen-time", "hourglass", true, TabGroup::Attention},
       {"theme", "settings.navigation.sections.theme", "palette", true, TabGroup::System},
       {"control-center", "settings.navigation.sections.control-center", "adjustments", true, TabGroup::System},
       {"launcher", "settings.navigation.sections.launcher", "rocket", true, TabGroup::System},
@@ -183,17 +166,9 @@ namespace {
       {"power", "control-center.tabs.power", "battery-charging-2", true, TabGroup::Desktop},
       {"keybinds", "settings.navigation.sections.keybinds", "keyboard", true, TabGroup::Devices},
       {"shell", "settings.navigation.sections.shell", "app-window", true, TabGroup::Devices},
-      {"printers", "control-center.tabs.printers", "printer", true, TabGroup::Devices},
-      {"camera", "control-center.tabs.camera", "camera", true, TabGroup::Devices},
-      {"localsend", "control-center.tabs.localsend", "share", true, TabGroup::Sharing},
-      {"syncthing", "control-center.tabs.syncthing", "folder", true, TabGroup::Sharing},
-      {"cast", "control-center.tabs.cast", "screen-share", true, TabGroup::Sharing},
-      {"calendar", "control-center.tabs.calendar", "calendar-event", true, TabGroup::Apps},
-      {"weather", "control-center.tabs.weather", "weather-cloud-sun", true, TabGroup::Apps},
       {"media", "control-center.tabs.media", "disc-filled", true, TabGroup::Apps},
       {"capture", "control-center.tabs.capture", "screenshot", true, TabGroup::Apps},
       {"clipboard", "control-center.tabs.clipboard", "clipboard", true, TabGroup::Apps},
-      {"ai", "control-center.tabs.ai", "sparkles", true, TabGroup::Apps},
       {"templates", "settings.navigation.sections.templates", "color-swatch", true, TabGroup::Apps},
       {"hooks", "settings.navigation.sections.hooks", "link", true, TabGroup::Advanced},
       {"niri", "settings.navigation.sections.niri", "niri", true, TabGroup::Advanced},
@@ -212,7 +187,6 @@ namespace {
 
   constexpr HubChildSpec kHubChildren[] = {
       {"privacy", "privacy-security", "control-center.tabs.privacy", "eye-off"},
-      {"firewall", "privacy-security", "control-center.tabs.firewall", "flame"},
       {"security", "privacy-security", "settings.navigation.sections.security", "lock"},
   };
 
@@ -247,8 +221,7 @@ namespace {
     if (id == "desktop") {
       return colorSpecFromRole(ColorRole::Tertiary);
     }
-    if (id == "network" || id == "bluetooth" || id == "tailscale" || id == "syncthing" || id == "localsend"
-        || id == "cast" || id == "phone") {
+    if (id == "network" || id == "bluetooth") {
       return fixed(kBlue);
     }
     if (id == "power" || id == "system") {
@@ -257,20 +230,16 @@ namespace {
     if (id == "audio" || id == "packages") {
       return fixed(kOrange);
     }
-    if (id == "notifications" || id == "calendar") {
+    if (id == "notifications") {
       return fixed(kRed);
     }
     if (id == "media" || id == "capture" || id == "launcher") {
       return fixed(kPink);
     }
-    if (id == "screen-time" || id == "clock" || id == "privacy-security" || id == "privacy" || id == "firewall"
-        || id == "security") {
+    if (id == "clock" || id == "privacy-security" || id == "privacy" || id == "security") {
       return fixed(kIndigo);
     }
-    if (id == "ai") {
-      return fixed(kPurple);
-    }
-    if (id == "monitor" || id == "weather") {
+    if (id == "monitor") {
       return fixed(kCyan);
     }
     if (id == "clipboard") {
@@ -327,12 +296,10 @@ namespace {
         || id == "scale"
         || id == "roundness"
         || id == "effects"
-        || id == "weather"
         || id == "notifications"
         || id == "power"
         || id == "system"
         || id == "packages"
-        || id == "calendar"
         || id == "clock"
         || id == "audio"
         || id == "privacy-security"
@@ -342,23 +309,13 @@ namespace {
         || id == "templates"
         || id == "keybinds"
         || id == "media"
-        || id == "screen-time"
-        || id == "ai"
         || id == "network"
         || id == "bluetooth"
         || id == "capture"
         || id == "clipboard"
-        || id == "tailscale"
-        || id == "localsend"
-        || id == "phone"
-        || id == "syncthing"
-        || id == "firewall"
-        || id == "printers"
-        || id == "cast"
         || id == "privacy"
         || id == "home"
         || id == "desktop"
-        || id == "camera"
         || id == "launcher";
   }
 
@@ -383,9 +340,6 @@ namespace {
     }
     if (context == "screenshot" || context == "screen-record" || context == "capture") {
       return "capture";
-    }
-    if (context == "ai" || context == "ai-usage") {
-      return "ai";
     }
     if (context == "widgets"
         || context == "corners"
@@ -476,7 +430,6 @@ namespace {
 
 ControlCenterPanel::ControlCenterPanel(const ControlCenterServices& services) {
   m_config = services.config;
-  m_aiUsage = services.aiUsage;
   m_mpris = services.mpris;
   m_notificationManager = services.notifications;
   m_dependencies = services.dependencies;
@@ -523,12 +476,9 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
 
   add("network", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.network", services.platform));
   add("bluetooth", std::make_unique<NativeRedirectTab>("helix-settings", "bluetooth", "control-center.tabs.bluetooth", services.platform));
-  add("tailscale", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.tailscale", services.platform));
-  add("phone", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.phone", services.platform));
 
   add("notifications", std::make_unique<NativeRedirectTab>("helix-settings", "notifications", "control-center.tabs.notifications", services.platform));
   add("audio", std::make_unique<NativeRedirectTab>("helix-settings", "sound", "control-center.tabs.audio", services.platform));
-  add("screen-time", std::make_unique<NativeRedirectTab>("helix-system-monitor", "screen-time", "control-center.tabs.screen-time", services.platform));
 
   add("theme", std::make_unique<NativeRedirectTab>("helix-settings", "appearance", "settings.navigation.sections.theme", services.platform));
   add(
@@ -541,7 +491,6 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   {
     std::vector<HubTab::Child> privacySecurity;
     privacySecurity.push_back(hubChild("privacy", std::make_unique<PrivacyTab>(services)));
-    privacySecurity.push_back(hubChild("firewall", std::make_unique<FirewallTab>(services)));
     privacySecurity.push_back(hubChild("security", std::make_unique<SettingsTab>(services, "security")));
     add("privacy-security", std::make_unique<HubTab>(std::move(privacySecurity)));
   }
@@ -561,19 +510,11 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
           std::unordered_set<std::string>{"general", "keyboard-layout", "window-switcher"}
       )
   );
-  add("printers", std::make_unique<PrintersTab>(services));
-  add("camera", std::make_unique<CameraTab>(services));
 
-  add("localsend", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.localsend", services.platform));
-  add("syncthing", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.syncthing", services.platform));
-  add("cast", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.cast", services.platform));
 
-  add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
-  add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
   add("media", std::make_unique<MediaTab>(services.mpris, services.httpClient, services.spectrum, services));
   add("capture", std::make_unique<CaptureTab>(services));
   add("clipboard", std::make_unique<ClipboardTab>(services));
-  add("ai", std::make_unique<AiUsageTab>(services));
   add("templates", std::make_unique<TemplatesTab>(services));
 
   add("hooks", std::make_unique<SettingsTab>(services, "hooks"));
@@ -1023,7 +964,6 @@ void ControlCenterPanel::doUpdate(Renderer& renderer) {
     syncTabVisibility();
   }
   syncPackagesBadge();
-  syncAiBadge();
   if (auto* slot = slotById(m_activeTabId); slot != nullptr && slot->tab != nullptr) {
     slot->tab->update(renderer);
   }
@@ -1304,9 +1244,6 @@ bool ControlCenterPanel::isTabVisible(std::string_view id) const {
   if (std::ranges::contains(hidden, id)) {
     return false;
   }
-  if (id == "ai" && std::ranges::contains(hidden, "ai-usage")) {
-    return false;
-  }
   if (id == "capture"
       && (std::ranges::contains(hidden, "screenshot") || std::ranges::contains(hidden, "screen-record"))) {
     return false;
@@ -1440,28 +1377,6 @@ void ControlCenterPanel::syncPackagesBadge() {
   slot->button->setBadge(badge);
   slot->button->setBadgeFontSize(Style::fontSizeCaption * contentScale());
   const std::string waiting = i18n::tr("control-center.packages.updates-waiting", "count", std::to_string(count));
-  slot->button->setTooltip(m_compact ? slot->title + " · " + waiting : waiting);
-}
-
-void ControlCenterPanel::syncAiBadge() {
-  auto* slot = slotById("ai");
-  if (slot == nullptr || slot->button == nullptr || m_aiUsage == nullptr) {
-    return;
-  }
-  const auto hit = noctalia::ai_usage::hottestQuota(m_aiUsage->snapshot());
-  const int attention = m_aiUsage->attentionPercent();
-  if (!hit.has_value() || hit->window.percent + 0.5F < static_cast<float>(attention)) {
-    slot->button->setBadge("");
-    slot->button->setTooltip(m_compact ? slot->title : std::string{});
-    return;
-  }
-  const int percent = static_cast<int>(std::lround(hit->window.percent));
-  slot->button->setBadge(std::to_string(percent));
-  slot->button->setBadgeFontSize(Style::fontSizeCaption * contentScale());
-  const std::string waiting = i18n::tr(
-      "control-center.ai-usage.attention-tooltip", "provider", noctalia::ai_usage::providerLabel(hit->provider),
-      "window", noctalia::ai_usage::windowLabel(hit->window.key), "percent", std::to_string(percent)
-  );
   slot->button->setTooltip(m_compact ? slot->title + " · " + waiting : waiting);
 }
 

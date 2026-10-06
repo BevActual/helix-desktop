@@ -4,7 +4,6 @@
 #include "core/log.h"
 #include "shell/desktop/widgets/desktop_audio_visualizer_widget.h"
 #include "shell/desktop/widgets/desktop_button_widget.h"
-#include "shell/desktop/widgets/desktop_calendar_widget.h"
 #include "shell/desktop/widgets/desktop_clock_widget.h"
 #include "shell/desktop/widgets/desktop_fancy_audio_visualizer_widget.h"
 #include "shell/desktop/widgets/desktop_label_widget.h"
@@ -14,7 +13,6 @@
 #include "shell/desktop/widgets/desktop_sticker_widget.h"
 #include "shell/desktop/widgets/desktop_sysmon_widget.h"
 #include "shell/desktop/widgets/desktop_volume_widget.h"
-#include "shell/desktop/widgets/desktop_weather_widget.h"
 #include "system/format_units.h"
 #include "ui/controls/button.h"
 
@@ -181,26 +179,12 @@ namespace {
 } // namespace
 
 DesktopWidgetFactory::DesktopWidgetFactory(DesktopWidgetRuntimeServices services)
-    : m_calendar(services.calendar), m_pipewire(services.pipewire), m_pipewireSpectrum(services.pipewireSpectrum),
-      m_weather(services.weather), m_mpris(services.mpris), m_httpClient(services.httpClient),
-      m_sysmon(services.sysmon), m_scriptDeps(services.scriptDeps) {}
+    : m_pipewire(services.pipewire), m_pipewireSpectrum(services.pipewireSpectrum), m_mpris(services.mpris),
+      m_httpClient(services.httpClient), m_sysmon(services.sysmon), m_scriptDeps(services.scriptDeps) {}
 
 std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
     const std::string& type, const std::unordered_map<std::string, WidgetSettingValue>& settings, float contentScale
 ) const {
-  if (type == "calendar") {
-    auto widget = std::make_unique<DesktopCalendarWidget>(
-        m_scriptDeps.configService, m_calendar,
-        DesktopCalendarWidget::Options{
-            .showEvents = getBoolSetting(settings, "show_events", false),
-            .showWeekNumbers = getBoolSetting(settings, "show_week_numbers", false),
-        }
-    );
-    applyCommonSettings(*widget, settings);
-    widget->setContentScale(contentScale);
-    return widget;
-  }
-
   if (type == "clock") {
     const std::string styleSetting = getStringSetting(settings, "clock_style", "digital");
     const DesktopClockWidget::Style style =
@@ -274,25 +258,6 @@ std::unique_ptr<DesktopWidget> DesktopWidgetFactory::create(
   if (type == "sticker") {
     auto widget = std::make_unique<DesktopStickerWidget>(
         getStringSetting(settings, "image_path"), std::clamp(getFloatSetting(settings, "opacity", 1.0F), 0.0F, 1.0F)
-    );
-    applyCommonSettings(*widget, settings);
-    widget->setContentScale(contentScale);
-    return widget;
-  }
-
-  if (type == "weather") {
-    if (m_weather == nullptr) {
-      kLog.warn("desktop widget factory: weather requires WeatherService");
-      return nullptr;
-    }
-    auto widget = std::make_unique<DesktopWeatherWidget>(
-        m_weather,
-        DesktopWeatherWidget::Options{
-            .color = getColorSpecSetting(settings, "color", colorSpecFromRole(ColorRole::OnSurface)),
-            .shadow = getBoolSetting(settings, "shadow", true),
-            .showForecast = getBoolSetting(settings, "show_forecast", false),
-            .forecastDays = getIntSetting(settings, "forecast_days", 3),
-        }
     );
     applyCommonSettings(*widget, settings);
     widget->setContentScale(contentScale);

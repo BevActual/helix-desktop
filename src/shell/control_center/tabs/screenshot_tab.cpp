@@ -8,7 +8,6 @@
 #include "shell/control_center/control_center_services.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
-#include "system/desktop_ai.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
@@ -40,25 +39,7 @@ namespace {
 } // namespace
 
 ScreenshotTab::ScreenshotTab(const ControlCenterServices& services)
-    : m_ipc(services.ipc), m_desktopAi(services.desktopAi), m_config(services.config),
-      m_thumbnails(services.thumbnails) {
-  if (m_desktopAi != nullptr) {
-    m_desktopAi->addChangeCallback([this]() {
-      if (m_desktopAi->state().surface != DesktopAiSurface::Capture) {
-        return;
-      }
-      m_aiStatus = m_desktopAi->state().result.empty() ? m_desktopAi->state().status : m_desktopAi->state().result;
-      constexpr std::size_t kMaxStatus = 180;
-      if (m_aiStatus.size() > kMaxStatus) {
-        m_aiStatus.resize(kMaxStatus);
-      }
-      if (m_status != nullptr && m_countdownLeft == 0) {
-        m_status->setText(m_aiStatus);
-        PanelManager::instance().requestRedraw();
-      }
-    });
-  }
-}
+    : m_ipc(services.ipc), m_config(services.config), m_thumbnails(services.thumbnails) {}
 
 std::unique_ptr<Flex> ScreenshotTab::createCompactBody() {
   const float scale = contentScale();
@@ -321,7 +302,7 @@ void ScreenshotTab::syncCountdownUi() {
     return;
   }
   if (!counting) {
-    m_status->setText(m_aiStatus);
+    m_status->setText(std::string{});
     return;
   }
   m_status->setText(i18n::tr("control-center.screenshot.countdown", "seconds", std::to_string(m_countdownLeft)));
@@ -344,18 +325,6 @@ void ScreenshotTab::bindRecentGallery() {
       .showAnnotate = true,
       .onOpen = [this](const std::string& path) { openRecentFile(path); },
       .onAnnotate = [this](const std::string& path) { annotateRecentFile(path); },
-      .onRead =
-          [this](const std::string& path) {
-            if (m_desktopAi != nullptr) {
-              m_desktopAi->readImage(path);
-            }
-          },
-      .onDescribe =
-          [this](const std::string& path) {
-            if (m_desktopAi != nullptr) {
-              m_desktopAi->describeImage(path);
-            }
-          },
       .onStatus =
           [this](std::string_view message) {
             if (m_status != nullptr) {

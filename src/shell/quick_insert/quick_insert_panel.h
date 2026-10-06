@@ -1,7 +1,6 @@
 #pragma once
 
 #include "config/config_types.h"
-#include "system/desktop_ai.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/launcher_provider.h"
 #include "render/core/thumbnail_service.h"
@@ -17,7 +16,6 @@
 
 class ClipboardService;
 class ConfigService;
-class DesktopAiService;
 class Flex;
 class Button;
 class Input;
@@ -36,7 +34,7 @@ public:
   enum class Source : std::uint8_t { Emoji, Recents, Clipboard };
 
   QuickInsertPanel(
-      ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails, DesktopAiService* desktopAi
+      ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails
   );
   ~QuickInsertPanel() override;
 
@@ -77,10 +75,6 @@ private:
   void insertRecent(const std::string& path);
   void insertClipboard(std::size_t historyIndex);
   void finishInsert(bool copied, bool isImage);
-  void syncAiActions();
-  void onDesktopAiChanged();
-  void requestTextTransform(DesktopAiTask task);
-  void requestVision(bool describe);
   [[nodiscard]] std::string selectedInsertText();
   [[nodiscard]] std::string selectedRecentPath() const;
   bool handleKeyEvent(std::uint32_t sym, std::uint32_t modifiers);
@@ -93,7 +87,6 @@ private:
   ConfigService* m_config = nullptr;
   ClipboardService* m_clipboard = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
-  DesktopAiService* m_desktopAi = nullptr;
   bool m_pasteOnResult = false;
   EmojiProvider m_emoji;
   Source m_source = Source::Emoji;
@@ -115,15 +108,6 @@ private:
   VirtualGridView* m_recentsGrid = nullptr;
   VirtualGridView* m_clipboardGrid = nullptr;
   Label* m_emptyLabel = nullptr;
-  Flex* m_aiRow = nullptr;
-  Label* m_aiStatus = nullptr;
-  Button* m_summarizeButton = nullptr;
-  Button* m_translateButton = nullptr;
-  Button* m_rewriteButton = nullptr;
-  Button* m_speakButton = nullptr;
-  Button* m_dictateButton = nullptr;
-  Button* m_readButton = nullptr;
-  Button* m_describeButton = nullptr;
 
   std::unique_ptr<QuickInsertEmojiAdapter> m_emojiAdapter;
   std::unique_ptr<QuickInsertRecentsAdapter> m_recentsAdapter;

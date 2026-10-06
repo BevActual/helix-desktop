@@ -5,7 +5,6 @@
 #include "pipewire/pipewire_service.h"
 #include "render/scene/input_area.h"
 #include "render/scene/node.h"
-#include "system/easyeffects_service.h"
 #include "ui/builders.h"
 #include "ui/palette.h"
 #include "ui/style.h"
@@ -16,8 +15,8 @@
 #include <string_view>
 #include <utility>
 
-VolumeWidget::VolumeWidget(PipeWireService* audio, EasyEffectsService* easyEffects, Options options)
-    : m_audio(audio), m_easyEffects(easyEffects), m_showLabel(options.showLabel), m_target(options.device),
+VolumeWidget::VolumeWidget(PipeWireService* audio, Options options)
+    : m_audio(audio), m_showLabel(options.showLabel), m_target(options.device),
       m_muteColor(options.muteColor), m_glyphOverride(std::move(options.glyph)),
       m_muteGlyphOverride(std::move(options.muteGlyph)),
       m_effectsProfileGlyphs(std::move(options.effectsProfileGlyphs)),
@@ -113,10 +112,7 @@ void VolumeWidget::syncState(Renderer& renderer) {
   const auto* node = m_target == VolumeWidgetTarget::Input ? m_audio->defaultSource() : m_audio->defaultSink();
   float volume = node != nullptr ? node->volume : 0.0F;
   bool muted = node != nullptr ? node->muted : false;
-  const auto kind =
-      m_target == VolumeWidgetTarget::Input ? AudioEffectsProfileKind::Input : AudioEffectsProfileKind::Output;
-  const std::string effectsProfile =
-      m_easyEffects != nullptr ? m_easyEffects->activeEffectsProfile(kind) : std::string{};
+  const std::string effectsProfile;
   // Reuses the privacy signal: a microphone capture exists while an application is linked to a
   // source. Skipped entirely for the output widget, where m_hideWhenInactive is always false.
   const bool micActive =

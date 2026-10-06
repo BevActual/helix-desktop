@@ -32,7 +32,6 @@ class SessionActionRunner;
 class SharedTextureCache;
 class SystemBus;
 class WaylandConnection;
-class WeatherService;
 
 class LockScreen {
 public:
@@ -47,7 +46,7 @@ public:
       std::function<void()> onLocked, std::function<void()> onUnlocked, std::function<void()> onLockAborted
   );
   void setLoginBoxServices(
-      SessionActionRunner* sessionActions, MprisService* mpris, const WeatherService* weather, HttpClient* httpClient
+      SessionActionRunner* sessionActions, MprisService* mpris, HttpClient* httpClient
   );
   bool lock();
   void primeDesktopCaptures();
@@ -150,7 +149,6 @@ private:
   std::function<void()> m_onLockAborted;
   SessionActionRunner* m_sessionActions = nullptr;
   MprisService* m_mpris = nullptr;
-  const WeatherService* m_weather = nullptr;
   HttpClient* m_httpClient = nullptr;
   Timer m_suspendTimeoutTimer;
 };

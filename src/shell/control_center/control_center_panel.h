@@ -135,7 +135,6 @@ private:
   void addSidebarTabButton(class RovingListNavHost& nav, TabSlot& slot, float scale);
   void addSidebarGroupHeader(class RovingListNavHost& nav, TabGroup group, float scale);
   void syncPackagesBadge();
-  void syncAiBadge();
   void applySettingsSearch(std::string value);
   void syncActiveTabSearch();
   [[nodiscard]] std::unique_ptr<Input> createSettingsSearchInput(float scale);
@@ -180,7 +179,6 @@ private:
   Box* m_sidebarEdgeFade = nullptr;
   Box* m_contentEdgeFade = nullptr;
   ConfigService* m_config = nullptr;
-  AiUsageService* m_aiUsage = nullptr;
   MprisService* m_mpris = nullptr;
   NotificationManager* m_notificationManager = nullptr;
   DependencyService* m_dependencies = nullptr;

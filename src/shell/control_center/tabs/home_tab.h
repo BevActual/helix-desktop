@@ -21,7 +21,6 @@
 class AccountsService;
 class AsyncTextureCache;
 class Button;
-class CalendarService;
 class CompositorPlatform;
 class HttpClient;
 class IpcService;
@@ -114,8 +113,6 @@ private:
   BrightnessService* m_brightness = nullptr;
   SessionActionRunner* m_session = nullptr;
   HttpClient* m_httpClient = nullptr;
-  WeatherService* m_weather = nullptr;
-  CalendarService* m_calendar = nullptr;
   ConfigService* m_config = nullptr;
   AccountsService* m_accounts = nullptr;
   Wallpaper* m_wallpaper = nullptr;
@@ -156,11 +153,7 @@ private:
   Button* m_statusNightLight = nullptr;
   Button* m_statusCaffeine = nullptr;
   Button* m_statusDnd = nullptr;
-  Button* m_statusLocalSend = nullptr;
-  Button* m_statusPhone = nullptr;
   Button* m_statusPrivacy = nullptr;
-  Button* m_statusCast = nullptr;
-  Button* m_statusFirewall = nullptr;
   InputArea* m_userCardKeyboardArea = nullptr;
   InputArea* m_userCardArea = nullptr;
   InputArea* m_mediaCardArea = nullptr;

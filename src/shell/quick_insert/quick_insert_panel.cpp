@@ -77,23 +77,6 @@ namespace {
     return out;
   }
 
-  std::unique_ptr<Button> makeAiButton(
-      Button** out, std::string glyph, float scale, std::function<void()> onClick, std::string tooltip
-  ) {
-    return ui::button({
-        .out = out,
-        .glyph = std::move(glyph),
-        .glyphSize = Style::fontSizeBody * scale,
-        .variant = ButtonVariant::Default,
-        .tooltip = std::move(tooltip),
-        .minWidth = Style::controlHeightSm * scale,
-        .minHeight = Style::controlHeightSm * scale,
-        .padding = Style::spaceXs * scale,
-        .radius = Style::scaledRadiusMd(scale),
-        .onClick = std::move(onClick),
-    });
-  }
-
   std::string clipboardTitle(const ClipboardEntry& entry) {
     if (!entry.textPreview.empty()) {
       return collapseWhitespace(entry.textPreview);
@@ -398,14 +381,9 @@ private:
   std::function<void(std::size_t)> m_onActivate;
 };
 
-QuickInsertPanel::QuickInsertPanel(
-    ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails, DesktopAiService* desktopAi
-)
-    : m_config(config), m_clipboard(clipboard), m_thumbnails(thumbnails), m_desktopAi(desktopAi), m_emoji(clipboard) {
+QuickInsertPanel::QuickInsertPanel(ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails)
+    : m_config(config), m_clipboard(clipboard), m_thumbnails(thumbnails), m_emoji(clipboard) {
   m_emoji.initialize();
-  if (m_desktopAi != nullptr) {
-    m_desktopAi->addChangeCallback([this]() { onDesktopAiChanged(); });
-  }
 }
 
 QuickInsertPanel::~QuickInsertPanel() {
@@ -515,54 +493,6 @@ void QuickInsertPanel::create() {
           },
   }));
   compactCard->addChild(std::move(chips));
-  const float scaleForAi = scale;
-  compactCard->addChild(ui::row(
-      {
-          .out = &m_aiRow,
-          .align = FlexAlign::Center,
-          .gap = Style::spaceXs * scaleForAi,
-          .visible = false,
-          .participatesInLayout = false,
-      },
-      makeAiButton(
-          &m_summarizeButton, "notes", scaleForAi, [this]() { requestTextTransform(DesktopAiTask::Summarize); },
-          i18n::tr("clipboard.actions.summarize")
-      ),
-      makeAiButton(
-          &m_translateButton, "language", scaleForAi, [this]() { requestTextTransform(DesktopAiTask::Translate); },
-          i18n::tr("clipboard.actions.translate")
-      ),
-      makeAiButton(
-          &m_rewriteButton, "pencil", scaleForAi, [this]() { requestTextTransform(DesktopAiTask::Rewrite); },
-          i18n::tr("clipboard.actions.rewrite")
-      ),
-      makeAiButton(
-          &m_speakButton, "volume", scaleForAi, [this]() { requestTextTransform(DesktopAiTask::Speak); },
-          i18n::tr("clipboard.actions.speak")
-      ),
-      makeAiButton(
-          &m_dictateButton, "microphone", scaleForAi, [this]() { requestTextTransform(DesktopAiTask::Dictate); },
-          i18n::tr("clipboard.actions.dictate")
-      ),
-      makeAiButton(
-          &m_readButton, "text-recognition", scaleForAi, [this]() { requestVision(false); },
-          i18n::tr("control-center.screenshot.read")
-      ),
-      makeAiButton(
-          &m_describeButton, "eye", scaleForAi, [this]() { requestVision(true); },
-          i18n::tr("control-center.screenshot.describe")
-      )
-  ));
-  compactCard->addChild(
-      ui::label({
-          .out = &m_aiStatus,
-          .fontSize = Style::fontSizeCaption * scaleForAi,
-          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
-          .maxLines = 2,
-          .visible = false,
-          .participatesInLayout = false,
-      })
-  );
   container->addChild(std::move(compactCard));
 
   auto leftover = ui::column({
@@ -722,7 +652,6 @@ void QuickInsertPanel::doUpdate(Renderer& renderer) {
   if (m_source == Source::Clipboard && m_clipboard != nullptr && m_clipboard->changeSerial() != m_clipboardSerial) {
     refreshClipboard();
   }
-  syncAiActions();
   if (m_thumbnails != nullptr) {
     (void)m_thumbnails->uploadPending(renderer.textureManager());
     if (m_thumbnailRefreshPending && m_recentsGrid != nullptr) {
@@ -1025,139 +954,6 @@ std::string QuickInsertPanel::selectedRecentPath() const {
     return m_recentPaths[m_selectedIndex];
   }
   return {};
-}
-
-void QuickInsertPanel::requestTextTransform(DesktopAiTask task) {
-  if (m_desktopAi == nullptr) {
-    return;
-  }
-  if (task == DesktopAiTask::Dictate) {
-    m_pasteOnResult = true;
-    m_desktopAi->toggleDictation();
-    return;
-  }
-  const std::string text = selectedInsertText();
-  if (task == DesktopAiTask::Speak) {
-    m_pasteOnResult = false;
-    m_desktopAi->speak(text);
-    return;
-  }
-  m_pasteOnResult = true;
-  switch (task) {
-  case DesktopAiTask::Summarize:
-    m_desktopAi->summarize(text);
-    break;
-  case DesktopAiTask::Translate:
-    m_desktopAi->translate(text);
-    break;
-  case DesktopAiTask::Rewrite:
-    m_desktopAi->rewrite(text);
-    break;
-  default:
-    m_pasteOnResult = false;
-    break;
-  }
-}
-
-void QuickInsertPanel::requestVision(bool describe) {
-  if (m_desktopAi == nullptr) {
-    return;
-  }
-  const std::string path = selectedRecentPath();
-  if (path.empty()) {
-    return;
-  }
-  m_pasteOnResult = true;
-  if (describe) {
-    m_desktopAi->describeImage(path);
-  } else {
-    m_desktopAi->readImage(path);
-  }
-}
-
-void QuickInsertPanel::onDesktopAiChanged() {
-  syncAiActions();
-  if (!m_pasteOnResult || m_desktopAi == nullptr) {
-    PanelManager::instance().requestLayout();
-    return;
-  }
-  const DesktopAiState& state = m_desktopAi->state();
-  if (state.busy || state.recording) {
-    PanelManager::instance().requestLayout();
-    return;
-  }
-  m_pasteOnResult = false;
-  if (state.failed || state.result.empty() || state.task == DesktopAiTask::Speak) {
-    PanelManager::instance().requestLayout();
-    return;
-  }
-  finishInsert(true, false);
-}
-
-void QuickInsertPanel::syncAiActions() {
-  const bool show = m_desktopAi != nullptr;
-  const bool clipboard = m_source == Source::Clipboard;
-  const bool recents = m_source == Source::Recents;
-  if (m_aiRow != nullptr) {
-    m_aiRow->setVisible(show);
-    m_aiRow->setParticipatesInLayout(show);
-  }
-  const auto showButton = [](Button* button, bool visible) {
-    if (button == nullptr) {
-      return;
-    }
-    button->setVisible(visible);
-    button->setParticipatesInLayout(visible);
-  };
-  showButton(m_summarizeButton, show && clipboard);
-  showButton(m_translateButton, show && clipboard);
-  showButton(m_rewriteButton, show && clipboard);
-  showButton(m_speakButton, show && clipboard);
-  showButton(m_dictateButton, show);
-  showButton(m_readButton, show && recents);
-  showButton(m_describeButton, show && recents);
-
-  const auto arm = [this](Button* button, noctalia::ai_usage::LocalAiCapability capability, std::string tooltip) {
-    if (button == nullptr || m_desktopAi == nullptr) {
-      return;
-    }
-    const bool recording = m_desktopAi->state().recording;
-    const std::string reason = m_desktopAi->unavailableReason(capability);
-    const bool enabled = reason.empty() && !recording;
-    button->setEnabled(enabled);
-    button->setTooltip(enabled ? tooltip : (reason.empty() ? i18n::tr("desktop-ai.busy") : reason));
-  };
-  arm(m_summarizeButton, noctalia::ai_usage::LocalAiCapability::Chat, i18n::tr("clipboard.actions.summarize"));
-  arm(m_translateButton, noctalia::ai_usage::LocalAiCapability::Chat, i18n::tr("clipboard.actions.translate"));
-  arm(m_rewriteButton, noctalia::ai_usage::LocalAiCapability::Chat, i18n::tr("clipboard.actions.rewrite"));
-  arm(m_speakButton, noctalia::ai_usage::LocalAiCapability::Tts, i18n::tr("clipboard.actions.speak"));
-  arm(m_readButton, noctalia::ai_usage::LocalAiCapability::Vision, i18n::tr("control-center.screenshot.read"));
-  arm(m_describeButton, noctalia::ai_usage::LocalAiCapability::Vision, i18n::tr("control-center.screenshot.describe"));
-  if (m_dictateButton != nullptr && m_desktopAi != nullptr) {
-    const bool recording = m_desktopAi->state().recording;
-    const std::string reason = m_desktopAi->unavailableReason(noctalia::ai_usage::LocalAiCapability::Transcript);
-    m_dictateButton->setEnabled(recording || reason.empty());
-    m_dictateButton->setGlyph(recording ? "player-stop" : "microphone");
-    m_dictateButton->setVariant(recording ? ButtonVariant::Primary : ButtonVariant::Default);
-    m_dictateButton->setTooltip(
-        !recording && !reason.empty() ? reason : i18n::tr("clipboard.actions.dictate")
-    );
-  }
-  if (m_aiStatus != nullptr) {
-    std::string status;
-    if (show && m_desktopAi != nullptr && (m_pasteOnResult || m_desktopAi->state().recording)) {
-      const DesktopAiState& state = m_desktopAi->state();
-      status = !state.busy && !state.recording && !state.result.empty() ? state.result : state.status;
-      constexpr std::size_t kMaxStatus = 160;
-      if (status.size() > kMaxStatus) {
-        status.resize(kMaxStatus);
-      }
-    }
-    m_aiStatus->setText(status);
-    const bool showStatus = !status.empty();
-    m_aiStatus->setVisible(showStatus);
-    m_aiStatus->setParticipatesInLayout(showStatus);
-  }
 }
 
 void QuickInsertPanel::finishInsert(bool copied, bool isImage) {

@@ -2,7 +2,6 @@
 
 #include "i18n/i18n.h"
 #include "shell/bar/widget_gesture_defaults.h"
-#include "shell/bar/widgets/ai_widget_definition.h"
 #include "shell/bar/widgets/active_window_widget_definition.h"
 #include "shell/bar/widgets/audio_visualizer_widget_definition.h"
 #include "shell/bar/widgets/battery_widget_definition.h"
@@ -34,7 +33,6 @@
 #include "shell/bar/widgets/tray_widget_definition.h"
 #include "shell/bar/widgets/volume_widget_definition.h"
 #include "shell/bar/widgets/wallpaper_widget_definition.h"
-#include "shell/bar/widgets/weather_widget_definition.h"
 #include "shell/bar/widgets/workspaces_widget_definition.h"
 #include "shell/settings/font_family_catalog.h"
 #include "shell/settings/font_weight_catalog.h"
@@ -130,7 +128,6 @@ namespace settings {
     }
 
     constexpr std::array kTypedWidgetDefinitions{
-        projectWidgetDefinition<aiWidgetDefinition>(),
         projectWidgetDefinition<activeWindowWidgetDefinition>(),
         projectWidgetDefinition<audioVisualizerWidgetDefinition>(),
         projectWidgetDefinition<batteryWidgetDefinition>(),
@@ -162,7 +159,6 @@ namespace settings {
         projectWidgetDefinition<trayWidgetDefinition>(),
         projectWidgetDefinition<volumeWidgetDefinition>(),
         projectWidgetDefinition<wallpaperWidgetDefinition>(),
-        projectWidgetDefinition<weatherWidgetDefinition>(),
         projectWidgetDefinition<workspacesWidgetDefinition>(),
     };
 
@@ -221,7 +217,6 @@ namespace settings {
     }
 
     const std::vector<WidgetTypeSpec> kWidgetTypeSpecs = {
-        {.type = "ai", .labelKey = "settings.widgets.types.ai", .glyph = "sparkles"},
         {.type = "active_window", .labelKey = "settings.widgets.types.active-window", .glyph = "app-window"},
         {.type = "audio_visualizer", .labelKey = "settings.widgets.types.audio-visualizer", .glyph = "wave-sine"},
         {.type = "battery", .labelKey = "settings.widgets.types.battery", .glyph = "battery-4"},
@@ -253,7 +248,6 @@ namespace settings {
         {.type = "tray", .labelKey = "settings.widgets.types.tray", .glyph = "apps"},
         {.type = "volume", .labelKey = "settings.widgets.types.volume", .glyph = "volume-high"},
         {.type = "wallpaper", .labelKey = "settings.widgets.types.wallpaper", .glyph = "wallpaper-selector"},
-        {.type = "weather", .labelKey = "settings.widgets.types.weather", .glyph = "weather-cloud"},
         {.type = "workspaces", .labelKey = "settings.widgets.types.workspaces", .glyph = "layout-grid"},
     };
 

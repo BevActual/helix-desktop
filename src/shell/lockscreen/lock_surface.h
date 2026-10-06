@@ -37,7 +37,6 @@ class Renderer;
 class SessionActionRunner;
 class SharedTextureCache;
 class WallpaperNode;
-class WeatherService;
 struct KeyboardEvent;
 struct PointerEvent;
 struct SessionPanelActionConfig;
@@ -67,7 +66,7 @@ public:
   void setOnCycleLayout(std::function<void()> onCycleLayout);
   void setOnPasswordChanged(std::function<void(const std::string&)> onPasswordChanged);
   void setLoginBoxServices(
-      SessionActionRunner* sessionActions, MprisService* mpris, const WeatherService* weather, HttpClient* httpClient
+      SessionActionRunner* sessionActions, MprisService* mpris, HttpClient* httpClient
   );
   void selectAllPassword();
   void clearPasswordSelection();
@@ -194,13 +193,11 @@ private:
 
   SessionActionRunner* m_sessionActions = nullptr;
   MprisService* m_mpris = nullptr;
-  const WeatherService* m_weather = nullptr;
   HttpClient* m_httpClient = nullptr;
   std::unordered_set<std::string> m_pendingArtDownloads;
   std::shared_ptr<void> m_aliveGuard = std::make_shared<int>(0);
   std::string m_lastArtUrl;
   std::string m_lastMediaTitle;
   std::string m_lastMediaArtist;
-  std::string m_lastWeatherFingerprint;
   std::vector<std::string> m_lastSessionActionKeys;
 };

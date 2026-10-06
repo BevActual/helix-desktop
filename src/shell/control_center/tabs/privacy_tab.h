@@ -12,7 +12,6 @@ class Button;
 class ConfigService;
 class Flex;
 class Label;
-class LocationService;
 class PipeWireService;
 class ScrollView;
 class Separator;
@@ -41,7 +40,6 @@ private:
 
   PipeWireService* m_audio = nullptr;
   ConfigService* m_config = nullptr;
-  LocationService* m_location = nullptr;
   std::unique_ptr<SettingsPane> m_settings;
 
   Flex* m_rootLayout = nullptr;

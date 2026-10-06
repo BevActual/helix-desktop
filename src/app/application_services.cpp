@@ -19,12 +19,7 @@
 #include "dbus/idle/screensaver_poll_source.h"
 #include "dbus/idle/screensaver_service.h"
 #include "dbus/logind/logind_service.h"
-#include "dbus/modem/modem_manager_service.h"
 #include "dbus/mpris/mpris_service.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
-#include "dbus/firewall/firewall_service.h"
-#include "dbus/cups/printer_service.h"
-#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/iwd_secret_agent.h"
 #include "dbus/network/iwd_service.h"
@@ -78,13 +73,10 @@
 #include "shell/tray/tray_drawer_panel.h"
 #include "shell/wallpaper/panel/wallpaper_panel.h"
 #include "shell/wallpaper/wallpaper_paths.h"
-#include "system/ai_usage.h"
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
-#include "system/camera_service.h"
 #include "system/display_config_service.h"
 #include "system/distro_info.h"
-#include "system/easyeffects_service.h"
 #include "system/keyboard_backlight_service.h"
 #include "system/system_monitor_service.h"
 #include "ui/app_icon_colorization.h"
@@ -242,7 +234,6 @@ void Application::installSecretServiceNameWatch() {
         }
         // A provider that just showed up is a fresh chance for every consumer that gave up.
         m_storageKeyAutoRetried = false;
-        m_calendarCredentialAutoRetried = false;
         kLog.info("secret service provider appeared on {}", kSecretServiceBusName);
         DeferredCall::callLater([this]() { retrySecretServiceConsumers(); });
       }
@@ -305,7 +296,6 @@ void Application::onSecretServiceCollectionChanged() {
   // follow-up lookup reads the unlocked collection without raising a prompt.
   m_secretServiceOwned = true;
   m_storageKeyAutoRetried = false;
-  m_calendarCredentialAutoRetried = false;
   kLog.info("secret service default collection unlocked; reopening consumers");
   retrySecretServiceConsumers();
 }
@@ -348,15 +338,6 @@ void Application::retrySecretServiceConsumers() {
     m_storageKeyAutoRetried = true;
     kLog.info("secret service is running; reopening encrypted storage");
     DeferredCall::callLater([this]() { m_storageKeyProvider.retry(); });
-  }
-  const calendar::CredentialState calendarCredentialState = m_calendarService.credentialState();
-  const bool calendarRetryNeeded = calendarCredentialState == calendar::CredentialState::Unavailable
-      || calendarCredentialState == calendar::CredentialState::DeniedOrLocked
-      || m_calendarService.hasMissingRefreshTokens();
-  if (!m_calendarCredentialAutoRetried && calendarRetryNeeded) {
-    m_calendarCredentialAutoRetried = true;
-    kLog.info("secret service is running; reopening calendar credentials");
-    DeferredCall::callLater([this]() { m_calendarService.retryCredentialMigration(); });
   }
 }
 
@@ -493,10 +474,6 @@ void Application::ensurePolkitAgent(std::function<void(bool ok)> onReady) {
   }
 }
 
-void Application::syncScreenTimeService() {
-  m_screenTimeService.setEnabled(m_configService.config().shell.screenTimeEnabled);
-}
-
 void Application::syncClipboardService() {
   const bool enabled = m_configService.config().shell.clipboardEnabled;
   const auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
@@ -528,7 +505,7 @@ void Application::syncClipboardService() {
 void Application::syncStorageKeyProvider() {
   const StorageConfig& storage = m_configService.config().storage;
   const bool encryptedDataExists =
-      m_clipboardService.hasEncryptedPersistence() || m_calendarService.hasEncryptedCache();
+      m_clipboardService.hasEncryptedPersistence();
   m_storageKeyProvider.configure(storage.keySource, storage.keyFile, encryptedDataExists);
 }
 
@@ -576,7 +553,6 @@ void Application::initServices() {
   }
   m_storageKeyProvider.setChangeCallback([this]() {
     m_clipboardService.syncPersistence();
-    m_calendarService.syncCachePersistence();
     retrySecretServiceConsumers();
   });
   syncStorageKeyProvider();
@@ -594,7 +570,6 @@ void Application::initServices() {
   initAuxServicesAndHooks();
   initSystemBusServices();
   initBrightnessAndPipewire();
-  initCamera();
   initSessionBusServices();
 }
 
@@ -646,7 +621,6 @@ void Application::initStyleThemeAndWayland() {
     m_httpClient.setOfflineMode(m_configService.config().shell.offlineMode);
   });
   m_configService.addReloadCallback([this]() { syncClipboardService(); });
-  m_configService.addReloadCallback([this]() { syncScreenTimeService(); });
   m_communityPaletteService.setReadyCallback([this]() {
     // A refreshed catalog may carry a new md5 for the selected palette; re-resolve
     // so a stale cached palette gets re-downloaded and faded in.
@@ -738,13 +712,6 @@ void Application::initStyleThemeAndWayland() {
     throw std::runtime_error("failed to connect to Wayland display");
   }
   m_compositorPlatform.initialize();
-  m_screenTimeService.initialize(&m_wayland);
-  syncScreenTimeService();
-  m_screenTimeService.setChangeCallback([this]() {
-    if (m_panelManager.isOpenPanel("control-center") && m_panelManager.isActivePanelContext("screen-time")) {
-      m_panelManager.refresh();
-    }
-  });
   if (m_configService.config().shell.disableMipmaps) {
     TextureManager::setGlobalMipmapsEnabled(false);
   }
@@ -843,7 +810,6 @@ void Application::initWaylandCallbacks() {
     }
   });
   m_compositorPlatform.setToplevelChangeCallback([this]() {
-    m_screenTimeService.onFocusChange();
     m_bar.scheduleSmartAutoHideReevaluation();
     m_dock.scheduleSmartAutoHideReevaluation();
     m_bar.refresh();
@@ -894,7 +860,6 @@ void Application::initAuxServicesAndHooks() {
       },
       "hooks"
   );
-  m_gammaService.setLocationResolving(m_locationService.resolving());
   m_gammaService.reload(m_configService.config().nightlight, m_configService.config().location);
   m_gammaService.setChangeCallback([this, shouldRefreshControlCenter]() {
     m_bar.refresh();
@@ -1027,8 +992,6 @@ void Application::initSystemBusServices() {
           // fade-complete cleanup races with process freeze.
           m_idleGraceOverlay.hide();
           if (sleeping) {
-            // Screen time must not accumulate across suspend even when lock-before-suspend is off.
-            m_screenTimeService.setSuspendPaused(true);
             // Delay inhibit (when lock_before_suspend is on) holds sleep until we lock.
             // Do not use runAfterSessionLocked here: that slot belongs to lock-and-suspend.
             if (m_skipLockOnNextSleep) {
@@ -1076,7 +1039,6 @@ void Application::initSystemBusServices() {
           }
           m_skipLockOnNextSleep = false;
           m_releaseSleepDelayWhenLocked = false;
-          m_screenTimeService.setSuspendPaused(false);
           if (m_configService.shouldLockBeforeSuspend() && m_logindService != nullptr) {
             (void)m_logindService->acquireSleepDelayInhibit();
           }
@@ -1092,7 +1054,6 @@ void Application::initSystemBusServices() {
           if (m_lockScreen.isActive()) {
             m_lockScreen.forceRepaintAfterResume();
           }
-          m_weatherService.requestRefresh();
           m_gammaService.reevaluateSchedule();
           // Auto theme mode schedules with steady_clock timers, which do not advance while
           // suspended. Re-resolve so a day/night boundary crossed during sleep is applied.
@@ -1162,24 +1123,6 @@ void Application::initSystemBusServices() {
     }
 
     try {
-      m_firewallService = std::make_unique<FirewallService>(*m_systemBus);
-      m_firewallService->start();
-      kLog.info("firewall service active");
-    } catch (const std::exception& e) {
-      kLog.warn("firewall disabled: {}", e.what());
-      m_firewallService.reset();
-    }
-
-    try {
-      m_printerService = std::make_unique<PrinterService>(m_systemBus.get());
-      m_printerService->start();
-      kLog.info("printer service active");
-    } catch (const std::exception& e) {
-      kLog.warn("printer service disabled: {}", e.what());
-      m_printerService.reset();
-    }
-
-    try {
       m_upowerService = std::make_unique<UPowerService>(*m_systemBus);
       m_batteryHookState.reset(m_upowerService->state());
       m_batteryWarningMonitor.evaluate(m_configService.config().battery, *m_upowerService, m_notificationManager);
@@ -1233,22 +1176,9 @@ void Application::initSystemBusServices() {
     m_networkService->setChangeCallback(
         [this, shouldRefreshControlCenter](const NetworkState& state, NetworkChangeOrigin origin) {
           onNetworkStateChangedForEvents(state, origin);
-          m_externalIpService.onNetworkChanged();
           m_bar.refresh();
           if (shouldRefreshControlCenter()) m_panelManager.refresh();
         });
-
-    if (m_networkService != nullptr) {
-      m_externalIpService.setNetworkService(m_networkService.get());
-      m_externalIpService.setChangeCallback([this, shouldRefreshControlCenter]() {
-        m_bar.refresh();
-        if (shouldRefreshControlCenter()) {
-          m_panelManager.refresh();
-        }
-      });
-      m_externalIpService.onNetworkChanged();
-    }
-    m_configService.addReloadCallback([this]() { m_externalIpService.onConfigReload(); });
 
     if (m_networkService != nullptr && m_networkService->supportsSecretAgent()) {
       try {
@@ -1309,20 +1239,6 @@ void Application::initSystemBusServices() {
         kLog.warn("bluetooth agent disabled: {}", e.what());
         m_bluetoothAgent.reset();
       }
-    }
-
-    try {
-      m_modemManagerService = std::make_unique<ModemManagerService>(*m_systemBus);
-      m_modemManagerService->setChangeCallback([this, shouldRefreshControlCenter]() {
-        m_bar.refresh();
-        if (shouldRefreshControlCenter()) {
-          m_panelManager.refresh();
-        }
-      });
-      kLog.info("modem manager service active");
-    } catch (const std::exception& e) {
-      kLog.warn("modem manager service disabled: {}", e.what());
-      m_modemManagerService.reset();
     }
 
     m_configService.addReloadCallback([this]() { syncPolkitAgent(); });
@@ -1395,12 +1311,8 @@ void Application::initBrightnessAndPipewire() {
     m_pipewireService = std::make_unique<PipeWireService>();
     // The shell retains a PipeWire observation/playback loop; control ownership lives in helix-service.
     m_pipewireService->setRemoteControl(true);
-    m_easyEffectsService = std::make_unique<EasyEffectsService>();
-    m_easyEffectsService->refreshProfiles();
-    m_easyEffectsService->refreshActiveEffectsProfiles();
     m_pipewireSpectrum = std::make_unique<PipeWireSpectrum>(*m_pipewireService);
     m_soundPlayer = std::make_shared<SoundPlayer>(m_pipewireService->loop());
-    m_desktopAiService.setSoundPlayer(m_soundPlayer.get());
 
     auto applySoundConfig = [this]() {
       if (m_soundPlayer == nullptr) {
@@ -1424,14 +1336,11 @@ void Application::initBrightnessAndPipewire() {
     kLog.warn("pipewire disabled: {}", e.what());
     m_soundPlayer.reset();
     m_pipewireSpectrum.reset();
-    m_easyEffectsService.reset();
     m_pipewireService.reset();
     m_wirePlumberMixer.reset();
   }
 
 }
-
-void Application::initCamera() { m_cameraService = std::make_unique<CameraService>(); }
 
 void Application::initSessionBusServices() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
@@ -1476,12 +1385,12 @@ void Application::initSessionBusServices() {
           m_panelManager.refresh();
         }
       });
-      m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, m_mprisService.get(), &m_weatherService, &m_httpClient);
+      m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, m_mprisService.get(), &m_httpClient);
       kLog.info("mpris discovery active");
     } catch (const std::exception& e) {
       kLog.warn("mpris disabled: {}", e.what());
       m_mprisService.reset();
-      m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, nullptr, &m_weatherService, &m_httpClient);
+      m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, nullptr, &m_httpClient);
       m_notificationManager.addInternal(
           "Helix", i18n::tr("notifications.internal.mpris-disabled"), e.what(), Urgency::Low
       );
@@ -1504,86 +1413,7 @@ void Application::initSessionBusServices() {
     m_trayService->setMenuToggleCallback([this](const std::string& itemId, float contentScale) {
       m_trayMenu.toggleForItem(itemId, contentScale);
     });
-
-    try {
-      m_phoneService = std::make_unique<PhoneConnectService>(*m_bus);
-      m_phoneService->start();
-      kLog.info("phone connect service active");
-    } catch (const std::exception& e) {
-      kLog.warn("phone connect disabled: {}", e.what());
-      m_phoneService.reset();
-    }
-
-    try {
-      m_castService = std::make_unique<CastService>(m_bus.get(), m_networkService.get());
-      m_castService->start();
-      kLog.info("cast service active");
-    } catch (const std::exception& e) {
-      kLog.warn("cast service disabled: {}", e.what());
-      m_castService.reset();
-    }
   }
-
-  m_locationService.initialize();
-  m_weatherService.initialize();
-  m_calendarService.initialize();
-  m_tailscaleService.setAuthPrep([this](std::function<void()> resume) {
-    ensurePolkitAgent([resume = std::move(resume)](bool /*ok*/) {
-      if (resume) {
-        resume();
-      }
-    });
-  });
-  m_tailscaleService.start();
-  m_localSendService.start();
-  m_syncthingService.start();
-  m_aiUsageService.start();
-  m_aiUsageService.addChangeCallback([this, shouldRefreshControlCenter]() {
-    m_bar.refresh();
-    m_desktopWidgetsController.requestLayout();
-    if (shouldRefreshControlCenter()) {
-      m_panelManager.refresh();
-    }
-  });
-
-  // LocationService is the single source of "where am I": push its resolved coordinates to the
-  // weather service, night light, and theme auto mode. Manual latitude/longitude and fixed
-  // sunrise/sunset live in [location] and reach night light/theme through their config reloads.
-  auto pushLocation = [this]() {
-    m_gammaService.setLocationResolving(m_locationService.resolving());
-    const auto location = m_locationService.resolvedLocation();
-    if (location.has_value()) {
-      m_weatherService.setLocation(
-          WeatherCoordinates{.latitude = location->latitude, .longitude = location->longitude}, location->name,
-          location->sourceLabel
-      );
-      m_gammaService.setResolvedCoordinates(location->latitude, location->longitude);
-      m_themeService.setAutoCoordinates(location->latitude, location->longitude);
-    } else {
-      m_weatherService.setLocation(std::nullopt, {}, {});
-      m_gammaService.setResolvedCoordinates(std::nullopt, std::nullopt);
-      m_themeService.setAutoCoordinates(std::nullopt, std::nullopt);
-    }
-  };
-  pushLocation();
-  m_locationService.addChangeCallback([this, pushLocation, shouldRefreshControlCenter]() {
-    pushLocation();
-    m_bar.refresh();
-    m_desktopWidgetsController.requestLayout();
-    if (shouldRefreshControlCenter()) {
-      m_panelManager.refresh();
-    }
-  });
-  m_weatherService.addChangeCallback([this, shouldRefreshControlCenter]() {
-    m_bar.refresh();
-    m_desktopWidgetsController.requestLayout();
-    if (m_lockScreen.isActive()) {
-      m_lockScreen.requestUpdate();
-    }
-    if (shouldRefreshControlCenter()) {
-      m_panelManager.refresh();
-    }
-  });
 }
 
 void Application::startTrayService() {

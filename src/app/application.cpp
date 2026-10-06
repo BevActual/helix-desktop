@@ -18,12 +18,7 @@
 #include "dbus/idle/screensaver_poll_source.h"
 #include "dbus/idle/screensaver_service.h"
 #include "dbus/logind/logind_service.h"
-#include "dbus/modem/modem_manager_service.h"
 #include "dbus/mpris/mpris_service.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
-#include "dbus/firewall/firewall_service.h"
-#include "dbus/cups/printer_service.h"
-#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/iwd_secret_agent.h"
 #include "dbus/network/network_manager_service.h"
@@ -77,11 +72,8 @@
 #include "shell/wallpaper/wallpaper_paths.h"
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
-#include "system/camera_poll_source.h"
-#include "system/camera_service.h"
 #include "system/display_config_service.h"
 #include "system/distro_info.h"
-#include "system/easyeffects_service.h"
 #include "system/keyboard_backlight_service.h"
 #include "system/system_monitor_service.h"
 #include "ui/app_icon_colorization.h"
@@ -146,10 +138,7 @@ namespace {
 } // namespace
 
 Application::Application()
-    : m_lockKeysService(m_wayland),
-      m_calendarService(m_configService, m_httpClient, m_secretStore, m_storageKeyProvider, &m_notificationManager),
-      m_gammaService(m_wayland), m_locationService(m_configService, m_httpClient),
-      m_weatherService(m_configService, m_httpClient) {
+    : m_lockKeysService(m_wayland), m_gammaService(m_wayland) {
   m_notificationManager.loadPersistedHistory();
   notify::setInstance(&m_notificationManager);
 
@@ -207,9 +196,6 @@ void Application::run(std::function<void()> startupReadyCallback) {
   runStartupPhase("startup hooks", [this]() {
     m_hookManager.reload(m_configService.config().hooks);
     m_hookManager.fire(HookKind::Started);
-  });
-  runStartupPhase("telemetry enqueue", [this]() {
-    m_telemetryService.maybeSend(m_configService, m_httpClient, m_wayland);
   });
 
 #ifdef __GLIBC__

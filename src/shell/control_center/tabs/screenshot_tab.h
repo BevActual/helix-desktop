@@ -11,7 +11,6 @@
 class Button;
 class ConfigService;
 class Flex;
-class DesktopAiService;
 class IpcService;
 class Label;
 class Renderer;
@@ -52,8 +51,6 @@ private:
   };
 
   IpcService* m_ipc = nullptr;
-  DesktopAiService* m_desktopAi = nullptr;
-  std::string m_aiStatus;
   ConfigService* m_config = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
   control_center::RecentCaptureGallery m_recents;

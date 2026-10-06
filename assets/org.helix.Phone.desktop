@@ -1,9 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Helix Phone
-Comment=Connect your phone and transfer files
-Exec=helix-phone
-Icon=phone
-Terminal=false
-Categories=Network;Utility;
-StartupNotify=true

@@ -26,14 +26,14 @@
       "compatibility-context": "bluetooth"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "tailscale",
       "destination": "settings:network",
       "status": "partial",
       "compatibility-context": "tailscale"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "phone",
       "destination": "app:phone",
       "status": "partial",
@@ -54,7 +54,7 @@
       "compatibility-context": "audio"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "screen-time",
       "destination": "app:system-monitor",
       "status": "partial",
@@ -152,49 +152,49 @@
       "compatibility-context": "shell"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "printers",
       "destination": "settings:devices",
       "status": "pending",
       "compatibility-context": "printers"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "camera",
       "destination": "settings:devices",
       "status": "pending",
       "compatibility-context": "camera"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "localsend",
       "destination": "app:phone",
       "status": "pending",
       "compatibility-context": "localsend"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "syncthing",
       "destination": "app:phone",
       "status": "pending",
       "compatibility-context": "syncthing"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "cast",
       "destination": "app:phone",
       "status": "pending",
       "compatibility-context": "cast"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "calendar",
       "destination": "app:calendar",
       "status": "pending",
       "compatibility-context": "calendar"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "weather",
       "destination": "app:weather",
       "status": "pending",
@@ -222,7 +222,7 @@
       "compatibility-context": "clipboard"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "ai",
       "destination": "app:agent-center",
       "status": "pending",
@@ -265,7 +265,7 @@
       "compatibility-context": "privacy"
     },
     {
-      "kind": "tab",
+      "kind": "retired-tab",
       "id": "firewall",
       "destination": "settings:privacy-security",
       "status": "pending",
@@ -585,18 +585,24 @@
   "legacy-control-center-tabs-retired": {
     "date": "2026-10-05",
     "tabs": [
-      "network",
-      "bluetooth",
-      "tailscale",
-      "notifications",
+      "ai",
       "audio",
-      "screen-time",
-      "theme",
-      "system",
-      "phone",
+      "bluetooth",
+      "calendar",
+      "camera",
+      "cast",
+      "firewall",
       "localsend",
+      "network",
+      "notifications",
+      "phone",
+      "printers",
+      "screen-time",
       "syncthing",
-      "cast"
+      "system",
+      "tailscale",
+      "theme",
+      "weather"
     ],
     "policy": "Live pages removed; each tab id is kept as a redirect to its destination app. Rebuild the capability in the destination, not here."
   },
@@ -619,5 +625,14 @@
   "dock-phone-item-retired": {
     "date": "2026-10-05",
     "note": "The dock's phone peer item (notification badge, opens Control Center phone tab) was removed; reintroduce it from Helix Phone."
+  },
+  "services-stripped": {
+    "date": "2026-10-05",
+    "removed": [
+      "PhoneConnect/KDE Connect, Cast, LocalSend, Syncthing, phone mirror, helix-phone",
+      "Tailscale, Firewall, Printers, ExternalIp, ModemManager",
+      "AiUsage, DesktopAi, ScreenTime, Telemetry, Camera, EasyEffects",
+      "Weather, Location, Calendar"
+    ]
   }
 }

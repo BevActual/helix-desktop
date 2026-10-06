@@ -1,7 +1,6 @@
 #pragma once
 
 class ClipboardService;
-class CalendarService;
 class ConfigService;
 class FileWatcher;
 class HttpClient;
@@ -12,7 +11,6 @@ class RenderContext;
 class SharedTextureCache;
 class SystemMonitorService;
 class WaylandConnection;
-class WeatherService;
 
 // Shared dependencies several desktop widgets read directly.
 struct DesktopWidgetScriptDeps {
@@ -22,10 +20,8 @@ struct DesktopWidgetScriptDeps {
 };
 
 struct DesktopWidgetRuntimeServices {
-  CalendarService* calendar = nullptr;
   PipeWireService* pipewire = nullptr;
   PipeWireSpectrum* pipewireSpectrum = nullptr;
-  const WeatherService* weather = nullptr;
   MprisService* mpris = nullptr;
   HttpClient* httpClient = nullptr;
   SystemMonitorService* sysmon = nullptr;

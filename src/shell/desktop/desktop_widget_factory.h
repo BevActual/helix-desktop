@@ -25,10 +25,8 @@ public:
   ) const;
 
 private:
-  CalendarService* m_calendar = nullptr;
   PipeWireService* m_pipewire = nullptr;
   PipeWireSpectrum* m_pipewireSpectrum = nullptr;
-  const WeatherService* m_weather = nullptr;
   MprisService* m_mpris = nullptr;
   HttpClient* m_httpClient = nullptr;
   SystemMonitorService* m_sysmon = nullptr;

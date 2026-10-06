@@ -2,7 +2,6 @@
 
 #include "config/config_service.h"
 #include "compositors/compositor_platform.h"
-#include "calendar/calendar_service.h"
 #include "core/deferred_call.h"
 #include "core/files/directory_scanner.h"
 #include "core/input/keybind_matcher.h"
@@ -27,14 +26,10 @@
 #include "shell/tooltip/tooltip_manager.h"
 #include "shell/wallpaper/wallpaper.h"
 #include "capture/screen_recorder_service.h"
-#include "dbus/cast/cast_service.h"
-#include "dbus/firewall/firewall_service.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
 #include "dbus/upower/upower_service.h"
 #include "idle/idle_inhibitor.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
-#include "system/ai_usage_service.h"
 #include "system/battery_warning_monitor.h"
 #include "system/desktop_entry.h"
 #include "system/desktop_entry_launch.h"
@@ -42,9 +37,6 @@
 #include "system/distro_info.h"
 #include "system/gamma_service.h"
 #include "system/package_kit_service.h"
-#include "system/weather_service.h"
-#include "net/localsend_service.h"
-#include "net/tailscale_service.h"
 #include "time/time_format.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
@@ -134,35 +126,6 @@ namespace {
     const std::time_t next = std::mktime(&local);
     return next == static_cast<std::time_t>(-1) ? time + std::chrono::hours{24}
                                                 : std::chrono::system_clock::from_time_t(next);
-  }
-
-  std::chrono::system_clock::time_point homeEventEndInstant(const CalendarEvent& event) {
-    if (!event.allDay) {
-      return std::max(event.end, event.start);
-    }
-    if (event.end > event.start) {
-      return event.end;
-    }
-    return homeNextLocalMidnight(event.start);
-  }
-
-  const CalendarEvent* homeNextCalendarEvent(const CalendarSnapshot& snapshot) {
-    const auto now = std::chrono::system_clock::now();
-    const CalendarEvent* current = nullptr;
-    const CalendarEvent* upcoming = nullptr;
-    for (const CalendarEvent& event : snapshot.events) {
-      if (homeEventEndInstant(event) <= now) {
-        continue;
-      }
-      if (!event.allDay && event.start <= now) {
-        if (current == nullptr || event.start > current->start) {
-          current = &event;
-        }
-      } else if (upcoming == nullptr || event.start < upcoming->start) {
-        upcoming = &event;
-      }
-    }
-    return current != nullptr ? current : upcoming;
   }
 
   constexpr auto kHomeTransientPositionRegressionWindow = std::chrono::milliseconds(1500);
@@ -348,7 +311,7 @@ namespace {
 HomeTab::HomeTab(const ControlCenterServices& services)
     : m_mpris(services.mpris), m_audio(services.audio), m_brightness(services.brightness),
       m_session(services.session),
-      m_httpClient(services.httpClient), m_weather(services.weather), m_calendar(services.calendar),
+      m_httpClient(services.httpClient), 
       m_config(services.config), m_accounts(services.accounts), m_wallpaper(services.wallpaper),
       m_thumbnails(services.thumbnails), m_asyncTextures(services.asyncTextures), m_upower(services.upower),
       m_services(services.shortcutServices()),
@@ -576,7 +539,7 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
     Shortcut* const shortcutPtr = shortcut.get();
     const std::string tabId = openTab;
     const std::string settingsPage = tabId == "bluetooth" ? "bluetooth" : "network";
-    const bool nativeDetails = tabId == "network" || tabId == "bluetooth" || tabId == "tailscale";
+    const bool nativeDetails = tabId == "network" || tabId == "bluetooth";
     const auto showDetails = [this, tabId, settingsPage, nativeDetails]() {
       if (nativeDetails) openDetails(settingsPage, tabId, m_services.platform);
       else openControlCenterTab(tabId);
@@ -641,9 +604,6 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
   };
   addToggle("wifi", "network", "control-center.tabs.network");
   addToggle("bluetooth", "bluetooth", "control-center.tabs.bluetooth");
-  if (m_services.tailscale != nullptr && (m_services.tailscale->installed() || m_services.tailscale->running())) {
-    addToggle("tailscale", "tailscale", "control-center.tabs.tailscale");
-  }
   addToggle("nightlight", "monitor", "control-center.tabs.monitor");
   addToggle("notification", "notifications", "control-center.tabs.notifications");
   tab.addChild(std::move(list));
@@ -672,9 +632,6 @@ void HomeTab::buildQuickSurface(Flex& tab, float scale) {
     });
   };
   destinations->addChild(destinationButton("capture", i18n::tr("control-center.tabs.capture"), "screenshot"));
-  if (m_services.phone != nullptr) {
-    destinations->addChild(destinationButton("phone", i18n::tr("control-center.tabs.phone"), "device-mobile"));
-  }
   tab.addChild(std::move(destinations));
 
   const float actionSize = Style::controlHeight * scale;
@@ -1895,28 +1852,6 @@ void HomeTab::syncStatusStrip() {
                 )
       || layoutDirty;
 
-  auto* aiUsage = m_services.aiUsage;
-  if (aiUsage != nullptr) {
-    const auto hit = noctalia::ai_usage::hottestQuota(aiUsage->snapshot());
-    const bool hot =
-        hit.has_value() && hit->window.percent + 0.5F >= static_cast<float>(aiUsage->attentionPercent());
-    if (hot) {
-      layoutDirty = applyChip(
-                        m_statusAi, true,
-                        i18n::tr(
-                            "control-center.home.status.ai", "percent",
-                            std::format("{:.0f}", static_cast<double>(hit->window.percent))
-                        ),
-                        noctalia::ai_usage::providerGlyph(hit->provider), true
-                    )
-          || layoutDirty;
-    } else {
-      layoutDirty = applyChip(m_statusAi, false, {}, "sparkles", false) || layoutDirty;
-    }
-  } else {
-    layoutDirty = applyChip(m_statusAi, false, {}, "sparkles", false) || layoutDirty;
-  }
-
   if (m_upower != nullptr && m_config != nullptr) {
     const auto* battery = m_upower->defaultSystemBattery();
     bool low = false;
@@ -1985,36 +1920,6 @@ void HomeTab::syncStatusStrip() {
                 )
       || layoutDirty;
 
-  auto* localSend = m_services.localSend;
-  const bool incoming = localSend != nullptr && localSend->snapshot().incoming.has_value();
-  if (incoming) {
-    layoutDirty = applyChip(
-                      m_statusLocalSend, true,
-                      i18n::tr("control-center.home.status.localsend", "name", localSend->snapshot().incoming->alias),
-                      "share", true
-                  )
-        || layoutDirty;
-  } else {
-    layoutDirty = applyChip(m_statusLocalSend, false, {}, "share", false) || layoutDirty;
-  }
-
-  auto* phone = m_services.phone;
-  const auto* peer = phone != nullptr ? phone->peerDevice() : nullptr;
-  if (peer != nullptr) {
-    const std::string name = peer->name.empty() ? peer->id : peer->name;
-    std::string text;
-    if (!peer->reachable) {
-      text = i18n::tr("control-center.home.status.phone-offline", "name", name);
-    } else if (peer->hasBattery && peer->charge >= 0) {
-      text = i18n::tr("control-center.home.status.phone-battery", "name", name, "percent", peer->charge);
-    } else {
-      text = i18n::tr("control-center.home.status.phone", "name", name);
-    }
-    layoutDirty = applyChip(m_statusPhone, true, text, "device-mobile", peer->reachable) || layoutDirty;
-  } else {
-    layoutDirty = applyChip(m_statusPhone, false, {}, "device-mobile", false) || layoutDirty;
-  }
-
   auto* audio = m_services.audio;
   const PrivacyState* privacy = audio != nullptr ? &audio->privacyState() : nullptr;
   bool privacyMic = false;
@@ -2057,40 +1962,13 @@ void HomeTab::syncStatusStrip() {
     layoutDirty = applyChip(m_statusPrivacy, false, {}, "eye-off", false) || layoutDirty;
   }
 
-  auto* cast = m_services.cast;
-  const bool sharing = cast != nullptr && cast->sharing();
-  if (sharing) {
-    layoutDirty = applyChip(
-                      m_statusCast, true, i18n::tr("control-center.home.status.cast"), "screen-share", true
-                  )
-        || layoutDirty;
-  } else {
-    layoutDirty = applyChip(m_statusCast, false, {}, "screen-share", false) || layoutDirty;
-  }
-
-  auto* firewall = m_services.firewall;
-  const bool panic = firewall != nullptr && firewall->snapshot().panic;
-  if (panic) {
-    layoutDirty = applyChip(
-                      m_statusFirewall, true, i18n::tr("control-center.home.status.firewall"), "shield-lock", true
-                  )
-        || layoutDirty;
-  } else {
-    layoutDirty = applyChip(m_statusFirewall, false, {}, "shield-lock", false) || layoutDirty;
-  }
-
   const bool any = (m_statusUpdates != nullptr && m_statusUpdates->visible())
-      || (m_statusAi != nullptr && m_statusAi->visible())
       || (m_statusBattery != nullptr && m_statusBattery->visible())
       || (m_statusCapture != nullptr && m_statusCapture->visible())
       || (m_statusNightLight != nullptr && m_statusNightLight->visible())
       || (m_statusCaffeine != nullptr && m_statusCaffeine->visible())
       || (m_statusDnd != nullptr && m_statusDnd->visible())
-      || (m_statusLocalSend != nullptr && m_statusLocalSend->visible())
-      || (m_statusPhone != nullptr && m_statusPhone->visible())
-      || (m_statusPrivacy != nullptr && m_statusPrivacy->visible())
-      || (m_statusCast != nullptr && m_statusCast->visible())
-      || (m_statusFirewall != nullptr && m_statusFirewall->visible());
+      || (m_statusPrivacy != nullptr && m_statusPrivacy->visible());
   if (m_statusStrip != nullptr) {
     const bool wasShown = m_statusStrip->visible();
     setShown(m_statusStrip, any);
@@ -2240,11 +2118,7 @@ void HomeTab::onClose() {
   m_statusNightLight = nullptr;
   m_statusCaffeine = nullptr;
   m_statusDnd = nullptr;
-  m_statusLocalSend = nullptr;
-  m_statusPhone = nullptr;
   m_statusPrivacy = nullptr;
-  m_statusCast = nullptr;
-  m_statusFirewall = nullptr;
   m_userCardKeyboardArea = nullptr;
   m_userCardArea = nullptr;
   m_mediaCardArea = nullptr;
@@ -2458,62 +2332,6 @@ void HomeTab::sync(Renderer& renderer) {
     const std::string uptimeText =
         uptime.has_value() ? formatDuration(*uptime) : i18n::tr("control-center.home.unknown");
     m_userUptime->setText(i18n::tr("control-center.home.uptime", "uptime", uptimeText));
-  }
-
-  if (m_weatherGlyph != nullptr && m_weatherLine != nullptr) {
-    const auto setWeatherUnavailable = [this](std::string_view glyph, const std::string& text) {
-      m_weatherGlyph->setGlyph(glyph);
-      m_weatherGlyph->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
-      m_weatherLine->setText(text);
-    };
-    if (m_weather == nullptr || !m_weather->enabled()) {
-      setWeatherUnavailable("weather-cloud-off", i18n::tr("control-center.home.weather.disabled"));
-    } else if (!m_weather->locationConfigured()) {
-      setWeatherUnavailable("weather-cloud", i18n::tr("control-center.home.weather.no-location"));
-    } else {
-      const auto& snapshot = m_weather->snapshot();
-      if (!snapshot.valid) {
-        setWeatherUnavailable(
-            "weather-cloud",
-            m_weather->loading() ? i18n::tr("control-center.home.weather.fetching")
-                                 : i18n::tr("control-center.home.weather.data-unavailable")
-        );
-      } else {
-        m_weatherGlyph->setGlyph(WeatherService::glyphForCode(snapshot.current.weatherCode, snapshot.current.isDay));
-        m_weatherGlyph->setColor(colorSpecFromRole(ColorRole::Primary));
-        const int t = static_cast<int>(std::lround(m_weather->displayTemperature(snapshot.current.temperatureC)));
-        const std::string temp = std::format("{}{}", t, m_weather->displayTemperatureUnit());
-        const std::string description = WeatherService::descriptionForCode(snapshot.current.weatherCode);
-        m_weatherLine->setText(description.empty() ? temp : std::format("{} · {}", temp, description));
-      }
-    }
-  }
-
-  if (m_eventRow != nullptr && m_eventLine != nullptr && m_eventGlyph != nullptr) {
-    const CalendarEvent* next = nullptr;
-    if (m_calendar != nullptr && m_calendar->enabled() && m_calendar->hasData()) {
-      next = homeNextCalendarEvent(m_calendar->snapshot());
-    }
-    const bool show = next != nullptr;
-    if (m_eventRow->visible() != show) {
-      setShown(m_eventRow, show);
-      PanelManager::instance().requestLayout();
-    }
-    if (show) {
-      const std::string title =
-          next->title.empty() ? i18n::tr("control-center.calendar.events") : next->title;
-      std::string when;
-      if (next->allDay) {
-        when = i18n::tr("control-center.calendar.all-day");
-      } else {
-        const std::time_t raw = std::chrono::system_clock::to_time_t(next->start);
-        const char* format = m_config != nullptr ? m_config->config().shell.timeFormat.c_str() : "{:%H:%M}";
-        when = formatLocalUnixTime(static_cast<std::int64_t>(raw), format);
-      }
-      m_eventGlyph->setGlyph("calendar-event");
-      m_eventGlyph->setColor(colorSpecFromRole(ColorRole::Primary));
-      m_eventLine->setText(std::format("{} · {}", when, title));
-    }
   }
 
   if (m_mediaTrack != nullptr && m_mediaArtist != nullptr) {

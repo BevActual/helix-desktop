@@ -7,7 +7,6 @@
 #include <string>
 #include <unordered_map>
 
-class EasyEffectsService;
 class Glyph;
 class Image;
 class Label;
@@ -33,7 +32,7 @@ public:
     ColorSpec muteColor = colorSpecFromRole(ColorRole::Error);
   };
 
-  VolumeWidget(PipeWireService* audio, EasyEffectsService* easyEffects, Options options);
+  VolumeWidget(PipeWireService* audio, Options options);
 
   void create() override;
 
@@ -45,7 +44,6 @@ private:
   [[nodiscard]] std::string glyphName(float volume, bool muted, const std::string& effectsProfile = {}) const;
 
   PipeWireService* m_audio = nullptr;
-  EasyEffectsService* m_easyEffects = nullptr;
   bool m_showLabel = true;
   VolumeWidgetTarget m_target = VolumeWidgetTarget::Output;
   ColorSpec m_muteColor;

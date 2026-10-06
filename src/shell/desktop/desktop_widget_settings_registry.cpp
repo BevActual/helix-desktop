@@ -20,7 +20,6 @@ namespace desktop_settings {
     const std::vector<DesktopWidgetTypeSpec> kDesktopWidgetTypeSpecs = {
         {.type = "audio_visualizer", .labelKey = "desktop-widgets.editor.types.audio-visualizer"},
         {.type = "button", .labelKey = "desktop-widgets.editor.types.button"},
-        {.type = "calendar", .labelKey = "desktop-widgets.editor.types.calendar"},
         {.type = "clock", .labelKey = "desktop-widgets.editor.types.clock"},
         {.type = "fancy_audio_visualizer", .labelKey = "desktop-widgets.editor.types.fancy-audio-visualizer"},
         {.type = "file", .labelKey = "desktop-widgets.editor.types.file"},
@@ -30,7 +29,6 @@ namespace desktop_settings {
         {.type = "sticker", .labelKey = "desktop-widgets.editor.types.sticker"},
         {.type = "sysmon", .labelKey = "desktop-widgets.editor.types.system-monitor"},
         {.type = "volume", .labelKey = "desktop-widgets.editor.types.volume"},
-        {.type = "weather", .labelKey = "desktop-widgets.editor.types.weather"},
     };
 
     WidgetSettingSpec baseSpec(std::string_view key, WidgetControlKind control, WidgetSettingValue defaultValue) {
@@ -209,11 +207,7 @@ namespace desktop_settings {
     std::vector<WidgetSettingSpec> specs;
     auto add = [&](WidgetSettingSpec spec) { specs.push_back(std::move(spec)); };
 
-    if (type == "calendar") {
-      add(boolSpec("show_events", false));
-      add(boolSpec("show_week_numbers", false));
-      add(fontFamilySpec());
-    } else if (type == "clock") {
+    if (type == "clock") {
       const WidgetSettingVisibility digitalOnly{{"clock_style", {"digital"}}};
       const WidgetSettingVisibility analogOnly{{"clock_style", {"analog"}}};
       add(segmentedSpec(
@@ -281,14 +275,6 @@ namespace desktop_settings {
     } else if (type == "sticker") {
       add(stringSpec("image_path"));
       add(doubleSpec("opacity", 1.0, 0.0, 1.0, 0.01));
-    } else if (type == "weather") {
-      add(colorSpec("color", "on_surface"));
-      add(fontFamilySpec());
-      add(boolSpec("shadow", true));
-      add(boolSpec("show_forecast", false));
-      auto forecastDays = stepperIntSpec("forecast_days", 3, 1.0, 6.0, 1.0);
-      forecastDays.visibleWhen = WidgetSettingVisibility{"show_forecast", {"true"}};
-      add(std::move(forecastDays));
     } else if (type == "media_player") {
       add(segmentedSpec(
           "layout", "horizontal",

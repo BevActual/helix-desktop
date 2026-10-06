@@ -15,7 +15,6 @@ ClipboardTab::ClipboardTab(const ControlCenterServices& services)
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "clipboard", .includedGroups = {"clipboard"}}
       )) {
-  m_picker.setDesktopAi(services.desktopAi);
   m_picker.setCloseCallback([]() { PanelManager::instance().close(); });
   m_picker.setActivateCallback([this](const ClipboardEntry& entry) {
     if (m_config == nullptr) {

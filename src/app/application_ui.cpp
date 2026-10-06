@@ -17,10 +17,6 @@
 #include "dbus/idle/screensaver_service.h"
 #include "dbus/logind/logind_service.h"
 #include "dbus/mpris/mpris_service.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
-#include "dbus/firewall/firewall_service.h"
-#include "dbus/cups/printer_service.h"
-#include "dbus/cast/cast_service.h"
 #include "dbus/network/inetwork_service.h"
 #include "dbus/network/network_manager_service.h"
 #include "dbus/network/network_secret_agent.h"
@@ -80,7 +76,6 @@
 #include "system/brightness_poll_source.h"
 #include "system/brightness_service.h"
 #include "system/distro_info.h"
-#include "system/easyeffects_service.h"
 #include "system/system_monitor_service.h"
 #include "ui/app_icon_colorization.h"
 #include "ui/controls/context_menu_popup.h"
@@ -331,7 +326,7 @@ void Application::initLockScreenAndSession() {
   m_lockScreen.initialize(
       m_wayland, &m_renderContext, &m_configService, &m_sharedTextureCache, m_systemBus.get(), &m_compositorPlatform
   );
-  m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, m_mprisService.get(), &m_weatherService, &m_httpClient);
+  m_lockScreen.setLoginBoxServices(&m_sessionActionRunner, m_mprisService.get(), &m_httpClient);
   m_wallpaper.setAutomationGate([this]() { return !m_lockScreen.isActive(); });
   m_configService.addReloadCallback([this]() {
     if (m_logindService != nullptr) {
@@ -347,7 +342,6 @@ void Application::initLockScreenAndSession() {
         m_idleGraceOverlay.hide();
         m_lockscreenWidgetsController.onLockStateChanged();
         m_idleManager.setSessionLocked(true);
-        m_screenTimeService.setSessionLocked(true);
         m_hookManager.fire(HookKind::SessionLocked);
         if (m_logindService != nullptr) {
           m_logindService->setSessionLockedHint(true);
@@ -361,7 +355,6 @@ void Application::initLockScreenAndSession() {
         m_idleGraceOverlay.hide();
         m_lockscreenWidgetsController.onLockStateChanged();
         m_idleManager.setSessionLocked(false);
-        m_screenTimeService.setSessionLocked(false);
         m_hookManager.fire(HookKind::SessionUnlocked);
         releaseSleepDelayInhibitIfPending();
         requestAllSurfacesRedraw();
@@ -446,9 +439,6 @@ void Application::initInputDispatch() {
     if (m_desktopWidgetsController.onPointerEvent(event)) {
       return;
     }
-    if (m_phoneMirror.onPointerEvent(event)) {
-      return;
-    }
     if (m_wallpaper.onPointerEvent(event)) {
       return;
     }
@@ -507,9 +497,6 @@ void Application::initInputDispatch() {
       m_desktopWidgetsController.onKeyboardEvent(event);
       return;
     }
-    if (m_phoneMirror.onKeyboardEvent(event)) {
-      return;
-    }
     if (m_overviewLauncherCapture.handleKeyboardEvent(event)) {
       return;
     }
@@ -531,10 +518,6 @@ void Application::initPanelManagerAndPanels() {
       m_desktopWidgetsController.exitEdit();
     }
   });
-  m_calendarService.setCredentialChangeCallback([this]() {
-    m_settingsInvalidated.emit();
-    retrySecretServiceConsumers();
-  });
   m_clipboardService.setPersistenceChangeCallback([this]() { m_settingsInvalidated.emit(); });
   syncClipboardService();
   m_panelManager.registerPanel("session", std::make_unique<SessionPanel>(&m_configService, m_sessionActionRunner));
@@ -543,8 +526,7 @@ void Application::initPanelManagerAndPanels() {
       .resetEncryptedStorage =
           [this]() {
             const bool clipboardCleared = m_clipboardService.clearEncryptedPersistenceForRecovery();
-            const bool calendarCleared = m_calendarService.clearEncryptedCacheForRecovery();
-            if (!clipboardCleared || !calendarCleared) {
+            if (!clipboardCleared) {
               notify::error(
                   "Helix", i18n::tr("settings.storage-recovery.label"),
                   i18n::tr("settings.storage-recovery.error-delete")
@@ -590,14 +572,6 @@ void Application::initPanelManagerAndPanels() {
             notify::info(
                 "Helix", i18n::tr("notifications.internal.launcher-usage-reset"),
                 i18n::tr("notifications.internal.launcher-usage-reset-success")
-            );
-          },
-      .resetScreenTime =
-          [this]() {
-            m_screenTimeService.clearAll();
-            notify::info(
-                "Helix", i18n::tr("notifications.internal.screen-time-reset"),
-                i18n::tr("notifications.internal.screen-time-reset-success")
             );
           },
       .saveWallpaperPaletteAsCustom =
@@ -659,28 +633,19 @@ void Application::initPanelManagerAndPanels() {
   auto controlCenter = std::make_unique<ControlCenterPanel>(ControlCenterServices{
       .notifications = &m_notificationManager,
           .audio = m_pipewireService.get(),
-          .easyEffects = m_easyEffectsService.get(),
           .mpris = m_mprisService.get(),
           .config = &m_configService,
           .httpClient = &m_httpClient,
-          .weather = &m_weatherService,
-          .location = &m_locationService,
           .spectrum = m_pipewireSpectrum.get(),
           .upower = m_upowerService.get(),
           .powerProfiles = m_powerProfilesService.get(),
           .network = m_networkService.get(),
-          .modem = m_modemManagerService.get(),
           .networkSecrets = m_networkSecretAgent.get(),
-          .externalIp = &m_externalIpService,
           .bluetooth = m_bluetoothService.get(),
           .bluetoothAgent = m_bluetoothAgent.get(),
           .brightness = m_brightnessService.get(),
-          .camera = m_cameraService.get(),
           .displayConfig = m_displayConfigService.get(),
           .sysmon = m_systemMonitor.get(),
-          .screenTime = &m_screenTimeService,
-          .aiUsage = &m_aiUsageService,
-          .desktopAi = &m_desktopAiService,
           .nightLight = &m_gammaService,
           .theme = &m_themeService,
           .templateApply = &m_templateApplyService,
@@ -690,7 +655,6 @@ void Application::initPanelManagerAndPanels() {
           .platform = &m_compositorPlatform,
           .ipc = &m_ipcService,
           .wallpaper = &m_wallpaper,
-          .calendar = &m_calendarService,
           .fileWatcher = &m_fileWatcher,
           .clipboard = &m_clipboardService,
           .scheduleClipboardAutoPaste =
@@ -711,13 +675,6 @@ void Application::initPanelManagerAndPanels() {
           .asyncTextures = &m_asyncTextureCache,
           .videoWallpaper = &m_videoWallpaper,
           .screenRecorder = &m_screenRecorder,
-          .tailscale = &m_tailscaleService,
-          .localSend = &m_localSendService,
-          .phone = m_phoneService.get(),
-          .syncthing = &m_syncthingService,
-          .firewall = m_firewallService.get(),
-          .printers = m_printerService.get(),
-          .cast = m_castService.get(),
           .desktopWidgets = &m_desktopWidgetsController,
           .upgradeShell = [this]() { performShellUpgrade(); },
           .upgradeAvailable = []() { return noctalia::fedora_upgrade::available(); },
@@ -765,7 +722,7 @@ void Application::initPanelManagerAndPanels() {
   }
   {
     auto quickInsert = std::make_unique<QuickInsertPanel>(
-        &m_configService, &m_clipboardService, &m_thumbnailService, &m_desktopAiService
+        &m_configService, &m_clipboardService, &m_thumbnailService
     );
     quickInsert->setCopiedActivationCallback([this](bool isImage) {
       const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;
@@ -969,19 +926,14 @@ void Application::initBarDockAndLayout() {
       .notifications = &m_notificationManager,
       .tray = m_trayService.get(),
       .audio = m_pipewireService.get(),
-      .easyEffects = m_easyEffectsService.get(),
       .upower = m_upowerService.get(),
       .sysmon = m_systemMonitor.get(),
       .powerProfiles = m_powerProfilesService.get(),
       .network = m_networkService.get(),
-      .modem = m_modemManagerService.get(),
-      .externalIp = &m_externalIpService,
       .idleInhibitor = &m_idleInhibitor,
       .mpris = m_mprisService.get(),
       .audioSpectrum = m_pipewireSpectrum.get(),
       .httpClient = &m_httpClient,
-      .weather = &m_weatherService,
-      .aiUsage = &m_aiUsageService,
       .renderContext = &m_renderContext,
       .nightLight = &m_gammaService,
       .theme = &m_themeService,
@@ -1079,56 +1031,14 @@ void Application::initWidgetControllersAndCallbacks() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
   m_dock.initialize(m_compositorPlatform, &m_configService, &m_renderContext);
-  if (m_phoneService != nullptr) {
-    // The iPhone mirror window: a manual Start shows it at once with the waiting steps;
-    // an always-on receiver stays invisible until the phone actually streams, and the
-    // window goes away when the phone stops. Closing the window ends the phone's
-    // session (UxPlay restarts when always-on, otherwise stops).
-    m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
-    m_phoneService->setPhoneNotifications(m_configService.config().phone.notifications);
-    m_phoneService->setCastAudio(m_configService.config().phone.castAudio);
-    m_configService.addReloadCallback([this]() {
-      if (m_phoneService != nullptr) {
-        m_phoneService->setMirrorAlwaysOn(m_configService.config().phone.mirrorAlwaysOn);
-        m_phoneService->setPhoneNotifications(m_configService.config().phone.notifications);
-    m_phoneService->setCastAudio(m_configService.config().phone.castAudio);
-      }
-    });
-    m_phoneMirrorConn = m_phoneService->changed().connect([this]() {
-      const auto& cast = m_phoneService->castSnapshot();
-      if (cast.airplayRunning && !m_phoneMirror.receiving()) {
-        m_phoneMirror.startReceiving();
-      } else if (!cast.airplayRunning && m_phoneMirror.receiving()) {
-        m_phoneMirror.stopReceiving();
-      }
-      const bool wantWindow = cast.airplayRunning && (cast.mirrorStreaming || !cast.receiverAuto);
-      if (wantWindow && !m_phoneMirror.isOpen()) {
-        m_phoneMirror.open();
-      } else if (!wantWindow && m_phoneMirror.isOpen()) {
-        m_phoneMirror.close();
-      }
-      m_phoneMirror.setStatus(PhoneMirrorStatus{
-          .pointerRunning = cast.pointerRunning,
-          .pointerConnected = cast.pointerConnected,
-          .pointerBondLost = cast.pointerBondLost,
-      });
-    });
-    m_phoneMirror.setClosedByUserCallback([this]() {
-      if (m_phoneService != nullptr) {
-        m_phoneService->restartReceiver();
-      }
-    });
-  }
   const DesktopWidgetScriptDeps desktopWidgetScriptDeps{
       .fileWatcher = &m_fileWatcher,
       .clipboard = &m_clipboardService,
       .configService = &m_configService,
   };
   const DesktopWidgetRuntimeServices desktopWidgetRuntime{
-      .calendar = &m_calendarService,
       .pipewire = m_pipewireService.get(),
       .pipewireSpectrum = m_pipewireSpectrum.get(),
-      .weather = &m_weatherService,
       .mpris = m_mprisService.get(),
       .httpClient = &m_httpClient,
       .sysmon = m_systemMonitor.get(),
@@ -1281,14 +1191,6 @@ void Application::initWidgetControllersAndCallbacks() {
         m_audioOsd.showInput(id, volume, muted);
       } else {
         m_audioOsd.showOutput(id, volume, muted);
-      }
-    });
-  }
-  if (m_easyEffectsService != nullptr) {
-    m_easyEffectsService->setChangeCallback([this, shouldRefreshControlCenter]() {
-      m_bar.refresh();
-      if (shouldRefreshControlCenter()) {
-        m_panelManager.refresh();
       }
     });
   }

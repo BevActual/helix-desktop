@@ -11,23 +11,13 @@
 #include "i18n/i18n.h"
 #include "idle/idle_inhibitor.h"
 #include "ipc/ipc_service.h"
-#include "net/localsend_service.h"
-#include "net/syncthing_service.h"
-#include "net/tailscale_service.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
-#include "dbus/firewall/firewall_service.h"
-#include "dbus/cups/printer_service.h"
-#include "dbus/cast/cast_service.h"
 #include "notification/notification_manager.h"
 #include "pipewire/pipewire_service.h"
 #include "core/process/process.h"
 #include "shell/control_center/shortcut_services.h"
 #include "shell/keyboard_layout_label.h"
 #include "shell/panel/panel_manager.h"
-#include "system/ai_usage.h"
-#include "system/ai_usage_service.h"
 #include "system/gamma_service.h"
-#include "system/weather_service.h"
 #include "theme/theme_service.h"
 
 #include <algorithm>
@@ -312,38 +302,6 @@ namespace {
     PowerProfilesService* m_svc;
   };
 
-  class WeatherShortcut final : public Shortcut {
-  public:
-    explicit WeatherShortcut(WeatherService* svc) : m_svc(svc) {}
-    std::string_view id() const override { return "weather"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.weather"); }
-    std::string displayLabel() const override {
-      if (m_svc != nullptr && m_svc->enabled() && m_svc->hasData()) {
-        const auto& snapshot = m_svc->snapshot();
-        const int temp = static_cast<int>(std::lround(m_svc->displayTemperature(snapshot.current.temperatureC)));
-        return std::format("{}{}", temp, m_svc->displayTemperatureUnit());
-      }
-      return defaultLabel();
-    }
-    std::string displayIcon() const override {
-      if (m_svc == nullptr || !m_svc->enabled()) {
-        return "weather-cloud-off";
-      }
-      if (m_svc->hasData()) {
-        const auto& snapshot = m_svc->snapshot();
-        return WeatherService::glyphForCode(snapshot.current.weatherCode, snapshot.current.isDay);
-      }
-      return "weather-cloud";
-    }
-    std::string_view iconOn() const override { return "weather-cloud-sun"; }
-    std::string_view iconOff() const override { return "weather-cloud-sun"; }
-    void onClick() override { openTab("weather"); }
-    void onRightClick() override { openTab("weather"); }
-
-  private:
-    WeatherService* m_svc;
-  };
-
   class KeyboardLayoutShortcut final : public Shortcut {
   public:
     KeyboardLayoutShortcut(CompositorPlatform* platform, ConfigService* config)
@@ -424,78 +382,6 @@ namespace {
     std::string_view iconOff() const override { return "activity"; }
     void onClick() override { openTab("system"); }
     void onRightClick() override { openTab("system"); }
-  };
-
-  class ScreenTimeShortcut final : public Shortcut {
-  public:
-    std::string_view id() const override { return "screen_time"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screen-time"); }
-    std::string_view iconOn() const override { return "hourglass"; }
-    std::string_view iconOff() const override { return "hourglass"; }
-    void onClick() override { openTab("screen-time"); }
-    void onRightClick() override { openTab("screen-time"); }
-  };
-
-  class AiShortcut final : public Shortcut {
-  public:
-    explicit AiShortcut(AiUsageService* svc) : m_svc(svc) {}
-    std::string_view id() const override { return "ai"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.ai"); }
-    std::string displayLabel() const override {
-      if (m_svc == nullptr) {
-        return defaultLabel();
-      }
-      const auto& snapshot = m_svc->snapshot();
-      if (noctalia::ai_usage::activeOllamaPull(snapshot) != nullptr) {
-        return noctalia::ai_usage::snapshotGlanceLabel(snapshot);
-      }
-      if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
-        return std::format("{:.0f}%", static_cast<double>(hit->window.percent));
-      }
-      if (noctalia::ai_usage::glanceableOllama(snapshot)) {
-        return noctalia::ai_usage::ollamaGlanceLabel(snapshot.ollama);
-      }
-      if (const auto* runtime = noctalia::ai_usage::glanceableLocalRuntime(snapshot)) {
-        return noctalia::ai_usage::localRuntimeLabel(runtime->kind);
-      }
-      return defaultLabel();
-    }
-    std::string displayIcon() const override {
-      if (m_svc == nullptr) {
-        return "sparkles";
-      }
-      const auto& snapshot = m_svc->snapshot();
-      if (noctalia::ai_usage::activeOllamaPull(snapshot) != nullptr) {
-        return "server";
-      }
-      if (const auto hit = noctalia::ai_usage::hottestQuota(snapshot)) {
-        return std::string(noctalia::ai_usage::providerGlyph(hit->provider));
-      }
-      if (noctalia::ai_usage::glanceableOllama(snapshot)) {
-        return "server";
-      }
-      if (const auto* runtime = noctalia::ai_usage::glanceableLocalRuntime(snapshot)) {
-        return std::string(noctalia::ai_usage::localRuntimeGlyph(runtime->kind));
-      }
-      return "sparkles";
-    }
-    std::string_view iconOn() const override { return "sparkles"; }
-    std::string_view iconOff() const override { return "sparkles"; }
-    bool active() const override {
-      if (m_svc == nullptr) {
-        return false;
-      }
-      const auto hit = noctalia::ai_usage::hottestQuota(m_svc->snapshot());
-      if (!hit.has_value()) {
-        return false;
-      }
-      return hit->window.percent + 0.5F >= static_cast<float>(m_svc->attentionPercent());
-    }
-    void onClick() override { openTab("ai"); }
-    void onRightClick() override { openTab("ai"); }
-
-  private:
-    AiUsageService* m_svc = nullptr;
   };
 
   class WallpaperShortcut final : public Shortcut {
@@ -660,157 +546,6 @@ namespace {
     ScreenRecorderService* m_recorder = nullptr;
   };
 
-  class TailscaleShortcut final : public Shortcut {
-  public:
-    explicit TailscaleShortcut(TailscaleService* service) : m_service(service) {}
-    std::string_view id() const override { return "tailscale"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.tailscale"); }
-    std::string_view iconOn() const override { return "circles"; }
-    std::string_view iconOff() const override { return "circles"; }
-    bool isToggle() const override { return true; }
-    bool enabled() const override {
-      return m_service != nullptr && (m_service->installed() || m_service->running());
-    }
-    bool active() const override { return m_service != nullptr && m_service->running(); }
-    void onClick() override {
-      if (m_service != nullptr) {
-        m_service->toggle();
-      }
-    }
-    void onRightClick() override { openTab("tailscale"); }
-
-  private:
-    TailscaleService* m_service = nullptr;
-  };
-
-  class LocalSendShortcut final : public Shortcut {
-  public:
-    LocalSendShortcut(LocalSendService* service, ConfigService* config) : m_service(service), m_config(config) {}
-    std::string_view id() const override { return "localsend"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.localsend"); }
-    std::string_view iconOn() const override { return "share"; }
-    std::string_view iconOff() const override { return "share"; }
-    bool isToggle() const override { return true; }
-    bool enabled() const override { return m_service != nullptr; }
-    bool active() const override { return m_service != nullptr && m_service->enabled(); }
-    void onClick() override {
-      if (m_service == nullptr) {
-        return;
-      }
-      const bool next = !m_service->enabled();
-      if (m_config != nullptr) {
-        (void)m_config->setOverride({"localsend", "enabled"}, next);
-      } else {
-        m_service->setEnabled(next);
-      }
-    }
-    void onRightClick() override { openTab("localsend"); }
-
-  private:
-    LocalSendService* m_service = nullptr;
-    ConfigService* m_config = nullptr;
-  };
-
-  class PhoneShortcut final : public Shortcut {
-  public:
-    explicit PhoneShortcut(PhoneConnectService* service) : m_service(service) {}
-    std::string_view id() const override { return "phone"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.phone"); }
-    std::string_view iconOn() const override { return "device-mobile"; }
-    std::string_view iconOff() const override { return "device-mobile"; }
-    bool isToggle() const override { return false; }
-    bool enabled() const override { return true; }
-    bool active() const override {
-      if (m_service == nullptr) {
-        return false;
-      }
-      const auto& snap = m_service->snapshot();
-      return std::ranges::any_of(snap.devices, [](const PhoneDevice& device) {
-        return device.paired && device.reachable;
-      });
-    }
-    void onClick() override { openTab("phone"); }
-    void onRightClick() override { openTab("phone"); }
-
-  private:
-    PhoneConnectService* m_service = nullptr;
-  };
-
-  class SyncthingShortcut final : public Shortcut {
-  public:
-    explicit SyncthingShortcut(SyncthingService* service) : m_service(service) {}
-    std::string_view id() const override { return "syncthing"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.syncthing"); }
-    std::string_view iconOn() const override { return "folder"; }
-    std::string_view iconOff() const override { return "folder"; }
-    bool isToggle() const override { return false; }
-    bool enabled() const override { return true; }
-    bool active() const override { return m_service != nullptr && m_service->running(); }
-    void onClick() override { openTab("syncthing"); }
-    void onRightClick() override { openTab("syncthing"); }
-
-  private:
-    SyncthingService* m_service = nullptr;
-  };
-
-  class FirewallShortcut final : public Shortcut {
-  public:
-    explicit FirewallShortcut(FirewallService* service) : m_service(service) {}
-    std::string_view id() const override { return "firewall"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.firewall"); }
-    std::string_view iconOn() const override { return "shield-lock"; }
-    std::string_view iconOff() const override { return "shield-lock"; }
-    bool isToggle() const override { return false; }
-    bool enabled() const override { return true; }
-    bool active() const override { return m_service != nullptr && m_service->snapshot().panic; }
-    void onClick() override { openTab("firewall"); }
-    void onRightClick() override { openTab("firewall"); }
-
-  private:
-    FirewallService* m_service = nullptr;
-  };
-
-  class PrintersShortcut final : public Shortcut {
-  public:
-    explicit PrintersShortcut(PrinterService* service) : m_service(service) {}
-    std::string_view id() const override { return "printers"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.printers"); }
-    std::string_view iconOn() const override { return "printer"; }
-    std::string_view iconOff() const override { return "printer"; }
-    bool isToggle() const override { return false; }
-    bool enabled() const override { return true; }
-    bool active() const override {
-      if (m_service == nullptr) {
-        return false;
-      }
-      return std::ranges::any_of(m_service->snapshot().printers, [](const PrinterInfo& printer) {
-        return printer.state == "printing" || printer.jobCount > 0;
-      });
-    }
-    void onClick() override { openTab("printers"); }
-    void onRightClick() override { openTab("printers"); }
-
-  private:
-    PrinterService* m_service = nullptr;
-  };
-
-  class CastShortcut final : public Shortcut {
-  public:
-    explicit CastShortcut(CastService* service) : m_service(service) {}
-    std::string_view id() const override { return "cast"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.cast"); }
-    std::string_view iconOn() const override { return "screen-share"; }
-    std::string_view iconOff() const override { return "screen-share"; }
-    bool isToggle() const override { return false; }
-    bool enabled() const override { return true; }
-    bool active() const override { return m_service != nullptr && m_service->sharing(); }
-    void onClick() override { openTab("cast"); }
-    void onRightClick() override { openTab("cast"); }
-
-  private:
-    CastService* m_service = nullptr;
-  };
-
   class PrivacyShortcut final : public Shortcut {
   public:
     explicit PrivacyShortcut(PipeWireService* audio) : m_audio(audio) {}
@@ -887,24 +622,10 @@ namespace {
           .type = "media",
           .labelKey = "control-center.shortcuts.media",
       }),
-      builtinShortcut<WeatherShortcut, &ShortcutServices::weather>({
-          .type = "weather",
-          .labelKey = "control-center.shortcuts.weather",
-          .isAvailable = [](const Config& config) { return config.weather.enabled; },
-      }),
       builtinShortcut<SystemShortcut>({
           .type = "system",
           .labelKey = "control-center.shortcuts.system",
           .isAvailable = [](const Config& config) { return config.system.monitor.enabled; },
-      }),
-      builtinShortcut<ScreenTimeShortcut>({
-          .type = "screen_time",
-          .labelKey = "control-center.shortcuts.screen-time",
-          .isAvailable = [](const Config& config) { return config.shell.screenTimeEnabled; },
-      }),
-      builtinShortcut<AiShortcut, &ShortcutServices::aiUsage>({
-          .type = "ai",
-          .labelKey = "control-center.shortcuts.ai",
       }),
       builtinShortcut<KeyboardLayoutShortcut, &ShortcutServices::platform, &ShortcutServices::config>({
           .type = "keyboard_layout",
@@ -946,34 +667,6 @@ namespace {
       builtinShortcut<ScreenReplayShortcut, &ShortcutServices::screenRecorder>({
           .type = "screen_replay",
           .labelKey = "control-center.shortcuts.screen-replay",
-      }),
-      builtinShortcut<TailscaleShortcut, &ShortcutServices::tailscale>({
-          .type = "tailscale",
-          .labelKey = "control-center.shortcuts.tailscale",
-      }),
-      builtinShortcut<LocalSendShortcut, &ShortcutServices::localSend, &ShortcutServices::config>({
-          .type = "localsend",
-          .labelKey = "control-center.shortcuts.localsend",
-      }),
-      builtinShortcut<PhoneShortcut, &ShortcutServices::phone>({
-          .type = "phone",
-          .labelKey = "control-center.shortcuts.phone",
-      }),
-      builtinShortcut<SyncthingShortcut, &ShortcutServices::syncthing>({
-          .type = "syncthing",
-          .labelKey = "control-center.shortcuts.syncthing",
-      }),
-      builtinShortcut<FirewallShortcut, &ShortcutServices::firewall>({
-          .type = "firewall",
-          .labelKey = "control-center.shortcuts.firewall",
-      }),
-      builtinShortcut<PrintersShortcut, &ShortcutServices::printers>({
-          .type = "printers",
-          .labelKey = "control-center.shortcuts.printers",
-      }),
-      builtinShortcut<CastShortcut, &ShortcutServices::cast>({
-          .type = "cast",
-          .labelKey = "control-center.shortcuts.cast",
       }),
       builtinShortcut<PrivacyShortcut, &ShortcutServices::audio>({
           .type = "privacy",

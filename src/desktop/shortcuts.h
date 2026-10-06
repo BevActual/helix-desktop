@@ -9,18 +9,14 @@ inline constexpr std::pair<std::string_view, std::string_view> builtInShortcuts[
   {"wifi", "Wi-Fi"}, {"bluetooth", "Bluetooth"}, {"nightlight", "Night Light"},
   {"notification", "Do Not Disturb"}, {"dark_mode", "Appearance"}, {"caffeine", "Keep Awake"},
   {"audio", "Sound"}, {"mic_mute", "Microphone"}, {"power_profile", "Power Profile"},
-  {"media", "Media"}, {"weather", "Weather"}, {"system", "System Monitor"},
-  {"screen_time", "Screen Time"}, {"ai", "AI Usage"}, {"keyboard_layout", "Keyboard Layout"},
+  {"media", "Media"}, {"system", "System Monitor"}, {"keyboard_layout", "Keyboard Layout"},
   {"wallpaper", "Wallpaper"}, {"session", "Session"}, {"clipboard", "Clipboard"},
   {"screenshot", "Screenshot"}, {"pick_color", "Color Picker"}, {"ocr", "Extract Text"},
   {"scan_qr", "Scan QR Code"}, {"screen_recorder", "Screen Recording"}, {"screen_replay", "Screen Replay"},
-  {"tailscale", "Tailscale"}, {"phone", "Phone"}, {"localsend", "LocalSend"}, {"syncthing", "Sync"},
-  {"firewall", "Firewall"}, {"printers", "Printers"}, {"cast", "Cast"}, {"privacy", "Privacy"},
+  {"privacy", "Privacy"},
 };
 inline bool shortcutAvailable(std::string_view id, const Config& config) {
-  if (id == "weather") return config.weather.enabled;
   if (id == "system") return config.system.monitor.enabled;
-  if (id == "screen_time") return config.shell.screenTimeEnabled;
   if (id == "clipboard") return config.shell.clipboardEnabled;
   return true;
 }

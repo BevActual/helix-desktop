@@ -2,7 +2,6 @@
 // throw std::logic_error on the first resolve()/schemaFields() call, and WidgetFactory::create() does
 // not catch. Without this test a malformed definition ships as an uncaught exception at bar build.
 #include "shell/bar/widget_gesture_defaults.h"
-#include "shell/bar/widgets/ai_widget_definition.h"
 #include "shell/bar/widgets/active_window_widget_definition.h"
 #include "shell/bar/widgets/audio_visualizer_widget_definition.h"
 #include "shell/bar/widgets/battery_widget_definition.h"
@@ -34,7 +33,6 @@
 #include "shell/bar/widgets/tray_widget_definition.h"
 #include "shell/bar/widgets/volume_widget_definition.h"
 #include "shell/bar/widgets/wallpaper_widget_definition.h"
-#include "shell/bar/widgets/weather_widget_definition.h"
 #include "shell/settings/widget_settings_registry.h"
 #include "system/battery_warning_monitor.h"
 
@@ -123,7 +121,6 @@ namespace {
 int main() {
   const BatteryConfig batteryConfig;
 
-  checkDefinition("ai", aiWidgetDefinition);
   checkDefinition("active_window", activeWindowWidgetDefinition);
   checkDefinition("audio_visualizer", audioVisualizerWidgetDefinition);
   checkDefinition("battery", batteryWidgetDefinition, BatteryWidgetDefinitionContext{.batteryConfig = &batteryConfig});
@@ -310,7 +307,6 @@ int main() {
     fail("volume", "hide_when_inactive is offered on an output widget");
   }
   checkDefinition("wallpaper", wallpaperWidgetDefinition);
-  checkDefinition("weather", weatherWidgetDefinition);
 
   return g_ok ? 0 : 1;
 }

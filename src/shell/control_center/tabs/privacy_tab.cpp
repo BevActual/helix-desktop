@@ -7,7 +7,6 @@
 #include "render/scene/node.h"
 #include "shell/control_center/control_center_services.h"
 #include "shell/panel/panel_manager.h"
-#include "system/location_service.h"
 #include "ui/builders.h"
 #include "ui/controls/button.h"
 #include "ui/controls/label.h"
@@ -111,7 +110,7 @@ namespace {
 } // namespace
 
 PrivacyTab::PrivacyTab(const ControlCenterServices& services)
-    : m_audio(services.audio), m_config(services.config), m_location(services.location),
+    : m_audio(services.audio), m_config(services.config), 
       m_settings(std::make_unique<SettingsPane>(
           services, SettingsPaneOptions{.section = "security", .includedGroups = {"privacy"}}
       )) {}
@@ -488,17 +487,6 @@ void PrivacyTab::syncSharing() {
   if (m_locationHint != nullptr) {
     if (!autoLocate) {
       m_locationHint->setText(i18n::tr("control-center.privacy.auto-locate-off"));
-    } else if (m_location != nullptr && m_location->resolving()) {
-      m_locationHint->setText(i18n::tr("control-center.privacy.auto-locate-looking"));
-    } else if (m_location != nullptr && m_location->hasResolvedLocation()) {
-      const auto resolved = m_location->resolvedLocation();
-      if (resolved.has_value() && !resolved->name.empty()) {
-        m_locationHint->setText(i18n::tr("control-center.privacy.auto-locate-using", "name", resolved->name));
-      } else {
-        m_locationHint->setText(i18n::tr("control-center.privacy.auto-locate-on"));
-      }
-    } else if (m_location != nullptr && !m_location->error().empty()) {
-      m_locationHint->setText(m_location->error());
     } else {
       m_locationHint->setText(i18n::tr("control-center.privacy.auto-locate-on"));
     }

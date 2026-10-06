@@ -8,7 +8,6 @@
 #include "dbus/power/power_profiles_service.h"
 #include "i18n/i18n.h"
 #include "shell/osd/osd_overlay.h"
-#include "system/easyeffects_service.h"
 #include "system/gamma_service.h"
 
 #include <algorithm>
@@ -57,15 +56,6 @@ inline OsdContent powerProfileOsdContent(std::string_view profile) {
       .kind = OsdKind::PowerProfile,
       .icon = std::string(profileGlyphName(profile)),
       .value = profileLabel(profile),
-      .showProgress = false,
-  };
-}
-
-inline OsdContent effectsProfileOsdContent(AudioEffectsProfileKind kind, std::string_view profile) {
-  const char* labelKey = kind == AudioEffectsProfileKind::Input ? "osd.effects.input" : "osd.effects.output";
-  return OsdContent{
-      .icon = "adjustments",
-      .value = i18n::tr(labelKey) + ": " + std::string(profile),
       .showProgress = false,
   };
 }
