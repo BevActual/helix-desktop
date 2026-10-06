@@ -115,9 +115,13 @@ end-to-end test (`tests/desktop_agent_integration.py`). It needs `msg-risk.toml`
 `<datadir>/helix/`, or `HELIX_RISK_POLICY`); without it every method fails closed with the reason. Caller identity
 is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
 Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent
-runners is the real fix (see the limit above). Still missing: the shell's confirmation dialog (the confirmer
-role has no UI yet, so confirm-tier actions and first-use consent are denied in a real session), the MCP adapter
-switch to `Agent1`, and the Settings page.
+runners is the real fix (see the limit above). The shell now registers as confirmer and shows `agent-confirm`
+(`src/shell/agent/`): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
+where Enter never approves, Escape denies, Allow stays disabled for 700 ms after each new request, grant tiers
+default to least privilege and closing the panel denies what is pending. It was checked in a nested helix-niri
+session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
+checked: the disabled look of Allow during the arming window, clicking Allow/Deny with a pointer, and the
+confirm-tier action layout. Still missing: the MCP adapter switch to `Agent1` and the Settings page.
 
 ## Build order
 

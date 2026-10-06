@@ -563,6 +563,8 @@ _noctalia_sources = files(
   'src/shell/panel/panel_manager.cpp',
   'src/shell/panel/persistent_panel_host.cpp',
   'src/shell/polkit/polkit_panel.cpp',
+  'src/shell/agent/agent_confirmation_queue.cpp',
+  'src/shell/agent/agent_confirm_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
   'src/shell/session/session_action_runner.cpp',
   'src/shell/session/session_ipc.cpp',
@@ -1273,6 +1275,12 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('desktop_agent_broker', helix_agent_broker_unit)
+  helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
+    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp'),
+    dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('agent_confirmation_queue', helix_confirmation_queue_unit)
   helix_displays_test = executable('desktop_displays_test',
     sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop/protocol.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],

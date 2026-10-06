@@ -1,5 +1,6 @@
 #include "application.h"
 #include "desktop/client.h"
+#include "shell/agent/agent_confirmation_queue.h"
 
 #include "app/main_loop.h"
 #include "ui/controls/select_dropdown_popup.h"

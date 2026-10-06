@@ -63,6 +63,7 @@
 #include "render/text/font_weight_catalog.h"
 #include "shell/greeter/greeter_appearance_sync.h"
 #include "shell/launcher/launcher_panel.h"
+#include "shell/agent/agent_confirmation_queue.h"
 #include "shell/polkit/polkit_panel.h"
 #include "shell/session/session_ipc.h"
 #include "shell/session/session_panel.h"
@@ -535,9 +536,34 @@ void Application::initServices() {
       if (state.value("desktop-capabilities", helix::Json::object()) != capabilities)
         helix::desktopClient().call("configuration", "RegisterCapabilities", g_variant_new("(@a{sv})", helix::toVariant(capabilities)));
     } catch (...) {}
+    // The shell shows agent confirmations. Registration is idempotent and repeats so it survives a service restart.
+    try { helix::desktopClient().call("agent", "RegisterConfirmer"); } catch (...) {}
   };
   registerDesktop();
+  m_agentConfirmations = std::make_unique<helix::agent::ConfirmationQueue>(
+    [](std::uint64_t operation, bool approved, const std::vector<std::string>& tiers) {
+      const helix::Json options = approved && !tiers.empty() ? helix::Json{{"tiers", tiers}} : helix::Json::object();
+      helix::desktopClient().callAsync("agent", "Confirm",
+        g_variant_new("(tb@a{sv})", operation, approved, helix::toVariant(options)), [](helix::Json, std::string) {});
+    });
+  m_agentConfirmations->onChanged = [this] {
+    // Deferred: this runs inside the panel's own button handler.
+    DeferredCall::callLater([this] {
+      if (m_agentConfirmations == nullptr) return;
+      if (m_agentConfirmations->front() != nullptr) {
+        if (!PanelManager::instance().isOpenPanel("agent-confirm")) PanelManager::instance().openPanel("agent-confirm");
+      } else if (PanelManager::instance().isOpenPanel("agent-confirm")) {
+        PanelManager::instance().closePanelById("agent-confirm");
+      }
+    });
+  };
   m_desktopServiceObserver = helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json& args) {
+    if (interface == helix::agentInterface) {
+      if (signal == "ConfirmationRequested" && !args.empty() && m_agentConfirmations != nullptr) {
+        if (auto request = helix::agent::ConfirmRequest::fromJson(args.at(0))) m_agentConfirmations->enqueue(std::move(*request));
+      }
+      return;
+    }
     if (interface == helix::appearanceInterface) {
       if (signal == "Changed") m_themeService.onConfigReload();
       else if (signal == "Applied" && args.size() > 1 && args.at(1) == true) m_hookManager.fire(HookKind::ColorsChanged);

@@ -116,6 +116,7 @@ class WirePlumberMixer;
 class PipeWireSpectrum;
 class PipeWireSpectrumPollSource;
 class PolkitAgent;
+namespace helix::agent { class ConfirmationQueue; }
 class PolkitPollSource;
 class PowerProfilesService;
 class ScreenSaverPollSource;
@@ -229,6 +230,7 @@ private:
   VirtualKeyboardService m_virtualKeyboardService;
   Timer m_desktopServiceTimer;
   unsigned m_desktopServiceObserver = 0;
+  std::unique_ptr<helix::agent::ConfirmationQueue> m_agentConfirmations;
   ConfigService m_configService;
   HttpClient m_httpClient;
   FileWatcher m_fileWatcher;

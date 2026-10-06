@@ -1,4 +1,24 @@
 {
+  "agent": {
+    "confirm": {
+      "action-title": "Allow this action?",
+      "action-subject": "{app} wants to do this on your desktop",
+      "grant-title": "Give an app access?",
+      "grant-subject": "{app} is asking to use your desktop",
+      "grant-detail": "Choose what it may do. You can change this later in Settings.",
+      "reason": "It says: “{reason}”",
+      "tainted": "This app read private content (clipboard, screen or notifications) since you last approved something. That content may be influencing this request.",
+      "waiting": "{count} more waiting",
+      "allow": "Allow",
+      "deny": "Deny"
+    },
+    "tier": {
+      "observe": "See what is on your desktop (status, windows, settings)",
+      "observe-private": "Read private content (clipboard, screen, notifications)",
+      "act": "Change settings and open panels",
+      "confirm": "Do things that ask for your approval each time"
+    }
+  },
   "auth": {
     "fingerprint": {
       "disconnected": "Fingerprint reader disconnected",
