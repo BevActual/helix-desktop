@@ -57,7 +57,23 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 | `window_close` | `window-close` (focused window, or a compositor id) |
 | `dnd_toggle` | `notification-dnd-toggle` |
 
-**Blocked in v1:** synthetic input, screen-record, `session reboot/shutdown/logout`, unrestricted raw msg.
+**Blocked in v1:** synthetic input, `session reboot/shutdown/logout`, `firewall-panic-toggle`, unrestricted raw msg.
+
+### Risk tiers
+
+`protocols/ipc/msg-risk.toml` assigns every `noctalia msg` command a tier: `observe`, `observe-private`
+(returns screen, clipboard or notification content; output is untrusted data), `act`, `confirm`, or `blocked`.
+`tests/msg_risk_policy_test.py` fails when a command has no tier, so new commands cannot ship unclassified.
+The MCP adapter enforces the policy in one place (`noctalia_msg`), refuses `blocked` and unknown commands
+regardless of configuration, and grants the tiers listed in `tools/helix-agent/allowlist.toml`. Model-supplied
+text is passed after `--` so it is never parsed as a flag. `noctalia schema-json` dumps the full msg schema
+for generated tooling.
+
+**Not yet enforced:** the policy lives in the adapter. The IPC socket itself still accepts every command from
+any process in the user session, so a client with a shell bypasses the adapter. The `confirm` tier is granted
+only because no shell-side confirmation exists yet. Closing both is the `Agent1` D-Bus interface (peer
+identity, per-client grants, confirmation, audit log); see `agent-and-inference.md` for that design and the
+built-in inference service.
 
 `notification-show` JSON may set `"history": false` for toast-only; CLI/MCP default is history on so agents can drive the unread badge.
 

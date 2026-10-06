@@ -1,0 +1,16 @@
+<node>
+<!-- DRAFT. Served by helix-inference at org.helix.Inference, /org/helix/Inference (D-Bus activated, sandboxed).
+     Design: docs/design/agent-and-inference.md. Mutating work goes through Action, like every other Helix service.
+     Actions: chat, embed, describe, transcribe, speak, load, unload, pull, remove, set-budget.
+     chat args: model (s), messages (av), tools (av), grammar (s, GBNF), max_tokens (u), temperature (d), priority (s), stream (b). -->
+<interface name="org.helix.Inference1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="ListModels"><arg type="av" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <!-- Delta(operation, text): streamed output for chat/transcribe. Delivered to the requester only. -->
+ <signal name="Delta"><arg type="t"/><arg type="s"/></signal>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Changed"/>
+</interface>
+</node>
