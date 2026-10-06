@@ -56,12 +56,6 @@ namespace {
     return cache;
   }
 
-  std::string normalizedRoleToken(std::string_view token) {
-    std::string normalized = StringUtils::trim(token);
-    StringUtils::toLowerInPlace(normalized);
-    return normalized;
-  }
-
 } // namespace
 
 const Color& colorForRole(ColorRole role) noexcept {
@@ -121,33 +115,6 @@ Color colorForRole(ColorRole role, float alpha) noexcept {
   Color color = colorForRole(role);
   color.a *= alpha;
   return color;
-}
-
-std::optional<ColorRole> colorRoleFromToken(std::string_view token) {
-  const std::string normalized = normalizedRoleToken(token);
-  for (const auto& option : kColorRoleTokens) {
-    if (normalized == option.token) {
-      return option.role;
-    }
-  }
-  return std::nullopt;
-}
-
-std::string_view colorRoleToken(ColorRole role) noexcept {
-  for (const auto& option : kColorRoleTokens) {
-    if (option.role == role) {
-      return option.token;
-    }
-  }
-  return "on_surface";
-}
-
-ColorSpec colorSpecFromRole(ColorRole role, float alpha) noexcept {
-  return ColorSpec{.role = role, .fixed = clearColor(), .alpha = alpha};
-}
-
-ColorSpec fixedColorSpec(const Color& color) noexcept {
-  return ColorSpec{.role = std::nullopt, .fixed = color, .alpha = 1.0F};
 }
 
 Color resolveColorSpec(const ColorSpec& color) noexcept {

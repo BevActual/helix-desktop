@@ -1,12 +1,12 @@
 #pragma once
 
 #include "core/motion_durations.h"
+#include "core/style_defaults.h"
 
 #include "ui/signal.h"
 
 namespace Style {
 
-  inline constexpr int barThicknessDefault = 34;
 
   inline constexpr int animFast = motion::kFast;
   inline constexpr int animNormal = motion::kNormal;
@@ -37,12 +37,10 @@ namespace Style {
   inline constexpr float panelPadding = 14.0F;
 
   // Default inner inset for bar widget capsules (logical px, before bar content scale).
-  inline constexpr float barCapsulePadding = 6.0F;
   inline constexpr float baseGlyphSize = 16.0F;
 
   inline constexpr float fontSizeMini = 11.0F;
   inline constexpr float fontSizeCaption = 13.0F;
-  inline constexpr float fontSizeBody = 14.0F;
   inline constexpr float fontSizeTitle = 16.0F;
   inline constexpr float fontSizeHeader = 20.0F;
 

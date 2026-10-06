@@ -1,7 +1,7 @@
 #pragma once
 
 #include "theme/community_palettes.h"
-#include "ui/palette.h"
+#include "theme/color_roles.h"
 
 #include <filesystem>
 #include <string>

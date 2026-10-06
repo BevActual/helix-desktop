@@ -5,7 +5,7 @@
 #include "config/widget_setting_value.h"
 #include "core/input/key_chord.h"
 #include "system/sysmon_threshold_profile.h"
-#include "ui/style.h"
+#include "core/style_defaults.h"
 
 #include <array>
 #include <cstddef>

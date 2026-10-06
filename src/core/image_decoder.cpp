@@ -1,6 +1,6 @@
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 
-#include "render/core/image_orientation.h"
+#include "core/image_orientation.h"
 
 #include <algorithm>
 #include <cstdio>

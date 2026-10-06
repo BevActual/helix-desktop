@@ -13,7 +13,7 @@
 #include "dbus/notification/notification_poll_source.h"
 #include "hooks/battery_hook_state.h"
 #include "hooks/hook_manager.h"
-#include "idle/idle_grace_overlay.h"
+#include "shell/idle/idle_grace_overlay.h"
 #include "idle/idle_inhibitor.h"
 #include "idle/idle_manager.h"
 #include "ipc/ipc_poll_source.h"

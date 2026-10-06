@@ -1,6 +1,6 @@
 #include "config/widget_config.h"
 
-#include "ui/style.h"
+#include "core/style_defaults.h"
 
 #include <optional>
 #include <string>

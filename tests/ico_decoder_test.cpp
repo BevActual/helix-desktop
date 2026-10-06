@@ -1,4 +1,4 @@
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 
 #include <cstdint>
 #include <cstdio>

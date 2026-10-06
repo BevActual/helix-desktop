@@ -4,7 +4,7 @@
 #include "core/timer_manager.h"
 #include "render/animation/animation_manager.h"
 #include "theme/palette.h"
-#include "ui/palette.h"
+#include "theme/color_roles.h"
 
 #include <chrono>
 #include <cstdint>

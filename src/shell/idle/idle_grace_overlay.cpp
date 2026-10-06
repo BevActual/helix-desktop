@@ -1,4 +1,4 @@
-#include "idle/idle_grace_overlay.h"
+#include "shell/idle/idle_grace_overlay.h"
 
 #include "core/deferred_call.h"
 #include "core/log.h"

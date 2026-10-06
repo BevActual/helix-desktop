@@ -1,7 +1,7 @@
 #include "ui/controls/image.h"
 
 #include "render/core/async_texture_cache.h"
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 #include "render/core/image_file_loader.h"
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"

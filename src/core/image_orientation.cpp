@@ -1,4 +1,4 @@
-#include "render/core/image_orientation.h"
+#include "core/image_orientation.h"
 
 #include <array>
 #include <cstring>

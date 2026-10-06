@@ -11,77 +11,10 @@
 #include <optional>
 #include <string_view>
 
-[[nodiscard]] constexpr Color clearColor() noexcept { return rgba(0.0F, 0.0F, 0.0F, 0.0F); }
-
-struct ColorSpec {
-  std::optional<ColorRole> role;
-  Color fixed = clearColor();
-  float alpha = 1.0F;
-};
-
-constexpr bool operator==(const ColorSpec& a, const ColorSpec& b) noexcept {
-  return a.role == b.role && a.fixed == b.fixed && a.alpha == b.alpha;
-}
-
-[[nodiscard]] constexpr ColorSpec clearColorSpec() noexcept {
-  return ColorSpec{.role = std::nullopt, .fixed = clearColor(), .alpha = 1.0F};
-}
-
-// Multiplies a spec's alpha, keeping any color role intact so theme switches still resolve.
-// Distinct from withAlpha(Color, float) in core/color.h, which replaces the alpha of an
-// already-resolved color and therefore cannot preserve the role.
-[[nodiscard]] constexpr ColorSpec scaleAlpha(const ColorSpec& color, float factor) noexcept {
-  ColorSpec out = color;
-  out.alpha = std::clamp(out.alpha * std::clamp(factor, 0.0F, 1.0F), 0.0F, 1.0F);
-  return out;
-}
-
-struct Palette {
-  Color primary;
-  Color onPrimary;
-  Color secondary;
-  Color onSecondary;
-  Color tertiary;
-  Color onTertiary;
-  Color error;
-  Color onError;
-  Color surface;
-  Color onSurface;
-  Color surfaceVariant;
-  Color onSurfaceVariant;
-  Color outline;
-  Color shadow;
-  Color hover;
-  Color onHover;
-};
-
-constexpr bool operator==(const Palette& lhs, const Palette& rhs) noexcept {
-  return lhs.primary == rhs.primary
-      && lhs.onPrimary == rhs.onPrimary
-      && lhs.secondary == rhs.secondary
-      && lhs.onSecondary == rhs.onSecondary
-      && lhs.tertiary == rhs.tertiary
-      && lhs.onTertiary == rhs.onTertiary
-      && lhs.error == rhs.error
-      && lhs.onError == rhs.onError
-      && lhs.surface == rhs.surface
-      && lhs.onSurface == rhs.onSurface
-      && lhs.surfaceVariant == rhs.surfaceVariant
-      && lhs.onSurfaceVariant == rhs.onSurfaceVariant
-      && lhs.outline == rhs.outline
-      && lhs.shadow == rhs.shadow
-      && lhs.hover == rhs.hover
-      && lhs.onHover == rhs.onHover;
-}
-
 extern Palette palette;
 
 [[nodiscard]] const Color& colorForRole(ColorRole role) noexcept;
 [[nodiscard]] Color colorForRole(ColorRole role, float alpha) noexcept;
-[[nodiscard]] std::optional<ColorRole> colorRoleFromToken(std::string_view token);
-[[nodiscard]] std::string_view colorRoleToken(ColorRole role) noexcept;
-[[nodiscard]] ColorSpec colorSpecFromRole(ColorRole role, float alpha = 1.0F) noexcept;
-[[nodiscard]] ColorSpec fixedColorSpec(const Color& color) noexcept;
 // A fixed hue pulled up to 15° toward the current primary (Material harmonize) so system colors
 // (blue for connectivity, green for power, red for alerts) sit in the wallpaper palette's family
 // without losing their meaning. Resolved against the palette at call time.

@@ -1,7 +1,7 @@
 #include "render/backend/gles_texture_manager.h"
 
 #include "core/log.h"
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 #include "render/core/image_file_loader.h"
 #include "render/core/image_source_log.h"
 

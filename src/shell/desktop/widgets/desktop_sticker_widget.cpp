@@ -1,7 +1,7 @@
 #include "shell/desktop/widgets/desktop_sticker_widget.h"
 
 #include "core/log.h"
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 #include "render/core/renderer.h"
 #include "render/core/texture_manager.h"
 #include "render/scene/node.h"

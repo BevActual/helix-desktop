@@ -1,6 +1,6 @@
 #include "render/core/image_file_loader.h"
 
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 #include "util/file_utils.h"
 
 #include <algorithm>

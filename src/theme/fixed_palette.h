@@ -1,7 +1,7 @@
 #pragma once
 
 #include "theme/palette.h"
-#include "ui/palette.h"
+#include "theme/color_roles.h"
 
 #include <array>
 #include <string_view>
