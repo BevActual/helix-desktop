@@ -192,7 +192,7 @@ void RenderContext::notifyFontConfigChanged() {
   ++m_textMetricsGeneration;
 }
 
-void RenderContext::renderScene(RenderTarget& target, Node* sceneRoot, const WallpaperMaskDrawParams* wallpaperMask) {
+void RenderContext::renderScene(RenderTarget& target, Node* sceneRoot) {
   if (m_backend == nullptr || m_graphicsResetPending) {
     return;
   }
@@ -225,11 +225,6 @@ void RenderContext::renderScene(RenderTarget& target, Node* sceneRoot, const Wal
       renderNode(
           renderScale, sceneRoot, Mat3::identity(), 1.0F, sw, sh, bw, bh, 0.0F, 0.0F, sw, sh, false, false, false
       );
-    }
-    if (wallpaperMask != nullptr && wallpaperMask->texture != 0) {
-      m_backend->disableScissor();
-      m_backend->setBlendMode(RenderBlendMode::DestinationOut);
-      m_backend->drawWallpaperMask(*wallpaperMask);
     }
   }
   float ms = elapsedSince(drawStart);

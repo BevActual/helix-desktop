@@ -186,76 +186,6 @@ bool DesktopWidgetsController::isEffectivelyVisible() const noexcept {
   return runtimeWantsVisible() && !m_displaySuppressed && !isEditing();
 }
 
-void DesktopWidgetsController::setWallpaperMask(
-    std::uint64_t ownerId, const std::string& outputName, std::optional<OutputWallpaperMask> mask
-) {
-  if (ownerId == 0 || outputName.empty()) {
-    kLog.warn("rejected wallpaper mask with missing owner or output");
-    return;
-  }
-
-  const auto existing = m_wallpaperMasks.find(outputName);
-  if (!mask.has_value()) {
-    if (existing != m_wallpaperMasks.end() && existing->second.ownerId == ownerId) {
-      m_wallpaperMasks.erase(existing);
-      syncWallpaperMasks();
-    }
-    return;
-  }
-
-  if (mask->path.empty() || mask->wallpaperPath.empty()) {
-    kLog.warn("rejected incomplete wallpaper mask for {}", outputName);
-    return;
-  }
-  if (existing != m_wallpaperMasks.end() && existing->second.ownerId != ownerId) {
-    kLog.warn("output {} already has a wallpaper mask owner", outputName);
-    return;
-  }
-  if (m_wayland == nullptr || desktop_widgets::findOutputByKey(*m_wayland, outputName) == nullptr) {
-    kLog.warn("rejected wallpaper mask for unknown output {}", outputName);
-    return;
-  }
-  if (m_config == nullptr || m_config->getWallpaperPath(outputName) != mask->wallpaperPath) {
-    kLog.warn("rejected wallpaper mask for stale wallpaper on {}", outputName);
-    return;
-  }
-
-  mask->ownerId = ownerId;
-  m_wallpaperMasks.insert_or_assign(outputName, std::move(*mask));
-  syncWallpaperMasks();
-}
-
-void DesktopWidgetsController::clearWallpaperMasks(std::uint64_t ownerId) {
-  if (ownerId == 0) {
-    return;
-  }
-  const auto removed =
-      std::erase_if(m_wallpaperMasks, [ownerId](const auto& item) { return item.second.ownerId == ownerId; });
-  if (removed != 0) {
-    syncWallpaperMasks();
-  }
-}
-
-void DesktopWidgetsController::syncWallpaperMasks() {
-  if (m_host != nullptr) {
-    m_host->setWallpaperMasks(m_wallpaperMasks);
-  }
-}
-
-void DesktopWidgetsController::pruneWallpaperMasks() {
-  if (m_config == nullptr) {
-    m_wallpaperMasks.clear();
-    syncWallpaperMasks();
-    return;
-  }
-  const auto removed = std::erase_if(m_wallpaperMasks, [this](const auto& item) {
-    return m_config->getWallpaperPath(item.first) != item.second.wallpaperPath;
-  });
-  if (removed != 0) {
-    syncWallpaperMasks();
-  }
-}
-
 void DesktopWidgetsController::onOutputChange() {
   if (!m_initialized) {
     return;
@@ -266,7 +196,6 @@ void DesktopWidgetsController::onOutputChange() {
   if (placementChanged) {
     saveSnapshotToConfig();
   }
-  pruneWallpaperMasks();
   if (isEditing()) {
     m_editor->onOutputChange();
   } else if (m_host != nullptr) {
@@ -554,7 +483,6 @@ void DesktopWidgetsController::handleConfigReload() {
       m_runtimeVisibility = RuntimeVisibility::FollowConfig;
     }
   }
-  pruneWallpaperMasks();
 
   const bool calendarChanged = m_config != nullptr && m_config->lastChange().calendar;
   if (!isEditing()) {

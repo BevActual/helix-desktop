@@ -517,7 +517,7 @@
       "compatibility-context": "settings:bar"
     },
     {
-      "kind": "settings-section",
+      "kind": "retired-settings-section",
       "id": "plugins",
       "destination": "settings:desktop-dock",
       "status": "pending",
@@ -604,6 +604,12 @@
       "plugin widgets, shortcuts, panels, launcher providers, desktop widgets",
       "`noctalia plugins` and `noctalia msg plugin(s)` commands",
       "[plugins] and [plugin_settings] config sections"
+    ],
+    "also-removed": [
+      "wallpaper-mask rendering path",
+      "ui_tree reconciler and markdown view (md4c)",
+      "plugin sound API",
+      "Plugins settings section"
     ]
   }
 }

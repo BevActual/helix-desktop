@@ -58,7 +58,6 @@ namespace settings {
     Niri,
     Windows,
     Bar,
-    Plugins,
     Camera,
     Clock,
   };

@@ -16,7 +16,6 @@ class RenderBackend;
 class RenderTarget;
 enum class RenderGraphicsResetStatus;
 struct Mat3;
-struct WallpaperMaskDrawParams;
 
 class RenderContext {
 public:
@@ -32,7 +31,7 @@ public:
   void restoreAfterGraphicsReset(GlSharedContext& shared);
   void finishGraphicsResetRecovery() noexcept { m_graphicsResetPending = false; }
 
-  void renderScene(RenderTarget& target, Node* sceneRoot, const WallpaperMaskDrawParams* wallpaperMask = nullptr);
+  void renderScene(RenderTarget& target, Node* sceneRoot);
   void setGraphicsResetCallback(std::function<void(RenderGraphicsResetStatus)> callback) {
     m_graphicsResetCallback = std::move(callback);
   }

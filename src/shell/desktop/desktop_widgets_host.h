@@ -6,7 +6,6 @@
 #include "render/scene/node.h"
 #include "shell/desktop/desktop_widget_factory.h"
 #include "shell/desktop/desktop_widgets_controller.h"
-#include "shell/desktop/wallpaper_mask.h"
 #include "wayland/layer_surface.h"
 
 #include <memory>
@@ -36,7 +35,6 @@ public:
   void requestUpdate();
   void requestLayout();
   void requestRedraw();
-  void setWallpaperMasks(const OutputWallpaperMaskMap& masks);
   bool onPointerEvent(const PointerEvent& event);
 
 private:
@@ -54,18 +52,11 @@ private:
     float intrinsicHeight = 0.0F;
   };
 
-  struct LoadedWallpaperMask {
-    OutputWallpaperMask descriptor;
-    TextureHandle retainedTexture;
-  };
-
   void syncInstances();
   void createInstance(const DesktopWidgetState& state, const WaylandOutput& output);
   void buildScene(DesktopWidgetInstance& instance);
   void prepareFrame(DesktopWidgetInstance& instance, bool needsUpdate, bool needsLayout);
   [[nodiscard]] DesktopWidgetInstance* findInstance(const std::string& id);
-  void releaseWallpaperMasks();
-  void updateWallpaperMask(DesktopWidgetInstance& instance);
 
   WaylandConnection* m_wayland = nullptr;
   ConfigService* m_config = nullptr;
@@ -75,5 +66,4 @@ private:
   DesktopWidgetsSnapshot m_snapshot;
   bool m_visible = false;
   std::vector<std::unique_ptr<DesktopWidgetInstance>> m_instances;
-  std::unordered_map<std::string, LoadedWallpaperMask> m_wallpaperMasks;
 };

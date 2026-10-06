@@ -185,7 +185,7 @@ constexpr std::pair<std::string_view, std::string_view> controlCenterTabs[] = {
   {"shell", "Shell"}, {"printers", "Printers"}, {"camera", "Camera"}, {"localsend", "LocalSend"},
   {"syncthing", "Sync"}, {"cast", "Cast"}, {"calendar", "Calendar"}, {"weather", "Weather"},
   {"media", "Media"}, {"capture", "Capture"}, {"clipboard", "Clipboard"}, {"ai", "AI Usage"},
-  {"templates", "Templates"}, {"plugins", "Extensions"}, {"hooks", "Automation"}, {"niri", "Niri"},
+  {"templates", "Templates"}, {"hooks", "Automation"}, {"niri", "Niri"},
 };
 const Setting* find(std::string_view id) {
   for (const auto& setting : settings) if (setting.id == id) return &setting;

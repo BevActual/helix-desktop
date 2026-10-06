@@ -45,7 +45,7 @@ namespace {
 
 } // namespace
 
-DesktopWidgetsHost::~DesktopWidgetsHost() { releaseWallpaperMasks(); }
+DesktopWidgetsHost::~DesktopWidgetsHost() = default;
 
 void DesktopWidgetsHost::initialize(const DesktopWidgetServices& services) {
   m_wayland = &services.wayland;
@@ -53,52 +53,6 @@ void DesktopWidgetsHost::initialize(const DesktopWidgetServices& services) {
   m_renderContext = services.renderContext;
   m_textureCache = services.textureCache;
   m_factory = std::make_unique<DesktopWidgetFactory>(services.runtime);
-}
-
-void DesktopWidgetsHost::releaseWallpaperMasks() {
-  if (m_textureCache != nullptr) {
-    for (auto& [outputName, mask] : m_wallpaperMasks) {
-      (void)outputName;
-      m_textureCache->releaseAlphaMask(mask.retainedTexture, mask.descriptor.path);
-    }
-  }
-  m_wallpaperMasks.clear();
-}
-
-void DesktopWidgetsHost::setWallpaperMasks(const OutputWallpaperMaskMap& masks) {
-  for (auto it = m_wallpaperMasks.begin(); it != m_wallpaperMasks.end();) {
-    const auto desired = masks.find(it->first);
-    if (desired != masks.end() && desired->second == it->second.descriptor) {
-      ++it;
-      continue;
-    }
-    if (m_textureCache != nullptr) {
-      m_textureCache->releaseAlphaMask(it->second.retainedTexture, it->second.descriptor.path);
-    }
-    it = m_wallpaperMasks.erase(it);
-  }
-
-  if (m_textureCache != nullptr) {
-    for (const auto& [outputName, descriptor] : masks) {
-      if (m_wallpaperMasks.contains(outputName)) {
-        continue;
-      }
-      TextureHandle texture = m_textureCache->acquireAlphaMask(descriptor.path);
-      const TextureHandle wallpaperTexture = m_textureCache->peek(descriptor.wallpaperPath);
-      if (!texture.valid()
-          || !wallpaperTexture.valid()
-          || texture.width != wallpaperTexture.width
-          || texture.height != wallpaperTexture.height) {
-        kLog.warn("rejected wallpaper mask with invalid source dimensions for {}", outputName);
-        m_textureCache->releaseAlphaMask(texture, descriptor.path);
-        continue;
-      }
-      m_wallpaperMasks.emplace(outputName, LoadedWallpaperMask{.descriptor = descriptor, .retainedTexture = texture});
-    }
-  }
-  for (auto& instance : m_instances) {
-    updateWallpaperMask(*instance);
-  }
 }
 
 void DesktopWidgetsHost::show(const DesktopWidgetsSnapshot& snapshot) {
@@ -363,47 +317,6 @@ void DesktopWidgetsHost::buildScene(DesktopWidgetInstance& instance) {
   }
 }
 
-void DesktopWidgetsHost::updateWallpaperMask(DesktopWidgetInstance& instance) {
-  if (instance.surface == nullptr || m_wayland == nullptr || m_config == nullptr || m_textureCache == nullptr) {
-    return;
-  }
-
-  const auto maskIt = m_wallpaperMasks.find(instance.effectiveOutputName);
-  const WaylandOutput* output = desktop_widgets::findOutputByKey(*m_wayland, instance.effectiveOutputName);
-  if (maskIt == m_wallpaperMasks.end()
-      || output == nullptr
-      || m_config->getWallpaperPath(instance.effectiveOutputName) != maskIt->second.descriptor.wallpaperPath) {
-    instance.surface->setWallpaperMask(std::nullopt);
-    return;
-  }
-
-  const TextureHandle texture = m_textureCache->peekAlphaMask(maskIt->second.descriptor.path);
-  if (!texture.valid() || texture.width <= 0 || texture.height <= 0) {
-    instance.surface->setWallpaperMask(std::nullopt);
-    return;
-  }
-
-  const auto fillMode = m_config->config().wallpaper.fillMode;
-  const WallpaperSpanParams span = fillMode == WallpaperFillMode::Span
-      ? computeWallpaperSpanParams(m_wayland->outputs(), output->name)
-      : WallpaperSpanParams{};
-  instance.surface->setWallpaperMask(
-      WallpaperMaskDrawParams{
-          .texture = texture.id,
-          .surfaceWidth = static_cast<float>(instance.surface->width()),
-          .surfaceHeight = static_cast<float>(instance.surface->height()),
-          .surfaceOffsetX = static_cast<float>(instance.surface->marginLeft()),
-          .surfaceOffsetY = static_cast<float>(instance.surface->marginTop()),
-          .outputWidth = desktop_widgets::outputLogicalWidth(*output),
-          .outputHeight = desktop_widgets::outputLogicalHeight(*output),
-          .imageWidth = static_cast<float>(texture.width),
-          .imageHeight = static_cast<float>(texture.height),
-          .fillMode = static_cast<float>(fillMode),
-          .span = span,
-      }
-  );
-}
-
 void DesktopWidgetsHost::prepareFrame(DesktopWidgetInstance& instance, bool needsUpdate, bool needsLayout) {
   if (instance.widget == nullptr || instance.surface == nullptr || m_renderContext == nullptr) {
     return;
@@ -450,7 +363,6 @@ void DesktopWidgetsHost::prepareFrame(DesktopWidgetInstance& instance, bool need
     instance.surface->requestSize(geometry.surfaceWidth, geometry.surfaceHeight);
   }
   instance.surface->setMargins(geometry.marginTop, 0, 0, geometry.marginLeft);
-  updateWallpaperMask(instance);
 
   if (instance.sceneRoot != nullptr) {
     instance.sceneRoot->setFrameSize(

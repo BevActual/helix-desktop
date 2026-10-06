@@ -128,7 +128,6 @@ public:
   void setAnimationManager(AnimationManager* manager) noexcept { m_animationManager = manager; }
   void setSceneRoot(Node* root);
   void setRenderContext(RenderContext* ctx);
-  void setWallpaperMask(std::optional<WallpaperMaskDrawParams> mask);
   [[nodiscard]] RenderContext* renderContext() const noexcept { return m_renderContext; }
   [[nodiscard]] RenderTarget& renderTarget() noexcept { return m_renderTarget; }
   [[nodiscard]] wl_surface* wlSurface() const noexcept { return m_surface; }
@@ -191,7 +190,6 @@ private:
   RenderTarget m_renderTarget;
   AnimationManager* m_animationManager = nullptr;
   Node* m_sceneRoot = nullptr;
-  std::optional<WallpaperMaskDrawParams> m_wallpaperMask;
   std::string m_debugName;
   std::shared_ptr<InvalidationToken> m_invalidationToken = std::make_shared<InvalidationToken>();
   ConfigureCallback m_configureCallback;

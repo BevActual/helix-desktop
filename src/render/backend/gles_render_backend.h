@@ -14,7 +14,6 @@
 #include "render/programs/rect_program.h"
 #include "render/programs/screen_corner_program.h"
 #include "render/programs/spinner_program.h"
-#include "render/programs/wallpaper_mask_program.h"
 #include "render/programs/wallpaper_program.h"
 
 #include <EGL/egl.h>
@@ -86,7 +85,6 @@ public:
       const GraphStyle& style, const Mat3& transform
   ) override;
   void drawWallpaper(const WallpaperDrawParams& params) override;
-  void drawWallpaperMask(const WallpaperMaskDrawParams& params) override;
   void drawFullscreenTexture(TextureId texture, bool flipY) override;
   void drawFullscreenTint(Color color) override;
   void drawFramebufferBlur(
@@ -131,7 +129,6 @@ private:
   EffectProgram m_effectProgram;
   GraphProgram m_graphProgram;
   WallpaperProgram m_wallpaperProgram;
-  WallpaperMaskProgram m_wallpaperMaskProgram;
   BlurProgram m_blurProgram;
   ShaderProgram m_fullscreenTextureProgram;
   ShaderProgram m_fullscreenTintProgram;

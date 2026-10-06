@@ -52,7 +52,7 @@ inline bool isSoftwareContext(std::string_view context) {
 
 inline bool isRetiredSettingsTab(std::string_view id) {
   return isSoftwareContext(id) || id == "theme" || id == "wallpaper" || id == "control-center" || id == "launcher" ||
-      id == "desktop" || id == "shell" || id == "keybinds" || id == "templates" || id == "plugins" ||
+      id == "desktop" || id == "shell" || id == "keybinds" || id == "templates" ||
       id == "hooks" || id == "niri";
 }
 }

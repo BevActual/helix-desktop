@@ -350,7 +350,6 @@ namespace settings {
     case SettingsSection::Niri:
     case SettingsSection::Windows:
     case SettingsSection::Bar:
-    case SettingsSection::Plugins:
     case SettingsSection::Camera:
     case SettingsSection::Clock:
     case SettingsSection::Type:
@@ -400,7 +399,6 @@ namespace settings {
     case SettingsSection::Niri:
     case SettingsSection::Windows:
     case SettingsSection::Bar:
-    case SettingsSection::Plugins:
     case SettingsSection::Camera:
     case SettingsSection::Clock:
     case SettingsSection::Type:

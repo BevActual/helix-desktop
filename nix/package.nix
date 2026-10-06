@@ -29,7 +29,6 @@
   librsvg,
   libqalculate,
   libxml2,
-  md4c,
   libsecret,
   libsodium,
   stb,
@@ -112,7 +111,6 @@ lib.warnIf cudaSupport
     librsvg
     libqalculate
     libxml2
-    md4c
     libsecret
     libsodium
     stb'

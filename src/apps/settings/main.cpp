@@ -1437,7 +1437,7 @@ struct Settings {
         addSetting(groups[name], setting);
       }
       if (page == "desktop-dock" && connected && snapshots.contains("configuration") && snapshots.at("configuration").value("helix-desktop", false)) {
-        if (matches("Extensions Widgets Automation Hooks Niri Keyboard Agents Advanced Desktop Settings")) {
+        if (matches("Widgets Automation Hooks Niri Keyboard Agents Advanced Desktop Settings")) {
           auto* pending = group("Advanced Desktop Settings");
           adw_preferences_group_set_description(pending, "Your existing configuration remains active. These controls are not yet available in Settings.");
           for (const auto& name : {"Extension, widget and automation editors", "Global compositor shortcuts and advanced Niri configuration"}) {

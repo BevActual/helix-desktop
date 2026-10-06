@@ -258,21 +258,6 @@ std::optional<std::string> SoundPlayer::decode(const fs::path& path, SoundBuffer
   return std::nullopt;
 }
 
-std::optional<std::string>
-SoundPlayer::loadPluginSound(std::uint64_t ownerId, const std::string& name, const fs::path& path) {
-  SoundBuffer buffer;
-  if (const auto error = decode(path, buffer)) {
-    kLog.warn("failed to load plugin sound \"{}\" from {}: {}", name, path.string(), *error);
-    return error;
-  }
-
-  m_pluginBuffers[ownerId][name] = std::make_shared<const SoundBuffer>(std::move(buffer));
-  kLog.info("loaded plugin sound \"{}\" from {}", name, path.string());
-  return std::nullopt;
-}
-
-void SoundPlayer::unloadPluginSounds(std::uint64_t ownerId) { m_pluginBuffers.erase(ownerId); }
-
 void SoundPlayer::playFile(const fs::path& path) {
   SoundBuffer decoded;
   if (const auto error = decode(path, decoded)) {
@@ -288,21 +273,6 @@ void SoundPlayer::play(const std::string& name) {
     return;
   }
   playBuffer(name, it->second);
-}
-
-void SoundPlayer::playPluginSound(std::uint64_t ownerId, const std::string& name) {
-  const auto ownerIt = m_pluginBuffers.find(ownerId);
-  if (ownerIt == m_pluginBuffers.end()) {
-    kLog.warn("plugin sound \"{}\" is not loaded", name);
-    return;
-  }
-
-  const auto soundIt = ownerIt->second.find(name);
-  if (soundIt == ownerIt->second.end()) {
-    kLog.warn("plugin sound \"{}\" is not loaded", name);
-    return;
-  }
-  playBuffer(name, soundIt->second);
 }
 
 void SoundPlayer::playBuffer(const std::string& name, const std::shared_ptr<const SoundBuffer>& buffer) {

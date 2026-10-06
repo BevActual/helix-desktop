@@ -127,7 +127,6 @@ namespace settings {
         {SettingsSection::Niri, "niri", "niri"},
         {SettingsSection::Windows, "windows", "app-window"},
         {SettingsSection::Bar, "bar", "crop-3-2", false},
-        {SettingsSection::Plugins, "plugins", "puzzle", true, true},
         {SettingsSection::Camera, "camera", "camera", true, true},
         {SettingsSection::Clock, "clock", "clock"},
     }};

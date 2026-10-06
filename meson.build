@@ -92,7 +92,6 @@ wireplumber_dep     = dependency('wireplumber-0.5', include_type: 'system')
 curl_dep            = dependency('libcurl')
 libqalculate_dep    = dependency('libqalculate')
 libxml2_dep         = dependency('libxml-2.0')
-md4c_dep            = dependency('md4c')
 nlohmann_dep        = dependency('nlohmann_json')
 tomlplusplus_dep    = dependency('tomlplusplus')
 libical_dep         = dependency('libical')
@@ -493,7 +492,6 @@ _noctalia_sources = files(
   'src/render/programs/graph_program.cpp',
   'src/render/programs/blur_program.cpp',
   'src/render/programs/wallpaper_program.cpp',
-  'src/render/programs/wallpaper_mask_program.cpp',
   'src/render/core/blur_cache.cpp',
   'src/render/core/cached_layer.cpp',
   'src/render/core/shared_texture_cache.cpp',
@@ -834,7 +832,6 @@ _noctalia_sources = files(
   'src/core/input/keybind_matcher.cpp',
   'src/ui/controls/keybind_recorder.cpp',
   'src/ui/controls/label.cpp',
-  'src/ui/controls/markdown_view.cpp',
   'src/ui/controls/list_editor.cpp',
   'src/ui/controls/color_swatch_preview.cpp',
   'src/ui/controls/progress_bar.cpp',
@@ -857,7 +854,6 @@ _noctalia_sources = files(
   'src/ui/controls/virtual_grid_view.cpp',
   'src/ui/controls/virtual_list_view.cpp',
   'src/ui/builders.cpp',
-  'src/ui/ui_tree_reconciler.cpp',
   'src/ui/app_icon_colorization.cpp',
   'src/ui/palette.cpp',
   'src/ui/popup_chrome.cpp',
@@ -1004,7 +1000,6 @@ _noctalia_system_dependencies = [
   libical_dep,
   cups_dep,
   tomlplusplus_dep,
-  md4c_dep,
   libwebp_dep,
   libwebpdemux_dep,
   libjxl_dep,
@@ -1221,7 +1216,6 @@ if build_tests
     'theme_shell_mode',
     'time_format',
     'tray_identifier',
-    'ui_tree_reconciler',
     'upower_charge_limit',
     'upower_device_catalog',
     'uri',
