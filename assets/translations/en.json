@@ -1836,8 +1836,10 @@
       "spacing-title": "Spacing",
       "spacing-tooltip": "Gaps and outer padding"
     },
+    "install-phone": "Install Helix Phone to open this application.",
     "install-settings": "Install Helix Settings to open this application.",
     "install-system-monitor": "Install Helix System Monitor to open this application.",
+    "open-phone": "Open Phone",
     "open-system-monitor": "Open System Monitor",
     "open-settings": "Open Settings"
   },

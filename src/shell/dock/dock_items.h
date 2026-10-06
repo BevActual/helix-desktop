@@ -45,7 +45,6 @@ namespace shell::dock {
   };
 
   struct DockItemAction {
-    DockItemKind kind = DockItemKind::App;
     DesktopEntry entry;
     std::string idLower;
     std::string startupWmClassLower;

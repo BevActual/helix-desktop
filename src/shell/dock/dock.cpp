@@ -5,7 +5,6 @@
 #include "config/config_service.h"
 #include "core/deferred_call.h"
 #include "core/log.h"
-#include "dbus/kdeconnect/phone_connect_service.h"
 #include "ipc/ipc_service.h"
 #include "render/scene/node.h"
 #include "shell/dock/dock_context_menu.h"
@@ -328,15 +327,6 @@ bool Dock::initialize(CompositorPlatform& platform, ConfigService* config, Rende
   return true;
 }
 
-void Dock::setPhoneService(PhoneConnectService* phone) {
-  m_phoneConn.disconnect();
-  m_phone = phone;
-  if (m_phone != nullptr) {
-    m_phoneConn = m_phone->changed().connect([this]() { refresh(); });
-  }
-  refresh();
-}
-
 void Dock::reload() {
   kLog.info("reloading config");
   const auto& cfg = m_config->config().dock;
@@ -649,9 +639,7 @@ void Dock::syncInstances() {
   const auto& outputs = m_platform->outputs();
   const auto& cfg = m_config->config().dock;
   const auto& selectedMonitors = cfg.monitors;
-  const bool hasPhonePeer = m_phone != nullptr && m_phone->peerDevice() != nullptr;
-  const bool hasStaticContent =
-      !cfg.pinned.empty() || shell::dock::dockLauncherButtonCount(cfg) > 0 || hasPhonePeer;
+  const bool hasStaticContent = !cfg.pinned.empty() || shell::dock::dockLauncherButtonCount(cfg) > 0;
   // When activeMonitorOnly is off, the running-apps check is identical for every output, so hoist it.
   const bool anyRunningGlobal = (!hasStaticContent && cfg.showRunning && !cfg.activeMonitorOnly)
       ? !m_platform->runningAppIds(nullptr).empty()
@@ -877,21 +865,6 @@ bool Dock::syncInstanceModel(shell::dock::DockInstance& instance) {
     }
   }
 
-  std::optional<shell::dock::DockPhonePeer> phonePeer;
-  if (m_phone != nullptr) {
-    if (const auto* peer = m_phone->peerDevice(); peer != nullptr) {
-      shell::dock::DockPhonePeer info;
-      info.name = peer->name.empty() ? peer->id : peer->name;
-      info.reachable = peer->reachable;
-      for (const auto& item : m_phone->notifications()) {
-        if (item.deviceId == peer->id) {
-          ++info.notificationCount;
-        }
-      }
-      phonePeer = std::move(info);
-    }
-  }
-
   auto next = shell::dock::buildDockSnapshot({
       .platform = *m_platform,
       .config = m_config->config().dock,
@@ -899,7 +872,6 @@ bool Dock::syncInstanceModel(shell::dock::DockInstance& instance) {
       .globalActiveIdLower = activeIdLower,
       .pinnedEntries = m_pinnedEntries,
       .sourceSerial = m_modelSerial,
-      .phone = std::move(phonePeer),
   });
 
   const bool needRebuild = instance.snapshot.sourceSerial != next.sourceSerial
@@ -1175,13 +1147,6 @@ void Dock::tryFulfillPendingLaunchFocus() {
 void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell::dock::DockItemAction& action) {
   assertDockInitialized(m_platform, m_config, m_renderContext);
 
-  if (action.kind == shell::dock::DockItemKind::Phone) {
-    PanelManager::instance().togglePanel(
-        "control-center", PanelOpenRequest{.output = instance.output, .context = "phone"}
-    );
-    return;
-  }
-
   pruneCachedToplevelHandles();
 
   auto windows = shell::dock::windowsForDockItem(
@@ -1244,9 +1209,6 @@ void Dock::activateOrLaunchItem(shell::dock::DockInstance& instance, const shell
 void Dock::openItemMenu(shell::dock::DockInstance& instance, const shell::dock::DockItemAction& action) {
   assertDockInitialized(m_platform, m_config, m_renderContext);
 
-  if (action.kind == shell::dock::DockItemKind::Phone) {
-    return;
-  }
   if (m_openingItemMenu) {
     kLog.debug("dock: ignoring item menu request while another is still opening");
     return;

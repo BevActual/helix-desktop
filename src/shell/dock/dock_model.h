@@ -16,18 +16,7 @@ struct wl_output;
 
 namespace shell::dock {
 
-  enum class DockItemKind : std::uint8_t { App, Phone };
-
-  inline constexpr std::string_view kPhoneDockEntryId = "helix:phone";
-
-  struct DockPhonePeer {
-    std::string name;
-    bool reachable = false;
-    std::size_t notificationCount = 0;
-  };
-
   struct DockItemModel {
-    DockItemKind kind = DockItemKind::App;
     DesktopEntry entry;
     std::string idLower;
     std::string startupWmClassLower;
@@ -54,7 +43,6 @@ namespace shell::dock {
     const std::string& globalActiveIdLower;
     const std::vector<DesktopEntry>& pinnedEntries;
     std::uint64_t sourceSerial = 0;
-    std::optional<DockPhonePeer> phone;
   };
 
   [[nodiscard]] wl_output* dockFilterOutput(const DockConfig& cfg, wl_output* instanceOutput);

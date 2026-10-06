@@ -541,7 +541,6 @@ namespace shell::dock {
       const auto& model = itemModels[itemIndex];
       auto& item = instance.items.emplace_back();
       DockItemAction action{
-          .kind = model.kind,
           .entry = model.entry,
           .idLower = model.idLower,
           .startupWmClassLower = model.startupWmClassLower,
@@ -558,19 +557,6 @@ namespace shell::dock {
         areaNode->setSize(cellCross, cellMain);
       }
 
-      const bool isPhone = model.kind == DockItemKind::Phone;
-      if (isPhone) {
-        item.iconGlyph = static_cast<Glyph*>(areaNode->addChild(
-            ui::glyph({
-                .glyph = "device-mobile",
-                .glyphSize = iSize,
-                .color = colorSpecFromRole(ColorRole::OnSurface),
-                .width = iSize,
-                .height = iSize,
-                .configure = [](Glyph& glyph) { glyph.setPosition(kCellPad, kCellPad); },
-            })
-        ));
-      } else {
       std::string iconPath;
       if (!model.entry.icon.empty()) {
         iconPath = deps.iconResolver.resolve(model.entry.icon, iconDecodeTarget);
@@ -610,9 +596,8 @@ namespace shell::dock {
             })
         ));
       }
-      }
 
-      if (cfg.showDots && !isPhone) {
+      if (cfg.showDots) {
         const float dot = std::max(kDotMinSize, std::round(iSize * kDotSizeRatio));
         const bool verticalDots = shell::dock::isVerticalEdge(edge);
 
@@ -638,7 +623,7 @@ namespace shell::dock {
         }
       }
 
-      if (cfg.showInstanceCount || isPhone) {
+      if (cfg.showInstanceCount) {
         const float bd = std::max(kBadgeMinSize, iSize * kBadgeSizeRatio);
         const float badgeX = kCellPad + iSize - bd * kBadgeCornerInsetX;
         const float badgeY = kCellPad - bd * kBadgeCornerInsetY;
@@ -667,9 +652,9 @@ namespace shell::dock {
 
       auto* instPtr = &instance;
 
-      configureDockTooltip(*areaNode, cfg, isPhone ? (model.entry.name.empty() ? i18n::tr("dock.phone") : model.entry.name) : dockItemTooltipText(model.entry));
+      configureDockTooltip(*areaNode, cfg, dockItemTooltipText(model.entry));
       areaNode->setAcceptedButtons(InputArea::buttonMask({BTN_LEFT, BTN_RIGHT}));
-      const bool itemPinned = !isPhone && itemIndex < pinnedCount;
+      const bool itemPinned = itemIndex < pinnedCount;
       areaNode->setOnPress([instPtr, clickContext, itemIndex, itemPinned](const InputArea::PointerData& d) {
         if (d.button != BTN_LEFT) {
           return;
@@ -893,7 +878,7 @@ namespace shell::dock {
       }
 
       if (item.badge != nullptr && item.badgeLabel != nullptr) {
-        const bool show = model.kind == DockItemKind::Phone ? count > 0 : count >= 2;
+        const bool show = count >= 2;
         item.badge->setVisible(show);
         item.badgeLabel->setVisible(show);
         if (show) {

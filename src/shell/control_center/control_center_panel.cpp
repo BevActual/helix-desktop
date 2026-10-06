@@ -33,13 +33,9 @@
 #include "shell/control_center/tabs/capture_tab.h"
 #include "shell/control_center/tabs/power_tab.h"
 #include "shell/control_center/tabs/settings_tab.h"
-#include "shell/control_center/tabs/localsend_tab.h"
 #include "shell/control_center/tabs/native_redirect_tab.h"
-#include "shell/control_center/tabs/phone_tab.h"
-#include "shell/control_center/tabs/syncthing_tab.h"
 #include "shell/control_center/tabs/firewall_tab.h"
 #include "shell/control_center/tabs/printers_tab.h"
-#include "shell/control_center/tabs/cast_tab.h"
 #include "shell/control_center/tabs/privacy_tab.h"
 #include "shell/control_center/tabs/templates_tab.h"
 #include "shell/control_center/tabs/wallpaper_tab.h"
@@ -104,6 +100,8 @@ namespace {
     if (tab == "system") return NativeDestination{"helix-system-monitor", "overview"};
     if (tab == "screen-time") return NativeDestination{"helix-system-monitor", "screen-time"};
     if (tab == "audio") return NativeDestination{"helix-settings", "sound"};
+    if (tab == "phone" || tab == "localsend" || tab == "syncthing" || tab == "cast")
+      return NativeDestination{"helix-phone", ""};
     if (tab == "network" || tab == "tailscale") return NativeDestination{"helix-settings", "network"};
     if (tab == "bluetooth") return NativeDestination{"helix-settings", "bluetooth"};
     if (tab == "theme" || tab == "wallpaper") return NativeDestination{"helix-settings", "appearance"};
@@ -526,7 +524,7 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("network", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.network", services.platform));
   add("bluetooth", std::make_unique<NativeRedirectTab>("helix-settings", "bluetooth", "control-center.tabs.bluetooth", services.platform));
   add("tailscale", std::make_unique<NativeRedirectTab>("helix-settings", "network", "control-center.tabs.tailscale", services.platform));
-  add("phone", std::make_unique<PhoneTab>(services));
+  add("phone", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.phone", services.platform));
 
   add("notifications", std::make_unique<NativeRedirectTab>("helix-settings", "notifications", "control-center.tabs.notifications", services.platform));
   add("audio", std::make_unique<NativeRedirectTab>("helix-settings", "sound", "control-center.tabs.audio", services.platform));
@@ -566,9 +564,9 @@ void ControlCenterPanel::appendBuiltinSlots(const ControlCenterServices& service
   add("printers", std::make_unique<PrintersTab>(services));
   add("camera", std::make_unique<CameraTab>(services));
 
-  add("localsend", std::make_unique<LocalSendTab>(services));
-  add("syncthing", std::make_unique<SyncthingTab>(services));
-  add("cast", std::make_unique<CastTab>(services));
+  add("localsend", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.localsend", services.platform));
+  add("syncthing", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.syncthing", services.platform));
+  add("cast", std::make_unique<NativeRedirectTab>("helix-phone", "", "control-center.tabs.cast", services.platform));
 
   add("calendar", std::make_unique<CalendarTab>(services.config, services.calendar, services));
   add("weather", std::make_unique<WeatherTab>(services.weather, services.config, services));
@@ -1499,18 +1497,19 @@ void ControlCenterPanel::updateTabChrome(std::string_view id) {
   if (m_nativeApplicationButton != nullptr) {
     const auto destination = nativeDestinationForTab(id);
     const bool monitor = destination.has_value() && destination->application == "helix-system-monitor";
+    const bool phone = destination.has_value() && destination->application == "helix-phone";
     const auto* activeSlot = slotById(id);
     const bool hasSettingsLink = activeSlot != nullptr && activeSlot->tab != nullptr && activeSlot->tab->settingsPane() != nullptr;
     const bool showNativeButton = destination.has_value() && (monitor || !hasSettingsLink);
     const bool available = destination.has_value()
-        && process::commandExists(monitor ? "helix-system-monitor" : "helix-settings");
-    const auto label = i18n::tr(monitor ? "control-center.open-system-monitor" : "control-center.open-settings");
+        && process::commandExists(monitor ? "helix-system-monitor" : phone ? "helix-phone" : "helix-settings");
+    const auto label = i18n::tr(monitor ? "control-center.open-system-monitor" : phone ? "control-center.open-phone" : "control-center.open-settings");
     m_nativeApplicationButton->setVisible(showNativeButton);
     m_nativeApplicationButton->setParticipatesInLayout(showNativeButton);
     m_nativeApplicationButton->setText(label);
     m_nativeApplicationButton->setEnabled(available);
-    m_nativeApplicationButton->setTooltip(available ? label : i18n::tr(monitor ? "control-center.install-system-monitor" : "control-center.install-settings"));
-    m_nativeApplicationButton->setGlyph(monitor ? "activity-heartbeat" : "settings");
+    m_nativeApplicationButton->setTooltip(available ? label : i18n::tr(monitor ? "control-center.install-system-monitor" : phone ? "control-center.install-phone" : "control-center.install-settings"));
+    m_nativeApplicationButton->setGlyph(monitor ? "activity-heartbeat" : phone ? "device-mobile" : "settings");
   }
   for (auto& slot : m_slots) {
     const bool tabEnabled = isTabShown(slot.id);

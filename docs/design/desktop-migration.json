@@ -592,7 +592,11 @@
       "audio",
       "screen-time",
       "theme",
-      "system"
+      "system",
+      "phone",
+      "localsend",
+      "syncthing",
+      "cast"
     ],
     "policy": "Live pages removed; each tab id is kept as a redirect to its destination app. Rebuild the capability in the destination, not here."
   },
@@ -611,5 +615,9 @@
       "plugin sound API",
       "Plugins settings section"
     ]
+  },
+  "dock-phone-item-retired": {
+    "date": "2026-10-05",
+    "note": "The dock's phone peer item (notification badge, opens Control Center phone tab) was removed; reintroduce it from Helix Phone."
   }
 }

@@ -1079,7 +1079,6 @@ void Application::initWidgetControllersAndCallbacks() {
   auto shouldRefreshControlCenter = [this]() { return m_panelManager.isOpenPanel("control-center"); };
 
   m_dock.initialize(m_compositorPlatform, &m_configService, &m_renderContext);
-  m_dock.setPhoneService(m_phoneService.get());
   if (m_phoneService != nullptr) {
     // The iPhone mirror window: a manual Start shows it at once with the waiting steps;
     // an always-on receiver stays invisible until the phone actually streams, and the
