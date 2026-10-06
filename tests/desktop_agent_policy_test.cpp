@@ -131,6 +131,34 @@ void checkEvaluate() {
   TEST_CHECK(!taint.tainted(client));
 }
 
+void checkIdentityAndWire() {
+  // Native programs are identified by executable; interpreter-run programs by script, so they do not share grants.
+  TEST_CHECK(clientIdentity("/usr/bin/helix-settings", {"helix-settings"}) == "exe:/usr/bin/helix-settings");
+  const auto a = clientIdentity("/usr/bin/python3.14", {"python3", "/opt/agents/a.py", "--flag"});
+  const auto b = clientIdentity("/usr/bin/python3.14", {"python3", "-u", "/opt/agents/b.py"});
+  TEST_CHECK(a == "exe:/usr/bin/python3.14#/opt/agents/a.py" && b == "exe:/usr/bin/python3.14#/opt/agents/b.py");
+  TEST_CHECK(a != b);
+  TEST_CHECK(clientIdentity("/usr/bin/node", {"node", "/x/server.js"}) == "exe:/usr/bin/node#/x/server.js");
+  TEST_CHECK(clientIdentity("/usr/bin/python3", {"python3"}) == "exe:/usr/bin/python3");
+
+  const std::vector<std::string> noArgs, fixed{"a"}, text{"hello world", "--help"};
+  auto line = buildWireCommand("clipboard-copy", noArgs, text);
+  TEST_CHECK(line.has_value() && *line == "/\x1e" "clipboard-copy hello world --help");
+  TEST_CHECK(buildWireCommand("status", noArgs, noArgs).value() == "/\x1e" "status");
+  TEST_CHECK(buildWireCommand("panel-open", fixed, text).value() == "/\x1e" "panel-open a hello world --help");
+
+  // The reserved byte could redefine where the cwd prefix ends, so it is refused rather than escaped.
+  const std::vector<std::string> smuggled{std::string("x\x1e") + "session reboot"};
+  TEST_CHECK(!buildWireCommand("clipboard-copy", noArgs, smuggled).has_value());
+  TEST_CHECK(!buildWireCommand("clipboard-copy", smuggled, noArgs).has_value());
+  const std::vector<std::string> withNul{std::string("a\0b", 3)};
+  TEST_CHECK(!buildWireCommand("clipboard-copy", noArgs, withNul).has_value());
+  TEST_CHECK(!buildWireCommand("two words", noArgs, noArgs).has_value());
+  TEST_CHECK(!buildWireCommand("", noArgs, noArgs).has_value());
+  const std::vector<std::string> newline{"line one\nline two"};
+  TEST_CHECK(buildWireCommand("notification-show", noArgs, newline).has_value());  // newlines are valid payload
+}
+
 void checkAudit(const std::filesystem::path& dir) {
   const auto file = dir / "audit" / "agent-audit.jsonl";
   AuditLog log(file);
@@ -166,6 +194,7 @@ int main(int argc, char** argv) {
   checkRealPolicy(argv[1]);
   checkGrants(scratch);
   checkEvaluate();
+  checkIdentityAndWire();
   checkAudit(scratch);
   std::filesystem::remove_all(scratch);
   return 0;

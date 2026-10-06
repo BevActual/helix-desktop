@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <filesystem>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
@@ -164,6 +165,40 @@ std::vector<std::string> GrantStore::clients() const {
   std::vector<std::string> names;
   for (const auto& entry : grants_) names.push_back(entry.first);
   return names;
+}
+
+std::string clientIdentity(const std::string& exePath, const std::vector<std::string>& cmdline) {
+  const std::string base = std::filesystem::path(exePath).filename().string();
+  static constexpr std::array<std::string_view, 7> kInterpreters{"python", "node", "bun", "deno", "ruby", "perl", "bash"};
+  const bool interpreter = std::ranges::any_of(kInterpreters, [&](std::string_view name) { return base.starts_with(name); })
+                           || base == "sh";
+  if (interpreter) {
+    // First argument that is not an option is the script (or module name for `-m`).
+    for (std::size_t i = 1; i < cmdline.size(); ++i) {
+      if (cmdline[i].empty() || cmdline[i].front() == '-') continue;
+      std::error_code ec;
+      const auto script = std::filesystem::weakly_canonical(cmdline[i], ec);
+      return "exe:" + exePath + "#" + (ec ? cmdline[i] : script.string());
+    }
+  }
+  return "exe:" + exePath;
+}
+
+std::expected<std::string, std::string> buildWireCommand(std::string_view tool, std::span<const std::string> argv,
+                                                         std::span<const std::string> literal) {
+  auto clean = [](std::string_view text) { return text.find('\x1e') == std::string_view::npos && text.find('\0') == std::string_view::npos; };
+  if (tool.empty() || tool.find(' ') != std::string_view::npos || !clean(tool))
+    return std::unexpected("invalid command name");
+  std::string line = "/\x1e";  // fixed cwd prefix; see the header comment
+  line += tool;
+  for (const auto* group : {&argv, &literal}) {
+    for (const std::string& argument : *group) {
+      if (!clean(argument)) return std::unexpected("argument contains a reserved control byte");
+      line += ' ';
+      line += argument;
+    }
+  }
+  return line;
 }
 
 bool resultIsUntrusted(Tier tier) { return tier == Tier::ObservePrivate; }

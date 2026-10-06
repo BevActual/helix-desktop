@@ -39,6 +39,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "desktop/agent_endpoint.h"
 #include "helix_desktop_introspection.h"
 
 namespace helix {
@@ -127,6 +128,7 @@ public:
   std::string networkOwner;
   std::string bluetoothOwner;
   std::vector<Operation> operations;
+  std::unique_ptr<agent::AgentEndpoint> agentEndpoint;
   std::uint64_t nextOperation = 1;
   std::shared_ptr<DisplayInventory> displays = std::make_shared<DisplayInventory>();
   Json appearance = {{"available", false}};
@@ -460,6 +462,11 @@ public:
   }
   void method(const std::string& sender, const std::string& interface, const std::string& name,
               GVariant* parameters, GDBusMethodInvocation* invocation) {
+    if (interface == agentInterface) {
+      if (agentEndpoint) agentEndpoint->method(sender, name, parameters, invocation);
+      else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
+      return;
+    }
     try {
       const auto args = fromVariant(parameters);
       if (interface == audioInterface && (name == "StartInputMeter" || name == "StopInputMeter")) {
@@ -716,6 +723,7 @@ public:
       TimerManager::instance().tick();
       config.checkReload();
       wallhaven.expire();
+      if (agentEndpoint) agentEndpoint->tick();
       const auto now = std::chrono::steady_clock::now();
       for (auto it = operations.begin(); it != operations.end();) {
         const bool success = it->done();
@@ -746,6 +754,7 @@ public:
       if (!id) throw std::runtime_error(error ? error->message : "Service registration failed");
       registrations.push_back(id);
     }
+    agentEndpoint = std::make_unique<agent::AgentEndpoint>(bus, objectPath, agentInterface, [this] { return desktopOwner; });
     ownerWatch = g_dbus_connection_signal_subscribe(bus, "org.freedesktop.DBus", "org.freedesktop.DBus",
       "NameOwnerChanged", "/org/freedesktop/DBus", nullptr, G_DBUS_SIGNAL_FLAGS_NONE,
       [](GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*, GVariant* value, gpointer data) {
@@ -758,6 +767,7 @@ public:
         if (service.networkOwner == name) { if (service.secrets) service.secrets->cancelSecret(); service.networkOwner.clear(); }
         if (service.bluetoothOwner == name) { if (service.pairing) service.pairing->cancelPending(); service.bluetoothOwner.clear(); }
         service.meters.erase(name);
+        if (service.agentEndpoint) service.agentEndpoint->ownerGone(name);
         std::erase_if(service.operations, [name](const auto& operation) { return operation.sender == name; });
       }, this, nullptr);
     source = g_timeout_add(16, [](gpointer data) -> gboolean { static_cast<Service*>(data)->tick(); return G_SOURCE_CONTINUE; }, this);

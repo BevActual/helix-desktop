@@ -15,6 +15,7 @@ inline constexpr auto audioInterface = "org.helix.Desktop.Audio1";
 inline constexpr auto networkInterface = "org.helix.Desktop.Network1";
 inline constexpr auto displaysInterface = "org.helix.Desktop.Displays1";
 inline constexpr auto bluetoothInterface = "org.helix.Desktop.Bluetooth1";
+inline constexpr auto agentInterface = "org.helix.Desktop.Agent1";
 
 // Variants retain primitive types. Objects are a{sv}, arrays are av.
 GVariant* toVariant(const Json& value);

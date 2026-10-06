@@ -1174,11 +1174,12 @@ helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
 )
 
 helix_service = executable('helix-service',
-  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp'), helix_desktop_introspection_h],
+  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp'), helix_desktop_introspection_h],
   dependencies: noctalia_core_dep,
   cpp_args: _noctalia_cpp_args,
   install: true,
 )
+install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
 helix_service_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/org.helix.Desktop.service.in',
@@ -1286,6 +1287,11 @@ if build_tests
   if helix_dbus_session.found()
     test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
     meter_python = find_program('python3')
+    if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+      test('desktop_agent_integration', helix_dbus_session,
+        args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_integration.py',
+          helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
+    endif
     meter_tools = [find_program('pipewire', required: false), find_program('pw-cli', required: false),
       find_program('pw-link', required: false), find_program('pw-dump', required: false)]
     have_meter_tools = true

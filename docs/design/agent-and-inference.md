@@ -45,7 +45,7 @@ Served by `helix-service` (D-Bus activated, runs without the shell). One interfa
 A client with no grants calls `RequestAccess(tiers)`. The service sends the confirmer a request of kind
 `grant` naming the client (label and verified identity) and the tiers asked for. The user can approve fewer
 tiers than requested; `blocked` is never offered. The grant is written to
-`~/.local/state/helix/agent-grants.json` (mode 0600) and applied only if the write succeeds. Tiers a client
+`<state dir>/agent/grants.json` (mode 0600; `~/.local/state/noctalia/` until the rename) and applied only if the write succeeds. Tiers a client
 already holds complete immediately without a dialog. Revoking a client or editing its tiers later is the
 manager role's job (Settings). A request with no confirmer present is denied, so a headless session cannot
 grant itself access.
@@ -71,7 +71,7 @@ confirms or the client reconnects. This does not stop injection; it makes the hu
 
 ### Audit
 
-Append-only JSON lines in `~/.local/state/helix/agent-audit.jsonl`: time, client, tool, argv (literal
+Append-only JSON lines in `<state dir>/agent/audit.jsonl`: time, client, tool, argv (literal
 arguments truncated, secrets never logged), tier, decision, outcome. Readable by the manager role only.
 
 ## Inference service
@@ -107,6 +107,17 @@ a silent fallback.
 - Store under `~/.local/share/helix/models/`, hash-verified, quota-limited. No weights in the OS image.
 - First-party clients use `Inference1`. Third-party apps get an OpenAI-compatible endpoint on a Unix
   socket, behind the same grants. Existing `desktop-ai-*` and `ai-usage-*` commands become clients.
+
+## Implementation status
+
+`Agent1` is registered by `helix-service` (`agent_endpoint`, `agent_broker`, `agent_policy`) and covered by an
+end-to-end test (`tests/desktop_agent_integration.py`). It needs `msg-risk.toml` (installed to
+`<datadir>/helix/`, or `HELIX_RISK_POLICY`); without it every method fails closed with the reason. Caller identity
+is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
+Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent
+runners is the real fix (see the limit above). Still missing: the shell's confirmation dialog (the confirmer
+role has no UI yet, so confirm-tier actions and first-use consent are denied in a real session), the MCP adapter
+switch to `Agent1`, and the Settings page.
 
 ## Build order
 

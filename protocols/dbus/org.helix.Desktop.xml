@@ -65,4 +65,34 @@
  <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
  <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
 </interface>
+<!-- Design: docs/design/agent-and-inference.md. Caller identity is the D-Bus connection (pid, exe, Flatpak id),
+     never an argument. Three roles share the interface: client (any granted app), confirmer (the shell, one owner),
+     manager (Settings, one owner). Role methods are rejected for other senders, as RegisterDesktop is today. -->
+<interface name="org.helix.Desktop.Agent1">
+ <!-- Client role -->
+ <method name="Hello"><arg name="label" type="s" direction="in"/><arg name="version" type="s" direction="in"/><arg name="session" type="a{sv}" direction="out"/></method>
+ <!-- First-use consent: the confirmer asks the user, who may approve fewer tiers. Completes via Completed with the held tiers.
+      Tiers already held complete without a dialog; "blocked" is never grantable. -->
+ <method name="RequestAccess"><arg name="tiers" type="as" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="ListTools"><arg type="av" direction="out"/></method>
+ <!-- action is a tool name from protocols/ipc/msg-risk.toml. args: argv (as), literal (as, model-supplied text), reason (s, shown in confirmation). -->
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <!-- Completed(operation, ok, result). Result is JSON: {trust: "trusted"|"untrusted", content: ...}. Delivered to the requester only. -->
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Changed"/>
+ <!-- Confirmer role: only the registered confirmer receives requests and may answer them. A confirmer that
+      disconnects denies every pending confirmation. -->
+ <method name="RegisterConfirmer"/>
+ <signal name="ConfirmationRequested"><arg type="a{sv}"/></signal>
+ <!-- options: tiers (as) narrows an access request to fewer tiers than were asked. -->
+ <method name="Confirm"><arg name="operation" type="t" direction="in"/><arg name="approved" type="b" direction="in"/><arg name="options" type="a{sv}" direction="in"/></method>
+ <!-- Manager role: grants and audit. -->
+ <method name="RegisterManager"/>
+ <method name="GetGrants"><arg type="av" direction="out"/></method>
+ <method name="SetGrant"><arg name="client" type="s" direction="in"/><arg name="tiers" type="as" direction="in"/></method>
+ <method name="RevokeClient"><arg name="client" type="s" direction="in"/></method>
+ <method name="GetAudit"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
+</interface>
 </node>

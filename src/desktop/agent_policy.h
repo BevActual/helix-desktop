@@ -57,6 +57,16 @@ private:
   std::map<std::string, std::set<Tier>> grants_;
 };
 
+// Stable client identity from the verified executable and command line of a bus peer. Programs run by an
+// interpreter would otherwise all share the interpreter's grants, so the script path is part of the identity.
+std::string clientIdentity(const std::string& exePath, const std::vector<std::string>& cmdline);
+
+// The line sent to the shell's IPC socket: a fixed caller-cwd prefix, then the command and its arguments.
+// The prefix matters: without it the server would read a stray record-separator byte inside model-supplied text
+// as the cwd boundary and drop everything before it. Arguments containing that byte or NUL are refused.
+std::expected<std::string, std::string> buildWireCommand(std::string_view tool, std::span<const std::string> argv,
+                                                         std::span<const std::string> literal);
+
 enum class Verdict { Allow, NeedsConfirmation, Deny };
 
 struct Decision {
