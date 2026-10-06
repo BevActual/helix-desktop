@@ -156,6 +156,10 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgScreenshotFullscreenPositionals{
       Positional{"mode", {}, kMsgScreenshotFullscreenModeChoices, false, false, false},
   };
+  // Optional: empty = focused/preferred output, "all" = stitch every output, else connector name.
+  inline constexpr std::array kMsgDesktopCapturePositionals{
+      Positional{"target", {}, {}, false, false, false},
+  };
   inline constexpr std::array kMsgScreenRecordStartPositionals{
       Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
   };
@@ -345,6 +349,19 @@ namespace noctalia::cli {
     };
     inline constexpr Command aiUsageStatus{
         "ai-usage-status", "Print AI usage and local inference status", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr std::array kMsgAppLaunchPositionals{
+        Positional{"query", "Desktop id or application name", {}, true, false, true},
+    };
+    inline constexpr Command appLaunch{
+        "app-launch",
+        "Launch an installed application by desktop id or name",
+        {},
+        {},
+        {},
+        kMsgAppLaunchPositionals,
+        {},
+        false
     };
     inline constexpr Command annotate{
         "annotate",
@@ -671,6 +688,16 @@ namespace noctalia::cli {
     inline constexpr Command notificationDndToggle{
         "notification-dnd-toggle", "Toggle notification Do Not Disturb state", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command notificationHistory{
+        "notification-history",
+        "Print recent notification history as JSON",
+        {},
+        {},
+        {},
+        {},
+        {},
+        false
+    };
     inline constexpr Command notificationInvokeLatest{
         "notification-invoke-latest",
         "Invoke the default action of the most recent active notification",
@@ -807,6 +834,16 @@ namespace noctalia::cli {
     };
     inline constexpr Command screenshotRegion{
         "screenshot-region", "Start an interactive region screenshot", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopCapture{
+        "desktop-capture",
+        "Capture the desktop for agents (non-interactive); prints ok <png-path>",
+        {},
+        {},
+        {},
+        kMsgDesktopCapturePositionals,
+        {},
+        false
     };
     inline constexpr Command session{"session", "Run a built-in session action", {}, {},
                                      {},        kMsgSessionPositionals,          {}, false};
@@ -1006,6 +1043,19 @@ namespace noctalia::cli {
     inline constexpr Command wifiEnable{"wifi-enable", "Enable Wi-Fi", {}, {}, {}, {}, {}, false};
     inline constexpr Command wifiStatus{"wifi-status", "Print Wi-Fi state", {}, {}, {}, {}, {}, false};
     inline constexpr Command wifiToggle{"wifi-toggle", "Toggle Wi-Fi", {}, {}, {}, {}, {}, false};
+    inline constexpr std::array kMsgWindowClosePositionals{
+        Positional{"id", "Compositor window id; omit to close the focused window", {}, false, false, false},
+    };
+    inline constexpr Command windowClose{
+        "window-close",
+        "Close the focused window, or a compositor window id",
+        {},
+        {},
+        {},
+        kMsgWindowClosePositionals,
+        {},
+        false
+    };
     inline constexpr Command windowSwitcher{"window-switcher",
                                             "Open or close the window switcher overlay",
                                             {},
@@ -1071,6 +1121,7 @@ namespace noctalia::cli {
       msg::aiUsageOllamaStop,
       msg::aiUsageRefresh,
       msg::aiUsageStatus,
+      msg::appLaunch,
       msg::annotate,
       msg::barAutoHideSet,
       msg::barHide,
@@ -1106,6 +1157,7 @@ namespace noctalia::cli {
       msg::desktopAiStatus,
       msg::desktopAiSummarize,
       msg::desktopAiTranslate,
+      msg::desktopCapture,
       msg::desktopWidgetsEdit,
       msg::desktopWidgetsExit,
       msg::desktopWidgetsHide,
@@ -1152,6 +1204,7 @@ namespace noctalia::cli {
       msg::notificationDndSet,
       msg::notificationDndStatus,
       msg::notificationDndToggle,
+      msg::notificationHistory,
       msg::notificationInvokeLatest,
       msg::notificationShow,
       msg::osdDisable,
@@ -1214,6 +1267,7 @@ namespace noctalia::cli {
       msg::wifiEnable,
       msg::wifiStatus,
       msg::wifiToggle,
+      msg::windowClose,
       msg::windowSwitcher,
       msg::workspaceAlertAdd,
       msg::workspaceAlertAddWindow,

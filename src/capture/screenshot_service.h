@@ -83,6 +83,11 @@ public:
 
   void registerIpc(IpcService& ipc, const ConfigService& configService);
 
+  // Non-interactive capture for the Agent Surface. Blocks until the PNG is written.
+  // `args`: empty = preferred output; "all" = stitch every output; else connector selector.
+  // Returns `ok <path>\n` or `error: …\n`.
+  [[nodiscard]] std::string captureDesktopForAgent(std::string_view args);
+
 private:
   struct PendingCapture {
     wl_output* output = nullptr;

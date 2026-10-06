@@ -493,6 +493,8 @@ void CompositorPlatform::notifyToplevelsChanged() {
   }
 }
 
+std::optional<std::string> CompositorPlatform::recentFocusedWindowId() const { return m_recentFocusedWindowId; }
+
 std::optional<std::string> CompositorPlatform::focusedCompositorWindowId() const {
   if (m_workspaces != nullptr) {
     if (auto id = m_workspaces->focusedWindowId(); id.has_value() && !id->empty()) {
@@ -511,9 +513,15 @@ void CompositorPlatform::setWorkspaceChangeCallback(ChangeCallback callback) {
   m_workspaceChangeCallback = std::move(callback);
   m_lastWorkspaceModelSnapshot = workspaceModelSnapshot();
   m_lastFocusedCompositorWindowId = focusedCompositorWindowId();
+  if (m_lastFocusedCompositorWindowId.has_value() && !m_lastFocusedCompositorWindowId->empty()) {
+    m_recentFocusedWindowId = m_lastFocusedCompositorWindowId;
+  }
   auto wrapper = [this]() {
     auto nextSnapshot = workspaceModelSnapshot();
     auto nextFocused = focusedCompositorWindowId();
+    if (nextFocused.has_value() && !nextFocused->empty()) {
+      m_recentFocusedWindowId = nextFocused;
+    }
     if (sameWorkspaceModelSnapshot(nextSnapshot, m_lastWorkspaceModelSnapshot)
         && nextFocused == m_lastFocusedCompositorWindowId) {
       return;

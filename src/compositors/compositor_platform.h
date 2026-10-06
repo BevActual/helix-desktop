@@ -106,6 +106,9 @@ public:
 
   void setToplevelChangeCallback(ChangeCallback callback);
   [[nodiscard]] std::optional<std::string> focusedCompositorWindowId() const;
+  // Last real window that held focus. Stays set when a shell panel takes the
+  // keyboard, so Actions can still name and close that window.
+  [[nodiscard]] std::optional<std::string> recentFocusedWindowId() const;
 
   void setWorkspaceChangeCallback(ChangeCallback callback);
   void setOverviewChangeCallback(ChangeCallback callback);
@@ -190,5 +193,6 @@ private:
   std::unique_ptr<OutputProbe> m_outputProbe;
   std::vector<WorkspaceModelSnapshot> m_lastWorkspaceModelSnapshot;
   std::optional<std::string> m_lastFocusedCompositorWindowId;
+  std::optional<std::string> m_recentFocusedWindowId;
   bool m_initialized = false;
 };

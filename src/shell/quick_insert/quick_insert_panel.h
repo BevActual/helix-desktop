@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/config_types.h"
+#include "launcher/desktop_actions.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/launcher_provider.h"
 #include "render/core/thumbnail_service.h"
@@ -28,13 +29,15 @@ class VirtualGridView;
 class QuickInsertEmojiAdapter;
 class QuickInsertRecentsAdapter;
 class QuickInsertClipboardAdapter;
+class QuickInsertActionAdapter;
 
 class QuickInsertPanel : public Panel {
 public:
-  enum class Source : std::uint8_t { Emoji, Recents, Clipboard };
+  enum class Source : std::uint8_t { Actions, Emoji, Recents, Clipboard };
 
   QuickInsertPanel(
-      ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails
+      ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails,
+      desktop_actions::Services actions
   );
   ~QuickInsertPanel() override;
 
@@ -46,8 +49,8 @@ public:
   void onOpen(std::string_view context) override;
   void onClose() override;
 
-  [[nodiscard]] float preferredWidth() const override { return scaled(520.0F); }
-  [[nodiscard]] float preferredHeight() const override { return scaled(480.0F); }
+  [[nodiscard]] float preferredWidth() const override;
+  [[nodiscard]] float preferredHeight() const override;
   [[nodiscard]] LayerShellKeyboard keyboardMode() const override { return LayerShellKeyboard::Exclusive; }
   [[nodiscard]] InputArea* initialFocusArea() const override;
   [[nodiscard]] bool handleGlobalKey(std::uint32_t sym, std::uint32_t modifiers, bool pressed, bool preedit) override;
@@ -65,6 +68,8 @@ private:
   void refreshResults();
   void refreshRecents();
   void refreshClipboard();
+  void refreshActions();
+  void updateContextLabel();
   void updateSourceVisibility();
   void updatePlaceholder();
   void updateEmptyState();
@@ -87,13 +92,18 @@ private:
   ConfigService* m_config = nullptr;
   ClipboardService* m_clipboard = nullptr;
   ThumbnailService* m_thumbnails = nullptr;
+  desktop_actions::Services m_actionsServices;
   bool m_pasteOnResult = false;
   EmojiProvider m_emoji;
-  Source m_source = Source::Emoji;
+  Source m_source = Source::Actions;
   std::string m_query;
   std::vector<LauncherResult> m_emojiResults;
   std::vector<std::string> m_recentPaths;
   std::vector<std::size_t> m_clipboardIndices;
+  std::vector<desktop_actions::Action> m_actions;
+  std::string m_focusedLabel;
+  std::string m_workspaceLabel;
+  bool m_actionDnd = false;
   std::size_t m_selectedIndex = 0;
   std::uint64_t m_clipboardSerial = 0;
   bool m_thumbnailRefreshPending = false;
@@ -107,10 +117,14 @@ private:
   VirtualGridView* m_emojiGrid = nullptr;
   VirtualGridView* m_recentsGrid = nullptr;
   VirtualGridView* m_clipboardGrid = nullptr;
+  VirtualGridView* m_actionGrid = nullptr;
+  Flex* m_contextHost = nullptr;
+  Label* m_contextLabel = nullptr;
   Label* m_emptyLabel = nullptr;
 
   std::unique_ptr<QuickInsertEmojiAdapter> m_emojiAdapter;
   std::unique_ptr<QuickInsertRecentsAdapter> m_recentsAdapter;
   std::unique_ptr<QuickInsertClipboardAdapter> m_clipboardAdapter;
+  std::unique_ptr<QuickInsertActionAdapter> m_actionAdapter;
   std::function<void(bool)> m_onCopiedActivation;
 };

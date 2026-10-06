@@ -5,6 +5,7 @@ compile_commands.json
 
 # Python cache
 __pycache__
+tools/helix-agent/.venv/
 
 # Editor / IDE
 .vscode/

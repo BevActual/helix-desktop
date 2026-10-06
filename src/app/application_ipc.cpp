@@ -39,6 +39,7 @@
 #include "i18n/i18n_service.h"
 #include "ipc/ipc_arg_parse.h"
 #include "launcher/app_provider.h"
+#include "launcher/desktop_actions.h"
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
@@ -239,6 +240,30 @@ void Application::initIpc() {
     return "ok\n"; // No active notification carries a default action; nothing to do.
   });
 
+  m_ipcService.bind(noctalia::cli::msg::notificationHistory, [this](const std::string&) -> std::string {
+    nlohmann::json entries = nlohmann::json::array();
+    constexpr std::size_t kLimit = 12;
+    const auto& history = m_notificationManager.history();
+    std::size_t shown = 0;
+    for (auto it = history.rbegin(); it != history.rend() && shown < kLimit; ++it, ++shown) {
+      const Notification& n = it->notification;
+      entries.push_back({
+          {"id", n.id},
+          {"app", n.appName},
+          {"summary", n.summary},
+          {"body", n.body},
+          {"seen", it->seen},
+          {"active", it->active},
+      });
+    }
+    nlohmann::json out = {
+        {"dnd", m_notificationManager.doNotDisturb()},
+        {"unread", m_notificationManager.unreadNotificationHistoryCount()},
+        {"entries", std::move(entries)},
+    };
+    return out.dump() + "\n";
+  });
+
   m_ipcService.bind(noctalia::cli::msg::notificationClearHistory, [this](const std::string&) -> std::string {
     m_notificationManager.clearHistory();
     if (m_panelManager.isOpenPanel("control-center")) {
@@ -258,6 +283,8 @@ void Application::initIpc() {
     std::string body;
     Urgency urgency = Urgency::Normal;
     int32_t timeoutMs = kDefaultNotificationTimeout;
+    // Agent Surface / CLI notifies participate in history + bar badge by default.
+    bool saveToHistory = true;
     std::optional<std::string> icon;
     std::optional<std::string> category;
     std::optional<std::string> desktopEntry;
@@ -346,6 +373,13 @@ void Application::initIpc() {
         }
         desktopEntry = it->get<std::string>();
       }
+
+      if (const auto it = payload.find("history"); it != payload.end()) {
+        if (!it->is_boolean()) {
+          return "error: notification-show field 'history' must be a boolean\n";
+        }
+        saveToHistory = it->get<bool>();
+      }
     } else {
       constexpr std::string_view kBodyDelimiter = " -- ";
       const std::size_t delimiterPos = input.find(kBodyDelimiter);
@@ -375,7 +409,7 @@ void Application::initIpc() {
 
     (void)m_notificationManager.addInternal(
         std::move(appName), std::move(summary), std::move(body), urgency, timeoutMs, std::move(icon), std::nullopt,
-        std::move(category), std::move(desktopEntry)
+        std::move(category), std::move(desktopEntry), NotificationDndPolicy::Respect, saveToHistory
     );
     return "ok\n";
   });
@@ -415,6 +449,27 @@ void Application::initIpc() {
       return "error: failed to execute dpms-off command\n";
     }
     return "ok\n";
+  });
+
+  m_ipcService.bind(noctalia::cli::msg::windowClose, [this](const std::string& args) -> std::string {
+    std::string error;
+    if (!desktop_actions::closeWindow(&m_compositorPlatform, StringUtils::trim(args), error)) {
+      return "error: " + (error.empty() ? "failed to close window" : error) + "\n";
+    }
+    return "ok\n";
+  });
+
+  m_ipcService.bind(noctalia::cli::msg::appLaunch, [this](const std::string& args) -> std::string {
+    const std::string query = StringUtils::trim(args);
+    if (query.empty()) {
+      return "error: app-launch requires an application id or name\n";
+    }
+    std::string error;
+    const std::string name = desktop_actions::launchQuery(&m_compositorPlatform, &m_configService, query, error);
+    if (name.empty()) {
+      return "error: " + (error.empty() ? "failed to launch application" : error) + "\n";
+    }
+    return "ok " + name + "\n";
   });
 
   m_ipcService.bindCycle(noctalia::cli::msg::workspaceSwitch, [this](const std::string& args) -> std::string {

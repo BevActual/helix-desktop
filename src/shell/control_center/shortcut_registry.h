@@ -12,6 +12,9 @@ public:
   [[nodiscard]] virtual std::string_view id() const = 0;
   [[nodiscard]] virtual std::string defaultLabel() const = 0;
   [[nodiscard]] virtual std::string displayLabel() const { return defaultLabel(); }
+  // Secondary status under a stable title (SSID, profile name, elapsed time). Empty when
+  // there is no extra state beyond on/off.
+  [[nodiscard]] virtual std::string displayStatus() const { return {}; }
   [[nodiscard]] virtual std::string displayIcon() const { return std::string(currentIcon()); }
   [[nodiscard]] virtual std::string_view iconOn() const = 0;
   [[nodiscard]] virtual std::string_view iconOff() const = 0;

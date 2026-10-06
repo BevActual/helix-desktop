@@ -42,14 +42,14 @@ namespace {
     explicit WifiShortcut(INetworkService* svc) : m_svc(svc) {}
     std::string_view id() const override { return "wifi"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.wifi"); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       if (m_svc != nullptr) {
         const NetworkState& state = m_svc->state();
         if (state.kind == NetworkConnectivity::Wireless && state.connected && !state.ssid.empty()) {
           return state.ssid;
         }
       }
-      return defaultLabel();
+      return {};
     }
     std::string_view iconOn() const override { return "wifi"; }
     std::string_view iconOff() const override { return "wifi-off"; }
@@ -77,6 +77,17 @@ namespace {
     explicit BluetoothShortcut(BluetoothService* svc) : m_svc(svc) {}
     std::string_view id() const override { return "bluetooth"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.bluetooth"); }
+    std::string displayStatus() const override {
+      if (m_svc == nullptr || !m_svc->state().powered) {
+        return {};
+      }
+      for (const auto& device : m_svc->devices()) {
+        if (device.connected && !device.alias.empty()) {
+          return device.alias;
+        }
+      }
+      return {};
+    }
     std::string_view iconOn() const override { return "bluetooth"; }
     std::string_view iconOff() const override { return "bluetooth-off"; }
     bool isToggle() const override { return true; }
@@ -98,9 +109,9 @@ namespace {
     std::string_view id() const override { return "nightlight"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.nightlight"); }
     bool enabled() const override { return m_platform != nullptr && m_platform->hasGammaControl(); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       if (m_svc == nullptr) {
-        return defaultLabel();
+        return {};
       }
       if (m_svc->forceEnabled()) {
         return i18n::tr("control-center.shortcuts.nightlight-states.forced");
@@ -163,10 +174,10 @@ namespace {
   public:
     explicit DarkModeShortcut(noctalia::theme::ThemeService* svc) : m_svc(svc) {}
     std::string_view id() const override { return "dark_mode"; }
-    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.dark-mode.dark"); }
-    std::string displayLabel() const override {
+    std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.appearance"); }
+    std::string displayStatus() const override {
       if (m_svc == nullptr) {
-        return defaultLabel();
+        return {};
       }
       switch (m_svc->configuredMode()) {
       case ThemeMode::Dark:
@@ -176,7 +187,7 @@ namespace {
       case ThemeMode::Auto:
         return i18n::tr("control-center.shortcuts.dark-mode.auto");
       }
-      return defaultLabel();
+      return {};
     }
     std::string_view iconOn() const override { return "theme-mode"; }
     std::string_view iconOff() const override { return "theme-mode"; }
@@ -272,11 +283,11 @@ namespace {
     explicit PowerProfileShortcut(PowerProfilesService* svc) : m_svc(svc) {}
     std::string_view id() const override { return "power_profile"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.power-profile"); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       if (m_svc != nullptr && !m_svc->activeProfile().empty()) {
         return profileLabel(m_svc->activeProfile());
       }
-      return defaultLabel();
+      return {};
     }
     std::string_view iconOn() const override {
       return profileGlyphName(m_svc != nullptr ? m_svc->activeProfile() : "");
@@ -309,8 +320,11 @@ namespace {
         : m_platform(platform), m_config(config) {}
     std::string_view id() const override { return "keyboard_layout"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.keyboard-layout"); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       const std::string layoutName = resolvedLayoutName();
+      if (layoutName.empty()) {
+        return {};
+      }
       if (m_config == nullptr) {
         return formatKeyboardLayoutLabel(layoutName, KeyboardLayoutDisplayMode::Short);
       }
@@ -483,11 +497,11 @@ namespace {
     explicit ScreenRecordShortcut(ScreenRecorderService* recorder) : m_recorder(recorder) {}
     std::string_view id() const override { return "screen_recorder"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screen-recorder"); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       if (m_recorder != nullptr && m_recorder->isRecording()) {
         return m_recorder->elapsedLabel();
       }
-      return defaultLabel();
+      return {};
     }
     std::string_view iconOn() const override { return "player-stop"; }
     std::string_view iconOff() const override { return "video"; }
@@ -514,11 +528,11 @@ namespace {
     explicit ScreenReplayShortcut(ScreenRecorderService* recorder) : m_recorder(recorder) {}
     std::string_view id() const override { return "screen_replay"; }
     std::string defaultLabel() const override { return i18n::tr("control-center.shortcuts.screen-replay"); }
-    std::string displayLabel() const override {
+    std::string displayStatus() const override {
       if (m_recorder != nullptr && m_recorder->isReplaying()) {
         return m_recorder->elapsedLabel();
       }
-      return defaultLabel();
+      return {};
     }
     std::string_view iconOn() const override { return "player-stop"; }
     std::string_view iconOff() const override { return "history"; }
@@ -601,7 +615,7 @@ namespace {
       }),
       builtinShortcut<DarkModeShortcut, &ShortcutServices::theme>({
           .type = "dark_mode",
-          .labelKey = "control-center.shortcuts.dark-mode.dark",
+          .labelKey = "control-center.shortcuts.appearance",
       }),
       builtinShortcut<IdleInhibitorShortcut, &ShortcutServices::idleInhibitor>({
           .type = "caffeine",

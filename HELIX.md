@@ -28,6 +28,10 @@ The name in the UI, notifications, generated niri includes, template display nam
 
 GTK4/libadwaita defines shared controls and application styling; glass remains floating shell chrome. The full design language (tiers, color, shape, type, motion, menus, accessibility, and known gaps) is in `docs/design/helix-hig.md`. Control Center follows Apple HIG structure without copying private Control Center visuals.
 
+Helix is evolving toward an **agentic OS** (Agent Center hub + Assistant presence). The session
+**Agent Surface** contract lives in `docs/design/agentic-os.md`; v1 is IPC + MCP adapters, not the
+assistant UI yet.
+
 ## Lineage
 
 This tree started from [Noctalia](https://github.com/noctalia-dev/noctalia). Compatibility names above are on purpose so existing installs keep working.

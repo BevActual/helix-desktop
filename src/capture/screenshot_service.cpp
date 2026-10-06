@@ -44,6 +44,7 @@
 #include <thread>
 #include <unistd.h>
 #include <utility>
+#include <wayland-client.h>
 
 namespace {
 
@@ -729,7 +730,122 @@ ScreenshotService::OutputOptions ScreenshotService::outputOptionsFromConfig(cons
   return options;
 }
 
+std::string ScreenshotService::captureDesktopForAgent(std::string_view args) {
+  if (!available()) {
+    return "error: screen capture is not available on this compositor\n";
+  }
+  if (overlayBusy() || m_capture.busy() || m_allOutputsBatch != nullptr) {
+    return "error: a capture is already in progress\n";
+  }
+
+  const std::string token = StringUtils::trim(args);
+  const char* runtime = std::getenv("XDG_RUNTIME_DIR");
+  if (runtime == nullptr || runtime[0] == '\0') {
+    return "error: XDG_RUNTIME_DIR is unset\n";
+  }
+  const std::filesystem::path outDir = std::filesystem::path(runtime) / "helix-agent";
+  std::error_code ec;
+  std::filesystem::create_directories(outDir, ec);
+  if (ec) {
+    return "error: failed to create " + outDir.string() + "\n";
+  }
+  const std::filesystem::path destPath = outDir / "desktop-capture.png";
+
+  auto writeFrame = [&](capture::ScreenshotImage image) -> std::string {
+    std::string encodeError;
+    std::vector<std::uint8_t> png =
+        encodePng(image.image.rgba.data(), image.image.width, image.image.height, &encodeError);
+    if (png.empty()) {
+      return "error: " + (encodeError.empty() ? std::string("failed to encode screenshot") : encodeError) + "\n";
+    }
+    std::ofstream out(destPath, std::ios::binary | std::ios::trunc);
+    out.write(reinterpret_cast<const char*>(png.data()), static_cast<std::streamsize>(png.size()));
+    if (!out) {
+      return "error: failed to write " + destPath.string() + "\n";
+    }
+    return "ok " + destPath.string() + "\n";
+  };
+
+  auto captureOneBlocking = [&](wl_output* output) -> std::expected<capture::ScreenshotImage, std::string> {
+    if (output == nullptr) {
+      return std::unexpected("no output for capture");
+    }
+    if (m_capture.busy()) {
+      return std::unexpected("capture already in progress");
+    }
+    std::optional<capture::ScreenshotImage> frame;
+    std::string error;
+    bool finished = false;
+    m_capture.capture(output, std::nullopt, false, false, [&](std::optional<capture::ScreenshotImage> image, const std::string& err) {
+      finished = true;
+      if (!err.empty() || !image.has_value()) {
+        error = err.empty() ? "capture failed" : err;
+        return;
+      }
+      frame = std::move(*image);
+    });
+    while (!finished && m_capture.busy()) {
+      if (wl_display_roundtrip(m_wayland.display()) < 0) {
+        m_capture.cancelInFlight();
+        return std::unexpected("Wayland roundtrip failed");
+      }
+    }
+    if (!error.empty() || !finished || !frame.has_value()) {
+      return std::unexpected(error.empty() ? "capture failed" : error);
+    }
+    return std::move(*frame);
+  };
+
+  if (token == "all" || token == "*") {
+    std::vector<CapturedOutputFrame> frames;
+    for (const auto& output : m_wayland.outputs()) {
+      if (output.output == nullptr || output.logicalWidth <= 0 || output.logicalHeight <= 0) {
+        continue;
+      }
+      auto captured = captureOneBlocking(output.output);
+      if (!captured) {
+        return "error: " + captured.error() + "\n";
+      }
+      frames.push_back(CapturedOutputFrame{.image = std::move(*captured), .output = &output});
+    }
+    if (frames.empty()) {
+      return "error: no outputs available\n";
+    }
+    if (frames.size() == 1) {
+      return writeFrame(std::move(frames.front().image));
+    }
+    auto stitched = stitchOutputFrames(std::move(frames));
+    if (!stitched.has_value()) {
+      return "error: failed to combine screenshots\n";
+    }
+    return writeFrame(std::move(*stitched));
+  }
+
+  wl_output* output = nullptr;
+  if (token.empty()) {
+    output = preferredCaptureOutput();
+  } else {
+    auto resolved = resolveOutputSelector(m_wayland, token);
+    if (!resolved) {
+      return resolved.error();
+    }
+    output = *resolved;
+  }
+  if (output == nullptr) {
+    return "error: no outputs available\n";
+  }
+  auto captured = captureOneBlocking(output);
+  if (!captured) {
+    return "error: " + captured.error() + "\n";
+  }
+  return writeFrame(std::move(*captured));
+}
+
 void ScreenshotService::registerIpc(IpcService& ipc, const ConfigService& configService) {
+  ipc.bind(noctalia::cli::msg::desktopCapture, [this](const std::string& args) -> std::string {
+    return captureDesktopForAgent(args);
+  });
+
   ipc.bind(noctalia::cli::msg::screenshotRegion, [this, &configService](const std::string& /*args*/) -> std::string {
     if (!available()) {
       return "error: screen capture is not available on this compositor\n";

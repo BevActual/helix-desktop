@@ -8,19 +8,23 @@
 #include "render/scene/node.h"
 #include "shell/panel/panel_manager.h"
 #include "ui/builders.h"
+#include "ui/controls/box.h"
 #include "ui/controls/label.h"
 #include "ui/palette.h"
 #include "ui/style.h"
 
 #include <algorithm>
 #include <cmath>
+#include <format>
 #include <memory>
 
 namespace {
-  constexpr float kDotBaseSize = 6.0F;
+  constexpr float kBadgeMinSize = 12.0F;
+  constexpr float kBadgeFontSize = 9.0F;
   constexpr float kRingBaseSize = 14.0F;
   constexpr float kRingBaseThickness = 2.5F;
   constexpr float kRingTrackAlpha = 0.22F;
+  constexpr std::size_t kBadgeCountCap = 9;
 } // namespace
 
 NotificationWidget::NotificationWidget(NotificationManager* manager, wl_output* /*output*/, Options options)
@@ -59,16 +63,23 @@ void NotificationWidget::create() {
       })
   );
 
-  const float dotSize = kDotBaseSize * m_contentScale;
-  m_dot = area->addChild(
-      ui::box({
-          .fill = colorSpecFromRole(ColorRole::Primary),
-          .radius = dotSize * 0.5F,
-          .width = dotSize,
-          .height = dotSize,
-          .visible = false,
-      })
-  );
+  auto badge = ui::box({
+      .out = &m_badge,
+      .fill = colorSpecFromRole(ColorRole::Primary),
+      .visible = false,
+      .participatesInLayout = false,
+  });
+  badge->addChild(ui::label({
+      .out = &m_badgeLabel,
+      .text = {},
+      .fontSize = kBadgeFontSize * m_contentScale,
+      .fontWeight = FontWeight::Bold,
+      .color = colorSpecFromRole(ColorRole::OnPrimary),
+      .maxLines = 1,
+      .visible = false,
+      .participatesInLayout = false,
+  }));
+  area->addChild(std::move(badge));
 
   // Live activity chip: track ring, progress ring, summary.
   const float ringSize = kRingBaseSize * m_contentScale;
@@ -233,19 +244,24 @@ void NotificationWidget::doLayout(Renderer& renderer, float containerWidth, floa
       }
     }
     m_glyph->setPosition(0.0F, 0.0F);
-    rootNode->setSize(m_glyph->width(), m_glyph->height());
-    if (m_dot != nullptr) {
-      const float dotSize = kDotBaseSize * m_contentScale;
-      m_dot->setPosition(m_glyph->width() - dotSize, 0.0F);
-      m_dot->setVisible(m_hasNotifications && !m_dndEnabled);
+    syncBadge(&renderer);
+    float width = m_glyph->width();
+    float height = m_glyph->height();
+    if (m_badge != nullptr && m_badge->visible()) {
+      width = std::max(width, m_badge->x() + m_badge->width());
+      height = std::max(height, m_badge->y() + m_badge->height());
     }
+    rootNode->setSize(width, height);
     return;
   }
 
   // Chip: the ring takes the bell's place; the summary follows in horizontal bars.
   m_glyph->setVisible(false);
-  if (m_dot != nullptr) {
-    m_dot->setVisible(false);
+  if (m_badge != nullptr) {
+    m_badge->setVisible(false);
+  }
+  if (m_badgeLabel != nullptr) {
+    m_badgeLabel->setVisible(false);
   }
 
   const float ringSize = kRingBaseSize * m_contentScale;
@@ -305,8 +321,49 @@ void NotificationWidget::doUpdate(Renderer& /*renderer*/) {
   refreshIndicatorState();
 }
 
+void NotificationWidget::syncBadge(Renderer* renderer) {
+  if (m_badge == nullptr || m_badgeLabel == nullptr) {
+    return;
+  }
+  const bool show = !m_live && m_hasNotifications && !m_dndEnabled && m_unreadCount > 0;
+  m_badge->setVisible(show);
+  m_badgeLabel->setVisible(show);
+  if (!show) {
+    return;
+  }
+  const std::string text =
+      m_unreadCount > kBadgeCountCap ? "9+" : std::format("{}", m_unreadCount);
+  m_badgeLabel->setText(text);
+  m_badgeLabel->setFontSize(kBadgeFontSize * m_contentScale);
+  m_badgeLabel->setColor(colorSpecFromRole(ColorRole::OnPrimary));
+  if (renderer != nullptr) {
+    m_badgeLabel->measure(*renderer);
+  }
+  const float pad = Style::spaceXs * 0.5F * m_contentScale;
+  const float minSize = kBadgeMinSize * m_contentScale;
+  const float badgeW = std::max(minSize, m_badgeLabel->width() + pad * 2.0F);
+  const float badgeH = std::max(minSize, m_badgeLabel->height() + pad);
+  m_badge->setFill(colorSpecFromRole(ColorRole::Primary));
+  m_badge->setRadius(badgeH * 0.5F);
+  m_badge->setSize(badgeW, badgeH);
+  // Keep the badge inside the widget box: bar capsules clip children, so a negative Y
+  // (the usual "overhang" badge) was being cut off on floating glass bars.
+  const float glyphW = m_glyph != nullptr ? m_glyph->width() : 0.0F;
+  const float glyphH = m_glyph != nullptr ? m_glyph->height() : 0.0F;
+  m_badge->setPosition(
+      std::max(0.0F, glyphW - badgeW * 0.45F),
+      std::max(0.0F, glyphH * 0.05F)
+  );
+  m_badgeLabel->setPosition(
+      std::round((badgeW - m_badgeLabel->width()) * 0.5F),
+      std::round((badgeH - m_badgeLabel->height()) * 0.5F)
+  );
+}
+
 void NotificationWidget::refreshIndicatorState() {
   const bool hasNotifications = (m_manager != nullptr) && m_manager->hasUnreadNotificationHistory();
+  const std::size_t unreadCount =
+      m_manager != nullptr ? m_manager->unreadNotificationHistoryCount() : 0;
   const bool dndEnabled = (m_manager != nullptr) && m_manager->doNotDisturb();
 
   if (Node* rootNode = root(); rootNode != nullptr) {
@@ -321,16 +378,17 @@ void NotificationWidget::refreshIndicatorState() {
     }
   }
 
-  if (hasNotifications == m_hasNotifications && dndEnabled == m_dndEnabled) {
+  if (hasNotifications == m_hasNotifications && dndEnabled == m_dndEnabled && unreadCount == m_unreadCount) {
     return;
   }
   m_hasNotifications = hasNotifications;
   m_dndEnabled = dndEnabled;
+  m_unreadCount = unreadCount;
   if (m_glyph != nullptr) {
     m_glyph->setGlyph(m_dndEnabled ? "bell-off" : "bell");
     m_glyph->setColor(widgetIconColorOr(colorSpecFromRole(ColorRole::OnSurface)));
   }
-  if (m_dot != nullptr) {
-    m_dot->setVisible(!m_live && m_hasNotifications && !m_dndEnabled);
+  if (!m_live) {
+    syncBadge(nullptr);
   }
 }

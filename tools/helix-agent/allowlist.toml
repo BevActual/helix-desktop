@@ -1,0 +1,23 @@
+# Helix Agent Surface v1 — tools exposed over MCP.
+# Dangerous session power actions and synthetic input stay off.
+
+[tools]
+desktop_status = true
+desktop_capture = true
+desktop_context = true
+panel_toggle = true
+panel_open = true
+panel_close = true
+settings_open = true
+bar_visibility = true
+clipboard_get = true
+clipboard_set = true
+notify = true
+notifications_recent = true
+workspace_step = true
+workspaces_list = true
+windows_list = true
+window_focus = true
+app_launch = true
+window_close = true
+dnd_toggle = true

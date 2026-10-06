@@ -114,6 +114,8 @@ public:
   void endAttachedPopup(wl_surface* surface);
 
   void registerIpc(IpcService& ipc);
+  // Show or hide every bar. Same path as `noctalia msg bar-toggle`.
+  [[nodiscard]] std::string toggleVisibility();
 
 private:
   void applyIpcVisibility(bool visible);

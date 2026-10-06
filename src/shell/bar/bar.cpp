@@ -3862,6 +3862,8 @@ std::string Bar::hideBarIpc(std::string_view args) {
   return "ok\n";
 }
 
+std::string Bar::toggleVisibility() { return toggleBarIpc(""); }
+
 std::string Bar::toggleBarIpc(std::string_view args) {
   std::optional<std::string> barName;
   std::optional<std::string> monitorSelector;

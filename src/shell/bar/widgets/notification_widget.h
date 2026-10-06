@@ -7,16 +7,16 @@
 #include <string>
 
 struct wl_output;
+class Box;
 class CountdownRingNode;
 class Glyph;
 class Label;
-class Node;
 class NotificationManager;
 
-// Bell with an unread dot. While a notification reports progress (the freedesktop `value` hint:
-// a download, copy, update, phone transfer) the bell gives way to a live activity chip, a progress
-// ring beside the activity's summary, the way iOS Live Activities sit in the Mac menu bar and
-// Android Live Updates sit in the status bar. Click still opens the notification panel.
+// Bell with an unread count badge. While a notification reports progress (the freedesktop `value`
+// hint: a download, copy, update, phone transfer) the bell gives way to a live activity chip, a
+// progress ring beside the activity's summary, the way iOS Live Activities sit in the Mac menu bar
+// and Android Live Updates sit in the status bar. Click opens Notification Center.
 class NotificationWidget : public Widget {
 public:
   struct Options {
@@ -43,13 +43,15 @@ private:
   void doLayout(Renderer& renderer, float containerWidth, float containerHeight) override;
   void doUpdate(Renderer& renderer) override;
   void refreshIndicatorState();
+  void syncBadge(Renderer* renderer);
   [[nodiscard]] bool findLiveActivity(LiveActivity& out) const;
   void syncLiveActivity();
 
   NotificationManager* m_manager = nullptr;
   int m_eventToken = -1;
   Glyph* m_glyph = nullptr;
-  Node* m_dot = nullptr;
+  Box* m_badge = nullptr;
+  Label* m_badgeLabel = nullptr;
   CountdownRingNode* m_ringTrack = nullptr;
   CountdownRingNode* m_ring = nullptr;
   Label* m_liveLabel = nullptr;
@@ -59,6 +61,7 @@ private:
   bool m_hasNotifications = false;
   bool m_dndEnabled = false;
   bool m_openedPanelByClick = false;
+  std::size_t m_unreadCount = 0;
 
   bool m_live = false;
   uint32_t m_liveId = 0;

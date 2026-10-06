@@ -6,6 +6,7 @@
 #include "core/input/keybind_matcher.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "i18n/i18n.h"
+#include "notification/notification_manager.h"
 #include "render/core/renderer.h"
 #include "shell/control_center/tab.h"
 #include "shell/panel/panel_manager.h"
@@ -41,6 +42,8 @@ namespace {
   constexpr float kEmojiCell = 48.0F;
   constexpr float kRecentCell = 112.0F;
   constexpr float kClipboardRow = 46.0F;
+  constexpr float kActionRow = 56.0F;
+  constexpr int kSourceCount = 4;
   constexpr std::size_t kGridOverscan = 3;
 
   [[nodiscard]] bool isDescendantOf(const Node* node, const Node* ancestor) {
@@ -264,6 +267,76 @@ namespace {
     Label* m_meta = nullptr;
   };
 
+  class ActionTile final : public Flex {
+  public:
+    explicit ActionTile(float scale) {
+      setDirection(FlexDirection::Horizontal);
+      setAlign(FlexAlign::Center);
+      setGap(Style::spaceSm * scale);
+      setPadding(Style::spaceXs * scale, Style::spaceSm * scale);
+      setRadius(Style::scaledRadiusMd(scale));
+      addChild(ui::glyph({
+          .out = &m_glyph,
+          .glyph = "bolt",
+          .glyphSize = Style::fontSizeHeader * scale,
+          .configure = [](Glyph& glyph) { glyph.setHitTestVisible(false); },
+      }));
+      auto text = ui::column({
+          .align = FlexAlign::Start,
+          .gap = 0.0F,
+          .flexGrow = 1.0F,
+      });
+      text->addChild(ui::label({
+          .out = &m_title,
+          .fontSize = Style::fontSizeBody * scale,
+          .fontWeight = FontWeight::SemiBold,
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .baselineMode = LabelBaselineMode::TextFixedHeight,
+          .configure = [](Label& label) { label.setHitTestVisible(false); },
+      }));
+      text->addChild(ui::label({
+          .out = &m_meta,
+          .fontSize = Style::fontSizeCaption * scale,
+          .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+          .maxLines = 1,
+          .ellipsize = TextEllipsize::End,
+          .baselineMode = LabelBaselineMode::TextFixedHeight,
+          .configure = [](Label& label) { label.setHitTestVisible(false); },
+      }));
+      addChild(std::move(text));
+    }
+
+    void bind(const desktop_actions::Action& action, bool selected, bool hovered, bool restFill) {
+      if (m_glyph != nullptr) {
+        m_glyph->setGlyph(action.glyph.empty() ? "bolt" : action.glyph);
+      }
+      if (m_title != nullptr) {
+        m_title->setText(action.title);
+      }
+      if (m_meta != nullptr) {
+        m_meta->setText(action.subtitle);
+      }
+      applySelectionFill(*this, selected, hovered, restFill);
+      const ColorSpec fg = colorSpecFromRole(selected ? ColorRole::OnPrimary : ColorRole::OnSurface);
+      const ColorSpec meta = colorSpecFromRole(selected ? ColorRole::OnPrimary : ColorRole::OnSurfaceVariant);
+      if (m_title != nullptr) {
+        m_title->setColor(fg);
+      }
+      if (m_meta != nullptr) {
+        m_meta->setColor(meta);
+      }
+      if (m_glyph != nullptr) {
+        m_glyph->setColor(selected ? fg : colorSpecFromRole(ColorRole::OnSurfaceVariant));
+      }
+    }
+
+  private:
+    Glyph* m_glyph = nullptr;
+    Label* m_title = nullptr;
+    Label* m_meta = nullptr;
+  };
+
 } // namespace
 
 class QuickInsertEmojiAdapter final : public VirtualGridAdapter {
@@ -381,10 +454,49 @@ private:
   std::function<void(std::size_t)> m_onActivate;
 };
 
-QuickInsertPanel::QuickInsertPanel(ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails)
-    : m_config(config), m_clipboard(clipboard), m_thumbnails(thumbnails), m_emoji(clipboard) {
+class QuickInsertActionAdapter final : public VirtualGridAdapter {
+public:
+  QuickInsertActionAdapter(float scale, bool restFill) : m_scale(scale), m_restFill(restFill) {}
+
+  void setActions(const std::vector<desktop_actions::Action>* actions) { m_actions = actions; }
+  void setOnActivate(std::function<void(std::size_t)> callback) { m_onActivate = std::move(callback); }
+
+  [[nodiscard]] std::size_t itemCount() const override { return m_actions == nullptr ? 0 : m_actions->size(); }
+
+  [[nodiscard]] std::unique_ptr<Node> createTile() override { return std::make_unique<ActionTile>(m_scale); }
+
+  void bindTile(Node& tile, std::size_t index, bool selected, bool hovered) override {
+    if (m_actions == nullptr || index >= m_actions->size()) {
+      return;
+    }
+    static_cast<ActionTile&>(tile).bind((*m_actions)[index], selected, hovered, m_restFill);
+  }
+
+  void onActivate(std::size_t index) override {
+    if (m_onActivate) {
+      m_onActivate(index);
+    }
+  }
+
+  [[nodiscard]] std::string itemTooltip(std::size_t /*index*/) const override { return {}; }
+
+private:
+  float m_scale = 1.0F;
+  bool m_restFill = false;
+  const std::vector<desktop_actions::Action>* m_actions = nullptr;
+  std::function<void(std::size_t)> m_onActivate;
+};
+
+QuickInsertPanel::QuickInsertPanel(
+    ConfigService* config, ClipboardService* clipboard, ThumbnailService* thumbnails, desktop_actions::Services actions
+)
+    : m_config(config), m_clipboard(clipboard), m_thumbnails(thumbnails), m_actionsServices(actions), m_emoji(clipboard) {
   m_emoji.initialize();
 }
+
+float QuickInsertPanel::preferredWidth() const { return scaled(520.0F + Style::panelPadding * 2.0F); }
+
+float QuickInsertPanel::preferredHeight() const { return scaled(480.0F + Style::panelPadding * 2.0F); }
 
 QuickInsertPanel::~QuickInsertPanel() {
   if (m_thumbnails != nullptr) {
@@ -396,7 +508,10 @@ QuickInsertPanel::~QuickInsertPanel() {
 
 QuickInsertPanel::Source QuickInsertPanel::sourceFromContext(std::string_view context, bool& usedAsQuery) {
   usedAsQuery = false;
-  if (context.empty() || context == "emoji" || context == "emo") {
+  if (context.empty() || context == "actions" || context == "act" || context == "desktop") {
+    return Source::Actions;
+  }
+  if (context == "emoji" || context == "emo") {
     return Source::Emoji;
   }
   if (context == "screenshots" || context == "screenshot" || context == "recents") {
@@ -406,19 +521,22 @@ QuickInsertPanel::Source QuickInsertPanel::sourceFromContext(std::string_view co
     return Source::Clipboard;
   }
   usedAsQuery = true;
-  return Source::Emoji;
+  return Source::Actions;
 }
 
 std::size_t QuickInsertPanel::indexFromSource(Source source) { return static_cast<std::size_t>(source); }
 
 QuickInsertPanel::Source QuickInsertPanel::sourceFromIndex(std::size_t index) {
+  if (index == indexFromSource(Source::Emoji)) {
+    return Source::Emoji;
+  }
   if (index == indexFromSource(Source::Recents)) {
     return Source::Recents;
   }
   if (index == indexFromSource(Source::Clipboard)) {
     return Source::Clipboard;
   }
-  return Source::Emoji;
+  return Source::Actions;
 }
 
 PanelPlacement QuickInsertPanel::panelPlacement() const noexcept {
@@ -473,6 +591,7 @@ void QuickInsertPanel::create() {
       .gap = Style::spaceXs * scale,
   });
   std::vector<ui::SegmentedOption> sourceOptions = {
+      {.label = i18n::tr("quick-insert.source-actions"), .glyph = "bolt"},
       {.label = i18n::tr("quick-insert.source-emoji"), .glyph = "mood-smile"},
       {.label = i18n::tr("quick-insert.source-recents"), .glyph = "photo"},
       {.label = i18n::tr("quick-insert.source-clipboard"), .glyph = "clipboard"},
@@ -513,6 +632,10 @@ void QuickInsertPanel::create() {
   m_clipboardAdapter = std::make_unique<QuickInsertClipboardAdapter>(scale, m_clipboard, restFill);
   m_clipboardAdapter->setIndices(&m_clipboardIndices);
   m_clipboardAdapter->setOnActivate([this](std::size_t index) { activateAt(index); });
+
+  m_actionAdapter = std::make_unique<QuickInsertActionAdapter>(scale, restFill);
+  m_actionAdapter->setActions(&m_actions);
+  m_actionAdapter->setOnActivate([this](std::size_t index) { activateAt(index); });
 
   leftover->addChild(ui::virtualGridView({
       .out = &m_emojiGrid,
@@ -578,6 +701,50 @@ void QuickInsertPanel::create() {
             }
           },
   }));
+  leftover->addChild(ui::row({
+      .out = &m_contextHost,
+      .align = FlexAlign::Center,
+      .visible = false,
+      .participatesInLayout = false,
+      .configure =
+          [scale](Flex& row) {
+            row.setPadding(Style::spaceSm * scale, Style::spaceMd * scale);
+            row.setFillWidth(true);
+          },
+  }));
+  if (m_contextHost != nullptr) {
+    m_contextHost->addChild(ui::label({
+        .out = &m_contextLabel,
+        .fontSize = Style::fontSizeCaption * scale,
+        .color = colorSpecFromRole(ColorRole::OnSurfaceVariant),
+        .maxLines = 1,
+        .ellipsize = TextEllipsize::End,
+        .flexGrow = 1.0F,
+        .configure = [](Label& label) { label.setHitTestVisible(false); },
+    }));
+  }
+  leftover->addChild(ui::virtualGridView({
+      .out = &m_actionGrid,
+      .contentScale = scale,
+      .columns = 1,
+      .cellHeight = kActionRow * scale,
+      .squareCells = false,
+      .columnGap = 0.0F,
+      .rowGap = Style::spaceXs * scale,
+      .overscanRows = kGridOverscan,
+      .itemCursorShape = WP_CURSOR_SHAPE_DEVICE_V1_SHAPE_POINTER,
+      .scrollbarVisible = true,
+      .adapter = m_actionAdapter.get(),
+      .flexGrow = 1.0F,
+      .visible = false,
+      .participatesInLayout = false,
+      .onSelectionChanged =
+          [this](std::optional<std::size_t> idx) {
+            if (idx.has_value()) {
+              m_selectedIndex = *idx;
+            }
+          },
+  }));
   leftover->addChild(ui::label({
       .out = &m_emptyLabel,
       .fontSize = Style::fontSizeCaption * scale,
@@ -624,6 +791,8 @@ void QuickInsertPanel::onClose() {
   m_recentPaths.clear();
   m_emojiResults.clear();
   m_clipboardIndices.clear();
+  m_actions.clear();
+  m_focusedLabel.clear();
   m_query.clear();
   m_selectedIndex = 0;
   m_pasteOnResult = false;
@@ -637,6 +806,7 @@ void QuickInsertPanel::doLayout(Renderer& renderer, float width, float height) {
   if (m_container == nullptr) {
     return;
   }
+  m_container->setClipChildren(true);
   if (m_recentsAdapter != nullptr) {
     m_recentsAdapter->setRenderer(&renderer);
   }
@@ -651,6 +821,14 @@ void QuickInsertPanel::doUpdate(Renderer& renderer) {
   }
   if (m_source == Source::Clipboard && m_clipboard != nullptr && m_clipboard->changeSerial() != m_clipboardSerial) {
     refreshClipboard();
+  }
+  if (m_source == Source::Actions) {
+    const std::string label = desktop_actions::focusedWindowLabel(m_actionsServices.compositor);
+    const std::string workspace = desktop_actions::activeWorkspaceLabel(m_actionsServices.compositor);
+    const bool dnd = m_actionsServices.notifications != nullptr && m_actionsServices.notifications->doNotDisturb();
+    if (label != m_focusedLabel || dnd != m_actionDnd || workspace != m_workspaceLabel) {
+      refreshResults();
+    }
   }
   if (m_thumbnails != nullptr) {
     (void)m_thumbnails->uploadPending(renderer.textureManager());
@@ -690,7 +868,7 @@ void QuickInsertPanel::applySource(Source source) {
 
 void QuickInsertPanel::cycleSource(bool reverse) {
   const int current = static_cast<int>(indexFromSource(m_source));
-  const int next = reverse ? (current == 0 ? 2 : current - 1) : (current == 2 ? 0 : current + 1);
+  const int next = reverse ? (current == 0 ? kSourceCount - 1 : current - 1) : ((current + 1) % kSourceCount);
   if (m_sourceSwitch != nullptr) {
     m_sourceSwitch->setSelectedIndex(static_cast<std::size_t>(next));
     return;
@@ -717,6 +895,9 @@ void QuickInsertPanel::refreshResults() {
     break;
   case Source::Clipboard:
     refreshClipboard();
+    break;
+  case Source::Actions:
+    refreshActions();
     break;
   }
   updateEmptyState();
@@ -786,6 +967,28 @@ void QuickInsertPanel::refreshClipboard() {
   }
 }
 
+void QuickInsertPanel::refreshActions() {
+  m_focusedLabel = desktop_actions::focusedWindowLabel(m_actionsServices.compositor);
+  m_workspaceLabel = desktop_actions::activeWorkspaceLabel(m_actionsServices.compositor);
+  m_actionDnd = m_actionsServices.notifications != nullptr && m_actionsServices.notifications->doNotDisturb();
+  m_actions = desktop_actions::query(m_query, m_actionsServices);
+  if (m_actionGrid != nullptr) {
+    m_actionGrid->notifyDataChanged();
+  }
+  updateContextLabel();
+}
+
+void QuickInsertPanel::updateContextLabel() {
+  const bool show = m_source == Source::Actions && !m_focusedLabel.empty();
+  if (m_contextHost != nullptr) {
+    m_contextHost->setVisible(show);
+    m_contextHost->setParticipatesInLayout(show);
+  }
+  if (m_contextLabel != nullptr && show) {
+    m_contextLabel->setText(i18n::tr("quick-insert.focused-window", "name", m_focusedLabel));
+  }
+}
+
 void QuickInsertPanel::updateSourceVisibility() {
   const auto show = [](VirtualGridView* grid, bool visible) {
     if (grid == nullptr) {
@@ -797,6 +1000,8 @@ void QuickInsertPanel::updateSourceVisibility() {
   show(m_emojiGrid, m_source == Source::Emoji);
   show(m_recentsGrid, m_source == Source::Recents);
   show(m_clipboardGrid, m_source == Source::Clipboard);
+  show(m_actionGrid, m_source == Source::Actions);
+  updateContextLabel();
 }
 
 void QuickInsertPanel::updatePlaceholder() {
@@ -813,6 +1018,9 @@ void QuickInsertPanel::updatePlaceholder() {
   case Source::Emoji:
     m_input->setPlaceholder(i18n::tr("quick-insert.search-emoji"));
     break;
+  case Source::Actions:
+    m_input->setPlaceholder(i18n::tr("quick-insert.search-actions"));
+    break;
   }
 }
 
@@ -828,6 +1036,9 @@ void QuickInsertPanel::updateEmptyState() {
       break;
     case Source::Emoji:
       m_emptyLabel->setText(i18n::tr("quick-insert.empty-emoji"));
+      break;
+    case Source::Actions:
+      m_emptyLabel->setText(i18n::tr("quick-insert.empty-actions"));
       break;
     }
     m_emptyLabel->setVisible(empty);
@@ -853,6 +1064,10 @@ void QuickInsertPanel::syncGridMetrics() {
     m_clipboardGrid->setScale(scale);
     m_clipboardGrid->setCellHeight(kClipboardRow * scale);
   }
+  if (m_actionGrid != nullptr) {
+    m_actionGrid->setScale(scale);
+    m_actionGrid->setCellHeight(kActionRow * scale);
+  }
 }
 
 VirtualGridView* QuickInsertPanel::activeGrid() const noexcept {
@@ -861,6 +1076,8 @@ VirtualGridView* QuickInsertPanel::activeGrid() const noexcept {
     return m_recentsGrid;
   case Source::Clipboard:
     return m_clipboardGrid;
+  case Source::Actions:
+    return m_actionGrid;
   case Source::Emoji:
     break;
   }
@@ -873,6 +1090,8 @@ std::size_t QuickInsertPanel::activeCount() const noexcept {
     return m_recentPaths.size();
   case Source::Clipboard:
     return m_clipboardIndices.size();
+  case Source::Actions:
+    return m_actions.size();
   case Source::Emoji:
     break;
   }
@@ -896,6 +1115,18 @@ void QuickInsertPanel::activateAt(std::size_t index) {
   case Source::Clipboard:
     if (index < m_clipboardIndices.size()) {
       insertClipboard(m_clipboardIndices[index]);
+    }
+    break;
+  case Source::Actions:
+    if (index < m_actions.size()) {
+      desktop_actions::Request request;
+      request.id = m_actions[index].id;
+      if (m_actionsServices.panels != nullptr && m_actionsServices.panels->isOpenPanel("quick-insert")) {
+        request.output = m_actionsServices.panels->attachedPanelOutput();
+        request.sourceBarName = std::string(m_actionsServices.panels->attachedSourceBarName());
+      }
+      desktop_actions::schedule(m_actionsServices, std::move(request));
+      PanelManager::instance().closePanel(false);
     }
     break;
   }

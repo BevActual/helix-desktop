@@ -37,7 +37,9 @@
 #include "i18n/i18n.h"
 #include "i18n/i18n_service.h"
 #include "ipc/ipc_arg_parse.h"
+#include "launcher/actions_provider.h"
 #include "launcher/app_provider.h"
+#include "launcher/desktop_actions.h"
 #include "launcher/dmenu_provider.h"
 #include "launcher/emoji_provider.h"
 #include "launcher/math_provider.h"
@@ -664,6 +666,13 @@ void Application::initPanelManagerAndPanels() {
       m_packageUpdateTimer.startRepeating(std::chrono::minutes(30), [this]() { refreshPackageUpdates(); });
     });
   }
+  const desktop_actions::Services desktopActions{
+      .panels = &m_panelManager,
+      .notifications = &m_notificationManager,
+      .compositor = &m_compositorPlatform,
+      .bar = &m_bar,
+      .config = &m_configService,
+  };
   {
     auto launcherPanel = std::make_unique<LauncherPanel>(&m_configService, &m_asyncTextureCache);
     launcherPanel->addProvider(std::make_unique<AppProvider>(&m_configService, &m_compositorPlatform));
@@ -672,6 +681,7 @@ void Application::initPanelManagerAndPanels() {
     launcherPanel->addProvider(
         std::make_unique<PanelProvider>(&m_panelManager, &m_configService)
     );
+    launcherPanel->addProvider(std::make_unique<ActionsProvider>(desktopActions));
     launcherPanel->addProvider(std::make_unique<SessionProvider>(&m_configService, &m_sessionActionRunner));
     launcherPanel->addProvider(std::make_unique<MathProvider>(&m_clipboardService, &m_configService, &m_httpClient));
     launcherPanel->addProvider(std::make_unique<EmojiProvider>(&m_clipboardService));
@@ -693,7 +703,7 @@ void Application::initPanelManagerAndPanels() {
   }
   {
     auto quickInsert = std::make_unique<QuickInsertPanel>(
-        &m_configService, &m_clipboardService, &m_thumbnailService
+        &m_configService, &m_clipboardService, &m_thumbnailService, desktopActions
     );
     quickInsert->setCopiedActivationCallback([this](bool isImage) {
       const ClipboardAutoPasteMode mode = m_configService.config().shell.clipboardAutoPaste;

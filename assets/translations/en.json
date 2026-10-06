@@ -1526,6 +1526,7 @@
     },
     "shortcuts": {
       "ai": "AI",
+      "appearance": "Appearance",
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "caffeine": "Caffeine",
@@ -1544,7 +1545,7 @@
       "nightlight": "Night Light",
       "nightlight-states": {
         "forced": "Always On",
-        "off": "Night Light",
+        "off": "Off",
         "scheduled-day": "Scheduled",
         "scheduled-night": "Running"
       },
@@ -2099,6 +2100,34 @@
       "user": "User"
     },
     "providers": {
+      "actions": {
+        "bar-toggle": "Toggle bar",
+        "bar-toggle-sub": "Show or hide the bar",
+        "close-focused": "Close {name}",
+        "close-focused-sub": "Close the focused window",
+        "control-center": "Control Center",
+        "control-center-sub": "Open quick settings",
+        "dnd": "Do Not Disturb",
+        "dnd-sub": "Toggle notification quiet mode",
+        "monitor": "System Monitor",
+        "monitor-sub": "See processes and resource use",
+        "notifications": "Notification Center",
+        "notifications-sub": "Open notification history",
+        "settings": "Settings",
+        "settings-sub": "Open Helix Settings",
+        "software": "Helix Software",
+        "software-sub": "Browse and update applications",
+        "state-off": "Off",
+        "state-on": "On",
+        "switch-to": "Switch to {name}",
+        "title": "Actions",
+        "workspace-next": "Next workspace",
+        "workspace-next-from": "After {name}",
+        "workspace-next-sub": "Move to the next workspace",
+        "workspace-prev": "Previous workspace",
+        "workspace-prev-from": "Before {name}",
+        "workspace-prev-sub": "Move to the previous workspace"
+      },
       "applications": {
         "title": "Applications"
       },
@@ -2323,13 +2352,17 @@
     }
   },
   "quick-insert": {
+    "empty-actions": "No matching actions",
     "empty-clipboard": "No matching clipboard items",
     "empty-emoji": "No matching emoji",
     "empty-recents": "No recent screenshots",
+    "focused-window": "Focused · {name}",
+    "search-actions": "Search actions",
     "search-clipboard": "Search clipboard",
     "search-emoji": "Search emoji",
-    "search-placeholder": "Search emoji, screenshots, or clipboard",
+    "search-placeholder": "Search actions, emoji, screenshots, or clipboard",
     "search-recents": "Search screenshots",
+    "source-actions": "Actions",
     "source-clipboard": "Clipboard",
     "source-emoji": "Emoji",
     "source-recents": "Recents"
