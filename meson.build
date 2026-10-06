@@ -1300,6 +1300,12 @@ if build_tests
         args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_integration.py',
           helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
     endif
+    _adapter_python = meson.project_source_root() / 'tools/helix-agent/.venv/bin/python'
+    if run_command('test', '-x', _adapter_python, check: false).returncode() == 0 and run_command(_adapter_python, '-c', 'import gi, mcp', check: false).returncode() == 0
+      test('helix_agent_adapter_integration', helix_dbus_session,
+        args: [_adapter_python, meson.project_source_root() / 'tests/helix_agent_adapter_integration.py',
+          meson.project_source_root(), helix_service], timeout: 120)
+    endif
     meter_tools = [find_program('pipewire', required: false), find_program('pw-cli', required: false),
       find_program('pw-link', required: false), find_program('pw-dump', required: false)]
     have_meter_tools = true

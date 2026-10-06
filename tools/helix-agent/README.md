@@ -34,6 +34,22 @@ Project config: [`.cursor/mcp.json`](../../.cursor/mcp.json).
 2. Confirm **helix-agent** tools appear (e.g. `desktop_status`, `desktop_capture`).
 3. Ask the agent to capture the desktop or toggle Control Center.
 
+## How calls reach the desktop
+
+The adapter prefers the desktop service's `Agent1` D-Bus interface. There, the service applies per-client grants,
+asks you before anything in the `confirm` tier (a dialog in the shell), labels private content as untrusted and
+writes an audit log. The first call that needs a tier asks you to grant it.
+
+`allowlist.toml` `[backend] mode` selects the path: `auto` (default) uses `Agent1` when the service has it and the
+direct `noctalia msg` socket otherwise; `agent1` requires `Agent1`; `legacy` never uses it. A refusal from
+`Agent1` is final and is never retried on the direct path. The direct path has no per-client grants or
+confirmation, so once your install includes `Agent1`, set `mode = "agent1"`.
+
+Window and workspace tools (`windows_list`, `workspaces_list`, `window_focus`) call `niri` directly. The service does
+not mediate them yet, but they still need the matching grant.
+
+PyGObject comes from the system packages, so `run.sh` creates the virtualenv with system site packages.
+
 ## Allowlist
 
 [`allowlist.toml`](allowlist.toml) gates which tools are enabled. Dangerous session power

@@ -16,6 +16,7 @@ with tempfile.TemporaryDirectory() as tmp:
     spec = importlib.util.spec_from_file_location("helix_agent_server", root / "tools/helix-agent/server.py")
     server = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(server)
+    server.BACKEND_MODE = "legacy"  # this test is about the adapter's own gate, not the desktop service
 
     msg = server.noctalia_msg
 
