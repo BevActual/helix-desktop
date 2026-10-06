@@ -23,7 +23,6 @@
 #include "theme/theme_service.h"
 #include "theme/template_apply_service.h"
 #include "theme/json_output.h"
-#include "render/core/color.h"
 #include "theme/palette.h"
 #include <filesystem>
 #include <sys/utsname.h>

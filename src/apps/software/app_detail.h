@@ -4,7 +4,7 @@
 #include "apps/software/app_grid.h"
 #include "apps/software/app_store.h"
 #include "system/package_kit_service.h"
-#include "ui/style.h"
+#include "core/motion_durations.h"
 
 #include <adwaita.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
@@ -113,7 +113,7 @@ inline void loadRemoteScreenshot(GtkBox* host, const std::string& url) {
   gtk_widget_set_hexpand(spinner, true);
   auto* stack = gtk_stack_new();
   gtk_stack_set_transition_type(GTK_STACK(stack), GTK_STACK_TRANSITION_TYPE_CROSSFADE);
-  gtk_stack_set_transition_duration(GTK_STACK(stack), Style::animNormal);
+  gtk_stack_set_transition_duration(GTK_STACK(stack), motion::kNormal);
   gtk_stack_add_named(GTK_STACK(stack), spinner, "loading");
   gtk_stack_add_named(GTK_STACK(stack), picture, "image");
   gtk_stack_set_visible_child_name(GTK_STACK(stack), "loading");
@@ -349,7 +349,7 @@ inline AdwNavigationPage* buildDetailPage(
     auto* carousel = adw_carousel_new();
     adw_carousel_set_allow_mouse_drag(ADW_CAROUSEL(carousel), true);
     adw_carousel_set_allow_scroll_wheel(ADW_CAROUSEL(carousel), true);
-    adw_carousel_set_reveal_duration(ADW_CAROUSEL(carousel), Style::animSlow);
+    adw_carousel_set_reveal_duration(ADW_CAROUSEL(carousel), motion::kSlow);
     for (std::size_t i = 0; i < std::min<std::size_t>(details.screenshotUrls.size(), 6); ++i) {
       auto* page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
       gtk_widget_set_hexpand(page, true);
@@ -487,7 +487,7 @@ inline AdwNavigationPage* buildDetailPage(
     gtk_box_append(GTK_BOX(pageBody), GTK_WIDGET(permGroup));
   }
 
-  helix::apps::staggerRevealChildren(pageBody, 35, Style::animNormal, 0);
+  helix::apps::staggerRevealChildren(pageBody, 35, motion::kNormal, 0);
 
   auto* clamp = adw_clamp_new();
   adw_clamp_set_maximum_size(ADW_CLAMP(clamp), 960);
@@ -506,7 +506,7 @@ inline AdwNavigationPage* buildLoadingDetailPage(const noctalia::packages::Packa
   const auto title = hit.title.empty() ? hit.name : hit.title;
   auto* status = adw_status_page_new();
   helix::apps::applyLoadingStatusPage(ADW_STATUS_PAGE(status), title.c_str(), "Loading package details");
-  helix::apps::revealWidget(status, 0, Style::animFast);
+  helix::apps::revealWidget(status, 0, motion::kFast);
   auto* toolbar = adw_toolbar_view_new();
   adw_toolbar_view_add_top_bar(ADW_TOOLBAR_VIEW(toolbar), adw_header_bar_new());
   adw_toolbar_view_set_content(ADW_TOOLBAR_VIEW(toolbar), status);

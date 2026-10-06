@@ -604,7 +604,7 @@ _noctalia_sources = files(
   'src/shell/wallpaper/wallpaper_shuffle_state.cpp',
   'src/shell/wallpaper/daily_wallpaper.cpp',
   'src/shell/wallpaper/daily_wallpaper_service.cpp',
-  'src/shell/wallpaper/wallhaven_client.cpp',
+  'src/net/wallhaven_client.cpp',
   'src/shell/wallpaper/video_wallpaper.cpp',
   'src/shell/wallpaper/video_wallpaper_service.cpp',
   'src/shell/wallpaper/wallpaper.cpp',

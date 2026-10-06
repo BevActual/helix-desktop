@@ -1,7 +1,4 @@
 src/app/application_services.cpp -> desktop/remote_network.h
-src/apps/common/motion.h -> ui/style.h
-src/apps/software/app_detail.h -> ui/style.h
-src/apps/software/app_store.h -> ui/style.h
 src/config/cli.cpp -> shell/settings/settings_registry.h
 src/config/color_spec.h -> ui/palette.h
 src/config/config_overrides.cpp -> shell/settings/widget_settings_registry.h
@@ -30,9 +27,6 @@ src/dbus/notification/notification_service.cpp -> render/core/image_decoder.h
 src/dbus/polkit/polkit_poll_source.h -> app/poll_source.h
 src/dbus/session_bus_poll_source.h -> app/poll_source.h
 src/dbus/system_bus_poll_source.h -> app/poll_source.h
-src/desktop/service_main.cpp -> render/core/color.h
-src/desktop/settings_catalog.cpp -> ui/palette.h
-src/desktop/wallhaven.h -> shell/wallpaper/wallhaven_client.h
 src/idle/idle_grace_overlay.cpp -> render/render_context.h
 src/idle/idle_grace_overlay.cpp -> render/scene/node.h
 src/idle/idle_grace_overlay.cpp -> ui/builders.h

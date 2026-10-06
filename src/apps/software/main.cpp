@@ -1,5 +1,6 @@
 #include "apps/common/inspection_guard.h"
 #include "apps/common/motion.h"
+#include "core/motion_durations.h"
 #include "apps/common/preview_export.h"
 #include "apps/common/appearance_binding.h"
 #include "apps/software/app_detail.h"
@@ -765,7 +766,7 @@ struct Software : std::enable_shared_from_this<Software> {
         gtk_box_append(body, recent);
       }
       if (animateHome) {
-        helix::apps::staggerRevealChildren(GTK_WIDGET(body), 40, Style::animNormal, 20);
+        helix::apps::staggerRevealChildren(GTK_WIDGET(body), 40, motion::kNormal, 20);
         exploreRevealed = true;
       }
       setStatusReady();
@@ -788,7 +789,7 @@ struct Software : std::enable_shared_from_this<Software> {
           gtk_box_append(body, recent);
         }
         if (!exploreRevealed) {
-          helix::apps::staggerRevealChildren(GTK_WIDGET(body), 40, Style::animNormal, 20);
+          helix::apps::staggerRevealChildren(GTK_WIDGET(body), 40, motion::kNormal, 20);
           exploreRevealed = true;
         }
         setStatusReady();

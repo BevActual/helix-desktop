@@ -12,7 +12,7 @@
 #include "theme/community_templates.h"
 #include "theme/custom_palettes.h"
 #include "i18n/i18n_service.h"
-#include "ui/palette.h"
+#include "theme/color_roles.h"
 #include <sstream>
 #include <array>
 #include <cctype>

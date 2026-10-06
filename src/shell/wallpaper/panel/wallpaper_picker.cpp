@@ -22,7 +22,7 @@
 #include "shell/wallpaper/panel/wallpaper_tile.h"
 #include "shell/wallpaper/video_wallpaper.h"
 #include "shell/wallpaper/video_wallpaper_service.h"
-#include "shell/wallpaper/wallhaven_client.h"
+#include "net/wallhaven_client.h"
 #include "shell/wallpaper/wallpaper_paths.h"
 #include "theme/builtin_palettes.h"
 #include "theme/community_palettes.h"

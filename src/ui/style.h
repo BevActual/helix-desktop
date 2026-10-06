@@ -1,14 +1,16 @@
 #pragma once
 
+#include "core/motion_durations.h"
+
 #include "ui/signal.h"
 
 namespace Style {
 
   inline constexpr int barThicknessDefault = 34;
 
-  inline constexpr int animFast = 100;
-  inline constexpr int animNormal = 200;
-  inline constexpr int animSlow = 400;
+  inline constexpr int animFast = motion::kFast;
+  inline constexpr int animNormal = motion::kNormal;
+  inline constexpr int animSlow = motion::kSlow;
   // Settle time for Easing::Spring / SpringBouncy. A spring reaches ~90% by 40% of this, so
   // it reads as quick as animNormal while the tail is soft.
   inline constexpr int animSpring = 320;

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "apps/software/app_grid.h"
-#include "ui/style.h"
+#include "core/motion_durations.h"
 
 #include <adwaita.h>
 #include <algorithm>
@@ -303,7 +303,7 @@ inline GtkWidget* buildFeaturedCarousel(
   auto* carousel = adw_carousel_new();
   adw_carousel_set_allow_scroll_wheel(ADW_CAROUSEL(carousel), true);
   adw_carousel_set_allow_mouse_drag(ADW_CAROUSEL(carousel), true);
-  adw_carousel_set_reveal_duration(ADW_CAROUSEL(carousel), Style::animSlow);
+  adw_carousel_set_reveal_duration(ADW_CAROUSEL(carousel), motion::kSlow);
   for (const auto& hit : featured) {
     auto* page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_widget_set_margin_start(page, 2);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "render/core/color.h"
+#include "theme/color_roles.h"
 #include "ui/signal.h"
 #include "ui/style.h"
 
@@ -9,49 +10,6 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
-
-enum class ColorRole : std::uint8_t {
-  Primary,
-  OnPrimary,
-  Secondary,
-  OnSecondary,
-  Tertiary,
-  OnTertiary,
-  Error,
-  OnError,
-  Surface,
-  OnSurface,
-  SurfaceVariant,
-  OnSurfaceVariant,
-  Outline,
-  Shadow,
-  Hover,
-  OnHover,
-};
-
-struct ColorRoleToken {
-  ColorRole role;
-  std::string_view token;
-};
-
-inline constexpr std::array<ColorRoleToken, 16> kColorRoleTokens = {{
-    {ColorRole::Primary, "primary"},
-    {ColorRole::OnPrimary, "on_primary"},
-    {ColorRole::Secondary, "secondary"},
-    {ColorRole::OnSecondary, "on_secondary"},
-    {ColorRole::Tertiary, "tertiary"},
-    {ColorRole::OnTertiary, "on_tertiary"},
-    {ColorRole::Error, "error"},
-    {ColorRole::OnError, "on_error"},
-    {ColorRole::Surface, "surface"},
-    {ColorRole::OnSurface, "on_surface"},
-    {ColorRole::SurfaceVariant, "surface_variant"},
-    {ColorRole::OnSurfaceVariant, "on_surface_variant"},
-    {ColorRole::Outline, "outline"},
-    {ColorRole::Shadow, "shadow"},
-    {ColorRole::Hover, "hover"},
-    {ColorRole::OnHover, "on_hover"},
-}};
 
 [[nodiscard]] constexpr Color clearColor() noexcept { return rgba(0.0F, 0.0F, 0.0F, 0.0F); }
 

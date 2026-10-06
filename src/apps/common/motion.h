@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ui/style.h"
+#include "core/motion_durations.h"
 
 #include <adwaita.h>
 #include <algorithm>
@@ -13,7 +13,7 @@ struct RevealState {
   GtkWidget* widget = nullptr;
   int marginFrom = 0;
   int marginTo = 0;
-  guint durationMs = Style::animNormal;
+  guint durationMs = motion::kNormal;
 };
 
 inline void playReveal(RevealState* reveal) {
@@ -71,7 +71,7 @@ inline void playReveal(RevealState* reveal) {
 }  // namespace detail
 
 // Soft fade + slight rise. Skips when Motion is off (adw_get_enable_animations).
-inline void revealWidget(GtkWidget* widget, guint delayMs = 0, guint durationMs = Style::animNormal) {
+inline void revealWidget(GtkWidget* widget, guint delayMs = 0, guint durationMs = motion::kNormal) {
   if (!widget || !GTK_IS_WIDGET(widget)) {
     return;
   }
@@ -104,7 +104,7 @@ inline void revealWidget(GtkWidget* widget, guint delayMs = 0, guint durationMs 
 
 // Stagger direct children of a box — explains store-home hierarchy without delaying work.
 inline void staggerRevealChildren(
-    GtkWidget* parent, guint stepMs = 45, guint durationMs = Style::animNormal, guint startDelayMs = 30
+    GtkWidget* parent, guint stepMs = 45, guint durationMs = motion::kNormal, guint startDelayMs = 30
 ) {
   if (!parent || !GTK_IS_WIDGET(parent) || !adw_get_enable_animations(parent)) {
     return;
@@ -132,7 +132,7 @@ inline void revealProgress(GtkWidget* progress, bool show) {
   const bool wasHidden = !gtk_widget_get_visible(progress);
   gtk_widget_set_visible(progress, true);
   if (wasHidden) {
-    revealWidget(progress, 0, Style::animFast);
+    revealWidget(progress, 0, motion::kFast);
   }
 }
 
@@ -168,7 +168,7 @@ inline GtkWidget* loadingDots(int pixelSize = 12) {
   };
   auto* pulse = new Pulse{row, {dots[0], dots[1], dots[2]}, 0, 0};
   pulse->source = g_timeout_add(
-      Style::animNormal,
+      motion::kNormal,
       +[](gpointer data) -> gboolean {
         auto* pulse = static_cast<Pulse*>(data);
         // Destroy handler owns Pulse lifetime; bail if the row is going away.

@@ -6,7 +6,7 @@
 #include "render/core/thumbnail_service.h"
 #include "shell/wallpaper/daily_wallpaper.h"
 #include "shell/wallpaper/panel/wallpaper_scanner.h"
-#include "shell/wallpaper/wallhaven_client.h"
+#include "net/wallhaven_client.h"
 
 #include <cstddef>
 #include <cstdint>

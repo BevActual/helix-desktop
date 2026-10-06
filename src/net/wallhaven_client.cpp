@@ -1,4 +1,4 @@
-#include "shell/wallpaper/wallhaven_client.h"
+#include "net/wallhaven_client.h"
 
 #include "util/file_utils.h"
 #include "util/string_utils.h"
