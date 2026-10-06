@@ -1,5 +1,8 @@
 #include "desktop/agent_broker.h"
 
+#include <algorithm>
+#include <iterator>
+
 namespace helix::agent {
 
 AgentBroker::AgentBroker(RiskPolicy policy, GrantStore& grants, AuditLog audit, Executor execute, Clock clock)
@@ -80,7 +83,63 @@ void AgentBroker::run(const Request& request, Tier tier, bool tainted, Done done
   });
 }
 
-bool AgentBroker::confirm(std::uint64_t operation, bool approved) {
+std::uint64_t AgentBroker::requestAccess(const std::string& client, const std::string& label, std::set<Tier> tiers,
+                                         Done done) {
+  const std::uint64_t operation = ++next_;
+  tiers.erase(Tier::Blocked);
+  Request request{client, "grant-request", {label}, {}, ""};
+  for (const Tier tier : tiers) request.literal.emplace_back(tierName(tier));
+
+  if (tiers.empty()) {
+    finish(request, Tier::Confirm, false, "denied", "nothing grantable requested");
+    done(false, denial("no grantable tiers were requested"));
+    return operation;
+  }
+  const auto held = grants_.tiersFor(client);
+  if (std::includes(held.begin(), held.end(), tiers.begin(), tiers.end())) {
+    done(true, nlohmann::json{{"trust", "trusted"}, {"granted", request.literal}}.dump());
+    return operation;
+  }
+  if (!confirmerPresent_ || !onConfirmationRequested) {
+    finish(request, Tier::Confirm, false, "denied", "no confirmer");
+    done(false, denial("access needs approval and no approval dialog is available"));
+    return operation;
+  }
+  Pending entry{request, Tier::Confirm, false, std::move(done), clock_() + kConfirmationDeadline};
+  entry.isGrant = true;
+  entry.requested = tiers;
+  pending_.emplace(operation, std::move(entry));
+  onConfirmationRequested(operation, nlohmann::json{
+    {"operation", operation}, {"kind", "grant"}, {"client", client}, {"label", label}, {"tiers", request.literal},
+  });
+  return operation;
+}
+
+void AgentBroker::grant(const Pending& entry, const std::optional<std::set<Tier>>& narrowed) {
+  std::set<Tier> approved = entry.requested;
+  if (narrowed) {
+    std::set<Tier> kept;
+    std::set_intersection(approved.begin(), approved.end(), narrowed->begin(), narrowed->end(),
+                          std::inserter(kept, kept.begin()));
+    approved = std::move(kept);
+  }
+  const auto before = grants_.tiersFor(entry.request.client);
+  auto after = before;
+  after.insert(approved.begin(), approved.end());
+  grants_.set(entry.request.client, after);
+  if (auto saved = grants_.save(); !saved) {
+    grants_.set(entry.request.client, before);  // a grant that cannot be persisted must not apply
+    finish(entry.request, entry.tier, false, "denied", saved.error());
+    entry.done(false, denial("the grant could not be saved"));
+    return;
+  }
+  nlohmann::json granted = nlohmann::json::array();
+  for (const Tier tier : after) granted.push_back(std::string(tierName(tier)));
+  finish(entry.request, entry.tier, false, "granted", granted.dump());
+  entry.done(true, nlohmann::json{{"trust", "trusted"}, {"granted", granted}}.dump());
+}
+
+bool AgentBroker::confirm(std::uint64_t operation, bool approved, const std::optional<std::set<Tier>>& narrowed) {
   const auto found = pending_.find(operation);
   if (found == pending_.end()) return false;
   Pending entry = std::move(found->second);
@@ -88,6 +147,10 @@ bool AgentBroker::confirm(std::uint64_t operation, bool approved) {
   if (!approved) {
     finish(entry.request, entry.tier, entry.tainted, "rejected", "");
     entry.done(false, denial("the user declined"));
+    return true;
+  }
+  if (entry.isGrant) {
+    grant(entry, narrowed);
     return true;
   }
   taint_.clear(entry.request.client);  // a human just looked at exactly this action

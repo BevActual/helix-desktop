@@ -150,6 +150,60 @@ void checkLifecycle(const std::filesystem::path& dir) {
   TEST_CHECK(h.broker.pending() == 0 && !h.results[2].first && h.calls.empty());
 }
 
+void checkAccess(const std::filesystem::path& dir) {
+  Harness h(dir / "e");
+  const std::string label = "Helix MCP";
+
+  h.broker.requestAccess(kClient, label, {Tier::Observe}, h.recorder(0));
+  TEST_CHECK(!h.results[0].first && h.confirmations.empty());  // no dialog available
+
+  h.broker.setConfirmerPresent(true);
+  h.broker.requestAccess(kClient, label, {Tier::Blocked}, h.recorder(1));
+  TEST_CHECK(!h.results[1].first && h.confirmations.empty());  // nothing grantable: no dialog either
+
+  h.broker.requestAccess(kClient, label, {Tier::Observe, Tier::Act, Tier::Blocked}, h.recorder(2));
+  TEST_CHECK(h.confirmations.size() == 1 && h.results.count(2) == 0);
+  const auto& details = h.confirmations[0].second;
+  TEST_CHECK(details["kind"] == "grant" && details["label"] == label);
+  TEST_CHECK((details["tiers"] == json::array({"observe", "act"})));
+  TEST_CHECK(!h.grants.allows(kClient, Tier::Observe));  // nothing granted until a human answers
+
+  // The user narrows the request to observe only; extra tiers they did not see are ignored.
+  TEST_CHECK(h.broker.confirm(h.confirmations[0].first, true, std::set<Tier>{Tier::Observe, Tier::Confirm}));
+  TEST_CHECK(h.results[2].first && h.results[2].second["granted"] == json::array({"observe"}));
+  TEST_CHECK(h.grants.allows(kClient, Tier::Observe) && !h.grants.allows(kClient, Tier::Act));
+  TEST_CHECK(!h.grants.allows(kClient, Tier::Confirm));
+  GrantStore reloaded(dir / "e" / "grants.json");
+  TEST_CHECK(reloaded.load().has_value() && reloaded.allows(kClient, Tier::Observe));  // persisted
+
+  h.broker.requestAccess(kClient, label, {Tier::Observe}, h.recorder(3));  // already held: no dialog
+  TEST_CHECK(h.results[3].first && h.confirmations.size() == 1);
+
+  h.broker.requestAccess(kClient, label, {Tier::Act}, h.recorder(4));
+  TEST_CHECK(h.confirmations.size() == 2);
+  TEST_CHECK(h.broker.confirm(h.confirmations[1].first, false));
+  TEST_CHECK(!h.results[4].first && !h.grants.allows(kClient, Tier::Act));
+
+  // Granted tiers take effect immediately.
+  h.broker.submit({kClient, "status", {}, {}, ""}, h.recorder(5));
+  TEST_CHECK(h.calls.size() == 1);
+}
+
+void checkUnwritableGrants(const std::filesystem::path& dir) {
+  std::filesystem::create_directories(dir / "f");
+  { std::ofstream(dir / "f" / "blocker") << "a file where a directory should be"; }
+  GrantStore grants(dir / "f" / "blocker" / "grants.json");
+  AgentBroker broker(*RiskPolicy::parse(kPolicy), grants, AuditLog(dir / "f" / "audit.jsonl"),
+                     [](auto&&...) {}, [] { return std::chrono::steady_clock::time_point{}; });
+  std::uint64_t asked = 0;
+  broker.onConfirmationRequested = [&](std::uint64_t operation, const json&) { asked = operation; };
+  broker.setConfirmerPresent(true);
+  bool ok = true;
+  broker.requestAccess(kClient, "x", {Tier::Act}, [&](bool done, std::string) { ok = done; });
+  TEST_CHECK(broker.confirm(asked, true));
+  TEST_CHECK(!ok && !grants.allows(kClient, Tier::Act));  // a grant that cannot be saved is rolled back
+}
+
 }  // namespace
 
 int main() {
@@ -159,6 +213,8 @@ int main() {
   checkSmuggling(dir);
   checkConfirmationAndTaint(dir);
   checkLifecycle(dir);
+  checkAccess(dir);
+  checkUnwritableGrants(dir);
   std::filesystem::remove_all(dir);
   return 0;
 }

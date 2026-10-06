@@ -7,6 +7,8 @@
 #include <functional>
 #include <map>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -40,8 +42,12 @@ public:
 
   // Always returns an operation id; `done` is invoked once, possibly before submit returns.
   std::uint64_t submit(const Request& request, Done done);
+  // First-use consent: asks the confirmer to grant `tiers` to `client`. Already-held tiers need no dialog.
+  // `blocked` is dropped from the request. Completes with the tiers the client now holds.
+  std::uint64_t requestAccess(const std::string& client, const std::string& label, std::set<Tier> tiers, Done done);
   bool cancel(const std::string& client, std::uint64_t operation);
-  bool confirm(std::uint64_t operation, bool approved);
+  // For grant requests `narrowed` lets the user approve fewer tiers than were asked; extras are ignored.
+  bool confirm(std::uint64_t operation, bool approved, const std::optional<std::set<Tier>>& narrowed = std::nullopt);
   void expire();  // denies confirmations past their deadline
   std::size_t pending() const { return pending_.size(); }
 
@@ -55,9 +61,12 @@ private:
     bool tainted;
     Done done;
     std::chrono::steady_clock::time_point deadline;
+    bool isGrant = false;
+    std::set<Tier> requested;  // grant requests only
   };
 
   void run(const Request& request, Tier tier, bool tainted, Done done);
+  void grant(const Pending& entry, const std::optional<std::set<Tier>>& narrowed);
   void finish(const Request& request, Tier tier, bool tainted, const std::string& decision, const std::string& outcome);
   static std::string denial(const std::string& reason);
 

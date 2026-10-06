@@ -40,6 +40,16 @@ Served by `helix-service` (D-Bus activated, runs without the shell). One interfa
   its own request: the confirmer is a different bus connection by construction.
 - **Manager.** Settings registers as manager to read and edit grants and read the audit log.
 
+### First-use consent
+
+A client with no grants calls `RequestAccess(tiers)`. The service sends the confirmer a request of kind
+`grant` naming the client (label and verified identity) and the tiers asked for. The user can approve fewer
+tiers than requested; `blocked` is never offered. The grant is written to
+`~/.local/state/helix/agent-grants.json` (mode 0600) and applied only if the write succeeds. Tiers a client
+already holds complete immediately without a dialog. Revoking a client or editing its tiers later is the
+manager role's job (Settings). A request with no confirmer present is denied, so a headless session cannot
+grant itself access.
+
 ### Tiers and flow
 
 `observe`, `observe-private`, `act`, `confirm`, `blocked` as in `msg-risk.toml`. Grants are per client and
