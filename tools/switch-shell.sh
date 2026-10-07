@@ -18,31 +18,28 @@ case "${1:-status}" in
     # Doubled because the next sed would read \x20 in its replacement as a space again.
     escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
     sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-tauri.service.in" > "$UNITS/helix-shell-tauri.service"
-    if ! grep -q 'helix-panel' "$NIRI"; then
-      cp -p "$NIRI" "$NIRI.bak-helix-$(date +%Y%m%d-%H%M%S)"
-      python3 - "$NIRI" <<'PY'
-import sys
-path = sys.argv[1]
-text = open(path).read()
-P = '"/home/' + __import__('os').environ.get('USER', '') + '/.local/bin/helix-panel"'
-swaps = {
-  'spawn "noctalia" "msg" "panel-toggle" "launcher"': f'spawn {P} "launcher"',
-  'spawn "noctalia" "msg" "panel-toggle" "control-center"': f'spawn {P} "control-center"',
-  'spawn "noctalia" "msg" "settings-toggle"': f'spawn {P} "settings"',
-  'spawn "noctalia" "msg" "window-switcher"': f'spawn {P} "window-switcher"',
-  'spawn "noctalia" "msg" "volume-up"': f'spawn {P} "volume-up"',
-  'spawn "noctalia" "msg" "volume-down"': f'spawn {P} "volume-down"',
-  'spawn "noctalia" "msg" "volume-mute"': f'spawn {P} "volume-mute"',
-  'spawn "noctalia" "msg" "mic-mute"': f'spawn {P} "mic-mute"',
-  'spawn "noctalia" "msg" "brightness-up"': f'spawn {P} "brightness-up"',
-  'spawn "noctalia" "msg" "brightness-down"': f'spawn {P} "brightness-down"',
-}
-for old, new in swaps.items():
-    text = text.replace(old, new)
-open(path, 'w').write(text)
+    # Idempotent: only binds still pointing at the native shell are changed, and each file is backed up before its first change.
+    python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/noctalia-setup.kdl" <<'PY'
+import os, shutil, sys, time
+panel = '"' + os.path.expanduser('~/.local/bin/helix-panel') + '"'
+names = {"panel-toggle launcher": "launcher", "panel-toggle control-center": "control-center", "settings-toggle": "settings",
+         "window-switcher": "window-switcher", "volume-up": "volume-up", "volume-down": "volume-down", "volume-mute": "volume-mute",
+         "mic-mute": "mic-mute", "brightness-up": "brightness-up", "brightness-down": "brightness-down",
+         "session lock": "lock", "session lid-close": "lid-close"}
+swaps = {}
+for native, name in names.items():
+    old = "spawn " + " ".join('"%s"' % word for word in ["noctalia", "msg"] + native.split())
+    swaps[old] = "spawn %s \"%s\"" % (panel, name)
+for path in sys.argv[1:]:
+    text = open(path).read()
+    new = text
+    for old, replacement in swaps.items():
+        new = new.replace(old, replacement)
+    if new != text:
+        shutil.copy2(path, "%s.bak-helix-%s" % (path, time.strftime("%Y%m%d-%H%M%S")))
+        open(path, "w").write(new)
+        print("key binds changed in", path)
 PY
-      echo "key binds now go through helix-panel (backup: $NIRI.bak-helix-*)"
-    fi
     systemctl --user daemon-reload
     systemctl --user stop helix-shell-tauri-trial.service 2>/dev/null || true
     systemctl --user disable helix-shell-dev.service 2>/dev/null || true

@@ -409,7 +409,11 @@ the Agents panel is live. Key binds call `~/.local/bin/helix-panel`, which drive
 When the service restarts its roles are gone, so the shell follows the name's owner (a signal) and claims them again; the nested
 test restarts the service and checks an approval dialog still works afterwards (and fails without the re-registration).
 
-Not available under this shell until ported: lock screen, notifications, wallpaper, clipboard history, the tray, workspaces in the bar,
+Locking uses `swaylock` through `helix-panel lock` (and on lid close): it speaks ext-session-lock-v1, which niri enforces even if the locker dies, and authenticates with PAM.
+`tools/nested/lock-test.sh` checks in a nested compositor that the bind takes the lock and a wrong password does not release it. Its duplicate-locker
+guard in `helix-panel` is belt and braces: swaylock refuses a second lock itself (removing the guard did not fail the test). There is no idle lock yet (no swayidle).
+
+Not available under this shell until ported: notifications, wallpaper, clipboard history, the tray, workspaces in the bar,
 and the on-screen display for volume and brightness (the keys still work through wpctl and brightnessctl).
 
 Gotcha: a unit's `ExecStart` needs `\x20` for a space, and a `sed` replacement turns `\x20` back into a space, so it is doubled.
