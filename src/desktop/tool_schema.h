@@ -4,7 +4,13 @@
 #include "desktop/agent_policy.h"
 
 #include <nlohmann/json.hpp>
+#include <expected>
+#include <filesystem>
+#include <map>
 #include <set>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace helix::agent {
 
@@ -23,6 +29,20 @@ namespace helix::agent {
 // `includeDecline` adds a `decline` tool ({"tool":"decline","args":[],"reason":"<why>"}, reason required). A grammar that
 // forces a call leaves a model no way to say "none of these fit", so a request nothing can satisfy would be answered with
 // a nearby tool. `decline` is not a desktop command: whoever receives it must not forward it, only show the reason.
+// protocols/ipc/tool-hints.toml: a person's-words one-liner per tool that replaces the command's own `--help` summary in
+// the catalog, so near-neighbours (sound vs screen brightness, desktop state vs AI state) are told apart. Descriptions
+// only: they never affect what a tool may do.
+class ToolHints {
+public:
+  static std::expected<ToolHints, std::string> parse(std::string_view toml);
+  static std::expected<ToolHints, std::string> load(const std::filesystem::path& file);
+  const std::string* find(std::string_view command) const;
+  std::vector<std::string> commands() const;
+
+private:
+  std::map<std::string, std::string, std::less<>> hints_;
+};
+
 inline constexpr const char* kDeclineTool = "decline";
 nlohmann::json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
                               const std::set<std::string>* onlyTools = nullptr, bool includeDecline = false);
@@ -32,6 +52,6 @@ nlohmann::json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskP
 //   media <action: next|previous|toggle|...> - Control active media playback
 // Only tools toolCallSchema offers for `tiers` are listed, so the prompt and the grammar always agree.
 std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
-                        const std::set<std::string>* onlyTools = nullptr, bool includeDecline = false);
+                        const std::set<std::string>* onlyTools = nullptr, bool includeDecline = false, const ToolHints* hints = nullptr);
 
 }  // namespace helix::agent

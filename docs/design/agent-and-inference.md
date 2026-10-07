@@ -151,6 +151,44 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
   of the shared prompt, the evaluation suite, packaging the engine (it is built by hand into `third_party/`, and the
   installed binary's library path points there), and a client in the assistant that uses it.
 
+## Implementation status: helix-assistant
+
+`helix-assistant "<request>"` (`src/assistant/`). Plain English in, one desktop action out.
+
+1. `Hello` to Agent1 to learn this client's grants. With none, it asks once (`RequestAccess observe, act`); the shell
+   shows the usual approval dialog. With no shell running it stops: a headless session cannot grant itself access.
+2. The tool list and grammar are built from the grants (`observe`, `observe-private`, `act`), the same measured
+   configuration as the evaluation (flat catalog, decline tool, 5 examples, tool hints), and sent to helix-inference.
+3. The reply is parsed strictly. `decline` is shown and never forwarded, whatever arguments came with it.
+4. Reading runs at once. Anything that changes the desktop is shown first as the tool's plain-words description plus
+   the exact call (`Step to the next power profile (power-cycle next)`), and runs only after a typed `y`. No terminal or
+   no answer means no. `--dry-run` shows the plan and stops.
+5. The call goes through Agent1 like any client's: grants, confirmations, taint and audit all still apply. Results
+   from outside sources are labelled.
+
+The plain-words description in step 4 exists because of a real result: the model answers "Restart my laptop" with
+`power-cycle next`, which sounds like a reboot and only changes the power profile. Showing the tool's name alone would
+have misled the person.
+
+Tested with scripted model replies (`assistant_integration`: first-use grant, preview, no/empty/yes answers, dry run,
+decline, blocked and invented tools, garbage reply, audit) and mutation-checked (running changes without asking, or
+skipping the ask, fails the tests). Tried live against the 7B model in an isolated session: about 0.5 s per request once
+warm, 25 s for the first request (model load and GPU kernels).
+
+Model choice: the person's `HELIX_ASSISTANT_MODEL` if installed, else the largest installed model (the 7B in the
+measurements). `helix-assistant --warm` loads it and primes its prompt cache with a background request, so the first real
+request takes about 0.7 s instead of 25 s (measured live). `assets/services/helix-assistant-warm.service.in` runs it at
+login; it is not installed or enabled by default, and the model is freed again after the idle timeout (300 s).
+
+Packaging: `meson install` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`scripts/install_engine.py`)
+and gives `helix-inference` an install rpath to it, so nothing system-wide changes and the repo's `third_party/` is
+not needed at run time. `tools/install-assistant.sh <staged tree>` installs only the model runtime, the assistant and
+`helix-service` (backing up the old one), restarts nothing, and has `--uninstall`. Installed on the development machine
+2026-10-06: the service activates under its sandbox and lists both models.
+
+Not done: the shell UI (this is a terminal client), a VRAM budget alongside other GPU users, multi-step requests, and
+`confirm`-tier tools (not offered to the model).
+
 ## Measured: model quality and speed
 
 `tests/inference_eval.cpp` runs 92 realistic requests (`tests/eval/desktop_requests.json`: 82 to act on across 10 families,
@@ -217,6 +255,29 @@ near-neighbours is which ("volume" is sound, "brightness" is the screen) in the 
 Earlier smoke test (14 requests, kept for the record): both models 14/14 valid; right tool 7/14 (1.5B) and 11/14 (7B).
 A constrained reply cut off by the token limit is an error, never returned as an answer. One unexplained slow run
 (about 6.7 minutes instead of about 20 s) did not reproduce; probably GPU contention.
+
+### Argument rules and tool hints (7B, flat, decline, 5 examples, warm cache)
+
+Two changes to what the model is shown. Neither changes what a tool may do.
+
+1. Only required arguments, enum arguments and `context` of panel/settings commands are offered. Optional free text
+   (a file path, a message) used to be offered and the model filled it with invented values. Strings are length-bounded
+   in the grammar, which also ends the runaway string reply seen once.
+2. `protocols/ipc/tool-hints.toml` replaces a command's `--help` summary with a one-line description in a person's
+   words, written for whole confusable families (sound vs screen brightness, desktop state vs AI state, panel vs history).
+
+| Set | Before | Argument rules | + hints |
+| --- | --- | --- | --- |
+| Original, exact | 90% (98% after earlier argument fix, see above) | 80/82 (98%) | 81/82 (99%) |
+| Held-out, exact | 44/52 (85%) | 46/52 (88%) | 47/52 (90%) |
+| Held-out, right tool | 48/52 | 47/52 | 49/52 (94%) |
+| Held-out, declined correctly | 3/8 | 3/8 | 3/8 |
+
+Read the held-out numbers with care: the hints were written after seeing which near-neighbours failed, so the held-out
+set is no longer fully independent. The honest claim is "about 90% exact on requests of this kind", not a precise figure.
+Declining is the weak spot and hints did not move it: 5/8 impossible requests still get a nearby tool, including
+`power-cycle next` for "Restart my laptop" and `session lock` for "Log me out". That is why the assistant client must
+show every state-changing call before running it and rely on the Agent1 tiers, never on the model refusing.
 
 ## Build order
 

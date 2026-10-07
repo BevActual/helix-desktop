@@ -1,0 +1,116 @@
+# One-line descriptions of desktop tools for the model's tool list, in the words a person uses. They replace the
+# command's own summary (written for `noctalia msg --help`) wherever a hint exists. They exist to tell near-neighbours
+# apart: sound from screen brightness, the desktop's state from the AI assistant's state, a panel from a list of past items.
+# Hints are descriptions, not policy: what a tool may do is decided by msg-risk.toml. tests/msg_risk_policy_test.py checks
+# that every key is a real command.
+
+[hints]
+# Sound (speakers) and microphone
+volume-up = "Make the speakers louder (sound volume)"
+volume-down = "Make the speakers quieter (sound volume)"
+volume-mute = "Mute or unmute the speakers (sound)"
+volume-set = "Set the speaker volume to a percentage (sound)"
+volume-osd = "Show the volume indicator on screen without changing the volume"
+mic-volume-up = "Raise the microphone input level"
+mic-volume-down = "Lower the microphone input level"
+mic-volume-set = "Set the microphone input level to a percentage"
+mic-volume-osd = "Show the microphone level indicator without changing it"
+media = "Control the music or video player: play, pause, next, previous, stop"
+
+# Screen and lighting
+brightness-up = "Make the screen brighter (display brightness, not sound)"
+brightness-down = "Make the screen dimmer (display brightness, not sound)"
+brightness-set = "Set the screen brightness to a percentage"
+brightness-osd = "Show the brightness indicator on screen without changing it"
+brightness-list-backlight-devices = "Technical: list the screen backlight devices"
+keyboard-backlight-up = "Make the keyboard lighting brighter"
+keyboard-backlight-down = "Make the keyboard lighting dimmer"
+keyboard-backlight-set = "Set the keyboard lighting to a percentage"
+keyboard-backlight-toggle = "Turn the keyboard lighting on or off"
+keyboard-backlight-osd = "Show the keyboard lighting indicator without changing it"
+nightlight-enable = "Turn on the night light (warmer, blue-light-filtered colors)"
+nightlight-disable = "Turn off the night light"
+nightlight-toggle = "Switch the night light schedule on or off"
+nightlight-force-toggle = "Force the night light on now, ignoring its schedule"
+dpms-off = "Turn the monitors off (screen sleep)"
+dpms-on = "Wake the monitors up"
+
+# Appearance
+theme-mode-set = "Switch the whole desktop between dark and light appearance"
+theme-mode-toggle = "Flip the desktop between dark and light appearance"
+theme-mode-get = "Report whether the desktop is in dark or light mode"
+color-scheme-get = "Report which color palette is in use"
+color-scheme-set = "Choose a different color palette"
+wallpaper-next = "Change the background: switch to the next wallpaper"
+wallpaper-previous = "Go back to the previous wallpaper (the earlier background)"
+wallpaper-random = "Change the background to a random wallpaper from the library"
+wallpaper-get = "Report which wallpaper file is set now"
+wallpaper-set = "Set one specific image file as the wallpaper (needs a file path; to just change it use next or random)"
+
+# Shell surfaces
+panel-open = "Open a panel by id: control-center (quick settings), launcher (app launcher), clipboard (clipboard history); optional context"
+panel-toggle = "Open or close a panel by id: control-center, launcher, clipboard; optional context"
+panel-close = "Close the panel that is open"
+settings-open = "Open the settings, optionally at a section"
+settings-toggle = "Open or close the settings"
+settings-close = "Close the settings"
+window-switcher = "Show the window switcher (alt-tab style)"
+bar-show = "Show the top bar"
+bar-hide = "Hide the top bar"
+bar-toggle = "Show the top bar if hidden, hide it if shown"
+bar-auto-hide-set = "Make the top bar hide itself when not in use (on, off or smart)"
+dock-show = "Show the dock (the app strip)"
+dock-hide = "Hide the dock (the app strip)"
+dock-toggle = "Show the dock if hidden, hide it if shown"
+desktop-widgets-show = "Show the desktop widgets that sit on the wallpaper"
+desktop-widgets-hide = "Hide the desktop widgets that sit on the wallpaper"
+desktop-widgets-toggle = "Show or hide the desktop widgets"
+desktop-widgets-edit = "Open the editor to rearrange the desktop widgets"
+osd-enable = "Turn on the on-screen popups for volume and brightness"
+osd-disable = "Turn off the on-screen popups for volume and brightness"
+osd-toggle = "Turn the on-screen popups on or off"
+keyboard-layout-cycle = "Switch to the next keyboard language layout"
+workspace-switch = "Go to the next or previous workspace"
+taskbar-cycle = "Move to the next or previous task in the taskbar"
+
+# Notifications and clipboard
+notification-history = "Show the list of past notifications (what I missed)"
+notification-clear-active = "Dismiss the notification popups currently on screen"
+notification-dnd-set = "Turn Do Not Disturb on or off (silences notification popups)"
+notification-dnd-toggle = "Flip Do Not Disturb"
+notification-dnd-status = "Report whether Do Not Disturb is on"
+notification-show = "Show a custom notification with a title and a message"
+clipboard-text = "Read what is on the clipboard right now (the last text copied)"
+
+# Reports: each says what it reports about, so they are not mixed up
+status = "Report the state of the desktop shell: is the bar visible, is a panel open, is the screen locked"
+desktop-ai-status = "Report the state of the local AI features (not the desktop)"
+ai-usage-status = "Report AI usage and the local AI models"
+bluetooth-status = "Report whether Bluetooth is on and what is connected"
+wifi-status = "Report the Wi-Fi connection"
+tailscale-status = "Report the Tailscale VPN connection"
+firewall-status = "Report whether the firewall is running"
+phone-status = "Report whether the phone is connected (KDE Connect)"
+privacy-status = "Report whether the camera, microphone or screen is being used or recorded, and the location setting"
+cast-status = "Report whether the screen is being shared or cast"
+localsend-status = "Report nearby file-sharing (LocalSend) devices"
+printers-status = "Report the printers and the default printer"
+syncthing-status = "Report the Syncthing file synchronisation"
+
+# Capture
+screenshot-fullscreen = "Take a screenshot of the whole screen or a monitor"
+screenshot-region = "Take a screenshot of an area the user selects"
+screenshot-ocr = "Select an area of the screen and copy the text recognised in it"
+screenshot-scan-qr = "Select an area of the screen and read the QR code or barcode in it"
+screenshot-pick-color = "Pick a color from the screen"
+screenshot-annotate = "Take a screenshot and draw on it"
+annotate = "Draw on the screen"
+desktop-capture = "Capture the desktop as an image for the assistant to look at"
+
+# Power and session
+power-set = "Set the power profile: performance, balanced or power-saver (does not shut down or restart)"
+power-cycle = "Step to the next power profile"
+session = "Lock the screen"
+caffeine-enable = "Keep the screen awake (stop it sleeping when idle)"
+caffeine-disable = "Let the screen sleep when idle again"
+caffeine-toggle = "Switch keeping the screen awake on or off"

@@ -92,6 +92,17 @@ int main(int argc, char** argv) {
   TEST_CHECK(valid(everyday, call("color-scheme-set", {"builtin", "Nord"})));
   TEST_CHECK(!valid(everyday, call("color-scheme-set", {"bogus", "Nord"})));
 
+  // Optional free-text arguments are not offered, so nothing can be copied into them as a placeholder; enums and the
+  // panel/settings `context` stay.
+  TEST_CHECK(valid(everyday, call("bar-hide")) && !valid(everyday, call("bar-hide", {"top"})));
+  TEST_CHECK(valid(everyday, call("wallpaper-next")) && !valid(everyday, call("wallpaper-next", {"eDP-1"})));
+  TEST_CHECK(valid(everyday, call("brightness-set", {"60"})) && !valid(everyday, call("brightness-set", {"", "60"})));
+  TEST_CHECK(!valid(everyday, call("brightness-set", {"eDP-1", "60"})) && !valid(everyday, call("brightness-set")));
+  TEST_CHECK(valid(everyday, call("wallpaper-set", {"/home/me/a.png"})) && !valid(everyday, call("wallpaper-set", {"eDP-1", "/a.png"})));
+  TEST_CHECK(valid(everyday, call("settings-open")) && valid(everyday, call("settings-open", {"network"})));
+  TEST_CHECK(valid(everyday, call("panel-open", {"control-center", "firewall"})));
+  TEST_CHECK(valid(everyday, call("screenshot-fullscreen", {"all"})) && valid(everyday, call("screenshot-fullscreen")));  // an enum stays optional
+
   // The decline option: only when asked for, reason required, and it takes no arguments.
   TEST_CHECK(!offers(everyday, "decline"));
   const auto withDecline = toolCallSchema(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act}, nullptr, true);
@@ -110,6 +121,19 @@ int main(int argc, char** argv) {
   TEST_CHECK(catalog.find("- session <action: lock>") != std::string::npos && catalog.find("reboot") == std::string::npos);
   TEST_CHECK(catalog.find("- app-launch") == std::string::npos && catalog.find("- window-close") == std::string::npos);
   TEST_CHECK(catalog.find("- panel-open <id> [context]") != std::string::npos);
+  TEST_CHECK(catalog.find("- brightness-set <value>") != std::string::npos && catalog.find("[target]") == std::string::npos);
+  TEST_CHECK(catalog.find("- bar-hide -") != std::string::npos);
+
+  // Hints replace the summary where they exist and change nothing else.
+  const auto hints = ToolHints::parse("[hints]\nbrightness-up = \"Make the screen brighter (not sound)\"\n");
+  TEST_CHECK(hints.has_value());
+  const std::string hinted = toolCatalog(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act}, nullptr, false, &*hints);
+  TEST_CHECK(hinted.find("- brightness-up - Make the screen brighter (not sound)\n") != std::string::npos);
+  TEST_CHECK(hinted.find("- bar-hide -") != std::string::npos);  // no hint: its own summary stays
+  TEST_CHECK(!ToolHints::parse("[hints]\nx = \"\"\n").has_value() && !ToolHints::parse("nothing = 1").has_value());
+  // A hint never adds a tool the policy does not offer.
+  const auto sneaky = ToolHints::parse("[hints]\nsession = \"anything\"\nwindow-close = \"Close the window\"\n");
+  TEST_CHECK(toolCatalog(root, *policy, {Tier::Observe}, nullptr, false, &*sneaky).find("window-close") == std::string::npos);
   std::size_t lines = 0;
   for (const char ch : catalog) lines += ch == '\n' ? 1 : 0;
   TEST_CHECK(lines == everyday.at("oneOf").size());

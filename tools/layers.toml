@@ -21,5 +21,5 @@ display = ["render", "ui"]
 shell = ["shell", "launcher", "capture", "app"]
 
 [independent]
-modules = ["desktop", "apps", "inference"]
+modules = ["desktop", "apps", "inference", "assistant"]
 may_include = ["base", "platform", "independent"]

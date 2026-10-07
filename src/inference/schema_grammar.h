@@ -12,8 +12,9 @@ namespace helix::inference {
 //
 // The output is compact JSON in a fixed key order: {"tool":"<name>","args":[...]} with an optional ,"reason":"<text>".
 // Free-text arguments must be non-empty: an empty string is never a meaningful value for a command.
-// String length limits in the schema are not expressed in the grammar (the generation token limit bounds them); the
-// service validates the finished reply against the schema regardless.
+// Strings are bounded in the grammar (free-text arguments 1 to 120 characters, a reason up to 200) so that a model that
+// gets stuck inside one cannot run on until the token limit; the service validates the finished reply against the schema
+// regardless.
 struct GrammarOptions {
   // Emit {"reason": ..., "tool": ..., "args": ...} instead of {"tool": ..., "args": ..., "reason": ...}. A reason written
   // before the tool can act as a short chain of thought; written after, it can only explain a choice already made. The

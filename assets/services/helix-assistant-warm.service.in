@@ -1,0 +1,9 @@
+[Unit]
+Description=Load the Helix assistant's model so the first request is fast
+After=helix-service.service
+# Optional: the assistant works without it, the first request is just slower (about 25 s on the development machine).
+
+[Service]
+Type=oneshot
+ExecStart=@HELIX_BINDIR@/helix-assistant --warm
+TimeoutStartSec=300

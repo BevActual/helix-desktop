@@ -28,3 +28,9 @@ for key, tier in policy.get("choices", {}).items():
 
 # A command that can power off, reboot or end the session must never be agent-reachable by default.
 assert tiers["session"] == "blocked"
+
+# Tool hints describe real commands, say something, and are not mistaken for policy.
+hints = tomllib.loads((root / "protocols/ipc/tool-hints.toml").read_text())["hints"]
+unknown = sorted(set(hints) - set(commands))
+assert not unknown, f"tool hints for commands that do not exist: {unknown}"
+assert all(isinstance(v, str) and 8 <= len(v) <= 140 for v in hints.values()), "hints must be 8-140 character strings"

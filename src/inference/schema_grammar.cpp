@@ -99,8 +99,8 @@ std::string grammarFromToolSchema(const json& schema, const GrammarOptions& opti
   return "root ::= call\n"
          "call ::= " + calls + "\n" + rules +
          "reason ::= (ws \",\" ws \"\\\"reason\\\"\" ws \":\" ws str)?\n"
-         "str ::= \"\\\"\" char* \"\\\"\"\n"
-         "str-nonempty ::= \"\\\"\" char+ \"\\\"\"\n"
+         "str ::= \"\\\"\" char{0,200} \"\\\"\"\n"
+         "str-nonempty ::= \"\\\"\" char{1,120} \"\\\"\"\n"
          "reason-short ::= \"\\\"\" char{1,160} \"\\\"\"\n"
          "char ::= [^\"\\\\\\x7F\\x00-\\x1F] | \"\\\\\" ([\"\\\\/bfnrt] | \"u\" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])\n"
          "ws ::= [ ]?\n";

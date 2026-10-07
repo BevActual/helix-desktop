@@ -1,0 +1,825 @@
+{
+ "version": 1,
+ "examples": [
+  {
+   "request": "Set the log level to debug.",
+   "call": {
+    "tool": "log-level-set",
+    "args": [
+     "debug"
+    ]
+   }
+  },
+  {
+   "request": "Make the bar hide itself unless I move the mouse to the edge.",
+   "call": {
+    "tool": "bar-auto-hide-set",
+    "args": [
+     "smart"
+    ]
+   }
+  },
+  {
+   "request": "Reload the configuration.",
+   "call": {
+    "tool": "config-reload",
+    "args": []
+   }
+  },
+  {
+   "request": "Turn the on-screen popups off.",
+   "call": {
+    "tool": "osd-disable",
+    "args": []
+   }
+  },
+  {
+   "request": "Set the output audio profile to Music.",
+   "call": {
+    "tool": "effects-profile-set",
+    "args": [
+     "output",
+     "Music"
+    ]
+   }
+  },
+  {
+   "request": "Order me a pizza.",
+   "call": {
+    "tool": "decline",
+    "args": [],
+    "reason": "I can only control this desktop; I cannot order food."
+   }
+  }
+ ],
+ "cases": [
+  {
+   "category": "audio",
+   "request": "Crank up the sound.",
+   "accept": [
+    {
+     "tool": "volume-up",
+     "args": []
+    }
+   ],
+   "id": 1
+  },
+  {
+   "category": "audio",
+   "request": "It's too loud, bring it down.",
+   "accept": [
+    {
+     "tool": "volume-down",
+     "args": []
+    }
+   ],
+   "id": 2
+  },
+  {
+   "category": "audio",
+   "request": "Silence the speakers.",
+   "accept": [
+    {
+     "tool": "volume-mute",
+     "args": []
+    }
+   ],
+   "id": 3
+  },
+  {
+   "category": "audio",
+   "request": "Put the volume at 20.",
+   "accept": [
+    {
+     "tool": "volume-set",
+     "args": [
+      "20"
+     ]
+    },
+    {
+     "tool": "volume-set",
+     "args": [
+      "20%"
+     ]
+    }
+   ],
+   "id": 4
+  },
+  {
+   "category": "audio",
+   "request": "Raise my mic level.",
+   "accept": [
+    {
+     "tool": "mic-volume-up",
+     "args": []
+    }
+   ],
+   "id": 5
+  },
+  {
+   "category": "audio",
+   "request": "Quiet the microphone a little.",
+   "accept": [
+    {
+     "tool": "mic-volume-down",
+     "args": []
+    }
+   ],
+   "id": 6
+  },
+  {
+   "category": "media",
+   "request": "Resume playback.",
+   "accept": [
+    {
+     "tool": "media",
+     "args": [
+      "play"
+     ]
+    },
+    {
+     "tool": "media",
+     "args": [
+      "toggle"
+     ]
+    }
+   ],
+   "id": 7
+  },
+  {
+   "category": "media",
+   "request": "Next track please.",
+   "accept": [
+    {
+     "tool": "media",
+     "args": [
+      "next"
+     ]
+    }
+   ],
+   "id": 8
+  },
+  {
+   "category": "media",
+   "request": "Back one song.",
+   "accept": [
+    {
+     "tool": "media",
+     "args": [
+      "previous"
+     ]
+    }
+   ],
+   "id": 9
+  },
+  {
+   "category": "media",
+   "request": "Pause.",
+   "accept": [
+    {
+     "tool": "media",
+     "args": [
+      "pause"
+     ]
+    },
+    {
+     "tool": "media",
+     "args": [
+      "toggle"
+     ]
+    }
+   ],
+   "id": 10
+  },
+  {
+   "category": "display",
+   "request": "It's too dark, brighten the display.",
+   "accept": [
+    {
+     "tool": "brightness-up",
+     "args": []
+    }
+   ],
+   "id": 11
+  },
+  {
+   "category": "display",
+   "request": "Lower the screen brightness.",
+   "accept": [
+    {
+     "tool": "brightness-down",
+     "args": []
+    }
+   ],
+   "id": 12
+  },
+  {
+   "category": "display",
+   "request": "Brightness 80.",
+   "accept": [
+    {
+     "tool": "brightness-set",
+     "args": [
+      "80"
+     ]
+    },
+    {
+     "tool": "brightness-set",
+     "args": [
+      "80%"
+     ]
+    }
+   ],
+   "id": 13
+  },
+  {
+   "category": "display",
+   "request": "Enable the blue light filter.",
+   "accept": [
+    {
+     "tool": "nightlight-enable",
+     "args": []
+    },
+    {
+     "tool": "nightlight-toggle",
+     "args": []
+    }
+   ],
+   "id": 14
+  },
+  {
+   "category": "display",
+   "request": "Switch off the screens.",
+   "accept": [
+    {
+     "tool": "dpms-off",
+     "args": []
+    }
+   ],
+   "id": 15
+  },
+  {
+   "category": "display",
+   "request": "Dim the keyboard lighting.",
+   "accept": [
+    {
+     "tool": "keyboard-backlight-down",
+     "args": []
+    }
+   ],
+   "id": 16
+  },
+  {
+   "category": "shell",
+   "request": "Get rid of the dock.",
+   "accept": [
+    {
+     "tool": "dock-hide",
+     "args": []
+    },
+    {
+     "tool": "dock-toggle",
+     "args": []
+    }
+   ],
+   "id": 17
+  },
+  {
+   "category": "shell",
+   "request": "Bring the dock back.",
+   "accept": [
+    {
+     "tool": "dock-show",
+     "args": []
+    },
+    {
+     "tool": "dock-toggle",
+     "args": []
+    }
+   ],
+   "id": 18
+  },
+  {
+   "category": "shell",
+   "request": "Flip the dock visibility.",
+   "accept": [
+    {
+     "tool": "dock-toggle",
+     "args": []
+    }
+   ],
+   "id": 19
+  },
+  {
+   "category": "shell",
+   "request": "Make the top bar disappear.",
+   "accept": [
+    {
+     "tool": "bar-hide",
+     "args": []
+    },
+    {
+     "tool": "bar-toggle",
+     "args": []
+    }
+   ],
+   "id": 20
+  },
+  {
+   "category": "shell",
+   "request": "Reveal the bar.",
+   "accept": [
+    {
+     "tool": "bar-show",
+     "args": []
+    },
+    {
+     "tool": "bar-toggle",
+     "args": []
+    }
+   ],
+   "id": 21
+  },
+  {
+   "category": "shell",
+   "request": "Open quick settings.",
+   "accept": [
+    {
+     "tool": "panel-open",
+     "args": [
+      "control-center"
+     ]
+    },
+    {
+     "tool": "panel-toggle",
+     "args": [
+      "control-center"
+     ]
+    },
+    {
+     "tool": "settings-open",
+     "args": null
+    }
+   ],
+   "id": 22
+  },
+  {
+   "category": "shell",
+   "request": "Pull up the app launcher.",
+   "accept": [
+    {
+     "tool": "panel-open",
+     "args": [
+      "launcher"
+     ]
+    },
+    {
+     "tool": "panel-toggle",
+     "args": [
+      "launcher"
+     ]
+    }
+   ],
+   "id": 23
+  },
+  {
+   "category": "shell",
+   "request": "Dismiss the open panel.",
+   "accept": [
+    {
+     "tool": "panel-close",
+     "args": []
+    }
+   ],
+   "id": 24
+  },
+  {
+   "category": "shell",
+   "request": "Open preferences.",
+   "accept": [
+    {
+     "tool": "settings-open",
+     "args": null
+    },
+    {
+     "tool": "panel-open",
+     "args": [
+      "control-center"
+     ]
+    }
+   ],
+   "id": 25
+  },
+  {
+   "category": "shell",
+   "request": "Turn off the on-screen popups.",
+   "accept": [
+    {
+     "tool": "osd-disable",
+     "args": []
+    },
+    {
+     "tool": "osd-toggle",
+     "args": []
+    }
+   ],
+   "id": 26
+  },
+  {
+   "category": "appearance",
+   "request": "I want a dark theme.",
+   "accept": [
+    {
+     "tool": "theme-mode-set",
+     "args": [
+      "dark"
+     ]
+    }
+   ],
+   "id": 27
+  },
+  {
+   "category": "appearance",
+   "request": "Make everything bright.",
+   "accept": [
+    {
+     "tool": "theme-mode-set",
+     "args": [
+      "light"
+     ]
+    }
+   ],
+   "id": 28
+  },
+  {
+   "category": "appearance",
+   "request": "Change the wallpaper.",
+   "accept": [
+    {
+     "tool": "wallpaper-next",
+     "args": []
+    },
+    {
+     "tool": "wallpaper-random",
+     "args": []
+    }
+   ],
+   "id": 29
+  },
+  {
+   "category": "appearance",
+   "request": "Show me the previous background.",
+   "accept": [
+    {
+     "tool": "wallpaper-previous",
+     "args": []
+    }
+   ],
+   "id": 30
+  },
+  {
+   "category": "appearance",
+   "request": "Which wallpaper is set right now?",
+   "accept": [
+    {
+     "tool": "wallpaper-get",
+     "args": []
+    }
+   ],
+   "id": 31
+  },
+  {
+   "category": "windows",
+   "request": "Cycle my keyboard layout.",
+   "accept": [
+    {
+     "tool": "keyboard-layout-cycle",
+     "args": []
+    }
+   ],
+   "id": 32
+  },
+  {
+   "category": "notifications",
+   "request": "Don't disturb me.",
+   "accept": [
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "on"
+     ]
+    },
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "true"
+     ]
+    },
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "1"
+     ]
+    }
+   ],
+   "id": 33
+  },
+  {
+   "category": "notifications",
+   "request": "You can disturb me again.",
+   "accept": [
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "off"
+     ]
+    },
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "false"
+     ]
+    },
+    {
+     "tool": "notification-dnd-set",
+     "args": [
+      "0"
+     ]
+    }
+   ],
+   "id": 34
+  },
+  {
+   "category": "notifications",
+   "request": "Dismiss all the popups.",
+   "accept": [
+    {
+     "tool": "notification-clear-active",
+     "args": []
+    }
+   ],
+   "id": 35
+  },
+  {
+   "category": "notifications",
+   "request": "What notifications did I miss?",
+   "accept": [
+    {
+     "tool": "notification-history",
+     "args": []
+    }
+   ],
+   "id": 36
+  },
+  {
+   "category": "system",
+   "request": "Lock my computer.",
+   "accept": [
+    {
+     "tool": "session",
+     "args": [
+      "lock"
+     ]
+    }
+   ],
+   "id": 37
+  },
+  {
+   "category": "system",
+   "request": "Battery saver mode.",
+   "accept": [
+    {
+     "tool": "power-set",
+     "args": [
+      "power-saver"
+     ]
+    }
+   ],
+   "id": 38
+  },
+  {
+   "category": "system",
+   "request": "Maximum performance, please.",
+   "accept": [
+    {
+     "tool": "power-set",
+     "args": [
+      "performance"
+     ]
+    }
+   ],
+   "id": 39
+  },
+  {
+   "category": "system",
+   "request": "Prevent the screen from sleeping.",
+   "accept": [
+    {
+     "tool": "caffeine-enable",
+     "args": []
+    },
+    {
+     "tool": "caffeine-toggle",
+     "args": []
+    }
+   ],
+   "id": 40
+  },
+  {
+   "category": "status",
+   "request": "Is Bluetooth enabled?",
+   "accept": [
+    {
+     "tool": "bluetooth-status",
+     "args": []
+    }
+   ],
+   "id": 41
+  },
+  {
+   "category": "status",
+   "request": "How is my Wi-Fi?",
+   "accept": [
+    {
+     "tool": "wifi-status",
+     "args": []
+    }
+   ],
+   "id": 42
+  },
+  {
+   "category": "status",
+   "request": "Is the VPN up?",
+   "accept": [
+    {
+     "tool": "tailscale-status",
+     "args": []
+    }
+   ],
+   "id": 43
+  },
+  {
+   "category": "status",
+   "request": "Is the firewall running?",
+   "accept": [
+    {
+     "tool": "firewall-status",
+     "args": []
+    }
+   ],
+   "id": 44
+  },
+  {
+   "category": "status",
+   "request": "Show what is in my clipboard.",
+   "accept": [
+    {
+     "tool": "clipboard-text",
+     "args": []
+    }
+   ],
+   "id": 45
+  },
+  {
+   "category": "status",
+   "request": "Give me the shell state.",
+   "accept": [
+    {
+     "tool": "status",
+     "args": []
+    }
+   ],
+   "id": 46
+  },
+  {
+   "category": "status",
+   "request": "Is a recording happening right now?",
+   "accept": [
+    {
+     "tool": "privacy-status",
+     "args": []
+    },
+    {
+     "tool": "cast-status",
+     "args": []
+    }
+   ],
+   "id": 47
+  },
+  {
+   "category": "capture",
+   "request": "Screenshot the entire screen.",
+   "accept": [
+    {
+     "tool": "screenshot-fullscreen",
+     "args": []
+    },
+    {
+     "tool": "screenshot-fullscreen",
+     "args": [
+      "all"
+     ]
+    },
+    {
+     "tool": "screenshot-fullscreen",
+     "args": [
+      "monitor"
+     ]
+    }
+   ],
+   "id": 48
+  },
+  {
+   "category": "capture",
+   "request": "Grab a region of the screen.",
+   "accept": [
+    {
+     "tool": "screenshot-region",
+     "args": []
+    }
+   ],
+   "id": 49
+  },
+  {
+   "category": "capture",
+   "request": "Read the text off my screen.",
+   "accept": [
+    {
+     "tool": "screenshot-ocr",
+     "args": []
+    }
+   ],
+   "id": 50
+  },
+  {
+   "category": "capture",
+   "request": "What color is that pixel?",
+   "accept": [
+    {
+     "tool": "screenshot-pick-color",
+     "args": []
+    }
+   ],
+   "id": 51
+  },
+  {
+   "category": "capture",
+   "request": "Scan the barcode on screen.",
+   "accept": [
+    {
+     "tool": "screenshot-scan-qr",
+     "args": []
+    }
+   ],
+   "id": 52
+  },
+  {
+   "category": "decline",
+   "request": "Restart my laptop.",
+   "expect": "decline",
+   "id": 53
+  },
+  {
+   "category": "decline",
+   "request": "Remove the file notes.txt.",
+   "expect": "decline",
+   "id": 54
+  },
+  {
+   "category": "decline",
+   "request": "Text my mom.",
+   "expect": "decline",
+   "id": 55
+  },
+  {
+   "category": "decline",
+   "request": "Launch the terminal.",
+   "expect": "decline",
+   "id": 56
+  },
+  {
+   "category": "decline",
+   "request": "Disable Bluetooth.",
+   "expect": "decline",
+   "id": 57
+  },
+  {
+   "category": "decline",
+   "request": "Log me out.",
+   "expect": "decline",
+   "id": 58
+  },
+  {
+   "category": "decline",
+   "request": "Play me a song by Queen.",
+   "expect": "decline",
+   "id": 59
+  },
+  {
+   "category": "decline",
+   "request": "Kill the Firefox process.",
+   "expect": "decline",
+   "id": 60
+  }
+ ]
+}

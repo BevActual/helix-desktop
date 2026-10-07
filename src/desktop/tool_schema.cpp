@@ -1,6 +1,13 @@
 #include "desktop/tool_schema.h"
 
+#include "core/toml.h"
+
+#include <fstream>
+#include <sstream>
+
 #include <algorithm>
+#include <utility>
+#include <vector>
 
 namespace helix::agent {
 
@@ -9,6 +16,22 @@ namespace {
 using nlohmann::json;
 
 constexpr int kMaxArgChars = 500;  // bounds free text so a model cannot run on forever
+
+// An optional free-text argument (a bar name, a monitor, a connector) is something a model copies from the signature it is
+// shown, as a placeholder, and when it precedes a required one the command's own parsing does not need it at all. So only
+// required arguments and enums are offered, plus the optional ones that are really meaningful.
+bool meaningfulOptional(const std::string& command, std::string_view positional) {
+  static const std::set<std::pair<std::string, std::string>> kept{
+    {"panel-open", "context"}, {"panel-toggle", "context"}, {"settings-open", "context"}, {"settings-toggle", "context"}};
+  return kept.contains({command, std::string(positional)});
+}
+
+std::vector<const noctalia::cli::Positional*> offeredPositionals(const noctalia::cli::Command& command) {
+  std::vector<const noctalia::cli::Positional*> out;
+  for (const auto& positional : command.positionals)
+    if (positional.required || !positional.choices.empty() || meaningfulOptional(std::string(command.name), positional.name)) out.push_back(&positional);
+  return out;
+}
 
 json stringSchema(std::span<const std::string_view> choices, const std::set<std::string>* allowed = nullptr) {
   if (choices.empty() && allowed == nullptr) return {{"type", "string"}, {"minLength", 1}, {"maxLength", kMaxArgChars}};
@@ -34,8 +57,9 @@ json callSchema(const noctalia::cli::Command& command, const std::set<std::strin
     required = 1;
     open = true;
   } else {
-    for (std::size_t i = 0; i < command.positionals.size(); ++i) {
-      const auto& positional = command.positionals[i];
+    const auto offered = offeredPositionals(command);
+    for (std::size_t i = 0; i < offered.size(); ++i) {
+      const auto& positional = *offered[i];
       prefix.push_back(stringSchema(positional.choices, i == 0 ? allowedFirst : nullptr));
       if (positional.required) required = i + 1;
       if (positional.variadic || positional.joinRemaining) open = true;
@@ -91,8 +115,45 @@ json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& pol
   };
 }
 
+std::expected<ToolHints, std::string> ToolHints::parse(std::string_view text) {
+  toml::table table;
+  try {
+    table = toml::parse(text);
+  } catch (const toml::parse_error& error) {
+    return std::unexpected(std::string("tool hints: ") + std::string(error.description()));
+  }
+  ToolHints out;
+  const auto* section = table["hints"].as_table();
+  if (!section) return std::unexpected("tool hints: missing [hints]");
+  for (const auto& [key, node] : *section) {
+    const auto value = node.value<std::string>();
+    if (!value || value->empty()) return std::unexpected("tool hints: '" + std::string(key.str()) + "' must be a non-empty string");
+    out.hints_.emplace(std::string(key.str()), *value);
+  }
+  return out;
+}
+
+std::expected<ToolHints, std::string> ToolHints::load(const std::filesystem::path& file) {
+  std::ifstream in(file);
+  if (!in) return std::unexpected("tool hints: cannot read " + file.string());
+  std::stringstream text;
+  text << in.rdbuf();
+  return parse(text.str());
+}
+
+const std::string* ToolHints::find(std::string_view command) const {
+  const auto it = hints_.find(command);
+  return it == hints_.end() ? nullptr : &it->second;
+}
+
+std::vector<std::string> ToolHints::commands() const {
+  std::vector<std::string> out;
+  for (const auto& entry : hints_) out.push_back(entry.first);
+  return out;
+}
+
 std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
-                        const std::set<std::string>* onlyTools, bool includeDecline) {
+                        const std::set<std::string>* onlyTools, bool includeDecline, const ToolHints* hints) {
   std::string out;
   for (const auto& command : msgRoot.subcommands) {
     const std::string name(command.name);
@@ -106,8 +167,9 @@ std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy&
       if (granted.empty()) continue;
     }
     out += "- " + name;
-    for (std::size_t i = 0; i < command.positionals.size(); ++i) {
-      const auto& positional = command.positionals[i];
+    const auto offered = offeredPositionals(command);
+    for (std::size_t i = 0; i < offered.size(); ++i) {
+      const auto& positional = *offered[i];
       std::string label = std::string(positional.name);
       if (i == 0 && !whole) {
         label += ": ";
@@ -123,7 +185,9 @@ std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy&
       for (const auto& sub : command.subcommands) out += (out.back() == '<' ? "" : "|") + std::string(sub.name);
       out += "> ...";
     }
-    if (!command.summary.empty()) out += " - " + std::string(command.summary);
+    const std::string* hint = hints ? hints->find(name) : nullptr;
+    if (hint) out += " - " + *hint;
+    else if (!command.summary.empty()) out += " - " + std::string(command.summary);
     out += "\n";
   }
   if (includeDecline)

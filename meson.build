@@ -1196,7 +1196,25 @@ helix_service = executable('helix-service',
   cpp_args: _noctalia_cpp_args,
   install: true,
 )
+helix_assistant_config = configuration_data()
+helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
+configure_file(input: 'assets/services/helix-assistant-warm.service.in',
+  output: 'helix-assistant-warm.service', configuration: helix_assistant_config,
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
+helix_assistant = executable('helix-assistant',
+  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+  dependencies: noctalia_core_dep,
+  cpp_args: _noctalia_cpp_args,
+  install: true,
+)
+helix_assistant_unit = executable('assistant_core_test',
+  sources: files('tests/assistant_core_test.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+  dependencies: noctalia_core_dep,
+  cpp_args: _noctalia_cpp_args,
+)
+test('assistant_core', helix_assistant_unit, args: [meson.project_source_root()])
 install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') / 'helix')
+install_data('protocols/ipc/tool-hints.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
 helix_service_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/org.helix.Desktop.service.in',
@@ -1218,9 +1236,13 @@ helix_inference = executable('helix-inference',
     + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
   dependencies: [noctalia_core_dep, dependency('threads')] + (llama_dep.found() ? [llama_dep] : []),
   build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
+  install_rpath: get_option('prefix') / 'lib64' / 'helix',  # installed: the private copy made below
   cpp_args: _noctalia_cpp_args,
   install: true,
 )
+if llama_dep.found()
+  meson.add_install_script(find_program('python3'), files('scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix')
+endif
 
 helix_inference_config = configuration_data()
 helix_inference_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
@@ -1351,9 +1373,9 @@ if build_tests
       override_options: ['b_ndebug=false'],
     )
     _model_path = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"', check: false).stdout().strip()
-    test('inference_llama', helix_llama_test, timeout: 600, args: [meson.project_source_root(), _model_path])
+    test('inference_llama', helix_llama_test, timeout: 600, is_parallel: false, args: [meson.project_source_root(), _model_path])
     _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()
-    test('inference_llama_7b', helix_llama_test, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
+    test('inference_llama_7b', helix_llama_test, is_parallel: false, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
@@ -1378,6 +1400,9 @@ if build_tests
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
       test('inference_service_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', helix_inference], timeout: 120)
+      test('assistant_integration', helix_dbus_session,
+        args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', helix_assistant, helix_service, helix_inference,
+          meson.project_source_root()], timeout: 120)
       test('desktop_agent_manager_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
           helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)

@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
     TEST_CHECK(declineRules.at("call-decline").find("reason") != std::string::npos && declineRules.at("call-decline").find(" reason ") == std::string::npos);
     TEST_CHECK(declineRules.at("call-decline").find("str-nonempty") != std::string::npos);   // a reason cannot be empty
     TEST_CHECK(declineRules.at("call-status").find("str-nonempty") == std::string::npos);
-    TEST_CHECK(declineRules.at("str-nonempty").find("char+") != std::string::npos);
+    TEST_CHECK(declineRules.at("str-nonempty").find("char{1,120}") != std::string::npos);
     TEST_CHECK(declineRules.at("call-status").find(" reason ") != std::string::npos);  // the optional rule
     for (const auto& [name, rhs] : declineRules)
       for (const auto& used : referenced(rhs)) TEST_CHECK(declineRules.contains(used));
@@ -130,6 +130,7 @@ int main(int argc, char** argv) {
     first.reasonFirst = true;
     const auto reasoned = parseRules(inference::grammarFromToolSchema(schema, first));
     TEST_CHECK(reasoned.at("reason-short").find("char{1,160}") != std::string::npos);
+    TEST_CHECK(rules.at("str-nonempty").find("char{1,120}") != std::string::npos);  // strings are bounded
     std::size_t calls = 0;
     for (const auto& [name, rhs] : reasoned) {
       for (const auto& used : referenced(rhs)) TEST_CHECK(reasoned.contains(used));

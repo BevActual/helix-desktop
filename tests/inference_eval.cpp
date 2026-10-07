@@ -12,6 +12,7 @@
 #include "inference/llama_backend.h"
 #include "tests/schema_validator.h"
 
+#include <optional>
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
@@ -28,6 +29,7 @@ using nlohmann::json;
 namespace {
 
 struct Options {
+  bool hints = true;
   std::filesystem::path root, model, cases, out;
   std::string strategy = "flat";
   bool decline = false;
@@ -51,6 +53,7 @@ int main(int argc, char** argv) {
     else if (key == "--cases") opt.cases = value;
     else if (key == "--strategy") opt.strategy = value;
     else if (key == "--decline") opt.decline = value == "1";
+    else if (key == "--hints") opt.hints = value == "1";
     else if (key == "--fewshot") opt.fewshot = std::stoi(value);
     else if (key == "--out") opt.out = value;
     else if (key == "--limit") opt.limit = std::stoi(value);
@@ -69,6 +72,13 @@ int main(int argc, char** argv) {
   if (!policy) { std::println(stderr, "{}", policy.error()); return 2; }
   const std::set<agent::Tier> tiers{agent::Tier::Observe, agent::Tier::ObservePrivate, agent::Tier::Act};
   const auto& root = noctalia::cli::kMsgCmd;
+  std::optional<agent::ToolHints> hintStore;
+  if (opt.hints) {
+    auto loaded = agent::ToolHints::load(opt.root / "protocols/ipc/tool-hints.toml");
+    if (!loaded) { std::println(stderr, "{}", loaded.error()); return 2; }
+    hintStore = std::move(*loaded);
+  }
+  const agent::ToolHints* hints = hintStore ? &*hintStore : nullptr;
   const json schema = agent::toolCallSchema(root, *policy, tiers, nullptr, opt.decline);
 
   auto backend = std::make_shared<inference::LlamaBackend>(inference::LlamaBackend::Config{.modelDir = opt.model.parent_path()});
@@ -125,7 +135,7 @@ int main(int argc, char** argv) {
     groupSystem = "You control a Linux desktop. Pick the group of tools that best fits the user's request"
                   + std::string(opt.decline ? ", or decline if none fits" : "") + ". Answer with a JSON object whose \"tool\" is the group name. Groups:\n" + catalog;
   }
-  const std::string flatCatalog = agent::toolCatalog(root, *policy, tiers, nullptr, opt.decline);
+  const std::string flatCatalog = agent::toolCatalog(root, *policy, tiers, nullptr, opt.decline, hints);
   const std::string flatSchema = schema.dump();
 
   // The first request pays for loading the model and compiling GPU kernels; it is not what a user waits for in steady state.
@@ -151,7 +161,7 @@ int main(int argc, char** argv) {
       std::set<std::string> only = shortlist;
       only.erase(agent::kDeclineTool);
       const json narrowed = agent::toolCallSchema(root, *policy, tiers, haveGroup ? &only : nullptr, opt.decline && (!haveGroup || group == agent::kDeclineTool));
-      outcome = ask(buildMessages(agent::toolCatalog(root, *policy, tiers, haveGroup ? &only : nullptr, opt.decline && (!haveGroup || group == agent::kDeclineTool)), request), narrowed.dump(), 128);
+      outcome = ask(buildMessages(agent::toolCatalog(root, *policy, tiers, haveGroup ? &only : nullptr, opt.decline && (!haveGroup || group == agent::kDeclineTool), hints), request), narrowed.dump(), 128);
     } else {
       outcome = ask(buildMessages(flatCatalog, request), flatSchema, 128);
     }
