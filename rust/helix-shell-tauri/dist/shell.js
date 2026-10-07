@@ -112,6 +112,57 @@ $("lq").addEventListener("keydown", (event) => {
     launch(selected);
   }
 });
+// Notifications. Applications write this text, so it is only ever assigned with textContent, and Rust has already reduced it to
+// plain bounded text. Toasts never take the pointer; buttons live in the shade and send an index into the list Rust offered.
+function ntext(cls, text) {
+  const element = document.createElement("div");
+  element.className = cls;
+  element.textContent = text;
+  return element;
+}
+function drawNotifications(view) {
+  const toasts = $("toasts");
+  toasts.replaceChildren();
+  view.toasts.forEach((item) => {
+    const toast = document.createElement("div");
+    toast.className = "toast" + (item.urgency === "critical" ? " critical" : "");
+    toast.append(ntext("napp", item.app), ntext("nsum", item.summary));
+    if (item.body) toast.append(ntext("nbody", item.body));
+    toasts.append(toast);
+  });
+  const list = $("notif-list");
+  list.replaceChildren();
+  view.items.forEach((item, index) => {
+    const row = document.createElement("div");
+    row.className = "nrow" + (item.urgency === "critical" ? " critical" : "") + (item.live ? "" : " stale");
+    row.append(ntext("napp", item.app), ntext("nsum", item.summary));
+    if (item.body) row.append(ntext("nbody", item.body));
+    const acts = document.createElement("div");
+    acts.className = "nacts";
+    item.actions.forEach((action, j) => {
+      acts.append(actionButton(action.label, "notif-" + index + "-action-" + j, () => invoke("notification_invoke", { id: item.id, index: j })));
+    });
+    acts.append(actionButton("Dismiss", "notif-" + index + "-dismiss", () => invoke("notification_dismiss", { id: item.id })));
+    row.append(acts);
+    list.append(row);
+  });
+  $("notif-empty").textContent = view.items.length ? "" : "No notifications.";
+  $("notif-clear").disabled = !view.items.length;
+  $("notif-dnd").textContent = view.dnd ? "Do not disturb: on" : "Do not disturb";
+  $("tile-dnd").classList.toggle("on", view.dnd);
+  $("tile-dnd").dataset.on = view.dnd ? "1" : "0";
+  $("tile-dnd-sub").textContent = view.dnd ? "On" : "Off";
+  $("notifbtn").textContent = view.unread ? "Notifications · " + view.unread : "Notifications";
+  $("notifbtn").classList.toggle("unread", view.unread > 0);
+  queueReport();
+}
+listen("notifications-view", (event) => drawNotifications(event.payload));
+invoke("notifications_view").then(drawNotifications);
+$("notifbtn").onclick = () => invoke("panel_open", { id: "notifications" });
+$("notif-clear").onclick = () => invoke("notification_clear");
+$("notif-dnd").onclick = () => invoke("notification_set_dnd", { on: $("tile-dnd").dataset.on !== "1" });
+$("tile-dnd").addEventListener("click", () => invoke("notification_set_dnd", { on: $("tile-dnd").dataset.on !== "1" }));
+
 // Agents. Rust owns the picture (everything an agent can influence is sanitized there) and builds every request; this page only
 // draws it and sends back ids it was given. Text is assigned with textContent only.
 function arow(what, sub, flag) {

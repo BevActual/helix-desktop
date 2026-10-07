@@ -181,11 +181,8 @@ impl Notifications {
     pub fn notify(&mut self, incoming: Incoming, now: u64) -> (u32, Vec<Event>) {
         let mut events = Vec::new();
         let app = sanitize_for_display(&incoming.app, 40);
-        let replaced = incoming.replaces != 0
-            && self
-                .items
-                .iter()
-                .any(|item| item.id == incoming.replaces);
+        let replaced =
+            incoming.replaces != 0 && self.items.iter().any(|item| item.id == incoming.replaces);
         let id = if replaced {
             incoming.replaces
         } else {
@@ -323,12 +320,7 @@ impl Notifications {
     pub fn next_deadline(&self) -> Option<u64> {
         self.items
             .iter()
-            .flat_map(|item| {
-                [
-                    item.live_until.filter(|_| item.live),
-                    item.toast_until,
-                ]
-            })
+            .flat_map(|item| [item.live_until.filter(|_| item.live), item.toast_until])
             .flatten()
             .min()
     }
@@ -423,7 +415,10 @@ mod tests {
     #[test]
     fn text_is_sanitized_and_markup_is_only_text() {
         let mut n = Notifications::new();
-        let mut hostile = incoming("Bank\u{202e}\nOf", "<b>Allow</b> &amp; <i>approve</i>\u{202e}");
+        let mut hostile = incoming(
+            "Bank\u{202e}\nOf",
+            "<b>Allow</b> &amp; <i>approve</i>\u{202e}",
+        );
         hostile.body = "<a href=\"x\">click</a><img src=\"y\"/> &lt;script&gt; <3".into();
         n.notify(hostile, 0);
         let row = &n.view(0).items[0];
@@ -464,20 +459,37 @@ mod tests {
     fn actions_come_from_the_stored_list_and_are_bounded() {
         let mut n = Notifications::new();
         let mut with = incoming("A", "x");
-        with.actions = ["default", "Open", "reply", "Reply", "k3", "B", "k4", "C", "k5", "D", "k6", "E", "", "empty", "odd"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect();
+        with.actions = [
+            "default", "Open", "reply", "Reply", "k3", "B", "k4", "C", "k5", "D", "k6", "E", "",
+            "empty", "odd",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
         let (id, _) = n.notify(with, 0);
         let view = n.view(0);
-        let labels: Vec<_> = view.items[0].actions.iter().map(|a| a.label.as_str()).collect();
-        assert_eq!(labels, ["Reply", "B", "C", "D"], "default has no button, at most four, empty keys dropped");
+        let labels: Vec<_> = view.items[0]
+            .actions
+            .iter()
+            .map(|a| a.label.as_str())
+            .collect();
+        assert_eq!(
+            labels,
+            ["Reply", "B", "C", "D"],
+            "default has no button, at most four, empty keys dropped"
+        );
         let events = n.invoke(id, 0).unwrap();
         assert_eq!(
             events,
             vec![
-                Event::ActionInvoked { id, key: "reply".into() },
-                Event::Closed { id, reason: CLOSED_DISMISSED }
+                Event::ActionInvoked {
+                    id,
+                    key: "reply".into()
+                },
+                Event::Closed {
+                    id,
+                    reason: CLOSED_DISMISSED
+                }
             ]
         );
         assert_eq!(n.invoke(id, 0), Err(RequestError::Unknown));
@@ -502,7 +514,13 @@ mod tests {
         let (id, _) = n.notify(with, 0);
         assert_eq!(n.next_deadline(), Some(2000));
         let events = n.expire(2500);
-        assert_eq!(events, vec![Event::Closed { id, reason: CLOSED_EXPIRED }]);
+        assert_eq!(
+            events,
+            vec![Event::Closed {
+                id,
+                reason: CLOSED_EXPIRED
+            }]
+        );
         let view = n.view(2500);
         assert_eq!(view.items.len(), 1);
         assert!(view.items[0].actions.is_empty());
@@ -520,11 +538,19 @@ mod tests {
         n.set_dnd(true);
         n.notify(incoming("Chat", "hi"), 1);
         let view = n.view(2);
-        assert_eq!(view.toasts.len(), 1, "only the critical one is shown while do-not-disturb is on");
+        assert_eq!(
+            view.toasts.len(),
+            1,
+            "only the critical one is shown while do-not-disturb is on"
+        );
         assert_eq!(view.toasts[0].app, "Power");
         assert_eq!(view.items.len(), 2, "the other is still recorded");
         let events = n.expire(1_000_000);
-        assert!(events.iter().all(|e| *e != Event::Closed { id: power, reason: CLOSED_EXPIRED }));
+        assert!(events.iter().all(|e| *e
+            != Event::Closed {
+                id: power,
+                reason: CLOSED_EXPIRED
+            }));
         assert_eq!(events.len(), 1, "the ordinary one expires");
     }
 
@@ -569,7 +595,10 @@ mod tests {
             n.notify(incoming("Spam", &format!("s{i}")), 1 + i as u64);
         }
         let view = n.view(100);
-        assert_eq!(view.items.iter().filter(|i| i.app == "Spam").count(), MAX_PER_APP);
+        assert_eq!(
+            view.items.iter().filter(|i| i.app == "Spam").count(),
+            MAX_PER_APP
+        );
         assert!(view.items.iter().any(|i| i.app == "Other"));
     }
 
@@ -604,11 +633,29 @@ mod tests {
         let (a, _) = n.notify(incoming("A", "1"), 0);
         let (b, _) = n.notify(incoming("B", "2"), 0);
         let (c, _) = n.notify(incoming("C", "3"), 0);
-        assert_eq!(n.dismiss(a).unwrap(), vec![Event::Closed { id: a, reason: CLOSED_DISMISSED }]);
+        assert_eq!(
+            n.dismiss(a).unwrap(),
+            vec![Event::Closed {
+                id: a,
+                reason: CLOSED_DISMISSED
+            }]
+        );
         assert_eq!(n.dismiss(a), Err(RequestError::Unknown));
-        assert_eq!(n.close_by_app(b), vec![Event::Closed { id: b, reason: CLOSED_BY_APP }]);
+        assert_eq!(
+            n.close_by_app(b),
+            vec![Event::Closed {
+                id: b,
+                reason: CLOSED_BY_APP
+            }]
+        );
         assert!(n.close_by_app(b).is_empty());
-        assert_eq!(n.clear(), vec![Event::Closed { id: c, reason: CLOSED_DISMISSED }]);
+        assert_eq!(
+            n.clear(),
+            vec![Event::Closed {
+                id: c,
+                reason: CLOSED_DISMISSED
+            }]
+        );
         assert!(n.view(0).items.is_empty());
     }
 
@@ -637,9 +684,16 @@ mod tests {
     fn an_empty_action_key_is_dropped_even_when_there_is_room() {
         let mut n = Notifications::new();
         let mut with = incoming("A", "x");
-        with.actions = ["", "Nothing", "k", "Real"].iter().map(|s| s.to_string()).collect();
+        with.actions = ["", "Nothing", "k", "Real"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
         n.notify(with, 0);
-        let labels: Vec<_> = n.view(0).items[0].actions.iter().map(|a| a.label.clone()).collect();
+        let labels: Vec<_> = n.view(0).items[0]
+            .actions
+            .iter()
+            .map(|a| a.label.clone())
+            .collect();
         assert_eq!(labels, ["Real"]);
     }
 
@@ -657,7 +711,14 @@ mod tests {
         let mut again = incoming("Loud", "updated");
         again.replaces = id;
         n.notify(again, 0);
-        assert_eq!(n.view(0).items.iter().filter(|i| i.summary == "updated").count(), 1);
+        assert_eq!(
+            n.view(0)
+                .items
+                .iter()
+                .filter(|i| i.summary == "updated")
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -684,7 +745,10 @@ mod tests {
         n.notify(long, 0);
         assert!(n.view(MAX_TOAST_MS + 1).toasts.is_empty());
         assert_eq!(n.view(MAX_TOAST_MS + 1).items.len(), 1);
-        assert!(n.view(MAX_TOAST_MS + 1).items[0].live, "it is still live in the shade");
+        assert!(
+            n.view(MAX_TOAST_MS + 1).items[0].live,
+            "it is still live in the shade"
+        );
     }
 
     #[test]
@@ -693,6 +757,12 @@ mod tests {
         let mut quick = incoming("A", "x");
         quick.timeout_ms = 1;
         let (id, _) = n.notify(quick, 0);
-        assert_eq!(n.expire(2), vec![Event::Closed { id, reason: CLOSED_EXPIRED }]);
+        assert_eq!(
+            n.expire(2),
+            vec![Event::Closed {
+                id,
+                reason: CLOSED_EXPIRED
+            }]
+        );
     }
 }

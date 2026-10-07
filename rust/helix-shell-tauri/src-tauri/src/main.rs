@@ -8,6 +8,7 @@ mod battery;
 mod confirmer;
 mod control;
 mod layer;
+mod notify;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -44,6 +45,8 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// What applications have posted through org.freedesktop.Notifications; see `notify`.
+    notifications: helix_shell_core::notifications::Notifications,
     /// The last AgentActivity1 reads; stop, revoke and the kill switch are built from them and nothing else.
     activity: Activity,
     /// The last settings list, for the dark-theme and night-light tiles.
@@ -184,6 +187,10 @@ fn open_panel(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
+    if id == "notifications" {
+        let reading = app.clone();
+        tauri::async_runtime::spawn(async move { notify::notifications_read(reading).await });
+    }
     if id == "agents" {
         let refreshing = app.clone();
         tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
@@ -255,6 +262,7 @@ fn control(app: &AppHandle, command: &str) {
         "launcher" => open_panel(app, "launcher"),
         "control-center" => open_panel(app, "control-center"),
         "agents" => open_panel(app, "agents"),
+        "notifications" => open_panel(app, "notifications"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
         "agent-stop-all" => {
@@ -1215,6 +1223,12 @@ fn main() {
             network_forget,
             network_vpn,
             activity_view,
+            notify::notifications_view,
+            notify::notification_dismiss,
+            notify::notification_clear,
+            notify::notification_invoke,
+            notify::notification_set_dnd,
+            notify::notifications_read,
             activity_stop,
             activity_stop_all,
             activity_revoke,
@@ -1259,6 +1273,7 @@ fn main() {
                 network: Network::default(),
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
+                notifications: helix_shell_core::notifications::Notifications::new(),
                 quick: Quick::default(),
                 icons: std::collections::HashMap::new(),
                 started,
@@ -1286,6 +1301,7 @@ fn main() {
             watch_bluetooth(handle.clone());
             watch_quick(handle.clone());
             control::serve(handle.clone());
+            notify::serve(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {
