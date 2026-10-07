@@ -1319,6 +1319,8 @@ if build_tests
     )
     _model_path = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"', check: false).stdout().strip()
     test('inference_llama', helix_llama_test, timeout: 600, args: [meson.project_source_root(), _model_path])
+    _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()
+    test('inference_llama_7b', helix_llama_test, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),

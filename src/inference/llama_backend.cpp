@@ -9,7 +9,9 @@
 #include <chrono>
 #include <cstdio>
 #include <memory>
+#include <optional>
 #include <random>
+#include <regex>
 
 namespace helix::inference {
 
@@ -64,36 +66,61 @@ LlamaBackend::LlamaBackend(Config config) : config_(std::move(config)) { initBac
 
 LlamaBackend::~LlamaBackend() { unload(); }
 
+namespace {
+
+// "name-00001-of-00003.gguf" -> {"name", 1, 3}. Only files in that exact shape are shards.
+struct Shard { std::string base; int index = 0; int total = 0; };
+std::optional<Shard> parseShard(const std::string& file) {
+  static const std::regex pattern(R"(^(.+)-(\d{5})-of-(\d{5})\.gguf$)");
+  std::smatch match;
+  if (!std::regex_match(file, match, pattern)) return std::nullopt;
+  return Shard{match[1], std::stoi(match[2]), std::stoi(match[3])};
+}
+
+}  // namespace
+
 std::vector<ModelInfo> LlamaBackend::models() {
-  std::vector<ModelInfo> out;
   std::error_code ec;
   std::string loaded;
   { std::lock_guard lock(mutex_); loaded = loaded_; }
+  struct File { std::string name; std::uint64_t bytes; };
+  std::vector<File> files;
   for (const auto& entry : fs::directory_iterator(config_.modelDir, ec)) {
     if (!entry.is_regular_file(ec) || entry.path().extension() != ".gguf") continue;
-    const std::string id = entry.path().filename().string();
-    out.push_back({id, static_cast<std::uint64_t>(entry.file_size(ec)), id == loaded});
+    files.push_back({entry.path().filename().string(), static_cast<std::uint64_t>(entry.file_size(ec))});
+  }
+  std::vector<ModelInfo> out;
+  for (const auto& file : files) {
+    const auto shard = parseShard(file.name);
+    if (!shard) { out.push_back({file.name, file.bytes, file.name == loaded}); continue; }
+    if (shard->index != 1) continue;  // a model split into shards is listed once, by its first shard (the engine finds the rest)
+    std::uint64_t total = 0;
+    int found = 0;
+    for (const auto& other : files) {
+      const auto candidate = parseShard(other.name);
+      if (candidate && candidate->base == shard->base && candidate->total == shard->total) { total += other.bytes; ++found; }
+    }
+    if (found == shard->total) out.push_back({file.name, total, file.name == loaded});  // an incomplete set is not offered
   }
   std::ranges::sort(out, {}, &ModelInfo::id);
   return out;
 }
 
 bool LlamaBackend::load(const std::string& requested, std::string& error) {
+  const auto available = models();
   std::string name = requested;
   if (name.empty()) {
-    const auto available = models();
     if (available.empty()) { error = "no models are installed in " + config_.modelDir.string(); return false; }
     name = available.front().id;
   }
   { std::lock_guard lock(mutex_); if (model_ && loaded_ == name) return true; }
-  // Only a bare file name is accepted: a client must not be able to point the loader at an arbitrary path.
-  if (name.find('/') != std::string::npos || name.find("..") != std::string::npos || !name.ends_with(".gguf")) {
-    error = "not a model name: " + name;
+  // Only a model the backend itself lists can be loaded, so a client cannot point the loader at an arbitrary path or at
+  // a stray shard.
+  if (std::ranges::none_of(available, [&](const ModelInfo& model) { return model.id == name; })) {
+    error = "no such model: " + name;
     return false;
   }
   const fs::path path = config_.modelDir / name;
-  std::error_code ec;
-  if (!fs::is_regular_file(path, ec)) { error = "no such model: " + name; return false; }
 
   unload();
   llama_model_params params = llama_model_default_params();

@@ -7,7 +7,10 @@
 #include "tests/schema_validator.h"
 #include "tests/test_check.h"
 
+#include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <unistd.h>
 #include <condition_variable>
 #include <cstdlib>
 #include <filesystem>
@@ -40,7 +43,33 @@ std::string groupOf(const std::string& tool) { return tool.substr(0, tool.find('
 
 }  // namespace
 
+// Which files count as models, and what may be loaded, without loading anything.
+void checkModelListing() {
+  namespace fs = std::filesystem;
+  const fs::path dir = fs::temp_directory_path() / ("helix-model-list-" + std::to_string(::getpid()));
+  fs::create_directories(dir);
+  auto make = [&](const std::string& name, std::size_t bytes) { std::ofstream(dir / name) << std::string(bytes, 'x'); };
+  make("small.gguf", 10);
+  make("big-00001-of-00002.gguf", 100);
+  make("big-00002-of-00002.gguf", 50);
+  make("broken-00001-of-00003.gguf", 7);       // a set with a shard missing is not offered
+  make("broken-00003-of-00003.gguf", 7);
+  make("notes.txt", 5);
+  inference::LlamaBackend backend({.modelDir = dir});
+  const auto models = backend.models();
+  TEST_CHECK(models.size() == 2);
+  TEST_CHECK(models[0].id == "big-00001-of-00002.gguf" && models[0].bytes == 150);  // listed once, with the combined size
+  TEST_CHECK(models[1].id == "small.gguf" && models[1].bytes == 10);
+  std::string error;
+  for (const char* refused : {"big-00002-of-00002.gguf", "broken-00001-of-00003.gguf", "../etc/passwd.gguf", "/etc/passwd", "notes.txt", "missing.gguf"}) {
+    TEST_CHECK(!backend.load(refused, error));
+    TEST_CHECK(error.find("no such model") != std::string::npos);
+  }
+  fs::remove_all(dir);
+}
+
 int main(int argc, char** argv) {
+  checkModelListing();
   if (argc < 3 || !std::filesystem::exists(argv[2])) { std::println(stderr, "model not found: skipping"); return 77; }
   const std::filesystem::path model = argv[2];
 
@@ -66,7 +95,8 @@ int main(int argc, char** argv) {
       });
 
   const auto models = backend->models();
-  TEST_CHECK(!models.empty() && models[0].id == model.filename().string());
+  TEST_CHECK(std::ranges::any_of(models, [&](const inference::ModelInfo& m) { return m.id == model.filename().string(); }));
+  std::println("model: {}", model.filename().string());
 
   auto ask = [&](const std::string& user, const std::string& system, const std::string& jsonSchema, std::uint32_t maxTokens) {
     inference::ChatRequest request;

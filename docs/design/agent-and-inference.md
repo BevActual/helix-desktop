@@ -128,6 +128,31 @@ to the user come from the verified identity only (`friendlyClientName`: ASCII le
 else `_`), and a self-declared label appears only as "it calls itself". Not yet checked: toggling a switch or
 pressing Remove with a pointer, and the unavailable state.
 
+## Measured: model quality and speed
+
+`tests/inference_llama_test.cpp` runs a real model through the queue, the tool-call grammar and the live command schema
+with 14 plain-English desktop requests (read-only and everyday tiers, about 120 tools). Hardware: RTX 4080 Laptop GPU,
+Vulkan, all layers offloaded. One run each, greedy decoding, so treat the figures as indicative, not as a benchmark.
+
+| | Qwen2.5-1.5B-Instruct Q4_K_M | Qwen2.5-7B-Instruct Q4_K_M |
+|---|---|---|
+| Reply is a valid tool call | 14 / 14 | 14 / 14 |
+| Right tool, one stage (about 120 tools) | 7 / 14 | **11 / 14** |
+| Right tool, two stages (group, then tool) | 8 / 14 | 11 / 14 |
+| Median time per request | about 0.95 s | about 1.45 s one stage, about 1.1 s two stages |
+| Model load plus first request | about 1 s warm-up | about 14 s |
+
+- **Validity is a guarantee, correctness is not.** The grammar makes every reply a valid call; choosing the *right* one
+  is the model's job. The 1.5B model confuses similar names ("lock the screen" became `lockscreen-widgets-toggle-edit`).
+  The 7B model's misses are mostly plausible neighbours (`settings-open` for "open the control center",
+  `desktop-ai-status` for "status").
+- **Load the model and run a throwaway request at service start**, not on the user's first request.
+- **A constrained reply cut off by the token limit is an error**, never returned as an answer.
+- **One unexplained slow run** (about 6.7 minutes instead of about 20 s for the 1.5B test) did not reproduce; it was
+  probably contention for the GPU. Timing output (`HELIX_TEST_TIMING=1`) is kept to catch it.
+- Accuracy is reported, not asserted beyond a loose floor. A proper evaluation suite (the 14 requests are a smoke test)
+  should gate changes to prompts, grammar and model choice.
+
 ## Build order
 
 1. Contracts and tests (done: drafts, contract test, `msg-risk.toml`, `schema-json`).
