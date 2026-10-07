@@ -178,6 +178,20 @@ mod tests {
                     "ConfirmationEnded",
                 ],
             ),
+            (
+                "org.helix.Desktop.AgentActivity1",
+                &[
+                    "GetActivity",
+                    "ListPending",
+                    "Stop",
+                    "StopAll",
+                    "GetGrants",
+                    "RevokeClient",
+                    "GetEnabled",
+                    "SetEnabled",
+                ],
+                &["Changed", "PendingChanged"],
+            ),
         ];
         assert_eq!(parsed.len(), catalog.len());
         for (name, methods, signals) in catalog {

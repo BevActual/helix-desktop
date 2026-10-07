@@ -2,10 +2,12 @@
 //! Agent1 **confirmer** role only (`RegisterConfirmer`, `Confirm`, the two confirmation signals).
 //! The shell must never call Hello, RequestAccess, Action on Agent1, or the manager methods.
 
+mod activity;
 mod agent;
 mod contract;
 mod json;
 
+pub use activity::{ActivityClient, ACTIVITY_METHODS, ACTIVITY_SIGNALS};
 pub use agent::{details_from_owned, ConfirmerClient, CONFIRMER_METHODS, CONFIRMER_SIGNALS};
 pub use contract::{parse_interfaces, protocol_xml, Interface, BUS_NAME, OBJECT_PATH};
 pub use json::{args_from_json, owned_to_json, to_json};
@@ -136,6 +138,10 @@ impl Desktop {
     pub async fn register_desktop(&self) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;
         proxy.call("RegisterDesktop", &()).await
+    }
+
+    pub fn activity(&self) -> ActivityClient {
+        ActivityClient::new(self.connection.clone())
     }
 
     pub fn confirmer(&self) -> ConfirmerClient {
