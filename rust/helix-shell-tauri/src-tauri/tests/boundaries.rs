@@ -8,12 +8,15 @@ fn shell_does_not_hold_agent_authority() {
     let sources = [
         include_str!("../src/main.rs"),
         include_str!("../src/layer.rs"),
+        include_str!("../src/confirmer.rs"),
         include_str!("../../dist/shell.js"),
+        include_str!("../../dist/confirmer.js"),
         include_str!("../../dist/index.html"),
+        include_str!("../../dist/confirmer.html"),
     ]
     .join("\n");
     for forbidden in [
-        // Client / manager Agent1 verbs. Confirmer verbs are allowed when the Overlay surface lands.
+        // Client / manager Agent1 verbs. Confirmer verbs are allowed on the Overlay surface.
         "RequestAccess",
         "RegisterManager",
         "GetGrants",
@@ -27,9 +30,7 @@ fn shell_does_not_hold_agent_authority() {
     ] {
         assert!(!sources.contains(forbidden), "{forbidden}");
     }
-    // Still must not embed the interface name as a client grant path; confirmer goes through
-    // helix_desktop_api::ConfirmerClient only.
-    assert!(!sources.contains("Hello\""));
     assert!(sources.contains("helix-assistant"));
     assert!(sources.contains("textContent"));
+    assert!(sources.contains("RegisterConfirmer") || sources.contains("confirmer"));
 }

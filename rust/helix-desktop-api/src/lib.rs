@@ -128,6 +128,20 @@ impl Desktop {
         })
     }
 
+    pub fn connection(&self) -> &zbus::Connection {
+        &self.connection
+    }
+
+    /// Claim the desktop role so the shell may register as Agent1 confirmer.
+    pub async fn register_desktop(&self) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        proxy.call("RegisterDesktop", &()).await
+    }
+
+    pub fn confirmer(&self) -> ConfirmerClient {
+        ConfirmerClient::new(self.connection.clone())
+    }
+
     async fn domain_proxy(&self, domain: Domain) -> zbus::Result<zbus::Proxy<'static>> {
         zbus::Proxy::new(&self.connection, BUS_NAME, OBJECT_PATH, domain.interface()).await
     }

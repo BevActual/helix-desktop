@@ -1,9 +1,11 @@
 //! The Helix shell: one layer surface hosting the bar and every panel in a single page. The assistant is a separate process
-//! (`helix-assistant`); this binary never calls Agent1 and never talks to the model. What the surface looks like in each state
-//! is decided by helix_shell_core::ShellSurface; layer.rs only applies it.
+//! (`helix-assistant`); this binary never holds Agent1 client grants and never talks to the model. It may take the Agent1
+//! confirmer role via a separate Overlay surface (`confirmer`). What the shell surface looks like in each state is decided
+//! by helix_shell_core::ShellSurface; layer.rs only applies it.
 
 mod apps;
 mod battery;
+mod confirmer;
 mod control;
 mod layer;
 
@@ -20,7 +22,9 @@ use helix_shell_core::network::{
 };
 use helix_shell_core::power::view as power_view;
 use helix_shell_core::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
-use helix_shell_core::{Confirmation, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS};
+use helix_shell_core::{
+    Confirmation, ConfirmerView, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS,
+};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -730,13 +734,80 @@ fn watch_volume(app: AppHandle) {
 #[tauri::command]
 fn ready(window: tauri::Window) {
     let label = window.label().to_string();
-    let state = shell_state(window.app_handle());
+    let app = window.app_handle().clone();
+    let state = shell_state(&app);
     let shell = state.lock().expect("shell state");
     eprintln!(
         "READY {} after {} ms",
         label,
         shell.started.elapsed().as_millis()
     );
+    drop(shell);
+    if label == layer::WINDOW {
+        if let Some(keep) = app.try_state::<Arc<Mutex<std::collections::BTreeSet<u32>>>>() {
+            *keep.lock().expect("webkit baseline") = confirmer::snapshot_webkit_web_pids();
+            eprintln!(
+                "WEBKIT bar-baseline {:?}",
+                keep.lock().expect("webkit baseline")
+            );
+        }
+    }
+}
+
+fn confirmer_host(app: &AppHandle) -> Arc<Mutex<confirmer::ConfirmerHost>> {
+    app.state::<Arc<Mutex<confirmer::ConfirmerHost>>>()
+        .inner()
+        .clone()
+}
+
+fn confirmer_keep(app: &AppHandle) -> std::collections::BTreeSet<u32> {
+    app.state::<Arc<Mutex<std::collections::BTreeSet<u32>>>>()
+        .lock()
+        .expect("webkit baseline")
+        .clone()
+}
+
+#[tauri::command]
+fn confirmer_allow(app: AppHandle) -> ConfirmerView {
+    let host = confirmer_host(&app);
+    let mut panel = host.lock().expect("confirmer");
+    let view = panel.allow();
+    let keep = confirmer_keep(&app);
+    confirmer::sync_surface(&app, &panel, &keep);
+    view
+}
+
+#[tauri::command]
+fn confirmer_deny(app: AppHandle) -> ConfirmerView {
+    let host = confirmer_host(&app);
+    let mut panel = host.lock().expect("confirmer");
+    let view = panel.deny();
+    let keep = confirmer_keep(&app);
+    confirmer::sync_surface(&app, &panel, &keep);
+    view
+}
+
+#[tauri::command]
+fn confirmer_enter(app: AppHandle) -> ConfirmerView {
+    let host = confirmer_host(&app);
+    let mut panel = host.lock().expect("confirmer");
+    panel.enter()
+}
+
+#[tauri::command]
+fn confirmer_escape(app: AppHandle) {
+    let host = confirmer_host(&app);
+    let mut panel = host.lock().expect("confirmer");
+    let _view = panel.escape();
+    let keep = confirmer_keep(&app);
+    confirmer::sync_surface(&app, &panel, &keep);
+}
+
+#[tauri::command]
+fn confirmer_set_tier(app: AppHandle, name: String, checked: bool) -> ConfirmerView {
+    let host = confirmer_host(&app);
+    let mut panel = host.lock().expect("confirmer");
+    panel.set_tier(&name, checked)
 }
 
 #[tauri::command]
@@ -938,7 +1009,12 @@ fn main() {
             quick_set_night_light,
             battery_view,
             layout_reporting,
-            report_layout
+            report_layout,
+            confirmer_allow,
+            confirmer_deny,
+            confirmer_enter,
+            confirmer_escape,
+            confirmer_set_tier
         ])
         .setup(move |app| {
             let window =
@@ -968,6 +1044,15 @@ fn main() {
             }));
             app.manage(state);
             let handle = app.handle().clone();
+
+            let (answer_tx, answer_rx) = tokio::sync::mpsc::unbounded_channel();
+            let confirmer_host = Arc::new(Mutex::new(confirmer::ConfirmerHost::new(
+                answer_tx, started,
+            )));
+            let keep_webkit = Arc::new(Mutex::new(confirmer::snapshot_webkit_web_pids()));
+            app.manage(confirmer_host.clone());
+            app.manage(keep_webkit.clone());
+            confirmer::start(handle.clone(), confirmer_host, keep_webkit, answer_rx);
 
             watch_volume(handle.clone());
             watch_audio(handle.clone());
