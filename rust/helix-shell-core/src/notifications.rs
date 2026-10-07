@@ -209,10 +209,7 @@ impl Notifications {
             (_, ms) if ms > 0 => Some(u64::try_from(ms).unwrap_or(0)),
             _ => Some(DEFAULT_TOAST_MS),
         };
-        let toast_for = live_for
-            .unwrap_or(MAX_TOAST_MS)
-            .min(MAX_TOAST_MS)
-            .max(1_000);
+        let toast_for = live_for.unwrap_or(MAX_TOAST_MS).clamp(1_000, MAX_TOAST_MS);
         let item = Item {
             id,
             app: app.clone(),
