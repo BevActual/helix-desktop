@@ -40,6 +40,7 @@ listen("shell-mode", (event) => {
     $("q").focus();
   } else if (panel === "control-center") {
     invoke("audio_view").then(drawAudio);
+    invoke("network_view").then(drawNetwork);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -147,6 +148,67 @@ $("volume").addEventListener("input", () => {
   $("percent").textContent = latest + "%";
   if (!sendTimer) sendTimer = setTimeout(sendVolume, 50);
 });
+// Wi-Fi. Same rule as sound: Rust holds the state and builds every request. A network is named by the path it was listed with, and
+// Rust refuses one that is not in its last snapshot, or that needs a password (not supported yet), instead of sending it.
+const bars = (strength) => (strength >= 75 ? "▂▄▆█" : strength >= 50 ? "▂▄▆" : strength >= 25 ? "▂▄" : "▂");
+function drawNetwork(view) {
+  $("wifi").style.display = view.available ? "" : "none";
+  if (!view.available) return;
+  $("wifi-status").textContent = view.status;
+  $("wifitoggle").textContent = view.wifi_enabled ? "Turn off" : "Turn on";
+  $("wifitoggle").dataset.on = view.wifi_enabled ? "1" : "0";
+  $("scan").style.display = view.wifi_enabled ? "" : "none";
+  $("scan").disabled = view.scanning;
+  $("disconnect").style.display = view.connected ? "" : "none";
+  const list = $("networks");
+  list.replaceChildren();
+  view.networks.forEach((net) => {
+    const row = document.createElement("div");
+    const joinable = net.action === "connect";
+    row.className = "net" + (net.active ? " active" : "") + (joinable ? " clickable" : "") + (joinable || net.active ? "" : " unavailable");
+    const signal = document.createElement("span");
+    signal.className = "bars";
+    signal.textContent = bars(net.strength);
+    const name = document.createElement("span");
+    name.className = "ssid";
+    name.textContent = net.ssid;
+    row.append(signal, name);
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = net.active ? "Connected"
+      : net.action === "password" ? "Needs a password"
+      : net.action === "enterprise" ? "Enterprise" : net.saved ? "Saved" : net.secured ? "Secured" : "Open";
+    row.append(tag);
+    if (joinable) row.addEventListener("click", () => invoke("network_connect", { path: net.path }));
+    if (net.saved) {
+      const forget = document.createElement("button");
+      forget.textContent = "Forget";
+      forget.addEventListener("click", (event) => { event.stopPropagation(); invoke("network_forget", { path: net.path }); });
+      row.append(forget);
+    }
+    list.append(row);
+  });
+  const vpns = $("vpns");
+  vpns.replaceChildren();
+  view.vpns.forEach((vpn) => {
+    const row = document.createElement("div");
+    row.className = "net clickable" + (vpn.active ? " active" : "");
+    const name = document.createElement("span");
+    name.className = "ssid";
+    name.textContent = "VPN: " + vpn.name;
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    tag.textContent = vpn.active ? "On" : "Off";
+    row.append(name, tag);
+    row.addEventListener("click", () => invoke("network_vpn", { path: vpn.path, active: !vpn.active }));
+    vpns.append(row);
+  });
+}
+listen("network-view", (event) => drawNetwork(event.payload));
+$("wifitoggle").onclick = () => invoke("network_set_wifi", { enabled: $("wifitoggle").dataset.on !== "1" });
+$("scan").onclick = () => invoke("network_scan");
+$("disconnect").onclick = () => invoke("network_disconnect");
+
 $("mute").onclick = () => invoke("audio_set_mute", { muted: $("mute").dataset.muted !== "1" });
 
 $("ask").onclick = () => invoke("panel_open", { id: "assistant" });

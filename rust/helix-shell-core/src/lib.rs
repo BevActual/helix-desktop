@@ -5,6 +5,7 @@ pub mod audio;
 mod confirm;
 mod display;
 pub mod launcher;
+pub mod network;
 pub mod shell_surface;
 pub mod surfaces;
 

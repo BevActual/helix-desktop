@@ -30,6 +30,15 @@
   #outputs { display: flex; flex-direction: column; gap: 2px; }
   #outputs .row { padding: 5px 8px; } #outputs .row.current { color: var(--accent); }
   #audio-note { color: var(--mut); }
+  #wifi { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 10px; }
+  #wifi-head { display: flex; align-items: center; gap: 6px; } #wifi-head h3 { flex: 1; }
+  #wifi-status { color: var(--mut); font-size: 12px; }
+  #networks, #vpns { display: flex; flex-direction: column; gap: 2px; }
+  .net { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 8px; }
+  .net.clickable:hover { background: rgba(255,255,255,.12); }
+  .net .bars { width: 3.4em; flex: none; color: var(--accent); letter-spacing: -1px; } .net .ssid { flex: 1; } .net.active .ssid { color: var(--accent); }
+  .net .tag { color: var(--mut); font-size: 11px; } .net button { padding: 1px 8px; font-size: 11px; }
+  .net.unavailable .ssid { color: var(--mut); }
   h3 { margin: 0; color: var(--accent); }
   input { font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
   #body { min-height: 1.4em; } #reason, #note { color: var(--mut); font-size: 12px; }
@@ -43,6 +52,12 @@
     <div id="outputdev"></div>
     <div class="sliderrow"><button id="mute">Mute</button><input id="volume" type="range" min="0" max="100" step="1" value="0"><span id="percent">0%</span></div>
     <div id="outputs"></div>
+  </div>
+  <div id="wifi">
+    <div id="wifi-head"><h3>Wi-Fi</h3><button id="scan">Scan</button><button id="disconnect">Disconnect</button><button id="wifitoggle">Turn off</button></div>
+    <div id="wifi-status"></div>
+    <div id="networks"></div>
+    <div id="vpns"></div>
   </div></div>
 <div id="launcher"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
 <div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?">

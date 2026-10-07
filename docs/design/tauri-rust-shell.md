@@ -55,7 +55,7 @@ rust/
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
 - **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
-- **M5 Launcher (done, see below), control center (sound done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
+- **M5 Launcher (done, see below), control center (sound and Wi-Fi done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
   a threat review before moving them; they may stay native.
@@ -296,3 +296,40 @@ What was tried, in alternating back-to-back runs so drift cannot fool the compar
 Where the rest is: the app process is about 120 MB (GTK, WebKit's UI side, about 25 MB of GPU driver libraries); the web process about 150 MB
 (its anonymous heap, WebKit itself, JavaScriptCore, more GPU libraries); the network process 20 MB. Most of it is fixed cost of having a
 WebKit web view at all. The first panel opened costs about 30 MB that never comes back.
+
+## M5 control center: Wi-Fi (done)
+
+The second section of the control center panel. Status ("Connected to X", "Connecting…", "Wi-Fi is off", "Network is unavailable"), a Wi-Fi
+on/off button, Scan, Disconnect (only while connected), the visible networks, and VPN rows.
+
+`helix-shell-core/src/network.rs` is the model and the only builder of requests, like audio:
+- One row per network name (the same network is heard from several access points): the joined access point if any, otherwise the
+  strongest; saved if any copy is saved. Order: joined, saved, strongest, name. At most 12 rows and 8 VPNs. Names are made display-safe for
+  showing but the service is always sent the exact original name (a forget request carries it); the page names a network only by the path
+  it was listed with.
+- A click joins a network that needs no new secret (open, or already saved). It **refuses**, and sends nothing for: a secured network never
+  joined ("Needs a password"), an enterprise network ("Enterprise"), the network already joined, an unknown path, Wi-Fi being off, no
+  service. Passwords and enterprise sign-in are not built yet; the rows say so.
+- Forget works only on a saved network; VPN toggles only on a listed path.
+- Mutation-checked: each refusal, the exact-name rule, the ordering, the bounds, the path check and the de-duplication fail a test when
+  removed (this found that the enterprise state in the row list had no test).
+
+`helix-desktop-api` now has one generic path (`Desktop::snapshot`, `action`, `watch` over `Domain::{Audio, Network, Bluetooth}`, checked against
+the contract) instead of a macro proxy per interface; audio goes through it and its end-to-end test is unchanged.
+
+**Testing without a network.** `tools/nested/fake-desktop.py` is a scripted `org.helix.Desktop` (tools/nested/tauri-fake-desktop.sh runs the
+shell against it): a joined saved network, an open one, a secured one never joined, an enterprise one and a VPN. It changes its world when
+actions arrive, emits `Changed`, refuses what the real service would refuse, and logs every action. `tools/nested/network-test.sh` clicks every
+control with a real pointer and asserts the exact action list: connect Cafe, disconnect, connect Home, forget "Home WiFi", vpn-connect, Wi-Fi
+off, on, scan, and **nothing** for the password-protected and enterprise rows; the service refused nothing. The fake replaces the real service
+for these tests, so the real service's NetworkManager bridge is not exercised by them.
+
+**Safety rail.** The nested session used to be able to reach the real system bus: earlier runs saw real NetworkManager and BlueZ change signals.
+Nothing wrote to them, but a Wi-Fi test could have. `tools/nested/run.sh` now points `DBUS_SYSTEM_BUS_ADDRESS` nowhere (a test may supply its own
+with `HELIX_NESTED_SYSTEM_BUS`), so nothing started in a nested run can reach the person's real network, Bluetooth, or logind.
+
+Memory with the full panel (sound plus Wi-Fi): 275 MB USS bar only, 294 MB open (including the fake service's Python process, so a little less
+in practice); the budget is 320 MB USS.
+
+Not done: entering a password for a secured network, enterprise sign-in, hidden networks, wired and cellular rows, Bluetooth, and a
+password prompt flow (`Network1.Prompt` and `Reply`).

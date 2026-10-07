@@ -8,8 +8,11 @@ mod layer;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use helix_desktop_api::{sound_volume_label, Desktop};
+use helix_desktop_api::{sound_volume_label, Desktop, Domain};
 use helix_shell_core::audio::{Audio, AudioView, Request, RequestError};
+use helix_shell_core::network::{
+    Network, NetworkView, Request as NetworkRequest, RequestError as NetworkError,
+};
 use helix_shell_core::{Confirmation, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -23,6 +26,8 @@ struct ShellState {
     history: helix_shell_core::launcher::History,
     /// The last Audio1 snapshot, read after every Changed signal. Writes are built from this and nothing else.
     audio: Audio,
+    /// The last Network1 snapshot; Wi-Fi writes are built from it and nothing else.
+    network: Network,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -161,7 +166,10 @@ fn open_panel(app: &AppHandle, id: &str) {
     }
     if id == "control-center" {
         let app = app.clone();
-        tauri::async_runtime::spawn(async move { refresh_audio(&app).await });
+        tauri::async_runtime::spawn(async move {
+            refresh_audio(&app).await;
+            refresh_network(&app).await;
+        });
     }
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
@@ -316,6 +324,110 @@ async fn send_audio(request: Result<Request, RequestError>) -> Result<(), String
         .map_err(|error| error.to_string())?;
     eprintln!("AUDIO {} sent", request.action);
     Ok(())
+}
+
+/// Reads the network snapshot, keeps it, and tells the page. A service that is down is "no network".
+async fn refresh_network(app: &AppHandle) {
+    let snapshot = match desktop().await {
+        Some(desktop) => desktop
+            .snapshot(Domain::Network)
+            .await
+            .unwrap_or(serde_json::Value::Null),
+        None => serde_json::Value::Null,
+    };
+    let network = Network::from_snapshot(&snapshot);
+    let view = network.view();
+    shell_state(app).lock().expect("shell state").network = network;
+    let _ = app.emit("network-view", view);
+}
+
+/// Follows Network1.Changed (no polling); reads are coalesced like the audio ones.
+fn watch_network(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            if let Some(desktop) = desktop().await {
+                refresh_network(&app).await;
+                let (watcher_app, flag) = (app.clone(), pending.clone());
+                let _ = desktop
+                    .watch(Domain::Network, move || {
+                        if flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
+                        let (app, flag) = (watcher_app.clone(), flag.clone());
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(100)).await;
+                            flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                            refresh_network(&app).await;
+                        });
+                    })
+                    .await;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+async fn send_network(request: Result<NetworkRequest, NetworkError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = desktop()
+        .await
+        .ok_or("the desktop service is not running")?;
+    desktop
+        .action(Domain::Network, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("NETWORK {} sent", request.action);
+    Ok(())
+}
+
+fn network_request(
+    app: &AppHandle,
+    build: impl FnOnce(&Network) -> Result<NetworkRequest, NetworkError>,
+) -> Result<NetworkRequest, NetworkError> {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    build(&shell.network)
+}
+
+#[tauri::command]
+fn network_view(app: AppHandle) -> NetworkView {
+    shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .network
+        .view()
+}
+
+#[tauri::command]
+async fn network_set_wifi(app: AppHandle, enabled: bool) -> Result<(), String> {
+    send_network(network_request(&app, |n| n.set_wifi(enabled))).await
+}
+
+#[tauri::command]
+async fn network_scan(app: AppHandle) -> Result<(), String> {
+    send_network(network_request(&app, Network::scan)).await
+}
+
+/// Joins a network by the path it was listed with. A secured network that has never been joined is refused here, not sent.
+#[tauri::command]
+async fn network_connect(app: AppHandle, path: String) -> Result<(), String> {
+    send_network(network_request(&app, |n| n.connect(&path))).await
+}
+
+#[tauri::command]
+async fn network_disconnect(app: AppHandle) -> Result<(), String> {
+    send_network(network_request(&app, Network::disconnect)).await
+}
+
+#[tauri::command]
+async fn network_forget(app: AppHandle, path: String) -> Result<(), String> {
+    send_network(network_request(&app, |n| n.forget(&path))).await
+}
+
+#[tauri::command]
+async fn network_vpn(app: AppHandle, path: String, active: bool) -> Result<(), String> {
+    send_network(network_request(&app, |n| n.set_vpn(&path, active))).await
 }
 
 fn audio_request(
@@ -564,7 +676,14 @@ fn main() {
             audio_view,
             audio_set_volume,
             audio_set_mute,
-            audio_set_default
+            audio_set_default,
+            network_view,
+            network_set_wifi,
+            network_scan,
+            network_connect,
+            network_disconnect,
+            network_forget,
+            network_vpn
         ])
         .setup(move |app| {
             let window =
@@ -584,6 +703,7 @@ fn main() {
                 apps: Vec::new(),
                 history: apps::load_history(),
                 audio: Audio::default(),
+                network: Network::default(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
@@ -593,6 +713,7 @@ fn main() {
 
             watch_volume(handle.clone());
             watch_audio(handle.clone());
+            watch_network(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {

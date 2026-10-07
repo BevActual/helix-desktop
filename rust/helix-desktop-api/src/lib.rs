@@ -94,30 +94,23 @@ fn value_number(value: &Value<'_>) -> Option<f64> {
     }
 }
 
-// Each proxy lives in its own module: the macro names its signal types after the signal ("Changed"), which would clash.
-mod audio_proxy {
-    use zbus::proxy;
-    use zbus::zvariant::OwnedValue;
+/// The service interfaces that follow the snapshot / action / changed pattern.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Domain {
+    Audio,
+    Network,
+    Bluetooth,
+}
 
-    #[proxy(
-        interface = "org.helix.Desktop.Audio1",
-        default_service = "org.helix.Desktop",
-        default_path = "/org/helix/Desktop"
-    )]
-    pub trait Audio {
-        fn get_snapshot(&self) -> zbus::Result<std::collections::HashMap<String, OwnedValue>>;
-
-        fn action(
-            &self,
-            action: &str,
-            args: std::collections::HashMap<String, OwnedValue>,
-        ) -> zbus::Result<u64>;
-
-        #[zbus(signal)]
-        fn changed(&self) -> zbus::Result<()>;
+impl Domain {
+    pub fn interface(self) -> &'static str {
+        match self {
+            Self::Audio => "org.helix.Desktop.Audio1",
+            Self::Network => "org.helix.Desktop.Network1",
+            Self::Bluetooth => "org.helix.Desktop.Bluetooth1",
+        }
     }
 }
-use audio_proxy::AudioProxy;
 
 pub struct Desktop {
     connection: zbus::Connection,
@@ -130,10 +123,15 @@ impl Desktop {
         })
     }
 
-    /// The Audio1 snapshot as JSON: `{available, sinks: [...], sources: [...], programs: [...]}`.
-    pub async fn audio_snapshot(&self) -> zbus::Result<serde_json::Value> {
-        let proxy = AudioProxy::new(&self.connection).await?;
-        let snapshot = proxy.get_snapshot().await?;
+    async fn domain_proxy(&self, domain: Domain) -> zbus::Result<zbus::Proxy<'static>> {
+        zbus::Proxy::new(&self.connection, BUS_NAME, OBJECT_PATH, domain.interface()).await
+    }
+
+    /// The domain's `GetSnapshot` as JSON (for audio: `{available, sinks, sources, programs}`).
+    pub async fn snapshot(&self, domain: Domain) -> zbus::Result<serde_json::Value> {
+        let proxy = self.domain_proxy(domain).await?;
+        let snapshot: std::collections::HashMap<String, OwnedValue> =
+            proxy.call("GetSnapshot", &()).await?;
         let mut object = serde_json::Map::new();
         for (key, value) in &snapshot {
             object.insert(key.clone(), owned_to_json(value));
@@ -141,24 +139,44 @@ impl Desktop {
         Ok(serde_json::Value::Object(object))
     }
 
-    /// Starts an audio action (`volume`, `mute`, `default`) and returns the operation id. The service checks everything again.
-    pub async fn audio_action(&self, action: &str, args: &serde_json::Value) -> zbus::Result<u64> {
-        let proxy = AudioProxy::new(&self.connection).await?;
+    /// Starts one of the domain's actions and returns the operation id. The service checks everything again.
+    pub async fn action(
+        &self,
+        domain: Domain,
+        action: &str,
+        args: &serde_json::Value,
+    ) -> zbus::Result<u64> {
+        let proxy = self.domain_proxy(domain).await?;
         let args = args_from_json(args).map_err(zbus::Error::Failure)?;
-        proxy.action(action, args).await
+        proxy.call("Action", &(action, args)).await
     }
 
-    /// Calls `on_change` after every Audio1.Changed. Does not poll.
-    pub async fn watch_audio<F>(&self, mut on_change: F) -> zbus::Result<()>
+    /// Calls `on_change` after every `Changed` signal of the domain. Does not poll. Returns when the stream ends.
+    pub async fn watch<F>(&self, domain: Domain, mut on_change: F) -> zbus::Result<()>
     where
         F: FnMut() + Send,
     {
-        let proxy = AudioProxy::new(&self.connection).await?;
-        let mut changes = proxy.receive_changed().await?;
+        let proxy = self.domain_proxy(domain).await?;
+        let mut changes = proxy.receive_signal("Changed").await?;
         while changes.next().await.is_some() {
             on_change();
         }
         Ok(())
+    }
+
+    pub async fn audio_snapshot(&self) -> zbus::Result<serde_json::Value> {
+        self.snapshot(Domain::Audio).await
+    }
+
+    pub async fn audio_action(&self, action: &str, args: &serde_json::Value) -> zbus::Result<u64> {
+        self.action(Domain::Audio, action, args).await
+    }
+
+    pub async fn watch_audio<F>(&self, on_change: F) -> zbus::Result<()>
+    where
+        F: FnMut() + Send,
+    {
+        self.watch(Domain::Audio, on_change).await
     }
 
     pub async fn sound_volume(&self) -> zbus::Result<Option<f64>> {
@@ -244,10 +262,24 @@ mod tests {
             );
         }
         assert!(configuration.signals.iter().any(|name| name == "Changed"));
-        let audio = &interfaces["org.helix.Desktop.Audio1"];
-        for method in ["GetSnapshot", "Action"] {
-            assert!(audio.methods.iter().any(|name| name == method), "{method}");
+        for domain in [
+            super::Domain::Audio,
+            super::Domain::Network,
+            super::Domain::Bluetooth,
+        ] {
+            let interface = &interfaces[domain.interface()];
+            for method in ["GetSnapshot", "Action"] {
+                assert!(
+                    interface.methods.iter().any(|name| name == method),
+                    "{} {method}",
+                    domain.interface()
+                );
+            }
+            assert!(
+                interface.signals.iter().any(|name| name == "Changed"),
+                "{}",
+                domain.interface()
+            );
         }
-        assert!(audio.signals.iter().any(|name| name == "Changed"));
     }
 }
