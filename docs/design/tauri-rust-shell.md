@@ -397,3 +397,19 @@ back with `pw-dump`).
 
 Not done: a brightness slider (nothing safe to drive it: the backlight is the native shell's, and writing it needs logind or elevated access),
 Do Not Disturb and keep-awake (they belong to the native shell today), airplane mode, media controls, and notifications in the panel.
+
+## The Tauri shell as the session shell (2026-10-07)
+
+`tools/switch-shell.sh tauri|native|status` chooses the session shell. It touches only the person's user units and niri key binds.
+The Tauri unit (`helix-shell-tauri.service`, generated from `tools/systemd/helix-shell-tauri.service.in`) conflicts with the native
+unit, so only one runs, and it runs with `HELIX_SHELL_CONFIRMER=1`: the shell is then the registered desktop and the Agent1 confirmer, and
+the Agents panel is live. Key binds call `~/.local/bin/helix-panel`, which drives whichever shell is active, so switching back
+(`tools/switch-shell.sh native`) needs no config edit. niri's config was backed up to `config.kdl.bak-helix-<time>` before the binds changed.
+
+When the service restarts its roles are gone, so the shell follows the name's owner (a signal) and claims them again; the nested
+test restarts the service and checks an approval dialog still works afterwards (and fails without the re-registration).
+
+Not available under this shell until ported: lock screen, notifications, wallpaper, clipboard history, the tray, workspaces in the bar,
+and the on-screen display for volume and brightness (the keys still work through wpctl and brightnessctl).
+
+Gotcha: a unit's `ExecStart` needs `\x20` for a space, and a `sed` replacement turns `\x20` back into a space, so it is doubled.

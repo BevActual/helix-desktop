@@ -1,0 +1,30 @@
+#!/bin/sh
+# What a niri key binding runs. Works under either shell: when the Tauri shell is the session shell it drives that
+# (panels over org.helix.Shell1, volume and brightness directly); otherwise it hands the same request to the native shell.
+#   helix-panel launcher | control-center | assistant | agents | settings | window-switcher
+#   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
+set -u
+cmd=${1:?usage: helix-panel <command>}
+tauri() { systemctl --user is-active --quiet helix-shell-tauri.service; }
+if tauri; then
+  case "$cmd" in
+    launcher|control-center|assistant|agents)
+      exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 TogglePanel s "$cmd" ;;
+    settings) exec helix-settings ;;
+    window-switcher) exec niri msg action focus-window-previous ;;
+    volume-up) exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+    volume-down) exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+    volume-mute) exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+    mic-mute) exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
+    brightness-up) exec brightnessctl --quiet set 5%+ ;;
+    brightness-down) exec brightnessctl --quiet set 5%- ;;
+    *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
+  esac
+fi
+case "$cmd" in
+  launcher|control-center) exec noctalia msg panel-toggle "$cmd" ;;
+  settings) exec noctalia msg settings-toggle ;;
+  window-switcher|volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down) exec noctalia msg "$cmd" ;;
+  assistant|agents) exit 0 ;;
+  *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
+esac

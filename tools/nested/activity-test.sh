@@ -115,5 +115,19 @@ grep -q 'cancelled' "$SCRATCH/probe-stop.log" || fail "the agent was not told it
 wait_for "CONFIRMER destroyed" $((opened + 1)) 40 || fail "the dialog stayed up after Stop"
 echo "ok: stop"
 
+echo "--- 8. The shell claims its roles again when the service restarts"
+OLD=$(cat "$SCRATCH/state/helix-service.pid")
+kill "$OLD"
+for _ in $(seq 1 40); do kill -0 "$OLD" 2>/dev/null || break; sleep 0.25; done
+registered=$(grep -c "CONFIRMER registered" "$LOG" || true)
+HELIX_RISK_POLICY="$ROOT/protocols/ipc/msg-risk.toml" PIPEWIRE_REMOTE=helix-nested-no-audio \
+  "$ROOT/build-debug/helix-service" >>"$SCRATCH/state/helix-service.log" 2>&1 &
+echo $! >"$SCRATCH/state/helix-service.pid"
+wait_for "CONFIRMER service restarted" 1 80 || fail "the shell did not notice the new service"
+wait_for "CONFIRMER registered" $((registered + 1)) 80 || fail "the shell did not register again"
+wait_view 'available=true enabled=true busy=false pending=0 grants=0' || fail "activity did not come back"
+grant_with_pointer || fail "an approval dialog did not work after the restart"
+echo "ok: roles reclaimed"
+
 if [ "$FAILED" -ne 0 ]; then echo FAILED; exit 1; fi
 echo "ALL ok"

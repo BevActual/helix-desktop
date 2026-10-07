@@ -218,6 +218,7 @@ pub fn start(
         let desktop = Arc::new(desktop);
         let _ = crate::REGISTERED.set(desktop.clone());
         crate::watch_activity(app.clone());
+        keep_roles(app.clone(), desktop.clone());
 
         {
             let app = app.clone();
@@ -286,6 +287,29 @@ pub fn start(
             if let Err(error) = confirmer.confirm(operation, approved, &tiers).await {
                 eprintln!("CONFIRMER confirm failed: {error}");
             }
+        }
+    });
+}
+
+/// The desktop and confirmer roles belong to the service's current process: when it restarts they are gone, and a shell that does
+/// not claim them again would silently stop showing approvals. Follows the name's owner (a signal, not a poll) and registers again.
+fn keep_roles(app: AppHandle, desktop: Arc<Desktop>) {
+    tauri::async_runtime::spawn(async move {
+        let Ok(mut starts) = desktop.watch_service_starts().await else {
+            return;
+        };
+        while starts.next().await.is_some() {
+            eprintln!("CONFIRMER service restarted");
+            for _ in 0..50 {
+                if desktop.register_desktop().await.is_ok()
+                    && desktop.confirmer().register().await.is_ok()
+                {
+                    eprintln!("CONFIRMER registered");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
+            crate::refresh_activity(&app).await;
         }
     });
 }

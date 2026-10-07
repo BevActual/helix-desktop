@@ -119,6 +119,22 @@ impl Domain {
     }
 }
 
+pub struct ServiceStarts {
+    changes: zbus::fdo::NameOwnerChangedStream,
+}
+
+impl ServiceStarts {
+    pub async fn next(&mut self) -> Option<()> {
+        while let Some(change) = self.changes.next().await {
+            let Ok(args) = change.args() else { continue };
+            if args.name().as_str() == BUS_NAME && args.new_owner().is_some() {
+                return Some(());
+            }
+        }
+        None
+    }
+}
+
 pub struct Desktop {
     connection: zbus::Connection,
 }
@@ -138,6 +154,14 @@ impl Desktop {
     pub async fn register_desktop(&self) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;
         proxy.call("RegisterDesktop", &()).await
+    }
+
+    /// A watch on who owns the service's name: `next()` completes each time a (new) process takes it. A signal, not a poll.
+    pub async fn watch_service_starts(&self) -> zbus::Result<ServiceStarts> {
+        let bus = zbus::fdo::DBusProxy::new(&self.connection).await?;
+        Ok(ServiceStarts {
+            changes: bus.receive_name_owner_changed().await?,
+        })
     }
 
     pub fn activity(&self) -> ActivityClient {
