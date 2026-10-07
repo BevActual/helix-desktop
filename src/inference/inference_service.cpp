@@ -19,7 +19,8 @@ struct Task { std::function<void()> run; };
 
 Json outcomeJson(const Outcome& outcome) {
   return {{"ok", outcome.ok}, {"text", outcome.text}, {"error", outcome.error}, {"cancelled", outcome.cancelled},
-          {"truncated", outcome.truncated}, {"prompt_tokens", outcome.promptTokens}, {"completion_tokens", outcome.completionTokens}};
+          {"truncated", outcome.truncated}, {"prompt_tokens", outcome.promptTokens},
+          {"cached_prompt_tokens", outcome.cachedPromptTokens}, {"completion_tokens", outcome.completionTokens}};
 }
 
 ChatRequest parseChat(const Json& args, const std::string& client) {

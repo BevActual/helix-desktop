@@ -71,6 +71,7 @@ int main(int argc, char** argv) {
   TEST_CHECK(!valid(everyday, json{{"tool", "status"}}));                // args is required
   TEST_CHECK(!valid(everyday, json{{"tool", "status"}, {"args", json::array()}, {"sudo", true}}));  // no extra fields
   TEST_CHECK(!valid(everyday, call("panel-open", {std::string(600, 'x')})));  // free text is bounded
+  TEST_CHECK(!valid(everyday, call("panel-open", {""})));                       // and never empty
 
   // With the confirm tier, the commands that ask the user are offered too, and blocked ones still are not.
   const auto withConfirm = toolCallSchema(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act, Tier::Confirm});

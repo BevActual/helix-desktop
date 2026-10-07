@@ -33,7 +33,6 @@ void initBackendOnce() {
   (void)initialised;
 }
 
-struct ContextDeleter { void operator()(llama_context* c) const { llama_free(c); } };
 struct SamplerDeleter { void operator()(llama_sampler* s) const { llama_sampler_free(s); } };
 
 // Keeps bytes that end in the middle of a UTF-8 character until the rest arrives, so only whole characters are sent.
@@ -136,9 +135,32 @@ bool LlamaBackend::load(const std::string& requested, std::string& error) {
 
 void LlamaBackend::unload() {
   std::lock_guard lock(mutex_);
+  if (context_) llama_free(context_);  // before the model it belongs to
+  context_ = nullptr;
+  contextTokens_ = 0;
+  kvTokens_.clear();
   if (model_) llama_model_free(model_);
   model_ = nullptr;
   loaded_.clear();
+}
+
+void LlamaBackend::invalidateCache() {
+  if (context_) llama_memory_clear(llama_get_memory(context_), true);
+  kvTokens_.clear();
+}
+
+bool LlamaBackend::ensureContext(std::uint32_t contextTokens) {
+  if (context_ && contextTokens_ == contextTokens) return true;
+  if (context_) llama_free(context_);
+  context_ = nullptr;
+  kvTokens_.clear();
+  llama_context_params params = llama_context_default_params();
+  params.n_ctx = contextTokens;
+  params.n_batch = 512;
+  params.no_perf = true;
+  context_ = llama_init_from_model(model_, params);
+  contextTokens_ = context_ ? contextTokens : 0;
+  return context_ != nullptr;
 }
 
 bool LlamaBackend::isLoaded() const {
@@ -181,7 +203,7 @@ Outcome LlamaBackend::chat(const ChatRequest& request, const std::function<void(
   // The grammar first: a request that cannot be constrained is refused, never run unconstrained.
   std::string grammar;
   if (!request.jsonSchema.empty()) {
-    try { grammar = grammarFromToolSchema(nlohmann::json::parse(request.jsonSchema)); }
+    try { grammar = grammarFromToolSchema(nlohmann::json::parse(request.jsonSchema), GrammarOptions{.reasonFirst = request.reasonFirst}); }
     catch (const std::exception& problem) { outcome.error = std::string("the output schema is not supported: ") + problem.what(); return outcome; }
   }
 
@@ -204,12 +226,8 @@ Outcome LlamaBackend::chat(const ChatRequest& request, const std::function<void(
     return outcome;
   }
 
-  llama_context_params contextParams = llama_context_default_params();
-  contextParams.n_ctx = contextTokens;
-  contextParams.n_batch = std::max<std::uint32_t>(512, static_cast<std::uint32_t>(count));
-  contextParams.no_perf = true;
-  std::unique_ptr<llama_context, ContextDeleter> context(llama_init_from_model(model, contextParams));
-  if (!context) { outcome.error = "could not create a context for the model"; return outcome; }
+  if (!ensureContext(contextTokens)) { outcome.error = "could not create a context for the model"; return outcome; }
+  llama_context* context = context_;
 
   std::unique_ptr<llama_sampler, SamplerDeleter> sampler(llama_sampler_chain_init(llama_sampler_chain_default_params()));
   if (!grammar.empty()) {
@@ -224,15 +242,38 @@ Outcome LlamaBackend::chat(const ChatRequest& request, const std::function<void(
     llama_sampler_chain_add(sampler.get(), llama_sampler_init_dist(std::random_device{}()));
   }
 
+  // Reuse the memory of the previous request for the part of the prompt that has not changed. At least the last prompt
+  // token is always decoded afresh, because sampling needs the model's output for it.
+  std::size_t shared = 0;
+  while (shared < kvTokens_.size() && shared + 1 < tokens.size() && kvTokens_[shared] == tokens[shared]) ++shared;
+  if (shared < kvTokens_.size()) {
+    if (!llama_memory_seq_rm(llama_get_memory(context), 0, static_cast<llama_pos>(shared), -1)) {
+      invalidateCache();  // this model cannot drop part of its memory: start again from nothing
+      shared = 0;
+    }
+    kvTokens_.resize(shared);
+  }
   outcome.promptTokens = static_cast<std::uint32_t>(count);
+  outcome.cachedPromptTokens = static_cast<std::uint32_t>(shared);
+
+  constexpr std::size_t kChunk = 512;  // the context's batch size
+  for (std::size_t at = shared; at < tokens.size(); at += kChunk) {
+    if (cancelled()) { outcome.cancelled = true; outcome.error = "cancelled"; return outcome; }
+    const auto chunk = static_cast<int32_t>(std::min(kChunk, tokens.size() - at));
+    if (llama_decode(context, llama_batch_get_one(tokens.data() + at, chunk)) != 0) {
+      invalidateCache();
+      outcome.error = "the engine failed while reading the prompt";
+      return outcome;
+    }
+    kvTokens_.insert(kvTokens_.end(), tokens.begin() + static_cast<std::ptrdiff_t>(at), tokens.begin() + static_cast<std::ptrdiff_t>(at) + chunk);
+  }
+
   Utf8Splitter utf8;
-  llama_batch batch = llama_batch_get_one(tokens.data(), count);
-  llama_token token = 0;  // outlives the loop: the next batch points at it
+  llama_token token = 0;  // outlives the loop: each batch points at it
   char piece[256];
   for (std::uint32_t generated = 0; generated < request.maxTokens; ++generated) {
     if (cancelled()) { outcome.cancelled = true; outcome.error = "cancelled"; break; }
-    if (llama_decode(context.get(), batch) != 0) { outcome.error = "the engine failed while generating"; break; }
-    token = llama_sampler_sample(sampler.get(), context.get(), -1);
+    token = llama_sampler_sample(sampler.get(), context, -1);
     if (llama_vocab_is_eog(vocab, token)) { outcome.ok = true; break; }
     const int32_t length = llama_token_to_piece(vocab, token, piece, sizeof piece, 0, false);
     if (length > 0) {
@@ -240,8 +281,13 @@ Outcome LlamaBackend::chat(const ChatRequest& request, const std::function<void(
       if (!text.empty()) { outcome.text += text; onDelta(text); }
     }
     ++outcome.completionTokens;
-    batch = llama_batch_get_one(&token, 1);
-    if (generated + 1 == request.maxTokens) outcome.truncated = true;  // ran out of tokens before the model finished
+    if (generated + 1 == request.maxTokens) { outcome.truncated = true; break; }  // out of tokens before the model finished
+    if (llama_decode(context, llama_batch_get_one(&token, 1)) != 0) {
+      invalidateCache();
+      outcome.error = "the engine failed while generating";
+      break;
+    }
+    kvTokens_.push_back(token);  // now part of the memory; the last sampled token never is
   }
   (void)utf8.flush();  // an incomplete character at the very end is dropped rather than sent as invalid UTF-8
   if (!outcome.cancelled && outcome.error.empty()) outcome.ok = true;

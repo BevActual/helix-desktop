@@ -192,9 +192,27 @@ What it says:
 - **Latency.** About 2 s per request for the 7B, dominated by reprocessing the roughly 2,000-token tool list each time.
   Reusing the key-value cache for the shared prompt prefix should cut most of it.
 
-Ideas to test next, in order of expected value: require non-empty strings for free-text arguments (the grammar allows empty
-ones today); put `reason` before `tool` in the output so it acts as a short chain of thought; cache the shared prompt prefix;
-list only the offered tools' optional arguments that matter; evaluate a 14B-class model.
+### Follow-up experiments (7B, flat, decline, 5 examples)
+
+| Change | Exact | Right tool | Median latency |
+|---|---|---|---|
+| Before | 90% | 95% | 2.1 s |
+| Prompt-prefix cache (the shared tool list is not reprocessed) | 90% | 95% | **0.62 s** (98% of prompt tokens served from memory) |
+| Reason written before the tool (hypothesis: a short chain of thought) | 48% | 61% | 2.7 s |
+
+- **The prompt cache is kept.** The context outlives a request and only the part of the prompt that changed is processed. It
+  is 3.4 times faster at the same accuracy. `tests/inference_llama_test.cpp` checks that a cached run gives exactly the same
+  answer as a cold one, and that trusting a stale cache is caught.
+- **Reason-first is rejected.** With room to talk first, the model reasons itself out of acting ("the request is vague...")
+  and wrongly declines 26 requests. The default stays tool, then arguments, then an optional reason. The option remains in
+  the grammar (`GrammarOptions::reasonFirst`) so the result can be reproduced.
+- **Non-empty free-text arguments are kept** (an empty string is never a meaningful value), but they did not change the
+  score: the model now writes placeholders for optional arguments (`["bar-name"]`, `["<value>", ">60"]`) because it copies
+  the signature it was shown. The leverage is in not offering optional free-text arguments the model should not fill.
+
+Ideas to test next, in order of expected value: drop optional free-text positionals from what is offered (or cap a tool's
+arguments at its required ones unless the optional one is an enum); evaluate a 14B-class model; tell the model which of two
+near-neighbours is which ("volume" is sound, "brightness" is the screen) in the tool summaries.
 
 Earlier smoke test (14 requests, kept for the record): both models 14/14 valid; right tool 7/14 (1.5B) and 11/14 (7B).
 A constrained reply cut off by the token limit is an error, never returned as an answer. One unexplained slow run

@@ -33,6 +33,7 @@ struct Options {
   bool decline = false;
   int fewshot = 0;
   int limit = 0;
+  bool reasonFirst = false;
 };
 
 std::string groupOf(const std::string& tool) { return tool.substr(0, tool.find('-')); }
@@ -53,6 +54,7 @@ int main(int argc, char** argv) {
     else if (key == "--fewshot") opt.fewshot = std::stoi(value);
     else if (key == "--out") opt.out = value;
     else if (key == "--limit") opt.limit = std::stoi(value);
+    else if (key == "--reason-first") opt.reasonFirst = value == "1";
     else { std::println(stderr, "unknown option {}", key); return 2; }
   }
   if (opt.root.empty() || !std::filesystem::exists(opt.model)) { std::println(stderr, "need --root and an existing --model"); return 2; }
@@ -82,6 +84,7 @@ int main(int argc, char** argv) {
     request.model = opt.model.filename().string();
     request.messages = messages;
     request.jsonSchema = jsonSchema;
+    request.reasonFirst = opt.reasonFirst && !jsonSchema.empty();
     request.maxTokens = maxTokens;
     const auto op = queue.submit(request);
     if (!op) { std::println(stderr, "submit refused: {}", op.error()); std::exit(2); }
@@ -128,10 +131,11 @@ int main(int argc, char** argv) {
   // The first request pays for loading the model and compiling GPU kernels; it is not what a user waits for in steady state.
   (void)ask(json::array({{{"role", "user"}, {"content", "Reply with OK."}}}), "", 4);
 
-  json report = {{"model", opt.model.filename().string()}, {"strategy", opt.strategy}, {"decline", opt.decline}, {"fewshot", opt.fewshot}, {"results", json::array()}};
+  json report = {{"model", opt.model.filename().string()}, {"strategy", opt.strategy}, {"decline", opt.decline}, {"fewshot", opt.fewshot}, {"reason_first", opt.reasonFirst}, {"results", json::array()}};
   std::map<std::string, std::map<std::string, int>> byCategory;
   std::map<std::string, int> total;
   std::vector<long> latencies;
+  std::uint64_t promptTotal = 0, cachedTotal = 0;
   for (const auto& c : cases) {
     const std::string request = c.at("request");
     const bool mustDecline = c.value("expect", "") == "decline";
@@ -153,6 +157,8 @@ int main(int argc, char** argv) {
     }
     const long ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
     latencies.push_back(ms);
+    promptTotal += outcome.promptTokens;
+    cachedTotal += outcome.cachedPromptTokens;
 
     json reply;
     bool valid = false;
@@ -187,14 +193,14 @@ int main(int argc, char** argv) {
   report["summary"] = {{"cases", n}, {"actionable", actionable}, {"must_decline", declineCases}, {"counts", total},
     {"exact_rate", actionable ? double(exact) / actionable : 0.0}, {"right_tool_rate", actionable ? double(exact + toolOnly) / actionable : 0.0},
     {"decline_recall", declineCases ? double(total["declined-correctly"]) / declineCases : 0.0},
-    {"median_ms", median}, {"p95_ms", p95}};
+    {"median_ms", median}, {"p95_ms", p95}, {"prompt_tokens", promptTotal}, {"cached_prompt_tokens", cachedTotal}};
   report["by_category"] = byCategory;
   std::println("\n{} / {} / decline={} / fewshot={}: {} cases", opt.model.filename().string(), opt.strategy, opt.decline, opt.fewshot, n);
   std::println("  exact {}/{} ({:.0f}%)  right tool {}/{} ({:.0f}%)  declined correctly {}/{}  wrongly declined {}  acted instead of declining {}  invalid {}",
                exact, actionable, actionable ? 100.0 * exact / actionable : 0.0, exact + toolOnly, actionable,
                actionable ? 100.0 * (exact + toolOnly) / actionable : 0.0, total["declined-correctly"], declineCases,
                total["declined-wrongly"], total["acted-instead-of-declining"], total["invalid"]);
-  std::println("  latency per request: median {} ms, p95 {} ms", median, p95);
+  std::println("  latency per request: median {} ms, p95 {} ms; {:.0f}% of prompt tokens served from the cache", median, p95, promptTotal ? 100.0 * cachedTotal / promptTotal : 0.0);
   if (!opt.out.empty()) std::ofstream(opt.out) << report.dump(1) << "\n";
   return total["invalid"] == 0 ? 0 : 1;  // validity is guaranteed by the grammar; anything else is a bug, not a score
 }

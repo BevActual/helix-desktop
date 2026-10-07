@@ -11,7 +11,7 @@ using nlohmann::json;
 constexpr int kMaxArgChars = 500;  // bounds free text so a model cannot run on forever
 
 json stringSchema(std::span<const std::string_view> choices, const std::set<std::string>* allowed = nullptr) {
-  if (choices.empty() && allowed == nullptr) return {{"type", "string"}, {"maxLength", kMaxArgChars}};
+  if (choices.empty() && allowed == nullptr) return {{"type", "string"}, {"minLength", 1}, {"maxLength", kMaxArgChars}};
   json values = json::array();
   for (const std::string_view choice : choices)
     if (allowed == nullptr || allowed->contains(std::string(choice))) values.push_back(std::string(choice));

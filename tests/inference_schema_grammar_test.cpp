@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
   TEST_CHECK(alternativesOf("call-panel-open") == 2);      // one or two, never none
   TEST_CHECK(alternativesOf("call-volume-set") == 1);      // exactly one
   TEST_CHECK(alternativesOf("call-notification-show") == 1);  // two required, then any number of further words
-  TEST_CHECK(rules.at("call-notification-show").find("(\",\" ws str)*") != std::string::npos);        // trailing words
+  TEST_CHECK(rules.at("call-notification-show").find("(\",\" ws str-nonempty)*") != std::string::npos);  // trailing words
   // `session` is blocked as a whole; only the granted choice may appear.
   TEST_CHECK(rules.at("call-session").find("\"lock\"") != std::string::npos);
   TEST_CHECK(rules.at("call-session").find("reboot") == std::string::npos && rules.at("call-session").find("shutdown") == std::string::npos);
@@ -115,6 +115,31 @@ int main(int argc, char** argv) {
     TEST_CHECK(declineRules.at("call-status").find(" reason ") != std::string::npos);  // the optional rule
     for (const auto& [name, rhs] : declineRules)
       for (const auto& used : referenced(rhs)) TEST_CHECK(declineRules.contains(used));
+  }
+
+  // Free text is never empty: every free-text position uses the non-empty rule, none the empty-allowing one.
+  for (const auto& [name, rhs] : rules)
+    if (name.starts_with("call-")) {
+      TEST_CHECK(rhs.find(" str ") == std::string::npos && rhs.find("(str ") == std::string::npos);
+    }
+  TEST_CHECK(rules.at("call-volume-set").find("str-nonempty") != std::string::npos);
+
+  // Reason first: every call starts with a short mandatory reason, written before the tool name.
+  {
+    inference::GrammarOptions first;
+    first.reasonFirst = true;
+    const auto reasoned = parseRules(inference::grammarFromToolSchema(schema, first));
+    TEST_CHECK(reasoned.at("reason-short").find("char{1,160}") != std::string::npos);
+    std::size_t calls = 0;
+    for (const auto& [name, rhs] : reasoned) {
+      for (const auto& used : referenced(rhs)) TEST_CHECK(reasoned.contains(used));
+      if (!name.starts_with("call-")) continue;
+      ++calls;
+      const auto reasonAt = rhs.find("reason"), toolAt = rhs.find("tool");
+      TEST_CHECK(reasonAt != std::string::npos && toolAt != std::string::npos && reasonAt < toolAt);
+      TEST_CHECK(rhs.find("reason-short") != std::string::npos);
+    }
+    TEST_CHECK(calls == callRules);  // exactly the same tools as the default ordering
   }
 
   // Quoting: a value with a quote or backslash must stay inside its literal.

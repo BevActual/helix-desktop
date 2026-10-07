@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <mutex>
 
+struct llama_context;
 struct llama_model;
 
 namespace helix::inference {
@@ -33,10 +34,18 @@ public:
 
 private:
   std::string formatPrompt(const nlohmann::json& messages) const;
+  // The context outlives a request so the start of the next prompt (the tool list, the examples) need not be processed
+  // again. `kvTokens_` is exactly what its memory holds. Touched only by the worker and by unload(), which the queue never
+  // runs while a request is in flight.
+  bool ensureContext(std::uint32_t contextTokens);
+  void invalidateCache();
 
   Config config_;
   mutable std::mutex mutex_;
   llama_model* model_ = nullptr;
+  llama_context* context_ = nullptr;
+  std::uint32_t contextTokens_ = 0;
+  std::vector<std::int32_t> kvTokens_;
   std::string loaded_;
 };
 

@@ -217,6 +217,29 @@ int main(int argc, char** argv) {
     TEST_CHECK(!outcome.ok && outcome.truncated && outcome.error.find("cut off") != std::string::npos);
   }
 
+  // 2d. The prompt cache: the shared start of the prompt (the tool list) is not processed again, and, the property that
+  // matters, a cached run gives exactly the same answer as a cold one.
+  {
+    using namespace std::chrono_literals;
+    const auto [op1, first] = ask("Pause the music.", system, schemaText, 96);
+    const auto [op2, other] = ask("Make it louder.", system, schemaText, 96);
+    const auto [op3, again] = ask("Pause the music.", system, schemaText, 96);
+    std::println("cache: prompt {} tokens; second request reused {} ({:.0f}%), repeat reused {}",
+                 other.promptTokens, other.cachedPromptTokens, 100.0 * other.cachedPromptTokens / other.promptTokens, again.cachedPromptTokens);
+    TEST_CHECK(first.ok && other.ok && again.ok);
+    TEST_CHECK(other.cachedPromptTokens * 10 >= other.promptTokens * 8);   // at least 80% of a different request's prompt was shared
+    TEST_CHECK(again.cachedPromptTokens * 10 >= again.promptTokens * 8);   // the cache holds the latest request: the shared start is reused
+    TEST_CHECK(again.text == first.text);                                  // reuse never changes the answer
+    const auto [op3b, repeat] = ask("Pause the music.", system, schemaText, 96);
+    TEST_CHECK(repeat.cachedPromptTokens + 1 >= repeat.promptTokens);      // straight after itself: all but the last token
+    TEST_CHECK(repeat.text == first.text);
+
+    TEST_CHECK(queue.unloadIfIdle(0s));                                    // free the model and its memory entirely
+    const auto [op4, cold] = ask("Pause the music.", system, schemaText, 96);
+    std::println("cold run after unload: reused {} tokens", cold.cachedPromptTokens);
+    TEST_CHECK(cold.cachedPromptTokens == 0 && cold.text == first.text);   // a fresh context agrees with the cached runs
+  }
+
   // 3. Cancelling stops generation early and keeps what was produced.
   {
     inference::ChatRequest request;

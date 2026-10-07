@@ -17,6 +17,7 @@ struct ChatRequest {
   std::string model;                   // empty = the backend's default
   nlohmann::json messages;             // [{role, content}, ...]
   std::string jsonSchema;              // when set the output must conform to it (structured output); empty = free text
+  bool reasonFirst = false;            // with a schema: emit the reason before the tool (see GrammarOptions)
   std::uint32_t maxTokens = 256;
   double temperature = 0.0;
   Priority priority = Priority::Interactive;
@@ -29,6 +30,7 @@ struct Outcome {
   bool cancelled = false;
   bool truncated = false;              // stopped by the token limit before the model finished
   std::uint32_t promptTokens = 0;
+  std::uint32_t cachedPromptTokens = 0; // of those, how many were already in the model's memory from the previous request
   std::uint32_t completionTokens = 0;
 };
 

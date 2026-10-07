@@ -11,7 +11,7 @@
        temperature  d                                    optional, 0 = greedy
        priority     s                                    "interactive" (default) or "background"
      Delta(operation, text) streams the reply to the requester only, in whole UTF-8 characters. Completed(operation, ok, result)
-     ends it; result is JSON: {ok, text, error, cancelled, truncated, prompt_tokens, completion_tokens}. A reply cut off by
+     ends it; result is JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens}. A reply cut off by
      the token limit while a schema is set is ok=false, truncated=true. -->
 <interface name="org.helix.Inference1">
  <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
