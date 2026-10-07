@@ -1290,6 +1290,13 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('inference_queue', helix_inference_queue_unit, timeout: 60)
+  helix_schema_grammar_unit = executable('inference_schema_grammar_test',
+    sources: files('tests/inference_schema_grammar_test.cpp', 'src/inference/schema_grammar.cpp',
+      'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+    dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('inference_schema_grammar', helix_schema_grammar_unit, args: [meson.project_source_root()])
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: noctalia_core_dep,
