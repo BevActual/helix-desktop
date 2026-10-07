@@ -1,5 +1,6 @@
 #!/bin/bash
-# HELIX_NESTED_SCRIPT: Agent1 confirmer Overlay with pointer and Escape.
+# Agent1 confirmer Overlay with pointer and Escape. Invoked by assistant-flow-test.sh (the nested
+# entry named in the workstream) or alone:
 #   HELIX_NESTED_SCRIPT=tools/nested/confirmer-test.sh tools/nested/run.sh confirmer tools/nested/tauri-shell.sh
 set -u
 SCRATCH=$1
@@ -20,11 +21,9 @@ wait_for() {
   return 1
 }
 cleanup() {
+  # Only the client peer we started. The nested harness owns helix-service.
   if [ -n "$CLIENT" ] && kill -0 "$CLIENT" 2>/dev/null; then
     kill "$CLIENT" 2>/dev/null || true
-  fi
-  if [ -f "$SCRATCH/state/helix-service.pid" ]; then
-    kill "$(cat "$SCRATCH/state/helix-service.pid")" 2>/dev/null || true
   fi
 }
 trap cleanup EXIT

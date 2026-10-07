@@ -129,7 +129,7 @@ confirm-tier action layout. The same queue and panel rules are ported in Rust as
 exclusive keyboard. Text reaches the page only as a sanitized `ConfirmerView` (`textContent`).
 Arming starts when the page is ready (`present()`), not when the D-Bus signal arrives ahead of
 the webview, so Allow is not already live after a slow load. Nested e2e
-(`tools/nested/confirmer-test.sh`) against real Agent1 with a real pointer:
+(`tools/nested/assistant-flow-test.sh`, which runs `confirmer-test.sh`) against real Agent1 with a real pointer:
 
 1. Enter never approves; Escape denies → `the user declined`.
 2. Pointer Deny → declined.
