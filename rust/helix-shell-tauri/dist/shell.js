@@ -560,7 +560,8 @@ invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport();
 function queueReport() {
   if (!reporting) return;
   clearTimeout(reportTimer);
-  reportTimer = setTimeout(sendReport, 80);
+  // Panels animate for ~240 ms; positions are only worth reporting once they have stopped moving.
+  reportTimer = setTimeout(sendReport, 300);
 }
 function sendReport() {
   const elements = {};

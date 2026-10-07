@@ -13,6 +13,7 @@ pub mod network;
 pub mod notifications;
 pub mod power;
 pub mod quick;
+pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
 

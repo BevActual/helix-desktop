@@ -7,10 +7,11 @@ export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/rust/target/fast/helix-shell-ta
 run() {  # name script program [env...]
   local name=$1 script=$2 program=$3; shift 3
   local out=/tmp/claude-1000/suite-$name.log
+  # Tests count the actions a run sent, so each starts from an empty scratch directory (this exact path, made by this script).
+  rm -rf "/tmp/helix-nested/suite-$name"
   HELIX_NESTED_SCRIPT="$ROOT/tools/nested/$script" timeout 420 "$ROOT/tools/nested/run.sh" "suite-$name" "$ROOT/tools/nested/$program" "$@" >"$out" 2>&1
   if grep -qE 'FAIL|TIMEOUT|NOT FOUND|FAILED' "$out"; then echo "FAIL  $name   ($out)"; grep -E 'FAIL|TIMEOUT|NOT FOUND' "$out" | head -3; else echo "ok    $name"; fi
 }
-want() { [ $# -eq 0 ] || return 0; return 0; }
 sel=("$@")
 pick() { [ ${#sel[@]} -eq 0 ] && return 0; for n in "${sel[@]}"; do [ "$n" = "$1" ] && return 0; done; return 1; }
 pick launcher       && run launcher launcher-test.sh tauri-shell.sh
