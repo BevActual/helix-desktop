@@ -38,4 +38,8 @@ if [ -n "${HELIX_NESTED_SCRIPT:-}" ]; then WAYLAND_DISPLAY=$DISPLAY_NAME bash "$
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5
 ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/screen.png"
 kill "$NIRI" 2>/dev/null; sleep 1; kill -9 "$NIRI" 2>/dev/null
+# Anything the program started that must not outlive the run, stopped by pid (never by name).
+for f in "$XDG_STATE_HOME/pipewire.pid" "$XDG_STATE_HOME/helix-service.pid"; do
+  [ -f "$f" ] && kill "$(cat "$f")" 2>/dev/null
+done
 echo "screenshot: $SCRATCH/screen.png"

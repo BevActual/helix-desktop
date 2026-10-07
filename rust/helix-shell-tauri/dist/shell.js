@@ -38,6 +38,8 @@ listen("shell-mode", (event) => {
   if (panel === "assistant") {
     $("q").value = "";
     $("q").focus();
+  } else if (panel === "control-center") {
+    invoke("audio_view").then(drawAudio);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -103,6 +105,49 @@ $("lq").addEventListener("keydown", (event) => {
   }
 });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
+$("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
+
+// Sound. Rust owns the audio state and every write; the page sends "volume 40", "mute" or "make this output the default" and
+// never names a device it was not given. Names are drawn with textContent.
+let dragging = false;
+let sendTimer = null;
+let latest = 0;
+function drawAudio(view) {
+  const usable = view.available && view.output;
+  $("audio-note").textContent = view.available ? (view.output ? "" : "No output device") : "Sound is unavailable";
+  $("audio-body").style.display = usable ? "" : "none";
+  if (!usable) return;
+  $("outputdev").textContent = view.output.name;
+  if (!dragging) {
+    $("volume").value = Math.min(view.percent, 100);
+    $("percent").textContent = view.percent + "%";
+  }
+  $("mute").textContent = view.muted ? "Unmute" : "Mute";
+  $("mute").dataset.muted = view.muted ? "1" : "0";
+  const list = $("outputs");
+  list.replaceChildren();
+  view.outputs.forEach((output) => {
+    const row = document.createElement("div");
+    row.className = "row" + (output.id === view.output.id ? " current" : "");
+    row.textContent = (output.id === view.output.id ? "● " : "○ ") + output.name;
+    row.addEventListener("click", () => invoke("audio_set_default", { id: output.id }));
+    list.append(row);
+  });
+}
+listen("audio-view", (event) => drawAudio(event.payload));
+// A drag sends at most one write every 50 ms, and always the last value, so the service is not flooded and the end state is right.
+function sendVolume() {
+  sendTimer = null;
+  invoke("audio_set_volume", { percent: latest });
+}
+$("volume").addEventListener("pointerdown", () => { dragging = true; });
+window.addEventListener("pointerup", () => { dragging = false; });
+$("volume").addEventListener("input", () => {
+  latest = Number($("volume").value);
+  $("percent").textContent = latest + "%";
+  if (!sendTimer) sendTimer = setTimeout(sendVolume, 50);
+});
+$("mute").onclick = () => invoke("audio_set_mute", { muted: $("mute").dataset.muted !== "1" });
 
 $("ask").onclick = () => invoke("panel_open", { id: "assistant" });
 $("scrim").addEventListener("click", () => invoke("panel_outside"));

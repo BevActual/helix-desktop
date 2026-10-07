@@ -3,8 +3,10 @@
 //! or talk to the model.
 
 mod contract;
+mod json;
 
 pub use contract::{parse_interfaces, protocol_xml, Interface, BUS_NAME, OBJECT_PATH};
+pub use json::{args_from_json, owned_to_json, to_json};
 
 use futures_util::StreamExt;
 use zbus::proxy;
@@ -92,6 +94,31 @@ fn value_number(value: &Value<'_>) -> Option<f64> {
     }
 }
 
+// Each proxy lives in its own module: the macro names its signal types after the signal ("Changed"), which would clash.
+mod audio_proxy {
+    use zbus::proxy;
+    use zbus::zvariant::OwnedValue;
+
+    #[proxy(
+        interface = "org.helix.Desktop.Audio1",
+        default_service = "org.helix.Desktop",
+        default_path = "/org/helix/Desktop"
+    )]
+    pub trait Audio {
+        fn get_snapshot(&self) -> zbus::Result<std::collections::HashMap<String, OwnedValue>>;
+
+        fn action(
+            &self,
+            action: &str,
+            args: std::collections::HashMap<String, OwnedValue>,
+        ) -> zbus::Result<u64>;
+
+        #[zbus(signal)]
+        fn changed(&self) -> zbus::Result<()>;
+    }
+}
+use audio_proxy::AudioProxy;
+
 pub struct Desktop {
     connection: zbus::Connection,
 }
@@ -101,6 +128,37 @@ impl Desktop {
         Ok(Self {
             connection: zbus::Connection::session().await?,
         })
+    }
+
+    /// The Audio1 snapshot as JSON: `{available, sinks: [...], sources: [...], programs: [...]}`.
+    pub async fn audio_snapshot(&self) -> zbus::Result<serde_json::Value> {
+        let proxy = AudioProxy::new(&self.connection).await?;
+        let snapshot = proxy.get_snapshot().await?;
+        let mut object = serde_json::Map::new();
+        for (key, value) in &snapshot {
+            object.insert(key.clone(), owned_to_json(value));
+        }
+        Ok(serde_json::Value::Object(object))
+    }
+
+    /// Starts an audio action (`volume`, `mute`, `default`) and returns the operation id. The service checks everything again.
+    pub async fn audio_action(&self, action: &str, args: &serde_json::Value) -> zbus::Result<u64> {
+        let proxy = AudioProxy::new(&self.connection).await?;
+        let args = args_from_json(args).map_err(zbus::Error::Failure)?;
+        proxy.action(action, args).await
+    }
+
+    /// Calls `on_change` after every Audio1.Changed. Does not poll.
+    pub async fn watch_audio<F>(&self, mut on_change: F) -> zbus::Result<()>
+    where
+        F: FnMut() + Send,
+    {
+        let proxy = AudioProxy::new(&self.connection).await?;
+        let mut changes = proxy.receive_changed().await?;
+        while changes.next().await.is_some() {
+            on_change();
+        }
+        Ok(())
     }
 
     pub async fn sound_volume(&self) -> zbus::Result<Option<f64>> {
@@ -186,5 +244,10 @@ mod tests {
             );
         }
         assert!(configuration.signals.iter().any(|name| name == "Changed"));
+        let audio = &interfaces["org.helix.Desktop.Audio1"];
+        for method in ["GetSnapshot", "Action"] {
+            assert!(audio.methods.iter().any(|name| name == method), "{method}");
+        }
+        assert!(audio.signals.iter().any(|name| name == "Changed"));
     }
 }

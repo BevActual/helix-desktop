@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use helix_desktop_api::{sound_volume_label, Desktop};
+use helix_shell_core::audio::{Audio, AudioView, Request, RequestError};
 use helix_shell_core::{Confirmation, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -20,6 +21,8 @@ struct ShellState {
     /// The applications the launcher lists, read each time it opens. The page refers to them by id only.
     apps: Vec<helix_shell_core::launcher::App>,
     history: helix_shell_core::launcher::History,
+    /// The last Audio1 snapshot, read after every Changed signal. Writes are built from this and nothing else.
+    audio: Audio,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -156,6 +159,10 @@ fn open_panel(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
+    if id == "control-center" {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { refresh_audio(&app).await });
+    }
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
     drop(shell);
@@ -211,6 +218,7 @@ fn control(app: &AppHandle, command: &str) {
     match command {
         "open" => open_panel(app, "assistant"),
         "launcher" => open_panel(app, "launcher"),
+        "control-center" => open_panel(app, "control-center"),
         "close" => close_panel(app),
         "escape" => dismiss_escape(app),
         "outside" => dismiss_outside(app),
@@ -241,6 +249,104 @@ fn watch_control(app: AppHandle, path: std::path::PathBuf) {
             }
         }
     });
+}
+
+static DESKTOP: tokio::sync::OnceCell<Arc<Desktop>> = tokio::sync::OnceCell::const_new();
+
+/// One connection to the session bus, shared by every call.
+async fn desktop() -> Option<Arc<Desktop>> {
+    DESKTOP
+        .get_or_try_init(|| async { Desktop::session().await.map(Arc::new) })
+        .await
+        .ok()
+        .cloned()
+}
+
+/// Reads the audio snapshot, keeps it, and tells the page. A service that is down or not answering is "no audio".
+async fn refresh_audio(app: &AppHandle) {
+    let snapshot = match desktop().await {
+        Some(desktop) => desktop
+            .audio_snapshot()
+            .await
+            .unwrap_or(serde_json::Value::Null),
+        None => serde_json::Value::Null,
+    };
+    let audio = Audio::from_snapshot(&snapshot);
+    let view = audio.view();
+    shell_state(app).lock().expect("shell state").audio = audio;
+    let _ = app.emit("audio-view", view);
+}
+
+/// Follows Audio1.Changed (no polling). Reads are coalesced: a volume drag is a burst of signals and one read.
+fn watch_audio(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            if let Some(desktop) = desktop().await {
+                refresh_audio(&app).await;
+                let (watcher_app, flag) = (app.clone(), pending.clone());
+                let _ = desktop
+                    .watch_audio(move || {
+                        if flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
+                        let (app, flag) = (watcher_app.clone(), flag.clone());
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(40)).await;
+                            flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                            refresh_audio(&app).await;
+                        });
+                    })
+                    .await;
+            }
+            // The service went away or has not started yet; try again shortly.
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+async fn send_audio(request: Result<Request, RequestError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = desktop()
+        .await
+        .ok_or("the desktop service is not running")?;
+    desktop
+        .audio_action(request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("AUDIO {} sent", request.action);
+    Ok(())
+}
+
+fn audio_request(
+    app: &AppHandle,
+    build: impl FnOnce(&Audio) -> Result<Request, RequestError>,
+) -> Result<Request, RequestError> {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    build(&shell.audio)
+}
+
+#[tauri::command]
+fn audio_view(app: AppHandle) -> AudioView {
+    shell_state(&app).lock().expect("shell state").audio.view()
+}
+
+/// Sets the volume of the current output, 0 to 100. The page never names a device.
+#[tauri::command]
+async fn audio_set_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_volume(percent))).await
+}
+
+#[tauri::command]
+async fn audio_set_mute(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_muted(muted))).await
+}
+
+/// Makes one of the listed outputs the default. An id that is not in the last snapshot is refused here.
+#[tauri::command]
+async fn audio_set_default(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_default(id))).await
 }
 
 fn watch_volume(app: AppHandle) {
@@ -449,7 +555,11 @@ fn main() {
             assistant_cancel,
             panel_escape,
             launcher_query,
-            launcher_launch
+            launcher_launch,
+            audio_view,
+            audio_set_volume,
+            audio_set_mute,
+            audio_set_default
         ])
         .setup(move |app| {
             let window =
@@ -468,6 +578,7 @@ fn main() {
                 surface,
                 apps: Vec::new(),
                 history: apps::load_history(),
+                audio: Audio::default(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
@@ -476,6 +587,7 @@ fn main() {
             let handle = app.handle().clone();
 
             watch_volume(handle.clone());
+            watch_audio(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {

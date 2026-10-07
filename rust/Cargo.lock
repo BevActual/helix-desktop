@@ -1343,6 +1343,7 @@ name = "helix-desktop-api"
 version = "0.1.0"
 dependencies = [
  "futures-util",
+ "serde_json",
  "zbus",
 ]
 
@@ -1350,6 +1351,7 @@ dependencies = [
 name = "helix-shell-core"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "serde_json",
 ]
 

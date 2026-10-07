@@ -11,7 +11,7 @@ use crate::surfaces::{KeyboardMode, Layer};
 pub const BAR_HEIGHT: i32 = 42;
 
 /// Panels the page knows how to show. A command naming anything else is refused.
-pub const PANELS: &[&str] = &["assistant", "launcher"];
+pub const PANELS: &[&str] = &["assistant", "launcher", "control-center"];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputRegion {

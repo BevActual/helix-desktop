@@ -55,7 +55,7 @@ rust/
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
 - **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
-- **M5 Launcher (done, see below), control center, notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
+- **M5 Launcher (done, see below), control center (sound done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
   a threat review before moving them; they may stay native.
@@ -241,3 +241,35 @@ launches), which orders near-equal matches but never lifts a weaker kind of matc
 200 entries. It is saved as `$XDG_STATE_HOME/helix/launcher-history.json` (directory 0700, file 0600, written by rename) and a damaged
 file is an empty history. The nested test checks the modes. Mutation-checked: removing the cap, recency, restoring the sequence after
 loading, the bound and the alphabetical fallback each fail a test.
+
+## M5 control center: sound (done)
+
+A third panel (`control-center`, top right; "Controls" in the bar). Sound only for now: the current output's volume slider, Mute/Unmute,
+and the list of outputs (click one to make it the default). Nothing else is in it yet: network, Bluetooth, brightness, battery and the
+rest of the quick settings come next.
+
+Layers, each tested on its own:
+- `helix-desktop-api`: `to_json` / `args_from_json` convert the service's `a{sv}` values (arrays, dictionaries, numbers, strings,
+  booleans; NaN and infinity become null; an id above u32 is never truncated into an id; nested arguments are refused),
+  `Desktop::audio_snapshot`, `audio_action` and `watch_audio` (follows `Audio1.Changed`, no polling). Each zbus proxy must be in its
+  own module because the macro names signal types after the signal.
+- `helix-shell-core/src/audio.rs`: `Audio::from_snapshot` (unavailable or malformed is "no audio"; unavailable devices are not listed;
+  names display-safe; volume clamped), `view()`, and the only producers of write requests: `set_volume` (0 to 100, finite, always the
+  current output), `set_muted`, `set_default` (the id must be an output in the snapshot just read: not a microphone, a program
+  stream, an unplugged device or a forged id). The page never names a device for volume or mute. Mutation-checked (it found that no
+  test had the default output anywhere but first).
+- `src-tauri`: async commands `audio_set_volume`, `audio_set_mute`, `audio_set_default`, `audio_view`; a watcher that re-reads the
+  snapshot after `Changed` (coalesced over 40 ms); the page throttles a drag to one write per 50 ms and ignores incoming updates while
+  the thumb is held.
+
+End to end (`tools/nested/control-center-test.sh`) against a private PipeWire with virtual sinks and a microphone
+(`tools/nested/private-audio.sh`, `private-pipewire.conf`): no session manager and no ALSA, its socket in the scratch directory, so real
+audio can never be touched; it is stopped by pid at the end of the run. Volume and mute are read back with `pw-dump`, not from the
+service. A click at about 70% on the slider set the speakers to 73% with the other sink unchanged; Mute and Unmute round-tripped; choosing
+the other output moved the "current" marker and the slider to that device (the service handles `default` without a session manager).
+
+Memory: 334-335 MB bar only, 341 MB with the control center open. That is inside the 350 MB budget, but only by about 9 MB: the next
+panels must come out of existing memory, not add to it.
+
+Not done: input (microphone) volume, per-program volumes, the other quick settings, keyboard control of the slider is the browser's
+default (arrow keys on the focused range input) and untested.

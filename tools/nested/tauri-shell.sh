@@ -4,6 +4,12 @@
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 export PIPEWIRE_REMOTE="${PIPEWIRE_REMOTE:-helix-nested-no-audio}"
+# HELIX_NESTED_PRIVATE_AUDIO=1: a private PipeWire with virtual sinks and a microphone, so audio writes can be tested for real
+# without touching the person's hardware. It is stopped by pid at the end of the run (tools/nested/run.sh).
+if [ -n "${HELIX_NESTED_PRIVATE_AUDIO:-}" ]; then
+  eval "$("$(dirname "$0")/private-audio.sh" "${XDG_STATE_HOME}/pipewire")"
+  echo "$HELIX_PRIVATE_PIPEWIRE_PID" > "${XDG_STATE_HOME}/pipewire.pid"
+fi
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
 SERVICE="$ROOT/build-debug/helix-service"
 SHELL_BIN="$ROOT/rust/target/release/helix-shell-tauri"
