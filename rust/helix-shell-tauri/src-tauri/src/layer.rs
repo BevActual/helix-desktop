@@ -34,6 +34,44 @@ fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width:
     gdk_window.input_shape_combine_region(&shape, 0, 0);
 }
 
+/// A surface anchored to all four edges has no single edge for the compositor to reserve space on, so the exclusive zone set on the
+/// shell surface is ignored and windows would slide under the bar. This is a second, empty, transparent surface (a plain GTK window,
+/// no web view, so no extra web process) anchored to the top and sides whose only job is to reserve the bar's strip.
+pub fn reserve_bar_space() {
+    let window = gtk::Window::new(gtk::WindowType::Toplevel);
+    window.set_decorated(false);
+    window.set_accept_focus(false);
+    window.set_app_paintable(true);
+    if let Some(visual) =
+        gtk::prelude::WidgetExt::screen(&window).and_then(|screen| screen.rgba_visual())
+    {
+        window.set_visual(Some(&visual));
+    }
+    // Nothing of this window is ever drawn: it is fully transparent and takes no pointer input.
+    let css = gtk::CssProvider::new();
+    if css
+        .load_from_data(b"window, window * { background: transparent; }")
+        .is_ok()
+    {
+        window
+            .style_context()
+            .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+    window.set_size_request(1, BAR_HEIGHT);
+    window.init_layer_shell();
+    window.set_namespace("helix-shell-reserve");
+    window.set_layer(gtk_layer_shell::Layer::Top);
+    for edge in [Edge::Top, Edge::Left, Edge::Right] {
+        window.set_anchor(edge, true);
+    }
+    window.set_exclusive_zone(BAR_HEIGHT);
+    window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+    window.show_all();
+    if let Some(gdk_window) = window.window() {
+        gdk_window.input_shape_combine_region(&gtk::cairo::Region::create(), 0, 0);
+    }
+}
+
 /// Creates the layer surface, hidden, sets it up in the order layer-shell requires, then shows it with the closed plan.
 pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
@@ -43,7 +81,8 @@ pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         gtk_window.set_anchor(edge, true);
     }
-    gtk_window.set_exclusive_zone(BAR_HEIGHT);
+    // -1: cover the whole output even where another surface (the one below) has reserved space; that surface holds the zone.
+    gtk_window.set_exclusive_zone(-1);
     apply_layer_and_keyboard(&gtk_window, plan);
     *INPUT.lock().expect("input region") = plan.input;
     gtk_window.connect_size_allocate(|window, allocation| {

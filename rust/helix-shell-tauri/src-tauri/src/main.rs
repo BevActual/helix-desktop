@@ -696,6 +696,7 @@ fn main() {
 
             let surface = ShellSurface::new();
             layer::setup(&window, surface.plan())?;
+            layer::reserve_bar_space();
             let state = Arc::new(Mutex::new(ShellState {
                 session: Session::new(|_| true),
                 confirmation: Confirmation::new(),
