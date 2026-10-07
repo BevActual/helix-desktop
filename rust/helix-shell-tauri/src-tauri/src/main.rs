@@ -754,22 +754,37 @@ fn ready(window: tauri::Window) {
     }
 }
 
-fn confirmer_host(app: &AppHandle) -> Arc<Mutex<confirmer::ConfirmerHost>> {
-    app.state::<Arc<Mutex<confirmer::ConfirmerHost>>>()
-        .inner()
-        .clone()
+fn confirmer_host(app: &AppHandle) -> Option<Arc<Mutex<confirmer::ConfirmerHost>>> {
+    app.try_state::<Arc<Mutex<confirmer::ConfirmerHost>>>()
+        .map(|state| state.inner().clone())
 }
 
 fn confirmer_keep(app: &AppHandle) -> std::collections::BTreeSet<u32> {
-    app.state::<Arc<Mutex<std::collections::BTreeSet<u32>>>>()
-        .lock()
-        .expect("webkit baseline")
-        .clone()
+    app.try_state::<Arc<Mutex<std::collections::BTreeSet<u32>>>>()
+        .map(|state| state.lock().expect("webkit baseline").clone())
+        .unwrap_or_default()
+}
+
+fn empty_confirmer_view() -> ConfirmerView {
+    ConfirmerView {
+        open: false,
+        kind: "action",
+        client_name: String::new(),
+        detail: String::new(),
+        aside: String::new(),
+        tainted: false,
+        waiting: 0,
+        tiers: Vec::new(),
+        armed: false,
+        operation: 0,
+    }
 }
 
 #[tauri::command]
 fn confirmer_allow(app: AppHandle) -> ConfirmerView {
-    let host = confirmer_host(&app);
+    let Some(host) = confirmer_host(&app) else {
+        return empty_confirmer_view();
+    };
     let mut panel = host.lock().expect("confirmer");
     let view = panel.allow();
     let keep = confirmer_keep(&app);
@@ -779,7 +794,9 @@ fn confirmer_allow(app: AppHandle) -> ConfirmerView {
 
 #[tauri::command]
 fn confirmer_deny(app: AppHandle) -> ConfirmerView {
-    let host = confirmer_host(&app);
+    let Some(host) = confirmer_host(&app) else {
+        return empty_confirmer_view();
+    };
     let mut panel = host.lock().expect("confirmer");
     let view = panel.deny();
     let keep = confirmer_keep(&app);
@@ -789,14 +806,18 @@ fn confirmer_deny(app: AppHandle) -> ConfirmerView {
 
 #[tauri::command]
 fn confirmer_enter(app: AppHandle) -> ConfirmerView {
-    let host = confirmer_host(&app);
+    let Some(host) = confirmer_host(&app) else {
+        return empty_confirmer_view();
+    };
     let mut panel = host.lock().expect("confirmer");
     panel.enter()
 }
 
 #[tauri::command]
 fn confirmer_escape(app: AppHandle) {
-    let host = confirmer_host(&app);
+    let Some(host) = confirmer_host(&app) else {
+        return;
+    };
     let mut panel = host.lock().expect("confirmer");
     let _view = panel.escape();
     let keep = confirmer_keep(&app);
@@ -805,7 +826,9 @@ fn confirmer_escape(app: AppHandle) {
 
 #[tauri::command]
 fn confirmer_set_tier(app: AppHandle, name: String, checked: bool) -> ConfirmerView {
-    let host = confirmer_host(&app);
+    let Some(host) = confirmer_host(&app) else {
+        return empty_confirmer_view();
+    };
     let mut panel = host.lock().expect("confirmer");
     panel.set_tier(&name, checked)
 }
@@ -1045,14 +1068,18 @@ fn main() {
             app.manage(state);
             let handle = app.handle().clone();
 
-            let (answer_tx, answer_rx) = tokio::sync::mpsc::unbounded_channel();
-            let confirmer_host = Arc::new(Mutex::new(confirmer::ConfirmerHost::new(
-                answer_tx, started,
-            )));
-            let keep_webkit = Arc::new(Mutex::new(confirmer::snapshot_webkit_web_pids()));
-            app.manage(confirmer_host.clone());
-            app.manage(keep_webkit.clone());
-            confirmer::start(handle.clone(), confirmer_host, keep_webkit, answer_rx);
+            // Opt-in: the live trial binary must not steal the C++ shell's confirmer role.
+            // Nested tests set HELIX_SHELL_CONFIRMER=1 via tauri-shell.sh.
+            if std::env::var_os("HELIX_SHELL_CONFIRMER").is_some() {
+                let (answer_tx, answer_rx) = tokio::sync::mpsc::unbounded_channel();
+                let confirmer_host = Arc::new(Mutex::new(confirmer::ConfirmerHost::new(
+                    answer_tx, started,
+                )));
+                let keep_webkit = Arc::new(Mutex::new(confirmer::snapshot_webkit_web_pids()));
+                app.manage(confirmer_host.clone());
+                app.manage(keep_webkit.clone());
+                confirmer::start(handle.clone(), confirmer_host, keep_webkit, answer_rx);
+            }
 
             watch_volume(handle.clone());
             watch_audio(handle.clone());

@@ -4,6 +4,12 @@
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 export PIPEWIRE_REMOTE="${PIPEWIRE_REMOTE:-helix-nested-no-audio}"
+# Agent1 fails closed without a risk policy. Prefer an explicit path; otherwise the installed datadir.
+if [ -z "${HELIX_RISK_POLICY:-}" ] && [ -f "$ROOT/protocols/ipc/msg-risk.toml" ]; then
+  export HELIX_RISK_POLICY="$ROOT/protocols/ipc/msg-risk.toml"
+fi
+# Nested harness owns Agent1 confirmer. The live trial binary must leave confirmer to the C++ shell.
+export HELIX_SHELL_CONFIRMER=1
 # HELIX_NESTED_PRIVATE_AUDIO=1: a private PipeWire with virtual sinks and a microphone, so audio writes can be tested for real
 # without touching the person's hardware. It is stopped by pid at the end of the run (tools/nested/run.sh).
 if [ -n "${HELIX_NESTED_PRIVATE_AUDIO:-}" ]; then

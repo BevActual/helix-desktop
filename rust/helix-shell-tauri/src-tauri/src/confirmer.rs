@@ -148,8 +148,20 @@ pub fn start(
     mut answers: mpsc::UnboundedReceiver<Answer>,
 ) {
     tauri::async_runtime::spawn(async move {
+        // Wait until the nested helix-service owns the name. Connecting early activates the
+        // installed org.helix.Desktop on this private bus with the dbus-daemon's HOME (the real one).
+        for _ in 0..50 {
+            if name_has_owner().await {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
         let mut desktop: Option<Desktop> = None;
         for _ in 0..50 {
+            if !name_has_owner().await {
+                tokio::time::sleep(Duration::from_millis(200)).await;
+                continue;
+            }
             if let Ok(session) = Desktop::session().await {
                 if session.register_desktop().await.is_err() {
                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -224,6 +236,26 @@ pub fn start(
             }
         }
     });
+}
+
+async fn name_has_owner() -> bool {
+    let Ok(connection) = zbus::Connection::session().await else {
+        return false;
+    };
+    let Ok(proxy) = zbus::Proxy::new(
+        &connection,
+        "org.freedesktop.DBus",
+        "/org/freedesktop/DBus",
+        "org.freedesktop.DBus",
+    )
+    .await
+    else {
+        return false;
+    };
+    proxy
+        .call("NameHasOwner", &("org.helix.Desktop",))
+        .await
+        .unwrap_or(false)
 }
 
 pub fn snapshot_webkit_web_pids() -> BTreeSet<u32> {

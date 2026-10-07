@@ -123,8 +123,13 @@ session with isolated state: a real access request opened the dialog and closing
 checked: the disabled look of Allow during the arming window, clicking Allow/Deny with a pointer, and the
 confirm-tier action layout. The same queue and panel rules are ported in Rust as
 `helix-shell-core::{ConfirmationQueue, Confirmer}` (mutation-checked) and `helix-desktop-api::ConfirmerClient`
-(RegisterConfirmer / Confirm / ConfirmationRequested / ConfirmationEnded only). The Tauri Overlay confirmer
-surface and nested pointer e2e are not wired yet. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
+(RegisterConfirmer / Confirm / ConfirmationRequested / ConfirmationEnded only). The Tauri Overlay confirmer surface is wired behind `HELIX_SHELL_CONFIRMER=1` (nested
+`tauri-shell.sh` sets it; the live trial must not). Nested Escape-deny e2e
+(`tools/nested/confirmer-test.sh`) against real Agent1: RequestAccess → confirmer opens →
+Return does not approve → Escape denies → client gets `the user declined`; shell USS ~214 MB
+afterward. Gotcha: wait for `NameHasOwner` before any Desktop call on the private bus, and use
+`NO_AUTO_START` in test clients — otherwise dbus activates the installed service with the
+daemon's real HOME. Pointer Allow/Deny and grant checkboxes are not yet e2e-tested. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
 role): apps with access, per-tier switches, remove, and recent activity. It was checked in a nested session against
 seeded hostile data (markup, bidi controls, newlines in names and arguments): all rendered inert. App names shown
 to the user come from the verified identity only (`friendlyClientName`: ASCII letters, digits and `._+-`, everything
