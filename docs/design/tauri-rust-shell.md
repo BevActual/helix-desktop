@@ -157,6 +157,15 @@ Idle CPU of the C++ pieces, measured on the real session: `helix-service` 2.8% o
 C++ shell 1.1%, the Tauri shell 0.1%. `helix-service` now ticks at 16 ms only while something is happening and at 100 ms otherwise
 (0.85% to 0.25% in the harness). A fully event-driven loop (watching the PipeWire, mixer and HTTP fds) would remove the rest.
 
+Follow-up on the real session (profiling with gdb samples, `dbus-monitor` for who calls what): the first fix alone did not help
+because read-only calls counted as activity (about 11 calls a second reach the service: the Settings app calls `GetSettings` every
+3 s and both it and the shell call `GetSnapshot` twice a second). Only calls that change something wake the fast tick now. The
+remaining cost was `GetSettings` rebuilding a catalog of several hundred entries (including a filesystem scan for palettes) on every
+call; it is now cached as a ready D-Bus variant and invalidated by every change notification except Network, Bluetooth and Audio
+(which fire constantly on a real machine and are not in the catalog), by the desktop/gamma state, and after 30 s. Mutation-checked:
+without invalidation `desktop_service` fails. Real-session idle CPU of `helix-service`: 2.9% before, 1.4-1.6% now. What remains is
+mostly the polling itself; clients should listen to `Changed` signals instead of polling `GetSnapshot` and `GetSettings`.
+
 ## M4 verified: the assistant inside the Tauri shell, end to end
 
 `tools/nested/assistant-flow-test.sh` (real 7B model, private bus, real `helix-service`, `helix-inference` and `helix-assistant`):

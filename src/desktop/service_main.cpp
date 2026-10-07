@@ -276,7 +276,30 @@ public:
     if (bus) g_dbus_connection_emit_signal(bus, destination.empty() ? nullptr : destination.c_str(), objectPath,
         interface, signal, value, nullptr);
   }
-  void changed(const char* interface) { emit(interface, "Changed"); }
+  void changed(const char* interface) {
+    // Network, Bluetooth and Audio state changes constantly on a real machine (signal strength, devices) and the settings catalog
+    // does not show any of it, so they must not throw the cache away.
+    const std::string_view name = interface;
+    if (name != networkInterface && name != bluetoothInterface && name != audioInterface) ++catalogEpoch;
+    emit(interface, "Changed");
+  }
+  // GetSettings builds a catalog of several hundred entries, and the Settings app asks for it every few seconds. Rebuilding it
+  // each time cost about 2.5% of a core with nothing changing. It is reused until something notifies a change (every config
+  // change, desktop registration or device change goes through changed()), the desktop or gamma state differs, or 30 s pass
+  // (for the few entries read from the filesystem).
+  GVariant* cachedCatalogVariant = nullptr;  // the catalog already converted for D-Bus, so a hit costs a reference
+  std::uint64_t catalogEpoch = 0, cachedEpoch = ~std::uint64_t{0};
+  bool cachedDesktop = false, cachedGamma = false;
+  std::chrono::steady_clock::time_point cachedAt{};
+  GVariant* catalog() {
+    const auto now = std::chrono::steady_clock::now();
+    if (cachedEpoch != catalogEpoch || cachedDesktop != desktop() || cachedGamma != gammaAvailable() || now - cachedAt > std::chrono::seconds(30)) {
+      if (cachedCatalogVariant) g_variant_unref(cachedCatalogVariant);
+      cachedCatalogVariant = g_variant_ref_sink(toVariant(settingsCatalog(config, desktop(), gammaAvailable())));
+      cachedEpoch = catalogEpoch; cachedDesktop = desktop(); cachedGamma = gammaAvailable(); cachedAt = now;
+    }
+    return cachedCatalogVariant;
+  }
   bool desktop() const { return !desktopOwner.empty(); }
   bool gammaAvailable() const { return desktop() && desktopCapabilities.value("gamma-control", false); }
   Json snapshot(const std::string& interface) {
@@ -468,7 +491,10 @@ public:
   }
   void method(const std::string& sender, const std::string& interface, const std::string& name,
               GVariant* parameters, GDBusMethodInvocation* invocation) {
-    wake();  // someone is talking to the service: react quickly for the next second
+    // A call that changes something gets a quick reaction for the next second. Reads do not: clients poll snapshots several times a
+    // second, and counting those kept the service at the fast rate forever.
+    const bool readOnly = name.starts_with("Get") || name.starts_with("List") || name.starts_with("Read");
+    if (!readOnly) wake();
     if (interface == agentInterface) {
       if (agentEndpoint) agentEndpoint->method(sender, name, parameters, invocation);
       else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
@@ -542,7 +568,7 @@ public:
           } else if (!config.clearStateOwner(owner)) throw std::runtime_error("Runtime state could not be cleared");
           g_dbus_method_invocation_return_value(invocation, nullptr); return;
         }
-        if (name == "GetSettings") { g_dbus_method_invocation_return_value(invocation, g_variant_new("(@av)", toVariant(settingsCatalog(config, desktop(), gammaAvailable())))); return; }
+        if (name == "GetSettings") { g_dbus_method_invocation_return_value(invocation, g_variant_new("(@av)", g_variant_ref(catalog()))); return; }
         if (name == "RegisterDesktop") {
           if (!desktopOwner.empty() && desktopOwner != sender) throw std::runtime_error("A Helix desktop is already registered");
           desktopOwner = sender; theme.apply(); changed(configurationInterface);
