@@ -13,6 +13,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use helix_desktop_api::{sound_volume_label, Desktop, Domain};
+use helix_shell_core::activity::{
+    Activity, ActivityView, Request as ActivityRequest, RequestError as ActivityError,
+};
 use helix_shell_core::audio::{Audio, AudioView, Request, RequestError};
 use helix_shell_core::bluetooth::{
     Bluetooth, BluetoothView, Request as BluetoothRequest, RequestError as BluetoothError,
@@ -41,6 +44,8 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// The last AgentActivity1 reads; stop, revoke and the kill switch are built from them and nothing else.
+    activity: Activity,
     /// The last settings list, for the dark-theme and night-light tiles.
     quick: Quick,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
@@ -179,6 +184,10 @@ fn open_panel(app: &AppHandle, id: &str) {
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
+    if id == "agents" {
+        let refreshing = app.clone();
+        tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
+    }
     if id == "control-center" {
         let refreshing = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -245,6 +254,15 @@ fn control(app: &AppHandle, command: &str) {
         "open" => open_panel(app, "assistant"),
         "launcher" => open_panel(app, "launcher"),
         "control-center" => open_panel(app, "control-center"),
+        "agents" => open_panel(app, "agents"),
+        // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
+        // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
+        "agent-stop-all" => {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let _ = send_activity(activity_request(&app, |a| Ok(a.stop_all()))).await;
+            });
+        }
         "close" => close_panel(app),
         "escape" => dismiss_escape(app),
         "outside" => dismiss_outside(app),
@@ -278,6 +296,10 @@ fn watch_control(app: AppHandle, path: std::path::PathBuf) {
 }
 
 static DESKTOP: tokio::sync::OnceCell<Arc<Desktop>> = tokio::sync::OnceCell::const_new();
+
+/// The connection that holds the registered-desktop role (set by the confirmer once `RegisterDesktop` succeeded). Only this
+/// connection may call AgentActivity1, so activity never uses the shared one above.
+static REGISTERED: std::sync::OnceLock<Arc<Desktop>> = std::sync::OnceLock::new();
 
 /// One connection to the session bus, shared by every call.
 async fn desktop() -> Option<Arc<Desktop>> {
@@ -545,6 +567,137 @@ async fn bluetooth_disconnect(app: AppHandle, path: String) -> Result<(), String
 #[tauri::command]
 async fn bluetooth_forget(app: AppHandle, path: String) -> Result<(), String> {
     send_bluetooth(bluetooth_request(&app, |b| b.forget(&path))).await
+}
+
+/// AgentActivity1 may only be called by the registered desktop. The live trial runs beside the C++ shell, which holds that role,
+/// so only a shell started as the registered desktop (the same opt-in as the confirmer) reads or changes agent activity.
+fn registered_desktop() -> bool {
+    std::env::var_os("HELIX_SHELL_CONFIRMER").is_some()
+}
+
+/// Reads who holds access, what is waiting and what happened, keeps it, and tells the page. Not the registered desktop, or a
+/// service that refuses, is "activity unavailable".
+async fn refresh_activity(app: &AppHandle) {
+    let mut next = Activity::default();
+    if registered_desktop() {
+        if let Some(desktop) = REGISTERED.get() {
+            let client = desktop.activity();
+            if let Ok(enabled) = client.enabled().await {
+                next.set_enabled(enabled);
+                if let Ok(rows) = client.pending().await {
+                    next.set_pending(&rows);
+                }
+                if let Ok(rows) = client.grants().await {
+                    next.set_grants(&rows);
+                }
+                if let Ok(rows) = client.activity(0, 60).await {
+                    next.set_history(&rows);
+                }
+            }
+        }
+    }
+    let view = next.view();
+    // Tests read this line; it carries counts and the newest row's sanitized fields, nothing an agent wrote verbatim.
+    let last = view.history.first().map_or(String::new(), |row| {
+        format!("{}/{}/{}", row.tool, row.decision, row.outcome)
+    });
+    eprintln!(
+        "ACTIVITY view available={} enabled={} busy={} pending={} grants={} history={} last={last}",
+        view.available,
+        view.enabled,
+        view.busy,
+        view.pending.len(),
+        view.grants.len(),
+        view.history.len(),
+    );
+    shell_state(app).lock().expect("shell state").activity = next;
+    let _ = app.emit("activity-view", view);
+}
+
+/// Follows AgentActivity1 Changed / PendingChanged (no polling); reads are coalesced like the others.
+fn watch_activity(app: AppHandle) {
+    if !registered_desktop() {
+        return;
+    }
+    tauri::async_runtime::spawn(async move {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            if let Some(desktop) = REGISTERED.get() {
+                refresh_activity(&app).await;
+                let (watcher_app, flag) = (app.clone(), pending.clone());
+                let _ = desktop
+                    .activity()
+                    .watch(move || {
+                        if flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
+                        let (app, flag) = (watcher_app.clone(), flag.clone());
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(100)).await;
+                            flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                            refresh_activity(&app).await;
+                        });
+                    })
+                    .await;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+async fn send_activity(request: Result<ActivityRequest, ActivityError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = REGISTERED
+        .get()
+        .ok_or("this shell is not the registered desktop")?;
+    let client = desktop.activity();
+    let sent = match &request {
+        ActivityRequest::Stop(operation) => client.stop(*operation).await,
+        ActivityRequest::StopAll => client.stop_all().await,
+        ActivityRequest::Revoke(id) => client.revoke(id).await,
+        ActivityRequest::SetEnabled(enabled) => client.set_enabled(*enabled).await,
+    };
+    sent.map_err(|error| error.to_string())?;
+    eprintln!("ACTIVITY {request:?} sent");
+    Ok(())
+}
+
+fn activity_request(
+    app: &AppHandle,
+    build: impl FnOnce(&Activity) -> Result<ActivityRequest, ActivityError>,
+) -> Result<ActivityRequest, ActivityError> {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    build(&shell.activity)
+}
+
+#[tauri::command]
+fn activity_view(app: AppHandle) -> ActivityView {
+    shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .activity
+        .view()
+}
+
+#[tauri::command]
+async fn activity_stop(app: AppHandle, operation: u64) -> Result<(), String> {
+    send_activity(activity_request(&app, |a| a.stop(operation))).await
+}
+
+#[tauri::command]
+async fn activity_stop_all(app: AppHandle) -> Result<(), String> {
+    send_activity(activity_request(&app, |a| Ok(a.stop_all()))).await
+}
+
+#[tauri::command]
+async fn activity_revoke(app: AppHandle, id: String) -> Result<(), String> {
+    send_activity(activity_request(&app, |a| a.revoke(&id))).await
+}
+
+#[tauri::command]
+async fn activity_set_enabled(app: AppHandle, enabled: bool) -> Result<(), String> {
+    send_activity(activity_request(&app, |a| Ok(a.set_agent_enabled(enabled)))).await
 }
 
 /// Reads the settings list, keeps the tiles it backs, and tells the page.
@@ -1061,6 +1214,11 @@ fn main() {
             network_disconnect,
             network_forget,
             network_vpn,
+            activity_view,
+            activity_stop,
+            activity_stop_all,
+            activity_revoke,
+            activity_set_enabled,
             bluetooth_view,
             bluetooth_set_power,
             bluetooth_scan,
@@ -1100,6 +1258,7 @@ fn main() {
                 audio: Audio::default(),
                 network: Network::default(),
                 bluetooth: Bluetooth::default(),
+                activity: Activity::default(),
                 quick: Quick::default(),
                 icons: std::collections::HashMap::new(),
                 started,

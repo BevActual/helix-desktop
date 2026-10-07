@@ -89,7 +89,7 @@ desktop** (`RegisterDesktop` owner) may call it — not every session process, a
 | `GetGrants` / `RevokeClient` | See and remove access from the shell (no `SetGrant`) |
 | `GetEnabled` / `SetEnabled` | Kill switch / safe mode: when false, `Action` and `RequestAccess` fail closed; the rest of the desktop keeps working |
 
-Signals: `Changed` (grants, enablement, new audit rows), `PendingChanged` (queue depth). Never poll.
+Signals: `Changed` (grants, enablement, and every new audit row, emitted by the broker's `onAudit`), `PendingChanged` (queue depth). Never poll.
 Trusted surfaces must still sanitize every field before display.
 
 ## Inference service
@@ -360,3 +360,26 @@ show every state-changing call before running it and rely on the Agent1 tiers, n
 - Does `Agent1` stay on `org.helix.Desktop` or move to its own bus name so it can be sandboxed separately?
 - A11y tree observation (AT-SPI) tier: `observe-private` by default?
 - Per-window `agent-visibility` rule in helix-niri so capture can exclude password managers and secrets.
+
+### The Agents panel in the Tauri shell (workstream 2)
+
+`helix-desktop-api::ActivityClient` wraps `AgentActivity1` (a contract test pins the method list to the XML, and a second test
+keeps `SetGrant`, `RegisterManager` and every client verb out of it). `helix-shell-core::activity` is the pure model: every field an
+agent can influence is sanitized, a tier that is not exactly one of the five names is shown as `unknown` (sanitizing could otherwise
+turn `ob<bidi>serve` into a real tier name), `stop` is refused unless the last snapshot listed that operation, `revoke` unless it
+listed that client, and `stop_all` is never refused. The panel (`agents`, also `org.helix.Shell1.OpenPanel("agents")`) shows what is
+waiting with Stop, who has access with Revoke, the kill switch, a Stop-all button and the recent audit rows; the bar button reads
+"Agents", "Agents · N waiting" or "Agents off" and is hidden when the shell is not the registered desktop.
+
+Constraints worth knowing:
+- Only the **connection that called `RegisterDesktop`** may use `AgentActivity1`, so the shell uses that one connection (set by the
+  confirmer once registered), not its shared one. The live trial runs beside the C++ shell, which holds the role, so the panel is
+  enabled by the same opt-in as the confirmer (`HELIX_SHELL_CONFIRMER`) and the trial shows nothing.
+- While a confirmation is on screen its Overlay covers the output, so the panel's Stop is reachable for requests queued behind
+  it or when the dialog was dismissed elsewhere; the nested test drives Stop through a test-only file hook that runs the same path.
+- The kill switch is held in the service's memory: a restart turns agents back on. Operations already running are not stoppable yet.
+
+Verified nested (`tools/nested/activity-test.sh`, real service, real pointer, a stand-in agent `agent-probe.py`): grant through the
+confirmer, an allowed action in the history, kill switch off refuses with "agent access is turned off" and on restores it, Revoke
+makes the next request fail with "no observe grant", Stop cancels a waiting request and closes its dialog. Shell memory with the
+panel open in the nested session: USS about 119 MB (PSS 172 MB without the service).

@@ -46,6 +46,8 @@ listen("shell-mode", (event) => {
     invoke("bluetooth_view").then(drawBluetooth);
     invoke("quick_view").then(drawQuick);
     invoke("battery_view").then(drawBattery);
+  } else if (panel === "agents") {
+    invoke("activity_view").then(drawAgents);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -110,6 +112,81 @@ $("lq").addEventListener("keydown", (event) => {
     launch(selected);
   }
 });
+// Agents. Rust owns the picture (everything an agent can influence is sanitized there) and builds every request; this page only
+// draws it and sends back ids it was given. Text is assigned with textContent only.
+function arow(what, sub, flag) {
+  const row = document.createElement("div");
+  row.className = "arow";
+  const main = document.createElement("div");
+  main.className = "main";
+  const title = document.createElement("div");
+  title.className = "what";
+  title.textContent = what;
+  main.append(title);
+  if (sub) {
+    const line = document.createElement("div");
+    line.className = "sub";
+    line.textContent = sub;
+    main.append(line);
+  }
+  row.append(main);
+  if (flag) {
+    const mark = document.createElement("span");
+    mark.className = "flag";
+    mark.textContent = flag;
+    row.append(mark);
+  }
+  return row;
+}
+function actionButton(label, test, run) {
+  const button = document.createElement("button");
+  button.textContent = label;
+  button.dataset.test = test;
+  button.onclick = run;
+  return button;
+}
+function drawAgents(view) {
+  const bar = $("agentsbtn");
+  bar.style.display = view.available ? "" : "none";
+  bar.classList.toggle("busy", view.available && view.enabled && view.busy);
+  bar.classList.toggle("off", view.available && !view.enabled);
+  bar.textContent = !view.enabled ? "Agents off" : view.busy ? "Agents · " + view.pending.length + " waiting" : "Agents";
+  $("agent-state").textContent = !view.available
+    ? "Agent activity is shown by the registered shell."
+    : view.enabled ? "Agents may ask to act. Nothing runs without the checks in Settings." : "Agents are off. Every request is refused until you turn them on.";
+  $("agent-toggle").textContent = view.enabled ? "Turn off" : "Turn on";
+  $("agent-toggle").disabled = !view.available;
+  $("agent-stopall").disabled = !view.available || !view.busy;
+  const pending = $("agent-pending");
+  pending.replaceChildren();
+  view.pending.forEach((row, index) => {
+    const line = arow(row.who + " · " + (row.grant ? "wants access" : row.tool), row.reason, row.tainted ? "untrusted input" : "");
+    line.append(actionButton("Stop", "stop-" + index, () => invoke("activity_stop", { operation: row.operation })));
+    pending.append(line);
+  });
+  if (!view.pending.length) pending.append(arow("Nothing is waiting.", "", ""));
+  const grants = $("agent-grants");
+  grants.replaceChildren();
+  view.grants.forEach((row, index) => {
+    const line = arow(row.who, row.tiers.length ? row.tiers.join(", ") : "no access", "");
+    line.append(actionButton("Revoke", "revoke-" + index, () => invoke("activity_revoke", { id: row.id })));
+    grants.append(line);
+  });
+  if (!view.grants.length) grants.append(arow("No agent has access.", "", ""));
+  const history = $("agent-history");
+  history.replaceChildren();
+  view.history.forEach((row) => {
+    const what = row.tool + (row.args ? " " + row.args : "");
+    history.append(arow(what, row.who + " · " + row.time + " · " + row.tier + " · " + row.decision + (row.outcome ? " · " + row.outcome : ""), row.tainted ? "untrusted input" : ""));
+  });
+  if (!view.history.length) history.append(arow("Nothing yet.", "", ""));
+  queueReport();
+}
+listen("activity-view", (event) => drawAgents(event.payload));
+invoke("activity_view").then(drawAgents);
+$("agentsbtn").onclick = () => invoke("panel_open", { id: "agents" });
+$("agent-stopall").onclick = () => invoke("activity_stop_all");
+$("agent-toggle").onclick = () => invoke("activity_set_enabled", { enabled: $("agent-toggle").textContent === "Turn on" });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
 $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
 

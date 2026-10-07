@@ -58,10 +58,22 @@
   .net.unavailable .ssid { color: var(--mut); }
   h3 { margin: 0; color: var(--accent); }
   input { font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
+  #agents { position: fixed; right: 12px; top: 50px; width: 440px; box-sizing: border-box; padding: 16px; background: var(--bg);
+            border-radius: 22px; display: none; flex-direction: column; gap: 10px; max-height: calc(100vh - 70px); overflow-y: auto; }
+  body[data-panel="agents"] #agents { display: flex; }
+  #agent-head { display: flex; align-items: center; gap: 8px; } #agent-head h3 { flex: 1; }
+  #agent-state { color: var(--mut); font-size: 12px; }
+  #agents h4 { margin: 6px 0 0; color: var(--mut); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .arow { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.05); }
+  .arow .main { flex: 1; min-width: 0; } .arow .what { font-weight: 600; } .arow .sub { color: var(--mut); font-size: 12px; overflow-wrap: anywhere; }
+  .arow .flag { color: #ffb4a8; font-size: 11px; } .arow button { padding: 1px 10px; font-size: 12px; }
+  #agent-history { display: flex; flex-direction: column; gap: 2px; }
+  #agent-history .arow { background: transparent; padding: 3px 8px; }
+  #agentsbtn.busy { background: var(--accent); color: #111; } #agentsbtn.off { color: #ffb4a8; }
   #body { min-height: 1.4em; } #reason, #note { color: var(--mut); font-size: 12px; }
   #buttons { display: none; justify-content: flex-end; gap: 8px; }
 </style>
-<div id="bar"><span id="live">Sound …</span><span><button id="apps">Apps</button> <button id="controlbtn">Controls</button> <button id="ask">Assistant</button></span></div>
+<div id="bar"><span id="live">Sound …</span><span><button id="agentsbtn" data-test="agentsbtn" style="display:none">Agents</button> <button id="apps">Apps</button> <button id="controlbtn">Controls</button> <button id="ask">Assistant</button></span></div>
 <div id="scrim"></div>
 <div id="controls">
   <div id="qs-main">
@@ -90,6 +102,13 @@
       <div id="btdevices"></div>
     </div>
   </div>
+</div>
+<div id="agents">
+  <div id="agent-head"><h3>Agents</h3><button id="agent-stopall" data-test="agent-stopall">Stop all</button><button id="agent-toggle" data-test="agent-toggle">Turn off</button></div>
+  <div id="agent-state"></div>
+  <h4>Waiting for you</h4><div id="agent-pending"></div>
+  <h4>Access</h4><div id="agent-grants"></div>
+  <h4>Recent</h4><div id="agent-history"></div>
 </div>
 <div id="launcher"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
 <div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?">

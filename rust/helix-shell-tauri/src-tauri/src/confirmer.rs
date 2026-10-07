@@ -214,6 +214,10 @@ pub fn start(
             return;
         };
         let confirmer = desktop.confirmer();
+        // AgentActivity1 answers only the connection that registered as the desktop, so activity uses this very connection.
+        let desktop = Arc::new(desktop);
+        let _ = crate::REGISTERED.set(desktop.clone());
+        crate::watch_activity(app.clone());
 
         {
             let app = app.clone();
