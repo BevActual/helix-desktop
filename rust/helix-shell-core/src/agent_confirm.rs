@@ -244,7 +244,9 @@ mod tests {
         }
     }
 
-    fn queue_with_log() -> (ConfirmationQueue, Arc<Mutex<Vec<Answer>>>, Arc<Mutex<i32>>) {
+    type Log = (ConfirmationQueue, Arc<Mutex<Vec<Answer>>>, Arc<Mutex<i32>>);
+
+    fn queue_with_log() -> Log {
         let answers = Arc::new(Mutex::new(Vec::new()));
         let log = answers.clone();
         let changes = Arc::new(Mutex::new(0));

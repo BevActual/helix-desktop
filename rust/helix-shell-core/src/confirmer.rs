@@ -213,7 +213,9 @@ mod tests {
     use serde_json::json;
     use std::sync::{Arc, Mutex};
 
-    fn confirmer() -> (Confirmer, Arc<Mutex<Vec<(u64, bool, Vec<String>)>>>) {
+    type Answers = Arc<Mutex<Vec<(u64, bool, Vec<String>)>>>;
+
+    fn confirmer() -> (Confirmer, Answers) {
         let log = Arc::new(Mutex::new(Vec::new()));
         let sink = log.clone();
         let panel = Confirmer::new(Box::new(move |operation, approved, tiers| {

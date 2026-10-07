@@ -804,7 +804,10 @@ fn empty_confirmer_view() -> ConfirmerView {
     }
 }
 
-fn confirmer_sync_and_arm(app: &AppHandle, host: &Arc<Mutex<confirmer::ConfirmerHost>>) -> ConfirmerView {
+fn confirmer_sync_and_arm(
+    app: &AppHandle,
+    host: &Arc<Mutex<confirmer::ConfirmerHost>>,
+) -> ConfirmerView {
     let panel = host.lock().expect("confirmer");
     let view = panel.view();
     let needs_arm = view.open && !view.armed;
