@@ -6,8 +6,8 @@ fn shell_does_not_hold_agent_authority() {
     let sources = [
         include_str!("../src/main.rs"),
         include_str!("../src/layer.rs"),
-        include_str!("../../dist/bar.js"),
-        include_str!("../../dist/panel.js"),
+        include_str!("../../dist/shell.js"),
+        include_str!("../../dist/index.html"),
     ]
     .join("\n");
     for forbidden in [

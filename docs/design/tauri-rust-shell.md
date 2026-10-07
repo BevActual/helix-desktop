@@ -50,7 +50,7 @@ rust/
 
 - **M0 done.** Bar + panel spike renders in nested niri.
 - **M1 Foundation.** Workspace builds (`cargo test`, `cargo clippy -D warnings`, `cargo fmt`). `helix-desktop-api` reads `audio.sound_volume` from the real `helix-service` on a private bus and the bar shows it, updating when the setting changes (50% to 25% in the nested run). First frame 387-412 ms. Shell PSS with the panel hidden was 342 MB when both webviews were created at startup.
-- **M2 Surface manager.** One Rust module owns every layer surface. Setup is hidden, size request, then `init_layer_shell`, then anchors, exclusive zone and keyboard mode. Escape and outside-click each close the open panel, and only one panel is open per monitor. Unit-tested with no display. Nested screenshots show the panel opening and closing. First measurement with both webviews kept alive: panel-open 409 MB (over budget). Stopped before M3.
+- **M2 Surface manager (superseded by the single surface, below).** One Rust module owns every layer surface. Setup is hidden, size request, then `init_layer_shell`, then anchors, exclusive zone and keyboard mode. Escape and outside-click each close the open panel, and only one panel is open per monitor. Unit-tested with no display. Nested screenshots show the panel opening and closing. First measurement with both webviews kept alive: panel-open 409 MB (over budget). Stopped before M3.
 - **M2 memory.** Creating the panel webview only while it is open, and `WebviewWindow::destroy` on dismiss, drops bar-only to 191 MB and panel-open to 255 MB (under the 350 MB budget, with ~95 MB headroom before notifications/OSD). `close()` instead of `destroy()` did not reclaim and ballooned back toward 409 MB; keep `destroy()`. Destroy alone does not exit the panel's `WebKitWebProcess` on Linux (reopen used to accumulate a third helper and ~300 MB idle). The shell snapshots bar-only WebKit PIDs and SIGTERMs any extra web-process descendants ~750 ms after panel destroy (`webkit_mem.rs`). Nested reclaim: after dismiss, webkit-web-count returns to 1 and shell PSS to ~201 MB within 1 s; a second open/close does not accumulate. `webkit_web_context_set_web_process_count_limit(1)` is a no-op on WebKit 2.54 (deprecated since 2.26; getter stays 0). M3 is unblocked on the peak budget.
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
@@ -127,3 +127,32 @@ Still open:
 
 Recommendation: adopt it for the shell UI (bar, launcher, control center, assistant); keep the approval dialog, lock screen and
 greeter as separate trusted surfaces regardless.
+
+
+## Decision: one surface, adopted (M2b, done)
+
+The shell is now one layer surface hosting the bar and every panel (`ShellSurface` in `helix-shell-core`, applied by
+`helix-shell-tauri/src-tauri/src/layer.rs`; frontend `dist/index.html` + `dist/shell.js`). The multi-surface manager
+(`surfaces.rs`) is kept for surfaces that must be separate, such as the approval dialog.
+
+Measured on the real crate (3 runs of `tools/nested/tauri-m2.sh`, nested niri, NVIDIA, shell excluding `helix-service`):
+
+| State | Before (two surfaces) | Now (one surface) | Budget |
+|---|---|---|---|
+| Bar only | 296-297 MB | 323 MB | <= 350 MB |
+| Panel open | 409 MB | 314-322 MB | <= 350 MB |
+| After the panel closes | 305 MB | 326-330 MB | <= 350 MB |
+| Idle CPU, shell + web processes | n/a | 0.15% | <= 0.3% |
+| First frame | 370 ms | 311-342 ms | <= 800 ms |
+
+Memory is now flat across states instead of spiking when a panel opens, at the price of about 26 MB more when idle.
+
+Verified with `tools/nested/single-surface-pointer-test.sh` (a real virtual pointer and keyboard): click-through while closed,
+typing confined to the panel while open, clicks inside keep it open, a click outside closes it without reaching the window
+below, keyboard focus returns afterwards, Escape closes. The test found two bugs in this adoption that unit tests could not:
+the Tauri capability still named the old windows (so the page received no events and the panel never appeared), and Escape
+closed the surface state without applying the plan. `ShellSurface::escape` now only reports what to do.
+
+Idle CPU of the C++ pieces, measured on the real session: `helix-service` 2.8% of a core (a permanent 16 ms poll timer), the
+C++ shell 1.1%, the Tauri shell 0.1%. `helix-service` now ticks at 16 ms only while something is happening and at 100 ms otherwise
+(0.85% to 0.25% in the harness). A fully event-driven loop (watching the PipeWire, mixer and HTTP fds) would remove the rest.

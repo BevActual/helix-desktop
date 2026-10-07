@@ -34,7 +34,6 @@ gdbus call --session --dest org.helix.Desktop --object-path /org/helix/Desktop \
 wait_count "LIVE Sound 25%" 1
 echo open >> "$CONTROL"
 wait_count "PANEL open" 1
-wait_count "READY panel" 1
 sleep 1
 niri msg action screenshot-screen >/dev/null 2>&1
 sleep 1.5
@@ -42,15 +41,13 @@ ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/panel-open.p
 python3 "$HERE/coverage.py" "$SCRATCH/panel-open.png" "panel-open"
 python3 "$HERE/process_tree.py" "$PID" "panel-open"
 echo escape >> "$CONTROL"
-wait_count "PANEL destroyed" 1
-# WebKit helpers often linger a few seconds after WebviewWindow::destroy.
-sleep 8
+wait_count "PANEL closed" 1
+sleep 3
 python3 "$HERE/process_tree.py" "$PID" "bar-only-after-destroy"
 echo open >> "$CONTROL"
 wait_count "PANEL open" 2
-wait_count "READY panel" 2
 echo outside >> "$CONTROL"
-wait_count "PANEL destroyed" 2
+wait_count "PANEL closed" 2
 sleep 0.5
 niri msg action screenshot-screen >/dev/null 2>&1
 sleep 1.5

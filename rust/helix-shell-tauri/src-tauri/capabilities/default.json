@@ -1,6 +1,6 @@
 {
   "identifier": "default",
-  "description": "The spike's two windows may call its own commands",
-  "windows": ["bar", "panel"],
+  "description": "The shell window may call its own commands and listen to its events",
+  "windows": ["shell"],
   "permissions": ["core:default"]
 }
