@@ -1,0 +1,10 @@
+[package]
+name = "helix-desktop-api"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "zbus client for org.helix.Desktop. Method names are checked against protocols/dbus/org.helix.Desktop.xml."
+
+[dependencies]
+futures-util = "0.3"
+zbus = { version = "5", default-features = false, features = ["tokio"] }

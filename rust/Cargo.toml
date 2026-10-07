@@ -1,4 +1,14 @@
-# Rust side of Helix. Each member is built and tested on its own; nothing here is part of the meson build yet.
+# Rust side of Helix. The C++ shell keeps running until each surface here reaches parity.
 [workspace]
 resolver = "2"
-members = ["helix-shell-tauri/src-tauri"]
+members = [
+    "helix-shell-core",
+    "helix-desktop-api",
+    "helix-shell-tauri/src-tauri",
+]
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
