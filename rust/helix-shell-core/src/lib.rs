@@ -10,6 +10,7 @@ pub mod confirmer;
 mod display;
 pub mod launcher;
 pub mod network;
+pub mod notifications;
 pub mod power;
 pub mod quick;
 pub mod shell_surface;
