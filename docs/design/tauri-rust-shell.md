@@ -109,12 +109,21 @@ Measured (same harness): bar only 323 MB (app 144 + web 158); panel open 317 MB,
 current two-surface tree: 297 MB bar only, 409 MB with a panel open. Pixel coverage with the panel open: bar 83.5%, panel 32.0%
 (a smaller panel than before). It fits the 350 MB budget in both states; the two-surface design does not when a panel is open.
 
-Costs and risks, not yet verified:
+Verified with a real pointer and keyboard (`tools/nested/single-surface-pointer-test.sh`, using `tools/nested/wl-pointer`, a virtual-pointer
+injector, and `tools/nested/probe_window.py`, a window that logs the events it receives). All nine checks pass:
+- Panel closed: clicks on empty areas reach the window below (click-through); clicks on the bar are handled by the bar.
+- Panel open: typed text goes to the panel and never to the window below; clicking inside it keeps it open; clicking outside
+  closes it and that click does not reach the window below; Escape closes it.
+- After closing, keyboard focus returns to the window below and click-through works again.
+- Bug found and fixed by the test: the input region must be re-applied on every resize (`connect_size_allocate`), not once on a
+  timer, or the first state lets empty areas swallow clicks.
+
+Still open:
 - Bar-only is about 26 MB higher (a full-output transparent buffer).
-- Click-through (the input region) and focus hand-over between bar and panel were not exercised with a real pointer.
 - Raising the whole surface to Overlay while a panel is open puts the bar above fullscreen windows for that time.
 - One page means one crash or hang takes the bar and the panels down together; per-output surfaces are needed for multi-monitor.
-- Layer and keyboard-mode switching on a mapped surface must be tested for flicker and for losing focus.
+- Layer and keyboard-mode switching was not checked for visible flicker, only for correctness.
+- The exclusive zone (space reserved for the bar) was not checked against tiled window placement.
 
-Recommendation: adopt it for the shell UI (bar, launcher, control center, assistant) if click-through and focus pass a pointer
-test; keep the approval dialog, lock screen and greeter as separate trusted surfaces regardless.
+Recommendation: adopt it for the shell UI (bar, launcher, control center, assistant); keep the approval dialog, lock screen and
+greeter as separate trusted surfaces regardless.

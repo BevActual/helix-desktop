@@ -8,6 +8,14 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 static STARTED: OnceLock<Instant> = OnceLock::new();
 const BAR_HEIGHT: i32 = 42;
+static PANEL_OPEN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The region that matches the current state, for the surface size it has right now.
+fn apply_region(window: &gtk::ApplicationWindow, width: i32, height: i32) {
+    let open = PANEL_OPEN.load(std::sync::atomic::Ordering::SeqCst);
+    let rect = if open { (0, 0, width.max(1), height.max(1)) } else { (0, 0, width.max(1), BAR_HEIGHT) };
+    set_input_region(window, &[rect]);
+}
 
 fn set_input_region(window: &gtk::ApplicationWindow, rects: &[(i32, i32, i32, i32)]) {
     if let Some(gdk_window) = window.window() {
@@ -23,6 +31,8 @@ fn set_input_region(window: &gtk::ApplicationWindow, rects: &[(i32, i32, i32, i3
 /// closed = only the bar is clickable, no keyboard, normal bar layer.
 #[tauri::command]
 fn set_open(app: tauri::AppHandle, open: bool) {
+    eprintln!("SET_OPEN {open}");
+    PANEL_OPEN.store(open, std::sync::atomic::Ordering::SeqCst);
     let Some(w) = app.get_webview_window("shell") else { return };
     let Ok(gtk_win) = w.gtk_window() else { return };
     let width = gtk_win.allocated_width().max(1);
@@ -67,11 +77,8 @@ fn main() {
             g.set_exclusive_zone(BAR_HEIGHT);
             g.set_keyboard_mode(KeyboardMode::None);
             win.show()?;
-            let g2 = g.clone();
-            gtk::glib::timeout_add_local_once(std::time::Duration::from_millis(400), move || {
-                let w = g2.allocated_width().max(1);
-                set_input_region(&g2, &[(0, 0, w, BAR_HEIGHT)]);
-            });
+            // The surface only gets its real size after the compositor configures it, so the input region follows every resize.
+            g.connect_size_allocate(|w, alloc| apply_region(w, alloc.width(), alloc.height()));
             if let Some(secs) = std::env::var("HELIX_SPIKE_AUTO_PANEL").ok().and_then(|v| v.parse::<u64>().ok()) {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
