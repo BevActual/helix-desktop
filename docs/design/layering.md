@@ -14,7 +14,7 @@ A module may include its own layer and the layers below it.
 | display | render, ui | The shell's renderer and UI toolkit. |
 | shell | shell, launcher, capture, app | Shell-only features and the application that wires them together. |
 
-`desktop` (the desktop service) and `apps` (Settings, Software, System Monitor) are **independent processes**. They may
+`desktop` (the desktop service), `inference` (the model runtime) and `apps` (Settings, Software, System Monitor) are **independent processes**. They may
 include base, platform and each other, never display or shell, so they can run without the shell. They currently have
 no violations. `desktop_api` is the client library for the service (protocol, client, display text); every process uses it.
 

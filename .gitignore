@@ -25,3 +25,9 @@ Thumbs.db
 result/
 result
 result-*
+
+# Inference engine: source, build tree and install prefix (see docs/design/agent-and-inference.md)
+/third_party/llama.cpp-*/
+/third_party/llama.cpp-*.tar.gz
+/third_party/.llama-build/
+/third_party/llama-install/
