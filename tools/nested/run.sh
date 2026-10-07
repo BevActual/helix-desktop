@@ -14,6 +14,9 @@ if [ -z "${HELIX_NESTED_INNER:-}" ]; then
 fi
 export HOME=$SCRATCH/home XDG_CONFIG_HOME=$SCRATCH/config XDG_STATE_HOME=$SCRATCH/state XDG_DATA_HOME=$SCRATCH/data XDG_CACHE_HOME=$SCRATCH/cache
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+# The real system bus (NetworkManager, BlueZ, logind, polkit) is out of reach of everything started here. A test that needs one
+# provides its own with HELIX_NESTED_SYSTEM_BUS=unix:path=...; otherwise services see "unavailable", never the person's real devices.
+export DBUS_SYSTEM_BUS_ADDRESS="${HELIX_NESTED_SYSTEM_BUS:-unix:path=/nonexistent/helix-nested-system-bus}"
 unset NIRI_SOCKET NOCTALIA_STATE_HOME NOCTALIA_CONFIG_HOME NOCTALIA_DATA_HOME NOCTALIA_CACHE_HOME
 for kv in "$@"; do export "$kv"; done
 # HELIX_NESTED_ASSISTANT=<path to helix-assistant>: pre-grant observe and act to that binary, as if the person had approved it once.
