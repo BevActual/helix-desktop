@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<style>
+  html, body { height: 100%; } body { background: transparent; }
+  #bar { height: 34px; box-sizing: border-box; margin: 4px 12px 0; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; background: var(--bg); border-radius: 18px; }
+  #scrim { position: fixed; inset: 42px 0 0 0; display: none; }
+  #panel { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); width: 520px; box-sizing: border-box; padding: 16px; background: var(--bg); border-radius: 14px; display: none; }
+  input { width: 100%; box-sizing: border-box; font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
+  h3 { margin: 0 0 10px; color: var(--accent); }
+</style>
+<div id="bar"><span id="clock"></span><span><button id="ask">Assistant</button></span></div>
+<div id="scrim"></div>
+<div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?"></div>
+<script>
+  const { invoke } = window.__TAURI__.core;
+  const $ = (id) => document.getElementById(id);
+  const tick = () => { const d = new Date(); $("clock").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + "  " + d.toLocaleDateString([], { weekday: "short", month: "short", day: "2-digit" }); };
+  tick(); setInterval(tick, 20000);
+  let open = false;
+  const setOpen = (v) => { open = v; $("panel").style.display = v ? "block" : "none"; $("scrim").style.display = v ? "block" : "none"; invoke("set_open", { open: v }); if (v) $("q").focus(); };
+  window.openPanel = () => setOpen(true);
+  $("ask").onclick = () => setOpen(!open);
+  $("scrim").onclick = () => setOpen(false);                       // a click outside the panel dismisses it
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
+  requestAnimationFrame(() => invoke("ready"));
+</script>

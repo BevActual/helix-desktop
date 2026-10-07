@@ -76,8 +76,11 @@ reproduce. Measured, shell only (excluding `helix-service`): bar only 296-297 MB
 about 122 MB plus network process 21 MB); panel open 409 MB (two web processes, 132 + 131 MB); after the panel is destroyed 305 MB
 (the reap lowers the process count but memory stays high). Idle CPU 0.67-0.57 cpu-seconds over 8 s (about 0.1%), first frame 370 ms,
 pixel coverage as reported (bar 83.5%, panel open 44.6%, closed 0.1%). So the bar alone is within the 350 MB budget, bar plus an
-open panel is not, and destroy-on-close does not return to the bar-only level. Also note the app process itself grew from about 57 MB
-(spike) to about 122 MB; find out why (zbus/tokio, the webkit2gtk crate, or mapped libraries) before adding more.
+open panel is not, and destroy-on-close does not return to the bar-only level. The app process is about 120 MB in this harness for the original spike too (116 MB, measured the same way), so the shell code added
+nothing; an earlier "57 MB" figure came from different measurement conditions and should be ignored. Most of it is WebKit and the
+GPU userspace stack (about 41 MB heap, 25 MB anonymous, about 25 MB of NVIDIA, Mesa and LLVM libraries mapped in each process),
+not allocator behaviour: `MALLOC_ARENA_MAX`/trim settings changed it by under 3 MB. Same harness, original spike (bar plus hidden panel,
+two web processes): 342 MB total, so the current tree already saves about 45 MB at idle by keeping to one web process.
 
 Measured in `tools/nested/run.sh` with the release binary and `tools/nested/process_tree.py` (prints total PSS and shell-only excluding `helix-service`). Use `tools/nested/tauri-reclaim.sh` to watch WebKit PIDs across destroy. The 409 MB figure was two WebKit renderers created at startup (hidden panel still ~72 MB). Lazy panel create + destroy on dismiss fixes the peak; PID reap fixes the post-dismiss leak. Pixel coverage unchanged: bar strip 83.5%, open panel 44.6%, closed 0.1%. Screenshots: `/tmp/helix-nested/tauri-m2/panel-open.png` and `panel-closed.png`.
 
@@ -94,3 +97,24 @@ If a milestone blows a budget, stop and report; do not push on.
   into `/usr/local` or restart the user's shell; installation is a separate, explicit step.
 - Packages already installed for this: `webkit2gtk4.1-devel gtk3-devel gtk-layer-shell-devel libsoup3-devel javascriptcoregtk4.1-devel`.
 - Commit small, one topic each, with the repo's message style. Update this document when a fact changes.
+
+
+## Experiment: one surface for the bar and all panels (`rust/experiments/single-surface`)
+
+The cost that breaks the budget is the second web process that appears when a panel opens (about 131 MB). A single full-output
+layer surface avoids it: the bar and the panel live in one page, one web process, with the input region trimmed so clicks
+outside the visible parts pass through.
+
+Measured (same harness): bar only 323 MB (app 144 + web 158); panel open 317 MB, still one web process. Compare the
+current two-surface tree: 297 MB bar only, 409 MB with a panel open. Pixel coverage with the panel open: bar 83.5%, panel 32.0%
+(a smaller panel than before). It fits the 350 MB budget in both states; the two-surface design does not when a panel is open.
+
+Costs and risks, not yet verified:
+- Bar-only is about 26 MB higher (a full-output transparent buffer).
+- Click-through (the input region) and focus hand-over between bar and panel were not exercised with a real pointer.
+- Raising the whole surface to Overlay while a panel is open puts the bar above fullscreen windows for that time.
+- One page means one crash or hang takes the bar and the panels down together; per-output surfaces are needed for multi-monitor.
+- Layer and keyboard-mode switching on a mapped surface must be tested for flicker and for losing focus.
+
+Recommendation: adopt it for the shell UI (bar, launcher, control center, assistant) if click-through and focus pass a pointer
+test; keep the approval dialog, lock screen and greeter as separate trusted surfaces regardless.
