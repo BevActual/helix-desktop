@@ -16,6 +16,12 @@ export HOME=$SCRATCH/home XDG_CONFIG_HOME=$SCRATCH/config XDG_STATE_HOME=$SCRATC
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
 unset NIRI_SOCKET NOCTALIA_STATE_HOME NOCTALIA_CONFIG_HOME NOCTALIA_DATA_HOME NOCTALIA_CACHE_HOME
 for kv in "$@"; do export "$kv"; done
+# HELIX_NESTED_ASSISTANT=<path to helix-assistant>: pre-grant observe and act to that binary, as if the person had approved it once.
+if [ -n "${HELIX_NESTED_ASSISTANT:-}" ]; then
+  mkdir -p "$XDG_STATE_HOME/noctalia/agent"
+  printf '{"clients":{"exe:%s":["observe","act"]},"version":1}' "$(readlink -f "$HELIX_NESTED_ASSISTANT")" > "$XDG_STATE_HOME/noctalia/agent/grants.json"
+  chmod 600 "$XDG_STATE_HOME/noctalia/agent/grants.json"
+fi
 cat > "$SCRATCH/niri.kdl" <<KDL
 hotkey-overlay { skip-at-startup; }
 screenshot-path "$SCRATCH/shots/shot-%H%M%S.png"

@@ -54,7 +54,7 @@ rust/
 - **M2 memory.** Creating the panel webview only while it is open, and `WebviewWindow::destroy` on dismiss, drops bar-only to 191 MB and panel-open to 255 MB (under the 350 MB budget, with ~95 MB headroom before notifications/OSD). `close()` instead of `destroy()` did not reclaim and ballooned back toward 409 MB; keep `destroy()`. Destroy alone does not exit the panel's `WebKitWebProcess` on Linux (reopen used to accumulate a third helper and ~300 MB idle). The shell snapshots bar-only WebKit PIDs and SIGTERMs any extra web-process descendants ~750 ms after panel destroy (`webkit_mem.rs`). Nested reclaim: after dismiss, webkit-web-count returns to 1 and shell PSS to ~201 MB within 1 s; a second open/close does not accumulate. `webkit_web_context_set_web_process_count_limit(1)` is a no-op on WebKit 2.54 (deprecated since 2.26; getter stays 0). M3 is unblocked on the peak budget.
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
-- **M4 Assistant panel parity.** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
+- **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
 - **M5 Launcher, control center, notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
@@ -156,3 +156,16 @@ closed the surface state without applying the plan. `ShellSurface::escape` now o
 Idle CPU of the C++ pieces, measured on the real session: `helix-service` 2.8% of a core (a permanent 16 ms poll timer), the
 C++ shell 1.1%, the Tauri shell 0.1%. `helix-service` now ticks at 16 ms only while something is happening and at 100 ms otherwise
 (0.85% to 0.25% in the harness). A fully event-driven loop (watching the PipeWire, mixer and HTTP fds) would remove the rest.
+
+## M4 verified: the assistant inside the Tauri shell, end to end
+
+`tools/nested/assistant-flow-test.sh` (real 7B model, private bus, real `helix-service`, `helix-inference` and `helix-assistant`):
+the panel opens, "Make the screen dimmer." is typed and submitted, the shell shows Thinking and then "About to: Make the screen dimmer
+(display brightness, not sound) (`brightness-down`)" with Cancel and Do it. Two Enter presses start nothing. A real pointer click on
+Do it starts the action, the result is shown, and focus returns to the input. The audit log shows `brightness-down` allowed under
+the `helix-assistant` identity, not the shell's: the shell never held the model's authority. Run with
+`HELIX_NESTED_ASSISTANT=<build>/helix-assistant` (pre-grants it, as an earlier approval would), `HELIX_MODEL_DIR` and `PATH` set on the
+outer command (the model service is started by D-Bus activation and inherits the outer environment).
+
+Known rough edges: the confirmation text includes the model-facing disambiguation ("display brightness, not sound"); the result text
+is whatever the command printed ("ok"); the panel is a fixed 520 px.

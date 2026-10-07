@@ -74,6 +74,7 @@ fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
 }
 
 fn emit_view(app: &AppHandle, view: &AssistantView) {
+    eprintln!("ASSISTANT {}", view.phase);
     let _ = app.emit("assistant-view", view);
 }
 
