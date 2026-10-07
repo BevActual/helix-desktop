@@ -153,28 +153,52 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
 
 ## Measured: model quality and speed
 
-`tests/inference_llama_test.cpp` runs a real model through the queue, the tool-call grammar and the live command schema
-with 14 plain-English desktop requests (read-only and everyday tiers, about 120 tools). Hardware: RTX 4080 Laptop GPU,
-Vulkan, all layers offloaded. One run each, greedy decoding, so treat the figures as indicative, not as a benchmark.
+`tests/inference_eval.cpp` runs 92 realistic requests (`tests/eval/desktop_requests.json`: 82 to act on across 10 families,
+10 that must be declined) against a real model through the whole stack: queue, grammar and the live command schema, with
+the read-only, everyday and `act` tiers (115 tools). Accepted answers are listed per request, and accepted arguments
+default to none, so a hallucinated argument is not scored as correct. `tools/run-inference-eval.py` runs the matrix. RTX 4080
+Laptop GPU, Vulkan, greedy decoding, one run per cell, warm-up excluded; roughly +/-3 points of noise on 82 requests.
 
-| | Qwen2.5-1.5B-Instruct Q4_K_M | Qwen2.5-7B-Instruct Q4_K_M |
-|---|---|---|
-| Reply is a valid tool call | 14 / 14 | 14 / 14 |
-| Right tool, one stage (about 120 tools) | 7 / 14 | **11 / 14** |
-| Right tool, two stages (group, then tool) | 8 / 14 | 11 / 14 |
-| Median time per request | about 0.95 s | about 1.45 s one stage, about 1.1 s two stages |
-| Model load plus first request | about 1 s warm-up | about 14 s |
+| Model | Configuration | Exact | Right tool | Declined correctly | Acted instead of declining | Median latency |
+|---|---|---|---|---|---|---|
+| 1.5B | flat | 61% | 68% | 0 / 10 | 10 | 0.83 s |
+| 1.5B | flat + decline | 62% | 72% | 0 / 10 | 10 | 1.0 s |
+| 1.5B | staged + decline | 63% | 72% | 1 / 10 | 9 | 0.88 s |
+| 1.5B | flat + decline + 5 examples | 70% | 80% | 1 / 10 | 9 | 0.89 s |
+| 1.5B | staged + decline + 5 examples | 60% | 72% | 1 / 10 | 9 | 0.86 s |
+| 7B | flat | 85% | 96% | 0 / 10 | 10 | 2.2 s |
+| 7B | flat + decline | 87% | 96% | 6 / 10 | 4 | 2.3 s |
+| 7B | staged + decline | 72% | 84% | 5 / 10 | 5 | 1.7 s |
+| 7B | **flat + decline + 5 examples** | **90%** | **95%** | **7 / 10** | **3** | **2.1 s** |
+| 7B | staged + decline + 5 examples | 78% | 83% | 5 / 10 | 5 | 1.6 s |
 
-- **Validity is a guarantee, correctness is not.** The grammar makes every reply a valid call; choosing the *right* one
-  is the model's job. The 1.5B model confuses similar names ("lock the screen" became `lockscreen-widgets-toggle-edit`).
-  The 7B model's misses are mostly plausible neighbours (`settings-open` for "open the control center",
-  `desktop-ai-status` for "status").
-- **Load the model and run a throwaway request at service start**, not on the user's first request.
-- **A constrained reply cut off by the token limit is an error**, never returned as an answer.
-- **One unexplained slow run** (about 6.7 minutes instead of about 20 s for the 1.5B test) did not reproduce; it was
-  probably contention for the GPU. Timing output (`HELIX_TEST_TIMING=1`) is kept to catch it.
-- Accuracy is reported, not asserted beyond a loose floor. A proper evaluation suite (the 14 requests are a smoke test)
-  should gate changes to prompts, grammar and model choice.
+What it says:
+
+- **Validity is a guarantee; correctness and safety are not.** Every reply in every run was a valid tool call. Nothing about
+  validity makes a call safe or right.
+- **A small model does not know what it cannot do.** The 1.5B model declined 1 of 10 impossible requests. For "reboot the
+  computer" it set the power profile to performance, and for "shut down the PC" it cycled the power profile: real state
+  changes from a valid call. The 7B model's wrong actions on the same requests were reads (`wifi-status` for "turn off
+  Wi-Fi") or a mild one (`media raise` for "open Spotify"), and it declined 7 of 10 correctly with the examples. Any
+  assistant must show the user what it is about to do for `act`-tier calls, not run them silently.
+- **A decline option is needed and works with the larger model** (0/10 to 6-7/10 correct declines). It barely helps the 1.5B.
+- **Flat beats two-stage for the larger model** (87-90% against 72-78%). The two-stage group choice is where it goes wrong;
+  its only advantage is latency (1.6 s against 2.1 s). An earlier 14-request test suggested the opposite, which is why the
+  larger suite exists.
+- **Five examples help modestly** (+8 points for the 1.5B, +3 for the 7B), at no latency cost.
+- **Remaining 7B misses** (95% right tool): "make it louder" and "quieter" became `brightness-up`/`brightness-down`;
+  "show my clipboard history" became `notification-history`; "status of the desktop" became `desktop-ai-status`; and four
+  right-tool answers carried empty or extra optional arguments (`bar-hide [""]`, `brightness-set ["", "60"]`).
+- **Latency.** About 2 s per request for the 7B, dominated by reprocessing the roughly 2,000-token tool list each time.
+  Reusing the key-value cache for the shared prompt prefix should cut most of it.
+
+Ideas to test next, in order of expected value: require non-empty strings for free-text arguments (the grammar allows empty
+ones today); put `reason` before `tool` in the output so it acts as a short chain of thought; cache the shared prompt prefix;
+list only the offered tools' optional arguments that matter; evaluate a 14B-class model.
+
+Earlier smoke test (14 requests, kept for the record): both models 14/14 valid; right tool 7/14 (1.5B) and 11/14 (7B).
+A constrained reply cut off by the token limit is an error, never returned as an answer. One unexplained slow run
+(about 6.7 minutes instead of about 20 s) did not reproduce; probably GPU contention.
 
 ## Build order
 
