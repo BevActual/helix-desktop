@@ -72,6 +72,15 @@ pub fn reserve_bar_space() {
     }
 }
 
+/// Extra space above the shell, in pixels: `HELIX_SHELL_TOP_OFFSET`. Zero normally. Running beside another shell that owns the top edge
+/// (the trial runs next to the native bar) sets it to that bar's height so the two do not draw over each other.
+pub fn top_offset() -> i32 {
+    std::env::var("HELIX_SHELL_TOP_OFFSET")
+        .ok()
+        .and_then(|value| value.trim().parse::<i32>().ok())
+        .map_or(0, |value| value.clamp(0, 400))
+}
+
 /// Creates the layer surface, hidden, sets it up in the order layer-shell requires, then shows it with the closed plan.
 pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
@@ -81,6 +90,7 @@ pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         gtk_window.set_anchor(edge, true);
     }
+    LayerShell::set_layer_shell_margin(&gtk_window, Edge::Top, top_offset());
     // -1: cover the whole output even where another surface (the one below) has reserved space; that surface holds the zone.
     gtk_window.set_exclusive_zone(-1);
     apply_layer_and_keyboard(&gtk_window, plan);
