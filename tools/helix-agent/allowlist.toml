@@ -1,17 +1,18 @@
 # Helix Agent Surface v1 — tools exposed over MCP.
 # Dangerous session power actions and synthetic input stay off.
 
-# Which risk tiers (protocols/ipc/msg-risk.toml) this adapter may call. "blocked" is never granted.
-# "confirm" stays granted only until the shell grows a user-confirmation path (Agent1 interface);
-# remove it from this list to make every confirm-tier tool refuse.
 # How tool calls reach the desktop.
 #   auto    use the desktop service's Agent1 interface when it exists, else the direct `noctalia msg` socket.
 #           A refusal from Agent1 is final and is never retried on the direct path.
-#   agent1  require Agent1 (grants, confirmation and audit are enforced by the service). Recommended once installed.
+#   agent1  require Agent1 (grants, confirmation and audit are enforced by the service). Set once installed: if the
+#           service is down the tools report an error instead of quietly using the unguarded direct path.
 #   legacy  always use the direct socket (no per-client grants or confirmation).
 [backend]
-mode = "auto"
+mode = "agent1"
 
+# Which risk tiers (protocols/ipc/msg-risk.toml) this adapter may ask for. "blocked" is never granted. The service still
+# decides: you are asked the first time a tier is needed, and "confirm" actions ask each time. Remove a tier here to make
+# the adapter refuse to even ask for it.
 [grants]
 tiers = ["observe", "observe-private", "act", "confirm"]
 

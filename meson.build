@@ -1299,6 +1299,9 @@ if build_tests
     test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
     meter_python = find_program('python3')
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+      test('desktop_agent_manager_integration', helix_dbus_session,
+        args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
+          helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
       test('desktop_agent_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_integration.py',
           helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
