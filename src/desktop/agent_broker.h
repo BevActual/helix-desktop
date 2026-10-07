@@ -38,6 +38,9 @@ public:
 
   // Called when a confirmation is needed; the service forwards it to the registered confirmer.
   std::function<void(std::uint64_t operation, const nlohmann::json& details)> onConfirmationRequested;
+  // Called when a pending confirmation ends without the confirmer answering it (the requester cancelled or left, or
+  // the deadline passed), so whoever is showing it can stop.
+  std::function<void(std::uint64_t operation)> onConfirmationEnded;
   void setConfirmerPresent(bool present);  // false denies everything pending
 
   // Always returns an operation id; `done` is invoked once, possibly before submit returns.
@@ -49,6 +52,8 @@ public:
   // For grant requests `narrowed` lets the user approve fewer tiers than were asked; extras are ignored.
   bool confirm(std::uint64_t operation, bool approved, const std::optional<std::set<Tier>>& narrowed = std::nullopt);
   void expire();  // denies confirmations past their deadline
+  // Records a change the user made to a client's grants (through the manager), so the log shows who widened what.
+  void recordGrantChange(const std::string& client, const std::string& change, const std::vector<std::string>& tiers);
   std::size_t pending() const { return pending_.size(); }
 
   const RiskPolicy& policy() const { return policy_; }

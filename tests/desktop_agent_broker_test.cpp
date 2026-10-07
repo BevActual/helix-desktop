@@ -113,7 +113,10 @@ void checkConfirmationAndTaint(const std::filesystem::path& dir) {
   TEST_CHECK(details["tainted"] == true && details["tool"] == "app-launch" && details["reason"] == "open settings");
   TEST_CHECK(h.broker.pending() == 1);
 
+  int endedByAnswer = 0;
+  h.broker.onConfirmationEnded = [&](std::uint64_t) { ++endedByAnswer; };
   TEST_CHECK(h.broker.confirm(operation, true));
+  TEST_CHECK(endedByAnswer == 0);  // answered by the confirmer itself: nothing to announce
   TEST_CHECK(h.calls.size() == 2 && h.calls[1].literal == std::vector<std::string>{"Settings"});
   TEST_CHECK(!h.broker.tainted(kClient));  // a human looked at it
   h.finishLast(true, "ok");
@@ -132,17 +135,23 @@ void checkLifecycle(const std::filesystem::path& dir) {
   h.grants.set("exe:/other", {Tier::Confirm});
   h.broker.setConfirmerPresent(true);
 
+  std::vector<std::uint64_t> ended;
+  h.broker.onConfirmationEnded = [&](std::uint64_t operation) { ended.push_back(operation); };
+
   const auto op = h.broker.submit({kClient, "app-launch", {}, {"A"}, ""}, h.recorder(0));
   TEST_CHECK(!h.broker.cancel("exe:/other", op));  // only the requester may cancel
+  TEST_CHECK(ended.empty());                        // a refused cancel ends nothing
   TEST_CHECK(h.broker.cancel(kClient, op) && !h.results[0].first);
+  TEST_CHECK(ended == std::vector<std::uint64_t>{op});  // the shell is told, so it can stop showing the dialog
 
-  h.broker.submit({kClient, "app-launch", {}, {"B"}, ""}, h.recorder(1));
+  const auto timedOut = h.broker.submit({kClient, "app-launch", {}, {"B"}, ""}, h.recorder(1));
   h.now += std::chrono::seconds(59);
   h.broker.expire();
-  TEST_CHECK(h.broker.pending() == 1);
+  TEST_CHECK(h.broker.pending() == 1 && ended.size() == 1);
   h.now += std::chrono::seconds(2);
   h.broker.expire();
   TEST_CHECK(h.broker.pending() == 0 && !h.results[1].first);
+  TEST_CHECK(ended.size() == 2 && ended.back() == timedOut);  // a timeout ends the dialog too
   TEST_CHECK(h.results[1].second["error"].get<std::string>().find("timed out") != std::string::npos);
 
   h.broker.submit({kClient, "app-launch", {}, {"C"}, ""}, h.recorder(2));
@@ -189,6 +198,18 @@ void checkAccess(const std::filesystem::path& dir) {
   TEST_CHECK(h.calls.size() == 1);
 }
 
+void checkGrantChangeAudit(const std::filesystem::path& dir) {
+  Harness h(dir / "g");
+  h.broker.recordGrantChange(kClient, "set", {"observe", "act"});
+  h.broker.recordGrantChange(kClient, "revoked", {});
+  std::ifstream in(dir / "g" / "audit.jsonl");
+  std::string first, second;
+  TEST_CHECK(std::getline(in, first) && std::getline(in, second));
+  const auto a = json::parse(first), b = json::parse(second);
+  TEST_CHECK(a["tool"] == "grant-change" && a["client"] == kClient && a["outcome"] == "set" && a["decision"] == "changed");
+  TEST_CHECK((a["args"] == json::array({"observe", "act"})) && b["outcome"] == "revoked");
+}
+
 void checkUnwritableGrants(const std::filesystem::path& dir) {
   std::filesystem::create_directories(dir / "f");
   { std::ofstream(dir / "f" / "blocker") << "a file where a directory should be"; }
@@ -214,6 +235,7 @@ int main() {
   checkConfirmationAndTaint(dir);
   checkLifecycle(dir);
   checkAccess(dir);
+  checkGrantChangeAudit(dir);
   checkUnwritableGrants(dir);
   std::filesystem::remove_all(dir);
   return 0;

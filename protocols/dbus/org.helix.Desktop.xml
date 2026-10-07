@@ -86,6 +86,8 @@
       disconnects denies every pending confirmation. -->
  <method name="RegisterConfirmer"/>
  <signal name="ConfirmationRequested"><arg type="a{sv}"/></signal>
+ <!-- The service ended a pending confirmation without an answer (cancelled, requester left, timed out). -->
+ <signal name="ConfirmationEnded"><arg type="t"/></signal>
  <!-- options: tiers (as) narrows an access request to fewer tiers than were asked. -->
  <method name="Confirm"><arg name="operation" type="t" direction="in"/><arg name="approved" type="b" direction="in"/><arg name="options" type="a{sv}" direction="in"/></method>
  <!-- Manager role: grants and audit. -->

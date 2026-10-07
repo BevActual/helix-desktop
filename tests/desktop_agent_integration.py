@@ -193,6 +193,14 @@ try:
     ok, result = client.finish(operation)
     assert not ok and "reserved control byte" in result["error"] and len(received) == 2, (result, received)
 
+    # 8b. If the requester cancels a pending confirmation, the shell is told so it can stop showing it.
+    operation = client.action("app-launch", literal=["Files"])
+    pending = shell.wait("ConfirmationRequested")[0]["operation"]
+    client.agent("Cancel", "(t)", operation)
+    assert shell.wait("ConfirmationEnded")[0] == pending
+    ok, result = client.finish(operation)
+    assert not ok and "cancelled" in result["error"], result
+
     # 9. If the confirmer disappears, pending confirmations are denied.
     operation = client.action("app-launch", literal=["Files"])
     shell.wait("ConfirmationRequested")

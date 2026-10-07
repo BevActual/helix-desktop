@@ -126,6 +126,9 @@ AgentEndpoint::AgentEndpoint(GDBusConnection* bus, std::string objectPath, std::
   auditFile_ = stateDir / "audit.jsonl";
   broker_ = std::make_unique<AgentBroker>(std::move(*policy), *grants_, AuditLog(auditFile_), executeInShell,
                                           [] { return std::chrono::steady_clock::now(); });
+  broker_->onConfirmationEnded = [this](std::uint64_t operation) {
+    if (!confirmer_.empty()) emit("ConfirmationEnded", g_variant_new("(t)", operation), confirmer_);
+  };
   broker_->onConfirmationRequested = [this](std::uint64_t, const Json& details) {
     if (!confirmer_.empty()) emit("ConfirmationRequested", g_variant_new("(@a{sv})", toVariant(details)), confirmer_);
   };
@@ -280,12 +283,19 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
         reply(g_variant_new("(@av)", toVariant(out)));
       } else {
         const auto client = args.at(0).get<std::string>();
-        if (name == "SetGrant") grants_->set(client, tiersFrom(args.at(1)));
-        else grants_->revoke(client);
+        std::vector<std::string> changed;
+        if (name == "SetGrant") {
+          const auto tiers = tiersFrom(args.at(1));
+          grants_->set(client, tiers);
+          for (const Tier tier : tiers) changed.emplace_back(tierName(tier));
+        } else {
+          grants_->revoke(client);
+        }
         if (auto saved = grants_->save(); !saved) {
           (void)grants_->load();  // drop the unsaved change
           throw Failure(saved.error());
         }
+        broker_->recordGrantChange(client, name == "SetGrant" ? "set" : "revoked", changed);
         emit("Changed", nullptr, {});
         reply(nullptr);
       }

@@ -164,6 +164,7 @@ bool AgentBroker::cancel(const std::string& client, std::uint64_t operation) {
   Pending entry = std::move(found->second);
   pending_.erase(found);
   finish(entry.request, entry.tier, entry.tainted, "cancelled", "");
+  if (onConfirmationEnded) onConfirmationEnded(operation);
   entry.done(false, denial("cancelled"));
   return true;
 }
@@ -172,11 +173,25 @@ void AgentBroker::expire() {
   const auto now = clock_();
   for (auto it = pending_.begin(); it != pending_.end();) {
     if (it->second.deadline > now) { ++it; continue; }
+    const std::uint64_t operation = it->first;
     Pending entry = std::move(it->second);
     it = pending_.erase(it);
     finish(entry.request, entry.tier, entry.tainted, "denied", "confirmation timed out");
+    if (onConfirmationEnded) onConfirmationEnded(operation);
     entry.done(false, denial("the confirmation timed out"));
   }
+}
+
+void AgentBroker::recordGrantChange(const std::string& client, const std::string& change,
+                                    const std::vector<std::string>& tiers) {
+  AuditRecord record;
+  record.client = client;
+  record.tool = "grant-change";
+  record.args = tiers;
+  record.tier = Tier::Confirm;  // only the user's own manager can do this
+  record.decision = "changed";
+  record.outcome = change;
+  (void)audit_.append(record);
 }
 
 }  // namespace helix::agent

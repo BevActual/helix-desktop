@@ -561,6 +561,9 @@ void Application::initServices() {
     if (interface == helix::agentInterface) {
       if (signal == "ConfirmationRequested" && !args.empty() && m_agentConfirmations != nullptr) {
         if (auto request = helix::agent::ConfirmRequest::fromJson(args.at(0))) m_agentConfirmations->enqueue(std::move(*request));
+      } else if (signal == "ConfirmationEnded" && !args.empty() && args.at(0).is_number_integer() && m_agentConfirmations != nullptr) {
+        // The service cancelled or timed this one out: stop showing it, so a stale dialog cannot hold the keyboard.
+        m_agentConfirmations->dropOperation(args.at(0).get<std::uint64_t>());
       }
       return;
     }
