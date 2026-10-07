@@ -103,7 +103,11 @@ class Confirmer:
 
 
 def run_assistant(request, answer="", *flags, timeout=60):
-    process = subprocess.Popen([assistant_bin, *flags, request], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+    return run_raw([*flags, request], answer, timeout)
+
+
+def run_raw(arguments, answer="", timeout=60):
+    process = subprocess.Popen([assistant_bin, *arguments], env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, text=True)
     process.stdin.write(answer + "\n")
     process.stdin.close()
@@ -161,21 +165,47 @@ try:
     code, out, err = run_assistant("Turn the popups off.", "y", "--dry-run")
     assert code == 0 and "dry run" in out and received == ["status", "osd-disable"], (out, received)
 
+    # 4b. JSON mode (what the shell's assistant panel uses): one object per call. A change is offered, not done.
+    code, out, err = run_assistant("Turn the popups off.", "", "--json")
+    plan = json.loads(out)
+    assert code == 0 and plan["kind"] == "confirm" and plan["tool"] == "osd-disable" and plan["args"] == [], (out, err)
+    assert "on-screen popups" in plan["description"] and received == ["status", "osd-disable"], (plan, received)
+    # 4c. Reading is done at once in JSON mode.
+    start_inference({"tool": "status", "args": []})
+    code, out, err = run_assistant("Is the bar visible?", "", "--json")
+    answer = json.loads(out)
+    assert code == 0 and answer["kind"] == "done" and "barVisible" in answer["text"] and received[-1] == "status", (out, received)
+    # 4d. Approving runs exactly the call that was shown, with the request as the stated reason.
+    code, out, err = run_raw(["--json", "--request", "Turn the popups off.", "--execute", "osd-disable"])
+    assert code == 0 and json.loads(out)["kind"] == "done" and received[-1] == "osd-disable", (out, err, received)
+    # 4e. --execute is checked like a model's reply: blocked and invented tools never reach the shell.
+    count = len(received)
+    for arguments in (["session", "reboot"], ["decline"], ["made-up"], ["firewall-panic-toggle"]):
+        code, out, err = run_raw(["--json", "--execute", *arguments])
+        assert code == 3 and json.loads(out)["kind"] == "explain" and len(received) == count, (arguments, out, received)
+    code, out, err = run_raw(["--json", "--execute"])
+    assert code == 3 and len(received) == count, (out, err)
+    # JSON mode never asks on the terminal and never prints prose around the object.
+    code, out, err = run_assistant("Do something.", "", "--json")
+    assert json.loads(out)["kind"] in ("confirm", "done", "explain"), out
+    start_inference({"tool": "osd-disable", "args": []})
+
+    base = len(received)
     # 5. A decline is shown and nothing runs, even if the model attaches arguments to it.
     start_inference({"tool": "decline", "args": ["session", "reboot"], "reason": "I have no way to restart the computer."})
     code, out, err = run_assistant("Restart my laptop.", "y")
-    assert code == 3 and "I can't do that: I have no way to restart the computer." in out and len(received) == 2, (out, received)
+    assert code == 3 and "I can't do that: I have no way to restart the computer." in out and len(received) == base, (out, received)
 
     # 6. If a model ever names something it may not use (a blocked tool, an invented one), it is refused and never sent.
     for reply in ({"tool": "session", "args": ["reboot"]}, {"tool": "firewall-panic-toggle", "args": []}, {"tool": "nope", "args": []}):
         start_inference(reply)
         code, out, err = run_assistant("Do it.", "y")
-        assert code == 3 and "not something this assistant is allowed" in out and len(received) == 2, (reply, out, received)
+        assert code == 3 and "not something this assistant is allowed" in out and len(received) == base, (reply, out, received)
 
     # 7. Garbage from the model is explained, not executed.
     start_inference("this is not a tool call")
     code, out, err = run_assistant("Do something.", "y")
-    assert code == 3 and "couldn't work out" in out and len(received) == 2, (out, err)
+    assert code == 3 and "couldn't work out" in out and len(received) == base, (out, err)
 
     # 7b. Warming loads the model and runs nothing.
     start_inference({"tool": "osd-disable", "args": []})

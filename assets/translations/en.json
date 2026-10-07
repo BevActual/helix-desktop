@@ -20,6 +20,17 @@
       "confirm": "Do things that ask for your approval each time"
     }
   },
+  "assistant": {
+    "about": "About to: {what}",
+    "acting": "Doing it…",
+    "cancel": "Cancel",
+    "do-it": "Do it",
+    "placeholder": "What should I do?",
+    "reason": "The assistant says: “{reason}”",
+    "thinking": "Thinking…",
+    "title": "Assistant",
+    "unverified": "This came from outside sources (clipboard, notifications) and has not been checked."
+  },
   "auth": {
     "fingerprint": {
       "disconnected": "Fingerprint reader disconnected",

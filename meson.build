@@ -565,6 +565,8 @@ _noctalia_sources = files(
   'src/shell/polkit/polkit_panel.cpp',
   'src/desktop_api/display_text.cpp',
   'src/shell/agent/agent_confirmation_queue.cpp',
+  'src/shell/assistant/assistant_session.cpp',
+  'src/shell/assistant/assistant_panel.cpp',
   'src/shell/agent/agent_confirm_panel.cpp',
   'src/shell/session/session_action_meta.cpp',
   'src/shell/session/session_action_runner.cpp',
@@ -1377,6 +1379,12 @@ if build_tests
     _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()
     test('inference_llama_7b', helix_llama_test, is_parallel: false, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
+  helix_assistant_session_unit = executable('assistant_session_test',
+    sources: files('tests/assistant_session_test.cpp', 'src/shell/assistant/assistant_session.cpp', 'src/desktop_api/display_text.cpp'),
+    dependencies: noctalia_core_dep,
+    cpp_args: _noctalia_cpp_args,
+  )
+  test('assistant_session', helix_assistant_session_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: noctalia_core_dep,

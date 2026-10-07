@@ -186,7 +186,30 @@ not needed at run time. `tools/install-assistant.sh <staged tree>` installs only
 `helix-service` (backing up the old one), restarts nothing, and has `--uninstall`. Installed on the development machine
 2026-10-06: the service activates under its sandbox and lists both models.
 
-Not done: the shell UI (this is a terminal client), a VRAM budget alongside other GPU users, multi-step requests, and
+### The shell panel
+
+`noctalia msg panel-toggle assistant` opens the assistant panel (bind it to a key in the compositor config).
+It is a thin face over `helix-assistant --json`, which prints one JSON object per call (`done`, `confirm`, `explain`,
+`error`). The panel never talks to the model and holds no authority: grants, confirmations and audit belong to the
+`helix-assistant` client identity, so a broken or closed panel cannot widen anything.
+
+- Reading runs at once. A change shows "About to: ..." with Cancel and Do it; Do it runs
+  `helix-assistant --json --request <text> --execute <tool> <args>`, exactly what was shown, and `--execute` re-checks the
+  tool against the grants like a model reply (blocked, invented and `decline` are refused).
+- Enter never confirms (focus stays in the input, and a submit while a change is waiting is ignored), Do it is disabled
+  for 700 ms after it appears, Escape backs out of a pending request before it closes the panel, and opening the panel
+  always starts fresh.
+- The state machine (`src/shell/assistant/assistant_session.*`) has no UI in it and is unit tested, including late answers
+  after cancel, a second yes, malformed output, and display-safety of model text. Mutation-checked.
+- Tried in a nested niri session on a private bus with the real 7B model: typing, "Thinking...", the confirmation, two
+  stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent1, audited as allowed), the
+  honest failure when there is no backlight, and focus returning to the input. Mouse clicks were not tried.
+
+The confirmation shows the tool's plain-words description, which for near-neighbours includes the disambiguation written
+for the model ("display brightness, not sound"). Slightly wordy for a person; a separate user-facing line is a possible
+refinement.
+
+Not done: a VRAM budget alongside other GPU users, multi-step requests, and
 `confirm`-tier tools (not offered to the model).
 
 ## Measured: model quality and speed
