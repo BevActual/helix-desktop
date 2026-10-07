@@ -49,16 +49,11 @@ rust/
 ## Milestones (each ends with: tests, a nested-session screenshot, and the budget table below)
 
 - **M0 done.** Bar + panel spike renders in nested niri.
-- **M1 Foundation.** Workspace builds in CI-like conditions (`cargo test`, `cargo clippy -D warnings`); `helix-desktop-api`
-  talks to the real `helix-service` in a private bus (`tools/nested/bus.conf`); one live value (volume or clock-with-config)
-  flows service -> Rust -> webview and updates.
-- **M2 Surface manager.** One Rust module owns every layer surface: create hidden, size, anchor, layer, keyboard mode,
-  exclusive zone, show/hide, dismiss on Escape and outside click, one panel open at a time, per-monitor. Unit-test the
-  state machine; screenshot-test with `tools/nested/`.
+- **M1 Foundation.** Workspace builds (`cargo test`, `cargo clippy -D warnings`, `cargo fmt`). `helix-desktop-api` reads `audio.sound_volume` from the real `helix-service` on a private bus and the bar shows it, updating when the setting changes (50% to 25% in the nested run). First frame 387-412 ms. Shell PSS with the panel hidden: 342 MB.
+- **M2 Surface manager.** One Rust module owns every layer surface. Setup is hidden, size request, then `init_layer_shell`, then anchors, exclusive zone and keyboard mode. Escape and outside-click each close the open panel, and only one panel is open per monitor. Unit-tested with no display. Nested screenshots show the panel opening and closing. Shell PSS with the panel open: 409 MB, which is over the 350 MB budget. Stop. Do not start M3 until that cost comes down.
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
-- **M4 Assistant panel parity.** Same states and rules as the native one (Thinking, confirm with Do it/Cancel, 700 ms arming,
-  Enter never confirms, stale answers dropped, display-safe text, focus back to the input). Port `assistant_session` tests.
+- **M4 Assistant panel parity.** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
 - **M5 Launcher, control center, notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
@@ -66,12 +61,20 @@ rust/
 
 ## Budgets (record every milestone; do not let them drift)
 
-| Metric | Native C++ shell today | Tauri spike | Budget |
-|---|---|---|---|
-| Whole shell PSS | 105 MB | 227-336 MB (bar + panel only) | <= 350 MB with bar, one panel, notifications, OSD |
-| Idle CPU (bar only) | not measured | ~0.07% | <= 0.3% |
-| First frame | not measured | ~400 ms | <= 800 ms |
-| Frontend bundle | n/a | ~10 KB | <= 150 KB gzipped |
+| Metric | Native C++ shell today | Tauri spike | M1 bar | M2 bar + panel | Budget |
+|---|---|---|---|---|---|
+| Whole shell PSS | 105 MB | 227-336 MB (bar + panel only) | 342 MB | 409 MB | <= 350 MB with bar, one panel, notifications, OSD |
+| Idle CPU (bar only) | not measured | ~0.07% | 0.20% | — | <= 0.3% |
+| First frame | not measured | ~400 ms | 387-412 ms | panel shown at 22 s (first open, not startup) | <= 800 ms |
+| Frontend bundle | n/a | ~10 KB | 2.2 KB gzipped | same bundle | <= 150 KB gzipped |
+
+M1 and M2 were measured once in `tools/nested/run.sh` with the release binary (`rust/target/release/helix-shell-tauri`) and `tools/nested/process_tree.py`. PSS is the shell and its WebKit processes, not `helix-service` (16 MB in that run; 358 MB and 425 MB if it is included). Idle CPU is a 10 s sample of those shell processes after the bar had painted (`tools/nested/tauri-idle.sh`), 0.20%. A sample that included `helix-service` while it registered a Bluetooth agent was about 1.1% and is not the idle figure.
+
+The panel-open PSS, 409 MB, is over the 350 MB budget. M2 stops here. Do not add notifications or OSD on this shell until the panel cost is understood. Pixel coverage in that run: bar strip 83.5%, open panel 44.6%, closed panel 0.1%. The bar text changed from `Sound 50%` to `Sound 25%` after `Configuration1.Update` of `audio.sound_volume` on the private bus. Screenshots: `/tmp/helix-nested/tauri-m2/panel-open.png` and `panel-closed.png`.
+
+Gotcha from that run: do not call the bus name until the nested `helix-service` has claimed it. A client call first activates the installed `org.helix.Desktop` service, which inherits the dbus daemon's environment and opens the real session's config. `tools/nested/tauri-shell.sh` starts the service and execs the shell without a probe call. The shell retries `GetSettings` until the name is owned.
+
+The live bar value is `audio.sound_volume` from `Configuration1.GetSettings`, not the PipeWire sink. Changing the sink would touch the person's real audio. The setting is portable (it does not require a Helix desktop) and `Changed` fires when it is updated.
 
 Measure with `tools/nested/run.sh` and `tools/nested/process_tree.py` (sums PSS across WebKit helper processes).
 If a milestone blows a budget, stop and report; do not push on.
