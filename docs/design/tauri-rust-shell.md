@@ -227,3 +227,17 @@ damaged rectangles: the first full paint never arrives. Forcing a repaint after 
 from JavaScript at 0.4, 1, 2 and 4 s, did not help. About 90 MB is on the table if someone finds why the surface is not
 repainted in software mode (possibly a GTK3/gtk-layer-shell shm-buffer interaction); until then the GPU path is the only one that paints,
 and the earlier "do not set these variables" rule stands, now on firmer evidence.
+
+### Launcher: icons and what you use
+
+Icons: `apps.rs` resolves an entry's `Icon` (an absolute path, or a theme name looked up in each data directory's
+`icons/hicolor/<size>/apps` and `pixmaps`) and returns PNG or SVG files up to 96 KB as `data:` URIs, cached per scan. A theme name is a
+single path component; anything with `/` or `..` is refused. The page shows them in an `<img>`, which cannot run script, and the CSP
+gained `img-src 'self' data:`. Only the HICOLOR theme is searched, so apps whose icons live in other themes show no icon.
+
+History: `History` in `helix-shell-core` records launches by sequence number (no clock). With no query, recently launched apps lead
+(most recent first), then alphabetical; with a query, use adds at most 60 points (frequency up to 30, plus 30 if among the last five
+launches), which orders near-equal matches but never lifts a weaker kind of match over a stronger one (the gaps are 200). It keeps
+200 entries. It is saved as `$XDG_STATE_HOME/helix/launcher-history.json` (directory 0700, file 0600, written by rename) and a damaged
+file is an empty history. The nested test checks the modes. Mutation-checked: removing the cap, recency, restoring the sequence after
+loading, the bound and the alphabetical fallback each fail a test.

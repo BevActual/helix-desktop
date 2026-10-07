@@ -19,6 +19,9 @@ struct ShellState {
     surface: ShellSurface,
     /// The applications the launcher lists, read each time it opens. The page refers to them by id only.
     apps: Vec<helix_shell_core::launcher::App>,
+    history: helix_shell_core::launcher::History,
+    /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
+    icons: std::collections::HashMap<String, String>,
     started: Instant,
     last_phase: Phase,
 }
@@ -150,6 +153,7 @@ fn open_panel(app: &AppHandle, id: &str) {
     reset_assistant(&mut shell);
     if id == "launcher" {
         shell.apps = apps::scan();
+        shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
     let view = assistant_view(&shell);
@@ -350,6 +354,8 @@ struct AppHit {
     id: String,
     name: String,
     generic: String,
+    /// A `data:` image URI, or empty.
+    icon: String,
 }
 
 const LAUNCHER_ROWS: usize = 8;
@@ -359,19 +365,39 @@ const MAX_QUERY_CHARS: usize = 100;
 #[tauri::command]
 fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
     let state = shell_state(&app);
-    let shell = state.lock().expect("shell state");
+    let mut shell = state.lock().expect("shell state");
     if shell.surface.open_panel_id() != Some("launcher") {
         return Vec::new();
     }
     let query: String = query.chars().take(MAX_QUERY_CHARS).collect();
-    helix_shell_core::launcher::search(&shell.apps, &query, LAUNCHER_ROWS)
-        .into_iter()
-        .map(|index| AppHit {
-            id: shell.apps[index].id.clone(),
-            name: shell.apps[index].name.clone(),
-            generic: shell.apps[index].generic_name.clone(),
-        })
-        .collect()
+    let found = helix_shell_core::launcher::search_with_history(
+        &shell.apps,
+        &query,
+        LAUNCHER_ROWS,
+        &shell.history,
+    );
+    let mut hits = Vec::with_capacity(found.len());
+    for index in found {
+        let entry = shell.apps[index].clone();
+        let icon = shell
+            .icons
+            .entry(entry.id.clone())
+            .or_insert_with(|| apps::icon_data_uri(&entry.icon).unwrap_or_default())
+            .clone();
+        hits.push(AppHit {
+            id: entry.id,
+            name: entry.name,
+            generic: entry.generic_name,
+            icon,
+        });
+    }
+    eprintln!(
+        "LAUNCHER results {} first {} icons {}",
+        hits.len(),
+        hits.first().map_or("-", |hit| hit.id.as_str()),
+        hits.iter().filter(|hit| !hit.icon.is_empty()).count()
+    );
+    hits
 }
 
 /// Starts the application with this id and closes the launcher. The page can only name an application the scan found; it
@@ -396,6 +422,11 @@ fn launcher_launch(app: AppHandle, id: String) -> bool {
     match apps::launch(&entry) {
         Ok(()) => {
             eprintln!("LAUNCH {}", entry.id);
+            {
+                let mut shell = state.lock().expect("shell state");
+                shell.history.record(&entry.id);
+                apps::save_history(&shell.history);
+            }
             close_panel(&app);
             true
         }
@@ -436,6 +467,8 @@ fn main() {
                 confirmation: Confirmation::new(),
                 surface,
                 apps: Vec::new(),
+                history: apps::load_history(),
+                icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
             }));

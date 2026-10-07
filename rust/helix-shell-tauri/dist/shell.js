@@ -56,6 +56,12 @@ function drawResults() {
   hits.forEach((hit, index) => {
     const row = document.createElement("div");
     row.className = "row" + (index === selected ? " selected" : "");
+    // The icon is a data: image URI built by Rust from a PNG or SVG file; an image element never runs script.
+    const icon = document.createElement("img");
+    icon.className = "icon";
+    icon.alt = "";
+    if (hit.icon) icon.src = hit.icon;
+    row.append(icon);
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = hit.name;

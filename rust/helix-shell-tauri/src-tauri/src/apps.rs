@@ -117,3 +117,114 @@ pub fn launch(app: &App) -> Result<(), String> {
     });
     Ok(())
 }
+
+const MAX_ICON_BYTES: u64 = 96 * 1024;
+const ICON_SIZES: &[&str] = &[
+    "48x48", "64x64", "32x32", "128x128", "256x256", "scalable", "24x24",
+];
+
+fn icon_candidates(icon: &str) -> Vec<PathBuf> {
+    if icon.starts_with('/') {
+        return vec![PathBuf::from(icon)];
+    }
+    // A theme icon name is a single path component: nothing that could climb out of the icon directories.
+    if icon.is_empty() || icon.contains('/') || icon.contains("..") || icon.contains('\0') {
+        return Vec::new();
+    }
+    let mut paths = Vec::new();
+    for dir in data_dirs() {
+        for size in ICON_SIZES {
+            for ext in ["png", "svg"] {
+                paths.push(dir.join(format!("icons/hicolor/{size}/apps/{icon}.{ext}")));
+            }
+        }
+        for ext in ["png", "svg"] {
+            paths.push(dir.join(format!("pixmaps/{icon}.{ext}")));
+        }
+    }
+    paths
+}
+
+/// The icon as a `data:` URI the page can show, or `None`. Only PNG and SVG files up to 96 KB are read. An SVG shown through an
+/// image element cannot run script, so it is as safe as a PNG.
+pub fn icon_data_uri(icon: &str) -> Option<String> {
+    use base64::Engine;
+    for path in icon_candidates(icon) {
+        let mime = match path.extension().and_then(|ext| ext.to_str()) {
+            Some("png") => "image/png",
+            Some("svg") => "image/svg+xml",
+            _ => continue,
+        };
+        let Ok(meta) = std::fs::metadata(&path) else {
+            continue;
+        };
+        if !meta.is_file() || meta.len() == 0 || meta.len() > MAX_ICON_BYTES {
+            continue;
+        }
+        let Ok(bytes) = std::fs::read(&path) else {
+            continue;
+        };
+        return Some(format!(
+            "data:{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ));
+    }
+    None
+}
+
+fn history_path() -> Option<PathBuf> {
+    let state = std::env::var_os("XDG_STATE_HOME")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".local/state")))?;
+    Some(state.join("helix/launcher-history.json"))
+}
+
+/// The launch history saved by an earlier session. A missing or damaged file is an empty history, never an error.
+pub fn load_history() -> helix_shell_core::launcher::History {
+    let entries = history_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+        .and_then(|value| value.get("entries").and_then(|e| e.as_array()).cloned())
+        .unwrap_or_default();
+    helix_shell_core::launcher::History::from_entries(entries.iter().filter_map(|entry| {
+        Some((
+            entry.get("id")?.as_str()?.to_string(),
+            u32::try_from(entry.get("count")?.as_u64()?).ok()?,
+            entry.get("last")?.as_u64()?,
+        ))
+    }))
+}
+
+/// Saves the history privately (directory 0700, file 0600), by writing a new file and renaming it so a crash cannot leave half a file.
+pub fn save_history(history: &helix_shell_core::launcher::History) {
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    let Some(path) = history_path() else { return };
+    let Some(dir) = path.parent() else { return };
+    if std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)
+        .is_err()
+    {
+        return;
+    }
+    let entries: Vec<serde_json::Value> = history
+        .entries()
+        .map(|(id, count, last)| serde_json::json!({"id": id, "count": count, "last": last}))
+        .collect();
+    let text = serde_json::json!({"version": 1, "entries": entries}).to_string();
+    let temporary = path.with_extension("json.tmp");
+    let written = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)
+        .and_then(|mut file| file.write_all(text.as_bytes()))
+        .and_then(|()| std::fs::rename(&temporary, &path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&temporary);
+    }
+}

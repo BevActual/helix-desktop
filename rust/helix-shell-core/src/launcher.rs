@@ -13,6 +13,8 @@ pub struct App {
     pub name: String,
     pub generic_name: String,
     pub keywords: Vec<String>,
+    /// The `Icon` value: a theme icon name or an absolute path. Empty when none.
+    pub icon: String,
     /// Program and arguments, field codes removed. Never empty.
     pub argv: Vec<String>,
     pub terminal: bool,
@@ -81,6 +83,7 @@ pub fn parse_desktop_entry(id: &str, text: &str) -> Option<App> {
             fields.get("GenericName").copied().unwrap_or(""),
             MAX_NAME_CHARS,
         ),
+        icon: fields.get("Icon").copied().unwrap_or("").to_string(),
         keywords: list(fields.get("Keywords").copied().unwrap_or("")),
         argv,
         terminal: truthy("Terminal"),
@@ -176,30 +179,112 @@ fn score(app: &App, query: &str) -> Option<i32> {
     is_subsequence(query, &name).then_some(100 - length_penalty)
 }
 
+/// What the person has launched before: how often and how recently, by app id. `last` is a launch sequence number, not a clock,
+/// so recency needs no time source and tests are deterministic.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct History {
+    entries: std::collections::BTreeMap<String, (u32, u64)>,
+    next: u64,
+}
+
+/// Entries kept; the least recently used are forgotten beyond this.
+pub const HISTORY_LIMIT: usize = 200;
+/// The most a launch history can add to a score. It breaks ties and reorders near-equal matches, and is kept below the gap
+/// between match kinds (a prefix match beats a word match by 200) so what you typed always matters more than what you did.
+const MAX_BOOST: i32 = 60;
+
+impl History {
+    pub fn from_entries(entries: impl IntoIterator<Item = (String, u32, u64)>) -> Self {
+        let mut history = Self::default();
+        for (id, count, last) in entries {
+            history.next = history.next.max(last);
+            history.entries.insert(id, (count, last));
+        }
+        history
+    }
+
+    pub fn entries(&self) -> impl Iterator<Item = (&str, u32, u64)> {
+        self.entries
+            .iter()
+            .map(|(id, (count, last))| (id.as_str(), *count, *last))
+    }
+
+    pub fn record(&mut self, id: &str) {
+        self.next += 1;
+        let entry = self.entries.entry(id.to_string()).or_insert((0, 0));
+        entry.0 = entry.0.saturating_add(1);
+        entry.1 = self.next;
+        while self.entries.len() > HISTORY_LIMIT {
+            let Some(oldest) = self
+                .entries
+                .iter()
+                .min_by_key(|(_, (_, last))| *last)
+                .map(|(id, _)| id.clone())
+            else {
+                break;
+            };
+            self.entries.remove(&oldest);
+        }
+    }
+
+    fn last(&self, id: &str) -> u64 {
+        self.entries.get(id).map_or(0, |(_, last)| *last)
+    }
+
+    fn boost(&self, id: &str) -> i32 {
+        let Some((count, last)) = self.entries.get(id) else {
+            return 0;
+        };
+        let frequent = i32::try_from((*count).min(5)).unwrap_or(5) * 6; // up to 30
+        let recent = if self.next.saturating_sub(*last) < 5 {
+            30
+        } else {
+            0
+        }; // among the last five launches
+        (frequent + recent).min(MAX_BOOST)
+    }
+}
+
 /// Indexes into `apps`, best match first, at most `limit`. An empty query lists apps alphabetically.
 pub fn search(apps: &[App], query: &str, limit: usize) -> Vec<usize> {
+    search_with_history(apps, query, limit, &History::default())
+}
+
+fn by_name(apps: &[App], a: usize, b: usize) -> std::cmp::Ordering {
+    apps[a]
+        .name
+        .to_lowercase()
+        .cmp(&apps[b].name.to_lowercase())
+        .then_with(|| a.cmp(&b))
+}
+
+/// Like [`search`], but what was launched before counts. With no query, recently launched apps come first (most recent first),
+/// then the rest alphabetically. With a query, past use adds a small boost that never outweighs a better kind of text match.
+pub fn search_with_history(
+    apps: &[App],
+    query: &str,
+    limit: usize,
+    history: &History,
+) -> Vec<usize> {
     let query = query.trim().to_lowercase();
+    if query.is_empty() {
+        let mut all: Vec<usize> = (0..apps.len()).collect();
+        all.sort_by(|a, b| {
+            history
+                .last(&apps[*b].id)
+                .cmp(&history.last(&apps[*a].id))
+                .then_with(|| by_name(apps, *a, *b))
+        });
+        all.truncate(limit);
+        return all;
+    }
     let mut hits: Vec<(i32, usize)> = apps
         .iter()
         .enumerate()
-        .filter_map(|(index, app)| {
-            if query.is_empty() {
-                Some((0, index))
-            } else {
-                score(app, &query).map(|s| (s, index))
-            }
-        })
+        .filter_map(|(index, app)| score(app, &query).map(|s| (s + history.boost(&app.id), index)))
         .collect();
     hits.sort_by(|(a_score, a), (b_score, b)| {
-        b_score
-            .cmp(a_score)
-            .then_with(|| {
-                apps[*a]
-                    .name
-                    .to_lowercase()
-                    .cmp(&apps[*b].name.to_lowercase())
-            })
-            .then_with(|| a.cmp(b))
+        b_score.cmp(a_score).then_with(|| by_name(apps, *a, *b))
     });
     hits.into_iter()
         .take(limit)
@@ -397,5 +482,116 @@ mod tests {
         );
         assert_eq!(names(&apps, &search(&apps, "  ", 2)), ["alpha", "Beta"]);
         assert!(search(&apps, "a", 0).is_empty());
+    }
+
+    #[test]
+    fn with_no_query_recent_apps_come_first_then_alphabetical() {
+        let apps: Vec<App> = ["Zed", "alpha", "Beta", "Gamma"]
+            .iter()
+            .map(|n| app(n))
+            .collect();
+        let mut history = History::default();
+        history.record("Gamma.desktop");
+        history.record("Zed.desktop");
+        assert_eq!(
+            names(&apps, &search_with_history(&apps, "", 10, &history)),
+            ["Zed", "Gamma", "alpha", "Beta"]
+        );
+        history.record("Gamma.desktop");
+        assert_eq!(
+            names(&apps, &search_with_history(&apps, "", 10, &history)),
+            ["Gamma", "Zed", "alpha", "Beta"]
+        );
+    }
+
+    #[test]
+    fn use_breaks_ties_but_never_beats_a_better_match() {
+        let apps: Vec<App> = ["Terminal Pro", "Terminator", "Determinant Tool"]
+            .iter()
+            .map(|n| app(n))
+            .collect();
+        // Equal kind of match: the one you use more comes first.
+        assert_eq!(names(&apps, &search(&apps, "termin", 10))[0], "Terminator");
+        let mut history = History::default();
+        for _ in 0..9 {
+            history.record("Terminal Pro.desktop");
+        }
+        assert_eq!(
+            names(&apps, &search_with_history(&apps, "termin", 10, &history))[0],
+            "Terminal Pro"
+        );
+        // A substring match, however much used, stays below a prefix match.
+        for _ in 0..50 {
+            history.record("Determinant Tool.desktop");
+        }
+        let order = names(&apps, &search_with_history(&apps, "termin", 10, &history));
+        assert_eq!(order.last().unwrap(), "Determinant Tool", "{order:?}");
+    }
+
+    #[test]
+    fn history_is_bounded_and_forgets_the_least_recent() {
+        let mut history = History::default();
+        for i in 0..(HISTORY_LIMIT + 25) {
+            history.record(&format!("app{i}.desktop"));
+        }
+        assert_eq!(history.entries().count(), HISTORY_LIMIT);
+        assert!(
+            history.entries().all(|(id, _, _)| id != "app0.desktop"),
+            "the oldest was dropped"
+        );
+        assert!(history
+            .entries()
+            .any(|(id, _, _)| id == format!("app{}.desktop", HISTORY_LIMIT + 24)));
+    }
+
+    #[test]
+    fn history_round_trips_and_keeps_counting_forward() {
+        let mut history = History::default();
+        history.record("a.desktop");
+        history.record("b.desktop");
+        history.record("a.desktop");
+        let saved: Vec<(String, u32, u64)> = history
+            .entries()
+            .map(|(id, c, l)| (id.to_string(), c, l))
+            .collect();
+        let mut loaded = History::from_entries(saved);
+        assert_eq!(loaded, history);
+        loaded.record("b.desktop");
+        let last = |h: &History, id: &str| h.entries().find(|(i, _, _)| *i == id).unwrap().2;
+        assert!(
+            last(&loaded, "b.desktop") > last(&loaded, "a.desktop"),
+            "a launch after loading is the most recent"
+        );
+    }
+
+    #[test]
+    fn the_icon_is_read_from_the_entry() {
+        let text = "[Desktop Entry]\nType=Application\nName=X\nExec=x\nIcon=org.example.X\n";
+        assert_eq!(
+            parse_desktop_entry("x.desktop", text).unwrap().icon,
+            "org.example.X"
+        );
+        assert_eq!(app("Plain").icon, "");
+    }
+
+    #[test]
+    fn a_recent_launch_outranks_an_equal_match_used_once_long_ago() {
+        let apps: Vec<App> = ["Foo A", "Foo B"].iter().map(|n| app(n)).collect();
+        let mut history = History::default();
+        history.record("Foo A.desktop");
+        for other in 0..6 {
+            history.record(&format!("other{other}.desktop"));
+        }
+        assert_eq!(
+            names(&apps, &search_with_history(&apps, "foo", 10, &history)),
+            ["Foo A", "Foo B"],
+            "A is old: the tie falls back to alphabetical"
+        );
+        history.record("Foo B.desktop");
+        assert_eq!(
+            names(&apps, &search_with_history(&apps, "foo", 10, &history)),
+            ["Foo B", "Foo A"],
+            "B was just launched"
+        );
     }
 }

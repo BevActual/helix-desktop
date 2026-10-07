@@ -6,7 +6,12 @@ SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 LOG=$SCRATCH/program.log; CONTROL=$SCRATCH/state/surface-control; PT="$ROOT/tools/nested/wl-pointer/wl-pointer"
 M=$SCRATCH/markers; mkdir -p "$M" "$SCRATCH/data/applications"
 app() { printf '[Desktop Entry]\nType=Application\nName=%s\nExec=touch %s/%s\n%s\n' "$1" "$M" "$2" "$3" > "$SCRATCH/data/applications/$2.desktop"; }
-app "Helix Test App" helix-test "GenericName=Test Tool"
+mkdir -p "$SCRATCH/data/icons/hicolor/48x48/apps"
+python3 -c "
+from PIL import Image
+Image.new('RGBA', (48, 48), (255, 90, 40, 255)).save('$SCRATCH/data/icons/hicolor/48x48/apps/helix-test-icon.png')"
+app "Helix Test App" helix-test "GenericName=Test Tool
+Icon=helix-test-icon"
 app "Another Thing" another-thing ""
 app "Another Tool" another-tool ""
 app "Hidden Thing" hidden-thing "NoDisplay=true"
@@ -22,18 +27,28 @@ echo "--- 2. type, then Enter launches the selected application and closes the l
 wtype "helix test"; sleep 1; shot launcher-typed; wtype -k Return
 wait_for "LAUNCH helix-test.desktop" 1 20 && echo "ok: launch logged"; wait_for "PANEL closed" 1 20 && echo "ok: panel closed"
 sleep 1; [ -e "$M/helix-test" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
+echo "--- 2b. the launch is remembered: the empty list now leads with it, and the history file is private"
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 2; sleep 1
+FIRST=$(grep "LAUNCHER results" "$LOG" | tail -1); echo "$FIRST"
+case "$FIRST" in *"first helix-test.desktop"*) echo "ok: the launched app leads the empty list";; *) echo "FAIL: not first";; esac
+H=$SCRATCH/state/helix/launcher-history.json
+[ "$(stat -c %a "$H" 2>/dev/null)" = "600" ] && echo "ok: history file is mode 600" || echo "FAIL: history file mode $(stat -c %a "$H" 2>/dev/null)"
+[ "$(stat -c %a "$SCRATCH/state/helix" 2>/dev/null)" = "700" ] && echo "ok: history directory is mode 700" || echo "FAIL: history directory mode"
+grep -q helix-test.desktop "$H" && echo "ok: history names the launched app" || echo "FAIL: history missing"
+shot launcher-recent; wtype "helix test"; sleep 1; grep "LAUNCHER results" "$LOG" | tail -1; shot launcher-icon
+echo escape >> "$CONTROL"; wait_for "PANEL closed" 2 20
 echo "--- 3. an application that is hidden or needs a terminal is not offered"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 2; sleep 0.8; wtype "hidden thing"; sleep 0.8; wtype -k Return; gone hidden-thing
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 3; sleep 0.8; wtype "hidden thing"; sleep 0.8; wtype -k Return; gone hidden-thing
 wtype -M ctrl a -m ctrl; wtype "terminal thing"; sleep 0.8; wtype -k Return; gone terminal-thing
 echo "--- 4. no match: Enter does nothing, Escape closes"
 wtype -M ctrl a -m ctrl; wtype "zzzqqq"; sleep 0.8; shot launcher-nomatch; wtype -k Return; sleep 0.8; wtype -k Escape
-wait_for "PANEL closed" 2 20 && echo "ok: Escape closed the launcher"
+wait_for "PANEL closed" 3 20 && echo "ok: Escape closed the launcher"
 echo "--- 5. a click launches the first row (the shorter name ranks first: Another Tool)"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 3; sleep 0.8; wtype "another"; sleep 1
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 4; sleep 0.8; wtype "another"; sleep 1
 "$PT" 0.5 0.262 click; wait_for "LAUNCH another-tool.desktop" 1 20 && echo "ok: click launched"; sleep 1
 [ -e "$M/another-tool" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
 echo "--- 6. arrow keys move the selection (query limited to the fake apps: Another Tool, then Another Thing)"
-echo launcher >> "$CONTROL"; wait_for "PANEL open" 4; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 5; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return
 wait_for "LAUNCH another-thing.desktop" 1 20 && echo "ok: Down moved to the second result and launched it"; sleep 1
 [ -e "$M/another-thing" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
 echo "--- 7. nothing but the fake applications was ever launched"
