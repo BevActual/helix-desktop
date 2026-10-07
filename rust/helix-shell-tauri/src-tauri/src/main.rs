@@ -662,18 +662,25 @@ fn layout_reporting() -> bool {
 }
 
 #[tauri::command]
-fn report_layout(report: serde_json::Value) {
+fn report_layout(window: tauri::Window, report: serde_json::Value) {
     let Some(path) = std::env::var_os("HELIX_UI_LAYOUT_LOG") else {
         return;
     };
+    let mut path = std::path::PathBuf::from(path);
+    // Separate file from the shell surface so confirmer click targets are not overwritten.
+    if window.label() == confirmer::WINDOW {
+        path = path.with_file_name("layout-confirmer.json");
+    }
     let text = report.to_string();
     if text.len() > 64 * 1024 {
         return;
     }
-    let path = std::path::PathBuf::from(path);
     let temporary = path.with_extension("tmp");
-    if std::fs::write(&temporary, text).is_ok() {
-        let _ = std::fs::rename(&temporary, &path);
+    match std::fs::write(&temporary, &text) {
+        Ok(()) => {
+            let _ = std::fs::rename(&temporary, &path);
+        }
+        Err(error) => eprintln!("layout write {}: {error}", temporary.display()),
     }
 }
 
@@ -752,6 +759,23 @@ fn ready(window: tauri::Window) {
             );
         }
     }
+    // Confirmer is created on demand: the first ConfirmationRequested often arrives before
+    // the page has called listen(). Present (restart arming) and push the view once ready.
+    if label == confirmer::WINDOW {
+        if let Some(host) = confirmer_host(&app) {
+            let view = {
+                let mut panel = host.lock().expect("confirmer");
+                panel.present()
+            };
+            if view.open {
+                let _ = window.emit("confirmer-view", &view);
+                eprintln!("CONFIRMER ready-replay");
+                if !view.armed {
+                    confirmer::schedule_arm(app.clone(), host);
+                }
+            }
+        }
+    }
 }
 
 fn confirmer_host(app: &AppHandle) -> Option<Arc<Mutex<confirmer::ConfirmerHost>>> {
@@ -780,16 +804,29 @@ fn empty_confirmer_view() -> ConfirmerView {
     }
 }
 
+fn confirmer_sync_and_arm(app: &AppHandle, host: &Arc<Mutex<confirmer::ConfirmerHost>>) -> ConfirmerView {
+    let panel = host.lock().expect("confirmer");
+    let view = panel.view();
+    let needs_arm = view.open && !view.armed;
+    let keep = confirmer_keep(app);
+    confirmer::sync_surface(app, &panel, &keep);
+    drop(panel);
+    if needs_arm {
+        confirmer::schedule_arm(app.clone(), host.clone());
+    }
+    view
+}
+
 #[tauri::command]
 fn confirmer_allow(app: AppHandle) -> ConfirmerView {
     let Some(host) = confirmer_host(&app) else {
         return empty_confirmer_view();
     };
-    let mut panel = host.lock().expect("confirmer");
-    let view = panel.allow();
-    let keep = confirmer_keep(&app);
-    confirmer::sync_surface(&app, &panel, &keep);
-    view
+    {
+        let mut panel = host.lock().expect("confirmer");
+        let _ = panel.allow();
+    }
+    confirmer_sync_and_arm(&app, &host)
 }
 
 #[tauri::command]
@@ -797,11 +834,11 @@ fn confirmer_deny(app: AppHandle) -> ConfirmerView {
     let Some(host) = confirmer_host(&app) else {
         return empty_confirmer_view();
     };
-    let mut panel = host.lock().expect("confirmer");
-    let view = panel.deny();
-    let keep = confirmer_keep(&app);
-    confirmer::sync_surface(&app, &panel, &keep);
-    view
+    {
+        let mut panel = host.lock().expect("confirmer");
+        let _ = panel.deny();
+    }
+    confirmer_sync_and_arm(&app, &host)
 }
 
 #[tauri::command]

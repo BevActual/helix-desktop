@@ -53,9 +53,8 @@ function show(view) {
   });
 }
 
-listen("confirmer-view", (event) => show(event.payload));
-deny.onclick = () => invoke("confirmer_deny").then(show);
-allow.onclick = () => invoke("confirmer_allow").then(show);
+deny.onclick = () => invoke("confirmer_deny").then((view) => { show(view); queueReport(); });
+allow.onclick = () => invoke("confirmer_allow").then((view) => { show(view); queueReport(); });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") invoke("confirmer_escape");
   if (event.key === "Enter") {
@@ -63,4 +62,42 @@ document.addEventListener("keydown", (event) => {
     invoke("confirmer_enter").then(show);
   }
 });
-requestAnimationFrame(() => invoke("ready"));
+
+let reporting = false;
+let reportTimer = null;
+let reportPulse = null;
+function queueReport() {
+  if (!reporting) return;
+  clearTimeout(reportTimer);
+  reportTimer = setTimeout(sendReport, 80);
+}
+function sendReport() {
+  const elements = {};
+  document.querySelectorAll("[data-test]").forEach((element) => {
+    const box = element.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0) {
+      elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+    }
+  });
+  invoke("report_layout", {
+    report: { width: window.innerWidth, height: window.innerHeight, panel: "confirmer", elements },
+  }).catch(() => {});
+}
+window.addEventListener("resize", queueReport);
+
+// Register the listener before ready(), otherwise the replayed view is lost.
+listen("confirmer-view", (event) => {
+  show(event.payload);
+  queueReport();
+}).then(() => {
+  invoke("layout_reporting")
+    .then((wanted) => {
+      reporting = !!wanted;
+      queueReport();
+      if (reporting && !reportPulse) {
+        reportPulse = setInterval(queueReport, 250);
+      }
+    })
+    .catch(() => {});
+  invoke("ready");
+});

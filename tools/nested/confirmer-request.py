@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 """Request Agent1 access on the nested session bus and print the Completed result.
-Usage: confirmer-request.py <tiers...>
-Waits up to 30 s for Completed. Exit 0 on a denied grant (the Escape path), 1 otherwise.
+Usage: confirmer-request.py [--cancel-after SECONDS] <tiers...>
+Waits up to 30 s for Completed. Exit 0 on a denied/cancelled grant, 1 on approve, 2 timeout.
+With --cancel-after, Cancel is called on the same connection after that many seconds (triggers
+ConfirmationEnded for the confirmer).
 """
+import argparse
 import json
+import os
 import sys
 import time
 
@@ -14,9 +18,12 @@ from gi.repository import Gio, GLib
 
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 AGENT = "org.helix.Desktop.Agent1"
-tiers = sys.argv[1:] or ["observe", "act"]
 
-import os
+parser = argparse.ArgumentParser()
+parser.add_argument("--cancel-after", type=float, default=None)
+parser.add_argument("tiers", nargs="*", default=["observe", "act"])
+args = parser.parse_args()
+tiers = args.tiers or ["observe", "act"]
 
 address = os.environ["DBUS_SESSION_BUS_ADDRESS"]
 conn = Gio.DBusConnection.new_for_address_sync(
@@ -48,7 +55,6 @@ def name_owned():
     ).unpack()[0]
 
 
-# Never activate the installed org.helix.Desktop: wait until the nested helix-service owns the name.
 deadline = time.time() + 20
 while time.time() < deadline and not name_owned():
     time.sleep(0.1)
@@ -59,7 +65,6 @@ if not name_owned():
 conn.signal_subscribe(
     NAME, AGENT, "Completed", PATH, None, Gio.DBusSignalFlags.NONE, on_signal
 )
-# NO_AUTO_START: refuse to launch /usr/local helix-service on this private bus.
 NO_AUTO = Gio.DBusCallFlags.NO_AUTO_START
 conn.call_sync(
     NAME,
@@ -85,9 +90,26 @@ conn.call_sync(
 ).unpack()
 print(f"REQUESTED {operation}", flush=True)
 
+cancel_at = time.time() + args.cancel_after if args.cancel_after is not None else None
+cancelled = False
+
 deadline = time.time() + 30
 context = GLib.MainContext.default()
 while time.time() < deadline:
+    if cancel_at is not None and not cancelled and time.time() >= cancel_at:
+        conn.call_sync(
+            NAME,
+            PATH,
+            AGENT,
+            "Cancel",
+            GLib.Variant("(t)", (operation,)),
+            GLib.VariantType("()"),
+            NO_AUTO,
+            5000,
+            None,
+        )
+        print(f"CANCELLED {operation}", flush=True)
+        cancelled = True
     for op, ok, text in list(completed):
         if op == operation:
             result = json.loads(text)

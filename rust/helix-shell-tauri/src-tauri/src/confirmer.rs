@@ -83,17 +83,28 @@ impl ConfirmerHost {
         self.panel.view(self.now_ms())
     }
 
+    pub fn present(&mut self) -> ConfirmerView {
+        self.panel.present(self.now_ms());
+        self.panel.view(self.now_ms())
+    }
+
     pub fn open(&self) -> bool {
         self.panel.front().is_some()
     }
 }
 
 fn setup_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
+    use gtk_layer_shell::Edge;
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
-    gtk_window.set_size_request(520, 320);
+    // Full-output Overlay so layout boxes are screen-relative (click_id uses fractions of the
+    // output). The card is centered in CSS; the surface itself is not a panel in the shell page.
+    gtk_window.set_size_request(1, 1);
     gtk_window.init_layer_shell();
     gtk_window.set_namespace("helix-tauri-confirmer");
     gtk_window.set_layer(gtk_layer_shell::Layer::Overlay);
+    for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
+        gtk_window.set_anchor(edge, true);
+    }
     gtk_window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::Exclusive);
     gtk_window.set_exclusive_zone(0);
     window.show().map_err(|e| e.to_string())?;
@@ -108,7 +119,6 @@ fn ensure_window(app: &AppHandle) -> Result<(), String> {
         .decorations(false)
         .transparent(true)
         .visible(false)
-        .inner_size(520.0, 320.0)
         .build()
         .map_err(|e| e.to_string())?;
     setup_overlay(&window)?;
@@ -117,14 +127,22 @@ fn ensure_window(app: &AppHandle) -> Result<(), String> {
 
 fn destroy_window(app: &AppHandle, keep_webkit: &BTreeSet<u32>) {
     if let Some(window) = app.get_webview_window(WINDOW) {
+        // Snapshot before destroy: a delayed reap must not kill a confirmer opened later.
+        let candidates = webkit_web_pids(std::process::id());
         let _ = window.destroy();
         eprintln!("CONFIRMER destroyed");
-        reap_extra_webkits(keep_webkit.clone());
+        reap_extra_webkits(keep_webkit.clone(), candidates);
     }
 }
 
 fn emit_view(app: &AppHandle, view: &ConfirmerView) {
-    let _ = app.emit("confirmer-view", view);
+    // Emit to the confirmer webview by label. App-wide emit can miss a window that just
+    // appeared, and a capability mismatch then looks like a blank dialog.
+    if let Some(window) = app.get_webview_window(WINDOW) {
+        let _ = window.emit("confirmer-view", view);
+    } else {
+        let _ = app.emit("confirmer-view", view);
+    }
 }
 
 pub fn sync_surface(app: &AppHandle, host: &ConfirmerHost, keep_webkit: &BTreeSet<u32>) {
@@ -138,6 +156,21 @@ pub fn sync_surface(app: &AppHandle, host: &ConfirmerHost, keep_webkit: &BTreeSe
     } else {
         destroy_window(app, keep_webkit);
     }
+}
+
+/// Wake the page once Allow becomes armed for the request currently showing.
+pub fn schedule_arm(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(helix_shell_core::ARMING_MS));
+        let runner = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let panel = host.lock().expect("confirmer");
+            if panel.open() {
+                eprintln!("CONFIRMER armed");
+                emit_view(&runner, &panel.view());
+            }
+        });
+    });
 }
 
 /// One Desktop connection: RegisterDesktop, RegisterConfirmer, watch, and Confirm all use it.
@@ -193,11 +226,20 @@ pub fn start(
                         let host = host.clone();
                         let runner = app.clone();
                         let keep = keep.clone();
+                        let arm_host = host.clone();
                         let _ = app.run_on_main_thread(move || {
                             let keep = keep.lock().expect("webkit baseline").clone();
+                            let already_open = runner.get_webview_window(WINDOW).is_some();
                             let mut panel = host.lock().expect("confirmer");
                             panel.requested(details);
+                            let needs_arm = panel.open() && !panel.view().armed;
                             sync_surface(&runner, &panel, &keep);
+                            drop(panel);
+                            // New Overlay: arming starts in ready() once the page can paint.
+                            // Already-visible Overlay (queued request): arm from here.
+                            if already_open && needs_arm {
+                                schedule_arm(runner.clone(), arm_host);
+                            }
                         });
                     })
                     .await;
@@ -214,11 +256,17 @@ pub fn start(
                         let host = host.clone();
                         let runner = app.clone();
                         let keep = keep.clone();
+                        let arm_host = host.clone();
                         let _ = app.run_on_main_thread(move || {
                             let keep = keep.lock().expect("webkit baseline").clone();
                             let mut panel = host.lock().expect("confirmer");
                             panel.ended(operation);
+                            let needs_arm = panel.open() && !panel.view().armed;
                             sync_surface(&runner, &panel, &keep);
+                            drop(panel);
+                            if needs_arm {
+                                schedule_arm(runner.clone(), arm_host);
+                            }
                         });
                     })
                     .await;
@@ -308,11 +356,12 @@ fn webkit_web_pids(root: u32) -> BTreeSet<u32> {
     pids
 }
 
-fn reap_extra_webkits(keep: BTreeSet<u32>) {
+fn reap_extra_webkits(keep: BTreeSet<u32>, candidates: BTreeSet<u32>) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(750));
-        for pid in webkit_web_pids(std::process::id()) {
-            if keep.contains(&pid) {
+        let still_alive = webkit_web_pids(std::process::id());
+        for pid in candidates {
+            if keep.contains(&pid) || !still_alive.contains(&pid) {
                 continue;
             }
             let result = unsafe { libc::kill(pid as i32, libc::SIGTERM) };

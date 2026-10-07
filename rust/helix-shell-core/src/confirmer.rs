@@ -80,6 +80,14 @@ impl Confirmer {
         }
     }
 
+    /// Restart the 700 ms arming clock from now. Used when the Overlay has just become visible so
+    /// Allow is not already armed after a slow webview load.
+    pub fn present(&mut self, now_ms: u64) {
+        if self.queue.front().is_some() {
+            self.arming.show(now_ms);
+        }
+    }
+
     /// Allow. Ignored until armed. For grants, empty selection is a no-op (does not answer).
     pub fn allow(&mut self, now_ms: u64) -> bool {
         let Some(front) = self.queue.front() else {

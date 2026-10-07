@@ -124,12 +124,27 @@ checked: the disabled look of Allow during the arming window, clicking Allow/Den
 confirm-tier action layout. The same queue and panel rules are ported in Rust as
 `helix-shell-core::{ConfirmationQueue, Confirmer}` (mutation-checked) and `helix-desktop-api::ConfirmerClient`
 (RegisterConfirmer / Confirm / ConfirmationRequested / ConfirmationEnded only). The Tauri Overlay confirmer surface is wired behind `HELIX_SHELL_CONFIRMER=1` (nested
-`tauri-shell.sh` sets it; the live trial must not). Nested Escape-deny e2e
-(`tools/nested/confirmer-test.sh`) against real Agent1: RequestAccess → confirmer opens →
-Return does not approve → Escape denies → client gets `the user declined`; shell USS ~214 MB
-afterward. Gotcha: wait for `NameHasOwner` before any Desktop call on the private bus, and use
-`NO_AUTO_START` in test clients — otherwise dbus activates the installed service with the
-daemon's real HOME. Pointer Allow/Deny and grant checkboxes are not yet e2e-tested. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
+`tauri-shell.sh` sets it; the live trial must not). It is a separate full-output Overlay window
+(not a panel in the shell page), created on demand and destroyed when the queue is empty, with
+exclusive keyboard. Text reaches the page only as a sanitized `ConfirmerView` (`textContent`).
+Arming starts when the page is ready (`present()`), not when the D-Bus signal arrives ahead of
+the webview, so Allow is not already live after a slow load. Nested e2e
+(`tools/nested/confirmer-test.sh`) against real Agent1 with a real pointer:
+
+1. Enter never approves; Escape denies → `the user declined`.
+2. Pointer Deny → declined.
+3. Pointer Allow after `CONFIRMER armed` on a grant with `observe`+`confirm` → granted
+   `["observe"]` only (`confirm` stays unchecked).
+4. Client `Cancel` → `ConfirmationEnded` destroys the Overlay; client sees cancelled.
+
+Measured (release, nested): confirmer-open shell USS ~195 MB (PSS ~273 MB without
+helix-service); after destroy ~142 MB USS. Under the 320 MB USS budget. Gotchas: wait for
+`NameHasOwner` before any Desktop call on the private bus, and use `NO_AUTO_START` in test
+clients — otherwise dbus activates the installed service with the daemon's real HOME; the
+WebKit reap after destroy must only kill PIDs that existed at destroy time or it kills the
+next confirmer's web process; confirmer layout is written to `layout-confirmer.json` (shell
+`layout.json` must not overwrite it); nested tests run
+`rust/target/release/helix-shell-tauri` so release builds are required. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
 role): apps with access, per-tier switches, remove, and recent activity. It was checked in a nested session against
 seeded hostile data (markup, bidi controls, newlines in names and arguments): all rendered inert. App names shown
 to the user come from the verified identity only (`friendlyClientName`: ASCII letters, digits and `._+-`, everything
