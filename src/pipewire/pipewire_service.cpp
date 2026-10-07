@@ -848,6 +848,7 @@ PipeWireService::PipeWireService() {
 }
 
 PipeWireService::~PipeWireService() {
+  if (m_remoteObserver) helix::desktopClient().unobserve(m_remoteObserver);
   // Destroy node proxies and their listeners
   for (auto& [id, nd] : m_nodes) {
     if (nd->listener != nullptr) {
@@ -2449,14 +2450,25 @@ bool PipeWireService::remoteAction(const char* action, std::uint32_t id, double 
 void PipeWireService::setRemoteControl(bool remote) {
   m_remoteControl = remote;
   m_remoteSnapshotTimer.stop();
+  m_remoteDebounce.stop();
+  if (m_remoteObserver) { helix::desktopClient().unobserve(m_remoteObserver); m_remoteObserver = 0; }
   if (!remote) return;
-  m_remoteSnapshotTimer.startRepeating(std::chrono::seconds(1), [this] {
-    try {
-      if (!helix::desktopClient().available()) return;
-      const auto snapshot = helix::desktopClient().call("audio", "GetSnapshot");
-      if (!snapshot.value("available", false)) return;
-      for (const std::string type : {"sinks", "sources"})
-        for (const auto& node : snapshot.at(type)) onMixerVolumeChanged(node.at("id"), node.at("volume"), node.at("muted"));
-    } catch (...) {}
+  // The service announces audio changes. They are read after a short pause so a volume drag is one read, not one per step;
+  // the slow timer only covers a signal that was missed.
+  m_remoteObserver = helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json&) {
+    if (interface != helix::audioInterface || signal != "Changed") return;
+    if (!m_remoteDebounce.active()) m_remoteDebounce.start(std::chrono::milliseconds(40), [this] { readRemoteSnapshot(); });
   });
+  m_remoteSnapshotTimer.startRepeating(std::chrono::seconds(30), [this] { readRemoteSnapshot(); });
+  readRemoteSnapshot();
+}
+
+void PipeWireService::readRemoteSnapshot() {
+  try {
+    if (!helix::desktopClient().available()) return;
+    const auto snapshot = helix::desktopClient().call("audio", "GetSnapshot");
+    if (!snapshot.value("available", false)) return;
+    for (const std::string type : {"sinks", "sources"})
+      for (const auto& node : snapshot.at(type)) onMixerVolumeChanged(node.at("id"), node.at("volume"), node.at("muted"));
+  } catch (...) {}
 }

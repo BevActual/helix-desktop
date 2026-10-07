@@ -112,6 +112,7 @@ public:
 private:
   bool m_remote = false;
   Timer m_remoteRefresh;
+  unsigned m_remoteObserver = 0;
   bool remoteAction(const char* action, const std::string& path = {}, std::optional<bool> value = std::nullopt);
   struct Impl;
   friend struct Impl;

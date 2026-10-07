@@ -231,6 +231,9 @@ public:
 private:
   bool m_remoteControl = false;
   Timer m_remoteSnapshotTimer;
+  Timer m_remoteDebounce;
+  unsigned m_remoteObserver = 0;
+  void readRemoteSnapshot();
   bool remoteAction(const char* action, std::uint32_t id, double value = 0, bool input = false);
   bool m_pendingDefaultAudioDevicePropsEnum = false;
   void enumDefaultAudioDeviceParams();

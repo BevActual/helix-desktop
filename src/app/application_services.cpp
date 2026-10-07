@@ -572,9 +572,12 @@ void Application::initServices() {
       else if (signal == "Applied" && args.size() > 1 && args.at(1) == true) m_hookManager.fire(HookKind::ColorsChanged);
     }
   });
+  // The service is re-registered the moment it (re)appears on the bus. The slow repeat only covers a registration that was lost
+  // some other way; it used to run every 3 s and cost three synchronous calls each time.
+  helix::desktopClient().onAppeared([registerDesktop] { registerDesktop(); });
   m_desktopServiceTimer.startRepeating(std::chrono::milliseconds(100), [registerDesktop, count = 0u]() mutable {
     for (int i = 0; i < 16 && g_main_context_pending(nullptr); ++i) g_main_context_iteration(nullptr, false);
-    if (++count % 30 == 0) registerDesktop();
+    if (++count % 300 == 0) registerDesktop();
   });
   if (!security::initializeSecurityPrimitives()) {
     kLog.error("libsodium initialization failed; encrypted persistence is unavailable");

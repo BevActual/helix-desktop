@@ -18,8 +18,19 @@ DesktopClient::DesktopClient() {
           if (client.m_observers.contains(id)) callback(interface, signal, value);
         }
       }, this, nullptr);
+  if (m_bus) m_nameWatch = g_bus_watch_name_on_connection(m_bus, busName, G_BUS_NAME_WATCHER_FLAGS_NONE,
+      [](GDBusConnection*, const gchar*, const gchar*, gpointer data) {
+        auto& client = *static_cast<DesktopClient*>(data);
+        client.m_ownerKnown = true; client.m_owned = true;
+        if (client.m_appeared) client.m_appeared();
+      },
+      [](GDBusConnection*, const gchar*, gpointer data) {
+        auto& client = *static_cast<DesktopClient*>(data);
+        client.m_ownerKnown = true; client.m_owned = false;
+      }, this, nullptr);
 }
 DesktopClient::~DesktopClient() {
+  if (m_nameWatch) g_bus_unwatch_name(m_nameWatch);
   if (m_bus && m_subscription) g_dbus_connection_signal_unsubscribe(m_bus, m_subscription);
   if (m_bus) g_object_unref(m_bus);
 }
@@ -66,8 +77,12 @@ void DesktopClient::callAsync(std::string_view domain, std::string_view method, 
         (*cb)(std::move(value), std::move(message));
       }, callback);
 }
+void DesktopClient::onAppeared(std::function<void()> handler) { m_appeared = std::move(handler); }
 bool DesktopClient::available() const {
   if (!m_bus) return false;
+  // Only a positive answer is trusted from the watch: it is what polling callers ask all day. When the service is absent the bus is
+  // asked directly, so a caller that cannot run the main loop can never be stuck on a stale "unavailable".
+  if (m_ownerKnown && m_owned) return true;
   auto* reply = g_dbus_connection_call_sync(m_bus, "org.freedesktop.DBus", "/org/freedesktop/DBus",
       "org.freedesktop.DBus", "NameHasOwner", g_variant_new("(s)", busName), G_VARIANT_TYPE("(b)"),
       G_DBUS_CALL_FLAGS_NONE, 200, nullptr, nullptr);

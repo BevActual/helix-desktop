@@ -179,9 +179,10 @@ struct Settings {
       auto& self = *static_cast<Settings*>(data); self.refreshIdle = 0; self.refresh(); return G_SOURCE_REMOVE;
     }, this);
   }
+  int quietTicks = 0;  // 3 s ticks since the last refresh
   void refresh() {
     if (refreshing || !window) return;
-    refreshing = true; refreshFailed = false; pending = 7;
+    refreshing = true; refreshFailed = false; pending = 7; quietTicks = 0;
     client.callAsync("configuration", "GetSettings", nullptr, [this](Json value, std::string error) {
       if (error.empty()) catalog = std::move(value);
       finish(error);
@@ -1974,7 +1975,10 @@ struct Settings {
       if (self.meterSource) self.client.callAsync("audio", "StartInputMeter", g_variant_new("(u)", self.meterSource), [&self](Json, std::string error) {
         if (!error.empty()) { self.stopMeter(); self.scheduleRefresh(); }
       });
-      self.refresh(); return G_SOURCE_CONTINUE;
+      // The service announces every change (the Changed subscription above refreshes at once), so a full refresh of seven calls
+      // every 3 s was pure overhead. It now runs when the service is unavailable (to notice its return) and as a slow safety net.
+      if (!self.connected || self.refreshFailed || ++self.quietTicks >= 10) self.refresh();
+      return G_SOURCE_CONTINUE;
     }, this);
     refresh();
   }

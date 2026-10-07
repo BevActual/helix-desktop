@@ -710,6 +710,11 @@ int main(int argc, char** argv) {
     std::this_thread::sleep_for(std::chrono::milliseconds(25));
   assert(setting(client, "theme.mode").at("value") == "light");
   service.stop();
+  // Availability comes from a bus name watch, which reports once the main loop has run (the shell and the apps always run one).
+  for (unsigned i = 0; i < 100 && client.available(); ++i) {
+    while (g_main_context_pending(nullptr)) g_main_context_iteration(nullptr, false);
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
   assert(!client.available());
   service.start(argv[1]); waitForService(client);
   assert(!client.call("configuration", "GetSnapshot").at("helix-desktop").get<bool>());

@@ -463,7 +463,11 @@ BluetoothService::BluetoothService(SystemBus& bus, UPowerService* upowerService,
     : m_remote(remote), m_impl(std::make_unique<Impl>(*this, bus)), m_upowerService(upowerService) {
   if (m_remote) {
     refresh();
-    m_remoteRefresh.startRepeating(std::chrono::seconds(2), [this] { refresh(); });
+    // The service announces changes; the timer only covers a signal that was missed.
+    m_remoteObserver = helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json&) {
+      if (interface == helix::bluetoothInterface && signal == "Changed") refresh();
+    });
+    m_remoteRefresh.startRepeating(std::chrono::seconds(30), [this] { refresh(); });
     return;
   }
   m_impl->root = sdbus::createProxy(bus.connection(), kBluezBusName, kRootPath);
@@ -482,7 +486,9 @@ BluetoothService::BluetoothService(SystemBus& bus, UPowerService* upowerService,
   refresh();
 }
 
-BluetoothService::~BluetoothService() = default;
+BluetoothService::~BluetoothService() {
+  if (m_remoteObserver) helix::desktopClient().unobserve(m_remoteObserver);
+}
 
 void BluetoothService::setStateCallback(StateCallback callback) { m_stateCallback = std::move(callback); }
 void BluetoothService::setDevicesCallback(DevicesCallback callback) { m_devicesCallback = std::move(callback); }

@@ -6,7 +6,8 @@ RemoteNetwork::RemoteNetwork() {
   m_observer = desktopClient().observe([this](std::string_view interface, std::string_view signal, const Json&) {
     if (interface == networkInterface && signal == "Changed") refresh();
   });
-  m_refreshTimer.startRepeating(std::chrono::seconds(3), [this] { refresh(); });
+  // The service announces changes; this only covers a signal that was missed.
+  m_refreshTimer.startRepeating(std::chrono::seconds(30), [this] { refresh(); });
   refresh();
 }
 RemoteNetwork::~RemoteNetwork() { desktopClient().unobserve(m_observer); }
