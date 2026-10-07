@@ -8,6 +8,20 @@ use tauri::{AppHandle, Manager};
 
 pub fn apply(app: &AppHandle, steps: &[Step]) {
     for step in steps {
+        // Destroy must not hold a gtk::Window across the call: destroy() only queues work on
+        // the event loop, and a live GTK handle can keep the WebKit process pinned.
+        if let Step::Destroy { id } = step {
+            let Some(webview) = app.get_webview_window(id) else {
+                eprintln!("surface {id} has no window");
+                continue;
+            };
+            let _ = webview.destroy();
+            if id == "panel" {
+                eprintln!("PANEL destroyed");
+            }
+            continue;
+        }
+
         let Some(webview) = app.get_webview_window(step.id()) else {
             eprintln!("surface {} has no window", step.id());
             continue;
@@ -52,6 +66,7 @@ pub fn apply(app: &AppHandle, steps: &[Step]) {
                     eprintln!("PANEL closed");
                 }
             }
+            Step::Destroy { .. } => unreachable!("handled above"),
         }
     }
 }

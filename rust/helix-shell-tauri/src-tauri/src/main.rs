@@ -3,13 +3,16 @@
 //! helix_shell_core::surfaces.
 
 mod layer;
+mod webkit_mem;
 
+use std::collections::BTreeSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use helix_desktop_api::{sound_volume_label, Desktop};
 use helix_shell_core::surfaces::{
-    validate_setup, Edge, ExclusiveZone, KeyboardMode, Layer, SurfaceManager, SurfaceSpec,
+    validate_setup, Edge, ExclusiveZone, KeyboardMode, Layer, SurfaceError, SurfaceManager,
+    SurfaceSpec,
 };
 use helix_shell_core::{Confirmation, Phase, Session, Spawn, ARMING_MS};
 use serde::Serialize;
@@ -21,6 +24,8 @@ struct ShellState {
     surfaces: SurfaceManager,
     started: Instant,
     last_phase: Phase,
+    /// WebKitWebProcess PIDs while only the bar exists. Panel helpers outside this set are reaped.
+    bar_webkit: BTreeSet<u32>,
 }
 
 #[derive(Clone, Serialize)]
@@ -146,14 +151,73 @@ fn panel_spec() -> SurfaceSpec {
     }
 }
 
+fn create_panel_window(app: &AppHandle) -> tauri::Result<()> {
+    if app.get_webview_window("panel").is_some() {
+        return Ok(());
+    }
+    let panel = WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
+        .decorations(false)
+        .transparent(true)
+        .visible(false)
+        .inner_size(520.0, 260.0)
+        .build()?;
+    if let Ok(gtk_panel) = panel.gtk_window() {
+        webkit_mem::limit_web_processes(&gtk_panel);
+        let handle = app.clone();
+        layer::when_deactivated(&gtk_panel, move || dismiss_outside(&handle));
+    }
+    Ok(())
+}
+
+fn tear_down_panel(app: &AppHandle) {
+    let state = shell_state(app);
+    let mut shell = state.lock().expect("shell state");
+    shell.session.cancel();
+    shell.confirmation = Confirmation::new();
+    shell.last_phase = Phase::Idle;
+    let keep = shell.bar_webkit.clone();
+    let steps = shell.surfaces.destroy_panel("panel").unwrap_or_default();
+    let view = assistant_view(&shell);
+    drop(shell);
+    layer::apply(app, &steps);
+    // destroy() queues on the event loop; log whether Tauri still tracks the label after the call.
+    if app.get_webview_window("panel").is_some() {
+        eprintln!("WEBVIEW panel still-present");
+    } else {
+        eprintln!("WEBVIEW panel absent");
+    }
+    if !keep.is_empty() {
+        webkit_mem::schedule_reap_extra_webkits(keep);
+    }
+    emit_view(app, &view);
+}
+
 fn open_panel(app: &AppHandle) {
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
     shell.session.cancel();
     shell.confirmation = Confirmation::new();
     shell.last_phase = Phase::Idle;
-    let steps = shell.surfaces.open_panel("panel").unwrap_or_default();
+    // Create the panel WebKit window only while it is open. A hidden second webview still costs
+    // tens of MB and already put the bar-only shell near the whole-shell budget.
+    let mut steps = Vec::new();
+    match shell.surfaces.open_panel("panel") {
+        Ok(show) => steps.extend(show),
+        Err(SurfaceError::Unknown) => {
+            steps.extend(shell.surfaces.add(panel_spec()).expect("panel"));
+            validate_setup(&steps).expect("panel layer setup");
+            steps.extend(shell.surfaces.open_panel("panel").expect("open panel"));
+        }
+        Err(error) => {
+            eprintln!("open panel: {error:?}");
+            return;
+        }
+    }
     drop(shell);
+    if let Err(error) = create_panel_window(app) {
+        eprintln!("panel window: {error}");
+        return;
+    }
     layer::apply(app, &steps);
     if let Some(panel) = app.get_webview_window("panel") {
         let _ = panel.set_focus();
@@ -161,14 +225,7 @@ fn open_panel(app: &AppHandle) {
 }
 
 fn close_panel(app: &AppHandle) {
-    let state = shell_state(app);
-    let mut shell = state.lock().expect("shell state");
-    shell.session.cancel();
-    shell.confirmation = Confirmation::new();
-    shell.last_phase = Phase::Idle;
-    let steps = shell.surfaces.close_panel("panel").unwrap_or_default();
-    drop(shell);
-    layer::apply(app, &steps);
+    tear_down_panel(app);
 }
 
 fn dismiss_escape(app: &AppHandle) {
@@ -183,25 +240,18 @@ fn dismiss_escape(app: &AppHandle) {
         emit_view(app, &view);
         return;
     }
-    let steps = shell.surfaces.escape("").unwrap_or_default();
     drop(shell);
-    layer::apply(app, &steps);
+    tear_down_panel(app);
 }
 
 fn dismiss_outside(app: &AppHandle) {
     let state = shell_state(app);
-    let mut shell = state.lock().expect("shell state");
+    let shell = state.lock().expect("shell state");
     if !shell.surfaces.is_visible("panel") {
         return;
     }
-    shell.confirmation.escape();
-    shell.session.cancel();
-    shell.last_phase = Phase::Idle;
-    let steps = shell.surfaces.outside_click("").unwrap_or_default();
-    let view = assistant_view(&shell);
     drop(shell);
-    layer::apply(app, &steps);
-    emit_view(app, &view);
+    tear_down_panel(app);
 }
 
 fn control(app: &AppHandle, command: &str) {
@@ -264,18 +314,18 @@ fn watch_volume(app: AppHandle) {
 
 #[tauri::command]
 fn ready(window: tauri::Window) {
+    let label = window.label().to_string();
+    let state = shell_state(window.app_handle());
+    let mut shell = state.lock().expect("shell state");
     eprintln!(
         "READY {} after {} ms",
-        window.label(),
-        window
-            .app_handle()
-            .state::<Arc<Mutex<ShellState>>>()
-            .lock()
-            .expect("shell state")
-            .started
-            .elapsed()
-            .as_millis()
+        label,
+        shell.started.elapsed().as_millis()
     );
+    if label == "bar" && shell.bar_webkit.is_empty() {
+        shell.bar_webkit = webkit_mem::snapshot_webkit_web_pids();
+        eprintln!("WEBKIT bar-baseline {:?}", shell.bar_webkit);
+    }
 }
 
 #[tauri::command]
@@ -368,19 +418,13 @@ fn main() {
                 .visible(false)
                 .inner_size(1280.0, 34.0)
                 .build()?;
-            let panel =
-                WebviewWindowBuilder::new(app, "panel", WebviewUrl::App("panel.html".into()))
-                    .decorations(false)
-                    .transparent(true)
-                    .visible(false)
-                    .inner_size(520.0, 260.0)
-                    .build()?;
+            if let Ok(gtk_bar) = bar.gtk_window() {
+                webkit_mem::limit_web_processes(&gtk_bar);
+            }
 
             let mut surfaces = SurfaceManager::new();
             let bar_steps = surfaces.add(bar_spec()).expect("bar");
-            let panel_steps = surfaces.add(panel_spec()).expect("panel");
             validate_setup(&bar_steps).expect("bar layer setup");
-            validate_setup(&panel_steps).expect("panel layer setup");
             let show_bar = surfaces.show_bar("bar").expect("show bar");
 
             let state = Arc::new(Mutex::new(ShellState {
@@ -389,17 +433,12 @@ fn main() {
                 surfaces,
                 started,
                 last_phase: Phase::Idle,
+                bar_webkit: BTreeSet::new(),
             }));
             app.manage(state);
             let handle = app.handle().clone();
             layer::apply(&handle, &bar_steps);
-            layer::apply(&handle, &panel_steps);
             layer::apply(&handle, &show_bar);
-
-            if let Ok(gtk_panel) = panel.gtk_window() {
-                let handle = handle.clone();
-                layer::when_deactivated(&gtk_panel, move || dismiss_outside(&handle));
-            }
             let _ = bar;
 
             watch_volume(handle.clone());

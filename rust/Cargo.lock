@@ -1361,11 +1361,13 @@ dependencies = [
  "gtk-layer-shell",
  "helix-desktop-api",
  "helix-shell-core",
+ "libc",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tokio",
+ "webkit2gtk",
 ]
 
 [[package]]

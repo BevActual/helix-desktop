@@ -24,4 +24,6 @@ root, label = int(sys.argv[1]), sys.argv[2]
 pids = tree(root)
 rows = [(open(f"/proc/{p}/comm").read().strip(), p, pss(p)) for p in pids]
 for n, p, m in sorted(rows, key=lambda r: -r[2])[:6]: print(f"    {n:18s} {p:<8d} {m:6.0f} MB")
-print(f"  {label}: {len(pids)} processes, TOTAL PSS {sum(r[2] for r in rows):.0f} MB, cpu-seconds so far {sum(cpu(p) for p in pids):.2f}")
+total = sum(r[2] for r in rows)
+shell = sum(m for n, _, m in rows if n != "helix-service")
+print(f"  {label}: {len(pids)} processes, TOTAL PSS {total:.0f} MB (shell {shell:.0f} MB without helix-service), cpu-seconds so far {sum(cpu(p) for p in pids):.2f}")

@@ -49,16 +49,47 @@ pub struct SurfaceSpec {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Step {
-    CreateHidden { id: String },
-    SetSizeRequest { id: String, width: i32, height: i32 },
-    InitLayerShell { id: String },
-    SetLayer { id: String, layer: Layer },
-    SetAnchors { id: String, edges: Vec<Edge> },
-    SetExclusiveZone { id: String, zone: ExclusiveZone },
-    SetKeyboardMode { id: String, mode: KeyboardMode },
-    SetNamespace { id: String, namespace: String },
-    Show { id: String },
-    Hide { id: String },
+    CreateHidden {
+        id: String,
+    },
+    SetSizeRequest {
+        id: String,
+        width: i32,
+        height: i32,
+    },
+    InitLayerShell {
+        id: String,
+    },
+    SetLayer {
+        id: String,
+        layer: Layer,
+    },
+    SetAnchors {
+        id: String,
+        edges: Vec<Edge>,
+    },
+    SetExclusiveZone {
+        id: String,
+        zone: ExclusiveZone,
+    },
+    SetKeyboardMode {
+        id: String,
+        mode: KeyboardMode,
+    },
+    SetNamespace {
+        id: String,
+        namespace: String,
+    },
+    Show {
+        id: String,
+    },
+    Hide {
+        id: String,
+    },
+    /// Drop the GTK/WebKit window. The surface is gone from the manager; add it again to reopen.
+    Destroy {
+        id: String,
+    },
 }
 
 impl Step {
@@ -73,7 +104,8 @@ impl Step {
             | Self::SetKeyboardMode { id, .. }
             | Self::SetNamespace { id, .. }
             | Self::Show { id }
-            | Self::Hide { id } => id,
+            | Self::Hide { id }
+            | Self::Destroy { id } => id,
         }
     }
 }
@@ -170,6 +202,32 @@ impl SurfaceManager {
             self.open.remove(&monitor);
         }
         Ok(steps)
+    }
+
+    /// Forget the surface so its WebKit window can be destroyed. Bars stay. Emits Destroy only
+    /// (no Hide): hide-then-destroy kept a second WebKitWebProcess alive in nested measurements.
+    pub fn destroy_panel(&mut self, id: &str) -> Result<Vec<Step>, SurfaceError> {
+        let (is_panel, monitor, visible) = {
+            let record = self.surfaces.get(id).ok_or(SurfaceError::Unknown)?;
+            (
+                record.spec.panel,
+                record.spec.monitor.clone(),
+                record.visible,
+            )
+        };
+        if !is_panel {
+            return Err(SurfaceError::NotPanel);
+        }
+        if visible {
+            if let Some(record) = self.surfaces.get_mut(id) {
+                record.visible = false;
+            }
+            if self.open.get(&monitor).is_some_and(|open| open == id) {
+                self.open.remove(&monitor);
+            }
+        }
+        self.surfaces.remove(id);
+        Ok(vec![Step::Destroy { id: id.to_string() }])
     }
 
     pub fn escape(&mut self, monitor: &str) -> Result<Vec<Step>, SurfaceError> {
@@ -417,5 +475,28 @@ mod tests {
         assert_eq!(manager.open_panel("bar"), Err(SurfaceError::NotPanel));
         assert_eq!(manager.show_bar("assistant"), Err(SurfaceError::NotBar));
         assert_eq!(manager.open_panel("missing"), Err(SurfaceError::Unknown));
+    }
+
+    #[test]
+    fn destroy_panel_forgets_it_so_it_can_be_added_again() {
+        let mut manager = SurfaceManager::new();
+        manager.add(panel("assistant", "")).unwrap();
+        manager.open_panel("assistant").unwrap();
+        let steps = manager.destroy_panel("assistant").unwrap();
+        assert_eq!(
+            steps,
+            vec![Step::Destroy {
+                id: "assistant".to_string()
+            }]
+        );
+        assert!(!manager.is_visible("assistant"));
+        assert_eq!(manager.open_panel_on(""), None);
+        assert_eq!(manager.open_panel("assistant"), Err(SurfaceError::Unknown));
+        manager.add(panel("assistant", "")).unwrap();
+        manager.open_panel("assistant").unwrap();
+        assert!(manager.is_visible("assistant"));
+        assert_eq!(manager.destroy_panel("bar"), Err(SurfaceError::Unknown));
+        manager.add(bar()).unwrap();
+        assert_eq!(manager.destroy_panel("bar"), Err(SurfaceError::NotPanel));
     }
 }
