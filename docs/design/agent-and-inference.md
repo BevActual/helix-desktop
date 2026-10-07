@@ -72,7 +72,25 @@ confirms or the client reconnects. This does not stop injection; it makes the hu
 ### Audit
 
 Append-only JSON lines in `<state dir>/agent/audit.jsonl`: time, client, tool, argv (literal
-arguments truncated, secrets never logged), tier, decision, outcome. Readable by the manager role only.
+arguments truncated, secrets never logged), tier, decision, outcome. Readable by the manager role
+(`GetAudit`) and by the shell via `AgentActivity1.GetActivity` (below). Clients still must not read it.
+
+### AgentActivity1 (shell visibility; workstream 2)
+
+New interface `org.helix.Desktop.AgentActivity1` on the same object path. **Only the registered
+desktop** (`RegisterDesktop` owner) may call it — not every session process, and not by widening
+`RegisterManager`. Settings keeps the manager role for `SetGrant` and the full Agents page.
+
+| Method | Purpose |
+|---|---|
+| `GetActivity(since, limit)` | Read-only audit rows (same JSON shape as manager `GetAudit`) |
+| `ListPending` | Operations waiting on confirm or still running (bar indicator) |
+| `Stop(operation)` / `StopAll` | Cancel pending work; **does not** revoke grants |
+| `GetGrants` / `RevokeClient` | See and remove access from the shell (no `SetGrant`) |
+| `GetEnabled` / `SetEnabled` | Kill switch / safe mode: when false, `Action` and `RequestAccess` fail closed; the rest of the desktop keeps working |
+
+Signals: `Changed` (grants, enablement, new audit rows), `PendingChanged` (queue depth). Never poll.
+Trusted surfaces must still sanitize every field before display.
 
 ## Inference service
 

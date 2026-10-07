@@ -128,15 +128,48 @@ AgentEndpoint::AgentEndpoint(GDBusConnection* bus, std::string objectPath, std::
                                           [] { return std::chrono::steady_clock::now(); });
   broker_->onConfirmationEnded = [this](std::uint64_t operation) {
     if (!confirmer_.empty()) emit("ConfirmationEnded", g_variant_new("(t)", operation), confirmer_);
+    emitActivity("PendingChanged", nullptr);
   };
   broker_->onConfirmationRequested = [this](std::uint64_t, const Json& details) {
     if (!confirmer_.empty()) emit("ConfirmationRequested", g_variant_new("(@a{sv})", toVariant(details)), confirmer_);
+    emitActivity("PendingChanged", nullptr);
   };
 }
 
 void AgentEndpoint::emit(const char* signal, GVariant* value, const std::string& destination) {
   g_dbus_connection_emit_signal(bus_, destination.empty() ? nullptr : destination.c_str(), objectPath_.c_str(),
                                 interface_.c_str(), signal, value, nullptr);
+}
+
+void AgentEndpoint::emitActivity(const char* signal, GVariant* value) {
+  const std::string owner = desktopOwner_ ? desktopOwner_() : std::string{};
+  g_dbus_connection_emit_signal(bus_, owner.empty() ? nullptr : owner.c_str(), objectPath_.c_str(),
+                                agentActivityInterface, signal, value, nullptr);
+}
+
+void AgentEndpoint::requireDesktop(const std::string& sender) const {
+  if (!desktopOwner_ || desktopOwner_().empty() || desktopOwner_() != sender)
+    throw Invalid("Only the registered shell may use agent activity");
+}
+
+Json AgentEndpoint::readAudit(std::uint64_t since, std::uint64_t limit) const {
+  limit = std::min<std::uint64_t>(limit, 500);
+  std::vector<Json> records;
+  std::ifstream in(auditFile_);
+  for (std::string line; std::getline(in, line);) {
+    try {
+      auto record = Json::parse(line);
+      std::tm utc{};
+      if (strptime(record.at("time").get<std::string>().c_str(), "%Y-%m-%dT%H:%M:%SZ", &utc) &&
+          static_cast<std::uint64_t>(timegm(&utc)) >= since)
+        records.push_back(std::move(record));
+    } catch (const std::exception&) {
+    }
+  }
+  Json out = Json::array();
+  for (std::size_t i = records.size() > limit ? records.size() - limit : 0; i < records.size(); ++i)
+    out.push_back(records[i]);
+  return out;
 }
 
 const AgentEndpoint::Peer& AgentEndpoint::peer(const std::string& sender) {
@@ -245,21 +278,7 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
         for (const auto& client : grants_->clients()) out.push_back({{"client", client}, {"tiers", tiersJson(grants_->tiersFor(client))}});
         reply(g_variant_new("(@av)", toVariant(out)));
       } else if (name == "GetAudit") {
-        const auto since = args.at(0).get<std::uint64_t>();
-        const auto limit = std::min<std::uint64_t>(args.at(1).get<std::uint64_t>(), 500);
-        std::vector<Json> records;
-        std::ifstream in(auditFile_);
-        for (std::string line; std::getline(in, line);) {
-          try {
-            auto record = Json::parse(line);
-            std::tm utc{};
-            if (strptime(record.at("time").get<std::string>().c_str(), "%Y-%m-%dT%H:%M:%SZ", &utc) &&
-                static_cast<std::uint64_t>(timegm(&utc)) >= since) records.push_back(std::move(record));
-          } catch (const std::exception&) {}  // skip a damaged line rather than hide the rest
-        }
-        Json out = Json::array();
-        for (std::size_t i = records.size() > limit ? records.size() - limit : 0; i < records.size(); ++i) out.push_back(records[i]);
-        reply(g_variant_new("(@av)", toVariant(out)));
+        reply(g_variant_new("(@av)", toVariant(readAudit(args.at(0).get<std::uint64_t>(), args.at(1).get<std::uint64_t>()))));
       } else {
         const auto client = args.at(0).get<std::string>();
         std::vector<std::string> changed;
@@ -280,6 +299,61 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
       }
     } else {
       throw Invalid("Unknown agent method");
+    }
+  } catch (const Invalid& error) {
+    g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.InvalidArgument", error.what());
+  } catch (const std::invalid_argument& error) {
+    g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.InvalidArgument", error.what());
+  } catch (const std::exception& error) {
+    g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", error.what());
+  }
+}
+
+void AgentEndpoint::activity(const std::string& sender, const std::string& name, GVariant* parameters,
+                             GDBusMethodInvocation* invocation) {
+  auto reply = [&](GVariant* value) { g_dbus_method_invocation_return_value(invocation, value); };
+  try {
+    if (!broker_) throw Failure("The agent surface is unavailable: " + unavailable_);
+    requireDesktop(sender);
+    const Json args = fromVariant(parameters);
+    if (name == "GetActivity") {
+      reply(g_variant_new("(@av)", toVariant(readAudit(args.at(0).get<std::uint64_t>(), args.at(1).get<std::uint64_t>()))));
+    } else if (name == "ListPending") {
+      reply(g_variant_new("(@av)", toVariant(broker_->listPending())));
+    } else if (name == "Stop") {
+      if (!broker_->stop(args.at(0).get<std::uint64_t>())) throw Invalid("There is no pending operation with that id");
+      emitActivity("PendingChanged", nullptr);
+      reply(nullptr);
+    } else if (name == "StopAll") {
+      broker_->stopAll();
+      emitActivity("PendingChanged", nullptr);
+      reply(nullptr);
+    } else if (name == "GetGrants") {
+      Json out = Json::array();
+      for (const auto& client : grants_->clients())
+        out.push_back({{"client", client}, {"tiers", tiersJson(grants_->tiersFor(client))}});
+      reply(g_variant_new("(@av)", toVariant(out)));
+    } else if (name == "RevokeClient") {
+      const auto client = args.at(0).get<std::string>();
+      grants_->revoke(client);
+      if (auto saved = grants_->save(); !saved) {
+        (void)grants_->load();
+        throw Failure(saved.error());
+      }
+      broker_->recordGrantChange(client, "revoked", {});
+      emit("Changed", nullptr, {});
+      emitActivity("Changed", nullptr);
+      reply(nullptr);
+    } else if (name == "GetEnabled") {
+      reply(g_variant_new("(b)", broker_->enabled()));
+    } else if (name == "SetEnabled") {
+      const bool enabled = args.at(0).get<bool>();
+      broker_->setEnabled(enabled);
+      emitActivity("Changed", nullptr);
+      emitActivity("PendingChanged", nullptr);
+      reply(nullptr);
+    } else {
+      throw Invalid("Unknown agent activity method");
     }
   } catch (const Invalid& error) {
     g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.InvalidArgument", error.what());

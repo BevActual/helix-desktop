@@ -41,6 +41,11 @@ void AgentBroker::finish(const Request& request, Tier tier, bool tainted, const 
 
 std::uint64_t AgentBroker::submit(const Request& request, Done done) {
   const std::uint64_t operation = ++next_;
+  if (!enabled_) {
+    finish(request, Tier::Blocked, false, "denied", "agent disabled");
+    done(false, denial("agent access is turned off"));
+    return operation;
+  }
   // The first token the command will see decides choice-level overrides, so evaluate fixed args and literals together.
   std::vector<std::string> all = request.argv;
   all.insert(all.end(), request.literal.begin(), request.literal.end());
@@ -86,6 +91,12 @@ void AgentBroker::run(const Request& request, Tier tier, bool tainted, Done done
 std::uint64_t AgentBroker::requestAccess(const std::string& client, const std::string& label, std::set<Tier> tiers,
                                          Done done) {
   const std::uint64_t operation = ++next_;
+  if (!enabled_) {
+    Request request{client, "grant-request", {label}, {}, ""};
+    finish(request, Tier::Confirm, false, "denied", "agent disabled");
+    done(false, denial("agent access is turned off"));
+    return operation;
+  }
   tiers.erase(Tier::Blocked);
   Request request{client, "grant-request", {label}, {}, ""};
   for (const Tier tier : tiers) request.literal.emplace_back(tierName(tier));
@@ -161,12 +172,42 @@ bool AgentBroker::confirm(std::uint64_t operation, bool approved, const std::opt
 bool AgentBroker::cancel(const std::string& client, std::uint64_t operation) {
   const auto found = pending_.find(operation);
   if (found == pending_.end() || found->second.request.client != client) return false;
+  return stop(operation);
+}
+
+bool AgentBroker::stop(std::uint64_t operation) {
+  const auto found = pending_.find(operation);
+  if (found == pending_.end()) return false;
   Pending entry = std::move(found->second);
   pending_.erase(found);
-  finish(entry.request, entry.tier, entry.tainted, "cancelled", "");
+  finish(entry.request, entry.tier, entry.tainted, "cancelled", "stopped");
   if (onConfirmationEnded) onConfirmationEnded(operation);
   entry.done(false, denial("cancelled"));
   return true;
+}
+
+void AgentBroker::stopAll() {
+  while (!pending_.empty()) stop(pending_.begin()->first);
+}
+
+nlohmann::json AgentBroker::listPending() const {
+  nlohmann::json out = nlohmann::json::array();
+  for (const auto& [operation, entry] : pending_) {
+    nlohmann::json row{{"operation", operation},
+                       {"client", entry.request.client},
+                       {"tool", entry.request.tool},
+                       {"tier", std::string(tierName(entry.tier))},
+                       {"kind", entry.isGrant ? "grant" : "action"},
+                       {"tainted", entry.tainted}};
+    if (!entry.request.reason.empty()) row["reason"] = entry.request.reason;
+    out.push_back(std::move(row));
+  }
+  return out;
+}
+
+void AgentBroker::setEnabled(bool enabled) {
+  enabled_ = enabled;
+  if (!enabled_) stopAll();
 }
 
 void AgentBroker::expire() {

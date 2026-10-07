@@ -22,6 +22,7 @@ from gi.repository import Gio, GLib  # noqa: E402
 service_bin, policy = sys.argv[1], sys.argv[2]
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 AGENT = "org.helix.Desktop.Agent1"
+ACTIVITY = "org.helix.Desktop.AgentActivity1"
 CFG = "org.helix.Desktop.Configuration1"
 
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-agent-it-"))
@@ -200,6 +201,40 @@ try:
     assert shell.wait("ConfirmationEnded")[0] == pending
     ok, result = client.finish(operation)
     assert not ok and "cancelled" in result["error"], result
+
+    # 8c. AgentActivity1: only the registered desktop; Stop cancels without revoking; safe mode fails closed.
+    def activity(method, params=None, reply="()"):
+        return shell.call(ACTIVITY, method, params, reply)
+
+    def activity_refused(peer, method, params=None):
+        try:
+            peer.call(ACTIVITY, method, params)
+        except GLib.Error as err:
+            return err.message
+        raise AssertionError(f"{method} unexpectedly succeeded")
+
+    assert "registered shell" in activity_refused(client, "GetActivity", GLib.Variant("(tu)", (0, 10)))
+    activity_rows = activity("GetActivity", GLib.Variant("(tu)", (0, 50)), "(av)")[0]
+    assert any(row.get("tool") == "app-launch" for row in activity_rows), activity_rows
+
+    operation = client.action("app-launch", literal=["Browser"])
+    shell.wait("ConfirmationRequested")
+    pending_rows = activity("ListPending", None, "(av)")[0]
+    assert any(row["operation"] == operation and row["tool"] == "app-launch" for row in pending_rows), pending_rows
+    activity("Stop", GLib.Variant("(t)", (operation,)))
+    assert shell.wait("ConfirmationEnded")[0] == operation
+    ok, result = client.finish(operation)
+    assert not ok and "cancelled" in result["error"], result
+    grants_before = {g["client"]: g["tiers"] for g in activity("GetGrants", None, "(av)")[0]}
+    assert grants_before, "Stop must not clear grants"
+    assert activity("GetEnabled", None, "(b)")[0] is True
+    activity("SetEnabled", GLib.Variant("(b)", (False,)))
+    assert activity("GetEnabled", None, "(b)")[0] is False
+    ok, result = client.finish(client.action("status"))
+    assert not ok and "turned off" in result["error"], result
+    activity("SetEnabled", GLib.Variant("(b)", (True,)))
+    ok, result = client.finish(client.action("status"))
+    assert ok, result
 
     # 9. If the confirmer disappears, pending confirmations are denied.
     operation = client.action("app-launch", literal=["Files"])
