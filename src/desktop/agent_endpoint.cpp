@@ -130,6 +130,7 @@ AgentEndpoint::AgentEndpoint(GDBusConnection* bus, std::string objectPath, std::
     if (!confirmer_.empty()) emit("ConfirmationEnded", g_variant_new("(t)", operation), confirmer_);
     emitActivity("PendingChanged", nullptr);
   };
+  broker_->onAudit = [this] { emitActivity("Changed", nullptr); };
   broker_->onConfirmationRequested = [this](std::uint64_t, const Json& details) {
     if (!confirmer_.empty()) emit("ConfirmationRequested", g_variant_new("(@a{sv})", toVariant(details)), confirmer_);
     emitActivity("PendingChanged", nullptr);

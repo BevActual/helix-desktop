@@ -83,9 +83,13 @@ class Peer:
             Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
         self.signals = []
         self.conn.signal_subscribe(NAME, AGENT, None, PATH, None, Gio.DBusSignalFlags.NONE, self._signal)
+        self.conn.signal_subscribe(NAME, ACTIVITY, None, PATH, None, Gio.DBusSignalFlags.NONE, self._activity_signal)
 
     def _signal(self, conn, sender, path, iface, name, params):
         self.signals.append((name, params.unpack()))
+
+    def _activity_signal(self, conn, sender, path, iface, name, params):
+        self.signals.append(("Activity." + name, params.unpack()))
 
     def call(self, interface, method, params=None, reply="()"):
         result = self.conn.call_sync(NAME, PATH, interface, method, params, GLib.VariantType(reply), Gio.DBusCallFlags.NONE, 5000, None)
@@ -214,6 +218,10 @@ try:
         raise AssertionError(f"{method} unexpectedly succeeded")
 
     assert "registered shell" in activity_refused(client, "GetActivity", GLib.Variant("(tu)", (0, 10)))
+    shell.signals.clear()
+    ok, result = client.finish(client.action("status"))
+    assert ok, result
+    shell.wait("Activity.Changed")  # a new audit row tells the shell to refresh, so it never polls
     activity_rows = activity("GetActivity", GLib.Variant("(tu)", (0, 50)), "(av)")[0]
     assert any(row.get("tool") == "app-launch" for row in activity_rows), activity_rows
 

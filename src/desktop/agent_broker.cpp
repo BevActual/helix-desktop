@@ -37,6 +37,7 @@ void AgentBroker::finish(const Request& request, Tier tier, bool tainted, const 
   record.outcome = outcome;
   record.tainted = tainted;
   (void)audit_.append(record);  // an unwritable audit log must not take the desktop down; see service logging
+  if (onAudit) onAudit();
 }
 
 std::uint64_t AgentBroker::submit(const Request& request, Done done) {

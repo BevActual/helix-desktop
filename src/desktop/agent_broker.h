@@ -41,6 +41,7 @@ public:
   // Called when a pending confirmation ends without the confirmer answering it (the requester cancelled or left, or
   // the deadline passed), so whoever is showing it can stop.
   std::function<void(std::uint64_t operation)> onConfirmationEnded;
+  std::function<void()> onAudit;  // a record was appended: the activity view should refresh
   void setConfirmerPresent(bool present);  // false denies everything pending
 
   // Always returns an operation id; `done` is invoked once, possibly before submit returns.
