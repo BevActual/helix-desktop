@@ -2,6 +2,7 @@
 //! (`helix-assistant`); this binary never calls Agent1 and never talks to the model. What the surface looks like in each state
 //! is decided by helix_shell_core::ShellSurface; layer.rs only applies it.
 
+mod apps;
 mod layer;
 
 use std::sync::{Arc, Mutex};
@@ -16,6 +17,8 @@ struct ShellState {
     session: Session,
     confirmation: Confirmation,
     surface: ShellSurface,
+    /// The applications the launcher lists, read each time it opens. The page refers to them by id only.
+    apps: Vec<helix_shell_core::launcher::App>,
     started: Instant,
     last_phase: Phase,
 }
@@ -145,6 +148,10 @@ fn open_panel(app: &AppHandle, id: &str) {
     };
     let Some(plan) = plan else { return };
     reset_assistant(&mut shell);
+    if id == "launcher" {
+        shell.apps = apps::scan();
+        eprintln!("LAUNCHER apps {}", shell.apps.len());
+    }
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
     drop(shell);
@@ -172,7 +179,9 @@ fn close_panel(app: &AppHandle) {
 fn dismiss_escape(app: &AppHandle) {
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
-    let active = shell.session.view().phase != Phase::Idle;
+    // Only the assistant has a request to back out of; Escape in the launcher just closes it.
+    let active = shell.surface.open_panel_id() == Some("assistant")
+        && shell.session.view().phase != Phase::Idle;
     match shell.surface.escape(active) {
         Escape::CancelRequest => {
             shell.confirmation.escape();
@@ -197,6 +206,7 @@ fn dismiss_outside(app: &AppHandle) {
 fn control(app: &AppHandle, command: &str) {
     match command {
         "open" => open_panel(app, "assistant"),
+        "launcher" => open_panel(app, "launcher"),
         "close" => close_panel(app),
         "escape" => dismiss_escape(app),
         "outside" => dismiss_outside(app),
@@ -331,8 +341,69 @@ fn assistant_cancel(app: AppHandle) -> AssistantView {
 }
 
 #[tauri::command]
-fn assistant_escape(app: AppHandle) {
+fn panel_escape(app: AppHandle) {
     dismiss_escape(&app);
+}
+
+#[derive(Clone, Serialize)]
+struct AppHit {
+    id: String,
+    name: String,
+    generic: String,
+}
+
+const LAUNCHER_ROWS: usize = 8;
+const MAX_QUERY_CHARS: usize = 100;
+
+/// The best matches for what was typed. Names are already display-safe; the page shows them as text.
+#[tauri::command]
+fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
+    let state = shell_state(&app);
+    let shell = state.lock().expect("shell state");
+    if shell.surface.open_panel_id() != Some("launcher") {
+        return Vec::new();
+    }
+    let query: String = query.chars().take(MAX_QUERY_CHARS).collect();
+    helix_shell_core::launcher::search(&shell.apps, &query, LAUNCHER_ROWS)
+        .into_iter()
+        .map(|index| AppHit {
+            id: shell.apps[index].id.clone(),
+            name: shell.apps[index].name.clone(),
+            generic: shell.apps[index].generic_name.clone(),
+        })
+        .collect()
+}
+
+/// Starts the application with this id and closes the launcher. The page can only name an application the scan found; it
+/// supplies no command, arguments or paths.
+#[tauri::command]
+fn launcher_launch(app: AppHandle, id: String) -> bool {
+    let state = shell_state(&app);
+    let shell = state.lock().expect("shell state");
+    if shell.surface.open_panel_id() != Some("launcher") {
+        return false;
+    }
+    let Some(entry) = shell
+        .apps
+        .iter()
+        .find(|candidate| candidate.id == id)
+        .cloned()
+    else {
+        eprintln!("LAUNCH refused: unknown id");
+        return false;
+    };
+    drop(shell);
+    match apps::launch(&entry) {
+        Ok(()) => {
+            eprintln!("LAUNCH {}", entry.id);
+            close_panel(&app);
+            true
+        }
+        Err(error) => {
+            eprintln!("LAUNCH failed {}: {error}", entry.id);
+            false
+        }
+    }
 }
 
 fn main() {
@@ -345,7 +416,9 @@ fn main() {
             assistant_submit,
             assistant_confirm,
             assistant_cancel,
-            assistant_escape
+            panel_escape,
+            launcher_query,
+            launcher_launch
         ])
         .setup(move |app| {
             let window =
@@ -362,6 +435,7 @@ fn main() {
                 session: Session::new(|_| true),
                 confirmation: Confirmation::new(),
                 surface,
+                apps: Vec::new(),
                 started,
                 last_phase: Phase::Idle,
             }));

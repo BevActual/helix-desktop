@@ -3,6 +3,7 @@
 mod assistant;
 mod confirm;
 mod display;
+pub mod launcher;
 pub mod shell_surface;
 pub mod surfaces;
 

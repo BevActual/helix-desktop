@@ -31,13 +31,72 @@ listen("live-value", (event) => {
 });
 listen("assistant-view", (event) => show(event.payload));
 listen("shell-mode", (event) => {
-  const open = event.payload.panel === "assistant";
-  document.body.classList.toggle("open", open);
-  if (open) {
+  const panel = event.payload.panel;
+  document.body.classList.toggle("open", panel !== null);
+  if (panel) document.body.dataset.panel = panel;
+  else delete document.body.dataset.panel;
+  if (panel === "assistant") {
     $("q").value = "";
     $("q").focus();
+  } else if (panel === "launcher") {
+    $("lq").value = "";
+    search();
+    $("lq").focus();
   }
 });
+
+// The launcher. Rust returns display-safe names for application ids; this page never holds a command line and launching sends
+// only an id. Results are drawn with textContent.
+let hits = [];
+let selected = 0;
+let searchSeq = 0;
+function drawResults() {
+  const list = $("results");
+  list.replaceChildren();
+  hits.forEach((hit, index) => {
+    const row = document.createElement("div");
+    row.className = "row" + (index === selected ? " selected" : "");
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = hit.name;
+    row.append(name);
+    if (hit.generic) {
+      const generic = document.createElement("span");
+      generic.className = "generic";
+      generic.textContent = hit.generic;
+      row.append(generic);
+    }
+    row.addEventListener("click", () => launch(index));
+    list.append(row);
+  });
+  $("empty").textContent = hits.length || !$("lq").value.trim() ? "" : "No matching applications";
+}
+function search() {
+  const seq = ++searchSeq;
+  invoke("launcher_query", { query: $("lq").value }).then((found) => {
+    if (seq !== searchSeq) return; // a newer keystroke already asked
+    hits = found;
+    selected = 0;
+    drawResults();
+  });
+}
+function launch(index) {
+  const hit = hits[index];
+  if (hit) invoke("launcher_launch", { id: hit.id });
+}
+$("lq").addEventListener("input", search);
+$("lq").addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    event.preventDefault();
+    if (!hits.length) return;
+    selected = (selected + (event.key === "ArrowDown" ? 1 : hits.length - 1)) % hits.length;
+    drawResults();
+  } else if (event.key === "Enter") {
+    event.preventDefault();
+    launch(selected);
+  }
+});
+$("apps").onclick = () => invoke("panel_open", { id: "launcher" });
 
 $("ask").onclick = () => invoke("panel_open", { id: "assistant" });
 $("scrim").addEventListener("click", () => invoke("panel_outside"));
@@ -51,6 +110,6 @@ $("q").addEventListener("keydown", (event) => {
 $("cancel").onclick = () => invoke("assistant_cancel").then(show);
 $("doit").onclick = () => invoke("assistant_confirm").then(show);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") invoke("assistant_escape");
+  if (event.key === "Escape") invoke("panel_escape");
 });
 requestAnimationFrame(() => invoke("ready"));

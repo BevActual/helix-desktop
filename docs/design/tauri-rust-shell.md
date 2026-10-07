@@ -55,7 +55,7 @@ rust/
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
 - **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
-- **M5 Launcher, control center, notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
+- **M5 Launcher (done, see below), control center, notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
   a threat review before moving them; they may stay native.
@@ -189,3 +189,23 @@ debounced 40 ms), the shell re-registers when the service appears, and every tim
 service: about 11 a second before; 0.7 a second in a nested session with the shell and Settings running
 (`tools/nested/call-rate.sh`); on the real session the shell alone sends about 0.3 a second and its idle CPU fell from 1.1% to 0.8%.
 Tauri clients should follow the same rule: subscribe to `Changed`, never poll.
+
+## M5 launcher (done)
+
+The launcher is a second panel on the single surface (`ShellSurface::PANELS = [assistant, launcher]`). Logic is in
+`helix-shell-core/src/launcher.rs` (pure, mutation-checked): desktop entry parsing (only real applications; `NoDisplay`, `Hidden`,
+`OnlyShowIn`/`NotShowIn` respected; translations ignored; names made display-safe), an `Exec` tokenizer that follows the Desktop Entry
+spec and never involves a shell (field codes dropped, quotes and escapes handled, `; && $( )` are just text), and ranking (exact,
+prefix, word start, substring, keywords/generic name, letters in order; shorter names and then alphabetical break ties).
+`src-tauri/src/apps.rs` scans the data directories (earlier directories win; terminal applications are left out) every time the
+panel opens and starts an application in its own process group with no stdio, then reaps it.
+
+The page never holds a command: it asks `launcher_query(text)` for display-safe names and ids, and `launcher_launch(id)` can only name
+an id from the current scan; unknown ids are refused and logged. Keyboard: type, Up/Down, Enter, Escape; a click on a row launches it.
+
+Verified end to end by `tools/nested/launcher-test.sh` (fake applications that leave marker files, real keyboard and pointer): Enter
+launches and closes the panel, hidden and terminal applications are never offered, no match plus Enter does nothing, Escape closes, a
+click launches the first row, Down moves the selection, and a guard fails the test if anything but the fake applications launches.
+(An earlier draft of that test launched a real application, Blender, because an empty query selects whatever sorts third on the
+machine; tests must never use a query that can match real software.) Memory with the launcher: 334 MB bar only, 325 MB open, 337 MB
+closed, flat over repeated cycles; still inside the 350 MB budget by about 15 MB, so the next panels need real attention to size.
