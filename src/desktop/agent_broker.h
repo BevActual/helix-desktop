@@ -49,20 +49,12 @@ public:
   // `blocked` is dropped from the request. Completes with the tiers the client now holds.
   std::uint64_t requestAccess(const std::string& client, const std::string& label, std::set<Tier> tiers, Done done);
   bool cancel(const std::string& client, std::uint64_t operation);
-  // Shell stop: cancel any pending operation without checking the requester. Does not revoke grants.
-  bool stop(std::uint64_t operation);
-  void stopAll();
   // For grant requests `narrowed` lets the user approve fewer tiers than were asked; extras are ignored.
   bool confirm(std::uint64_t operation, bool approved, const std::optional<std::set<Tier>>& narrowed = std::nullopt);
   void expire();  // denies confirmations past their deadline
   // Records a change the user made to a client's grants (through the manager), so the log shows who widened what.
   void recordGrantChange(const std::string& client, const std::string& change, const std::vector<std::string>& tiers);
   std::size_t pending() const { return pending_.size(); }
-  nlohmann::json listPending() const;
-
-  // Kill switch / safe mode. When false, submit and requestAccess fail closed; pending is stopped.
-  bool enabled() const { return enabled_; }
-  void setEnabled(bool enabled);
 
   const RiskPolicy& policy() const { return policy_; }
   bool tainted(const std::string& client) const { return taint_.tainted(client); }
@@ -90,7 +82,6 @@ private:
   Clock clock_;
   TaintTracker taint_;
   bool confirmerPresent_ = false;
-  bool enabled_ = true;
   std::uint64_t next_ = 0;
   std::map<std::uint64_t, Pending> pending_;
 };

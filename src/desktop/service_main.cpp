@@ -500,11 +500,6 @@ public:
       else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
       return;
     }
-    if (interface == agentActivityInterface) {
-      if (agentEndpoint) agentEndpoint->activity(sender, name, parameters, invocation);
-      else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
-      return;
-    }
     try {
       const auto args = fromVariant(parameters);
       if (interface == audioInterface && (name == "StartInputMeter" || name == "StopInputMeter")) {
