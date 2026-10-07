@@ -136,6 +136,13 @@ public:
   std::vector<guint> registrations;
   GDBusNodeInfo* info = nullptr;
   guint source = 0;
+  // The tick polls PipeWire, the mixer, HTTP and deferred calls by hand. It runs fast while anything is happening and slowly
+  // when idle: a permanent 16 ms timer cost about 2.5% of a core with nothing to do. Anything that needs a quick reaction
+  // (a D-Bus call, a ready fd, running operations, meters, transfers) calls wake().
+  static constexpr guint kBusyIntervalMs = 16, kIdleIntervalMs = 100;
+  static constexpr auto kBusyHold = std::chrono::seconds(1);
+  guint tickIntervalMs = kBusyIntervalMs;
+  std::chrono::steady_clock::time_point busyUntil{};
   std::string networkBackendOwner, bluetoothBackendOwner;
   std::chrono::steady_clock::time_point nextBackendCheck{};
   void failOperations(const char* interface) {
@@ -461,6 +468,7 @@ public:
   }
   void method(const std::string& sender, const std::string& interface, const std::string& name,
               GVariant* parameters, GDBusMethodInvocation* invocation) {
+    wake();  // someone is talking to the service: react quickly for the next second
     if (interface == agentInterface) {
       if (agentEndpoint) agentEndpoint->method(sender, name, parameters, invocation);
       else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
@@ -699,6 +707,26 @@ public:
       g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", message);
     }
   }
+  void wake() {
+    busyUntil = std::chrono::steady_clock::now() + kBusyHold;
+    if (source && tickIntervalMs != kBusyIntervalMs) setTickInterval(kBusyIntervalMs);
+  }
+  void setTickInterval(guint interval) {
+    if (source) g_source_remove(source);
+    tickIntervalMs = interval;
+    source = g_timeout_add(interval, [](gpointer data) -> gboolean { return static_cast<Service*>(data)->tickAndRearm(); }, this);
+  }
+  // Returns whether this timer source stays. Switching speed replaces the source, so the old one is removed here.
+  gboolean tickAndRearm() {
+    tick();
+    const auto now = std::chrono::steady_clock::now();
+    const bool busy = now < busyUntil || !meters.empty() || !operations.empty();
+    const guint wanted = busy ? kBusyIntervalMs : kIdleIntervalMs;
+    if (wanted == tickIntervalMs) return G_SOURCE_CONTINUE;
+    tickIntervalMs = wanted;
+    source = g_timeout_add(wanted, [](gpointer data) -> gboolean { return static_cast<Service*>(data)->tickAndRearm(); }, this);
+    return G_SOURCE_REMOVE;
+  }
   void tick() {
     try {
       displays->refresh(desktop());
@@ -719,10 +747,15 @@ public:
       if (mixer) mixerStart = mixer->addPollFds(fds);
       const auto httpStart = fds.size(); http.addPollFds(fds);
       if (!fds.empty()) ::poll(fds.data(), fds.size(), 0);
+      for (const auto& fd : fds)
+        if (fd.revents & (POLLIN | POLLOUT | POLLERR | POLLHUP)) { busyUntil = std::chrono::steady_clock::now() + kBusyHold; break; }
+      if (fds.size() > httpStart) busyUntil = std::chrono::steady_clock::now() + kBusyHold;  // an HTTP transfer is running
       if (mixer) mixer->dispatch(fds, mixerStart);
       http.dispatch(fds, httpStart);
       DeferredCall::drainWakeFd();
-      for (auto& callback : DeferredCall::takePending()) callback();
+      auto deferred = DeferredCall::takePending();
+      if (!deferred.empty()) busyUntil = std::chrono::steady_clock::now() + kBusyHold;
+      for (auto& callback : deferred) callback();
       TimerManager::instance().tick();
       config.checkReload();
       wallhaven.expire();
@@ -773,7 +806,8 @@ public:
         if (service.agentEndpoint) service.agentEndpoint->ownerGone(name);
         std::erase_if(service.operations, [name](const auto& operation) { return operation.sender == name; });
       }, this, nullptr);
-    source = g_timeout_add(16, [](gpointer data) -> gboolean { static_cast<Service*>(data)->tick(); return G_SOURCE_CONTINUE; }, this);
+    wake();
+    setTickInterval(kBusyIntervalMs);
   }
 };
 }
