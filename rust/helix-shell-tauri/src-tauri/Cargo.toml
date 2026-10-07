@@ -1,23 +1,19 @@
 [package]
-name = "helix-tauri-spike"
+name = "helix-shell-tauri"
 version = "0.1.0"
 edition = "2021"
-
-# Throwaway experiment: can a Tauri window be a layer-shell bar and panel, and what does it cost?
-# Not part of the Helix build. See README.md.
+publish = false
+description = "Helix shell surfaces on Tauri. A thin face over helix-shell-core and helix-desktop-api."
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+helix-desktop-api = { path = "../../helix-desktop-api" }
+helix-shell-core = { path = "../../helix-shell-core" }
 gtk = "0.18"
 gtk-layer-shell = { version = "0.8", features = ["v0_6"] }
-
-[profile.release]
-opt-level = "s"
-lto = true
-codegen-units = 1
-strip = true
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tokio = { version = "1", features = ["time"] }

@@ -2,14 +2,7 @@
 <style>
   #bar { height: 34px; box-sizing: border-box; margin: 4px 12px 0; padding: 0 14px; display: flex; align-items: center;
          justify-content: space-between; background: var(--bg); border-radius: 18px; }
-  #clock { font-weight: 600; }
+  #live { font-weight: 600; }
 </style>
-<div id="bar"><span id="clock"></span><span><button id="ask">Assistant</button></span></div>
-<script>
-  const { invoke } = window.__TAURI__.core;
-  const tick = () => { const d = new Date(); document.getElementById("clock").textContent =
-    d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + "  " + d.toLocaleDateString([], { weekday: "short", month: "short", day: "2-digit" }); };
-  tick(); setInterval(tick, 1000 * 20);
-  document.getElementById("ask").onclick = () => invoke("toggle_panel");
-  requestAnimationFrame(() => invoke("ready"));
-</script>
+<div id="bar"><span id="live">Sound …</span><span><button id="ask">Assistant</button></span></div>
+<script src="bar.js"></script>
