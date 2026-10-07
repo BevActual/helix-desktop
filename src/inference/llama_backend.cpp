@@ -2,6 +2,7 @@
 
 #include "inference/schema_grammar.h"
 
+#include <ggml-backend.h>
 #include <ggml.h>
 #include <llama.h>
 
@@ -140,6 +141,11 @@ void LlamaBackend::unload() {
   loaded_.clear();
 }
 
+bool LlamaBackend::isLoaded() const {
+  std::lock_guard lock(mutex_);
+  return model_ != nullptr;
+}
+
 std::string LlamaBackend::formatPrompt(const nlohmann::json& messages) const {
   std::vector<std::string> roles, contents;
   for (const auto& message : messages) {
@@ -245,8 +251,20 @@ Outcome LlamaBackend::chat(const ChatRequest& request, const std::function<void(
 }
 
 nlohmann::json LlamaBackend::snapshot() const {
+  // What the engine can compute on, and how much memory is free right now: the budget the service has to respect.
+  nlohmann::json devices = nlohmann::json::array();
+  for (std::size_t i = 0; i < ggml_backend_dev_count(); ++i) {
+    ggml_backend_dev_t device = ggml_backend_dev_get(i);
+    std::size_t free = 0, total = 0;
+    ggml_backend_dev_memory(device, &free, &total);
+    const auto type = ggml_backend_dev_type(device);
+    devices.push_back({{"name", ggml_backend_dev_name(device)}, {"description", ggml_backend_dev_description(device)},
+                       {"gpu", type == GGML_BACKEND_DEVICE_TYPE_GPU || type == GGML_BACKEND_DEVICE_TYPE_IGPU},
+                       {"memory_free", free}, {"memory_total", total}});
+  }
   std::lock_guard lock(mutex_);
-  return {{"backend", "llama.cpp"}, {"loaded", loaded_}, {"gpuLayers", config_.gpuLayers}, {"contextTokens", config_.contextTokens}};
+  return {{"backend", "llama.cpp"}, {"loaded", loaded_}, {"gpuLayers", config_.gpuLayers},
+          {"contextTokens", config_.contextTokens}, {"devices", std::move(devices)}};
 }
 
 }  // namespace helix::inference

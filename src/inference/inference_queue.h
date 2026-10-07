@@ -2,6 +2,7 @@
 
 #include "inference/backend.h"
 
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <deque>
@@ -37,6 +38,10 @@ public:
   // token. Returns false for an unknown operation or someone else's.
   bool cancel(const std::string& client, std::uint64_t operation);
 
+  // Frees the model when nothing has run, or been asked to run, for `idle`. Never while a request is running or waiting.
+  // Returns true if it unloaded one. The next request loads it again (the first one after is slower).
+  bool unloadIfIdle(std::chrono::steady_clock::duration idle);
+
   nlohmann::json snapshot() const;  // queue depth and the backend's own state
 
 private:
@@ -60,6 +65,7 @@ private:
   std::string runningClient_;
   bool runningCancelled_ = false;
   bool stopping_ = false;
+  std::chrono::steady_clock::time_point lastActivity_ = std::chrono::steady_clock::now();
   std::thread worker_;
 };
 

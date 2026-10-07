@@ -167,6 +167,31 @@ void checkModelLoading() {
   TEST_CHECK(queue.snapshot().at("queue").at("waiting") == 0 && queue.snapshot().at("backend") == "fake");
 }
 
+void checkIdleUnload() {
+  auto backend = std::make_shared<FakeBackend>();
+  Gate gate;
+  gate.hook(*backend);
+  Recorder rec;
+  InferenceQueue queue(backend, Limits{}, rec.onDelta(), rec.onDone());
+  using namespace std::chrono_literals;
+
+  TEST_CHECK(!queue.unloadIfIdle(0s));  // nothing loaded yet: nothing to free
+  ChatRequest r = request("a");
+  r.model = "fake-model";
+  const auto op = *queue.submit(r);
+  gate.entered.get_future().wait();
+  TEST_CHECK(!queue.unloadIfIdle(0s) && backend->loadedModel() == "fake-model");  // never while a request is running
+  const auto next = *queue.submit(request("a"));
+  gate.release.set_value();
+  TEST_CHECK(rec.wait(op) && rec.wait(next));
+  TEST_CHECK(!queue.unloadIfIdle(1h) && backend->isLoaded());   // recently used: kept
+  TEST_CHECK(queue.unloadIfIdle(0s) && !backend->isLoaded());   // idle long enough: freed
+  TEST_CHECK(!queue.unloadIfIdle(0s));                          // and only once
+
+  r.model = "fake-model";                                       // the next request loads it again
+  TEST_CHECK(rec.wait(*queue.submit(r)) && backend->isLoaded());
+}
+
 void checkShutdown() {
   auto backend = std::make_shared<FakeBackend>();
   Gate gate;
@@ -193,6 +218,7 @@ int main() {
   checkLimits();
   checkClamping();
   checkCancel();
+  checkIdleUnload();
   checkModelLoading();
   checkShutdown();
   return 0;

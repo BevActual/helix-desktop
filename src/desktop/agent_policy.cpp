@@ -175,23 +175,6 @@ std::vector<std::string> GrantStore::clients() const {
   return names;
 }
 
-std::string clientIdentity(const std::string& exePath, const std::vector<std::string>& cmdline) {
-  const std::string base = std::filesystem::path(exePath).filename().string();
-  static constexpr std::array<std::string_view, 7> kInterpreters{"python", "node", "bun", "deno", "ruby", "perl", "bash"};
-  const bool interpreter = std::ranges::any_of(kInterpreters, [&](std::string_view name) { return base.starts_with(name); })
-                           || base == "sh";
-  if (interpreter) {
-    // First argument that is not an option is the script (or module name for `-m`).
-    for (std::size_t i = 1; i < cmdline.size(); ++i) {
-      if (cmdline[i].empty() || cmdline[i].front() == '-') continue;
-      std::error_code ec;
-      const auto script = std::filesystem::weakly_canonical(cmdline[i], ec);
-      return "exe:" + exePath + "#" + (ec ? cmdline[i] : script.string());
-    }
-  }
-  return "exe:" + exePath;
-}
-
 std::expected<std::string, std::string> buildWireCommand(std::string_view tool, std::span<const std::string> argv,
                                                          std::span<const std::string> literal) {
   auto clean = [](std::string_view text) { return text.find('\x1e') == std::string_view::npos && text.find('\0') == std::string_view::npos; };

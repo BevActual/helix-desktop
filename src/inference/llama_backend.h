@@ -26,6 +26,7 @@ public:
   std::vector<ModelInfo> models() override;
   bool load(const std::string& model, std::string& error) override;
   void unload() override;
+  bool isLoaded() const override;
   Outcome chat(const ChatRequest& request, const std::function<void(const std::string&)>& onDelta,
                const std::function<bool()>& cancelled) override;
   nlohmann::json snapshot() const override;

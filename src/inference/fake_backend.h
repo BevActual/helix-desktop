@@ -27,6 +27,7 @@ public:
     return true;
   }
   void unload() override { std::lock_guard lock(mutex_); loaded_.clear(); }
+  bool isLoaded() const override { std::lock_guard lock(mutex_); return !loaded_.empty(); }
 
   Outcome chat(const ChatRequest& request, const std::function<void(const std::string&)>& onDelta,
                const std::function<bool()>& cancelled) override {

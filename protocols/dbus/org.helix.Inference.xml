@@ -1,0 +1,25 @@
+<node>
+<!-- Served by helix-inference at org.helix.Inference, /org/helix/Inference (D-Bus activated, sandboxed by its unit).
+     Design and measurements: docs/design/agent-and-inference.md. Mutating work goes through Action like every other Helix service.
+
+     Action "chat"; args (a{sv}):
+       messages     av of a{sv} {role: s, content: s}   required
+       model        s                                    optional, a name from ListModels; default: the first model
+       schema       s                                    optional; a tool-call JSON Schema (see desktop/tool_schema.h); the reply is
+                                                          then guaranteed to conform to it. Other schemas are refused.
+       max_tokens   any integer                          optional, clamped by the service
+       temperature  d                                    optional, 0 = greedy
+       priority     s                                    "interactive" (default) or "background"
+     Delta(operation, text) streams the reply to the requester only, in whole UTF-8 characters. Completed(operation, ok, result)
+     ends it; result is JSON: {ok, text, error, cancelled, truncated, prompt_tokens, completion_tokens}. A reply cut off by
+     the token limit while a schema is set is ok=false, truncated=true. -->
+<interface name="org.helix.Inference1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="ListModels"><arg type="av" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <signal name="Delta"><arg type="t"/><arg type="s"/></signal>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Changed"/>
+</interface>
+</node>

@@ -46,6 +46,7 @@ public:
   // Called before a request that names a model that is not the current one.
   virtual bool load(const std::string& model, std::string& error) = 0;
   virtual void unload() = 0;
+  virtual bool isLoaded() const = 0;
 
   // Produces the reply, calling `onDelta` with each new piece. Must return promptly once `cancelled()` is true.
   virtual Outcome chat(const ChatRequest& request, const std::function<void(const std::string&)>& onDelta,

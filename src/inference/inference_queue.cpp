@@ -47,6 +47,7 @@ std::expected<std::uint64_t, std::string> InferenceQueue::submit(ChatRequest req
                             (runningOperation_ != 0 && runningClient_ == request.client ? 1 : 0);
     if (fromClient >= limits_.maxPerClient) return std::unexpected("too many requests from this client");
     operation = ++next_;
+    lastActivity_ = std::chrono::steady_clock::now();
     // Interactive requests go ahead of waiting background ones, behind earlier interactive ones.
     Entry entry{operation, std::move(request)};
     if (entry.request.priority == Priority::Interactive) {
@@ -76,6 +77,14 @@ bool InferenceQueue::cancel(const std::string& client, std::uint64_t operation) 
   outcome.cancelled = true;
   outcome.error = "cancelled";
   onDone_(operation, outcome);
+  return true;
+}
+
+bool InferenceQueue::unloadIfIdle(std::chrono::steady_clock::duration idle) {
+  std::lock_guard lock(mutex_);  // held throughout: the worker cannot start a request while the model is being freed
+  if (stopping_ || runningOperation_ != 0 || !waiting_.empty() || !backend_->isLoaded()) return false;
+  if (std::chrono::steady_clock::now() - lastActivity_ < idle) return false;
+  backend_->unload();
   return true;
 }
 
@@ -116,6 +125,7 @@ void InferenceQueue::run() {
       runningOperation_ = 0;
       runningClient_.clear();
       runningCancelled_ = false;
+      lastActivity_ = std::chrono::steady_clock::now();
     }
     if (wasCancelled && !outcome.ok) { outcome.cancelled = true; if (outcome.error.empty()) outcome.error = "cancelled"; }
     onDone_(entry.operation, outcome);

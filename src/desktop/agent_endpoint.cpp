@@ -141,33 +141,12 @@ void AgentEndpoint::emit(const char* signal, GVariant* value, const std::string&
 
 const AgentEndpoint::Peer& AgentEndpoint::peer(const std::string& sender) {
   if (const auto found = peers_.find(sender); found != peers_.end()) return found->second;
-  GError* error = nullptr;
-  GVariant* reply = g_dbus_connection_call_sync(bus_, "org.freedesktop.DBus", "/org/freedesktop/DBus",
-    "org.freedesktop.DBus", "GetConnectionCredentials", g_variant_new("(s)", sender.c_str()), G_VARIANT_TYPE("(a{sv})"),
-    G_DBUS_CALL_FLAGS_NONE, 500, nullptr, &error);
-  if (!reply) {
-    const std::string message = error ? error->message : "unknown error";
-    if (error) g_error_free(error);
-    throw Failure("could not identify the caller: " + message);
+  const auto identity = resolvePeer(bus_, sender);
+  if (!identity) {
+    if (identity.error().wrongUser) throw Invalid(identity.error().message);
+    throw Failure(identity.error().message);
   }
-  GVariant* dict = g_variant_get_child_value(reply, 0);
-  guint32 pid = 0, uid = 0;
-  const bool havePid = g_variant_lookup(dict, "ProcessID", "u", &pid);
-  const bool haveUid = g_variant_lookup(dict, "UnixUserID", "u", &uid);
-  g_variant_unref(dict);
-  g_variant_unref(reply);
-  if (!havePid || !haveUid) throw Failure("the bus did not report the caller's process");
-  if (uid != geteuid()) throw Invalid("callers must run as the same user");
-
-  std::error_code ec;
-  const auto exe = std::filesystem::read_symlink("/proc/" + std::to_string(pid) + "/exe", ec);
-  if (ec) throw Failure("could not read the caller's executable");
-  std::vector<std::string> cmdline;
-  if (std::ifstream in("/proc/" + std::to_string(pid) + "/cmdline", std::ios::binary); in) {
-    for (std::string part; std::getline(in, part, '\0');) cmdline.push_back(part);
-  }
-  Peer who{clientIdentity(exe.string(), cmdline), exe.string(), {}};
-  return peers_.emplace(sender, std::move(who)).first->second;
+  return peers_.emplace(sender, Peer{identity->client, identity->exe, {}}).first->second;
 }
 
 void AgentEndpoint::complete(const std::string& sender, std::shared_ptr<std::uint64_t> operation, bool ok, std::string result) {

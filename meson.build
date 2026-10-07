@@ -852,7 +852,7 @@ _noctalia_sources = files(
   'src/ipc/cli.cpp',
 )
 
-_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp')
+_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
 
 if sanitize
   _noctalia_sources += files('src/core/lsan_suppressions.cpp')
@@ -1206,6 +1206,31 @@ configure_file(input: 'assets/services/helix-service.service.in',
   output: 'helix-service.service', configuration: helix_service_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 
+# The model runtime: its own process, its own bus name (org.helix.Inference), sandboxed by its unit.
+helix_inference_introspection_h = custom_target('helix-inference-introspection',
+  input: 'protocols/dbus/org.helix.Inference.xml',
+  output: 'helix_inference_introspection.h',
+  command: [find_program('python3'), files('scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'inferenceIntrospectionXml'],
+)
+helix_inference = executable('helix-inference',
+  sources: [files('src/inference/service_main.cpp', 'src/inference/inference_service.cpp', 'src/inference/inference_queue.cpp',
+    'src/inference/schema_grammar.cpp'), helix_inference_introspection_h]
+    + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
+  dependencies: [noctalia_core_dep, dependency('threads')] + (llama_dep.found() ? [llama_dep] : []),
+  build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
+  cpp_args: _noctalia_cpp_args,
+  install: true,
+)
+
+helix_inference_config = configuration_data()
+helix_inference_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
+configure_file(input: 'assets/services/org.helix.Inference.service.in',
+  output: 'org.helix.Inference.service', configuration: helix_inference_config,
+  install_dir: get_option('datadir') / 'dbus-1' / 'services')
+configure_file(input: 'assets/services/helix-inference.service.in',
+  output: 'helix-inference.service', configuration: helix_inference_config,
+  install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
+
 gtk4_dep = dependency('gtk4', version: '>=4.12', required: get_option('desktop_apps'))
 adwaita_dep = dependency('libadwaita-1', version: '>=1.7', required: get_option('desktop_apps'))
 if gtk4_dep.found() and adwaita_dep.found()
@@ -1279,7 +1304,7 @@ if build_tests
     override_options: ['b_ndebug=false'])
   test('desktop_protocol', helix_protocol_test)
   helix_agent_policy_unit = executable('desktop_agent_policy_test',
-    sources: files('tests/desktop_agent_policy_test.cpp', 'src/desktop/agent_policy.cpp'),
+    sources: files('tests/desktop_agent_policy_test.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop_api/peer_identity.cpp'),
     dependencies: noctalia_core_dep,
     override_options: ['b_ndebug=false'],
   )
@@ -1343,6 +1368,8 @@ if build_tests
     test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
     meter_python = find_program('python3')
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+      test('inference_service_integration', helix_dbus_session,
+        args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', helix_inference], timeout: 120)
       test('desktop_agent_manager_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
           helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)

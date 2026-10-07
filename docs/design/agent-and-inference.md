@@ -128,6 +128,29 @@ to the user come from the verified identity only (`friendlyClientName`: ASCII le
 else `_`), and a self-declared label appears only as "it calls itself". Not yet checked: toggling a switch or
 pressing Remove with a pointer, and the unavailable state.
 
+## Implementation status: helix-inference
+
+`helix-inference` is a separate, D-Bus-activated process (`org.helix.Inference`, interface `org.helix.Inference1`,
+contract in `protocols/dbus/org.helix.Inference.xml`). The queue (`inference_queue`), the engine (`llama_backend`) and the
+D-Bus layer (`inference_service`) are built and tested; `tests/inference_service_integration.py` drives the service with a
+scripted backend over a real bus (streaming, replies only to the requester, strict arguments, per-client limit, cancel,
+cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a real model.
+
+- **Sandbox.** `assets/services/helix-inference.service.in` carries 20 hardening properties (no network, no writes
+  outside private temporary space, read-only home, restricted system calls, no capabilities, `AF_UNIX` only).
+  `tools/check-inference-sandbox.py` applies exactly those properties to transient units and confirms the network and home
+  writes are blocked, the model directory is readable, and the real service still sees the GPU and runs a model.
+- **Caller identity differs from Agent1.** Any hardened user unit runs in its own user namespace, where another process's
+  `/proc/<pid>/exe` cannot be read. So this service identifies callers by `pid:<n>` from the bus and uses that only for
+  per-caller limits. Ownership of a request is the caller's unique bus name. There are no per-program grants yet: any
+  same-user process may use the model, within the queue limits. Per-client grants for inference belong with the Settings
+  Agents page.
+- **Memory.** The model is freed after `HELIX_INFERENCE_IDLE_SECONDS` (default 300) of inactivity, never while a request is
+  running or waiting. `GetSnapshot` reports the compute devices and their free memory.
+- **Not done:** startup preload and warm-up, a VRAM budget that backs off when the compositor needs the GPU, KV-cache reuse
+  of the shared prompt, the evaluation suite, packaging the engine (it is built by hand into `third_party/`, and the
+  installed binary's library path points there), and a client in the assistant that uses it.
+
 ## Measured: model quality and speed
 
 `tests/inference_llama_test.cpp` runs a real model through the queue, the tool-call grammar and the live command schema

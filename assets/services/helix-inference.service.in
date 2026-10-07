@@ -1,0 +1,34 @@
+[Unit]
+Description=Helix local model runtime
+
+[Service]
+Type=dbus
+BusName=org.helix.Inference
+ExecStart=@HELIX_BINDIR@/helix-inference
+Restart=on-failure
+RestartSec=2
+
+# Model files are untrusted binary input to a parser written in C++, so the process that reads them is boxed in: no
+# network, no writes outside its own temporary space, no new privileges, only the system calls a normal service needs.
+# It can still read the models under ~/.local/share/helix and use the GPU. tools/check-inference-sandbox.py proves it.
+NoNewPrivileges=yes
+PrivateNetwork=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+UMask=0077
+# Not set: MemoryDenyWriteExecute (GPU drivers map writable executable memory for shader code).
