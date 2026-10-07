@@ -178,3 +178,14 @@ outer command (the model service is started by D-Bus activation and inherits the
 
 Known rough edges: the confirmation text includes the model-facing disambiguation ("display brightness, not sound"); the result text
 is whatever the command printed ("ok"); the panel is a fixed 520 px.
+
+## Polling removed from the C++ clients
+
+The shell polled the desktop service on four timers (audio 1 s, Bluetooth 2 s, network 3 s, re-registration 3 s), each making a
+synchronous `NameHasOwner` call first, and the Settings app refreshed seven calls every 3 s. All of it duplicated the `Changed`
+signals the service already sends. Now: `DesktopClient::available()` trusts a bus name watch while the service is up (and still asks
+the bus when it is absent, so a caller can never be stuck "unavailable"), audio and Bluetooth clients listen for `Changed` (audio
+debounced 40 ms), the shell re-registers when the service appears, and every timer is a 30 s safety net. Measured idle calls to the
+service: about 11 a second before; 0.7 a second in a nested session with the shell and Settings running
+(`tools/nested/call-rate.sh`); on the real session the shell alone sends about 0.3 a second and its idle CPU fell from 1.1% to 0.8%.
+Tauri clients should follow the same rule: subscribe to `Changed`, never poll.
