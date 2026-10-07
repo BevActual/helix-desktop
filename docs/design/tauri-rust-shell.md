@@ -417,3 +417,28 @@ Not available under this shell until ported: notifications, wallpaper, clipboard
 and the on-screen display for volume and brightness (the keys still work through wpctl and brightnessctl).
 
 Gotcha: a unit's `ExecStart` needs `\x20` for a space, and a `sed` replacement turns `\x20` back into a space, so it is doubled.
+
+## Notifications, the visual design, and the Caps Lock palette (2026-10-07)
+
+**Notifications.** The shell serves `org.freedesktop.Notifications` (never taking the name from another daemon). `helix-shell-core::notifications` is
+the pure store: names, summaries, bodies and button labels are sanitized and bounded, markup is reduced to text, buttons are returned by index into
+the list the application offered (the key sent back comes from the store), one application is capped at eight entries and twenty per ten seconds,
+critical ones never expire and ignore Do not disturb, and time is passed in so the model has no timers: the host sleeps until `next_deadline()`.
+Toasts never take the pointer; buttons live in the shade. niri posts its own "screenshot captured" notification, which the tests must allow for.
+
+**Visual design.** One stylesheet (`dist/style.css`) holds the tokens (Inter, a 4 pt scale, concentric radii, one easing curve, dark and light that
+follow the Dark theme setting) and every component uses only tokens. Icons are a small stroke set drawn with the SVG DOM (`dist/icons.js`, shared with the
+approval dialog), never parsed from markup. The bar is a menu bar: apps and assistant on the left, the clock in the middle (it opens the notification
+shade), notifications, agents and one status button (Wi-Fi, Bluetooth, sound, battery) on the right. Panels share one glass recipe and one entrance.
+The approval dialog is deliberately unlike everything else: a modal on a dimmed screen with an "Exact action" box and an Allow button that visibly
+fills while it is still arming. Glass proper (blur behind the panels) needs the shell to tell niri which rectangles to blur through
+`ext-background-effect-v1`; the shell is one full-output surface, so that region has to follow the panels. Not done yet.
+Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tools/nested/look.sh` (a screenshot of every panel), `tools/nested/ui-suite.sh`
+(every nested UI test, each from an empty scratch directory). The layout report waits 300 ms so panel animations have settled before positions are read.
+
+**Caps Lock palette (`quick-insert`).** Caps Lock is remapped to F19 in the keymap and bound to this panel. `helix-shell-core::quick_insert` searches emoji
+(ranked: exact, prefix, word, keyword, stem, substring; what you use comes first), the clipboard history and desktop actions; typing always adds an
+"Ask Helix" row that hands the sentence to the assistant. The page sends only the position of the chosen row; what it means comes from the last query's
+results. Emoji are typed with `wtype`; clipboard entries go on the clipboard and are pasted with Shift+Insert, so a terminal receives a bracketed paste
+and never keystrokes. The history is in memory only, text only, at most 50 entries of 64 KiB, and skips anything a password manager flags. What was
+typed or copied is never written to the log.

@@ -73,6 +73,11 @@ listen("shell-mode", (event) => {
     invoke("bluetooth_view").then(drawBluetooth);
     invoke("quick_view").then(drawQuick);
     invoke("battery_view").then(drawBattery);
+  } else if (panel === "quick-insert") {
+    qiSource = "emoji"; // always opens on emoji, so the same keys do the same thing every time
+    $("qi-input").value = "";
+    qiSearch();
+    $("qi-input").focus();
   } else if (panel === "agents") {
     invoke("activity_view").then(drawAgents);
   } else if (panel === "launcher") {
@@ -214,6 +219,93 @@ $("notifbtn").onclick = () => invoke("panel_open", { id: "notifications" });
 $("notif-clear").onclick = () => invoke("notification_clear");
 $("notif-dnd").onclick = () => invoke("notification_set_dnd", { on: $("tile-dnd").dataset.on !== "1" });
 $("tile-dnd").addEventListener("click", () => invoke("notification_set_dnd", { on: $("tile-dnd").dataset.on !== "1" }));
+
+
+// The Caps Lock palette. Rust holds the emoji, the clipboard history and what each row means; this page draws display rows and sends
+// back the position of the one chosen, so it can neither invent text to insert nor name an action it was not offered.
+let qiSource = "emoji";
+let qiRows = [];
+let qiSelected = 0;
+let qiSeq = 0;
+let qiGeneration = 0;
+const QI_COLUMNS = 8;
+function qiDraw() {
+  const list = $("qi-results");
+  list.replaceChildren();
+  const grid = qiSource === "emoji";
+  list.classList.toggle("grid", grid);
+  qiRows.forEach((row, index) => {
+    const selected = index === qiSelected;
+    let element;
+    if (grid && row.glyph) {
+      element = document.createElement("div");
+      element.className = "qi-cell" + (selected ? " selected" : "");
+      element.textContent = row.glyph;
+      element.title = row.label;
+    } else {
+      element = document.createElement("div");
+      element.className = "qi-row" + (selected ? " selected" : "") + (row.ask ? " ask" : "");
+      if (row.ask) element.append(icon("sparkle"));
+      if (row.glyph) { const g = document.createElement("span"); g.textContent = row.glyph; element.append(g); }
+      const main = document.createElement("div");
+      main.className = "qi-main";
+      const label = document.createElement("div");
+      label.className = "qi-label";
+      label.textContent = row.label;
+      main.append(label);
+      element.append(main);
+      const detail = document.createElement("div");
+      detail.className = "qi-detail";
+      detail.textContent = row.detail;
+      element.append(detail);
+    }
+    element.dataset.test = "qi-row-" + index;
+    element.addEventListener("click", () => qiChoose(index));
+    list.append(element);
+    if (selected) element.scrollIntoView({ block: "nearest" });
+  });
+  document.body.dataset.qi = qiSource;
+  document.querySelectorAll(".qi-tab").forEach((tab) => tab.classList.toggle("current", tab.dataset.source === qiSource));
+  $("qi-empty").textContent = qiRows.length ? "" : qiSource === "clipboard" ? "Nothing copied yet" : "No matches";
+  queueReport();
+}
+function qiSearch() {
+  const seq = ++qiSeq;
+  invoke("quick_insert_query", { source: qiSource, text: $("qi-input").value }).then((results) => {
+    if (seq !== qiSeq) return; // a newer keystroke already asked
+    qiRows = results.rows;
+    qiGeneration = results.generation;
+    qiSelected = 0;
+    qiDraw();
+  });
+}
+function qiChoose(index) {
+  // Rust only honours the choice for the results it was drawn from; if newer results exist, the press is ignored and can be repeated.
+  if (index >= 0 && index < qiRows.length) invoke("quick_insert_activate", { generation: qiGeneration, index }).catch(() => qiSearch());
+}
+function qiSwitch(step) {
+  const order = ["emoji", "clipboard", "actions"];
+  qiSource = order[(order.indexOf(qiSource) + step + order.length) % order.length];
+  qiSearch();
+}
+$("qi-input").addEventListener("input", qiSearch);
+$("qi-input").addEventListener("keydown", (event) => {
+  const grid = qiSource === "emoji";
+  const move = (delta) => {
+    event.preventDefault();
+    if (!qiRows.length) return;
+    qiSelected = Math.max(0, Math.min(qiRows.length - 1, qiSelected + delta));
+    qiDraw();
+  };
+  if (event.key === "ArrowDown") move(grid ? QI_COLUMNS : 1);
+  else if (event.key === "ArrowUp") move(grid ? -QI_COLUMNS : -1);
+  else if (event.key === "ArrowRight" && grid) move(1);
+  else if (event.key === "ArrowLeft" && grid) move(-1);
+  else if (event.key === "Tab") { event.preventDefault(); qiSwitch(event.shiftKey ? -1 : 1); }
+  else if (event.key === "Enter") { event.preventDefault(); qiChoose(qiSelected); }
+});
+document.querySelectorAll(".qi-tab").forEach((tab) => tab.addEventListener("click", () => { qiSource = tab.dataset.source; qiSearch(); $("qi-input").focus(); }));
+$("qi-forget").onclick = () => invoke("quick_insert_forget_clipboard").then(qiSearch);
 
 // Agents. Rust owns the picture (everything an agent can influence is sanitized there) and builds every request; this page only
 // draws it and sends back ids it was given. Text is assigned with textContent only.

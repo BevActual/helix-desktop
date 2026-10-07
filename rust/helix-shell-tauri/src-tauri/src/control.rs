@@ -12,7 +12,15 @@ pub const BUS_NAME: &str = "org.helix.Shell";
 pub const OBJECT_PATH: &str = "/org/helix/Shell";
 /// The methods this object serves. A test checks them against the XML contract.
 #[cfg(test)]
-pub const METHODS: &[&str] = &["OpenPanel", "TogglePanel", "ClosePanel", "GetStatus"];
+pub const METHODS: &[&str] = &[
+    "OpenPanel",
+    "TogglePanel",
+    "ClosePanel",
+    "GetStatus",
+    "ToggleDoNotDisturb",
+    "ToggleNightLight",
+    "ToggleDarkTheme",
+];
 
 struct Control {
     app: AppHandle,
@@ -62,6 +70,18 @@ impl Control {
                 open_panel(app, &id);
             }
         })
+    }
+
+    async fn toggle_do_not_disturb(&self) {
+        crate::notify::toggle_dnd(&self.app).await;
+    }
+
+    async fn toggle_night_light(&self) {
+        crate::toggle_night_light(&self.app).await;
+    }
+
+    async fn toggle_dark_theme(&self) {
+        crate::toggle_dark_theme(&self.app).await;
     }
 
     async fn close_panel(&self) -> zbus::fdo::Result<()> {

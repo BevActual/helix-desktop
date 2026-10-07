@@ -27,6 +27,12 @@ for panel in control-center launcher assistant notifications; do
   echo "$panel" >> "$CONTROL"; sleep 1.6; shot "10-$panel"
   echo close >> "$CONTROL"; sleep 0.8
 done
+wl-copy "Meeting notes: ship the shell polish pass before Friday." ; sleep 0.4; wl-copy "https://helix.example/docs/quick-insert"; sleep 0.6
+echo quick-insert >> "$CONTROL"; sleep 1.6; shot 30-quick-emoji
+wtype "smile"; sleep 0.8; shot 31-quick-emoji-search
+wtype -k Tab; sleep 0.8; shot 32-quick-clipboard
+wtype -k Tab; sleep 0.8; shot 33-quick-actions
+echo close >> "$CONTROL"; sleep 0.8
 echo control-center >> "$CONTROL"; sleep 1.2
 for page in tile-wifi-open tile-bt-open sound-open; do
   click_id "$page" && sleep 0.9; shot "20-detail-$page"; click_id back; sleep 0.5

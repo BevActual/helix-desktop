@@ -67,7 +67,7 @@ input:focus { outline: none; background: var(--fill-2); box-shadow: 0 0 0 2px co
 .panel { position: fixed; display: flex; flex-direction: column; gap: 12px; padding: 16px; opacity: 0; visibility: hidden; transform: translateY(-8px) scale(.965);
          transform-origin: top right; transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease), visibility 0s linear var(--dur); }
 body[data-panel="control-center"] #controls, body[data-panel="notifications"] #notifs, body[data-panel="agents"] #agents,
-body[data-panel="launcher"] #launcher, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+body[data-panel="launcher"] #launcher, body[data-panel="quick-insert"] #quickinsert, body[data-panel="assistant"] #panel { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
 
 /* Bar */
 #bar { position: relative; height: 34px; margin: 4px 12px 0; padding: 0 6px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
@@ -213,3 +213,26 @@ input.switch:checked { background: var(--ok); } input.switch:checked::after { tr
 #allow { position: relative; overflow: hidden; }
 #allow.arming::after { content: ""; position: absolute; inset: 0; background: rgba(255,255,255,.28); transform-origin: left; animation: arm 700ms linear both; }
 @keyframes arm { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Caps Lock palette */
+#quickinsert { left: 50%; top: 14%; width: 680px; margin-left: -340px; padding: 10px; gap: 8px; transform-origin: top center; }
+#qi-field { display: flex; align-items: center; gap: 10px; padding: 0 16px; border-radius: 16px; background: var(--fill-1); color: var(--label-2); }
+#qi-field svg { width: 20px; height: 20px; }
+#qi-input { flex: 1; background: transparent; padding: 14px 0; font-size: 19px; font-weight: 450; letter-spacing: -.014em; color: var(--label); }
+#qi-input:focus { background: transparent; box-shadow: none; }
+#qi-tabs { display: flex; align-items: center; gap: 4px; padding: 0 2px; }
+.qi-tab { background: transparent; color: var(--label-2); padding: 5px 14px; border-radius: var(--r-pill); font-weight: 600; font-size: 12.5px; }
+.qi-tab.current { background: var(--fill-2); color: var(--label); }
+#qi-spacer { flex: 1; } #qi-forget { padding: 4px 11px; font-size: 12px; background: transparent; color: var(--label-2); display: none; } body[data-qi="clipboard"] #qi-forget { display: block; }
+#qi-results { max-height: 46vh; overflow-y: auto; display: grid; gap: 2px; grid-template-columns: 1fr; }
+#qi-results.grid { grid-template-columns: repeat(8, 1fr); gap: 4px; padding: 2px; }
+.qi-row { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-radius: 12px; min-width: 0; }
+.qi-row .qi-main { flex: 1; min-width: 0; } .qi-row .qi-label { font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qi-row .qi-detail { color: var(--label-2); font-size: 12px; white-space: nowrap; }
+.qi-row.selected { background: var(--accent); color: var(--on-accent); } .qi-row.selected .qi-detail { color: color-mix(in srgb, var(--on-accent) 78%, transparent); }
+.qi-row.ask:not(.selected) .qi-label { color: var(--accent); } .qi-row svg { width: 18px; height: 18px; flex: none; }
+.qi-cell { height: 54px; border-radius: 12px; display: grid; place-items: center; font-size: 30px; line-height: 1; font-family: "Noto Color Emoji", var(--font); }
+.qi-cell.selected { background: var(--accent); }
+#qi-results.grid .qi-row { grid-column: 1 / -1; }
+#qi-empty { color: var(--label-2); padding: 12px 14px; } #qi-empty:empty { display: none; }
+#qi-hint { display: flex; gap: 16px; padding: 2px 14px 4px; color: var(--label-3); font-size: 11.5px; }

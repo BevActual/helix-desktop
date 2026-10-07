@@ -1,15 +1,23 @@
 #!/bin/sh
 # What a niri key binding runs. Works under either shell: when the Tauri shell is the session shell it drives that
 # (panels over org.helix.Shell1, volume and brightness directly); otherwise it hands the same request to the native shell.
-#   helix-panel launcher | control-center | assistant | agents | settings | window-switcher | lock | lid-close
+#   helix-panel launcher | control-center | assistant | agents | notifications | quick-insert | settings | window-switcher
+#   helix-panel lock | lid-close | dnd | night-light | media-toggle | media-next | media-previous | screenshot | screenshot-screen
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
 set -u
 cmd=${1:?usage: helix-panel <command>}
 tauri() { systemctl --user is-active --quiet helix-shell-tauri.service; }
 if tauri; then
   case "$cmd" in
-    launcher|control-center|assistant|agents)
+    launcher|control-center|assistant|agents|notifications|quick-insert)
       exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 TogglePanel s "$cmd" ;;
+    dnd) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 ToggleDoNotDisturb ;;
+    night-light) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 ToggleNightLight ;;
+    media-toggle) exec playerctl play-pause ;;
+    media-next) exec playerctl next ;;
+    media-previous) exec playerctl previous ;;
+    screenshot) exec niri msg action screenshot ;;
+    screenshot-screen) exec niri msg action screenshot-screen ;;
     lock|lid-close)
       # swaylock speaks ext-session-lock-v1 (niri keeps the session locked even if the locker dies) and authenticates with PAM.
       pgrep -x swaylock >/dev/null && exit 0
@@ -31,6 +39,15 @@ case "$cmd" in
   lock) exec noctalia msg session lock ;;
   lid-close) exec noctalia msg session lid-close ;;
   window-switcher|volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down) exec noctalia msg "$cmd" ;;
+  notifications) exec noctalia msg panel-toggle notifications ;;
+  quick-insert) exec noctalia msg panel-toggle quick-insert ;;
+  dnd) exec noctalia msg notification-dnd-toggle ;;
+  night-light) exec noctalia msg nightlight-toggle ;;
+  media-toggle) exec noctalia msg media toggle ;;
+  media-next) exec noctalia msg media next ;;
+  media-previous) exec noctalia msg media previous ;;
+  screenshot) exec noctalia msg screenshot-region ;;
+  screenshot-screen) exec noctalia msg screenshot-fullscreen ;;
   assistant|agents) exit 0 ;;
   *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
 esac

@@ -17,6 +17,7 @@ pub const PANELS: &[&str] = &[
     "control-center",
     "agents",
     "notifications",
+    "quick-insert",
 ];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -19,17 +19,21 @@ case "${1:-status}" in
     escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
     sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-tauri.service.in" > "$UNITS/helix-shell-tauri.service"
     # Idempotent: only binds still pointing at the native shell are changed, and each file is backed up before its first change.
-    python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/noctalia-setup.kdl" <<'PY'
+    python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/noctalia-setup.kdl" "$HOME/.config/niri/noctalia-binds.kdl" <<'PY'
 import os, shutil, sys, time
 panel = '"' + os.path.expanduser('~/.local/bin/helix-panel') + '"'
 names = {"panel-toggle launcher": "launcher", "panel-toggle control-center": "control-center", "settings-toggle": "settings",
          "window-switcher": "window-switcher", "volume-up": "volume-up", "volume-down": "volume-down", "volume-mute": "volume-mute",
          "mic-mute": "mic-mute", "brightness-up": "brightness-up", "brightness-down": "brightness-down",
-         "session lock": "lock", "session lid-close": "lid-close"}
+         "session lock": "lock", "session lid-close": "lid-close", "panel-toggle notifications": "notifications",
+         "panel-toggle quick-insert": "quick-insert", "notification-dnd-toggle": "dnd", "nightlight-toggle": "night-light",
+         "media toggle": "media-toggle", "media next": "media-next", "media previous": "media-previous",
+         "screenshot-region": "screenshot", "screenshot-fullscreen": "screenshot-screen"}
 swaps = {}
 for native, name in names.items():
     old = "spawn " + " ".join('"%s"' % word for word in ["noctalia", "msg"] + native.split())
     swaps[old] = "spawn %s \"%s\"" % (panel, name)
+    swaps['spawn-sh "noctalia msg ' + native + '"'] = "spawn %s \"%s\"" % (panel, name)
 for path in sys.argv[1:]:
     text = open(path).read()
     new = text

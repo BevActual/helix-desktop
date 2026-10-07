@@ -151,9 +151,30 @@ pub struct Row {
     pub ask: bool,
 }
 
+/// One line from the clipboard watcher: the copied bytes as hex, so any content (newlines, binary) fits on one line. Text that is
+/// not valid UTF-8, or is empty, is not a clipboard entry.
+pub fn decode_clip_hex(line: &str) -> Option<String> {
+    let hex = line.trim().as_bytes();
+    if hex.is_empty() || !hex.len().is_multiple_of(2) || hex.len() > 2 * (MAX_CLIP_BYTES + 1) {
+        return None;
+    }
+    let nibble = |c: u8| match c {
+        b'0'..=b'9' => Some(c - b'0'),
+        b'a'..=b'f' => Some(c - b'a' + 10),
+        _ => None,
+    };
+    let mut bytes = Vec::with_capacity(hex.len() / 2);
+    for pair in hex.chunks(2) {
+        bytes.push(nibble(pair[0])? << 4 | nibble(pair[1])?);
+    }
+    String::from_utf8(bytes).ok()
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RequestError {
     NoSuchResult,
+    /// The rows the person was looking at are not the latest results: what a position means has changed since they were drawn.
+    Stale,
 }
 
 pub struct QuickInsert {
@@ -161,6 +182,20 @@ pub struct QuickInsert {
     clips: VecDeque<String>,
     used: HashMap<String, u32>,
     last: Vec<Outcome>,
+    generation: u64,
+}
+
+/// A crude English stem, enough that "smile" finds "smiling" and "laughs" finds "laughing": the longest common suffixes are dropped,
+/// never leaving fewer than three letters.
+fn stem(word: &str) -> &str {
+    for suffix in ["ing", "ed", "es", "s", "e"] {
+        if let Some(root) = word.strip_suffix(suffix) {
+            if root.chars().count() >= 3 {
+                return root;
+            }
+        }
+    }
+    word
 }
 
 /// Higher is a better match; 0 is no match. `fields` are the lowercase texts to try, the first being the most important.
@@ -180,6 +215,14 @@ fn score(query: &str, name: &str, keywords: &[String]) -> u32 {
     if keywords.iter().any(|k| k.starts_with(query)) {
         return 45;
     }
+    // Same word under a different ending ("smile" / "smiling"): below an exact or prefix hit, above a stray substring.
+    let root = stem(query);
+    if root.chars().count() >= 3 && name.split(' ').any(|word| stem(word).starts_with(root)) {
+        return 40;
+    }
+    if root.chars().count() >= 3 && keywords.iter().any(|k| stem(k).starts_with(root)) {
+        return 35;
+    }
     if name.contains(query) {
         return 30;
     }
@@ -196,6 +239,7 @@ impl QuickInsert {
             clips: VecDeque::new(),
             used: HashMap::new(),
             last: Vec::new(),
+            generation: 0,
         }
     }
 
@@ -217,7 +261,13 @@ impl QuickInsert {
         self.clips.len()
     }
 
+    /// Identifies the results of the latest query; a row can only be chosen from the results it was drawn from.
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub fn query(&mut self, source: Source, text: &str) -> Vec<Row> {
+        self.generation += 1;
         let needle = text.trim().to_lowercase();
         let mut rows = Vec::new();
         let mut outcomes = Vec::new();
@@ -317,8 +367,11 @@ impl QuickInsert {
         rows
     }
 
-    /// The person chose the row at `index` of the last query's results.
-    pub fn activate(&mut self, index: usize) -> Result<Outcome, RequestError> {
+    /// The person chose the row at `index` of the results of query `generation`.
+    pub fn activate(&mut self, generation: u64, index: usize) -> Result<Outcome, RequestError> {
+        if generation != self.generation {
+            return Err(RequestError::Stale);
+        }
         let outcome = self
             .last
             .get(index)
@@ -391,11 +444,11 @@ mod tests {
     fn what_you_use_comes_first_when_you_open_the_palette() {
         let mut p = palette();
         p.query(Source::Emoji, "pizza");
-        p.activate(0).unwrap();
+        p.activate(p.generation(), 0).unwrap();
         p.query(Source::Emoji, "pizza");
-        p.activate(0).unwrap();
+        p.activate(p.generation(), 0).unwrap();
         p.query(Source::Emoji, "fire");
-        p.activate(0).unwrap();
+        p.activate(p.generation(), 0).unwrap();
         let rows = p.query(Source::Emoji, "");
         assert_eq!(
             labels(&rows),
@@ -408,16 +461,38 @@ mod tests {
     fn choosing_an_emoji_types_it() {
         let mut p = palette();
         p.query(Source::Emoji, "pizza");
-        assert_eq!(p.activate(0), Ok(Outcome::Type("🍕".into())));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Type("🍕".into()))
+        );
     }
 
     #[test]
     fn the_page_cannot_choose_a_row_that_was_not_offered() {
         let mut p = palette();
         p.query(Source::Emoji, "pizza");
-        assert_eq!(p.activate(5), Err(RequestError::NoSuchResult));
+        assert_eq!(
+            p.activate(p.generation(), 5),
+            Err(RequestError::NoSuchResult)
+        );
         let mut fresh = palette();
-        assert_eq!(fresh.activate(0), Err(RequestError::NoSuchResult));
+        assert_eq!(
+            fresh.activate(fresh.generation(), 0),
+            Err(RequestError::NoSuchResult)
+        );
+    }
+
+    #[test]
+    fn a_row_drawn_from_an_older_query_cannot_be_chosen() {
+        let mut p = palette();
+        p.query(Source::Emoji, "pizza");
+        let drawn = p.generation();
+        p.query(Source::Emoji, "fire");
+        assert_eq!(p.activate(drawn, 0), Err(RequestError::Stale));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Type("🔥".into()))
+        );
     }
 
     #[test]
@@ -425,7 +500,10 @@ mod tests {
         let mut p = palette();
         p.query(Source::Emoji, "pizza");
         p.query(Source::Emoji, "fire");
-        assert_eq!(p.activate(0), Ok(Outcome::Type("🔥".into())));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Type("🔥".into()))
+        );
     }
 
     #[test]
@@ -460,7 +538,7 @@ mod tests {
         assert!(!rows[0].label.contains('\u{202e}') && !rows[0].label.contains('\n'));
         assert_eq!(rows[0].detail, "3 lines");
         assert_eq!(
-            p.activate(0),
+            p.activate(p.generation(), 0),
             Ok(Outcome::Paste(
                 "first line\u{202e}\nsecond line\nthird".into()
             ))
@@ -496,9 +574,15 @@ mod tests {
         let mut p = palette();
         let rows = p.query(Source::Actions, "lock");
         assert_eq!(rows[0].label, "Lock Screen");
-        assert_eq!(p.activate(0), Ok(Outcome::Do(Action::LockSession)));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Do(Action::LockSession))
+        );
         p.query(Source::Actions, "focus");
-        assert_eq!(p.activate(0), Ok(Outcome::Do(Action::ToggleDoNotDisturb)));
+        assert_eq!(
+            p.activate(p.generation(), 0),
+            Ok(Outcome::Do(Action::ToggleDoNotDisturb))
+        );
         assert_eq!(
             p.query(Source::Actions, "").len(),
             ACTIONS.len(),
@@ -513,7 +597,7 @@ mod tests {
         assert_eq!(rows.len(), 1);
         assert!(rows[0].ask && rows[0].label.starts_with("Ask Helix: make the screen"));
         assert_eq!(
-            p.activate(0),
+            p.activate(p.generation(), 0),
             Ok(Outcome::Ask("make the screen dimmer".into()))
         );
         let rows = p.query(Source::Emoji, "pizza");
@@ -527,7 +611,7 @@ mod tests {
         let rows = p.query(Source::Actions, &long);
         let ask = rows.last().unwrap();
         assert!(!ask.label.contains('\u{202e}') && ask.label.chars().count() < 120);
-        match p.activate(rows.len() - 1).unwrap() {
+        match p.activate(p.generation(), rows.len() - 1).unwrap() {
             Outcome::Ask(q) => assert!(q.chars().count() <= MAX_QUESTION_CHARS),
             other => panic!("{other:?}"),
         }
@@ -601,7 +685,7 @@ mod tests {
         let mut p = QuickInsert::new(parse_emoji(json));
         assert_eq!(p.query(Source::Emoji, "smile")[0].label, "smile one");
         p.query(Source::Emoji, "two");
-        p.activate(0).unwrap();
+        p.activate(p.generation(), 0).unwrap();
         assert_eq!(p.query(Source::Emoji, "smile")[0].label, "smile two");
     }
 
@@ -637,5 +721,44 @@ mod tests {
             !name.contains('\u{202e}') && name.chars().count() <= 61,
             "{name}"
         );
+    }
+
+    #[test]
+    fn clipboard_lines_decode_only_when_they_are_valid_text() {
+        assert_eq!(decode_clip_hex("68690a"), Some("hi\n".into()));
+        assert_eq!(decode_clip_hex("  68690a \n"), Some("hi\n".into()));
+        assert_eq!(decode_clip_hex(""), None);
+        assert_eq!(decode_clip_hex("686"), None, "odd length");
+        assert_eq!(decode_clip_hex("6g"), None, "not hex");
+        assert_eq!(decode_clip_hex("ff"), None, "not UTF-8");
+        assert_eq!(decode_clip_hex("e29c93"), Some("\u{2713}".into()));
+        assert_eq!(
+            decode_clip_hex(&"61".repeat(MAX_CLIP_BYTES + 2)),
+            None,
+            "too long to be an entry"
+        );
+        assert!(decode_clip_hex(&"61".repeat(MAX_CLIP_BYTES)).is_some());
+    }
+
+    #[test]
+    fn a_word_finds_the_same_word_with_another_ending() {
+        let json = r#"[
+          {"emoji":"1","name":"smiling face","keywords":[],"category":"c"},
+          {"emoji":"2","name":"face with laughing eyes","keywords":["giggles"],"category":"c"}
+        ]"#;
+        assert_eq!(ranked(json, "smile"), ["smiling face"]);
+        assert_eq!(ranked(json, "laughs"), ["face with laughing eyes"]);
+        assert_eq!(ranked(json, "giggling"), ["face with laughing eyes"]);
+        assert!(ranked(json, "xy").is_empty());
+    }
+
+    #[test]
+    fn stems_never_shrink_a_short_word_to_nothing() {
+        assert_eq!(stem("smiling"), "smil");
+        assert_eq!(stem("is"), "is");
+        assert_eq!(stem("ies"), "ies");
+        assert_eq!(stem("cats"), "cat");
+        assert_eq!(stem("dogs"), "dog");
+        assert_eq!(stem("bed"), "bed");
     }
 }

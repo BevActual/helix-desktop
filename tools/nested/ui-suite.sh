@@ -22,3 +22,4 @@ pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
 pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1
 pick notifications  && run notifications notifications-test.sh tauri-shell.sh
 pick activity       && run activity activity-test.sh tauri-shell.sh
+pick qi             && run qi quick-insert-test.sh tauri-fake-desktop.sh

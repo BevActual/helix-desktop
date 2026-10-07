@@ -252,3 +252,15 @@ pub async fn notifications_read(app: AppHandle) {
         .mark_all_read();
     changed(&app, Vec::new()).await;
 }
+
+/// Flips Do not disturb (what a key binding or the palette wants).
+pub async fn toggle_dnd(app: &AppHandle) {
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        let now = now_ms(shell.started);
+        let on = shell.notifications.view(now).dnd;
+        shell.notifications.set_dnd(!on);
+    }
+    changed(app, Vec::new()).await;
+}

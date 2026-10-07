@@ -1,6 +1,6 @@
 <node>
 <!-- Served by the Helix shell (the Tauri one) at org.helix.Shell, /org/helix/Shell, on the session bus. This is how key bindings and other
-     programs open its panels. Panels are the ids the shell knows ("assistant", "launcher", "control-center", "agents", "notifications"); anything else is refused.
+     programs open its panels. Panels are the ids the shell knows ("assistant", "launcher", "control-center", "agents", "notifications", "quick-insert"); anything else is refused.
      Opening a panel only shows UI, so it needs no grant. Design: docs/design/tauri-rust-shell.md. -->
 <interface name="org.helix.Shell1">
  <!-- Opens the panel, replacing any other that is open. Opening the one that is already open does nothing. -->
@@ -8,6 +8,10 @@
  <!-- Opens the panel, or closes it if it is the one that is open. What a key binding wants. -->
  <method name="TogglePanel"><arg name="id" type="s" direction="in"/></method>
  <method name="ClosePanel"/>
+ <!-- What key bindings for the matching quick settings want: flip the setting from its current state. -->
+ <method name="ToggleDoNotDisturb"/>
+ <method name="ToggleNightLight"/>
+ <method name="ToggleDarkTheme"/>
  <!-- {panel: s}, empty when none is open -->
  <method name="GetStatus"><arg type="a{sv}" direction="out"/></method>
 </interface>

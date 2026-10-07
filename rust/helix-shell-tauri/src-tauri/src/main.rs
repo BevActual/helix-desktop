@@ -7,6 +7,7 @@ mod apps;
 mod battery;
 mod confirmer;
 mod control;
+mod insert;
 mod layer;
 mod notify;
 
@@ -45,6 +46,8 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// The Caps Lock palette: emoji, clipboard history, actions.
+    insert: helix_shell_core::quick_insert::QuickInsert,
     /// What applications have posted through org.freedesktop.Notifications; see `notify`.
     notifications: helix_shell_core::notifications::Notifications,
     /// The last AgentActivity1 reads; stop, revoke and the kill switch are built from them and nothing else.
@@ -263,6 +266,7 @@ fn control(app: &AppHandle, command: &str) {
         "control-center" => open_panel(app, "control-center"),
         "agents" => open_panel(app, "agents"),
         "notifications" => open_panel(app, "notifications"),
+        "quick-insert" => open_panel(app, "quick-insert"),
         // Tests only (this file hook exists only under HELIX_SURFACE_CONTROL): the confirmer overlay covers the whole output while
         // a request is pending, so a pointer cannot reach the panel's Stop; this runs the same command path the button does.
         "agent-stop-all" => {
@@ -785,6 +789,27 @@ async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
     send_setting(update).await
 }
 
+/// Flips the Night Light setting from its current state (what a key binding wants).
+pub(crate) async fn toggle_night_light(app: &AppHandle) {
+    let update = {
+        let state = shell_state(app);
+        let shell = state.lock().expect("shell state");
+        let on = shell.quick.view().night_light.unwrap_or(false);
+        shell.quick.set_night_light(!on)
+    };
+    let _ = send_setting(update).await;
+}
+
+pub(crate) async fn toggle_dark_theme(app: &AppHandle) {
+    let update = {
+        let state = shell_state(app);
+        let shell = state.lock().expect("shell state");
+        let dark = shell.quick.view().dark.unwrap_or(true);
+        shell.quick.set_dark(!dark)
+    };
+    let _ = send_setting(update).await;
+}
+
 fn refresh_battery(app: &AppHandle) {
     let view = power_view(battery::read_battery());
     let _ = app.emit("battery-view", view);
@@ -1046,9 +1071,14 @@ fn panel_outside(app: AppHandle) {
 
 #[tauri::command]
 fn assistant_submit(app: AppHandle, request: String) -> AssistantView {
-    let state = shell_state(&app);
+    submit_request(&app, &request)
+}
+
+/// Hands a request to the assistant session, as typing it in the assistant panel does.
+pub(crate) fn submit_request(app: &AppHandle, request: &str) -> AssistantView {
+    let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
-    shell.session.submit(&request);
+    shell.session.submit(request);
     let arm = note_phase(&mut shell);
     let spawns = shell.session.take_spawns();
     let view = assistant_view(&shell);
@@ -1059,7 +1089,7 @@ fn assistant_submit(app: AppHandle, request: String) -> AssistantView {
     if arm {
         schedule_arm(app.clone());
     }
-    emit_view(&app, &view);
+    emit_view(app, &view);
     view
 }
 
@@ -1224,6 +1254,9 @@ fn main() {
             network_vpn,
             activity_view,
             notify::notifications_view,
+            insert::quick_insert_query,
+            insert::quick_insert_activate,
+            insert::quick_insert_forget_clipboard,
             notify::notification_dismiss,
             notify::notification_clear,
             notify::notification_invoke,
@@ -1274,6 +1307,11 @@ fn main() {
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
+                insert: helix_shell_core::quick_insert::QuickInsert::new(
+                    helix_shell_core::quick_insert::parse_emoji(include_str!(
+                        "../../../../assets/emoji.json"
+                    )),
+                ),
                 quick: Quick::default(),
                 icons: std::collections::HashMap::new(),
                 started,
@@ -1302,6 +1340,7 @@ fn main() {
             watch_quick(handle.clone());
             control::serve(handle.clone());
             notify::serve(handle.clone());
+            insert::watch_clipboard(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {

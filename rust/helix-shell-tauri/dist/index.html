@@ -61,6 +61,19 @@
   <h4>Access</h4><div id="agent-grants"></div>
   <h4>Recent</h4><div id="agent-history"></div>
 </div>
+<div id="quickinsert" class="panel glass">
+  <div id="qi-field"><i data-icon="search"></i><input id="qi-input" placeholder="Search emoji, clipboard and actions" autocomplete="off"></div>
+  <div id="qi-tabs" role="tablist">
+    <button class="qi-tab" id="qi-tab-emoji" data-test="qi-tab-emoji" data-source="emoji">Emoji</button>
+    <button class="qi-tab" id="qi-tab-clipboard" data-test="qi-tab-clipboard" data-source="clipboard">Clipboard</button>
+    <button class="qi-tab" id="qi-tab-actions" data-test="qi-tab-actions" data-source="actions">Actions</button>
+    <span id="qi-spacer"></span>
+    <button id="qi-forget" data-test="qi-forget" title="Forget everything copied so far">Clear history</button>
+  </div>
+  <div id="qi-results"></div>
+  <div id="qi-empty"></div>
+  <div id="qi-hint"><span>↵ insert</span><span>⇥ switch</span><span>esc close</span></div>
+</div>
 <div id="launcher" class="panel glass"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
 <div id="panel" class="panel glass"><div id="panel-head"><i data-icon="sparkle"></i><h3>Assistant</h3></div><input id="q" placeholder="What should I do?" autocomplete="off">
   <div id="body"></div><div id="reason"></div><div id="note"></div>
