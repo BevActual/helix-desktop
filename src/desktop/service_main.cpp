@@ -607,7 +607,11 @@ public:
               else if (field == "action") { behavior.action = value.get<std::string>(); if (behavior.action == "suspend") behavior.lockBeforeSuspend = false; }
             }
             ok = config.setOverride({"idle", "behavior"}, std::move(behaviors));
-          } else ok = name == "Reset" ? config.clearOverride(settingPath(id)) : config.setOverride(settingPath(id), settingValue(args.at(1), id));
+          } else if (name == "Reset") {
+            // Resetting a setting that is already at its default is not a failure; clearOverride() reports "nothing changed" as false.
+            bool changed = false;
+            ok = config.clearOverrides({settingPath(id)}, &changed);
+          } else ok = config.setOverride(settingPath(id), settingValue(args.at(1), id));
           if (!ok) throw std::invalid_argument(config.lastMutationError().empty() ? "Setting could not be saved" : config.lastMutationError());
         } else throw std::invalid_argument("Unknown configuration method");
       } else if (interface == appearanceInterface && (name == "SavePalette" || name == "SetRole")) {

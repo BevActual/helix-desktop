@@ -648,8 +648,8 @@ int main(int argc, char** argv) {
   auto updateWidgets = [&](const Json& before, const Json& after) {
     return g_variant_new("(s@av@av)", "bar:default:center", helix::toVariant(before), helix::toVariant(after));
   };
-  client.call("configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"volume", "clock"})));
-  assert(setting(client, "bar:default:center").at("value") == Json::array({"volume", "clock"}));
+  client.call("configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"output_volume", "clock"})));
+  assert(setting(client, "bar:default:center").at("value") == Json::array({"output_volume", "clock"}));
   assert(rejects(client, "configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"clock"}))));
   widgets = setting(client, "bar:default:center").at("value");
   assert(rejects(client, "configuration", "UpdateOrderedList", updateWidgets(widgets, Json::array({"missing-widget"}))));
@@ -722,7 +722,7 @@ int main(int argc, char** argv) {
   assert(setting(client, "dock.pinned").at("value") == Json::array({"test-second", "test-first"}));
   client.call("configuration", "Reset", g_variant_new("(s)", "dock.pinned"));
   assert(!setting(client, "dock.pinned").at("overridden").get<bool>());
-  assert(setting(client, "bar:default:center").at("value") == Json::array({"volume", "clock"}));
+  assert(setting(client, "bar:default:center").at("value") == Json::array({"output_volume", "clock"}));
   client.call("configuration", "Reset", g_variant_new("(s)", "bar:default:center"));
   assert(!setting(client, "bar:default:center").at("overridden").get<bool>());
   assert(setting(client, "notification.position").at("value") == "bottom_center");
