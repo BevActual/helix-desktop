@@ -97,4 +97,19 @@
  <method name="RevokeClient"><arg name="client" type="s" direction="in"/></method>
  <method name="GetAudit"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
 </interface>
+ <!-- Shell-facing agent visibility. Only the registered desktop (RegisterDesktop) may call these.
+      Read-only activity and pending state, stop (cancel pending without revoking grants), grant
+      revoke, and a kill switch. Does not replace the manager role (Settings still owns SetGrant). -->
+ <interface name="org.helix.Desktop.AgentActivity1">
+  <method name="GetActivity"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
+  <method name="ListPending"><arg type="av" direction="out"/></method>
+  <method name="Stop"><arg name="operation" type="t" direction="in"/></method>
+  <method name="StopAll"/>
+  <method name="GetGrants"><arg type="av" direction="out"/></method>
+  <method name="RevokeClient"><arg name="client" type="s" direction="in"/></method>
+  <method name="GetEnabled"><arg type="b" direction="out"/></method>
+  <method name="SetEnabled"><arg name="enabled" type="b" direction="in"/></method>
+  <signal name="Changed"/>
+  <signal name="PendingChanged"/>
+ </interface>
 </node>
