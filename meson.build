@@ -1170,6 +1170,18 @@ if build_tests
 endif # build_tests
 
 
+# Inference engine (llama.cpp), built by hand into third_party/llama-install; see docs/design/agent-and-inference.md.
+# Optional: without it the service still builds, with only the scripted backend.
+llama_prefix = meson.project_source_root() / 'third_party/llama-install'
+llama_dep = dependency('', required: false)
+if run_command('test', '-e', llama_prefix / 'lib64/libllama.so', check: false).returncode() == 0
+  llama_dep = declare_dependency(
+    include_directories: include_directories('third_party/llama-install/include'),
+    link_args: ['-L' + llama_prefix / 'lib64', '-lllama', '-lggml', '-lggml-base'],
+    compile_args: ['-DHELIX_HAVE_LLAMA'],
+  )
+endif
+
 # Independent desktop service and adaptive applications. GTK never enters shell dependencies.
 # D-Bus contract: protocols/dbus/*.xml is the single source of truth for interface shapes.
 helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
@@ -1297,6 +1309,17 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('inference_schema_grammar', helix_schema_grammar_unit, args: [meson.project_source_root()])
+  if llama_dep.found()
+    helix_llama_test = executable('inference_llama_test',
+      sources: files('tests/inference_llama_test.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
+        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+      dependencies: [noctalia_core_dep, llama_dep, dependency('threads')],
+      build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
+      override_options: ['b_ndebug=false'],
+    )
+    _model_path = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"', check: false).stdout().strip()
+    test('inference_llama', helix_llama_test, timeout: 600, args: [meson.project_source_root(), _model_path])
+  endif
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: noctalia_core_dep,

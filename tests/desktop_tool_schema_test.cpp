@@ -1,5 +1,6 @@
 #include "cli/schema_msg.h"
 #include "desktop/tool_schema.h"
+#include "tests/schema_validator.h"
 #include "tests/test_check.h"
 
 #include <algorithm>
@@ -7,46 +8,10 @@
 #include <string>
 
 using namespace helix::agent;
+using helix::test::valid;
 using nlohmann::json;
 
 namespace {
-
-// A validator for exactly the JSON Schema subset the generator emits.
-bool valid(const json& schema, const json& value) {
-  if (schema.is_boolean()) return schema.get<bool>();
-  if (schema.contains("oneOf")) {
-    int matches = 0;
-    for (const auto& alternative : schema.at("oneOf")) matches += valid(alternative, value) ? 1 : 0;
-    if (matches != 1) return false;
-  }
-  if (schema.contains("const") && value != schema.at("const")) return false;
-  if (schema.contains("enum") && std::ranges::find(schema.at("enum"), value) == schema.at("enum").end()) return false;
-  if (schema.contains("type")) {
-    const auto type = schema.at("type").get<std::string>();
-    if ((type == "string" && !value.is_string()) || (type == "array" && !value.is_array()) ||
-        (type == "object" && !value.is_object())) return false;
-  }
-  if (value.is_string() && schema.contains("maxLength") && value.get<std::string>().size() > schema.at("maxLength").get<std::size_t>())
-    return false;
-  if (value.is_object()) {
-    const auto properties = schema.value("properties", json::object());
-    for (const auto& [key, child] : value.items()) {
-      if (properties.contains(key)) { if (!valid(properties.at(key), child)) return false; }
-      else if (schema.value("additionalProperties", true) == false) return false;
-    }
-    for (const auto& key : schema.value("required", json::array())) if (!value.contains(key.get<std::string>())) return false;
-  }
-  if (value.is_array()) {
-    if (schema.contains("minItems") && value.size() < schema.at("minItems").get<std::size_t>()) return false;
-    if (schema.contains("maxItems") && value.size() > schema.at("maxItems").get<std::size_t>()) return false;
-    const auto prefix = schema.value("prefixItems", json::array());
-    for (std::size_t i = 0; i < value.size(); ++i) {
-      if (i < prefix.size()) { if (!valid(prefix[i], value[i])) return false; }
-      else if (schema.contains("items") && !valid(schema.at("items"), value[i])) return false;
-    }
-  }
-  return true;
-}
 
 json call(const std::string& tool, json args = json::array()) { return {{"tool", tool}, {"args", std::move(args)}}; }
 
@@ -125,5 +90,15 @@ int main(int argc, char** argv) {
   // Subcommand grammar: the subcommand name is an enum, then its own text arguments.
   TEST_CHECK(valid(everyday, call("color-scheme-set", {"builtin", "Nord"})));
   TEST_CHECK(!valid(everyday, call("color-scheme-set", {"bogus", "Nord"})));
+
+  // The catalog lists exactly the tools the schema offers, with their arguments and a summary.
+  const std::string catalog = toolCatalog(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act});
+  TEST_CHECK(catalog.find("- status") != std::string::npos && catalog.find("- media <action: next|previous|toggle") != std::string::npos);
+  TEST_CHECK(catalog.find("- session <action: lock>") != std::string::npos && catalog.find("reboot") == std::string::npos);
+  TEST_CHECK(catalog.find("- app-launch") == std::string::npos && catalog.find("- window-close") == std::string::npos);
+  TEST_CHECK(catalog.find("- panel-open <id> [context]") != std::string::npos);
+  std::size_t lines = 0;
+  for (const char ch : catalog) lines += ch == '\n' ? 1 : 0;
+  TEST_CHECK(lines == everyday.at("oneOf").size());
   return 0;
 }

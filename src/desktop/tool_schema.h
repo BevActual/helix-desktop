@@ -17,6 +17,16 @@ namespace helix::agent {
 //
 // Commands outside `tiers` are absent. A command that is blocked as a whole but has granted choices (`session lock`)
 // appears with its first argument limited to those choices.
-nlohmann::json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers);
+//
+// `onlyTools`, when given, further limits the result to those tool names (a shortlist for the request at hand).
+nlohmann::json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+                              const std::set<std::string>* onlyTools = nullptr);
+
+// A compact, one-line-per-tool description of the same set of tools, for a model's system prompt:
+//   panel-open <id> [context] - Open a panel by id, optionally with context
+//   media <action: next|previous|toggle|...> - Control active media playback
+// Only tools toolCallSchema offers for `tiers` are listed, so the prompt and the grammar always agree.
+std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+                        const std::set<std::string>* onlyTools = nullptr);
 
 }  // namespace helix::agent

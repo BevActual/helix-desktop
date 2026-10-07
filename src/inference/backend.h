@@ -27,6 +27,7 @@ struct Outcome {
   std::string text;                    // everything produced, including after a cancellation
   std::string error;                   // set when !ok
   bool cancelled = false;
+  bool truncated = false;              // stopped by the token limit before the model finished
   std::uint32_t promptTokens = 0;
   std::uint32_t completionTokens = 0;
 };

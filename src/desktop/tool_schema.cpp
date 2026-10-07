@@ -59,11 +59,13 @@ json callSchema(const noctalia::cli::Command& command, const std::set<std::strin
 
 }  // namespace
 
-json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers) {
+json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+                    const std::set<std::string>* onlyTools) {
   json alternatives = json::array();
   for (const auto& command : msgRoot.subcommands) {
     const std::string name(command.name);
     if (!policy.knows(name)) continue;  // an unclassified command is blocked, so it is never offered
+    if (onlyTools && !onlyTools->contains(name)) continue;
     if (tiers.contains(policy.tierFor(name))) {
       alternatives.push_back(callSchema(command, nullptr));
       continue;
@@ -78,6 +80,44 @@ json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& pol
     {"title", "Helix desktop tool call"},
     {"oneOf", std::move(alternatives)},
   };
+}
+
+std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+                        const std::set<std::string>* onlyTools) {
+  std::string out;
+  for (const auto& command : msgRoot.subcommands) {
+    const std::string name(command.name);
+    if (!policy.knows(name)) continue;
+    if (onlyTools && !onlyTools->contains(name)) continue;
+    std::set<std::string> granted;  // choices of a command that is blocked as a whole
+    const bool whole = tiers.contains(policy.tierFor(name));
+    if (!whole) {
+      for (const auto& [choice, tier] : policy.choiceTiers(name))
+        if (tiers.contains(tier)) granted.insert(choice);
+      if (granted.empty()) continue;
+    }
+    out += "- " + name;
+    for (std::size_t i = 0; i < command.positionals.size(); ++i) {
+      const auto& positional = command.positionals[i];
+      std::string label = std::string(positional.name);
+      if (i == 0 && !whole) {
+        label += ": ";
+        for (const auto& choice : granted) label += (label.back() == ' ' ? "" : "|") + choice;
+      } else if (!positional.choices.empty()) {
+        label += ": ";
+        for (const std::string_view choice : positional.choices) label += (label.back() == ' ' ? "" : "|") + std::string(choice);
+      }
+      out += positional.required ? " <" + label + ">" : " [" + label + "]";
+    }
+    if (!command.subcommands.empty()) {
+      out += " <";
+      for (const auto& sub : command.subcommands) out += (out.back() == '<' ? "" : "|") + std::string(sub.name);
+      out += "> ...";
+    }
+    if (!command.summary.empty()) out += " - " + std::string(command.summary);
+    out += "\n";
+  }
+  return out;
 }
 
 }  // namespace helix::agent
