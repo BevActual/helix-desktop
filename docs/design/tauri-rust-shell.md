@@ -55,7 +55,7 @@ rust/
 - **M3 Bar.** Real widgets driven by the existing config and the desktop service (clock, workspaces via niri IPC,
   volume, network, battery, tray later). Visual parity with the native bar on the same wallpaper.
 - **M4 Assistant panel parity (done, see below).** The session rules and their tests already live in `helix-shell-core` (including 700 ms arming, Enter never confirming, and Escape denying). This milestone is the panel UI at parity with the native one: Thinking, Do it/Cancel, stale answers dropped, display-safe text, focus back to the input.
-- **M5 Launcher (done, see below), control center (sound and Wi-Fi done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
+- **M5 Launcher (done, see below), control center (sound, Wi-Fi and Bluetooth done, see below), notifications, OSD.** One at a time, each behind a config flag so the C++ surface remains
   the default until parity is signed off.
 - **M6 Decide lock screen and greeter.** They are trusted surfaces (ext-session-lock, greetd). Decide with measurements and
   a threat review before moving them; they may stay native.
@@ -343,3 +343,27 @@ anchored to the top and sides, with the exclusive zone and an empty input region
 output regardless of other surfaces' zones). Using the bar's own zone with the second surface present pushed the shell surface 42 px down
 (the pointer test caught it: keys leaked and clicks missed); with `-1` the pointer test is back to all-pass and a probe window is 863 px tall
 (905 - 42). `tools/nested/idle-program.sh` is the do-nothing baseline for such comparisons.
+
+## M5 control center: Bluetooth (done)
+
+The third section of the control center. Status ("On", "Connected to X", "N devices connected", "Bluetooth is off", blocked by a hardware
+switch), a power button, Scan/Stop, and the device list (battery level where the device reports one).
+
+`helix-shell-core/src/bluetooth.rs` is the model and the only builder of requests, like audio and network:
+- Order: connected, then paired, then the rest, each by name; at most 12; names display-safe (the address stands in for an empty name);
+  paths and battery levels validated and clamped.
+- A click connects a paired idle device or disconnects a connected one. Refused, and nothing is sent, for: a device that is not paired
+  (pairing is a prompt flow with PINs and confirmation and is **not built yet**), one already connected or still connecting, an unknown path,
+  Bluetooth off, no service. Power-on is refused behind a hardware switch. Forget works only on a paired device.
+- Mutation-checked: each refusal, the path checks, the ordering, the bound, the display-safety and the battery clamp fail a test when removed.
+  The first run found two gaps: no test where "connected first" differs from alphabetical, and none for a battery value above 100.
+
+`tools/nested/fake-desktop.py` now also scripts Bluetooth (earbuds connected with a battery level, an idle phone and keyboard, an unpaired
+speaker) and logs to `fake-bluetooth-actions.log`. `tools/nested/bluetooth-test.sh` clicks every control with a real pointer and asserts the exact
+action list: disconnect, connect, connect, forget, scan, stop-scan, off, on, and nothing for the unpaired speaker. The Wi-Fi and sound tests still
+pass unchanged. The panel is now scrollable (`max-height` of the screen less 70 px) so three sections cannot run off a small screen.
+Click positions in these tests are measured from screenshots and shift when text wraps differently; re-measure them when the layout changes.
+
+Memory with all three sections open: 251 MB USS (233 MB bar only; includes the fake service's Python process); budget 320 MB USS.
+
+Not done: pairing a new device, trust/discoverable/pairable toggles, per-device type icons.

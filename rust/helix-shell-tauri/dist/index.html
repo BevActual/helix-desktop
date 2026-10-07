@@ -20,7 +20,7 @@
   .row .name { font-weight: 600; } .row .generic { color: var(--mut); font-size: 12px; }
   #empty { color: var(--mut); padding: 8px 10px; }
   #controls { position: fixed; right: 12px; top: 50px; width: 340px; box-sizing: border-box; padding: 14px; background: var(--bg);
-              border-radius: 14px; display: none; flex-direction: column; gap: 10px; }
+              border-radius: 14px; display: none; flex-direction: column; gap: 10px; max-height: calc(100vh - 70px); overflow-y: auto; }
   body[data-panel="control-center"] #controls { display: flex; }
   #controls h3 { margin: 0; }
   .sliderrow { display: flex; align-items: center; gap: 10px; }
@@ -39,6 +39,9 @@
   .net .bars { width: 3.4em; flex: none; color: var(--accent); letter-spacing: -1px; } .net .ssid { flex: 1; } .net.active .ssid { color: var(--accent); }
   .net .tag { color: var(--mut); font-size: 11px; } .net button { padding: 1px 8px; font-size: 11px; }
   .net.unavailable .ssid { color: var(--mut); }
+  #bluetooth { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 10px; }
+  #bt-head { display: flex; align-items: center; gap: 6px; } #bt-head h3 { flex: 1; }
+  #bt-status { color: var(--mut); font-size: 12px; } #btdevices { display: flex; flex-direction: column; gap: 2px; }
   h3 { margin: 0; color: var(--accent); }
   input { font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
   #body { min-height: 1.4em; } #reason, #note { color: var(--mut); font-size: 12px; }
@@ -58,6 +61,11 @@
     <div id="wifi-status"></div>
     <div id="networks"></div>
     <div id="vpns"></div>
+  </div>
+  <div id="bluetooth">
+    <div id="bt-head"><h3>Bluetooth</h3><button id="btscan">Scan</button><button id="bttoggle">Turn off</button></div>
+    <div id="bt-status"></div>
+    <div id="btdevices"></div>
   </div></div>
 <div id="launcher"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
 <div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?">

@@ -2,6 +2,7 @@
 
 mod assistant;
 pub mod audio;
+pub mod bluetooth;
 mod confirm;
 mod display;
 pub mod launcher;

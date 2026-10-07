@@ -15,6 +15,7 @@ from gi.repository import Gio, GLib
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 state_dir = sys.argv[1]
 log_path = os.path.join(state_dir, "fake-network-actions.log")
+bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 
 world = {
@@ -49,7 +50,45 @@ def network_snapshot():
             "access-points": aps if world["enabled"] else [],
             "vpns": [{"path": p, "name": v["name"], "active": v["active"]} for p, v in world["vpn"].items()]}
 
+bt = {
+    "enabled": True, "scanning": False,
+    "devices": {
+        "/d/phone":   {"name": "Phone",           "paired": True,  "connected": False, "battery": None},
+        "/d/buds":    {"name": "Earbuds",         "paired": True,  "connected": True,  "battery": 80},
+        "/d/kbd":     {"name": "Keyboard",        "paired": True,  "connected": False, "battery": None},
+        "/d/speaker": {"name": "Kitchen Speaker", "paired": False, "connected": False, "battery": None},
+    },
+}
+
+def bluetooth_snapshot():
+    devices = [{"path": p, "address": "AA:BB:CC:DD:EE:%02X" % i, "name": d["name"], "kind": 1, "paired": d["paired"],
+                "trusted": d["paired"], "connected": d["connected"], "connecting": False, "has-battery": d["battery"] is not None,
+                "battery": d["battery"] or 0, "has-rssi": False, "rssi": 0} for i, (p, d) in enumerate(bt["devices"].items())]
+    return {"available": True, "enabled": bt["enabled"], "scanning": bt["scanning"], "name": "fake-laptop", "discoverable": False,
+            "pairable": True, "soft-blocked": not bt["enabled"], "hard-blocked": False, "devices": devices if bt["enabled"] else []}
+
 class Refused(Exception): pass
+
+def bluetooth_action(name, args, emit):
+    if name == "enable":
+        bt["enabled"] = bool(args["value"])
+        if not bt["enabled"]:
+            bt["scanning"] = False
+            for d in bt["devices"].values(): d["connected"] = False
+    elif name in ("scan", "stop-scan"):
+        if not bt["enabled"]: raise Refused("Bluetooth is off")
+        bt["scanning"] = name == "scan"
+    elif name in ("connect", "disconnect", "forget", "pair"):
+        device = bt["devices"].get(args.get("path"))
+        if not device or not bt["enabled"]: raise Refused("Device is no longer available")
+        if name == "pair": raise Refused("Pairing was rejected")
+        if name == "connect":
+            if not device["paired"]: raise Refused("Connection rejected")
+            device["connected"] = True
+        elif name == "disconnect": device["connected"] = False
+        elif name == "forget": device["paired"], device["connected"] = False, False
+    else:
+        raise Refused("Unknown Bluetooth action")
 
 def network_action(name, args, emit):
     if name == "enable":
@@ -92,6 +131,7 @@ def on_method(conn, sender, path, interface, method, params, invocation):
     try:
         if method == "GetSnapshot":
             if short == "Network1": reply = network_snapshot()
+            elif short == "Bluetooth1": reply = bluetooth_snapshot()
             else: reply = {"available": False}
             invocation.return_value(GLib.Variant("(a{sv})", (variant(reply).unpack() and {k: variant(v) for k, v in reply.items()},)))
         elif method == "GetSettings" and short == "Configuration1":
@@ -109,6 +149,18 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             next_operation[0] += 1
             invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
             GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Network1"), False)[1])
+        elif method == "Action" and short == "Bluetooth1":
+            name, args = params.unpack()
+            args = {k: (v if not isinstance(v, GLib.Variant) else v.unpack()) for k, v in args.items()}
+            with open(bt_log_path, "a") as log: log.write(f"ACTION {name} {json.dumps(args, sort_keys=True)}\n")
+            try:
+                bluetooth_action(name, args, lambda: emit_changed("org.helix.Desktop.Bluetooth1"))
+            except (Refused, KeyError) as error:
+                with open(bt_log_path, "a") as log: log.write(f"REFUSED {name} {error}\n")
+                invocation.return_dbus_error("org.helix.Desktop.Error.Failed", str(error)); return
+            next_operation[0] += 1
+            invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
+            GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Bluetooth1"), False)[1])
         else:
             invocation.return_dbus_error("org.helix.Desktop.Error.Failed", f"fake service: {short}.{method} is not implemented")
     except Exception as error:  # a bug in this fake must be loud, not a silent timeout

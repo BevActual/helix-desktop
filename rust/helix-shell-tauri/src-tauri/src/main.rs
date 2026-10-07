@@ -11,6 +11,9 @@ use std::time::{Duration, Instant};
 
 use helix_desktop_api::{sound_volume_label, Desktop, Domain};
 use helix_shell_core::audio::{Audio, AudioView, Request, RequestError};
+use helix_shell_core::bluetooth::{
+    Bluetooth, BluetoothView, Request as BluetoothRequest, RequestError as BluetoothError,
+};
 use helix_shell_core::network::{
     Network, NetworkView, Request as NetworkRequest, RequestError as NetworkError,
 };
@@ -29,6 +32,8 @@ struct ShellState {
     audio: Audio,
     /// The last Network1 snapshot; Wi-Fi writes are built from it and nothing else.
     network: Network,
+    /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
+    bluetooth: Bluetooth,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -170,6 +175,7 @@ fn open_panel(app: &AppHandle, id: &str) {
         tauri::async_runtime::spawn(async move {
             refresh_audio(&app).await;
             refresh_network(&app).await;
+            refresh_bluetooth(&app).await;
         });
     }
     let view = assistant_view(&shell);
@@ -431,6 +437,105 @@ async fn network_vpn(app: AppHandle, path: String, active: bool) -> Result<(), S
     send_network(network_request(&app, |n| n.set_vpn(&path, active))).await
 }
 
+/// Reads the Bluetooth snapshot, keeps it, and tells the page. A service that is down is "no Bluetooth".
+async fn refresh_bluetooth(app: &AppHandle) {
+    let snapshot = match desktop().await {
+        Some(desktop) => desktop
+            .snapshot(Domain::Bluetooth)
+            .await
+            .unwrap_or(serde_json::Value::Null),
+        None => serde_json::Value::Null,
+    };
+    let bluetooth = Bluetooth::from_snapshot(&snapshot);
+    let view = bluetooth.view();
+    shell_state(app).lock().expect("shell state").bluetooth = bluetooth;
+    let _ = app.emit("bluetooth-view", view);
+}
+
+/// Follows Bluetooth1.Changed (no polling); reads are coalesced like the others.
+fn watch_bluetooth(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            if let Some(desktop) = desktop().await {
+                refresh_bluetooth(&app).await;
+                let (watcher_app, flag) = (app.clone(), pending.clone());
+                let _ = desktop
+                    .watch(Domain::Bluetooth, move || {
+                        if flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
+                        let (app, flag) = (watcher_app.clone(), flag.clone());
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(100)).await;
+                            flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                            refresh_bluetooth(&app).await;
+                        });
+                    })
+                    .await;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+async fn send_bluetooth(request: Result<BluetoothRequest, BluetoothError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = desktop()
+        .await
+        .ok_or("the desktop service is not running")?;
+    desktop
+        .action(Domain::Bluetooth, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("BLUETOOTH {} sent", request.action);
+    Ok(())
+}
+
+fn bluetooth_request(
+    app: &AppHandle,
+    build: impl FnOnce(&Bluetooth) -> Result<BluetoothRequest, BluetoothError>,
+) -> Result<BluetoothRequest, BluetoothError> {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    build(&shell.bluetooth)
+}
+
+#[tauri::command]
+fn bluetooth_view(app: AppHandle) -> BluetoothView {
+    shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .bluetooth
+        .view()
+}
+
+#[tauri::command]
+async fn bluetooth_set_power(app: AppHandle, enabled: bool) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.set_power(enabled))).await
+}
+
+#[tauri::command]
+async fn bluetooth_scan(app: AppHandle, on: bool) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.set_scanning(on))).await
+}
+
+/// Connects a paired device by the path it was listed with. A device that is not paired is refused here, not sent.
+#[tauri::command]
+async fn bluetooth_connect(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.connect(&path))).await
+}
+
+#[tauri::command]
+async fn bluetooth_disconnect(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.disconnect(&path))).await
+}
+
+#[tauri::command]
+async fn bluetooth_forget(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.forget(&path))).await
+}
+
 fn audio_request(
     app: &AppHandle,
     build: impl FnOnce(&Audio) -> Result<Request, RequestError>,
@@ -684,7 +789,13 @@ fn main() {
             network_connect,
             network_disconnect,
             network_forget,
-            network_vpn
+            network_vpn,
+            bluetooth_view,
+            bluetooth_set_power,
+            bluetooth_scan,
+            bluetooth_connect,
+            bluetooth_disconnect,
+            bluetooth_forget
         ])
         .setup(move |app| {
             let window =
@@ -706,6 +817,7 @@ fn main() {
                 history: apps::load_history(),
                 audio: Audio::default(),
                 network: Network::default(),
+                bluetooth: Bluetooth::default(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
@@ -716,6 +828,7 @@ fn main() {
             watch_volume(handle.clone());
             watch_audio(handle.clone());
             watch_network(handle.clone());
+            watch_bluetooth(handle.clone());
             control::serve(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);

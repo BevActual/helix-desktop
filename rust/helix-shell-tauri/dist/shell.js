@@ -41,6 +41,7 @@ listen("shell-mode", (event) => {
   } else if (panel === "control-center") {
     invoke("audio_view").then(drawAudio);
     invoke("network_view").then(drawNetwork);
+    invoke("bluetooth_view").then(drawBluetooth);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -208,6 +209,50 @@ listen("network-view", (event) => drawNetwork(event.payload));
 $("wifitoggle").onclick = () => invoke("network_set_wifi", { enabled: $("wifitoggle").dataset.on !== "1" });
 $("scan").onclick = () => invoke("network_scan");
 $("disconnect").onclick = () => invoke("network_disconnect");
+
+// Bluetooth. Same rules: Rust holds the state and builds every request; a device is named by the path it was listed with. Pairing a new
+// device is not built yet, so a device that is not paired is listed with a note and cannot be clicked.
+function drawBluetooth(view) {
+  $("bluetooth").style.display = view.available ? "" : "none";
+  if (!view.available) return;
+  $("bt-status").textContent = view.status;
+  $("bttoggle").textContent = view.enabled ? "Turn off" : "Turn on";
+  $("bttoggle").dataset.on = view.enabled ? "1" : "0";
+  $("bttoggle").disabled = view.blocked;
+  $("btscan").style.display = view.enabled ? "" : "none";
+  $("btscan").textContent = view.scanning ? "Stop" : "Scan";
+  $("btscan").dataset.scanning = view.scanning ? "1" : "0";
+  const list = $("btdevices");
+  list.replaceChildren();
+  view.devices.forEach((device) => {
+    const row = document.createElement("div");
+    const usable = device.action === "connect" || device.action === "disconnect";
+    row.className = "net" + (device.connected ? " active" : "") + (usable ? " clickable" : "") + (usable || device.connected ? "" : " unavailable");
+    const name = document.createElement("span");
+    name.className = "ssid";
+    name.textContent = device.name;
+    row.append(name);
+    const tag = document.createElement("span");
+    tag.className = "tag";
+    const battery = device.battery === null || device.battery === undefined ? "" : " · " + device.battery + "%";
+    if (device.action === "pair") tag.title = "Pairing a new device is not available yet";
+    tag.textContent = (device.action === "pair" ? "Not paired"
+      : device.action === "busy" ? "Connecting…" : device.connected ? "Connected" : "Paired") + battery;
+    row.append(tag);
+    if (device.action === "connect") row.addEventListener("click", () => invoke("bluetooth_connect", { path: device.path }));
+    if (device.action === "disconnect") row.addEventListener("click", () => invoke("bluetooth_disconnect", { path: device.path }));
+    if (device.paired) {
+      const forget = document.createElement("button");
+      forget.textContent = "Forget";
+      forget.addEventListener("click", (event) => { event.stopPropagation(); invoke("bluetooth_forget", { path: device.path }); });
+      row.append(forget);
+    }
+    list.append(row);
+  });
+}
+listen("bluetooth-view", (event) => drawBluetooth(event.payload));
+$("bttoggle").onclick = () => invoke("bluetooth_set_power", { enabled: $("bttoggle").dataset.on !== "1" });
+$("btscan").onclick = () => invoke("bluetooth_scan", { on: $("btscan").dataset.scanning !== "1" });
 
 $("mute").onclick = () => invoke("audio_set_mute", { muted: $("mute").dataset.muted !== "1" });
 
