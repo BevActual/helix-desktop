@@ -84,7 +84,7 @@ desktop** (`RegisterDesktop` owner) may call it — not every session process, a
 | Method | Purpose |
 |---|---|
 | `GetActivity(since, limit)` | Read-only audit rows (same JSON shape as manager `GetAudit`) |
-| `ListPending` | Operations waiting on confirm or still running (bar indicator) |
+| `ListPending` | Operations waiting for a confirmation (bar indicator). Operations already running are not listed or stoppable yet |
 | `Stop(operation)` / `StopAll` | Cancel pending work; **does not** revoke grants |
 | `GetGrants` / `RevokeClient` | See and remove access from the shell (no `SetGrant`) |
 | `GetEnabled` / `SetEnabled` | Kill switch / safe mode: when false, `Action` and `RequestAccess` fail closed; the rest of the desktop keeps working |
