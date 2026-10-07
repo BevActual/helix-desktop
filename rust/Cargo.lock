@@ -1364,6 +1364,7 @@ dependencies = [
  "gtk-layer-shell",
  "helix-desktop-api",
  "helix-shell-core",
+ "libc",
  "serde",
  "serde_json",
  "tauri",
