@@ -16,6 +16,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 state_dir = sys.argv[1]
 log_path = os.path.join(state_dir, "fake-network-actions.log")
 bt_log_path = os.path.join(state_dir, "fake-bluetooth-actions.log")
+settings_log_path = os.path.join(state_dir, "fake-settings-actions.log")
+settings = {"theme.mode": "dark", "nightlight.enabled": False}
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
 
 world = {
@@ -135,8 +137,22 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             else: reply = {"available": False}
             invocation.return_value(GLib.Variant("(a{sv})", (variant(reply).unpack() and {k: variant(v) for k, v in reply.items()},)))
         elif method == "GetSettings" and short == "Configuration1":
-            entry = {"id": variant("audio.sound_volume"), "value": variant(0.5)}
-            invocation.return_value(GLib.Variant("(av)", ([GLib.Variant("a{sv}", entry)],)))
+            def entry(**fields): return GLib.Variant("a{sv}", {k: variant(v) for k, v in fields.items()})
+            entries = [entry(id="audio.sound_volume", type="number", value=0.5),
+                       entry(id="theme.mode", type="mode", value=settings["theme.mode"], options=["dark", "light", "auto"]),
+                       entry(id="nightlight.enabled", type="boolean", value=settings["nightlight.enabled"])]
+            invocation.return_value(GLib.Variant("(av)", (entries,)))
+        elif method == "Update" and short == "Configuration1":
+            setting_id, value = params.unpack()
+            if isinstance(value, GLib.Variant): value = value.unpack()
+            with open(settings_log_path, "a") as log: log.write(f"UPDATE {setting_id} {json.dumps(value)}\n")
+            ok = (setting_id == "theme.mode" and value in ("dark", "light", "auto")) or (setting_id == "nightlight.enabled" and isinstance(value, bool))
+            if not ok:
+                with open(settings_log_path, "a") as log: log.write(f"REFUSED {setting_id} {json.dumps(value)}\n")
+                invocation.return_dbus_error("org.helix.Desktop.Error.InvalidArgument", "Setting could not be saved"); return
+            settings[setting_id] = value
+            invocation.return_value(None)
+            GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Configuration1"), False)[1])
         elif method == "Action" and short == "Network1":
             name, args = params.unpack()
             args = {k: (v if not isinstance(v, GLib.Variant) else v.unpack()) for k, v in args.items()}

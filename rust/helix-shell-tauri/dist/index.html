@@ -19,29 +19,43 @@
   .row .icon { width: 24px; height: 24px; flex: none; align-self: center; object-fit: contain; }
   .row .name { font-weight: 600; } .row .generic { color: var(--mut); font-size: 12px; }
   #empty { color: var(--mut); padding: 8px 10px; }
-  #controls { position: fixed; right: 12px; top: 50px; width: 340px; box-sizing: border-box; padding: 14px; background: var(--bg);
-              border-radius: 14px; display: none; flex-direction: column; gap: 10px; max-height: calc(100vh - 70px); overflow-y: auto; }
+  #controls { position: fixed; right: 12px; top: 50px; width: 372px; box-sizing: border-box; padding: 16px; background: var(--bg);
+              border-radius: 22px; display: none; flex-direction: column; gap: 14px; max-height: calc(100vh - 70px); overflow-y: auto; }
   body[data-panel="control-center"] #controls { display: flex; }
   #controls h3 { margin: 0; }
+  /* Quick settings, in the manner of Android: a header, a grid of tiles (tap to switch, the arrow opens the details), sliders. */
+  #qs-main, #qs-detail { display: flex; flex-direction: column; gap: 14px; }
+  #qs-head { display: flex; justify-content: space-between; align-items: flex-start; }
+  #qs-time { font-size: 26px; font-weight: 600; line-height: 1.1; } #qs-date { color: var(--mut); font-size: 12px; }
+  #qs-battery { color: var(--mut); font-size: 13px; padding: 4px 10px; border-radius: 14px; background: rgba(255,255,255,.07); }
+  #qs-battery.low { color: #ffb4a8; background: rgba(255,120,100,.18); }
+  #tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile { display: flex; align-items: center; gap: 4px; min-height: 58px; padding: 8px 6px 8px 14px; border-radius: 22px;
+          background: rgba(255,255,255,.08); cursor: default; }
+  .tile.on { background: var(--accent); color: #151515; }
+  .tile .tile-main { flex: 1; min-width: 0; } .tile .tile-title { font-weight: 600; } .tile .tile-sub { font-size: 12px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile button.tile-open { border: 0; background: transparent; color: inherit; font-size: 20px; padding: 6px 10px; border-radius: 50%; }
+  .tile button.tile-open:hover { background: rgba(0,0,0,.12); }
   .sliderrow { display: flex; align-items: center; gap: 10px; }
-  .sliderrow input[type=range] { flex: 1; accent-color: var(--accent); background: transparent; border: 0; padding: 0; }
+  .sliderrow input[type=range] { flex: 1; accent-color: var(--accent); background: transparent; border: 0; padding: 0; height: 28px; }
+  #mute { border-radius: 50%; width: 40px; height: 40px; padding: 0; }
   #percent { width: 3.2em; text-align: right; }
+  #audio-note { color: var(--mut); }
+  .sliderrow button.tile-open { border: 0; background: transparent; color: var(--fg); font-size: 20px; padding: 6px 10px; border-radius: 50%; }
+  #detail-head { display: flex; align-items: center; gap: 8px; } #detail-head h3 { flex: 1; }
+  #back { border-radius: 50%; width: 36px; height: 36px; padding: 0; font-size: 20px; }
+  .page { display: none; flex-direction: column; gap: 8px; } .page.current { display: flex; }
   #outputdev { color: var(--mut); font-size: 12px; }
   #outputs { display: flex; flex-direction: column; gap: 2px; }
-  #outputs .row { padding: 5px 8px; } #outputs .row.current { color: var(--accent); }
-  #audio-note { color: var(--mut); }
-  #wifi { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 10px; }
-  #wifi-head { display: flex; align-items: center; gap: 6px; } #wifi-head h3 { flex: 1; }
-  #wifi-status { color: var(--mut); font-size: 12px; }
-  #networks, #vpns { display: flex; flex-direction: column; gap: 2px; }
-  .net { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 8px; }
+  #outputs .row { padding: 6px 8px; } #outputs .row.current { color: var(--accent); }
+  #wifi-head, #bt-head { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+  #wifi-status, #bt-status { color: var(--mut); font-size: 12px; }
+  #networks, #vpns, #btdevices { display: flex; flex-direction: column; gap: 2px; }
+  .net { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 10px; }
   .net.clickable:hover { background: rgba(255,255,255,.12); }
   .net .bars { width: 3.4em; flex: none; color: var(--accent); letter-spacing: -1px; } .net .ssid { flex: 1; } .net.active .ssid { color: var(--accent); }
   .net .tag { color: var(--mut); font-size: 11px; } .net button { padding: 1px 8px; font-size: 11px; }
   .net.unavailable .ssid { color: var(--mut); }
-  #bluetooth { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(255,255,255,.12); padding-top: 10px; }
-  #bt-head { display: flex; align-items: center; gap: 6px; } #bt-head h3 { flex: 1; }
-  #bt-status { color: var(--mut); font-size: 12px; } #btdevices { display: flex; flex-direction: column; gap: 2px; }
   h3 { margin: 0; color: var(--accent); }
   input { font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
   #body { min-height: 1.4em; } #reason, #note { color: var(--mut); font-size: 12px; }
@@ -49,24 +63,34 @@
 </style>
 <div id="bar"><span id="live">Sound …</span><span><button id="apps">Apps</button> <button id="controlbtn">Controls</button> <button id="ask">Assistant</button></span></div>
 <div id="scrim"></div>
-<div id="controls"><h3>Sound</h3>
-  <div id="audio-note"></div>
-  <div id="audio-body">
-    <div id="outputdev"></div>
-    <div class="sliderrow"><button id="mute">Mute</button><input id="volume" type="range" min="0" max="100" step="1" value="0"><span id="percent">0%</span></div>
-    <div id="outputs"></div>
+<div id="controls">
+  <div id="qs-main">
+    <div id="qs-head"><div><div id="qs-time" data-test="time"></div><div id="qs-date"></div></div><div id="qs-battery" data-test="battery"></div></div>
+    <div id="tiles">
+      <div class="tile" id="tile-wifi" data-test="tile-wifi"><div class="tile-main"><div class="tile-title">Internet</div><div class="tile-sub" id="tile-wifi-sub"></div></div><button class="tile-open" id="tile-wifi-open" data-test="tile-wifi-open" title="Wi-Fi details">›</button></div>
+      <div class="tile" id="tile-bt" data-test="tile-bt"><div class="tile-main"><div class="tile-title">Bluetooth</div><div class="tile-sub" id="tile-bt-sub"></div></div><button class="tile-open" id="tile-bt-open" data-test="tile-bt-open" title="Bluetooth details">›</button></div>
+      <div class="tile" id="tile-dark" data-test="tile-dark"><div class="tile-main"><div class="tile-title">Dark theme</div><div class="tile-sub" id="tile-dark-sub"></div></div></div>
+      <div class="tile" id="tile-night" data-test="tile-night"><div class="tile-main"><div class="tile-title">Night Light</div><div class="tile-sub" id="tile-night-sub"></div></div></div>
+    </div>
+    <div id="audio-note"></div>
+    <div class="sliderrow" id="volrow"><button id="mute" data-test="mute" title="Mute">🔊</button><input id="volume" data-test="volume" type="range" min="0" max="100" step="1" value="0"><span id="percent"></span><button class="tile-open" id="sound-open" data-test="sound-open" title="Sound output">›</button></div>
   </div>
-  <div id="wifi">
-    <div id="wifi-head"><h3>Wi-Fi</h3><button id="scan">Scan</button><button id="disconnect">Disconnect</button><button id="wifitoggle">Turn off</button></div>
-    <div id="wifi-status"></div>
-    <div id="networks"></div>
-    <div id="vpns"></div>
+  <div id="qs-detail" style="display:none">
+    <div id="detail-head"><button id="back" data-test="back" title="Back">‹</button><h3 id="detail-title"></h3></div>
+    <div class="page" id="detail-sound"><div id="outputdev"></div><div id="outputs"></div></div>
+    <div class="page" id="wifi">
+      <div id="wifi-head"><button id="scan" data-test="wifi-scan">Scan</button><button id="disconnect" data-test="wifi-disconnect">Disconnect</button><button id="wifitoggle" data-test="wifi-toggle">Turn off</button></div>
+      <div id="wifi-status"></div>
+      <div id="networks"></div>
+      <div id="vpns"></div>
+    </div>
+    <div class="page" id="bluetooth">
+      <div id="bt-head"><button id="btscan" data-test="bt-scan">Scan</button><button id="bttoggle" data-test="bt-toggle">Turn off</button></div>
+      <div id="bt-status"></div>
+      <div id="btdevices"></div>
+    </div>
   </div>
-  <div id="bluetooth">
-    <div id="bt-head"><h3>Bluetooth</h3><button id="btscan">Scan</button><button id="bttoggle">Turn off</button></div>
-    <div id="bt-status"></div>
-    <div id="btdevices"></div>
-  </div></div>
+</div>
 <div id="launcher"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
 <div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?">
   <div id="body"></div><div id="reason"></div><div id="note"></div>

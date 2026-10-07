@@ -39,9 +39,13 @@ listen("shell-mode", (event) => {
     $("q").value = "";
     $("q").focus();
   } else if (panel === "control-center") {
+    showDetail(null);
+    tickClock();
     invoke("audio_view").then(drawAudio);
     invoke("network_view").then(drawNetwork);
     invoke("bluetooth_view").then(drawBluetooth);
+    invoke("quick_view").then(drawQuick);
+    invoke("battery_view").then(drawBattery);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -117,14 +121,15 @@ let latest = 0;
 function drawAudio(view) {
   const usable = view.available && view.output;
   $("audio-note").textContent = view.available ? (view.output ? "" : "No output device") : "Sound is unavailable";
-  $("audio-body").style.display = usable ? "" : "none";
-  if (!usable) return;
+  $("volrow").style.display = usable ? "" : "none";
+  if (!usable) { queueReport(); return; }
   $("outputdev").textContent = view.output.name;
   if (!dragging) {
     $("volume").value = Math.min(view.percent, 100);
     $("percent").textContent = view.percent + "%";
   }
-  $("mute").textContent = view.muted ? "Unmute" : "Mute";
+  $("mute").textContent = view.muted ? "🔇" : "🔊";
+  $("mute").title = view.muted ? "Unmute" : "Mute";
   $("mute").dataset.muted = view.muted ? "1" : "0";
   const list = $("outputs");
   list.replaceChildren();
@@ -132,9 +137,11 @@ function drawAudio(view) {
     const row = document.createElement("div");
     row.className = "row" + (output.id === view.output.id ? " current" : "");
     row.textContent = (output.id === view.output.id ? "● " : "○ ") + output.name;
+    row.dataset.test = "out:" + output.name;
     row.addEventListener("click", () => invoke("audio_set_default", { id: output.id }));
     list.append(row);
   });
+  queueReport();
 }
 listen("audio-view", (event) => drawAudio(event.payload));
 // A drag sends at most one write every 50 ms, and always the last value, so the service is not flooded and the end state is right.
@@ -153,8 +160,11 @@ $("volume").addEventListener("input", () => {
 // Rust refuses one that is not in its last snapshot, or that needs a password (not supported yet), instead of sending it.
 const bars = (strength) => (strength >= 75 ? "▂▄▆█" : strength >= 50 ? "▂▄▆" : strength >= 25 ? "▂▄" : "▂");
 function drawNetwork(view) {
-  $("wifi").style.display = view.available ? "" : "none";
+  $("tile-wifi").style.display = view.available ? "" : "none";
   if (!view.available) return;
+  $("tile-wifi").classList.toggle("on", view.wifi_enabled);
+  $("tile-wifi").dataset.on = view.wifi_enabled ? "1" : "0";
+  $("tile-wifi-sub").textContent = view.wifi_enabled ? view.status.replace(/^Connected to /, "") : "Off";
   $("wifi-status").textContent = view.status;
   $("wifitoggle").textContent = view.wifi_enabled ? "Turn off" : "Turn on";
   $("wifitoggle").dataset.on = view.wifi_enabled ? "1" : "0";
@@ -167,6 +177,7 @@ function drawNetwork(view) {
     const row = document.createElement("div");
     const joinable = net.action === "connect";
     row.className = "net" + (net.active ? " active" : "") + (joinable ? " clickable" : "") + (joinable || net.active ? "" : " unavailable");
+    row.dataset.test = "net:" + net.ssid;
     const signal = document.createElement("span");
     signal.className = "bars";
     signal.textContent = bars(net.strength);
@@ -184,6 +195,7 @@ function drawNetwork(view) {
     if (net.saved) {
       const forget = document.createElement("button");
       forget.textContent = "Forget";
+      forget.dataset.test = "net-forget:" + net.ssid;
       forget.addEventListener("click", (event) => { event.stopPropagation(); invoke("network_forget", { path: net.path }); });
       row.append(forget);
     }
@@ -194,6 +206,7 @@ function drawNetwork(view) {
   view.vpns.forEach((vpn) => {
     const row = document.createElement("div");
     row.className = "net clickable" + (vpn.active ? " active" : "");
+    row.dataset.test = "vpn:" + vpn.name;
     const name = document.createElement("span");
     name.className = "ssid";
     name.textContent = "VPN: " + vpn.name;
@@ -205,7 +218,7 @@ function drawNetwork(view) {
     vpns.append(row);
   });
 }
-listen("network-view", (event) => drawNetwork(event.payload));
+listen("network-view", (event) => { drawNetwork(event.payload); queueReport(); });
 $("wifitoggle").onclick = () => invoke("network_set_wifi", { enabled: $("wifitoggle").dataset.on !== "1" });
 $("scan").onclick = () => invoke("network_scan");
 $("disconnect").onclick = () => invoke("network_disconnect");
@@ -213,8 +226,12 @@ $("disconnect").onclick = () => invoke("network_disconnect");
 // Bluetooth. Same rules: Rust holds the state and builds every request; a device is named by the path it was listed with. Pairing a new
 // device is not built yet, so a device that is not paired is listed with a note and cannot be clicked.
 function drawBluetooth(view) {
-  $("bluetooth").style.display = view.available ? "" : "none";
+  $("tile-bt").style.display = view.available ? "" : "none";
   if (!view.available) return;
+  $("tile-bt").classList.toggle("on", view.enabled);
+  $("tile-bt").dataset.on = view.enabled ? "1" : "0";
+  $("tile-bt").dataset.blocked = view.blocked ? "1" : "0";
+  $("tile-bt-sub").textContent = view.blocked ? "Blocked" : view.enabled ? view.status.replace(/^Connected to /, "") : "Off";
   $("bt-status").textContent = view.status;
   $("bttoggle").textContent = view.enabled ? "Turn off" : "Turn on";
   $("bttoggle").dataset.on = view.enabled ? "1" : "0";
@@ -228,6 +245,7 @@ function drawBluetooth(view) {
     const row = document.createElement("div");
     const usable = device.action === "connect" || device.action === "disconnect";
     row.className = "net" + (device.connected ? " active" : "") + (usable ? " clickable" : "") + (usable || device.connected ? "" : " unavailable");
+    row.dataset.test = "bt:" + device.name;
     const name = document.createElement("span");
     name.className = "ssid";
     name.textContent = device.name;
@@ -244,13 +262,14 @@ function drawBluetooth(view) {
     if (device.paired) {
       const forget = document.createElement("button");
       forget.textContent = "Forget";
+      forget.dataset.test = "bt-forget:" + device.name;
       forget.addEventListener("click", (event) => { event.stopPropagation(); invoke("bluetooth_forget", { path: device.path }); });
       row.append(forget);
     }
     list.append(row);
   });
 }
-listen("bluetooth-view", (event) => drawBluetooth(event.payload));
+listen("bluetooth-view", (event) => { drawBluetooth(event.payload); queueReport(); });
 $("bttoggle").onclick = () => invoke("bluetooth_set_power", { enabled: $("bttoggle").dataset.on !== "1" });
 $("btscan").onclick = () => invoke("bluetooth_scan", { on: $("btscan").dataset.scanning !== "1" });
 
@@ -268,6 +287,93 @@ $("q").addEventListener("keydown", (event) => {
 $("cancel").onclick = () => invoke("assistant_cancel").then(show);
 $("doit").onclick = () => invoke("assistant_confirm").then(show);
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") invoke("panel_escape");
+  if (event.key !== "Escape") return;
+  if (document.body.dataset.panel === "control-center" && detail) { showDetail(null); return; }
+  invoke("panel_escape");
 });
+
+// The tiles. A tile's body switches the thing it stands for; the arrow opens its details. Rust owns the state and builds every request.
+$("tile-wifi").addEventListener("click", (event) => {
+  if (event.target.closest(".tile-open")) return;
+  invoke("network_set_wifi", { enabled: $("tile-wifi").dataset.on !== "1" });
+});
+$("tile-bt").addEventListener("click", (event) => {
+  if (event.target.closest(".tile-open") || $("tile-bt").dataset.blocked === "1") return;
+  invoke("bluetooth_set_power", { enabled: $("tile-bt").dataset.on !== "1" });
+});
+$("tile-dark").addEventListener("click", () => invoke("quick_set_dark", { on: $("tile-dark").dataset.on !== "1" }));
+$("tile-night").addEventListener("click", () => invoke("quick_set_night_light", { on: $("tile-night").dataset.on !== "1" }));
+function drawQuick(view) {
+  const dark = view.dark !== null && view.dark !== undefined;
+  $("tile-dark").style.display = dark ? "" : "none";
+  if (dark) {
+    $("tile-dark").classList.toggle("on", view.dark);
+    $("tile-dark").dataset.on = view.dark ? "1" : "0";
+    $("tile-dark-sub").textContent = view.dark_label;
+  }
+  const night = view.night_light !== null && view.night_light !== undefined;
+  $("tile-night").style.display = night ? "" : "none";
+  if (night) {
+    $("tile-night").classList.toggle("on", view.night_light);
+    $("tile-night").dataset.on = view.night_light ? "1" : "0";
+    $("tile-night-sub").textContent = view.night_light ? "On" : "Off";
+  }
+  queueReport();
+}
+listen("quick-view", (event) => drawQuick(event.payload));
+
+function drawBattery(view) {
+  $("qs-battery").style.display = view.present ? "" : "none";
+  if (!view.present) return;
+  $("qs-battery").textContent = view.label + (view.state ? " · " + view.state : "");
+  $("qs-battery").classList.toggle("low", view.low);
+  queueReport();
+}
+listen("battery-view", (event) => drawBattery(event.payload));
+
+function tickClock() {
+  const now = new Date();
+  $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+}
+setInterval(() => { if (document.body.dataset.panel === "control-center") tickClock(); }, 20000);
+
+// Details. One page at a time inside the panel, with a back arrow; Escape goes back before it closes the panel.
+let detail = null;
+const titles = { sound: "Sound output", wifi: "Internet", bluetooth: "Bluetooth" };
+function showDetail(name) {
+  detail = name;
+  $("qs-main").style.display = name ? "none" : "";
+  $("qs-detail").style.display = name ? "" : "none";
+  $("detail-sound").classList.toggle("current", name === "sound");
+  $("wifi").classList.toggle("current", name === "wifi");
+  $("bluetooth").classList.toggle("current", name === "bluetooth");
+  $("detail-title").textContent = titles[name] || "";
+  queueReport();
+}
+$("tile-wifi-open").onclick = () => showDetail("wifi");
+$("tile-bt-open").onclick = () => showDetail("bluetooth");
+$("sound-open").onclick = () => showDetail("sound");
+$("back").onclick = () => showDetail(null);
+
+// Tests only: when Rust says a layout log is wanted, report where every named control is, so a test can click it by name.
+let reporting = false;
+let reportTimer = null;
+invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport(); });
+function queueReport() {
+  if (!reporting) return;
+  clearTimeout(reportTimer);
+  reportTimer = setTimeout(sendReport, 80);
+}
+function sendReport() {
+  const elements = {};
+  document.querySelectorAll("[data-test]").forEach((element) => {
+    const box = element.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0) elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+  });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, elements } });
+}
+window.addEventListener("resize", queueReport);
+new MutationObserver(queueReport).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
+
 requestAnimationFrame(() => invoke("ready"));

@@ -367,3 +367,33 @@ Click positions in these tests are measured from screenshots and shift when text
 Memory with all three sections open: 251 MB USS (233 MB bar only; includes the fake service's Python process); budget 320 MB USS.
 
 Not done: pairing a new device, trust/discoverable/pairable toggles, per-device type icons.
+
+## The control center, redone in the manner of Android quick settings
+
+The panel is now a quick-settings view instead of a stack of sections. Main view: the time and date, a battery pill, a two-column grid of
+tiles, and the volume slider. A tile's body switches the thing it stands for (lit in the accent colour when on); a small arrow on the
+tile opens its details inside the panel, with a back arrow, and Escape goes back before it closes the panel. Details: Internet (the old
+Wi-Fi section), Bluetooth, and Sound output (the list of outputs).
+
+Tiles: **Internet** and **Bluetooth** (switch the radio; subtitles say what is connected), **Dark theme** (`theme.mode` dark or light) and
+**Night Light** (`nightlight.enabled`). A tile appears only if the service offers its setting, so a tile never does nothing; Night Light is
+not offered outside a registered Helix desktop and so is absent in the nested sessions that run the real service.
+
+New models, each pure and mutation-checked: `helix-shell-core::quick` (the two setting-backed tiles; trusts a setting only with the expected
+type and value; builds the `Configuration1.Update` for it) and `helix-shell-core::power` (battery from the kernel's `capacity` and `status`
+files; implausible values are "no battery"). `helix-desktop-api` gained `settings()` and `update_setting()`. The shell reads the battery
+when the panel opens and every 30 s while it is open (nothing runs while it is closed) and follows `Configuration1.Changed` for the tiles.
+
+**A bug the screenshot found.** The first version of the battery reader refused any file the kernel reported as 4096 bytes or longer, and the
+kernel reports every sysfs attribute that way, so no battery ever showed on real hardware; the unit test used ordinary small files and passed. It
+now reads at most 512 bytes whatever the size says, and there is a test for an oversized file.
+
+**Tests find controls by name, not pixel.** Controls carry `data-test` names; when `HELIX_UI_LAYOUT_LOG` is set the page reports where each is
+(`layout_reporting`, `report_layout`; nothing happens otherwise), `tools/nested/ui_pos.py` waits for a control to exist and stop moving, and
+`tools/nested/ui-lib.sh` gives `click_id <name> [fraction]`. This replaced hard-coded positions that broke every time text wrapped differently.
+`quick-settings-test.sh` covers the header, the four tiles (what each sends, in order), navigation into and out of details, Escape, and
+reopening at the main view. The Wi-Fi, Bluetooth and sound tests were ported unchanged in what they assert (exact action lists; PipeWire read
+back with `pw-dump`).
+
+Not done: a brightness slider (nothing safe to drive it: the backlight is the native shell's, and writing it needs logind or elevated access),
+Do Not Disturb and keep-awake (they belong to the native shell today), airplane mode, media controls, and notifications in the panel.

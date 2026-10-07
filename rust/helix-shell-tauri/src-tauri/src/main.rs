@@ -3,6 +3,7 @@
 //! is decided by helix_shell_core::ShellSurface; layer.rs only applies it.
 
 mod apps;
+mod battery;
 mod control;
 mod layer;
 
@@ -17,6 +18,8 @@ use helix_shell_core::bluetooth::{
 use helix_shell_core::network::{
     Network, NetworkView, Request as NetworkRequest, RequestError as NetworkError,
 };
+use helix_shell_core::power::view as power_view;
+use helix_shell_core::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
 use helix_shell_core::{Confirmation, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -34,6 +37,8 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// The last settings list, for the dark-theme and night-light tiles.
+    quick: Quick,
     /// Icon data URIs by app id (empty when the app has no usable icon), filled as results are shown.
     icons: std::collections::HashMap<String, String>,
     started: Instant,
@@ -171,12 +176,14 @@ fn open_panel(app: &AppHandle, id: &str) {
         eprintln!("LAUNCHER apps {}", shell.apps.len());
     }
     if id == "control-center" {
-        let app = app.clone();
+        let refreshing = app.clone();
         tauri::async_runtime::spawn(async move {
-            refresh_audio(&app).await;
-            refresh_network(&app).await;
-            refresh_bluetooth(&app).await;
+            refresh_audio(&refreshing).await;
+            refresh_network(&refreshing).await;
+            refresh_bluetooth(&refreshing).await;
+            refresh_quick(&refreshing).await;
         });
+        watch_battery_while_open(app.clone());
     }
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
@@ -536,6 +543,136 @@ async fn bluetooth_forget(app: AppHandle, path: String) -> Result<(), String> {
     send_bluetooth(bluetooth_request(&app, |b| b.forget(&path))).await
 }
 
+/// Reads the settings list, keeps the tiles it backs, and tells the page.
+async fn refresh_quick(app: &AppHandle) {
+    let settings = match desktop().await {
+        Some(desktop) => desktop.settings().await.unwrap_or(serde_json::Value::Null),
+        None => serde_json::Value::Null,
+    };
+    let quick = Quick::from_settings(&settings);
+    let view = quick.view();
+    shell_state(app).lock().expect("shell state").quick = quick;
+    let _ = app.emit("quick-view", view);
+}
+
+/// Follows Configuration1.Changed (no polling), coalesced like the others.
+fn watch_quick(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        let pending = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        loop {
+            if let Some(desktop) = desktop().await {
+                refresh_quick(&app).await;
+                let (watcher_app, flag) = (app.clone(), pending.clone());
+                let _ = desktop
+                    .watch(Domain::Configuration, move || {
+                        if flag.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                            return;
+                        }
+                        let (app, flag) = (watcher_app.clone(), flag.clone());
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(Duration::from_millis(150)).await;
+                            flag.store(false, std::sync::atomic::Ordering::SeqCst);
+                            refresh_quick(&app).await;
+                        });
+                    })
+                    .await;
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    });
+}
+
+async fn send_setting(update: Result<SettingUpdate, QuickError>) -> Result<(), String> {
+    let update = update.map_err(|error| format!("{error:?}"))?;
+    let desktop = desktop()
+        .await
+        .ok_or("the desktop service is not running")?;
+    desktop
+        .update_setting(update.id, &update.value)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTING {} sent", update.id);
+    Ok(())
+}
+
+#[tauri::command]
+fn quick_view(app: AppHandle) -> QuickView {
+    shell_state(&app).lock().expect("shell state").quick.view()
+}
+
+#[tauri::command]
+async fn quick_set_dark(app: AppHandle, on: bool) -> Result<(), String> {
+    let update = shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .quick
+        .set_dark(on);
+    send_setting(update).await
+}
+
+#[tauri::command]
+async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
+    let update = shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .quick
+        .set_night_light(on);
+    send_setting(update).await
+}
+
+fn refresh_battery(app: &AppHandle) {
+    let view = power_view(battery::read_battery());
+    let _ = app.emit("battery-view", view);
+}
+
+/// While the control center is open the battery is re-read every 30 s. Nothing runs while it is closed.
+fn watch_battery_while_open(app: AppHandle) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            refresh_battery(&app);
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            let open = shell_state(&app)
+                .lock()
+                .expect("shell state")
+                .surface
+                .open_panel_id()
+                == Some("control-center");
+            if !open {
+                return;
+            }
+        }
+    });
+}
+
+#[tauri::command]
+fn battery_view() -> helix_shell_core::power::BatteryView {
+    power_view(battery::read_battery())
+}
+
+/// For tests only: when `HELIX_UI_LAYOUT_LOG` names a file, the page reports where its controls are and this writes them there, so a
+/// test can find a control by name instead of by pixel. Without the variable it does nothing.
+/// Whether the page should report where its controls are (a test asked for it).
+#[tauri::command]
+fn layout_reporting() -> bool {
+    std::env::var_os("HELIX_UI_LAYOUT_LOG").is_some()
+}
+
+#[tauri::command]
+fn report_layout(report: serde_json::Value) {
+    let Some(path) = std::env::var_os("HELIX_UI_LAYOUT_LOG") else {
+        return;
+    };
+    let text = report.to_string();
+    if text.len() > 64 * 1024 {
+        return;
+    }
+    let path = std::path::PathBuf::from(path);
+    let temporary = path.with_extension("tmp");
+    if std::fs::write(&temporary, text).is_ok() {
+        let _ = std::fs::rename(&temporary, &path);
+    }
+}
+
 fn audio_request(
     app: &AppHandle,
     build: impl FnOnce(&Audio) -> Result<Request, RequestError>,
@@ -795,7 +932,13 @@ fn main() {
             bluetooth_scan,
             bluetooth_connect,
             bluetooth_disconnect,
-            bluetooth_forget
+            bluetooth_forget,
+            quick_view,
+            quick_set_dark,
+            quick_set_night_light,
+            battery_view,
+            layout_reporting,
+            report_layout
         ])
         .setup(move |app| {
             let window =
@@ -818,6 +961,7 @@ fn main() {
                 audio: Audio::default(),
                 network: Network::default(),
                 bluetooth: Bluetooth::default(),
+                quick: Quick::default(),
                 icons: std::collections::HashMap::new(),
                 started,
                 last_phase: Phase::Idle,
@@ -829,6 +973,7 @@ fn main() {
             watch_audio(handle.clone());
             watch_network(handle.clone());
             watch_bluetooth(handle.clone());
+            watch_quick(handle.clone());
             control::serve(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);

@@ -100,6 +100,8 @@ pub enum Domain {
     Audio,
     Network,
     Bluetooth,
+    /// Settings. Has no `Action`; use [`Desktop::settings`] and [`Desktop::update_setting`], and `watch` for changes.
+    Configuration,
 }
 
 impl Domain {
@@ -108,6 +110,7 @@ impl Domain {
             Self::Audio => "org.helix.Desktop.Audio1",
             Self::Network => "org.helix.Desktop.Network1",
             Self::Bluetooth => "org.helix.Desktop.Bluetooth1",
+            Self::Configuration => "org.helix.Desktop.Configuration1",
         }
     }
 }
@@ -162,6 +165,30 @@ impl Desktop {
             on_change();
         }
         Ok(())
+    }
+
+    /// The service's settings list (`GetSettings`) as a JSON array of entries.
+    pub async fn settings(&self) -> zbus::Result<serde_json::Value> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let entries: Vec<OwnedValue> = proxy.call("GetSettings", &()).await?;
+        Ok(serde_json::Value::Array(
+            entries.iter().map(owned_to_json).collect(),
+        ))
+    }
+
+    /// `Configuration1.Update(id, value)` for a boolean or a string. The service validates the id and the value again.
+    pub async fn update_setting(&self, id: &str, value: &serde_json::Value) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Configuration).await?;
+        let value: Value<'static> = match value {
+            serde_json::Value::Bool(flag) => Value::Bool(*flag),
+            serde_json::Value::String(text) => Value::from(text.clone()),
+            _ => {
+                return Err(zbus::Error::Failure(
+                    "only a boolean or a string can be set".into(),
+                ))
+            }
+        };
+        proxy.call("Update", &(id, value)).await
     }
 
     pub async fn audio_snapshot(&self) -> zbus::Result<serde_json::Value> {

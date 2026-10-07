@@ -7,6 +7,8 @@ mod confirm;
 mod display;
 pub mod launcher;
 pub mod network;
+pub mod power;
+pub mod quick;
 pub mod shell_surface;
 pub mod surfaces;
 

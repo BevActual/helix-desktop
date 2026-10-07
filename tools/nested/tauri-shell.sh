@@ -11,6 +11,7 @@ if [ -n "${HELIX_NESTED_PRIVATE_AUDIO:-}" ]; then
   echo "$HELIX_PRIVATE_PIPEWIRE_PID" > "${XDG_STATE_HOME}/pipewire.pid"
 fi
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
+export HELIX_UI_LAYOUT_LOG="${XDG_STATE_HOME}/layout.json"   # where the page reports its named controls (tests click by name)
 SERVICE="$ROOT/build-debug/helix-service"
 SHELL_BIN="$ROOT/rust/target/release/helix-shell-tauri"
 "$SERVICE" > "${XDG_STATE_HOME}/helix-service.log" 2>&1 &
