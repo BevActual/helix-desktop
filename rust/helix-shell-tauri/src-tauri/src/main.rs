@@ -3,6 +3,7 @@
 //! is decided by helix_shell_core::ShellSurface; layer.rs only applies it.
 
 mod apps;
+mod control;
 mod layer;
 
 use std::sync::{Arc, Mutex};
@@ -715,6 +716,7 @@ fn main() {
             watch_volume(handle.clone());
             watch_audio(handle.clone());
             watch_network(handle.clone());
+            control::serve(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {
