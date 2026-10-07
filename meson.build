@@ -1278,6 +1278,12 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('desktop_agent_broker', helix_agent_broker_unit)
+  helix_tool_schema_unit = executable('desktop_tool_schema_test',
+    sources: files('tests/desktop_tool_schema_test.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+    dependencies: noctalia_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('desktop_tool_schema', helix_tool_schema_unit, args: [meson.project_source_root()])
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: noctalia_core_dep,

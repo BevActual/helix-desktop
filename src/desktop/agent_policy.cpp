@@ -92,6 +92,14 @@ Tier RiskPolicy::tierFor(std::string_view command, std::span<const std::string> 
   return found == tiers_.end() ? Tier::Blocked : found->second;
 }
 
+std::map<std::string, Tier> RiskPolicy::choiceTiers(std::string_view command) const {
+  std::map<std::string, Tier> out;
+  const std::string prefix = std::string(command) + " ";
+  for (const auto& [key, tier] : choices_)
+    if (key.starts_with(prefix)) out.emplace(key.substr(prefix.size()), tier);
+  return out;
+}
+
 std::vector<std::string> RiskPolicy::commands() const {
   std::vector<std::string> names;
   for (const auto& entry : tiers_) names.push_back(entry.first);

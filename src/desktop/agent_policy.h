@@ -29,6 +29,8 @@ public:
   // `args` are the command's arguments; the first one selects a choice-level override such as `session lock`.
   Tier tierFor(std::string_view command, std::span<const std::string> args = {}) const;
   bool knows(std::string_view command) const { return tiers_.contains(std::string(command)); }
+  // Choice-level overrides for `command` (for example `session` -> {lock: act}), keyed by the first argument.
+  std::map<std::string, Tier> choiceTiers(std::string_view command) const;
   std::vector<std::string> commands() const;
 
 private:
