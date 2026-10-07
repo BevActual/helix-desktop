@@ -1,0 +1,12 @@
+{
+  "productName": "helix-tauri-spike",
+  "version": "0.1.0",
+  "identifier": "dev.helix.tauri-spike",
+  "build": { "frontendDist": "../dist" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'" }
+  },
+  "bundle": { "active": false }
+}

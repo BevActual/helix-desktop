@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The spike's two windows may call its own commands",
+  "windows": ["bar", "panel"],
+  "permissions": ["core:default"]
+}

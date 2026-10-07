@@ -1,0 +1,4 @@
+# Rust side of Helix. Each member is built and tested on its own; nothing here is part of the meson build yet.
+[workspace]
+resolver = "2"
+members = ["helix-shell-tauri/src-tauri"]

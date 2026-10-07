@@ -1,0 +1,5 @@
+:root { color-scheme: dark; --bg: rgba(14,16,40,.78); --fg: #e8e8f4; --accent: #fff3a0; --mut: #9aa0c8; }
+html, body { margin: 0; background: transparent; color: var(--fg); font: 14px "Noto Sans", sans-serif; overflow: hidden; user-select: none; }
+button { font: inherit; color: var(--fg); background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18); border-radius: 8px; padding: 4px 12px; }
+button.primary { background: var(--accent); color: #111; border-color: transparent; }
+button:disabled { opacity: .4; }
