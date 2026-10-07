@@ -209,3 +209,21 @@ click launches the first row, Down moves the selection, and a guard fails the te
 (An earlier draft of that test launched a real application, Blender, because an empty query selects whatever sorts third on the
 machine; tests must never use a query that can match real software.) Memory with the launcher: 334 MB bar only, 325 MB open, 337 MB
 closed, flat over repeated cycles; still inside the 350 MB budget by about 15 MB, so the next panels need real attention to size.
+
+## Experiment: can software rendering save memory? (no)
+
+`tools/nested/mem-variant.sh` compares WebKit environment variants on the working single-surface shell (shell only, bar / panel open,
+and whether anything paints, via `coverage.py`):
+
+| Variant | Bar only | Panel open | Paints? |
+|---|---|---|---|
+| default (GPU path) | 334 MB | 324 MB | yes (83.5% / 49.5%) |
+| `WEBKIT_DISABLE_DMABUF_RENDERER=1` | 243 MB | 248 MB | no (0.0% / 0.2%) |
+| `WEBKIT_DISABLE_COMPOSITING_MODE=1` | 316 MB | 318 MB | no |
+| both, or plus `LIBGL_ALWAYS_SOFTWARE=1` | 243-244 MB | 247-248 MB | no |
+
+Without the DMA-BUF renderer the page runs (it reports ready, and a text caret region repaints) but the compositor only ever shows
+damaged rectangles: the first full paint never arrives. Forcing a repaint after each resize (`queue_draw`), and nudging the page
+from JavaScript at 0.4, 1, 2 and 4 s, did not help. About 90 MB is on the table if someone finds why the surface is not
+repainted in software mode (possibly a GTK3/gtk-layer-shell shm-buffer interaction); until then the GPU path is the only one that paints,
+and the earlier "do not set these variables" rule stands, now on firmer evidence.
