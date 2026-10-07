@@ -1,9 +1,11 @@
 //! State machines the shell UI shows. Nothing here opens a window or a bus connection.
 
+pub mod agent_confirm;
 mod assistant;
 pub mod audio;
 pub mod bluetooth;
 mod confirm;
+pub mod confirmer;
 mod display;
 pub mod launcher;
 pub mod network;
@@ -12,7 +14,9 @@ pub mod quick;
 pub mod shell_surface;
 pub mod surfaces;
 
+pub use agent_confirm::{ConfirmRequest, ConfirmationQueue, Kind as ConfirmKind};
 pub use assistant::{Phase, Session, Spawn, View};
 pub use confirm::{Confirmation, ARMING_MS};
-pub use display::sanitize_for_display;
+pub use confirmer::{Confirmer, ConfirmerView, TierView};
+pub use display::{friendly_client_name, sanitize_for_display};
 pub use shell_surface::{Escape, InputRegion, Plan, ShellSurface, BAR_HEIGHT};

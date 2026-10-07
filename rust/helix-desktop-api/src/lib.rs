@@ -1,10 +1,12 @@
-//! Read `audio.sound_volume` from Configuration1 and follow its Changed signal.
-//! The shell shows that number. This crate does not call Agent1: the shell must not hold grants
-//! or talk to the model.
+//! Desktop D-Bus client. Configuration, Audio, Network, Bluetooth snapshots and actions, and the
+//! Agent1 **confirmer** role only (`RegisterConfirmer`, `Confirm`, the two confirmation signals).
+//! The shell must never call Hello, RequestAccess, Action on Agent1, or the manager methods.
 
+mod agent;
 mod contract;
 mod json;
 
+pub use agent::{details_from_owned, ConfirmerClient, CONFIRMER_METHODS, CONFIRMER_SIGNALS};
 pub use contract::{parse_interfaces, protocol_xml, Interface, BUS_NAME, OBJECT_PATH};
 pub use json::{args_from_json, owned_to_json, to_json};
 

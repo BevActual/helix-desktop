@@ -115,13 +115,16 @@ end-to-end test (`tests/desktop_agent_integration.py`). It needs `msg-risk.toml`
 `<datadir>/helix/`, or `HELIX_RISK_POLICY`); without it every method fails closed with the reason. Caller identity
 is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
 Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent
-runners is the real fix (see the limit above). The shell now registers as confirmer and shows `agent-confirm`
+runners is the real fix (see the limit above). The C++ shell registers as confirmer and shows `agent-confirm`
 (`src/shell/agent/`): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
 where Enter never approves, Escape denies, Allow stays disabled for 700 ms after each new request, grant tiers
 default to least privilege and closing the panel denies what is pending. It was checked in a nested helix-niri
 session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
 checked: the disabled look of Allow during the arming window, clicking Allow/Deny with a pointer, and the
-confirm-tier action layout. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
+confirm-tier action layout. The same queue and panel rules are ported in Rust as
+`helix-shell-core::{ConfirmationQueue, Confirmer}` (mutation-checked) and `helix-desktop-api::ConfirmerClient`
+(RegisterConfirmer / Confirm / ConfirmationRequested / ConfirmationEnded only). The Tauri Overlay confirmer
+surface and nested pointer e2e are not wired yet. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
 role): apps with access, per-tier switches, remove, and recent activity. It was checked in a nested session against
 seeded hostile data (markup, bidi controls, newlines in names and arguments): all rendered inert. App names shown
 to the user come from the verified identity only (`friendlyClientName`: ASCII letters, digits and `._+-`, everything

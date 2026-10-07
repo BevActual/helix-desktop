@@ -1,5 +1,6 @@
 //! The D-Bus contract in `protocols/dbus/org.helix.Desktop.xml`. Names here are checked against that
-//! file by the crate tests. This crate does not offer Agent1: the shell must not hold grants or
+//! file by the crate tests. Agent1 is exposed only as the confirmer role
+//! ([`crate::CONFIRMER_METHODS`] / [`crate::CONFIRMER_SIGNALS`]); the shell must not hold grants or
 //! talk to the model. `helix-assistant` is the client that does.
 
 use std::collections::BTreeMap;

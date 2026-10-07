@@ -1,5 +1,7 @@
-//! The shell binary must not hold Agent1 grants or talk to the model, and must not set the
-//! WebKit environment variables that blank layer-shell surfaces.
+//! The shell binary must not hold Agent1 *client* or *manager* authority, and must not talk to
+//! the model. The confirmer role is allowed: RegisterConfirmer, Confirm, ConfirmationRequested,
+//! ConfirmationEnded (see helix_desktop_api::CONFIRMER_METHODS / CONFIRMER_SIGNALS). It must not
+//! set the WebKit environment variables that blank layer-shell surfaces.
 
 #[test]
 fn shell_does_not_hold_agent_authority() {
@@ -11,8 +13,13 @@ fn shell_does_not_hold_agent_authority() {
     ]
     .join("\n");
     for forbidden in [
-        "org.helix.Desktop.Agent1",
+        // Client / manager Agent1 verbs. Confirmer verbs are allowed when the Overlay surface lands.
         "RequestAccess",
+        "RegisterManager",
+        "GetGrants",
+        "SetGrant",
+        "RevokeClient",
+        "GetAudit",
         "helix-inference",
         "WEBKIT_DISABLE",
         "innerHTML",
@@ -20,6 +27,9 @@ fn shell_does_not_hold_agent_authority() {
     ] {
         assert!(!sources.contains(forbidden), "{forbidden}");
     }
+    // Still must not embed the interface name as a client grant path; confirmer goes through
+    // helix_desktop_api::ConfirmerClient only.
+    assert!(!sources.contains("Hello\""));
     assert!(sources.contains("helix-assistant"));
     assert!(sources.contains("textContent"));
 }
