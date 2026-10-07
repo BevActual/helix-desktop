@@ -1,30 +1,17 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
-<style>
-  html, body { height: 100%; margin: 0; background: transparent; }
-  body { display: flex; align-items: center; justify-content: center; }
-  #card { box-sizing: border-box; width: 500px; padding: 16px; background: var(--bg);
-          border-radius: 14px; display: flex; flex-direction: column; gap: 12px; }
-  #title { font-size: 18px; font-weight: 700; color: var(--accent); }
-  #subject, #detail { font-size: 14px; }
-  #aside, #waiting { font-size: 12px; color: var(--mut); }
-  #warning { font-size: 12px; color: #ffb4a8; display: none; }
-  #warning.show { display: block; }
-  #tiers { display: flex; flex-direction: column; gap: 6px; }
-  .tier { display: flex; align-items: center; gap: 8px; }
-  #actions { display: flex; justify-content: flex-end; gap: 8px; }
-  button:disabled { opacity: .45; }
-</style>
-<div id="card">
-  <div id="title" data-test="confirm-title"></div>
+<body class="confirmer">
+<div id="card" class="glass">
+  <div id="head"><span id="shield"><i data-icon="shield"></i></span><div id="title" data-test="confirm-title"></div></div>
   <div id="subject" data-test="confirm-subject"></div>
-  <div id="detail" data-test="confirm-detail"></div>
+  <div id="detailbox"><div id="detaillabel">Exact action</div><div id="detail" data-test="confirm-detail"></div></div>
   <div id="aside" data-test="confirm-aside"></div>
   <div id="tiers" data-test="confirm-tiers"></div>
   <div id="warning" data-test="confirm-taint">This app read private content since you last approved something.</div>
   <div id="waiting" data-test="confirm-waiting"></div>
   <div id="actions">
     <button type="button" data-test="confirm-deny" id="deny">Deny</button>
-    <button type="button" data-test="confirm-allow" id="allow" disabled>Allow</button>
+    <button type="button" data-test="confirm-allow" id="allow" class="primary" disabled><span>Allow</span></button>
   </div>
 </div>
+<script src="icons.js"></script>
 <script src="confirmer.js"></script>

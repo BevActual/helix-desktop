@@ -12,3 +12,12 @@ opt-level = "s"
 lto = true
 codegen-units = 1
 strip = true
+
+# For iterating on the live desktop: links in seconds instead of minutes. Memory is measured with the release profile.
+[profile.fast]
+inherits = "release"
+opt-level = 1
+lto = false
+codegen-units = 16
+incremental = true
+strip = false

@@ -11,4 +11,4 @@ python3 "$ROOT/tools/nested/fake-desktop.py" "${XDG_STATE_HOME}" > "${XDG_STATE_
 echo $! > "${XDG_STATE_HOME}/helix-service.pid"   # run.sh stops it by pid, like the real service
 for _ in $(seq 1 50); do grep -q "ready" "${XDG_STATE_HOME}/fake-desktop.log" 2>/dev/null && break; sleep 0.1; done
 echo $$ > "${XDG_STATE_HOME}/shell.pid"
-exec "$ROOT/rust/target/release/helix-shell-tauri"
+exec "${HELIX_SHELL_BIN:-$ROOT/rust/target/release/helix-shell-tauri}"

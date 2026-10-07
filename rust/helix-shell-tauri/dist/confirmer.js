@@ -29,11 +29,14 @@ function show(view) {
   subject.textContent = grant
     ? view.client_name + " is asking for access"
     : view.client_name + " wants to run a command";
+  document.getElementById("detaillabel").textContent = grant ? "Request" : "Exact action";
   detail.textContent = view.detail || "";
   aside.textContent = view.aside || "";
   warning.classList.toggle("show", !!view.tainted);
   waiting.textContent = view.waiting > 0 ? view.waiting + " more waiting" : "";
   allow.disabled = !view.armed;
+  // Allow stays dead for the arming delay; the sweep shows that it is coming alive, not broken.
+  allow.classList.toggle("arming", !view.armed);
   tiers.replaceChildren();
   (view.tiers || []).forEach((tier) => {
     const row = document.createElement("label");
@@ -43,6 +46,7 @@ function show(view) {
     box.checked = !!tier.checked;
     box.dataset.tier = tier.name;
     box.setAttribute("data-test", "confirm-tier-" + tier.name);
+    box.className = "switch";
     box.addEventListener("change", () => {
       invoke("confirmer_set_tier", { name: tier.name, checked: box.checked }).then(show);
     });

@@ -1,112 +1,40 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
-<style>
-  html, body { height: 100%; }
-  #bar { height: 34px; box-sizing: border-box; margin: 4px 12px 0; padding: 0 14px; display: flex; align-items: center;
-         justify-content: space-between; background: var(--bg); border-radius: 18px; }
-  #live { font-weight: 600; }
-  /* Covers everything below the bar while a panel is open, so a click outside the panel lands here and dismisses it. */
-  #scrim { position: fixed; inset: 42px 0 0 0; display: none; }
-  #panel { position: fixed; left: 50%; top: 30%; transform: translateX(-50%); width: 520px; box-sizing: border-box; padding: 16px;
-           background: var(--bg); border-radius: 14px; display: none; flex-direction: column; gap: 12px; }
-  body.open #scrim { display: block; }
-  body[data-panel="assistant"] #panel { display: flex; }
-  #launcher { position: fixed; left: 50%; top: 18%; transform: translateX(-50%); width: 560px; box-sizing: border-box; padding: 12px;
-              background: var(--bg); border-radius: 14px; display: none; flex-direction: column; gap: 8px; }
-  body[data-panel="launcher"] #launcher { display: flex; }
-  #results { display: flex; flex-direction: column; gap: 2px; }
-  .row { display: flex; align-items: baseline; gap: 10px; padding: 7px 10px; border-radius: 8px; cursor: default; }
-  .row.selected { background: rgba(255,255,255,.14); }
-  .row .icon { width: 24px; height: 24px; flex: none; align-self: center; object-fit: contain; }
-  .row .name { font-weight: 600; } .row .generic { color: var(--mut); font-size: 12px; }
-  #empty { color: var(--mut); padding: 8px 10px; }
-  #controls { position: fixed; right: 12px; top: 50px; width: 372px; box-sizing: border-box; padding: 16px; background: var(--bg);
-              border-radius: 22px; display: none; flex-direction: column; gap: 14px; max-height: calc(100vh - 70px); overflow-y: auto; }
-  body[data-panel="control-center"] #controls { display: flex; }
-  #controls h3 { margin: 0; }
-  /* Quick settings, in the manner of Android: a header, a grid of tiles (tap to switch, the arrow opens the details), sliders. */
-  #qs-main, #qs-detail { display: flex; flex-direction: column; gap: 14px; }
-  #qs-head { display: flex; justify-content: space-between; align-items: flex-start; }
-  #qs-time { font-size: 26px; font-weight: 600; line-height: 1.1; } #qs-date { color: var(--mut); font-size: 12px; }
-  #qs-battery { color: var(--mut); font-size: 13px; padding: 4px 10px; border-radius: 14px; background: rgba(255,255,255,.07); }
-  #qs-battery.low { color: #ffb4a8; background: rgba(255,120,100,.18); }
-  #tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .tile { display: flex; align-items: center; gap: 4px; min-height: 58px; padding: 8px 6px 8px 14px; border-radius: 22px;
-          background: rgba(255,255,255,.08); cursor: default; }
-  .tile.on { background: var(--accent); color: #151515; }
-  .tile .tile-main { flex: 1; min-width: 0; } .tile .tile-title { font-weight: 600; } .tile .tile-sub { font-size: 12px; opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tile button.tile-open { border: 0; background: transparent; color: inherit; font-size: 20px; padding: 6px 10px; border-radius: 50%; }
-  .tile button.tile-open:hover { background: rgba(0,0,0,.12); }
-  .sliderrow { display: flex; align-items: center; gap: 10px; }
-  .sliderrow input[type=range] { flex: 1; accent-color: var(--accent); background: transparent; border: 0; padding: 0; height: 28px; }
-  #mute { border-radius: 50%; width: 40px; height: 40px; padding: 0; }
-  #percent { width: 3.2em; text-align: right; }
-  #audio-note { color: var(--mut); }
-  .sliderrow button.tile-open { border: 0; background: transparent; color: var(--fg); font-size: 20px; padding: 6px 10px; border-radius: 50%; }
-  #detail-head { display: flex; align-items: center; gap: 8px; } #detail-head h3 { flex: 1; }
-  #back { border-radius: 50%; width: 36px; height: 36px; padding: 0; font-size: 20px; }
-  .page { display: none; flex-direction: column; gap: 8px; } .page.current { display: flex; }
-  #outputdev { color: var(--mut); font-size: 12px; }
-  #outputs { display: flex; flex-direction: column; gap: 2px; }
-  #outputs .row { padding: 6px 8px; } #outputs .row.current { color: var(--accent); }
-  #wifi-head, #bt-head { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
-  #wifi-status, #bt-status { color: var(--mut); font-size: 12px; }
-  #networks, #vpns, #btdevices { display: flex; flex-direction: column; gap: 2px; }
-  .net { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 10px; }
-  .net.clickable:hover { background: rgba(255,255,255,.12); }
-  .net .bars { width: 3.4em; flex: none; color: var(--accent); letter-spacing: -1px; } .net .ssid { flex: 1; } .net.active .ssid { color: var(--accent); }
-  .net .tag { color: var(--mut); font-size: 11px; } .net button { padding: 1px 8px; font-size: 11px; }
-  .net.unavailable .ssid { color: var(--mut); }
-  h3 { margin: 0; color: var(--accent); }
-  input { font: inherit; color: var(--fg); background: rgba(0,0,0,.35); border: 2px solid var(--accent); border-radius: 8px; padding: 8px 10px; user-select: text; }
-  #agents { position: fixed; right: 12px; top: 50px; width: 440px; box-sizing: border-box; padding: 16px; background: var(--bg);
-            border-radius: 22px; display: none; flex-direction: column; gap: 10px; max-height: calc(100vh - 70px); overflow-y: auto; }
-  body[data-panel="agents"] #agents { display: flex; }
-  #agent-head { display: flex; align-items: center; gap: 8px; } #agent-head h3 { flex: 1; }
-  #agent-state { color: var(--mut); font-size: 12px; }
-  #agents h4 { margin: 6px 0 0; color: var(--mut); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  .arow { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255,255,255,.05); }
-  .arow .main { flex: 1; min-width: 0; } .arow .what { font-weight: 600; } .arow .sub { color: var(--mut); font-size: 12px; overflow-wrap: anywhere; }
-  .arow .flag { color: #ffb4a8; font-size: 11px; } .arow button { padding: 1px 10px; font-size: 12px; }
-  #agent-history { display: flex; flex-direction: column; gap: 2px; }
-  #agent-history .arow { background: transparent; padding: 3px 8px; }
-  #agentsbtn.busy { background: var(--accent); color: #111; } #agentsbtn.off { color: #ffb4a8; }
-  /* Toasts are drawn over the desktop but never take the pointer: only the bar and open panels are clickable, so a toast cannot be
-     clicked into doing anything. Buttons live in the shade. */
-  #toasts { position: fixed; right: 12px; top: 50px; width: 340px; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-  body.open #toasts { display: none; }
-  .toast, .nrow { box-sizing: border-box; padding: 10px 12px; border-radius: 14px; background: var(--bg); }
-  .toast.critical, .nrow.critical { box-shadow: inset 3px 0 0 #ff8a78; }
-  .napp { color: var(--mut); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
-  .nsum { font-weight: 600; overflow-wrap: anywhere; } .nbody { color: var(--fg); opacity: .85; font-size: 13px; overflow-wrap: anywhere; }
-  #notifs { position: fixed; right: 12px; top: 50px; width: 400px; box-sizing: border-box; padding: 16px; background: var(--bg);
-            border-radius: 22px; display: none; flex-direction: column; gap: 10px; max-height: calc(100vh - 70px); overflow-y: auto; }
-  body[data-panel="notifications"] #notifs { display: flex; }
-  #notif-head { display: flex; align-items: center; gap: 8px; } #notif-head h3 { flex: 1; }
-  #notif-list { display: flex; flex-direction: column; gap: 6px; }
-  .nrow { background: rgba(255,255,255,.06); } .nrow.stale .nsum { opacity: .7; }
-  .nacts { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; } .nacts button { padding: 1px 10px; font-size: 12px; }
-  #notif-empty { color: var(--mut); padding: 6px 4px; }
-  #notifbtn.unread { background: var(--accent); color: #111; }
-  #body { min-height: 1.4em; } #reason, #note { color: var(--mut); font-size: 12px; }
-  #buttons { display: none; justify-content: flex-end; gap: 8px; }
-</style>
-<div id="bar"><span id="live">Sound …</span><span><button id="notifbtn" data-test="notifbtn">Notifications</button> <button id="agentsbtn" data-test="agentsbtn" style="display:none">Agents</button> <button id="apps">Apps</button> <button id="controlbtn">Controls</button> <button id="ask">Assistant</button></span></div>
+<div id="bar">
+  <div class="side">
+    <button class="bar-btn icon" id="apps" data-test="apps" title="Apps"><i data-icon="grid"></i></button>
+    <button class="bar-btn icon" id="ask" data-test="ask" title="Assistant"><i data-icon="sparkle"></i></button>
+  </div>
+  <button class="bar-btn" id="clock" data-test="clock" title="Notifications"><span class="day"></span><span class="time"></span></button>
+  <div class="side right">
+    <button class="bar-btn icon" id="agentsbtn" data-test="agentsbtn" style="display:none" title="Agents"><i data-icon="shield"></i></button>
+    <button class="bar-btn icon" id="notifbtn" data-test="notifbtn" title="Notifications"><i data-icon="bell" data-slot="bell"></i><span class="badge" id="notif-badge" hidden></span></button>
+    <button class="bar-btn" id="controlbtn" data-test="controlbtn" title="Control Center">
+      <span id="status"><i data-icon="wifi" data-slot="wifi"></i><i data-icon="bluetooth" data-slot="bt"></i><i data-icon="volume" data-slot="vol"></i><span id="batt"><i data-icon="battery" data-slot="batt"></i><span id="batt-label"></span></span></span>
+    </button>
+  </div>
+  <span id="live" hidden></span>
+</div>
 <div id="scrim"></div>
-<div id="controls">
+<div id="controls" class="panel glass">
   <div id="qs-main">
     <div id="qs-head"><div><div id="qs-time" data-test="time"></div><div id="qs-date"></div></div><div id="qs-battery" data-test="battery"></div></div>
     <div id="tiles">
-      <div class="tile" id="tile-wifi" data-test="tile-wifi"><div class="tile-main"><div class="tile-title">Internet</div><div class="tile-sub" id="tile-wifi-sub"></div></div><button class="tile-open" id="tile-wifi-open" data-test="tile-wifi-open" title="Wi-Fi details">›</button></div>
-      <div class="tile" id="tile-bt" data-test="tile-bt"><div class="tile-main"><div class="tile-title">Bluetooth</div><div class="tile-sub" id="tile-bt-sub"></div></div><button class="tile-open" id="tile-bt-open" data-test="tile-bt-open" title="Bluetooth details">›</button></div>
-      <div class="tile" id="tile-dark" data-test="tile-dark"><div class="tile-main"><div class="tile-title">Dark theme</div><div class="tile-sub" id="tile-dark-sub"></div></div></div>
-      <div class="tile" id="tile-dnd" data-test="tile-dnd"><div class="tile-main"><div class="tile-title">Do not disturb</div><div class="tile-sub" id="tile-dnd-sub"></div></div></div>
-      <div class="tile" id="tile-night" data-test="tile-night"><div class="tile-main"><div class="tile-title">Night Light</div><div class="tile-sub" id="tile-night-sub"></div></div></div>
+      <div class="tile" id="tile-wifi" data-test="tile-wifi"><span class="tile-ico"><i data-icon="wifi"></i></span><div class="tile-main"><div class="tile-title">Internet</div><div class="tile-sub" id="tile-wifi-sub"></div></div><button class="tile-open" id="tile-wifi-open" data-test="tile-wifi-open" title="Wi-Fi details"><i data-icon="chevron-right"></i></button></div>
+      <div class="tile" id="tile-bt" data-test="tile-bt"><span class="tile-ico"><i data-icon="bluetooth"></i></span><div class="tile-main"><div class="tile-title">Bluetooth</div><div class="tile-sub" id="tile-bt-sub"></div></div><button class="tile-open" id="tile-bt-open" data-test="tile-bt-open" title="Bluetooth details"><i data-icon="chevron-right"></i></button></div>
+      <div class="tile" id="tile-dark" data-test="tile-dark"><span class="tile-ico"><i data-icon="contrast"></i></span><div class="tile-main"><div class="tile-title">Dark theme</div><div class="tile-sub" id="tile-dark-sub"></div></div></div>
+      <div class="tile" id="tile-dnd" data-test="tile-dnd"><span class="tile-ico"><i data-icon="moon"></i></span><div class="tile-main"><div class="tile-title">Do not disturb</div><div class="tile-sub" id="tile-dnd-sub"></div></div></div>
+      <div class="tile" id="tile-night" data-test="tile-night"><span class="tile-ico"><i data-icon="sun"></i></span><div class="tile-main"><div class="tile-title">Night Light</div><div class="tile-sub" id="tile-night-sub"></div></div></div>
     </div>
     <div id="audio-note"></div>
-    <div class="sliderrow" id="volrow"><button id="mute" data-test="mute" title="Mute">🔊</button><input id="volume" data-test="volume" type="range" min="0" max="100" step="1" value="0"><span id="percent"></span><button class="tile-open" id="sound-open" data-test="sound-open" title="Sound output">›</button></div>
+    <div class="sliderrow" id="volrow">
+      <button id="mute" data-test="mute" title="Mute"><i data-icon="volume" data-slot="mute"></i></button>
+      <div id="volslider"><div id="volfill"></div><input id="volume" data-test="volume" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="percent"></span>
+      <button class="tile-open" id="sound-open" data-test="sound-open" title="Sound output"><i data-icon="chevron-right"></i></button>
+    </div>
   </div>
   <div id="qs-detail" style="display:none">
-    <div id="detail-head"><button id="back" data-test="back" title="Back">‹</button><h3 id="detail-title"></h3></div>
+    <div id="detail-head"><button id="back" data-test="back" title="Back"><i data-icon="chevron-left"></i></button><h3 id="detail-title"></h3></div>
     <div class="page" id="detail-sound"><div id="outputdev"></div><div id="outputs"></div></div>
     <div class="page" id="wifi">
       <div id="wifi-head"><button id="scan" data-test="wifi-scan">Scan</button><button id="disconnect" data-test="wifi-disconnect">Disconnect</button><button id="wifitoggle" data-test="wifi-toggle">Turn off</button></div>
@@ -122,19 +50,20 @@
   </div>
 </div>
 <div id="toasts"></div>
-<div id="notifs">
+<div id="notifs" class="panel glass">
   <div id="notif-head"><h3>Notifications</h3><button id="notif-dnd" data-test="notif-dnd">Do not disturb</button><button id="notif-clear" data-test="notif-clear">Clear all</button></div>
   <div id="notif-list"></div><div id="notif-empty"></div>
 </div>
-<div id="agents">
+<div id="agents" class="panel glass">
   <div id="agent-head"><h3>Agents</h3><button id="agent-stopall" data-test="agent-stopall">Stop all</button><button id="agent-toggle" data-test="agent-toggle">Turn off</button></div>
   <div id="agent-state"></div>
   <h4>Waiting for you</h4><div id="agent-pending"></div>
   <h4>Access</h4><div id="agent-grants"></div>
   <h4>Recent</h4><div id="agent-history"></div>
 </div>
-<div id="launcher"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
-<div id="panel"><h3>Assistant</h3><input id="q" placeholder="What should I do?">
+<div id="launcher" class="panel glass"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
+<div id="panel" class="panel glass"><div id="panel-head"><i data-icon="sparkle"></i><h3>Assistant</h3></div><input id="q" placeholder="What should I do?" autocomplete="off">
   <div id="body"></div><div id="reason"></div><div id="note"></div>
   <div id="buttons"><button id="cancel">Cancel</button><button id="doit" class="primary" disabled>Do it</button></div></div>
+<script src="icons.js"></script>
 <script src="shell.js"></script>

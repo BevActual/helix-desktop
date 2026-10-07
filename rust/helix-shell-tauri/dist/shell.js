@@ -4,6 +4,33 @@ const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const $ = (id) => document.getElementById(id);
 
+
+
+// The bar's right side is the system status, in the manner of a menu bar: Wi-Fi, Bluetooth, sound and battery, one button that opens
+// the control center. The clock opens the notification shade. Everything here is drawn from the same views the panels use.
+const statusState = { wifi: "off", bt: false };
+function drawStatus() {
+  const wifi = slot("wifi");
+  const next = swapIcon(wifi, statusState.wifi === "off" ? "wifi-off" : "wifi");
+  next.classList.toggle("dim", statusState.wifi !== "on");
+  slot("bt").style.display = statusState.bt ? "" : "none";
+}
+let clockTimer = null;
+function tickClock() {
+  const now = new Date();
+  $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  document.querySelector("#clock .time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+// One timer, aligned to the minute: it moves the clock and re-reads the battery. Nothing else in the bar runs on a timer.
+function everyMinute() {
+  tickClock();
+  invoke("battery_view").then(drawBattery);
+  clearTimeout(clockTimer);
+  clockTimer = setTimeout(everyMinute, 60000 - (Date.now() % 60000) + 50);
+}
+
 function show(view) {
   const phase = view.phase;
   let body = "";
@@ -27,7 +54,7 @@ function show(view) {
 }
 
 listen("live-value", (event) => {
-  $("live").textContent = String(event.payload);
+  $("live").textContent = String(event.payload); // kept for tests and logs; not shown
 });
 listen("assistant-view", (event) => show(event.payload));
 listen("shell-mode", (event) => {
@@ -120,14 +147,30 @@ function ntext(cls, text) {
   element.textContent = text;
   return element;
 }
+// A coloured tile with the application's first letter, the colour taken from its name: a stable, quiet stand-in for an app icon.
+function appBadge(name) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  const badge = document.createElement("div");
+  badge.className = "nico";
+  badge.style.background = "hsl(" + (hash % 360) + " 52% 46%)";
+  badge.textContent = Array.from(name)[0] || "•";
+  return badge;
+}
+function notificationBody(item) {
+  const text = document.createElement("div");
+  text.className = "ntext";
+  text.append(ntext("napp", item.app), ntext("nsum", item.summary));
+  if (item.body) text.append(ntext("nbody", item.body));
+  return text;
+}
 function drawNotifications(view) {
   const toasts = $("toasts");
   toasts.replaceChildren();
   view.toasts.forEach((item) => {
     const toast = document.createElement("div");
     toast.className = "toast" + (item.urgency === "critical" ? " critical" : "");
-    toast.append(ntext("napp", item.app), ntext("nsum", item.summary));
-    if (item.body) toast.append(ntext("nbody", item.body));
+    toast.append(appBadge(item.app), notificationBody(item));
     toasts.append(toast);
   });
   const list = $("notif-list");
@@ -135,25 +178,34 @@ function drawNotifications(view) {
   view.items.forEach((item, index) => {
     const row = document.createElement("div");
     row.className = "nrow" + (item.urgency === "critical" ? " critical" : "") + (item.live ? "" : " stale");
-    row.append(ntext("napp", item.app), ntext("nsum", item.summary));
-    if (item.body) row.append(ntext("nbody", item.body));
+    const text = notificationBody(item);
     const acts = document.createElement("div");
     acts.className = "nacts";
     item.actions.forEach((action, j) => {
       acts.append(actionButton(action.label, "notif-" + index + "-action-" + j, () => invoke("notification_invoke", { id: item.id, index: j })));
     });
-    acts.append(actionButton("Dismiss", "notif-" + index + "-dismiss", () => invoke("notification_dismiss", { id: item.id })));
-    row.append(acts);
+    if (item.actions.length) text.append(acts);
+    // Dismiss is a quiet corner button that appears when the row is pointed at, as in a notification centre.
+    const dismiss = document.createElement("button");
+    dismiss.className = "ndismiss";
+    dismiss.title = "Dismiss";
+    dismiss.setAttribute("aria-label", "Dismiss");
+    dismiss.dataset.test = "notif-" + index + "-dismiss";
+    dismiss.append(icon("x"));
+    dismiss.onclick = () => invoke("notification_dismiss", { id: item.id });
+    row.append(appBadge(item.app), text, dismiss);
     list.append(row);
   });
-  $("notif-empty").textContent = view.items.length ? "" : "No notifications.";
+  $("notif-empty").textContent = view.items.length ? "" : "No notifications";
   $("notif-clear").disabled = !view.items.length;
-  $("notif-dnd").textContent = view.dnd ? "Do not disturb: on" : "Do not disturb";
+  $("notif-dnd").textContent = "Do not disturb";
+  $("notif-dnd").classList.toggle("on", view.dnd);
   $("tile-dnd").classList.toggle("on", view.dnd);
   $("tile-dnd").dataset.on = view.dnd ? "1" : "0";
   $("tile-dnd-sub").textContent = view.dnd ? "On" : "Off";
-  $("notifbtn").textContent = view.unread ? "Notifications · " + view.unread : "Notifications";
-  $("notifbtn").classList.toggle("unread", view.unread > 0);
+  swapIcon(slot("bell"), view.dnd ? "moon" : "bell");
+  $("notif-badge").hidden = !view.unread;
+  $("notif-badge").textContent = view.unread > 9 ? "9+" : String(view.unread);
   queueReport();
 }
 listen("notifications-view", (event) => drawNotifications(event.payload));
@@ -201,7 +253,7 @@ function drawAgents(view) {
   bar.style.display = view.available ? "" : "none";
   bar.classList.toggle("busy", view.available && view.enabled && view.busy);
   bar.classList.toggle("off", view.available && !view.enabled);
-  bar.textContent = !view.enabled ? "Agents off" : view.busy ? "Agents · " + view.pending.length + " waiting" : "Agents";
+  bar.title = !view.enabled ? "Agents are off" : view.busy ? view.pending.length + " waiting for you" : "Agents";
   $("agent-state").textContent = !view.available
     ? "Agent activity is shown by the registered shell."
     : view.enabled ? "Agents may ask to act. Nothing runs without the checks in Settings." : "Agents are off. Every request is refused until you turn them on.";
@@ -239,6 +291,7 @@ $("agentsbtn").onclick = () => invoke("panel_open", { id: "agents" });
 $("agent-stopall").onclick = () => invoke("activity_stop_all");
 $("agent-toggle").onclick = () => invoke("activity_set_enabled", { enabled: $("agent-toggle").textContent === "Turn on" });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
+$("clock").onclick = () => invoke("panel_open", { id: "notifications" });
 $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
 
 // Sound. Rust owns the audio state and every write; the page sends "volume 40", "mute" or "make this output the default" and
@@ -250,13 +303,16 @@ function drawAudio(view) {
   const usable = view.available && view.output;
   $("audio-note").textContent = view.available ? (view.output ? "" : "No output device") : "Sound is unavailable";
   $("volrow").style.display = usable ? "" : "none";
+  slot("vol").style.display = usable ? "" : "none";
   if (!usable) { queueReport(); return; }
   $("outputdev").textContent = view.output.name;
   if (!dragging) {
     $("volume").value = Math.min(view.percent, 100);
     $("percent").textContent = view.percent + "%";
   }
-  $("mute").textContent = view.muted ? "🔇" : "🔊";
+  swapIcon(slot("mute"), view.muted ? "volume-mute" : "volume");
+  swapIcon(slot("vol"), view.muted ? "volume-mute" : "volume");
+  $("volslider").style.setProperty("--pct", Math.min(view.percent, 100) + "%");
   $("mute").title = view.muted ? "Unmute" : "Mute";
   $("mute").dataset.muted = view.muted ? "1" : "0";
   const list = $("outputs");
@@ -282,12 +338,15 @@ window.addEventListener("pointerup", () => { dragging = false; });
 $("volume").addEventListener("input", () => {
   latest = Number($("volume").value);
   $("percent").textContent = latest + "%";
+  $("volslider").style.setProperty("--pct", latest + "%");
   if (!sendTimer) sendTimer = setTimeout(sendVolume, 50);
 });
 // Wi-Fi. Same rule as sound: Rust holds the state and builds every request. A network is named by the path it was listed with, and
 // Rust refuses one that is not in its last snapshot, or that needs a password (not supported yet), instead of sending it.
 const bars = (strength) => (strength >= 75 ? "▂▄▆█" : strength >= 50 ? "▂▄▆" : strength >= 25 ? "▂▄" : "▂");
 function drawNetwork(view) {
+  statusState.wifi = !view.available || !view.wifi_enabled ? "off" : view.connected ? "on" : "idle";
+  drawStatus();
   $("tile-wifi").style.display = view.available ? "" : "none";
   if (!view.available) return;
   $("tile-wifi").classList.toggle("on", view.wifi_enabled);
@@ -354,6 +413,8 @@ $("disconnect").onclick = () => invoke("network_disconnect");
 // Bluetooth. Same rules: Rust holds the state and builds every request; a device is named by the path it was listed with. Pairing a new
 // device is not built yet, so a device that is not paired is listed with a note and cannot be clicked.
 function drawBluetooth(view) {
+  statusState.bt = view.available && view.enabled;
+  drawStatus();
   $("tile-bt").style.display = view.available ? "" : "none";
   if (!view.available) return;
   $("tile-bt").classList.toggle("on", view.enabled);
@@ -432,6 +493,8 @@ $("tile-bt").addEventListener("click", (event) => {
 $("tile-dark").addEventListener("click", () => invoke("quick_set_dark", { on: $("tile-dark").dataset.on !== "1" }));
 $("tile-night").addEventListener("click", () => invoke("quick_set_night_light", { on: $("tile-night").dataset.on !== "1" }));
 function drawQuick(view) {
+  // The shell follows the system theme: the same setting the Dark theme tile changes.
+  document.documentElement.dataset.theme = view.dark === false ? "light" : "dark";
   const dark = view.dark !== null && view.dark !== undefined;
   $("tile-dark").style.display = dark ? "" : "none";
   if (dark) {
@@ -452,19 +515,25 @@ listen("quick-view", (event) => drawQuick(event.payload));
 
 function drawBattery(view) {
   $("qs-battery").style.display = view.present ? "" : "none";
+  $("batt").style.display = view.present ? "" : "none";
   if (!view.present) return;
   $("qs-battery").textContent = view.label + (view.state ? " · " + view.state : "");
   $("qs-battery").classList.toggle("low", view.low);
+  $("batt-label").textContent = view.label;
+  $("batt").classList.toggle("low", view.low);
+  $("batt").classList.toggle("charging", view.charging);
+  // The glyph's fill is the charge: one rectangle inside the outline, drawn here so it needs no markup parsing.
+  const glyph = slot("batt");
+  glyph.querySelectorAll(".level").forEach((old) => old.remove());
+  const level = document.createElementNS(SVG, "rect");
+  level.setAttribute("class", "level solid");
+  level.setAttribute("x", 4.4); level.setAttribute("y", 9.4); level.setAttribute("height", 5.2); level.setAttribute("rx", 1.1);
+  level.setAttribute("width", Math.max(1.2, 12.2 * Math.min(view.percent, 100) / 100));
+  glyph.append(level);
   queueReport();
 }
 listen("battery-view", (event) => drawBattery(event.payload));
 
-function tickClock() {
-  const now = new Date();
-  $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
-}
-setInterval(() => { if (document.body.dataset.panel === "control-center") tickClock(); }, 20000);
 
 // Details. One page at a time inside the panel, with a back arrow; Escape goes back before it closes the panel.
 let detail = null;
@@ -497,11 +566,17 @@ function sendReport() {
   const elements = {};
   document.querySelectorAll("[data-test]").forEach((element) => {
     const box = element.getBoundingClientRect();
-    if (box.width > 0 && box.height > 0) elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+    // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
+    if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, elements } });
 }
 window.addEventListener("resize", queueReport);
 new MutationObserver(queueReport).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
 
+invoke("quick_view").then(drawQuick);
+invoke("audio_view").then(drawAudio);
+invoke("network_view").then(drawNetwork);
+invoke("bluetooth_view").then(drawBluetooth);
+everyMinute();
 requestAnimationFrame(() => invoke("ready"));
