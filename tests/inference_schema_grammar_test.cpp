@@ -103,6 +103,20 @@ int main(int argc, char** argv) {
   for (const char* absent : {"call-app-launch", "call-window-close", "call-firewall-panic-toggle", "call-clipboard-copy"})
     TEST_CHECK(!rules.contains(absent));
 
+  // `decline` carries a mandatory reason; ordinary tools keep it optional.
+  {
+    const auto declining = inference::grammarFromToolSchema(agent::toolCallSchema(noctalia::cli::kMsgCmd, *policy, {agent::Tier::Observe}, nullptr, true));
+    const auto declineRules = parseRules(declining);
+    TEST_CHECK(declineRules.contains("call-decline"));
+    TEST_CHECK(declineRules.at("call-decline").find("reason") != std::string::npos && declineRules.at("call-decline").find(" reason ") == std::string::npos);
+    TEST_CHECK(declineRules.at("call-decline").find("str-nonempty") != std::string::npos);   // a reason cannot be empty
+    TEST_CHECK(declineRules.at("call-status").find("str-nonempty") == std::string::npos);
+    TEST_CHECK(declineRules.at("str-nonempty").find("char+") != std::string::npos);
+    TEST_CHECK(declineRules.at("call-status").find(" reason ") != std::string::npos);  // the optional rule
+    for (const auto& [name, rhs] : declineRules)
+      for (const auto& used : referenced(rhs)) TEST_CHECK(declineRules.contains(used));
+  }
+
   // Quoting: a value with a quote or backslash must stay inside its literal.
   const json tricky = {{"oneOf", json::array({tool("pick", {{"prefixItems", json::array({{{"type", "string"}, {"enum", json::array({"a\"b", "c\\d"})}}})}, {"minItems", 1}, {"items", false}})})}};
   const auto quoted = inference::grammarFromToolSchema(tricky);

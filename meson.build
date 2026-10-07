@@ -1342,6 +1342,14 @@ if build_tests
       build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
       override_options: ['b_ndebug=false'],
     )
+    # Evaluation harness (not a test: it takes minutes). Run it with tools/run-inference-eval.py.
+    executable('inference_eval',
+      sources: files('tests/inference_eval.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
+        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+      dependencies: [noctalia_core_dep, llama_dep, dependency('threads')],
+      build_rpath: llama_prefix / 'lib64',
+      override_options: ['b_ndebug=false'],
+    )
     _model_path = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-1.5b-instruct-q4_k_m.gguf"', check: false).stdout().strip()
     test('inference_llama', helix_llama_test, timeout: 600, args: [meson.project_source_root(), _model_path])
     _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()

@@ -26,6 +26,8 @@ inline bool valid(const json& schema, const json& value) {
   }
   if (value.is_string() && schema.contains("maxLength") && value.get<std::string>().size() > schema.at("maxLength").get<std::size_t>())
     return false;
+  if (value.is_string() && schema.contains("minLength") && value.get<std::string>().size() < schema.at("minLength").get<std::size_t>())
+    return false;
   if (value.is_object()) {
     const auto properties = schema.value("properties", json::object());
     for (const auto& [key, child] : value.items()) {

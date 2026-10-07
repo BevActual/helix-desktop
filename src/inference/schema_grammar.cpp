@@ -79,8 +79,12 @@ std::string grammarFromToolSchema(const json& schema) {
     const std::string name = ruleName(tool);
     if (!seen.insert(name).second) throw std::invalid_argument("duplicate tool: " + tool);
     calls += (calls.empty() ? "" : " | ") + name;
+    // A tool whose schema requires `reason` must carry it; otherwise it is optional.
+    bool reasonRequired = false;
+    for (const auto& key : alternative.value("required", json::array())) reasonRequired = reasonRequired || key == "reason";
+    const std::string reason = reasonRequired ? "ws \",\" ws \"\\\"reason\\\"\" ws \":\" ws str-nonempty" : "reason";
     rules += name + " ::= \"{\" ws \"\\\"tool\\\"\" ws \":\" ws " + literal("\"" + tool + "\"") + " ws \",\" ws \"\\\"args\\\"\" ws \":\" ws (" +
-             argsRule(properties.at("args")) + ") reason ws \"}\"\n";
+             argsRule(properties.at("args")) + ") " + reason + " ws \"}\"\n";
   }
   if (calls.empty()) throw std::invalid_argument("no tools to choose from");
 
@@ -88,6 +92,7 @@ std::string grammarFromToolSchema(const json& schema) {
          "call ::= " + calls + "\n" + rules +
          "reason ::= (ws \",\" ws \"\\\"reason\\\"\" ws \":\" ws str)?\n"
          "str ::= \"\\\"\" char* \"\\\"\"\n"
+         "str-nonempty ::= \"\\\"\" char+ \"\\\"\"\n"
          "char ::= [^\"\\\\\\x7F\\x00-\\x1F] | \"\\\\\" ([\"\\\\/bfnrt] | \"u\" [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F])\n"
          "ws ::= [ ]?\n";
 }

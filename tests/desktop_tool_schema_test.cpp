@@ -91,6 +91,18 @@ int main(int argc, char** argv) {
   TEST_CHECK(valid(everyday, call("color-scheme-set", {"builtin", "Nord"})));
   TEST_CHECK(!valid(everyday, call("color-scheme-set", {"bogus", "Nord"})));
 
+  // The decline option: only when asked for, reason required, and it takes no arguments.
+  TEST_CHECK(!offers(everyday, "decline"));
+  const auto withDecline = toolCallSchema(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act}, nullptr, true);
+  TEST_CHECK(offers(withDecline, "decline") && withDecline.at("oneOf").size() == everyday.at("oneOf").size() + 1);
+  TEST_CHECK(valid(withDecline, json{{"tool", "decline"}, {"args", json::array()}, {"reason", "Rebooting is not something I can do."}}));
+  TEST_CHECK(!valid(withDecline, call("decline")));                                                     // reason is required
+  TEST_CHECK(!valid(withDecline, json{{"tool", "decline"}, {"args", json::array()}, {"reason", ""}})); // and must say something
+  TEST_CHECK(!valid(withDecline, json{{"tool", "decline"}, {"args", json::array({"x"})}, {"reason", "no"}}));
+  TEST_CHECK(valid(withDecline, call("status")));                                                       // real tools still work
+  TEST_CHECK(toolCatalog(root, *policy, {Tier::Observe}, nullptr, true).find("- decline - Use this when none") != std::string::npos);
+  TEST_CHECK(toolCatalog(root, *policy, {Tier::Observe}).find("decline") == std::string::npos);
+
   // The catalog lists exactly the tools the schema offers, with their arguments and a summary.
   const std::string catalog = toolCatalog(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act});
   TEST_CHECK(catalog.find("- status") != std::string::npos && catalog.find("- media <action: next|previous|toggle") != std::string::npos);

@@ -60,7 +60,7 @@ json callSchema(const noctalia::cli::Command& command, const std::set<std::strin
 }  // namespace
 
 json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
-                    const std::set<std::string>* onlyTools) {
+                    const std::set<std::string>* onlyTools, bool includeDecline) {
   json alternatives = json::array();
   for (const auto& command : msgRoot.subcommands) {
     const std::string name(command.name);
@@ -75,6 +75,15 @@ json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& pol
       if (tiers.contains(tier)) granted.insert(choice);
     if (!granted.empty()) alternatives.push_back(callSchema(command, &granted));
   }
+  if (includeDecline) {
+    alternatives.push_back({
+      {"type", "object"},
+      {"properties", {{"tool", {{"const", kDeclineTool}}}, {"args", {{"type", "array"}, {"minItems", 0}, {"maxItems", 0}, {"items", false}}},
+                      {"reason", {{"type", "string"}, {"minLength", 1}, {"maxLength", 200}}}}},
+      {"required", json::array({"tool", "args", "reason"})},
+      {"additionalProperties", false},
+    });
+  }
   return {
     {"$schema", "https://json-schema.org/draft/2020-12/schema"},
     {"title", "Helix desktop tool call"},
@@ -83,7 +92,7 @@ json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& pol
 }
 
 std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
-                        const std::set<std::string>* onlyTools) {
+                        const std::set<std::string>* onlyTools, bool includeDecline) {
   std::string out;
   for (const auto& command : msgRoot.subcommands) {
     const std::string name(command.name);
@@ -117,6 +126,8 @@ std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy&
     if (!command.summary.empty()) out += " - " + std::string(command.summary);
     out += "\n";
   }
+  if (includeDecline)
+    out += std::string("- ") + kDeclineTool + " - Use this when none of the other tools can do what was asked, or it would be unsafe. Put the reason in \"reason\".\n";
   return out;
 }
 
