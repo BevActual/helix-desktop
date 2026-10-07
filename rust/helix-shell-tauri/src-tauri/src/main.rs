@@ -544,6 +544,11 @@ fn launcher_launch(app: AppHandle, id: String) -> bool {
 }
 
 fn main() {
+    // The page is a few lines of script. The JIT and its compile threads cost about 7 MB here and put executable memory in a
+    // process that draws text from a model, so it is off. Set before WebKit starts any helper process, which inherit it.
+    if std::env::var_os("JSC_useJIT").is_none() {
+        std::env::set_var("JSC_useJIT", "false");
+    }
     let started = Instant::now();
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![

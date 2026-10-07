@@ -273,3 +273,26 @@ panels must come out of existing memory, not add to it.
 
 Not done: input (microphone) volume, per-program volumes, the other quick settings, keyboard control of the slider is the browser's
 default (arrow keys on the focused range input) and untested.
+
+## Memory pass
+
+**Measure with USS, not PSS.** PSS counts a share of every library page the process maps, so it moves with whatever else is running:
+identical code measured 15-20 MB higher in a later session. `tools/nested/process_tree.py` now prints the shell's USS (private memory,
+what stopping it would free), which is stable. Shell only, JIT off: **bar only 260 MB USS (327 PSS); after panels have been opened and
+closed 290-295 MB USS (345-350 PSS)**. New budget: **<= 320 MB USS in every state** (PSS stays informational, about 55-70 MB higher).
+The older "350 MB PSS" budget above is superseded by this.
+
+What was tried, in alternating back-to-back runs so drift cannot fool the comparison:
+
+| Change | Effect | Kept? |
+|---|---|---|
+| JavaScriptCore JIT off (`JSC_useJIT=false`, set before WebKit starts; an explicit environment value overrides it) | 5-6 MB USS, 7-13 MB PSS, every run; also no executable JIT memory in a process that draws model text | yes |
+| Surface only bar-height while closed, full output when a panel is open | bar only 304 MB PSS instead of 334 (-30) **until the first panel opens**; after one open/close it is back at about 337 and stays: WebKit keeps the buffers | no |
+| Open surface only 720 px tall instead of the whole output | no change at all after cycles (339 PSS) | no |
+| `MALLOC_ARENA_MAX`, trim thresholds | under 3 MB | no |
+| JSC concurrent GC/JIT off, one GC marker | 1 MB beyond JIT off | no |
+| `WEBKIT_DISABLE_DMABUF_RENDERER` | about 90 MB, but nothing paints (see above) | no |
+
+Where the rest is: the app process is about 120 MB (GTK, WebKit's UI side, about 25 MB of GPU driver libraries); the web process about 150 MB
+(its anonymous heap, WebKit itself, JavaScriptCore, more GPU libraries); the network process 20 MB. Most of it is fixed cost of having a
+WebKit web view at all. The first panel opened costs about 30 MB that never comes back.
