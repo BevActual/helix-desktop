@@ -49,6 +49,11 @@ click_id set-theme.mode-light; sleep 1.2
 click_id set-theme.pure_black_dark; sleep 1.2
 [ "$(setting_of theme.pure_black_dark)" = "true" ] && echo "ok: pure black on" || fail "pure black is $(setting_of theme.pure_black_dark)"
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-appearance.png"
+echo "--- 1c. the Keyboard page lists the key binds and flags the clash"
+click_id page-keyboard; sleep 1.2
+for _ in $(seq 1 20); do has_id "shortcut:Open the launcher" && break; sleep 0.25; done
+has_id "shortcut:Open the launcher" && has_id "shortcut:Open a Terminal" && has_id "shortcut:Close window" && echo "ok: binds listed" || fail "binds missing"
+niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-keyboard.png"
 click_id page-agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"

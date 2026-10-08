@@ -24,6 +24,7 @@ const PAGES = [
   { name: "displays", title: "Displays", icon: "sun", rows: true },
   { name: "network", title: "Network", icon: "wifi", rows: false },
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
+  { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: true },
   { name: "dock", title: "Dock & corners", icon: "grid", rows: true },
   { name: "notifications", title: "Notifications", icon: "bell", rows: true },
@@ -44,7 +45,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "about") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -73,6 +74,7 @@ function showPage(name) {
   $("page-title").textContent = TITLES[name];
   $("refresh").style.display = name === "agents" ? "" : "none";
   if (name === "about") drawAbout();
+  if (name === "keyboard") drawKeyboard();
   queueReport();
 }
 buildPages();
@@ -92,6 +94,33 @@ async function drawAbout() {
       card.append(line);
     });
   host.append(card);
+  queueReport();
+}
+
+// Keyboard: the compositor's key binds, read only ----------------------------------------------------------------------------------
+async function drawKeyboard() {
+  const groups = await invoke("shortcuts_view");
+  const host = $("keyboard-host");
+  host.replaceChildren();
+  const note = el("div", "setting-about note", "These are the key binds in your compositor config. Settings shows them and flags clashes; it does not change them.");
+  host.append(note);
+  groups.forEach((group) => {
+    host.append(el("h4", "", group.name));
+    const card = el("div", "rows-card");
+    group.rows.forEach((row, index) => {
+      const line = el("div", "setting-row");
+      line.dataset.test = "shortcut:" + row.title;
+      const text = el("div", "setting-text");
+      text.append(el("div", "setting-title", row.title));
+      if (row.conflict) text.append(el("div", "setting-about warn", "Also bound in another place. Only one of them will work."));
+      const keys = el("div", "keycaps");
+      row.keys.forEach((key) => keys.append(el("kbd", "", key)));
+      line.append(text, keys);
+      card.append(line);
+    });
+    host.append(card);
+  });
+  if (!groups.length) host.append(el("div", "empty", "No key binds found."));
   queueReport();
 }
 

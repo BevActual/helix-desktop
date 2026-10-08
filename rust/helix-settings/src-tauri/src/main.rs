@@ -9,6 +9,7 @@ use std::time::Duration;
 use helix_desktop_api::{Desktop, Domain};
 use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
 use helix_shell_core::network::{Network, NetworkView, Request as NetRequest, RequestError as NetError};
+use helix_shell_core::shortcuts::{self, ShortcutGroup};
 use helix_shell_core::catalog::{Catalog, Change, RowView};
 use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
 use serde::Serialize;
@@ -465,6 +466,34 @@ fn about(app: AppHandle) -> AboutView {
     }
 }
 
+/// The key binds in the compositor's config files (read only: Settings never writes them).
+#[tauri::command]
+fn shortcuts_view() -> Vec<ShortcutGroup> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config")));
+    let Some(dir) = base.map(|base| base.join("niri")) else { return Vec::new() };
+    let mut files: Vec<_> = std::fs::read_dir(&dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "kdl") && path.is_file())
+        .collect();
+    files.sort();
+    let mut binds = Vec::new();
+    for path in files.into_iter().take(40) {
+        // A config file is small; anything bigger is not one.
+        if std::fs::metadata(&path).map(|m| m.len() > 512 * 1024).unwrap_or(true) {
+            continue;
+        }
+        if let (Ok(text), Some(name)) = (std::fs::read_to_string(&path), path.file_name()) {
+            binds.extend(shortcuts::parse(&text, &name.to_string_lossy()));
+        }
+    }
+    shortcuts::view(&binds)
+}
+
 #[tauri::command]
 fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
@@ -546,6 +575,7 @@ fn main() {
             agents_revoke,
             agents_refresh,
             rows_view,
+            shortcuts_view,
             about,
             network_view,
             network_set_wifi,

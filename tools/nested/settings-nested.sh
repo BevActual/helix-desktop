@@ -4,7 +4,8 @@
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 BIN=${HELIX_SETTINGS_BIN:-$(ls -t "$ROOT/rust/target/fast/helix-settings" "$ROOT/rust/target/release/helix-settings" 2>/dev/null | head -1)}
 export PIPEWIRE_REMOTE=helix-nested-no-audio HELIX_RISK_POLICY="$ROOT/protocols/ipc/msg-risk.toml" HELIX_MANAGER_EXE="$BIN"
-mkdir -p "$XDG_STATE_HOME/noctalia/agent"
+mkdir -p "$XDG_STATE_HOME/noctalia/agent" "$XDG_CONFIG_HOME/niri"
+cp "$ROOT/tools/nested/fixtures/niri-binds.kdl" "$ROOT/tools/nested/fixtures/niri-extra.kdl" "$XDG_CONFIG_HOME/niri/"
 printf '{"clients":{"exe:/opt/agents/helper.py":["observe","act"],"exe:/opt/agents/notes-agent":["observe"]},"version":1}' > "$XDG_STATE_HOME/noctalia/agent/grants.json"
 chmod 600 "$XDG_STATE_HOME/noctalia/agent/grants.json"
 cat > "$XDG_STATE_HOME/noctalia/agent/audit.jsonl" <<'AUDIT'

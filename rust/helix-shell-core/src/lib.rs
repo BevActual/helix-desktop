@@ -21,6 +21,7 @@ pub mod niri;
 pub mod notifications;
 pub mod power;
 pub mod quick;
+pub mod shortcuts;
 pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
