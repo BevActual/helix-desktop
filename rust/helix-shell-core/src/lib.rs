@@ -12,6 +12,7 @@ mod display;
 pub mod glass;
 pub mod launcher;
 pub mod network;
+pub mod niri;
 pub mod notifications;
 pub mod power;
 pub mod quick;
