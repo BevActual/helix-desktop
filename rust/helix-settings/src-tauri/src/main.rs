@@ -3,10 +3,12 @@
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
 //! change may be is decided by the pure models in `helix-shell-core`; the page only sends names those models listed.
 
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_desktop_api::{Desktop, Domain};
+use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
+use helix_shell_core::network::{Network, NetworkView, Request as NetRequest, RequestError as NetError};
 use helix_shell_core::catalog::{Catalog, Change, RowView};
 use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
 use serde::Serialize;
@@ -55,10 +57,34 @@ const POWER: &[&str] = &[
 ];
 
 /// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
-const ROW_PAGES: [(&str, &[&str]); 6] = [
+const DOCK: &[&str] = &[
+    "dock.enabled",
+    "dock.position",
+    "dock.auto_hide",
+    "dock.smart_auto_hide",
+    "dock.reserve_space",
+    "dock.active_monitor_only",
+    "dock.icon_size",
+    "dock.magnification",
+    "dock.magnification_scale",
+    "dock.show_running",
+    "dock.show_dots",
+    "dock.show_instance_count",
+    "dock.shadow",
+    "dock.background_opacity",
+    "hot_corners.enabled",
+    "hot_corners.delay_ms",
+    "hot_corners.top_left.action",
+    "hot_corners.top_right.action",
+    "hot_corners.bottom_left.action",
+    "hot_corners.bottom_right.action",
+];
+
+const ROW_PAGES: [(&str, &[&str]); 7] = [
     ("appearance", APPEARANCE),
     ("accessibility", ACCESSIBILITY),
     ("displays", DISPLAYS),
+    ("dock", DOCK),
     ("sound", SOUND),
     ("notifications", NOTIFICATIONS),
     ("power", POWER),
@@ -71,13 +97,19 @@ fn page_ids(page: &str) -> Option<&'static [&'static str]> {
 struct State {
     grants: Grants,
     catalog: Catalog,
+    network: Network,
+    bluetooth: Bluetooth,
     status: &'static str,
 }
 
 type Shared = Arc<Mutex<State>>;
 
 /// The connection that registered as manager: the service knows the manager by this connection, so every change goes through it.
-static DESKTOP: OnceLock<Arc<Desktop>> = OnceLock::new();
+static DESKTOP: Mutex<Option<Arc<Desktop>>> = Mutex::new(None);
+
+fn current() -> Option<Arc<Desktop>> {
+    DESKTOP.lock().expect("desktop").clone()
+}
 
 #[derive(Serialize, Clone)]
 struct AgentsView {
@@ -110,7 +142,7 @@ fn publish(app: &AppHandle) {
 
 /// Reads grants and the audit again and tells the page.
 async fn refresh(app: &AppHandle) {
-    let Some(desktop) = DESKTOP.get() else { return };
+    let Some(desktop) = current() else { return };
     let manager = desktop.manager();
     let grants = manager.grants().await;
     let audit = manager.audit(0, 400).await;
@@ -147,7 +179,7 @@ fn rows_of(state: &State) -> Vec<RowsView> {
 
 /// Reads the service's settings again and tells the page.
 async fn refresh_settings(app: &AppHandle) {
-    let Some(desktop) = DESKTOP.get() else { return };
+    let Some(desktop) = current() else { return };
     match desktop.settings().await {
         Ok(settings) => {
             let view = {
@@ -163,6 +195,135 @@ async fn refresh_settings(app: &AppHandle) {
         }
         Err(error) => eprintln!("SETTINGS settings: {error}"),
     }
+}
+
+/// Network and Bluetooth: the control center's models, with the same request rules, shown as pages. Each follows its own `Changed` signal.
+async fn refresh_network(app: &AppHandle) {
+    let Some(desktop) = current() else { return };
+    let snapshot = desktop.snapshot(Domain::Network).await.unwrap_or(serde_json::Value::Null);
+    let network = Network::from_snapshot(&snapshot);
+    let view = network.view();
+    shared(app).lock().expect("state").network = network;
+    eprintln!("SETTINGS network networks={}", view.networks.len());
+    let _ = app.emit("network-view", view);
+}
+
+async fn refresh_bluetooth(app: &AppHandle) {
+    let Some(desktop) = current() else { return };
+    let snapshot = desktop.snapshot(Domain::Bluetooth).await.unwrap_or(serde_json::Value::Null);
+    let bluetooth = Bluetooth::from_snapshot(&snapshot);
+    let view = bluetooth.view();
+    shared(app).lock().expect("state").bluetooth = bluetooth;
+    eprintln!("SETTINGS bluetooth devices={}", view.devices.len());
+    let _ = app.emit("bluetooth-view", view);
+}
+
+fn follow(
+    app: &AppHandle,
+    desktop: &Arc<Desktop>,
+    domain: Domain,
+) -> tauri::async_runtime::JoinHandle<()> {
+    let (app, desktop) = (app.clone(), desktop.clone());
+    tauri::async_runtime::spawn(async move {
+        let watcher = app.clone();
+        let _ = desktop
+            .watch(domain, move || {
+                let app = watcher.clone();
+                tauri::async_runtime::spawn(async move {
+                    match domain {
+                        Domain::Network => refresh_network(&app).await,
+                        Domain::Bluetooth => refresh_bluetooth(&app).await,
+                        Domain::Configuration => refresh_settings(&app).await,
+                        _ => {}
+                    }
+                });
+            })
+            .await;
+    })
+}
+
+async fn send_network(request: Result<NetRequest, NetError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .action(Domain::Network, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS network {} sent", request.action);
+    Ok(())
+}
+
+async fn send_bluetooth(request: Result<BtRequest, BtError>) -> Result<(), String> {
+    let request = request.map_err(|error| format!("{error:?}"))?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .action(Domain::Bluetooth, request.action, &request.args)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS bluetooth {} sent", request.action);
+    Ok(())
+}
+
+fn network_with<T>(app: &AppHandle, build: impl FnOnce(&Network) -> T) -> T {
+    build(&shared(app).lock().expect("state").network)
+}
+
+fn bluetooth_with<T>(app: &AppHandle, build: impl FnOnce(&Bluetooth) -> T) -> T {
+    build(&shared(app).lock().expect("state").bluetooth)
+}
+
+#[tauri::command]
+fn network_view(app: AppHandle) -> NetworkView {
+    network_with(&app, Network::view)
+}
+#[tauri::command]
+async fn network_set_wifi(app: AppHandle, enabled: bool) -> Result<(), String> {
+    send_network(network_with(&app, |n| n.set_wifi(enabled))).await
+}
+#[tauri::command]
+async fn network_scan(app: AppHandle) -> Result<(), String> {
+    send_network(network_with(&app, Network::scan)).await
+}
+#[tauri::command]
+async fn network_connect(app: AppHandle, path: String) -> Result<(), String> {
+    send_network(network_with(&app, |n| n.connect(&path))).await
+}
+#[tauri::command]
+async fn network_disconnect(app: AppHandle) -> Result<(), String> {
+    send_network(network_with(&app, Network::disconnect)).await
+}
+#[tauri::command]
+async fn network_forget(app: AppHandle, path: String) -> Result<(), String> {
+    send_network(network_with(&app, |n| n.forget(&path))).await
+}
+#[tauri::command]
+async fn network_vpn(app: AppHandle, path: String, active: bool) -> Result<(), String> {
+    send_network(network_with(&app, |n| n.set_vpn(&path, active))).await
+}
+
+#[tauri::command]
+fn bluetooth_view(app: AppHandle) -> BluetoothView {
+    bluetooth_with(&app, Bluetooth::view)
+}
+#[tauri::command]
+async fn bluetooth_set_power(app: AppHandle, enabled: bool) -> Result<(), String> {
+    send_bluetooth(bluetooth_with(&app, |b| b.set_power(enabled))).await
+}
+#[tauri::command]
+async fn bluetooth_scan(app: AppHandle, on: bool) -> Result<(), String> {
+    send_bluetooth(bluetooth_with(&app, |b| b.set_scanning(on))).await
+}
+#[tauri::command]
+async fn bluetooth_connect(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_with(&app, |b| b.connect(&path))).await
+}
+#[tauri::command]
+async fn bluetooth_disconnect(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_with(&app, |b| b.disconnect(&path))).await
+}
+#[tauri::command]
+async fn bluetooth_forget(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_with(&app, |b| b.forget(&path))).await
 }
 
 fn set_status(app: &AppHandle, status: &'static str) {
@@ -183,24 +344,20 @@ fn connect(app: AppHandle) {
             match Desktop::session().await {
                 Ok(desktop) => {
                     let desktop = Arc::new(desktop);
+                    *DESKTOP.lock().expect("desktop") = Some(desktop.clone());
+                    // Everything but the agent pages needs no special role: settings, Wi-Fi and Bluetooth.
+                    refresh_settings(&app).await;
+                    refresh_network(&app).await;
+                    refresh_bluetooth(&app).await;
+                    let tasks = [
+                        follow(&app, &desktop, Domain::Configuration),
+                        follow(&app, &desktop, Domain::Network),
+                        follow(&app, &desktop, Domain::Bluetooth),
+                    ];
                     match desktop.manager().register().await {
                         Ok(()) => {
-                            let _ = DESKTOP.set(desktop.clone());
                             set_status(&app, "connected");
                             refresh(&app).await;
-                            refresh_settings(&app).await;
-                            let settings_watcher = app.clone();
-                            let settings_desktop = desktop.clone();
-                            tauri::async_runtime::spawn(async move {
-                                let _ = settings_desktop
-                                    .watch(Domain::Configuration, move || {
-                                        let app = settings_watcher.clone();
-                                        tauri::async_runtime::spawn(async move {
-                                            refresh_settings(&app).await
-                                        });
-                                    })
-                                    .await;
-                            });
                             let watcher = app.clone();
                             let _ = desktop
                                 .manager()
@@ -210,14 +367,25 @@ fn connect(app: AppHandle) {
                                 })
                                 .await;
                         }
-                        Err(error) if error.to_string().contains("Only Helix Settings") => {
-                            set_status(&app, "denied")
+                        Err(error) => {
+                            set_status(
+                                &app,
+                                if error.to_string().contains("Only Helix Settings") {
+                                    "denied"
+                                } else {
+                                    "unavailable"
+                                },
+                            );
+                            // Keep this connection until the service goes away; the other pages still work.
+                            for task in tasks {
+                                let _ = task.await;
+                            }
                         }
-                        Err(_) => set_status(&app, "unavailable"),
                     }
                 }
                 Err(_) => set_status(&app, "unavailable"),
             }
+            *DESKTOP.lock().expect("desktop") = None;
             tokio::time::sleep(Duration::from_secs(3)).await;
         }
     });
@@ -230,9 +398,7 @@ fn agents_view(app: AppHandle) -> AgentsView {
 
 async fn send(app: &AppHandle, request: Result<Request, RequestError>) -> Result<(), String> {
     let request = request.map_err(|error| format!("{error:?}"))?;
-    let desktop = DESKTOP
-        .get()
-        .ok_or("not connected to the desktop service")?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
     let manager = desktop.manager();
     match &request {
         Request::SetGrant { client, tiers } => manager.set_grant(client, tiers).await,
@@ -271,6 +437,34 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
     send(&app, request).await
 }
 
+#[derive(Serialize)]
+struct AboutView {
+    version: &'static str,
+    service: &'static str,
+    agent_access: &'static str,
+    settings: usize,
+    network: bool,
+    bluetooth: bool,
+}
+
+#[tauri::command]
+fn about(app: AppHandle) -> AboutView {
+    let shared = shared(&app);
+    let state = shared.lock().expect("state");
+    AboutView {
+        version: env!("CARGO_PKG_VERSION"),
+        service: if current().is_some() { "Running" } else { "Not running" },
+        agent_access: match state.status {
+            "connected" => "Managing",
+            "denied" => "Not permitted: this is not the installed Settings",
+            _ => "Unavailable",
+        },
+        settings: ROW_PAGES.iter().map(|(_, ids)| state.catalog.rows(ids).len()).sum(),
+        network: state.network.view().available,
+        bluetooth: state.bluetooth.view().available,
+    }
+}
+
 #[tauri::command]
 fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
@@ -301,9 +495,7 @@ async fn setting_change(
         .catalog
         .update(ids, &id, change)
         .map_err(|error| format!("{error:?}"))?;
-    let desktop = DESKTOP
-        .get()
-        .ok_or("not connected to the desktop service")?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
     desktop
         .update_setting(&update.id, &update.value)
         .await
@@ -354,6 +546,20 @@ fn main() {
             agents_revoke,
             agents_refresh,
             rows_view,
+            about,
+            network_view,
+            network_set_wifi,
+            network_scan,
+            network_connect,
+            network_disconnect,
+            network_forget,
+            network_vpn,
+            bluetooth_view,
+            bluetooth_set_power,
+            bluetooth_scan,
+            bluetooth_connect,
+            bluetooth_disconnect,
+            bluetooth_forget,
             setting_change,
             layout_reporting,
             report_layout
@@ -362,6 +568,8 @@ fn main() {
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 grants: Grants::default(),
                 catalog: Catalog::default(),
+                network: Network::from_snapshot(&serde_json::Value::Null),
+                bluetooth: Bluetooth::from_snapshot(&serde_json::Value::Null),
                 status: "unavailable",
             })));
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))

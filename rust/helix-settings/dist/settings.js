@@ -22,10 +22,14 @@ const PAGES = [
   { name: "appearance", title: "Appearance", icon: "palette", rows: true },
   { name: "accessibility", title: "Accessibility", icon: "eye", rows: true },
   { name: "displays", title: "Displays", icon: "sun", rows: true },
+  { name: "network", title: "Network", icon: "wifi", rows: false },
+  { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: true },
+  { name: "dock", title: "Dock & corners", icon: "grid", rows: true },
   { name: "notifications", title: "Notifications", icon: "bell", rows: true },
   { name: "power", title: "Power & lock", icon: "lock", rows: true },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
+  { name: "about", title: "About", icon: "sparkle", rows: false },
 ];
 const TITLES = Object.fromEntries(PAGES.map((page) => [page.name, page.title]));
 function buildPages() {
@@ -40,6 +44,15 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "about") {
+      const section = el("section", "settings-page");
+      section.id = "page-" + page.name;
+      section.hidden = true;
+      const host = el("div");
+      host.id = page.name + "-host";
+      section.append(host);
+      content.insertBefore(section, agents);
+    }
     if (page.rows) {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
@@ -59,10 +72,28 @@ function showPage(name) {
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
   $("page-title").textContent = TITLES[name];
   $("refresh").style.display = name === "agents" ? "" : "none";
+  if (name === "about") drawAbout();
   queueReport();
 }
 buildPages();
 showPage("appearance");
+
+// About: what this copy is and what it can reach -----------------------------------------------------------------------------------
+async function drawAbout() {
+  const info = await invoke("about");
+  const host = $("about-host");
+  host.replaceChildren();
+  const card = el("div", "rows-card");
+  [["Helix Settings", info.version], ["Desktop service", info.service], ["Agent access", info.agent_access],
+   ["Settings on these pages", String(info.settings)], ["Wi-Fi", info.network ? "Available" : "Not available"], ["Bluetooth", info.bluetooth ? "Available" : "Not available"]]
+    .forEach(([name, value]) => {
+      const line = el("div", "setting-row");
+      line.append(el("div", "setting-title", name), el("div", "slider-value", value));
+      card.append(line);
+    });
+  host.append(card);
+  queueReport();
+}
 
 // Rows of service settings ----------------------------------------------------------------------------------------------------------
 const pageRows = {};  // page name -> the rows last sent for it, kept so search can list matches from every page

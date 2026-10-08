@@ -89,7 +89,8 @@ impl Catalog {
         let value = entry.get("value")?;
         match kind {
             "boolean" => Some(Control::Switch { on: value.as_bool()? }),
-            "mode" | "enum" | "choice" => {
+            // Any string setting that comes with a list of options (modes, positions, layers, corner actions) is a choice.
+            _ if value.is_string() && entry.get("options").and_then(Value::as_array).is_some_and(|o| !o.is_empty()) => {
                 let options = entry.get("options").and_then(Value::as_array)?;
                 let labels = entry.get("option-labels").and_then(Value::as_array);
                 let options: Vec<Choice> = options
@@ -278,6 +279,20 @@ mod tests {
         assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("a\u{7}b".into())), Err(RequestError::BadText));
         assert_eq!(c.update(PAGE, "shell.font_family", Change::Text("x".repeat(501))), Err(RequestError::BadText));
         assert!(c.update(PAGE, "shell.font_family", Change::Text("x".repeat(500))).is_ok());
+    }
+
+    #[test]
+    fn any_string_with_options_is_a_choice_and_one_without_is_text() {
+        let mut c = Catalog::default();
+        c.set(&json!([
+            {"id": "dock.position", "title": "Position", "group": "Dock", "type": "position", "value": "bottom", "options": ["top", "bottom"], "option-labels": []},
+            {"id": "dock.launcher_icon", "title": "Icon", "group": "Dock", "type": "string", "value": "x", "options": []}
+        ]));
+        let rows = c.rows(&["dock.position", "dock.launcher_icon"]);
+        assert!(matches!(&rows[0].control, Control::Choice { options, .. } if options[1].label == "bottom"), "a missing label falls back to the value");
+        assert!(matches!(rows[1].control, Control::Text { .. }));
+        assert!(c.update(&["dock.position"], "dock.position", Change::Choice("left".into())).is_err());
+        assert!(c.update(&["dock.position"], "dock.position", Change::Choice("top".into())).is_ok());
     }
 
     #[test]

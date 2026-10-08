@@ -369,3 +369,13 @@ body.settings h2 { font-size: 26px; }
   background: linear-gradient(to right, var(--accent) var(--pct), var(--fill-3) var(--pct)) center / 100% 4px no-repeat; }
 .slider-wrap input[type=range]::-webkit-slider-runnable-track { height: 18px; background: transparent; }
 .slider-wrap input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 22px 0 6px; padding-right: 2px; }
+.section-head h4 { margin: 0 0 0 14px !important; }
+.section-tools { display: flex; gap: 8px; } .section-tools button { padding: 3px 12px; font-size: 12.5px; }
+.list-row { gap: 12px; } .list-row .row-lead { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+.list-row .row-lead svg { width: 18px; height: 18px; flex: none; color: var(--label-2); }
+.list-row.active .row-lead svg, .list-row.active .setting-title { color: var(--accent); }
+.list-row.clickable { cursor: pointer; } .list-row.clickable:hover { background: var(--fill-1); margin: 0 -16px; padding-left: 16px; padding-right: 16px; border-radius: 8px; }
+.list-row.dim { opacity: .55; }
+.list-row button { flex: none; padding: 3px 12px; font-size: 12.5px; }
+.rows-card > .empty { padding: 14px 0; text-align: center; color: var(--label-2); }
