@@ -8,6 +8,7 @@ pub mod bluetooth;
 mod confirm;
 pub mod confirmer;
 mod display;
+pub mod glass;
 pub mod launcher;
 pub mod network;
 pub mod notifications;
