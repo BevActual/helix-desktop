@@ -1,0 +1,12 @@
+[package]
+name = "helix-idle"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Locks the session and turns the screen off when nobody is there, using the compositor's idle protocol. A separate small process."
+
+[dependencies]
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+zbus = { version = "5", features = ["blocking-api"] }
+toml = "0.8"

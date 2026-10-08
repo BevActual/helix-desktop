@@ -5,6 +5,7 @@ members = [
     "helix-shell-core",
     "helix-desktop-api",
     "helix-wallpaper",
+    "helix-idle",
     "helix-shell-tauri/src-tauri",
 ]
 

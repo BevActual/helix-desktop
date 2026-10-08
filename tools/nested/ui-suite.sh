@@ -28,3 +28,4 @@ pick keys           && run keys keys-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE
 pick dock           && run dock dock-test.sh dock-nested.sh
 pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
+pick idle           && run idle idle-test.sh idle-nested.sh

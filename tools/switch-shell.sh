@@ -49,11 +49,20 @@ PY
       wall_escaped=$(printf '%s' "$WALL" | sed 's/ /\\\\x20/g')
       sed "s|@WALLPAPER_BIN@|$wall_escaped|" "$ROOT/tools/systemd/helix-wallpaper.service.in" > "$UNITS/helix-wallpaper.service"
     fi
+    IDLE=$ROOT/rust/target/release/helix-idle
+    if [ -x "$IDLE" ]; then
+      idle_escaped=$(printf '%s' "$IDLE" | sed 's/ /\\\\x20/g')
+      sed "s|@IDLE_BIN@|$idle_escaped|" "$ROOT/tools/systemd/helix-idle.service.in" > "$UNITS/helix-idle.service"
+    fi
     systemctl --user daemon-reload
     systemctl --user stop helix-shell-tauri-trial.service 2>/dev/null || true
     systemctl --user disable helix-shell-dev.service 2>/dev/null || true
     systemctl --user enable helix-shell-tauri.service
     systemctl --user start helix-shell-tauri.service
+    if [ -f "$UNITS/helix-idle.service" ]; then
+      systemctl --user enable helix-idle.service
+      systemctl --user restart helix-idle.service
+    fi
     if [ -f "$UNITS/helix-wallpaper.service" ]; then
       systemctl --user enable helix-wallpaper.service
       systemctl --user restart helix-wallpaper.service
@@ -62,13 +71,14 @@ PY
     ;;
   native)
     systemctl --user disable --now helix-wallpaper.service 2>/dev/null || true   # the native shell paints its own
+    systemctl --user disable --now helix-idle.service 2>/dev/null || true        # and handles its own idle
     systemctl --user disable helix-shell-tauri.service 2>/dev/null || true
     systemctl --user enable helix-shell-dev.service
     systemctl --user start helix-shell-dev.service
     echo "The native shell is the session shell."
     ;;
   status)
-    for unit in helix-shell-dev helix-shell-tauri helix-wallpaper helix-service; do
+    for unit in helix-shell-dev helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     ;;

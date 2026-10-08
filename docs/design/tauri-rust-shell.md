@@ -502,3 +502,13 @@ right and middle click as `Activate`, `ContextMenu` and `SecondaryActivate`, and
 from the theme (or the item's own `IconThemePath`, single component names only) or from the pixels it publishes, drawn on a canvas, never as markup. Not done: dbusmenu
 (applications that only publish a `Menu` and expect the host to draw it show nothing on right click).
 `tools/nested/tray-test.sh` runs a stand-in application against the real watcher.
+
+## Idle lock (2026-10-07)
+
+`helix-idle` is a separate small process on `ext-idle-notify-v1`: after 5 minutes without input it runs the lock command, 2 minutes later it turns the screen off
+(`niri msg action power-off-monitors`) and the first touch turns it back on. Idle time comes from the compositor, so anything that inhibits idling (a video, a
+presentation) is respected without this process knowing. It also locks on `loginctl lock-session` and, holding a logind delay inhibitor, locks before the machine
+sleeps (needs the system bus; a session without one only gets idle locking). `~/.config/helix/idle.toml` can set `lock_after_seconds` (not below 15),
+`screen_off_after_seconds` (0 = never; never earlier than the lock), `enabled = false`, and the three commands as argument lists (a string or a malformed list is
+ignored, nothing is run through a shell). `tools/nested/idle-test.sh` runs it against the real compositor with short times and stand-in commands: lock, then off,
+then on at a touch, and the lock does not repeat. Not tested: the logind paths (they need the real system bus).
