@@ -15,6 +15,7 @@ pub mod dbusmenu;
 mod display;
 pub mod dock;
 pub mod glass;
+pub mod identity;
 pub mod grants;
 pub mod island;
 pub mod launcher;

@@ -897,7 +897,7 @@ function drawDock(items) {
   row.replaceChildren();
   items.forEach((item, index) => {
     const cell = document.createElement("div");
-    cell.className = "dock-item" + (item.running ? " running" : "") + (item.focused ? " focused" : "") + (item.urgent ? " urgent" : "");
+    cell.className = "dock-item" + (item.running ? " running" : "") + (item.focused ? " focused" : "") + (item.urgent ? " urgent" : "") + (item.unverified ? " unverified" : "");
     cell.dataset.test = "dock-item-" + index;
     cell.dataset.name = item.name;
     if (item.icon_uri) { const img = document.createElement("img"); img.src = item.icon_uri; img.alt = ""; img.draggable = false; cell.append(img); }
@@ -905,7 +905,7 @@ function drawDock(items) {
     cell.addEventListener("click", () => invoke("dock_activate", { id: item.id }));
     cell.addEventListener("auxclick", (event) => { if (event.button === 1) invoke("dock_new_window", { id: item.id }); });
     cell.addEventListener("contextmenu", (event) => { event.preventDefault(); openDockMenu(item, cell); });
-    cell.addEventListener("pointerenter", () => showDockTip(item.name, cell));
+    cell.addEventListener("pointerenter", () => showDockTip(item.unverified ? item.detail : item.name, cell));
     cell.addEventListener("pointerleave", () => $("dock-tip").classList.remove("show"));
     row.append(cell);
   });

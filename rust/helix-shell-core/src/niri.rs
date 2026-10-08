@@ -19,6 +19,9 @@ pub struct Window {
     pub workspace: Option<u64>,
     pub focused: bool,
     pub urgent: bool,
+    /// The window's process, as the compositor knows it from the connection (not from anything the program says). `None` when the
+    /// compositor does not say.
+    pub pid: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -60,6 +63,11 @@ fn window(value: &Value) -> Option<Window> {
         workspace: value.get("workspace_id").and_then(Value::as_u64),
         focused: flag(value, "is_focused"),
         urgent: flag(value, "is_urgent"),
+        pid: value
+            .get("pid")
+            .and_then(Value::as_u64)
+            .and_then(|p| u32::try_from(p).ok())
+            .filter(|p| *p > 0),
     })
 }
 
@@ -424,6 +432,21 @@ mod tests {
         assert_eq!(n.focused_window().map(|w| w.id), Some(2));
         n.apply(&json!({"WindowFocusChanged": {"id": null}}));
         assert!(n.focused_window().is_none());
+    }
+
+    #[test]
+    fn the_compositors_process_id_is_read_and_junk_is_ignored() {
+        let mut n = Niri::default();
+        n.apply(&json!({"WindowsChanged": {"windows": [
+            {"id": 1, "app_id": "a", "title": "t", "pid": 4242},
+            {"id": 2, "app_id": "b", "title": "t"},
+            {"id": 3, "app_id": "c", "title": "t", "pid": -5},
+            {"id": 4, "app_id": "d", "title": "t", "pid": 0},
+            {"id": 5, "app_id": "e", "title": "t", "pid": "7"},
+            {"id": 6, "app_id": "f", "title": "t", "pid": 99999999999u64}
+        ]}}));
+        let pids: Vec<Option<u32>> = (1..=6).map(|i| n.window(i).unwrap().pid).collect();
+        assert_eq!(pids, [Some(4242), None, None, None, None, None]);
     }
 
     #[test]

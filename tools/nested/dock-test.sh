@@ -54,6 +54,18 @@ click_id dock-menu-unpin
 sleep 1
 python3 -c "import json; p=json.load(open('$XDG_CONFIG_HOME/helix/dock.json'))['pinned']; print('saved:', p); import sys; sys.exit(0 if p==['fakeone.desktop'] else 1)" && echo "ok: faketwo unpinned and saved" || fail "pins file wrong: $(cat "$SCRATCH/config/helix/dock.json" 2>/dev/null)"
 
+echo "--- 6. a program that claims an application's app id does not light that application up"
+ln -sf "$ROOT/tools/nested/text-target.py" "$XDG_STATE_HOME/intruder.py"
+APP_ID=fakeone TARGET_FILE="$XDG_STATE_HOME/intruder.txt" python3 "$XDG_STATE_HOME/intruder.py" >/dev/null 2>&1 &
+INTRUDER=$!
+wait_log 'unverified=1' 60 && echo "ok: the intruder is shown apart and marked" || fail "the intruder was credited to the application: $(grep 'DOCK view' "$LOG" | tail -1)"
+niri msg --json windows | python3 -c "
+import json, sys
+w = [x for x in json.load(sys.stdin) if x['app_id'] == 'fakeone']
+print('windows claiming fakeone:', len(w))
+sys.exit(0 if len(w) == 3 else 1)" && echo "ok: three windows claim fakeone (two real, one intruder)" || fail "unexpected window count"
+kill "$INTRUDER" 2>/dev/null; wait_log 'unverified=0' 40 && echo "ok: the mark goes when it closes" || fail "the mark stayed"
+
 # Tidy: the windows the test started (pids come from niri; stopped by pid)
 for pid in $(niri msg --json windows | python3 -c "import json,sys; print(' '.join(str(x['pid']) for x in json.load(sys.stdin) if x['app_id'].startswith('fake')))"); do kill "$pid" 2>/dev/null; done
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

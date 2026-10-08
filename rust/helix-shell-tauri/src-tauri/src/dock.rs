@@ -132,19 +132,63 @@ fn items(app: &AppHandle) -> Vec<DockItem> {
         .collect()
 }
 
+/// What each window's process really is, read from `/proc` (the pid is the compositor's, taken from the connection). A process that cannot
+/// be read (it has gone) is simply left out: the dock then keeps the application its window names.
+fn read_processes(niri: &helix_shell_core::niri::Niri) -> std::collections::HashMap<u32, helix_shell_core::identity::Process> {
+    let mut found = std::collections::HashMap::new();
+    for pid in niri.windows().filter_map(|w| w.pid) {
+        if found.contains_key(&pid) {
+            continue;
+        }
+        let Ok(exe) = std::fs::read_link(format!("/proc/{pid}/exe")) else { continue };
+        let mut raw = std::fs::read(format!("/proc/{pid}/cmdline")).unwrap_or_default();
+        raw.truncate(4096);
+        let cmdline = raw
+            .split(|b| *b == 0)
+            .filter(|part| !part.is_empty())
+            .take(16)
+            .map(|part| String::from_utf8_lossy(part).into_owned())
+            .collect();
+        // A Flatpak sandbox records which application it belongs to in a file the program inside cannot choose.
+        let flatpak = std::fs::read_to_string(format!("/proc/{pid}/root/.flatpak-info"))
+            .ok()
+            .and_then(|text| {
+                text.lines()
+                    .skip_while(|l| l.trim() != "[Application]")
+                    .skip(1)
+                    .take_while(|l| !l.starts_with('['))
+                    .find_map(|l| l.strip_prefix("name=").map(|n| n.trim().to_string()))
+            })
+            .filter(|name| !name.is_empty());
+        found.insert(
+            pid,
+            helix_shell_core::identity::Process {
+                exe: exe.to_string_lossy().into_owned(),
+                cmdline,
+                flatpak,
+            },
+        );
+    }
+    found
+}
+
 /// Recomputes the dock from the installed applications and open windows, and tells the page.
 pub fn refresh(app: &AppHandle) {
     {
         let state = shell_state(app);
         let mut guard = state.lock().expect("shell state");
         let shell = &mut *guard;
-        shell.dock.refresh(&shell.dock_apps, &shell.niri);
+        let processes = read_processes(&shell.niri);
+        shell
+            .dock
+            .refresh_checked(&shell.dock_apps, &shell.niri, &processes);
     }
     let view = items(app);
     eprintln!(
-        "DOCK view items={} running={}",
+        "DOCK view items={} running={} unverified={}",
         view.len(),
-        view.iter().filter(|i| i.item.running > 0).count()
+        view.iter().filter(|i| i.item.running > 0).count(),
+        view.iter().filter(|i| i.item.unverified).count()
     );
     let _ = app.emit("dock-view", view);
     publish_workspaces(app);

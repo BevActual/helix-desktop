@@ -481,8 +481,14 @@ or focuses one of its windows (the next one if it already has the keyboard); mid
 (`report_interactive`; the shell is one full-output surface, so the input region is the bar plus whatever the page names), and the page, which can only
 send back ids the dock listed, never holds a command line. niri is spoken to over `$NIRI_SOCKET` (a long-lived event-stream connection, no polling, and a
 short one per action). `tools/nested/dock-test.sh` drives it with a real pointer against two fake applications.
-Accepted limitation: a window's app id is its own claim, so an application that calls itself `org.gnome.Nautilus` gets Files' icon. Matching windows
-to the process they run (niri gives the pid) would close it; not done.
+**Window identity (2026-10-08, closes the app-id limitation above).** niri reports each window's process (`pid`, from the Wayland connection, not from anything
+the program says). The host reads `/proc/<pid>/exe`, the command line and, for Flatpak, the sandbox's own record of its application id; `helix_shell_core::identity`
+decides whether that process fits the installed application the app id names, by shared distinctive words (the desktop entry's id, window class and program against
+the real executable, the script an interpreter runs, or the Flatpak id). A window that does not fit is not credited to the application: it gets its own item named
+for the program it really is, marked with a warning, and cannot be started as if it were an application. Stated limits: matching is by name, so two programs of one
+vendor can pass for each other, and a program that deliberately names its binary after the application passes; a process that cannot be read (it has gone, or the
+compositor gave no pid) keeps the application its window names, which is not a way around the check because a program cannot make its own process unreadable to
+its own user. `dock-test.sh` step 6 runs a real intruder. The same identity is what the window tools for agents will report.
 
 **Review.** An independent read-only review (codex, `--sandbox read-only`) of the trust-boundary code found, and these were fixed with tests that fail
 without the fix: the approval dialog cut arguments the service would run in full (now whole arguments or Allow is refused, quoted so boundaries show,

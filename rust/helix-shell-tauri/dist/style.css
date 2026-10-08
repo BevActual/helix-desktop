@@ -425,3 +425,6 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 .cal-day { height: 30px; width: 30px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; font-size: 13px; }
 .cal-day.out { color: var(--label-3); } .cal-day.weekend:not(.out) { color: var(--label-2); }
 .cal-day.today { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+
+/* A window that says it is one application but is another program: shown apart, with a mark. */
+.dock-item.unverified::after { content: "!"; position: absolute; right: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--warn, #ff9f0a); color: #000; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
