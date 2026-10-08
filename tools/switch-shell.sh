@@ -44,21 +44,31 @@ for path in sys.argv[1:]:
         open(path, "w").write(new)
         print("key binds changed in", path)
 PY
+    WALL=$ROOT/rust/target/release/helix-wallpaper
+    if [ -x "$WALL" ]; then
+      wall_escaped=$(printf '%s' "$WALL" | sed 's/ /\\\\x20/g')
+      sed "s|@WALLPAPER_BIN@|$wall_escaped|" "$ROOT/tools/systemd/helix-wallpaper.service.in" > "$UNITS/helix-wallpaper.service"
+    fi
     systemctl --user daemon-reload
     systemctl --user stop helix-shell-tauri-trial.service 2>/dev/null || true
     systemctl --user disable helix-shell-dev.service 2>/dev/null || true
     systemctl --user enable helix-shell-tauri.service
     systemctl --user start helix-shell-tauri.service
+    if [ -f "$UNITS/helix-wallpaper.service" ]; then
+      systemctl --user enable helix-wallpaper.service
+      systemctl --user restart helix-wallpaper.service
+    fi
     echo "The Tauri shell is the session shell."
     ;;
   native)
+    systemctl --user disable --now helix-wallpaper.service 2>/dev/null || true   # the native shell paints its own
     systemctl --user disable helix-shell-tauri.service 2>/dev/null || true
     systemctl --user enable helix-shell-dev.service
     systemctl --user start helix-shell-dev.service
     echo "The native shell is the session shell."
     ;;
   status)
-    for unit in helix-shell-dev helix-shell-tauri helix-service; do
+    for unit in helix-shell-dev helix-shell-tauri helix-wallpaper helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     ;;

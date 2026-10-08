@@ -23,3 +23,4 @@ pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED
 pick notifications  && run notifications notifications-test.sh tauri-shell.sh
 pick activity       && run activity activity-test.sh tauri-shell.sh
 pick qi             && run qi quick-insert-test.sh tauri-fake-desktop.sh
+pick wp             && run wp wallpaper-test.sh wallpaper-nested.sh

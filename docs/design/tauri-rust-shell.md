@@ -445,3 +445,13 @@ Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tool
 results. Emoji are typed with `wtype`; clipboard entries go on the clipboard and are pasted with Shift+Insert, so a terminal receives a bracketed paste
 and never keystrokes. The history is in memory only, text only, at most 50 entries of 64 KiB, and skips anything a password manager flags. What was
 typed or copied is never written to the log.
+
+## Wallpaper (2026-10-07)
+
+`helix-wallpaper` is a separate small process (so its memory is not the shell's): one layer surface per output on the background layer,
+namespace `noctalia-wallpaper` (the person's overview rule already matches it). It reads the choice from the settings file the shell always
+used (`[wallpaper.default]`, `[wallpaper.monitors.<connector>]`, `color:#rrggbb` allowed), renders at the output's real fractional scale
+(`wp_fractional_scale_v1` + `wp_viewporter`), crops to cover without distortion, and keeps no decoded image: it decodes, crops and scales once per
+draw, frees the scratch memory and keeps only the buffer on screen (about 17 MB private on a 2561x1601 output, 0.00% idle CPU). An unreadable
+image falls back to a quiet dark colour, never white. `tools/nested/wallpaper-test.sh` checks real screenshot pixels (a red/blue image with a green
+square, cropped not stretched). `tools/switch-shell.sh tauri` installs and enables `helix-wallpaper.service`; `native` stops it.
