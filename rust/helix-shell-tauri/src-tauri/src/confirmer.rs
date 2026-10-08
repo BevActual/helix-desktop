@@ -28,6 +28,24 @@ pub enum Answer {
 pub struct ConfirmerHost {
     panel: Confirmer,
     started: Instant,
+    /// The person chose to approve even where the compositor cannot protect the dialog.
+    allow_unprotected: bool,
+}
+
+/// Whether the person allows approvals the compositor cannot protect: `HELIX_ALLOW_UNPROTECTED_APPROVALS=1` (the shell's own
+/// environment, which a program cannot change) or `allow_unprotected` in `~/.config/helix/approvals.json`. Off unless chosen.
+fn unprotected_allowed() -> bool {
+    if let Some(value) = std::env::var_os("HELIX_ALLOW_UNPROTECTED_APPROVALS") {
+        return value == "1";
+    }
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")));
+    base.map(|b| b.join("helix/approvals.json"))
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .and_then(|v| v.get("allow_unprotected").and_then(Value::as_bool))
+        .unwrap_or(false)
 }
 
 impl ConfirmerHost {
@@ -39,7 +57,22 @@ impl ConfirmerHost {
                 tiers,
             });
         }));
-        Self { panel, started }
+        let mut panel = panel;
+        panel.require_protection();
+        Self {
+            panel,
+            started,
+            allow_unprotected: unprotected_allowed(),
+        }
+    }
+
+    pub fn needs_protection_check(&self) -> bool {
+        self.panel.needs_protection_check()
+    }
+
+    pub fn set_protection(&mut self, protected: bool) {
+        let now = self.now_ms();
+        self.panel.set_protection(protected, self.allow_unprotected, now);
     }
 
     fn now_ms(&self) -> u64 {
@@ -157,6 +190,38 @@ pub fn sync_surface(app: &AppHandle, host: &ConfirmerHost, keep_webkit: &BTreeSe
     } else {
         destroy_window(app, keep_webkit);
     }
+}
+
+/// Finds out whether the compositor treats the dialog as a trusted surface (kept on top, capture-proof, closed to synthetic input), then
+/// tells the model. The compositor decides when the surface maps, so this asks until it appears; a compositor that never says yes (stock
+/// niri, an executable not on its list) is "unprotected".
+pub fn probe_protection(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
+    std::thread::spawn(move || {
+        let mut trusted = false;
+        for _ in 0..25 {
+            match crate::niri_query::layer_is_trusted("helix-tauri-confirmer") {
+                Some(answer) => {
+                    trusted = answer;
+                    break;
+                }
+                None => std::thread::sleep(Duration::from_millis(100)),
+            }
+        }
+        eprintln!("CONFIRMER protection={}", if trusted { "protected" } else { "unprotected" });
+        let runner = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            let keep = crate::confirmer_keep(&runner);
+            let mut panel = host.lock().expect("confirmer");
+            panel.set_protection(trusted);
+            let view = panel.view();
+            sync_surface(&runner, &panel, &keep);
+            drop(panel);
+            if view.open {
+                emit_view(&runner, &view);
+                schedule_arm(runner.clone(), host.clone());
+            }
+        });
+    });
 }
 
 /// Wake the page once Allow becomes armed for the request currently showing.

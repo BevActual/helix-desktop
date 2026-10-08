@@ -13,6 +13,7 @@ mod control;
 mod dock;
 mod insert;
 mod island;
+mod niri_query;
 mod layer;
 mod notify;
 mod tray;
@@ -1138,7 +1139,10 @@ fn ready(window: tauri::Window) {
             if view.open {
                 let _ = window.emit("confirmer-view", &view);
                 eprintln!("CONFIRMER ready-replay");
-                if !view.armed {
+                if host.lock().expect("confirmer").needs_protection_check() {
+                    // The window exists now: ask the compositor whether it treats it as a trusted surface.
+                    confirmer::probe_protection(app.clone(), host);
+                } else if !view.armed {
                     confirmer::schedule_arm(app.clone(), host);
                 }
             }
@@ -1160,6 +1164,7 @@ fn confirmer_keep(app: &AppHandle) -> std::collections::BTreeSet<u32> {
 fn empty_confirmer_view() -> ConfirmerView {
     ConfirmerView {
         open: false,
+        protection: "off",
         kind: "action",
         client_name: String::new(),
         detail: String::new(),

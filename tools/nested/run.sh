@@ -16,15 +16,20 @@ export HOME=$SCRATCH/home XDG_CONFIG_HOME=$SCRATCH/config XDG_STATE_HOME=$SCRATC
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
 # The shell's command socket and tool list go in the scratch directory, never the real runtime directory.
 export HELIX_AGENT_IPC_DIR=$XDG_STATE_HOME
+# Approvals on a compositor that cannot protect the dialog are refused unless the person allows them. The nested compositor is stock niri, so
+# tests allow them (the protection tests unset this).
+export HELIX_ALLOW_UNPROTECTED_APPROVALS=${HELIX_ALLOW_UNPROTECTED_APPROVALS-1}
 # The real system bus (NetworkManager, BlueZ, logind, polkit) is out of reach of everything started here. A test that needs one
 # provides its own with HELIX_NESTED_SYSTEM_BUS=unix:path=...; otherwise services see "unavailable", never the person's real devices.
 export DBUS_SYSTEM_BUS_ADDRESS="${HELIX_NESTED_SYSTEM_BUS:-unix:path=/nonexistent/helix-nested-system-bus}"
 unset NIRI_SOCKET NOCTALIA_STATE_HOME NOCTALIA_CONFIG_HOME NOCTALIA_DATA_HOME NOCTALIA_CACHE_HOME
 for kv in "$@"; do export "$kv"; done
 # HELIX_NESTED_ASSISTANT=<path to helix-assistant>: pre-grant observe and act to that binary, as if the person had approved it once.
+# HELIX_NESTED_ASSISTANT_TIERS (default `observe act`) and HELIX_NESTED_ASSISTANT_SCRIPT (an interpreter is known by the script it runs).
 if [ -n "${HELIX_NESTED_ASSISTANT:-}" ]; then
   mkdir -p "$XDG_STATE_HOME/noctalia/agent"
-  printf '{"clients":{"exe:%s":["observe","act"]},"version":1}' "$(readlink -f "$HELIX_NESTED_ASSISTANT")" > "$XDG_STATE_HOME/noctalia/agent/grants.json"
+  TIERS=$(printf '"%s",' ${HELIX_NESTED_ASSISTANT_TIERS:-observe act}); TIERS=${TIERS%,}
+  printf '{"clients":{"exe:%s":[%s]},"version":1}' "$(readlink -f "$HELIX_NESTED_ASSISTANT")${HELIX_NESTED_ASSISTANT_SCRIPT:+#$HELIX_NESTED_ASSISTANT_SCRIPT}" "$TIERS" > "$XDG_STATE_HOME/noctalia/agent/grants.json"
   chmod 600 "$XDG_STATE_HOME/noctalia/agent/grants.json"
 fi
 cat > "$SCRATCH/niri.kdl" <<KDL
@@ -34,7 +39,8 @@ spawn-at-startup "sh" "-c" "exec '$PROGRAM' > '$SCRATCH/program.log' 2>&1"
 KDL
 # HELIX_NESTED_KDL: extra niri configuration for this run (a test of compositor-side behaviour, such as blur rules).
 [ -n "${HELIX_NESTED_KDL:-}" ] && printf '%s\n' "$HELIX_NESTED_KDL" >> "$SCRATCH/niri.kdl"
-niri -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
+# HELIX_NIRI_BIN: a compositor build to test (the fork under development); otherwise the installed one.
+"${HELIX_NIRI_BIN:-niri}" -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
 NIRI=$!
 for _ in $(seq 1 60); do grep -q "IPC listening" "$SCRATCH/niri.log" && break; sleep 0.3; done
 NIRI_SOCKET=$(grep -oE "/run/user/[0-9]+/niri\.[^ ]*\.sock" "$SCRATCH/niri.log" | tail -1)

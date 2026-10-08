@@ -1,13 +1,15 @@
 #!/bin/bash
 # Five attacks on a pending approval, from a program that is merely running as the person (no sandbox): a synthetic pointer click, synthetic
 # keys, reading the screen, covering the dialog, and stealing the keyboard. docs/design/trusted-surface.md says what the compositor must do.
-#   TRUSTED_EXPECT=vulnerable   every attack must succeed (today's compositor; proves each attack is real)
-#   TRUSTED_EXPECT=protected    every attack must be blocked (a compositor with the trusted-surface role, and the shell using it)
+#   TRUSTED_EXPECT=stock       an unprotected compositor (stock niri, no trusted-surface block): the attacks on the compositor's side
+#                              (pointer, capture, covering, focus) must all succeed, proving each is real; keys are already refused by the
+#                              dialog itself (a key never allows)
+#   TRUSTED_EXPECT=protected   the fork with the trusted-surface role (HELIX_NIRI_BIN, configured for the shell): every attack must fail
 #   HELIX_NESTED_SCRIPT=tools/nested/trusted-attack-test.sh tools/nested/run.sh trusted-attack tools/nested/tauri-shell.sh
 set -u
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log
 export LAYOUT=$SCRATCH/state/layout-confirmer.json
-EXPECT=${TRUSTED_EXPECT:-vulnerable}; FAILED=0; CLIENT=""; ATTACKER=""
+EXPECT=${TRUSTED_EXPECT:-stock}; FAILED=0; CLIENT=""; ATTACKER=""
 CAPTURE=$ROOT/rust/target/fast/wl-capture
 [ -x "$CAPTURE" ] || CAPTURE=$ROOT/rust/target/release/wl-capture
 source "$ROOT/tools/nested/ui-lib.sh"
@@ -32,9 +34,11 @@ close_dialog() {  # whatever happened, end it
 }
 approved() { grep -q 'COMPLETED ok=True' "$SCRATCH/client.log"; }
 verdict() {  # name, succeeded(0/1)
-  local what=BLOCKED; [ "$2" = 1 ] && what=SUCCEEDED
-  if { [ "$EXPECT" = vulnerable ] && [ "$2" = 1 ]; } || { [ "$EXPECT" = protected ] && [ "$2" = 0 ]; }; then echo "ok: $1: attack $what (expected: $EXPECT)"
-  else echo "FAIL: $1: attack $what but the expectation is $EXPECT" >&2; FAILED=1; fi
+  local what=BLOCKED want=0; [ "$2" = 1 ] && what=SUCCEEDED
+  # On a stock compositor every attack but the keys succeeds; with the role every one fails.
+  [ "$EXPECT" = stock ] && [ "$1" != "synthetic keys" ] && want=1
+  if [ "$2" = "$want" ]; then echo "ok: $1: attack $what (expected on a $EXPECT compositor)"
+  else echo "FAIL: $1: attack $what, not what a $EXPECT compositor should give" >&2; FAILED=1; fi
 }
 shot_pixel() {  # x y of the last niri screenshot, as r,g,b
   niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5

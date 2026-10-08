@@ -105,14 +105,32 @@ receives real clicks), so the existing pointer tool that uses virtual pointers w
   path; every other test never opens a trusted surface.
 * **Not a sandbox**: see Non-goals.
 
-## Status
+## Status (2026-10-08)
 
-Decision (the person, 2026-10-08): when the role is missing, **confirm-tier actions are refused** (the default; a setting may allow them, marked in the audit).
+Decision (the person): when the role is missing, **confirm-tier actions are refused** (default; `HELIX_ALLOW_UNPROTECTED_APPROVALS=1` or
+`allow_unprotected` in `~/.config/helix/approvals.json` allows them, and the dialog says so).
 
-Step 1 is done: `tools/nested/trusted-attack-test.sh` (with `tools/nested/attacker.py` and the `wl-capture` tool in `rust/helix-attacker`) runs the five
-attacks against a pending approval. With `TRUSTED_EXPECT=vulnerable` (today) all five **succeed**: a synthetic pointer click approves it, so do
-synthetic keys (Tab x4, Space found by trying 1 to 7 Tabs), screencopy reads the verified client's name and path, an Overlay surface hides the dialog,
-and an exclusive-keyboard surface takes the keys. The same test with `TRUSTED_EXPECT=protected` must pass once the role exists.
+**Built.** In the fork (`helix-niri`, branch `trusted-surface`, see its `HELIX.md`): the `trusted-surface` config block, role detection by
+namespace and `/proc/<pid>/exe`, always-on-top rendering and hit testing, keyboard priority, forced capture block-out, dropping of virtual-pointer and
+touch input while mapped, `niri msg layers` ("Trusted: yes") and `helix-capabilities` (`trusted-surfaces`). In the shell: the dialog asks the
+compositor whether it holds the role (`niri_query.rs`, `Confirmer::set_protection`), shows nothing until it knows, arms Allow 700 ms after, refuses
+confirm-tier actions and the `confirm` tier of grants when unprotected, and says so in the dialog.
+
+**Measured** (nested, `tools/nested/trusted-run.sh <mode>`, attacks in `trusted-attack-test.sh`): on stock niri, a synthetic pointer click approves the
+dialog, screencopy reads it, an Overlay surface covers it and an exclusive-keyboard surface takes the keys (all four succeed); with the role, all four
+fail, and with the right namespace but another executable (`wrong-exe`) they succeed again, so the check is not vacuous. `protection-test.sh` shows an
+unprotected compositor refusing a confirm-tier action without showing it, and a protected one arming Allow.
+
+**One finding changed the design.** `zwp_virtual_keyboard_v1` events are delivered by smithay straight to the focused client; they do not pass through the
+compositor, so they cannot be filtered there. The dialog therefore refuses to be allowed by *any* key (a click that a key produced has `detail 0`
+and is ignored), which protects approvals even on a stock compositor. A person with no pointing device cannot approve; an accessibility path is future
+work (`allow-virtual-input` in the compositor config opens the pointer path for such tools).
+
+**Not built.** The compositor-drawn rim (imitation defence), a Settings toggle for `allow_unprotected`, an audit mark for approvals made without protection,
+and a physical-device test (the nested compositor only receives virtual input; the device path is checked on the real session).
+
+**Deploying.** The compositor needs the fork build installed and this block in the person's niri config, then a new session; until then the shell
+(which is the confirmer) refuses confirm-tier actions. Nothing here touches the running session.
 
 ## Order of work
 

@@ -1,4 +1,4 @@
-// Agent1 confirmer surface. Trusted text only via textContent. Enter never calls Allow.
+// Agent1 confirmer surface. Trusted text only via textContent. Enter never calls Allow, and no key does.
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
@@ -41,6 +41,14 @@ function show(view) {
   detail.textContent = view.detail || "";
   aside.textContent = view.aside || "";
   warning.classList.toggle("show", !!view.tainted);
+  // What the compositor does for this dialog. Nothing is said when it is protected.
+  const protection = document.getElementById("protection");
+  protection.dataset.state = view.protection || "off";
+  protection.textContent =
+    view.protection === "unknown" ? "Checking that this dialog is protected…"
+    : view.protection === "unprotected" ? "This desktop cannot protect approvals from other programs, so actions that need confirmation are refused here."
+    : view.protection === "unprotected-allowed" ? "This desktop cannot protect this dialog from other programs. You have chosen to approve anyway."
+    : "";
   waiting.textContent = view.waiting > 0 ? view.waiting + " more waiting" : "";
   allow.disabled = !view.armed;
   // Allow stays dead for the arming delay; the sweep shows that it is coming alive, not broken.
@@ -66,7 +74,12 @@ function show(view) {
 }
 
 deny.onclick = () => invoke("confirmer_deny", { operation: shownOperation }).then((view) => { show(view); queueReport(); });
-allow.onclick = () => invoke("confirmer_allow", { operation: shownOperation }).then((view) => { show(view); queueReport(); });
+// Only a pointer (or a touch) approves. A click that a key produced (Space or Enter on the focused button) has detail 0; it is ignored, so no
+// keystroke, real or synthetic, can allow anything. The pointer is what the compositor protects (docs/design/trusted-surface.md).
+allow.onclick = (event) => {
+  if (event.detail === 0) return;
+  invoke("confirmer_allow", { operation: shownOperation }).then((view) => { show(view); queueReport(); });
+};
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") invoke("confirmer_escape");
   if (event.key === "Enter") {
