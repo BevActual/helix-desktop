@@ -2,6 +2,8 @@
 # Like tauri-shell.sh, but the desktop service is tools/nested/fake-desktop.py: scripted Wi-Fi networks, nothing real behind it.
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# Unless HELIX_SHELL_BIN says otherwise, run whichever build (fast or release) was made last, so a test never silently runs a stale binary.
+newest_shell_bin() { ls -t "$ROOT/rust/target/fast/helix-shell-tauri" "$ROOT/rust/target/release/helix-shell-tauri" 2>/dev/null | head -1; }
 # A stand-in backlight, so a nested session never reads or writes the real one.
 mkdir -p "${XDG_STATE_HOME}/backlight"; printf "50\n" > "${XDG_STATE_HOME}/backlight/brightness"; printf "100\n" > "${XDG_STATE_HOME}/backlight/max_brightness"
 export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"
@@ -14,4 +16,4 @@ python3 "$ROOT/tools/nested/fake-desktop.py" "${XDG_STATE_HOME}" > "${XDG_STATE_
 echo $! > "${XDG_STATE_HOME}/helix-service.pid"   # run.sh stops it by pid, like the real service
 for _ in $(seq 1 50); do grep -q "ready" "${XDG_STATE_HOME}/fake-desktop.log" 2>/dev/null && break; sleep 0.1; done
 echo $$ > "${XDG_STATE_HOME}/shell.pid"
-exec "${HELIX_SHELL_BIN:-$ROOT/rust/target/release/helix-shell-tauri}"
+exec "${HELIX_SHELL_BIN:-$(newest_shell_bin)}"

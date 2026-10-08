@@ -16,7 +16,9 @@ use tauri::{AppHandle, Emitter};
 use crate::{apps, shell_state};
 
 fn socket_path() -> Option<PathBuf> {
-    std::env::var_os("NIRI_SOCKET").filter(|v| !v.is_empty()).map(PathBuf::from)
+    std::env::var_os("NIRI_SOCKET")
+        .filter(|v| !v.is_empty())
+        .map(PathBuf::from)
 }
 
 fn config_path() -> Option<PathBuf> {
@@ -31,14 +33,26 @@ fn config_path() -> Option<PathBuf> {
 pub fn load_pins() -> Option<Vec<String>> {
     let text = std::fs::read_to_string(config_path()?).ok()?;
     let value: Value = serde_json::from_str(&text).ok()?;
-    Some(value.get("pinned")?.as_array()?.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+    Some(
+        value
+            .get("pinned")?
+            .as_array()?
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect(),
+    )
 }
 
 pub fn save_pins(pins: &[String]) {
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
     let Some(path) = config_path() else { return };
     let Some(dir) = path.parent() else { return };
-    if std::fs::DirBuilder::new().recursive(true).mode(0o700).create(dir).is_err() {
+    if std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)
+        .is_err()
+    {
         return;
     }
     let text = serde_json::json!({"version": 1, "pinned": pins}).to_string();
@@ -60,10 +74,16 @@ pub fn save_pins(pins: &[String]) {
 fn request(json: &str) -> Result<String, String> {
     let path = socket_path().ok_or("no niri socket")?;
     let mut stream = UnixStream::connect(path).map_err(|e| e.to_string())?;
-    stream.set_read_timeout(Some(Duration::from_secs(2))).map_err(|e| e.to_string())?;
-    stream.write_all(format!("{json}\n").as_bytes()).map_err(|e| e.to_string())?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .map_err(|e| e.to_string())?;
+    stream
+        .write_all(format!("{json}\n").as_bytes())
+        .map_err(|e| e.to_string())?;
     let mut reply = String::new();
-    BufReader::new(stream).read_line(&mut reply).map_err(|e| e.to_string())?;
+    BufReader::new(stream)
+        .read_line(&mut reply)
+        .map_err(|e| e.to_string())?;
     Ok(reply)
 }
 
@@ -98,9 +118,16 @@ fn items(app: &AppHandle) -> Vec<DockItem> {
                     let uri = apps::icon_data_uri(&item.icon).unwrap_or_default();
                     shell.icons.insert(item.icon.clone(), uri);
                 }
-                shell.icons.get(&item.icon).filter(|u| !u.is_empty()).cloned()
+                shell
+                    .icons
+                    .get(&item.icon)
+                    .filter(|u| !u.is_empty())
+                    .cloned()
             };
-            DockItem { item, icon_uri: uri }
+            DockItem {
+                item,
+                icon_uri: uri,
+            }
         })
         .collect()
 }
@@ -114,7 +141,11 @@ pub fn refresh(app: &AppHandle) {
         shell.dock.refresh(&shell.dock_apps, &shell.niri);
     }
     let view = items(app);
-    eprintln!("DOCK view items={} running={}", view.len(), view.iter().filter(|i| i.item.running > 0).count());
+    eprintln!(
+        "DOCK view items={} running={}",
+        view.len(),
+        view.iter().filter(|i| i.item.running > 0).count()
+    );
     let _ = app.emit("dock-view", view);
 }
 
@@ -125,7 +156,8 @@ pub fn start(app: AppHandle) {
         let state = shell_state(&app);
         let mut guard = state.lock().expect("shell state");
         guard.dock_apps = apps::scan();
-        let pins = load_pins().unwrap_or_else(|| helix_shell_core::dock::Dock::default_pins(&guard.dock_apps));
+        let pins = load_pins()
+            .unwrap_or_else(|| helix_shell_core::dock::Dock::default_pins(&guard.dock_apps));
         guard.dock = helix_shell_core::dock::Dock::new(pins);
     }
     refresh(&app);
@@ -143,19 +175,34 @@ pub fn start(app: AppHandle) {
 
 fn follow(app: &AppHandle, stream: UnixStream) {
     for line in BufReader::new(stream).lines().map_while(Result::ok) {
-        let Ok(event) = serde_json::from_str::<Value>(&line) else { continue };
-        let changed = shell_state(app).lock().expect("shell state").niri.apply(&event);
+        let Ok(event) = serde_json::from_str::<Value>(&line) else {
+            continue;
+        };
+        let changed = shell_state(app)
+            .lock()
+            .expect("shell state")
+            .niri
+            .apply(&event);
         if changed {
             refresh(app);
         }
     }
 }
 
-fn run(app: &AppHandle, action: Result<Action, helix_shell_core::dock::RequestError>) -> Result<(), String> {
+fn run(
+    app: &AppHandle,
+    action: Result<Action, helix_shell_core::dock::RequestError>,
+) -> Result<(), String> {
     match action.map_err(|e| format!("{e:?}"))? {
         Action::Focus(id) => focus_window(id),
         Action::Launch(id) => {
-            let found = shell_state(app).lock().expect("shell state").dock_apps.iter().find(|a| a.id == id).cloned();
+            let found = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .dock_apps
+                .iter()
+                .find(|a| a.id == id)
+                .cloned();
             apps::launch(&found.ok_or("not installed")?)
         }
     }
@@ -168,7 +215,11 @@ pub fn dock_view(app: AppHandle) -> Vec<DockItem> {
 
 #[tauri::command]
 pub fn dock_activate(app: AppHandle, id: String) -> Result<(), String> {
-    let action = shell_state(&app).lock().expect("shell state").dock.activate(&id);
+    let action = shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .dock
+        .activate(&id);
     eprintln!("DOCK activate {action:?}");
     let result = run(&app, action);
     if let Err(error) = &result {
@@ -179,12 +230,21 @@ pub fn dock_activate(app: AppHandle, id: String) -> Result<(), String> {
 
 #[tauri::command]
 pub fn dock_new_window(app: AppHandle, id: String) -> Result<(), String> {
-    let action = shell_state(&app).lock().expect("shell state").dock.launch_new(&id);
+    let action = shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .dock
+        .launch_new(&id);
     eprintln!("DOCK new window {action:?}");
     run(&app, action)
 }
 
-fn edit(app: &AppHandle, change: impl FnOnce(&mut helix_shell_core::dock::Dock) -> Result<(), helix_shell_core::dock::RequestError>) -> Result<(), String> {
+fn edit(
+    app: &AppHandle,
+    change: impl FnOnce(
+        &mut helix_shell_core::dock::Dock,
+    ) -> Result<(), helix_shell_core::dock::RequestError>,
+) -> Result<(), String> {
     let pins = {
         let state = shell_state(app);
         let mut shell = state.lock().expect("shell state");

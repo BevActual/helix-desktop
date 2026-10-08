@@ -20,7 +20,6 @@ if tauri; then
     screenshot-screen) exec niri msg action screenshot-screen ;;
     lock|lid-close)
       # swaylock speaks ext-session-lock-v1 (niri keeps the session locked even if the locker dies) and authenticates with PAM.
-      pgrep -x swaylock >/dev/null && exit 0
       exec swaylock --daemonize --color 0e1028 ;;
     settings) exec helix-settings ;;
     window-switcher) exec niri msg action focus-window-previous ;;

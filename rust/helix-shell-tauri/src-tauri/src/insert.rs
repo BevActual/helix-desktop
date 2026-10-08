@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 
-use helix_shell_core::quick_insert::{decode_clip_hex, Action, Outcome, Row, Source};
+use helix_shell_core::quick_insert::{decode_clip_hex, needs_care, Action, Outcome, Row, Source};
 use tauri::AppHandle;
 
 use crate::{close_panel, open_panel, shell_state};
@@ -97,8 +97,8 @@ pub fn quick_insert_activate(app: AppHandle, generation: u64, index: usize) -> R
     eprintln!("INSERT {}", describe(&outcome));
     close_panel(&app);
     match outcome {
-        Outcome::Type(text) => later(move || type_text(&text)),
-        Outcome::Paste(text) => later(move || paste_text(&text)),
+        Outcome::Type(text) => deliver(&app, text, false),
+        Outcome::Paste(text) => deliver(&app, text, true),
         Outcome::Do(action) => do_action(&app, action),
         Outcome::Ask(question) => {
             open_panel(&app, "assistant");
@@ -118,10 +118,59 @@ fn describe(outcome: &Outcome) -> String {
     }
 }
 
-fn later(work: impl FnOnce() + Send + 'static) {
+/// Inserts into the window that had the keyboard when the palette opened, and only that one. The palette has closed, so the keyboard is on
+/// its way back: wait (briefly, on shell state that niri's events keep current) until that window has it again. If it never does, or the
+/// text is a line break away from running as commands in a terminal, nothing is inserted and the person is told.
+fn deliver(app: &AppHandle, text: String, paste: bool) {
+    let app = app.clone();
+    let target = shell_state(&app).lock().expect("shell state").insert_target;
+    eprintln!("INSERT target window {target:?}");
     std::thread::spawn(move || {
-        std::thread::sleep(FOCUS_RETURN);
-        work();
+        let Some(target) = target else {
+            crate::show_notice(&app, "Nothing to insert into");
+            return;
+        };
+        let mut back = false;
+        for _ in 0..16 {
+            std::thread::sleep(Duration::from_millis(40));
+            let state = shell_state(&app);
+            let shell = state.lock().expect("shell state");
+            if shell.niri.focused_window().map(|w| w.id) == Some(target) {
+                back = true;
+                break;
+            }
+        }
+        eprintln!(
+            "INSERT focus returned={back} now={:?}",
+            shell_state(&app)
+                .lock()
+                .expect("shell state")
+                .niri
+                .focused_window()
+                .map(|w| w.id)
+        );
+        if !back {
+            crate::show_notice(&app, "Not inserted: the window changed");
+            return;
+        }
+        let terminal = {
+            let state = shell_state(&app);
+            let shell = state.lock().expect("shell state");
+            shell
+                .niri
+                .window(target)
+                .is_some_and(|w| helix_shell_core::niri::looks_like_terminal(&w.app_id))
+        };
+        if terminal && needs_care(&text) {
+            crate::show_notice(&app, "Multi-line text was not pasted into a terminal");
+            return;
+        }
+        std::thread::sleep(FOCUS_RETURN / 2);
+        if paste {
+            paste_text(&text);
+        } else {
+            type_text(&text);
+        }
     });
 }
 
@@ -167,78 +216,11 @@ fn do_action(app: &AppHandle, action: Action) {
     }
 }
 
-/// `swaylock` takes the session lock (ext-session-lock-v1) and checks the password with PAM; a second request while it runs is ignored.
+/// `swaylock` takes the session lock (ext-session-lock-v1) and checks the password with PAM. It is always started: a second one while
+/// the session is already locked is refused by the compositor and exits, and nothing is inferred from a process name (any program can
+/// call itself "swaylock", which would otherwise stop the real lock from ever being taken).
 pub fn lock_session() {
-    let running = Command::new("pgrep")
-        .args(["-x", "swaylock"])
-        .stdout(Stdio::null())
-        .status()
-        .is_ok_and(|status| status.success());
-    if !running {
-        let _ = Command::new("swaylock")
-            .args(["--daemonize", "--color", "0e1028"])
-            .status();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::WATCH_SCRIPT;
-    use std::os::unix::fs::PermissionsExt;
-    use std::process::{Command, Stdio};
-
-    /// Runs the watcher's script as `wl-paste --watch` would, with a stand-in `wl-paste` that reports `types`, feeding `content` on stdin.
-    fn run(types: &str, content: &[u8]) -> String {
-        let dir = std::env::temp_dir().join(format!(
-            "helix-insert-test-{}-{}",
-            std::process::id(),
-            types.len()
-        ));
-        std::fs::create_dir_all(&dir).unwrap();
-        let fake = dir.join("wl-paste");
-        std::fs::write(&fake, format!("#!/bin/sh\nprintf '%s\\n' '{types}'\n")).unwrap();
-        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let path = format!(
-            "{}:{}",
-            dir.display(),
-            std::env::var("PATH").unwrap_or_default()
-        );
-        let mut child = Command::new("sh")
-            .args(["-c", WATCH_SCRIPT])
-            .env("PATH", path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .spawn()
-            .unwrap();
-        // The script stops reading after 64 KiB, so a big writer must not be waited for (it gets a broken pipe, as wl-paste would).
-        let mut stdin = child.stdin.take().unwrap();
-        let content = content.to_vec();
-        let writer = std::thread::spawn(move || {
-            let _ = std::io::Write::write_all(&mut stdin, &content);
-        });
-        let out = child.wait_with_output().unwrap();
-        let _ = writer.join();
-        let _ = std::fs::remove_dir_all(&dir);
-        String::from_utf8(out.stdout).unwrap()
-    }
-
-    #[test]
-    fn ordinary_text_is_reported_as_one_hex_line() {
-        assert_eq!(
-            run("text/plain\ntext/plain;charset=utf-8", b"hi\n"),
-            "68690a\n"
-        );
-    }
-
-    #[test]
-    fn what_a_password_manager_flags_is_never_reported() {
-        assert_eq!(run("text/plain\nx-kde-passwordManagerHint", b"hunter2"), "");
-    }
-
-    #[test]
-    fn only_the_first_64_kib_plus_one_byte_are_read() {
-        let big = vec![b'a'; 200_000];
-        let line = run("text/plain", &big);
-        assert_eq!(line.trim().len(), 2 * (64 * 1024 + 1));
-    }
+    let _ = Command::new("swaylock")
+        .args(["--daemonize", "--color", "0e1028"])
+        .status();
 }

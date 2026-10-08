@@ -35,7 +35,10 @@ pub struct ConfirmerView {
 /// An argument as a person would type it: bare when it is a plain word, otherwise in double quotes with `"` and `\` escaped, so where one
 /// argument ends and the next begins is always visible.
 fn quote_arg(arg: &str) -> String {
-    let plain = !arg.is_empty() && !arg.chars().any(|c| c.is_whitespace() || matches!(c, '"' | '\\' | '\''));
+    let plain = !arg.is_empty()
+        && !arg
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '"' | '\\' | '\''));
     if plain {
         arg.to_string()
     } else {
@@ -309,7 +312,10 @@ mod tests {
         );
         let view = panel.view(0);
         assert_eq!(view.kind, "grant");
-        assert_eq!(view.aside, "It calls itself “My Agent”.", "the identity is its own field, not part of the app's words");
+        assert_eq!(
+            view.aside, "It calls itself “My Agent”.",
+            "the identity is its own field, not part of the app's words"
+        );
         assert_eq!(view.identity, "exe:/x");
         assert_eq!(
             view.tiers
@@ -380,9 +386,18 @@ mod tests {
     #[test]
     fn arguments_are_shown_whole_and_quoted_where_they_could_run_together() {
         let (mut panel, _) = confirmer();
-        panel.requested(&action(1, json!(["plain", "two words", "", "say \"hi\"", "back\\slash"])), 0);
+        panel.requested(
+            &action(
+                1,
+                json!(["plain", "two words", "", "say \"hi\"", "back\\slash"]),
+            ),
+            0,
+        );
         let view = panel.view(0);
-        assert_eq!(view.detail, "clipboard-copy plain \"two words\" \"\" \"say \\\"hi\\\"\" \"back\\\\slash\"");
+        assert_eq!(
+            view.detail,
+            "clipboard-copy plain \"two words\" \"\" \"say \\\"hi\\\"\" \"back\\\\slash\""
+        );
         assert!(!view.incomplete);
     }
 
@@ -390,7 +405,9 @@ mod tests {
     fn an_argument_that_could_not_be_shown_whole_can_only_be_denied() {
         for args in [
             json!(["x".repeat(401)]),
-            json!(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q"]),
+            json!([
+                "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q"
+            ]),
             json!(["ok", 5]),
             json!(["bidi\u{202e}text"]),
         ] {
@@ -401,7 +418,10 @@ mod tests {
             assert!(view.detail.ends_with('…'));
             assert!(!panel.allow(1, ARMING_MS * 3), "approval must be refused");
             assert!(log.lock().unwrap().is_empty());
-            assert!(panel.deny(1, ARMING_MS * 3), "but denying is always possible");
+            assert!(
+                panel.deny(1, ARMING_MS * 3),
+                "but denying is always possible"
+            );
             assert_eq!(log.lock().unwrap()[0], (1, false, Vec::new()));
         }
     }
@@ -409,7 +429,9 @@ mod tests {
     #[test]
     fn four_hundred_characters_and_sixteen_arguments_are_still_reviewable() {
         let (mut panel, _) = confirmer();
-        let args: Vec<String> = (0..16).map(|i| format!("{i:02}{}", "y".repeat(398))).collect();
+        let args: Vec<String> = (0..16)
+            .map(|i| format!("{i:02}{}", "y".repeat(398)))
+            .collect();
         panel.requested(&action(1, json!(args)), 0);
         assert!(!panel.view(0).incomplete);
         assert!(panel.allow(1, ARMING_MS));
@@ -425,7 +447,10 @@ mod tests {
         let view = panel.view(0);
         assert_eq!(view.identity, "exe:/tmp/helix-settings");
         assert!(view.aside.contains("I am the real settings app"));
-        assert!(!view.aside.contains("/tmp/"), "the aside is the agent's words only");
+        assert!(
+            !view.aside.contains("/tmp/"),
+            "the aside is the agent's words only"
+        );
     }
 
     #[test]
@@ -447,8 +472,16 @@ mod tests {
         let (mut panel, _) = confirmer();
         panel.requested(&json!({"operation": 5, "kind": "grant", "client": "exe:/x", "tiers": ["observe", "confirm"]}), 0);
         panel.set_tier(9, "confirm", true);
-        assert!(!panel.view(0).tiers.iter().any(|t| t.name == "confirm" && t.checked));
+        assert!(!panel
+            .view(0)
+            .tiers
+            .iter()
+            .any(|t| t.name == "confirm" && t.checked));
         panel.set_tier(5, "confirm", true);
-        assert!(panel.view(0).tiers.iter().any(|t| t.name == "confirm" && t.checked));
+        assert!(panel
+            .view(0)
+            .tiers
+            .iter()
+            .any(|t| t.name == "confirm" && t.checked));
     }
 }

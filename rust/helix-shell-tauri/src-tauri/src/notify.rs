@@ -41,13 +41,17 @@ impl Server {
         actions: Vec<String>,
         hints: HashMap<String, OwnedValue>,
         expire_timeout: i32,
+        #[zbus(header)] header: zbus::message::Header<'_>,
     ) -> u32 {
+        // The sender is the bus connection that made the call: it cannot be chosen by the caller, unlike the name it gives itself.
+        let owner = header.sender().map(ToString::to_string).unwrap_or_default();
         let urgency = hints
             .get("urgency")
             .and_then(|value| u8::try_from(value.clone()).ok())
             .map_or(Urgency::Normal, Urgency::from_hint);
         let app_label: String = app_name.chars().take(20).collect();
         let incoming = Incoming {
+            owner,
             app: app_name,
             replaces: replaces_id,
             summary,
@@ -222,12 +226,17 @@ pub async fn notification_clear(app: AppHandle) {
 
 /// Presses the `index`th button of a live notification. The key sent to the application comes from the store, never from here.
 #[tauri::command]
-pub async fn notification_invoke(app: AppHandle, id: u32, index: usize) -> Result<(), String> {
+pub async fn notification_invoke(
+    app: AppHandle,
+    id: u32,
+    revision: u32,
+    index: usize,
+) -> Result<(), String> {
     let events = shell_state(&app)
         .lock()
         .expect("shell state")
         .notifications
-        .invoke(id, index)
+        .invoke(id, revision, index)
         .map_err(refused)?;
     changed(&app, events).await;
     Ok(())

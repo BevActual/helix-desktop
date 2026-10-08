@@ -15,6 +15,12 @@ pub const MAX_CLIPS: usize = 50;
 pub const MAX_CLIP_BYTES: usize = 64 * 1024;
 pub const MAX_QUESTION_CHARS: usize = 500;
 
+/// Text with a line break or a control character: pasted into a terminal that does not guard against it, it runs as commands.
+pub fn needs_care(text: &str) -> bool {
+    text.chars()
+        .any(|c| c == '\n' || c == '\r' || (c.is_control() && c != '\t'))
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {
@@ -760,5 +766,15 @@ mod tests {
         assert_eq!(stem("cats"), "cat");
         assert_eq!(stem("dogs"), "dog");
         assert_eq!(stem("bed"), "bed");
+    }
+
+    #[test]
+    fn text_with_line_breaks_or_control_characters_needs_care() {
+        assert!(!needs_care("one line, tabs\tare fine"));
+        assert!(needs_care("a\nb"));
+        assert!(needs_care("a\rb"));
+        assert!(needs_care("a\u{1b}[31mb"));
+        assert!(needs_care("a\u{7}b"));
+        assert!(!needs_care("unicode ✓ and emoji 🍕"));
     }
 }

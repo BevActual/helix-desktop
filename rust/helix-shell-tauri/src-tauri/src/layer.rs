@@ -146,8 +146,17 @@ pub fn apply(app: &AppHandle, plan: Plan) {
 /// Replaces the extra pointer-taking rectangles and re-applies the region. Must run on the main thread.
 pub fn set_extra_input(app: &AppHandle, rects: &[helix_shell_core::glass::Rect]) {
     *EXTRA.lock().expect("extra input") = rects.iter().map(|r| (r.x, r.y, r.w, r.h)).collect();
-    let Some(window) = app.get_webview_window(WINDOW) else { return };
-    let Ok(gtk_window) = window.gtk_window() else { return };
+    let Some(window) = app.get_webview_window(WINDOW) else {
+        return;
+    };
+    let Ok(gtk_window) = window.gtk_window() else {
+        return;
+    };
     let region = *INPUT.lock().expect("input region");
-    set_input_region(&gtk_window, region, gtk_window.allocated_width(), gtk_window.allocated_height());
+    set_input_region(
+        &gtk_window,
+        region,
+        gtk_window.allocated_width(),
+        gtk_window.allocated_height(),
+    );
 }

@@ -7,6 +7,8 @@ use serde::Deserialize;
 /// More glass elements than this are never on screen at once (bar, one panel, a few toasts).
 pub const MAX_ELEMENTS: usize = 16;
 pub const MAX_RADIUS: f64 = 64.0;
+/// Coordinates beyond this are nonsense for a screen and are dropped before any integer arithmetic can overflow.
+const MAX_COORDINATE: f64 = 1.0e6;
 
 /// One glass element as the page measured it (CSS pixels, which are surface pixels here).
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -36,7 +38,7 @@ pub fn blur_rects(elements: &[Glass], width: i32, height: i32) -> Vec<Rect> {
     for glass in elements.iter().take(MAX_ELEMENTS) {
         if ![glass.x, glass.y, glass.w, glass.h, glass.radius]
             .iter()
-            .all(|v| v.is_finite())
+            .all(|v| v.is_finite() && v.abs() <= MAX_COORDINATE)
         {
             continue;
         }
@@ -261,5 +263,21 @@ mod tests {
             let bottom = (0..120).filter(|&x| covers(&rects, x, 79 - dy)).count();
             assert_eq!(top, bottom, "row {dy}");
         }
+    }
+
+    #[test]
+    fn coordinates_that_could_overflow_integer_arithmetic_are_dropped() {
+        let hostile = [
+            glass(2_147_483_647.0, 0.0, -4_294_967_295.0, 1.0, 0.0),
+            glass(0.0, 0.0, 1.0e12, 10.0, 0.0),
+            glass(-1.0e9, 0.0, 10.0, 10.0, 0.0),
+            glass(0.0, 0.0, 10.0, 10.0, 1.0e9),
+        ];
+        assert!(blur_rects(&hostile, 1000, 800).is_empty());
+        assert_eq!(
+            blur_rects(&[glass(0.0, 0.0, 999_999.0, 10.0, 0.0)], 1000, 800).len(),
+            1,
+            "large but sane is clamped, not dropped"
+        );
     }
 }

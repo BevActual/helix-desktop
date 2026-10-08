@@ -17,6 +17,13 @@ pub const FLOOD_WINDOW_MS: u64 = 10_000;
 pub const DEFAULT_TOAST_MS: u64 = 6_000;
 pub const MAX_TOAST_MS: u64 = 15_000;
 const MAX_KEY: usize = 64;
+/// Text is cut to this many characters *before* it is parsed, so a hostile body costs a bounded amount of work.
+const MAX_RAW_SUMMARY: usize = 600;
+const MAX_RAW_BODY: usize = 3000;
+/// A tag is at most this long; a `<` with no `>` close by is just a character.
+const MAX_TAG: usize = 64;
+/// The most flood-history entries kept, whatever is thrown at the store.
+const MAX_RECENT: usize = 4 * FLOOD_LIMIT;
 
 pub const CLOSED_EXPIRED: u32 = 1;
 pub const CLOSED_DISMISSED: u32 = 2;
@@ -44,6 +51,8 @@ impl Urgency {
 /// One `Notify` call, as received.
 #[derive(Clone, Debug)]
 pub struct Incoming {
+    /// The bus connection that sent it (unforgeable, unlike the name it gives itself). Empty when unknown.
+    pub owner: String,
     pub app: String,
     pub replaces: u32,
     pub summary: String,
@@ -65,6 +74,9 @@ pub enum Event {
 #[derive(Clone, Debug)]
 struct Item {
     id: u32,
+    owner: String,
+    /// Starts at 1 and grows each time the notification is replaced: a click is only honoured for the revision that was on screen.
+    revision: u32,
     app: String,
     summary: String,
     body: String,
@@ -94,6 +106,7 @@ pub struct ActionView {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ItemView {
     pub id: u32,
+    pub revision: u32,
     pub app: String,
     pub summary: String,
     pub body: String,
@@ -116,6 +129,8 @@ pub struct NotificationsView {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RequestError {
     Unknown,
+    /// The notification was replaced after the person saw it, so the click was for something else.
+    Stale,
     NotLive,
     NoSuchAction,
 }
@@ -128,17 +143,22 @@ pub fn plain_text(markup: &str) -> String {
     while let Some(start) = rest.find('<') {
         out.push_str(&rest[..start]);
         let tail = &rest[start..];
-        let known = tail.find('>').and_then(|end| {
-            let name: String = tail[1..end]
-                .trim_start_matches('/')
-                .chars()
-                .take_while(|c| c.is_ascii_alphabetic())
-                .collect::<String>()
-                .to_ascii_lowercase();
-            ["b", "i", "u", "a", "img", "br"]
-                .contains(&name.as_str())
-                .then_some(end)
-        });
+        let known = tail
+            .char_indices()
+            .take(MAX_TAG)
+            .find(|(_, c)| *c == '>')
+            .map(|(end, _)| end)
+            .and_then(|end| {
+                let name: String = tail[1..end]
+                    .trim_start_matches('/')
+                    .chars()
+                    .take_while(|c| c.is_ascii_alphabetic())
+                    .collect::<String>()
+                    .to_ascii_lowercase();
+                ["b", "i", "u", "a", "img", "br"]
+                    .contains(&name.as_str())
+                    .then_some(end)
+            });
         match known {
             Some(end) => rest = &tail[end + 1..],
             None => {
@@ -169,11 +189,15 @@ impl Notifications {
         id
     }
 
-    fn flooding(&mut self, app: &str, now: u64) -> bool {
+    /// Keyed by who sent it (the bus connection), so renaming itself does not buy a sender a fresh allowance. The history is bounded.
+    fn flooding(&mut self, key: &str, now: u64) -> bool {
         self.recent
             .retain(|(_, at)| now.saturating_sub(*at) < FLOOD_WINDOW_MS);
-        let count = self.recent.iter().filter(|(name, _)| name == app).count();
-        self.recent.push((app.to_string(), now));
+        let count = self.recent.iter().filter(|(name, _)| name == key).count();
+        self.recent.push((key.to_string(), now));
+        if self.recent.len() > MAX_RECENT {
+            self.recent.remove(0);
+        }
         count >= FLOOD_LIMIT
     }
 
@@ -181,14 +205,23 @@ impl Notifications {
     pub fn notify(&mut self, incoming: Incoming, now: u64) -> (u32, Vec<Event>) {
         let mut events = Vec::new();
         let app = sanitize_for_display(&incoming.app, 40);
-        let replaced =
-            incoming.replaces != 0 && self.items.iter().any(|item| item.id == incoming.replaces);
+        // Only the connection that posted a notification can replace it.
+        let replaced = incoming.replaces != 0
+            && self
+                .items
+                .iter()
+                .any(|item| item.id == incoming.replaces && item.owner == incoming.owner);
         let id = if replaced {
             incoming.replaces
         } else {
             self.fresh_id()
         };
-        if !replaced && self.flooding(&app, now) {
+        let flood_key = if incoming.owner.is_empty() {
+            app.clone()
+        } else {
+            incoming.owner.clone()
+        };
+        if !replaced && self.flooding(&flood_key, now) {
             return (id, events);
         }
         let mut actions = Vec::new();
@@ -210,11 +243,22 @@ impl Notifications {
             _ => Some(DEFAULT_TOAST_MS),
         };
         let toast_for = live_for.unwrap_or(MAX_TOAST_MS).clamp(1_000, MAX_TOAST_MS);
+        let cut = |text: &str, max: usize| -> String { text.chars().take(max).collect() };
+        let revision = self
+            .items
+            .iter()
+            .find(|existing| replaced && existing.id == id)
+            .map_or(1, |existing| existing.revision.saturating_add(1));
         let item = Item {
             id,
+            owner: incoming.owner.clone(),
+            revision,
             app: app.clone(),
-            summary: sanitize_for_display(&plain_text(&incoming.summary), 120),
-            body: sanitize_for_display(&plain_text(&incoming.body), 400),
+            summary: sanitize_for_display(
+                &plain_text(&cut(&incoming.summary, MAX_RAW_SUMMARY)),
+                120,
+            ),
+            body: sanitize_for_display(&plain_text(&cut(&incoming.body, MAX_RAW_BODY)), 400),
             actions,
             urgency: incoming.urgency,
             created: now,
@@ -230,8 +274,16 @@ impl Notifications {
         } else {
             self.items.push(item);
             // One application cannot crowd out the rest: its oldest go first.
-            while self.items.iter().filter(|i| i.app == app).count() > MAX_PER_APP {
-                if let Some(index) = self.items.iter().position(|i| i.app == app) {
+            // "Same sender" is the bus connection when known (a name it gives itself proves nothing), else the name.
+            let same = |i: &Item| {
+                if flood_key == app {
+                    i.app == app
+                } else {
+                    i.owner == incoming.owner
+                }
+            };
+            while self.items.iter().filter(|i| same(i)).count() > MAX_PER_APP {
+                if let Some(index) = self.items.iter().position(&same) {
                     let gone = self.items.remove(index);
                     events.push(Event::Closed {
                         id: gone.id,
@@ -282,12 +334,20 @@ impl Notifications {
     }
 
     /// The person pressed one of a live notification's buttons. The key comes from the stored list, never from the caller.
-    pub fn invoke(&mut self, id: u32, index: usize) -> Result<Vec<Event>, RequestError> {
+    pub fn invoke(
+        &mut self,
+        id: u32,
+        revision: u32,
+        index: usize,
+    ) -> Result<Vec<Event>, RequestError> {
         let item = self
             .items
             .iter()
             .find(|item| item.id == id)
             .ok_or(RequestError::Unknown)?;
+        if item.revision != revision {
+            return Err(RequestError::Stale);
+        }
         if !item.live {
             return Err(RequestError::NotLive);
         }
@@ -343,6 +403,7 @@ impl Notifications {
     pub fn view(&self, now: u64) -> NotificationsView {
         let row = |item: &Item| ItemView {
             id: item.id,
+            revision: item.revision,
             app: item.app.clone(),
             summary: item.summary.clone(),
             body: item.body.clone(),
@@ -387,6 +448,7 @@ mod tests {
 
     fn incoming(app: &str, summary: &str) -> Incoming {
         Incoming {
+            owner: String::new(),
             app: app.into(),
             replaces: 0,
             summary: summary.into(),
@@ -475,7 +537,7 @@ mod tests {
             ["Reply", "B", "C", "D"],
             "default has no button, at most four, empty keys dropped"
         );
-        let events = n.invoke(id, 0).unwrap();
+        let events = n.invoke(id, 1, 0).unwrap();
         assert_eq!(
             events,
             vec![
@@ -489,7 +551,7 @@ mod tests {
                 }
             ]
         );
-        assert_eq!(n.invoke(id, 0), Err(RequestError::Unknown));
+        assert_eq!(n.invoke(id, 1, 0), Err(RequestError::Unknown));
     }
 
     #[test]
@@ -498,8 +560,8 @@ mod tests {
         let mut with = incoming("A", "x");
         with.actions = vec!["k".into(), "Label".into()];
         let (id, _) = n.notify(with, 0);
-        assert_eq!(n.invoke(id, 1), Err(RequestError::NoSuchAction));
-        assert!(n.invoke(id, 0).is_ok());
+        assert_eq!(n.invoke(id, 1, 1), Err(RequestError::NoSuchAction));
+        assert!(n.invoke(id, 1, 0).is_ok());
     }
 
     #[test]
@@ -521,7 +583,7 @@ mod tests {
         let view = n.view(2500);
         assert_eq!(view.items.len(), 1);
         assert!(view.items[0].actions.is_empty());
-        assert_eq!(n.invoke(id, 0), Err(RequestError::NotLive));
+        assert_eq!(n.invoke(id, 1, 0), Err(RequestError::NotLive));
         assert!(view.toasts.is_empty());
     }
 
@@ -760,6 +822,118 @@ mod tests {
                 id,
                 reason: CLOSED_EXPIRED
             }]
+        );
+    }
+
+    fn from(owner: &str, app: &str, summary: &str) -> Incoming {
+        Incoming {
+            owner: owner.into(),
+            ..incoming(app, summary)
+        }
+    }
+
+    #[test]
+    fn only_the_sender_can_replace_its_own_notification() {
+        let mut n = Notifications::new();
+        let (id, _) = n.notify(from(":1.10", "Mail", "mine"), 0);
+        let mut hijack = from(":1.99", "Mail", "forged");
+        hijack.replaces = id;
+        let (other, _) = n.notify(hijack, 1);
+        assert_ne!(
+            other, id,
+            "someone else's replace request makes a new notification"
+        );
+        let view = n.view(1);
+        assert_eq!(view.items.len(), 2);
+        assert!(view.items.iter().any(|i| i.id == id && i.summary == "mine"));
+        let mut honest = from(":1.10", "Mail", "updated");
+        honest.replaces = id;
+        assert_eq!(n.notify(honest, 2).0, id);
+    }
+
+    #[test]
+    fn a_click_is_only_honoured_for_the_revision_that_was_shown() {
+        let mut n = Notifications::new();
+        let mut first = from(":1.1", "A", "x");
+        first.actions = vec!["safe".into(), "Open".into()];
+        let (id, _) = n.notify(first, 0);
+        let shown = n.view(0).items[0].revision;
+        let mut changed = from(":1.1", "A", "x");
+        changed.replaces = id;
+        changed.actions = vec!["danger".into(), "Open".into()];
+        n.notify(changed, 1);
+        assert_eq!(
+            n.invoke(id, shown, 0),
+            Err(RequestError::Stale),
+            "index 0 now means something else"
+        );
+        let now = n.view(1).items[0].revision;
+        assert_eq!(now, shown + 1);
+        let events = n.invoke(id, now, 0).unwrap();
+        assert_eq!(
+            events[0],
+            Event::ActionInvoked {
+                id,
+                key: "danger".into()
+            }
+        );
+    }
+
+    #[test]
+    fn renaming_does_not_buy_a_sender_a_new_allowance() {
+        let mut n = Notifications::new();
+        let mut stored = 0;
+        for i in 0..(FLOOD_LIMIT + 30) {
+            let before = n.view(0).items.len();
+            n.notify(from(":1.5", &format!("Name{i}"), "spam"), 0);
+            stored += usize::from(n.view(0).items.len() > before);
+        }
+        assert!(
+            n.view(0).items.len() <= MAX_PER_APP,
+            "one connection stays under the per-sender cap"
+        );
+        let _ = stored;
+        // A different connection is unaffected.
+        let before = n.view(0).items.len();
+        n.notify(from(":1.6", "Calm", "hello"), 0);
+        assert_eq!(n.view(0).items.len(), before + 1);
+    }
+
+    #[test]
+    fn the_flood_memory_cannot_grow_without_bound() {
+        let mut n = Notifications::new();
+        for i in 0..5_000 {
+            n.notify(from(&format!(":1.{}", i % 7), "x", "y"), 0);
+        }
+        assert!(n.recent.len() <= MAX_RECENT, "{}", n.recent.len());
+    }
+
+    #[test]
+    fn hostile_markup_costs_bounded_work_and_stays_bounded() {
+        let mut n = Notifications::new();
+        let mut hostile = incoming("A", &"<".repeat(1_000_000));
+        hostile.body = "<".repeat(5_000_000);
+        let start = std::time::Instant::now();
+        n.notify(hostile, 0);
+        assert!(
+            start.elapsed() < std::time::Duration::from_millis(500),
+            "{:?}",
+            start.elapsed()
+        );
+        let view = n.view(0);
+        assert!(
+            view.items[0].body.chars().count() <= 401
+                && view.items[0].summary.chars().count() <= 121
+        );
+    }
+
+    #[test]
+    fn a_tag_must_be_short_to_be_stripped() {
+        assert_eq!(plain_text("<b>bold</b>"), "bold");
+        let long = format!("<a {}>text", "x".repeat(100));
+        assert!(
+            plain_text(&long).starts_with("<a xxx"),
+            "an over-long tag is just text"
         );
     }
 }

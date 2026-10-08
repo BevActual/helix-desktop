@@ -89,7 +89,11 @@ pub fn parse_desktop_entry(id: &str, text: &str) -> Option<App> {
         keywords: list(fields.get("Keywords").copied().unwrap_or("")),
         argv,
         terminal: truthy("Terminal"),
-        startup_wm_class: fields.get("StartupWMClass").copied().unwrap_or("").to_string(),
+        startup_wm_class: fields
+            .get("StartupWMClass")
+            .copied()
+            .unwrap_or("")
+            .to_string(),
         only_show_in: list(fields.get("OnlyShowIn").copied().unwrap_or("")),
         not_show_in: list(fields.get("NotShowIn").copied().unwrap_or("")),
     })

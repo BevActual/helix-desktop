@@ -464,3 +464,27 @@ bottom centre (the `osd` event; it never takes the pointer, and counts as glass 
 (the dimmest is 5%), never above the maximum, NaN changes nothing. The backlight is read from sysfs and written through logind (`SetBrightness`), so no root is needed;
 `HELIX_BACKLIGHT_DIR` stands in for the device in tests and nested sessions, which never touch the real one. Volume up unmutes. The sliders' native range inputs have a
 zero-width thumb so a click maps linearly onto the value (what you point at is where the fill ends). A negative argument to `busctl` must follow `--`.
+
+## Dock, and an independent security review (2026-10-07)
+
+**Dock.** `helix_shell_core::niri` models niri's event stream (windows, workspaces; text from applications bounded, at most 512 windows) and
+`helix_shell_core::dock` turns installed applications plus open windows into the dock: pinned first, then whatever is open, matched by the app id a
+window announces (desktop file name, `StartupWMClass`, or the program it runs); an unmatched window still gets a place. A click starts an application
+or focuses one of its windows (the next one if it already has the keyboard); middle click opens another window; the menu pins and unpins, saved in
+`~/.config/helix/dock.json` (0600). The dock stays hidden until the pointer touches the bottom edge: while hidden only a 5 px strip takes the pointer
+(`report_interactive`; the shell is one full-output surface, so the input region is the bar plus whatever the page names), and the page, which can only
+send back ids the dock listed, never holds a command line. niri is spoken to over `$NIRI_SOCKET` (a long-lived event-stream connection, no polling, and a
+short one per action). `tools/nested/dock-test.sh` drives it with a real pointer against two fake applications.
+Accepted limitation: a window's app id is its own claim, so an application that calls itself `org.gnome.Nautilus` gets Files' icon. Matching windows
+to the process they run (niri gives the pid) would close it; not done.
+
+**Review.** An independent read-only review (codex, `--sandbox read-only`) of the trust-boundary code found, and these were fixed with tests that fail
+without the fix: the approval dialog cut arguments the service would run in full (now whole arguments or Allow is refused, quoted so boundaries show,
+and the verified identity is always its own line); a click on Allow carried no operation id (every decision now names the request on screen); a
+notification could be replaced by another sender and a click bound to a replaced notification (sender ownership and revisions); notification markup
+and flood memory were unbounded (cut before parsing, tag length bounded, history capped, flood keyed by bus connection); a process named `swaylock`
+could stop the real lock (the guard is gone; swaylock refuses a second lock itself); palette text could land in a different window than the one it
+was opened over (the target window is captured at open and verified before inserting) or run as commands in a terminal (multi-line text is refused
+into a terminal); `glass` overflowed on absurd coordinates. Not changed: `org.helix.Shell1` accepts calls from any process on the session bus. It is a
+UI interface (the same things a person's key binds do), not an authority boundary; confining agent processes away from the session bus except
+through Agent1 is a deployment requirement, recorded in `agent-and-inference.md`.

@@ -383,3 +383,10 @@ Verified nested (`tools/nested/activity-test.sh`, real service, real pointer, a 
 confirmer, an allowed action in the history, kill switch off refuses with "agent access is turned off" and on restores it, Revoke
 makes the next request fail with "no observe grant", Stop cancels a waiting request and closes its dialog. Shell memory with the
 panel open in the nested session: USS about 119 MB (PSS 172 MB without the service).
+
+### Confinement is a deployment requirement
+
+`org.helix.Shell1` (panels, volume, brightness, do-not-disturb, night light, dark theme) is served to the whole session bus: it does what a
+person's own key binds do and carries no grant check. An agent that can reach the session bus can call it, so agent processes must be confined
+(sandbox with no session-bus access except `org.helix.Desktop.Agent1`), not merely trusted to use Agent1. The model service already runs sandboxed;
+the assistant and any third-party agent must be packaged the same way before they are treated as untrusted-but-contained.

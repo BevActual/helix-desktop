@@ -188,7 +188,7 @@ function drawNotifications(view) {
     const acts = document.createElement("div");
     acts.className = "nacts";
     item.actions.forEach((action, j) => {
-      acts.append(actionButton(action.label, "notif-" + index + "-action-" + j, () => invoke("notification_invoke", { id: item.id, index: j })));
+      acts.append(actionButton(action.label, "notif-" + index + "-action-" + j, () => invoke("notification_invoke", { id: item.id, revision: item.revision, index: j })));
     });
     if (item.actions.length) text.append(acts);
     // Dismiss is a quiet corner button that appears when the row is pointed at, as in a notification centre.
@@ -651,15 +651,21 @@ $("back").onclick = () => showDetail(null);
 // The on-screen indicator for the volume and brightness keys: Rust says what changed and to what; this draws it for a moment.
 let osdTimer = null;
 listen("osd", (event) => {
-  const { kind, percent, muted } = event.payload;
+  const { kind, percent, muted, text } = event.payload;
   const osd = $("osd");
-  swapIcon(slot("osd-ico"), kind === "brightness" ? "sun" : muted || percent === 0 ? "volume-mute" : "volume");
-  osd.style.setProperty("--pct", percent + "%");
-  osd.classList.toggle("muted", !!muted);
-  $("osd-val").textContent = muted ? "Muted" : percent + "%";
+  osd.classList.toggle("notice", kind === "notice");
+  if (kind === "notice") {
+    swapIcon(slot("osd-ico"), "shield");
+    $("osd-text").textContent = text || "";
+  } else {
+    swapIcon(slot("osd-ico"), kind === "brightness" ? "sun" : muted || percent === 0 ? "volume-mute" : "volume");
+    osd.style.setProperty("--pct", percent + "%");
+    osd.classList.toggle("muted", !!muted);
+    $("osd-val").textContent = muted ? "Muted" : percent + "%";
+  }
   osd.classList.add("show");
   clearTimeout(osdTimer);
-  osdTimer = setTimeout(() => osd.classList.remove("show"), 1500);
+  osdTimer = setTimeout(() => osd.classList.remove("show"), kind === "notice" ? 3200 : 1500);
 });
 new MutationObserver(() => queueGlass()).observe($("osd"), { attributes: true, attributeFilter: ["class"] });
 

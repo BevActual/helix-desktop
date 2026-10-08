@@ -6,6 +6,11 @@ use std::collections::BTreeMap;
 
 use serde_json::Value;
 
+/// What is kept of what applications write, and how many windows: an application cannot make the model grow without bound.
+pub const MAX_WINDOWS: usize = 512;
+const MAX_APP_ID: usize = 120;
+const MAX_TITLE: usize = 300;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Window {
     pub id: u64,
@@ -33,8 +38,14 @@ pub struct Niri {
     workspaces: BTreeMap<u64, Workspace>,
 }
 
-fn text(value: &Value, key: &str) -> String {
-    value.get(key).and_then(Value::as_str).unwrap_or("").to_string()
+fn text(value: &Value, key: &str, max_chars: usize) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .chars()
+        .take(max_chars)
+        .collect()
 }
 
 fn flag(value: &Value, key: &str) -> bool {
@@ -44,8 +55,8 @@ fn flag(value: &Value, key: &str) -> bool {
 fn window(value: &Value) -> Option<Window> {
     Some(Window {
         id: value.get("id")?.as_u64()?,
-        app_id: text(value, "app_id"),
-        title: text(value, "title"),
+        app_id: text(value, "app_id", MAX_APP_ID),
+        title: text(value, "title", MAX_TITLE),
         workspace: value.get("workspace_id").and_then(Value::as_u64),
         focused: flag(value, "is_focused"),
         urgent: flag(value, "is_urgent"),
@@ -56,8 +67,14 @@ fn workspace(value: &Value) -> Option<Workspace> {
     Some(Workspace {
         id: value.get("id")?.as_u64()?,
         idx: value.get("idx").and_then(Value::as_u64).unwrap_or(0),
-        name: value.get("name").and_then(Value::as_str).map(str::to_string),
-        output: value.get("output").and_then(Value::as_str).map(str::to_string),
+        name: value
+            .get("name")
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        output: value
+            .get("output")
+            .and_then(Value::as_str)
+            .map(str::to_string),
         active: flag(value, "is_active"),
         focused: flag(value, "is_focused"),
         urgent: flag(value, "is_urgent"),
@@ -76,7 +93,13 @@ impl Niri {
                 self.windows = body
                     .get("windows")
                     .and_then(Value::as_array)
-                    .map(|list| list.iter().filter_map(window).map(|w| (w.id, w)).collect())
+                    .map(|list| {
+                        list.iter()
+                            .filter_map(window)
+                            .take(MAX_WINDOWS)
+                            .map(|w| (w.id, w))
+                            .collect()
+                    })
                     .unwrap_or_default();
             }
             "WindowOpenedOrChanged" => {
@@ -86,7 +109,10 @@ impl Niri {
                             other.focused = false;
                         }
                     }
-                    self.windows.insert(opened.id, opened);
+                    // A new window beyond the cap is not tracked; one already known is always updated.
+                    if self.windows.len() < MAX_WINDOWS || self.windows.contains_key(&opened.id) {
+                        self.windows.insert(opened.id, opened);
+                    }
                 }
             }
             "WindowClosed" => {
@@ -101,7 +127,10 @@ impl Niri {
                 }
             }
             "WindowUrgencyChanged" => {
-                if let (Some(id), Some(urgent)) = (body.get("id").and_then(Value::as_u64), body.get("urgent").and_then(Value::as_bool)) {
+                if let (Some(id), Some(urgent)) = (
+                    body.get("id").and_then(Value::as_u64),
+                    body.get("urgent").and_then(Value::as_bool),
+                ) {
                     if let Some(w) = self.windows.get_mut(&id) {
                         w.urgent = urgent;
                     }
@@ -111,12 +140,20 @@ impl Niri {
                 self.workspaces = body
                     .get("workspaces")
                     .and_then(Value::as_array)
-                    .map(|list| list.iter().filter_map(workspace).map(|w| (w.id, w)).collect())
+                    .map(|list| {
+                        list.iter()
+                            .filter_map(workspace)
+                            .map(|w| (w.id, w))
+                            .collect()
+                    })
                     .unwrap_or_default();
             }
             "WorkspaceActivated" => {
                 if let Some(id) = body.get("id").and_then(Value::as_u64) {
-                    let focused = body.get("focused").and_then(Value::as_bool).unwrap_or(false);
+                    let focused = body
+                        .get("focused")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
                     let output = self.workspaces.get(&id).and_then(|w| w.output.clone());
                     for w in self.workspaces.values_mut() {
                         if w.output == output {
@@ -144,9 +181,44 @@ impl Niri {
         list
     }
 
+    /// The window that has the keyboard, if one does (none while a layer-shell surface such as the launcher holds it).
+    pub fn focused_window(&self) -> Option<&Window> {
+        self.windows.values().find(|w| w.focused)
+    }
+
     pub fn window(&self, id: u64) -> Option<&Window> {
         self.windows.get(&id)
     }
+}
+
+/// Whether a window's app id looks like a terminal emulator. A pasted line break runs a command there unless the terminal protects
+/// against it, so the palette treats these windows with extra care. A false positive only makes the palette stricter.
+pub fn looks_like_terminal(app_id: &str) -> bool {
+    const NAMES: &[&str] = &[
+        "terminal",
+        "foot",
+        "kitty",
+        "alacritty",
+        "wezterm",
+        "konsole",
+        "xterm",
+        "ghostty",
+        "warp",
+        "tilix",
+        "terminator",
+        "urxvt",
+        "rxvt",
+        "ptyxis",
+        "blackbox",
+        "rio",
+        "st-256color",
+        "cool-retro-term",
+        "hyper",
+        "tabby",
+        "contour",
+    ];
+    let id = app_id.to_lowercase();
+    NAMES.iter().any(|name| id.contains(name))
 }
 
 #[cfg(test)]
@@ -207,7 +279,10 @@ mod tests {
         let mut n = started();
         assert!(n.apply(&json!({"WindowUrgencyChanged": {"id": 1, "urgent": true}})));
         assert!(n.window(1).unwrap().urgent);
-        assert!(!n.apply(&json!({"WindowUrgencyChanged": {"id": 1, "urgent": true}})), "no change is reported as none");
+        assert!(
+            !n.apply(&json!({"WindowUrgencyChanged": {"id": 1, "urgent": true}})),
+            "no change is reported as none"
+        );
     }
 
     #[test]
@@ -219,12 +294,24 @@ mod tests {
             {"id": 9, "idx": 1, "name": null, "output": "HDMI-A-1", "is_active": true, "is_focused": false, "is_urgent": false}
         ]}}));
         let order: Vec<u64> = n.workspaces().iter().map(|w| w.id).collect();
-        assert_eq!(order, [9, 5, 7], "grouped by output, then by position on it");
+        assert_eq!(
+            order,
+            [9, 5, 7],
+            "grouped by output, then by position on it"
+        );
         assert!(n.apply(&json!({"WorkspaceActivated": {"id": 7, "focused": true}})));
-        let by: BTreeMap<u64, (bool, bool)> = n.workspaces().iter().map(|w| (w.id, (w.active, w.focused))).collect();
+        let by: BTreeMap<u64, (bool, bool)> = n
+            .workspaces()
+            .iter()
+            .map(|w| (w.id, (w.active, w.focused)))
+            .collect();
         assert_eq!(by[&7], (true, true));
         assert_eq!(by[&5], (false, false));
-        assert_eq!(by[&9], (true, false), "another output's active workspace is untouched");
+        assert_eq!(
+            by[&9],
+            (true, false),
+            "another output's active workspace is untouched"
+        );
     }
 
     #[test]
@@ -247,5 +334,66 @@ mod tests {
         assert_eq!(w.title, "a\u{202e}b", "sanitizing is the viewer's job");
         assert_eq!(w.workspace, None);
         assert!(!w.focused && !w.urgent, "missing flags mean no");
+    }
+
+    #[test]
+    fn what_applications_write_and_how_many_windows_are_bounded() {
+        let mut n = Niri::default();
+        n.apply(&json!({"WindowOpenedOrChanged": {"window": {"id": 1, "app_id": "a".repeat(5000), "title": "t".repeat(100_000)}}}));
+        let w = n.window(1).unwrap();
+        assert!(w.app_id.chars().count() <= 120 && w.title.chars().count() <= 300);
+        let many: Vec<Value> = (0..2000)
+            .map(|i| json!({"id": i + 10, "app_id": "x", "title": "t"}))
+            .collect();
+        n.apply(&json!({"WindowsChanged": {"windows": many}}));
+        assert_eq!(n.windows().count(), MAX_WINDOWS);
+        for i in 0..MAX_WINDOWS as u64 + 50 {
+            n.apply(&json!({"WindowOpenedOrChanged": {"window": {"id": 100_000 + i, "app_id": "y", "title": "t"}}}));
+        }
+        assert_eq!(
+            n.windows().count(),
+            MAX_WINDOWS,
+            "new windows beyond the cap are not tracked"
+        );
+        let known = n.windows().next().unwrap().id;
+        n.apply(&json!({"WindowOpenedOrChanged": {"window": {"id": known, "app_id": "renamed", "title": "t"}}}));
+        assert_eq!(
+            n.window(known).unwrap().app_id,
+            "renamed",
+            "one already known is still updated"
+        );
+    }
+
+    #[test]
+    fn the_focused_window_is_the_one_with_the_keyboard_if_any() {
+        let mut n = started();
+        assert_eq!(n.focused_window().map(|w| w.id), Some(2));
+        n.apply(&json!({"WindowFocusChanged": {"id": null}}));
+        assert!(n.focused_window().is_none());
+    }
+
+    #[test]
+    fn terminals_are_recognised_by_their_app_id() {
+        for yes in [
+            "Alacritty",
+            "foot",
+            "kitty",
+            "org.wezterm.wezterm",
+            "dev.warp.Warp",
+            "org.gnome.Terminal",
+            "com.mitchellh.ghostty",
+            "org.kde.konsole",
+        ] {
+            assert!(looks_like_terminal(yes), "{yes}");
+        }
+        for no in [
+            "org.gnome.Nautilus",
+            "brave-browser",
+            "cursor",
+            "",
+            "com.anthropic.Claude",
+        ] {
+            assert!(!looks_like_terminal(no), "{no}");
+        }
     }
 }

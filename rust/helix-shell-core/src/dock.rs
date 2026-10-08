@@ -78,7 +78,12 @@ fn matches(app: &App, window_app_id: &str) -> u8 {
     if stem(&app.id) == window || app.startup_wm_class.to_lowercase() == window {
         return 2;
     }
-    let program = app.argv.first().and_then(|p| p.rsplit('/').next()).unwrap_or("").to_lowercase();
+    let program = app
+        .argv
+        .first()
+        .and_then(|p| p.rsplit('/').next())
+        .unwrap_or("")
+        .to_lowercase();
     u8::from(program == window)
 }
 
@@ -95,7 +100,11 @@ impl Dock {
 
     /// What to pin on a first run: the preferred applications that are installed.
     pub fn default_pins(apps: &[App]) -> Vec<String> {
-        PREFERRED.iter().filter(|id| apps.iter().any(|a| a.id == **id)).map(|id| (*id).to_string()).collect()
+        PREFERRED
+            .iter()
+            .filter(|id| apps.iter().any(|a| a.id == **id))
+            .map(|id| (*id).to_string())
+            .collect()
     }
 
     pub fn pinned(&self) -> &[String] {
@@ -119,7 +128,13 @@ impl Dock {
             match apps.iter().find(|a| a.id == *id) {
                 Some(app) => items.push(new_item(&app.id, &app.name, &app.icon, true, true)),
                 // Pinned but no longer installed: keep its place so it comes back if the application does.
-                None => items.push(new_item(id, id.strip_suffix(".desktop").unwrap_or(id), "", false, true)),
+                None => items.push(new_item(
+                    id,
+                    id.strip_suffix(".desktop").unwrap_or(id),
+                    "",
+                    false,
+                    true,
+                )),
             }
         }
         for window in niri.windows() {
@@ -141,7 +156,11 @@ impl Dock {
                     match items.iter().position(|i| i.id == key) {
                         Some(index) => index,
                         None => {
-                            let name = if window.app_id.is_empty() { "Window" } else { &window.app_id };
+                            let name = if window.app_id.is_empty() {
+                                "Window"
+                            } else {
+                                &window.app_id
+                            };
                             items.push(new_item(&key, name, "", false, false));
                             items.len() - 1
                         }
@@ -175,16 +194,25 @@ impl Dock {
     }
 
     fn item(&self, id: &str) -> Result<&Item, RequestError> {
-        self.items.iter().find(|i| i.id == id).ok_or(RequestError::Unknown)
+        self.items
+            .iter()
+            .find(|i| i.id == id)
+            .ok_or(RequestError::Unknown)
     }
 
     /// What clicking the icon does: bring a window forward (the next one, if this application already has the focus), or start it.
     pub fn activate(&self, id: &str) -> Result<Action, RequestError> {
         let item = self.item(id)?;
         if item.windows.is_empty() {
-            return if item.installed { Ok(Action::Launch(item.id.clone())) } else { Err(RequestError::NotInstalled) };
+            return if item.installed {
+                Ok(Action::Launch(item.id.clone()))
+            } else {
+                Err(RequestError::NotInstalled)
+            };
         }
-        let position = item.focused_window.and_then(|w| item.windows.iter().position(|x| *x == w));
+        let position = item
+            .focused_window
+            .and_then(|w| item.windows.iter().position(|x| *x == w));
         let next = match position {
             Some(i) => item.windows[(i + 1) % item.windows.len()],
             None => item.windows[0],
@@ -234,7 +262,11 @@ impl Dock {
 
     /// The pinned order after dragging `id` to `to` (an index among the pinned items).
     pub fn move_pinned(&mut self, id: &str, to: usize) -> Result<(), RequestError> {
-        let from = self.pinned.iter().position(|p| p == id).ok_or(RequestError::Unknown)?;
+        let from = self
+            .pinned
+            .iter()
+            .position(|p| p == id)
+            .ok_or(RequestError::Unknown)?;
         let entry = self.pinned.remove(from);
         self.pinned.insert(to.min(self.pinned.len()), entry);
         Ok(())
@@ -248,16 +280,46 @@ mod tests {
     use serde_json::json;
 
     fn app(id: &str, name: &str, exec: &str, wm_class: &str) -> App {
-        let class = if wm_class.is_empty() { String::new() } else { format!("StartupWMClass={wm_class}\n") };
-        parse_desktop_entry(id, &format!("[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nIcon={name}\n{class}")).unwrap()
+        let class = if wm_class.is_empty() {
+            String::new()
+        } else {
+            format!("StartupWMClass={wm_class}\n")
+        };
+        parse_desktop_entry(
+            id,
+            &format!(
+                "[Desktop Entry]\nType=Application\nName={name}\nExec={exec}\nIcon={name}\n{class}"
+            ),
+        )
+        .unwrap()
     }
 
     fn apps() -> Vec<App> {
         vec![
-            app("org.gnome.Nautilus.desktop", "Files", "nautilus --new-window %U", ""),
-            app("brave-browser.desktop", "Brave", "/usr/bin/brave-browser-stable %U", "brave-browser"),
-            app("dev.warp.Warp.desktop", "Warp", "warp-terminal", "dev.warp.Warp"),
-            app("cursor.desktop", "Cursor", "/usr/share/cursor/cursor %F", "cursor"),
+            app(
+                "org.gnome.Nautilus.desktop",
+                "Files",
+                "nautilus --new-window %U",
+                "",
+            ),
+            app(
+                "brave-browser.desktop",
+                "Brave",
+                "/usr/bin/brave-browser-stable %U",
+                "brave-browser",
+            ),
+            app(
+                "dev.warp.Warp.desktop",
+                "Warp",
+                "warp-terminal",
+                "dev.warp.Warp",
+            ),
+            app(
+                "cursor.desktop",
+                "Cursor",
+                "/usr/share/cursor/cursor %F",
+                "cursor",
+            ),
         ]
     }
 
@@ -283,18 +345,45 @@ mod tests {
 
     #[test]
     fn pinned_come_first_in_their_order_then_running_ones() {
-        let d = dock(&["dev.warp.Warp.desktop", "org.gnome.Nautilus.desktop"], &[(1, "cursor", false), (2, "org.gnome.nautilus", false)]);
-        assert_eq!(ids(&d), ["dev.warp.Warp.desktop", "org.gnome.Nautilus.desktop", "cursor.desktop"]);
+        let d = dock(
+            &["dev.warp.Warp.desktop", "org.gnome.Nautilus.desktop"],
+            &[(1, "cursor", false), (2, "org.gnome.nautilus", false)],
+        );
+        assert_eq!(
+            ids(&d),
+            [
+                "dev.warp.Warp.desktop",
+                "org.gnome.Nautilus.desktop",
+                "cursor.desktop"
+            ]
+        );
         let v = d.view();
         assert_eq!(v[0].running, 0);
-        assert_eq!(v[1].running, 1, "matched by the desktop file name, ignoring case");
+        assert_eq!(
+            v[1].running, 1,
+            "matched by the desktop file name, ignoring case"
+        );
         assert!(!v[2].pinned && v[2].running == 1);
     }
 
     #[test]
     fn windows_match_by_window_class_or_by_the_program_they_run() {
-        let d = dock(&[], &[(1, "brave-browser", false), (2, "Warp-Terminal", false), (3, "nautilus", false)]);
-        assert_eq!(ids(&d), ["brave-browser.desktop", "dev.warp.Warp.desktop", "org.gnome.Nautilus.desktop"]);
+        let d = dock(
+            &[],
+            &[
+                (1, "brave-browser", false),
+                (2, "Warp-Terminal", false),
+                (3, "nautilus", false),
+            ],
+        );
+        assert_eq!(
+            ids(&d),
+            [
+                "brave-browser.desktop",
+                "dev.warp.Warp.desktop",
+                "org.gnome.Nautilus.desktop"
+            ]
+        );
     }
 
     #[test]
@@ -309,7 +398,14 @@ mod tests {
 
     #[test]
     fn several_windows_of_one_application_share_an_icon_and_are_counted() {
-        let d = dock(&[], &[(1, "cursor", false), (2, "cursor", true), (3, "cursor", false)]);
+        let d = dock(
+            &[],
+            &[
+                (1, "cursor", false),
+                (2, "cursor", true),
+                (3, "cursor", false),
+            ],
+        );
         assert_eq!(d.view().len(), 1);
         assert_eq!(d.view()[0].running, 3);
         assert!(d.view()[0].focused);
@@ -329,38 +425,77 @@ mod tests {
         let d = dock(&["gone.desktop"], &[]);
         assert_eq!(ids(&d), ["gone.desktop"]);
         assert_eq!(d.activate("gone.desktop"), Err(RequestError::NotInstalled));
-        assert_eq!(d.launch_new("gone.desktop"), Err(RequestError::NotInstalled));
+        assert_eq!(
+            d.launch_new("gone.desktop"),
+            Err(RequestError::NotInstalled)
+        );
     }
 
     #[test]
     fn clicking_a_stopped_application_starts_it() {
         let d = dock(&["cursor.desktop"], &[]);
-        assert_eq!(d.activate("cursor.desktop"), Ok(Action::Launch("cursor.desktop".into())));
+        assert_eq!(
+            d.activate("cursor.desktop"),
+            Ok(Action::Launch("cursor.desktop".into()))
+        );
     }
 
     #[test]
     fn clicking_a_running_application_focuses_a_window_and_repeated_clicks_cycle() {
         let d = dock(&[], &[(1, "cursor", false), (2, "cursor", false)]);
-        assert_eq!(d.activate("cursor.desktop"), Ok(Action::Focus(1)), "nothing focused yet: the first window");
-        let d = dock(&[], &[(1, "cursor", true), (2, "cursor", false), (3, "cursor", false)]);
+        assert_eq!(
+            d.activate("cursor.desktop"),
+            Ok(Action::Focus(1)),
+            "nothing focused yet: the first window"
+        );
+        let d = dock(
+            &[],
+            &[
+                (1, "cursor", true),
+                (2, "cursor", false),
+                (3, "cursor", false),
+            ],
+        );
         assert_eq!(d.activate("cursor.desktop"), Ok(Action::Focus(2)));
-        let d = dock(&[], &[(1, "cursor", false), (2, "cursor", false), (3, "cursor", true)]);
-        assert_eq!(d.activate("cursor.desktop"), Ok(Action::Focus(1)), "wraps around");
+        let d = dock(
+            &[],
+            &[
+                (1, "cursor", false),
+                (2, "cursor", false),
+                (3, "cursor", true),
+            ],
+        );
+        assert_eq!(
+            d.activate("cursor.desktop"),
+            Ok(Action::Focus(1)),
+            "wraps around"
+        );
         let d = dock(&[], &[(1, "cursor", true)]);
-        assert_eq!(d.activate("cursor.desktop"), Ok(Action::Focus(1)), "a single focused window stays");
+        assert_eq!(
+            d.activate("cursor.desktop"),
+            Ok(Action::Focus(1)),
+            "a single focused window stays"
+        );
     }
 
     #[test]
     fn a_new_window_can_be_asked_for_even_while_running() {
         let d = dock(&[], &[(1, "cursor", true)]);
-        assert_eq!(d.launch_new("cursor.desktop"), Ok(Action::Launch("cursor.desktop".into())));
+        assert_eq!(
+            d.launch_new("cursor.desktop"),
+            Ok(Action::Launch("cursor.desktop".into()))
+        );
     }
 
     #[test]
     fn the_page_cannot_name_an_item_the_dock_did_not_list() {
         let d = dock(&["cursor.desktop"], &[]);
         assert_eq!(d.activate("../etc/passwd"), Err(RequestError::Unknown));
-        assert_eq!(d.launch_new("brave-browser.desktop"), Err(RequestError::Unknown), "installed but not in the dock");
+        assert_eq!(
+            d.launch_new("brave-browser.desktop"),
+            Err(RequestError::Unknown),
+            "installed but not in the dock"
+        );
     }
 
     #[test]
@@ -402,19 +537,41 @@ mod tests {
 
     #[test]
     fn dragging_reorders_the_pinned_ones() {
-        let mut d = dock(&["org.gnome.Nautilus.desktop", "brave-browser.desktop", "cursor.desktop"], &[]);
+        let mut d = dock(
+            &[
+                "org.gnome.Nautilus.desktop",
+                "brave-browser.desktop",
+                "cursor.desktop",
+            ],
+            &[],
+        );
         d.move_pinned("cursor.desktop", 0).unwrap();
-        assert_eq!(d.pinned(), ["cursor.desktop", "org.gnome.Nautilus.desktop", "brave-browser.desktop"]);
+        assert_eq!(
+            d.pinned(),
+            [
+                "cursor.desktop",
+                "org.gnome.Nautilus.desktop",
+                "brave-browser.desktop"
+            ]
+        );
         d.move_pinned("cursor.desktop", 99).unwrap();
         assert_eq!(d.pinned().last().unwrap(), "cursor.desktop");
-        assert_eq!(d.move_pinned("brave-browser.desktop", 0).is_ok(), true);
+        assert!(d.move_pinned("brave-browser.desktop", 0).is_ok());
         assert_eq!(d.move_pinned("nope", 0), Err(RequestError::Unknown));
     }
 
     #[test]
     fn first_run_pins_what_is_installed_from_the_preferred_list() {
         let pins = Dock::default_pins(&apps());
-        assert_eq!(pins, ["org.gnome.Nautilus.desktop", "brave-browser.desktop", "dev.warp.Warp.desktop", "cursor.desktop"]);
+        assert_eq!(
+            pins,
+            [
+                "org.gnome.Nautilus.desktop",
+                "brave-browser.desktop",
+                "dev.warp.Warp.desktop",
+                "cursor.desktop"
+            ]
+        );
     }
 
     #[test]
@@ -436,8 +593,13 @@ mod tests {
 
     #[test]
     fn the_dock_is_bounded() {
-        let windows: Vec<(u64, String, bool)> = (0..100).map(|i| (i + 1, format!("app.{i}"), false)).collect();
-        let refs: Vec<(u64, &str, bool)> = windows.iter().map(|(i, a, f)| (*i, a.as_str(), *f)).collect();
+        let windows: Vec<(u64, String, bool)> = (0..100)
+            .map(|i| (i + 1, format!("app.{i}"), false))
+            .collect();
+        let refs: Vec<(u64, &str, bool)> = windows
+            .iter()
+            .map(|(i, a, f)| (*i, a.as_str(), *f))
+            .collect();
         assert_eq!(dock(&[], &refs).view().len(), MAX_ITEMS);
     }
 
@@ -447,7 +609,11 @@ mod tests {
         list.push(app("foo.desktop", "Foo", "other-program", ""));
         let mut d = Dock::new(vec![]);
         d.refresh(&list, &niri(&[(1, "foo", false)]));
-        assert_eq!(ids(&d), ["foo.desktop"], "the desktop file's own name beats a program that happens to be called the same");
+        assert_eq!(
+            ids(&d),
+            ["foo.desktop"],
+            "the desktop file's own name beats a program that happens to be called the same"
+        );
     }
 
     #[test]
@@ -461,7 +627,18 @@ mod tests {
 
     #[test]
     fn duplicate_pins_are_dropped_wherever_they_appear() {
-        let d = Dock::new(["a.desktop", "b.desktop", "a.desktop", "b.desktop", "c.desktop"].iter().map(|s| (*s).to_string()).collect());
+        let d = Dock::new(
+            [
+                "a.desktop",
+                "b.desktop",
+                "a.desktop",
+                "b.desktop",
+                "c.desktop",
+            ]
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+        );
         assert_eq!(d.pinned(), ["a.desktop", "b.desktop", "c.desktop"]);
     }
 

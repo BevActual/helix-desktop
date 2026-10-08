@@ -55,6 +55,8 @@ struct ShellState {
     dock: helix_shell_core::dock::Dock,
     /// The backlight as last read or written, if the machine has one.
     brightness: Option<helix_shell_core::brightness::Brightness>,
+    /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
+    insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
     insert: helix_shell_core::quick_insert::QuickInsert,
     /// What applications have posted through org.freedesktop.Notifications; see `notify`.
@@ -198,6 +200,9 @@ fn open_panel(app: &AppHandle, id: &str) {
         shell.apps = apps::scan();
         shell.icons.clear();
         eprintln!("LAUNCHER apps {}", shell.apps.len());
+    }
+    if id == "quick-insert" {
+        shell.insert_target = shell.niri.focused_window().map(|w| w.id);
     }
     if id == "notifications" {
         let reading = app.clone();
@@ -804,6 +809,8 @@ struct Osd {
     kind: &'static str,
     percent: u32,
     muted: bool,
+    /// For `kind == "notice"`: a short sentence the shell itself wrote (never text from elsewhere).
+    text: Option<&'static str>,
 }
 
 fn show_osd(app: &AppHandle, kind: &'static str, percent: u32, muted: bool) {
@@ -814,6 +821,21 @@ fn show_osd(app: &AppHandle, kind: &'static str, percent: u32, muted: bool) {
             kind,
             percent,
             muted,
+            text: None,
+        },
+    );
+}
+
+/// A short message from the shell itself, shown in the indicator: something the person asked for was deliberately not done.
+pub(crate) fn show_notice(app: &AppHandle, text: &'static str) {
+    eprintln!("OSD notice {text}");
+    let _ = app.emit(
+        "osd",
+        Osd {
+            kind: "notice",
+            percent: 0,
+            muted: false,
+            text: Some(text),
         },
     );
 }
@@ -1215,9 +1237,17 @@ fn report_glass(
 /// While no panel is open only the bar takes the pointer; the page also names the other things that must (the dock, or the thin strip
 /// along the bottom edge that makes it appear). They are clamped to the surface like the glass is, and applied on the main thread.
 #[tauri::command]
-fn report_interactive(app: AppHandle, elements: Vec<helix_shell_core::glass::Glass>, width: i32, height: i32) {
+fn report_interactive(
+    app: AppHandle,
+    elements: Vec<helix_shell_core::glass::Glass>,
+    width: i32,
+    height: i32,
+) {
     let rects: Vec<helix_shell_core::glass::Rect> = helix_shell_core::glass::blur_rects(
-        &elements.iter().map(|g| helix_shell_core::glass::Glass { radius: 0.0, ..*g }).collect::<Vec<_>>(),
+        &elements
+            .iter()
+            .map(|g| helix_shell_core::glass::Glass { radius: 0.0, ..*g })
+            .collect::<Vec<_>>(),
         width.clamp(1, 16384),
         height.clamp(1, 16384),
     );
@@ -1483,6 +1513,7 @@ fn main() {
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
+                insert_target: None,
                 brightness: backlight::read(),
                 niri: helix_shell_core::niri::Niri::default(),
                 dock_apps: Vec::new(),
