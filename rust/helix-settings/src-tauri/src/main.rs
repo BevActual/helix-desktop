@@ -382,11 +382,9 @@ async fn network_connect_password(
     .await
 }
 
-/// Joins an enterprise network with what the person typed. Used for this one request and kept nowhere.
-#[tauri::command]
-async fn network_connect_enterprise(
-    app: AppHandle,
-    path: String,
+/// What the sign-in form sends: every field as typed.
+#[derive(serde::Deserialize)]
+struct EnterpriseForm {
     identity: String,
     anonymous: String,
     password: String,
@@ -394,15 +392,23 @@ async fn network_connect_enterprise(
     domain: String,
     eap: String,
     phase2: String,
+}
+
+/// Joins an enterprise network with what the person typed. Used for this one request and kept nowhere.
+#[tauri::command]
+async fn network_connect_enterprise(
+    app: AppHandle,
+    path: String,
+    form: EnterpriseForm,
 ) -> Result<(), String> {
     let input = EnterpriseInput {
-        identity,
-        anonymous,
-        password,
-        certificate,
-        domain,
-        eap,
-        phase2,
+        identity: form.identity,
+        anonymous: form.anonymous,
+        password: form.password,
+        certificate: form.certificate,
+        domain: form.domain,
+        eap: form.eap,
+        phase2: form.phase2,
     };
     send_network(network_with(&app, |n| n.connect_enterprise(&path, &input))).await
 }

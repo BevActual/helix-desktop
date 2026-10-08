@@ -153,7 +153,7 @@ function askEnterprise(line, net) {
     event.preventDefault();
     const typed = password.value;
     password.value = "";
-    invoke("network_connect_enterprise", { path: net.path, identity: identity.value, anonymous: anonymous.value, password: typed, certificate: certificate.value, domain: domain.value, eap: eap.value, phase2: phase2.value })
+    invoke("network_connect_enterprise", { path: net.path, form: { identity: identity.value, anonymous: anonymous.value, password: typed, certificate: certificate.value, domain: domain.value, eap: eap.value, phase2: phase2.value } })
       .then(close, (error) => {
         const text = String(error);
         message.textContent = text.includes("MissingIdentity") ? "Enter your identity."
