@@ -18,6 +18,8 @@ pub struct App {
     /// Program and arguments, field codes removed. Never empty.
     pub argv: Vec<String>,
     pub terminal: bool,
+    /// `StartupWMClass`: the app id its windows announce, when it differs from the desktop file's name. Empty when unset.
+    pub startup_wm_class: String,
     only_show_in: Vec<String>,
     not_show_in: Vec<String>,
 }
@@ -87,6 +89,7 @@ pub fn parse_desktop_entry(id: &str, text: &str) -> Option<App> {
         keywords: list(fields.get("Keywords").copied().unwrap_or("")),
         argv,
         terminal: truthy("Terminal"),
+        startup_wm_class: fields.get("StartupWMClass").copied().unwrap_or("").to_string(),
         only_show_in: list(fields.get("OnlyShowIn").copied().unwrap_or("")),
         not_show_in: list(fields.get("NotShowIn").copied().unwrap_or("")),
     })
