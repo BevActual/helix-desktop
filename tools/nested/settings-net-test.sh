@@ -47,5 +47,21 @@ ACTION scan {}'
 [ "$(grep -c '^REFUSED' "$NET" 2>/dev/null)" = 0 ] && echo "ok: the service refused nothing" || fail "service refused something"
 echo "--- 3. Bluetooth"
 click_id page-bluetooth; sleep 1.5; shot settings-bt-open
-BT=$SCRATCH/state/fake-bluetooth-actions.log; ls "$SCRATCH/state" | grep -i fake
+BT=$SCRATCH/state/fake-bluetooth-actions.log
+echo "--- 3b. pairing: compare a code (yes), and type a PIN (too long refused, then accepted)"
+click_id "bt-pair:Kitchen Speaker"; sleep 1.2
+has_id pair-code && has_id pair-accept && echo "ok: the code to compare is shown" || fail "no code shown"
+shot settings-bt-pair-confirm
+click_id pair-accept; sleep 1.2
+has_id pair-accept && fail "the question is still showing" || echo "ok: the question closed"
+grep -q '^REPLY cancel=False length=0' "$BT" && echo "ok: a yes was sent" || fail "no yes in $(cat "$BT")"
+click_id "bt-pair:Old Headset"; sleep 1.2
+has_id pair-pin && echo "ok: a PIN is asked for" || fail "no PIN field"
+click_id pair-pin; wtype "12345678901234567"; wtype -k Return; sleep 0.6
+grep -c '^REPLY' "$BT" | sed 's/^/replies so far: /'
+[ "$(grep -c '^REPLY' "$BT")" = 1 ] && echo "ok: a 17-character PIN was not sent" || fail "a bad PIN was sent"
+wtype -M ctrl -k a -m ctrl; wtype -k BackSpace; wtype "0000"; shot settings-bt-pair-pin; wtype -k Return; sleep 1.2
+grep -q '^REPLY cancel=False length=4' "$BT" && echo "ok: the PIN was sent (length only in the log)" || fail "PIN missing"
+grep -q 0000 "$BT" && fail "the PIN is in the log" || echo "ok: the PIN is in no log"
+has_id "bt-forget:Kitchen Speaker" && echo "ok: both devices are paired now" || fail "not paired"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

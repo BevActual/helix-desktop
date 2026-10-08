@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use helix_desktop_api::{Desktop, Domain};
+use helix_shell_core::pairing::{Pairing, PairingView};
 use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
 use helix_shell_core::network::{Network, NetworkView, Request as NetRequest, RequestError as NetError};
 use helix_wallpaper::picker::{Picker, PickerView};
@@ -103,6 +104,7 @@ struct State {
     network: Network,
     bluetooth: Bluetooth,
     picker: Picker,
+    pairing: Pairing,
     status: &'static str,
 }
 
@@ -217,9 +219,84 @@ async fn refresh_bluetooth(app: &AppHandle) {
     let snapshot = desktop.snapshot(Domain::Bluetooth).await.unwrap_or(serde_json::Value::Null);
     let bluetooth = Bluetooth::from_snapshot(&snapshot);
     let view = bluetooth.view();
-    shared(app).lock().expect("state").bluetooth = bluetooth;
+    {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        state.pairing.follow(&bluetooth);
+        state.bluetooth = bluetooth;
+    }
     eprintln!("SETTINGS bluetooth devices={}", view.devices.len());
     let _ = app.emit("bluetooth-view", view);
+    publish_pairing(app);
+}
+
+fn pairing_view_of(state: &State) -> PairingView {
+    state.pairing.view(&state.bluetooth)
+}
+
+fn publish_pairing(app: &AppHandle) {
+    let view = pairing_view_of(&shared(app).lock().expect("state"));
+    eprintln!("SETTINGS pairing active={} stage={}", view.active, view.stage);
+    let _ = app.emit("pairing-view", view);
+}
+
+#[tauri::command]
+fn pairing_view(app: AppHandle) -> PairingView {
+    pairing_view_of(&shared(&app).lock().expect("state"))
+}
+
+/// Starts pairing with an unpaired device; the questions arrive as `Prompt` signals.
+#[tauri::command]
+async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
+    let request = {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        let State { pairing, bluetooth, .. } = &mut *state;
+        pairing.begin(bluetooth, &path).map_err(|error| format!("{error:?}"))?
+    };
+    publish_pairing(&app);
+    if let Err(error) = send_bluetooth(Ok(request)).await {
+        shared(&app).lock().expect("state").pairing.finish();
+        publish_pairing(&app);
+        return Err(error);
+    }
+    Ok(())
+}
+
+async fn send_reply(app: &AppHandle, reply: Result<helix_shell_core::pairing::Reply, helix_shell_core::pairing::PairingError>) -> Result<(), String> {
+    let reply = reply.map_err(|error| format!("{error:?}"))?;
+    let desktop = current().ok_or("not connected to the desktop service")?;
+    desktop
+        .bluetooth_reply(&reply.response, reply.cancel)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS pairing answered");
+    publish_pairing(app);
+    Ok(())
+}
+
+/// A PIN or passkey the person typed. Used for this one answer and kept nowhere.
+#[tauri::command]
+async fn bluetooth_pair_answer(app: AppHandle, text: String) -> Result<(), String> {
+    let reply = shared(&app).lock().expect("state").pairing.answer_text(&text);
+    send_reply(&app, reply).await
+}
+
+#[tauri::command]
+async fn bluetooth_pair_accept(app: AppHandle) -> Result<(), String> {
+    let reply = shared(&app).lock().expect("state").pairing.accept();
+    send_reply(&app, reply).await
+}
+
+#[tauri::command]
+async fn bluetooth_pair_cancel(app: AppHandle) -> Result<(), String> {
+    let request = shared(&app).lock().expect("state").pairing.cancel();
+    publish_pairing(&app);
+    match request {
+        Ok(request) => send_bluetooth(Ok(request)).await,
+        // Nothing was under way, so there is nothing to cancel.
+        Err(_) => Ok(()),
+    }
 }
 
 fn follow(
@@ -371,6 +448,29 @@ fn connect(app: AppHandle) {
                         follow(&app, &desktop, Domain::Network),
                         follow(&app, &desktop, Domain::Bluetooth),
                     ];
+                    let prompt_app = app.clone();
+                    let prompt_desktop = desktop.clone();
+                    let prompts = tauri::async_runtime::spawn(async move {
+                        let watcher = prompt_app.clone();
+                        let _ = prompt_desktop
+                            .watch_bluetooth_prompt(move |prompt| {
+                                shared(&watcher).lock().expect("state").pairing.on_prompt(&prompt);
+                                publish_pairing(&watcher);
+                            })
+                            .await;
+                    });
+                    let done_app = app.clone();
+                    let done_desktop = desktop.clone();
+                    let completed = tauri::async_runtime::spawn(async move {
+                        let watcher = done_app.clone();
+                        let _ = done_desktop
+                            .watch_completed(Domain::Bluetooth, move |_, _, _| {
+                                // The pairing operation ended, however it ended: the question is over.
+                                shared(&watcher).lock().expect("state").pairing.finish();
+                                publish_pairing(&watcher);
+                            })
+                            .await;
+                    });
                     match desktop.manager().register().await {
                         Ok(()) => {
                             set_status(&app, "connected");
@@ -383,6 +483,8 @@ fn connect(app: AppHandle) {
                                     tauri::async_runtime::spawn(async move { refresh(&app).await });
                                 })
                                 .await;
+                            prompts.abort();
+                            completed.abort();
                         }
                         Err(error) => {
                             set_status(
@@ -397,6 +499,8 @@ fn connect(app: AppHandle) {
                             for task in tasks {
                                 let _ = task.await;
                             }
+                            prompts.abort();
+                            completed.abort();
                         }
                     }
                 }
@@ -721,6 +825,11 @@ fn main() {
             bluetooth_connect,
             bluetooth_disconnect,
             bluetooth_forget,
+            bluetooth_pair,
+            bluetooth_pair_answer,
+            bluetooth_pair_accept,
+            bluetooth_pair_cancel,
+            pairing_view,
             setting_change,
             layout_reporting,
             report_layout
@@ -730,6 +839,7 @@ fn main() {
                 grants: Grants::default(),
                 catalog: Catalog::default(),
                 picker: Picker::default(),
+                pairing: Pairing::default(),
                 network: Network::from_snapshot(&serde_json::Value::Null),
                 bluetooth: Bluetooth::from_snapshot(&serde_json::Value::Null),
                 status: "unavailable",

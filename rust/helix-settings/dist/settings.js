@@ -52,6 +52,13 @@ function buildPages() {
       section.hidden = true;
       const host = el("div");
       host.id = page.name + "-host";
+      if (page.name === "bluetooth") {
+        const pairing = el("div");
+        pairing.id = "bt-pairing";
+        const main = el("div");
+        main.id = "bt-main";
+        host.append(pairing, main);
+      }
       section.append(host);
       content.insertBefore(section, agents);
     }

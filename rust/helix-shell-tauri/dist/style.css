@@ -396,3 +396,7 @@ kbd { font: inherit; font-size: 12px; font-weight: 500; min-width: 22px; text-al
 .password-form input { flex: 1; min-width: 0; padding: 7px 11px; font-size: 14px; }
 .password-form button { padding: 6px 14px; flex: none; }
 .rows-card .warn:empty { display: none; }
+.pairing { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.pairing .pairing-actions { display: flex; gap: 8px; }
+.pair-code { font-size: 34px; font-weight: 700; letter-spacing: .18em; font-variant-numeric: tabular-nums; padding: 4px 0; }
+.pair-code span.done { color: var(--ok); }

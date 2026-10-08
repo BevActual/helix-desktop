@@ -121,7 +121,7 @@ function drawNetworkPage(view) {
 }
 
 function drawBluetoothPage(view) {
-  const host = $("bluetooth-host");
+  const host = $("bt-main");
   host.replaceChildren();
   if (!view.available) { host.append(el("div", "empty", "Bluetooth is not available on this computer.")); queueReport(); return; }
   const top = el("div", "rows-card");
@@ -137,12 +137,17 @@ function drawBluetoothPage(view) {
     const card = el("div", "rows-card");
     view.devices.forEach((device) => {
       const usable = device.action === "connect" || device.action === "disconnect";
+      const pairable = device.action === "pair";
       const battery = device.battery === null || device.battery === undefined ? "" : " · " + device.battery + "% battery";
-      const tag = (device.action === "pair" ? "Not paired. Pairing is not available here yet"
+      const tag = (pairable ? "Not paired"
         : device.action === "busy" ? "Connecting…" : device.connected ? "Connected" : "Paired") + battery;
-      const line = listRow(device.name, tag, "bt:" + device.name, { icon: "bluetooth", active: device.connected, clickable: usable, dim: !usable && !device.connected });
+      const line = listRow(device.name, tag, "bt:" + device.name, { icon: "bluetooth", active: device.connected, clickable: usable || pairable, dim: !usable && !pairable && !device.connected });
       if (device.action === "connect") line.addEventListener("click", () => invoke("bluetooth_connect", { path: device.path }));
       if (device.action === "disconnect") line.addEventListener("click", () => invoke("bluetooth_disconnect", { path: device.path }));
+      if (pairable) {
+        line.append(actionButton("Pair", "bt-pair:" + device.name, () => invoke("bluetooth_pair", { path: device.path }).catch((error) => console.error(error))));
+        line.addEventListener("click", () => invoke("bluetooth_pair", { path: device.path }).catch((error) => console.error(error)));
+      }
       if (device.paired) line.append(actionButton("Forget", "bt-forget:" + device.name, () => invoke("bluetooth_forget", { path: device.path })));
       card.append(line);
     });
@@ -152,5 +157,77 @@ function drawBluetoothPage(view) {
   queueReport();
 }
 
+// The question a device asks while it is being paired. What is typed goes to Rust once and the field is emptied; nothing is kept.
+function drawPairing(view) {
+  const host = $("bt-pairing");
+  host.replaceChildren();
+  if (!view.active) { queueReport(); return; }
+  const card = el("div", "rows-card pairing");
+  const title = (text) => card.append(el("div", "setting-title", text));
+  const row = el("div", "pairing-actions");
+  const cancel = actionButton("Cancel", "pair-cancel", () => invoke("bluetooth_pair_cancel"));
+  const typed = (label, test, numeric) => {
+    const form = el("form", "password-form");
+    form.style.padding = "0";
+    const field = el("input");
+    field.type = "text";
+    field.placeholder = label;
+    field.autocomplete = "off";
+    field.spellcheck = false;
+    if (numeric) { field.inputMode = "numeric"; field.maxLength = 6; }
+    field.dataset.test = test;
+    const send = el("button", "primary", "Pair");
+    send.type = "submit";
+    send.dataset.test = "pair-send";
+    form.append(field, send);
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const text = field.value;
+      field.value = "";
+      invoke("bluetooth_pair_answer", { text }).catch(() => { message.textContent = numeric ? "A passkey is up to six digits." : "A PIN is 1 to 16 characters."; field.focus(); });
+    });
+    card.append(form);
+    setTimeout(() => field.focus(), 0);
+  };
+  const message = el("div", "setting-about warn");
+  switch (view.stage) {
+    case "pin":
+      title("Enter the PIN for " + view.device);
+      typed("PIN", "pair-pin", false);
+      break;
+    case "passkey":
+      title("Enter the passkey for " + view.device);
+      typed("Passkey", "pair-passkey", true);
+      break;
+    case "display": {
+      title("Type this code on " + view.device);
+      const code = el("div", "pair-code");
+      code.dataset.test = "pair-code";
+      [...view.code].forEach((digit, index) => code.append(el("span", index < view.entered ? "done" : "", digit)));
+      card.append(code);
+      break;
+    }
+    case "confirm": {
+      title("Does " + view.device + " show this code?");
+      const code = el("div", "pair-code", view.code);
+      code.dataset.test = "pair-code";
+      card.append(code);
+      row.append(actionButton("They match", "pair-accept", () => invoke("bluetooth_pair_accept"), "primary"));
+      break;
+    }
+    case "authorize":
+      title(view.device + " wants to pair");
+      row.append(actionButton("Allow", "pair-accept", () => invoke("bluetooth_pair_accept"), "primary"));
+      break;
+    default:
+      title("Pairing with " + view.device + "…");
+  }
+  row.append(cancel);
+  card.append(message, row);
+  host.append(card);
+  queueReport();
+}
+
 listen("network-view", (event) => drawNetworkPage(event.payload)).then(() => invoke("network_view").then(drawNetworkPage));
 listen("bluetooth-view", (event) => drawBluetoothPage(event.payload)).then(() => invoke("bluetooth_view").then(drawBluetoothPage));
+listen("pairing-view", (event) => drawPairing(event.payload)).then(() => invoke("pairing_view").then(drawPairing));

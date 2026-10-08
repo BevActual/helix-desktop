@@ -59,8 +59,22 @@ bt = {
         "/d/buds":    {"name": "Earbuds",         "paired": True,  "connected": True,  "battery": 80},
         "/d/kbd":     {"name": "Keyboard",        "paired": True,  "connected": False, "battery": None},
         "/d/speaker": {"name": "Kitchen Speaker", "paired": False, "connected": False, "battery": None},
+        "/d/headset": {"name": "Old Headset",     "paired": False, "connected": False, "battery": None},
     },
+    "pairing": None,
 }
+
+PAIR_KINDS = {"/d/speaker": 5, "/d/headset": 1}   # Confirm, PinCode
+
+def emit_prompt(path):
+    kind = PAIR_KINDS[path]
+    body = {"kind": variant(kind), "device": variant(path), "passkey": variant(123456 if kind == 5 else 0), "pin": variant(""), "entered": variant(0)}
+    connection.emit_signal(None, PATH, "org.helix.Desktop.Bluetooth1", "Prompt", GLib.Variant("(a{sv})", (body,)))
+    return False
+
+def emit_completed(ok, text):
+    connection.emit_signal(None, PATH, "org.helix.Desktop.Bluetooth1", "Completed", GLib.Variant("(tbs)", (next_operation[0], ok, text)))
+    return False
 
 def bluetooth_snapshot():
     devices = [{"path": p, "address": "AA:BB:CC:DD:EE:%02X" % i, "name": d["name"], "kind": 1, "paired": d["paired"],
@@ -80,11 +94,17 @@ def bluetooth_action(name, args, emit):
     elif name in ("scan", "stop-scan"):
         if not bt["enabled"]: raise Refused("Bluetooth is off")
         bt["scanning"] = name == "scan"
-    elif name in ("connect", "disconnect", "forget", "pair"):
+    elif name in ("connect", "disconnect", "forget", "pair", "cancel-pair"):
         device = bt["devices"].get(args.get("path"))
         if not device or not bt["enabled"]: raise Refused("Device is no longer available")
-        if name == "pair": raise Refused("Pairing was rejected")
-        if name == "connect":
+        if name == "pair":
+            if device["paired"] or bt["pairing"] or args["path"] not in PAIR_KINDS: raise Refused("Pairing was rejected")
+            bt["pairing"] = args["path"]
+            GLib.timeout_add(200, emit_prompt, args["path"])
+        elif name == "cancel-pair":
+            bt["pairing"] = None
+        if name in ("pair", "cancel-pair"): pass
+        elif name == "connect":
             if not device["paired"]: raise Refused("Connection rejected")
             device["connected"] = True
         elif name == "disconnect": device["connected"] = False
@@ -167,6 +187,17 @@ def on_method(conn, sender, path, interface, method, params, invocation):
             next_operation[0] += 1
             invocation.return_value(GLib.Variant("(t)", (next_operation[0],)))
             GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Network1"), False)[1])
+        elif method == "Reply" and short == "Bluetooth1":
+            response, cancel = params.unpack()
+            path = bt["pairing"]
+            with open(bt_log_path, "a") as log: log.write(f"REPLY cancel={cancel} length={len(response)}\n")   # what was typed never goes in a log
+            if not path:
+                invocation.return_dbus_error("org.helix.Desktop.Error.InvalidArgument", "No pairing request for this client"); return
+            bt["pairing"] = None
+            if not cancel: bt["devices"][path]["paired"] = True
+            invocation.return_value(None)
+            GLib.idle_add(lambda: (emit_changed("org.helix.Desktop.Bluetooth1"), False)[1])
+            GLib.idle_add(emit_completed, not cancel, "Paired" if not cancel else "Cancelled")
         elif method == "Action" and short == "Bluetooth1":
             name, args = params.unpack()
             args = {k: (v if not isinstance(v, GLib.Variant) else v.unpack()) for k, v in args.items()}

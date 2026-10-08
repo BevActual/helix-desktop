@@ -219,6 +219,47 @@ impl Desktop {
         Ok(())
     }
 
+    /// Answers the question the service asked the pairing client (`Bluetooth1.Reply`). `cancel` refuses it.
+    pub async fn bluetooth_reply(&self, response: &str, cancel: bool) -> zbus::Result<()> {
+        let proxy = self.domain_proxy(Domain::Bluetooth).await?;
+        proxy.call("Reply", &(response, cancel)).await
+    }
+
+    /// Calls `on_prompt` with every `Prompt` signal the service sends this client for a pairing (kind, device, passkey, pin, entered).
+    /// Returns when the stream ends.
+    pub async fn watch_bluetooth_prompt<F>(&self, mut on_prompt: F) -> zbus::Result<()>
+    where
+        F: FnMut(serde_json::Value) + Send,
+    {
+        let proxy = self.domain_proxy(Domain::Bluetooth).await?;
+        let mut prompts = proxy.receive_signal("Prompt").await?;
+        while let Some(message) = prompts.next().await {
+            if let Ok((body,)) = message.body().deserialize::<(std::collections::HashMap<String, OwnedValue>,)>() {
+                let mut object = serde_json::Map::new();
+                for (key, value) in &body {
+                    object.insert(key.clone(), owned_to_json(value));
+                }
+                on_prompt(serde_json::Value::Object(object));
+            }
+        }
+        Ok(())
+    }
+
+    /// Calls `on_done` with `(operation, succeeded, message)` for every `Completed` signal of the domain.
+    pub async fn watch_completed<F>(&self, domain: Domain, mut on_done: F) -> zbus::Result<()>
+    where
+        F: FnMut(u64, bool, String) + Send,
+    {
+        let proxy = self.domain_proxy(domain).await?;
+        let mut done = proxy.receive_signal("Completed").await?;
+        while let Some(message) = done.next().await {
+            if let Ok((operation, ok, text)) = message.body().deserialize::<(u64, bool, String)>() {
+                on_done(operation, ok, text);
+            }
+        }
+        Ok(())
+    }
+
     /// The service's settings list (`GetSettings`) as a JSON array of entries.
     pub async fn settings(&self) -> zbus::Result<serde_json::Value> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;

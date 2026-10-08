@@ -19,6 +19,7 @@ pub mod launcher;
 pub mod network;
 pub mod niri;
 pub mod notifications;
+pub mod pairing;
 pub mod power;
 pub mod quick;
 pub mod shortcuts;

@@ -1,8 +1,8 @@
 //! The control center's Bluetooth model: the Bluetooth1 snapshot as what the page shows, and the only place that builds write requests.
 //! Nothing here talks to D-Bus. The page names a device by the path it was listed with; this checks that path against the snapshot just read.
 //!
-//! Pairing a new device is a prompt flow (PINs, passkeys, confirmation) and is not built yet. Devices that are not paired are listed, with
-//! a note, so a scan shows what is nearby, but they cannot be clicked.
+//! Pairing a new device is a prompt flow (PINs, passkeys, confirmation): `Bluetooth::pair` starts it and `crate::pairing` follows it. The
+//! control center does not offer it, so there its unpaired devices are listed with a note and cannot be clicked.
 
 use std::collections::BTreeMap;
 
@@ -46,6 +46,7 @@ pub enum RequestError {
     AlreadyConnected,
     Busy,
     NotConnected,
+    AlreadyPaired,
 }
 
 /// What to send to Bluetooth1.Action.
@@ -243,6 +244,28 @@ impl Bluetooth {
         }
         Ok(Request {
             action: "connect",
+            args: json!({"path": device.path}),
+        })
+    }
+
+    pub fn is_paired(&self, path: &str) -> bool {
+        self.devices.iter().any(|d| d.path == path && d.paired)
+    }
+
+    /// The name a device is shown under, for a prompt about it.
+    pub fn name_of(&self, path: &str) -> Option<String> {
+        self.devices.iter().find(|d| d.path == path).map(|d| d.name.clone())
+    }
+
+    /// Starts pairing with a device that has not been paired yet.
+    pub fn pair(&self, path: &str) -> Result<Request, RequestError> {
+        self.require_on()?;
+        let device = self.device(path)?;
+        if device.paired {
+            return Err(RequestError::AlreadyPaired);
+        }
+        Ok(Request {
+            action: "pair",
             args: json!({"path": device.path}),
         })
     }
