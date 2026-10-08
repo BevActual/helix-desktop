@@ -16,6 +16,7 @@ const WINDOW: &str = "settings";
 
 /// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
 const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
+
 const DISPLAYS: &[&str] = &[
     "nightlight.enabled",
     "nightlight.force",
@@ -25,13 +26,46 @@ const DISPLAYS: &[&str] = &[
     "brightness.enable_ddcutil",
     "brightness.minimum_brightness",
 ];
+const ACCESSIBILITY: &[&str] = &["accessibility.ui_scale", "accessibility.high_contrast"];
+const SOUND: &[&str] = &["audio.enable_sounds", "audio.sound_volume", "audio.enable_overdrive"];
+const NOTIFICATIONS: &[&str] = &[
+    "notification.enable_daemon",
+    "notification.show_app_name",
+    "notification.show_actions",
+    "notification.max_visible",
+    "notification.collapse_on_dismiss",
+    "notification.border",
+    "notification.background_opacity",
+    "notification.scale",
+    "notification.offset_x",
+    "notification.offset_y",
+    "notification.keep_dismissed_in_history",
+    "notification.history_retention_hours",
+];
+const POWER: &[&str] = &[
+    "lockscreen.enabled",
+    "lockscreen.lock_before_suspend",
+    "lockscreen.lid_close_keep_external_displays",
+    "lockscreen.allow_empty_password",
+    "lockscreen.blurred_desktop",
+    "lockscreen.blur_intensity",
+    "lockscreen.tint_intensity",
+    "idle.pre_action_fade_seconds",
+    "battery.warning_threshold",
+];
+
+/// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
+const ROW_PAGES: [(&str, &[&str]); 6] = [
+    ("appearance", APPEARANCE),
+    ("accessibility", ACCESSIBILITY),
+    ("displays", DISPLAYS),
+    ("sound", SOUND),
+    ("notifications", NOTIFICATIONS),
+    ("power", POWER),
+];
 
 fn page_ids(page: &str) -> Option<&'static [&'static str]> {
-    match page {
-        "appearance" => Some(APPEARANCE),
-        "displays" => Some(DISPLAYS),
-        _ => None,
-    }
+    ROW_PAGES.iter().find(|(name, _)| *name == page).map(|(_, ids)| *ids)
 }
 
 struct State {
@@ -100,7 +134,6 @@ struct RowsView {
     rows: Vec<RowView>,
 }
 
-const ROW_PAGES: [(&str, &[&str]); 2] = [("appearance", APPEARANCE), ("displays", DISPLAYS)];
 
 fn rows_of(state: &State) -> Vec<RowsView> {
     ROW_PAGES

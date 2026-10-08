@@ -15,7 +15,39 @@ $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 $("refresh").onclick = () => invoke("agents_refresh");
 
 // Pages -----------------------------------------------------------------------------------------------------------------------------
-const TITLES = { appearance: "Appearance", displays: "Displays", agents: "Privacy & agents" };
+const PAGES = [
+  { name: "appearance", title: "Appearance", icon: "palette", rows: true },
+  { name: "accessibility", title: "Accessibility", icon: "eye", rows: true },
+  { name: "displays", title: "Displays", icon: "sun", rows: true },
+  { name: "sound", title: "Sound", icon: "volume", rows: true },
+  { name: "notifications", title: "Notifications", icon: "bell", rows: true },
+  { name: "power", title: "Power & lock", icon: "lock", rows: true },
+  { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
+];
+const TITLES = Object.fromEntries(PAGES.map((page) => [page.name, page.title]));
+function buildPages() {
+  const nav = $("pages");
+  const content = $("content");
+  const agents = $("page-agents");
+  nav.replaceChildren();
+  PAGES.forEach((page) => {
+    const link = el("button", "page-link");
+    link.dataset.page = page.name;
+    link.dataset.test = "page-" + page.name;
+    link.append(icon(page.icon), el("span", "", page.title));
+    link.onclick = () => showPage(page.name);
+    nav.append(link);
+    if (page.rows) {
+      const section = el("section", "settings-page");
+      section.id = "page-" + page.name;
+      section.hidden = true;
+      const rows = el("div");
+      rows.id = page.name + "-rows";
+      section.append(rows);
+      content.insertBefore(section, agents);
+    }
+  });
+}
 function showPage(name) {
   document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-" + name; });
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
@@ -23,7 +55,7 @@ function showPage(name) {
   $("refresh").style.display = name === "agents" ? "" : "none";
   queueReport();
 }
-document.querySelectorAll(".page-link").forEach((node) => { node.onclick = () => showPage(node.dataset.page); });
+buildPages();
 showPage("appearance");
 
 // Rows of service settings ----------------------------------------------------------------------------------------------------------

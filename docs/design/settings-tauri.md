@@ -1,6 +1,6 @@
 # Settings, rebuilt as a Rust + Tauri application
 
-Status: started 2026-10-08. Built: the window, the Privacy & agents page (manager role: who holds which tiers, switch a tier, revoke, the audit), the manager identity check
+Status: started 2026-10-08. Built: the window, Privacy & agents (manager role), the manager identity check, shared design tokens, and the catalog-row pages Appearance, Accessibility, Displays, Sound, Notifications, Power & lock (one pure model, `catalog.rs`, validates every write). Still plan: Network, Bluetooth, Keyboard, Dock & bar, About, wallpaper picker.
 in the service, and the shared design tokens. Everything else below is still plan.
 
 Try it: `tools/switch-shell.sh tauri` links it as `helix-settings-new` (the installed C++ Settings is untouched).
