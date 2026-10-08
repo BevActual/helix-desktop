@@ -11,9 +11,14 @@ const warning = document.getElementById("warning");
 const waiting = document.getElementById("waiting");
 const allow = document.getElementById("allow");
 const deny = document.getElementById("deny");
+const identity = document.getElementById("identity");
+// The request on screen: every decision names it, so a click can only ever apply to what the person was looking at.
+let shownOperation = 0;
 
 function show(view) {
   if (!view || !view.open) {
+    shownOperation = 0;
+    identity.textContent = "";
     title.textContent = "";
     subject.textContent = "";
     detail.textContent = "";
@@ -24,6 +29,9 @@ function show(view) {
     allow.disabled = true;
     return;
   }
+  shownOperation = view.operation;
+  identity.textContent = view.identity ? "Verified: " + view.identity : "";
+  allow.title = view.incomplete ? "What would run is not shown in full, so it cannot be approved" : "";
   const grant = view.kind === "grant";
   title.textContent = grant ? "Allow access?" : "Allow this action?";
   subject.textContent = grant
@@ -48,7 +56,7 @@ function show(view) {
     box.setAttribute("data-test", "confirm-tier-" + tier.name);
     box.className = "switch";
     box.addEventListener("change", () => {
-      invoke("confirmer_set_tier", { name: tier.name, checked: box.checked }).then(show);
+      invoke("confirmer_set_tier", { operation: shownOperation, name: tier.name, checked: box.checked }).then(show);
     });
     const name = document.createElement("span");
     name.textContent = tier.name;
@@ -57,8 +65,8 @@ function show(view) {
   });
 }
 
-deny.onclick = () => invoke("confirmer_deny").then((view) => { show(view); queueReport(); });
-allow.onclick = () => invoke("confirmer_allow").then((view) => { show(view); queueReport(); });
+deny.onclick = () => invoke("confirmer_deny", { operation: shownOperation }).then((view) => { show(view); queueReport(); });
+allow.onclick = () => invoke("confirmer_allow", { operation: shownOperation }).then((view) => { show(view); queueReport(); });
 document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") invoke("confirmer_escape");
   if (event.key === "Enter") {

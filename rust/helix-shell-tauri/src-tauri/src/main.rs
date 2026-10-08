@@ -9,6 +9,7 @@ mod battery;
 mod blur;
 mod confirmer;
 mod control;
+mod dock;
 mod insert;
 mod layer;
 mod notify;
@@ -48,6 +49,10 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// What niri says is open (its event stream), the installed applications the dock matches them to, and the dock itself.
+    niri: helix_shell_core::niri::Niri,
+    dock_apps: Vec<helix_shell_core::launcher::App>,
+    dock: helix_shell_core::dock::Dock,
     /// The backlight as last read or written, if the machine has one.
     brightness: Option<helix_shell_core::brightness::Brightness>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
@@ -1095,6 +1100,8 @@ fn empty_confirmer_view() -> ConfirmerView {
         kind: "action",
         client_name: String::new(),
         detail: String::new(),
+        identity: String::new(),
+        incomplete: false,
         aside: String::new(),
         tainted: false,
         waiting: 0,
@@ -1121,25 +1128,25 @@ fn confirmer_sync_and_arm(
 }
 
 #[tauri::command]
-fn confirmer_allow(app: AppHandle) -> ConfirmerView {
+fn confirmer_allow(app: AppHandle, operation: u64) -> ConfirmerView {
     let Some(host) = confirmer_host(&app) else {
         return empty_confirmer_view();
     };
     {
         let mut panel = host.lock().expect("confirmer");
-        let _ = panel.allow();
+        let _ = panel.allow(operation);
     }
     confirmer_sync_and_arm(&app, &host)
 }
 
 #[tauri::command]
-fn confirmer_deny(app: AppHandle) -> ConfirmerView {
+fn confirmer_deny(app: AppHandle, operation: u64) -> ConfirmerView {
     let Some(host) = confirmer_host(&app) else {
         return empty_confirmer_view();
     };
     {
         let mut panel = host.lock().expect("confirmer");
-        let _ = panel.deny();
+        let _ = panel.deny(operation);
     }
     confirmer_sync_and_arm(&app, &host)
 }
@@ -1165,12 +1172,17 @@ fn confirmer_escape(app: AppHandle) {
 }
 
 #[tauri::command]
-fn confirmer_set_tier(app: AppHandle, name: String, checked: bool) -> ConfirmerView {
+fn confirmer_set_tier(
+    app: AppHandle,
+    operation: u64,
+    name: String,
+    checked: bool,
+) -> ConfirmerView {
     let Some(host) = confirmer_host(&app) else {
         return empty_confirmer_view();
     };
     let mut panel = host.lock().expect("confirmer");
-    panel.set_tier(&name, checked)
+    panel.set_tier(operation, &name, checked)
 }
 
 /// The page says which rectangles are drawn as glass; Rust turns them into the blur region (clamped to the surface) and tells the
@@ -1198,6 +1210,19 @@ fn report_glass(
         let active = blur::apply(&gtk_window, &rects);
         let _ = runner.emit("blur-active", active);
     });
+}
+
+/// While no panel is open only the bar takes the pointer; the page also names the other things that must (the dock, or the thin strip
+/// along the bottom edge that makes it appear). They are clamped to the surface like the glass is, and applied on the main thread.
+#[tauri::command]
+fn report_interactive(app: AppHandle, elements: Vec<helix_shell_core::glass::Glass>, width: i32, height: i32) {
+    let rects: Vec<helix_shell_core::glass::Rect> = helix_shell_core::glass::blur_rects(
+        &elements.iter().map(|g| helix_shell_core::glass::Glass { radius: 0.0, ..*g }).collect::<Vec<_>>(),
+        width.clamp(1, 16384),
+        height.clamp(1, 16384),
+    );
+    let runner = app.clone();
+    let _ = app.run_on_main_thread(move || layer::set_extra_input(&runner, &rects));
 }
 
 #[tauri::command]
@@ -1396,6 +1421,13 @@ fn main() {
             activity_view,
             notify::notifications_view,
             report_glass,
+            report_interactive,
+            dock::dock_view,
+            dock::dock_activate,
+            dock::dock_new_window,
+            dock::dock_pin,
+            dock::dock_unpin,
+            dock::dock_move,
             brightness_view,
             brightness_set,
             insert::quick_insert_query,
@@ -1452,6 +1484,9 @@ fn main() {
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
                 brightness: backlight::read(),
+                niri: helix_shell_core::niri::Niri::default(),
+                dock_apps: Vec::new(),
+                dock: helix_shell_core::dock::Dock::default(),
                 insert: helix_shell_core::quick_insert::QuickInsert::new(
                     helix_shell_core::quick_insert::parse_emoji(include_str!(
                         "../../../../assets/emoji.json"
@@ -1486,6 +1521,7 @@ fn main() {
             control::serve(handle.clone());
             notify::serve(handle.clone());
             insert::watch_clipboard(handle.clone());
+            dock::start(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {

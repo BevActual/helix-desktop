@@ -58,13 +58,14 @@ impl ConfirmerHost {
         self.panel.ended(operation, self.now_ms());
     }
 
-    pub fn allow(&mut self) -> ConfirmerView {
-        self.panel.allow(self.now_ms());
+    /// `operation` is the request the person was looking at when they clicked; anything else is not honoured.
+    pub fn allow(&mut self, operation: u64) -> ConfirmerView {
+        self.panel.allow(operation, self.now_ms());
         self.panel.view(self.now_ms())
     }
 
-    pub fn deny(&mut self) -> ConfirmerView {
-        self.panel.deny(self.now_ms());
+    pub fn deny(&mut self, operation: u64) -> ConfirmerView {
+        self.panel.deny(operation, self.now_ms());
         self.panel.view(self.now_ms())
     }
 
@@ -78,8 +79,8 @@ impl ConfirmerHost {
         self.panel.view(self.now_ms())
     }
 
-    pub fn set_tier(&mut self, name: &str, checked: bool) -> ConfirmerView {
-        self.panel.set_tier(name, checked);
+    pub fn set_tier(&mut self, operation: u64, name: &str, checked: bool) -> ConfirmerView {
+        self.panel.set_tier(operation, name, checked);
         self.panel.view(self.now_ms())
     }
 

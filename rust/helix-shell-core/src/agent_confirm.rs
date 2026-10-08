@@ -31,6 +31,9 @@ pub struct ConfirmRequest {
     /// The agent's own words; displayed as a quotation, never as a fact.
     pub reason: String,
     pub args: Vec<String>,
+    /// Every argument is shown whole, exactly as it will run. False when anything was cut, dropped or altered for display: the person
+    /// could not review what would run, so such an action can only be denied.
+    pub args_complete: bool,
     pub tiers: Vec<String>,
     /// The client read private content since the person last approved something.
     pub tainted: bool,
@@ -56,7 +59,7 @@ impl ConfirmRequest {
         let label = string_field(object, "label", 64);
         let tool = string_field(object, "tool", 64);
         let reason = string_field(object, "reason", 200);
-        let args = string_list(object, "args", 8, 120);
+        let (args, args_complete) = review_args(object);
         let tiers = string_list(object, "tiers", 5, 24);
         let tainted = object
             .get("tainted")
@@ -77,10 +80,35 @@ impl ConfirmRequest {
             tool,
             reason,
             args,
+            args_complete,
             tiers,
             tainted,
         })
     }
+}
+
+/// At most this many arguments of at most this many characters are shown; more than that is "not reviewable", never silently cut.
+pub const MAX_ARGS: usize = 16;
+pub const MAX_ARG_CHARS: usize = 400;
+
+/// The arguments as they will run, and whether all of them could be shown unchanged.
+fn review_args(object: &serde_json::Map<String, Value>) -> (Vec<String>, bool) {
+    let Some(Value::Array(items)) = object.get("args") else {
+        return (Vec::new(), true);
+    };
+    let mut complete = items.len() <= MAX_ARGS;
+    let mut shown = Vec::new();
+    for item in items.iter().take(MAX_ARGS) {
+        let Some(text) = item.as_str() else {
+            complete = false;
+            continue;
+        };
+        let display = sanitize_for_display(text, MAX_ARG_CHARS);
+        // Sanitizing drops control and direction characters and shortens: whatever it changed is not what would run.
+        complete &= display == text;
+        shown.push(display);
+    }
+    (shown, complete)
 }
 
 fn json_u64(value: &Value) -> Option<u64> {
@@ -239,6 +267,7 @@ mod tests {
             tool: "app-launch".to_string(),
             reason: String::new(),
             args: Vec::new(),
+            args_complete: true,
             tiers: Vec::new(),
             tainted: false,
         }
@@ -310,8 +339,9 @@ mod tests {
             "args": many
         }))
         .unwrap();
-        assert_eq!(big.args.len(), 8);
-        assert!(big.args[0].chars().count() <= 121); // 120 + possible ellipsis
+        assert_eq!(big.args.len(), super::MAX_ARGS);
+        assert!(big.args[0].chars().count() <= super::MAX_ARG_CHARS + 1); // plus a possible ellipsis
+        assert!(!big.args_complete, "cut for display, so not reviewable");
     }
 
     #[test]
@@ -400,6 +430,7 @@ mod tests {
             tool: String::new(),
             reason: String::new(),
             args: Vec::new(),
+            args_complete: true,
             tiers: vec!["observe".into(), "act".into()],
             tainted: false,
         };

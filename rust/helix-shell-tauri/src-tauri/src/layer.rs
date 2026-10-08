@@ -19,6 +19,9 @@ pub const WINDOW: &str = "shell";
 /// What the size-allocate hook should apply. Written whenever a plan is applied.
 static INPUT: Mutex<InputRegion> = Mutex::new(InputRegion::BarOnly);
 
+/// Rectangles besides the bar that take the pointer while no panel is open (the dock, or the strip that summons it).
+static EXTRA: Mutex<Vec<(i32, i32, i32, i32)>> = Mutex::new(Vec::new());
+
 fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width: i32, height: i32) {
     let Some(gdk_window) = window.window() else {
         return;
@@ -31,6 +34,12 @@ fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width:
     let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(
         rect.0, rect.1, rect.2, rect.3,
     ));
+    // The extras only matter while the pointer is otherwise limited to the bar; a panel's region already covers everything.
+    if region == InputRegion::BarOnly {
+        for (x, y, w, h) in EXTRA.lock().expect("extra input").iter() {
+            let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(*x, *y, *w, *h));
+        }
+    }
     gdk_window.input_shape_combine_region(&shape, 0, 0);
 }
 
@@ -132,4 +141,13 @@ pub fn apply(app: &AppHandle, plan: Plan) {
         gtk_window.allocated_width(),
         gtk_window.allocated_height(),
     );
+}
+
+/// Replaces the extra pointer-taking rectangles and re-applies the region. Must run on the main thread.
+pub fn set_extra_input(app: &AppHandle, rects: &[helix_shell_core::glass::Rect]) {
+    *EXTRA.lock().expect("extra input") = rects.iter().map(|r| (r.x, r.y, r.w, r.h)).collect();
+    let Some(window) = app.get_webview_window(WINDOW) else { return };
+    let Ok(gtk_window) = window.gtk_window() else { return };
+    let region = *INPUT.lock().expect("input region");
+    set_input_region(&gtk_window, region, gtk_window.allocated_width(), gtk_window.allocated_height());
 }

@@ -1,4 +1,4 @@
-// wl-pointer <fx> <fy> [click]   Move the pointer to a fraction (0..1) of the output and optionally click the left button.
+// wl-pointer <fx> <fy> [click|rclick|mclick]   Move the pointer to a fraction (0..1) of the output and optionally click a button.
 // For driving a nested compositor in tests (zwlr_virtual_pointer_v1). Run with WAYLAND_DISPLAY set to the nested display.
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,12 +36,18 @@ int main(int argc, char **argv) {
   zwlr_virtual_pointer_v1_frame(pointer);
   wl_display_roundtrip(display);
   usleep(150000);
-  if (argc > 3 && !strcmp(argv[3], "click")) {
-    zwlr_virtual_pointer_v1_button(pointer, now_ms(), 0x110, 1);  // BTN_LEFT pressed
+  uint32_t button = 0;
+  if (argc > 3) {
+    if (!strcmp(argv[3], "click")) button = 0x110;        // BTN_LEFT
+    else if (!strcmp(argv[3], "rclick")) button = 0x111;  // BTN_RIGHT
+    else if (!strcmp(argv[3], "mclick")) button = 0x112;  // BTN_MIDDLE
+  }
+  if (button) {
+    zwlr_virtual_pointer_v1_button(pointer, now_ms(), button, 1);  // pressed
     zwlr_virtual_pointer_v1_frame(pointer);
     wl_display_roundtrip(display);
     usleep(60000);
-    zwlr_virtual_pointer_v1_button(pointer, now_ms(), 0x110, 0);
+    zwlr_virtual_pointer_v1_button(pointer, now_ms(), button, 0);
     zwlr_virtual_pointer_v1_frame(pointer);
   }
   wl_display_roundtrip(display);

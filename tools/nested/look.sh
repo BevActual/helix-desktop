@@ -18,6 +18,10 @@ source "$ROOT/tools/nested/ui-lib.sh"
 probe() { python3 "$ROOT/tools/nested/notify-probe.py" "$@" >/dev/null; }
 wait_for "LIVE Sound" 1 120; sleep 1
 shot 01-bar
+PT="$ROOT/tools/nested/wl-pointer/wl-pointer"
+"$PT" 0.5 0.999; sleep 1.2; shot 06-dock
+"$PT" 0.47 0.965; sleep 0.9; shot 07-dock-hover
+"$PT" 0.5 0.4; sleep 1
 probe send "Messages" "Alex Rivera" "Are we still on for 6? I booked the table by the window." 1 -1 reply Reply
 probe send "Calendar" "Design review in 10 minutes" "Studio B · Bring the latest prototype" 1 -1
 sleep 1; shot 02-toasts

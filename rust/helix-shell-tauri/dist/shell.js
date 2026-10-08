@@ -685,6 +685,144 @@ $("brightness").addEventListener("input", () => {
   if (!brightTimer) brightTimer = setTimeout(() => { brightTimer = null; invoke("brightness_set", { percent: brightLatest }); }, 50);
 });
 
+
+// The dock. Rust decides what is listed (pinned first, then whatever is open) and what a click does; this page draws it and sends back ids
+// it was given. It stays hidden until the pointer touches the bottom edge, and while hidden only a thin strip there takes the pointer.
+let dockItems = [];
+let dockHideTimer = null;
+let dockMenuOpen = false;
+function dockLetterTile(name) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.codePointAt(0)) >>> 0;
+  const tile = document.createElement("div");
+  tile.className = "dock-tile";
+  tile.style.background = "hsl(" + (hash % 360) + " 45% 42%)";
+  tile.textContent = Array.from(name)[0] || "•";
+  return tile;
+}
+function drawDock(items) {
+  dockItems = items;
+  const row = $("dock-items");
+  row.replaceChildren();
+  items.forEach((item, index) => {
+    const cell = document.createElement("div");
+    cell.className = "dock-item" + (item.running ? " running" : "") + (item.focused ? " focused" : "") + (item.urgent ? " urgent" : "");
+    cell.dataset.test = "dock-item-" + index;
+    cell.dataset.name = item.name;
+    if (item.icon_uri) { const img = document.createElement("img"); img.src = item.icon_uri; img.alt = ""; img.draggable = false; cell.append(img); }
+    else cell.append(dockLetterTile(item.name));
+    cell.addEventListener("click", () => invoke("dock_activate", { id: item.id }));
+    cell.addEventListener("auxclick", (event) => { if (event.button === 1) invoke("dock_new_window", { id: item.id }); });
+    cell.addEventListener("contextmenu", (event) => { event.preventDefault(); openDockMenu(item, cell); });
+    cell.addEventListener("pointerenter", () => showDockTip(item.name, cell));
+    cell.addEventListener("pointerleave", () => $("dock-tip").classList.remove("show"));
+    row.append(cell);
+  });
+  queueInteractive();
+  queueGlass();
+}
+// The dock is centred with a transform, which offset boxes ignore; where it rests is simply centred above the bottom margin.
+function dockBox() {
+  const dock = $("dock");
+  return { x: (window.innerWidth - dock.offsetWidth) / 2, y: window.innerHeight - 10 - dock.offsetHeight, w: dock.offsetWidth, h: dock.offsetHeight, radius: parseFloat(getComputedStyle(dock).borderTopLeftRadius) || 0 };
+}
+function showDockTip(name, cell) {
+  const tip = $("dock-tip");
+  tip.textContent = name;
+  const box = cell.getBoundingClientRect();
+  tip.style.left = box.left + box.width / 2 + "px";
+  tip.style.top = box.top - 42 + "px";
+  tip.classList.add("show");
+}
+function setDock(show) {
+  document.body.classList.toggle("dock-show", show);
+  if (!show) { $("dock-tip").classList.remove("show"); closeDockMenu(); }
+  queueInteractive();
+  queueGlass();
+}
+function scheduleDockHide() {
+  clearTimeout(dockHideTimer);
+  dockHideTimer = setTimeout(() => { if (!dockMenuOpen) setDock(false); }, 450);
+}
+$("dock-edge").addEventListener("pointerenter", () => { clearTimeout(dockHideTimer); if (!document.body.classList.contains("open")) setDock(true); });
+$("dock").addEventListener("pointerenter", () => clearTimeout(dockHideTimer));
+$("dock").addEventListener("pointerleave", () => { magnify(null); scheduleDockHide(); });
+$("dock-edge").addEventListener("pointerleave", () => { if (!$("dock").matches(":hover")) scheduleDockHide(); });
+// Icons grow toward the pointer: a smooth bump (a Gaussian of the distance) rather than steps.
+function magnify(x) {
+  document.querySelectorAll(".dock-item").forEach((cell) => {
+    let scale = 1;
+    if (x !== null) {
+      const box = cell.getBoundingClientRect();
+      const distance = x - (box.left + box.width / 2);
+      scale = 1 + 0.62 * Math.exp(-(distance * distance) / (2 * 62 * 62));
+    }
+    cell.style.setProperty("--s", scale.toFixed(3));
+  });
+}
+$("dock").addEventListener("pointermove", (event) => magnify(event.clientX));
+function closeDockMenu() { dockMenuOpen = false; $("dock-menu").classList.remove("show"); queueInteractive(); }
+function openDockMenu(item, cell) {
+  const menu = $("dock-menu");
+  menu.replaceChildren();
+  const title = document.createElement("div");
+  title.className = "dock-menu-title";
+  title.textContent = item.name;
+  menu.append(title);
+  const entry = (label, test, run) => {
+    const row = document.createElement("div");
+    row.className = "dock-menu-item";
+    row.textContent = label;
+    row.dataset.test = test;
+    row.addEventListener("click", () => { closeDockMenu(); run(); });
+    menu.append(row);
+  };
+  entry(item.running ? "New window" : "Open", "dock-menu-new", () => invoke("dock_new_window", { id: item.id }));
+  if (!item.id.startsWith("app:")) {
+    if (item.pinned) entry("Remove from Dock", "dock-menu-unpin", () => invoke("dock_unpin", { id: item.id }));
+    else entry("Keep in Dock", "dock-menu-pin", () => invoke("dock_pin", { id: item.id }));
+  }
+  menu.classList.add("show");
+  const box = cell.getBoundingClientRect();
+  menu.style.left = Math.max(8, box.left + box.width / 2 - 95) + "px";
+  menu.style.top = Math.max(8, box.top - menu.offsetHeight - 14) + "px";
+  dockMenuOpen = true;
+  queueInteractive();
+}
+document.addEventListener("pointerdown", (event) => { if (dockMenuOpen && !event.target.closest("#dock-menu")) closeDockMenu(); });
+listen("dock-view", (event) => drawDock(event.payload));
+invoke("dock_view").then(drawDock);
+
+// What takes the pointer while no panel is open besides the bar: the dock when it is showing (and its menu), else the strip that summons it.
+let interactiveQueued = false;
+let lastInteractive = "";
+function reportInteractive() {
+  interactiveQueued = false;
+  const open = document.body.classList.contains("open");
+  const rects = [];
+  if (!open) {
+    if (document.body.classList.contains("dock-show")) {
+      const dock = dockBox();
+      rects.push({ x: dock.x - 12, y: dock.y - 12, w: dock.w + 24, h: dock.h + 24 + 12, radius: 0 });
+      if (dockMenuOpen) rects.push({ ...layoutBox($("dock-menu")), radius: 0 });
+    } else {
+      rects.push({ ...layoutBox($("dock-edge")), radius: 0 });
+    }
+  }
+  const key = JSON.stringify(rects) + window.innerWidth + "x" + window.innerHeight;
+  if (key === lastInteractive) return;
+  lastInteractive = key;
+  invoke("report_interactive", { elements: rects, width: window.innerWidth, height: window.innerHeight });
+}
+function queueInteractive() {
+  if (interactiveQueued) return;
+  interactiveQueued = true;
+  requestAnimationFrame(reportInteractive);
+}
+new MutationObserver(queueInteractive).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
+window.addEventListener("resize", queueInteractive);
+queueInteractive();
+
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
@@ -700,11 +838,13 @@ function reportGlass() {
   glassQueued = false;
   const elements = [$("bar")];
   if ($("osd").classList.contains("show")) elements.push($("osd"));
+  if (document.body.classList.contains("dock-show") && !document.body.dataset.panel) elements.push(dockBox());
+  if (dockMenuOpen) elements.push($("dock-menu"));
   const open = document.body.dataset.panel;
   if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
   document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
-  if (open) elements.splice(0, elements.length, ...elements.filter((el) => el.id !== "toast" && !el.classList.contains("toast"))); // toasts are hidden while a panel is open
-  const boxes = elements.map(layoutBox);
+  if (open) elements.splice(0, elements.length, ...elements.filter((el) => !(el instanceof Element) || !el.classList.contains("toast"))); // toasts are hidden while a panel is open
+  const boxes = elements.map((el) => (el instanceof Element ? layoutBox(el) : el));
   const key = JSON.stringify(boxes) + window.innerWidth + "x" + window.innerHeight;
   if (key === lastGlass) return;
   lastGlass = key;
@@ -716,10 +856,10 @@ function queueGlass() {
   requestAnimationFrame(reportGlass);
 }
 listen("blur-active", (event) => { document.documentElement.dataset.blur = event.payload ? "1" : ""; });
-new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
+new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock"].forEach((id) => glassResize.observe($(id)));
 window.addEventListener("resize", queueGlass);
 queueGlass();
 
@@ -748,7 +888,7 @@ function sendReport() {
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, elements } });
 }
 window.addEventListener("resize", () => queueReport());
-new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
+new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 
 invoke("quick_view").then(drawQuick);
 invoke("brightness_view").then(drawBrightness);
