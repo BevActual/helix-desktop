@@ -410,3 +410,18 @@ select:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
 .pairing-actions { display: flex; gap: 8px; }
 select { appearance: none; -webkit-appearance: none; padding-right: 30px;
   background: var(--fill-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='%23999' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") right 10px center / 12px no-repeat; }
+
+/* Today: the date, a month, then the notifications. */
+#today { display: flex; flex-direction: column; gap: 6px; padding-bottom: 12px; margin-bottom: 4px; border-bottom: .5px solid var(--hairline); }
+#today-head { padding: 2px 4px 6px; } #today-weekday { color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+#today-date { font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-top: 1px; }
+#cal-bar { display: flex; align-items: center; gap: 2px; padding: 0 2px; } #cal-title { flex: 1; font-weight: 600; font-size: 14px; }
+.cal-btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: transparent; color: var(--label-2); }
+.cal-btn:hover { background: var(--fill-2); color: var(--label); } .cal-btn svg { width: 16px; height: 16px; stroke-width: 2.2; }
+.cal-btn.cal-now { width: auto; padding: 0 10px; border-radius: 14px; font-size: 12px; font-weight: 600; color: var(--accent); }
+#cal-grid { display: grid; grid-template-columns: 22px repeat(7, 1fr); row-gap: 2px; text-align: center; font-variant-numeric: tabular-nums; }
+.cal-dow { color: var(--label-2); font-size: 11px; font-weight: 600; padding: 4px 0; }
+.cal-week { color: var(--label-3); font-size: 10.5px; align-self: center; }
+.cal-day { height: 30px; width: 30px; margin: 0 auto; display: grid; place-items: center; border-radius: 50%; font-size: 13px; }
+.cal-day.out { color: var(--label-3); } .cal-day.weekend:not(.out) { color: var(--label-2); }
+.cal-day.today { background: var(--accent); color: var(--on-accent); font-weight: 700; }

@@ -788,6 +788,36 @@ async fn send_setting(update: Result<SettingUpdate, QuickError>) -> Result<(), S
     Ok(())
 }
 
+/// A month of the calendar behind the clock. The page says what today is (in the person's own time zone) and which month to show.
+#[derive(serde::Deserialize)]
+struct Today {
+    year: i32,
+    month: u32,
+    day: u32,
+}
+
+#[tauri::command]
+fn calendar_view(
+    year: i32,
+    month: u32,
+    delta: i32,
+    today: Today,
+    week_start: u32,
+) -> Result<helix_shell_core::calendar::MonthView, String> {
+    helix_shell_core::calendar::month_view(
+        year,
+        month,
+        delta,
+        helix_shell_core::calendar::Date {
+            year: today.year,
+            month: today.month,
+            day: today.day,
+        },
+        week_start,
+    )
+    .map_err(|error| format!("{error:?}"))
+}
+
 #[tauri::command]
 fn quick_view(app: AppHandle) -> QuickView {
     shell_state(&app).lock().expect("shell state").quick.view()
@@ -1460,6 +1490,7 @@ fn main() {
             network_vpn,
             activity_view,
             notify::notifications_view,
+            calendar_view,
             report_glass,
             island::island_view,
             island::media_toggle,

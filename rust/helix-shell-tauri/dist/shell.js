@@ -23,9 +23,62 @@ function tickClock() {
   document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   document.querySelector("#clock .time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
+// Today panel: the month grid is built in Rust (leap years, week starts, week numbers); this draws it. Moving months re-asks with a delta.
+let calMonth = null;   // { year, month } being shown
+let calDay = null;     // the day the grid was last drawn for
+const weekStart = () => (/^en-(US|CA)|^ja|^pt-BR|^he/.test(navigator.language) || navigator.language === "en" ? 0 : 1);
+function localToday() {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth() + 1, day: now.getDate() };
+}
+function drawToday() {
+  const now = new Date();
+  $("today-weekday").textContent = now.toLocaleDateString([], { weekday: "long" });
+  $("today-date").textContent = now.toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" });
+}
+function showMonth(delta) {
+  const today = localToday();
+  const base = calMonth || today;
+  invoke("calendar_view", { year: base.year, month: base.month, delta, today, weekStart: weekStart() }).then((view) => {
+    calMonth = { year: view.year, month: view.month };
+    calDay = today.year * 10000 + today.month * 100 + today.day;
+    const first = new Date(2024, 0, 7 + view.week_start);   // a Sunday, then a Monday
+    const grid = $("cal-grid");
+    grid.replaceChildren();
+    grid.append(document.createElement("span"));
+    for (let i = 0; i < 7; i++) {
+      const label = document.createElement("span");
+      label.className = "cal-dow";
+      label.textContent = new Date(first.getFullYear(), 0, first.getDate() + i).toLocaleDateString([], { weekday: "narrow" });
+      grid.append(label);
+    }
+    view.weeks.forEach((week) => {
+      const number = document.createElement("span");
+      number.className = "cal-week";
+      number.textContent = week.iso_week;
+      grid.append(number);
+      week.days.forEach((cell) => {
+        const day = document.createElement("span");
+        day.className = "cal-day" + (cell.in_month ? "" : " out") + (cell.today ? " today" : "") + (cell.weekend ? " weekend" : "");
+        day.textContent = cell.day;
+        day.dataset.test = "day-" + cell.year + "-" + String(cell.month).padStart(2, "0") + "-" + String(cell.day).padStart(2, "0");
+        grid.append(day);
+      });
+    });
+    $("cal-title").textContent = new Date(view.year, view.month - 1, 1).toLocaleDateString([], { month: "long", year: "numeric" });
+    $("cal-today").style.visibility = view.year === today.year && view.month === today.month ? "hidden" : "visible";
+    queueReport();
+  });
+}
+$("cal-prev").onclick = () => showMonth(-1);
+$("cal-next").onclick = () => showMonth(1);
+$("cal-today").onclick = () => { calMonth = null; showMonth(0); };
+
 // One timer, aligned to the minute: it moves the clock and re-reads the battery. Nothing else in the bar runs on a timer.
 function everyMinute() {
   tickClock();
+  const today = localToday();
+  if (calDay !== null && calDay !== today.year * 10000 + today.month * 100 + today.day) { drawToday(); calMonth = null; showMonth(0); }
   invoke("battery_view").then(drawBattery);
   clearTimeout(clockTimer);
   clockTimer = setTimeout(everyMinute, 60000 - (Date.now() % 60000) + 50);
@@ -62,6 +115,11 @@ listen("shell-mode", (event) => {
   document.body.classList.toggle("open", panel !== null);
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
+  if (panel === "notifications") {
+    drawToday();
+    calMonth = null;
+    showMonth(0);
+  }
   if (panel === "assistant") {
     $("q").value = "";
     $("q").focus();

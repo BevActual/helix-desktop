@@ -6,7 +6,7 @@
     <div id="workspaces" data-test="workspaces"></div>
   </div>
   <div id="center">
-    <button class="bar-btn" id="clock" data-test="clock" title="Notifications"><span class="day"></span><span class="time"></span><span id="dnd-mark" hidden><i data-icon="moon" data-slot="dnd-mark"></i></span></button>
+    <button class="bar-btn" id="clock" data-test="clock" title="Today and notifications"><span class="day"></span><span class="time"></span><span id="dnd-mark" hidden><i data-icon="moon" data-slot="dnd-mark"></i></span></button>
     <button class="bar-btn" id="island" data-test="island" hidden><i data-icon="sparkle" data-slot="island-ico"></i><span id="island-text"></span><span id="island-detail"></span></button>
   </div>
   <div class="side right">
@@ -67,6 +67,14 @@
 <div id="toasts"></div>
 <div id="osd"><i data-icon="volume" data-slot="osd-ico"></i><div id="osd-bar"><div id="osd-fill"></div></div><span id="osd-val"></span><span id="osd-text"></span></div>
 <div id="notifs" class="panel glass">
+  <div id="today">
+    <div id="today-head"><div id="today-weekday"></div><div id="today-date"></div></div>
+    <div id="cal-bar"><div id="cal-title"></div>
+      <button id="cal-prev" class="cal-btn" data-test="cal-prev" title="Previous month" aria-label="Previous month"><i data-icon="chevron-left"></i></button>
+      <button id="cal-today" class="cal-btn cal-now" data-test="cal-today">Today</button>
+      <button id="cal-next" class="cal-btn" data-test="cal-next" title="Next month" aria-label="Next month"><i data-icon="chevron-right"></i></button></div>
+    <div id="cal-grid"></div>
+  </div>
   <div id="notif-head"><h3>Notifications</h3><button id="notif-dnd" data-test="notif-dnd">Do not disturb</button><button id="notif-clear" data-test="notif-clear">Clear all</button></div>
   <div id="notif-list"></div><div id="notif-empty"></div>
 </div>

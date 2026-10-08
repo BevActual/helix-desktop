@@ -458,6 +458,10 @@ square, cropped not stretched). `tools/switch-shell.sh tauri` installs and enabl
 
 **Choice and reload (2026-10-08).** Settings' Wallpaper page writes the choice to `~/.config/helix/wallpaper.toml` (0600, atomic; `[wallpaper.default]`, same format), never to the service's settings file. `helix-wallpaper` reads that file on top of the older one and watches both folders with inotify (no polling), so a new choice shows at once without a restart (`wallpaper-test.sh` checks real pixels after a rewrite). The picker's model (`helix_wallpaper::picker`) lists only pictures directly inside the folder and accepts a choice only as a place in that listing or a fixed swatch.
 
+## Today (2026-10-08)
+
+The clock opens **Today**: the date large, a month grid (previous, next, Today), then the notifications. The grid is `helix_shell_core::calendar` (pure date arithmetic, no time zones: the page says what today is in the person's zone; leap years, Sunday or Monday week starts, ISO week numbers by each row's Thursday, month moves across year ends, input refused outside 1900-2200). Reopening always starts on the current month, and the grid is rebuilt when midnight passes. No events yet: the service's calendar settings have no provider wired to the Tauri shell. `tools/nested/today-test.sh` clicks through months by name and checks today's real date.
+
 ## Volume and brightness keys, and the on-screen indicator (2026-10-07)
 
 The volume and brightness keys go through the shell (`org.helix.Shell1.AdjustVolume`, `ToggleMute`, `AdjustBrightness`; `helix-panel` calls them and falls back to

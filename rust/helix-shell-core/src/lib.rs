@@ -6,6 +6,7 @@ mod assistant;
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod calendar;
 mod confirm;
 pub mod catalog;
 pub mod confirmer;
