@@ -30,3 +30,4 @@ pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
 pick tray           && run tray tray-test.sh tauri-fake-desktop.sh
 pick idle           && run idle idle-test.sh idle-nested.sh
 pick island         && run island island-test.sh tauri-shell.sh
+pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

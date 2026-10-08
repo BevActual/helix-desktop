@@ -2,7 +2,7 @@
   ui_pos.py <layout.json> <control name> [fraction along its width]  ->  prints "fx fy" (fractions of the screen) for wl-pointer.
 Waits up to 8 s for the control to exist and for its position to stop changing, so a click never lands on a stale layout.
 Exits 1 when the control never appears."""
-import json, sys, time
+import json, os, sys, time
 path, name = sys.argv[1], sys.argv[2]
 along = float(sys.argv[3]) if len(sys.argv) > 3 else 0.5
 def read():
@@ -17,6 +17,12 @@ while time.time() < end:
     now = read()
     if now and now == last:
         w, h, box = now
+        # A window that is not a full-screen surface reports positions inside itself: UI_ORIGIN is where its corner is on the
+        # screen and UI_SCREEN is the screen size (both in the same logical pixels), as niri says.
+        if os.environ.get("UI_ORIGIN") and os.environ.get("UI_SCREEN"):
+            ox, oy = (float(v) for v in os.environ["UI_ORIGIN"].split())
+            w, h = (float(v) for v in os.environ["UI_SCREEN"].split())
+            box = dict(box, x=box["x"] + ox, y=box["y"] + oy)
         print(f"{(box['x'] + box['w'] * along) / w:.4f} {(box['y'] + box['h'] / 2) / h:.4f}")
         sys.exit(0)
     last = now

@@ -6,11 +6,13 @@ mod activity;
 mod agent;
 mod contract;
 mod json;
+mod manager;
 
 pub use activity::{ActivityClient, ACTIVITY_METHODS, ACTIVITY_SIGNALS};
 pub use agent::{details_from_owned, ConfirmerClient, CONFIRMER_METHODS, CONFIRMER_SIGNALS};
 pub use contract::{parse_interfaces, protocol_xml, Interface, BUS_NAME, OBJECT_PATH};
 pub use json::{args_from_json, owned_to_json, to_json};
+pub use manager::{ManagerClient, MANAGER_METHODS};
 
 use futures_util::StreamExt;
 use zbus::proxy;
@@ -162,6 +164,10 @@ impl Desktop {
         Ok(ServiceStarts {
             changes: bus.receive_name_owner_changed().await?,
         })
+    }
+
+    pub fn manager(&self) -> ManagerClient {
+        ManagerClient::new(self.connection.clone())
     }
 
     pub fn activity(&self) -> ActivityClient {

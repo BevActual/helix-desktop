@@ -14,6 +14,11 @@ case "${1:-status}" in
     [ -x "$BIN" ] || { echo "build it first: (cd rust && cargo build --release)" >&2; exit 1; }
     mkdir -p "$UNITS" "$HOME/.local/bin"
     install -m 0755 "$ROOT/tools/helix-panel" "$HOME/.local/bin/helix-panel"
+    # The Tauri Settings app, alongside the installed one (not instead of it): `helix-settings-new`. It becomes `helix-settings` when it covers
+    # the pages that matter; the symlink resolves to the repo's build, whose executable is itself named helix-settings.
+    for build in fast release; do
+      [ -x "$ROOT/rust/target/$build/helix-settings" ] && ln -sf "$ROOT/rust/target/$build/helix-settings" "$HOME/.local/bin/helix-settings-new" && break
+    done
     # systemd reads \x20 for a space in ExecStart; systemd-escape --path would also turn / into -, so escape spaces only.
     # Doubled because the next sed would read \x20 in its replacement as a space again.
     escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')

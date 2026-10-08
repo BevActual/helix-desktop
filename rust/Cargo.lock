@@ -1498,6 +1498,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-settings"
+version = "0.1.0"
+dependencies = [
+ "gtk",
+ "helix-desktop-api",
+ "helix-shell-core",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tokio",
+ "zbus",
+]
+
+[[package]]
 name = "helix-shell-core"
 version = "0.1.0"
 dependencies = [

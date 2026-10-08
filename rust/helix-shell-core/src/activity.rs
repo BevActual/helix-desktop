@@ -107,6 +107,30 @@ pub struct ActivityView {
     pub history: Vec<HistoryRow>,
 }
 
+/// One audit record as the person reads it: every field an agent can influence is sanitized and bounded.
+pub fn history_row(row: &Value) -> HistoryRow {
+    let args = row
+        .get("args")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default();
+    HistoryRow {
+        time: sanitize_for_display(&text(row, "time"), 24),
+        who: friendly_client_name(&text(row, "client"), 40),
+        tool: sanitize_for_display(&text(row, "tool"), 40),
+        args: sanitize_for_display(&args, 120),
+        tier: tier(row),
+        decision: sanitize_for_display(&text(row, "decision"), 24),
+        outcome: sanitize_for_display(&text(row, "outcome"), 80),
+        tainted: row.get("tainted").and_then(Value::as_bool).unwrap_or(false),
+    }
+}
+
 impl Activity {
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = Some(enabled);
@@ -167,28 +191,7 @@ impl Activity {
             .iter()
             .rev()
             .take(MAX_ROWS)
-            .map(|row| {
-                let args = row
-                    .get("args")
-                    .and_then(Value::as_array)
-                    .map(|list| {
-                        list.iter()
-                            .filter_map(Value::as_str)
-                            .collect::<Vec<_>>()
-                            .join(" ")
-                    })
-                    .unwrap_or_default();
-                HistoryRow {
-                    time: sanitize_for_display(&text(row, "time"), 24),
-                    who: friendly_client_name(&text(row, "client"), 40),
-                    tool: sanitize_for_display(&text(row, "tool"), 40),
-                    args: sanitize_for_display(&args, 120),
-                    tier: tier(row),
-                    decision: sanitize_for_display(&text(row, "decision"), 24),
-                    outcome: sanitize_for_display(&text(row, "outcome"), 80),
-                    tainted: row.get("tainted").and_then(Value::as_bool).unwrap_or(false),
-                }
-            })
+            .map(history_row)
             .collect();
         ActivityView {
             available: self.enabled.is_some(),

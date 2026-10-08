@@ -1,0 +1,56 @@
+#!/bin/bash
+# Helix Settings against the real service: it becomes the Agent1 manager, lists who holds which tiers, and a tier switch or a revoke
+# changes what the service holds. Controls are clicked by name with the real pointer; the truth is read from the service's own state.
+#   HELIX_NESTED_SCRIPT=tools/nested/settings-test.sh tools/nested/run.sh settings tools/nested/settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+# (no gaps, so the window sits at the corner of the screen and the pointer maths is exact)
+SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log; FAILED=0
+LAYOUT=$SCRATCH/state/layout.json; GRANTS=$SCRATCH/state/noctalia/agent/grants.json
+source "$ROOT/tools/nested/ui-lib.sh"
+fail() { echo "FAIL: $*" >&2; FAILED=1; }
+wait_log() { for _ in $(seq 1 "${2:-60}"); do grep 'SETTINGS agents' "$LOG" | tail -1 | grep -Eq "$1" && return 0; sleep 0.25; done; echo "TIMEOUT waiting for: $1 (newest: $(grep 'SETTINGS agents' "$LOG" | tail -1))" >&2; return 1; }
+tiers_of() { python3 -c "import json; print(','.join(sorted(json.load(open('$GRANTS'))['clients'].get('$1', ['<none>']))))"; }
+locate_window() {  # where the window is on the screen, from niri, so the pointer lands on the page's controls
+  python3 - <<'PY'
+import json, subprocess
+windows = json.loads(subprocess.check_output(["niri", "msg", "--json", "windows"]))
+outputs = json.loads(subprocess.check_output(["niri", "msg", "--json", "outputs"]))
+w = next((x for x in windows if "settings" in (x["app_id"] or "").lower() or x["title"] == "Settings"), None)
+if w is None:
+    print("NO WINDOW; windows were:", [(x["app_id"], x["title"]) for x in windows], file=__import__("sys").stderr)
+    raise SystemExit(1)
+print("app id:", w["app_id"], file=__import__("sys").stderr)
+layout = w["layout"]
+tile = layout.get("tile_pos_in_workspace_view") or [0, 0]
+offset = layout.get("window_offset_in_tile") or [0, 0]
+logical = next(iter(outputs.values()))["logical"]
+print(f'{tile[0] + offset[0]} {tile[1] + offset[1]}|{logical["width"]} {logical["height"]}')
+PY
+}
+for _ in $(seq 1 120); do grep -q "SETTINGS agents" "$LOG" && break; sleep 0.25; done
+echo "--- 1. it becomes the manager and lists both applications"
+wait_log 'status=connected clients=2' || { fail "not connected as manager"; cat "$SCRATCH/state/helix-service.log" | tail -3; exit 1; }
+sleep 2
+niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-step1.png"
+loc=$(locate_window); export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}; echo "window at $UI_ORIGIN on a screen of $UI_SCREEN"
+for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
+has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"
+
+echo "--- 2. a tier switch changes what the service holds"
+before=$(tiers_of "exe:/opt/agents/helper.py"); echo "helper before: $before"
+click_id tier-0-observe-private; sleep 1.2
+after=$(tiers_of "exe:/opt/agents/helper.py"); echo "helper after: $after"
+[ "$after" = "act,observe,observe-private" ] && echo "ok: observe-private granted, the others kept" || fail "wrong tiers: $after"
+click_id tier-0-act; sleep 1.2
+[ "$(tiers_of 'exe:/opt/agents/helper.py')" = "observe,observe-private" ] && echo "ok: act withdrawn" || fail "act not withdrawn: $(tiers_of 'exe:/opt/agents/helper.py')"
+[ "$(tiers_of 'exe:/opt/agents/notes-agent')" = "observe" ] && echo "ok: the other application is untouched" || fail "the other application changed"
+
+echo "--- 3. revoking removes the application"
+click_id revoke-1; sleep 1.2
+[ "$(tiers_of 'exe:/opt/agents/notes-agent')" = "<none>" ] && echo "ok: revoked" || fail "still has: $(tiers_of 'exe:/opt/agents/notes-agent')"
+wait_log 'clients=1' && echo "ok: the page followed" || fail "the page still lists it"
+
+echo "--- 4. the changes are in the audit"
+grep -c '"tool":"grant-change"' "$SCRATCH/state/noctalia/agent/audit.jsonl" | sed 's/^/grant-change records: /'
+[ "$(grep -c '"tool":"grant-change"' "$SCRATCH/state/noctalia/agent/audit.jsonl")" -ge 3 ] && echo "ok: every change was recorded" || fail "changes missing from the audit"
+niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-final.png"
+[ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

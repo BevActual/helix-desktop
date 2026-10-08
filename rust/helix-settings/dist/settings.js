@@ -1,0 +1,90 @@
+// Helix Settings. Rust owns every picture and every request: this page draws views it was sent (text only through textContent) and sends back
+// the names those views listed. Nothing here builds a command or names a client it was not given.
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
+const $ = (id) => document.getElementById(id);
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+$("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
+$("refresh").onclick = () => invoke("agents_refresh");
+
+// Privacy & agents ------------------------------------------------------------------------------------------------------------------
+function drawAgents(view) {
+  const note = $("agents-note");
+  note.textContent = view.status === "connected" ? "" :
+    view.status === "denied" ? "This copy of Settings is not the installed one, so it cannot manage agent access." :
+    "The desktop service is not running.";
+  note.style.display = view.status === "connected" ? "none" : "";
+  const list = $("agents-clients");
+  list.replaceChildren();
+  view.clients.forEach((client, index) => {
+    const card = el("div", "agent-card");
+    card.dataset.test = "agent-" + index;
+    const head = el("div", "agent-head");
+    const who = el("div", "agent-who");
+    who.append(el("div", "agent-name", client.name), el("div", "agent-identity", client.identity));
+    const stats = el("div", "agent-stats", client.requests + " requests" + (client.denied ? " · " + client.denied + " refused" : "") + (client.last ? " · last " + client.last : ""));
+    who.append(stats);
+    const revoke = el("button", "danger", "Revoke");
+    revoke.dataset.test = "revoke-" + index;
+    revoke.onclick = () => invoke("agents_revoke", { client: client.id });
+    head.append(who, revoke);
+    card.append(head);
+    client.tiers.forEach((tier) => {
+      const row = el("label", "tier-row");
+      const box = el("input");
+      box.type = "checkbox";
+      box.className = "switch";
+      box.checked = tier.on;
+      box.dataset.test = "tier-" + index + "-" + tier.name;
+      box.addEventListener("change", () => invoke("agents_set_tier", { client: client.id, tier: tier.name, on: box.checked }));
+      const text = el("div", "tier-text");
+      text.append(el("div", "tier-name", tier.name), el("div", "tier-about", tier.about));
+      row.append(box, text);
+      card.append(row);
+    });
+    list.append(card);
+  });
+  if (!view.clients.length && view.status === "connected") list.append(el("div", "empty", "No application has been given access."));
+  const history = $("agents-history");
+  history.replaceChildren();
+  view.history.forEach((row) => {
+    const line = el("div", "hist-row");
+    const main = el("div", "hist-main");
+    main.append(el("div", "hist-what", row.tool + (row.args ? " " + row.args : "")),
+      el("div", "hist-sub", row.who + " · " + row.time + " · " + row.tier + " · " + row.decision + (row.outcome ? " · " + row.outcome : "")));
+    line.append(main);
+    if (row.tainted) line.append(el("span", "hist-flag", "untrusted input"));
+    history.append(line);
+  });
+  if (!view.history.length) history.append(el("div", "empty", "Nothing yet."));
+  queueReport();
+}
+// Registering a listener takes a moment; anything sent meanwhile would be lost, so the current state is read once it is in place.
+listen("agents-view", (event) => drawAgents(event.payload)).then(() => invoke("agents_view").then(drawAgents));
+
+// Tests only: where every named control is, so a test can click it by name.
+let reporting = false;
+let reportTimer = null;
+invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport(); });
+function queueReport() {
+  if (!reporting) return;
+  clearTimeout(reportTimer);
+  reportTimer = setTimeout(sendReport, 120);
+}
+function sendReport() {
+  const elements = {};
+  document.querySelectorAll("[data-test]").forEach((node) => {
+    const box = node.getBoundingClientRect();
+    if (box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden") elements[node.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
+  });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements } });
+}
+window.addEventListener("resize", queueReport);
+new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true });

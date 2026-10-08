@@ -319,3 +319,27 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 #island-detail { color: var(--label-2); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #island-detail:empty { display: none; }
 #island.approval { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); } #island.approval svg { animation: pulse 1.6s ease-in-out infinite; }
 #island.assistant svg { color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+
+/* Settings app (shared stylesheet: the shell simply never has these elements) */
+body.settings { background: transparent; }
+body.settings #app { height: 100vh; display: grid; grid-template-columns: 240px 1fr; background: var(--glass-solid); border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 .5px var(--hairline); }
+body.settings #side { background: var(--fill-1); display: flex; flex-direction: column; padding: 0 10px 12px; }
+#titlebar { height: 46px; display: flex; align-items: center; }
+.win-btn { width: 26px; height: 26px; padding: 0; border-radius: 50%; display: grid; place-items: center; background: var(--fill-2); } .win-btn svg { width: 12px; height: 12px; stroke-width: 2.2; }
+#pages { display: flex; flex-direction: column; gap: 2px; }
+.page-link { display: flex; align-items: center; gap: 10px; text-align: left; padding: 8px 12px; border-radius: 10px; background: transparent; font-weight: 500; }
+.page-link.current { background: var(--accent); color: var(--on-accent); }
+body.settings #content { overflow-y: auto; padding: 0 28px 28px; display: flex; flex-direction: column; gap: 10px; }
+body.settings #content::-webkit-scrollbar { width: 0; }
+body.settings header { height: 46px; flex: none; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: var(--glass-solid); z-index: 2; }
+body.settings h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+#agents-note { padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); font-weight: 500; }
+.agent-card { background: var(--fill-1); border-radius: var(--r-card); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.agent-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; } .agent-who { flex: 1; min-width: 0; }
+.agent-name { font-size: 15px; font-weight: 650; } .agent-identity { font: 500 11.5px/1.4 "JetBrains Mono", "DejaVu Sans Mono", ui-monospace, monospace; color: var(--label-2); overflow-wrap: anywhere; user-select: text; }
+.agent-stats { color: var(--label-2); font-size: 12px; margin-top: 2px; }
+button.danger { color: var(--danger); background: color-mix(in srgb, var(--danger) 14%, transparent); }
+.tier-row { display: flex; align-items: center; gap: 12px; padding: 6px 0; } .tier-name { font-weight: 600; } .tier-about { color: var(--label-2); font-size: 12.5px; }
+.hist-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: .5px solid var(--sep); } .hist-main { flex: 1; min-width: 0; }
+.hist-what { font-weight: 550; overflow-wrap: anywhere; } .hist-sub { color: var(--label-2); font-size: 12px; overflow-wrap: anywhere; } .hist-flag { color: var(--warn); font-size: 11px; font-weight: 600; }
+.empty { color: var(--label-2); padding: 14px 4px; }

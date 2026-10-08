@@ -7,6 +7,7 @@ members = [
     "helix-wallpaper",
     "helix-idle",
     "helix-shell-tauri/src-tauri",
+    "helix-settings/src-tauri",
 ]
 
 [profile.release]
