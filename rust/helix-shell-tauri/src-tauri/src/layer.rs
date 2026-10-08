@@ -86,7 +86,8 @@ pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
     gtk_window.set_size_request(1, 1);
     gtk_window.init_layer_shell();
-    gtk_window.set_namespace("helix-shell");
+    // "noctalia-panel" is what the person's niri blur and liquid-glass rule (generated from their Theme settings) matches for panels.
+    gtk_window.set_namespace("noctalia-panel");
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         gtk_window.set_anchor(edge, true);
     }

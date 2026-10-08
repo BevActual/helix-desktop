@@ -645,6 +645,44 @@ $("tile-bt-open").onclick = () => showDetail("bluetooth");
 $("sound-open").onclick = () => showDetail("sound");
 $("back").onclick = () => showDetail(null);
 
+
+// Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
+// is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
+// animated transform, so the blur is in place from the first frame of an opening panel.
+const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "agents", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+function layoutBox(element) {
+  let x = 0, y = 0;
+  for (let node = element; node; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
+  return { x, y, w: element.offsetWidth, h: element.offsetHeight, radius: parseFloat(getComputedStyle(element).borderTopLeftRadius) || 0 };
+}
+let lastGlass = "";
+let glassQueued = false;
+function reportGlass() {
+  glassQueued = false;
+  const elements = [$("bar")];
+  const open = document.body.dataset.panel;
+  if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
+  document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
+  if (open) elements.length = Math.min(elements.length, 2); // toasts are hidden while a panel is open
+  const boxes = elements.map(layoutBox);
+  const key = JSON.stringify(boxes) + window.innerWidth + "x" + window.innerHeight;
+  if (key === lastGlass) return;
+  lastGlass = key;
+  invoke("report_glass", { elements: boxes, width: window.innerWidth, height: window.innerHeight });
+}
+function queueGlass() {
+  if (glassQueued) return;
+  glassQueued = true;
+  requestAnimationFrame(reportGlass);
+}
+listen("blur-active", (event) => { document.documentElement.dataset.blur = event.payload ? "1" : ""; });
+new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
+new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
+const glassResize = new ResizeObserver(queueGlass);
+["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts"].forEach((id) => glassResize.observe($(id)));
+window.addEventListener("resize", queueGlass);
+queueGlass();
+
 // Tests only: when Rust says a layout log is wanted, report where every named control is, so a test can click it by name.
 let reporting = false;
 let reportTimer = null;

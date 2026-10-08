@@ -5,6 +5,7 @@
 
 mod apps;
 mod battery;
+mod blur;
 mod confirmer;
 mod control;
 mod insert;
@@ -1059,6 +1060,33 @@ fn confirmer_set_tier(app: AppHandle, name: String, checked: bool) -> ConfirmerV
     panel.set_tier(&name, checked)
 }
 
+/// The page says which rectangles are drawn as glass; Rust turns them into the blur region (clamped to the surface) and tells the
+/// compositor. Returns nothing: whether blur exists is reported to the page as the `blur-active` event.
+#[tauri::command]
+fn report_glass(
+    app: AppHandle,
+    elements: Vec<helix_shell_core::glass::Glass>,
+    width: i32,
+    height: i32,
+) {
+    let runner = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        let Some(window) = runner.get_webview_window(layer::WINDOW) else {
+            return;
+        };
+        let Ok(gtk_window) = window.gtk_window() else {
+            return;
+        };
+        let rects = helix_shell_core::glass::blur_rects(
+            &elements,
+            width.clamp(1, 16384),
+            height.clamp(1, 16384),
+        );
+        let active = blur::apply(&gtk_window, &rects);
+        let _ = runner.emit("blur-active", active);
+    });
+}
+
 #[tauri::command]
 fn panel_open(app: AppHandle, id: String) {
     open_panel(&app, &id);
@@ -1254,6 +1282,7 @@ fn main() {
             network_vpn,
             activity_view,
             notify::notifications_view,
+            report_glass,
             insert::quick_insert_query,
             insert::quick_insert_activate,
             insert::quick_insert_forget_clipboard,

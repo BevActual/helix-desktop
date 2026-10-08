@@ -30,6 +30,8 @@ hotkey-overlay { skip-at-startup; }
 screenshot-path "$SCRATCH/shots/shot-%H%M%S.png"
 spawn-at-startup "sh" "-c" "exec '$PROGRAM' > '$SCRATCH/program.log' 2>&1"
 KDL
+# HELIX_NESTED_KDL: extra niri configuration for this run (a test of compositor-side behaviour, such as blur rules).
+[ -n "${HELIX_NESTED_KDL:-}" ] && printf '%s\n' "$HELIX_NESTED_KDL" >> "$SCRATCH/niri.kdl"
 niri -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
 NIRI=$!
 for _ in $(seq 1 60); do grep -q "IPC listening" "$SCRATCH/niri.log" && break; sleep 0.3; done

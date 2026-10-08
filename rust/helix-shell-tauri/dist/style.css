@@ -38,6 +38,8 @@
   --shadow: 0 22px 60px rgba(0, 0, 0, .22), 0 4px 14px rgba(0, 0, 0, .12);
   --shadow-small: 0 8px 24px rgba(0, 0, 0, .16);
 }
+:root[data-blur="1"] { --glass: rgba(28, 28, 32, .62); --glass-solid: rgba(34, 34, 40, .78); --fill-1: rgba(255, 255, 255, .09); }
+:root[data-theme="light"][data-blur="1"] { --glass: rgba(250, 250, 252, .58); --glass-solid: rgba(252, 252, 254, .8); --fill-1: rgba(0, 0, 0, .06); }
 @media (prefers-reduced-motion: reduce) { :root { --dur: 1ms; } }
 
 html, body { height: 100%; margin: 0; background: transparent; color: var(--label); overflow: hidden; user-select: none; cursor: default;

@@ -431,8 +431,11 @@ follow the Dark theme setting) and every component uses only tokens. Icons are a
 approval dialog), never parsed from markup. The bar is a menu bar: apps and assistant on the left, the clock in the middle (it opens the notification
 shade), notifications, agents and one status button (Wi-Fi, Bluetooth, sound, battery) on the right. Panels share one glass recipe and one entrance.
 The approval dialog is deliberately unlike everything else: a modal on a dimmed screen with an "Exact action" box and an Allow button that visibly
-fills while it is still arming. Glass proper (blur behind the panels) needs the shell to tell niri which rectangles to blur through
-`ext-background-effect-v1`; the shell is one full-output surface, so that region has to follow the panels. Not done yet.
+fills while it is still arming. Glass: the shell tells niri which rectangles to blur through `ext-background-effect-v1` (`src/blur.rs`, its own event queue on GTK's
+connection; only ever sets the blur region and commits). The page reports the bar, the open panel and the toasts from their layout boxes, so the blur is in
+place from the first frame of an opening panel; `helix_shell_core::glass` turns them into rectangles with the rounded corners cut in. The layer namespace is
+`noctalia-panel`, which the person's generated niri rule (blur and liquid glass from their Theme settings) already matches, so no config is added.
+With blur active the page lightens its glass tokens. `tools/nested/blur-look.sh` screenshots panels over a striped window with that rule enabled.
 Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tools/nested/look.sh` (a screenshot of every panel), `tools/nested/ui-suite.sh`
 (every nested UI test, each from an empty scratch directory). The layout report waits 300 ms so panel animations have settled before positions are read.
 
