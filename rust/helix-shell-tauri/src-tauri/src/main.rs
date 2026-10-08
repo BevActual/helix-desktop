@@ -56,6 +56,8 @@ struct ShellState {
     dock: helix_shell_core::dock::Dock,
     /// Applications' tray items (StatusNotifierItem), as the watcher this shell serves registered them.
     tray: helix_shell_core::tray::Tray,
+    /// The menu last shown for a tray item, so a choice is checked against exactly what was on screen.
+    tray_menu: Option<(String, helix_shell_core::dbusmenu::Menu)>,
     /// The backlight as last read or written, if the machine has one.
     brightness: Option<helix_shell_core::brightness::Brightness>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
@@ -1458,6 +1460,8 @@ fn main() {
             tray::tray_activate,
             tray::tray_context,
             tray::tray_secondary,
+            tray::tray_menu,
+            tray::tray_menu_activate,
             report_interactive,
             dock::dock_view,
             dock::workspaces_view,
@@ -1524,6 +1528,7 @@ fn main() {
                 notifications: helix_shell_core::notifications::Notifications::new(),
                 insert_target: None,
                 tray: helix_shell_core::tray::Tray::default(),
+                tray_menu: None,
                 brightness: backlight::read(),
                 niri: helix_shell_core::niri::Niri::default(),
                 dock_apps: Vec::new(),

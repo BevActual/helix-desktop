@@ -299,3 +299,11 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 .tray-item:hover { background: var(--fill-1); } .tray-item img, .tray-item canvas, .tray-item .tray-tile { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; }
 .tray-item .tray-tile { display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; }
 .tray-item.attention { animation: pulse 1.6s ease-in-out infinite; }
+
+/* An application's own menu from the tray: the same popup recipe as the dock's. */
+#tray-menu { position: fixed; min-width: 220px; max-width: 360px; max-height: 70vh; overflow-y: auto; padding: 6px; border-radius: 16px; display: none; flex-direction: column; gap: 1px; }
+#tray-menu.show { display: flex; animation: cardin 160ms var(--ease) both; }
+.menu-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 9px; font-weight: 500; }
+.menu-row.sub { padding-left: 26px; } .menu-row.header { color: var(--label-2); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+.menu-row.disabled { opacity: .4; } .menu-row:not(.disabled):not(.header):hover { background: var(--accent); color: var(--on-accent); }
+.menu-row .tick { width: 14px; flex: none; } .menu-sep { height: 1px; margin: 5px 8px; background: var(--sep); }

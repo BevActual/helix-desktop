@@ -13,7 +13,7 @@ click_tray() { local pos; pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT"
 for _ in $(seq 1 120); do grep -q "TRAY serving" "$LOG" && break; sleep 0.25; done
 grep -q "TRAY serving" "$LOG" || { echo "FAIL: the shell did not become the tray watcher"; exit 1; }
 rm -f "$TRAY_LOG"; export TRAY_CMD=$SCRATCH/tray.cmd; : > "$TRAY_CMD"
-python3 "$ROOT/tools/nested/tray-app.py" 2>/dev/null & APP=$!
+python3 "$ROOT/tools/nested/tray-app.py" 2>"$SCRATCH/tray-app.err" & APP=$!
 trap 'kill $APP 2>/dev/null' EXIT
 cmd() { echo "$1" >> "$TRAY_CMD"; }
 
@@ -25,8 +25,30 @@ sleep 0.6
 
 echo "--- 2. clicks reach the application"
 click_tray click;  wait_app "Activate" && echo "ok: Activate" || fail "left click"
-click_tray rclick; wait_app "ContextMenu" && echo "ok: ContextMenu" || fail "right click"
 click_tray mclick; wait_app "SecondaryActivate" && echo "ok: SecondaryActivate" || fail "middle click"
+
+echo "--- 2b. the application's own menu is shown, and only its enabled entries can be chosen"
+click_tray rclick
+for _ in $(seq 1 20); do has_id tray-menu-1 && break; sleep 0.25; done
+has_id tray-menu-1 && has_id tray-menu-5 && echo "ok: the menu (with its submenu entries) is open" || fail "the menu did not open"
+grep -q ContextMenu "$TRAY_LOG" && fail "an item with a menu was also sent ContextMenu"
+click_id tray-menu-3; sleep 0.8
+grep -q 'menu-event 3' "$TRAY_LOG" && fail "a disabled entry was activated"
+click_id tray-menu-5; sleep 0.8
+wait_app "menu-event 5 clicked" && echo "ok: the chosen entry reached the application" || fail "the choice did not arrive"
+sleep 0.8; has_id tray-menu-1 && fail "the menu stayed open after a choice"
+
+echo "--- 2c. an application with no menu gets the plain ContextMenu call"
+export TRAY_NAME=org.helix.TestTray2 TRAY_NO_MENU=1 TRAY_LOG=$SCRATCH/tray-app2.log TRAY_CMD=$SCRATCH/tray2.cmd; : > "$TRAY_CMD"
+python3 "$ROOT/tools/nested/tray-app.py" 2>/dev/null & APP2=$!
+wait_tray 'items=2' || fail "second item"
+sleep 0.6
+pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" tray-1 0.5) && "$PT" $pos rclick; sleep 1
+for _ in $(seq 1 20); do grep -q ContextMenu "$TRAY_LOG" 2>/dev/null && break; sleep 0.25; done
+grep -q ContextMenu "$TRAY_LOG" && echo "ok: ContextMenu for an item with no menu" || fail "no ContextMenu call: $(cat "$TRAY_LOG" 2>/dev/null)"
+kill $APP2 2>/dev/null
+export TRAY_LOG=$SCRATCH/tray-app.log TRAY_CMD=$SCRATCH/tray.cmd; unset TRAY_NAME TRAY_NO_MENU
+wait_tray 'items=1' || fail "the second item did not go"
 
 echo "--- 3. a change in the application updates the bar; passive hides it"
 before=$(grep -c 'TRAY view' "$LOG")

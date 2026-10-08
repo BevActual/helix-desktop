@@ -48,6 +48,7 @@ struct Item {
     title: String,
     icon_name: String,
     icon_theme_path: String,
+    menu_path: String,
     status: Status,
     pixmap: Option<Pixmap>,
 }
@@ -59,6 +60,8 @@ pub struct Props {
     pub title: String,
     pub icon_name: String,
     pub icon_theme_path: String,
+    /// The object path of the item's `com.canonical.dbusmenu`, if it has one.
+    pub menu: String,
     pub status: String,
     /// `(width, height, ARGB32 bytes in network order)` as the specification delivers them.
     pub pixmaps: Vec<(i32, i32, Vec<u8>)>,
@@ -200,6 +203,7 @@ impl Tray {
             title: String::new(),
             icon_name: String::new(),
             icon_theme_path: String::new(),
+            menu_path: String::new(),
             status: Status::Active,
             pixmap: None,
         });
@@ -219,6 +223,11 @@ impl Tray {
             && props.icon_theme_path.len() <= 400
         {
             props.icon_theme_path.clone()
+        } else {
+            String::new()
+        };
+        item.menu_path = if valid_object_path(&props.menu) && props.menu != "/" {
+            props.menu.clone()
         } else {
             String::new()
         };
@@ -254,6 +263,15 @@ impl Tray {
             .iter()
             .find(|i| i.key == key)
             .map(|i| (i.bus_name.as_str(), i.path.as_str()))
+    }
+
+    /// Where the item's menu lives, when it publishes one.
+    pub fn menu_path(&self, key: &str) -> Option<&str> {
+        self.items
+            .iter()
+            .find(|i| i.key == key)
+            .map(|i| i.menu_path.as_str())
+            .filter(|p| !p.is_empty())
     }
 
     pub fn icon_theme_path(&self, key: &str) -> Option<&str> {
@@ -515,5 +533,21 @@ mod tests {
         p.icon_theme_path = format!("/{}", "a".repeat(500));
         t.update(&key, &p);
         assert_eq!(t.icon_theme_path(&key), None);
+    }
+
+    #[test]
+    fn a_menu_path_is_kept_only_if_it_is_a_real_object_path() {
+        let mut t = Tray::default();
+        t.register("org.a.B", "/StatusNotifierItem");
+        let key = t.registered()[0].clone();
+        let mut p = props();
+        p.menu = "/MenuBar".into();
+        t.update(&key, &p);
+        assert_eq!(t.menu_path(&key), Some("/MenuBar"));
+        for bad in ["/", "", "not/a/path", "/a b", "/a//b"] {
+            p.menu = bad.into();
+            t.update(&key, &p);
+            assert_eq!(t.menu_path(&key), None, "{bad:?}");
+        }
     }
 }

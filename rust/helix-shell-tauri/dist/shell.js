@@ -731,6 +731,45 @@ function trayIcon(item) {
   }
   return dockLetterTile(item.title || "?");
 }
+
+// An application's own menu. Rust reads it from the application and remembers exactly what it showed, so a choice is only passed on if it
+// was an enabled entry of this menu; applications with no menu get the plain ContextMenu call instead.
+let trayMenuOpen = false;
+function closeTrayMenu() { trayMenuOpen = false; $("tray-menu").classList.remove("show"); queueInteractive(); queueGlass(); queueReport(); }
+async function openTrayMenu(item, button, at) {
+  let items = [];
+  try { items = await invoke("tray_menu", { key: item.key }); } catch (error) { items = []; }
+  if (!items.length) { invoke("tray_context", at); return; }
+  const menu = $("tray-menu");
+  menu.replaceChildren();
+  const add = (entry, sub) => {
+    if (entry.kind === "separator") { const sep = document.createElement("div"); sep.className = "menu-sep"; menu.append(sep); return; }
+    const row = document.createElement("div");
+    row.className = "menu-row" + (sub ? " sub" : "") + (entry.kind === "submenu" ? " header" : "") + (!entry.enabled && entry.kind !== "submenu" ? " disabled" : "");
+    const tick = document.createElement("span");
+    tick.className = "tick";
+    tick.textContent = entry.checked ? (entry.kind === "radio" ? "●" : "✓") : "";
+    const label = document.createElement("span");
+    label.textContent = entry.label;
+    row.append(tick, label);
+    row.dataset.test = "tray-menu-" + entry.id;
+    if (entry.kind !== "submenu") row.addEventListener("click", () => { if (!entry.enabled) return; closeTrayMenu(); invoke("tray_menu_activate", { key: item.key, id: entry.id }); });
+    menu.append(row);
+    (entry.children || []).forEach((child) => add(child, true));
+  };
+  items.forEach((entry) => add(entry, false));
+  menu.classList.add("show");
+  const box = button.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(window.innerWidth - menu.offsetWidth - 8, box.right - menu.offsetWidth)) + "px";
+  menu.style.top = box.bottom + 8 + "px";
+  trayMenuOpen = true;
+  queueInteractive();
+  queueGlass();
+  queueReport();
+}
+document.addEventListener("pointerdown", (event) => { if (trayMenuOpen && !event.target.closest("#tray-menu")) closeTrayMenu(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape" && trayMenuOpen) { event.stopPropagation(); closeTrayMenu(); } }, true);
+
 function drawTray(items) {
   const host = $("tray");
   host.replaceChildren();
@@ -746,7 +785,7 @@ function drawTray(items) {
     const where = (event) => ({ key: item.key, x: Math.round(event.clientX), y: Math.round(event.clientY) });
     button.addEventListener("click", (event) => invoke("tray_activate", where(event)));
     button.addEventListener("auxclick", (event) => { if (event.button === 1) invoke("tray_secondary", where(event)); });
-    button.addEventListener("contextmenu", (event) => { event.preventDefault(); invoke("tray_context", where(event)); });
+    button.addEventListener("contextmenu", (event) => { event.preventDefault(); openTrayMenu(item, button, where(event)); });
     host.append(button);
   });
   queueReport();
@@ -869,7 +908,9 @@ function reportInteractive() {
   interactiveQueued = false;
   const open = document.body.classList.contains("open");
   const rects = [];
-  if (!open) {
+  if (!open && (trayMenuOpen || dockMenuOpen)) {
+    rects.push({ x: 0, y: 0, w: window.innerWidth, h: window.innerHeight, radius: 0 });
+  } else if (!open) {
     if (document.body.classList.contains("dock-show")) {
       const dock = dockBox();
       rects.push({ x: dock.x - 12, y: dock.y - 12, w: dock.w + 24, h: dock.h + 24 + 12, radius: 0 });
@@ -909,6 +950,7 @@ function reportGlass() {
   if ($("osd").classList.contains("show")) elements.push($("osd"));
   if (document.body.classList.contains("dock-show") && !document.body.dataset.panel) elements.push(dockBox());
   if (dockMenuOpen) elements.push($("dock-menu"));
+  if (trayMenuOpen) elements.push($("tray-menu"));
   const open = document.body.dataset.panel;
   if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
   document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
@@ -928,7 +970,7 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu"].forEach((id) => glassResize.observe($(id)));
 window.addEventListener("resize", queueGlass);
 queueGlass();
 

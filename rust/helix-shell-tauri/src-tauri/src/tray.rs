@@ -9,10 +9,11 @@ use std::time::Duration;
 
 use base64::Engine;
 use futures_util::StreamExt;
+use helix_shell_core::dbusmenu::{Menu, MenuItem};
 use helix_shell_core::tray::{parse_service, Props, Registered, Status};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
-use zbus::zvariant::OwnedValue;
+use zbus::zvariant::{OwnedObjectPath, OwnedValue, Value};
 
 use crate::{apps, shell_state};
 
@@ -175,6 +176,11 @@ async fn read_props(connection: &zbus::Connection, bus: &str, path: &str) -> Opt
         title: text(&all, "Title"),
         icon_name: text(&all, "IconName"),
         icon_theme_path: text(&all, "IconThemePath"),
+        menu: all
+            .get("Menu")
+            .and_then(|v| OwnedObjectPath::try_from(v.try_clone().ok()?).ok())
+            .map(|p| p.as_str().to_string())
+            .unwrap_or_default(),
         status: text(&all, "Status"),
         pixmaps,
     })
@@ -337,4 +343,145 @@ pub async fn tray_context(app: AppHandle, key: String, x: i32, y: i32) -> Result
 #[tauri::command]
 pub async fn tray_secondary(app: AppHandle, key: String, x: i32, y: i32) -> Result<(), String> {
     call(&app, &key, "SecondaryActivate", x, y).await
+}
+
+// --- The application's own menu (com.canonical.dbusmenu) ---------------------------------------------------------------------------
+
+/// `GetLayout`'s reply: a revision and the root node `(id, properties, children)`.
+type MenuReply = (u32, (i32, HashMap<String, OwnedValue>, Vec<OwnedValue>));
+
+const MENU_INTERFACE: &str = "com.canonical.dbusmenu";
+
+fn prop_text(props: &HashMap<String, OwnedValue>, key: &str) -> Option<String> {
+    props
+        .get(key)
+        .and_then(|v| <String>::try_from(v.try_clone().ok()?).ok())
+}
+
+fn prop_bool(props: &HashMap<String, OwnedValue>, key: &str) -> Option<bool> {
+    props
+        .get(key)
+        .and_then(|v| <bool>::try_from(v.try_clone().ok()?).ok())
+}
+
+/// One layout node `(id, properties, children)` as the JSON the menu model reads. Only the properties the model understands are copied, and
+/// depth is capped (the model caps it again).
+fn node_from_parts(
+    id: i32,
+    props: &HashMap<String, OwnedValue>,
+    children: &[&Value<'_>],
+    depth: usize,
+) -> serde_json::Value {
+    let mut out = serde_json::Map::new();
+    for key in ["label", "type", "toggle-type", "children-display"] {
+        if let Some(text) = prop_text(props, key) {
+            out.insert(key.into(), text.into());
+        }
+    }
+    for key in ["enabled", "visible"] {
+        if let Some(flag) = prop_bool(props, key) {
+            out.insert(key.into(), flag.into());
+        }
+    }
+    if let Some(state) = props
+        .get("toggle-state")
+        .and_then(|v| <i32>::try_from(v.try_clone().ok()?).ok())
+    {
+        out.insert("toggle-state".into(), state.into());
+    }
+    let mut kids = Vec::new();
+    if depth < 5 {
+        for child in children {
+            // An entry of `av` arrives wrapped in a variant, sometimes in more than one; peel them (a bounded number of times).
+            let mut inner: &Value<'_> = child;
+            for _ in 0..4 {
+                match inner {
+                    Value::Value(boxed) => inner = boxed,
+                    _ => break,
+                }
+            }
+            if let Value::Structure(structure) = inner {
+                if let Some(node) = node_from_fields(structure.fields(), depth + 1) {
+                    kids.push(node);
+                }
+            }
+        }
+    }
+    serde_json::json!({"id": id, "props": out, "children": kids})
+}
+
+fn node_from_fields(fields: &[Value<'_>], depth: usize) -> Option<serde_json::Value> {
+    let [id, props, children] = fields else {
+        return None;
+    };
+    let id = i32::try_from(id.clone()).ok()?;
+    let props: HashMap<String, OwnedValue> = HashMap::try_from(props.clone()).ok()?;
+    let Value::Array(list) = children else {
+        return None;
+    };
+    let kids: Vec<&Value<'_>> = list.iter().collect();
+    Some(node_from_parts(id, &props, &kids, depth))
+}
+
+async fn menu_proxy(app: &AppHandle, key: &str) -> Result<zbus::Proxy<'static>, String> {
+    let (bus, _) = address(app, key)?;
+    let path = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .tray
+        .menu_path(key)
+        .map(str::to_string)
+        .ok_or("this item has no menu")?;
+    let connection = CONNECTION.get().ok_or("tray not running")?;
+    zbus::Proxy::new(connection, bus, path, MENU_INTERFACE)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Reads the item's menu and remembers it, so a later choice can be checked against exactly what was shown. Empty when it has none.
+#[tauri::command]
+pub async fn tray_menu(app: AppHandle, key: String) -> Result<Vec<MenuItem>, String> {
+    let Ok(proxy) = menu_proxy(&app, &key).await else {
+        return Ok(Vec::new());
+    };
+    // Many applications build their menu lazily when asked; the answer does not matter.
+    let asked = std::time::Duration::from_secs(2);
+    let _ = tokio::time::timeout(asked, proxy.call::<_, _, bool>("AboutToShow", &(0i32,))).await;
+    // An application that does not answer must not leave the click hanging: the person gets its plain context menu call instead.
+    let reply = tokio::time::timeout(
+        asked,
+        proxy.call_method("GetLayout", &(0i32, -1i32, Vec::<&str>::new())),
+    )
+    .await
+    .map_err(|_| "the application did not answer".to_string())?
+    .map_err(|e| e.to_string())?;
+    let body = reply.body();
+    let (_revision, (id, props, children)): MenuReply =
+        body.deserialize().map_err(|e| e.to_string())?;
+    let kids: Vec<&Value<'_>> = children.iter().map(|c| &**c).collect();
+    let json = node_from_parts(id, &props, &kids, 0);
+    let menu = Menu::from_layout(&json);
+    let items = menu.items().to_vec();
+    shell_state(&app).lock().expect("shell state").tray_menu = Some((key, menu));
+    eprintln!("TRAY menu items={}", items.len());
+    Ok(items)
+}
+
+/// Tells the application the person chose an entry of the menu that was shown; any other id is refused here.
+#[tauri::command]
+pub async fn tray_menu_activate(app: AppHandle, key: String, id: i32) -> Result<(), String> {
+    let allowed = {
+        let state = shell_state(&app);
+        let shell = state.lock().expect("shell state");
+        matches!(&shell.tray_menu, Some((shown, menu)) if *shown == key && menu.may_activate(id))
+    };
+    if !allowed {
+        return Err("not an entry of the menu that was shown".into());
+    }
+    let proxy = menu_proxy(&app, &key).await?;
+    eprintln!("TRAY menu choice");
+    proxy
+        .call::<_, _, ()>("Event", &(id, "clicked", Value::from(0i32), 0u32))
+        .await
+        .map_err(|e| e.to_string())
 }
