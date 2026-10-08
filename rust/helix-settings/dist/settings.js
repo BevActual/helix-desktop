@@ -14,6 +14,64 @@ function el(tag, className, text) {
 $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 $("refresh").onclick = () => invoke("agents_refresh");
 
+// Pages -----------------------------------------------------------------------------------------------------------------------------
+const TITLES = { appearance: "Appearance", agents: "Privacy & agents" };
+function showPage(name) {
+  document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-" + name; });
+  document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
+  $("page-title").textContent = TITLES[name];
+  $("refresh").style.display = name === "agents" ? "" : "none";
+  queueReport();
+}
+document.querySelectorAll(".page-link").forEach((node) => { node.onclick = () => showPage(node.dataset.page); });
+showPage("appearance");
+
+// Rows of service settings ----------------------------------------------------------------------------------------------------------
+function drawRows(view) {
+  const host = $(view.page + "-rows");
+  host.replaceChildren();
+  let group = null;
+  let card = null;
+  view.rows.forEach((row) => {
+    if (row.group !== group) {
+      group = row.group;
+      host.append(el("h4", "", group));
+      card = el("div", "rows-card");
+      host.append(card);
+    }
+    const line = el("div", "setting-row");
+    const text = el("div", "setting-text");
+    text.append(el("div", "setting-title", row.title));
+    if (row.description) text.append(el("div", "setting-about", row.description));
+    if (row.overridden) text.append(el("div", "setting-about", "Pinned by a local override."));
+    line.append(text);
+    const control = row.control;
+    const send = (change) => invoke("setting_change", { page: view.page, id: row.id, change }).catch((error) => console.error(error));
+    if (control.kind === "switch") {
+      const box = el("input");
+      box.type = "checkbox";
+      box.className = "switch";
+      box.checked = control.on;
+      box.dataset.test = "set-" + row.id;
+      box.addEventListener("change", () => send({ kind: "switch", value: box.checked }));
+      line.append(box);
+    } else if (control.kind === "choice") {
+      const segments = el("div", "segments");
+      control.options.forEach((option) => {
+        const button = el("button", "segment" + (option.value === control.current ? " current" : ""), option.label);
+        button.dataset.test = "set-" + row.id + "-" + option.value;
+        button.onclick = () => send({ kind: "choice", value: option.value });
+        segments.append(button);
+      });
+      line.append(segments);
+    }
+    card.append(line);
+  });
+  if (!view.rows.length) host.append(el("div", "empty", "These settings are not available: the desktop service is not running."));
+  queueReport();
+}
+listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then(drawRows));
+
 // Privacy & agents ------------------------------------------------------------------------------------------------------------------
 function drawAgents(view) {
   const note = $("agents-note");

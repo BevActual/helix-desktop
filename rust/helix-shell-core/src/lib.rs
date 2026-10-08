@@ -7,6 +7,7 @@ pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
 mod confirm;
+pub mod catalog;
 pub mod confirmer;
 pub mod dbusmenu;
 mod display;

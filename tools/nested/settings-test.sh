@@ -32,6 +32,24 @@ wait_log 'status=connected clients=2' || { fail "not connected as manager"; cat 
 sleep 2
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-step1.png"
 loc=$(locate_window); export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}; echo "window at $UI_ORIGIN on a screen of $UI_SCREEN"
+setting_of() {  # the service's own answer for one setting
+  python3 - "$1" <<'PY'
+import sys, subprocess, re
+out = subprocess.check_output(["gdbus", "call", "--session", "--dest", "org.helix.Desktop", "--object-path", "/org/helix/Desktop", "--method", "org.helix.Desktop.Configuration1.GetSettings"], text=True)
+m = re.search(r"'id': <'%s'>.*?'value': <([^>]*)>" % re.escape(sys.argv[1]), out)
+print(m.group(1) if m else "<missing>")
+PY
+}
+echo "--- 1b. the Appearance page changes service settings"
+for _ in $(seq 1 20); do has_id set-theme.mode-light && break; sleep 0.25; done
+has_id set-theme.mode-light && has_id set-theme.pure_black_dark && echo "ok: appearance rows listed" || fail "appearance rows missing"
+echo "mode before: $(setting_of theme.mode)"
+click_id set-theme.mode-light; sleep 1.2
+[ "$(setting_of theme.mode)" = "'light'" ] && echo "ok: theme mode set to light" || fail "theme mode is $(setting_of theme.mode)"
+click_id set-theme.pure_black_dark; sleep 1.2
+[ "$(setting_of theme.pure_black_dark)" = "true" ] && echo "ok: pure black on" || fail "pure black is $(setting_of theme.pure_black_dark)"
+niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-appearance.png"
+click_id page-agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"
 

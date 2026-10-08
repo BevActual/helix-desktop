@@ -343,3 +343,12 @@ button.danger { color: var(--danger); background: color-mix(in srgb, var(--dange
 .hist-row { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: .5px solid var(--sep); } .hist-main { flex: 1; min-width: 0; }
 .hist-what { font-weight: 550; overflow-wrap: anywhere; } .hist-sub { color: var(--label-2); font-size: 12px; overflow-wrap: anywhere; } .hist-flag { color: var(--warn); font-size: 11px; font-weight: 600; }
 .empty { color: var(--label-2); padding: 14px 4px; }
+
+.settings-page[hidden] { display: none; }
+.rows-card { background: var(--fill-1); border-radius: var(--r-card); padding: 4px 16px; margin-bottom: 14px; }
+.setting-row { display: flex; align-items: center; gap: 16px; padding: 11px 0; justify-content: space-between; }
+.setting-row + .setting-row { border-top: 1px solid var(--fill-2); }
+.setting-title { font-weight: 600; } .setting-about { color: var(--label-2); font-size: 12.5px; }
+.segments { display: flex; gap: 2px; padding: 2px; background: var(--fill-2); border-radius: 9px; flex: none; }
+.segment { border: 0; background: transparent; color: var(--label-1); padding: 5px 14px; border-radius: 7px; font: inherit; font-size: 13px; }
+.segment.current { background: var(--fill-3); font-weight: 600; }

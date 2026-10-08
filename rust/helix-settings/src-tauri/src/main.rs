@@ -6,15 +6,27 @@
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use helix_desktop_api::Desktop;
+use helix_desktop_api::{Desktop, Domain};
+use helix_shell_core::catalog::{Catalog, Change, RowView};
 use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const WINDOW: &str = "settings";
 
+/// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
+const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
+
+fn page_ids(page: &str) -> Option<&'static [&'static str]> {
+    match page {
+        "appearance" => Some(APPEARANCE),
+        _ => None,
+    }
+}
+
 struct State {
     grants: Grants,
+    catalog: Catalog,
     status: &'static str,
 }
 
@@ -72,6 +84,37 @@ async fn refresh(app: &AppHandle) {
     publish(app);
 }
 
+#[derive(Serialize, Clone)]
+struct RowsView {
+    page: &'static str,
+    rows: Vec<RowView>,
+}
+
+fn rows_of(state: &State) -> RowsView {
+    RowsView {
+        page: "appearance",
+        rows: state.catalog.rows(APPEARANCE),
+    }
+}
+
+/// Reads the service's settings again and tells the page.
+async fn refresh_settings(app: &AppHandle) {
+    let Some(desktop) = DESKTOP.get() else { return };
+    match desktop.settings().await {
+        Ok(settings) => {
+            let view = {
+                let shared = shared(app);
+                let mut state = shared.lock().expect("state");
+                state.catalog.set(&settings);
+                rows_of(&state)
+            };
+            eprintln!("SETTINGS rows page=appearance n={}", view.rows.len());
+            let _ = app.emit("rows-view", view);
+        }
+        Err(error) => eprintln!("SETTINGS settings: {error}"),
+    }
+}
+
 fn set_status(app: &AppHandle, status: &'static str) {
     let changed = {
         let shared = shared(app);
@@ -95,6 +138,19 @@ fn connect(app: AppHandle) {
                             let _ = DESKTOP.set(desktop.clone());
                             set_status(&app, "connected");
                             refresh(&app).await;
+                            refresh_settings(&app).await;
+                            let settings_watcher = app.clone();
+                            let settings_desktop = desktop.clone();
+                            tauri::async_runtime::spawn(async move {
+                                let _ = settings_desktop
+                                    .watch(Domain::Configuration, move || {
+                                        let app = settings_watcher.clone();
+                                        tauri::async_runtime::spawn(async move {
+                                            refresh_settings(&app).await
+                                        });
+                                    })
+                                    .await;
+                            });
                             let watcher = app.clone();
                             let _ = desktop
                                 .manager()
@@ -166,6 +222,48 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn rows_view(app: AppHandle) -> RowsView {
+    rows_of(&shared(&app).lock().expect("state"))
+}
+
+/// A change to one row. The page names the row and what it wants; the catalog model decides whether that is a legal write.
+#[tauri::command]
+async fn setting_change(
+    app: AppHandle,
+    page: String,
+    id: String,
+    change: serde_json::Value,
+) -> Result<(), String> {
+    let ids = page_ids(&page).ok_or("unknown page")?;
+    let change = match (
+        change.get("kind").and_then(|k| k.as_str()),
+        change.get("value"),
+    ) {
+        (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
+        (Some("choice"), Some(v)) => Change::Choice(v.as_str().ok_or("not text")?.to_string()),
+        (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
+        (Some("text"), Some(v)) => Change::Text(v.as_str().ok_or("not text")?.to_string()),
+        _ => return Err("unknown change".into()),
+    };
+    let update = shared(&app)
+        .lock()
+        .expect("state")
+        .catalog
+        .update(ids, &id, change)
+        .map_err(|error| format!("{error:?}"))?;
+    let desktop = DESKTOP
+        .get()
+        .ok_or("not connected to the desktop service")?;
+    desktop
+        .update_setting(&update.id, &update.value)
+        .await
+        .map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS set {} {}", update.id, update.value);
+    refresh_settings(&app).await;
+    Ok(())
+}
+
+#[tauri::command]
 async fn agents_refresh(app: AppHandle) {
     refresh(&app).await;
 }
@@ -205,12 +303,15 @@ fn main() {
             agents_set_tier,
             agents_revoke,
             agents_refresh,
+            rows_view,
+            setting_change,
             layout_reporting,
             report_layout
         ])
         .setup(|app| {
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 grants: Grants::default(),
+                catalog: Catalog::default(),
                 status: "unavailable",
             })));
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
