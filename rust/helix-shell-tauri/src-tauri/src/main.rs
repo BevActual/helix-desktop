@@ -11,6 +11,7 @@ mod confirmer;
 mod control;
 mod dock;
 mod insert;
+mod island;
 mod layer;
 mod notify;
 mod tray;
@@ -60,6 +61,8 @@ struct ShellState {
     tray_menu: Option<(String, helix_shell_core::dbusmenu::Menu)>,
     /// The backlight as last read or written, if the machine has one.
     brightness: Option<helix_shell_core::brightness::Brightness>,
+    /// What is playing (from playerctl), for the live-status pill.
+    media: Option<helix_shell_core::island::Media>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
     insert_target: Option<u64>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
@@ -91,7 +94,7 @@ fn now_ms(started: Instant) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
-fn phase_name(phase: Phase) -> &'static str {
+pub(crate) fn phase_name(phase: Phase) -> &'static str {
     match phase {
         Phase::Idle => "idle",
         Phase::Thinking => "thinking",
@@ -132,6 +135,7 @@ fn shell_state(app: &AppHandle) -> Arc<Mutex<ShellState>> {
 fn emit_view(app: &AppHandle, view: &AssistantView) {
     eprintln!("ASSISTANT {}", view.phase);
     let _ = app.emit("assistant-view", view);
+    island::publish(app);
 }
 
 fn schedule_arm(app: AppHandle) {
@@ -643,6 +647,7 @@ async fn refresh_activity(app: &AppHandle) {
     );
     shell_state(app).lock().expect("shell state").activity = next;
     let _ = app.emit("activity-view", view);
+    island::publish(app);
 }
 
 /// Follows AgentActivity1 Changed / PendingChanged (no polling); reads are coalesced like the others.
@@ -1456,6 +1461,8 @@ fn main() {
             activity_view,
             notify::notifications_view,
             report_glass,
+            island::island_view,
+            island::media_toggle,
             tray::tray_view,
             tray::tray_activate,
             tray::tray_context,
@@ -1526,6 +1533,7 @@ fn main() {
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
+                media: None,
                 insert_target: None,
                 tray: helix_shell_core::tray::Tray::default(),
                 tray_menu: None,
@@ -1567,6 +1575,7 @@ fn main() {
             control::serve(handle.clone());
             notify::serve(handle.clone());
             tray::serve(handle.clone());
+            island::watch_media(handle.clone());
             insert::watch_clipboard(handle.clone());
             dock::start(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {

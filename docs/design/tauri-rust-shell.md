@@ -512,3 +512,17 @@ sleeps (needs the system bus; a session without one only gets idle locking). `~/
 `screen_off_after_seconds` (0 = never; never earlier than the lock), `enabled = false`, and the three commands as argument lists (a string or a malformed list is
 ignored, nothing is run through a shell). `tools/nested/idle-test.sh` runs it against the real compositor with short times and stand-in commands: lock, then off,
 then on at a touch, and the lock does not repeat. Not tested: the logind paths (they need the real system bus).
+
+## Live status in the middle of the bar (2026-10-07)
+
+The clock stays exactly centred; beside it a pill appears only when something is going on, one thing at a time by importance (`helix_shell_core::island`):
+agents waiting for a decision (amber, click opens Agents), the assistant thinking or working or needing an answer (click opens the assistant), music
+playing (click plays/pauses). Titles come from `playerctl --follow` (one long-lived process that sleeps until a player speaks) and are sanitized and bounded; a paused
+player or no player means no pill. A moon sits beside the time while Do Not Disturb is on. Not yet: mic or camera in use (the desktop service does not expose capture
+streams), timers, and a "Today" panel with a calendar behind the date. `tools/nested/island-test.sh` drives it with a stand-in MPRIS player and a real approval request.
+
+## Manager identity
+
+The Agent1 manager (the Settings app) is recognised by the canonical path of its executable (`/usr/local/bin/helix-settings` or `/usr/bin/helix-settings`), no longer
+by a file name any program could carry; the service reads one extra accepted path from `HELIX_MANAGER_EXE` in its own environment, which the integration test sets and
+a same-named impostor in another directory is refused.

@@ -210,6 +210,7 @@ function drawNotifications(view) {
   $("tile-dnd").dataset.on = view.dnd ? "1" : "0";
   $("tile-dnd-sub").textContent = view.dnd ? "On" : "Off";
   swapIcon(slot("bell"), view.dnd ? "moon" : "bell");
+  $("dnd-mark").hidden = !view.dnd;
   $("notif-badge").hidden = !view.unread;
   $("notif-badge").textContent = view.unread > 9 ? "9+" : String(view.unread);
   queueReport();
@@ -307,6 +308,30 @@ $("qi-input").addEventListener("keydown", (event) => {
 });
 document.querySelectorAll(".qi-tab").forEach((tab) => tab.addEventListener("click", () => { qiSource = tab.dataset.source; qiSearch(); $("qi-input").focus(); }));
 $("qi-forget").onclick = () => invoke("quick_insert_forget_clipboard").then(qiSearch);
+
+
+// The live-status pill. Rust decides what (if anything) is going on; this draws it and sends the click back as the thing it stands for.
+let islandKind = "none";
+function drawIsland(view) {
+  islandKind = view.kind;
+  const pill = $("island");
+  pill.hidden = view.kind === "none";
+  pill.className = "bar-btn " + view.kind;
+  if (view.kind === "none") { queueReport(); queueGlass(); return; }
+  swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : "sparkle");
+  $("island-text").textContent = view.text;
+  $("island-detail").textContent = view.detail;
+  pill.title = view.detail ? view.text + " · " + view.detail : view.text;
+  queueReport();
+  queueGlass();
+}
+listen("island-view", (event) => drawIsland(event.payload));
+invoke("island_view").then(drawIsland);
+$("island").onclick = () => {
+  if (islandKind === "approval") invoke("panel_open", { id: "agents" });
+  else if (islandKind === "assistant") invoke("panel_open", { id: "assistant" });
+  else if (islandKind === "media") invoke("media_toggle");
+};
 
 // Agents. Rust owns the picture (everything an agent can influence is sanitized there) and builds every request; this page only
 // draws it and sends back ids it was given. Text is assigned with textContent only.
@@ -970,7 +995,7 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
 window.addEventListener("resize", queueGlass);
 queueGlass();
 

@@ -5,7 +5,10 @@
     <button class="bar-btn icon" id="ask" data-test="ask" title="Assistant"><i data-icon="sparkle"></i></button>
     <div id="workspaces" data-test="workspaces"></div>
   </div>
-  <button class="bar-btn" id="clock" data-test="clock" title="Notifications"><span class="day"></span><span class="time"></span></button>
+  <div id="center">
+    <button class="bar-btn" id="clock" data-test="clock" title="Notifications"><span class="day"></span><span class="time"></span><span id="dnd-mark" hidden><i data-icon="moon" data-slot="dnd-mark"></i></span></button>
+    <button class="bar-btn" id="island" data-test="island" hidden><i data-icon="sparkle" data-slot="island-ico"></i><span id="island-text"></span><span id="island-detail"></span></button>
+  </div>
   <div class="side right">
     <div id="tray" data-test="tray"></div>
     <button class="bar-btn icon" id="agentsbtn" data-test="agentsbtn" style="display:none" title="Agents"><i data-icon="shield"></i></button>

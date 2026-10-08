@@ -17,6 +17,10 @@ shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.3; ls -t "$S
 source "$ROOT/tools/nested/ui-lib.sh"
 probe() { python3 "$ROOT/tools/nested/notify-probe.py" "$@" >/dev/null; }
 wait_for "LIVE Sound" 1 120; sleep 1
+export MPRIS_LOG=$SCRATCH/mpris.log MPRIS_CMD=$SCRATCH/mpris.cmd; : > "$MPRIS_CMD"
+python3 "$ROOT/tools/nested/mpris-app.py" 2>/dev/null & PLAYER=$!
+trap 'kill $PLAYER 2>/dev/null' EXIT
+sleep 2
 shot 01-bar
 PT="$ROOT/tools/nested/wl-pointer/wl-pointer"
 "$PT" 0.5 0.999; sleep 1.2; shot 06-dock

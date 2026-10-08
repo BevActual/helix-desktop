@@ -307,3 +307,15 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 .menu-row.sub { padding-left: 26px; } .menu-row.header { color: var(--label-2); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
 .menu-row.disabled { opacity: .4; } .menu-row:not(.disabled):not(.header):hover { background: var(--accent); color: var(--on-accent); }
 .menu-row .tick { width: 14px; flex: none; } .menu-sep { height: 1px; margin: 5px 8px; background: var(--sep); }
+
+/* The middle of the bar: the clock, and beside it a pill that appears only when something is going on. */
+/* The clock stays exactly in the middle; the pill hangs off its right side instead of pushing it over. */
+#center { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; }
+#dnd-mark { display: inline-flex; margin-left: 6px; } #dnd-mark[hidden] { display: none; } #dnd-mark { color: var(--label-2); } #dnd-mark svg { width: 13px; height: 13px; }
+#island { position: absolute; left: 100%; margin-left: 8px; white-space: nowrap; max-width: 320px; background: var(--fill-1); gap: 7px; animation: islandin 320ms var(--ease) both; }
+#island[hidden] { display: none; }
+@keyframes islandin { from { opacity: 0; transform: scale(.85); max-width: 0; } }
+#island svg { width: 14px; height: 14px; flex: none; } #island-text { font-weight: 600; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#island-detail { color: var(--label-2); max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } #island-detail:empty { display: none; }
+#island.approval { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); } #island.approval svg { animation: pulse 1.6s ease-in-out infinite; }
+#island.assistant svg { color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }

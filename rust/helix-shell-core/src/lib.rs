@@ -12,6 +12,7 @@ pub mod dbusmenu;
 mod display;
 pub mod dock;
 pub mod glass;
+pub mod island;
 pub mod launcher;
 pub mod network;
 pub mod niri;
