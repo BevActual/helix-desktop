@@ -1,8 +1,8 @@
 //! The control center's Wi-Fi model: the Network1 snapshot as what the page shows, and the only place that builds write requests.
 //! Nothing here talks to D-Bus. The page names a network by the path it was given; this checks that path against the snapshot just read.
 //!
-//! Not supported yet, and refused here rather than half-done: a network that needs a password, and enterprise networks. The page shows
-//! them with a note instead of a button.
+//! A secured network that was never joined is joined with a password the person typed (`connect_with_password`): checked here for what a
+//! Wi-Fi passphrase can be, held nowhere, and never shown in a log or a debug print. Enterprise networks are refused rather than half-done.
 
 use std::collections::BTreeMap;
 
@@ -62,13 +62,34 @@ pub enum RequestError {
     NotConnected,
     NotSaved,
     UnknownVpn,
+    /// A password was offered for a network that has none.
+    NotSecured,
+    /// Not a Wi-Fi passphrase: 8 to 63 printable ASCII characters, or exactly 64 hexadecimal digits.
+    BadPassword,
 }
 
 /// What to send to Network1.Action.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Request {
     pub action: &'static str,
     pub args: Value,
+}
+
+/// A request never prints a secret: whatever it carries under `secret` is replaced.
+impl std::fmt::Debug for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut args = self.args.clone();
+        if let Some(secret) = args.get_mut("secret") {
+            *secret = Value::String("<hidden>".into());
+        }
+        f.debug_struct("Request").field("action", &self.action).field("args", &args).finish()
+    }
+}
+
+/// Whether `text` can be a WPA passphrase or a raw 64-digit key.
+fn is_wifi_password(text: &str) -> bool {
+    let printable = text.chars().all(|c| (' '..='~').contains(&c));
+    (printable && (8..=63).contains(&text.len())) || (text.len() == 64 && text.chars().all(|c| c.is_ascii_hexdigit()))
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -321,6 +342,28 @@ impl Network {
         })
     }
 
+    /// Joins a secured network with a password the person typed. The password goes into the request and nowhere else.
+    pub fn connect_with_password(&self, path: &str, password: &str) -> Result<Request, RequestError> {
+        self.require_wifi()?;
+        let ap = self.point(path)?;
+        if ap.active {
+            return Err(RequestError::AlreadyConnected);
+        }
+        if ap.enterprise {
+            return Err(RequestError::Enterprise);
+        }
+        if !ap.secured {
+            return Err(RequestError::NotSecured);
+        }
+        if !is_wifi_password(password) {
+            return Err(RequestError::BadPassword);
+        }
+        Ok(Request {
+            action: "connect",
+            args: json!({"path": ap.path, "secret": password}),
+        })
+    }
+
     pub fn disconnect(&self) -> Result<Request, RequestError> {
         self.require_available()?;
         if !self.connected {
@@ -467,6 +510,45 @@ mod tests {
             "the joined access point wins over a stronger one"
         );
         assert_eq!(view.networks.len(), 2);
+    }
+
+    #[test]
+    fn a_secured_network_is_joined_with_a_password_that_is_checked() {
+        let network = Network::from_snapshot(&snapshot());
+        let request = network.connect_with_password("/ap/3", "correct horse").unwrap();
+        assert_eq!(request, Request { action: "connect", args: json!({"path": "/ap/3", "secret": "correct horse"}) });
+        assert!(network.connect_with_password("/ap/4", "another pass").is_ok(), "a saved network can be given a new password");
+        for bad in ["", "short", "1234567", &"x".repeat(64), &"x".repeat(100), "tab\tinside!", "new\nline!!", "ünïcode-pass", "emoji🙂passwd"] {
+            assert_eq!(network.connect_with_password("/ap/3", bad), Err(RequestError::BadPassword), "{bad:?}");
+        }
+        assert!(network.connect_with_password("/ap/3", &"x".repeat(63)).is_ok());
+        assert!(network.connect_with_password("/ap/3", &"x".repeat(8)).is_ok());
+        assert!(network.connect_with_password("/ap/3", &"Ab12".repeat(16)).is_ok(), "a raw 64-digit hex key");
+        assert_eq!(network.connect_with_password("/ap/3", &"g".repeat(64)), Err(RequestError::BadPassword), "64 characters that are not hex");
+    }
+
+    #[test]
+    fn a_password_is_refused_for_the_wrong_kind_of_network() {
+        let network = Network::from_snapshot(&snapshot());
+        assert_eq!(network.connect_with_password("/ap/1", "correct horse"), Err(RequestError::NotSecured), "an open network has none");
+        assert_eq!(network.connect_with_password("/ap/2", "correct horse"), Err(RequestError::AlreadyConnected));
+        assert_eq!(network.connect_with_password("/ap/999", "correct horse"), Err(RequestError::UnknownNetwork));
+        let mut data = snapshot();
+        data["access-points"][2]["enterprise"] = json!(true);
+        assert_eq!(Network::from_snapshot(&data).connect_with_password("/ap/3", "correct horse"), Err(RequestError::Enterprise));
+        let mut off = snapshot();
+        off["enabled"] = json!(false);
+        assert!(Network::from_snapshot(&off).connect_with_password("/ap/3", "correct horse").is_err());
+    }
+
+    #[test]
+    fn a_request_never_prints_its_secret() {
+        let network = Network::from_snapshot(&snapshot());
+        let request = network.connect_with_password("/ap/3", "correct horse").unwrap();
+        let shown = format!("{request:?} {:#?}", request);
+        assert!(!shown.contains("correct horse"), "{shown}");
+        assert!(shown.contains("<hidden>") && shown.contains("/ap/3"));
+        assert_eq!(request.args["secret"], "correct horse", "only the printing is hidden, not the data");
     }
 
     #[test]

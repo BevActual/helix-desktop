@@ -36,7 +36,49 @@ function actionButton(label, test, onClick, kind) {
   return button;
 }
 
+// The password is typed into a field that is removed as soon as it is sent; it is never stored or drawn back.
+let asking = null;
+let deferred = null;   // a newer view that arrived while a password was being typed
+function askPassword(line, net) {
+  if (asking === net.path) return;
+  asking = net.path;
+  const form = el("form", "password-form");
+  const field = el("input");
+  field.type = "password";
+  field.placeholder = "Password";
+  field.autocomplete = "off";
+  field.spellcheck = false;
+  field.dataset.test = "wifi-password";
+  const join = el("button", "primary", "Join");
+  join.type = "submit";
+  join.dataset.test = "wifi-join";
+  const cancel = el("button", "", "Cancel");
+  cancel.type = "button";
+  cancel.dataset.test = "wifi-cancel";
+  const message = el("div", "setting-about warn");
+  form.append(field, join, cancel);
+  line.after(form);
+  form.after(message);
+  field.focus();
+  const close = () => {
+    asking = null; field.value = ""; form.remove(); message.remove();
+    if (deferred) { const view = deferred; deferred = null; drawNetworkPage(view); }
+  };
+  cancel.onclick = close;
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const password = field.value;
+    field.value = "";
+    invoke("network_connect_password", { path: net.path, password }).then(close, (error) => {
+      message.textContent = String(error).includes("BadPassword") ? "A Wi-Fi password has 8 to 63 characters." : "That did not work.";
+      field.focus();
+    });
+  });
+}
+
 function drawNetworkPage(view) {
+  if (asking) { deferred = view; return; }
   const host = $("network-host");
   host.replaceChildren();
   if (!view.available) { host.append(el("div", "empty", "Networking is not available on this computer.")); queueReport(); return; }
@@ -56,10 +98,12 @@ function drawNetworkPage(view) {
     const card = el("div", "rows-card");
     view.networks.forEach((net) => {
       const joinable = net.action === "connect";
+      const asksPassword = net.action === "password";
       const tag = net.active ? "Connected"
-        : net.action === "password" ? "Needs a password, which Settings cannot ask for yet"
+        : asksPassword ? "Password required"
         : net.action === "enterprise" ? "Enterprise network" : net.saved ? "Saved" : net.secured ? "Secured" : "Open";
-      const line = listRow(net.ssid, tag, "net:" + net.ssid, { icon: net.secured ? "lock" : "wifi", active: net.active, clickable: joinable, dim: !joinable && !net.active });
+      const line = listRow(net.ssid, tag, "net:" + net.ssid, { icon: net.secured ? "lock" : "wifi", active: net.active, clickable: joinable || asksPassword, dim: !joinable && !asksPassword && !net.active });
+      if (asksPassword) line.addEventListener("click", () => askPassword(line, net));
       if (joinable) line.addEventListener("click", () => invoke("network_connect", { path: net.path }));
       if (net.saved) line.append(actionButton("Forget", "net-forget:" + net.ssid, () => invoke("network_forget", { path: net.path })));
       card.append(line);

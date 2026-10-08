@@ -157,7 +157,8 @@ def on_method(conn, sender, path, interface, method, params, invocation):
         elif method == "Action" and short == "Network1":
             name, args = params.unpack()
             args = {k: (v if not isinstance(v, GLib.Variant) else v.unpack()) for k, v in args.items()}
-            with open(log_path, "a") as log: log.write(f"ACTION {name} {json.dumps(args, sort_keys=True)}\n")
+            shown = {k: (f"<secret:{len(v)}>" if k == "secret" else v) for k, v in args.items()}   # a password never goes in a log
+            with open(log_path, "a") as log: log.write(f"ACTION {name} {json.dumps(shown, sort_keys=True)}\n")
             try:
                 network_action(name, args, lambda: emit_changed("org.helix.Desktop.Network1"))
             except (Refused, KeyError) as error:

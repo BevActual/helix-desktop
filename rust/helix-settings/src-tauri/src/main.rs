@@ -292,6 +292,19 @@ async fn network_scan(app: AppHandle) -> Result<(), String> {
 async fn network_connect(app: AppHandle, path: String) -> Result<(), String> {
     send_network(network_with(&app, |n| n.connect(&path))).await
 }
+/// Joins a secured network with the password the person typed. The password is used for this one request and kept nowhere.
+#[tauri::command]
+async fn network_connect_password(
+    app: AppHandle,
+    path: String,
+    password: String,
+) -> Result<(), String> {
+    send_network(network_with(&app, |n| {
+        n.connect_with_password(&path, &password)
+    }))
+    .await
+}
+
 #[tauri::command]
 async fn network_disconnect(app: AppHandle) -> Result<(), String> {
     send_network(network_with(&app, Network::disconnect)).await
@@ -698,6 +711,7 @@ fn main() {
             network_set_wifi,
             network_scan,
             network_connect,
+            network_connect_password,
             network_disconnect,
             network_forget,
             network_vpn,
