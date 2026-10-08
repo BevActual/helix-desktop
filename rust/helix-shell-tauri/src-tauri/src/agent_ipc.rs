@@ -189,7 +189,10 @@ pub fn serve(app: AppHandle) {
             list.push_str(name);
             list.push('\n');
         }
-        let _ = std::fs::write(&tools, list);
+        if std::fs::write(&tools, list).is_ok() {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&tools, std::fs::Permissions::from_mode(0o600));
+        }
         eprintln!("AGENT-IPC serving {} ({} commands)", path.display(), SUPPORTED.len());
         loop {
             match listener.accept().await {
