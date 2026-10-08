@@ -717,6 +717,44 @@ function drawWorkspaces(strip) {
 listen("workspaces-view", (event) => drawWorkspaces(event.payload));
 invoke("workspaces_view").then(drawWorkspaces);
 
+
+// The tray. Applications publish these icons and titles, so they are drawn as images (never as markup) and named by a key Rust made.
+function trayIcon(item) {
+  if (item.icon_uri) { const img = document.createElement("img"); img.src = item.icon_uri; img.alt = ""; img.draggable = false; return img; }
+  if (item.pixmap) {
+    const { width, height, rgba } = item.pixmap;
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const bytes = Uint8ClampedArray.from(atob(rgba), (ch) => ch.charCodeAt(0));
+    if (bytes.length === width * height * 4) canvas.getContext("2d").putImageData(new ImageData(bytes, width, height), 0, 0);
+    return canvas;
+  }
+  return dockLetterTile(item.title || "?");
+}
+function drawTray(items) {
+  const host = $("tray");
+  host.replaceChildren();
+  items.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.className = "tray-item" + (item.status === "attention" ? " attention" : "");
+    button.dataset.test = "tray-" + index;
+    button.title = item.title;
+    button.setAttribute("aria-label", item.title);
+    const icon = trayIcon(item);
+    if (icon.classList.contains("dock-tile")) icon.classList.add("tray-tile");
+    button.append(icon);
+    const where = (event) => ({ key: item.key, x: Math.round(event.clientX), y: Math.round(event.clientY) });
+    button.addEventListener("click", (event) => invoke("tray_activate", where(event)));
+    button.addEventListener("auxclick", (event) => { if (event.button === 1) invoke("tray_secondary", where(event)); });
+    button.addEventListener("contextmenu", (event) => { event.preventDefault(); invoke("tray_context", where(event)); });
+    host.append(button);
+  });
+  queueReport();
+  queueGlass();
+}
+listen("tray-view", (event) => drawTray(event.payload));
+invoke("tray_view").then(drawTray);
+
 // The dock. Rust decides what is listed (pinned first, then whatever is open) and what a click does; this page draws it and sends back ids
 // it was given. It stays hidden until the pointer touches the bottom edge, and while hidden only a thin strip there takes the pointer.
 let dockItems = [];

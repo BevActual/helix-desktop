@@ -13,6 +13,7 @@ mod dock;
 mod insert;
 mod layer;
 mod notify;
+mod tray;
 
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -53,6 +54,8 @@ struct ShellState {
     niri: helix_shell_core::niri::Niri,
     dock_apps: Vec<helix_shell_core::launcher::App>,
     dock: helix_shell_core::dock::Dock,
+    /// Applications' tray items (StatusNotifierItem), as the watcher this shell serves registered them.
+    tray: helix_shell_core::tray::Tray,
     /// The backlight as last read or written, if the machine has one.
     brightness: Option<helix_shell_core::brightness::Brightness>,
     /// The window that had the keyboard when the Caps Lock palette opened: where an insertion is allowed to go.
@@ -1451,6 +1454,10 @@ fn main() {
             activity_view,
             notify::notifications_view,
             report_glass,
+            tray::tray_view,
+            tray::tray_activate,
+            tray::tray_context,
+            tray::tray_secondary,
             report_interactive,
             dock::dock_view,
             dock::workspaces_view,
@@ -1516,6 +1523,7 @@ fn main() {
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
                 insert_target: None,
+                tray: helix_shell_core::tray::Tray::default(),
                 brightness: backlight::read(),
                 niri: helix_shell_core::niri::Niri::default(),
                 dock_apps: Vec::new(),
@@ -1553,6 +1561,7 @@ fn main() {
             watch_quick(handle.clone());
             control::serve(handle.clone());
             notify::serve(handle.clone());
+            tray::serve(handle.clone());
             insert::watch_clipboard(handle.clone());
             dock::start(handle.clone());
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {

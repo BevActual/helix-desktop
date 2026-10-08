@@ -27,3 +27,4 @@ pick wp             && run wp wallpaper-test.sh wallpaper-nested.sh
 pick keys           && run keys keys-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1
 pick dock           && run dock dock-test.sh dock-nested.sh
 pick ws             && run ws workspaces-test.sh tauri-fake-desktop.sh
+pick tray           && run tray tray-test.sh tauri-fake-desktop.sh

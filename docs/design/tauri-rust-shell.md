@@ -488,3 +488,17 @@ was opened over (the target window is captured at open and verified before inser
 into a terminal); `glass` overflowed on absurd coordinates. Not changed: `org.helix.Shell1` accepts calls from any process on the session bus. It is a
 UI interface (the same things a person's key binds do), not an authority boundary; confining agent processes away from the session bus except
 through Agent1 is a deployment requirement, recorded in `agent-and-inference.md`.
+
+## Workspaces and the tray (2026-10-07)
+
+**Workspaces.** `Niri::workspace_strip` is the focused output's workspaces with how many windows each holds and whether one is urgent; the bar draws them as
+small pills (the active one long) and a click sends only an id from that strip to niri (`FocusWorkspace`); a lone workspace shows nothing. niri keeps a spare empty
+workspace after the last one with a window, so the strip has two entries once anything is open.
+
+**Tray.** The shell is the StatusNotifierWatcher (it never displaces another one) and the only host. `helix_shell_core::tray` validates what applications register
+(bus names and object paths), size-checks icon pixels (at most 64x64, converted from ARGB32), sanitizes titles, bounds the item count, and hides `Passive` items;
+the page can only address an item by a key the model made. The shell reads an item's properties, re-reads them (coalesced) after its change signals, forwards left,
+right and middle click as `Activate`, `ContextMenu` and `SecondaryActivate`, and drops an item when its application leaves the bus or stops answering. Icons come
+from the theme (or the item's own `IconThemePath`, single component names only) or from the pixels it publishes, drawn on a canvas, never as markup. Not done: dbusmenu
+(applications that only publish a `Menu` and expect the host to draw it show nothing on right click).
+`tools/nested/tray-test.sh` runs a stand-in application against the real watcher.

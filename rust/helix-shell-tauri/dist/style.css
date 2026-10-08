@@ -292,3 +292,10 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 .ws { height: 8px; width: 8px; border-radius: 4px; padding: 0; background: var(--label-3); transition: width 220ms var(--ease), background 160ms var(--ease), transform 120ms var(--ease); }
 .ws.has-windows { background: var(--label-2); } .ws.active { width: 24px; background: var(--label); } .ws.urgent { background: var(--warn); }
 .ws-hit:hover .ws { transform: scaleY(1.5); background: var(--label); } .ws-hit:active .ws { transform: scale(.9); }
+
+/* Tray: applications' own icons, small, with a quiet hover. */
+#tray { display: flex; align-items: center; gap: 2px; margin-right: 2px; }
+.tray-item { width: 28px; height: 26px; padding: 0; border-radius: 8px; background: transparent; display: grid; place-items: center; }
+.tray-item:hover { background: var(--fill-1); } .tray-item img, .tray-item canvas, .tray-item .tray-tile { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; }
+.tray-item .tray-tile { display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; text-transform: uppercase; }
+.tray-item.attention { animation: pulse 1.6s ease-in-out infinite; }

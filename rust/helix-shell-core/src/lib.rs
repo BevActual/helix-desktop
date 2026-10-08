@@ -20,6 +20,7 @@ pub mod quick;
 pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
+pub mod tray;
 
 pub use agent_confirm::{ConfirmRequest, ConfirmationQueue, Kind as ConfirmKind};
 pub use assistant::{Phase, Session, Spawn, View};

@@ -25,3 +25,4 @@ base64 = "0.22"
 tauri = { version = "2", features = [] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 tokio = { version = "1", features = ["time", "sync"] }
+futures-util = { version = "0.3", default-features = false }
