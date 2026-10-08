@@ -273,3 +273,11 @@ pub async fn toggle_dnd(app: &AppHandle) {
     }
     changed(app, Vec::new()).await;
 }
+
+/// Whether do-not-disturb is on.
+pub fn dnd_is_on(app: &AppHandle) -> bool {
+    let state = shell_state(app);
+    let shell = state.lock().expect("shell state");
+    let now = now_ms(shell.started);
+    shell.notifications.view(now).dnd
+}

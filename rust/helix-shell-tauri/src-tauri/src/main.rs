@@ -8,6 +8,7 @@ mod backlight;
 mod battery;
 mod blur;
 mod confirmer;
+mod agent_ipc;
 mod control;
 mod dock;
 mod insert;
@@ -1604,6 +1605,7 @@ fn main() {
             watch_bluetooth(handle.clone());
             watch_quick(handle.clone());
             control::serve(handle.clone());
+            agent_ipc::serve(handle.clone());
             notify::serve(handle.clone());
             tray::serve(handle.clone());
             island::watch_media(handle.clone());

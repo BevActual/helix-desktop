@@ -169,6 +169,25 @@ to the user come from the verified identity only (`friendlyClientName`: ASCII le
 else `_`), and a self-declared label appears only as "it calls itself". Not yet checked: toggling a switch or
 pressing Remove with a pointer, and the unavailable state.
 
+## Implementation status: agent actions under the Tauri shell (2026-10-08)
+
+Until now an approved action was carried out by sending `noctalia msg` commands to the **native** shell's socket, so under the Tauri shell
+every action failed with "noctalia is not running". The Tauri shell now serves that socket (`noctalia-<WAYLAND_DISPLAY>.sock`, mode 0600,
+`rust/helix-shell-tauri/src-tauri/src/agent_ipc.rs`) and understands exactly the commands in `helix_shell_core::agent_msg::SUPPORTED`
+(volume, brightness, theme mode, night light, do not disturb, open and close its own panels). Every other command gets
+`error: unknown command (this shell does not support it)`. The line is parsed by a pure, mutation-tested model (whole numbers in range,
+listed words only, no extra arguments, no control characters, 1 KiB limit) and executes through the code the sliders and key bindings use.
+A test checks that each supported command is classified in `msg-risk.toml` and none is `blocked`.
+
+The shell also writes `helix-shell-tools-<display>` (first line its pid, then the command names). `ListTools` offers only those names while that
+shell is alive (a file whose pid is gone is ignored), so the model is not offered `bar-toggle` or `wallpaper-next` under a shell that cannot
+do them; with no live list every classified command is offered, as for the native shell. Socket choice no longer trusts the newest
+`noctalia-wayland*.sock`: sockets that nobody answers on (left by tests or a crashed shell) are skipped.
+Tests: `tools/nested/agent-ipc-test.sh` (the wire protocol, effects and refusals), `tests/desktop_agent_integration.py` steps 12 to 13
+(tool list, stale list, dead socket). `HELIX_AGENT_IPC_DIR` moves both files for tests; nested sessions always set it.
+Accepted limit, as for `org.helix.Shell1`: the socket does not authenticate other processes of the same user; Agent1 is what gates agents.
+Not yet reachable: windows and workspaces (niri), app launch and close, media, files, clipboard. Each needs its taint rules first.
+
 ## Implementation status: helix-inference
 
 `helix-inference` is a separate, D-Bus-activated process (`org.helix.Inference`, interface `org.helix.Inference1`,

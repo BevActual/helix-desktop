@@ -8,8 +8,13 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <cstring>
+#include <set>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 namespace helix::agent {
 
@@ -43,23 +48,79 @@ std::filesystem::path locatePolicy() {
   return exe.parent_path() / ".." / "protocols" / "ipc" / "msg-risk.toml";
 }
 
-// The shell socket is named after WAYLAND_DISPLAY, which an activated service may not inherit.
+// Where the shell's command socket and tool list live: the runtime directory, or the folder HELIX_AGENT_IPC_DIR names (a test's).
+std::filesystem::path shellRuntimeDir() {
+  const char* override = std::getenv("HELIX_AGENT_IPC_DIR");
+  if (override && *override) return override;
+  const char* runtime = std::getenv("XDG_RUNTIME_DIR");
+  return runtime && *runtime ? std::filesystem::path(runtime) : std::filesystem::path();
+}
+
+// Whether something is listening on the socket (a leftover file of a program that has gone is not).
+bool socketAnswers(const std::filesystem::path& path) {
+  const int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+  if (fd < 0) return false;
+  sockaddr_un addr{};
+  addr.sun_family = AF_UNIX;
+  const std::string text = path.string();
+  bool answers = false;
+  if (text.size() < sizeof(addr.sun_path)) {
+    std::memcpy(addr.sun_path, text.c_str(), text.size() + 1);
+    // A connect to a live local socket completes at once; a refusal means nobody is listening.
+    answers = ::connect(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) == 0;
+  }
+  ::close(fd);
+  return answers;
+}
+
+// The shell socket is named after WAYLAND_DISPLAY, which an activated service may not inherit. Without it, the newest socket that
+// answers is the shell's: files left behind by programs that have gone (tests, crashed shells) are skipped.
 std::string shellSocket() {
   namespace fs = std::filesystem;
-  const char* runtime = std::getenv("XDG_RUNTIME_DIR");
-  if (!runtime || !*runtime) return {};
+  const fs::path runtime = shellRuntimeDir();
+  if (runtime.empty()) return {};
   const char* display = std::getenv("WAYLAND_DISPLAY");
   std::error_code ec;
-  if (display && *display && fs::exists(fs::path(runtime) / (std::string("noctalia-") + display + ".sock"), ec)) return {};
-  fs::path newest;
-  fs::file_time_type newestTime{};
+  if (display && *display) {
+    const fs::path named = runtime / (std::string("noctalia-") + display + ".sock");
+    if (fs::exists(named, ec)) return named.string();
+  }
+  std::vector<std::pair<fs::file_time_type, fs::path>> found;
   for (const auto& entry : fs::directory_iterator(runtime, ec)) {
     const std::string name = entry.path().filename().string();
     if (!name.starts_with("noctalia-wayland") || !name.ends_with(".sock")) continue;
+    found.emplace_back(entry.last_write_time(ec), entry.path());
+  }
+  std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+  for (const auto& [time, path] : found) if (socketAnswers(path)) return path.string();
+  return found.empty() ? std::string() : found.front().second.string();
+}
+
+// The commands the running shell says it carries out (`helix-shell-tools-<display>`, first line the shell's pid). Empty when no live
+// shell has published one: then every classified command is listed, as for the native shell.
+std::set<std::string> shellSupportedTools() {
+  namespace fs = std::filesystem;
+  std::set<std::string> names;
+  const fs::path runtime = shellRuntimeDir();
+  std::error_code ec;
+  if (runtime.empty()) return names;
+  fs::path newest;
+  fs::file_time_type newestTime{};
+  for (const auto& entry : fs::directory_iterator(runtime, ec)) {
+    if (!entry.path().filename().string().starts_with("helix-shell-tools-")) continue;
     const auto time = entry.last_write_time(ec);
+    std::ifstream in(entry.path());
+    std::string first;
+    if (!std::getline(in, first) || first.empty() || !std::all_of(first.begin(), first.end(), [](char c) { return c >= '0' && c <= '9'; })) continue;
+    if (!fs::exists(fs::path("/proc") / first, ec)) continue;   // the shell that wrote it has gone
     if (newest.empty() || time > newestTime) { newest = entry.path(); newestTime = time; }
   }
-  return newest.string();
+  if (newest.empty()) return names;
+  std::ifstream in(newest);
+  std::string line;
+  std::getline(in, line);
+  while (std::getline(in, line)) if (!line.empty() && line.size() <= 80) names.insert(line);
+  return names;
 }
 
 std::set<Tier> tiersFrom(const Json& value, bool allowBlockedName = false) {
@@ -244,7 +305,9 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
         {"tiers", tiersJson(grants_->tiersFor(who.client))}, {"confirmer", !confirmer_.empty()}})));
     } else if (name == "ListTools") {
       Json tools = Json::array();
+      const auto supported = shellSupportedTools();
       for (const auto& command : broker_->policy().commands()) {
+        if (!supported.empty() && !supported.contains(command)) continue;
         const Tier tier = broker_->policy().tierFor(command);
         if (grants_->allows(who.client, tier)) tools.push_back({{"name", command}, {"tier", std::string(tierName(tier))}});
       }

@@ -14,6 +14,8 @@ if [ -z "${HELIX_NESTED_INNER:-}" ]; then
 fi
 export HOME=$SCRATCH/home XDG_CONFIG_HOME=$SCRATCH/config XDG_STATE_HOME=$SCRATCH/state XDG_DATA_HOME=$SCRATCH/data XDG_CACHE_HOME=$SCRATCH/cache
 mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+# The shell's command socket and tool list go in the scratch directory, never the real runtime directory.
+export HELIX_AGENT_IPC_DIR=$XDG_STATE_HOME
 # The real system bus (NetworkManager, BlueZ, logind, polkit) is out of reach of everything started here. A test that needs one
 # provides its own with HELIX_NESTED_SYSTEM_BUS=unix:path=...; otherwise services see "unavailable", never the person's real devices.
 export DBUS_SYSTEM_BUS_ADDRESS="${HELIX_NESTED_SYSTEM_BUS:-unix:path=/nonexistent/helix-nested-system-bus}"

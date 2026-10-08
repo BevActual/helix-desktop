@@ -29,7 +29,7 @@ struct Control {
     app: AppHandle,
 }
 
-fn current_panel(app: &AppHandle) -> Option<String> {
+pub(crate) fn current_panel(app: &AppHandle) -> Option<String> {
     shell_state(app)
         .lock()
         .expect("shell state")
@@ -39,7 +39,7 @@ fn current_panel(app: &AppHandle) -> Option<String> {
 }
 
 /// Runs `work` on the main thread, where GTK must be touched.
-fn on_main(
+pub(crate) fn on_main(
     app: &AppHandle,
     work: impl FnOnce(&AppHandle) + Send + 'static,
 ) -> zbus::fdo::Result<()> {

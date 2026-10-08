@@ -1,6 +1,7 @@
 //! State machines the shell UI shows. Nothing here opens a window or a bus connection.
 
 pub mod activity;
+pub mod agent_msg;
 pub mod agent_confirm;
 mod assistant;
 pub mod audio;

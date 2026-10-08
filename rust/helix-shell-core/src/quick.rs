@@ -84,6 +84,15 @@ impl Quick {
         })
     }
 
+    /// Follow the schedule (light by day, dark by night) instead of a fixed mode.
+    pub fn set_auto(&self) -> Result<SettingUpdate, RequestError> {
+        self.theme.as_ref().ok_or(RequestError::Unavailable)?;
+        Ok(SettingUpdate {
+            id: THEME_MODE,
+            value: json!("auto"),
+        })
+    }
+
     pub fn set_night_light(&self, on: bool) -> Result<SettingUpdate, RequestError> {
         self.night_light.ok_or(RequestError::Unavailable)?;
         Ok(SettingUpdate {

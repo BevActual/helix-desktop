@@ -26,7 +26,8 @@ ACTIVITY = "org.helix.Desktop.AgentActivity1"
 CFG = "org.helix.Desktop.Configuration1"
 
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-agent-it-"))
-runtime = pathlib.Path(os.environ["XDG_RUNTIME_DIR"])
+runtime = scratch / "run"   # the shell socket and tool list live here (HELIX_AGENT_IPC_DIR), never in the real runtime directory
+runtime.mkdir()
 display = f"wayland-helix-it-{os.getpid()}"
 sock_path = runtime / f"noctalia-{display}.sock"
 
@@ -48,14 +49,20 @@ def serve():
             while chunk := conn.recv(4096):
                 data += chunk
             line = data.decode()
-            received.append(line)
+            if data:
+                received.append(line)
             command = line.split("\x1e", 1)[-1]
-            conn.sendall(b'{"barVisible":true}\n' if command == "status" else (b"ok\n" if command.startswith("app-launch") else b"error: unexpected\n"))
+            if not data:
+                continue   # the service checks that a socket answers by connecting and leaving
+            try:
+                conn.sendall(b'{"barVisible":true}\n' if command == "status" else (b"ok\n" if command.startswith("app-launch") else b"error: unexpected\n"))
+            except OSError:
+                pass
 
 
 threading.Thread(target=serve, daemon=True).start()
 
-env = dict(os.environ, WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"),
+env = dict(os.environ, HELIX_AGENT_IPC_DIR=str(runtime), WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"),
            XDG_CONFIG_HOME=str(scratch / "config"), XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"))
 for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
     env.pop(key, None)
@@ -269,6 +276,40 @@ try:
     again = Peer()
     (session,) = again.agent("Hello", "(ss)", "integration test", "1", reply="(a{sv})")
     assert set(session["tiers"]) == {"observe", "confirm"}, session
+
+    # 12. The tools offered are the ones the running shell says it carries out; a list left by a shell that has gone is ignored.
+    def tool_names():
+        (tools,) = again.call(AGENT, "ListTools", None, "(av)"),
+        return {item["name"] for item in tools[0]}
+    everything = tool_names()
+    assert {"status", "wifi-status", "clipboard-copy"} <= everything, everything
+    live = runtime / "helix-shell-tools-wayland-live"
+    live.write_text(f"{os.getpid()}\nstatus\nclipboard-copy\n")
+    assert tool_names() == {"status", "clipboard-copy"}, "only what the shell supports is offered"
+    gone = runtime / "helix-shell-tools-wayland-gone"
+    gone.write_text("4194999\nwifi-status\n")
+    os.utime(gone, (time.time() + 5, time.time() + 5))
+    assert tool_names() == {"status", "clipboard-copy"}, "a list from a shell that has gone is not used"
+    live.unlink()
+    assert tool_names() == everything, "with no live list, everything classified is offered"
+    gone.unlink()
+
+    # 13. A socket left behind by a program that has gone is not the shell: the newest one that answers is.
+    dead = runtime / "noctalia-wayland-dead.sock"
+    leftover = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    leftover.bind(str(dead))
+    leftover.close()
+    os.utime(dead, (time.time() + 5, time.time() + 5))
+    assert dead.exists()
+    again.conn.close_sync(None)
+    process.terminate()
+    process.wait(timeout=10)
+    env.pop("WAYLAND_DISPLAY")   # as when the service is started by D-Bus activation: no display to name the socket after
+    process = start_service()
+    final = Peer()
+    final.agent("Hello", "(ss)", "integration test", "1", reply="(a{sv})")
+    ok, result = final.finish(final.action("status"))
+    assert ok and json.loads(result["content"]) == {"barVisible": True}, (ok, result)
     print("agent integration ok")
 finally:
     process.terminate()
