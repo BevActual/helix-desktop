@@ -163,11 +163,7 @@ async fn read_props(connection: &zbus::Connection, bus: &str, path: &str) -> Opt
         .await
         .ok()?;
     let all = proxy
-        .get_all(
-            zbus::names::InterfaceName::try_from(ITEM_INTERFACE)
-                .ok()?
-                .into(),
-        )
+        .get_all(zbus::names::InterfaceName::try_from(ITEM_INTERFACE).ok()?)
         .await
         .ok()?;
     let pixmaps = all
