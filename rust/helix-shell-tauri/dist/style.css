@@ -352,3 +352,6 @@ button.danger { color: var(--danger); background: color-mix(in srgb, var(--dange
 .segments { display: flex; gap: 2px; padding: 2px; background: var(--fill-2); border-radius: 9px; flex: none; }
 .segment { border: 0; background: transparent; color: var(--label-1); padding: 5px 14px; border-radius: 7px; font: inherit; font-size: 13px; }
 .segment.current { background: var(--fill-3); font-weight: 600; }
+.slider-wrap { display: flex; align-items: center; gap: 12px; flex: none; }
+.slider-wrap input[type=range] { width: 200px; accent-color: var(--accent, #0a84ff); }
+.slider-value { min-width: 48px; text-align: right; color: var(--label-2); font-variant-numeric: tabular-nums; }

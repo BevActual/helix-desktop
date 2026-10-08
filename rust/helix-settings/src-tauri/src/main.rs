@@ -16,10 +16,20 @@ const WINDOW: &str = "settings";
 
 /// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
 const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
+const DISPLAYS: &[&str] = &[
+    "nightlight.enabled",
+    "nightlight.force",
+    "nightlight.temperature_day",
+    "nightlight.temperature_night",
+    "brightness.sync_all_monitors",
+    "brightness.enable_ddcutil",
+    "brightness.minimum_brightness",
+];
 
 fn page_ids(page: &str) -> Option<&'static [&'static str]> {
     match page {
         "appearance" => Some(APPEARANCE),
+        "displays" => Some(DISPLAYS),
         _ => None,
     }
 }
@@ -90,11 +100,16 @@ struct RowsView {
     rows: Vec<RowView>,
 }
 
-fn rows_of(state: &State) -> RowsView {
-    RowsView {
-        page: "appearance",
-        rows: state.catalog.rows(APPEARANCE),
-    }
+const ROW_PAGES: [(&str, &[&str]); 2] = [("appearance", APPEARANCE), ("displays", DISPLAYS)];
+
+fn rows_of(state: &State) -> Vec<RowsView> {
+    ROW_PAGES
+        .iter()
+        .map(|(page, ids)| RowsView {
+            page,
+            rows: state.catalog.rows(ids),
+        })
+        .collect()
 }
 
 /// Reads the service's settings again and tells the page.
@@ -108,8 +123,10 @@ async fn refresh_settings(app: &AppHandle) {
                 state.catalog.set(&settings);
                 rows_of(&state)
             };
-            eprintln!("SETTINGS rows page=appearance n={}", view.rows.len());
-            let _ = app.emit("rows-view", view);
+            for page in view {
+                eprintln!("SETTINGS rows page={} n={}", page.page, page.rows.len());
+                let _ = app.emit("rows-view", page);
+            }
         }
         Err(error) => eprintln!("SETTINGS settings: {error}"),
     }
@@ -222,7 +239,7 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn rows_view(app: AppHandle) -> RowsView {
+fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
 }
 

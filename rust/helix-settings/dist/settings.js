@@ -15,7 +15,7 @@ $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 $("refresh").onclick = () => invoke("agents_refresh");
 
 // Pages -----------------------------------------------------------------------------------------------------------------------------
-const TITLES = { appearance: "Appearance", agents: "Privacy & agents" };
+const TITLES = { appearance: "Appearance", displays: "Displays", agents: "Privacy & agents" };
 function showPage(name) {
   document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-" + name; });
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
@@ -55,6 +55,20 @@ function drawRows(view) {
       box.dataset.test = "set-" + row.id;
       box.addEventListener("change", () => send({ kind: "switch", value: box.checked }));
       line.append(box);
+    } else if (control.kind === "slider") {
+      const wrap = el("div", "slider-wrap");
+      const range = el("input");
+      range.type = "range";
+      range.min = control.min;
+      range.max = control.max;
+      range.step = control.integer ? 1 : (control.max - control.min) / 100;
+      range.value = control.value;
+      range.dataset.test = "set-" + row.id;
+      const readout = el("span", "slider-value", String(control.integer ? Math.round(control.value) : control.value.toFixed(2)));
+      range.addEventListener("input", () => { readout.textContent = String(control.integer ? Math.round(range.value) : Number(range.value).toFixed(2)); });
+      range.addEventListener("change", () => send({ kind: "number", value: Number(range.value) }));
+      wrap.append(range, readout);
+      line.append(wrap);
     } else if (control.kind === "choice") {
       const segments = el("div", "segments");
       control.options.forEach((option) => {
@@ -70,7 +84,7 @@ function drawRows(view) {
   if (!view.rows.length) host.append(el("div", "empty", "These settings are not available: the desktop service is not running."));
   queueReport();
 }
-listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then(drawRows));
+listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Privacy & agents ------------------------------------------------------------------------------------------------------------------
 function drawAgents(view) {

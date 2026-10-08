@@ -7,6 +7,7 @@
     </div>
     <nav id="pages">
       <button class="page-link current" data-page="appearance" data-test="page-appearance"><i data-icon="palette"></i><span>Appearance</span></button>
+      <button class="page-link" data-page="displays" data-test="page-displays"><i data-icon="sun"></i><span>Displays</span></button>
       <button class="page-link" data-page="agents" data-test="page-agents"><i data-icon="shield"></i><span>Privacy &amp; agents</span></button>
     </nav>
   </aside>
@@ -14,6 +15,9 @@
     <header data-tauri-drag-region><h2 id="page-title">Appearance</h2><button id="refresh" data-test="refresh" title="Read again">Refresh</button></header>
     <section id="page-appearance" class="settings-page">
       <div id="appearance-rows"></div>
+    </section>
+    <section id="page-displays" class="settings-page" hidden>
+      <div id="displays-rows"></div>
     </section>
     <section id="page-agents" class="settings-page" hidden>
       <div id="agents-note"></div>

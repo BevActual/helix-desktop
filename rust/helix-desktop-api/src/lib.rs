@@ -228,15 +228,19 @@ impl Desktop {
         ))
     }
 
-    /// `Configuration1.Update(id, value)` for a boolean or a string. The service validates the id and the value again.
+    /// `Configuration1.Update(id, value)` for a boolean, a string or a number (whole numbers as 64-bit integers). The service validates the id and the value again.
     pub async fn update_setting(&self, id: &str, value: &serde_json::Value) -> zbus::Result<()> {
         let proxy = self.domain_proxy(Domain::Configuration).await?;
         let value: Value<'static> = match value {
             serde_json::Value::Bool(flag) => Value::Bool(*flag),
             serde_json::Value::String(text) => Value::from(text.clone()),
+            serde_json::Value::Number(number) => match number.as_i64() {
+                Some(whole) => Value::I64(whole),
+                None => Value::F64(number.as_f64().unwrap_or(0.0)),
+            },
             _ => {
                 return Err(zbus::Error::Failure(
-                    "only a boolean or a string can be set".into(),
+                    "only a boolean, a string or a number can be set".into(),
                 ))
             }
         };
