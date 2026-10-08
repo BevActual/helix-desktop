@@ -238,3 +238,22 @@ input.switch:checked { background: var(--ok); } input.switch:checked::after { tr
 #qi-results.grid .qi-row { grid-column: 1 / -1; }
 #qi-empty { color: var(--label-2); padding: 12px 14px; } #qi-empty:empty { display: none; }
 #qi-hint { display: flex; gap: 16px; padding: 2px 14px 4px; color: var(--label-3); font-size: 11.5px; }
+
+/* Brightness slider shares the volume slider's look; the on-screen indicator is a quiet glass pill that never takes the pointer. */
+#brightslider { position: relative; flex: 1; height: 36px; border-radius: 18px; background: var(--fill-1); overflow: hidden; }
+#brightfill { position: absolute; inset: 0 auto 0 0; width: var(--pct, 0%); background: var(--label); opacity: .92; border-radius: 18px 0 0 18px; transition: width 90ms linear; }
+#brightness { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+#bright-ico { width: 36px; height: 36px; display: grid; place-items: center; color: var(--label-2); } #bright-percent { width: 3.2em; text-align: right; color: var(--label-2); font-variant-numeric: tabular-nums; }
+#osd { position: fixed; left: 50%; bottom: 72px; width: 300px; margin-left: -150px; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 26px;
+       background: var(--glass); box-shadow: var(--shadow), inset 0 0 0 .5px var(--hairline); pointer-events: none; opacity: 0; transform: translateY(10px) scale(.96);
+       transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease); }
+#osd.show { opacity: 1; transform: none; }
+#osd svg { width: 22px; height: 22px; flex: none; }
+#osd-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--fill-2); overflow: hidden; } #osd-fill { height: 100%; width: var(--pct, 0%); background: var(--label); border-radius: 4px; transition: width 120ms var(--ease); }
+#osd.muted #osd-fill { width: 0; } #osd-val { width: 2.6em; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* The sliders are drawn by their fill; the native range input only receives the pointer, so its thumb has no width and the click
+   position maps linearly onto the value (what you point at is where the fill ends). */
+input[type="range"] { -webkit-appearance: none; appearance: none; background: transparent; padding: 0; }
+input[type="range"]::-webkit-slider-runnable-track { height: 100%; background: transparent; }
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 0; height: 0; }

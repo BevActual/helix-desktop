@@ -5,6 +5,7 @@ pub mod agent_confirm;
 mod assistant;
 pub mod audio;
 pub mod bluetooth;
+pub mod brightness;
 mod confirm;
 pub mod confirmer;
 mod display;

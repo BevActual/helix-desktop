@@ -2,6 +2,9 @@
 # Like tauri-shell.sh, but the desktop service is tools/nested/fake-desktop.py: scripted Wi-Fi networks, nothing real behind it.
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+# A stand-in backlight, so a nested session never reads or writes the real one.
+mkdir -p "${XDG_STATE_HOME}/backlight"; printf "50\n" > "${XDG_STATE_HOME}/backlight/brightness"; printf "100\n" > "${XDG_STATE_HOME}/backlight/max_brightness"
+export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
 # A fake battery, and the file where the page reports where its controls are (tests click controls by name).
 mkdir -p "${XDG_STATE_HOME}/power_supply/BAT0"

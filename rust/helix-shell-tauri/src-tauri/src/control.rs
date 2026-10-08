@@ -20,6 +20,9 @@ pub const METHODS: &[&str] = &[
     "ToggleDoNotDisturb",
     "ToggleNightLight",
     "ToggleDarkTheme",
+    "AdjustVolume",
+    "ToggleMute",
+    "AdjustBrightness",
 ];
 
 struct Control {
@@ -78,6 +81,19 @@ impl Control {
 
     async fn toggle_night_light(&self) {
         crate::toggle_night_light(&self.app).await;
+    }
+
+    /// The volume keys: change by `delta` percentage points (and show the indicator).
+    async fn adjust_volume(&self, delta: i32) {
+        crate::adjust_volume(&self.app, delta.clamp(-100, 100)).await;
+    }
+
+    async fn toggle_mute(&self) {
+        crate::toggle_mute(&self.app).await;
+    }
+
+    async fn adjust_brightness(&self, delta: i32) {
+        crate::adjust_brightness(&self.app, delta.clamp(-100, 100)).await;
     }
 
     async fn toggle_dark_theme(&self) {

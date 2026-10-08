@@ -24,12 +24,12 @@ if tauri; then
       exec swaylock --daemonize --color 0e1028 ;;
     settings) exec helix-settings ;;
     window-switcher) exec niri msg action focus-window-previous ;;
-    volume-up) exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
-    volume-down) exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
-    volume-mute) exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
+    volume-up) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustVolume i 5 || exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;
+    volume-down) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustVolume i -- -5 || exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%- ;;
+    volume-mute) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 ToggleMute || exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle ;;
     mic-mute) exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
-    brightness-up) exec brightnessctl --quiet set 5%+ ;;
-    brightness-down) exec brightnessctl --quiet set 5%- ;;
+    brightness-up) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustBrightness i 5 || exec brightnessctl --quiet set 5%+ ;;
+    brightness-down) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustBrightness i -- -5 || exec brightnessctl --quiet set 5%- ;;
     *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
   esac
 fi

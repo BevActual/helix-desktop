@@ -16,6 +16,9 @@ if [ -n "${HELIX_NESTED_PRIVATE_AUDIO:-}" ]; then
   eval "$("$(dirname "$0")/private-audio.sh" "${XDG_STATE_HOME}/pipewire")"
   echo "$HELIX_PRIVATE_PIPEWIRE_PID" > "${XDG_STATE_HOME}/pipewire.pid"
 fi
+# A stand-in backlight, so a nested session never reads or writes the real one.
+mkdir -p "${XDG_STATE_HOME}/backlight"; printf "50\n" > "${XDG_STATE_HOME}/backlight/brightness"; printf "100\n" > "${XDG_STATE_HOME}/backlight/max_brightness"
+export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
 export HELIX_UI_LAYOUT_LOG="${XDG_STATE_HOME}/layout.json"   # where the page reports its named controls (tests click by name)
 SERVICE="$ROOT/build-debug/helix-service"

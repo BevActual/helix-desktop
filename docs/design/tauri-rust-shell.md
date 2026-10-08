@@ -455,3 +455,12 @@ used (`[wallpaper.default]`, `[wallpaper.monitors.<connector>]`, `color:#rrggbb`
 draw, frees the scratch memory and keeps only the buffer on screen (about 17 MB private on a 2561x1601 output, 0.00% idle CPU). An unreadable
 image falls back to a quiet dark colour, never white. `tools/nested/wallpaper-test.sh` checks real screenshot pixels (a red/blue image with a green
 square, cropped not stretched). `tools/switch-shell.sh tauri` installs and enables `helix-wallpaper.service`; `native` stops it.
+
+## Volume and brightness keys, and the on-screen indicator (2026-10-07)
+
+The volume and brightness keys go through the shell (`org.helix.Shell1.AdjustVolume`, `ToggleMute`, `AdjustBrightness`; `helix-panel` calls them and falls back to
+`wpctl`/`brightnessctl` if the shell is not there), so they use the same validated models as the sliders and the shell can show what happened: a quiet glass pill at the
+bottom centre (the `osd` event; it never takes the pointer, and counts as glass while visible). `helix_shell_core::brightness` decides what may be written: never zero
+(the dimmest is 5%), never above the maximum, NaN changes nothing. The backlight is read from sysfs and written through logind (`SetBrightness`), so no root is needed;
+`HELIX_BACKLIGHT_DIR` stands in for the device in tests and nested sessions, which never touch the real one. Volume up unmutes. The sliders' native range inputs have a
+zero-width thumb so a click maps linearly onto the value (what you point at is where the fill ends). A negative argument to `busctl` must follow `--`.

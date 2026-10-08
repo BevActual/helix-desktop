@@ -25,6 +25,11 @@
       <div class="tile" id="tile-dnd" data-test="tile-dnd"><span class="tile-ico"><i data-icon="moon"></i></span><div class="tile-main"><div class="tile-title">Do not disturb</div><div class="tile-sub" id="tile-dnd-sub"></div></div></div>
       <div class="tile" id="tile-night" data-test="tile-night"><span class="tile-ico"><i data-icon="sun"></i></span><div class="tile-main"><div class="tile-title">Night Light</div><div class="tile-sub" id="tile-night-sub"></div></div></div>
     </div>
+    <div class="sliderrow" id="brightrow" style="display:none">
+      <span id="bright-ico"><i data-icon="sun"></i></span>
+      <div id="brightslider"><div id="brightfill"></div><input id="brightness" data-test="brightness" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="bright-percent"></span>
+    </div>
     <div id="audio-note"></div>
     <div class="sliderrow" id="volrow">
       <button id="mute" data-test="mute" title="Mute"><i data-icon="volume" data-slot="mute"></i></button>
@@ -50,6 +55,7 @@
   </div>
 </div>
 <div id="toasts"></div>
+<div id="osd"><i data-icon="volume" data-slot="osd-ico"></i><div id="osd-bar"><div id="osd-fill"></div></div><span id="osd-val"></span></div>
 <div id="notifs" class="panel glass">
   <div id="notif-head"><h3>Notifications</h3><button id="notif-dnd" data-test="notif-dnd">Do not disturb</button><button id="notif-clear" data-test="notif-clear">Clear all</button></div>
   <div id="notif-list"></div><div id="notif-empty"></div>

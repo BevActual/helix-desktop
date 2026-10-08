@@ -12,6 +12,10 @@
  <method name="ToggleDoNotDisturb"/>
  <method name="ToggleNightLight"/>
  <method name="ToggleDarkTheme"/>
+ <!-- The volume and brightness keys: change by delta percentage points, or mute; the shell shows the indicator. -->
+ <method name="AdjustVolume"><arg name="delta" type="i" direction="in"/></method>
+ <method name="ToggleMute"/>
+ <method name="AdjustBrightness"><arg name="delta" type="i" direction="in"/></method>
  <!-- {panel: s}, empty when none is open -->
  <method name="GetStatus"><arg type="a{sv}" direction="out"/></method>
 </interface>

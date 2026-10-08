@@ -72,6 +72,7 @@ listen("shell-mode", (event) => {
     invoke("network_view").then(drawNetwork);
     invoke("bluetooth_view").then(drawBluetooth);
     invoke("quick_view").then(drawQuick);
+    invoke("brightness_view").then(drawBrightness);
     invoke("battery_view").then(drawBattery);
   } else if (panel === "quick-insert") {
     qiSource = "emoji"; // always opens on emoji, so the same keys do the same thing every time
@@ -646,6 +647,44 @@ $("sound-open").onclick = () => showDetail("sound");
 $("back").onclick = () => showDetail(null);
 
 
+
+// The on-screen indicator for the volume and brightness keys: Rust says what changed and to what; this draws it for a moment.
+let osdTimer = null;
+listen("osd", (event) => {
+  const { kind, percent, muted } = event.payload;
+  const osd = $("osd");
+  swapIcon(slot("osd-ico"), kind === "brightness" ? "sun" : muted || percent === 0 ? "volume-mute" : "volume");
+  osd.style.setProperty("--pct", percent + "%");
+  osd.classList.toggle("muted", !!muted);
+  $("osd-val").textContent = muted ? "Muted" : percent + "%";
+  osd.classList.add("show");
+  clearTimeout(osdTimer);
+  osdTimer = setTimeout(() => osd.classList.remove("show"), 1500);
+});
+new MutationObserver(() => queueGlass()).observe($("osd"), { attributes: true, attributeFilter: ["class"] });
+
+// Brightness. Rust reads the backlight and clamps every write (never black); the slider sends at most one write every 50 ms.
+let brightTimer = null;
+let brightLatest = 0;
+let brightDragging = false;
+function drawBrightness(view) {
+  $("brightrow").style.display = view.available ? "" : "none";
+  if (!view.available || brightDragging) { queueReport(); return; }
+  $("brightness").value = view.percent;
+  $("brightslider").style.setProperty("--pct", view.percent + "%");
+  $("bright-percent").textContent = view.percent + "%";
+  queueReport();
+}
+listen("brightness-view", (event) => drawBrightness(event.payload));
+$("brightness").addEventListener("pointerdown", () => { brightDragging = true; });
+window.addEventListener("pointerup", () => { brightDragging = false; });
+$("brightness").addEventListener("input", () => {
+  brightLatest = Number($("brightness").value);
+  $("bright-percent").textContent = brightLatest + "%";
+  $("brightslider").style.setProperty("--pct", brightLatest + "%");
+  if (!brightTimer) brightTimer = setTimeout(() => { brightTimer = null; invoke("brightness_set", { percent: brightLatest }); }, 50);
+});
+
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
@@ -660,10 +699,11 @@ let glassQueued = false;
 function reportGlass() {
   glassQueued = false;
   const elements = [$("bar")];
+  if ($("osd").classList.contains("show")) elements.push($("osd"));
   const open = document.body.dataset.panel;
   if (open && GLASS_PANEL[open]) elements.push($(GLASS_PANEL[open]));
   document.querySelectorAll("#toasts .toast").forEach((toast) => elements.push(toast));
-  if (open) elements.length = Math.min(elements.length, 2); // toasts are hidden while a panel is open
+  if (open) elements.splice(0, elements.length, ...elements.filter((el) => el.id !== "toast" && !el.classList.contains("toast"))); // toasts are hidden while a panel is open
   const boxes = elements.map(layoutBox);
   const key = JSON.stringify(boxes) + window.innerWidth + "x" + window.innerHeight;
   if (key === lastGlass) return;
@@ -679,7 +719,7 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd"].forEach((id) => glassResize.observe($(id)));
 window.addEventListener("resize", queueGlass);
 queueGlass();
 
@@ -687,11 +727,16 @@ queueGlass();
 let reporting = false;
 let reportTimer = null;
 invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport(); });
-function queueReport() {
+let reportDue = 0;
+// `delay` is long only after a panel opened or closed (it animates for ~240 ms); anything else is reported almost at once. A later,
+// shorter request never pulls a pending longer one earlier, so positions are never read mid-animation.
+function queueReport(delay = 80) {
   if (!reporting) return;
+  const due = Date.now() + delay;
+  if (reportTimer && due < reportDue) return;
   clearTimeout(reportTimer);
-  // Panels animate for ~240 ms; positions are only worth reporting once they have stopped moving.
-  reportTimer = setTimeout(sendReport, 300);
+  reportDue = due;
+  reportTimer = setTimeout(() => { reportTimer = null; sendReport(); }, delay);
 }
 function sendReport() {
   const elements = {};
@@ -702,10 +747,11 @@ function sendReport() {
   });
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, elements } });
 }
-window.addEventListener("resize", queueReport);
-new MutationObserver(queueReport).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
+window.addEventListener("resize", () => queueReport());
+new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel"] });
 
 invoke("quick_view").then(drawQuick);
+invoke("brightness_view").then(drawBrightness);
 invoke("audio_view").then(drawAudio);
 invoke("network_view").then(drawNetwork);
 invoke("bluetooth_view").then(drawBluetooth);

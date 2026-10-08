@@ -27,6 +27,8 @@ for panel in control-center launcher assistant notifications; do
   echo "$panel" >> "$CONTROL"; sleep 1.6; shot "10-$panel"
   echo close >> "$CONTROL"; sleep 0.8
 done
+busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustBrightness i 15 >/dev/null; sleep 0.6; shot 05-osd
+sleep 2
 wl-copy "Meeting notes: ship the shell polish pass before Friday." ; sleep 0.4; wl-copy "https://helix.example/docs/quick-insert"; sleep 0.6
 echo quick-insert >> "$CONTROL"; sleep 1.6; shot 30-quick-emoji
 wtype "smile"; sleep 0.8; shot 31-quick-emoji-search

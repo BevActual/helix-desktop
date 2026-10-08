@@ -4,6 +4,7 @@
 //! by helix_shell_core::ShellSurface; layer.rs only applies it.
 
 mod apps;
+mod backlight;
 mod battery;
 mod blur;
 mod confirmer;
@@ -47,6 +48,8 @@ struct ShellState {
     network: Network,
     /// The last Bluetooth1 snapshot; writes are built from it and nothing else.
     bluetooth: Bluetooth,
+    /// The backlight as last read or written, if the machine has one.
+    brightness: Option<helix_shell_core::brightness::Brightness>,
     /// The Caps Lock palette: emoji, clipboard history, actions.
     insert: helix_shell_core::quick_insert::QuickInsert,
     /// What applications have posted through org.freedesktop.Notifications; see `notify`.
@@ -790,6 +793,116 @@ async fn quick_set_night_light(app: AppHandle, on: bool) -> Result<(), String> {
     send_setting(update).await
 }
 
+/// What the on-screen indicator shows after a key press or a slider: one value, drawn for a moment.
+#[derive(Clone, Serialize)]
+struct Osd {
+    kind: &'static str,
+    percent: u32,
+    muted: bool,
+}
+
+fn show_osd(app: &AppHandle, kind: &'static str, percent: u32, muted: bool) {
+    eprintln!("OSD {kind} {percent}{}", if muted { " muted" } else { "" });
+    let _ = app.emit(
+        "osd",
+        Osd {
+            kind,
+            percent,
+            muted,
+        },
+    );
+}
+
+/// The volume keys: a step up or down on the current output (unmuting when going up), then the indicator.
+pub(crate) async fn adjust_volume(app: &AppHandle, delta: i32) {
+    let (current, muted) = {
+        let view = shell_state(app).lock().expect("shell state").audio.view();
+        (view.percent as f64, view.muted)
+    };
+    let target = (current + f64::from(delta)).clamp(0.0, 100.0);
+    if muted && delta > 0 {
+        let _ = send_audio(audio_request(app, |audio| audio.set_muted(false))).await;
+    }
+    if send_audio(audio_request(app, |audio| audio.set_volume(target)))
+        .await
+        .is_ok()
+    {
+        show_osd(app, "volume", target.round() as u32, false);
+    }
+}
+
+pub(crate) async fn toggle_mute(app: &AppHandle) {
+    let (percent, muted) = {
+        let view = shell_state(app).lock().expect("shell state").audio.view();
+        (view.percent, view.muted)
+    };
+    if send_audio(audio_request(app, |audio| audio.set_muted(!muted)))
+        .await
+        .is_ok()
+    {
+        show_osd(app, "volume", percent as u32, !muted);
+    }
+}
+
+/// Writes a brightness request, remembers the result, and tells the page.
+async fn write_brightness(
+    app: &AppHandle,
+    request: helix_shell_core::brightness::Request,
+) -> Result<u32, String> {
+    backlight::write(request).await?;
+    let view = {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.brightness = shell.brightness.map(|b| b.with(request));
+        shell.brightness.map(|b| b.view())
+    };
+    if let Some(view) = view {
+        let _ = app.emit("brightness-view", view);
+        return Ok(u32::from(view.percent));
+    }
+    Err("no backlight".into())
+}
+
+/// The brightness keys: a step, then the indicator. Nothing happens on a machine without a backlight.
+pub(crate) async fn adjust_brightness(app: &AppHandle, delta: i32) {
+    let request = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .brightness
+        .map(|b| b.adjust(delta));
+    if let Some(request) = request {
+        if let Ok(percent) = write_brightness(app, request).await {
+            show_osd(app, "brightness", percent, false);
+        }
+    }
+}
+
+#[tauri::command]
+fn brightness_view(app: AppHandle) -> helix_shell_core::brightness::BrightnessView {
+    // Re-read: another tool may have changed it since the shell last wrote.
+    let state = shell_state(&app);
+    let mut shell = state.lock().expect("shell state");
+    shell.brightness = backlight::read();
+    shell
+        .brightness
+        .map_or_else(helix_shell_core::brightness::Brightness::unavailable, |b| {
+            b.view()
+        })
+}
+
+/// The slider: an absolute level, clamped by the model.
+#[tauri::command]
+async fn brightness_set(app: AppHandle, percent: f64) -> Result<(), String> {
+    let request = shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .brightness
+        .map(|b| b.set_percent(percent));
+    write_brightness(&app, request.ok_or("no backlight")?)
+        .await
+        .map(|_| ())
+}
+
 /// Flips the Night Light setting from its current state (what a key binding wants).
 pub(crate) async fn toggle_night_light(app: &AppHandle) {
     let update = {
@@ -1283,6 +1396,8 @@ fn main() {
             activity_view,
             notify::notifications_view,
             report_glass,
+            brightness_view,
+            brightness_set,
             insert::quick_insert_query,
             insert::quick_insert_activate,
             insert::quick_insert_forget_clipboard,
@@ -1336,6 +1451,7 @@ fn main() {
                 bluetooth: Bluetooth::default(),
                 activity: Activity::default(),
                 notifications: helix_shell_core::notifications::Notifications::new(),
+                brightness: backlight::read(),
                 insert: helix_shell_core::quick_insert::QuickInsert::new(
                     helix_shell_core::quick_insert::parse_emoji(include_str!(
                         "../../../../assets/emoji.json"
