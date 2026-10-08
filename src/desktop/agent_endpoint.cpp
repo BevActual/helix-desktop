@@ -15,6 +15,20 @@ namespace helix::agent {
 
 namespace {
 
+// Who may manage agent access: the installed Settings app, identified by the canonical path of its executable (what /proc says it is),
+// not by a file name that any program could carry. HELIX_MANAGER_EXE names one more path, read from this service's own environment
+// (which a test sets and which a process of the person's cannot change for a running service).
+bool isHelixSettings(const std::string& exe) {
+  const std::filesystem::path path(exe);
+  if (path == "/usr/local/bin/helix-settings" || path == "/usr/bin/helix-settings") return true;
+  const char* extra = std::getenv("HELIX_MANAGER_EXE");
+  return extra != nullptr && *extra != '\0' && path == std::filesystem::path(extra);
+}
+
+}  // namespace
+
+namespace {
+
 struct Failure : std::runtime_error { using std::runtime_error::runtime_error; };
 struct Invalid : std::invalid_argument { using std::invalid_argument::invalid_argument; };
 
@@ -268,7 +282,7 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
         throw Invalid("There is no pending confirmation with that id");
       reply(nullptr);
     } else if (name == "RegisterManager") {
-      if (std::filesystem::path(who.exe).filename() != "helix-settings") throw Invalid("Only Helix Settings may manage agent access");
+      if (!isHelixSettings(who.exe)) throw Invalid("Only Helix Settings may manage agent access");
       if (!manager_.empty() && manager_ != sender) throw Failure("A manager is already registered");
       manager_ = sender;
       reply(nullptr);

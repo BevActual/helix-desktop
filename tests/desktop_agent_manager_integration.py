@@ -1,7 +1,8 @@
 """The Agent1 manager role (what Settings uses): set, revoke, read grants and audit, against the real service.
 
-The service only lets an executable named `helix-settings` register as manager, so the manager calls run in a
-child process whose interpreter is a copy of python named that. Run under dbus-run-session:
+The service only lets the installed Settings executable (by canonical path) register as manager, so the manager calls run in a
+child process whose interpreter is a copy of python at the one path the service is told to accept (HELIX_MANAGER_EXE). A second
+copy with the same file name in another directory must be refused. Run under dbus-run-session:
   desktop_agent_manager_integration.py <helix-service> <msg-risk.toml>
 """
 import json
@@ -54,13 +55,34 @@ out["audit"] = [r for r in call("GetAudit", GLib.Variant("(tu)", (0, 50)), "(av)
 print(json.dumps(out))
 '''
 
+# Named like Settings but not at the accepted path: it must not be able to manage anything.
+IMPOSTOR = r'''
+import os, sys
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib
+conn = Gio.DBusConnection.new_for_address_sync(os.environ["DBUS_SESSION_BUS_ADDRESS"],
+    Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
+try:
+    conn.call_sync("org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1", "RegisterManager", None, None, Gio.DBusCallFlags.NONE, 5000, None)
+    print("REGISTERED")
+except GLib.Error as error:
+    print("REFUSED " + error.message)
+'''
+
 copy = scratch / "bin" / "helix-settings"
 copy.parent.mkdir()
 shutil.copy2(sys.executable, copy)
 copy.chmod(copy.stat().st_mode | stat.S_IXUSR)
 (scratch / "child.py").write_text(CHILD)
 
-env = dict(os.environ, HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"), XDG_CONFIG_HOME=str(scratch / "config"),
+impostor = scratch / "elsewhere" / "helix-settings"
+impostor.parent.mkdir()
+shutil.copy2(sys.executable, impostor)
+impostor.chmod(impostor.stat().st_mode | stat.S_IXUSR)
+(scratch / "impostor.py").write_text(IMPOSTOR)
+
+env = dict(os.environ, HELIX_MANAGER_EXE=str(copy), HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"), XDG_CONFIG_HOME=str(scratch / "config"),
            XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"))
 for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
     env.pop(key, None)
@@ -85,6 +107,9 @@ try:
         raise AssertionError(f"{method} unexpectedly succeeded for a non-manager")
     assert "Only Helix Settings" in refused("RegisterManager")
     assert "registered manager" in refused("GetGrants")
+
+    fake = subprocess.run([str(impostor), str(scratch / "impostor.py")], env=dict(env, PYTHONHOME=sys.base_prefix), capture_output=True, text=True, timeout=30)
+    assert fake.stdout.strip().startswith("REFUSED") and "Only Helix Settings" in fake.stdout, f"an impostor with the right name registered: {fake.stdout!r} {fake.stderr[-300:]}"
 
     result = subprocess.run([str(copy), str(scratch / "child.py")], env=dict(env, PYTHONHOME=sys.base_prefix, DBUS_SESSION_BUS_ADDRESS=os.environ["DBUS_SESSION_BUS_ADDRESS"]),
                             capture_output=True, text=True, timeout=60)
