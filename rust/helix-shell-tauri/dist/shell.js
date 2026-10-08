@@ -692,6 +692,31 @@ $("brightness").addEventListener("input", () => {
 });
 
 
+
+// Workspaces. Rust sends the strip for the output being worked on; clicking sends only an id from that strip, and Rust refuses any other.
+function drawWorkspaces(strip) {
+  const host = $("workspaces");
+  host.replaceChildren();
+  host.style.display = strip.length > 1 ? "" : "none"; // a lone workspace is not worth a control
+  strip.forEach((ws, index) => {
+    // A roomy invisible button around a small pill: the pill is what is seen, the button is what is clicked.
+    const pill = document.createElement("button");
+    pill.className = "ws-hit";
+    const mark = document.createElement("span");
+    mark.className = "ws" + (ws.active ? " active" : "") + (ws.windows ? " has-windows" : "") + (ws.urgent ? " urgent" : "");
+    pill.append(mark);
+    pill.dataset.test = "ws-" + index;
+    pill.title = ws.name ? ws.name : "Workspace " + ws.idx;
+    pill.setAttribute("aria-label", pill.title);
+    pill.onclick = () => invoke("workspace_focus", { id: ws.id });
+    host.append(pill);
+  });
+  queueReport();
+  queueGlass();
+}
+listen("workspaces-view", (event) => drawWorkspaces(event.payload));
+invoke("workspaces_view").then(drawWorkspaces);
+
 // The dock. Rust decides what is listed (pinned first, then whatever is open) and what a click does; this page draws it and sends back ids
 // it was given. It stays hidden until the pointer touches the bottom edge, and while hidden only a thin strip there takes the pointer.
 let dockItems = [];

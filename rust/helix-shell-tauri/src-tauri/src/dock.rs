@@ -147,6 +147,28 @@ pub fn refresh(app: &AppHandle) {
         view.iter().filter(|i| i.item.running > 0).count()
     );
     let _ = app.emit("dock-view", view);
+    publish_workspaces(app);
+}
+
+/// Tells the page the workspace strip, but only when it differs from what it was last told (the event stream is chatty).
+fn publish_workspaces(app: &AppHandle) {
+    static LAST: std::sync::Mutex<Vec<helix_shell_core::niri::WorkspaceView>> =
+        std::sync::Mutex::new(Vec::new());
+    let strip = shell_state(app)
+        .lock()
+        .expect("shell state")
+        .niri
+        .workspace_strip();
+    let mut last = LAST.lock().expect("workspace strip");
+    if *last != strip {
+        eprintln!(
+            "WORKSPACES {} active={:?}",
+            strip.len(),
+            strip.iter().find(|w| w.active).map(|w| w.idx)
+        );
+        *last = strip.clone();
+        let _ = app.emit("workspaces-view", strip);
+    }
 }
 
 /// Loads the applications and the pinned list, then follows niri's events for as long as the shell runs. Reconnects (after a pause) if
@@ -162,12 +184,18 @@ pub fn start(app: AppHandle) {
     }
     refresh(&app);
     std::thread::spawn(move || loop {
-        if let Some(path) = socket_path() {
-            if let Ok(mut stream) = UnixStream::connect(path) {
-                if stream.write_all(b"\"EventStream\"\n").is_ok() {
-                    follow(&app, stream);
+        match socket_path() {
+            Some(path) => match UnixStream::connect(&path) {
+                Ok(mut stream) => {
+                    if stream.write_all(b"\"EventStream\"\n").is_ok() {
+                        eprintln!("NIRI following the event stream");
+                        follow(&app, stream);
+                        eprintln!("NIRI event stream ended");
+                    }
                 }
-            }
+                Err(error) => eprintln!("NIRI cannot connect to {}: {error}", path.display()),
+            },
+            None => eprintln!("NIRI no socket in the environment"),
         }
         std::thread::sleep(Duration::from_secs(3));
     });
@@ -269,4 +297,35 @@ pub fn dock_unpin(app: AppHandle, id: String) -> Result<(), String> {
 #[tauri::command]
 pub fn dock_move(app: AppHandle, id: String, to: usize) -> Result<(), String> {
     edit(&app, |d| d.move_pinned(&id, to))
+}
+
+#[tauri::command]
+pub fn workspaces_view(app: AppHandle) -> Vec<helix_shell_core::niri::WorkspaceView> {
+    shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .niri
+        .workspace_strip()
+}
+
+/// Switches to a workspace of the strip the bar shows; any other id is refused here and never sent to niri.
+#[tauri::command]
+pub fn workspace_focus(app: AppHandle, id: u64) -> Result<(), String> {
+    if !shell_state(&app)
+        .lock()
+        .expect("shell state")
+        .niri
+        .strip_has(id)
+    {
+        return Err("not a workspace the bar shows".into());
+    }
+    let reply = request(
+        &serde_json::json!({"Action": {"FocusWorkspace": {"reference": {"Id": id}}}}).to_string(),
+    )?;
+    eprintln!("WORKSPACES focus {id}");
+    if reply.contains("\"Ok\"") {
+        Ok(())
+    } else {
+        Err(format!("niri refused: {}", reply.trim()))
+    }
 }

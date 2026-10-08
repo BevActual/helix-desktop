@@ -285,3 +285,10 @@ body:not(.dock-show) #dock, body.open #dock { transform: translate(-50%, calc(10
 /* A notice is a sentence from the shell, not a level: no bar, wider. */
 #osd-text { display: none; font-weight: 550; } #osd.notice { width: auto; max-width: 460px; margin-left: 0; transform: translateX(-50%) translateY(10px) scale(.96); }
 #osd.notice.show { transform: translateX(-50%); } #osd.notice #osd-bar, #osd.notice #osd-val { display: none; } #osd.notice #osd-text { display: block; }
+
+/* Workspaces: small pills, the active one long; pointing at one grows it. */
+#workspaces { display: flex; align-items: center; gap: 0; margin-left: 4px; height: 26px; }
+.ws-hit { height: 26px; padding: 0 5px; display: flex; align-items: center; background: transparent; border-radius: 8px; } .ws-hit:hover { background: var(--fill-1); }
+.ws { height: 8px; width: 8px; border-radius: 4px; padding: 0; background: var(--label-3); transition: width 220ms var(--ease), background 160ms var(--ease), transform 120ms var(--ease); }
+.ws.has-windows { background: var(--label-2); } .ws.active { width: 24px; background: var(--label); } .ws.urgent { background: var(--warn); }
+.ws-hit:hover .ws { transform: scaleY(1.5); background: var(--label); } .ws-hit:active .ws { transform: scale(.9); }

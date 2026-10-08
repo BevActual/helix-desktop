@@ -1453,6 +1453,8 @@ fn main() {
             report_glass,
             report_interactive,
             dock::dock_view,
+            dock::workspaces_view,
+            dock::workspace_focus,
             dock::dock_activate,
             dock::dock_new_window,
             dock::dock_pin,

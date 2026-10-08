@@ -191,6 +191,60 @@ impl Niri {
     }
 }
 
+/// One workspace as the bar draws it.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+pub struct WorkspaceView {
+    pub id: u64,
+    pub idx: u64,
+    /// Sanitized by the caller's display rules at the page; niri workspace names come from the person's own configuration.
+    pub name: String,
+    pub active: bool,
+    pub urgent: bool,
+    pub windows: usize,
+}
+
+impl Niri {
+    /// The workspaces of the output the person is working on (the one holding the focused workspace, else the first output), in order.
+    pub fn workspace_strip(&self) -> Vec<WorkspaceView> {
+        let all = self.workspaces();
+        let output = all
+            .iter()
+            .find(|w| w.focused)
+            .or_else(|| all.first())
+            .and_then(|w| w.output.clone());
+        all.into_iter()
+            .filter(|w| w.output == output)
+            .map(|w| WorkspaceView {
+                id: w.id,
+                idx: w.idx,
+                name: w
+                    .name
+                    .clone()
+                    .unwrap_or_default()
+                    .chars()
+                    .take(40)
+                    .collect(),
+                active: w.active,
+                urgent: w.urgent
+                    || self
+                        .windows
+                        .values()
+                        .any(|win| win.urgent && win.workspace == Some(w.id)),
+                windows: self
+                    .windows
+                    .values()
+                    .filter(|win| win.workspace == Some(w.id))
+                    .count(),
+            })
+            .collect()
+    }
+
+    /// Whether `id` is a workspace of the strip the bar is showing: the only ones the bar may ask niri to switch to.
+    pub fn strip_has(&self, id: u64) -> bool {
+        self.workspace_strip().iter().any(|w| w.id == id)
+    }
+}
+
 /// Whether a window's app id looks like a terminal emulator. A pasted line break runs a command there unless the terminal protects
 /// against it, so the palette treats these windows with extra care. A false positive only makes the palette stricter.
 pub fn looks_like_terminal(app_id: &str) -> bool {
@@ -395,5 +449,90 @@ mod tests {
         ] {
             assert!(!looks_like_terminal(no), "{no}");
         }
+    }
+
+    fn with_workspaces() -> Niri {
+        let mut n = Niri::default();
+        n.apply(&json!({"WorkspacesChanged": {"workspaces": [
+            {"id": 1, "idx": 1, "name": null, "output": "eDP-1", "is_active": true, "is_focused": true, "is_urgent": false},
+            {"id": 2, "idx": 2, "name": "web", "output": "eDP-1", "is_active": false, "is_focused": false, "is_urgent": false},
+            {"id": 3, "idx": 1, "name": null, "output": "HDMI-A-1", "is_active": true, "is_focused": false, "is_urgent": false}
+        ]}}));
+        n.apply(&json!({"WindowsChanged": {"windows": [
+            {"id": 10, "app_id": "a", "title": "t", "workspace_id": 1, "is_focused": true, "is_urgent": false},
+            {"id": 11, "app_id": "b", "title": "t", "workspace_id": 1, "is_focused": false, "is_urgent": false},
+            {"id": 12, "app_id": "c", "title": "t", "workspace_id": 2, "is_focused": false, "is_urgent": true}
+        ]}}));
+        n
+    }
+
+    #[test]
+    fn the_strip_is_the_focused_outputs_workspaces_with_counts_and_urgency() {
+        let strip = with_workspaces().workspace_strip();
+        let ids: Vec<u64> = strip.iter().map(|w| w.id).collect();
+        assert_eq!(ids, [1, 2], "the other output's workspace is not shown");
+        assert_eq!(
+            (strip[0].active, strip[0].windows, strip[0].urgent),
+            (true, 2, false)
+        );
+        assert_eq!(
+            (strip[1].active, strip[1].windows, strip[1].urgent),
+            (false, 1, true),
+            "an urgent window makes its workspace urgent"
+        );
+        assert_eq!(strip[1].name, "web");
+    }
+
+    #[test]
+    fn with_no_focused_workspace_the_first_output_is_shown() {
+        let mut n = with_workspaces();
+        n.apply(&json!({"WorkspacesChanged": {"workspaces": [
+            {"id": 3, "idx": 1, "name": null, "output": "HDMI-A-1", "is_active": true, "is_focused": false, "is_urgent": false},
+            {"id": 1, "idx": 1, "name": null, "output": "eDP-1", "is_active": true, "is_focused": false, "is_urgent": false}
+        ]}}));
+        let ids: Vec<u64> = n.workspace_strip().iter().map(|w| w.id).collect();
+        assert_eq!(ids, [3], "HDMI-A-1 sorts first");
+        assert!(Niri::default().workspace_strip().is_empty());
+    }
+
+    #[test]
+    fn only_workspaces_in_the_strip_may_be_switched_to() {
+        let n = with_workspaces();
+        assert!(n.strip_has(2));
+        assert!(!n.strip_has(3), "another output's workspace");
+        assert!(!n.strip_has(99));
+    }
+
+    #[test]
+    fn workspace_names_are_bounded() {
+        let mut n = Niri::default();
+        n.apply(&json!({"WorkspacesChanged": {"workspaces": [{"id": 1, "idx": 1, "name": "n".repeat(500), "output": "o", "is_active": true, "is_focused": true, "is_urgent": false}]}}));
+        assert_eq!(n.workspace_strip()[0].name.chars().count(), 40);
+    }
+}
+
+#[cfg(test)]
+mod real_stream_tests {
+    use super::*;
+
+    /// The first lines niri 26.04 actually sends on connecting (captured from a nested session).
+    #[test]
+    fn niris_real_opening_events_are_understood() {
+        let mut n = Niri::default();
+        let lines = [
+            r#"{"Ok":"Handled"}"#,
+            r#"{"WorkspacesChanged":{"workspaces":[{"id":1,"idx":1,"name":null,"output":"winit","is_urgent":false,"is_active":true,"is_focused":true,"active_window_id":null}]}}"#,
+            r#"{"WindowsChanged":{"windows":[]}}"#,
+            r#"{"KeyboardLayoutsChanged":{"keyboard_layouts":{"names":["English (US)"],"current_idx":0}}}"#,
+            r#"{"OverviewOpenedOrClosed":{"is_open":false}}"#,
+            r#"{"ConfigLoaded":{"failed":false}}"#,
+            r#"{"CastsChanged":{"casts":[]}}"#,
+        ];
+        let changed: Vec<bool> = lines
+            .iter()
+            .map(|l| n.apply(&serde_json::from_str(l).unwrap()))
+            .collect();
+        assert_eq!(changed, [false, true, false, false, false, false, false]);
+        assert_eq!(n.workspace_strip().len(), 1);
     }
 }
