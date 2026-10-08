@@ -214,10 +214,14 @@ pub fn probe_protection(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
             let mut panel = host.lock().expect("confirmer");
             panel.set_protection(trusted);
             let view = panel.view();
-            sync_surface(&runner, &panel, &keep);
+            if view.open {
+                // The window is already up; only its content changes (and it is destroyed below when the refusal emptied the queue).
+                emit_view(&runner, &view);
+            } else {
+                sync_surface(&runner, &panel, &keep);
+            }
             drop(panel);
             if view.open {
-                emit_view(&runner, &view);
                 schedule_arm(runner.clone(), host.clone());
             }
         });
