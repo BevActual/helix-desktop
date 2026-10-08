@@ -80,6 +80,11 @@ impl Catalog {
         self.entries = settings.as_array().cloned().unwrap_or_default();
     }
 
+    /// The text value of a string setting, if the catalog has it and it is not empty.
+    pub fn text_of(&self, id: &str) -> Option<String> {
+        self.entry(id)?.get("value")?.as_str().filter(|t| !t.is_empty()).map(str::to_string)
+    }
+
     fn entry(&self, id: &str) -> Option<&Value> {
         self.entries.iter().find(|e| e.get("id").and_then(Value::as_str) == Some(id))
     }
@@ -293,6 +298,16 @@ mod tests {
         assert!(matches!(rows[1].control, Control::Text { .. }));
         assert!(c.update(&["dock.position"], "dock.position", Change::Choice("left".into())).is_err());
         assert!(c.update(&["dock.position"], "dock.position", Change::Choice("top".into())).is_ok());
+    }
+
+    #[test]
+    fn text_of_gives_only_non_empty_text() {
+        let mut c = Catalog::default();
+        c.set(&json!([{"id": "a", "type": "string", "value": "/x"}, {"id": "b", "type": "string", "value": ""}, {"id": "c", "type": "boolean", "value": true}]));
+        assert_eq!(c.text_of("a"), Some("/x".into()));
+        assert_eq!(c.text_of("b"), None);
+        assert_eq!(c.text_of("c"), None);
+        assert_eq!(c.text_of("missing"), None);
     }
 
     #[test]

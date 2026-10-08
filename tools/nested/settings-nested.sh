@@ -13,6 +13,15 @@ cat > "$XDG_STATE_HOME/noctalia/agent/audit.jsonl" <<'AUDIT'
 {"time":"2026-10-07T10:00:05Z","client":"exe:/opt/agents/notes-agent","tool":"app-launch","args":["Browser"],"tier":"confirm","decision":"denied","outcome":"the user declined","tainted":true}
 AUDIT
 chmod 600 "$XDG_STATE_HOME/noctalia/agent/audit.jsonl"
+mkdir -p "$HOME/Pictures/Wallpapers"
+python3 - "$HOME/Pictures/Wallpapers" <<'PY'
+import sys, zlib, struct
+def png(path, rgb, w=320, h=200):
+    raw = zlib.compress((b"\x00" + bytes(rgb) * w) * h, 6)
+    def chunk(tag, data): c = struct.pack(">I", len(data)) + tag + data; return c + struct.pack(">I", zlib.crc32(tag + data))
+    open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
+png(sys.argv[1] + "/alpha-red.png", (200, 40, 40)); png(sys.argv[1] + "/beta-green.png", (40, 160, 70)); png(sys.argv[1] + "/gamma-blue.png", (50, 80, 210))
+PY
 "$ROOT/build-debug/helix-service" > "$XDG_STATE_HOME/helix-service.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 export HELIX_UI_LAYOUT_LOG="$XDG_STATE_HOME/layout.json"

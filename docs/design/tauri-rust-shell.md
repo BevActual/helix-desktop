@@ -456,6 +456,8 @@ draw, frees the scratch memory and keeps only the buffer on screen (about 17 MB 
 image falls back to a quiet dark colour, never white. `tools/nested/wallpaper-test.sh` checks real screenshot pixels (a red/blue image with a green
 square, cropped not stretched). `tools/switch-shell.sh tauri` installs and enables `helix-wallpaper.service`; `native` stops it.
 
+**Choice and reload (2026-10-08).** Settings' Wallpaper page writes the choice to `~/.config/helix/wallpaper.toml` (0600, atomic; `[wallpaper.default]`, same format), never to the service's settings file. `helix-wallpaper` reads that file on top of the older one and watches both folders with inotify (no polling), so a new choice shows at once without a restart (`wallpaper-test.sh` checks real pixels after a rewrite). The picker's model (`helix_wallpaper::picker`) lists only pictures directly inside the folder and accepts a choice only as a place in that listing or a fixed swatch.
+
 ## Volume and brightness keys, and the on-screen indicator (2026-10-07)
 
 The volume and brightness keys go through the shell (`org.helix.Shell1.AdjustVolume`, `ToggleMute`, `AdjustBrightness`; `helix-panel` calls them and falls back to

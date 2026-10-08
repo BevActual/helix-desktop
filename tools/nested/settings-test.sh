@@ -54,6 +54,17 @@ click_id page-keyboard; sleep 1.2
 for _ in $(seq 1 20); do has_id "shortcut:Open the launcher" && break; sleep 0.25; done
 has_id "shortcut:Open the launcher" && has_id "shortcut:Open a Terminal" && has_id "shortcut:Close window" && echo "ok: binds listed" || fail "binds missing"
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-keyboard.png"
+echo "--- 1d. the Wallpaper page writes the choice the wallpaper process reads"
+CHOICE=$SCRATCH/config/helix/wallpaper.toml
+click_id page-wallpaper; sleep 1.5
+for _ in $(seq 1 20); do has_id wp-image-1 && break; sleep 0.25; done
+has_id wp-image-2 && echo "ok: three pictures listed" || fail "pictures missing"
+sleep 1; niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-wallpaper.png"
+click_id wp-image-1; sleep 1
+grep -q 'beta-green.png' "$CHOICE" 2>/dev/null && echo "ok: the second picture was chosen" || fail "choice is: $(cat "$CHOICE" 2>/dev/null)"
+[ "$(stat -c %a "$CHOICE" 2>/dev/null)" = 600 ] && echo "ok: the file is owner only" || fail "file mode is $(stat -c %a "$CHOICE" 2>/dev/null)"
+click_id wp-swatch-3; sleep 1
+grep -q 'color:#1f4d3a' "$CHOICE" 2>/dev/null && echo "ok: a colour was chosen" || fail "choice is: $(cat "$CHOICE" 2>/dev/null)"
 click_id page-agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"

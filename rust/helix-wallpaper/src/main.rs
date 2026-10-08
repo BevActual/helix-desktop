@@ -4,10 +4,12 @@
 //! decoded, cropped and scaled once per draw and dropped, so what stays in memory is the buffers on screen.
 
 use std::fs::File;
-use std::os::fd::AsFd;
+use std::os::fd::{AsFd, AsRawFd};
 use std::path::PathBuf;
 
-use helix_wallpaper::{buffer_size, cover_crop, parse_config, Config, Source, FALLBACK};
+use helix_wallpaper::{
+    buffer_size, choice_path, cover_crop, load_config, settings_path, Config, Source, FALLBACK,
+};
 use memmap2::MmapMut;
 use wayland_client::globals::{registry_queue_init, GlobalListContents};
 use wayland_client::protocol::{
@@ -69,13 +71,6 @@ struct App {
     surfaces: Vec<Option<Surface>>,
 }
 
-fn settings_path(home: &str) -> PathBuf {
-    if let Some(path) = std::env::var_os("HELIX_WALLPAPER_SETTINGS") {
-        return PathBuf::from(path);
-    }
-    let state = std::env::var("XDG_STATE_HOME").unwrap_or_else(|_| format!("{home}/.local/state"));
-    PathBuf::from(state).join("noctalia/settings.toml")
-}
 
 /// BGRX bytes (what `wl_shm` calls XRGB8888 on a little-endian machine) of `source` fitted to `w` x `h`.
 fn render(source: &Source, w: u32, h: u32) -> Vec<u8> {
@@ -144,6 +139,28 @@ impl App {
             buffers: Vec::new(),
         }));
         self.outputs[output_index].surface = Some(index);
+    }
+
+    /// Starts again from a new configuration: every surface takes what the config says for its output and is drawn once more.
+    fn reload(&mut self, config: Config, qh: &QueueHandle<App>) {
+        self.config = config;
+        for index in 0..self.surfaces.len() {
+            let name = self
+                .outputs
+                .iter()
+                .find(|o| o.surface == Some(index))
+                .and_then(|o| o.name.clone());
+            let source = self.config.for_output(name.as_deref());
+            if let Some(surface) = self.surfaces[index].as_mut() {
+                if surface.source == source {
+                    continue;
+                }
+                surface.source = source;
+                surface.drawn = None;
+            }
+            self.draw(index, qh);
+        }
+        eprintln!("wallpaper: reloaded");
     }
 
     /// Draws when the size and scale are known and differ from what is on screen.
@@ -380,9 +397,7 @@ ignore_events! {
 
 fn main() {
     let home = std::env::var("HOME").unwrap_or_default();
-    let config = std::fs::read_to_string(settings_path(&home))
-        .map(|text| parse_config(&text, &home))
-        .unwrap_or_default();
+    let config = load_config(&home);
     let connection = Connection::connect_to_env().expect("no Wayland compositor to paint on");
     let (globals, mut queue) = registry_queue_init::<App>(&connection).expect("registry");
     let qh = queue.handle();
@@ -424,10 +439,101 @@ fn main() {
         }
     }
     eprintln!("wallpaper: running");
+    let watcher = ConfigWatch::new(&[settings_path(&app.home), choice_path(&app.home)]);
     loop {
-        if queue.blocking_dispatch(&mut app).is_err() {
+        if queue.dispatch_pending(&mut app).is_err() || queue.flush().is_err() {
             eprintln!("wallpaper: the compositor went away");
             return;
+        }
+        let Some(guard) = queue.prepare_read() else {
+            continue;
+        };
+        let mut fds = [
+            libc::pollfd {
+                fd: guard.connection_fd().as_raw_fd(),
+                events: libc::POLLIN,
+                revents: 0,
+            },
+            libc::pollfd {
+                fd: watcher.fd,
+                events: libc::POLLIN,
+                revents: 0,
+            },
+        ];
+        // SAFETY: two valid pollfd structures; the call only reads and writes them.
+        let ready = unsafe { libc::poll(fds.as_mut_ptr(), if watcher.fd >= 0 { 2 } else { 1 }, -1) };
+        if ready < 0 {
+            continue;
+        }
+        if fds[0].revents & libc::POLLIN != 0 {
+            if guard.read().is_err() {
+                eprintln!("wallpaper: the compositor went away");
+                return;
+            }
+        } else {
+            drop(guard);
+        }
+        if watcher.fd >= 0 && fds[1].revents & libc::POLLIN != 0 && watcher.changed() {
+            let config = load_config(&app.home);
+            app.reload(config, &qh);
+        }
+    }
+}
+
+/// Tells when the wallpaper settings files change (inotify on their folders: no polling, nothing runs while they are still).
+struct ConfigWatch {
+    fd: i32,
+    names: Vec<std::ffi::OsString>,
+}
+
+impl ConfigWatch {
+    fn new(files: &[PathBuf]) -> Self {
+        // SAFETY: plain system call; a negative result means no watching, and the wallpaper keeps what it has.
+        let fd = unsafe { libc::inotify_init1(libc::IN_NONBLOCK | libc::IN_CLOEXEC) };
+        let mut names = Vec::new();
+        for file in files {
+            let (Some(dir), Some(name)) = (file.parent(), file.file_name()) else {
+                continue;
+            };
+            let _ = std::fs::create_dir_all(dir);
+            if let Ok(dir) = std::ffi::CString::new(dir.as_os_str().as_encoded_bytes()) {
+                // SAFETY: `dir` is a valid NUL-terminated path for the length of the call.
+                unsafe {
+                    libc::inotify_add_watch(
+                        fd,
+                        dir.as_ptr(),
+                        libc::IN_CLOSE_WRITE | libc::IN_MOVED_TO | libc::IN_CREATE,
+                    )
+                };
+            }
+            names.push(name.to_owned());
+        }
+        ConfigWatch { fd, names }
+    }
+
+    /// Reads what happened; true when one of the files was written or replaced.
+    fn changed(&self) -> bool {
+        let mut buffer = [0u8; 4096];
+        let mut changed = false;
+        loop {
+            // SAFETY: reads at most `buffer.len()` bytes into `buffer`.
+            let n = unsafe { libc::read(self.fd, buffer.as_mut_ptr().cast(), buffer.len()) };
+            if n <= 0 {
+                return changed;
+            }
+            let mut at = 0usize;
+            let n = n as usize;
+            while at + 16 <= n {
+                let len = u32::from_ne_bytes(buffer[at + 12..at + 16].try_into().unwrap()) as usize;
+                let end = (at + 16 + len).min(n);
+                let name = &buffer[at + 16..end];
+                let name = name.split(|b| *b == 0).next().unwrap_or(&[]);
+                changed |= self
+                    .names
+                    .iter()
+                    .any(|wanted| wanted.as_encoded_bytes() == name);
+                at = end;
+            }
         }
     }
 }

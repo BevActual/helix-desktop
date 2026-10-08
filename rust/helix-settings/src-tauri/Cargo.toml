@@ -11,6 +11,9 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 helix-desktop-api = { path = "../../helix-desktop-api" }
 helix-shell-core = { path = "../../helix-shell-core" }
+helix-wallpaper = { path = "../../helix-wallpaper" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+base64 = "0.22"
 gtk = "0.18"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

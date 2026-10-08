@@ -9,6 +9,8 @@ use std::time::Duration;
 use helix_desktop_api::{Desktop, Domain};
 use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
 use helix_shell_core::network::{Network, NetworkView, Request as NetRequest, RequestError as NetError};
+use helix_wallpaper::picker::{Picker, PickerView};
+use helix_wallpaper::{choice_path, choice_to_toml, load_config, Source};
 use helix_shell_core::shortcuts::{self, ShortcutGroup};
 use helix_shell_core::catalog::{Catalog, Change, RowView};
 use helix_shell_core::grants::{Grants, GrantsView, Request, RequestError};
@@ -100,6 +102,7 @@ struct State {
     catalog: Catalog,
     network: Network,
     bluetooth: Bluetooth,
+    picker: Picker,
     status: &'static str,
 }
 
@@ -494,6 +497,116 @@ fn shortcuts_view() -> Vec<ShortcutGroup> {
     shortcuts::view(&binds)
 }
 
+// Wallpaper -------------------------------------------------------------------------------------------------------------------------
+fn home() -> String {
+    std::env::var("HOME").unwrap_or_default()
+}
+
+/// The folder the picker offers: the service's wallpaper folder if one is set, otherwise Pictures/Wallpapers.
+fn wallpaper_folder(app: &AppHandle) -> std::path::PathBuf {
+    let shared = shared(app);
+    let state = shared.lock().expect("state");
+    let from_service = state
+        .catalog
+        .text_of("wallpaper.directory")
+        .filter(|path| path.starts_with('/'));
+    from_service
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| std::path::PathBuf::from(home()).join("Pictures/Wallpapers"))
+}
+
+fn scan_wallpapers(app: &AppHandle) -> PickerView {
+    let folder = wallpaper_folder(app);
+    let files: Vec<std::path::PathBuf> = std::fs::read_dir(&folder)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .take(5000)
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect();
+    let current = load_config(&home()).default;
+    let shared = shared(app);
+    let mut state = shared.lock().expect("state");
+    state.picker.set_folder(&folder, files);
+    state.picker.set_current(current);
+    state.picker.view()
+}
+
+#[tauri::command]
+fn wallpaper_view(app: AppHandle) -> PickerView {
+    scan_wallpapers(&app)
+}
+
+/// A small picture of listed image number `index`, as a data URL. Only listed images can be asked for.
+#[tauri::command]
+async fn wallpaper_thumb(app: AppHandle, index: usize) -> Option<String> {
+    let path = shared(&app).lock().expect("state").picker.file(index)?.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        use base64::Engine;
+        let image = image::open(&path).ok()?.thumbnail(360, 225).to_rgb8();
+        let mut bytes = Vec::new();
+        image::codecs::jpeg::JpegEncoder::new_with_quality(&mut bytes, 80)
+            .encode_image(&image)
+            .ok()?;
+        Some(format!(
+            "data:image/jpeg;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ))
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+/// Writes the choice where the wallpaper process looks (atomically, owner only) and tells the page. The process reloads by itself.
+fn write_choice(app: &AppHandle, source: Source) -> Result<(), String> {
+    let path = choice_path(&home());
+    let parent = path.parent().ok_or("no folder for the choice")?;
+    std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    let temporary = path.with_extension("tmp");
+    {
+        use std::io::Write;
+        use std::os::unix::fs::OpenOptionsExt;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|error| error.to_string())?;
+        file.write_all(choice_to_toml(&source).as_bytes())
+            .map_err(|error| error.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|error| error.to_string())?;
+    eprintln!("SETTINGS wallpaper chosen");
+    let view = scan_wallpapers(app);
+    let _ = app.emit("wallpaper-view", view);
+    Ok(())
+}
+
+#[tauri::command]
+fn wallpaper_choose_image(app: AppHandle, index: usize) -> Result<(), String> {
+    let source = shared(&app)
+        .lock()
+        .expect("state")
+        .picker
+        .choose_image(index)
+        .map_err(|error| format!("{error:?}"))?;
+    write_choice(&app, source)
+}
+
+#[tauri::command]
+fn wallpaper_choose_swatch(app: AppHandle, index: usize) -> Result<(), String> {
+    let source = shared(&app)
+        .lock()
+        .expect("state")
+        .picker
+        .choose_swatch(index)
+        .map_err(|error| format!("{error:?}"))?;
+    write_choice(&app, source)
+}
+
 #[tauri::command]
 fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
@@ -575,6 +688,10 @@ fn main() {
             agents_revoke,
             agents_refresh,
             rows_view,
+            wallpaper_view,
+            wallpaper_thumb,
+            wallpaper_choose_image,
+            wallpaper_choose_swatch,
             shortcuts_view,
             about,
             network_view,
@@ -598,6 +715,7 @@ fn main() {
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 grants: Grants::default(),
                 catalog: Catalog::default(),
+                picker: Picker::default(),
                 network: Network::from_snapshot(&serde_json::Value::Null),
                 bluetooth: Bluetooth::from_snapshot(&serde_json::Value::Null),
                 status: "unavailable",

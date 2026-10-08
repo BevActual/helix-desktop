@@ -20,6 +20,7 @@ let reportTimer = null;
 // Pages -----------------------------------------------------------------------------------------------------------------------------
 const PAGES = [
   { name: "appearance", title: "Appearance", icon: "palette", rows: true },
+  { name: "wallpaper", title: "Wallpaper", icon: "image", rows: false },
   { name: "accessibility", title: "Accessibility", icon: "eye", rows: true },
   { name: "displays", title: "Displays", icon: "sun", rows: true },
   { name: "network", title: "Network", icon: "wifi", rows: false },
@@ -45,7 +46,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -75,6 +76,7 @@ function showPage(name) {
   $("refresh").style.display = name === "agents" ? "" : "none";
   if (name === "about") drawAbout();
   if (name === "keyboard") drawKeyboard();
+  if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
   queueReport();
 }
 buildPages();
@@ -96,6 +98,50 @@ async function drawAbout() {
   host.append(card);
   queueReport();
 }
+
+// Wallpaper: a grid of the pictures in the folder; choosing one writes the choice and the wallpaper process reloads by itself ---------
+let thumbObserver = null;
+function drawWallpaper(view) {
+  const host = $("wallpaper-host");
+  host.replaceChildren();
+  host.append(el("h4", "", "Colours"));
+  const swatches = el("div", "swatches");
+  view.swatches.forEach((swatch) => {
+    const button = el("button", "swatch" + (swatch.current ? " current" : ""));
+    button.style.background = swatch.hex;
+    button.title = swatch.hex;
+    button.dataset.test = "wp-swatch-" + swatch.index;
+    button.onclick = () => invoke("wallpaper_choose_swatch", { index: swatch.index });
+    swatches.append(button);
+  });
+  host.append(swatches);
+  host.append(el("h4", "", "Pictures"));
+  host.append(el("div", "setting-about note", view.folder));
+  const grid = el("div", "wp-grid");
+  if (thumbObserver) thumbObserver.disconnect();
+  thumbObserver = new IntersectionObserver((entries) => entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    const tile = entry.target;
+    thumbObserver.unobserve(tile);
+    invoke("wallpaper_thumb", { index: Number(tile.dataset.index) }).then((url) => {
+      if (url) tile.style.backgroundImage = "url(" + url + ")";
+    });
+  }), { rootMargin: "200px" });
+  view.images.forEach((image) => {
+    const tile = el("button", "wp-tile" + (image.current ? " current" : ""));
+    tile.dataset.index = image.index;
+    tile.dataset.test = "wp-image-" + image.index;
+    tile.title = image.name;
+    tile.append(el("span", "wp-name", image.name));
+    tile.onclick = () => invoke("wallpaper_choose_image", { index: image.index });
+    grid.append(tile);
+    thumbObserver.observe(tile);
+  });
+  host.append(grid);
+  if (!view.images.length) host.append(el("div", "empty", "No pictures in this folder."));
+  queueReport();
+}
+listen("wallpaper-view", (event) => drawWallpaper(event.payload));
 
 // Keyboard: the compositor's key binds, read only ----------------------------------------------------------------------------------
 async function drawKeyboard() {

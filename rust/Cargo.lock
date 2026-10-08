@@ -1501,9 +1501,12 @@ dependencies = [
 name = "helix-settings"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "gtk",
  "helix-desktop-api",
  "helix-shell-core",
+ "helix-wallpaper",
+ "image",
  "serde",
  "serde_json",
  "tauri",
@@ -1550,6 +1553,7 @@ dependencies = [
  "image",
  "libc",
  "memmap2",
+ "serde",
  "toml 0.8.2",
  "wayland-client",
  "wayland-protocols",

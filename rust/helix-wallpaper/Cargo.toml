@@ -13,3 +13,4 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 memmap2 = "0.9"
 libc = "0.2"
 toml = "0.8"
+serde = { version = "1", features = ["derive"] }

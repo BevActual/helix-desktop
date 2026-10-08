@@ -1,5 +1,7 @@
 //! What to paint, and how an image fills a screen. No Wayland here: the geometry and the configuration are plain and tested.
 
+pub mod picker;
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -72,13 +74,65 @@ pub fn parse_config(settings: &str, home: &str) -> Config {
     config
 }
 
+/// Where Settings writes the person's wallpaper choice. It sits on top of the older settings file, so a choice made here wins and the
+/// older file is never written by anything but the service that owns it.
+pub fn choice_path(home: &str) -> PathBuf {
+    if let Some(path) = std::env::var_os("HELIX_WALLPAPER_CHOICE") {
+        return PathBuf::from(path);
+    }
+    let config = std::env::var("XDG_CONFIG_HOME").unwrap_or_else(|_| format!("{home}/.config"));
+    PathBuf::from(config).join("helix/wallpaper.toml")
+}
+
+/// The text of a choice file that makes `source` the wallpaper on every output.
+pub fn choice_to_toml(source: &Source) -> String {
+    let path = match source {
+        Source::Color([r, g, b]) => format!("color:#{r:02x}{g:02x}{b:02x}"),
+        Source::Image(path) => path.to_string_lossy().into_owned(),
+    };
+    let mut default = toml::Table::new();
+    default.insert("path".into(), toml::Value::String(path));
+    let mut wallpaper = toml::Table::new();
+    wallpaper.insert("default".into(), toml::Value::Table(default));
+    let mut root = toml::Table::new();
+    root.insert("wallpaper".into(), toml::Value::Table(wallpaper));
+    toml::to_string(&root).unwrap_or_default()
+}
+
 impl Config {
+    /// `self` with everything `over` says on top of it: its default wins, and so does each monitor it names.
+    pub fn overlay(mut self, over: Config) -> Config {
+        if over.default.is_some() {
+            self.default = over.default;
+        }
+        self.monitors.extend(over.monitors);
+        self
+    }
+
     pub fn for_output(&self, name: Option<&str>) -> Source {
         name.and_then(|n| self.monitors.get(n))
             .or(self.default.as_ref())
             .cloned()
             .unwrap_or(Source::Color(FALLBACK))
     }
+}
+
+/// The older settings file with the person's choice (written by Settings) on top.
+pub fn load_config(home: &str) -> Config {
+    let read = |path: PathBuf| {
+        std::fs::read_to_string(path)
+            .map(|text| parse_config(&text, home))
+            .unwrap_or_default()
+    };
+    read(settings_path(home)).overlay(read(choice_path(home)))
+}
+
+pub fn settings_path(home: &str) -> PathBuf {
+    if let Some(path) = std::env::var_os("HELIX_WALLPAPER_SETTINGS") {
+        return PathBuf::from(path);
+    }
+    let state = std::env::var("XDG_STATE_HOME").unwrap_or_else(|_| format!("{home}/.local/state"));
+    PathBuf::from(state).join("noctalia/settings.toml")
 }
 
 /// The part of an `iw` x `ih` image that, scaled to `ow` x `oh`, covers the whole output without distortion (centred crop).
@@ -106,6 +160,25 @@ pub fn buffer_size(logical: u32, scale120: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_choice_round_trips_and_wins_over_the_older_file() {
+        for source in [
+            Source::Image("/pics/a \"quoted\" b.jpg".into()),
+            Source::Image("/pics/ü ñ.png".into()),
+            Source::Color([1, 2, 255]),
+        ] {
+            let text = choice_to_toml(&source);
+            assert_eq!(parse_config(&text, "/h").default, Some(source));
+        }
+        let old = parse_config("[wallpaper.default]\npath=\"/old.jpg\"\n[wallpaper.monitors.A]\npath=\"/a.jpg\"\n[wallpaper.monitors.B]\npath=\"/b.jpg\"", "/h");
+        let new = parse_config("[wallpaper.default]\npath=\"/new.jpg\"\n[wallpaper.monitors.B]\npath=\"color:#000000\"", "/h");
+        let merged = old.clone().overlay(new);
+        assert_eq!(merged.default, Some(Source::Image("/new.jpg".into())));
+        assert_eq!(merged.monitors["A"], Source::Image("/a.jpg".into()), "untouched monitors stay");
+        assert_eq!(merged.monitors["B"], Source::Color([0, 0, 0]), "a named monitor is replaced");
+        assert_eq!(old.clone().overlay(Config::default()), old, "an empty choice changes nothing");
+    }
 
     #[test]
     fn colours_and_paths_are_told_apart() {
