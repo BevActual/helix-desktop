@@ -14,6 +14,9 @@ function el(tag, className, text) {
 $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 $("refresh").onclick = () => invoke("agents_refresh");
 
+let reporting = false;
+let reportTimer = null;
+
 // Pages -----------------------------------------------------------------------------------------------------------------------------
 const PAGES = [
   { name: "appearance", title: "Appearance", icon: "palette", rows: true },
@@ -48,7 +51,10 @@ function buildPages() {
     }
   });
 }
+let current = "appearance";
 function showPage(name) {
+  current = name;
+  $("search").value = "";
   document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-" + name; });
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
   $("page-title").textContent = TITLES[name];
@@ -59,64 +65,111 @@ buildPages();
 showPage("appearance");
 
 // Rows of service settings ----------------------------------------------------------------------------------------------------------
-function drawRows(view) {
-  const host = $(view.page + "-rows");
-  host.replaceChildren();
+const pageRows = {};  // page name -> the rows last sent for it, kept so search can list matches from every page
+function rowLine(page, row) {
+  const line = el("div", "setting-row");
+  const text = el("div", "setting-text");
+  text.append(el("div", "setting-title", row.title));
+  if (row.description) text.append(el("div", "setting-about", row.description));
+  if (row.overridden) text.append(el("div", "setting-about", "Pinned by a local override."));
+  line.append(text);
+  const control = row.control;
+  const send = (change) => invoke("setting_change", { page, id: row.id, change }).catch((error) => console.error(error));
+  if (control.kind === "switch") {
+    const box = el("input");
+    box.type = "checkbox";
+    box.className = "switch";
+    box.checked = control.on;
+    box.dataset.test = "set-" + row.id;
+    box.addEventListener("change", () => send({ kind: "switch", value: box.checked }));
+    line.append(box);
+  } else if (control.kind === "slider") {
+    const wrap = el("div", "slider-wrap");
+    const range = el("input");
+    range.type = "range";
+    range.min = control.min;
+    range.max = control.max;
+    range.step = control.integer ? 1 : (control.max - control.min) / 100;
+    range.value = control.value;
+    range.dataset.test = "set-" + row.id;
+    const show = () => {
+      const v = Number(range.value);
+      range.style.setProperty("--pct", ((v - control.min) / (control.max - control.min) * 100) + "%");
+      return control.integer ? String(Math.round(v)) : v.toFixed(2);
+    };
+    const readout = el("span", "slider-value", show());
+    range.addEventListener("input", () => { readout.textContent = show(); });
+    range.addEventListener("change", () => send({ kind: "number", value: Number(range.value) }));
+    wrap.append(range, readout);
+    line.append(wrap);
+  } else if (control.kind === "choice") {
+    const segments = el("div", "segments");
+    control.options.forEach((option) => {
+      const button = el("button", "segment" + (option.value === control.current ? " current" : ""), option.label);
+      button.dataset.test = "set-" + row.id + "-" + option.value;
+      button.onclick = () => send({ kind: "choice", value: option.value });
+      segments.append(button);
+    });
+    line.append(segments);
+  }
+  return line;
+}
+// Rows under their group headings, each group in one rounded card.
+function drawGroups(host, page, rows) {
   let group = null;
   let card = null;
-  view.rows.forEach((row) => {
+  rows.forEach((row) => {
     if (row.group !== group) {
       group = row.group;
       host.append(el("h4", "", group));
       card = el("div", "rows-card");
       host.append(card);
     }
-    const line = el("div", "setting-row");
-    const text = el("div", "setting-text");
-    text.append(el("div", "setting-title", row.title));
-    if (row.description) text.append(el("div", "setting-about", row.description));
-    if (row.overridden) text.append(el("div", "setting-about", "Pinned by a local override."));
-    line.append(text);
-    const control = row.control;
-    const send = (change) => invoke("setting_change", { page: view.page, id: row.id, change }).catch((error) => console.error(error));
-    if (control.kind === "switch") {
-      const box = el("input");
-      box.type = "checkbox";
-      box.className = "switch";
-      box.checked = control.on;
-      box.dataset.test = "set-" + row.id;
-      box.addEventListener("change", () => send({ kind: "switch", value: box.checked }));
-      line.append(box);
-    } else if (control.kind === "slider") {
-      const wrap = el("div", "slider-wrap");
-      const range = el("input");
-      range.type = "range";
-      range.min = control.min;
-      range.max = control.max;
-      range.step = control.integer ? 1 : (control.max - control.min) / 100;
-      range.value = control.value;
-      range.dataset.test = "set-" + row.id;
-      const readout = el("span", "slider-value", String(control.integer ? Math.round(control.value) : control.value.toFixed(2)));
-      range.addEventListener("input", () => { readout.textContent = String(control.integer ? Math.round(range.value) : Number(range.value).toFixed(2)); });
-      range.addEventListener("change", () => send({ kind: "number", value: Number(range.value) }));
-      wrap.append(range, readout);
-      line.append(wrap);
-    } else if (control.kind === "choice") {
-      const segments = el("div", "segments");
-      control.options.forEach((option) => {
-        const button = el("button", "segment" + (option.value === control.current ? " current" : ""), option.label);
-        button.dataset.test = "set-" + row.id + "-" + option.value;
-        button.onclick = () => send({ kind: "choice", value: option.value });
-        segments.append(button);
-      });
-      line.append(segments);
-    }
-    card.append(line);
+    card.append(rowLine(page, row));
   });
-  if (!view.rows.length) host.append(el("div", "empty", "These settings are not available: the desktop service is not running."));
+}
+function drawRows(view) {
+  pageRows[view.page] = view.rows;
+  const host = $(view.page + "-rows");
+  host.replaceChildren();
+  drawGroups(host, view.page, view.rows);
+  if (!view.rows.length) host.append(el("div", "empty", "There is nothing to adjust here on this desktop."));
+  if (searching()) drawSearch();
   queueReport();
 }
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
+
+// Search: matching rows from every page, under the page they belong to ------------------------------------------------------------
+const searching = () => $("search").value.trim() !== "";
+function drawSearch() {
+  const words = $("search").value.toLowerCase().split(/\s+/).filter(Boolean);
+  const host = $("search-rows");
+  host.replaceChildren();
+  let found = 0;
+  PAGES.filter((page) => page.rows).forEach((page) => {
+    const rows = (pageRows[page.name] || []).filter((row) => {
+      const hay = (row.title + " " + row.group + " " + row.description).toLowerCase();
+      return words.every((word) => hay.includes(word));
+    });
+    if (!rows.length) return;
+    found += rows.length;
+    host.append(el("h3", "search-page", page.title));
+    drawGroups(host, page.name, rows);
+  });
+  if (!found) host.append(el("div", "empty", "No settings match."));
+  queueReport();
+}
+$("search").addEventListener("input", () => {
+  if (searching()) {
+    document.querySelectorAll(".settings-page").forEach((node) => { node.hidden = node.id !== "page-search"; });
+    document.querySelectorAll(".page-link").forEach((node) => node.classList.remove("current"));
+    $("page-title").textContent = "Search";
+    $("refresh").style.display = "none";
+    drawSearch();
+  } else {
+    showPage(current);
+  }
+});
 
 // Privacy & agents ------------------------------------------------------------------------------------------------------------------
 function drawAgents(view) {
@@ -174,8 +227,6 @@ function drawAgents(view) {
 listen("agents-view", (event) => drawAgents(event.payload)).then(() => invoke("agents_view").then(drawAgents));
 
 // Tests only: where every named control is, so a test can click it by name.
-let reporting = false;
-let reportTimer = null;
 invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport(); });
 function queueReport() {
   if (!reporting) return;
