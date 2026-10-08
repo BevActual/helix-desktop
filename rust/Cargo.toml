@@ -8,6 +8,7 @@ members = [
     "helix-idle",
     "helix-shell-tauri/src-tauri",
     "helix-settings/src-tauri",
+    "helix-attacker",
 ]
 
 [profile.release]

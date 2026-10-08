@@ -105,6 +105,15 @@ receives real clicks), so the existing pointer tool that uses virtual pointers w
   path; every other test never opens a trusted surface.
 * **Not a sandbox**: see Non-goals.
 
+## Status
+
+Decision (the person, 2026-10-08): when the role is missing, **confirm-tier actions are refused** (the default; a setting may allow them, marked in the audit).
+
+Step 1 is done: `tools/nested/trusted-attack-test.sh` (with `tools/nested/attacker.py` and the `wl-capture` tool in `rust/helix-attacker`) runs the five
+attacks against a pending approval. With `TRUSTED_EXPECT=vulnerable` (today) all five **succeed**: a synthetic pointer click approves it, so do
+synthetic keys (Tab x4, Space found by trying 1 to 7 Tabs), screencopy reads the verified client's name and path, an Overlay surface hides the dialog,
+and an exclusive-keyboard surface takes the keys. The same test with `TRUSTED_EXPECT=protected` must pass once the role exists.
+
 ## Order of work
 
 1. Add the failing tests (attacker program for each threat) and the `--device` pointer. Prove each attack works today.

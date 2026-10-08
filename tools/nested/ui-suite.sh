@@ -21,6 +21,7 @@ pick bt             && run bt bluetooth-test.sh tauri-fake-desktop.sh
 pick ctl            && run ctl shell-control-test.sh tauri-shell.sh
 pick cc             && run cc control-center-test.sh tauri-shell.sh HELIX_NESTED_PRIVATE_AUDIO=1
 pick notifications  && run notifications notifications-test.sh tauri-shell.sh
+pick trusted-attack && run trusted-attack trusted-attack-test.sh tauri-shell.sh
 pick agent-ipc      && run agent-ipc agent-ipc-test.sh tauri-fake-desktop.sh
 pick today          && run today today-test.sh tauri-shell.sh
 pick activity       && run activity activity-test.sh tauri-shell.sh
