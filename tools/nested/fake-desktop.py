@@ -128,6 +128,11 @@ def network_action(name, args, emit):
         if ap["secured"] and not ap["saved"] and "secret" not in args: raise Refused("Connection was rejected")
         if ap["enterprise"]: raise Refused("Connection was rejected")
         world.update(connected=True, ssid=ap["ssid"], active=args["path"])
+    elif name == "enterprise":
+        ap = world["aps"].get(args["path"])
+        if not ap or not world["enabled"] or not ap["enterprise"]: raise Refused("Connection was rejected")
+        if not args.get("identity") or not args.get("secret"): raise Refused("Invalid enterprise credentials")
+        world.update(connected=True, ssid=ap["ssid"], active=args["path"])
     elif name == "disconnect":
         world["connected"], world["ssid"] = False, ""
     elif name == "forget":

@@ -400,3 +400,13 @@ kbd { font: inherit; font-size: 12px; font-weight: 500; min-width: 22px; text-al
 .pairing .pairing-actions { display: flex; gap: 8px; }
 .pair-code { font-size: 34px; font-weight: 700; letter-spacing: .18em; font-variant-numeric: tabular-nums; padding: 4px 0; }
 .pair-code span.done { color: var(--ok); }
+.enterprise-form { display: flex; flex-direction: column; gap: 10px; padding: 4px 0 14px 30px; }
+.enterprise-form .field { display: grid; grid-template-columns: 170px 1fr; align-items: center; gap: 10px; font-size: 13px; color: var(--label-2); }
+.enterprise-form input, .enterprise-form select { padding: 7px 11px; font-size: 14px; }
+select { font: inherit; font-size: 14px; color: var(--label); background: var(--fill-1); border: 0; border-radius: var(--r-ctl); padding: 7px 11px; }
+select:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--accent); }
+.enterprise-form summary { cursor: pointer; color: var(--label-2); font-size: 13px; padding: 2px 0 8px; }
+.enterprise-form .more .field { margin-bottom: 10px; }
+.pairing-actions { display: flex; gap: 8px; }
+select { appearance: none; -webkit-appearance: none; padding-right: 30px;
+  background: var(--fill-1) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5l3 3 3-3' fill='none' stroke='%23999' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>") right 10px center / 12px no-repeat; }

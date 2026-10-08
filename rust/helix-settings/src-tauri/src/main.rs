@@ -9,7 +9,7 @@ use std::time::Duration;
 use helix_desktop_api::{Desktop, Domain};
 use helix_shell_core::pairing::{Pairing, PairingView};
 use helix_shell_core::bluetooth::{Bluetooth, BluetoothView, Request as BtRequest, RequestError as BtError};
-use helix_shell_core::network::{Network, NetworkView, Request as NetRequest, RequestError as NetError};
+use helix_shell_core::network::{EnterpriseInput, Network, NetworkView, Request as NetRequest, RequestError as NetError};
 use helix_wallpaper::picker::{Picker, PickerView};
 use helix_wallpaper::{choice_path, choice_to_toml, load_config, Source};
 use helix_shell_core::shortcuts::{self, ShortcutGroup};
@@ -380,6 +380,31 @@ async fn network_connect_password(
         n.connect_with_password(&path, &password)
     }))
     .await
+}
+
+/// Joins an enterprise network with what the person typed. Used for this one request and kept nowhere.
+#[tauri::command]
+async fn network_connect_enterprise(
+    app: AppHandle,
+    path: String,
+    identity: String,
+    anonymous: String,
+    password: String,
+    certificate: String,
+    domain: String,
+    eap: String,
+    phase2: String,
+) -> Result<(), String> {
+    let input = EnterpriseInput {
+        identity,
+        anonymous,
+        password,
+        certificate,
+        domain,
+        eap,
+        phase2,
+    };
+    send_network(network_with(&app, |n| n.connect_enterprise(&path, &input))).await
 }
 
 #[tauri::command]
@@ -816,6 +841,7 @@ fn main() {
             network_scan,
             network_connect,
             network_connect_password,
+            network_connect_enterprise,
             network_disconnect,
             network_forget,
             network_vpn,

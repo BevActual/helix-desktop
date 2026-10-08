@@ -66,6 +66,12 @@ pub enum RequestError {
     NotSecured,
     /// Not a Wi-Fi passphrase: 8 to 63 printable ASCII characters, or exactly 64 hexadecimal digits.
     BadPassword,
+    /// Not an enterprise network.
+    NotEnterprise,
+    MissingIdentity,
+    BadField,
+    /// PEAP only carries MSCHAPv2; the others need TTLS.
+    UnsupportedPhase2,
 }
 
 /// What to send to Network1.Action.
@@ -84,6 +90,31 @@ impl std::fmt::Debug for Request {
         }
         f.debug_struct("Request").field("action", &self.action).field("args", &args).finish()
     }
+}
+
+/// What the person typed for an enterprise (802.1X) network.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct EnterpriseInput {
+    pub identity: String,
+    pub anonymous: String,
+    pub password: String,
+    /// An absolute path to a CA certificate, or empty for the system's.
+    pub certificate: String,
+    pub domain: String,
+    /// `peap` or `ttls`.
+    pub eap: String,
+    /// `mschapv2`, `pap`, `mschap` or `chap`.
+    pub phase2: String,
+}
+
+impl std::fmt::Debug for EnterpriseInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EnterpriseInput").field("identity", &self.identity).field("password", &"<hidden>").finish_non_exhaustive()
+    }
+}
+
+fn plain(text: &str, max: usize) -> bool {
+    text.chars().count() <= max && !text.chars().any(char::is_control)
 }
 
 /// Whether `text` can be a WPA passphrase or a raw 64-digit key.
@@ -364,6 +395,59 @@ impl Network {
         })
     }
 
+    /// Joins an enterprise network with the identity and password the person typed. Mirrors what the service insists on, so a form that
+    /// cannot work is refused here with the reason instead of failing at association time.
+    pub fn connect_enterprise(&self, path: &str, input: &EnterpriseInput) -> Result<Request, RequestError> {
+        self.require_wifi()?;
+        let ap = self.point(path)?;
+        if ap.active {
+            return Err(RequestError::AlreadyConnected);
+        }
+        if !ap.enterprise {
+            return Err(RequestError::NotEnterprise);
+        }
+        if input.identity.trim().is_empty() {
+            return Err(RequestError::MissingIdentity);
+        }
+        if input.password.is_empty() {
+            return Err(RequestError::BadPassword);
+        }
+        let domain_ok = input.domain.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
+        if !plain(&input.identity, 128)
+            || !plain(&input.anonymous, 128)
+            || input.password.chars().count() > 128
+            || input.password.chars().any(char::is_control)
+            || !domain_ok
+            || input.domain.len() > 100
+            || !plain(&input.certificate, 300)
+            || (!input.certificate.is_empty() && !input.certificate.starts_with('/'))
+        {
+            return Err(RequestError::BadField);
+        }
+        let eap = match input.eap.as_str() {
+            "peap" => 0,
+            "ttls" => 1,
+            _ => return Err(RequestError::BadField),
+        };
+        let phase2 = match input.phase2.as_str() {
+            "mschapv2" => 0,
+            "pap" => 1,
+            "mschap" => 2,
+            "chap" => 3,
+            _ => return Err(RequestError::BadField),
+        };
+        if eap == 0 && phase2 != 0 {
+            return Err(RequestError::UnsupportedPhase2);
+        }
+        Ok(Request {
+            action: "enterprise",
+            args: json!({
+                "path": ap.path, "identity": input.identity, "anonymous": input.anonymous, "secret": input.password,
+                "certificate": input.certificate, "domain": input.domain, "eap": eap, "phase2": phase2,
+            }),
+        })
+    }
+
     pub fn disconnect(&self) -> Result<Request, RequestError> {
         self.require_available()?;
         if !self.connected {
@@ -539,6 +623,62 @@ mod tests {
         let mut off = snapshot();
         off["enabled"] = json!(false);
         assert!(Network::from_snapshot(&off).connect_with_password("/ap/3", "correct horse").is_err());
+    }
+
+    fn corporate() -> EnterpriseInput {
+        EnterpriseInput { identity: "me@corp".into(), password: "hunter2!".into(), eap: "peap".into(), phase2: "mschapv2".into(), ..Default::default() }
+    }
+
+    #[test]
+    fn an_enterprise_network_is_joined_with_checked_credentials() {
+        let mut data = snapshot();
+        data["access-points"][2]["enterprise"] = json!(true);
+        let network = Network::from_snapshot(&data);
+        let request = network.connect_enterprise("/ap/3", &corporate()).unwrap();
+        assert_eq!(request.action, "enterprise");
+        assert_eq!(request.args["identity"], "me@corp");
+        assert_eq!(request.args["secret"], "hunter2!");
+        assert_eq!((request.args["eap"].as_i64(), request.args["phase2"].as_i64()), (Some(0), Some(0)));
+        let ttls = EnterpriseInput { eap: "ttls".into(), phase2: "pap".into(), certificate: "/etc/ca.pem".into(), domain: "radius.corp.example".into(), anonymous: "anon@corp".into(), ..corporate() };
+        let request = network.connect_enterprise("/ap/3", &ttls).unwrap();
+        assert_eq!((request.args["eap"].as_i64(), request.args["phase2"].as_i64()), (Some(1), Some(1)));
+        assert_eq!(request.args["certificate"], "/etc/ca.pem");
+    }
+
+    #[test]
+    fn enterprise_credentials_that_cannot_work_are_refused_with_the_reason() {
+        let mut data = snapshot();
+        data["access-points"][2]["enterprise"] = json!(true);
+        let network = Network::from_snapshot(&data);
+        let try_with = |change: &dyn Fn(&mut EnterpriseInput)| {
+            let mut input = corporate();
+            change(&mut input);
+            network.connect_enterprise("/ap/3", &input)
+        };
+        assert_eq!(try_with(&|i| i.identity = "  ".into()), Err(RequestError::MissingIdentity));
+        assert_eq!(try_with(&|i| i.password.clear()), Err(RequestError::BadPassword));
+        assert_eq!(try_with(&|i| i.phase2 = "pap".into()), Err(RequestError::UnsupportedPhase2), "PEAP carries only MSCHAPv2");
+        assert_eq!(try_with(&|i| i.eap = "tls".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.phase2 = "magic".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.certificate = "relative/ca.pem".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.certificate = "/ca\n.pem".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.domain = "bad domain!".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.identity = "a\nb".into()), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.password = "x".repeat(129)), Err(RequestError::BadField));
+        assert_eq!(try_with(&|i| i.identity = "x".repeat(129)), Err(RequestError::BadField));
+        assert!(try_with(&|i| i.identity = "x".repeat(128)).is_ok());
+        assert_eq!(network.connect_enterprise("/ap/1", &corporate()), Err(RequestError::NotEnterprise), "an open network is not enterprise");
+        assert_eq!(network.connect_enterprise("/ap/999", &corporate()), Err(RequestError::UnknownNetwork));
+    }
+
+    #[test]
+    fn enterprise_input_never_prints_the_password() {
+        let shown = format!("{:?}", corporate());
+        assert!(!shown.contains("hunter2"), "{shown}");
+        let mut data = snapshot();
+        data["access-points"][2]["enterprise"] = json!(true);
+        let request = Network::from_snapshot(&data).connect_enterprise("/ap/3", &corporate()).unwrap();
+        assert!(!format!("{request:?}").contains("hunter2"));
     }
 
     #[test]

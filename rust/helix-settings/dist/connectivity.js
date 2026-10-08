@@ -77,6 +77,94 @@ function askPassword(line, net) {
   });
 }
 
+// Enterprise (802.1X) sign-in. Same rule as the password: typed once, sent once, the field emptied at once.
+function askEnterprise(line, net) {
+  if (asking === net.path) return;
+  asking = net.path;
+  const form = el("form", "enterprise-form");
+  const field = (name, label, type, test) => {
+    const wrap = el("label", "field");
+    wrap.append(el("span", "", label));
+    const input = el("input");
+    input.type = type;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dataset.test = test;
+    wrap.append(input);
+    form.append(wrap);
+    return input;
+  };
+  const identity = field("identity", "Identity", "text", "ent-identity");
+  const password = field("password", "Password", "password", "ent-password");
+  const choose = (label, test, options) => {
+    const wrap = el("label", "field");
+    wrap.append(el("span", "", label));
+    const select = el("select");
+    select.dataset.test = test;
+    options.forEach(([value, text]) => { const option = el("option", "", text); option.value = value; select.append(option); });
+    wrap.append(select);
+    form.append(wrap);
+    return select;
+  };
+  const eap = choose("Method", "ent-eap", [["peap", "PEAP"], ["ttls", "TTLS"]]);
+  const phase2 = choose("Inner authentication", "ent-phase2", [["mschapv2", "MSCHAPv2"], ["pap", "PAP"], ["mschap", "MSCHAP"], ["chap", "CHAP"]]);
+  const sync = () => { if (eap.value === "peap") phase2.value = "mschapv2"; [...phase2.options].forEach((o) => { o.disabled = eap.value === "peap" && o.value !== "mschapv2"; }); };
+  eap.addEventListener("change", sync);
+  sync();
+  const more = el("details", "more");
+  more.append(el("summary", "", "More options"));
+  const holder = el("div");
+  more.append(holder);
+  form.append(more);
+  const extra = (label, test) => {
+    const wrap = el("label", "field");
+    wrap.append(el("span", "", label));
+    const input = el("input");
+    input.type = "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.dataset.test = test;
+    wrap.append(input);
+    holder.append(wrap);
+    return input;
+  };
+  const anonymous = extra("Anonymous identity", "ent-anonymous");
+  const certificate = extra("CA certificate file (full path)", "ent-certificate");
+  const domain = extra("Server name", "ent-domain");
+  const buttons = el("div", "pairing-actions");
+  const join = el("button", "primary", "Join");
+  join.type = "submit";
+  join.dataset.test = "ent-join";
+  const cancel = el("button", "", "Cancel");
+  cancel.type = "button";
+  cancel.dataset.test = "ent-cancel";
+  const message = el("div", "setting-about warn");
+  buttons.append(join, cancel);
+  form.append(buttons, message);
+  line.after(form);
+  identity.focus();
+  const close = () => {
+    asking = null; password.value = ""; form.remove();
+    if (deferred) { const view = deferred; deferred = null; drawNetworkPage(view); }
+  };
+  cancel.onclick = close;
+  form.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const typed = password.value;
+    password.value = "";
+    invoke("network_connect_enterprise", { path: net.path, identity: identity.value, anonymous: anonymous.value, password: typed, certificate: certificate.value, domain: domain.value, eap: eap.value, phase2: phase2.value })
+      .then(close, (error) => {
+        const text = String(error);
+        message.textContent = text.includes("MissingIdentity") ? "Enter your identity."
+          : text.includes("BadPassword") ? "Enter your password."
+          : text.includes("UnsupportedPhase2") ? "PEAP works only with MSCHAPv2."
+          : text.includes("BadField") ? "Check the certificate path (it starts with /) and the server name."
+          : "That did not work.";
+      });
+  });
+}
+
 function drawNetworkPage(view) {
   if (asking) { deferred = view; return; }
   const host = $("network-host");
@@ -101,8 +189,9 @@ function drawNetworkPage(view) {
       const asksPassword = net.action === "password";
       const tag = net.active ? "Connected"
         : asksPassword ? "Password required"
-        : net.action === "enterprise" ? "Enterprise network" : net.saved ? "Saved" : net.secured ? "Secured" : "Open";
-      const line = listRow(net.ssid, tag, "net:" + net.ssid, { icon: net.secured ? "lock" : "wifi", active: net.active, clickable: joinable || asksPassword, dim: !joinable && !asksPassword && !net.active });
+        : net.action === "enterprise" ? "Enterprise network. Sign in with your account" : net.saved ? "Saved" : net.secured ? "Secured" : "Open";
+      const line = listRow(net.ssid, tag, "net:" + net.ssid, { icon: net.secured ? "lock" : "wifi", active: net.active, clickable: joinable || asksPassword || net.action === "enterprise", dim: !joinable && !asksPassword && net.action !== "enterprise" && !net.active });
+      if (net.action === "enterprise") line.addEventListener("click", () => askEnterprise(line, net));
       if (asksPassword) line.addEventListener("click", () => askPassword(line, net));
       if (joinable) line.addEventListener("click", () => invoke("network_connect", { path: net.path }));
       if (net.saved) line.append(actionButton("Forget", "net-forget:" + net.ssid, () => invoke("network_forget", { path: net.path })));
