@@ -165,11 +165,18 @@ function wallhavenBlock() {
   sorting.dataset.test = "wh-sorting";
   [["toplist", "Top this year"], ["latest", "Latest"], ["random", "Random"], ["views", "Most viewed"], ["favorites", "Most favourited"]]
     .forEach(([value, label]) => { const o = el("option", "", label); o.value = value; sorting.append(o); });
+  const minimum = el("select");
+  minimum.dataset.test = "wh-minimum";
+  [["1080", "Full HD and up"], ["1440", "QHD and up"], ["2160", "4K and up"], ["any", "Any size"]]
+    .forEach(([value, label]) => { const o = el("option", "", label); o.value = value; minimum.append(o); });
   const go = el("button", "primary", "Search");
   go.type = "submit"; go.dataset.test = "wh-search";
-  bar.append(query, sorting, go);
+  bar.append(query, sorting, minimum, go);
   const note = el("div", "setting-about note", "Searching sends your words to wallhaven.cc. Only safe-for-work pictures are shown.");
   const message = el("div", "setting-about warn");
+  const surprise = el("button", "", "Surprise me");
+  surprise.type = "button"; surprise.dataset.test = "wh-surprise";
+  bar.append(surprise);
   const grid = el("div", "wp-grid");
   const more = el("button", "", "Show more");
   more.dataset.test = "wh-more"; more.hidden = true;
@@ -184,8 +191,12 @@ function wallhavenBlock() {
   const run = (page) => {
     if (wallhaven.busy) return;
     wallhaven.busy = true; message.textContent = ""; go.disabled = true; more.disabled = true;
-    if (page === 1) { grid.replaceChildren(); more.hidden = true; }
-    invoke("wallhaven_search", { query: query.value, sorting: sorting.value, page }).then((results) => {
+    if (page === 1) {
+      grid.replaceChildren(); more.hidden = true;
+      for (let i = 0; i < 6; i++) grid.append(el("div", "wp-tile skeleton"));
+    }
+    invoke("wallhaven_search", { query: query.value, sorting: sorting.value, minimum: minimum.value, page }).then((results) => {
+      grid.querySelectorAll(".skeleton").forEach((tile) => tile.remove());
       wallhaven.page = results.page; wallhaven.last = results.last_page;
       if (!results.hits.length && page === 1) message.textContent = "Nothing found. Try other words.";
       results.hits.forEach((hit) => {
@@ -193,21 +204,24 @@ function wallhavenBlock() {
         tile.dataset.id = hit.id; tile.dataset.test = "wh-hit-" + hit.id;
         tile.title = hit.resolution + " · " + hit.size_mb;
         tile.append(el("span", "wp-name", hit.resolution + " · " + hit.size_mb));
+        if (hit.saved) tile.append(el("span", "wp-saved", "Saved"));
         tile.onclick = () => {
           if (wallhaven.using) return;
           wallhaven.using = hit.id; tile.classList.add("busy"); message.textContent = "";
           invoke("wallhaven_use", { id: hit.id }).catch((error) => { message.textContent = String(error); })
+            .then(() => { if (!tile.querySelector(".wp-saved")) tile.append(el("span", "wp-saved", "Saved")); })
             .finally(() => { wallhaven.using = null; tile.classList.remove("busy"); });
         };
         grid.append(tile);
         thumbs.observe(tile);
       });
       more.hidden = results.page >= results.last_page;
-    }).catch((error) => { message.textContent = String(error); })
+    }).catch((error) => { grid.querySelectorAll(".skeleton").forEach((tile) => tile.remove()); message.textContent = String(error); })
       .finally(() => { wallhaven.busy = false; go.disabled = false; more.disabled = false; queueReport(); });
   };
   bar.addEventListener("submit", (event) => { event.preventDefault(); run(1); });
   more.onclick = () => run(wallhaven.page + 1);
+  surprise.onclick = () => { query.value = ""; sorting.value = "random"; run(1); };
   return root;
 }
 

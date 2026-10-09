@@ -45,8 +45,9 @@ fn encode(value: &str) -> String {
 }
 
 #[tauri::command]
-pub async fn wallhaven_search(query: String, sorting: String, page: u32) -> Result<Results, String> {
-    let search = Search::new(&query, &sorting, page).map_err(|_| "Use letters and numbers to search.".to_string())?;
+pub async fn wallhaven_search(app: AppHandle, query: String, sorting: String, minimum: String, page: u32) -> Result<serde_json::Value, String> {
+    let search = Search::new(&query, &sorting, &minimum, page).map_err(|_| "Use letters and numbers to search.".to_string())?;
+    let folder = crate::wallpaper_folder(&app);
     tauri::async_runtime::spawn_blocking(move || {
         let pairs: Vec<String> = search.parameters().into_iter().map(|(k, v)| format!("{k}={}", encode(&v))).collect();
         let bytes = fetch(&format!("{}?{}", model::API, pairs.join("&")), 2 * 1024 * 1024)?;
@@ -61,7 +62,12 @@ pub async fn wallhaven_search(query: String, sorting: String, page: u32) -> Resu
         for hit in &results.hits {
             map.insert(hit.id.clone(), hit.clone());
         }
-        Ok(results)
+        // Which of these are already in the wallpaper folder, so the page can say so.
+        let mut view = serde_json::to_value(&results).map_err(|e| e.to_string())?;
+        for (entry, hit) in view["hits"].as_array_mut().into_iter().flatten().zip(&results.hits) {
+            entry["saved"] = folder.join(model::file_name(hit)).exists().into();
+        }
+        Ok(view)
     })
     .await
     .map_err(|e| e.to_string())?

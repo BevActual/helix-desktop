@@ -46,6 +46,7 @@ pub enum SearchError {
     BadQuery,
     BadSorting,
     BadPage,
+    BadSize,
 }
 
 /// A search as the person typed it.
@@ -53,12 +54,14 @@ pub enum SearchError {
 pub struct Search {
     pub query: String,
     pub sorting: Sorting,
+    /// The smallest picture wanted, as the long side's usual name: `any`, `1080`, `1440` or `2160`.
+    pub minimum: &'static str,
     pub page: u32,
 }
 
 impl Search {
     /// `query` is free text of letters, digits, spaces and a few marks (wallhaven's own `+tag -tag` and `"phrase"` forms are fine).
-    pub fn new(query: &str, sorting: &str, page: u32) -> Result<Search, SearchError> {
+    pub fn new(query: &str, sorting: &str, minimum: &str, page: u32) -> Result<Search, SearchError> {
         let query = query.split_whitespace().collect::<Vec<_>>().join(" ");
         let allowed = |c: char| c.is_alphanumeric() || " +-_\"'.".contains(c);
         if query.chars().count() > 80 || !query.chars().all(allowed) {
@@ -68,7 +71,14 @@ impl Search {
         if !(1..=100).contains(&page) {
             return Err(SearchError::BadPage);
         }
-        Ok(Search { query, sorting, page })
+        let minimum = match minimum {
+            "any" => "any",
+            "1080" => "1080",
+            "1440" => "1440",
+            "2160" => "2160",
+            _ => return Err(SearchError::BadSize),
+        };
+        Ok(Search { query, sorting, minimum, page })
     }
 
     /// The query pairs to send, already in final form (the caller percent-encodes them). General and anime categories, never people;
@@ -78,9 +88,14 @@ impl Search {
             ("categories", "110".to_string()),
             ("purity", "100".to_string()),
             ("sorting", self.sorting.wire().to_string()),
-            ("atleast", "1920x1080".to_string()),
             ("page", self.page.to_string()),
         ];
+        match self.minimum {
+            "1080" => all.push(("atleast", "1920x1080".to_string())),
+            "1440" => all.push(("atleast", "2560x1440".to_string())),
+            "2160" => all.push(("atleast", "3840x2160".to_string())),
+            _ => {}
+        }
         if self.sorting == Sorting::Toplist {
             all.push(("topRange", "1y".to_string()));
         }
@@ -199,22 +214,25 @@ mod tests {
 
     #[test]
     fn a_search_is_always_safe_and_never_takes_the_purity_from_the_person() {
-        let search = Search::new("  mountain   lake ", "toplist", 2).unwrap();
+        let search = Search::new("  mountain   lake ", "toplist", "1440", 2).unwrap();
         let p = search.parameters();
         assert!(p.contains(&("purity", "100".into())));
         assert!(p.contains(&("q", "mountain lake".into())));
         assert!(p.contains(&("topRange", "1y".into())));
         assert!(p.contains(&("categories", "110".into())), "no people category");
-        assert!(!Search::new("", "latest", 1).unwrap().parameters().iter().any(|(k, _)| *k == "q" || *k == "topRange"));
-        let injected = Search::new("cat&purity=111", "toplist", 1);
+        assert!(p.contains(&("atleast", "2560x1440".into())));
+        assert!(!Search::new("x", "latest", "any", 1).unwrap().parameters().iter().any(|(k, _)| *k == "atleast"));
+        assert_eq!(Search::new("x", "latest", "9999x", 1), Err(SearchError::BadSize));
+        assert!(!Search::new("", "latest", "any", 1).unwrap().parameters().iter().any(|(k, _)| *k == "q" || *k == "topRange"));
+        let injected = Search::new("cat&purity=111", "toplist", "any", 1);
         assert_eq!(injected, Err(SearchError::BadQuery), "a query cannot add parameters");
-        assert_eq!(Search::new("a\nb", "toplist", 1).unwrap().query, "a b", "line breaks are just spaces");
-        assert_eq!(Search::new("a\u{0}b", "toplist", 1), Err(SearchError::BadQuery));
-        assert_eq!(Search::new(&"x".repeat(81), "toplist", 1), Err(SearchError::BadQuery));
-        assert_eq!(Search::new("x", "nsfw", 1), Err(SearchError::BadSorting));
-        assert_eq!(Search::new("x", "latest", 0), Err(SearchError::BadPage));
-        assert_eq!(Search::new("x", "latest", 101), Err(SearchError::BadPage));
-        assert!(Search::new("+forest -city \"night sky\"", "random", 1).is_ok());
+        assert_eq!(Search::new("a\nb", "toplist", "any", 1).unwrap().query, "a b", "line breaks are just spaces");
+        assert_eq!(Search::new("a\u{0}b", "toplist", "any", 1), Err(SearchError::BadQuery));
+        assert_eq!(Search::new(&"x".repeat(81), "toplist", "any", 1), Err(SearchError::BadQuery));
+        assert_eq!(Search::new("x", "nsfw", "any", 1), Err(SearchError::BadSorting));
+        assert_eq!(Search::new("x", "latest", "any", 0), Err(SearchError::BadPage));
+        assert_eq!(Search::new("x", "latest", "any", 101), Err(SearchError::BadPage));
+        assert!(Search::new("+forest -city \"night sky\"", "random", "any", 1).is_ok());
     }
 
     #[test]
