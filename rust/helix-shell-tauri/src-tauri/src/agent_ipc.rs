@@ -8,7 +8,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
-use helix_shell_core::agent_msg::{parse, Command, Theme, MAX_LINE, SUPPORTED};
+use helix_shell_core::agent_msg::{parse, Command, Direction, Theme, MAX_LINE, SUPPORTED};
+use helix_shell_core::agent_status::{status_json, StatusInput};
 use tauri::AppHandle;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
@@ -119,6 +120,49 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
                 }
             })
             .map_err(|e| e.to_string())?;
+            ok()
+        }
+        Command::Status => {
+            let state = shell_state(app);
+            let shell = state.lock().expect("shell state");
+            let now = crate::notify::now_ms_of(&shell);
+            let audio = shell.audio.view();
+            let quick = shell.quick.view();
+            let input = StatusInput {
+                panel: shell.surface.open_panel_id().map(str::to_string),
+                dark: quick.dark,
+                night_light: quick.night_light,
+                do_not_disturb: shell.notifications.view(now).dnd,
+                volume: audio.available.then_some(audio.percent),
+                muted: audio.available.then_some(audio.muted),
+                brightness: shell.brightness.map(|b| b.percent().round().clamp(0., 100.) as u8),
+                workspaces: shell
+                    .niri
+                    .workspace_strip()
+                    .iter()
+                    .map(|w| (w.idx, w.active, w.windows))
+                    .collect(),
+                windows: shell.dock.window_facts(),
+            };
+            Ok(format!("{}\n", status_json(&input)))
+        }
+        Command::WindowClose(id) => {
+            // Only a window the shell knows (what `status` listed) can be named; closing is a request to the program, not a kill.
+            if let Some(id) = id {
+                let known = shell_state(app).lock().expect("shell state").niri.window(id).is_some();
+                if !known {
+                    return Err("no such window".into());
+                }
+            }
+            crate::dock::niri_action(&serde_json::json!({"CloseWindow": {"id": id}}))?;
+            ok()
+        }
+        Command::WorkspaceSwitch(direction) => {
+            let action = match direction {
+                Direction::Next => "FocusWorkspaceDown",
+                Direction::Prev => "FocusWorkspaceUp",
+            };
+            crate::dock::niri_action(&serde_json::json!({ action: {} }))?;
             ok()
         }
         Command::PanelClose(which) => {

@@ -84,6 +84,10 @@ impl ConfirmerHost {
         self.panel.requested(&details, self.now_ms());
     }
 
+    pub fn set_gloss(&mut self, operation: u64, gloss: &str) {
+        self.panel.set_gloss(operation, gloss);
+    }
+
     pub fn ended(&mut self, operation: u64) {
         self.panel.ended(operation, self.now_ms());
     }
@@ -240,6 +244,19 @@ pub fn schedule_arm(app: AppHandle, host: Arc<Mutex<ConfirmerHost>>) {
     });
 }
 
+/// What the shell knows about a request, in its own words: for `window-close`, which window the id names.
+fn gloss_for(app: &AppHandle, details: &Value) -> Option<String> {
+    if details.get("tool").and_then(Value::as_str) != Some("window-close") {
+        return None;
+    }
+    let id = match details.get("args").and_then(Value::as_array).and_then(|a| a.first()) {
+        Some(arg) => Some(arg.as_str()?.parse::<u64>().ok()?),
+        None => None,
+    };
+    let facts = crate::shell_state(app).lock().expect("shell state").dock.window_facts();
+    Some(helix_shell_core::agent_status::describe_window_close(&facts, id))
+}
+
 /// One Desktop connection: RegisterDesktop, RegisterConfirmer, watch, and Confirm all use it.
 pub fn start(
     app: AppHandle,
@@ -302,8 +319,13 @@ pub fn start(
                         let _ = app.run_on_main_thread(move || {
                             let keep = keep.lock().expect("webkit baseline").clone();
                             let already_open = runner.get_webview_window(WINDOW).is_some();
+                            let gloss = gloss_for(&runner, &details);
+                            let operation = details.get("operation").and_then(Value::as_u64);
                             let mut panel = host.lock().expect("confirmer");
                             panel.requested(details);
+                            if let (Some(operation), Some(gloss)) = (operation, gloss) {
+                                panel.set_gloss(operation, &gloss);
+                            }
                             let needs_arm = panel.open() && !panel.view().armed;
                             sync_surface(&runner, &panel, &keep);
                             drop(panel);

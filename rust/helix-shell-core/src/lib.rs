@@ -2,6 +2,7 @@
 
 pub mod activity;
 pub mod agent_msg;
+pub mod agent_status;
 pub mod agent_confirm;
 mod assistant;
 pub mod approvals;

@@ -29,6 +29,9 @@ pub const SUPPORTED: &[&str] = &[
     "panel-open",
     "panel-close",
     "panel-toggle",
+    "status",
+    "window-close",
+    "workspace-switch",
 ];
 
 const VOLUME_STEP: i32 = 5;
@@ -59,6 +62,18 @@ pub enum Command {
     PanelOpen(String),
     PanelToggle(String),
     PanelClose(Option<String>),
+    /// Print the desktop's state (no titles or other program text).
+    Status,
+    /// Close the focused window, or the window with this niri id.
+    WindowClose(Option<u64>),
+    /// The next or previous workspace.
+    WorkspaceSwitch(Direction),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Direction {
+    Next,
+    Prev,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -205,6 +220,23 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
             [id] => Command::PanelClose(Some(panel(id)?)),
             _ => return Err(MsgError::Usage("unexpected arguments")),
         },
+        "status" => {
+            no_args(&args)?;
+            Command::Status
+        }
+        "window-close" => match args.as_slice() {
+            [] => Command::WindowClose(None),
+            [id] if id.len() <= 10 && id.bytes().all(|b| b.is_ascii_digit()) => {
+                Command::WindowClose(Some(id.parse().map_err(|_| MsgError::Usage("not a window id"))?))
+            }
+            [_] => return Err(MsgError::Usage("a window id is whole digits")),
+            _ => return Err(MsgError::Usage("unexpected arguments")),
+        },
+        "workspace-switch" => match args.as_slice() {
+            ["next"] => Command::WorkspaceSwitch(Direction::Next),
+            ["prev"] => Command::WorkspaceSwitch(Direction::Prev),
+            _ => return Err(MsgError::Usage("workspace-switch takes next or prev")),
+        },
         _ => return Err(MsgError::Unknown),
     })
 }
@@ -294,8 +326,25 @@ mod tests {
     }
 
     #[test]
+    fn status_windows_and_workspaces() {
+        assert_eq!(parse("status"), Ok(Command::Status));
+        assert!(parse("status now").is_err());
+        assert_eq!(parse("window-close"), Ok(Command::WindowClose(None)));
+        assert_eq!(parse("window-close 12"), Ok(Command::WindowClose(Some(12))));
+        assert_eq!(parse("window-close 0"), Ok(Command::WindowClose(Some(0))));
+        for bad in ["window-close -1", "window-close 1.5", "window-close abc", "window-close 12 13", "window-close 99999999999", "window-close +3", "window-close 0x10"] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+        assert_eq!(parse("workspace-switch next"), Ok(Command::WorkspaceSwitch(Direction::Next)));
+        assert_eq!(parse("workspace-switch prev"), Ok(Command::WorkspaceSwitch(Direction::Prev)));
+        for bad in ["workspace-switch", "workspace-switch up", "workspace-switch Next", "workspace-switch next prev", "workspace-switch 2"] {
+            assert!(parse(bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
     fn anything_else_is_not_supported_and_odd_lines_are_refused() {
-        for unknown in ["bar-toggle", "session", "wallpaper-next", "clipboard-copy hi", "VOLUME-UP", "volume-up;ls", "status"] {
+        for unknown in ["bar-toggle", "session", "wallpaper-next", "clipboard-copy hi", "VOLUME-UP", "volume-up;ls", "session", "window-switcher"] {
             assert_eq!(parse(unknown), Err(MsgError::Unknown), "{unknown}");
         }
         assert_eq!(parse(""), Err(MsgError::Empty));
@@ -320,7 +369,9 @@ mod tests {
             let line = policy.lines().find(|l| l.starts_with(&format!("{name} = "))).unwrap_or_else(|| panic!("{name} is not classified"));
             assert!(!line.contains("blocked"), "{line}");
         }
-        let observe = ["theme-mode-get", "notification-dnd-status"];
+        let observe = ["theme-mode-get", "notification-dnd-status", "status"];
+        // Closing a window ends someone's work: it needs a person's say-so.
+        assert!(policy.contains("window-close = \"confirm\""));
         for name in observe {
             assert!(policy.contains(&format!("{name} = \"observe\"")), "{name}");
         }
@@ -336,7 +387,7 @@ mod tests {
         let examples = [
             "volume-up", "volume-down", "volume-mute", "volume-set 50", "brightness-up", "brightness-down", "brightness-set 50", "theme-mode-set dark",
             "theme-mode-toggle", "theme-mode-get", "nightlight-enable", "nightlight-disable", "nightlight-toggle", "notification-dnd-set on",
-            "notification-dnd-toggle", "notification-dnd-status", "panel-open launcher", "panel-close", "panel-toggle launcher",
+            "notification-dnd-toggle", "notification-dnd-status", "panel-open launcher", "panel-close", "panel-toggle launcher", "status", "window-close", "workspace-switch next",
         ];
         assert_eq!(examples.len(), SUPPORTED.len());
         for (example, name) in examples.iter().zip(SUPPORTED) {

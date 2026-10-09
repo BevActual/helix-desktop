@@ -281,3 +281,8 @@ pub fn dnd_is_on(app: &AppHandle) -> bool {
     let now = now_ms(shell.started);
     shell.notifications.view(now).dnd
 }
+
+/// The notifications clock's "now" for a state the caller already holds.
+pub fn now_ms_of(shell: &crate::ShellState) -> u64 {
+    now_ms(shell.started)
+}

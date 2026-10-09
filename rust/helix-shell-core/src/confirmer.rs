@@ -144,6 +144,11 @@ impl Confirmer {
         self.sync_shown(now_ms);
     }
 
+    /// Tells the person what the shell knows about a request (for example which window an id is).
+    pub fn set_gloss(&mut self, operation: u64, gloss: &str) {
+        self.queue.set_gloss(operation, gloss);
+    }
+
     pub fn ended(&mut self, operation: u64, now_ms: u64) {
         self.queue.drop_operation(operation);
         self.sync_shown(now_ms);
@@ -258,7 +263,13 @@ impl Confirmer {
         if incomplete {
             detail.push_str(" …");
         }
-        let aside = if incomplete {
+        let aside = if !request.gloss.is_empty() && !grant && !incomplete {
+            if request.reason.is_empty() {
+                request.gloss.clone()
+            } else {
+                format!("{} The assistant says: “{}”", request.gloss, request.reason)
+            }
+        } else if incomplete {
             "Not shown in full (too long or unusual), so it cannot be reviewed. It can only be denied.".to_string()
         } else if grant && !request.label.is_empty() {
             format!("It calls itself “{}”.", request.label)
@@ -676,5 +687,18 @@ mod tests {
         panel.set_protection(false, false, 0);
         assert!(panel.allow(1, ARMING_MS), "set_protection does nothing while the requirement is off");
         assert_eq!(log.lock().unwrap()[0], (1, true, Vec::new()));
+    }
+
+    #[test]
+    fn the_shells_gloss_is_shown_with_the_assistants_words_and_never_for_grants() {
+        let (mut panel, _log) = confirmer();
+        panel.requested(&json!({"operation": 1, "client": "exe:/a", "tool": "window-close", "args": ["3"], "reason": "tidy up"}), 0);
+        assert_eq!(panel.view(0).aside, "The assistant says: “tidy up”");
+        panel.set_gloss(1, "This closes a window of Brave.");
+        assert_eq!(panel.view(0).aside, "This closes a window of Brave. The assistant says: “tidy up”");
+        panel.deny(1, 0);
+        panel.requested(&json!({"operation": 2, "kind": "grant", "client": "exe:/g", "label": "G", "tiers": ["observe"]}), 1);
+        panel.set_gloss(2, "ignored for a grant");
+        assert_eq!(panel.view(1).aside, "It calls itself “G”.");
     }
 }

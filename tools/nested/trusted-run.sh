@@ -11,7 +11,7 @@ SCRIPT=${2:-trusted-attack-test.sh}
 SHELL_BIN=$(ls -t "$ROOT/rust/target/fast/helix-shell-tauri" "$ROOT/rust/target/release/helix-shell-tauri" 2>/dev/null | head -1)
 export HELIX_SHELL_BIN=$SHELL_BIN TRUSTED_EXPECT=$MODE
 # Approvals are not allowed on an unprotected compositor here (the default for a person).
-export HELIX_ALLOW_UNPROTECTED_APPROVALS=0
+export HELIX_ALLOW_UNPROTECTED_APPROVALS=${HELIX_ALLOW_UNPROTECTED_APPROVALS:-0}
 [ "$MODE" = wrong-exe ] && export TRUSTED_EXPECT=stock
 KDL=""
 if [ "$MODE" = protected ] || [ "$MODE" = wrong-exe ]; then

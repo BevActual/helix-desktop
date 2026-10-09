@@ -45,6 +45,17 @@ pub struct Dock {
     items: Vec<Item>,
 }
 
+/// One window as the agent may hear of it: no title (a title is the program's own text), and an application name only the desktop entry or the
+/// sanitized program name supplies.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WindowFact {
+    pub id: u64,
+    pub app: String,
+    /// An installed application, and really that application.
+    pub known: bool,
+    pub focused: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ItemView {
     pub id: String,
@@ -216,6 +227,22 @@ impl Dock {
         }
         items.truncate(MAX_ITEMS);
         self.items = items;
+    }
+
+    /// Every window the dock knows, with the name of the item it sits under and whether that is an installed application the window really is.
+    /// Names come from desktop entries (or, for a program that is not what it claims or not installed, from the program itself, sanitized).
+    pub fn window_facts(&self) -> Vec<WindowFact> {
+        self.items
+            .iter()
+            .flat_map(|item| {
+                item.windows.iter().map(|id| WindowFact {
+                    id: *id,
+                    app: item.name.clone(),
+                    known: item.installed && item.warning.is_none(),
+                    focused: item.focused_window == Some(*id),
+                })
+            })
+            .collect()
     }
 
     pub fn view(&self) -> Vec<ItemView> {

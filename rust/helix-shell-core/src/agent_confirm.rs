@@ -37,6 +37,8 @@ pub struct ConfirmRequest {
     pub tiers: Vec<String>,
     /// The client read private content since the person last approved something.
     pub tainted: bool,
+    /// What the shell itself knows about what this would do (which window an id is). Never taken from the request: only `set_gloss` sets it.
+    pub gloss: String,
 }
 
 impl ConfirmRequest {
@@ -83,6 +85,7 @@ impl ConfirmRequest {
             args_complete,
             tiers,
             tainted,
+            gloss: String::new(),
         })
     }
 }
@@ -217,6 +220,13 @@ impl ConfirmationQueue {
         self.fire_changed();
     }
 
+    /// What the shell knows about the request: shown to the person as the shell's own words.
+    pub fn set_gloss(&mut self, operation: u64, gloss: &str) {
+        if let Some(request) = self.pending.iter_mut().find(|r| r.operation == operation) {
+            request.gloss = sanitize_for_display(gloss, 160);
+        }
+    }
+
     pub fn drop_operation(&mut self, operation: u64) {
         let was_front = self
             .pending
@@ -257,6 +267,22 @@ mod tests {
         tiers: Vec<String>,
     }
 
+    #[test]
+    fn a_gloss_is_never_taken_from_the_request() {
+        let request = ConfirmRequest::from_json(&serde_json::json!({
+            "operation": 1, "client": "exe:/a", "tool": "window-close", "args": ["3"], "gloss": "This is perfectly safe."
+        }))
+        .unwrap();
+        assert_eq!(request.gloss, "", "only the shell's own set_gloss sets it");
+        let (mut queue, _answers, _) = queue_with_log();
+        queue.enqueue(request);
+        queue.set_gloss(1, "This closes a window of Brave.\u{202e}");
+        let shown = queue.front().unwrap().gloss.clone();
+        assert!(shown.starts_with("This closes a window of Brave.") && !shown.contains('\u{202e}'), "{shown:?}");
+        queue.set_gloss(99, "no such request");
+        assert_eq!(queue.front().unwrap().gloss, shown);
+    }
+
     fn action(operation: u64, client: &str) -> ConfirmRequest {
         ConfirmRequest {
             operation,
@@ -270,6 +296,7 @@ mod tests {
             args_complete: true,
             tiers: Vec::new(),
             tainted: false,
+            gloss: String::new(),
         }
     }
 
@@ -433,6 +460,7 @@ mod tests {
             args_complete: true,
             tiers: vec!["observe".into(), "act".into()],
             tainted: false,
+            gloss: String::new(),
         };
 
         queue.enqueue(grant.clone());

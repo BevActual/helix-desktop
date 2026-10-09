@@ -87,6 +87,16 @@ fn request(json: &str) -> Result<String, String> {
     Ok(reply)
 }
 
+/// One niri action (`{"CloseWindow": {"id": 3}}`); `Ok` only when niri said so.
+pub(crate) fn niri_action(action: &Value) -> Result<(), String> {
+    let reply = request(&serde_json::json!({ "Action": action }).to_string())?;
+    if reply.contains("\"Ok\"") {
+        Ok(())
+    } else {
+        Err(format!("niri refused: {}", reply.trim()))
+    }
+}
+
 fn focus_window(id: u64) -> Result<(), String> {
     let reply = request(&serde_json::json!({"Action": {"FocusWindow": {"id": id}}}).to_string())?;
     if reply.contains("\"Ok\"") {

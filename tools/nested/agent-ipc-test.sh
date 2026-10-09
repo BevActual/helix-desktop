@@ -42,8 +42,28 @@ expect_reply "notification-dnd-status" "off"
 expect_reply "panel-open launcher" "ok"; sleep 1
 grep -q "PANEL open" "$LOG" && echo "ok: the launcher opened" || fail "no panel opened"
 expect_reply "panel-close" "ok"; sleep 0.8
+echo "--- 2b. status describes the desktop without anything a program wrote; windows are closed by the ids it lists"
+APP_ID=agentwin TARGET_FILE="$STATE/agentwin.txt" python3 "$ROOT/tools/nested/text-target.py" >/dev/null 2>&1 & WIN=$!
+for _ in $(seq 1 40); do send "status" | grep -q '"agentwin"' && break; sleep 0.25; done
+STATUS=$(send "status"); echo "$STATUS" | cut -c1-300
+echo "$STATUS" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+assert d['do_not_disturb'] in (True, False) and isinstance(d['workspaces'], list)
+w = [x for x in d['windows'] if x['app'] == 'agentwin']
+assert w and set(w[0]) == {'id', 'app', 'verified', 'focused'}, d['windows']
+assert w[0]['verified'] is False, 'an application that is not installed is not verified'
+assert 'title' not in json.dumps(d), 'titles are program text'
+print('ok: status lists the window by id and app name only')" || fail "status shape"
+ID=$(echo "$STATUS" | python3 -c "import json,sys; print([x['id'] for x in json.load(sys.stdin)['windows'] if x['app']=='agentwin'][0])")
+expect_error "window-close 99999999"
+expect_reply "workspace-switch next" "ok"
+expect_reply "window-close $ID" "ok"; sleep 1.5
+niri msg --json windows | python3 -c "import json,sys; sys.exit(1 if any(x['app_id']=='agentwin' for x in json.load(sys.stdin)) else 0)" && echo "ok: the window is gone" || fail "the window is still there"
+kill $WIN 2>/dev/null
+
 echo "--- 3. what must be refused"
-for bad in "bar-toggle" "session" "wallpaper-next" "clipboard-copy secret" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
+for bad in "window-close abc" "window-close -1" "workspace-switch up" "status now" "bar-toggle" "session" "wallpaper-next" "clipboard-copy secret" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
 n=$(grep -c "UPDATE" "$SETTINGS"); sleep 0.3
 expect_error "theme-mode-set sepia" >/dev/null; [ "$(grep -c UPDATE "$SETTINGS")" = "$n" ] && echo "ok: a refused command changed nothing" || fail "a refused command changed a setting"
 echo "--- 4. nothing about the arguments reaches the log"

@@ -50,10 +50,8 @@ impl Dispatch<ZwlrScreencopyManagerV1, ()> for App {
 impl Dispatch<ZwlrScreencopyFrameV1, ()> for App {
     fn event(app: &mut Self, _: &ZwlrScreencopyFrameV1, event: zwlr_screencopy_frame_v1::Event, _: &(), _: &Connection, _: &QueueHandle<Self>) {
         match event {
-            zwlr_screencopy_frame_v1::Event::Buffer { format, width, height, stride } => {
-                if let WEnum::Value(format) = format {
-                    app.format = Some((format as u32, width, height, stride));
-                }
+            zwlr_screencopy_frame_v1::Event::Buffer { format: WEnum::Value(format), width, height, stride } => {
+                app.format = Some((format as u32, width, height, stride));
             }
             zwlr_screencopy_frame_v1::Event::Flags { flags } => {
                 app.y_invert = matches!(flags, WEnum::Value(f) if f.contains(zwlr_screencopy_frame_v1::Flags::YInvert));
