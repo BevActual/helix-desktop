@@ -37,3 +37,14 @@ for f in share/helix/msg-risk.toml share/helix/tool-hints.toml share/dbus-1/serv
   install -D -m 0644 "$S/$f" "$P/$f"
 done
 echo "Installed. Backup of the previous helix-service: $BACKUP"
+# A running helix-inference keeps its old binary but loads the engine libraries at the next model load: after the libraries were replaced that is
+# a mismatch, and it crashed (SIGSEGV in LlamaBackend::load, 2026-10-07). So the person's own copies of the units are restarted now.
+if [ -n "${SUDO_USER:-}" ] && command -v runuser >/dev/null 2>&1; then
+  uid=$(id -u "$SUDO_USER")
+  if [ -d "/run/user/$uid" ]; then
+    runuser -u "$SUDO_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" systemctl --user try-restart helix-inference.service helix-service.service \
+      && echo "Restarted helix-inference and helix-service for $SUDO_USER." || echo "Could not restart them: run  systemctl --user restart helix-inference helix-service"
+  fi
+else
+  echo "Restart them to use the new files:  systemctl --user restart helix-inference helix-service"
+fi
