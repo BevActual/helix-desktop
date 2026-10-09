@@ -69,6 +69,8 @@ pub enum RequestError {
     /// Not an enterprise network.
     NotEnterprise,
     MissingIdentity,
+    /// With the system's certificates and no server name, any certificate a public authority signed would pass: a rogue access point could take the password.
+    MissingServerName,
     BadField,
     /// PEAP only carries MSCHAPv2; the others need TTLS.
     UnsupportedPhase2,
@@ -412,6 +414,9 @@ impl Network {
         if input.password.is_empty() {
             return Err(RequestError::BadPassword);
         }
+        if input.certificate.is_empty() && input.domain.trim().is_empty() {
+            return Err(RequestError::MissingServerName);
+        }
         let domain_ok = input.domain.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-');
         if !plain(&input.identity, 128)
             || !plain(&input.anonymous, 128)
@@ -626,7 +631,7 @@ mod tests {
     }
 
     fn corporate() -> EnterpriseInput {
-        EnterpriseInput { identity: "me@corp".into(), password: "hunter2!".into(), eap: "peap".into(), phase2: "mschapv2".into(), ..Default::default() }
+        EnterpriseInput { identity: "me@corp".into(), password: "hunter2!".into(), eap: "peap".into(), phase2: "mschapv2".into(), domain: "radius.corp.example".into(), ..Default::default() }
     }
 
     #[test]
@@ -657,6 +662,8 @@ mod tests {
         };
         assert_eq!(try_with(&|i| i.identity = "  ".into()), Err(RequestError::MissingIdentity));
         assert_eq!(try_with(&|i| i.password.clear()), Err(RequestError::BadPassword));
+        assert_eq!(try_with(&|i| { i.certificate.clear(); i.domain.clear(); }), Err(RequestError::MissingServerName), "system trust needs a server name");
+        assert!(try_with(&|i| { i.certificate.clear(); i.domain = "radius.corp.example".into(); }).is_ok());
         assert_eq!(try_with(&|i| i.phase2 = "pap".into()), Err(RequestError::UnsupportedPhase2), "PEAP carries only MSCHAPv2");
         assert_eq!(try_with(&|i| i.eap = "tls".into()), Err(RequestError::BadField));
         assert_eq!(try_with(&|i| i.phase2 = "magic".into()), Err(RequestError::BadField));

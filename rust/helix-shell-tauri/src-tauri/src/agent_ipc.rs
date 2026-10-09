@@ -148,11 +148,13 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
         }
         Command::WindowClose(id) => {
             // Only a window the shell knows (what `status` listed) can be named; closing is a request to the program, not a kill.
-            if let Some(id) = id {
-                let known = shell_state(app).lock().expect("shell state").niri.window(id).is_some();
-                if !known {
-                    return Err("no such window".into());
-                }
+            // "The focused window" is refused: focus can move between the person reading the dialog and pressing Allow, so only a named window is closed.
+            let Some(id) = id else {
+                return Err("name the window: window-close <id> (ids are in status)".into());
+            };
+            let known = shell_state(app).lock().expect("shell state").niri.window(id).is_some();
+            if !known {
+                return Err("no such window".into());
             }
             crate::dock::niri_action(&serde_json::json!({"CloseWindow": {"id": id}}))?;
             ok()

@@ -32,6 +32,10 @@ struct Prompt {
 pub struct Pairing {
     device: Option<String>,
     prompt: Option<Prompt>,
+    /// The service's id for the pair operation; only its completion ends this pairing (a scan finishing must not).
+    operation: Option<u64>,
+    /// Operations that completed before `operation` was known.
+    ended: Vec<u64>,
 }
 
 /// What to send to Bluetooth1.Reply.
@@ -92,6 +96,8 @@ impl Pairing {
         let request = bluetooth.pair(path).map_err(PairingError::Request)?;
         self.device = Some(path.to_string());
         self.prompt = None;
+        self.operation = None;
+        self.ended.clear();
         Ok(request)
     }
 
@@ -108,6 +114,30 @@ impl Pairing {
             pin: sanitize_for_display(prompt.get("pin").and_then(Value::as_str).unwrap_or(""), 16),
             entered: prompt.get("entered").and_then(Value::as_u64).unwrap_or(0).min(6) as u16,
         });
+    }
+
+    /// The service accepted the pair request as operation `id`. If that operation already completed, the pairing is over.
+    pub fn set_operation(&mut self, id: u64) {
+        if self.device.is_none() {
+            return;
+        }
+        if self.ended.contains(&id) {
+            self.finish();
+        } else {
+            self.operation = Some(id);
+        }
+    }
+
+    /// A `Completed` signal for operation `id`: ends the pairing only when it is the pair operation.
+    pub fn operation_done(&mut self, id: u64) {
+        if self.device.is_none() {
+            return;
+        }
+        if self.operation == Some(id) {
+            self.finish();
+        } else if self.operation.is_none() && self.ended.len() < 16 {
+            self.ended.push(id);
+        }
     }
 
     /// Pairing is over (finished, failed or cancelled): forget the question.
@@ -225,6 +255,26 @@ mod tests {
         assert_eq!(pairing.begin(&bt, "/d/new").unwrap_err(), PairingError::Request(RequestError::Busy));
         let off = Bluetooth::from_snapshot(&json!({"available": true, "enabled": false, "devices": []}));
         assert!(Pairing::default().begin(&off, "/d/new").is_err());
+    }
+
+    #[test]
+    fn only_the_pair_operation_ending_ends_the_pairing() {
+        let mut p = started();
+        p.set_operation(7);
+        p.operation_done(3);
+        assert!(p.is_active(), "a scan finishing is not the pairing finishing");
+        p.operation_done(7);
+        assert!(!p.is_active());
+        let mut early = started();
+        early.operation_done(9);
+        early.operation_done(4);
+        assert!(early.is_active());
+        early.set_operation(9);
+        assert!(!early.is_active(), "the pair operation finished before its id arrived");
+        let mut other = started();
+        other.operation_done(4);
+        other.set_operation(5);
+        assert!(other.is_active());
     }
 
     #[test]

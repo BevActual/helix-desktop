@@ -111,6 +111,14 @@ function askEnterprise(line, net) {
   const sync = () => { if (eap.value === "peap") phase2.value = "mschapv2"; [...phase2.options].forEach((o) => { o.disabled = eap.value === "peap" && o.value !== "mschapv2"; }); };
   eap.addEventListener("change", sync);
   sync();
+  // The server name is needed to tell the real network from a look-alike, so it is not hidden away.
+  const nameLabel = el("label", "field");
+  nameLabel.append(el("span", "", "Server name"));
+  const domain = el("input");
+  domain.type = "text"; domain.autocomplete = "off"; domain.spellcheck = false; domain.placeholder = "radius.example.com";
+  domain.dataset.test = "ent-domain";
+  nameLabel.append(domain);
+  form.append(nameLabel);
   const more = el("details", "more");
   more.append(el("summary", "", "More options"));
   const holder = el("div");
@@ -130,7 +138,6 @@ function askEnterprise(line, net) {
   };
   const anonymous = extra("Anonymous identity", "ent-anonymous");
   const certificate = extra("CA certificate file (full path)", "ent-certificate");
-  const domain = extra("Server name", "ent-domain");
   const buttons = el("div", "pairing-actions");
   const join = el("button", "primary", "Join");
   join.type = "submit";
@@ -157,10 +164,13 @@ function askEnterprise(line, net) {
       .then(close, (error) => {
         const text = String(error);
         message.textContent = text.includes("MissingIdentity") ? "Enter your identity."
+          : text.includes("MissingServerName") ? "Enter the server name (ask whoever runs the network), or a CA certificate file under More options."
           : text.includes("BadPassword") ? "Enter your password."
           : text.includes("UnsupportedPhase2") ? "PEAP works only with MSCHAPv2."
           : text.includes("BadField") ? "Check the certificate path (it starts with /) and the server name."
           : "That did not work.";
+        // A form the person can fix keeps what they typed; the password was never sent.
+        if (message.textContent !== "That did not work.") password.value = typed;
       });
   });
 }

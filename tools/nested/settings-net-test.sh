@@ -36,7 +36,10 @@ click_id "net:Corp"; sleep 0.8; has_id ent-identity && has_id ent-password && ec
 shot settings-net-enterprise
 N0=$(count); click_id ent-join; sleep 0.6
 [ $(( $(count) - N0 )) = 0 ] && echo "ok: an empty form was not sent" || fail "an empty enterprise form was sent"
-click_id ent-identity; wtype "me@corp.example"; click_id ent-password; wtype "hunter22!"; click_id ent-join; sleep 1
+click_id ent-identity; wtype "me@corp.example"; click_id ent-password; wtype "hunter22!"
+N1=$(count); click_id ent-join; sleep 0.6
+[ $(( $(count) - N1 )) = 0 ] && echo "ok: no server name or certificate, not sent" || fail "enterprise form sent without a server name"
+click_id ent-domain; wtype "radius.corp.example"; sleep 0.3; click_id ent-join; sleep 1
 grep -q '"identity": "me@corp.example"' "$NET" && grep -q 'ACTION enterprise' "$NET" && echo "ok: the enterprise join was sent" || fail "no enterprise join"
 grep -q hunter22 "$NET" "$LOG" && fail "the password is in a log" || echo "ok: the password is in no log"
 has_id ent-identity && fail "the form is still open" || echo "ok: the form closed"
@@ -45,7 +48,7 @@ click_id "net:Cafe"; sleep 0.6; click_id wifi-disconnect; sleep 0.6; click_id "n
 click_id "net-forget:Home WiFi"; sleep 1.2; click_id "vpn:Work VPN"; sleep 0.8
 click_id wifi-switch; sleep 0.6; shot settings-net-off; click_id wifi-switch; sleep 0.8; click_id wifi-scan; sleep 0.6
 EXPECTED='ACTION connect {"path": "/ap/neigh", "secret": "<secret:11>"}
-ACTION enterprise {"anonymous": "", "certificate": "", "domain": "", "eap": 0, "identity": "me@corp.example", "path": "/ap/corp", "phase2": 0, "secret": "<secret:9>"}
+ACTION enterprise {"anonymous": "", "certificate": "", "domain": "radius.corp.example", "eap": 0, "identity": "me@corp.example", "path": "/ap/corp", "phase2": 0, "secret": "<secret:9>"}
 ACTION connect {"path": "/ap/cafe"}
 ACTION disconnect {}
 ACTION connect {"path": "/ap/home"}

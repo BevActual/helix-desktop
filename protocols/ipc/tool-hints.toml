@@ -71,7 +71,7 @@ osd-disable = "Turn off the on-screen popups for volume and brightness"
 osd-toggle = "Turn the on-screen popups on or off"
 keyboard-layout-cycle = "Switch to the next keyboard language layout"
 workspace-switch = "Go to the next or previous workspace"
-window-close = "Close one window by its id (the ids are in the status), or the focused window when no id is given"
+window-close = "Close one window by its id (the ids are in the status)"
 taskbar-cycle = "Move to the next or previous task in the taskbar"
 
 # Notifications and clipboard

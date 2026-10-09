@@ -103,13 +103,12 @@ fn process_words(process: &Process) -> Vec<String> {
     if let Some(parent) = Path::new(&process.exe).parent().and_then(Path::file_name).and_then(|n| n.to_str()) {
         all.extend(words(parent));
     }
-    let program = process.cmdline.first().map(|c| basename(c)).unwrap_or("");
-    all.extend(words(program));
+    // argv[0] is whatever the program says it is, so it is never a word to match on.
     let interpreter = |name: &str| {
         let name = name.trim_end_matches(|c: char| c.is_ascii_digit() || c == '.');
         INTERPRETERS.contains(&name)
     };
-    if interpreter(basename(&process.exe)) || interpreter(program) {
+    if interpreter(basename(&process.exe)) {
         for argument in process.cmdline.iter().skip(1) {
             // The script is the first argument that is a path and not an option.
             if !argument.starts_with('-') && argument.contains('/') {
@@ -190,6 +189,7 @@ mod tests {
         }
         let brave = app("brave-browser.desktop", "brave-browser-stable", "");
         assert_eq!(verify(&brave, &process("/usr/bin/firefox", &["firefox"])), Identity::Unverified, "another real application");
+        assert_eq!(verify(&brave, &process("/tmp/payload", &["brave-browser-stable"])), Identity::Unverified, "argv[0] is not evidence");
     }
 
     #[test]

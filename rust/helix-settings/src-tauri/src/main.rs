@@ -255,12 +255,18 @@ async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
         pairing.begin(bluetooth, &path).map_err(|error| format!("{error:?}"))?
     };
     publish_pairing(&app);
-    if let Err(error) = send_bluetooth(Ok(request)).await {
-        shared(&app).lock().expect("state").pairing.finish();
-        publish_pairing(&app);
-        return Err(error);
+    match send_bluetooth_operation(Ok(request)).await {
+        Ok(operation) => {
+            shared(&app).lock().expect("state").pairing.set_operation(operation);
+            publish_pairing(&app);
+            Ok(())
+        }
+        Err(error) => {
+            shared(&app).lock().expect("state").pairing.finish();
+            publish_pairing(&app);
+            Err(error)
+        }
     }
-    Ok(())
 }
 
 async fn send_reply(app: &AppHandle, reply: Result<helix_shell_core::pairing::Reply, helix_shell_core::pairing::PairingError>) -> Result<(), String> {
@@ -335,14 +341,19 @@ async fn send_network(request: Result<NetRequest, NetError>) -> Result<(), Strin
 }
 
 async fn send_bluetooth(request: Result<BtRequest, BtError>) -> Result<(), String> {
+    send_bluetooth_operation(request).await.map(|_| ())
+}
+
+/// Like `send_bluetooth`, giving the service's id for the operation.
+async fn send_bluetooth_operation(request: Result<BtRequest, BtError>) -> Result<u64, String> {
     let request = request.map_err(|error| format!("{error:?}"))?;
     let desktop = current().ok_or("not connected to the desktop service")?;
-    desktop
+    let operation = desktop
         .action(Domain::Bluetooth, request.action, &request.args)
         .await
         .map_err(|error| error.to_string())?;
     eprintln!("SETTINGS bluetooth {} sent", request.action);
-    Ok(())
+    Ok(operation)
 }
 
 fn network_with<T>(app: &AppHandle, build: impl FnOnce(&Network) -> T) -> T {
@@ -495,9 +506,9 @@ fn connect(app: AppHandle) {
                     let completed = tauri::async_runtime::spawn(async move {
                         let watcher = done_app.clone();
                         let _ = done_desktop
-                            .watch_completed(Domain::Bluetooth, move |_, _, _| {
-                                // The pairing operation ended, however it ended: the question is over.
-                                shared(&watcher).lock().expect("state").pairing.finish();
+                            .watch_completed(Domain::Bluetooth, move |operation, _, _| {
+                                // The pairing operation ended, however it ended: the question is over. Other operations (a scan) do not count.
+                                shared(&watcher).lock().expect("state").pairing.operation_done(operation);
                                 publish_pairing(&watcher);
                             })
                             .await;

@@ -187,7 +187,7 @@ Tests: `tools/nested/agent-ipc-test.sh` (the wire protocol, effects and refusals
 (tool list, stale list, dead socket). `HELIX_AGENT_IPC_DIR` moves both files for tests; nested sessions always set it.
 Accepted limit, as for `org.helix.Shell1`: the socket does not authenticate other processes of the same user; Agent1 is what gates agents.
 Also supported now: `status` (observe: the desktop's state, windows by id and application name only, **never a title or any other program text**: `agent_status.rs`),
-`workspace-switch next|prev` (act) and `window-close [id]` (confirm: only a window the shell knows can be named; the approval dialog says in the
+`workspace-switch next|prev` (act) and `window-close <id>` (confirm: only a window the shell knows can be named, never "the focused one", which can change before Allow; the approval dialog says in the
 shell's own words which window the id is, `describe_window_close`, and a gloss can never come from the request). The window's application name comes from
 the desktop entry when the window really is that application (`identity.rs`), otherwise it is the sanitized program name and `verified` is false.
 Not yet reachable: focusing a window by id, app launch, media, files, clipboard. Each needs its taint rules first.

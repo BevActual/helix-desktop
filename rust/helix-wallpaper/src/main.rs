@@ -502,7 +502,11 @@ impl ConfigWatch {
                     libc::inotify_add_watch(
                         fd,
                         dir.as_ptr(),
-                        libc::IN_CLOSE_WRITE | libc::IN_MOVED_TO | libc::IN_CREATE,
+                        libc::IN_CLOSE_WRITE
+                            | libc::IN_MOVED_TO
+                            | libc::IN_MOVED_FROM
+                            | libc::IN_CREATE
+                            | libc::IN_DELETE,
                     )
                 };
             }

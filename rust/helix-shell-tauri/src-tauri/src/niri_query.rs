@@ -23,8 +23,8 @@ pub fn request(name: &str) -> Option<Value> {
 pub fn layer_is_trusted(namespace: &str) -> Option<bool> {
     let reply = request("Layers")?;
     let layers = reply.get("Layers")?.as_array()?;
-    layers
-        .iter()
-        .find(|layer| layer.get("namespace").and_then(Value::as_str) == Some(namespace))
-        .map(|layer| layer.get("trusted").and_then(Value::as_bool).unwrap_or(false))
+    // Anyone may use the namespace, so only the surface the compositor trusts counts: a look-alike listed first must not hide it.
+    let mut same = layers.iter().filter(|layer| layer.get("namespace").and_then(Value::as_str) == Some(namespace)).peekable();
+    same.peek()?;
+    Some(same.any(|layer| layer.get("trusted").and_then(Value::as_bool).unwrap_or(false)))
 }
