@@ -22,6 +22,8 @@ pub struct DockPrefs {
     pub magnification: f64,
     /// Hidden until the pointer reaches the bottom edge; otherwise always showing (windows can sit behind it).
     pub auto_hide: bool,
+    /// Windows stop above the dock instead of behind it. Only means something while the dock stays visible (`auto_hide` off).
+    pub reserve_space: bool,
     /// The dot under an open application.
     pub indicators: bool,
     /// Applications that are open but not kept in the dock.
@@ -30,7 +32,7 @@ pub struct DockPrefs {
 
 impl Default for DockPrefs {
     fn default() -> Self {
-        DockPrefs { icon_size: ICON_DEFAULT, magnify: true, magnification: MAGNIFY_DEFAULT, auto_hide: true, indicators: true, running: true }
+        DockPrefs { icon_size: ICON_DEFAULT, magnify: true, magnification: MAGNIFY_DEFAULT, auto_hide: true, reserve_space: true, indicators: true, running: true }
     }
 }
 
@@ -50,7 +52,7 @@ impl DockPrefs {
         if let Some(n) = value.get("magnification").and_then(Value::as_f64).filter(|n| n.is_finite()) {
             prefs.magnification = round2(n.clamp(MAGNIFY_MIN, MAGNIFY_MAX));
         }
-        for (key, slot) in [("magnify", &mut prefs.magnify), ("auto_hide", &mut prefs.auto_hide), ("indicators", &mut prefs.indicators), ("running", &mut prefs.running)] {
+        for (key, slot) in [("magnify", &mut prefs.magnify), ("auto_hide", &mut prefs.auto_hide), ("reserve_space", &mut prefs.reserve_space), ("indicators", &mut prefs.indicators), ("running", &mut prefs.running)] {
             if let Some(b) = value.get(key).and_then(Value::as_bool) {
                 *slot = b;
             }
@@ -60,7 +62,7 @@ impl DockPrefs {
 
     pub fn to_json(&self) -> String {
         json!({"version": 1, "icon_size": self.icon_size, "magnify": self.magnify, "magnification": self.magnification,
-               "auto_hide": self.auto_hide, "indicators": self.indicators, "running": self.running})
+               "auto_hide": self.auto_hide, "reserve_space": self.reserve_space, "indicators": self.indicators, "running": self.running})
         .to_string()
     }
 
@@ -81,6 +83,7 @@ impl DockPrefs {
             }
             "magnify" => next.magnify = value.as_bool().ok_or(PrefsError::BadValue)?,
             "auto_hide" => next.auto_hide = value.as_bool().ok_or(PrefsError::BadValue)?,
+            "reserve_space" => next.reserve_space = value.as_bool().ok_or(PrefsError::BadValue)?,
             "indicators" => next.indicators = value.as_bool().ok_or(PrefsError::BadValue)?,
             "running" => next.running = value.as_bool().ok_or(PrefsError::BadValue)?,
             _ => return Err(PrefsError::UnknownSetting),
@@ -90,6 +93,12 @@ impl DockPrefs {
 }
 
 impl DockPrefs {
+    /// The space (in pixels) the compositor should keep free along the bottom edge, or `None` when the dock hides or does not reserve.
+    /// The dock's own height (icons, padding), the gap below it and a little air above.
+    pub fn reserved_height(&self) -> Option<i32> {
+        (!self.auto_hide && self.reserve_space).then(|| self.icon_size as i32 + 17 + 10 + 6)
+    }
+
     /// The rows the Dock page draws, in order.
     pub fn rows(&self) -> Vec<RowView> {
         let row = |id: &str, title: &str, group: &str, description: &str, control: Control| RowView {
@@ -102,6 +111,7 @@ impl DockPrefs {
         };
         vec![
             row("auto_hide", "Automatically hide", "Dock", "Shows when the pointer reaches the bottom edge. When off, the dock stays visible and windows can sit behind it.", Control::Switch { on: self.auto_hide }),
+            row("reserve_space", "Reserve space for the dock", "Dock", "Windows stop above the dock instead of behind it. Used while Automatically hide is off.", Control::Switch { on: self.reserve_space }),
             row("running", "Show open applications", "Dock", "Applications that are running but not kept in the dock.", Control::Switch { on: self.running }),
             row("indicators", "Show open indicators", "Dock", "A small dot under applications that are open.", Control::Switch { on: self.indicators }),
             row("icon_size", "Icon size", "Size", "", Control::Slider { min: ICON_MIN as f64, max: ICON_MAX as f64, integer: true, value: self.icon_size as f64 }),
@@ -171,7 +181,7 @@ mod tests {
     fn the_page_shows_every_setting_once_and_applies_what_it_sends() {
         let p = DockPrefs::default();
         let ids: Vec<String> = p.rows().into_iter().map(|r| r.id).collect();
-        assert_eq!(ids, ["auto_hide", "running", "indicators", "icon_size", "magnify", "magnification"]);
+        assert_eq!(ids, ["auto_hide", "reserve_space", "running", "indicators", "icon_size", "magnify", "magnification"]);
         for id in &ids {
             assert!(p.set(id, &json!(true)).is_ok() || p.set(id, &json!(40)).is_ok() || p.set(id, &json!(1.5)).is_ok(), "{id} is writable");
         }
@@ -180,6 +190,16 @@ mod tests {
         assert!(!p.apply("auto_hide", &Change::Switch(false)).unwrap().auto_hide);
         assert_eq!(p.apply("auto_hide", &Change::Number(1.0)), Err(PrefsError::BadValue));
         assert_eq!(p.apply("icon_size", &Change::Text("9".into())), Err(PrefsError::BadValue));
+    }
+
+    #[test]
+    fn space_is_reserved_only_for_a_dock_that_stays() {
+        let p = DockPrefs::default();
+        assert_eq!(p.reserved_height(), None, "an auto-hiding dock reserves nothing");
+        let shown = p.set("auto_hide", &json!(false)).unwrap();
+        assert_eq!(shown.reserved_height(), Some(52 + 33));
+        assert_eq!(shown.set("icon_size", &json!(72)).unwrap().reserved_height(), Some(72 + 33), "it follows the icon size");
+        assert_eq!(shown.set("reserve_space", &json!(false)).unwrap().reserved_height(), None);
     }
 
     #[test]

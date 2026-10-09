@@ -22,11 +22,18 @@ mkdir -p "$(dirname "$FILE")"
 echo '{"version":1,"auto_hide":false,"icon_size":40,"indicators":false,"magnify":false}' > "$FILE"
 for _ in $(seq 1 20); do [ "$(size_of dock-item-0)" != none ] && break; sleep 0.5; done
 [ "$(size_of dock-item-0)" = 40 ] && echo "ok: showing, 40 wide" || fail "expected a 40 px icon, saw $(size_of dock-item-0)"
+sleep 1
+niri msg layers 2>/dev/null | grep -q helix-shell-dock-reserve && echo "ok: the compositor keeps space for the dock" || fail "no space reserved"
 grep -q "DOCK settings changed" "$LOG" && echo "ok: the shell noticed the change" || fail "no change noticed"
+echo "--- 2b. always showing but not reserving"
+echo '{"version":1,"auto_hide":false,"reserve_space":false}' > "$FILE"; sleep 3
+niri msg layers 2>/dev/null | grep -q helix-shell-dock-reserve && fail "space still reserved" || echo "ok: space let go"
+[ "$(size_of dock-item-0)" != none ] && echo "ok: still showing" || fail "dock hid"
 echo "--- 3. back to the defaults"
 echo '{"version":1}' > "$FILE"
 for _ in $(seq 1 20); do [ "$(size_of dock-item-0)" = none ] && break; sleep 0.5; done
 [ "$(size_of dock-item-0)" = none ] && echo "ok: hides again" || fail "still showing: $(size_of dock-item-0)"
+niri msg layers 2>/dev/null | grep -q helix-shell-dock-reserve && fail "space kept for a hidden dock" || echo "ok: nothing reserved for an auto-hiding dock"
 echo "--- 4. a damaged file means the defaults"
 echo 'not json' > "$FILE"; sleep 2.5
 [ "$(size_of dock-item-0)" = none ] && echo "ok: still the defaults" || fail "damaged file changed the dock"

@@ -81,6 +81,54 @@ pub fn reserve_bar_space() {
     }
 }
 
+thread_local! {
+    static DOCK_STRUT: std::cell::RefCell<Option<gtk::Window>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Keeps `height` pixels free along the bottom edge for the dock (an empty transparent surface with an exclusive zone, as for the bar), or
+/// lets the space go with `None`. Must run on the GTK thread.
+pub fn set_dock_strut(height: Option<i32>) {
+    DOCK_STRUT.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        let Some(height) = height else {
+            if let Some(window) = slot.take() {
+                window.close();
+            }
+            return;
+        };
+        if let Some(window) = slot.as_ref() {
+            window.set_size_request(1, height);
+            window.set_exclusive_zone(height);
+            return;
+        }
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        window.set_decorated(false);
+        window.set_accept_focus(false);
+        window.set_app_paintable(true);
+        if let Some(visual) = gtk::prelude::WidgetExt::screen(&window).and_then(|screen| screen.rgba_visual()) {
+            window.set_visual(Some(&visual));
+        }
+        let css = gtk::CssProvider::new();
+        if css.load_from_data(b"window, window * { background: transparent; }").is_ok() {
+            window.style_context().add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+        window.set_size_request(1, height);
+        window.init_layer_shell();
+        window.set_namespace("helix-shell-dock-reserve");
+        window.set_layer(gtk_layer_shell::Layer::Top);
+        for edge in [Edge::Bottom, Edge::Left, Edge::Right] {
+            window.set_anchor(edge, true);
+        }
+        window.set_exclusive_zone(height);
+        window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+        window.show_all();
+        if let Some(gdk_window) = window.window() {
+            gdk_window.input_shape_combine_region(&gtk::cairo::Region::create(), 0, 0);
+        }
+        *slot = Some(window);
+    });
+}
+
 /// Extra space above the shell, in pixels: `HELIX_SHELL_TOP_OFFSET`. Zero normally. Running beside another shell that owns the top edge
 /// (the trial runs next to the native bar) sets it to that bar's height so the two do not draw over each other.
 pub fn top_offset() -> i32 {
@@ -109,6 +157,18 @@ pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
         let region = *INPUT.lock().expect("input region");
         set_input_region(window, region, allocation.width(), allocation.height());
     });
+    // The web view is not always told when the pointer leaves the surface (the compositor moves it to another surface, or the input
+    // region shrinks under it), so the page is told from here, where the leave is certain.
+    {
+        use tauri::Emitter;
+        let emitter = window.clone();
+        gtk_window.connect_leave_notify_event(move |_, event| {
+            if event.detail() != gtk::gdk::NotifyType::Inferior {
+                let _ = emitter.emit("pointer-left", ());
+            }
+            gtk::glib::Propagation::Proceed
+        });
+    }
     window.show().map_err(|e| e.to_string())
 }
 

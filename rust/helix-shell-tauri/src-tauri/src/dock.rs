@@ -43,6 +43,12 @@ fn read_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
         .unwrap_or_default()
 }
 
+/// Applies what is not the page's business: the strip the compositor keeps free for the dock.
+fn apply_reserve(app: &AppHandle, prefs: &helix_shell_core::dock_prefs::DockPrefs) {
+    let height = prefs.reserved_height();
+    let _ = app.run_on_main_thread(move || crate::layer::set_dock_strut(height));
+}
+
 pub fn prefs() -> helix_shell_core::dock_prefs::DockPrefs {
     PREFS.lock().expect("dock prefs").get_or_insert_with(read_prefs).clone()
 }
@@ -73,6 +79,7 @@ fn watch_prefs(app: AppHandle) {
             };
             if changed {
                 eprintln!("DOCK settings changed");
+                apply_reserve(&app, &next);
                 let _ = app.emit("dock-prefs", next);
                 refresh(&app);
             }
@@ -290,6 +297,7 @@ pub fn start(app: AppHandle) {
         guard.dock = helix_shell_core::dock::Dock::new(pins);
     }
     refresh(&app);
+    apply_reserve(&app, &prefs());
     watch_prefs(app.clone());
     std::thread::spawn(move || loop {
         match socket_path() {

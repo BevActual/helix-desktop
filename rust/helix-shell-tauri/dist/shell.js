@@ -972,7 +972,7 @@ function showDockTip(name, cell) {
 function setDock(show) {
   if (!dockPrefs.auto_hide && !document.body.classList.contains("open")) show = true;
   document.body.classList.toggle("dock-show", show);
-  if (!show) { $("dock-tip").classList.remove("show"); closeDockMenu(); }
+  if (!show) { $("dock-tip").classList.remove("show"); closeDockMenu(); magnify(null); }
   queueInteractive();
   queueGlass();
 }
@@ -1000,6 +1000,7 @@ listen("dock-prefs", (event) => applyDockPrefs(event.payload));
 invoke("dock_prefs").then(applyDockPrefs);
 function magnify(x) {
   if (!dockPrefs.magnify) x = null;
+
   const row = $("dock-items");
   const cells = Array.from(row.children);
   if (!cells.length) return;
@@ -1023,6 +1024,11 @@ function magnify(x) {
   row.style.paddingInline = Math.round(total / 2 / 4) * 4 + "px";
 }
 $("dock").addEventListener("pointermove", (event) => magnify(event.clientX));
+document.documentElement.addEventListener("pointerleave", () => magnify(null));
+// The pointer left the whole shell surface (Rust is told by the toolkit even when the page is not).
+listen("pointer-left", () => { magnify(null); if (!dockMenuOpen) scheduleDockHide(); });
+window.addEventListener("blur", () => magnify(null));
+$("dock-items").addEventListener("transitionend", () => queueReport());
 function closeDockMenu() { dockMenuOpen = false; $("dock-menu").classList.remove("show"); queueInteractive(); }
 function openDockMenu(item, cell) {
   const menu = $("dock-menu");

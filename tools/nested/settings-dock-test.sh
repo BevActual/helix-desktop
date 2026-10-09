@@ -17,7 +17,7 @@ PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
 click_id page-dock; sleep 1.5; shot settings-dock
-for id in auto_hide running indicators icon_size magnify magnification; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
+for id in auto_hide reserve_space running indicators icon_size magnify magnification; do has_id "set-$id" && echo "ok: $id is on the page" || fail "no row for $id"; done
 has_id set-dock.position && fail "a setting the shell ignores is still listed" || echo "ok: nothing the shell ignores"
 click_id set-auto_hide; sleep 1
 grep -q '"auto_hide":false' "$FILE" && echo "ok: Automatically hide written" || fail "auto_hide not written: $(cat "$FILE" 2>&1)"
