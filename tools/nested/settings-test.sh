@@ -69,6 +69,14 @@ click_id page-agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"
 
+echo "--- 1e. the approvals switch writes the choice the shell reads (off by default)"
+APPROVALS=$SCRATCH/config/helix/approvals.json
+[ ! -f "$APPROVALS" ] && echo "ok: nothing is allowed until chosen" || fail "a choice exists already"
+click_id approvals-unprotected; sleep 0.8
+grep -q '"allow_unprotected":true' "$APPROVALS" && [ "$(stat -c %a "$APPROVALS")" = 600 ] && echo "ok: allowed, in an owner-only file" || fail "approvals file: $(cat "$APPROVALS" 2>/dev/null)"
+click_id approvals-unprotected; sleep 0.8
+grep -q '"allow_unprotected":false' "$APPROVALS" && echo "ok: switched back off" || fail "not off: $(cat "$APPROVALS" 2>/dev/null)"
+
 echo "--- 2. a tier switch changes what the service holds"
 before=$(tiers_of "exe:/opt/agents/helper.py"); echo "helper before: $before"
 click_id tier-0-observe-private; sleep 1.2

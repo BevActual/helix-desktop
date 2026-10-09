@@ -126,8 +126,12 @@ compositor, so they cannot be filtered there. The dialog therefore refuses to be
 and is ignored), which protects approvals even on a stock compositor. A person with no pointing device cannot approve; an accessibility path is future
 work (`allow-virtual-input` in the compositor config opens the pointer path for such tools).
 
-**Not built.** The compositor-drawn rim (imitation defence), a Settings toggle for `allow_unprotected`, an audit mark for approvals made without protection,
-and a physical-device test (the nested compositor only receives virtual input; the device path is checked on the real session).
+**Also built.** The compositor-drawn frame (`rim-color`, orange by default; test A6 reads a pixel on the screen's edge: present with the role, absent without), and
+a Settings switch (Privacy & agents > Approvals) that writes `~/.config/helix/approvals.json`, which the shell reads each time a dialog opens.
+The real-device path was checked on the real session: a click with the real mouse approved a protected dialog.
+
+**Not built.** An audit mark for approvals made without protection (the confirm call to the service has no field for it; adding one is a change to the
+Agent1 contract and the service, which the person installs with sudo).
 
 **Deploying.** The compositor needs the fork build installed and this block in the person's niri config, then a new session; until then the shell
 (which is the confirmer) refuses confirm-tier actions. Nothing here touches the running session.

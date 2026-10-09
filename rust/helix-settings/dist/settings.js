@@ -284,6 +284,28 @@ $("search").addEventListener("input", () => {
   }
 });
 
+// Approvals: whether an approval may be given where the desktop cannot protect the dialog -----------------------------------------------
+function drawApprovals(allow) {
+  const card = $("approvals-card");
+  card.replaceChildren();
+  const line = el("div", "setting-row");
+  const text = el("div", "setting-text");
+  text.append(el("div", "setting-title", "Approve on a desktop that cannot protect the dialog"));
+  text.append(el("div", "setting-about", allow
+    ? "On. Other programs on this desktop might be able to click Allow for you or read the dialog. Actions that need confirmation are shown anyway."
+    : "Off. Where the desktop cannot protect the approval dialog from other programs, actions that need confirmation are refused instead of shown."));
+  const box = el("input");
+  box.type = "checkbox";
+  box.className = "switch";
+  box.checked = allow;
+  box.dataset.test = "approvals-unprotected";
+  box.addEventListener("change", () => invoke("approvals_set", { allow: box.checked }).then(drawApprovals));
+  line.append(text, box);
+  card.append(line);
+  queueReport();
+}
+invoke("approvals_view").then(drawApprovals);
+
 // Privacy & agents ------------------------------------------------------------------------------------------------------------------
 function drawAgents(view) {
   const note = $("agents-note");

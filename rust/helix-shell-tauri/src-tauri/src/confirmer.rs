@@ -28,8 +28,6 @@ pub enum Answer {
 pub struct ConfirmerHost {
     panel: Confirmer,
     started: Instant,
-    /// The person chose to approve even where the compositor cannot protect the dialog.
-    allow_unprotected: bool,
 }
 
 /// Whether the person allows approvals the compositor cannot protect: `HELIX_ALLOW_UNPROTECTED_APPROVALS=1` (the shell's own
@@ -43,9 +41,7 @@ fn unprotected_allowed() -> bool {
         .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")));
     base.map(|b| b.join("helix/approvals.json"))
         .and_then(|path| std::fs::read_to_string(path).ok())
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .and_then(|v| v.get("allow_unprotected").and_then(Value::as_bool))
-        .unwrap_or(false)
+        .is_some_and(|text| helix_shell_core::approvals::allow_unprotected(&text))
 }
 
 impl ConfirmerHost {
@@ -62,7 +58,6 @@ impl ConfirmerHost {
         Self {
             panel,
             started,
-            allow_unprotected: unprotected_allowed(),
         }
     }
 
@@ -72,7 +67,9 @@ impl ConfirmerHost {
 
     pub fn set_protection(&mut self, protected: bool) {
         let now = self.now_ms();
-        self.panel.set_protection(protected, self.allow_unprotected, now);
+        // Read when the dialog is checked, so a change in Settings applies to the next dialog without a restart.
+        let allowed = unprotected_allowed();
+        self.panel.set_protection(protected, allowed, now);
     }
 
     fn now_ms(&self) -> u64 {

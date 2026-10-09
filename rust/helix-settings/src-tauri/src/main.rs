@@ -755,6 +755,42 @@ fn wallpaper_choose_swatch(app: AppHandle, index: usize) -> Result<(), String> {
     write_choice(&app, source)
 }
 
+/// Whether approvals are allowed on a desktop that cannot protect the dialog (off unless chosen). Stored where the shell reads it.
+fn approvals_path() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+    Some(base.join("helix/approvals.json"))
+}
+
+#[tauri::command]
+fn approvals_view() -> bool {
+    approvals_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .is_some_and(|text| helix_shell_core::approvals::allow_unprotected(&text))
+}
+
+#[tauri::command]
+fn approvals_set(allow: bool) -> Result<bool, String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let path = approvals_path().ok_or("no folder for the choice")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("tmp");
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&temporary)
+        .map_err(|e| e.to_string())?;
+    file.write_all(helix_shell_core::approvals::render(allow).as_bytes())
+        .map_err(|e| e.to_string())?;
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    eprintln!("SETTINGS approvals allow_unprotected={allow}");
+    Ok(allow)
+}
+
 #[tauri::command]
 fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
@@ -836,6 +872,8 @@ fn main() {
             agents_revoke,
             agents_refresh,
             rows_view,
+            approvals_view,
+            approvals_set,
             wallpaper_view,
             wallpaper_thumb,
             wallpaper_choose_image,

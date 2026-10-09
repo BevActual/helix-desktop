@@ -100,4 +100,13 @@ sleep 1; wtype -k a; sleep 0.8
 grep -q "KEY a" "$SCRATCH/attacker.out" && verdict "keyboard theft" 1 || verdict "keyboard theft" 0
 close_dialog
 
+echo "--- A6. imitation: only the compositor can draw the frame that marks the real dialog (a pixel on the screen's edge)"
+open_dialog
+pixel=$(shot_pixel 3 3); echo "pixel at the edge: $pixel"
+case "$pixel" in "255 159 10"|"255 158 10"|"255 160 10") framed=1 ;; *) framed=0 ;; esac
+# The real dialog has the frame on a protected compositor; on any other the frame cannot exist, so a copy of the dialog cannot have it either.
+if [ "$EXPECT" = protected ]; then [ $framed = 1 ] && echo "ok: the real dialog carries the compositor's frame" || { echo "FAIL: no frame on a protected compositor" >&2; FAILED=1; }
+else [ $framed = 0 ] && echo "ok: no frame without the role, so nothing can show the real mark" || { echo "FAIL: a frame without the role" >&2; FAILED=1; }; fi
+close_dialog
+
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED
