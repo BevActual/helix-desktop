@@ -14,7 +14,7 @@ print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
 PY
 )
 export UI_ORIGIN=${loc%%|*} UI_SCREEN=${loc##*|}
-for page in appearance accessibility displays dock sound notifications power agents about; do
+for page in appearance accessibility displays dock sound notifications power keyboard about; do
   click_id page-$page; sleep 1.2
   niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.2
   ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/look-$page.png"

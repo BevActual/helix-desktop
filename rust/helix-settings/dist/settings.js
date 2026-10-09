@@ -361,6 +361,28 @@ function drawAgents(view) {
 // Registering a listener takes a moment; anything sent meanwhile would be lost, so the current state is read once it is in place.
 listen("agents-view", (event) => drawAgents(event.payload)).then(() => invoke("agents_view").then(drawAgents));
 
+// Keys: Ctrl+F or / searches, Escape leaves the search, Ctrl+W closes, Alt+Up and Alt+Down move through the pages.
+document.addEventListener("keydown", (event) => {
+  const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement && document.activeElement.tagName);
+  if ((event.ctrlKey && event.key.toLowerCase() === "f") || (event.key === "/" && !typing)) {
+    event.preventDefault();
+    $("search").focus();
+    $("search").select();
+  } else if (event.key === "Escape" && $("search").value !== "") {
+    $("search").value = "";
+    $("search").dispatchEvent(new Event("input"));
+    $("search").blur();
+  } else if (event.ctrlKey && event.key.toLowerCase() === "w") {
+    event.preventDefault();
+    window.__TAURI__.window.getCurrentWindow().close();
+  } else if (event.altKey && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    const at = PAGES.findIndex((page) => page.name === current);
+    const next = PAGES[(at + (event.key === "ArrowDown" ? 1 : PAGES.length - 1)) % PAGES.length];
+    showPage(next.name);
+  }
+});
+
 // Tests only: where every named control is, so a test can click it by name.
 invoke("layout_reporting").then((wanted) => { reporting = wanted; queueReport(); });
 function queueReport() {

@@ -69,6 +69,14 @@ click_id page-agents; sleep 0.8
 for _ in $(seq 1 20); do has_id agent-0 && has_id agent-1 && break; sleep 0.25; done
 has_id agent-0 && has_id agent-1 && echo "ok: two applications listed" || fail "the applications are not on the page"
 
+echo "--- 1d2. the keyboard: / searches across pages, Escape leaves the search"
+click_id page-appearance; sleep 0.8
+wtype "/"; sleep 0.3; wtype "volume"; sleep 0.8
+has_id set-audio.sound_volume && echo "ok: the search found a setting on another page" || fail "search found nothing for volume"
+wtype -k Escape; sleep 0.6
+has_id set-audio.sound_volume && fail "Escape did not leave the search" || echo "ok: Escape went back to the page"
+click_id page-agents; sleep 0.6
+
 echo "--- 1e. the approvals switch writes the choice the shell reads (off by default)"
 APPROVALS=$SCRATCH/config/helix/approvals.json
 [ ! -f "$APPROVALS" ] && echo "ok: nothing is allowed until chosen" || fail "a choice exists already"
