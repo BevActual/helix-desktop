@@ -27,7 +27,7 @@ const PAGES = [
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
   { name: "sound", title: "Sound", icon: "volume", rows: true },
-  { name: "dock", title: "Dock & corners", icon: "grid", rows: true },
+  { name: "dock", title: "Dock", icon: "grid", rows: false },
   { name: "notifications", title: "Notifications", icon: "bell", rows: true },
   { name: "power", title: "Power & lock", icon: "lock", rows: true },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
@@ -46,7 +46,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -84,6 +84,7 @@ function showPage(name) {
   if (name === "about") drawAbout();
   if (name === "keyboard") drawKeyboard();
   if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
+  if (name === "dock") invoke("dock_rows").then(drawDock);
   queueReport();
 }
 buildPages();
@@ -268,10 +269,9 @@ function rowLine(page, row) {
   const text = el("div", "setting-text");
   text.append(el("div", "setting-title", row.title));
   if (row.description) text.append(el("div", "setting-about", row.description));
-  if (row.overridden) text.append(el("div", "setting-about", "Pinned by a local override."));
   line.append(text);
   const control = row.control;
-  const send = (change) => invoke("setting_change", { page, id: row.id, change }).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -345,6 +345,15 @@ function drawGroups(host, page, rows) {
     card.append(rowLine(page, row));
   });
 }
+// The Dock page: settings the shell honours (kept in a file it watches), drawn with the same rows as the service's pages.
+function drawDock(rows) {
+  pageRows.dock = rows;
+  const host = $("dock-host");
+  host.replaceChildren();
+  drawGroups(host, "dock", rows);
+  if (searching()) drawSearch();
+  queueReport();
+}
 function drawRows(view) {
   pageRows[view.page] = view.rows;
   const host = $(view.page + "-rows");
@@ -354,6 +363,7 @@ function drawRows(view) {
   if (searching()) drawSearch();
   queueReport();
 }
+invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------
@@ -363,7 +373,7 @@ function drawSearch() {
   const host = $("search-rows");
   host.replaceChildren();
   let found = 0;
-  PAGES.filter((page) => page.rows).forEach((page) => {
+  PAGES.filter((page) => page.rows || pageRows[page.name]).forEach((page) => {
     const rows = (pageRows[page.name] || []).filter((row) => {
       const hay = (row.title + " " + row.group + " " + row.description).toLowerCase();
       return words.every((word) => hay.includes(word));

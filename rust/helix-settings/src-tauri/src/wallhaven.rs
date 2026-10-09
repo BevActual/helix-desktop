@@ -6,7 +6,7 @@ use std::io::Read;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use helix_shell_core::wallhaven::{self as model, Hit, Results, Search, MAX_DOWNLOAD};
+use helix_shell_core::wallhaven::{self as model, Hit, Search, MAX_DOWNLOAD};
 use tauri::AppHandle;
 
 /// What the last search listed, by id: nothing else can be fetched or saved.

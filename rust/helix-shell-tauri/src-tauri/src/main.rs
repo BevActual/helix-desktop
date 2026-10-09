@@ -1527,6 +1527,7 @@ fn main() {
             tray::tray_menu_activate,
             report_interactive,
             dock::dock_view,
+            dock::dock_prefs,
             dock::workspaces_view,
             dock::workspace_focus,
             dock::dock_activate,

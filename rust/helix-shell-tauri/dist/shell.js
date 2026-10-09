@@ -113,6 +113,7 @@ listen("assistant-view", (event) => show(event.payload));
 listen("shell-mode", (event) => {
   const panel = event.payload.panel;
   document.body.classList.toggle("open", panel !== null);
+  if (panel === null && !dockPrefs.auto_hide) setDock(true);
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
   if (panel === "notifications") {
@@ -969,6 +970,7 @@ function showDockTip(name, cell) {
   tip.classList.add("show");
 }
 function setDock(show) {
+  if (!dockPrefs.auto_hide && !document.body.classList.contains("open")) show = true;
   document.body.classList.toggle("dock-show", show);
   if (!show) { $("dock-tip").classList.remove("show"); closeDockMenu(); }
   queueInteractive();
@@ -984,8 +986,20 @@ $("dock").addEventListener("pointerleave", () => { magnify(null); scheduleDockHi
 $("dock-edge").addEventListener("pointerleave", () => { if (!$("dock").matches(":hover")) scheduleDockHide(); });
 // Icons grow toward the pointer like a lens, and their neighbours move aside to make room (a Gaussian of the distance, not steps). The pill
 // widens by what the icons gained, evenly on both sides, so nothing ever sits on top of its neighbour or hangs outside the glass.
-const ICON = 52;
+let ICON = 52;
+let dockPrefs = { icon_size: 52, magnify: true, magnification: 1.5, auto_hide: true, indicators: true, running: true };
+function applyDockPrefs(prefs) {
+  dockPrefs = prefs;
+  ICON = prefs.icon_size;
+  document.documentElement.style.setProperty("--dock-icon", prefs.icon_size + "px");
+  document.body.classList.toggle("no-dots", !prefs.indicators);
+  magnify(null);
+  setDock(!prefs.auto_hide && !document.body.classList.contains("open"));
+}
+listen("dock-prefs", (event) => applyDockPrefs(event.payload));
+invoke("dock_prefs").then(applyDockPrefs);
 function magnify(x) {
+  if (!dockPrefs.magnify) x = null;
   const row = $("dock-items");
   const cells = Array.from(row.children);
   if (!cells.length) return;
@@ -995,7 +1009,7 @@ function magnify(x) {
   const scales = cells.map((_, i) => {
     if (x === null) return 1;
     const distance = x - centre - (i - (cells.length - 1) / 2) * pitch;
-    return 1 + 0.5 * Math.exp(-(distance * distance) / (2 * 58 * 58));
+    return 1 + (dockPrefs.magnification - 1) * Math.exp(-(distance * distance) / (2 * 58 * 58));
   });
   const gains = scales.map((s) => ICON * (s - 1));
   const total = gains.reduce((a, b) => a + b, 0);

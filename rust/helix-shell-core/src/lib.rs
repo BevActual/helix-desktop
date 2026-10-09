@@ -16,6 +16,7 @@ pub mod confirmer;
 pub mod dbusmenu;
 mod display;
 pub mod dock;
+pub mod dock_prefs;
 pub mod glass;
 pub mod identity;
 pub mod grants;

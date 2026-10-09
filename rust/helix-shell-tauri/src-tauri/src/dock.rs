@@ -29,6 +29,57 @@ fn config_path() -> Option<PathBuf> {
     Some(base.join("helix/dock.json"))
 }
 
+/// The dock's look and behaviour as the person set it in Settings (`dock-settings.json`), re-read when the file changes.
+static PREFS: std::sync::Mutex<Option<helix_shell_core::dock_prefs::DockPrefs>> = std::sync::Mutex::new(None);
+
+pub fn prefs_path() -> Option<PathBuf> {
+    config_path().map(|p| p.with_file_name("dock-settings.json"))
+}
+
+fn read_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+    prefs_path()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_shell_core::dock_prefs::DockPrefs::parse(&text))
+        .unwrap_or_default()
+}
+
+pub fn prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+    PREFS.lock().expect("dock prefs").get_or_insert_with(read_prefs).clone()
+}
+
+#[tauri::command]
+pub fn dock_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+    prefs()
+}
+
+/// Looks at the settings file once a second (a stat, nothing more) and tells the page and the dock list when it changed.
+fn watch_prefs(app: AppHandle) {
+    std::thread::spawn(move || {
+        let stamp = || prefs_path().and_then(|p| std::fs::metadata(p).ok()).and_then(|m| m.modified().ok());
+        let mut seen = stamp();
+        loop {
+            std::thread::sleep(Duration::from_secs(1));
+            let now = stamp();
+            if now == seen {
+                continue;
+            }
+            seen = now;
+            let next = read_prefs();
+            let changed = {
+                let mut guard = PREFS.lock().expect("dock prefs");
+                let changed = guard.as_ref() != Some(&next);
+                *guard = Some(next.clone());
+                changed
+            };
+            if changed {
+                eprintln!("DOCK settings changed");
+                let _ = app.emit("dock-prefs", next);
+                refresh(&app);
+            }
+        }
+    });
+}
+
 /// The pinned application ids saved last time, or `None` on a first run.
 pub fn load_pins() -> Option<Vec<String>> {
     let text = std::fs::read_to_string(config_path()?).ok()?;
@@ -117,9 +168,11 @@ pub struct DockItem {
 fn items(app: &AppHandle) -> Vec<DockItem> {
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
+    let show_running = prefs().running;
     let views = shell.dock.view();
     views
         .into_iter()
+        .filter(|item| show_running || item.pinned)
         .map(|item| {
             let uri = if item.icon.is_empty() {
                 None
@@ -237,6 +290,7 @@ pub fn start(app: AppHandle) {
         guard.dock = helix_shell_core::dock::Dock::new(pins);
     }
     refresh(&app);
+    watch_prefs(app.clone());
     std::thread::spawn(move || loop {
         match socket_path() {
             Some(path) => match UnixStream::connect(&path) {

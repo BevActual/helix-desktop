@@ -63,34 +63,10 @@ const POWER: &[&str] = &[
 ];
 
 /// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
-const DOCK: &[&str] = &[
-    "dock.enabled",
-    "dock.position",
-    "dock.auto_hide",
-    "dock.smart_auto_hide",
-    "dock.reserve_space",
-    "dock.active_monitor_only",
-    "dock.icon_size",
-    "dock.magnification",
-    "dock.magnification_scale",
-    "dock.show_running",
-    "dock.show_dots",
-    "dock.show_instance_count",
-    "dock.shadow",
-    "dock.background_opacity",
-    "hot_corners.enabled",
-    "hot_corners.delay_ms",
-    "hot_corners.top_left.action",
-    "hot_corners.top_right.action",
-    "hot_corners.bottom_left.action",
-    "hot_corners.bottom_right.action",
-];
-
-const ROW_PAGES: [(&str, &[&str]); 7] = [
+const ROW_PAGES: [(&str, &[&str]); 6] = [
     ("appearance", APPEARANCE),
     ("accessibility", ACCESSIBILITY),
     ("displays", DISPLAYS),
-    ("dock", DOCK),
     ("sound", SOUND),
     ("notifications", NOTIFICATIONS),
     ("power", POWER),
@@ -815,6 +791,49 @@ fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
 }
 
+fn dock_prefs_file() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("XDG_CONFIG_HOME")
+        .filter(|v| !v.is_empty())
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".config")))?;
+    Some(base.join("helix/dock-settings.json"))
+}
+
+fn read_dock_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
+    dock_prefs_file()
+        .and_then(|path| std::fs::read_to_string(path).ok())
+        .map(|text| helix_shell_core::dock_prefs::DockPrefs::parse(&text))
+        .unwrap_or_default()
+}
+
+/// The Dock page: settings the shell honours, kept in a file the shell watches.
+#[tauri::command]
+fn dock_rows() -> Vec<RowView> {
+    read_dock_prefs().rows()
+}
+
+#[tauri::command]
+fn dock_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+        (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
+        (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
+        _ => return Err("unknown change".into()),
+    };
+    let next = read_dock_prefs().apply(&id, &change).map_err(|error| format!("{error:?}"))?;
+    let path = dock_prefs_file().ok_or("no folder for the settings")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("tmp");
+    {
+        let mut file = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&temporary).map_err(|e| e.to_string())?;
+        file.write_all(next.to_json().as_bytes()).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    eprintln!("SETTINGS dock {id} changed");
+    Ok(next.rows())
+}
+
 /// A change to one row. The page names the row and what it wants; the catalog model decides whether that is a legal write.
 #[tauri::command]
 async fn setting_change(
@@ -898,6 +917,8 @@ fn main() {
             wallpaper_thumb,
             wallpaper_choose_image,
             wallpaper_choose_swatch,
+            dock_rows,
+            dock_change,
             wallhaven::wallhaven_search,
             wallhaven::wallhaven_thumb,
             wallhaven::wallhaven_use,
