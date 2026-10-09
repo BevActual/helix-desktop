@@ -5,6 +5,7 @@
 // client's, so its grants, confirmations and audit apply on top. Design: docs/design/agent-and-inference.md.
 #include "assistant/assistant_core.h"
 #include "cli/schema_msg.h"
+#include "desktop/shell_tools.h"
 #include "desktop/tool_schema.h"
 #include "desktop_api/protocol.h"
 #include "inference/protocol.h"
@@ -182,7 +183,9 @@ int main(int argc, char** argv) {
       reply.kind = Reply::Kind::Call;
       reply.tool = executeArgs.empty() ? "" : executeArgs.front();
       reply.args.assign(executeArgs.begin() + (executeArgs.empty() ? 0 : 1), executeArgs.end());
-      if (stepFor(*policy, granted, reply) == Step::Refuse || reply.tool == helix::agent::kDeclineTool) {
+      const std::set<std::string> shellTools = helix::agent::shellSupportedTools();
+      if (stepFor(*policy, granted, reply) == Step::Refuse || reply.tool == helix::agent::kDeclineTool ||
+          (!shellTools.empty() && !shellTools.contains(reply.tool))) {
         out.say("That is not something this assistant is allowed to do.");
         out.result("explain", {{"text", "That is not something this assistant is allowed to do."}});
         return 3;
@@ -195,6 +198,10 @@ int main(int argc, char** argv) {
     for (const Tier tier : {Tier::Observe, Tier::ObservePrivate, Tier::Act}) if (granted.contains(tier)) offered.insert(tier);
     if (offered.empty()) return fail("The assistant has no usable permission.");
     const auto& root = noctalia::cli::kMsgCmd;
+    // The model is shown every tool: it is best at finding the right one (96%), and a request for something this desktop cannot do then
+    // comes back as that tool, which is turned into a decline below. Offering only the tools the shell has made it pick a similar-sounding
+    // one instead (held-out: 27 of 43 requests it should have declined, against 1 of 43 this way). tests/inference_eval.cpp --map-unsupported.
+    const std::set<std::string> carriedOut = helix::agent::shellSupportedTools();
     const Json schema = helix::agent::toolCallSchema(root, *policy, offered, nullptr, true);
     const std::string catalog = helix::agent::toolCatalog(root, *policy, offered, nullptr, true, &*hints);
 
@@ -214,7 +221,13 @@ int main(int argc, char** argv) {
     }
     if (!answer.ok) return fail("The model could not answer: " + answer.result.value("error", "unknown error"));
 
-    const Reply reply = parseReply(answer.result.value("text", ""));
+    Reply reply = parseReply(answer.result.value("text", ""));
+    if (reply.kind == Reply::Kind::Call && !carriedOut.empty() && !carriedOut.contains(reply.tool)) {
+      // A real tool, but not one this desktop's shell can carry out: say so, and do nothing.
+      reply.kind = Reply::Kind::Decline;
+      reply.args.clear();
+      reply.reason = "this desktop cannot do that yet (" + describe(reply, &*hints) + ")";
+    }
     switch (stepFor(*policy, granted, reply)) {
       case Step::Explain: {
         const std::string text = reply.kind == Reply::Kind::Decline ? "I can't do that: " + reply.reason : "I couldn't work out what to do: " + reply.error;

@@ -1,5 +1,6 @@
 #include "desktop/agent_endpoint.h"
 
+#include "desktop/shell_tools.h"
 #include "desktop_api/protocol.h"
 #include "ipc/ipc_client.h"
 #include "util/file_utils.h"
@@ -48,13 +49,7 @@ std::filesystem::path locatePolicy() {
   return exe.parent_path() / ".." / "protocols" / "ipc" / "msg-risk.toml";
 }
 
-// Where the shell's command socket and tool list live: the runtime directory, or the folder HELIX_AGENT_IPC_DIR names (a test's).
-std::filesystem::path shellRuntimeDir() {
-  const char* override = std::getenv("HELIX_AGENT_IPC_DIR");
-  if (override && *override) return override;
-  const char* runtime = std::getenv("XDG_RUNTIME_DIR");
-  return runtime && *runtime ? std::filesystem::path(runtime) : std::filesystem::path();
-}
+std::filesystem::path shellRuntimeDir() { return helix::agent::shellRuntimeDir(); }
 
 // Whether something is listening on the socket (a leftover file of a program that has gone is not).
 bool socketAnswers(const std::filesystem::path& path) {
@@ -94,33 +89,6 @@ std::string shellSocket() {
   std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
   for (const auto& [time, path] : found) if (socketAnswers(path)) return path.string();
   return found.empty() ? std::string() : found.front().second.string();
-}
-
-// The commands the running shell says it carries out (`helix-shell-tools-<display>`, first line the shell's pid). Empty when no live
-// shell has published one: then every classified command is listed, as for the native shell.
-std::set<std::string> shellSupportedTools() {
-  namespace fs = std::filesystem;
-  std::set<std::string> names;
-  const fs::path runtime = shellRuntimeDir();
-  std::error_code ec;
-  if (runtime.empty()) return names;
-  fs::path newest;
-  fs::file_time_type newestTime{};
-  for (const auto& entry : fs::directory_iterator(runtime, ec)) {
-    if (!entry.path().filename().string().starts_with("helix-shell-tools-")) continue;
-    const auto time = entry.last_write_time(ec);
-    std::ifstream in(entry.path());
-    std::string first;
-    if (!std::getline(in, first) || first.empty() || !std::all_of(first.begin(), first.end(), [](char c) { return c >= '0' && c <= '9'; })) continue;
-    if (!fs::exists(fs::path("/proc") / first, ec)) continue;   // the shell that wrote it has gone
-    if (newest.empty() || time > newestTime) { newest = entry.path(); newestTime = time; }
-  }
-  if (newest.empty()) return names;
-  std::ifstream in(newest);
-  std::string line;
-  std::getline(in, line);
-  while (std::getline(in, line)) if (!line.empty() && line.size() <= 80) names.insert(line);
-  return names;
 }
 
 std::set<Tier> tiersFrom(const Json& value, bool allowBlockedName = false) {
@@ -305,7 +273,7 @@ void AgentEndpoint::method(const std::string& sender, const std::string& name, G
         {"tiers", tiersJson(grants_->tiersFor(who.client))}, {"confirmer", !confirmer_.empty()}})));
     } else if (name == "ListTools") {
       Json tools = Json::array();
-      const auto supported = shellSupportedTools();
+      const auto supported = helix::agent::shellSupportedTools();
       for (const auto& command : broker_->policy().commands()) {
         if (!supported.empty() && !supported.contains(command)) continue;
         const Tier tier = broker_->policy().tierFor(command);

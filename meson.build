@@ -1193,7 +1193,7 @@ helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
 )
 
 helix_service = executable('helix-service',
-  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp'), helix_desktop_introspection_h],
+  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp', 'src/desktop/shell_tools.cpp'), helix_desktop_introspection_h],
   dependencies: noctalia_core_dep,
   cpp_args: _noctalia_cpp_args,
   install: true,
@@ -1204,7 +1204,7 @@ configure_file(input: 'assets/services/helix-assistant-warm.service.in',
   output: 'helix-assistant-warm.service', configuration: helix_assistant_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 helix_assistant = executable('helix-assistant',
-  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
+  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/shell_tools.cpp'),
   dependencies: noctalia_core_dep,
   cpp_args: _noctalia_cpp_args,
   install: true,

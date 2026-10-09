@@ -25,7 +25,8 @@ assistant_bin, service_bin, inference_bin, repo = sys.argv[1:5]
 NAME, PATH, AGENT, CFG = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1", "org.helix.Desktop.Configuration1"
 
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-assistant-it-"))
-runtime = pathlib.Path(os.environ["XDG_RUNTIME_DIR"])
+runtime = scratch / "run"   # the fake shell socket and tool list live here (HELIX_AGENT_IPC_DIR), never in the real runtime directory
+runtime.mkdir()
 display = f"wayland-helix-asst-{os.getpid()}"
 sock_path = runtime / f"noctalia-{display}.sock"
 
@@ -53,7 +54,7 @@ def serve():
 
 threading.Thread(target=serve, daemon=True).start()
 
-env = dict(os.environ, WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=f"{repo}/protocols/ipc/msg-risk.toml",
+env = dict(os.environ, HELIX_AGENT_IPC_DIR=str(runtime), WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=f"{repo}/protocols/ipc/msg-risk.toml",
            HELIX_TOOL_HINTS=f"{repo}/protocols/ipc/tool-hints.toml", XDG_STATE_HOME=str(scratch / "state"),
            XDG_CONFIG_HOME=str(scratch / "config"), XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"),
            HELIX_ASSISTANT_ANSWER_FROM_STDIN="1")
@@ -160,6 +161,14 @@ try:
     code, out, err = run_assistant("Turn the popups off.", "y")
     assert code == 0 and received == ["status", "osd-disable"], (out, err, received)
     assert len([r for r in shell.requests if r["kind"] == "grant"]) == 1, "asked for permission again"
+
+    # 3b. A shell that publishes the tools it carries out: a real tool outside that list is declined, and nothing reaches the shell.
+    (runtime / "helix-shell-tools-test").write_text(f"{os.getpid()}\nstatus\nvolume-up\n")
+    code, out, err = run_assistant("Turn the popups off.", "y")
+    assert code == 3 and "cannot do that yet" in out and received == ["status", "osd-disable"], (code, out, err, received)
+    code, out, err = run_raw(["--execute", "osd-disable"], "")
+    assert code == 3 and received == ["status", "osd-disable"], ("execute must refuse it too", code, out, received)
+    (runtime / "helix-shell-tools-test").unlink()
 
     # 4. A dry run shows the plan and does nothing.
     code, out, err = run_assistant("Turn the popups off.", "y", "--dry-run")

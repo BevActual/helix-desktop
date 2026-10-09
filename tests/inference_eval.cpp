@@ -36,6 +36,12 @@ struct Options {
   int fewshot = 0;
   int limit = 0;
   bool reasonFirst = false;
+  // --tools: the commands a running shell carries out (a file of names, or a comma list). Only these are offered, and a request whose accepted
+  // answers are all outside them must be declined, as it would be for a real assistant under that shell.
+  std::set<std::string> tools;
+  // --map-unsupported 1: offer the whole tool list anyway (the model is best at finding the right tool) and treat a choice outside --tools as a decline,
+  // which is what the assistant does when the shell cannot carry the tool out.
+  bool mapUnsupported = false;
 };
 
 std::string groupOf(const std::string& tool) { return tool.substr(0, tool.find('-')); }
@@ -58,6 +64,23 @@ int main(int argc, char** argv) {
     else if (key == "--out") opt.out = value;
     else if (key == "--limit") opt.limit = std::stoi(value);
     else if (key == "--reason-first") opt.reasonFirst = value == "1";
+    else if (key == "--map-unsupported") opt.mapUnsupported = value == "1";
+    else if (key == "--tools") {
+      std::ifstream file(value);
+      if (file) {
+        std::string line;
+        while (std::getline(file, line)) if (!line.empty() && !std::all_of(line.begin(), line.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) opt.tools.insert(line);
+      } else {
+        std::size_t from = 0;
+        while (from <= value.size()) {
+          const auto comma = value.find(',', from);
+          const std::string name = value.substr(from, comma == std::string::npos ? std::string::npos : comma - from);
+          if (!name.empty()) opt.tools.insert(name);
+          if (comma == std::string::npos) break;
+          from = comma + 1;
+        }
+      }
+    }
     else { std::println(stderr, "unknown option {}", key); return 2; }
   }
   if (opt.root.empty() || !std::filesystem::exists(opt.model)) { std::println(stderr, "need --root and an existing --model"); return 2; }
@@ -65,7 +88,7 @@ int main(int argc, char** argv) {
 
   const json data = json::parse(std::ifstream(opt.cases));
   auto cases = data.at("cases");
-  const auto examples = data.at("examples");
+  const auto examples = opt.tools.empty() || opt.mapUnsupported ? data.at("examples") : data.value("supported_examples", data.at("examples"));
   if (opt.limit > 0 && static_cast<std::size_t>(opt.limit) < cases.size()) cases.erase(cases.begin() + opt.limit, cases.end());
 
   auto policy = agent::RiskPolicy::load(opt.root / "protocols/ipc/msg-risk.toml");
@@ -79,7 +102,17 @@ int main(int argc, char** argv) {
     hintStore = std::move(*loaded);
   }
   const agent::ToolHints* hints = hintStore ? &*hintStore : nullptr;
-  const json schema = agent::toolCallSchema(root, *policy, tiers, nullptr, opt.decline);
+  const std::set<std::string>* offeredTools = opt.tools.empty() || opt.mapUnsupported ? nullptr : &opt.tools;
+  if (offeredTools && opt.strategy != "flat") { std::println(stderr, "--tools needs the flat strategy"); return 2; }
+  const json schema = agent::toolCallSchema(root, *policy, tiers, offeredTools, opt.decline);
+
+  // A request is declined when it says so, or when nothing that would satisfy it is among the tools on offer.
+  auto declineExpected = [&](const json& c) {
+    if (c.value("expect", "") == "decline") return true;
+    if (opt.tools.empty()) return false;
+    for (const auto& accepted : c.at("accept")) if (opt.tools.contains(accepted.at("tool").get<std::string>())) return false;
+    return true;
+  };
 
   auto backend = std::make_shared<inference::LlamaBackend>(inference::LlamaBackend::Config{.modelDir = opt.model.parent_path()});
   std::mutex mutex;
@@ -106,7 +139,9 @@ int main(int argc, char** argv) {
   // Prompts. Few-shot examples are earlier turns of the conversation, so the model sees the exact output format.
   auto buildMessages = [&](const std::string& catalog, const std::string& request) {
     json messages = json::array({{{"role", "system"}, {"content", "You control a Linux desktop. Answer with exactly one JSON tool call for the user's request, "
-                                  "choosing the single most suitable tool. Use only these tools:\n" + catalog}}});
+                                  "choosing the single most suitable tool. Use only these tools:\n" + catalog +
+                                  (opt.tools.empty() || opt.mapUnsupported ? "" : "\nChoose a tool only if it does exactly what the user asked. If none does, answer with the decline tool: never pick a similar-sounding tool "
+                                                            "(the speakers are not the microphone, a panel is not a bar, and nothing here reads the clipboard or controls music).")}}});
     for (int i = 0; i < opt.fewshot && i < static_cast<int>(examples.size()); ++i) {
       if (!opt.decline && examples[i].at("call").at("tool") == "decline") continue;
       messages.push_back({{"role", "user"}, {"content", examples[i].at("request")}});
@@ -135,7 +170,7 @@ int main(int argc, char** argv) {
     groupSystem = "You control a Linux desktop. Pick the group of tools that best fits the user's request"
                   + std::string(opt.decline ? ", or decline if none fits" : "") + ". Answer with a JSON object whose \"tool\" is the group name. Groups:\n" + catalog;
   }
-  const std::string flatCatalog = agent::toolCatalog(root, *policy, tiers, nullptr, opt.decline, hints);
+  const std::string flatCatalog = agent::toolCatalog(root, *policy, tiers, offeredTools, opt.decline, hints);
   const std::string flatSchema = schema.dump();
 
   // The first request pays for loading the model and compiling GPU kernels; it is not what a user waits for in steady state.
@@ -148,7 +183,7 @@ int main(int argc, char** argv) {
   std::uint64_t promptTotal = 0, cachedTotal = 0;
   for (const auto& c : cases) {
     const std::string request = c.at("request");
-    const bool mustDecline = c.value("expect", "") == "decline";
+    const bool mustDecline = declineExpected(c);
     const auto started = std::chrono::steady_clock::now();
     std::string group;
     inference::Outcome outcome;
@@ -174,7 +209,9 @@ int main(int argc, char** argv) {
     bool valid = false;
     try { reply = json::parse(outcome.text); valid = helix::test::valid(schema, reply); } catch (const std::exception&) {}
     std::string kind;
-    const std::string tool = valid ? reply.at("tool").get<std::string>() : "";
+    std::string tool = valid ? reply.at("tool").get<std::string>() : "";
+    // The assistant turns a tool the shell cannot carry out into a decline.
+    if (opt.mapUnsupported && !opt.tools.empty() && tool != agent::kDeclineTool && !tool.empty() && !opt.tools.contains(tool)) tool = agent::kDeclineTool;
     if (!valid) kind = "invalid";
     else if (mustDecline) kind = tool == agent::kDeclineTool ? "declined-correctly" : "acted-instead-of-declining";
     else if (tool == agent::kDeclineTool) kind = "declined-wrongly";
@@ -195,7 +232,7 @@ int main(int argc, char** argv) {
 
   const int n = static_cast<int>(cases.size());
   int actionable = 0, declineCases = 0;
-  for (const auto& c : cases) (c.value("expect", "") == "decline" ? declineCases : actionable)++;
+  for (const auto& c : cases) (declineExpected(c) ? declineCases : actionable)++;
   std::ranges::sort(latencies);
   const long median = latencies.empty() ? 0 : latencies[latencies.size() / 2];
   const long p95 = latencies.empty() ? 0 : latencies[std::min(latencies.size() - 1, latencies.size() * 95 / 100)];

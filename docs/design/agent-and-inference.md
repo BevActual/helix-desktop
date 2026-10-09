@@ -192,6 +192,27 @@ shell's own words which window the id is, `describe_window_close`, and a gloss c
 the desktop entry when the window really is that application (`identity.rs`), otherwise it is the sanitized program name and `verified` is false.
 Not yet reachable: focusing a window by id, app launch, media, files, clipboard. Each needs its taint rules first.
 
+### Measured: a shell that carries out only some of the tools (2026-10-08)
+
+The Tauri shell carries out 22 of the 115 tools the evaluation offers. How the assistant should treat the rest was measured (7B, flat + decline,
+`tests/inference_eval.cpp --tools <list>`, tuning set 92 requests and the held-out 60; "must decline" counts every request whose answers are all
+outside the shell's 22):
+
+| What the model is shown | Actionable exact (tuning / held-out) | Declined correctly (tuning / held-out) | Acted instead of declining |
+|---|---|---|---|
+| all 115 tools (the old behaviour; unsupported ones fail at the shell) | 99% on 82 (only 28 are possible) | n/a | n/a |
+| only the 22, 5 examples | 100% / 82% | 40 of 64 / (not run) | 24 / (not run) |
+| only the 22, 9 examples that show declines, plus a sentence to decline unless exact | 100% / 82% | 50 of 64 / **16 of 43** | 14 / **27** |
+| **all 115, and a choice outside the 22 becomes a decline** (what ships) | 93% / 65% | **64 of 64 / 42 of 43** | **0 / 1** |
+
+Offering only the shell's tools makes the model choose a similar-sounding one ("turn the mic down" became `volume-down`, "get rid of the dock" became
+`panel-close`), and prompt wording that fixed the tuning set did not carry over to the held-out set (16 of 43). Showing the whole list and turning
+a choice the shell cannot carry out into a decline is far safer (a refusal costs a sentence; a wrong action changes something) at the price of
+actionable accuracy: some requests the shell *could* do are answered with a tool it does not have ("open preferences" became `settings-open`,
+"it's too loud" became `mic-volume-down`). That is a list of commands worth teaching the shell next (`settings-open` first). The assistant does this
+in `assistant_main.cpp`; the service's `ListTools` and `--execute` apply the same list. The eval's `--tools`, `--map-unsupported` and
+`supported_examples` reproduce all four rows.
+
 ## Implementation status: helix-inference
 
 `helix-inference` is a separate, D-Bus-activated process (`org.helix.Inference`, interface `org.helix.Inference1`,

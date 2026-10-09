@@ -1209,5 +1209,80 @@
    "expect": "decline",
    "id": 92
   }
+ ],
+ "supported_examples": [
+  {
+   "request": "Make it a bit quieter.",
+   "call": {
+    "tool": "volume-down",
+    "args": []
+   }
+  },
+  {
+   "request": "Set the screen brightness to 40 percent.",
+   "call": {
+    "tool": "brightness-set",
+    "args": [
+     "40"
+    ]
+   }
+  },
+  {
+   "request": "Switch everything to light mode.",
+   "call": {
+    "tool": "theme-mode-set",
+    "args": [
+     "light"
+    ]
+   }
+  },
+  {
+   "request": "Don't let notifications bother me for now.",
+   "call": {
+    "tool": "notification-dnd-set",
+    "args": [
+     "on"
+    ]
+   }
+  },
+  {
+   "request": "What are the volume and brightness right now?",
+   "call": {
+    "tool": "status",
+    "args": []
+   }
+  },
+  {
+   "request": "Order me a pizza.",
+   "call": {
+    "tool": "decline",
+    "args": [],
+    "reason": "I can only control this desktop; I cannot order food."
+   }
+  },
+  {
+   "request": "Make the top bar go away.",
+   "call": {
+    "tool": "decline",
+    "args": [],
+    "reason": "This desktop has no bar controls I can use."
+   }
+  },
+  {
+   "request": "Mute my microphone.",
+   "call": {
+    "tool": "decline",
+    "args": [],
+    "reason": "I cannot control the microphone from here."
+   }
+  },
+  {
+   "request": "Show me my clipboard history.",
+   "call": {
+    "tool": "decline",
+    "args": [],
+    "reason": "I cannot read the clipboard."
+   }
+  }
  ]
 }
