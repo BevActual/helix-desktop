@@ -54,11 +54,9 @@ pub async fn wallhaven_search(app: AppHandle, query: String, sorting: String, mi
         let body: serde_json::Value = serde_json::from_slice(&bytes).map_err(|_| "Wallhaven sent something unexpected.".to_string())?;
         let results = model::parse_results(&body);
         let mut listed = LISTED.lock().expect("listed");
-        // A later page adds to the list; a new search starts it again.
+        // Only the page on screen can be fetched or saved.
         let map = listed.get_or_insert_with(HashMap::new);
-        if search.page == 1 {
-            map.clear();
-        }
+        map.clear();
         for hit in &results.hits {
             map.insert(hit.id.clone(), hit.clone());
         }

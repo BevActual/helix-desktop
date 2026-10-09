@@ -178,9 +178,16 @@ function wallhavenBlock() {
   surprise.type = "button"; surprise.dataset.test = "wh-surprise";
   bar.append(surprise);
   const grid = el("div", "wp-grid");
-  const more = el("button", "", "Show more");
-  more.dataset.test = "wh-more"; more.hidden = true;
-  root.append(bar, note, message, grid, more);
+  const pager = el("div", "wh-pager");
+  const previous = el("button", "", "‹ Previous");
+  previous.dataset.test = "wh-previous";
+  const label = el("span", "wh-page");
+  label.dataset.test = "wh-page";
+  const next = el("button", "", "Next ›");
+  next.dataset.test = "wh-next";
+  pager.append(previous, label, next);
+  pager.hidden = true;
+  root.append(bar, note, message, grid, pager);
   wallhaven = { root, page: 0, last: 0, busy: false, using: null };
   const thumbs = new IntersectionObserver((entries) => entries.forEach((entry) => {
     if (!entry.isIntersecting) return;
@@ -190,11 +197,10 @@ function wallhavenBlock() {
   }), { rootMargin: "300px" });
   const run = (page) => {
     if (wallhaven.busy) return;
-    wallhaven.busy = true; message.textContent = ""; go.disabled = true; more.disabled = true;
-    if (page === 1) {
-      grid.replaceChildren(); more.hidden = true;
-      for (let i = 0; i < 6; i++) grid.append(el("div", "wp-tile skeleton"));
-    }
+    wallhaven.busy = true; message.textContent = ""; go.disabled = true; previous.disabled = true; next.disabled = true;
+    grid.replaceChildren(); pager.hidden = true;
+    for (let i = 0; i < 6; i++) grid.append(el("div", "wp-tile skeleton"));
+    if (page > 1) root.scrollIntoView({ block: "start" });
     invoke("wallhaven_search", { query: query.value, sorting: sorting.value, minimum: minimum.value, page }).then((results) => {
       grid.querySelectorAll(".skeleton").forEach((tile) => tile.remove());
       wallhaven.page = results.page; wallhaven.last = results.last_page;
@@ -215,12 +221,15 @@ function wallhavenBlock() {
         grid.append(tile);
         thumbs.observe(tile);
       });
-      more.hidden = results.page >= results.last_page;
+      label.textContent = "Page " + results.page + " of " + results.last_page;
+      previous.disabled = results.page <= 1; next.disabled = results.page >= results.last_page;
+      pager.hidden = results.last_page <= 1;
     }).catch((error) => { grid.querySelectorAll(".skeleton").forEach((tile) => tile.remove()); message.textContent = String(error); })
-      .finally(() => { wallhaven.busy = false; go.disabled = false; more.disabled = false; queueReport(); });
+      .finally(() => { wallhaven.busy = false; go.disabled = false; queueReport(); });
   };
   bar.addEventListener("submit", (event) => { event.preventDefault(); run(1); });
-  more.onclick = () => run(wallhaven.page + 1);
+  previous.onclick = () => run(wallhaven.page - 1);
+  next.onclick = () => run(wallhaven.page + 1);
   surprise.onclick = () => { query.value = ""; sorting.value = "random"; run(1); };
   return root;
 }
@@ -494,4 +503,5 @@ function sendReport() {
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements } });
 }
 window.addEventListener("resize", queueReport);
+document.addEventListener("scroll", queueReport, { capture: true, passive: true });
 new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true });

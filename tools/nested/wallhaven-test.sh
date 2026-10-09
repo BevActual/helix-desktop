@@ -41,7 +41,23 @@ grep -q "wallhaven-$ID" "$SCRATCH/config/helix/wallpaper.toml" 2>/dev/null && ec
 [ "$(stat -c %a "$SCRATCH/config/helix/wallpaper.toml")" = 600 ] && echo "ok: choice file is private"
 has_id "$HIT" && echo "ok: the results are still listed after choosing" || fail "results vanished"
 shot wallhaven-chosen
-click_id wh-surprise; sleep 6
-has_id wh-more && echo "ok: a random search with no words lists pictures" || fail "surprise me found nothing"
+FIRST=$(python3 - "$LAYOUT" <<'PY'
+import json, sys
+e = json.load(open(sys.argv[1]))["elements"]
+print(sorted((v["y"], v["x"], k) for k, v in e.items() if k.startswith("wh-hit-"))[0][2])
+PY
+)
+wtype -k End; sleep 1.5; click_id wh-next; sleep 6
+SECOND=$(python3 - "$LAYOUT" <<'PY'
+import json, sys
+e = json.load(open(sys.argv[1]))["elements"]
+print(sorted((v["y"], v["x"], k) for k, v in e.items() if k.startswith("wh-hit-"))[0][2])
+PY
+)
+[ "$FIRST" != "$SECOND" ] && echo "ok: Next shows a different page" || fail "Next showed the same pictures"
+shot wallhaven-page2
+wtype -k End; sleep 1.5; click_id wh-previous; sleep 6
+wtype -k Home; sleep 1.5; click_id wh-surprise; sleep 6
+has_id wh-page && echo "ok: a random search with no words lists pictures" || fail "surprise me found nothing"
 shot wallhaven-surprise
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED
