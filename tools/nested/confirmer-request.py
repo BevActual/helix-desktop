@@ -93,7 +93,7 @@ print(f"REQUESTED {operation}", flush=True)
 cancel_at = time.time() + args.cancel_after if args.cancel_after is not None else None
 cancelled = False
 
-deadline = time.time() + 30
+deadline = time.time() + float(os.environ.get("CONFIRM_WAIT", "30"))
 context = GLib.MainContext.default()
 while time.time() < deadline:
     if cancel_at is not None and not cancelled and time.time() >= cancel_at:
