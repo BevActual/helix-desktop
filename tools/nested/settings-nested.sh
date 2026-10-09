@@ -25,7 +25,8 @@ PY
 "$ROOT/build-debug/helix-service" > "$XDG_STATE_HOME/helix-service.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 # With a desktop registered the service offers the whole catalog (without one only the portable settings), so every Settings page has its rows.
-for _ in $(seq 1 40); do gdbus call --session --dest org.helix.Desktop --object-path /org/helix/Desktop --method org.freedesktop.DBus.Peer.Ping >/dev/null 2>&1 && break; sleep 0.25; done
+# Wait for the name to be OWNED (asking the service itself would let D-Bus activate the installed one, with the real home folder).
+for _ in $(seq 1 40); do gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.NameHasOwner org.helix.Desktop 2>/dev/null | grep -q true && break; sleep 0.25; done
 python3 "$ROOT/tools/nested/register-desktop.py" > "$XDG_STATE_HOME/register-desktop.log" 2>&1 &
 export HELIX_UI_LAYOUT_LOG="$XDG_STATE_HOME/layout.json"
 echo $$ > "$XDG_STATE_HOME/shell.pid"

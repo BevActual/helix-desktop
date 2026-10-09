@@ -791,6 +791,12 @@ fn approvals_set(allow: bool) -> Result<bool, String> {
     Ok(allow)
 }
 
+/// A page reports something that went wrong (only the start of it, and never anything a person typed).
+#[tauri::command]
+fn ui_error(text: String) {
+    eprintln!("SETTINGS ui error: {}", text.chars().take(200).collect::<String>());
+}
+
 #[tauri::command]
 fn rows_view(app: AppHandle) -> Vec<RowsView> {
     rows_of(&shared(&app).lock().expect("state"))
@@ -822,10 +828,10 @@ async fn setting_change(
         .update(ids, &id, change)
         .map_err(|error| format!("{error:?}"))?;
     let desktop = current().ok_or("not connected to the desktop service")?;
-    desktop
-        .update_setting(&update.id, &update.value)
-        .await
-        .map_err(|error| error.to_string())?;
+    if let Err(error) = desktop.update_setting(&update.id, &update.value).await {
+        eprintln!("SETTINGS set {} refused: {error}", update.id);
+        return Err(error.to_string());
+    }
     eprintln!("SETTINGS set {} {}", update.id, update.value);
     refresh_settings(&app).await;
     Ok(())
@@ -872,6 +878,7 @@ fn main() {
             agents_revoke,
             agents_refresh,
             rows_view,
+            ui_error,
             approvals_view,
             approvals_set,
             wallpaper_view,

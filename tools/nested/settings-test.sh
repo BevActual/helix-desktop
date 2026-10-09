@@ -77,6 +77,15 @@ wtype -k Escape; sleep 0.6
 has_id set-audio.sound_volume && fail "Escape did not leave the search" || echo "ok: Escape went back to the page"
 click_id page-agents; sleep 0.6
 
+echo "--- 1d3. a number can be typed (and an out-of-range one is not sent)"
+click_id page-notifications; sleep 1
+click_id set-notification.offset_x-number; sleep 0.3
+wtype "33"; wtype -k Return; sleep 1.2
+[ "$(setting_of notification.offset_x | sed "s/.* //")" = 33 ] && echo "ok: 33 was set" || fail "offset_x is $(setting_of notification.offset_x)"
+click_id set-notification.offset_x-number; wtype "999"; wtype -k Return; sleep 1
+[ "$(setting_of notification.offset_x | sed "s/.* //")" = 33 ] && echo "ok: 999 is above the range and was not sent" || fail "offset_x is $(setting_of notification.offset_x) after 999"
+click_id page-agents; sleep 0.6
+
 echo "--- 1e. the approvals switch writes the choice the shell reads (off by default)"
 APPROVALS=$SCRATCH/config/helix/approvals.json
 [ ! -f "$APPROVALS" ] && echo "ok: nothing is allowed until chosen" || fail "a choice exists already"

@@ -1,6 +1,6 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
 <body class="settings">
-<div id="app">
+<div id="app" data-test="app">
   <aside id="side">
     <div id="titlebar" data-tauri-drag-region>
       <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
@@ -10,7 +10,7 @@
       <button class="page-link" data-page="agents" data-test="page-agents"><i data-icon="shield"></i><span>Privacy &amp; agents</span></button>
     </nav>
   </aside>
-  <main id="content">
+  <main id="content" data-test="content">
     <header data-tauri-drag-region><h2 id="page-title">Appearance</h2><button id="refresh" data-test="refresh" title="Read again">Refresh</button></header>
     <!-- pages made of rows of service settings are created by settings.js from PAGES -->
     <section id="page-search" class="settings-page" hidden><div id="search-rows"></div></section>

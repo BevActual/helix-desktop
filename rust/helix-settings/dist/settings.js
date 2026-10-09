@@ -187,7 +187,7 @@ function rowLine(page, row) {
   if (row.overridden) text.append(el("div", "setting-about", "Pinned by a local override."));
   line.append(text);
   const control = row.control;
-  const send = (change) => invoke("setting_change", { page, id: row.id, change }).catch((error) => console.error(error));
+  const send = (change) => invoke("setting_change", { page, id: row.id, change }).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -205,14 +205,34 @@ function rowLine(page, row) {
     range.step = control.integer ? 1 : (control.max - control.min) / 100;
     range.value = control.value;
     range.dataset.test = "set-" + row.id;
+    const format = (v) => (control.integer ? String(Math.round(v)) : Number(v).toFixed(2));
     const show = () => {
       const v = Number(range.value);
       range.style.setProperty("--pct", ((v - control.min) / (control.max - control.min) * 100) + "%");
-      return control.integer ? String(Math.round(v)) : v.toFixed(2);
+      return format(v);
     };
-    const readout = el("span", "slider-value", show());
-    range.addEventListener("input", () => { readout.textContent = show(); });
+    // The number can be typed as well as dragged; the model refuses anything outside the setting's range.
+    const readout = el("input", "slider-input");
+    readout.type = "number";
+    readout.min = control.min;
+    readout.max = control.max;
+    readout.step = range.step;
+    readout.value = show();
+    readout.dataset.test = "set-" + row.id + "-number";
+    range.addEventListener("input", () => { readout.value = show(); });
     range.addEventListener("change", () => send({ kind: "number", value: Number(range.value) }));
+    // Typing replaces the number: the whole value is selected when the field is entered (the click that entered it must not move the caret).
+    let justEntered = false;
+    readout.addEventListener("focus", () => { justEntered = true; readout.select(); });
+    readout.addEventListener("mouseup", (event) => { if (justEntered) { event.preventDefault(); justEntered = false; } });
+    readout.addEventListener("keydown", (event) => { if (event.key === "Enter") readout.blur(); });   // Enter commits, like leaving the field
+    readout.addEventListener("change", () => {
+      const typed = Number(readout.value);
+      if (readout.value === "" || !Number.isFinite(typed) || typed < control.min || typed > control.max) { readout.value = format(range.value); return; }
+      range.value = typed;
+      show();
+      send({ kind: "number", value: typed });
+    });
     wrap.append(range, readout);
     line.append(wrap);
   } else if (control.kind === "choice") {

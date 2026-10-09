@@ -434,3 +434,12 @@ select { appearance: none; -webkit-appearance: none; padding-right: 30px;
 
 /* A lettered tile where a launcher row has no icon. */
 .row .dock-tile.icon { width: 30px; height: 30px; border-radius: 8px; font-size: 15px; display: grid; place-items: center; flex: none; }
+
+/* Settings never scrolls sideways (a horizontal bar would also draw a dark corner square at the window's edge). */
+body.settings #content { overflow-x: hidden; }
+body.settings #content::-webkit-scrollbar { height: 0; }
+.rows-card, .setting-row { min-width: 0; }
+
+.slider-input { width: 62px; padding: 3px 6px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--label-2); background: transparent; border-radius: 7px; -moz-appearance: textfield; }
+.slider-input::-webkit-inner-spin-button, .slider-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.slider-input:hover { background: var(--fill-1); } .slider-input:focus { background: var(--fill-2); color: var(--label); }
