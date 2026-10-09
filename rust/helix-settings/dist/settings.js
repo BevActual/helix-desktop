@@ -122,6 +122,8 @@ function drawWallpaper(view) {
     swatches.append(button);
   });
   host.append(swatches);
+  host.append(el("h4", "", "Find on Wallhaven"));
+  host.append(wallhavenBlock());
   host.append(el("h4", "", "Pictures"));
   host.append(el("div", "setting-about note", view.folder));
   const grid = el("div", "wp-grid");
@@ -149,6 +151,65 @@ function drawWallpaper(view) {
   queueReport();
 }
 listen("wallpaper-view", (event) => drawWallpaper(event.payload));
+
+// Wallhaven: search wallhaven.cc (safe-for-work only). The block is built once, so choosing a picture does not lose the results. -----
+let wallhaven = null;
+function wallhavenBlock() {
+  if (wallhaven) return wallhaven.root;
+  const root = el("div", "wh");
+  const bar = el("form", "wh-bar");
+  const query = el("input");
+  query.type = "search"; query.placeholder = "Search wallpapers"; query.autocomplete = "off"; query.spellcheck = false;
+  query.dataset.test = "wh-query";
+  const sorting = el("select");
+  sorting.dataset.test = "wh-sorting";
+  [["toplist", "Top this year"], ["latest", "Latest"], ["random", "Random"], ["views", "Most viewed"], ["favorites", "Most favourited"]]
+    .forEach(([value, label]) => { const o = el("option", "", label); o.value = value; sorting.append(o); });
+  const go = el("button", "primary", "Search");
+  go.type = "submit"; go.dataset.test = "wh-search";
+  bar.append(query, sorting, go);
+  const note = el("div", "setting-about note", "Searching sends your words to wallhaven.cc. Only safe-for-work pictures are shown.");
+  const message = el("div", "setting-about warn");
+  const grid = el("div", "wp-grid");
+  const more = el("button", "", "Show more");
+  more.dataset.test = "wh-more"; more.hidden = true;
+  root.append(bar, note, message, grid, more);
+  wallhaven = { root, page: 0, last: 0, busy: false, using: null };
+  const thumbs = new IntersectionObserver((entries) => entries.forEach((entry) => {
+    if (!entry.isIntersecting) return;
+    const tile = entry.target;
+    thumbs.unobserve(tile);
+    invoke("wallhaven_thumb", { id: tile.dataset.id }).then((url) => { if (url) tile.style.backgroundImage = "url(" + url + ")"; });
+  }), { rootMargin: "300px" });
+  const run = (page) => {
+    if (wallhaven.busy) return;
+    wallhaven.busy = true; message.textContent = ""; go.disabled = true; more.disabled = true;
+    if (page === 1) { grid.replaceChildren(); more.hidden = true; }
+    invoke("wallhaven_search", { query: query.value, sorting: sorting.value, page }).then((results) => {
+      wallhaven.page = results.page; wallhaven.last = results.last_page;
+      if (!results.hits.length && page === 1) message.textContent = "Nothing found. Try other words.";
+      results.hits.forEach((hit) => {
+        const tile = el("button", "wp-tile");
+        tile.dataset.id = hit.id; tile.dataset.test = "wh-hit-" + hit.id;
+        tile.title = hit.resolution + " · " + hit.size_mb;
+        tile.append(el("span", "wp-name", hit.resolution + " · " + hit.size_mb));
+        tile.onclick = () => {
+          if (wallhaven.using) return;
+          wallhaven.using = hit.id; tile.classList.add("busy"); message.textContent = "";
+          invoke("wallhaven_use", { id: hit.id }).catch((error) => { message.textContent = String(error); })
+            .finally(() => { wallhaven.using = null; tile.classList.remove("busy"); });
+        };
+        grid.append(tile);
+        thumbs.observe(tile);
+      });
+      more.hidden = results.page >= results.last_page;
+    }).catch((error) => { message.textContent = String(error); })
+      .finally(() => { wallhaven.busy = false; go.disabled = false; more.disabled = false; queueReport(); });
+  };
+  bar.addEventListener("submit", (event) => { event.preventDefault(); run(1); });
+  more.onclick = () => run(wallhaven.page + 1);
+  return root;
+}
 
 // Keyboard: the compositor's key binds, read only ----------------------------------------------------------------------------------
 async function drawKeyboard() {

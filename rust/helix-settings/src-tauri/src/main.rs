@@ -3,6 +3,8 @@
 //! tiers and the audit, change tiers and revoke, but it is not an agent, cannot approve anything, and never talks to the model. What a
 //! change may be is decided by the pure models in `helix-shell-core`; the page only sends names those models listed.
 
+mod wallhaven;
+
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -662,7 +664,7 @@ fn home() -> String {
 }
 
 /// The folder the picker offers: the service's wallpaper folder if one is set, otherwise Pictures/Wallpapers.
-fn wallpaper_folder(app: &AppHandle) -> std::path::PathBuf {
+pub(crate) fn wallpaper_folder(app: &AppHandle) -> std::path::PathBuf {
     let shared = shared(app);
     let state = shared.lock().expect("state");
     let from_service = state
@@ -719,7 +721,7 @@ async fn wallpaper_thumb(app: AppHandle, index: usize) -> Option<String> {
 }
 
 /// Writes the choice where the wallpaper process looks (atomically, owner only) and tells the page. The process reloads by itself.
-fn write_choice(app: &AppHandle, source: Source) -> Result<(), String> {
+pub(crate) fn write_choice(app: &AppHandle, source: Source) -> Result<(), String> {
     let path = choice_path(&home());
     let parent = path.parent().ok_or("no folder for the choice")?;
     std::fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -896,6 +898,9 @@ fn main() {
             wallpaper_thumb,
             wallpaper_choose_image,
             wallpaper_choose_swatch,
+            wallhaven::wallhaven_search,
+            wallhaven::wallhaven_thumb,
+            wallhaven::wallhaven_use,
             shortcuts_view,
             about,
             network_view,
