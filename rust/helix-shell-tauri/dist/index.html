@@ -34,18 +34,25 @@
       <span id="bright-ico"><i data-icon="sun"></i></span>
       <div id="brightslider"><div id="brightfill"></div><input id="brightness" data-test="brightness" type="range" min="0" max="100" step="1" value="0"></div>
       <span id="bright-percent"></span>
+      <span class="end-slot"></span>
     </div>
     <div id="audio-note"></div>
     <div class="sliderrow" id="volrow">
       <button id="mute" data-test="mute" title="Mute"><i data-icon="volume" data-slot="mute"></i></button>
       <div id="volslider"><div id="volfill"></div><input id="volume" data-test="volume" type="range" min="0" max="100" step="1" value="0"></div>
       <span id="percent"></span>
-      <button class="tile-open" id="sound-open" data-test="sound-open" title="Sound output"><i data-icon="chevron-right"></i></button>
+      <button class="tile-open" id="sound-open" data-test="sound-open" title="Sound settings"><i data-icon="chevron-right"></i></button>
+    </div>
+    <div class="sliderrow" id="microw" style="display:none">
+      <button id="micmute" data-test="micmute" title="Mute the microphone"><i data-icon="mic" data-slot="micmute"></i></button>
+      <div id="micslider"><div id="micfill"></div><input id="micvolume" data-test="micvolume" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="micpercent"></span>
+      <span class="end-slot"></span>
     </div>
   </div>
   <div id="qs-detail" style="display:none">
     <div id="detail-head"><button id="back" data-test="back" title="Back"><i data-icon="chevron-left"></i></button><h3 id="detail-title"></h3></div>
-    <div class="page" id="detail-sound"><div id="outputdev"></div><div id="outputs"></div></div>
+    <div class="page" id="detail-sound"><h4>Output</h4><div id="outputs"></div><div id="input-section" style="display:none"><h4>Input</h4><div id="inputs"></div></div></div>
     <div class="page" id="wifi">
       <div id="wifi-head"><button id="scan" data-test="wifi-scan">Scan</button><button id="disconnect" data-test="wifi-disconnect">Disconnect</button><button id="wifitoggle" data-test="wifi-toggle">Turn off</button></div>
       <div id="wifi-status"></div>

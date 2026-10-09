@@ -113,12 +113,12 @@ button.tile-open { background: transparent; color: var(--label-2); width: 28px; 
 button.tile-open:hover { background: var(--fill-2); color: var(--label); }
 button.tile-open svg { width: 15px; height: 15px; }
 .sliderrow { display: flex; align-items: center; gap: 8px; }
-#volslider { position: relative; flex: 1; height: 36px; border-radius: 18px; background: var(--fill-1); overflow: hidden; }
-#volfill { position: absolute; inset: 0 auto 0 0; width: var(--pct, 0%); background: var(--label); opacity: .92; border-radius: 18px 0 0 18px; transition: width 90ms linear; }
-#volume { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+#volslider, #micslider { position: relative; flex: 1; height: 36px; border-radius: 18px; background: var(--fill-1); overflow: hidden; }
+#volfill, #micfill { position: absolute; inset: 0 auto 0 0; width: var(--pct, 0%); background: var(--label); opacity: .92; border-radius: 18px 0 0 18px; transition: width 90ms linear; }
+#volume, #micvolume { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 #volico { position: absolute; left: 12px; top: 9px; pointer-events: none; mix-blend-mode: difference; color: #fff; }
-#mute { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
-#percent { width: 3.2em; text-align: right; color: var(--label-2); font-variant-numeric: tabular-nums; }
+#mute, #micmute { width: 36px; height: 36px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+#percent, #micpercent { width: 3.2em; text-align: right; color: var(--label-2); font-variant-numeric: tabular-nums; }
 #audio-note { color: var(--label-2); }
 #detail-head { display: flex; align-items: center; gap: 8px; } #detail-head h3 { flex: 1; }
 #back { width: 32px; height: 32px; padding: 0; border-radius: 50%; display: grid; place-items: center; }
@@ -443,3 +443,10 @@ body.settings #content::-webkit-scrollbar { height: 0; }
 .slider-input { width: 62px; padding: 3px 6px; text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: var(--label-2); background: transparent; border-radius: 7px; -moz-appearance: textfield; }
 .slider-input::-webkit-inner-spin-button, .slider-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .slider-input:hover { background: var(--fill-1); } .slider-input:focus { background: var(--fill-2); color: var(--label); }
+
+/* Every slider row ends in the same 28 px slot (the chevron on the sound row), so the sliders and their percentages line up. */
+.end-slot { width: 28px; flex: none; }
+#detail-sound h4 { margin: 8px 0 2px; }
+#inputs { display: flex; flex-direction: column; gap: 2px; }
+#inputs .row:hover { background: var(--fill-2); } #inputs .row.current { color: var(--accent); font-weight: 600; }
+#audio-note:empty { display: none; }

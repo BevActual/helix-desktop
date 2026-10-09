@@ -37,6 +37,18 @@ click_id mute; wait_for "AUDIO mute sent" 2 20 && sleep 1.2
 echo "truth speakers after unmute: $(truth helix-test-sink-1)"
 echo "--- 3. the output page: choosing the other output makes it the default"
 click_id sound-open; click_id "out:Helix Test Headphones"; wait_for "AUDIO default sent" 1 20 && sleep 1.2; shot cc-default
+echo "--- 3b. the microphone has its own slider and mute, and never touches the speakers"
+wtype -k Escape; sleep 1   # back from the output page
+SPK_BEFORE=$(truth helix-test-sink-2)
+click_id micvolume 0.3; wait_for "AUDIO volume sent" 2 20 && sleep 1.2
+MIC=$(truth helix-test-mic); echo "truth microphone after 30%: $MIC"
+python3 -c "import sys; v=float('$MIC'.split()[0]); sys.exit(0 if abs(v-0.3)<0.06 else 1)" && echo "ok: the microphone is at about 30%" || { echo "FAIL: the microphone is not at 30%: $MIC"; }
+[ "$(truth helix-test-sink-2)" = "$SPK_BEFORE" ] && echo "ok: the speakers were not touched" || echo "FAIL: the speakers changed: $(truth helix-test-sink-2) (was $SPK_BEFORE)"
+shot cc-mic
+click_id micmute; wait_for "AUDIO mute sent" 3 20 && sleep 1.2
+echo "$(truth helix-test-mic)" | grep -q "muted" && ! echo "$(truth helix-test-mic)" | grep -q unmuted && echo "ok: the microphone is muted" || echo "FAIL: not muted: $(truth helix-test-mic)"
+click_id micmute; wait_for "AUDIO mute sent" 4 20 && sleep 1.2
+echo "$(truth helix-test-mic)" | grep -q unmuted && echo "ok: and unmuted" || echo "FAIL: still muted"
 echo "--- 4. Escape goes back, then closes the panel"
 wtype -k Escape; sleep 1; wtype -k Escape; wait_for "PANEL closed" 1 20 && echo "ok: closed"
 echo "--- audio actions sent: $(grep -c '^AUDIO ' "$LOG")"

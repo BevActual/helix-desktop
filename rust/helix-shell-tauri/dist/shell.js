@@ -480,6 +480,9 @@ $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
 // Sound. Rust owns the audio state and every write; the page sends "volume 40", "mute" or "make this output the default" and
 // never names a device it was not given. Names are drawn with textContent.
 let dragging = false;
+let micDragging = false;
+let micTimer = null;
+let micLatest = 0;
 let sendTimer = null;
 let latest = 0;
 function drawAudio(view) {
@@ -488,7 +491,6 @@ function drawAudio(view) {
   $("volrow").style.display = usable ? "" : "none";
   slot("vol").style.display = usable ? "" : "none";
   if (!usable) { queueReport(); return; }
-  $("outputdev").textContent = view.output.name;
   if (!dragging) {
     $("volume").value = Math.min(view.percent, 100);
     $("percent").textContent = view.percent + "%";
@@ -498,6 +500,30 @@ function drawAudio(view) {
   $("volslider").style.setProperty("--pct", Math.min(view.percent, 100) + "%");
   $("mute").title = view.muted ? "Unmute" : "Mute";
   $("mute").dataset.muted = view.muted ? "1" : "0";
+  // The microphone: its own slider and mute, shown only when there is one; its devices are listed apart from the speakers.
+  const mic = view.input;
+  $("microw").style.display = mic ? "" : "none";
+  $("input-section").style.display = view.inputs.length > 1 ? "" : "none";
+  if (mic) {
+    if (!micDragging) {
+      $("micvolume").value = Math.min(view.input_percent, 100);
+      $("micpercent").textContent = view.input_percent + "%";
+    }
+    swapIcon(slot("micmute"), view.input_muted ? "mic-off" : "mic");
+    $("micslider").style.setProperty("--pct", Math.min(view.input_percent, 100) + "%");
+    $("micmute").title = view.input_muted ? "Unmute the microphone" : "Mute the microphone";
+    $("micmute").dataset.muted = view.input_muted ? "1" : "0";
+  }
+  const inputList = $("inputs");
+  inputList.replaceChildren();
+  view.inputs.forEach((input) => {
+    const row = document.createElement("div");
+    row.className = "row" + (mic && input.id === mic.id ? " current" : "");
+    row.textContent = (mic && input.id === mic.id ? "● " : "○ ") + input.name;
+    row.dataset.test = "in:" + input.name;
+    row.addEventListener("click", () => invoke("audio_set_default_input", { id: input.id }));
+    inputList.append(row);
+  });
   const list = $("outputs");
   list.replaceChildren();
   view.outputs.forEach((output) => {
@@ -517,7 +543,15 @@ function sendVolume() {
   invoke("audio_set_volume", { percent: latest });
 }
 $("volume").addEventListener("pointerdown", () => { dragging = true; });
-window.addEventListener("pointerup", () => { dragging = false; });
+$("micvolume").addEventListener("pointerdown", () => { micDragging = true; });
+window.addEventListener("pointerup", () => { dragging = false; micDragging = false; });
+$("micvolume").addEventListener("input", () => {
+  micLatest = Number($("micvolume").value);
+  $("micpercent").textContent = micLatest + "%";
+  $("micslider").style.setProperty("--pct", micLatest + "%");
+  if (!micTimer) micTimer = setTimeout(() => { micTimer = null; invoke("audio_set_input_volume", { percent: micLatest }); }, 50);
+});
+$("micmute").onclick = () => invoke("audio_set_input_mute", { muted: $("micmute").dataset.muted !== "1" });
 $("volume").addEventListener("input", () => {
   latest = Number($("volume").value);
   $("percent").textContent = latest + "%";
@@ -720,7 +754,7 @@ listen("battery-view", (event) => drawBattery(event.payload));
 
 // Details. One page at a time inside the panel, with a back arrow; Escape goes back before it closes the panel.
 let detail = null;
-const titles = { sound: "Sound output", wifi: "Internet", bluetooth: "Bluetooth" };
+const titles = { sound: "Sound", wifi: "Internet", bluetooth: "Bluetooth" };
 function showDetail(name) {
   detail = name;
   $("qs-main").style.display = name ? "none" : "";

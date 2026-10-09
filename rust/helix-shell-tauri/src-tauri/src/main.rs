@@ -1078,6 +1078,22 @@ async fn audio_set_mute(app: AppHandle, muted: bool) -> Result<(), String> {
     send_audio(audio_request(&app, |audio| audio.set_muted(muted))).await
 }
 
+/// The microphone's level (0 to 100) and mute, and which listed input is the default. The page never names the microphone it controls.
+#[tauri::command]
+async fn audio_set_input_volume(app: AppHandle, percent: f64) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_input_volume(percent))).await
+}
+
+#[tauri::command]
+async fn audio_set_input_mute(app: AppHandle, muted: bool) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_input_muted(muted))).await
+}
+
+#[tauri::command]
+async fn audio_set_default_input(app: AppHandle, id: u32) -> Result<(), String> {
+    send_audio(audio_request(&app, |audio| audio.set_default_input(id))).await
+}
+
 /// Makes one of the listed outputs the default. An id that is not in the last snapshot is refused here.
 #[tauri::command]
 async fn audio_set_default(app: AppHandle, id: u32) -> Result<(), String> {
@@ -1487,6 +1503,9 @@ fn main() {
             audio_set_volume,
             audio_set_mute,
             audio_set_default,
+            audio_set_input_volume,
+            audio_set_input_mute,
+            audio_set_default_input,
             network_view,
             network_set_wifi,
             network_scan,

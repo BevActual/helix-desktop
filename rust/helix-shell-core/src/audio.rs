@@ -36,6 +36,8 @@ pub enum RequestError {
     Unavailable,
     /// Audio works but no output device is available.
     NoOutput,
+    /// Audio works but there is no microphone.
+    NoInput,
     OutOfRange,
     /// The id is not one of the current outputs.
     UnknownDevice,
@@ -63,6 +65,11 @@ pub struct AudioView {
     pub percent: u8,
     pub muted: bool,
     pub outputs: Vec<OutputView>,
+    /// The microphone the input controls apply to. `None` when there is no input.
+    pub input: Option<OutputView>,
+    pub input_percent: u8,
+    pub input_muted: bool,
+    pub inputs: Vec<OutputView>,
 }
 
 fn devices(snapshot: &Value, key: &str) -> Vec<Device> {
@@ -121,6 +128,14 @@ impl Audio {
             .or_else(|| self.outputs.first())
     }
 
+    /// The input the microphone controls apply to: the default one, else the first.
+    pub fn input(&self) -> Option<&Device> {
+        self.inputs
+            .iter()
+            .find(|device| device.is_default)
+            .or_else(|| self.inputs.first())
+    }
+
     pub fn inputs(&self) -> &[Device] {
         &self.inputs
     }
@@ -132,6 +147,7 @@ impl Audio {
             is_default: device.is_default,
         };
         let current = self.output();
+        let microphone = self.input();
         AudioView {
             available: self.available,
             output: current.map(show),
@@ -140,6 +156,10 @@ impl Audio {
             }),
             muted: current.is_some_and(|device| device.muted),
             outputs: self.outputs.iter().map(show).collect(),
+            input: microphone.map(show),
+            input_percent: microphone.map_or(0, |device| (device.volume * 100.0).round().clamp(0.0, 150.0) as u8),
+            input_muted: microphone.is_some_and(|device| device.muted),
+            inputs: self.inputs.iter().map(show).collect(),
         }
     }
 
@@ -167,6 +187,47 @@ impl Audio {
         Ok(Request {
             action: "mute",
             args: json!({"id": target.id, "value": muted}),
+        })
+    }
+
+    fn microphone(&self) -> Result<&Device, RequestError> {
+        if !self.available {
+            return Err(RequestError::Unavailable);
+        }
+        self.input().ok_or(RequestError::NoInput)
+    }
+
+    /// Sets the current microphone's level to `percent` (0 to 100).
+    pub fn set_input_volume(&self, percent: f64) -> Result<Request, RequestError> {
+        let target = self.microphone()?;
+        if !percent.is_finite() || !(0.0..=MAX_PERCENT).contains(&percent) {
+            return Err(RequestError::OutOfRange);
+        }
+        Ok(Request {
+            action: "volume",
+            args: json!({"id": target.id, "value": percent / 100.0}),
+        })
+    }
+
+    pub fn set_input_muted(&self, muted: bool) -> Result<Request, RequestError> {
+        let target = self.microphone()?;
+        Ok(Request {
+            action: "mute",
+            args: json!({"id": target.id, "value": muted}),
+        })
+    }
+
+    /// Makes `id` the default input. It must be one of the inputs in this snapshot.
+    pub fn set_default_input(&self, id: u32) -> Result<Request, RequestError> {
+        if !self.available {
+            return Err(RequestError::Unavailable);
+        }
+        if !self.inputs.iter().any(|device| device.id == id) {
+            return Err(RequestError::UnknownDevice);
+        }
+        Ok(Request {
+            action: "default",
+            args: json!({"id": id, "input": true}),
         })
     }
 
@@ -373,5 +434,46 @@ mod tests {
             48,
             "writes go to the default, not the first"
         );
+    }
+
+    #[test]
+    fn the_microphone_is_the_default_input_and_its_writes_name_it() {
+        let audio = Audio::from_snapshot(&snapshot());
+        let view = audio.view();
+        assert_eq!(view.input.as_ref().unwrap().id, 70);
+        assert_eq!((view.input_percent, view.input_muted), (80, true));
+        assert_eq!(view.inputs.len(), 1);
+        assert_eq!(audio.set_input_volume(35.0).unwrap(), Request { action: "volume", args: json!({"id": 70, "value": 0.35}) });
+        assert_eq!(audio.set_input_muted(false).unwrap(), Request { action: "mute", args: json!({"id": 70, "value": false}) });
+        // The speakers are never touched by a microphone control, and the other way round.
+        assert_eq!(audio.set_volume(35.0).unwrap().args["id"], 48);
+    }
+
+    #[test]
+    fn microphone_levels_are_bounded_and_need_a_microphone() {
+        let audio = Audio::from_snapshot(&snapshot());
+        for bad in [-1.0, 100.5, f64::NAN, f64::INFINITY] {
+            assert_eq!(audio.set_input_volume(bad), Err(RequestError::OutOfRange), "{bad}");
+        }
+        assert!(audio.set_input_volume(0.0).is_ok() && audio.set_input_volume(100.0).is_ok());
+        let mut none = snapshot();
+        none["sources"] = json!([]);
+        let audio = Audio::from_snapshot(&none);
+        assert!(audio.view().input.is_none() && audio.view().inputs.is_empty());
+        assert_eq!(audio.set_input_volume(10.0), Err(RequestError::NoInput));
+        assert_eq!(audio.set_input_muted(true), Err(RequestError::NoInput));
+        assert_eq!(Audio::from_snapshot(&json!({})).set_input_muted(true), Err(RequestError::Unavailable));
+    }
+
+    #[test]
+    fn only_a_listed_input_can_become_the_default_input() {
+        let mut data = snapshot();
+        data["sources"] = json!([sink(70, "Built-in", 0.8, false, true, true), sink(71, "USB mic", 0.5, false, false, true), sink(72, "Gone", 0.5, false, false, false)]);
+        let audio = Audio::from_snapshot(&data);
+        assert_eq!(audio.set_default_input(71).unwrap(), Request { action: "default", args: json!({"id": 71, "input": true}) });
+        assert_eq!(audio.set_default_input(72), Err(RequestError::UnknownDevice), "an unplugged one");
+        assert_eq!(audio.set_default_input(48), Err(RequestError::UnknownDevice), "an output is not an input");
+        assert_eq!(audio.set_default(70), Err(RequestError::UnknownDevice), "and an input is not an output");
+        assert_eq!(Audio::from_snapshot(&json!({})).set_default_input(1), Err(RequestError::Unavailable));
     }
 }
