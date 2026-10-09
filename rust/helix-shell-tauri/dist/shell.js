@@ -158,11 +158,18 @@ function drawResults() {
     const row = document.createElement("div");
     row.className = "row" + (index === selected ? " selected" : "");
     // The icon is a data: image URI built by Rust from a PNG or SVG file; an image element never runs script.
-    const icon = document.createElement("img");
-    icon.className = "icon";
-    icon.alt = "";
-    if (hit.icon) icon.src = hit.icon;
-    row.append(icon);
+    // An application with no icon gets a lettered tile like the dock's, so every row has something where the icon goes.
+    if (hit.icon) {
+      const icon = document.createElement("img");
+      icon.className = "icon";
+      icon.alt = "";
+      icon.src = hit.icon;
+      row.append(icon);
+    } else {
+      const tile = dockLetterTile(hit.name);
+      tile.classList.add("icon");
+      row.append(tile);
+    }
     const name = document.createElement("span");
     name.className = "name";
     name.textContent = hit.name;
@@ -920,9 +927,11 @@ function dockBox() {
 function showDockTip(name, cell) {
   const tip = $("dock-tip");
   tip.textContent = name;
+  // Above the dock's own top edge, not the icon's: a magnified icon grows upward and would sit under the label.
   const box = cell.getBoundingClientRect();
+  const dockTop = $("dock").getBoundingClientRect().top;
   tip.style.left = box.left + box.width / 2 + "px";
-  tip.style.top = box.top - 42 + "px";
+  tip.style.top = Math.min(box.top, dockTop) - 58 + "px";
   tip.classList.add("show");
 }
 function setDock(show) {
@@ -939,17 +948,31 @@ $("dock-edge").addEventListener("pointerenter", () => { clearTimeout(dockHideTim
 $("dock").addEventListener("pointerenter", () => clearTimeout(dockHideTimer));
 $("dock").addEventListener("pointerleave", () => { magnify(null); scheduleDockHide(); });
 $("dock-edge").addEventListener("pointerleave", () => { if (!$("dock").matches(":hover")) scheduleDockHide(); });
-// Icons grow toward the pointer: a smooth bump (a Gaussian of the distance) rather than steps.
+// Icons grow toward the pointer like a lens, and their neighbours move aside to make room (a Gaussian of the distance, not steps). The pill
+// widens by what the icons gained, evenly on both sides, so nothing ever sits on top of its neighbour or hangs outside the glass.
+const ICON = 52;
 function magnify(x) {
-  document.querySelectorAll(".dock-item").forEach((cell) => {
-    let scale = 1;
-    if (x !== null) {
-      const box = cell.getBoundingClientRect();
-      const distance = x - (box.left + box.width / 2);
-      scale = 1 + 0.62 * Math.exp(-(distance * distance) / (2 * 62 * 62));
-    }
-    cell.style.setProperty("--s", scale.toFixed(3));
+  const row = $("dock-items");
+  const cells = Array.from(row.children);
+  if (!cells.length) return;
+  const dock = $("dock").getBoundingClientRect();
+  const centre = dock.left + dock.width / 2;   // does not move when the pill widens evenly
+  const pitch = cells.length > 1 ? cells[1].offsetLeft - cells[0].offsetLeft : ICON;
+  const scales = cells.map((_, i) => {
+    if (x === null) return 1;
+    const distance = x - centre - (i - (cells.length - 1) / 2) * pitch;
+    return 1 + 0.5 * Math.exp(-(distance * distance) / (2 * 58 * 58));
   });
+  const gains = scales.map((s) => ICON * (s - 1));
+  const total = gains.reduce((a, b) => a + b, 0);
+  let before = 0;
+  cells.forEach((cell, i) => {
+    cell.style.setProperty("--s", scales[i].toFixed(3));
+    cell.style.setProperty("--dx", (before + gains[i] / 2 - total / 2).toFixed(1) + "px");
+    before += gains[i];
+  });
+  // In steps of 4 px so the glass behind it is told about a new width a few times, not on every pointer move.
+  row.style.paddingInline = Math.round(total / 2 / 4) * 4 + "px";
 }
 $("dock").addEventListener("pointermove", (event) => magnify(event.clientX));
 function closeDockMenu() { dockMenuOpen = false; $("dock-menu").classList.remove("show"); queueInteractive(); }
