@@ -2,7 +2,8 @@
 # Installs the model runtime and the assistant into /usr/local from a staged `meson install --destdir` tree.
 #   meson install -C build-debug --destdir "$STAGE" --no-rebuild && sudo tools/install-assistant.sh "$STAGE"
 # Only these pieces are touched (the shell and the other apps are left alone): helix-service, helix-inference,
-# helix-assistant, the engine libraries in /usr/local/lib64/helix, the policy and hints files, the two D-Bus service
+# helix-assistant, the Tauri Settings app when staged as bin/helix-settings-tauri (it becomes /usr/local/bin/helix-settings; the one it
+# replaces is backed up), the engine libraries in /usr/local/lib64/helix, the policy and hints files, the two D-Bus service
 # files and the user units. Files it replaces are first copied to /usr/local/share/helix/backup/<timestamp>/.
 # It does not restart anything. To undo: tools/install-assistant.sh --uninstall
 set -eu
@@ -24,6 +25,11 @@ mkdir -p "$BACKUP"
 install -D -m 0755 "$S/bin/helix-service"   $P/bin/helix-service.new && mv -f $P/bin/helix-service.new $P/bin/helix-service
 install -D -m 0755 "$S/bin/helix-inference" $P/bin/helix-inference
 install -D -m 0755 "$S/bin/helix-assistant" $P/bin/helix-assistant
+if [ -x "$S/bin/helix-settings-tauri" ]; then
+  [ -e $P/bin/helix-settings ] && cp -p $P/bin/helix-settings "$BACKUP/helix-settings"
+  install -D -m 0755 "$S/bin/helix-settings-tauri" $P/bin/helix-settings.new && mv -f $P/bin/helix-settings.new $P/bin/helix-settings
+  echo "Settings app replaced (the previous one is in $BACKUP/helix-settings)."
+fi
 mkdir -p $P/lib64/helix
 cp -a "$S"/lib64/helix/. $P/lib64/helix/
 for f in share/helix/msg-risk.toml share/helix/tool-hints.toml share/dbus-1/services/org.helix.Inference.service \
