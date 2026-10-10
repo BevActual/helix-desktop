@@ -120,11 +120,23 @@ pub fn has(api_key_ref: &str) -> bool {
 
 pub fn clear(api_key_ref: &str) -> Result<(), String> {
     let id = normalize_ref(api_key_ref)?;
+    let mut failure: Option<String> = None;
     if let Ok(entry) = keyring_entry(&id) {
-        let _ = entry.delete_credential();
+        match entry.delete_credential() {
+            Ok(()) | Err(keyring::Error::NoEntry) => {}
+            Err(error) => failure = Some(format!("The saved key could not be removed from the keyring: {error}")),
+        }
     }
-    delete_file_secret(&id);
-    Ok(())
+    // A key left in either place would be found and used again, so a failure to remove it is reported, not hidden.
+    match fs::remove_file(file_path(&id)) {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => failure = Some(format!("The saved key file could not be removed: {error}")),
+    }
+    match failure {
+        Some(reason) => Err(reason),
+        None => Ok(()),
+    }
 }
 
 /// Resolve the Bearer token for a backend (`api_key_ref`, else backend id when non-local).

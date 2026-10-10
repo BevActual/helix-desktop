@@ -24,28 +24,7 @@ impl Default for RemoteOptions {
 /// so a key is never put on the open internet in clear text (a typo of `http://` for a cloud service would do that).
 pub fn key_allowed(base: &str) -> bool {
     let base = base.trim();
-    if base.starts_with("https://") {
-        return true;
-    }
-    let Some(rest) = base.strip_prefix("http://") else { return false };
-    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
-    if authority.contains('@') {
-        return false;
-    }
-    let host = match authority.strip_prefix('[') {
-        Some(v6) => v6.split(']').next().unwrap_or("").to_string(),
-        None => authority.rsplit_once(':').map_or(authority, |(h, port)| if port.chars().all(|c| c.is_ascii_digit()) { h } else { authority }).to_string(),
-    };
-    let host = host.to_ascii_lowercase();
-    if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") || host == "::1" {
-        return true;
-    }
-    let octets: Vec<u8> = host.split('.').filter_map(|p| p.parse().ok()).collect();
-    if octets.len() == 4 && host.split('.').count() == 4 {
-        return matches!(octets[..], [127, ..] | [10, ..] | [192, 168, ..] | [169, 254, ..]) || (octets[0] == 172 && (16..=31).contains(&octets[1]));
-    }
-    // Carrier-grade NAT and unique-local IPv6 are private too.
-    host.starts_with("fd") && host.contains(':') || host.starts_with("fe80:")
+    base.starts_with("https://") || (base.starts_with("http://") && helix_shell_core::inference_routing::is_local_network_url(base))
 }
 
 /// POST `{base}/chat/completions`. `base` is e.g. `http://host:11434/v1` (no trailing slash required).

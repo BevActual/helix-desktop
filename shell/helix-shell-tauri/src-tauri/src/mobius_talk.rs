@@ -130,9 +130,16 @@ fn chat_args(
     Ok(args)
 }
 
+static CONNECTION: tokio::sync::OnceCell<zbus::Connection> = tokio::sync::OnceCell::const_new();
+
+/// One bus connection for every quick turn: the model service lets only the connection that started an operation cancel it, so Stop
+/// must not come from a new connection.
 async fn inference_proxy() -> Result<zbus::Proxy<'static>, String> {
-    let connection = zbus::Connection::session().await.map_err(|e| e.to_string())?;
-    zbus::Proxy::new(&connection, BUS_NAME, OBJECT_PATH, INTERFACE)
+    let connection = CONNECTION
+        .get_or_try_init(zbus::Connection::session)
+        .await
+        .map_err(|e| e.to_string())?;
+    zbus::Proxy::new(connection, BUS_NAME, OBJECT_PATH, INTERFACE)
         .await
         .map_err(|e| e.to_string())
 }
@@ -184,6 +191,17 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
             return Ok(());
         }
     };
+    // Subscribe before the request: a short reply can be complete before the call returns, and a signal sent then is not replayed.
+    let (deltas, done) = match (
+        proxy.receive_signal("Delta").await,
+        proxy.receive_signal("Completed").await,
+    ) {
+        (Ok(deltas), Ok(done)) => (deltas, done),
+        _ => {
+            fail(&app, generation, "Could not follow the model reply.");
+            return Ok(());
+        }
+    };
     let operation: u64 = match proxy.call("Action", &("chat", args)).await {
         Ok(op) => op,
         Err(error) => {
@@ -213,14 +231,6 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
         return Ok(());
     }
     emit(&app);
-
-    let (Ok(deltas), Ok(done)) = (
-        proxy.receive_signal("Delta").await,
-        proxy.receive_signal("Completed").await,
-    ) else {
-        fail(&app, generation, "Could not follow the model reply.");
-        return Ok(());
-    };
 
     enum TalkEv {
         Delta(zbus::Message),
@@ -350,6 +360,8 @@ pub async fn cancel(app: AppHandle) {
         ) {
             shell.talk.phase = TalkPhase::Idle;
             shell.talk.error.clear();
+            // The turn is over for good: a request still being started must not come back to life when it returns.
+            shell.talk.generation = shell.talk.generation.saturating_add(1);
             if shell.talk.reply.is_empty() {
                 if let Some(("user", _)) = shell.talk.history.last().map(|p| (p.0.as_str(), ())) {
                     shell.talk.history.pop();
@@ -411,7 +423,7 @@ fn handoff_path() -> std::path::PathBuf {
 pub fn write_handoff(app: &AppHandle) -> Result<(), String> {
     let history = {
         let state = shell_state(app);
-        let mut shell = state.lock().expect("shell state");
+        let shell = state.lock().expect("shell state");
         if matches!(
             shell.talk.phase,
             TalkPhase::Thinking | TalkPhase::Streaming
@@ -421,15 +433,9 @@ pub fn write_handoff(app: &AppHandle) -> Result<(), String> {
         if shell.talk.history.is_empty() {
             return Err("Nothing to continue yet — ask something first.".into());
         }
-        // Include in-progress reply if Done left it only in reply (history already has assistant).
-        let history = shell.talk.history.clone();
-        shell.talk.history.clear();
-        shell.talk.reply.clear();
-        shell.talk.error.clear();
-        shell.talk.phase = TalkPhase::Idle;
-        history
+        // The bar keeps its thread until the file is really written: a failed handoff must not lose the conversation.
+        shell.talk.history.clone()
     };
-    emit(app);
     let messages: Vec<serde_json::Value> = history
         .into_iter()
         .map(|(role, content)| {
@@ -440,10 +446,53 @@ pub fn write_handoff(app: &AppHandle) -> Result<(), String> {
         })
         .collect();
     let path = handoff_path();
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    write_private_file(&path, serde_json::json!({ "messages": messages }).to_string().as_bytes())?;
+    {
+        let state = shell_state(app);
+        let mut shell = state.lock().expect("shell state");
+        shell.talk.history.clear();
+        shell.talk.reply.clear();
+        shell.talk.error.clear();
+        shell.talk.phase = TalkPhase::Idle;
     }
-    let body = serde_json::json!({ "messages": messages });
-    std::fs::write(&path, body.to_string()).map_err(|e| e.to_string())?;
+    emit(app);
     Ok(())
+}
+
+/// The whole conversation goes in this file: the folder is the person's alone (0700), the file is 0600, and it appears complete or not at all.
+fn write_private_file(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
+    use std::io::Write;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    if let Some(parent) = path.parent() {
+        std::fs::DirBuilder::new().recursive(true).mode(0o700).create(parent).map_err(|e| e.to_string())?;
+    }
+    let temporary = path.with_extension("json.tmp");
+    {
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .mode(0o600)
+            .open(&temporary)
+            .map_err(|e| e.to_string())?;
+        file.write_all(bytes).map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, path).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    use std::os::unix::fs::PermissionsExt;
+
+    #[test]
+    fn the_handoff_file_is_private_and_atomic() {
+        let dir = std::env::temp_dir().join(format!("handoff-{}", std::process::id())).join("nested");
+        let path = dir.join("mobius-bar-handoff.json");
+        super::write_private_file(&path, b"{\"messages\":[]}").unwrap();
+        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert_eq!(std::fs::metadata(&dir).unwrap().permissions().mode() & 0o777, 0o700);
+        assert!(!path.with_extension("json.tmp").exists(), "no half-written leftover");
+        let _ = std::fs::remove_dir_all(dir.parent().unwrap());
+    }
 }

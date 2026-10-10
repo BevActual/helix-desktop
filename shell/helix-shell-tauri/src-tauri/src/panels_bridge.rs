@@ -43,18 +43,21 @@ async fn write_line(stream: &mut UnixStream, line: &str) -> Result<(), String> {
     stream.flush().await.map_err(|e| e.to_string())
 }
 
+/// One line from the socket: at most `MAX_LINE` bytes are ever read (a peer that never sends a newline cannot make this grow), and a
+/// peer that goes quiet is given up on after a few seconds.
 async fn read_line(stream: &mut UnixStream) -> Result<String, String> {
-    let mut reader = BufReader::new(stream);
+    use tokio::io::AsyncReadExt;
+    let mut reader = BufReader::new((&mut *stream).take(MAX_LINE as u64 + 1));
     let mut line = String::new();
-    let n = reader
-        .read_line(&mut line)
+    let read = tokio::time::timeout(std::time::Duration::from_secs(3), reader.read_line(&mut line))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|_| "panels socket timed out".to_string())?;
+    let n = read.map_err(|e| e.to_string())?;
     if n == 0 {
         return Err("panels socket closed".into());
     }
-    if line.len() > MAX_LINE {
-        return Err("panels reply too long".into());
+    if line.len() > MAX_LINE || !line.ends_with('\n') && line.len() >= MAX_LINE {
+        return Err("panels line too long".into());
     }
     Ok(line)
 }

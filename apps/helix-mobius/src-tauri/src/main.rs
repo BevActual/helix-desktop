@@ -111,10 +111,14 @@ fn take_bar_handoff() -> Option<Vec<(Role, String)>> {
 }
 
 fn apply_bar_handoff(app: &AppHandle) -> bool {
+    let shared = shared(app);
+    // A reply on its way is not interrupted, and the handoff stays where it is (it is only consumed when it can be used).
+    if shared.lock().expect("state").chat.is_streaming() {
+        return false;
+    }
     let Some(turns) = take_bar_handoff() else {
         return false;
     };
-    let shared = shared(app);
     let mut state = shared.lock().expect("state");
     if state.chat.is_streaming() {
         return false;
@@ -1012,8 +1016,14 @@ fn snippet_around(haystack: &str, needle: &str) -> Option<String> {
     let lower_h = haystack.to_lowercase();
     let lower_n = needle.to_lowercase();
     let byte_pos = lower_h.find(&lower_n)?;
-    // Lowercasing can change length for some scripts — fall back to a prefix.
-    if lower_h.len() != haystack.len() {
+    let after_raw = byte_pos + lower_n.len();
+    // Lowercasing can change lengths for some scripts, so the match position in the lowered text may not be a character boundary of the
+    // original: fall back to a prefix whenever the two do not line up.
+    if lower_h.len() != haystack.len()
+        || lower_n.len() != needle.len()
+        || !haystack.is_char_boundary(byte_pos)
+        || !haystack.is_char_boundary(after_raw.min(haystack.len()))
+    {
         return Some(haystack.chars().take(96).collect());
     }
     let start = haystack[..byte_pos]
@@ -1022,7 +1032,7 @@ fn snippet_around(haystack: &str, needle: &str) -> Option<String> {
         .nth(28)
         .map(|(i, _)| i)
         .unwrap_or(0);
-    let after = (byte_pos + needle.len()).min(haystack.len());
+    let after = after_raw.min(haystack.len());
     let end = haystack[after..]
         .char_indices()
         .nth(56)
@@ -1491,4 +1501,20 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running Mobius");
+}
+
+#[cfg(test)]
+mod snippet_tests {
+    use super::snippet_around;
+
+    #[test]
+    fn a_search_never_cuts_inside_a_character() {
+        // Lowercasing keeps this text's length, but the needle's capital changes nothing about where the emoji starts.
+        assert!(snippet_around("ké😀 and more text", "Ké").is_some());
+        // A letter whose lowercase form is longer than the original (İ becomes i + a combining dot) must not shift the cut.
+        assert!(snippet_around("İstanbul ké😀 text", "ké").is_some());
+        assert!(snippet_around("😀ké", "É").is_some());
+        assert_eq!(snippet_around("hello world", "WORLD").as_deref(), Some("hello world"));
+        assert!(snippet_around("hello", "zzz").is_none());
+    }
 }

@@ -515,8 +515,16 @@ impl Chat {
         {
             return Err(ChatError::NothingToReplay);
         }
+        // The edit may be refused (empty, too long); the conversation must then be exactly as it was.
+        let kept_messages = self.conversation.messages.clone();
+        let kept_title = self.conversation.title.clone();
         self.conversation.messages.truncate(index);
-        self.send_with_system(text, now, system)
+        let result = self.send_with_system(text, now, system);
+        if result.is_err() {
+            self.conversation.messages = kept_messages;
+            self.conversation.title = kept_title;
+        }
+        result
     }
 
     fn begin_assistant_turn(&mut self, now: u64, system: &str) -> Result<Turn, ChatError> {
@@ -725,6 +733,26 @@ mod tests {
 
     fn chat() -> Chat {
         Chat::new(Conversation::new(ID, 1).unwrap())
+    }
+
+    #[test]
+    fn a_refused_edit_leaves_the_conversation_alone() {
+        let mut c = chat();
+        let t = c.send("first question", 1).unwrap();
+        c.started(t.generation, 1);
+        c.delta(1, "first answer");
+        c.complete(1, true, "{}");
+        let t = c.send("second question", 2).unwrap();
+        c.started(t.generation, 2);
+        c.delta(2, "second answer");
+        c.complete(2, true, "{}");
+        let before = c.conversation.messages.clone();
+        let title = c.conversation.title.clone();
+        assert_eq!(c.edit_and_resend(0, "   ", 3, SYSTEM_PROMPT).unwrap_err(), ChatError::Empty);
+        assert_eq!(c.edit_and_resend(0, &"x".repeat(MAX_INPUT_CHARS + 1), 3, SYSTEM_PROMPT).unwrap_err(), ChatError::TooLong);
+        assert_eq!(c.conversation.messages, before);
+        assert_eq!(c.conversation.title, title);
+        assert!(!c.is_streaming());
     }
 
     #[test]
