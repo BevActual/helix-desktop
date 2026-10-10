@@ -4,6 +4,10 @@ use std::process::Stdio;
 use std::time::Duration;
 
 pub fn strut_unit_active() -> bool {
+    // A test session shares the real user's systemd: it neither asks it nor starts units in it.
+    if helix_shell_core::nested_test_session() {
+        return false;
+    }
     std::process::Command::new("systemctl")
         .args(["--user", "is-active", "--quiet", "helix-shell-strut.service"])
         .status()
@@ -12,6 +16,9 @@ pub fn strut_unit_active() -> bool {
 }
 
 fn strut_unit_installed() -> bool {
+    if helix_shell_core::nested_test_session() {
+        return false;
+    }
     std::process::Command::new("systemctl")
         .args(["--user", "cat", "helix-shell-strut.service"])
         .stdin(Stdio::null())
@@ -23,6 +30,9 @@ fn strut_unit_installed() -> bool {
 }
 
 fn start_strut_unit() -> bool {
+    if helix_shell_core::nested_test_session() {
+        return false;
+    }
     std::process::Command::new("systemctl")
         .args(["--user", "start", "helix-shell-strut.service"])
         .stdin(Stdio::null())

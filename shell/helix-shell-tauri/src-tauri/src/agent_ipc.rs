@@ -179,6 +179,7 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
         }
         Command::SettingsOpen(section) => {
             let mut command = std::process::Command::new("helix-settings");
+            crate::apps::scrub_shell_env(&mut command);
             if let Some(page) = section {
                 command.arg("--page").arg(page);
             }

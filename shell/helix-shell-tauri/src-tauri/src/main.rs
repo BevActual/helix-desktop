@@ -851,6 +851,7 @@ async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
 #[tauri::command]
 fn open_settings(app: AppHandle, page: Option<String>) {
     let mut command = std::process::Command::new("helix-settings");
+    apps::scrub_shell_env(&mut command);
     if let Some(page) = page.filter(|p| !p.is_empty()) {
         command.arg("--page").arg(page);
     }
@@ -867,6 +868,10 @@ fn session_lock(app: AppHandle) {
 #[tauri::command]
 fn session_suspend(app: AppHandle) {
     close_panel(&app);
+    if helix_shell_core::nested_test_session() {
+        eprintln!("SESSION session_suspend skipped (test session)");
+        return;
+    }
     let _ = std::process::Command::new("systemctl")
         .args(["suspend"])
         .stdin(std::process::Stdio::null())
@@ -878,6 +883,10 @@ fn session_suspend(app: AppHandle) {
 #[tauri::command]
 fn session_logout(app: AppHandle) {
     close_panel(&app);
+    if helix_shell_core::nested_test_session() {
+        eprintln!("SESSION session_logout skipped (test session)");
+        return;
+    }
     let _ = std::process::Command::new("loginctl")
         .args(["terminate-user", &whoami()])
         .stdin(std::process::Stdio::null())
@@ -889,6 +898,10 @@ fn session_logout(app: AppHandle) {
 #[tauri::command]
 fn session_reboot(app: AppHandle) {
     close_panel(&app);
+    if helix_shell_core::nested_test_session() {
+        eprintln!("SESSION session_reboot skipped (test session)");
+        return;
+    }
     let _ = std::process::Command::new("systemctl")
         .args(["reboot"])
         .stdin(std::process::Stdio::null())
@@ -900,6 +913,10 @@ fn session_reboot(app: AppHandle) {
 #[tauri::command]
 fn session_poweroff(app: AppHandle) {
     close_panel(&app);
+    if helix_shell_core::nested_test_session() {
+        eprintln!("SESSION session_poweroff skipped (test session)");
+        return;
+    }
     let _ = std::process::Command::new("systemctl")
         .args(["poweroff"])
         .stdin(std::process::Stdio::null())
@@ -1633,16 +1650,16 @@ fn panel_open(app: AppHandle, id: String) {
 /// Opens the full Mobius window (longer Talk). Bar Talk stays in the dropdown.
 #[tauri::command]
 fn open_mobius() {
-    for bin in ["helix-mobius"] {
-        match std::process::Command::new(bin)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-        {
-            Ok(_) => return,
-            Err(error) => eprintln!("MOBIUS launch via {bin}: {error}"),
-        }
+    let mut command = std::process::Command::new("helix-mobius");
+    apps::scrub_shell_env(&mut command);
+    match command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(_) => {}
+        Err(error) => eprintln!("MOBIUS launch via helix-mobius: {error}"),
     }
 }
 

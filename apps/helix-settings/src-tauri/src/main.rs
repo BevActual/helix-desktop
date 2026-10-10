@@ -883,7 +883,9 @@ fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, S
     }
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
     // helix-idle reads the file when it starts, so it is started again (a fixed command; nothing typed reaches it).
-    let _ = std::process::Command::new("systemctl").args(["--user", "restart", "helix-idle.service"]).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status();
+    if !helix_shell_core::nested_test_session() {
+        let _ = std::process::Command::new("systemctl").args(["--user", "restart", "helix-idle.service"]).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status();
+    }
     eprintln!("SETTINGS power {id} changed");
     Ok(next.rows())
 }

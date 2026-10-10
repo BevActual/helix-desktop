@@ -1,9 +1,13 @@
 #!/bin/bash
 # Runs every nested UI test in turn against one shell binary (default: the fast build) and prints one line per test.
-#   tools/nested/ui-suite.sh [name ...]      names: launcher qs net bt ctl cc notifications activity
+#   tools/nested/ui-suite.sh [name ...]      names: see the pick lines below (launcher qs net bt ctl cc ... mobius)
+#   (wallhaven-test.sh needs the internet and is run by hand.)
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/target/fast/helix-shell-tauri}"
+# Whichever shell build was made last (fast or release), unless HELIX_SHELL_BIN says otherwise.
+export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$(ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1)}"
+# A shell started from a launched program must not decide the tests' roles for them.
+unset HELIX_SHELL_ROLE HELIX_SHELL_CONFIRMER
 run() {  # name script program [env...]
   local name=$1 script=$2 program=$3; shift 3
   local out=/tmp/claude-1000/suite-$name.log
@@ -35,3 +39,6 @@ pick idle           && run idle idle-test.sh idle-nested.sh
 pick island         && run island island-test.sh tauri-shell.sh
 pick settings       && run settings settings-test.sh settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick settings-net   && run settings-net settings-net-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
+pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

@@ -100,6 +100,9 @@ pub async fn open_status() -> Result<Option<String>, String> {
 }
 
 fn panels_unit_installed() -> bool {
+    if helix_shell_core::nested_test_session() {
+        return false;
+    }
     std::process::Command::new("systemctl")
         .args(["--user", "cat", "helix-shell-panels.service"])
         .stdin(Stdio::null())
@@ -121,6 +124,9 @@ fn unlink_stale_socket() {
 }
 
 fn start_panels_via_systemd() -> bool {
+    if helix_shell_core::nested_test_session() {
+        return false;
+    }
     std::process::Command::new("systemctl")
         .args(["--user", "start", "helix-shell-panels.service"])
         .stdin(Stdio::null())

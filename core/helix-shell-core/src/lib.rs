@@ -5,6 +5,14 @@
 
 pub mod agent;
 pub mod apps;
+
+/// True inside a nested test session (`tools/nested/run.sh` sets `HELIX_NESTED_INNER`). The test session has its own bus and compositor but
+/// shares the real user's systemd and login manager, so anything that would reach those (start or restart a unit, suspend, power off)
+/// must not happen from it.
+pub fn nested_test_session() -> bool {
+    std::env::var_os("HELIX_NESTED_INNER").is_some()
+}
+
 pub mod desktop;
 pub mod shell;
 

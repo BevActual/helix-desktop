@@ -99,9 +99,21 @@ pub fn scan() -> Vec<App> {
 }
 
 /// Starts the application in its own process group, with no terminal and no inherited stdio, and reaps it when it exits.
+/// Settings the shell's own processes are started with. A program the shell launches is not part of the shell, and must not take its role
+/// from the process that started it (a second shell started by hand from a launched terminal would otherwise come up as "panels").
+const SHELL_ONLY_VARS: &[&str] = &["HELIX_SHELL_ROLE", "HELIX_SHELL_CONFIRMER", "HELIX_SURFACE_CONTROL", "HELIX_SPIKE_AUTO_PANEL"];
+
+pub fn scrub_shell_env(command: &mut Command) -> &mut Command {
+    for name in SHELL_ONLY_VARS {
+        command.env_remove(name);
+    }
+    command
+}
+
 pub fn launch(app: &App) -> Result<(), String> {
     let (program, args) = app.argv.split_first().ok_or("the entry has no command")?;
     let mut command = Command::new(program);
+    scrub_shell_env(&mut command);
     command
         .args(args)
         .stdin(Stdio::null())
@@ -231,5 +243,21 @@ pub fn save_history(history: &helix_shell_core::launcher::History) {
         .and_then(|()| std::fs::rename(&temporary, &path));
     if written.is_err() {
         let _ = std::fs::remove_file(&temporary);
+    }
+}
+
+#[cfg(test)]
+mod env_tests {
+    use super::*;
+
+    #[test]
+    fn a_launched_program_does_not_inherit_the_shells_role() {
+        let mut command = Command::new("true");
+        command.env("HELIX_SHELL_ROLE", "panels").env("HOME", "/home/x");
+        scrub_shell_env(&mut command);
+        let removed: Vec<_> = command.get_envs().filter(|(_, v)| v.is_none()).map(|(k, _)| k.to_string_lossy().into_owned()).collect();
+        assert!(removed.contains(&"HELIX_SHELL_ROLE".to_string()), "{removed:?}");
+        assert!(removed.contains(&"HELIX_SHELL_CONFIRMER".to_string()));
+        assert!(!removed.contains(&"HOME".to_string()), "ordinary variables are untouched");
     }
 }
