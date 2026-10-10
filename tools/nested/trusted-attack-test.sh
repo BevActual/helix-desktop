@@ -10,8 +10,8 @@ set -u
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log
 export LAYOUT=$SCRATCH/state/layout-confirmer.json
 EXPECT=${TRUSTED_EXPECT:-stock}; FAILED=0; CLIENT=""; ATTACKER=""
-CAPTURE=$ROOT/rust/target/fast/wl-capture
-[ -x "$CAPTURE" ] || CAPTURE=$ROOT/rust/target/release/wl-capture
+CAPTURE=$ROOT/target/fast/wl-capture
+[ -x "$CAPTURE" ] || CAPTURE=$ROOT/target/release/wl-capture
 source "$ROOT/tools/nested/ui-lib.sh"
 cleanup() { for p in "$CLIENT" "$ATTACKER"; do [ -n "$p" ] && kill "$p" 2>/dev/null; done; true; }
 trap cleanup EXIT

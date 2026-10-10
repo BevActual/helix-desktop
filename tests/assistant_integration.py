@@ -1,7 +1,7 @@
 """helix-assistant end to end: real helix-service, real helix-inference (scripted replies), a fake shell, a fake confirmer.
 
 The model's reply is scripted, so this tests what the assistant does with a reply, not how good a model is: what it shows,
-what it asks, what reaches the shell, and that Agent1's decisions still apply on top.
+what it asks, what reaches the shell, and that Agent Surface's decisions still apply on top.
 
 Run under dbus-run-session: assistant_integration.py <helix-assistant> <helix-service> <helix-inference> <repo-root>
 """
@@ -22,13 +22,13 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 assistant_bin, service_bin, inference_bin, repo = sys.argv[1:5]
-NAME, PATH, AGENT, CFG = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1", "org.helix.Desktop.Configuration1"
+NAME, PATH, AGENT, CFG = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.AgentSurface1", "org.helix.Desktop.Configuration1"
 
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-assistant-it-"))
 runtime = scratch / "run"   # the fake shell socket and tool list live here (HELIX_AGENT_IPC_DIR), never in the real runtime directory
 runtime.mkdir()
 display = f"wayland-helix-asst-{os.getpid()}"
-sock_path = runtime / f"noctalia-{display}.sock"
+sock_path = runtime / f"helix-{display}.sock"
 
 received = []
 server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -58,7 +58,7 @@ env = dict(os.environ, HELIX_AGENT_IPC_DIR=str(runtime), WAYLAND_DISPLAY=display
            HELIX_TOOL_HINTS=f"{repo}/protocols/ipc/tool-hints.toml", XDG_STATE_HOME=str(scratch / "state"),
            XDG_CONFIG_HOME=str(scratch / "config"), XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"),
            HELIX_ASSISTANT_ANSWER_FROM_STDIN="1")
-for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
+for key in ("HELIX_STATE_HOME", "HELIX_CONFIG_HOME", "HELIX_DATA_HOME", "HELIX_CACHE_HOME"):
     env.pop(key, None)
 
 
@@ -157,7 +157,7 @@ try:
     code, out, err = run_assistant("Turn the popups off.", "")
     assert "Cancelled" in out and received == ["status"], (out, received)
 
-    # 3. Answering yes sends it through Agent1, which reaches the shell.
+    # 3. Answering yes sends it through Agent Surface, which reaches the shell.
     code, out, err = run_assistant("Turn the popups off.", "y")
     assert code == 0 and received == ["status", "osd-disable"], (out, err, received)
     assert len([r for r in shell.requests if r["kind"] == "grant"]) == 1, "asked for permission again"
@@ -223,9 +223,9 @@ try:
     assert code == 0 and "is ready" in out and len(received) == before, (code, out, err)
 
     # 8. The audit trail shows the assistant as its own client, with what ran.
-    lines = [json.loads(line) for line in (scratch / "state" / "noctalia" / "agent" / "audit.jsonl").read_text().splitlines()]
+    lines = [json.loads(line) for line in (scratch / "state" / "helix" / "agent" / "audit.jsonl").read_text().splitlines()]
     assert ("osd-disable", "allowed") in {(e["tool"], e["decision"]) for e in lines}, lines
-    assert not any(e["tool"] in ("session", "nope", "firewall-panic-toggle") for e in lines), "refused calls must not reach Agent1"
+    assert not any(e["tool"] in ("session", "nope", "firewall-panic-toggle") for e in lines), "refused calls must not reach Agent Surface"
     print("assistant integration ok")
 finally:
     for process in processes:

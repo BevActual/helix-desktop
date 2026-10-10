@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <print>
 
-namespace noctalia::cli {
+namespace helix::cli {
 
   namespace {
 
@@ -173,4 +173,4 @@ namespace noctalia::cli {
     return std::move(*parsed);
   }
 
-} // namespace noctalia::cli
+} // namespace helix::cli

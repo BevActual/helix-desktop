@@ -5,7 +5,7 @@
 #include <iostream>
 #include <nlohmann/json.hpp>
 
-namespace noctalia::cli {
+namespace helix::cli {
 
   namespace {
 
@@ -69,4 +69,4 @@ namespace noctalia::cli {
     return 0;
   }
 
-} // namespace noctalia::cli
+} // namespace helix::cli

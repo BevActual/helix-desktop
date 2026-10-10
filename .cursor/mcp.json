@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "helix-agent": {
+      "command": "/home/andrewbevington/Software Projects/helix-shell/tools/helix-agent/run.sh",
+      "args": []
+    }
+  }
+}

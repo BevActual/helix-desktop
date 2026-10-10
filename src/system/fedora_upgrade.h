@@ -6,15 +6,15 @@
 #include <string_view>
 #include <vector>
 
-namespace noctalia::fedora_upgrade {
+namespace helix::fedora_upgrade {
 
-  inline constexpr std::string_view kHelperName = "noctalia-system-upgrade";
+  inline constexpr std::string_view kHelperName = "helix-system-upgrade";
   inline constexpr std::string_view kDnfPath = "/usr/bin/dnf";
   inline constexpr std::string_view kPkexecName = "pkexec";
 
   // Hardcoded RPM names the privileged helper may pass to dnf. Order is the
   // upgrade order. Names not installed on the machine are skipped.
-  inline constexpr std::string_view kAllowlistedPackages[] = {"helix-shell", "noctalia", "noctalia-greeter"};
+  inline constexpr std::string_view kAllowlistedPackages[] = {"helix-shell", "helix", "helix-greeter"};
 
   enum class HostKind : std::uint8_t { Fedora, FedoraAtomic, Other };
 
@@ -42,4 +42,4 @@ namespace noctalia::fedora_upgrade {
       std::span<const std::string> installedPackages
   );
 
-} // namespace noctalia::fedora_upgrade
+} // namespace helix::fedora_upgrade

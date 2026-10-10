@@ -15,7 +15,7 @@ inline std::string_view nativePageForSection(std::string_view section) {
   if (section == "accessibility" || section == "scale") return "accessibility";
   if (section == "clipboard" || section == "privacy" || section == "security" || section == "privacy-security" || section == "firewall" || section == "storage" || section == "location" || section == "weather" || section == "lock-screen" || section == "lockscreen" || section == "authentication") return "privacy-security";
   if (section == "power" || section == "idle" || section == "session") return "power";
-  if (section == "system" || section == "clock" || section == "calendar" || section == "localsend" || section == "language" || section == "setup" || section == "advanced") return "system";
+  if (section == "system" || section == "clock" || section == "calendar" || section == "language" || section == "setup" || section == "advanced") return "system";
   if (section == "keybinds" || section == "keyboard") return "keyboard";
   if (section == "monitor" || section == "displays") return "displays";
   if (section == "online-accounts" || section == "accounts") return "online-accounts";
@@ -61,7 +61,6 @@ inline std::string_view nativeGroupForSection(std::string_view id) {
   if (id == "tailscale") return "Tailscale";
   if (id == "clock") return "Clock";
   if (id == "calendar") return "Calendar";
-  if (id == "localsend") return "LocalSend";
   if (id == "setup") return "Setup";
   if (id == "advanced") return "Settings";
   if (id == "sounds" || id == "audio") return "Sounds";
@@ -70,7 +69,7 @@ inline std::string_view nativeGroupForSection(std::string_view id) {
 inline std::string_view nativePageForTargetSection(std::string_view id) {
   if (id == "clipboard" || id == "privacy" || id == "lock-screen" || id == "lockscreen" || id == "location" || id == "weather" || id == "authentication" || id == "storage" || id == "firewall" || id == "security") return "privacy-security";
   if (id == "scale") return "accessibility";
-  if (id == "language" || id == "clock" || id == "calendar" || id == "localsend" || id == "setup" || id == "advanced") return "system";
+  if (id == "language" || id == "clock" || id == "calendar" || id == "setup" || id == "advanced") return "system";
   if (id == "type" || id == "roundness" || id == "glass" || id == "icons" || id == "effects" || id == "templates" || id == "colors" || id == "wallpaper" || id == "theme" || id == "backdrop" || id == "video-wallpaper") return "appearance";
   if (id == "wifi-prefs" || id == "wifi" || id == "dns" || id == "tailscale") return "network";
   if (id == "sounds" || id == "audio") return "sound";
@@ -92,6 +91,6 @@ inline bool isSoftwareContext(std::string_view context) {
 inline bool isRetiredSettingsTab(std::string_view id) {
   return isSoftwareContext(id) || id == "theme" || id == "wallpaper" || id == "control-center" || id == "launcher" ||
       id == "desktop" || id == "shell" || id == "keybinds" || id == "templates" ||
-      id == "hooks" || id == "niri";
+      id == "hooks" || id == "niri" || id == "phone" || id == "localsend" || id == "syncthing" || id == "cast";
 }
 }

@@ -1,13 +1,13 @@
-"""Every `noctalia msg` command needs a risk tier; tiers must be known; overrides must name real choices."""
+"""Every `helix-panel` command needs a risk tier; tiers must be known; overrides must name real choices."""
 import json
 import pathlib
 import subprocess
 import sys
 import tomllib
 
-root, noctalia = pathlib.Path(sys.argv[1]), sys.argv[2]
+root, helix = pathlib.Path(sys.argv[1]), sys.argv[2]
 policy = tomllib.loads((root / "protocols/ipc/msg-risk.toml").read_text())
-schema = json.loads(subprocess.check_output([noctalia, "schema-json"], text=True))
+schema = json.loads(subprocess.check_output([helix, "schema-json"], text=True))
 commands = {c["name"]: c for c in schema["commands"]}
 
 TIERS = {"observe", "observe-private", "act", "confirm", "blocked"}

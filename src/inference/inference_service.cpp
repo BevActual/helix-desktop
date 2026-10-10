@@ -3,6 +3,7 @@
 #include "desktop_api/peer_identity.h"
 #include "desktop_api/protocol.h"
 #include "inference/protocol.h"
+#include "inference/routing.h"
 
 #include <algorithm>
 #include <set>
@@ -23,8 +24,9 @@ Json outcomeJson(const Outcome& outcome) {
           {"cached_prompt_tokens", outcome.cachedPromptTokens}, {"completion_tokens", outcome.completionTokens}};
 }
 
-ChatRequest parseChat(const Json& args, const std::string& client) {
-  static const std::set<std::string> known{"messages", "model", "schema", "max_tokens", "temperature", "priority"};
+ChatRequest parseChat(const Json& args, const std::string& client, const RoutingTable& routing) {
+  static const std::set<std::string> known{"messages", "model", "schema", "max_tokens", "temperature", "priority",
+                                           "task"};
   if (!args.is_object()) throw Invalid("arguments must be a dictionary");
   for (const auto& [key, value] : args.items())
     if (!known.contains(key)) throw Invalid("unknown argument: " + key);
@@ -33,12 +35,31 @@ ChatRequest parseChat(const Json& args, const std::string& client) {
   request.client = client;
   if (!args.contains("messages")) throw Invalid("messages is required");
   request.messages = args.at("messages");  // the queue validates the shape
+  std::string task = "chat";
+  if (args.contains("task")) {
+    if (!args.at("task").is_string()) throw Invalid("task must be a string");
+    task = args.at("task").get<std::string>();
+    static const std::set<std::string> tasks{"act", "chat", "summarize", "vision", "code"};
+    if (!tasks.contains(task)) throw Invalid("task must be act, chat, summarize, vision or code");
+  }
   if (args.contains("model")) {
     if (!args.at("model").is_string()) throw Invalid("model must be a string");
     request.model = args.at("model").get<std::string>();
   }
+  // Local model slots: when the client omits model, use the profile from inference-routing.toml.
+  if (request.model.empty()) {
+    if (!routing.isLocal(task))
+      throw Invalid(
+          "task \"" + task +
+          "\" is routed to a non-local backend; the sandboxed engine only runs local GGUF "
+          "(use Mobius for LAN/cloud talk)");
+    request.model = routing.route(task).model;
+  }
   if (args.contains("schema")) {
     if (!args.at("schema").is_string()) throw Invalid("schema must be a string of JSON");
+    // Only the on-device Act slot may emit tool JSON (grammar). Refuse schemas on talk tasks.
+    if (task != "act") throw Invalid("schema is only allowed for task \"act\"");
+    if (!routing.isLocal(task)) throw Invalid("schema requires a local act backend");
     request.jsonSchema = args.at("schema").get<std::string>();
   }
   if (args.contains("max_tokens")) {
@@ -126,6 +147,17 @@ void InferenceService::method(const std::string& sender, const std::string& name
       Json snapshot = queue_->snapshot();
       snapshot["model_dir"] = config_.modelDir;
       snapshot["idle_unload_seconds"] = config_.idleUnload.count();
+      const RoutingTable routing = loadRouting();
+      Json backends = Json::array();
+      for (const auto& b : routing.backends)
+        backends.push_back(
+            {{"id", b.id}, {"kind", b.kind}, {"base_url", b.baseUrl}, {"label", b.label}});
+      snapshot["backends"] = backends;
+      Json profiles = Json::object();
+      for (const auto& [profile, route] : routing.profiles)
+        profiles[profile] = {{"backend", route.backend}, {"model", route.model}};
+      snapshot["profiles"] = profiles;
+      snapshot["allow_remote_on_battery_saver"] = routing.allowRemoteOnBatterySaver;
       g_dbus_method_invocation_return_value(invocation, g_variant_new("(@a{sv})", toVariant(snapshot)));
     } else if (name == "ListModels") {
       Json models = Json::array();
@@ -134,7 +166,8 @@ void InferenceService::method(const std::string& sender, const std::string& name
     } else if (name == "Action") {
       const auto action = args.at(0).get<std::string>();
       if (action != "chat") throw Invalid("unknown action: " + action);
-      auto submitted = queue_->submit(parseChat(args.at(1), client));
+      const RoutingTable routing = loadRouting();
+      auto submitted = queue_->submit(parseChat(args.at(1), client, routing));
       if (!submitted) throw Invalid(submitted.error());
       owners_[*submitted] = {sender, client};  // callbacks reach the main loop only after this handler returns
       g_dbus_method_invocation_return_value(invocation, g_variant_new("(t)", *submitted));

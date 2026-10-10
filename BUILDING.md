@@ -1,7 +1,14 @@
 # Building Helix Shell from source
 
-This guide covers source dependencies, distro-specific package installation, build modes, and install layouts.
-The installed command is still `noctalia`. For the Helix source installation path, see
+Product layout (greeter / compositor / shell / services): [docs/design/product-structure.md](docs/design/product-structure.md).
+
+This guide covers **Meson/C++** dependencies, build modes, and install layouts for live desktop authority and helpers (`helix-service`, `helix-assistant`, `helix-inference`).
+
+The **live session shell and apps are Rust/Tauri** — see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
+Rust desktop scaffold: `cargo build -p helix-desktop` ([docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md)).
+The C++ session UI and GTK apps are removed; use `shell/` and `apps/`.
+
+For the older source-install path docs, see
 [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
 
 ## Dependencies
@@ -204,28 +211,28 @@ Production sources compile once into an internal static library shared by the sh
 Meson installs the binary and shipped assets using the normal prefix layout:
 
 ```text
-/usr/local/bin/noctalia
-/usr/local/share/noctalia/assets/...
+/usr/local/bin/helix
+/usr/local/share/helix/assets/...
 ```
 
-Helix needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
+Helix needs the shipped `assets/` tree at runtime. Copying only the `helix-shell` binary is not enough.
 
 Firefox theming uses the built-in template `post_action = "firefox-theme"` (same pattern as
 `kde-color-scheme`) plus the [Pywalfox](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/)
-browser extension. Manual host helpers: `noctalia firefox-theme --help`.
+browser extension. Manual host helpers: `helix firefox-theme --help`.
 
 Portable bundle layouts are also supported:
 
 ```text
 bundle/
-  noctalia
+  helix
   assets/
 ```
 
 ```text
 bundle/
-  bin/noctalia
-  share/noctalia/assets/
+  bin/helix
+  share/helix/assets/
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for the full runtime asset lookup order.
@@ -233,7 +240,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for the full runtime asset
 ## Helix services and adaptive applications
 
 Install `gtk4-devel` and `libadwaita-devel` on Fedora to build Settings. GTK 4.12 and libadwaita
-1.7 or newer are required. `-Ddesktop_apps=enabled` requires them; `auto` builds the app when found,
+1.7 or newer are required. GTK was only required for the retired desktop apps;
 and `disabled` builds only the shell and service. GTK is not a dependency of the shell executable.
 
 Build `helix-service`, `helix-settings` and `helix-system-monitor` with
@@ -251,9 +258,8 @@ session during development, because the old shell still owns the original device
 The service does not require a display server. Run integration tests in an isolated D-Bus session;
 the test redirects both session and system buses and all configuration paths to temporary locations.
 
-System Monitor runs independently: `build-debug/helix-system-monitor`. Use `--snapshot`
-for local resource diagnostics without a display server. Its source lives in
-`src/apps/system_monitor` alongside Settings in this Software Projects repository.
+System Monitor is the Tauri app `apps/helix-system-monitor` (`cargo build -p helix-system-monitor`).
+Use nested helpers under `tools/nested/` for isolated runs.
 
 Online Accounts support uses optional `goa-backend-1.0 >= 3.56`. On Fedora install
 `gnome-online-accounts` and `gnome-online-accounts-devel` for the activation daemon and

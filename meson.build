@@ -1,4 +1,4 @@
-project('noctalia', ['c', 'cpp'],
+project('helix-shell', ['c', 'cpp'],
   version: '5.1.0',
   default_options: [
     'cpp_std=c++23',
@@ -112,7 +112,7 @@ if is_glibc
   jemalloc_dep = dependency('jemalloc', required: jemalloc_option)
   if jemalloc_dep.found()
     jemalloc_deps += [jemalloc_dep]
-    jemalloc_cpp_args += ['-DNOCTALIA_USE_JEMALLOC=1']
+    jemalloc_cpp_args += ['-DHELIX_USE_JEMALLOC=1']
   endif
 endif
 
@@ -337,15 +337,7 @@ _protocol_headers += _wlr_ls_h
 alias_target('wayland-protocol-headers', _protocol_headers)
 
 # ── Main sources ──────────────────────────────────────────────────────────────
-_noctalia_sources = files(
-  'src/app/application.cpp',
-  'src/app/application_events.cpp',
-  'src/app/application_ipc.cpp',
-  'src/app/application_poll_sources.cpp',
-  'src/app/application_services.cpp',
-  'src/app/application_ui.cpp',
-  'src/app/main_loop.cpp',
-  'src/app/single_instance_lock.cpp',
+_helix_sources = files(
   'src/auth/fingerprint_authenticator.cpp',
   'src/auth/pam_authenticator.cpp',
   'src/config/atomic_file.cpp',
@@ -406,26 +398,9 @@ _noctalia_sources = files(
   'src/hooks/battery_hook_state.cpp',
   'src/hooks/hook_manager.cpp',
   'src/idle/idle_inhibitor.cpp',
-  'src/shell/idle/idle_grace_overlay.cpp',
   'src/idle/idle_manager.cpp',
   'src/ipc/ipc_client.cpp',
   'src/ipc/ipc_service.cpp',
-  'src/launcher/actions_provider.cpp',
-  'src/launcher/app_provider.cpp',
-  'src/launcher/desktop_actions.cpp',
-  'src/launcher/dmenu_cli.cpp',
-  'src/launcher/dmenu_ipc.cpp',
-  'src/launcher/dmenu_provider.cpp',
-  'src/launcher/dmenu_socket_path.cpp',
-  'src/launcher/dmenu_stdin_provider.cpp',
-  'src/launcher/emoji_provider.cpp',
-  'src/launcher/math_provider.cpp',
-  'src/launcher/panel_catalog.cpp',
-  'src/launcher/panel_provider.cpp',
-  'src/launcher/session_provider.cpp',
-  'src/launcher/wallpaper_provider.cpp',
-  'src/launcher/window_provider.cpp',
-  'src/launcher/usage_tracker.cpp',
   'src/net/http_client.cpp',
   'src/net/uri.cpp',
   'src/net/url_open.cpp',
@@ -441,252 +416,24 @@ _noctalia_sources = files(
   'src/pipewire/privacy_filter.cpp',
   'src/pipewire/pipewire_spectrum.cpp',
   'src/pipewire/sound_player.cpp',
-  'src/render/animation/animation.cpp',
-  'src/render/animation/animation_manager.cpp',
-  'src/render/animation/motion_service.cpp',
-  'src/render/backend/gles_framebuffer.cpp',
-  'src/render/backend/gles_render_backend.cpp',
-  'src/render/backend/gles_texture_manager.cpp',
-  'src/render/backend/render_backend.cpp',
-  'src/render/core/async_texture_cache.cpp',
   'src/core/color.cpp',
-  'src/render/core/image_file_loader.cpp',
-  'src/render/core/shader_program.cpp',
-  'src/render/core/stb_image_resize_impl.cpp',
-  'src/render/core/thumbnail_service.cpp',
   'src/core/image_decoder.cpp',
-  'src/render/core/image_encoder.cpp',
   'src/core/image_orientation.cpp',
-  'src/render/programs/glyph_program.cpp',
-  'src/render/programs/image_program.cpp',
-  'src/render/programs/linear_gradient_program.cpp',
-  'src/render/programs/rect_program.cpp',
-  'src/render/programs/screen_corner_program.cpp',
-  'src/render/programs/countdown_ring_program.cpp',
-  'src/render/programs/spinner_program.cpp',
-  'src/render/programs/audio_spectrum_program.cpp',
-  'src/render/programs/fancy_audio_visualizer_program.cpp',
-  'src/render/programs/effect_program.cpp',
-  'src/render/programs/graph_program.cpp',
-  'src/render/programs/blur_program.cpp',
-  'src/render/programs/wallpaper_program.cpp',
-  'src/render/core/blur_cache.cpp',
-  'src/render/core/cached_layer.cpp',
-  'src/render/core/shared_texture_cache.cpp',
-  'src/render/gl_shared_context.cpp',
-  'src/render/render_context.cpp',
-  'src/render/render_target.cpp',
-  'src/render/scene/input_area.cpp',
-  'src/render/scene/input_dispatcher.cpp',
-  'src/render/scene/fancy_audio_visualizer_node.cpp',
-  'src/render/scene/graph_node.cpp',
-  'src/render/scene/node.cpp',
-  'src/render/text/cairo_text_renderer.cpp',
-  'src/render/text/font_registry.cpp',
-  'src/render/text/font_weight_catalog.cpp',
-  'src/render/text/cairo_glyph_renderer.cpp',
-  'src/render/wallpaper_renderer.cpp',
   'src/security/encrypted_file_store.cpp',
   'src/security/secret_store.cpp',
   'src/security/secure_buffer.cpp',
   'src/security/storage_key_provider.cpp',
   'src/system/battery_warning_monitor.cpp',
-  'src/shell/bar/bar.cpp',
-  'src/shell/bar/bar_widget_layout.cpp',
-  'src/shell/clipboard/clipboard_paste.cpp',
-  'src/shell/dock/dock.cpp',
-  'src/shell/dock/dock_context_menu.cpp',
-  'src/shell/dock/dock_geometry.cpp',
-  'src/shell/dock/dock_instance.cpp',
-  'src/shell/dock/dock_items.cpp',
-  'src/shell/dock/dock_model.cpp',
-  'src/shell/dock/pinned_apps.cpp',
-  'src/shell/desktop/desktop_widget.cpp',
-  'src/shell/desktop/desktop_widget_factory.cpp',
-  'src/shell/desktop/desktop_widget_settings_registry.cpp',
-  'src/shell/desktop/desktop_widgets_controller.cpp',
-  'src/shell/desktop/editor/desktop_widgets_editor.cpp',
-  'src/shell/desktop/editor/desktop_widgets_editor_types.cpp',
-  'src/shell/desktop/editor/desktop_widgets_editor_settings.cpp',
-  'src/shell/desktop/desktop_widgets_host.cpp',
-  'src/shell/lockscreen/lockscreen_login_box.cpp',
-  'src/shell/lockscreen/lockscreen_widgets_controller.cpp',
-  'src/shell/lockscreen/lockscreen_widgets_host.cpp',
-  'src/shell/desktop/widgets/desktop_audio_visualizer_widget.cpp',
-  'src/shell/desktop/widgets/desktop_button_widget.cpp',
-  'src/shell/desktop/widgets/desktop_path_widget.cpp',
-  'src/shell/desktop/widgets/desktop_clock_widget.cpp',
-  'src/shell/desktop/widgets/desktop_fancy_audio_visualizer_widget.cpp',
-  'src/shell/desktop/widgets/desktop_label_widget.cpp',
-  'src/shell/desktop/widgets/desktop_login_box_widget.cpp',
-  'src/shell/desktop/widgets/desktop_media_player_widget.cpp',
-  'src/shell/desktop/widgets/desktop_sticker_widget.cpp',
-  'src/shell/desktop/widgets/desktop_sysmon_widget.cpp',
-  'src/shell/desktop/widgets/desktop_volume_widget.cpp',
-  'src/shell/clipboard/clipboard_picker.cpp',
-  'src/shell/quick_insert/quick_insert_panel.cpp',
-  'src/shell/control_center/shortcut_registry.cpp',
-  'src/shell/quick_settings/quick_settings_panel.cpp',
-  'src/shell/control_center/tab.cpp',
+  'src/config/widgets/desktop_widget_settings_registry.cpp',
   'src/core/files/directory_scanner.cpp',
-  'src/ui/dialogs/color_picker_dialog.cpp',
-  'src/ui/dialogs/color_picker_dialog_popup.cpp',
-  'src/ui/dialogs/dialog_popup_host.cpp',
-  'src/ui/dialogs/file_dialog.cpp',
-  'src/ui/dialogs/file_dialog_popup.cpp',
-  'src/ui/dialogs/file_dialog_view.cpp',
-  'src/ui/dialogs/file_entry_row.cpp',
-  'src/ui/dialogs/file_entry_tile.cpp',
-  'src/ui/dialogs/glyph_picker_dialog.cpp',
-  'src/ui/dialogs/glyph_picker_dialog_popup.cpp',
-  'src/ui/dialogs/layer_popup_host.cpp',
-  'src/shell/launcher/launcher_panel.cpp',
-  'src/shell/switcher/window_switcher.cpp',
-  'src/shell/switcher/window_switcher_tile.cpp',
-  'src/shell/profile/avatar_path.cpp',
-  'src/shell/greeter/greeter_appearance_sync.cpp',
-  'src/shell/lockscreen/lock_screen.cpp',
-  'src/shell/lockscreen/lock_surface.cpp',
-  'src/shell/notification/notification_toast.cpp',
-  'src/shell/osd/audio_osd.cpp',
-  'src/shell/osd/media_osd.cpp',
-  'src/shell/osd/brightness_osd.cpp',
-  'src/shell/osd/keyboard_backlight_osd.cpp',
-  'src/shell/osd/lock_keys_osd.cpp',
-  'src/shell/osd/keyboard_layout_osd.cpp',
-  'src/shell/osd/privacy_osd.cpp',
-  'src/shell/osd/osd_overlay.cpp',
-  'src/shell/tooltip/tooltip_manager.cpp',
-  'src/shell/hot_corners/hot_corners.cpp',
-  'src/shell/screen_corners/screen_corners.cpp',
-  'src/shell/panel/panel_click_shield.cpp',
-  'src/shell/panel/panel_manager.cpp',
-  'src/shell/panel/persistent_panel_host.cpp',
-  'src/shell/polkit/polkit_panel.cpp',
   'src/desktop_api/display_text.cpp',
-  'src/shell/agent/agent_confirmation_queue.cpp',
-  'src/shell/assistant/assistant_session.cpp',
-  'src/shell/assistant/assistant_panel.cpp',
-  'src/shell/agent/agent_confirm_panel.cpp',
-  'src/shell/session/session_action_meta.cpp',
-  'src/shell/session/session_action_runner.cpp',
-  'src/shell/session/session_ipc.cpp',
-  'src/shell/session/session_panel.cpp',
-  'src/shell/setup_wizard/setup_wizard_panel.cpp',
-  'src/ui/shadow.cpp',
-  'src/shell/settings/bar_widget_editor.cpp',
-  'src/shell/settings/color_spec_picker.cpp',
-  'src/shell/settings/config_export_dialog_modal.cpp',
-  'src/shell/settings/settings_content.cpp',
-  'src/shell/settings/settings_content_common.cpp',
-  'src/shell/settings/path_browse.cpp',
-  'src/shell/settings/template_store_content.cpp',
-  'src/shell/settings/template_store_tile.cpp',
-  'src/shell/settings/settings_control_factory.cpp',
-  'src/shell/settings/settings_content_idle_behavior.cpp',
-  'src/shell/settings/settings_content_notification_filter.cpp',
-  'src/shell/settings/settings_content_session_action.cpp',
-  'src/shell/settings/settings_bar_management.cpp',
-  'src/shell/settings/settings_registry.cpp',
-  'src/shell/settings/font_family_catalog.cpp',
-  'src/shell/settings/font_weight_catalog.cpp',
-  'src/shell/settings/widget_settings_registry.cpp',
-  'src/shell/settings/widget_add_popup.cpp',
-  'src/shell/settings/settings_modal_host.cpp',
-  'src/shell/test/test_panel.cpp',
-  'src/shell/tray/tray_drawer_panel.cpp',
-  'src/shell/tray/tray_settings.cpp',
-  'src/shell/tray/tray_menu.cpp',
-  'src/shell/backdrop/backdrop.cpp',
-  'src/shell/backdrop/backdrop_surface.cpp',
-  'src/shell/overview/overview_launcher_capture.cpp',
+  'src/desktop/agent_confirmation_queue.cpp',
+  'src/assistant/assistant_session.cpp',
+  'src/config/widgets/widget_settings_registry.cpp',
   'src/system/app_identity.cpp',
-  'src/shell/wallpaper/wallpaper_paths.cpp',
-  'src/shell/wallpaper/wallpaper_geometry.cpp',
-  'src/shell/wallpaper/wallpaper_shuffle_state.cpp',
-  'src/shell/wallpaper/daily_wallpaper.cpp',
-  'src/shell/wallpaper/daily_wallpaper_service.cpp',
   'src/net/wallhaven_client.cpp',
-  'src/shell/wallpaper/video_wallpaper.cpp',
-  'src/shell/wallpaper/video_wallpaper_service.cpp',
-  'src/shell/wallpaper/wallpaper.cpp',
-  'src/shell/wallpaper/panel/wallpaper_panel.cpp',
-  'src/shell/wallpaper/panel/wallpaper_picker.cpp',
-  'src/shell/wallpaper/panel/wallpaper_scanner.cpp',
-  'src/shell/wallpaper/panel/wallpaper_tile.cpp',
-  'src/shell/keyboard_layout_label.cpp',
-  'src/shell/bar/widget.cpp',
   'src/config/widget_action.cpp',
-  'src/shell/bar/widget_action_dispatcher.cpp',
-  'src/shell/bar/widget_custom_image.cpp',
-  'src/shell/bar/widget_factory.cpp',
   'src/config/widget_gesture.cpp',
-  'src/shell/bar/widget_gesture_input.cpp',
-  'src/shell/bar/widget_gesture_defaults.cpp',
-  'src/shell/bar/widgets/active_window_widget.cpp',
-  'src/shell/bar/widgets/active_window_widget_definition.cpp',
-  'src/shell/bar/widgets/audio_visualizer_widget.cpp',
-  'src/shell/bar/widgets/audio_visualizer_widget_definition.cpp',
-  'src/shell/bar/widgets/battery_widget.cpp',
-  'src/shell/bar/widgets/battery_widget_definition.cpp',
-  'src/shell/bar/widgets/bluetooth_widget.cpp',
-  'src/shell/bar/widgets/bluetooth_widget_definition.cpp',
-  'src/shell/bar/widgets/control_center_widget.cpp',
-  'src/shell/bar/widgets/control_center_widget_definition.cpp',
-  'src/shell/bar/widgets/custom_button_widget.cpp',
-  'src/shell/bar/widgets/custom_button_widget_definition.cpp',
-  'src/shell/bar/widgets/clipboard_widget.cpp',
-  'src/shell/bar/widgets/clipboard_widget_definition.cpp',
-  'src/shell/bar/widgets/clock_widget.cpp',
-  'src/shell/bar/widgets/clock_widget_definition.cpp',
-  'src/shell/bar/widgets/debug_indicator_widget.cpp',
-  'src/shell/bar/widgets/idle_inhibitor_widget.cpp',
-  'src/shell/bar/widgets/caffeine_widget_definition.cpp',
-  'src/shell/bar/widgets/keyboard_layout_widget.cpp',
-  'src/shell/bar/widgets/keyboard_layout_widget_definition.cpp',
-  'src/shell/bar/widgets/lock_keys_widget.cpp',
-  'src/shell/bar/widgets/lock_keys_widget_definition.cpp',
-  'src/shell/bar/widgets/nightlight_widget.cpp',
-  'src/shell/bar/widgets/nightlight_widget_definition.cpp',
-  'src/shell/bar/widgets/launcher_widget.cpp',
-  'src/shell/bar/widgets/launcher_widget_definition.cpp',
-  'src/shell/bar/widgets/media_widget.cpp',
-  'src/shell/bar/widgets/media_widget_definition.cpp',
-  'src/shell/bar/widgets/network_widget.cpp',
-  'src/shell/bar/widgets/network_widget_definition.cpp',
-  'src/shell/bar/widgets/notification_widget.cpp',
-  'src/shell/bar/widgets/notification_widget_definition.cpp',
-  'src/shell/bar/widgets/power_profile_widget.cpp',
-  'src/shell/bar/widgets/power_profile_widget_definition.cpp',
-  'src/shell/bar/widgets/privacy_widget.cpp',
-  'src/shell/bar/widgets/privacy_widget_definition.cpp',
-  'src/shell/bar/widgets/screenshot_widget_definition.cpp',
-  'src/shell/bar/widgets/session_widget.cpp',
-  'src/shell/bar/widgets/session_widget_definition.cpp',
-  'src/shell/bar/widgets/settings_widget.cpp',
-  'src/shell/bar/widgets/settings_widget_definition.cpp',
-  'src/shell/bar/widgets/spacer_widget.cpp',
-  'src/shell/bar/widgets/spacer_widget_definition.cpp',
-  'src/shell/bar/widgets/text_widget.cpp',
-  'src/shell/bar/widgets/text_widget_definition.cpp',
-  'src/shell/bar/widgets/sysmon_widget.cpp',
-  'src/shell/bar/widgets/sysmon_widget_definition.cpp',
-  'src/shell/bar/widgets/taskbar_widget.cpp',
-  'src/shell/bar/widgets/taskbar_widget_definition.cpp',
-  'src/shell/bar/widgets/test_widget.cpp',
-  'src/shell/bar/widgets/test_widget_definition.cpp',
-  'src/shell/bar/widgets/theme_mode_widget.cpp',
-  'src/shell/bar/widgets/theme_mode_widget_definition.cpp',
-  'src/shell/bar/widgets/tray_widget.cpp',
-  'src/shell/bar/widgets/tray_widget_definition.cpp',
-  'src/shell/bar/widgets/volume_widget.cpp',
-  'src/shell/bar/widgets/volume_widget_definition.cpp',
-  'src/shell/bar/widgets/brightness_widget.cpp',
-  'src/shell/bar/widgets/brightness_widget_definition.cpp',
-  'src/shell/bar/widgets/wallpaper_widget.cpp',
-  'src/shell/bar/widgets/wallpaper_widget_definition.cpp',
-  'src/shell/bar/widgets/workspaces_widget.cpp',
-  'src/shell/bar/widgets/workspaces_widget_definition.cpp',
   'src/system/dependency_service.cpp',
   'src/system/desktop_entry.cpp',
   'src/system/freedesktop_key_file.cpp',
@@ -709,18 +456,6 @@ _noctalia_sources = files(
   'src/system/internal_app_metadata.cpp',
   'src/system/day_night_schedule.cpp',
   'src/system/gamma_service.cpp',
-  'src/capture/screencopy_capture.cpp',
-  'src/capture/pointer_cursor_capture.cpp',
-  'src/capture/screencopy_util.cpp',
-  'src/capture/screenshot_capture.cpp',
-  'src/capture/screenshot_image.cpp',
-  'src/capture/screenshot_service.cpp',
-  'src/capture/screen_recorder_service.cpp',
-  'src/capture/screenshot_region_overlay.cpp',
-  'src/capture/annotation_document.cpp',
-  'src/capture/annotation_raster.cpp',
-  'src/capture/annotation_overlay.cpp',
-  'src/shell/bar/widgets/screenshot_widget.cpp',
   'src/system/rfkill_helper.cpp',
   'src/system/cpu_stat.cpp',
   'src/system/cpu_freq.cpp',
@@ -729,60 +464,8 @@ _noctalia_sources = files(
   'src/system/system_monitor_service.cpp',
   'src/time/time_format.cpp',
   'src/time/time_service.cpp',
-  'src/ui/visuals/audio_visualizer.cpp',
-  'src/ui/visuals/fancy_audio_visualizer.cpp',
-  'src/ui/controls/box.cpp',
-  'src/ui/controls/button.cpp',
-  'src/ui/controls/drag_source.cpp',
-  'src/ui/controls/drop_zone.cpp',
-  'src/ui/controls/checkbox.cpp',
-  'src/ui/controls/color_picker.cpp',
-  'src/ui/controls/collapsible.cpp',
-  'src/ui/controls/context_menu.cpp',
-  'src/ui/controls/context_menu_popup.cpp',
-  'src/ui/controls/countdown_ring.cpp',
-  'src/ui/controls/flex.cpp',
-  'src/ui/controls/glyph.cpp',
-  'src/ui/controls/graph.cpp',
-  'src/ui/controls/glyph_picker.cpp',
-  'src/render/text/glyph_registry.cpp',
-  'src/ui/controls/grid_view.cpp',
-  'src/ui/controls/grid_tile.cpp',
-  'src/ui/controls/image.cpp',
-  'src/ui/controls/input.cpp',
   'src/core/input/keybind_matcher.cpp',
-  'src/ui/controls/keybind_recorder.cpp',
-  'src/ui/controls/label.cpp',
-  'src/ui/controls/list_editor.cpp',
-  'src/ui/controls/color_swatch_preview.cpp',
-  'src/ui/controls/progress_bar.cpp',
-  'src/ui/controls/radio_button.cpp',
-  'src/ui/controls/scrollbar.cpp',
-  'src/ui/controls/scroll_view.cpp',
-  'src/ui/controls/roving_list_nav.cpp',
-  'src/ui/controls/search_picker.cpp',
-  'src/ui/controls/range_slider.cpp',
-  'src/ui/controls/screen_corner.cpp',
-  'src/ui/controls/segmented.cpp',
-  'src/ui/controls/select.cpp',
-  'src/ui/controls/select_dropdown_popup.cpp',
-  'src/ui/controls/separator.cpp',
-  'src/ui/controls/slider.cpp',
-  'src/ui/controls/spacer.cpp',
-  'src/ui/controls/spinner.cpp',
-  'src/ui/controls/stepper.cpp',
-  'src/ui/controls/toggle.cpp',
-  'src/ui/controls/virtual_grid_view.cpp',
-  'src/ui/controls/virtual_list_view.cpp',
-  'src/ui/builders.cpp',
-  'src/ui/app_icon_colorization.cpp',
   'src/theme/color_roles.cpp',
-  'src/ui/palette.cpp',
-  'src/ui/popup_chrome.cpp',
-  'src/ui/scroll_into_view.cpp',
-  'src/ui/split_pane_focus.cpp',
-  'src/ui/style.cpp',
-  'src/ui/drag_drop_controller.cpp',
   'src/util/checksum.cpp',
   'src/util/clamp.cpp',
   'src/util/fuzzy_match.cpp',
@@ -810,12 +493,7 @@ _noctalia_sources = files(
   'src/compositors/niri/niri_config_blur.cpp',
   'src/compositors/niri/niri_config_overview.cpp',
   'src/compositors/niri/niri_config_setup.cpp',
-  'src/render/surface/layer_surface.cpp',
   'src/wayland/output_probe.cpp',
-  'src/render/surface/popup_surface.cpp',
-  'src/render/surface/subsurface.cpp',
-  'src/render/surface/surface.cpp',
-  'src/render/surface/toplevel_surface.cpp',
   'src/wayland/wayland_connection.cpp',
   'src/wayland/wayland_seat.cpp',
   'src/wayland/wayland_toplevels.cpp',
@@ -837,6 +515,7 @@ _noctalia_sources = files(
   'src/theme/custom_palettes.cpp',
   'src/theme/fixed_palette.cpp',
   'src/theme/template_apply_service.cpp',
+  'src/theme/runtime_palette.cpp',
   'src/theme/theme_service.cpp',
   'src/theme/json_output.cpp',
   'src/theme/kde_color_scheme.cpp',
@@ -851,20 +530,19 @@ _noctalia_sources = files(
   'src/cli/parse.cpp',
   'src/cli/help.cpp',
   'src/theme/cli.cpp',
-  'src/ipc/cli.cpp',
-)
+  'src/ipc/cli.cpp',)
 
-_noctalia_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
+_helix_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
 
 if sanitize
-  _noctalia_sources += files('src/core/lsan_suppressions.cpp')
+  _helix_sources += files('src/core/lsan_suppressions.cpp')
 endif
 
 git_program = find_program('git', required: false)
 if git_program.found()
   _git_revision_h = vcs_tag(
     input: 'src/core/git_revision.h.in',
-    output: 'noctalia_git_revision.h',
+    output: 'helix_git_revision.h',
     command: [git_program, 'describe', '--tags', '--always', '--dirty=-dirty', '--abbrev=12'],
     fallback: 'unknown',
   )
@@ -873,13 +551,13 @@ else
   _git_revision_config.set('VCS_TAG', 'unknown')
   _git_revision_h = configure_file(
     input: 'src/core/git_revision.h.in',
-    output: 'noctalia_git_revision.h',
+    output: 'helix_git_revision.h',
     configuration: _git_revision_config,
   )
 endif
 
 # ── Include directories ────────────────────────────────────────────────────────
-_noctalia_inc = [
+_helix_inc = [
   include_directories('src'),
   include_directories('third_party/wuffs', is_system: true),
   # '.' adds both the source root and the corresponding build-dir root, so
@@ -888,7 +566,7 @@ _noctalia_inc = [
 ]
 
 # ── Application library and executable ────────────────────────────────────────
-_noctalia_system_dependencies = [
+_helix_system_dependencies = [
   sdbus_cpp_dep,
   wayland_client_dep,
   egl_dep,
@@ -928,79 +606,64 @@ _noctalia_system_dependencies = [
   sndfile_dep,
 ] + jemalloc_deps + (dl_dep.found() ? [dl_dep] : [])
 
-_noctalia_dependencies = _noctalia_system_dependencies + [
+_helix_dependencies = _helix_system_dependencies + [
   fzy_dep,
   mcu_dep,
   qrcodegen_dep,
 ]
 
-_noctalia_test_dependencies = _noctalia_system_dependencies + [
+_helix_test_dependencies = _helix_system_dependencies + [
   _fzy_selective_dep,
   _mcu_selective_dep,
 ]
 
-noctalia_system_upgrade_path = join_paths(get_option('prefix'), get_option('libexecdir'), 'noctalia-system-upgrade')
+helix_system_upgrade_path = join_paths(get_option('prefix'), get_option('libexecdir'), 'helix-system-upgrade')
 
-_noctalia_compile_definitions = [
-  '-DNOCTALIA_INSTALL_PREFIX="' + get_option('prefix') + '"',
-  '-DNOCTALIA_INSTALL_DATADIR="' + get_option('datadir') + '"',
-  '-DNOCTALIA_VERSION="' + meson.project_version() + '"',
-  '-DNOCTALIA_SYSTEM_UPGRADE_PATH="' + noctalia_system_upgrade_path + '"',
+_helix_compile_definitions = [
+  '-DHELIX_INSTALL_PREFIX="' + get_option('prefix') + '"',
+  '-DHELIX_INSTALL_DATADIR="' + get_option('datadir') + '"',
+  '-DHELIX_VERSION="' + meson.project_version() + '"',
+  '-DHELIX_SYSTEM_UPGRADE_PATH="' + helix_system_upgrade_path + '"',
 ] + jemalloc_cpp_args
 
-_noctalia_cpp_args = [
+_helix_cpp_args = [
   '-Wall', '-Wextra', '-Wno-missing-field-initializers', '-Wpedantic', '-Wconversion', '-Wshadow',
-] + _noctalia_compile_definitions
+] + _helix_compile_definitions
 
 # Production sources and generated protocols compile once. The shell links the
 # archive whole; tests link it normally so only the objects they exercise enter
 # each test executable.
-noctalia_core_lib = static_library('noctalia_core',
-  sources: _noctalia_sources + _protocol_sources + _protocol_headers + [_git_revision_h],
-  dependencies: _noctalia_dependencies,
-  include_directories: _noctalia_inc,
-  cpp_args: _noctalia_cpp_args,
+helix_core_lib = static_library('helix_core',
+  sources: _helix_sources + _protocol_sources + _protocol_headers + [_git_revision_h],
+  dependencies: _helix_dependencies,
+  include_directories: _helix_inc,
+  cpp_args: _helix_cpp_args,
 )
 
-noctalia_core_dep = declare_dependency(
-  link_with: noctalia_core_lib,
-  dependencies: _noctalia_test_dependencies,
-  include_directories: _noctalia_inc,
-  compile_args: _noctalia_compile_definitions,
+helix_core_dep = declare_dependency(
+  link_with: helix_core_lib,
+  dependencies: _helix_test_dependencies,
+  include_directories: _helix_inc,
+  compile_args: _helix_compile_definitions,
   sources: _protocol_headers,
 )
 
-noctalia_exe = executable('noctalia',
-  sources: files('src/main.cpp') + _protocol_headers,
-  dependencies: _noctalia_dependencies,
-  include_directories: _noctalia_inc,
-  cpp_args: _noctalia_cpp_args,
-  objects: noctalia_core_lib.extract_all_objects(recursive: false),
-  install: true,
-)
-
-install_subdir('assets',
-  install_dir: get_option('datadir') / 'noctalia',
-  exclude_files: ['dev.noctalia.Noctalia.desktop'],
-)
+# C++ session binary is still built (tests / reference). Install only when explicitly enabled —
+# the live session shell is Tauri (`tools/switch-shell.sh install`).
+# Retired C++ session binary removed; live shell is shell/helix-shell-tauri.
 
 install_data(
-  'assets/dev.noctalia.Noctalia.desktop',
-  install_dir: get_option('datadir') / 'applications',
-)
-
-install_data(
-  'assets/noctalia.svg',
+  'assets/helix.svg',
   install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps',
 )
 
 # Helix Phone: BLE HID pointer for iPhone AssistiveTouch and its bluetoothd setup helper.
 install_data(
-  install_dir: get_option('datadir') / 'noctalia' / 'scripts',
+  install_dir: get_option('datadir') / 'helix' / 'scripts',
   install_mode: 'rwxr-xr-x',
 )
 
-executable('noctalia-system-upgrade',
+executable('helix-system-upgrade',
   sources: files(
     'src/system/fedora_upgrade.cpp',
     'src/system/fedora_upgrade_main.cpp',
@@ -1011,12 +674,12 @@ executable('noctalia-system-upgrade',
   install_dir: get_option('libexecdir'),
 )
 
-noctalia_upgrade_policy_conf = configuration_data()
-noctalia_upgrade_policy_conf.set('HELPER_PATH', noctalia_system_upgrade_path)
+helix_upgrade_policy_conf = configuration_data()
+helix_upgrade_policy_conf.set('HELPER_PATH', helix_system_upgrade_path)
 configure_file(
-  input: 'assets/polkit/dev.noctalia.Noctalia.upgrade.policy.in',
-  output: 'dev.noctalia.Noctalia.upgrade.policy',
-  configuration: noctalia_upgrade_policy_conf,
+  input: 'assets/polkit/org.helix.Shell.upgrade.policy.in',
+  output: 'org.helix.Shell.upgrade.policy',
+  configuration: helix_upgrade_policy_conf,
   install: true,
   install_dir: get_option('datadir') / 'polkit-1' / 'actions',
 )
@@ -1024,67 +687,37 @@ configure_file(
 if build_tests
   _cpp_test_names = [
     'adw_gtk3',
-    'annotation_document',
-    'annotation_raster',
-    'animation_manager',
     'app_identity',
     'audio_glyphs',
     'audio_route_selection',
     'battery_health',
     'battery_hook_state',
-    'button_layout',
-    'cairo_text_renderer',
-    'capsule_group_lane_override',
-    'capsule_group_reconcile',
     'cli_help',
     'cli_parse',
     'cli_schema',
-    'clipboard_service',
-    'clipboard_storage_permissions',
-    'daily_wallpaper',
     'config_migration',
     'config_override_mutation',
     'config_path_resolution',
     'config_schema_roundtrip',
     'config_wallpaper_precedence',
     'config_widget',
-    'context_menu_popup',
     'cpu_freq',
     'cpu_stat',
     'cpu_temp_sensor',
     'desktop_entry_launch',
-    'desktop_entry_localization',
     'disk_mounts',
     'display_config',
-    'dock_edge_overlap',
-    'dock_pinned_apps',
     'enterprise_credentials',
     'fcitx_status',
     'fedora_upgrade',
     'freedesktop_key_file',
-    'greeter_appearance_sync',
-    'grid_item_cursor',
     'hook_manager',
     'i18n_language_tag',
     'i18n_supported_languages',
-    'ico_decoder',
-    'icon_resolver',
-    'image_file_loader_data_uri',
-    'image_orientation',
-    'image_source_log',
     'inotify',
-    'input_area',
-    'input_dispatcher',
-    'input_password_mode',
-    'input_readline_shortcuts',
     'ipc_service',
-    'jxl_decoder',
     'kde_color_scheme',
-    'keyboard_layout_label',
-    'lane_selection_token',
     'log',
-    'math_provider',
-    'monitor_selector',
     'network_display',
     'network_manager_security',
     'niri_config_binds',
@@ -1101,67 +734,62 @@ if build_tests
     'notification_history_utf8',
     'notification_live_activity',
     'package_spec',
-    'path_browse',
-    'popup_dismiss_order',
     'process',
     'scheme',
-    'scrollbar_geometry',
     'secret_store',
     'security_primitives',
     'state_store',
     'string_utils',
-    'surface_blur_region',
     'system_monitor_service',
-    'taskbar_widget',
     'template_apply_notify',
     'template_hook_async',
     'template_hook_runner',
     'theme_shell_mode',
     'time_format',
-    'tray_identifier',
     'upower_device_catalog',
-    'uri',
-    'virtual_grid_view_gesture',
-    'wallpaper_scan_symlink',
-    'wallpaper_shuffle_state',
     'wallhaven_client',
-    'video_wallpaper',
+    'workspace_alert_service',
+    'capsule_group_lane_override',
+    'capsule_group_reconcile',
+    'clipboard_service',
+    'clipboard_storage_permissions',
+    'ico_decoder',
+    'icon_resolver',
+    'jxl_decoder',
+    'monitor_selector',
+    'popup_dismiss_order',
     'wayland_output_scale',
     'wayland_toplevels_identity',
     'webp_decoder',
-    'widget_action',
-    'widget_definition',
-    'workspace_alert_service',
   ]
 
   foreach test_name : _cpp_test_names
     test_exe = executable(test_name + '_test',
       sources: files('tests' / (test_name + '_test.cpp')),
-      dependencies: noctalia_core_dep,
+      dependencies: helix_core_dep,
       override_options: ['b_ndebug=false'],
     )
     test_args = []
-    if test_name == 'desktop_entry_localization'
-      test_args = [meson.project_source_root() / 'assets']
-    elif test_name == 'i18n_supported_languages'
+    if test_name == 'i18n_supported_languages'
       test_args = [meson.project_source_root() / 'assets' / 'translations']
     endif
     test(test_name, test_exe, args: test_args)
   endforeach
 
+  inference_routing_test_exe = executable('inference_routing_test',
+    sources: files('tests/inference_routing_test.cpp', 'src/inference/routing.cpp'),
+    dependencies: helix_core_dep,
+    override_options: ['b_ndebug=false'],
+  )
+  test('inference_routing', inference_routing_test_exe, args: [meson.project_source_root()])
+
   config_validate_env = environment()
-  config_validate_env.set('NOCTALIA_CONFIG_HOME', meson.current_source_dir() / 'tests/config_validate/config-home')
-  config_validate_env.set('NOCTALIA_STATE_HOME', meson.current_source_dir() / 'tests/config_validate/state-home')
-  config_validate_env.set('NOCTALIA_DATA_HOME', meson.current_source_dir() / 'tests/config_validate/data-home')
+  config_validate_env.set('HELIX_CONFIG_HOME', meson.current_source_dir() / 'tests/config_validate/config-home')
+  config_validate_env.set('HELIX_STATE_HOME', meson.current_source_dir() / 'tests/config_validate/state-home')
+  config_validate_env.set('HELIX_DATA_HOME', meson.current_source_dir() / 'tests/config_validate/data-home')
 
   sh_program = find_program('sh')
-  test('config_validate_cli',
-    sh_program,
-    args: ['tests/config_validate_cli_test.sh', noctalia_exe.full_path()],
-    depends: noctalia_exe,
-    workdir: meson.current_source_dir(),
-    env: config_validate_env,
-  )
+  # config_validate_cli retired with helix-shell binary
 
   bash_program = find_program('bash')
   test('template_undo_signal',
@@ -1189,13 +817,13 @@ endif
 helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
   input: 'protocols/dbus/org.helix.Desktop.xml',
   output: 'helix_desktop_introspection.h',
-  command: [find_program('python3'), files('scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'desktopIntrospectionXml'],
+  command: [find_program('python3'), files('tools/scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'desktopIntrospectionXml'],
 )
 
 helix_service = executable('helix-service',
-  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp', 'src/desktop/shell_tools.cpp'), helix_desktop_introspection_h],
-  dependencies: noctalia_core_dep,
-  cpp_args: _noctalia_cpp_args,
+  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp', 'src/desktop/shell_tools.cpp', 'src/inference/routing.cpp'), helix_desktop_introspection_h],
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
   install: true,
 )
 helix_assistant_config = configuration_data()
@@ -1204,15 +832,16 @@ configure_file(input: 'assets/services/helix-assistant-warm.service.in',
   output: 'helix-assistant-warm.service', configuration: helix_assistant_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 helix_assistant = executable('helix-assistant',
-  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/shell_tools.cpp'),
-  dependencies: noctalia_core_dep,
-  cpp_args: _noctalia_cpp_args,
+  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/shell_tools.cpp',
+    'src/inference/routing.cpp'),
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
   install: true,
 )
 helix_assistant_unit = executable('assistant_core_test',
   sources: files('tests/assistant_core_test.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-  dependencies: noctalia_core_dep,
-  cpp_args: _noctalia_cpp_args,
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
 )
 test('assistant_core', helix_assistant_unit, args: [meson.project_source_root()])
 install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') / 'helix')
@@ -1230,20 +859,20 @@ configure_file(input: 'assets/services/helix-service.service.in',
 helix_inference_introspection_h = custom_target('helix-inference-introspection',
   input: 'protocols/dbus/org.helix.Inference.xml',
   output: 'helix_inference_introspection.h',
-  command: [find_program('python3'), files('scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'inferenceIntrospectionXml'],
+  command: [find_program('python3'), files('tools/scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'inferenceIntrospectionXml'],
 )
 helix_inference = executable('helix-inference',
   sources: [files('src/inference/service_main.cpp', 'src/inference/inference_service.cpp', 'src/inference/inference_queue.cpp',
-    'src/inference/schema_grammar.cpp'), helix_inference_introspection_h]
+    'src/inference/schema_grammar.cpp', 'src/inference/routing.cpp'), helix_inference_introspection_h]
     + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
-  dependencies: [noctalia_core_dep, dependency('threads')] + (llama_dep.found() ? [llama_dep] : []),
+  dependencies: [helix_core_dep, dependency('threads')] + (llama_dep.found() ? [llama_dep] : []),
   build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
   install_rpath: get_option('prefix') / 'lib64' / 'helix',  # installed: the private copy made below
-  cpp_args: _noctalia_cpp_args,
+  cpp_args: _helix_cpp_args,
   install: true,
 )
 if llama_dep.found()
-  meson.add_install_script(find_program('python3'), files('scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix')
+  meson.add_install_script(find_program('python3'), files('tools/scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix')
 endif
 
 helix_inference_config = configuration_data()
@@ -1255,63 +884,13 @@ configure_file(input: 'assets/services/helix-inference.service.in',
   output: 'helix-inference.service', configuration: helix_inference_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 
-gtk4_dep = dependency('gtk4', version: '>=4.12', required: get_option('desktop_apps'))
-adwaita_dep = dependency('libadwaita-1', version: '>=1.7', required: get_option('desktop_apps'))
-if gtk4_dep.found() and adwaita_dep.found()
-  goa_backend_dep = dependency('goa-backend-1.0', version: '>=3.56', required: false)
-  settings_deps = [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep]
-  settings_args = ['-Wall', '-Wextra', '-Wno-missing-field-initializers']
-  if goa_backend_dep.found()
-    settings_deps += goa_backend_dep
-    settings_args += '-DHELIX_HAVE_GOA'
-  endif
-  helix_settings = executable('helix-settings',
-    sources: files('src/apps/settings/main.cpp', 'src/apps/settings/wallpaper_catalog.cpp', 'src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/display_text.cpp'),
-    include_directories: include_directories('src'),
-    dependencies: settings_deps,
-    cpp_args: settings_args,
-    install: true,
-  )
-  install_data('assets/org.helix.Settings.desktop', install_dir: get_option('datadir') / 'applications')
-  helix_software = executable('helix-software',
-    sources: files('src/apps/software/main.cpp'),
-    include_directories: include_directories('src'),
-    dependencies: [noctalia_core_dep, gtk4_dep, adwaita_dep, gio_dep],
-    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
-    install: true,
-  )
-  install_data('assets/org.helix.Software.desktop', install_dir: get_option('datadir') / 'applications')
-
-
-  helix_monitor = executable('helix-system-monitor',
-    sources: files('src/apps/system_monitor/main.cpp', 'src/apps/system_monitor/proc_reader.cpp',
-      'src/apps/system_monitor/report_reader.cpp', 'src/desktop_api/protocol.cpp'),
-    include_directories: include_directories('src'),
-    dependencies: [gtk4_dep, adwaita_dep, gio_dep, nlohmann_dep],
-    cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers'],
-    install: true,
-  )
-  install_data('assets/org.helix.SystemMonitor.desktop', install_dir: get_option('datadir') / 'applications')
-  install_data('assets/org.helix.SystemMonitor.svg', install_dir: get_option('datadir') / 'icons' / 'hicolor' / 'scalable' / 'apps')
-endif
+# GTK desktop apps retired; Tauri apps under apps/.
 
 if build_tests
-  helix_monitor_test = executable('desktop_monitor_test',
-    sources: files('tests/desktop_monitor_test.cpp', 'src/apps/system_monitor/proc_reader.cpp'),
-    include_directories: include_directories('src'), override_options: ['b_ndebug=false'])
-  test('desktop_monitor', helix_monitor_test)
-  helix_wallpaper_test = executable('desktop_wallpaper_catalog_test',
-    sources: files('tests/desktop_wallpaper_catalog_test.cpp', 'src/apps/settings/wallpaper_catalog.cpp'),
-    include_directories: include_directories('src'), override_options: ['b_ndebug=false'])
-  test('desktop_wallpaper_catalog', helix_wallpaper_test)
   helix_wallhaven_test = executable('desktop_wallhaven_test',
-    sources: files('tests/desktop_wallhaven_test.cpp'), dependencies: noctalia_core_dep,
+    sources: files('tests/desktop_wallhaven_test.cpp'), dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'])
   test('desktop_wallhaven', helix_wallhaven_test)
-  helix_monitor_reports_test = executable('desktop_monitor_reports_test',
-    sources: files('tests/desktop_monitor_reports_test.cpp', 'src/apps/system_monitor/report_reader.cpp'),
-    include_directories: include_directories('src'), dependencies: [nlohmann_dep], override_options: ['b_ndebug=false'])
-  test('desktop_monitor_reports', helix_monitor_reports_test)
   helix_dns_test = executable('desktop_dns_validation_test',
     sources: files('tests/desktop_dns_validation_test.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
@@ -1329,32 +908,32 @@ if build_tests
   test('desktop_protocol', helix_protocol_test)
   helix_agent_policy_unit = executable('desktop_agent_policy_test',
     sources: files('tests/desktop_agent_policy_test.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop_api/peer_identity.cpp'),
-    dependencies: noctalia_core_dep,
+    dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('desktop_agent_policy', helix_agent_policy_unit, args: [meson.project_source_root()])
   helix_agent_broker_unit = executable('desktop_agent_broker_test',
     sources: files('tests/desktop_agent_broker_test.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_policy.cpp'),
-    dependencies: noctalia_core_dep,
+    dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('desktop_agent_broker', helix_agent_broker_unit)
   helix_tool_schema_unit = executable('desktop_tool_schema_test',
     sources: files('tests/desktop_tool_schema_test.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-    dependencies: noctalia_core_dep,
+    dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('desktop_tool_schema', helix_tool_schema_unit, args: [meson.project_source_root()])
   helix_inference_queue_unit = executable('inference_queue_test',
     sources: files('tests/inference_queue_test.cpp', 'src/inference/inference_queue.cpp'),
-    dependencies: [noctalia_core_dep, dependency('threads')],
+    dependencies: [helix_core_dep, dependency('threads')],
     override_options: ['b_ndebug=false'],
   )
   test('inference_queue', helix_inference_queue_unit, timeout: 60)
   helix_schema_grammar_unit = executable('inference_schema_grammar_test',
     sources: files('tests/inference_schema_grammar_test.cpp', 'src/inference/schema_grammar.cpp',
       'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-    dependencies: noctalia_core_dep,
+    dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('inference_schema_grammar', helix_schema_grammar_unit, args: [meson.project_source_root()])
@@ -1362,7 +941,7 @@ if build_tests
     helix_llama_test = executable('inference_llama_test',
       sources: files('tests/inference_llama_test.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
         'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-      dependencies: [noctalia_core_dep, llama_dep, dependency('threads')],
+      dependencies: [helix_core_dep, llama_dep, dependency('threads')],
       build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
       override_options: ['b_ndebug=false'],
     )
@@ -1370,7 +949,7 @@ if build_tests
     executable('inference_eval',
       sources: files('tests/inference_eval.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
         'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-      dependencies: [noctalia_core_dep, llama_dep, dependency('threads')],
+      dependencies: [helix_core_dep, llama_dep, dependency('threads')],
       build_rpath: llama_prefix / 'lib64',
       override_options: ['b_ndebug=false'],
     )
@@ -1380,14 +959,14 @@ if build_tests
     test('inference_llama_7b', helix_llama_test, is_parallel: false, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
   helix_assistant_session_unit = executable('assistant_session_test',
-    sources: files('tests/assistant_session_test.cpp', 'src/shell/assistant/assistant_session.cpp', 'src/desktop_api/display_text.cpp'),
-    dependencies: noctalia_core_dep,
-    cpp_args: _noctalia_cpp_args,
+    sources: files('tests/assistant_session_test.cpp', 'src/assistant/assistant_session.cpp', 'src/desktop_api/display_text.cpp'),
+    dependencies: helix_core_dep,
+    cpp_args: _helix_cpp_args,
   )
   test('assistant_session', helix_assistant_session_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
-    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/shell/agent/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
-    dependencies: noctalia_core_dep,
+    sources: files('tests/agent_confirmation_queue_test.cpp', 'src/desktop/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
+    dependencies: helix_core_dep,
     override_options: ['b_ndebug=false'],
   )
   test('agent_confirmation_queue', helix_confirmation_queue_unit)
@@ -1443,8 +1022,7 @@ if build_tests
   endif
   test('layering', find_program('python3'),
     args: [meson.project_source_root() / 'tools/check-layers.py', meson.project_source_root()])
-  test('msg_risk_policy', find_program('python3'),
-    args: [meson.project_source_root() / 'tests/msg_risk_policy_test.py', meson.project_source_root(), noctalia_exe])
+  # msg_risk_policy CLI host retired with helix-shell binary
   test('desktop_dbus_contract', find_program('python3'),
     args: [meson.project_source_root() / 'tests/desktop_dbus_contract_test.py', meson.project_source_root()])
   test('desktop_migration_inventory', find_program('python3'),

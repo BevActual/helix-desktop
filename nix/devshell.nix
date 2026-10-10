@@ -1,9 +1,9 @@
 {
   pkgs,
-  noctalia,
+  helix,
 }:
 pkgs.mkShell {
-  inputsFrom = [ noctalia ];
+  inputsFrom = [ helix ];
 
   nativeBuildInputs = with pkgs; [
     # Workflow & Hooks
@@ -30,7 +30,7 @@ pkgs.mkShell {
 
   shellHook = ''
     # Point to local assets so binaries find resources without installation
-    export NOCTALIA_ASSETS_DIR="$PWD/assets"
+    export HELIX_ASSETS_DIR="$PWD/assets"
 
     echo " Helix dev-shell | 'just --list' to see available tasks"
   '';

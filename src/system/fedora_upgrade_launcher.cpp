@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <vector>
 
-namespace noctalia::fedora_upgrade {
+namespace helix::fedora_upgrade {
 
   namespace {
 
@@ -43,13 +43,13 @@ namespace noctalia::fedora_upgrade {
     }
 
     std::filesystem::path helperPath() {
-#ifdef NOCTALIA_SYSTEM_UPGRADE_PATH
-      const std::filesystem::path configured(NOCTALIA_SYSTEM_UPGRADE_PATH);
+#ifdef HELIX_SYSTEM_UPGRADE_PATH
+      const std::filesystem::path configured(HELIX_SYSTEM_UPGRADE_PATH);
       if (isExecutableFile(configured)) {
         return configured;
       }
 #endif
-      for (const char* candidate : {"/usr/libexec/noctalia-system-upgrade", "/usr/local/libexec/noctalia-system-upgrade"}) {
+      for (const char* candidate : {"/usr/libexec/helix-system-upgrade", "/usr/local/libexec/helix-system-upgrade"}) {
         if (isExecutableFile(candidate)) {
           return candidate;
         }
@@ -114,4 +114,4 @@ namespace noctalia::fedora_upgrade {
     return Launch::Launched;
   }
 
-} // namespace noctalia::fedora_upgrade
+} // namespace helix::fedora_upgrade

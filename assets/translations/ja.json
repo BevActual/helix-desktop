@@ -560,10 +560,10 @@
       "calendar-google-connect-start-http": "Google認証を開始できませんでした。OAuthブローカーからHTTP {status}が返されました。",
       "calendar-google-connect-timeout": "Google の認証がタイムアウトしました。サインインする準備ができたら、もう一度接続を開始してください。",
       "greeter-sync-pending": "外観設定をグリーターに同期しています。管理者の認証画面が表示された場合は承認してください。パスワード不要の認証はシステムポリシーに従います。",
-      "greeter-sync-pending-manual": "認証済みの従来方式の同期用ファイルを準備しました。ターミナルで位置引数形式の適用ヘルパーを実行してください。独自の保存先を使用している場合はNOCTALIA_GREETER_STATE_DIRを引き継ぐか、shell.greeter_sync.privilege_commandを設定してから、もう一度同期してください。",
+      "greeter-sync-pending-manual": "認証済みの従来方式の同期用ファイルを準備しました。ターミナルで位置引数形式の適用ヘルパーを実行してください。独自の保存先を使用している場合はHELIX_GREETER_STATE_DIRを引き継ぐか、shell.greeter_sync.privilege_commandを設定してから、もう一度同期してください。",
       "greeter-sync-timeout": "グリーターの同期は、まだ認証待ちです。TTYまたはコンソールでpolkitの認証要求を確認するか、セキュリティ設定でpolkitエージェントを有効にするか、pkexecを手動で実行してください。",
-      "greeter-sync-timeout-manual": "認証済みの従来方式の同期には、引き続き管理者の承認が必要です。ターミナルで位置引数形式の適用ヘルパーを実行し、独自の保存先を使用している場合はNOCTALIA_GREETER_STATE_DIRを引き継いでください",
-      "greeter-sync-timeout-manual-pkexec": "グリーターの同期には、まだ認証が必要です。ターミナルで次のコマンドを実行してください：pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "認証済みの従来方式の同期には、引き続き管理者の承認が必要です。ターミナルで位置引数形式の適用ヘルパーを実行し、独自の保存先を使用している場合はHELIX_GREETER_STATE_DIRを引き継いでください",
+      "greeter-sync-timeout-manual-pkexec": "グリーターの同期には、まだ認証が必要です。ターミナルで次のコマンドを実行してください：pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "launcher-usage-reset": "ランチャー",
       "launcher-usage-reset-success": "使用データを消去しました。",
       "lockscreen-widgets-editor-blocked-locked": "ロック画面ウィジェットを編集する前にセッションのロックを解除してください。",
@@ -627,7 +627,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}：{error}",
-      "body-incompatible": "{plugin}はプラグインAPI{version}を対象としています。このNoctaliaが対応しているAPIは{oldest}～{current}です。",
+      "body-incompatible": "{plugin}はプラグインAPI{version}を対象としています。このHelixが対応しているAPIは{oldest}～{current}です。",
       "body-timeout": "{plugin}のインストールに時間がかかりすぎました。",
       "title": "プラグインが有効になっていません"
     }
@@ -756,8 +756,8 @@
         "rename": "画面の上書き設定の名前を変更できませんでした。"
       },
       "sync-greeter-timeout": "グリーターの同期は、まだ認証待ちです。TTYまたはコンソールでpolkitの認証要求を確認するか、セキュリティ設定でpolkitエージェントを有効にするか、pkexecを手動で実行してください。",
-      "sync-greeter-timeout-manual": "認証済みの従来方式の同期には、引き続き管理者の承認が必要です。ターミナルで位置引数形式の適用ヘルパーを実行し、独自の保存先を使用している場合はNOCTALIA_GREETER_STATE_DIRを引き継いでください",
-      "sync-greeter-timeout-manual-pkexec": "グリーターの同期には、まだ認証が必要です。ターミナルで次のコマンドを実行してください：pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\""
+      "sync-greeter-timeout-manual": "認証済みの従来方式の同期には、引き続き管理者の承認が必要です。ターミナルで位置引数形式の適用ヘルパーを実行し、独自の保存先を使用している場合はHELIX_GREETER_STATE_DIRを引き継いでください",
+      "sync-greeter-timeout-manual-pkexec": "グリーターの同期には、まだ認証が必要です。ターミナルで次のコマンドを実行してください：pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\""
     },
     "idle": {
       "behavior": {
@@ -893,7 +893,7 @@
         "deprecated": "非推奨",
         "empty": "有効なプラグインはありません。",
         "held-back": "旧バージョン",
-        "held-back-hint": "v{version}にはプラグインAPI{required}が必要ですが、このNoctaliaが対応しているのは{current}までです。利用するにはNoctaliaを更新してください。",
+        "held-back-hint": "v{version}にはプラグインAPI{required}が必要ですが、このHelixが対応しているのは{current}までです。利用するにはHelixを更新してください。",
         "incompatible-plugin-api": "互換性のないプラグインAPI",
         "remove": "プラグインを削除",
         "requires": "必要な依存関係：{dependencies}",
@@ -926,8 +926,8 @@
         },
         "kind-label": "種類",
         "location-label": "位置情報",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "配布元ID",
         "name-placeholder": "my-plugins",
         "precedence-hint": "同じプラグインがある場合、下にある配布元が上の配布元より優先されます。",
@@ -937,19 +937,19 @@
         "update": "配布元を更新"
       },
       "store": {
-        "add": "Noctaliaに追加",
+        "add": "Helixに追加",
         "back-to-catalog": "プラグインカタログに戻る",
         "categories": "カテゴリ",
         "category-all": "すべて",
         "empty": "プラグインが見つかりません",
         "held-back": "旧バージョン",
-        "held-back-hint": "プラグインAPI{resolved}向けのv{version}をインストールします。最新版v{latest}にはプラグインAPI{latestRequired}が必要ですが、このNoctaliaは{current}まで対応しています。",
+        "held-back-hint": "プラグインAPI{resolved}向けのv{version}をインストールします。最新版v{latest}にはプラグインAPI{latestRequired}が必要ですが、このHelixは{current}まで対応しています。",
         "incompatible": "互換性なし",
-        "incompatible-hint": "プラグインAPI{required}が必要ですが、このNoctaliaが対応しているのは{oldest}～{current}です。",
+        "incompatible-hint": "プラグインAPI{required}が必要ですが、このHelixが対応しているのは{oldest}～{current}です。",
         "installed": "インストール済み",
         "loading": "カタログを読み込み中…",
         "no-readme": "説明がありません。",
-        "open-page": "noctalia.devでプラグインページを開く",
+        "open-page": "helix.devでプラグインページを開く",
         "open-source": "プラグインのソースリポジトリを開く",
         "results-count": "{count}個のプラグイン",
         "search-placeholder": "プラグインを検索…",
@@ -971,7 +971,7 @@
           "label": "壁紙の配色をエクスポート"
         },
         "shell-theme-mode": {
-          "description": "Noctalia独自のライトまたはダークモードに固定します。「追従」ではテーマモードと同期します",
+          "description": "Helix独自のライトまたはダークモードに固定します。「追従」ではテーマモードと同期します",
           "label": "シェルのテーマモード"
         },
         "theme-mode": {
@@ -1037,7 +1037,7 @@
             "label": "テーマモード変更時"
           },
           "wallpaper-changed": {
-            "description": "壁紙変更時に実行するコマンド。NOCTALIA_WALLPAPER_PATHとNOCTALIA_WALLPAPER_CONNECTORが利用できます。",
+            "description": "壁紙変更時に実行するコマンド。HELIX_WALLPAPER_PATHとHELIX_WALLPAPER_CONNECTORが利用できます。",
             "label": "壁紙変更時"
           }
         }
@@ -1268,7 +1268,7 @@
           "placeholder": "都市名、国名"
         },
         "location-auto-locate": {
-          "description": "noctalia.devを利用してIPアドレスから現在地を自動検出",
+          "description": "helix.devを利用してIPアドレスから現在地を自動検出",
           "label": "現在地を自動検出（IP）"
         },
         "mpris-blacklist": {
@@ -1358,15 +1358,15 @@
           "description-unavailable": "利用可能なSecret Serviceプロバイダーがありません。クリップボード履歴はこのセッション中のみ利用できます"
         },
         "external-ip": {
-          "description": "接続のパブリックWAN IPアドレスを（api.noctalia.dev経由で）取得し、コントロールセンターのネットワークタブに表示します"
+          "description": "接続のパブリックWAN IPアドレスを（a public IP lookup service経由で）取得し、コントロールセンターのネットワークタブに表示します"
         },
         "greeter-sync-auto": {
           "description": "壁紙、配色、テーマモード、またはシェルフォントの変更時に、グリーターを自動同期します。認証は引き続きシステムの方針に従います。この設定でパスワードなしの同期が有効になることはありません。"
         },
         "launch-apps-as-systemd-services": {
-          "description": "アプリを個別のsystemdサービスとして起動し、Noctaliaのcgroupを共有しないようにします。",
+          "description": "アプリを個別のsystemdサービスとして起動し、Helixのcgroupを共有しないようにします。",
           "label": "アプリをsystemdサービスとして起動",
-          "requires-systemd-session": "Noctaliaをsystemdユーザーサービスとして実行する必要があります（uwsmまたはsystemdユーザーユニット）"
+          "requires-systemd-session": "Helixをsystemdユーザーサービスとして実行する必要があります（uwsmまたはsystemdユーザーユニット）"
         },
         "offline-mode": {
           "description": "すべての送信ネットワーク通信をブロック"
@@ -1497,7 +1497,7 @@
           "label": "位置情報を表示"
         },
         "sync-greeter": {
-          "description": "現在の外観設定と画面配置をNoctalia Greeterにコピーします。システムポリシーでユーザーのパスワードなし同期が許可されていない場合は、管理者の承認を求めます。"
+          "description": "現在の外観設定と画面配置をHelix Greeterにコピーします。システムポリシーでユーザーのパスワードなし同期が許可されていない場合は、管理者の承認を求めます。"
         },
         "telemetry": {
           "description": "バージョン、OS、コンポジター、画面解像度、RAM、UI倍率を含む匿名の起動時通信を送信します。"
@@ -1695,7 +1695,7 @@
             "label": "画面の電源を入れる"
           },
           "greeter-sync": {
-            "description": "壁紙、配色、画面配置をNoctalia Greeterに同期"
+            "description": "壁紙、配色、画面配置をHelix Greeterに同期"
           },
           "keyboard-backlight-osd": {
             "description": "明るさを変更せずにキーボードバックライトOSDを表示",
@@ -1953,7 +1953,7 @@
     "no-wallpaper-selected": "壁紙が選択されていません",
     "select-wallpaper": "壁紙を選択",
     "subtitle": "いくつかの簡単な設定を選んで始めましょう。",
-    "title": "Noctaliaへようこそ",
+    "title": "Helixへようこそ",
     "wallpaper": "壁紙",
     "wallpaper-scheme": "壁紙配色"
   },

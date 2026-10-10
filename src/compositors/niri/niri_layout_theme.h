@@ -9,7 +9,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kLayoutThemeIncludeFileName = "noctalia-layout.kdl";
+  inline constexpr std::string_view kLayoutThemeIncludeFileName = "helix-layout.kdl";
 
   struct LayoutThemeSettings {
     bool focusRing = false;

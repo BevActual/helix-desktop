@@ -862,12 +862,12 @@
       "greeter-sync-pending": "Sincronizando aparência para o greeter. Se uma caixa de diálogo de autorização aparecer, aprove-o; autorização sem senha segue políticas do sistema.",
       "greeter-sync-pending-console": "Sincronizando aparência para o greeter. Se autorização é necessária, aprove o diálogo polkit no Helix, em um TTY ou em um console.",
       "greeter-sync-pending-legacy": "Sincronizando através do utilitário legado. Aprovação do administrador é necessária.",
-      "greeter-sync-pending-manual": "Os arquivos estão preparados para a sincronização legada autenticada. Execute o auxiliar de aplicação posicional em um terminal, mantendo o NOCTALIA_GREETER_STATE_DIR caso utilize um caminho personalizado, ou configure o shell.greeter_sync.privilege_command e sincronize novamente.",
-      "greeter-sync-pending-manual-pkexec": "Sincronizando aparência para o greeter. Se autorização de administrador for necessária e não for apresentada uma caixa de diálogo, execute em um terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "Os arquivos estão preparados para a sincronização legada autenticada. Execute o auxiliar de aplicação posicional em um terminal, mantendo o HELIX_GREETER_STATE_DIR caso utilize um caminho personalizado, ou configure o shell.greeter_sync.privilege_command e sincronize novamente.",
+      "greeter-sync-pending-manual-pkexec": "Sincronizando aparência para o greeter. Se autorização de administrador for necessária e não for apresentada uma caixa de diálogo, execute em um terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Aparência sincronizada. As alterações serão aplicadas na próxima tela de login.",
       "greeter-sync-timeout": "A sincronização do Greeter ainda está aguardando autorização. Verifique se há uma caixa de diálogo do polkit em um TTY ou console, habilite o agente polkit nas configurações de Segurança ou execute o pkexec manualmente.",
-      "greeter-sync-timeout-manual": "A sincronização legada do Greeter ainda precisa da autorização. Execute o auxiliar de aplicação posicional em um terminal e preserve NOCTALIA_GREETER_STATE_DIR se você utiliza um caminho personalizado.",
-      "greeter-sync-timeout-manual-pkexec": "Sincronização com o greeter continua necessitando autorização. Execute em um terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "A sincronização legada do Greeter ainda precisa da autorização. Execute o auxiliar de aplicação posicional em um terminal e preserve HELIX_GREETER_STATE_DIR se você utiliza um caminho personalizado.",
+      "greeter-sync-timeout-manual-pkexec": "Sincronização com o greeter continua necessitando autorização. Execute em um terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "Este atalho aceita uma única tecla sem modificadores.",
       "keybind-invalid-printable": "Teclas imprimíveis (letras, números, símbolos) requerem uma tecla modificadora como Ctrl ou Alt.",
@@ -1236,8 +1236,8 @@
       "support-report": "Falha em salvar o relatório de suporte.",
       "sync-greeter": "Não foi possível sincronizar a aparência com o Helix Greeter.",
       "sync-greeter-timeout": "A sincronização do Greeter ainda está aguardando a autorização. Verifique se há uma caixa de diálogo do polkit em um TTY ou console, habilite o agente polkit nas configurações de Segurança ou execute o pkexec manualmente.",
-      "sync-greeter-timeout-manual": "A sincronização legada do Greeter ainda precisa da autorização do administrador. Execute o auxiliar de aplicação posicional em um terminal e preserve NOCTALIA_GREETER_STATE_DIR se você utiliza um caminho personalizado.",
-      "sync-greeter-timeout-manual-pkexec": "Sincronização com o greeter continua necessitando autorização. Execute em um terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "A sincronização legada do Greeter ainda precisa da autorização do administrador. Execute o auxiliar de aplicação posicional em um terminal e preserve HELIX_GREETER_STATE_DIR se você utiliza um caminho personalizado.",
+      "sync-greeter-timeout-manual-pkexec": "Sincronização com o greeter continua necessitando autorização. Execute em um terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Não foi possível renomar o widget nomeado."
       },
@@ -1651,8 +1651,8 @@
         },
         "kind-label": "Tipo",
         "location-label": "Localização",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID da Fonte",
         "name-placeholder": "meus-plugins",
         "precedence-hint": "As fontes de nível inferior têm prioridade sobre as de nível superior quando oferecem o mesmo plug-in.",
@@ -1674,7 +1674,7 @@
         "installed": "Instalado",
         "loading": "Carregando catálogo...",
         "no-readme": "Nenhuma descrição disponível.",
-        "open-page": "Abrir página de plugin em noctalia.dev",
+        "open-page": "Abrir página de plugin em helix.dev",
         "open-source": "Abrir repositório fonte de plugin",
         "results-count": "{count} plugins",
         "search-placeholder": "Busque plugins...",
@@ -1734,7 +1734,7 @@
           "label": "Arredondamento dos Cantos"
         },
         "custom-palette": {
-          "description": "Escolha uma paleta em ~/.config/noctalia/palettes/",
+          "description": "Escolha uma paleta em ~/.config/helix/palettes/",
           "label": "Paleta Personalizada",
           "search-placeholder": "Busque paletas personalizadas..."
         },
@@ -2224,7 +2224,7 @@
             "label": "Ao Mudar o Modo do Tema"
           },
           "wallpaper-changed": {
-            "description": "Comando para executar quando o papel de parede mudar; fornece NOCTALIA_WALLPAPER_PATH e NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Comando para executar quando o papel de parede mudar; fornece HELIX_WALLPAPER_PATH e HELIX_WALLPAPER_CONNECTOR",
             "label": "Ao Mudar o Papel de Parede"
           },
           "wifi-disabled": {
@@ -2972,7 +2972,7 @@
           "label": "Formato da Data"
         },
         "external-ip": {
-          "description": "Determinar o IP público da WAN da conexão (por meio de api.noctalia.dev) e exibi-lo na guia “Rede” da Central de Controle",
+          "description": "Determinar o IP público da WAN da conexão (por meio de a public IP lookup service) e exibi-lo na guia “Rede” da Central de Controle",
           "label": "Mostrar IP da WAN"
         },
         "greeter-sync-auto": {
@@ -3724,7 +3724,7 @@
             "label": "Abrir configurações"
           },
           "settings-open-plugin": {
-            "description": "Abrir a janela de configurações na configuração de um plugin (ex.: noctalia/notes)",
+            "description": "Abrir a janela de configurações na configuração de um plugin (ex.: helix/notes)",
             "label": "Abrir configurações de plugin"
           },
           "settings-open-widget": {

@@ -33,20 +33,20 @@ if tauri; then
   esac
 fi
 case "$cmd" in
-  launcher|control-center) exec noctalia msg panel-toggle "$cmd" ;;
-  settings) exec noctalia msg settings-toggle ;;
-  lock) exec noctalia msg session lock ;;
-  lid-close) exec noctalia msg session lid-close ;;
-  window-switcher|volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down) exec noctalia msg "$cmd" ;;
-  notifications) exec noctalia msg panel-toggle notifications ;;
-  quick-insert) exec noctalia msg panel-toggle quick-insert ;;
-  dnd) exec noctalia msg notification-dnd-toggle ;;
-  night-light) exec noctalia msg nightlight-toggle ;;
-  media-toggle) exec noctalia msg media toggle ;;
-  media-next) exec noctalia msg media next ;;
-  media-previous) exec noctalia msg media previous ;;
-  screenshot) exec noctalia msg screenshot-region ;;
-  screenshot-screen) exec noctalia msg screenshot-fullscreen ;;
+  launcher|control-center) exec helix-shell msg panel-toggle "$cmd" ;;
+  settings) exec helix-shell msg settings-toggle ;;
+  lock) exec helix-shell msg session lock ;;
+  lid-close) exec helix-shell msg session lid-close ;;
+  window-switcher|volume-up|volume-down|volume-mute|mic-mute|brightness-up|brightness-down) exec helix-shell msg "$cmd" ;;
+  notifications) exec helix-shell msg panel-toggle notifications ;;
+  quick-insert) exec helix-shell msg panel-toggle quick-insert ;;
+  dnd) exec helix-shell msg notification-dnd-toggle ;;
+  night-light) exec helix-shell msg nightlight-toggle ;;
+  media-toggle) exec helix-shell msg media toggle ;;
+  media-next) exec helix-shell msg media next ;;
+  media-previous) exec helix-shell msg media previous ;;
+  screenshot) exec helix-shell msg screenshot-region ;;
+  screenshot-screen) exec helix-shell msg screenshot-fullscreen ;;
   assistant|agents) exit 0 ;;
   *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
 esac

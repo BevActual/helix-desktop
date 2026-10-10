@@ -1,4 +1,4 @@
-"""The agent MCP adapter must enforce msg-risk.toml at its single `noctalia msg` choke point."""
+"""The agent MCP adapter must enforce msg-risk.toml at its single `helix-panel` choke point."""
 import importlib.util
 import os
 import pathlib
@@ -8,17 +8,17 @@ import tempfile
 
 root = pathlib.Path(sys.argv[1])
 with tempfile.TemporaryDirectory() as tmp:
-    fake = pathlib.Path(tmp) / "noctalia"
+    fake = pathlib.Path(tmp) / "helix"
     fake.write_text('#!/bin/sh\nprintf "argv:"; for a in "$@"; do printf " [%s]" "$a"; done; printf "\\n"\n')
     fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
-    os.environ["HELIX_NOCTALIA"] = str(fake)
+    os.environ["HELIX_SHELL"] = str(fake)
 
     spec = importlib.util.spec_from_file_location("helix_agent_server", root / "tools/helix-agent/server.py")
     server = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(server)
     server.BACKEND_MODE = "legacy"  # this test is about the adapter's own gate, not the desktop service
 
-    msg = server.noctalia_msg
+    msg = server.helix_msg
 
     # Blocked commands are unreachable even though the fake binary would happily run them.
     for blocked in (("session", "reboot"), ("session", "shutdown"), ("firewall-panic-toggle",)):

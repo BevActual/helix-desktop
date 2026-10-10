@@ -1,7 +1,7 @@
 #include "wayland/output_probe.h"
 
 #include "core/log.h"
-#include "render/surface/layer_surface.h"
+// LayerShell enums inlined (platform must not include display)
 #include "wayland/wayland_connection.h"
 #include "wlr-layer-shell-unstable-v1-client-protocol.h"
 
@@ -16,7 +16,7 @@ namespace {
   constexpr Logger kLog("output-probe");
 
   int createAnonFd(std::size_t size) {
-    int fd = memfd_create("noctalia-output-probe", MFD_CLOEXEC);
+    int fd = memfd_create("helix-output-probe", MFD_CLOEXEC);
     if (fd < 0) {
       return -1;
     }
@@ -64,8 +64,8 @@ OutputProbe::OutputProbe(WaylandConnection& wayland, std::chrono::milliseconds t
   // No output argument: the compositor assigns the surface to the output it
   // would choose for any unpinned layer surface (the focused one).
   m_layerSurface = zwlr_layer_shell_v1_get_layer_surface(
-      m_wayland.layerShell(), m_surface, nullptr, static_cast<std::uint32_t>(LayerShellLayer::Background),
-      "noctalia-output-probe"
+      m_wayland.layerShell(), m_surface, nullptr, /*ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND*/ 0u,
+      "helix-output-probe"
   );
   if (m_layerSurface == nullptr) {
     finish(nullptr);
@@ -76,7 +76,7 @@ OutputProbe::OutputProbe(WaylandConnection& wayland, std::chrono::milliseconds t
   zwlr_layer_surface_v1_set_anchor(m_layerSurface, 0);
   zwlr_layer_surface_v1_set_exclusive_zone(m_layerSurface, -1);
   zwlr_layer_surface_v1_set_keyboard_interactivity(
-      m_layerSurface, static_cast<std::uint32_t>(LayerShellKeyboard::None)
+      m_layerSurface, /*ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE*/ 0u
   );
 
   // The probe never takes input — an empty region keeps its stray pixel from

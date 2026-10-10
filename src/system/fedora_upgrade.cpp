@@ -4,7 +4,7 @@
 #include <array>
 #include <cstring>
 
-namespace noctalia::fedora_upgrade {
+namespace helix::fedora_upgrade {
 
   namespace {
 
@@ -121,4 +121,4 @@ namespace noctalia::fedora_upgrade {
     return plan;
   }
 
-} // namespace noctalia::fedora_upgrade
+} // namespace helix::fedora_upgrade

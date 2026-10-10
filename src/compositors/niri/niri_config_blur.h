@@ -13,7 +13,7 @@ namespace compositors::niri {
 
   class NiriRuntime;
 
-  inline constexpr std::string_view kBlurIncludeFileName = "noctalia-blur.kdl";
+  inline constexpr std::string_view kBlurIncludeFileName = "helix-blur.kdl";
 
   inline constexpr int kDefaultBlurPasses = 2;
   inline constexpr float kDefaultBlurOffset = 3.0F;

@@ -1,50 +1,56 @@
 # Helix
 
-Helix is a niri-first Linux desktop, not a drop-in rebrand of upstream Noctalia.
+Helix is a niri-first Linux desktop: login, compositor, and shell as one product tree.
 
-## Three packages
+**How it should be structured and run:** [`docs/design/product-structure.md`](docs/design/product-structure.md).  
+**Design index:** [`docs/design/README.md`](docs/design/README.md).
 
-| Package | Role |
+## Packages in this repository
+
+| Path | Role |
 |---|---|
-| **helix-greeter** | Login (greetd session) |
-| **helix-niri** | Compositor |
-| **Helix Shell** (this tree) | Bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, desktop widgets |
+| **greeter/** | Login greeter (Tauri; greetd) |
+| **compositor/** | Helix compositor (niri fork; own Cargo workspace) |
+| **shell/**, **apps/**, **services/**, **core/** | Helix Shell (Tauri + desktop authority + helpers) |
 
-Login flow: **greetd → helix-greeter → helix-niri + Helix Shell**. Fedora and helix-niri are the sole shell target. Other compositor backends are retained only until the migration cutover.
+Login flow: **greetd → helix-greeter → helix-niri + Helix Shell**. Fedora and helix-niri are the sole shell target.
 
-## Names that stay `noctalia`
+## Session shell (live)
 
-Keep these until a rename is an explicit release:
+```sh
+tools/switch-shell.sh install
+```
 
-- Meson project and installed command: `noctalia`
-- Config, state, cache: `~/.config/noctalia/`, `~/.local/state/noctalia/`, and the `NOCTALIA_*` env overrides
-- IPC: `noctalia msg …`
-- Desktop entry id: `dev.noctalia.Noctalia.desktop` (the **Name** is Helix Shell)
-- Builtin palette id: `Noctalia`
+Compositor / greeter (from this tree):
 
-The name in the UI, notifications, generated niri includes, template display names, docs, and package descriptions is **Helix Shell**. Template file paths (`noctalia.yaml`, `noctalia.conf`, `Noctalia.toml`) stay as compatibility names.
+```sh
+cd compositor && cargo build --release
+cargo build --profile fast -p helix-greeter
+```
+
+Standalone apps under `apps/` (shared UI in `core/shared-ui/`). Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
+
+## Repository map
+
+| Path | Role |
+|---|---|
+| `greeter/` | Tauri login greeter (`helix-greeter`) |
+| `compositor/` | niri fork (excluded from root Cargo workspace) |
+| `core/` | Pure core, desktop API client, shared-ui |
+| `shell/` | Live session shell (Tauri) |
+| `apps/` | Settings, Software, Monitor, Mobius (`helix-chat` tree → `helix-mobius`) |
+| `services/` | `helix-desktop` (Rust Desktop scaffold), wallpaper, idle |
+| `dev/` | Nested probes only |
+| `protocols/` | D-Bus / IPC contracts |
+| `tools/` | Dev install, nested tests, Helix MCP server (`helix-agent`), helpers |
+| `src/desktop/` | `helix-service` (keep) |
+| `src/assistant/`, `src/inference/` | Assistant + model runtime (target: `services/helix-*`) |
+| `src/` (platform) | config, theme, dbus, wayland, … (migrating with domains) |
+| `assets/` | Branding, templates, translations |
+| `docs/` | Design + user docs (`design/archive/` for dumps) |
 
 ## Design
 
-GTK4/libadwaita defines shared controls and application styling; glass remains floating shell chrome. The full design language (tiers, color, shape, type, motion, menus, accessibility, and known gaps) is in `docs/design/helix-hig.md`. Control Center follows Apple HIG structure without copying private Control Center visuals.
+GTK4/libadwaita defines shared controls and application styling; glass remains floating shell chrome. Full language: `docs/design/helix-hig.md`.
 
-Helix is evolving toward an **agentic OS** (Agent Center hub + Assistant presence). The session
-**Agent Surface** contract lives in `docs/design/agentic-os.md`; v1 is IPC + MCP adapters, not the
-assistant UI yet.
-
-## Lineage
-
-This tree started from [Noctalia](https://github.com/noctalia-dev/noctalia). Compatibility names above are on purpose so existing installs keep working.
-
-## Independent services and applications
-
-`helix-service` owns configuration persistence, appearance exports and the migrated audio/network/
-Bluetooth backends. `helix-settings` is an adaptive GTK4/libadwaita application that can run without
-Helix Shell or helix-niri. The shell retains rendering, session surfaces and audio playback/observation.
-The migration inventory in `docs/design/desktop-migration.json` tracks feature parity.
-The user explicitly retired all legacy Settings editors on 2026-10-05 before
-replacement parity; unavailable advanced controls must be rebuilt in GTK Settings.
-`docs/design/desktop-transition-handoff.md` records the current
-implementation state, next slices and verification criteria for contributors.
-Settings commands now launch GTK Settings, and Control Center defaults to quick Home.
-The full desktop migration remains incomplete.
+Helix is an **agentic OS** (Mobius hub + bar Assistant + MCP layer). Fabric: `docs/design/inference-fabric.md`. Surface: `docs/design/agentic-os.md`.

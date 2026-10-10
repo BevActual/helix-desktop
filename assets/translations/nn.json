@@ -770,7 +770,7 @@
       "calendar-google-connect-start-failed": "Kunne ikkje byrja Google-sanninga. Sjå etter nettverktilkoplinga og prøv å nyo.",
       "calendar-google-connect-start-http": "Kunne ikkje byrja Google-sanninga. OAuth-handsamaren svara med HTTP {status}.",
       "calendar-google-connect-timeout": "Google-sanning gjekk ut. Byrja koplinga å nyo når du vil skriva deg inn.",
-      "config-migration-body": "Oppdater {path} i brunnfila. Helix legg til dette utbytet berre mellombels. Køyr noctalia config validate for å sjå alle dei naudsynlege brigda.",
+      "config-migration-body": "Oppdater {path} i brunnfila. Helix legg til dette utbytet berre mellombels. Køyr helix config validate for å sjå alle dei naudsynlege brigda.",
       "config-migration-title": "Tilmåtinga krev oppdatering",
       "dbus-disabled": "DBus-varsel avslegne",
       "desktop-widgets-editor": "Nøytelbrigdar",
@@ -778,10 +778,10 @@
       "greeter-sync": "Helixhelsar",
       "greeter-sync-pending": "Ventar på stjornargodkjenning for å skriva til helsaren.",
       "greeter-sync-pending-console": "Ventar på stjornargodkjenning. Godkjenn polkit-meldinga i Helix, i ein TTY eller konsoll, eller køyr pkexec sjølv.",
-      "greeter-sync-pending-manual": "Filene ventar. Køyr i terminal: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\". Eller set shell.greeter_sync.privilege_command (til dømes ghostty -e pkexec) og synkroniser å nyo.",
+      "greeter-sync-pending-manual": "Filene ventar. Køyr i terminal: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\". Eller set shell.greeter_sync.privilege_command (til dømes ghostty -e pkexec) og synkroniser å nyo.",
       "greeter-sync-success": "Utsjånad synkronisert. Brigde viser neste gong du skriv deg inn.",
       "greeter-sync-timeout": "Helsarsynkroniseringa ventar enno på stjornargodkjenning. Sjå i ein TTY eller konsoll for polkit-leietekst, slå på polkitagenten i Tryggleiksinnstillingane, eller køyr pkexec sjølv.",
-      "greeter-sync-timeout-manual": "Helsarsynkroniseringa tarv enno stjornargodkjenning. Køyr i terminal: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "Helsarsynkroniseringa tarv enno stjornargodkjenning. Køyr i terminal: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "Snarvegen godtek éin knapp utan hjelpeknappar.",
       "keybind-invalid-printable": "Skrivande knappar (bokstavar, tal, teikn) krev ein hjelpeknapp som Ctrl eller Alt.",
@@ -1145,7 +1145,7 @@
       "support-report": "Kunne ikkje lagra støtterapport.",
       "sync-greeter": "Kunne ikkje synkronisera utsjånad med Helixhelsaren.",
       "sync-greeter-timeout": "Helsarsynkroniseringa ventar enno på stjornargodkjenning. Sjå i ein TTY eller konsoll for polkit-leietekst, slå på polkitagenten i Tryggleiksinnstillingane, eller køyr pkexec sjølv.",
-      "sync-greeter-timeout-manual": "Helsarsynkroniseringa tarv enno stjornargodkjenning. Køyr i terminal: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "Helsarsynkroniseringa tarv enno stjornargodkjenning. Køyr i terminal: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
       "widget": {
         "rename": "Kunne ikkje gjeva eit nytt namn til nøytelen."
       },
@@ -1535,8 +1535,8 @@
         },
         "kind-label": "Slag",
         "location-label": "Stad",
-        "location-placeholder-git": "https://github.com/me/noctalia-utvidingar",
-        "location-placeholder-path": "~/dev/noctalia-utvidingar",
+        "location-placeholder-git": "https://github.com/me/helix-utvidingar",
+        "location-placeholder-path": "~/dev/helix-utvidingar",
         "name-label": "Brunn-ID",
         "name-placeholder": "utvidingane-mine",
         "precedence-hint": "Brunnar lægre ned på lista overstyrer høgre brunnar når dei båe byd på same utvidinga.",
@@ -1557,7 +1557,7 @@
         "incompatible-hint": "Krev utvidings-API {required}; denne Helix stør {oldest} – {current}.",
         "loading": "Lastar inn katalog ...",
         "no-readme": "Ingen skildring tilgjengeleg.",
-        "open-page": "Opna utvidingssida på noctalia.dev",
+        "open-page": "Opna utvidingssida på helix.dev",
         "open-source": "Opna kodelageret for utvidinga",
         "results-count": "{count} utvidingar",
         "search-placeholder": "Leita i utvidingar ...",
@@ -1617,7 +1617,7 @@
           "label": "Rundingsgrad på hyrno"
         },
         "custom-palette": {
-          "description": "Vel ein palett frå ~/.config/noctalia/palettes/",
+          "description": "Vel ein palett frå ~/.config/helix/palettes/",
           "label": "Sjølvvald palett",
           "search-placeholder": "Leita i sjølvvalde palettar ..."
         },
@@ -2099,7 +2099,7 @@
             "label": "Ved brigda hammodus"
           },
           "wallpaper-changed": {
-            "description": "Kommandoen som køyrer når bakgrunnsbiletet brigdar; gjev NOCTALIA_WALLPAPER_PATH og NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Kommandoen som køyrer når bakgrunnsbiletet brigdar; gjev HELIX_WALLPAPER_PATH og HELIX_WALLPAPER_CONNECTOR",
             "label": "Ved nytt bakgrunnsbilete"
           },
           "wifi-disabled": {
@@ -2600,7 +2600,7 @@
           "placeholder": "By, Land"
         },
         "location-auto-locate": {
-          "description": "Finn staden din automatisk ut frå IP-adressa di med noctalia.dev",
+          "description": "Finn staden din automatisk ut frå IP-adressa di med helix.dev",
           "label": "Finn-stad (IP)"
         },
         "longitude": {
@@ -2823,7 +2823,7 @@
           "label": "Datoformattering"
         },
         "external-ip": {
-          "description": "Finn den offentlege WAN IP-adressa til oppkoplinga (med api.noctalia.dev) og vis henne i nettverksfana i Styreromet",
+          "description": "Finn den offentlege WAN IP-adressa til oppkoplinga (med a public IP lookup service) og vis henne i nettverksfana i Styreromet",
           "label": "Vis WAN IP"
         },
         "greeter-sync-auto": {

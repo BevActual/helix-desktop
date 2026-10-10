@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme_file="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/noctalia.yaml"
+theme_file="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/helix.yaml"
 config_file="${XDG_CONFIG_HOME:-$HOME/.config}/warp-terminal/settings.toml"
 
 write_if_changed() {
@@ -16,7 +16,7 @@ if [[ -f "$config_file" ]]; then
     tmp_file="$(mktemp "${config_file}.tmp.XXXXXX")"
     trap 'rm -f "$tmp_file"' EXIT
     awk '
-        /noctalia\.yaml/ { next }
+        /helix\.yaml/ { next }
         { print }
     ' "$config_file" >"$tmp_file"
     trap - EXIT

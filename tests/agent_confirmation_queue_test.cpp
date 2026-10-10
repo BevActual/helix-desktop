@@ -1,4 +1,4 @@
-#include "shell/agent/agent_confirmation_queue.h"
+#include "desktop/agent_confirmation_queue.h"
 #include "tests/test_check.h"
 
 using namespace helix::agent;

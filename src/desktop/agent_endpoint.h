@@ -11,7 +11,7 @@
 
 namespace helix::agent {
 
-// GDBus face of org.helix.Desktop.Agent1. Policy and confirmation logic live in AgentBroker; this class resolves
+// GDBus face of org.helix.Desktop.AgentSurface1. Policy and confirmation logic live in AgentBroker; this class resolves
 // who is calling, enforces the confirmer and manager roles, and turns broker completions into signals.
 // If the risk policy cannot be loaded every method fails closed with the reason.
 class AgentEndpoint {
@@ -20,7 +20,7 @@ public:
                 std::function<std::string()> desktopOwner);
 
   void method(const std::string& sender, const std::string& name, GVariant* parameters, GDBusMethodInvocation* invocation);
-  // org.helix.Desktop.AgentActivity1: only the registered desktop may call these.
+  // org.helix.Desktop.AgentSurfaceActivity1: only the registered desktop may call these.
   void activity(const std::string& sender, const std::string& name, GVariant* parameters, GDBusMethodInvocation* invocation);
   void ownerGone(const std::string& name);
   void tick();

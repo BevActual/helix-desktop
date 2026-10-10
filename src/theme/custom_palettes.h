@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   struct GeneratedPalette;
 
@@ -24,4 +24,4 @@ namespace noctalia::theme {
   );
   [[nodiscard]] bool applyEditablePaletteRole(::Palette& palette, ColorRole role, const ::Color& color);
 
-} // namespace noctalia::theme
+} // namespace helix::theme

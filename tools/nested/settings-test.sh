@@ -1,10 +1,10 @@
 #!/bin/bash
-# Helix Settings against the real service: it becomes the Agent1 manager, lists who holds which tiers, and a tier switch or a revoke
+# Helix Settings against the real service: it becomes the Agent Surface manager, lists who holds which tiers, and a tier switch or a revoke
 # changes what the service holds. Controls are clicked by name with the real pointer; the truth is read from the service's own state.
 #   HELIX_NESTED_SCRIPT=tools/nested/settings-test.sh tools/nested/run.sh settings tools/nested/settings-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 # (no gaps, so the window sits at the corner of the screen and the pointer maths is exact)
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log; FAILED=0
-LAYOUT=$SCRATCH/state/layout.json; GRANTS=$SCRATCH/state/noctalia/agent/grants.json
+LAYOUT=$SCRATCH/state/layout.json; GRANTS=$SCRATCH/state/helix/agent/grants.json
 source "$ROOT/tools/nested/ui-lib.sh"
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 wait_log() { for _ in $(seq 1 "${2:-60}"); do grep 'SETTINGS agents' "$LOG" | tail -1 | grep -Eq "$1" && return 0; sleep 0.25; done; echo "TIMEOUT waiting for: $1 (newest: $(grep 'SETTINGS agents' "$LOG" | tail -1))" >&2; return 1; }
@@ -53,6 +53,23 @@ echo "--- 1c. the Keyboard page lists the key binds and flags the clash"
 click_id page-keyboard; sleep 1.2
 for _ in $(seq 1 20); do has_id "shortcut:Open the launcher" && break; sleep 0.25; done
 has_id "shortcut:Open the launcher" && has_id "shortcut:Open a Terminal" && has_id "shortcut:Close window" && echo "ok: binds listed" || fail "binds missing"
+echo "--- 1c2. a navigation chord can be changed"
+for _ in $(seq 1 20); do has_id "keybind-edit:keybinds.copy" && break; sleep 0.25; done
+has_id "keybind-edit:keybinds.copy" || fail "copy keybind missing"
+click_id "keybind-edit:keybinds.copy"; sleep 0.6
+has_id "keybind-input:keybinds.copy" && has_id "keybind-save:keybinds.copy" || fail "edit form missing"
+click_id "keybind-input:keybinds.copy"; sleep 0.2
+wtype -M ctrl -k a -m ctrl; wtype -k BackSpace; wtype "Alt+F9; Ctrl+F8"; sleep 0.3
+click_id "keybind-save:keybinds.copy"; sleep 1.2
+copy_keys=$(python3 - <<'PY'
+import json, re, subprocess
+out = subprocess.check_output(["gdbus", "call", "--session", "--dest", "org.helix.Desktop", "--object-path", "/org/helix/Desktop", "--method", "org.helix.Desktop.Configuration1.GetSettings"], text=True)
+# GVariant dump: find the keybinds.copy entry and print its value blob
+m = re.search(r"'id': <'keybinds\.copy'>.*?('value': <.*?>)(?:, '|})", out, re.S)
+print(m.group(1) if m else "<missing>")
+PY
+)
+echo "$copy_keys" | grep -q "Alt+F9" && echo "$copy_keys" | grep -q "Ctrl+F8" && echo "ok: copy chords changed" || fail "copy chords are $copy_keys"
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-keyboard.png"
 echo "--- 1d. the Wallpaper page writes the choice the wallpaper process reads"
 CHOICE=$SCRATCH/config/helix/wallpaper.toml
@@ -112,7 +129,7 @@ click_id revoke-1; sleep 1.2
 wait_log 'clients=1' && echo "ok: the page followed" || fail "the page still lists it"
 
 echo "--- 4. the changes are in the audit"
-grep -c '"tool":"grant-change"' "$SCRATCH/state/noctalia/agent/audit.jsonl" | sed 's/^/grant-change records: /'
-[ "$(grep -c '"tool":"grant-change"' "$SCRATCH/state/noctalia/agent/audit.jsonl")" -ge 3 ] && echo "ok: every change was recorded" || fail "changes missing from the audit"
+grep -c '"tool":"grant-change"' "$SCRATCH/state/helix/agent/audit.jsonl" | sed 's/^/grant-change records: /'
+[ "$(grep -c '"tool":"grant-change"' "$SCRATCH/state/helix/agent/audit.jsonl")" -ge 3 ] && echo "ok: every change was recorded" || fail "changes missing from the audit"
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/settings-final.png"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

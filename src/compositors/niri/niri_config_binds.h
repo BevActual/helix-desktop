@@ -13,7 +13,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kBindsIncludeFileName = "noctalia-binds.kdl";
+  inline constexpr std::string_view kBindsIncludeFileName = "helix-binds.kdl";
 
   enum class BindKind : std::uint8_t { Panels, Capture, Media, System };
 

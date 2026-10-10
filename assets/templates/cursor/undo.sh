@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/themes/noctalia.yaml"
+theme_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/themes/helix.yaml"
 db_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/globalStorage/state.vscdb"
 
 rm -f -- "$theme_file"
@@ -22,7 +22,7 @@ import sys
 
 db_file = os.environ["DB_FILE"]
 settings_prefix = "cursor-custom-theme:"
-theme_id = "noctalia"
+theme_id = "helix"
 fallback = {
     "glass.theme.settingsId": "Cursor Dark",
     "glass.theme.darkSettingsId": "Cursor Dark",
@@ -50,7 +50,7 @@ try:
     for key, value in list(themes.items()):
         name = value.get("name") if isinstance(value, dict) else None
         vscode_id = value.get("vscodeThemeSettingsId") if isinstance(value, dict) else None
-        if key == theme_id or name in {"Helix", "Noctalia"} or vscode_id in {"Helix", "Noctalia"}:
+        if key == theme_id or name in {"Helix", "Helix"} or vscode_id in {"Helix", "Helix"}:
             removed.append(key)
             themes.pop(key)
 

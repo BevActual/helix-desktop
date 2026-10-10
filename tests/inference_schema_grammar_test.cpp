@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   TEST_CHECK(argc >= 2);
   auto policy = agent::RiskPolicy::load(std::filesystem::path(argv[1]) / "protocols/ipc/msg-risk.toml");
   TEST_CHECK(policy.has_value());
-  const auto schema = agent::toolCallSchema(noctalia::cli::kMsgCmd, *policy,
+  const auto schema = agent::toolCallSchema(helix::cli::kMsgCmd, *policy,
                                             {agent::Tier::Observe, agent::Tier::ObservePrivate, agent::Tier::Act});
   const std::string grammar = inference::grammarFromToolSchema(schema);
   const auto rules = parseRules(grammar);
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
 
   // `decline` carries a mandatory reason; ordinary tools keep it optional.
   {
-    const auto declining = inference::grammarFromToolSchema(agent::toolCallSchema(noctalia::cli::kMsgCmd, *policy, {agent::Tier::Observe}, nullptr, true));
+    const auto declining = inference::grammarFromToolSchema(agent::toolCallSchema(helix::cli::kMsgCmd, *policy, {agent::Tier::Observe}, nullptr, true));
     const auto declineRules = parseRules(declining);
     TEST_CHECK(declineRules.contains("call-decline"));
     TEST_CHECK(declineRules.at("call-decline").find("reason") != std::string::npos && declineRules.at("call-decline").find(" reason ") == std::string::npos);

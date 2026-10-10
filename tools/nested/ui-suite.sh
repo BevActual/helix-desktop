@@ -3,7 +3,7 @@
 #   tools/nested/ui-suite.sh [name ...]      names: launcher qs net bt ctl cc notifications activity
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/rust/target/fast/helix-shell-tauri}"
+export HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/target/fast/helix-shell-tauri}"
 run() {  # name script program [env...]
   local name=$1 script=$2 program=$3; shift 3
   local out=/tmp/claude-1000/suite-$name.log

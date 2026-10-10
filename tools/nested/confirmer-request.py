@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Request Agent1 access on the nested session bus and print the Completed result.
+"""Request Agent Surface access on the nested session bus and print the Completed result.
 Usage: confirmer-request.py [--cancel-after SECONDS] <tiers...>
 Waits up to 30 s for Completed. Exit 0 on a denied/cancelled grant, 1 on approve, 2 timeout.
 With --cancel-after, Cancel is called on the same connection after that many seconds (triggers
@@ -17,7 +17,7 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
 
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
-AGENT = "org.helix.Desktop.Agent1"
+AGENT = "org.helix.Desktop.AgentSurface1"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--cancel-after", type=float, default=None)

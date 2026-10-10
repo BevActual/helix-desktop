@@ -1,0 +1,31 @@
+[package]
+name = "helix-mobius"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Mobius: Helix AI hub — conversations, personas, and model routing. Talks via org.helix.Inference; desktop act hands off to the bar Assistant."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+helix-shell-core = { path = "../../../core/helix-shell-core" }
+helix-desktop-api = { path = "../../../core/helix-desktop-api" }
+gtk = "0.18"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+tokio = { version = "1", features = ["time", "sync", "macros", "fs", "io-util", "process", "rt-multi-thread"] }
+futures-util = { version = "0.3", default-features = false }
+toml = "0.8"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[[bin]]
+name = "helix-mobius"
+path = "src/main.rs"
+
+# Transition alias until launchers and docs finish migrating.
+[[bin]]
+name = "helix-chat"
+path = "src/main.rs"

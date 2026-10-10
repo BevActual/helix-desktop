@@ -3,7 +3,7 @@ contrast=4
 
 [General]
 ColorScheme=Helix
-Name=noctalia
+Name=helix
 
 [ColorEffects:Disabled]
 Color={{colors.surface_container_lowest.default.rgb_csv}}

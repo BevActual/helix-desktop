@@ -16,7 +16,7 @@ namespace {
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
   std::filesystem::path makeTempDir() {
-    auto path = std::filesystem::temp_directory_path() / ("noctalia-niri-setup-" + std::to_string(::getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("helix-niri-setup-" + std::to_string(::getpid()));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -31,7 +31,7 @@ int main() {
   const auto config = dir / "config.kdl";
   {
     std::ofstream out(config);
-    out << "spawn-at-startup \"noctalia\"\n";
+    out << "spawn-at-startup \"helix\"\n";
   }
 
   auto scan = compositors::niri::scanSetupFile(config, true);
@@ -46,7 +46,7 @@ int main() {
       activationMissing = !status.present;
     }
   }
-  ok = expect(autostartPresent, "detects existing spawn-at-startup noctalia") && ok;
+  ok = expect(autostartPresent, "detects existing spawn-at-startup helix") && ok;
   ok = expect(activationMissing, "xdg-activation is missing before install") && ok;
 
   const auto installed = compositors::niri::installSetupInto(config, true);
@@ -54,13 +54,13 @@ int main() {
   ok = expect(installed.added > 0, "adds missing snippets") && ok;
 
   const auto after = compositors::niri::scanSetupFile(config, true);
-  ok = expect(after.hasSetupInclude, "appends noctalia-setup.kdl include") && ok;
+  ok = expect(after.hasSetupInclude, "appends helix-setup.kdl include") && ok;
   const auto missing = compositors::niri::missingSetup(after);
   ok = expect(missing.empty(), "all catalog items are present after install") && ok;
 
-  const auto includeText = compositors::niri::readFile(dir / "noctalia-setup.kdl");
-  const auto first = includeText.find("spawn-at-startup \"noctalia\"");
-  const auto second = includeText.find("spawn-at-startup \"noctalia\"", first == std::string::npos ? 0 : first + 1);
+  const auto includeText = compositors::niri::readFile(dir / "helix-setup.kdl");
+  const auto first = includeText.find("spawn-at-startup \"helix\"");
+  const auto second = includeText.find("spawn-at-startup \"helix\"", first == std::string::npos ? 0 : first + 1);
   ok = expect(first == std::string::npos, "does not duplicate autostart into the owned include") && ok;
   static_cast<void>(second);
   ok = expect(
@@ -75,7 +75,7 @@ int main() {
   const auto legacyInclude = dir / "legacy-lid-close.kdl";
   {
     std::ofstream out(legacyInclude);
-    out << "switch-events {\n    lid-close { spawn \"noctalia\" \"msg\" \"session\" \"lock-and-suspend\"; }\n}\n";
+    out << "switch-events {\n    lid-close { spawn \"helix\" \"msg\" \"session\" \"lock-and-suspend\"; }\n}\n";
   }
   std::string migrateError;
   ok = expect(

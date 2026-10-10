@@ -7,4 +7,4 @@ option(
   description: 'Optimize for the build machine CPU; output may not be portable',
 )
 
-option('desktop_apps', type: 'feature', value: 'auto', description: 'Build adaptive GTK4/libadwaita Helix applications')
+

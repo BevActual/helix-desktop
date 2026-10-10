@@ -22,13 +22,14 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} noctalia noctalia-system-upgrade
+    meson compile -C build-{{m}} helix-shell helix-system-upgrade
 
-# Focused, lower-priority builds for work on the running desktop. No test targets.
+# Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
-    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} noctalia noctalia-system-upgrade helix-service helix-settings helix-system-monitor helix-software helix-phone -j {{jobs}}
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-assistant helix-inference -j {{jobs}}
 
+# Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)
 build-settings m=mode jobs="2": (_ensure-configured m)
     mkdir -p build-{{m}}/helix-tmp
     TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
@@ -51,7 +52,7 @@ _ensure-configured m=mode:
     fi
 
 run m=mode: (build m)
-    ./build-{{m}}/noctalia
+    ./build-{{m}}/helix-shell
 
 # Build and run the unit tests, enabling their targets when auto mode omits them.
 test m=mode *args: (_ensure-configured m)
@@ -73,8 +74,8 @@ test-install m=mode: (build m)
 install m:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ ! -x "build-{{m}}/noctalia" ]]; then
-        echo "error: build-{{m}}/noctalia is missing; run 'just build {{m}}' before installing" >&2
+    if [[ ! -x "build-{{m}}/helix-shell" ]]; then
+        echo "error: build-{{m}}/helix-shell is missing; run 'just build {{m}}' before installing" >&2
         exit 1
     fi
     meson install --no-rebuild -C build-{{m}}

@@ -1,0 +1,57 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<body class="chat">
+<div id="app" data-test="app">
+  <aside id="side">
+    <div id="titlebar" data-tauri-drag-region>
+      <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
+      <span id="brand">Mobius</span>
+    </div>
+    <label class="side-label" for="persona">Persona</label>
+    <select id="persona" data-test="persona"></select>
+    <button id="new-chat" data-test="new-chat"><i data-icon="plus"></i><span>New chat</span></button>
+    <nav id="chats" data-test="chats"></nav>
+    <div id="side-links">
+      <button id="open-routing" data-test="open-routing" type="button" title="Models and routing">Models &amp; routing</button>
+      <button id="open-assistant" data-test="open-assistant" type="button" title="Bar Assistant">Desktop assistant</button>
+      <button id="open-agents" data-test="open-agents" type="button" title="Agent activity">Agents</button>
+      <button id="open-settings-agents" data-test="open-settings-agents" type="button" title="Grants in Settings">Privacy &amp; agents</button>
+    </div>
+  </aside>
+  <main id="main">
+    <header data-tauri-drag-region>
+      <h2 id="chat-title" data-test="chat-title">New chat</h2>
+      <span id="route-chip" data-test="route-chip" hidden></span>
+    </header>
+    <div id="banner" data-test="banner" hidden></div>
+    <div id="scroller"><div id="messages" data-test="messages"></div><div id="empty" data-test="empty"></div></div>
+    <form id="composer" data-test="composer">
+      <textarea id="input" data-test="input" rows="1" placeholder="Ask anything" autocomplete="off" spellcheck="true"></textarea>
+      <button id="act" type="button" data-test="act" title="Act on desktop" aria-label="Act on desktop">Act</button>
+      <button id="send" type="submit" data-test="send" title="Send" aria-label="Send"><i data-icon="arrow-up"></i></button>
+      <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
+    </form>
+  </main>
+</div>
+<dialog id="routing-dialog" data-test="routing-dialog">
+  <form method="dialog" id="routing-form">
+    <h3>Models &amp; routing</h3>
+    <p class="dialog-note">Managed in Mobius. Act stays on-device. LAN replies never run desktop tools.</p>
+    <label>Chat model (local GGUF id)<input id="route-chat-model" data-test="route-chat-model" type="text" placeholder="optional"></label>
+    <label>Act model (local GGUF id)<input id="route-act-model" data-test="route-act-model" type="text" placeholder="optional"></label>
+    <label>Code model<input id="route-code-model" data-test="route-code-model" type="text" placeholder="optional"></label>
+    <label>LAN OpenAI-compat URL<input id="route-lan-url" data-test="route-lan-url" type="url" placeholder="http://host:11434/v1"></label>
+    <label>Route <code>code</code> via LAN
+      <select id="route-code-backend" data-test="route-code-backend">
+        <option value="local">On this computer</option>
+        <option value="lan">LAN</option>
+      </select>
+    </label>
+    <label class="check"><input id="route-battery" data-test="route-battery" type="checkbox"> Allow remote on battery saver</label>
+    <div class="dialog-actions">
+      <button type="submit" value="cancel">Cancel</button>
+      <button id="routing-save" type="submit" value="save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+<script src="icons.js"></script>
+<script src="chat.js"></script>

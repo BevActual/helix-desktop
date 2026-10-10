@@ -21,10 +21,10 @@ int main() {
   const std::filesystem::path root(directory);
   for (const auto* kind : {"CONFIG", "STATE", "DATA", "CACHE"}) {
     setenv((std::string("XDG_") + kind + "_HOME").c_str(), (root / kind).c_str(), 1);
-    if (std::string(kind) != "CACHE") setenv((std::string("NOCTALIA_") + kind + "_HOME").c_str(), (root / kind).c_str(), 1);
+    if (std::string(kind) != "CACHE") setenv((std::string("HELIX_") + kind + "_HOME").c_str(), (root / kind).c_str(), 1);
   }
-  std::filesystem::create_directories(root / "CONFIG/noctalia");
-  std::ofstream(root / "CONFIG/noctalia/config.toml") << "[wallpaper.wallhaven]\napi_key = \"test-secret\"\ndownload_dir = \"" << (root / "downloads").string() << "\"\n";
+  std::filesystem::create_directories(root / "CONFIG/helix");
+  std::ofstream(root / "CONFIG/helix/config.toml") << "[wallpaper.wallhaven]\napi_key = \"test-secret\"\ndownload_dir = \"" << (root / "downloads").string() << "\"\n";
   ConfigService config; HttpClient http; bool desktop = true;
   struct Request { HttpRequest request; HttpClient::StreamDataCallback data; HttpClient::StreamCloseCallback close; };
   std::map<std::uint64_t, Request> requests; std::uint64_t next = 1;

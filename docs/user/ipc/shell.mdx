@@ -18,11 +18,11 @@ These commands control shell state, logging, settings, the window switcher, and 
 | Set log level | <IpcCommand command="log-level-set debug" /> | Set the console log level for the running session. Use `debug`, `info`, `warn`, or `error`. |
 | Reload config | <IpcCommand command="config-reload" /> | Reload the merged Helix config stack immediately. |
 | Open settings | <IpcCommand command="settings-open [context]" /> | Open Control Center on that settings page, or focus it if already open (e.g. `bar`). |
-| Open plugin settings | <IpcCommand command="settings-open-plugin noctalia/notes" /> | Open Control Center at an installed plugin's settings sheet. The plugin must be enabled and expose settings. |
+| Open plugin settings | <IpcCommand command="settings-open-plugin helix/notes" /> | Open Control Center at an installed plugin's settings sheet. The plugin must be enabled and expose settings. |
 | Close settings | <IpcCommand command="settings-close" /> | Close Control Center if it is the open panel. |
 | Toggle settings | <IpcCommand command="settings-toggle [context]" /> | Toggle Control Center on the matching settings page (Appearance when omitted), for example `bar`, `notifications`, `wallpaper`, `templates`, or `keybinds`. Appearance opens on the live theme page. Domain pages such as Notifications, Wallpaper, Templates, and Keybinds open the live tab in settings view. |
 
-Set `NOCTALIA_LOG_LEVEL` to `debug`, `info`, `warn`, or `error` before startup to choose the initial console log level. The default is `info`; the file log remains unfiltered.
+Set `HELIX_LOG_LEVEL` to `debug`, `info`, `warn`, or `error` before startup to choose the initial console log level. The default is `info`; the file log remains unfiltered.
 
 ## Window Switcher
 
@@ -33,10 +33,12 @@ Alt+Tab-style overlay: a dimmed fullscreen layer with a centered grid of open wi
 | Open | <IpcCommand command="window-switcher" /> | Show the switcher on the preferred monitor (pointer, keyboard focus, or first output). |
 | Close | <IpcCommand command="window-switcher close" /> | Hide the overlay without changing focus. `hide` is an alias. |
 
-Example Hyprland bind:
+Example helix-niri bind:
 
-```ini
-hl.bind("ALT + TAB", hl.dsp.exec_cmd("noctalia msg window-switcher"))
+```kdl
+binds {
+    Alt+Tab { spawn-sh "helix-panel window-switcher"; }
+}
 ```
 
 While the overlay is open it takes exclusive keyboard focus on its layer surface:

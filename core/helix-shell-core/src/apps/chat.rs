@@ -1,0 +1,543 @@
+//! One chat with the local model, as a pure model: the conversation, what is sent to the model for a turn (the system prompt, then as much
+//! recent history as fits), and the turn state machine (a reply streams in, may be stopped, and a late answer to an older turn is
+//! harmless). No D-Bus, no files, no widgets: the app feeds it what the model service says and draws what it returns.
+
+use serde::Serialize;
+use serde_json::{json, Value};
+
+use crate::display::sanitize_for_display;
+use crate::markdown::{self, Block};
+
+pub const MAX_INPUT_CHARS: usize = 4000;
+pub const MAX_MESSAGES: usize = 400;
+pub const MAX_MESSAGE_CHARS: usize = 20_000;
+/// How much history goes to the model with a turn (characters; a token is about four).
+pub const CONTEXT_CHARS: usize = 12_000;
+
+pub const SYSTEM_PROMPT: &str = "You are Helix, the assistant built into the person's Linux desktop. Be direct and brief. \
+Use plain text; use a fenced code block for code and commands. If asked to change something on the desktop, tell them to use \
+Act on desktop (or the bar Assistant). Do not claim to have done it yourself.";
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    User,
+    Assistant,
+}
+
+impl Role {
+    fn wire(self) -> &'static str {
+        match self {
+            Role::User => "user",
+            Role::Assistant => "assistant",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Message {
+    pub role: Role,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Conversation {
+    pub id: String,
+    pub title: String,
+    pub messages: Vec<Message>,
+    /// Seconds since the epoch, for ordering.
+    pub updated: u64,
+}
+
+/// An id is 16 lowercase hex digits (it names a file).
+pub fn valid_id(id: &str) -> bool {
+    id.len() == 16 && id.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+fn tidy(text: &str, max: usize) -> String {
+    // Keep line breaks and tabs; drop every other control character and anything that could reorder or hide text.
+    let cleaned: String = text
+        .chars()
+        .filter(|c| *c == '\n' || *c == '\t' || (!c.is_control() && !matches!(*c, '\u{200b}'..='\u{200f}' | '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')))
+        .take(max)
+        .collect();
+    cleaned
+}
+
+fn title_of(text: &str) -> String {
+    let line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("New chat");
+    let title = sanitize_for_display(line.trim(), 48);
+    if title.is_empty() {
+        "New chat".into()
+    } else {
+        title
+    }
+}
+
+impl Conversation {
+    pub fn new(id: &str, now: u64) -> Option<Conversation> {
+        valid_id(id).then(|| Conversation { id: id.to_string(), title: "New chat".into(), messages: Vec::new(), updated: now })
+    }
+
+    /// The messages to send for the next turn: the system prompt, then the newest history that fits, oldest first. The last user message
+    /// always goes (cut if it alone is too long). Empty `system` uses [`SYSTEM_PROMPT`].
+    pub fn context(&self) -> Vec<(&'static str, String)> {
+        self.context_with_system(SYSTEM_PROMPT)
+    }
+
+    pub fn context_with_system(&self, system: &str) -> Vec<(&'static str, String)> {
+        let mut budget = CONTEXT_CHARS;
+        let mut kept: Vec<&Message> = Vec::new();
+        for message in self.messages.iter().rev() {
+            let cost = message.text.chars().count() + 8;
+            if cost > budget && !kept.is_empty() {
+                break;
+            }
+            budget = budget.saturating_sub(cost);
+            kept.push(message);
+        }
+        kept.reverse();
+        // A conversation sent to the model starts with a user turn.
+        while kept.first().is_some_and(|m| m.role == Role::Assistant) {
+            kept.remove(0);
+        }
+        let prompt = if system.trim().is_empty() {
+            SYSTEM_PROMPT.to_string()
+        } else {
+            system.to_string()
+        };
+        let mut out = vec![("system", prompt)];
+        out.extend(kept.into_iter().map(|m| (m.role.wire(), m.text.chars().take(CONTEXT_CHARS).collect::<String>())));
+        out
+    }
+
+    pub fn to_json(&self) -> String {
+        json!({
+            "version": 1, "id": self.id, "title": self.title, "updated": self.updated,
+            "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text})).collect::<Vec<_>>(),
+        })
+        .to_string()
+    }
+
+    /// Reads a saved conversation. Anything wrong with the file is a refusal (not a guess); sizes are bounded.
+    pub fn from_json(text: &str) -> Option<Conversation> {
+        if text.len() > 8 * 1024 * 1024 {
+            return None;
+        }
+        let value: Value = serde_json::from_str(text).ok()?;
+        let id = value.get("id")?.as_str()?;
+        if !valid_id(id) {
+            return None;
+        }
+        let mut messages = Vec::new();
+        for entry in value.get("messages")?.as_array()?.iter().take(MAX_MESSAGES) {
+            let role = match entry.get("role")?.as_str()? {
+                "user" => Role::User,
+                "assistant" => Role::Assistant,
+                _ => return None,
+            };
+            messages.push(Message { role, text: tidy(entry.get("text")?.as_str()?, MAX_MESSAGE_CHARS) });
+        }
+        let first_user = messages.iter().find(|m| m.role == Role::User).map(|m| title_of(&m.text));
+        Some(Conversation {
+            id: id.to_string(),
+            title: value.get("title").and_then(Value::as_str).map(|t| sanitize_for_display(t, 48)).filter(|t| !t.is_empty()).or(first_user).unwrap_or_else(|| "New chat".into()),
+            messages,
+            updated: value.get("updated").and_then(Value::as_u64).unwrap_or(0),
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ChatError {
+    Empty,
+    TooLong,
+    Busy,
+    Full,
+}
+
+/// A turn the app should start: these messages to the model.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Turn {
+    pub generation: u64,
+    pub messages: Vec<(&'static str, String)>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Outcome {
+    Finished,
+    Failed(String),
+    Stopped,
+}
+
+#[derive(Debug, Default)]
+struct Streaming {
+    generation: u64,
+    operation: Option<u64>,
+    /// Deltas and endings that arrived before the service's operation id did.
+    early_deltas: Vec<(u64, String)>,
+    early_done: Vec<(u64, bool, String)>,
+    stopping: bool,
+}
+
+#[derive(Debug)]
+pub struct Chat {
+    pub conversation: Conversation,
+    streaming: Option<Streaming>,
+    generation: u64,
+    pub error: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct MessageView {
+    pub role: Role,
+    pub text: String,
+    pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct ChatView {
+    pub id: String,
+    pub title: String,
+    pub messages: Vec<MessageView>,
+    pub streaming: bool,
+    pub error: String,
+}
+
+fn view_of(message: &Message) -> MessageView {
+    MessageView {
+        role: message.role,
+        text: message.text.clone(),
+        blocks: if message.role == Role::Assistant { markdown::parse(&message.text) } else { Vec::new() },
+    }
+}
+
+impl Chat {
+    pub fn new(conversation: Conversation) -> Chat {
+        Chat { conversation, streaming: None, generation: 0, error: String::new() }
+    }
+
+    pub fn is_streaming(&self) -> bool {
+        self.streaming.is_some()
+    }
+
+    /// The person sent `text`. Refused while a reply is on its way.
+    pub fn send(&mut self, text: &str, now: u64) -> Result<Turn, ChatError> {
+        self.send_with_system(text, now, SYSTEM_PROMPT)
+    }
+
+    /// Like [`send`] but uses a persona system prompt (empty → [`SYSTEM_PROMPT`]).
+    pub fn send_with_system(&mut self, text: &str, now: u64, system: &str) -> Result<Turn, ChatError> {
+        if self.streaming.is_some() {
+            return Err(ChatError::Busy);
+        }
+        let text = tidy(text, MAX_INPUT_CHARS + 1);
+        if text.trim().is_empty() {
+            return Err(ChatError::Empty);
+        }
+        if text.chars().count() > MAX_INPUT_CHARS {
+            return Err(ChatError::TooLong);
+        }
+        if self.conversation.messages.len() + 2 > MAX_MESSAGES {
+            return Err(ChatError::Full);
+        }
+        if self.conversation.messages.is_empty() {
+            self.conversation.title = title_of(&text);
+        }
+        self.conversation.messages.push(Message { role: Role::User, text });
+        self.conversation.messages.push(Message { role: Role::Assistant, text: String::new() });
+        self.conversation.updated = now;
+        self.generation += 1;
+        self.error.clear();
+        self.streaming = Some(Streaming { generation: self.generation, ..Streaming::default() });
+        // The reply being written is not part of what is sent.
+        let mut sent = self.conversation.clone();
+        sent.messages.pop();
+        Ok(Turn {
+            generation: self.generation,
+            messages: sent.context_with_system(system),
+        })
+    }
+
+    /// The service accepted the turn as `operation`. Anything it sent before that is applied now. Returns the outcome if it already ended.
+    pub fn started(&mut self, generation: u64, operation: u64) -> Option<Outcome> {
+        let streaming = self.streaming.as_mut().filter(|s| s.generation == generation)?;
+        streaming.operation = Some(operation);
+        let deltas: Vec<String> = streaming.early_deltas.iter().filter(|(op, _)| *op == operation).map(|(_, t)| t.clone()).collect();
+        let done = streaming.early_done.iter().find(|(op, _, _)| *op == operation).cloned();
+        streaming.early_deltas.clear();
+        streaming.early_done.clear();
+        for text in deltas {
+            self.append(&text);
+        }
+        done.and_then(|(op, ok, result)| self.complete(op, ok, &result))
+    }
+
+    fn append(&mut self, text: &str) {
+        if let Some(last) = self.conversation.messages.last_mut() {
+            if last.role == Role::Assistant && last.text.chars().count() < MAX_MESSAGE_CHARS {
+                let room = MAX_MESSAGE_CHARS - last.text.chars().count();
+                last.text.push_str(&tidy(text, room));
+            }
+        }
+    }
+
+    /// Streamed text. Returns whether the visible reply changed.
+    pub fn delta(&mut self, operation: u64, text: &str) -> bool {
+        let Some(streaming) = self.streaming.as_mut() else { return false };
+        match streaming.operation {
+            Some(own) if own == operation => {
+                if streaming.stopping {
+                    return false;
+                }
+                self.append(text);
+                true
+            }
+            Some(_) => false,
+            None => {
+                if streaming.early_deltas.len() < 256 {
+                    streaming.early_deltas.push((operation, text.to_string()));
+                }
+                false
+            }
+        }
+    }
+
+    /// The model service says the turn ended. `result` is its JSON.
+    pub fn complete(&mut self, operation: u64, ok: bool, result: &str) -> Option<Outcome> {
+        let streaming = self.streaming.as_mut()?;
+        match streaming.operation {
+            Some(own) if own == operation => {}
+            Some(_) => return None,
+            None => {
+                if streaming.early_done.len() < 8 {
+                    streaming.early_done.push((operation, ok, result.to_string()));
+                }
+                return None;
+            }
+        }
+        let stopped = streaming.stopping;
+        self.streaming = None;
+        let value: Value = serde_json::from_str(result).unwrap_or(Value::Null);
+        let cancelled = value.get("cancelled").and_then(Value::as_bool).unwrap_or(false);
+        let reply_empty = self.conversation.messages.last().is_some_and(|m| m.role == Role::Assistant && m.text.trim().is_empty());
+        if stopped || cancelled {
+            if reply_empty {
+                self.conversation.messages.pop();
+                // Take the unanswered question back out too, so it can be edited and sent again.
+                if self.conversation.messages.last().is_some_and(|m| m.role == Role::User) {
+                    self.conversation.messages.pop();
+                }
+            }
+            return Some(Outcome::Stopped);
+        }
+        if !ok {
+            let reason = value.get("error").and_then(Value::as_str).map(|e| sanitize_for_display(e, 200)).filter(|e| !e.is_empty()).unwrap_or_else(|| "The model could not answer.".into());
+            if reply_empty {
+                self.conversation.messages.pop();
+                self.conversation.messages.pop();
+            }
+            self.error = reason.clone();
+            return Some(Outcome::Failed(reason));
+        }
+        if reply_empty {
+            self.conversation.messages.pop();
+            self.conversation.messages.pop();
+            self.error = "The model returned nothing.".into();
+            return Some(Outcome::Failed(self.error.clone()));
+        }
+        Some(Outcome::Finished)
+    }
+
+    /// The turn could not be started at all (the service is not there).
+    pub fn failed_to_start(&mut self, generation: u64, reason: &str) {
+        if self.streaming.as_ref().is_some_and(|s| s.generation == generation) {
+            self.streaming = None;
+            self.conversation.messages.pop();
+            self.conversation.messages.pop();
+            self.error = sanitize_for_display(reason, 200);
+        }
+    }
+
+    /// Whether Stop was pressed for the turn on its way (so a turn that gets its id late can still be cancelled).
+    pub fn stop_requested(&self) -> bool {
+        self.streaming.as_ref().is_some_and(|s| s.stopping)
+    }
+
+    /// The person pressed Stop. Returns the operation to cancel, if the service has given one.
+    pub fn stop(&mut self) -> Option<u64> {
+        let streaming = self.streaming.as_mut()?;
+        streaming.stopping = true;
+        streaming.operation
+    }
+
+    pub fn view(&self) -> ChatView {
+        ChatView {
+            id: self.conversation.id.clone(),
+            title: self.conversation.title.clone(),
+            messages: self.conversation.messages.iter().map(view_of).collect(),
+            streaming: self.streaming.is_some(),
+            error: self.error.clone(),
+        }
+    }
+
+    /// The reply being written, as blocks (what a streaming update sends).
+    pub fn last_blocks(&self) -> Vec<Block> {
+        self.conversation.messages.last().filter(|m| m.role == Role::Assistant).map(|m| markdown::parse(&m.text)).unwrap_or_default()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Summary {
+    pub id: String,
+    pub title: String,
+    pub updated: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ID: &str = "0123456789abcdef";
+
+    fn chat() -> Chat {
+        Chat::new(Conversation::new(ID, 1).unwrap())
+    }
+
+    #[test]
+    fn ids_name_files_safely() {
+        assert!(valid_id(ID));
+        for bad in ["", "0123456789abcde", "0123456789abcdeg", "0123456789ABCDEF", "../../etc/passwd0", "0123456789abcdef0"] {
+            assert!(!valid_id(bad), "{bad}");
+        }
+        assert!(Conversation::new("nope", 0).is_none());
+    }
+
+    #[test]
+    fn a_turn_streams_in_and_finishes() {
+        let mut c = chat();
+        let turn = c.send("  What is a cron job?  ", 5).unwrap();
+        assert_eq!(turn.messages[0].0, "system");
+        assert_eq!(turn.messages.last().unwrap(), &("user", "  What is a cron job?  ".to_string()));
+        assert_eq!(c.conversation.title, "What is a cron job?");
+        assert!(c.is_streaming());
+        assert_eq!(c.started(turn.generation, 7), None);
+        assert!(c.delta(7, "A cron "));
+        assert!(c.delta(7, "job runs on a schedule."));
+        assert_eq!(c.complete(7, true, "{\"ok\":true}"), Some(Outcome::Finished));
+        assert!(!c.is_streaming());
+        assert_eq!(c.conversation.messages[1].text, "A cron job runs on a schedule.");
+        assert_eq!(c.send("again", 6).is_ok(), true);
+    }
+
+    #[test]
+    fn one_turn_at_a_time_and_bad_input_is_refused() {
+        let mut c = chat();
+        assert_eq!(c.send("   ", 0).unwrap_err(), ChatError::Empty);
+        assert_eq!(c.send(&"x".repeat(MAX_INPUT_CHARS + 1), 0).unwrap_err(), ChatError::TooLong);
+        assert!(c.send("hi", 0).is_ok());
+        assert_eq!(c.send("again", 0).unwrap_err(), ChatError::Busy);
+    }
+
+    #[test]
+    fn what_arrives_before_the_operation_id_is_not_lost() {
+        let mut c = chat();
+        let turn = c.send("hi", 0).unwrap();
+        assert!(!c.delta(9, "Hel"));
+        assert!(!c.delta(9, "lo"));
+        assert_eq!(c.complete(9, true, "{}"), None, "the end came before the id");
+        assert_eq!(c.started(turn.generation, 9), Some(Outcome::Finished));
+        assert_eq!(c.conversation.messages[1].text, "Hello");
+    }
+
+    #[test]
+    fn stopping_keeps_what_was_written_and_ignores_the_rest() {
+        let mut c = chat();
+        let turn = c.send("tell me a story", 0).unwrap();
+        c.started(turn.generation, 3);
+        c.delta(3, "Once upon");
+        assert_eq!(c.stop(), Some(3));
+        assert!(!c.delta(3, " a time"), "text after Stop is not added");
+        assert_eq!(c.complete(3, true, "{\"cancelled\":true}"), Some(Outcome::Stopped));
+        assert_eq!(c.conversation.messages[1].text, "Once upon");
+        // Stopping before anything was written takes the question back.
+        let mut d = chat();
+        let t = d.send("q", 0).unwrap();
+        d.started(t.generation, 4);
+        d.stop();
+        assert_eq!(d.complete(4, false, "{\"cancelled\":true}"), Some(Outcome::Stopped));
+        assert!(d.conversation.messages.is_empty());
+    }
+
+    #[test]
+    fn a_failure_says_why_and_leaves_no_empty_reply() {
+        let mut c = chat();
+        let t = c.send("hi", 0).unwrap();
+        c.started(t.generation, 1);
+        let out = c.complete(1, false, "{\"error\":\"model not loaded\"}");
+        assert_eq!(out, Some(Outcome::Failed("model not loaded".into())));
+        assert!(c.conversation.messages.is_empty());
+        assert_eq!(c.error, "model not loaded");
+        let mut d = chat();
+        let t = d.send("hi", 0).unwrap();
+        d.failed_to_start(t.generation, "The assistant is not running.");
+        assert!(d.conversation.messages.is_empty() && !d.is_streaming());
+    }
+
+    #[test]
+    fn a_late_answer_to_an_older_turn_is_harmless() {
+        let mut c = chat();
+        let t = c.send("one", 0).unwrap();
+        c.started(t.generation, 1);
+        c.complete(1, true, "{}");
+        c.delta(1, "late");
+        assert_eq!(c.complete(1, true, "{}"), None);
+        let t2 = c.send("two", 0).unwrap();
+        c.started(t2.generation, 2);
+        assert!(!c.delta(1, "from the old turn"));
+        assert_eq!(c.conversation.messages.last().unwrap().text, "");
+    }
+
+    #[test]
+    fn history_sent_to_the_model_fits_and_starts_with_the_person() {
+        let mut c = chat();
+        for i in 0..40 {
+            c.conversation.messages.push(Message { role: Role::User, text: format!("question {i} {}", "x".repeat(600)) });
+            c.conversation.messages.push(Message { role: Role::Assistant, text: format!("answer {i} {}", "y".repeat(600)) });
+        }
+        let ctx = c.conversation.context();
+        let total: usize = ctx.iter().skip(1).map(|(_, t)| t.chars().count()).sum();
+        assert!(total <= CONTEXT_CHARS + 200, "{total}");
+        assert_eq!(ctx[0].0, "system");
+        assert_eq!(ctx[1].0, "user");
+        assert!(ctx.last().unwrap().1.starts_with("answer 39"));
+    }
+
+    #[test]
+    fn saved_files_are_read_strictly() {
+        let mut c = chat();
+        let t = c.send("hello\u{202e}there", 12).unwrap();
+        c.started(t.generation, 1);
+        c.delta(1, "hi!");
+        c.complete(1, true, "{}");
+        let back = Conversation::from_json(&c.conversation.to_json()).unwrap();
+        assert_eq!(back.messages.len(), 2);
+        assert_eq!(back.messages[0].text, "hellothere", "direction overrides are dropped");
+        assert_eq!(back.id, ID);
+        for bad in ["", "{", "[]", "{\"id\":\"../x\",\"messages\":[]}", &format!("{{\"id\":\"{ID}\",\"messages\":[{{\"role\":\"system\",\"text\":\"x\"}}]}}")] {
+            assert!(Conversation::from_json(bad).is_none(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn the_view_renders_the_model_as_blocks_and_the_person_as_text() {
+        let mut c = chat();
+        let t = c.send("show **me**", 0).unwrap();
+        c.started(t.generation, 1);
+        c.delta(1, "# Hi\n\n```sh\nls\n```");
+        let v = c.view();
+        assert!(v.messages[0].blocks.is_empty() && v.messages[0].text == "show **me**");
+        assert_eq!(v.messages[1].blocks.len(), 2);
+        assert!(v.streaming);
+    }
+}

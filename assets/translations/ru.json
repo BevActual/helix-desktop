@@ -832,16 +832,16 @@
       "calendar-google-connect-start-failed": "Не удалось запустить авторизацию Google. Проверьте подключение к сети и повторите попытку.",
       "calendar-google-connect-start-http": "Не удалось запустить авторизацию Google. Брокер OAuth вернул HTTP {status}.",
       "calendar-google-connect-timeout": "Истекло время ожидания авторизации Google. Запустите подключение снова, когда будете готовы войти.",
-      "config-migration-body": "Обновите {path} в исходном файле. Noctalia применяет эту замену временно. Выполните «noctalia config validate», чтобы просмотреть список всех необходимых изменений.",
+      "config-migration-body": "Обновите {path} в исходном файле. Helix применяет эту замену временно. Выполните «helix config validate», чтобы просмотреть список всех необходимых изменений.",
       "config-migration-title": "Требуется обновление конфигурации",
       "dbus-disabled": "DBus-уведомления отключены",
       "desktop-widgets-editor": "Редактор виджетов",
       "desktop-widgets-editor-enabled": "Редактор виджетов рабочего стола включён. Переключитесь на пустое рабочее пространство, чтобы открытые окна не перекрывали редактор.",
       "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Синхронизация внешнего вида с экраном входа. Если появится запрос администратора, подтвердите его; авторизация без пароля зависит от системной политики.",
-      "greeter-sync-pending-console": "Синхронизация внешнего вида с экраном входа. Если потребуется авторизация, подтвердите запрос polkit в Noctalia, в TTY или в консоли.",
+      "greeter-sync-pending-console": "Синхронизация внешнего вида с экраном входа. Если потребуется авторизация, подтвердите запрос polkit в Helix, в TTY или в консоли.",
       "greeter-sync-pending-legacy": "Синхронизация через устаревший модуль с авторизацией. Требуется подтверждение администратора.",
-      "greeter-sync-pending-manual": "Файлы подготовлены для устаревшей синхронизации с аутентификацией. Запустите консольную утилиту применения в терминале (сохранив переменную NOCTALIA_GREETER_STATE_DIR, если вы используете кастомный путь) или настройте параметр shell.greeter_sync.privilege_command и повторите синхронизацию.",
+      "greeter-sync-pending-manual": "Файлы подготовлены для устаревшей синхронизации с аутентификацией. Запустите консольную утилиту применения в терминале (сохранив переменную HELIX_GREETER_STATE_DIR, если вы используете кастомный путь) или настройте параметр shell.greeter_sync.privilege_command и повторите синхронизацию.",
       "greeter-sync-success": "Внешний вид синхронизирован. Изменения вступят в силу на следующем экране входа.",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "Это сочетание клавиш принимает одну клавишу без модификаторов.",
@@ -914,7 +914,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin} предназначен для API версии {version}; эта версия Noctalia поддерживает API {oldest}–{current}.",
+      "body-incompatible": "{plugin} предназначен для API версии {version}; эта версия Helix поддерживает API {oldest}–{current}.",
       "body-timeout": "Установка {plugin} заняла слишком много времени.",
       "title": "Плагин не включен"
     }
@@ -1203,7 +1203,7 @@
       "reset-page": "Не удалось сбросить некоторые настройки.",
       "support-report": "Не удалось сохранить отчёт поддержки.",
       "sync-greeter": "Не удалось синхронизировать внешний вид с Helix Greeter.",
-      "sync-greeter-timeout-manual": "Для устаревшей синхронизации с аутентификацией по-прежнему требуется подтверждение администратора. Запустите позиционный вспомогательный инструмент применения (apply helper) в терминале, сохранив переменную NOCTALIA_GREETER_STATE_DIR, если вы используете нестандартный путь.",
+      "sync-greeter-timeout-manual": "Для устаревшей синхронизации с аутентификацией по-прежнему требуется подтверждение администратора. Запустите позиционный вспомогательный инструмент применения (apply helper) в терминале, сохранив переменную HELIX_GREETER_STATE_DIR, если вы используете нестандартный путь.",
       "widget": {
         "rename": "Не удалось переименовать виджет."
       },
@@ -1599,8 +1599,8 @@
         },
         "kind-label": "Тип",
         "location-label": "Местоположение",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID источника",
         "name-placeholder": "my-plugins",
         "precedence-hint": "Источники, расположенные ниже, имеют приоритет над высшими при совпадении плагинов.",
@@ -1619,7 +1619,7 @@
         "installed": "Установлено",
         "loading": "Загрузка каталога...",
         "no-readme": "Описание недоступно",
-        "open-page": "Открыть страницу плагина на noctalia.dev",
+        "open-page": "Открыть страницу плагина на helix.dev",
         "open-source": "Открыть репозиторий исходного кода плагина",
         "results-count": "{count} плагинов",
         "search-placeholder": "Поиск плагинов...",
@@ -1679,7 +1679,7 @@
           "label": "Скругление углов"
         },
         "custom-palette": {
-          "description": "Выберите палитру из ~/.config/noctalia/palettes/",
+          "description": "Выберите палитру из ~/.config/helix/palettes/",
           "label": "Пользовательская палитра",
           "search-placeholder": "Поиск пользовательских палитр…"
         },
@@ -2161,7 +2161,7 @@
             "label": "При изменении режима темы"
           },
           "wallpaper-changed": {
-            "description": "Команда, запускаемая при смене обоев; предоставляет NOCTALIA_WALLPAPER_PATH и NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Команда, запускаемая при смене обоев; предоставляет HELIX_WALLPAPER_PATH и HELIX_WALLPAPER_CONNECTOR",
             "label": "При смене обоев"
           },
           "wifi-disabled": {
@@ -2576,7 +2576,7 @@
           "placeholder": "Город, страна"
         },
         "location-auto-locate": {
-          "description": "Автоматически определять местоположение по IP-адресу через noctalia.dev",
+          "description": "Автоматически определять местоположение по IP-адресу через helix.dev",
           "label": "Автоматическое определение местоположения (IP)"
         },
         "longitude": {
@@ -2787,7 +2787,7 @@
           "label": "Формат даты"
         },
         "external-ip": {
-          "description": "Определять публичный WAN-адрес подключения (через api.noctalia.dev) и показывать его в Центре управления во вкладке \"Сеть\"",
+          "description": "Определять публичный WAN-адрес подключения (через a public IP lookup service) и показывать его в Центре управления во вкладке \"Сеть\"",
           "label": "Показывать WAN IP"
         },
         "greeter-sync-auto": {

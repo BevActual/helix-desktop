@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
   auto policy = agent::RiskPolicy::load(opt.root / "protocols/ipc/msg-risk.toml");
   if (!policy) { std::println(stderr, "{}", policy.error()); return 2; }
   const std::set<agent::Tier> tiers{agent::Tier::Observe, agent::Tier::ObservePrivate, agent::Tier::Act};
-  const auto& root = noctalia::cli::kMsgCmd;
+  const auto& root = helix::cli::kMsgCmd;
   std::optional<agent::ToolHints> hintStore;
   if (opt.hints) {
     auto loaded = agent::ToolHints::load(opt.root / "protocols/ipc/tool-hints.toml");

@@ -17,7 +17,7 @@ To make Helix's wifi, bluetooth, power-profile, and battery feature available, p
 :::
 
 ## Installation
-The `noctalia` package in nixpkgs is upstream Noctalia. To build Helix Shell, use the flake in the [Helix Shell repository](https://github.com/BevActual/helix-shell).
+The `helix-shell` package in nixpkgs is upstream Helix. To build Helix Shell, use the flake in the [Helix Shell repository](https://github.com/BevActual/helix-shell).
 
 Add the Helix repository as an input using your preferred pinning method, then install its package or module. Builds from this input are compiled locally unless you provide a Helix-specific cache.
 
@@ -31,7 +31,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
     # flake.nix
     {
       inputs = {
-        noctalia = {
+        helix = {
           url = "github:BevActual/helix-shell";
           inputs.nixpkgs.follows = "nixpkgs"; # optional: use your system's nixpkgs input
         };
@@ -46,7 +46,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
   <TabItem label="tack">
     Add Helix to your tack inputs:
     ```
-    tack add noctalia github:BevActual/helix-shell
+    tack add helix github:BevActual/helix-shell
     ```
 
     Keep the input pinned to a known Helix revision for reproducible builds.
@@ -65,7 +65,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
     # configuration.nix
     { pkgs, ... }:
     let
-      noctalia = import (import ./npins).helix-shell {
+      helix = import (import ./npins).helix-shell {
         inherit pkgs; # optional: use your system's nixpkgs input
       };
     in
@@ -79,7 +79,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
     # configuration.nix
     { pkgs, ... }:
     let
-      noctalia-src = let
+      helix-src = let
         commit = ""; # replace this with an actual commit id or tag
       in
         fetchTarball {
@@ -87,7 +87,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
           sha256 = ""; # replace this with hash from nix build output, or by using `nix-prefetch-url --unpack`
         };
       
-      noctalia = import noctalia-src {
+      helix = import helix-src {
         inherit pkgs; # optional: use your system's nixpkgs input
       };
     in
@@ -99,9 +99,9 @@ Add the Helix repository as an input using your preferred pinning method, then i
     # configuration.nix
     { pkgs, ... }:
     let
-      noctalia-src = fetchTarball "https://github.com/BevActual/helix-shell/archive/main.tar.gz";
+      helix-src = fetchTarball "https://github.com/BevActual/helix-shell/archive/main.tar.gz";
 
-      noctalia = import noctalia-src {
+      helix = import helix-src {
         inherit pkgs; # optional: use your system's nixpkgs input
       };
     in
@@ -122,7 +122,7 @@ Note that both the Home Manager and Hjem modules install the package for you, so
     { inputs, pkgs, ... }:
     {
       environment.systemPackages = [
-        inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default
+        inputs.helix.packages.${pkgs.stdenv.hostPlatform.system}.default
       ];
     }
     ```
@@ -134,7 +134,7 @@ Note that both the Home Manager and Hjem modules install the package for you, so
       # see adding the input above
     in {
       environment.systemPackages = [
-        noctalia.package
+        helix.package
       ];
     }
     ```
@@ -143,7 +143,7 @@ Note that both the Home Manager and Hjem modules install the package for you, so
 
 ### Home Manager Module {#home-manager}
 
-The Home Manager module allows you to configure Helix's settings [(that you would otherwise put in `~/.config/noctalia/`)](/noctalia/configuration/) using nix instead of toml, or allows you to link an existing toml file. It is optional.
+The Home Manager module allows you to configure Helix's settings [(that you would otherwise put in `~/.config/helix/`)](/helix/configuration/) using nix instead of toml, or allows you to link an existing toml file. It is optional.
 
 <Tabs>
   <TabItem label="flakes/tack">
@@ -152,10 +152,10 @@ The Home Manager module allows you to configure Helix's settings [(that you woul
     {
       home-manager.users.drfoobar = {
         imports = [
-          inputs.noctalia.homeModules.default
+          inputs.helix.homeModules.default
         ];
 
-        programs.noctalia = {
+        programs.helix = {
           enable = true;
 
           settings = { # This may also be a string or path to a .toml file.
@@ -182,10 +182,10 @@ The Home Manager module allows you to configure Helix's settings [(that you woul
     in {
       home-manager.users.drfoobar = {
         imports = [
-          noctalia.homeModule
+          helix.homeModule
         ];
 
-        programs.noctalia = {
+        programs.helix = {
           enable = true;
 
           settings = { # This may also be a string or path to a .toml file.
@@ -218,11 +218,11 @@ For those using Hjem instead of Home Manager, a Hjem module is also available.
     {
       hjem = {
         extraModules = [
-          inputs.noctalia.hjemModules.default
+          inputs.helix.hjemModules.default
         ];
 
         users.drfoobar = {
-          programs.noctalia = {
+          programs.helix = {
             enable = true;
             
             settings = { ... };
@@ -239,11 +239,11 @@ For those using Hjem instead of Home Manager, a Hjem module is also available.
     in {
       hjem = {
         extraModules = [
-          noctalia.hjemModule
+          helix.hjemModule
         ];
 
         users.drfoobar = {
-          programs.noctalia = {
+          programs.helix = {
             enable = true;
             
             settings = { ... };
@@ -266,10 +266,10 @@ The NixOS module installs the package system-wide and can enable some recommende
     { inputs, ... }:
     {
       imports = [
-        inputs.noctalia.nixosModules.default
+        inputs.helix.nixosModules.default
       ];
     
-      programs.noctalia = {
+      programs.helix = {
         enable = true;
     
         # Enables NetworkManager, Bluetooth, UPower, and a power profile service.
@@ -284,10 +284,10 @@ The NixOS module installs the package system-wide and can enable some recommende
       # see adding the input above
     in {
       imports = [
-        noctalia.nixosModule
+        helix.nixosModule
       ];
       
-      programs.noctalia = {
+      programs.helix = {
         enable = true;
       
         # Enables NetworkManager, Bluetooth, UPower, and a power profile service.
@@ -300,7 +300,7 @@ The NixOS module installs the package system-wide and can enable some recommende
 
 ### Systemd Service {#systemd}
 
-Each of the above modules includes a systemd user service for Helix, which can be enabled by setting `programs.noctalia.systemd.enable = true`.
+Each of the above modules includes a systemd user service for Helix, which can be enabled by setting `programs.helix.systemd.enable = true`.
 
 :::note
 When using the service, `launch_apps_as_systemd_services` defaults to on so apps launched from Helix survive a service restart. Turn it off only if you want those apps to die with the shell.

@@ -5,7 +5,7 @@
 #include <linux/input-event-codes.h>
 #include <wayland-client-protocol.h>
 
-namespace noctalia::bar {
+namespace helix::bar {
 
   namespace {
 
@@ -120,4 +120,4 @@ namespace noctalia::bar {
 
   std::span<const std::uint32_t> buttonsForGesture(Gesture gesture) noexcept { return entryFor(gesture).buttons; }
 
-} // namespace noctalia::bar
+} // namespace helix::bar

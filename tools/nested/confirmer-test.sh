@@ -1,5 +1,5 @@
 #!/bin/bash
-# Agent1 confirmer Overlay with pointer and Escape. Invoked by assistant-flow-test.sh (the nested
+# Agent Surface confirmer Overlay with pointer and Escape. Invoked by assistant-flow-test.sh (the nested
 # entry named in the workstream) or alone:
 #   HELIX_NESTED_SCRIPT=tools/nested/confirmer-test.sh tools/nested/run.sh confirmer tools/nested/tauri-shell.sh
 set -u

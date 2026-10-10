@@ -1,24 +1,10 @@
 # Layering rules for src/, checked by tools/check-layers.py (meson test `layering`).
 #
-# A module may include its own layer and the layers below it, in this order:
-#   base < platform < display < shell
-# Independent-process code (the desktop service and the apps) may include base, platform and each other, but not the
-# shell's renderer, UI toolkit or shell-only services: it must be able to run without them.
-#
-# wayland and compositors are clients of the display server (connections, protocols, compositor IPC), so they sit in
-# the platform layer. wayland/surface.* and text_input_service are rendering glue that still reaches into render and
-# ui; those entries in the baseline mark where that module needs splitting.
-#
-# desktop_api is the client library for the desktop service (protocol, client, display text). Every process uses it.
-#
-# Existing violations are recorded in tools/layers-baseline.txt. The check fails on any NEW violation and on baseline
-# entries that no longer exist, so the list can only shrink. Fix a violation, then remove its line.
+# After retiring the C++ session UI, only base + platform + independent processes remain.
 
 [layers]
 base = ["util", "core", "i18n", "time"]
 platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api", "wayland", "compositors"]
-display = ["render", "ui"]
-shell = ["shell", "launcher", "capture", "app"]
 
 [independent]
 modules = ["desktop", "apps", "inference", "assistant"]

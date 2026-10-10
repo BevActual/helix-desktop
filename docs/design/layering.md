@@ -45,12 +45,12 @@ The baseline went from 106 to **10**. Moves, in the order they were made:
 
 | Entries | Why it is there | What fixing it takes |
 |---|---|---|
-| 7 `config -> shell` | Config validation and the `noctalia config` CLI call the bar widgets' settings schema (`widgetSettingSchema`, `validateWidgetSemantics`, `isBuiltInWidgetType`) and the desktop widget specs. Those come from the ~30 `shell/bar/widgets/*_widget_definition.h` files and the settings registry. | Move the widget definitions (data and validators) into a platform-level module, or split each definition into a schema part and a shell part. A startup callback would only hide the dependency, because `helix-service` validates widgets too. This is the main blocker for splitting the library. |
+| 7 `config -> shell` | Config validation and the `helix-shell config` CLI call the bar widgets' settings schema (`widgetSettingSchema`, `validateWidgetSemantics`, `isBuiltInWidgetType`) and the desktop widget specs. Those come from the ~30 `shell/bar/widgets/*_widget_definition.h` files and the settings registry. | Move the widget definitions (data and validators) into a platform-level module, or split each definition into a schema part and a shell part. A startup callback would only hide the dependency, because `helix-service` validates widgets too. This is the main blocker for splitting the library. |
 | 2 `theme -> ui/render` | `ThemeService` both computes palettes and drives a palette cross-fade (`AnimationManager`) and app-icon colouring. | Separate palette computation (platform) from applying it to the UI (shell). |
 | 1 `wayland -> render` | `output_probe.cpp` creates a `LayerSurface` to probe outputs, and `compositors` also uses it. | Probe without a `LayerSurface`, or move the probe to the display layer and let `compositors` call it through an interface. |
 
 ## Splitting the library
 
-`noctalia_core` is still one static library, so `helix-service` and the apps link the whole shell even though their
+`helix_core` is still one static library, so `helix-service` and the apps link the whole shell even though their
 sources no longer include it. Once the three rows above are done, build base and platform as their own libraries and link
 the independent processes against only those.

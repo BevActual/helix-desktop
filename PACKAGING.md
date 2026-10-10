@@ -8,7 +8,7 @@ Notes for distribution packagers. End-user install docs live in the
 Use this exact short description for package metadata (`pkgdesc`, `Summary`,
 AppStream, etc.):
 
-> Helix Shell — a niri-first Wayland desktop shell (command: noctalia).
+> Helix Shell — a niri-first Wayland desktop shell (command: helix).
 
 Do not substitute shorter or alternate blurbs (“lightweight Wayland bar”,
 “status bar”, ...). Helix Shell is a full desktop shell (bars, dock, launcher,
@@ -16,7 +16,7 @@ notifications, lock screen, wallpaper, settings, Control Center services), not a
 
 ## Packaged distributions
 
-Upstream Noctalia v5 is already packaged as `noctalia` for:
+Upstream Helix v5 is already packaged as `helix-shell` for:
 
 - Arch Linux
 - NixOS
@@ -28,21 +28,22 @@ Upstream Noctalia v5 is already packaged as `noctalia` for:
 - GNU Guix
 - Debian (including Ubuntu)
 
-Helix currently builds from this tree. Keep the `noctalia` command and config paths until a rename is an explicit release.
+Helix currently builds from this tree. Keep the `helix-shell` command and config paths until a rename is an explicit release.
 
 ## Identity
 
 | | |
 |---|---|
 | Product | Helix Shell |
-| Command | `noctalia` |
+| Command | `helix-shell` |
 | Homepage | https://github.com/BevActual/helix-shell |
 | Docs | [`docs/user/`](docs/user/) |
 | License | MIT ([LICENSE](LICENSE)); also see vendored licenses under `third_party/` for SPDX completeness |
 | Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
-| Binary | `noctalia` |
-| Desktop entry | `dev.noctalia.Noctalia.desktop` (Name=Helix Shell) |
-| Icon | `noctalia` (`share/icons/hicolor/scalable/apps/noctalia.svg`) |
+| Session shell (live) | `helix-shell-tauri` via `tools/switch-shell.sh install` |
+| Legacy C++ session binary | Removed (Tauri only) |
+| Desktop entry | `org.helix.Shell.desktop` |
+| Icon | `org.helix.Shell` / `helix.svg` |
 
 ## Maintenance Policy
 
@@ -96,22 +97,22 @@ support.
 - `jemalloc`: recommended on glibc; Meson feature option `-Djemalloc=auto|enabled|disabled`.
   Only used on glibc builds.
 
-Prefix/datadir are baked into the binary via `NOCTALIA_INSTALL_PREFIX` /
-`NOCTALIA_INSTALL_DATADIR`. Install with the same prefix you configured.
+Prefix/datadir are baked into the binary via `HELIX_INSTALL_PREFIX` /
+`HELIX_INSTALL_DATADIR`. Install with the same prefix you configured.
 
 ### Installed layout
 
 ```text
-<prefix>/bin/noctalia
-<prefix>/share/noctalia/assets/...
-<prefix>/share/applications/dev.noctalia.Noctalia.desktop
-<prefix>/share/icons/hicolor/scalable/apps/noctalia.svg
+<prefix>/bin/helix
+<prefix>/share/helix/assets/...
+<prefix>/share/applications/org.helix.Helix.desktop
+<prefix>/share/icons/hicolor/scalable/apps/helix.svg
 ```
 
 The shipped `assets/` tree is **required at runtime**. Shipping only the binary
 breaks fonts, translations, templates, glyphs, and sounds. See
 [CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for lookup order (including
-`NOCTALIA_ASSETS_DIR` overrides for unusual layouts).
+`HELIX_ASSETS_DIR` overrides for unusual layouts).
 
 Not shipped (don’t look for them in the install): AppStream / metainfo XML, man
 pages, systemd units.
@@ -122,9 +123,9 @@ Static completion files are not shipped. Generate them from the freshly built
 binary and install them in the distribution's completion directories:
 
 ```text
-./build-<mode>/noctalia completions bash  → share/bash-completion/completions/noctalia
-./build-<mode>/noctalia completions zsh   → share/zsh/site-functions/_noctalia
-./build-<mode>/noctalia completions fish  → share/fish/vendor_completions.d/noctalia.fish
+./build-<mode>/helix completions bash  → share/bash-completion/completions/helix
+./build-<mode>/helix completions zsh   → share/zsh/site-functions/_helix
+./build-<mode>/helix completions fish  → share/fish/vendor_completions.d/helix.fish
 ```
 
 This is intentionally a packaging step rather than a Meson install rule:
@@ -132,8 +133,13 @@ executing the target binary during installation would break cross-compilation.
 
 ## Dependencies
 
-No Qt or GTK. UI is Wayland + OpenGL ES (EGL/GLES, or `libepoxy` as a fallback
-when separate EGL/GLES packages are missing).
+The **session shell and apps** are Rust/Tauri (`shell/`, `apps/`); see
+[docs/design/rust-workspace.md](docs/design/rust-workspace.md). Shared app controls
+follow GTK4/libadwaita grammar ([docs/design/helix-hig.md](docs/design/helix-hig.md)).
+
+The section below is for the **live C++ desktop authority** (`helix-service`) and
+related Meson targets until Rust cutover. GLES/EGL appear where C++ helpers still
+need them — not as the session UI stack.
 
 ### Build-time (required)
 
@@ -169,8 +175,8 @@ Each carries its own license file beside the code.
 ## Startup and IPC
 
 No systemd user unit is shipped. Typical startup is compositor autostart or the
-desktop entry (`noctalia --daemon`). Control a running instance with
-`noctalia msg ...` (Unix socket under `XDG_RUNTIME_DIR`).
+desktop entry (`helix --daemon`). Control a running instance with
+`helix-panel ...` (Unix socket under `XDG_RUNTIME_DIR`).
 
 Keep the `.desktop` daemon Exec unless you intentionally package a different
 session integration. Prefer the canonical description above for `Comment=` /
@@ -192,21 +198,22 @@ the freedesktop Notifications name.
 
 | Kind | Default |
 |---|---|
-| Config | `$XDG_CONFIG_HOME/noctalia` (`~/.config/noctalia`), e.g. `config.toml` |
-| State | `$XDG_STATE_HOME/noctalia` (`~/.local/state/noctalia`), e.g. `settings.toml`, caches |
-| Data | `$XDG_DATA_HOME/noctalia` (`~/.local/share/noctalia`) |
-| Logs | `$XDG_CACHE_HOME/noctalia` (`~/.cache/noctalia`) |
+| Config | `$XDG_CONFIG_HOME/helix` (`~/.config/helix`), e.g. `config.toml` |
+| State | `$XDG_STATE_HOME/helix` (`~/.local/state/helix`), e.g. `settings.toml`, caches |
+| Data | `$XDG_DATA_HOME/helix` (`~/.local/share/helix`) |
+| Logs | `$XDG_CACHE_HOME/helix` (`~/.cache/helix`) |
 
-Override bases with `NOCTALIA_CONFIG_HOME`, `NOCTALIA_STATE_HOME`,
-`NOCTALIA_DATA_HOME` (each still appends `/noctalia`).
+Override bases with `HELIX_CONFIG_HOME`, `HELIX_STATE_HOME`,
+`HELIX_DATA_HOME` (each still appends `/helix`).
 
 ## What Helix is not
 
-- Not a compositor, display manager, or greeter. Login is helix-greeter
-  (commands stay `noctalia-greeter`).
+- Not a display manager. Login is in-tree `greeter/` (`helix-greeter`).
 - Not a replacement for file managers, screen casting, or drive mounting.
-- Compositor support varies (protocols / IPC). See
-  [`docs/user/compositor-settings/`](docs/user/compositor-settings/).
+- The supported compositor is in-tree helix-niri (`compositor/`). Other
+  compositor guides under [`docs/user/compositor-settings/`](docs/user/compositor-settings/)
+  are unsupported historical notes. Product shape:
+  [`docs/design/product-structure.md`](docs/design/product-structure.md).
 
 ## Versioning
 
@@ -216,20 +223,20 @@ you maintain a `-git` / nightly package on purpose.
 ## Contact
 
 Report Helix Shell issues at https://github.com/BevActual/helix-shell/issues.
-The upstream Noctalia project is at https://github.com/noctalia-dev/noctalia.
 
 ## Helix desktop service and Settings
 
-Install the `helix-service` binary, `org.helix.Desktop.service` D-Bus activation file and
-`helix-service.service` systemd user unit together with the migrated shell. They must share the
-same prefix. The service is activated on demand; no globally enabled user unit is required.
+Install the live `helix-service` binary (or the Rust `helix-desktop` binary when cut over),
+`org.helix.Desktop.service` D-Bus activation file and matching systemd user unit together with
+the shell. They must share the same prefix. The service is activated on demand; no globally
+enabled user unit is required. See [`docs/design/cpp-to-rust.md`](docs/design/cpp-to-rust.md).
 
-`helix-settings` has its own application entry, GTK4/libadwaita runtime dependencies and no dependency
-on the Helix compositor or shell. It requires the matching desktop service for live state and edits.
-Other Linux desktops expose portable capabilities; Helix Desktop & Dock is omitted outside a Helix
-session. Install the Settings desktop entry only when the application target is built.
+`helix-settings` is the Tauri Settings app (`apps/helix-settings`). It has its own application
+entry and requires the matching desktop service for live state and edits. Helix Desktop & Dock
+settings are omitted outside a Helix session. Install the Settings desktop entry only when the
+application target is built.
 
-`helix-system-monitor` is built with the same GTK4/libadwaita application option. Install
+`helix-system-monitor` is the Tauri System Monitor app. Install
 `org.helix.SystemMonitor.desktop` with its binary. It needs Linux procfs for resource
 metrics and runs independently of the shell, compositor and desktop service. Appearance
 integration is optional and does not activate a service.

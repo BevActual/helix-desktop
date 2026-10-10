@@ -913,7 +913,7 @@
     },
     "keybinds": {
       "copy-missing-tooltip": "Copy missing recommended keys",
-      "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
+      "in-helix-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
       "install-tooltip": "Add the missing recommended keys",
       "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
       "open-folder-failed": "Could not open the compositor config folder.",
@@ -2256,7 +2256,7 @@
       "calendar-google-connect-start-failed": "Could not start Google authorization. Check your network connection and try again.",
       "calendar-google-connect-start-http": "Could not start Google authorization. The OAuth broker returned HTTP {status}.",
       "calendar-google-connect-timeout": "Google authorization timed out. Start the connection again when you are ready to sign in.",
-      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run noctalia config validate to list every required change.",
+      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run helix config validate to list every required change.",
       "config-migration-title": "Configuration update needed",
       "dbus-disabled": "DBus notifications disabled",
       "desktop-widgets-editor": "Widget editor",
@@ -2265,12 +2265,12 @@
       "greeter-sync-pending": "Syncing appearance to the greeter. If an administrator prompt appears, approve it; passwordless authorization follows system policy.",
       "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Helix, on a TTY, or on a console.",
       "greeter-sync-pending-legacy": "Syncing through the authenticated legacy helper. Administrator approval is required.",
-      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving NOCTALIA_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
-      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving HELIX_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
+      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Appearance synced. Changes apply on the next login screen.",
       "greeter-sync-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "keybind-app": "Helix Shell",
       "keybind-invalid-modifier": "This shortcut accepts a single key without modifiers.",
       "keybind-invalid-printable": "Printable keys (letters, numbers, symbols) require a modifier such as Ctrl or Alt.",
@@ -2667,10 +2667,10 @@
       "reset-page": "Failed to reset some settings.",
       "support-report": "Failed to save support report.",
       "sync-greeter": "Could not sync appearance to Helix Greeter.",
-      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "sync-greeter-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Could not rename named widget."
       },
@@ -2756,7 +2756,7 @@
         "hot-corners": "Hot Corners",
         "icons": "Icons",
         "idle": "Idle",
-        "in-noctalia": "In Helix Shell",
+        "in-helix": "In Helix Shell",
         "interface": "Interface",
         "keybinds": "Keybinds",
         "keyboard-layout": "Keyboard Layout",
@@ -3172,8 +3172,8 @@
         },
         "kind-label": "Kind",
         "location-label": "Location",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "Source ID",
         "name-placeholder": "my-plugins",
         "precedence-hint": "Lower sources override higher ones when they offer the same plugin.",
@@ -3195,7 +3195,7 @@
         "installed": "Installed",
         "loading": "Loading catalog…",
         "no-readme": "No description available.",
-        "open-page": "Open plugin page on noctalia.dev",
+        "open-page": "Open plugin page on helix.dev",
         "open-source": "Open plugin source repository",
         "results-count": "{count} plugins",
         "search-placeholder": "Search plugins…",
@@ -3327,7 +3327,7 @@
           "label": "Corner Roundness"
         },
         "custom-palette": {
-          "description": "Choose a palette from ~/.config/noctalia/palettes/",
+          "description": "Choose a palette from ~/.config/helix/palettes/",
           "label": "Custom Palette",
           "search-placeholder": "Search custom palettes…"
         },
@@ -3833,7 +3833,7 @@
             "label": "On Theme Mode Changed"
           },
           "wallpaper-changed": {
-            "description": "Command to run when the wallpaper changes; provides NOCTALIA_WALLPAPER_PATH and NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Command to run when the wallpaper changes; provides HELIX_WALLPAPER_PATH and HELIX_WALLPAPER_CONNECTOR",
             "label": "On Wallpaper Changed"
           },
           "wifi-disabled": {
@@ -4629,7 +4629,7 @@
           "placeholder": "City, Country"
         },
         "location-auto-locate": {
-          "description": "Detect your location automatically from your IP address via noctalia.dev",
+          "description": "Detect your location automatically from your IP address via helix.dev",
           "label": "Auto-Locate (IP)"
         },
         "longitude": {
@@ -4857,7 +4857,7 @@
           "label": "Date Format"
         },
         "external-ip": {
-          "description": "Resolve the connection's public WAN IP (via api.noctalia.dev) and show it in the Control Center network tab",
+          "description": "Resolve the connection's public WAN IP (via a public IP lookup) and show it in the Control Center network tab",
           "label": "Show WAN IP"
         },
         "greeter-sync-auto": {
@@ -5807,7 +5807,7 @@
             "label": "Open settings"
           },
           "settings-open-plugin": {
-            "description": "Open Control Center at a plugin's settings (e.g. noctalia/notes)",
+            "description": "Open Control Center at a plugin's settings (e.g. helix/notes)",
             "label": "Open plugin settings"
           },
           "settings-open-widget": {
@@ -6655,7 +6655,7 @@
       "export-config": "Export Config…",
       "export-config-saved": "Config export saved.",
       "filter-overridden": "Overridden",
-      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
+      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run helix config validate to list every required change.",
       "native-title": "Helix Shell Settings",
       "no-results": "No settings found",
       "no-results-hint": "Try a different setting name or config key.",

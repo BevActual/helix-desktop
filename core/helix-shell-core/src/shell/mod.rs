@@ -1,0 +1,13 @@
+pub mod calendar;
+pub mod dbusmenu;
+pub mod dock;
+pub mod glass;
+pub mod identity;
+pub mod island;
+pub mod launcher;
+pub mod niri;
+pub mod notifications;
+pub mod quick_insert;
+pub mod shell_surface;
+pub mod surfaces;
+pub mod tray;

@@ -3,7 +3,7 @@
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 # Unless HELIX_SHELL_BIN says otherwise, run whichever build (fast or release) was made last, so a test never silently runs a stale binary.
-newest_shell_bin() { ls -t "$ROOT/rust/target/fast/helix-shell-tauri" "$ROOT/rust/target/release/helix-shell-tauri" 2>/dev/null | head -1; }
+newest_shell_bin() { ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1; }
 # A stand-in backlight, so a nested session never reads or writes the real one.
 mkdir -p "${XDG_STATE_HOME}/backlight"; printf "50\n" > "${XDG_STATE_HOME}/backlight/brightness"; printf "100\n" > "${XDG_STATE_HOME}/backlight/max_brightness"
 export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"

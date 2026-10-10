@@ -1209,8 +1209,8 @@
         },
         "kind-label": "Rodzaj",
         "location-label": "Lokalizacja",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID Źródła",
         "name-placeholder": "moje-wtyczki",
         "remove": "Usuń źródło",
@@ -1250,7 +1250,7 @@
           "label": "Zaokrąglenie narożników"
         },
         "custom-palette": {
-          "description": "Wybierz paletę z ~/.config/noctalia/palettes/",
+          "description": "Wybierz paletę z ~/.config/helix/palettes/",
           "label": "Niestandardowa paleta",
           "search-placeholder": "Szukaj niestandardowych palet…"
         },
@@ -1621,7 +1621,7 @@
             "label": "Przy zmianie motywu"
           },
           "wallpaper-changed": {
-            "description": "Polecenie do uruchomienia gdy zmienia się tapeta; dostarcza NOCTALIA_WALLPAPER_PATH oraz NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Polecenie do uruchomienia gdy zmienia się tapeta; dostarcza HELIX_WALLPAPER_PATH oraz HELIX_WALLPAPER_CONNECTOR",
             "label": "Przy zmianie tapety"
           },
           "wifi-disabled": {
@@ -1887,7 +1887,7 @@
           "placeholder": "Miasto, Kraj"
         },
         "location-auto-locate": {
-          "description": "Wykryj swoją lokalizację automatycznie na podstawie twojego adresu IP za pomocą serwisu noctalia.dev",
+          "description": "Wykryj swoją lokalizację automatycznie na podstawie twojego adresu IP za pomocą serwisu helix.dev",
           "label": "Auto-lokalizacja (IP)"
         },
         "longitude": {

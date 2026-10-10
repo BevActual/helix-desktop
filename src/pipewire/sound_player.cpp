@@ -298,7 +298,7 @@ void SoundPlayer::playBuffer(const std::string& name, const std::shared_ptr<cons
       PW_KEY_MEDIA_TYPE, "Audio", PW_KEY_MEDIA_CATEGORY, "Playback", PW_KEY_MEDIA_ROLE, "Notification", PW_KEY_APP_NAME,
       "Helix", nullptr
   );
-  active->stream = pw_stream_new_simple(m_loop, "noctalia-sound", props, &kStreamEvents, active.get());
+  active->stream = pw_stream_new_simple(m_loop, "helix-sound", props, &kStreamEvents, active.get());
   if (active->stream == nullptr) {
     delete active->listener;
     kLog.warn("failed to create stream for sound \"{}\"", name);

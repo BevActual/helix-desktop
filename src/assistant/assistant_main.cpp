@@ -1,7 +1,7 @@
 // helix-assistant "turn the volume up": plain English in, one desktop action out.
 //
 // The model (helix-inference) only chooses a tool call, constrained to the tools this client is allowed to use. Anything that
-// changes the desktop is shown first and runs only after a yes typed here. The call then goes through Agent1 like any other
+// changes the desktop is shown first and runs only after a yes typed here. The call then goes through Agent Surface like any other
 // client's, so its grants, confirmations and audit apply on top. Design: docs/design/agent-and-inference.md.
 #include "assistant/assistant_core.h"
 #include "cli/schema_msg.h"
@@ -9,6 +9,7 @@
 #include "desktop/tool_schema.h"
 #include "desktop_api/protocol.h"
 #include "inference/protocol.h"
+#include "inference/routing.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -26,7 +27,7 @@ namespace {
 fs::path dataFile(const char* env, const char* name) {
   if (const char* value = std::getenv(env); value && *value) return value;
   std::error_code ec;
-  const fs::path installed = fs::path(NOCTALIA_INSTALL_PREFIX) / NOCTALIA_INSTALL_DATADIR / "helix" / name;
+  const fs::path installed = fs::path(HELIX_INSTALL_PREFIX) / HELIX_INSTALL_DATADIR / "helix" / name;
   if (fs::exists(installed, ec)) return installed;
   const fs::path exe = fs::read_symlink("/proc/self/exe", ec);
   return exe.parent_path() / ".." / "protocols" / "ipc" / name;  // development builds run from <repo>/<builddir>/
@@ -143,7 +144,7 @@ int main(int argc, char** argv) {
 
   try {
     using helix::agent::Tier;
-    const char* desktop = helix::busName; const char* desktopPath = helix::objectPath; const char* agentIface = helix::agentInterface;
+    const char* desktop = helix::busName; const char* desktopPath = helix::objectPath; const char* agentIface = helix::agentSurfaceInterface;
     Waiter agentDone(bus, desktop, desktopPath, agentIface);
     Waiter chatDone(bus, helix::inference::busName, helix::inference::objectPath, helix::inference::interfaceName);
 
@@ -163,7 +164,7 @@ int main(int argc, char** argv) {
       granted = grantedTiers(answer.result.at("granted"));
     }
 
-    // Runs a call through Agent1 and reports the outcome. The service decides; this only carries the result back.
+    // Runs a call through Agent Surface and reports the outcome. The service decides; this only carries the result back.
     const auto run = [&](const Reply& reply, const std::string& why) {
       Json action{{"argv", Json::array()}, {"literal", reply.args}, {"reason", why.substr(0, 200)}};
       const auto operation = call(bus, desktop, desktopPath, agentIface, "Action", g_variant_new("(s@a{sv})", reply.tool.c_str(), helix::toVariant(action)))[0].get<guint64>();
@@ -197,7 +198,7 @@ int main(int argc, char** argv) {
     std::set<Tier> offered;
     for (const Tier tier : {Tier::Observe, Tier::ObservePrivate, Tier::Act}) if (granted.contains(tier)) offered.insert(tier);
     if (offered.empty()) return fail("The assistant has no usable permission.");
-    const auto& root = noctalia::cli::kMsgCmd;
+    const auto& root = helix::cli::kMsgCmd;
     // The model is shown every tool: it is best at finding the right one (96%), and a request for something this desktop cannot do then
     // comes back as that tool, which is turned into a decline below. Offering only the tools the shell has made it pick a similar-sounding
     // one instead (held-out: 27 of 43 requests it should have declined, against 1 of 43 this way). tests/inference_eval.cpp --map-unsupported.
@@ -205,11 +206,20 @@ int main(int argc, char** argv) {
     const Json schema = helix::agent::toolCallSchema(root, *policy, offered, nullptr, true);
     const std::string catalog = helix::agent::toolCatalog(root, *policy, offered, nullptr, true, &*hints);
 
+    // Act slot: task=act selects the on-device grammar model from inference-routing.toml when model is omitted.
+    // HELIX_ASSISTANT_MODEL still wins when set and installed.
+    std::string preferred = std::getenv("HELIX_ASSISTANT_MODEL") ? std::getenv("HELIX_ASSISTANT_MODEL") : "";
+    if (preferred.empty()) preferred = helix::inference::loadRouting().route("act").model;
     const auto chosen = chooseModel(call(bus, helix::inference::busName, helix::inference::objectPath, helix::inference::interfaceName, "ListModels", nullptr)[0],
-                                    std::getenv("HELIX_ASSISTANT_MODEL") ? std::getenv("HELIX_ASSISTANT_MODEL") : "");
+                                    preferred);
     if (!chosen.error.empty()) return fail(chosen.error);
-    Json options{{"messages", buildMessages(catalog, request)}, {"schema", schema.dump()}, {"model", chosen.id}, {"max_tokens", warm ? 1 : 128},
-                 {"temperature", 0.0}, {"priority", warm ? "background" : "interactive"}};
+    Json options{{"messages", buildMessages(catalog, request)},
+                 {"schema", schema.dump()},
+                 {"task", "act"},
+                 {"model", chosen.id},
+                 {"max_tokens", warm ? 1 : 128},
+                 {"temperature", 0.0},
+                 {"priority", warm ? "background" : "interactive"}};
     const auto chat = call(bus, helix::inference::busName, helix::inference::objectPath, helix::inference::interfaceName, "Action",
                            g_variant_new("(s@a{sv})", "chat", helix::toVariant(options)))[0].get<guint64>();
     const auto answer = chatDone.wait(chat, 300);

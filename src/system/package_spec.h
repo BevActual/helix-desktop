@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-namespace noctalia::packages {
+namespace helix::packages {
 
   enum class PackageState : std::uint8_t {
     Installed,
@@ -152,4 +152,4 @@ namespace noctalia::packages {
   [[nodiscard]] PackageDetails parseRpmInfoOutput(std::string_view text, PackageHit base = {});
   [[nodiscard]] PackageDetails enrichFromFwupdDeviceJson(std::string_view text, PackageHit base);
 
-} // namespace noctalia::packages
+} // namespace helix::packages

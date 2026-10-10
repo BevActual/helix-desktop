@@ -8,7 +8,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kKeyboardIncludeFileName = "noctalia-keyboard.kdl";
+  inline constexpr std::string_view kKeyboardIncludeFileName = "helix-keyboard.kdl";
   inline constexpr std::string_view kQuickInsertXkbOption = "helix:quickinsert";
 
   // Remap the Caps Lock key to F19 while Quick Insert owns it, so the physical

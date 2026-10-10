@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 VENV="$ROOT/.venv"
 if [[ ! -x "$VENV/bin/python" ]]; then
-  # System site packages provide PyGObject, which the adapter uses to reach the desktop service (Agent1).
+  # System site packages provide PyGObject, which the adapter uses to reach the desktop service (Agent Surface).
   python3 -m venv --system-site-packages "$VENV"
 fi
 if grep -q '^include-system-site-packages = false' "$VENV/pyvenv.cfg" 2>/dev/null; then

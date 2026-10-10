@@ -5,9 +5,9 @@ sidebar:
   order: 1
 ---
 
-Helix Shell is currently distributed from the [Helix Shell source repository](https://github.com/BevActual/helix-shell). Distribution packages named `noctalia` generally contain [upstream Noctalia](https://github.com/noctalia-dev/noctalia), not this Helix fork. Install from this repository to get Helix features.
+Helix Shell is currently distributed from the [Helix Shell source repository](https://github.com/BevActual/helix-shell). Install from this repository to get Helix features.
 
-The installed executable, desktop entry, and configuration paths still use `noctalia` for compatibility. If upstream Noctalia is also installed, check which `noctalia` executable your `PATH` selects before starting a session. The two builds use the same configuration and runtime paths.
+The installed executable, desktop entry, and configuration paths still use `helix-shell` for compatibility. If upstream Helix is also installed, check which `helix-shell` executable your `PATH` selects before starting a session. The two builds use the same configuration and runtime paths.
 
 ## Build from source
 
@@ -21,9 +21,9 @@ just build release
 just install release
 ```
 
-This installs the shell and its required assets under `~/.local`. Ensure `~/.local/bin` is on your `PATH`, then use `command -v noctalia` to check which build will start. To try the executable directly, run `~/.local/bin/noctalia --version`. The command name in the version output remains `noctalia`.
+This installs the shell and its required assets under `~/.local`. Ensure `~/.local/bin` is on your `PATH`, then use `command -v helix` to check which build will start. To try the executable directly, run `~/.local/bin/helix --version`. The command name in the version output remains `helix-shell`.
 
-Start the shell through your [compositor's startup configuration](/noctalia/getting-started/running-the-shell/). [Helix Niri](https://github.com/BevActual/helix-niri) is the intended compositor; stock niri and other supported Wayland compositors can also run the shell. [Helix Greeter](https://github.com/BevActual/helix-greeter) is a separate, optional login component. Build and install those projects using their own instructions.
+Start the shell through your [compositor's startup configuration](/helix/getting-started/running-the-shell/). The intended compositor is in-tree at `compositor/` (build with `cd compositor && cargo build --release`); stock niri and other supported Wayland compositors can also run the shell. The login greeter is in-tree at `greeter/` (`cargo build -p helix-greeter`).
 
 ## Update or remove
 
@@ -35,6 +35,6 @@ just build release
 just install release
 ```
 
-To remove files installed by this build, run `just uninstall release` from the same checkout and build directory. Your personal configuration and state remain under the `noctalia` XDG directories; see [Uninstall](/noctalia/getting-started/uninstall/) before removing them.
+To remove files installed by this build, run `just uninstall release` from the same checkout and build directory. Your personal configuration and state remain under the `helix-shell` XDG directories; see [Uninstall](/helix/getting-started/uninstall/) before removing them.
 
 For build options, troubleshooting, and system-wide installation, see [BUILDING.md](https://github.com/BevActual/helix-shell/blob/main/BUILDING.md). Report Helix Shell issues in the [Helix issue tracker](https://github.com/BevActual/helix-shell/issues).

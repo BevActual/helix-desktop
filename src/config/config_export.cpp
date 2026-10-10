@@ -14,7 +14,7 @@
 #include <vector>
 
 namespace config_export {
-  namespace schema = noctalia::config::schema;
+  namespace schema = helix::config::schema;
 
   namespace {
 

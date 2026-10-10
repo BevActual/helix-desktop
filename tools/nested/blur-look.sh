@@ -5,7 +5,7 @@ if [ -z "${HELIX_BLUR_INNER:-}" ]; then
   ROOT=$(cd "$(dirname "$0")/../.." && pwd)
   rm -rf /tmp/helix-nested/blur
   KDL='layer-rule {
-    match namespace="^noctalia-panel$"
+    match namespace="^helix-panel$"
     background-effect {
         blur true
         xray false
@@ -20,7 +20,7 @@ blur {
     noise 0.00
     saturation 1.0
 }'
-  HELIX_BLUR_INNER=1 HELIX_NESTED_KDL="$KDL" HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/rust/target/fast/helix-shell-tauri}" HELIX_NESTED_SETTLE=8 \
+  HELIX_BLUR_INNER=1 HELIX_NESTED_KDL="$KDL" HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/target/fast/helix-shell-tauri}" HELIX_NESTED_SETTLE=8 \
     HELIX_NESTED_SCRIPT="$ROOT/tools/nested/blur-look.sh" "$ROOT/tools/nested/run.sh" blur "$ROOT/tools/nested/tauri-fake-desktop.sh" >/dev/null 2>&1
   ls /tmp/helix-nested/blur/named/; grep -h 'GLASS' /tmp/helix-nested/blur/program.log
   exit 0

@@ -21,7 +21,7 @@ namespace compositors::niri {
         "// Requires niri 26.04 or newer. Refraction requires helix-niri.\n";
 
     constexpr std::string_view kChromeNamespace =
-        "^noctalia-(bar-.+|notification|dock|panel|attached-panel|osd|idle-grace|screenshot-region|annotate|overview-launcher)$";
+        "^helix-(bar-.+|notification|dock|panel|attached-panel|osd|idle-grace|screenshot-region|annotate|overview-launcher)$";
 
     constexpr std::string_view kDisabledKdl = R"(window-rule {
     background-effect {
@@ -30,7 +30,7 @@ namespace compositors::niri {
 }
 
 layer-rule {
-    match namespace="^noctalia-"
+    match namespace="^helix-"
     background-effect {
         blur false
     }
@@ -215,12 +215,12 @@ layer-rule {
     body += backgroundEffectBlock(chromeBlur, false, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
-    body += "layer-rule {\n    match namespace=\"noctalia-window-switcher\"\n";
+    body += "layer-rule {\n    match namespace=\"helix-window-switcher\"\n";
     body += backgroundEffectBlock(chromeBlur, false, helixGlass, strength, params, helixGlass && !chromeBlur);
     body += "}\n\n";
 
     if (helixGlass) {
-      body += "window-rule {\n    match app-id=\"^dev\\\\.noctalia\\\\.Greeter$\"\n";
+      body += "window-rule {\n    match app-id=\"^dev\\\\.helix\\\\.Greeter$\"\n";
       body += backgroundEffectBlock(false, true, true, strength, params, true);
       body += "}\n\n";
     }

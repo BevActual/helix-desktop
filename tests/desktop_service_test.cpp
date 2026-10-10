@@ -68,10 +68,10 @@ int main(int argc, char** argv) {
   assert(argc == 2);
   if (std::string(argv[1]) == "--fake-bluez") return fakeBluez();
   const auto root = std::filesystem::temp_directory_path() / ("helix-service-test-" + std::to_string(getpid()));
-  std::filesystem::create_directories(root / "config/noctalia");
-  const auto source = root / "config/noctalia/config.toml";
+  std::filesystem::create_directories(root / "config/helix");
+  const auto source = root / "config/helix/config.toml";
   { std::ofstream file(source); file << "[theme]\nmode = \"dark\"\n[control_center]\nhidden_tabs = [\"plugin:test-hidden\", \"ai-usage\", \"screenshot\", \"screen-record\"]\n[[control_center.shortcuts]]\ntype = \"author/plugin:pin\"\nsize = \"wide\"\n"; }
-  setenv("NOCTALIA_CONFIG_HOME", (root / "config").c_str(), 1);
+  setenv("HELIX_CONFIG_HOME", (root / "config").c_str(), 1);
   setenv("XDG_STATE_HOME", (root / "state").c_str(), 1);
   setenv("XDG_CACHE_HOME", (root / "cache").c_str(), 1);
   setenv("XDG_DATA_HOME", (root / "data").c_str(), 1);
@@ -345,8 +345,6 @@ int main(int argc, char** argv) {
   assert(setting(client, "notification.filter_replace").at("value") == true);
   client.call("configuration", "Update", g_variant_new("(sv)", "tailscale.notify_on_peer_change", g_variant_new_boolean(true)));
   assert(setting(client, "tailscale.notify_on_peer_change").at("value") == true);
-  client.call("configuration", "Update", g_variant_new("(sv)", "localsend.enabled", g_variant_new_boolean(false)));
-  assert(setting(client, "localsend.enabled").at("value") == false);
   client.call("configuration", "Update", g_variant_new("(sv)", "dock.border", g_variant_new_string("primary")));
   assert(setting(client, "dock.border").at("value") == "primary");
   {
@@ -370,7 +368,6 @@ int main(int argc, char** argv) {
   client.call("configuration", "Reset", g_variant_new("(s)", "calendar.enabled"));
   client.call("configuration", "Reset", g_variant_new("(s)", "notification.filter_replace"));
   client.call("configuration", "Reset", g_variant_new("(s)", "tailscale.notify_on_peer_change"));
-  client.call("configuration", "Reset", g_variant_new("(s)", "localsend.enabled"));
   client.call("configuration", "Reset", g_variant_new("(s)", "dock.border"));
   client.call("configuration", "Reset", g_variant_new("(s)", "wallpaper.transition"));
   client.call("configuration", "Update", g_variant_new("(sv)", "dock.border_width", g_variant_new_double(2.0)));
@@ -459,7 +456,7 @@ int main(int argc, char** argv) {
   assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "control_center.visible_tabs", helix::toVariant(pages.at("options")))));
   client.call("configuration", "UpdateOrderedList", updatePages(visiblePages, pages.at("options")));
   assert(setting(client, "control_center.visible_tabs").at("value") == pages.at("options"));
-  { std::ifstream file(root / "state/noctalia/settings.toml"); std::string contents((std::istreambuf_iterator<char>(file)), {});
+  { std::ifstream file(root / "state/helix/settings.toml"); std::string contents((std::istreambuf_iterator<char>(file)), {});
     assert(contents.find("plugin:test-hidden") != std::string::npos);
     assert(contents.find("ai-usage") == std::string::npos && contents.find("screenshot") == std::string::npos && contents.find("screen-record") == std::string::npos);
   }
@@ -760,7 +757,7 @@ int main(int argc, char** argv) {
   { std::ofstream file(source, std::ios::app); file << "\n[idle.behavior.custom]\nenabled = false\ntimeout = 90\naction = \"command\"\ncommand = \"existing-command\"\nresume_command = \"existing-resume\"\n"; }
   client.call("configuration", "Update", g_variant_new("(sv)", "idle:custom:timeout", g_variant_new_double(120)));
   assert(setting(client, "idle:custom:action").at("value") == "command");
-  { std::ifstream file(root / "state/noctalia/settings.toml"); std::string content((std::istreambuf_iterator<char>(file)), {});
+  { std::ifstream file(root / "state/helix/settings.toml"); std::string content((std::istreambuf_iterator<char>(file)), {});
     assert(content.find("existing-command") != std::string::npos && content.find("existing-resume") != std::string::npos); }
   client.call("configuration", "Reset", g_variant_new("(s)", "idle.behavior"));
   assert(setting(client, "idle:custom:timeout").at("value") == 90);

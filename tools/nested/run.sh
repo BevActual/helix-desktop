@@ -22,15 +22,15 @@ export HELIX_ALLOW_UNPROTECTED_APPROVALS=${HELIX_ALLOW_UNPROTECTED_APPROVALS-1}
 # The real system bus (NetworkManager, BlueZ, logind, polkit) is out of reach of everything started here. A test that needs one
 # provides its own with HELIX_NESTED_SYSTEM_BUS=unix:path=...; otherwise services see "unavailable", never the person's real devices.
 export DBUS_SYSTEM_BUS_ADDRESS="${HELIX_NESTED_SYSTEM_BUS:-unix:path=/nonexistent/helix-nested-system-bus}"
-unset NIRI_SOCKET NOCTALIA_STATE_HOME NOCTALIA_CONFIG_HOME NOCTALIA_DATA_HOME NOCTALIA_CACHE_HOME
+unset NIRI_SOCKET HELIX_STATE_HOME HELIX_CONFIG_HOME HELIX_DATA_HOME HELIX_CACHE_HOME
 for kv in "$@"; do export "$kv"; done
 # HELIX_NESTED_ASSISTANT=<path to helix-assistant>: pre-grant observe and act to that binary, as if the person had approved it once.
 # HELIX_NESTED_ASSISTANT_TIERS (default `observe act`) and HELIX_NESTED_ASSISTANT_SCRIPT (an interpreter is known by the script it runs).
 if [ -n "${HELIX_NESTED_ASSISTANT:-}" ]; then
-  mkdir -p "$XDG_STATE_HOME/noctalia/agent"
+  mkdir -p "$XDG_STATE_HOME/helix/agent"
   TIERS=$(printf '"%s",' ${HELIX_NESTED_ASSISTANT_TIERS:-observe act}); TIERS=${TIERS%,}
-  printf '{"clients":{"exe:%s":[%s]},"version":1}' "$(readlink -f "$HELIX_NESTED_ASSISTANT")${HELIX_NESTED_ASSISTANT_SCRIPT:+#$HELIX_NESTED_ASSISTANT_SCRIPT}" "$TIERS" > "$XDG_STATE_HOME/noctalia/agent/grants.json"
-  chmod 600 "$XDG_STATE_HOME/noctalia/agent/grants.json"
+  printf '{"clients":{"exe:%s":[%s]},"version":1}' "$(readlink -f "$HELIX_NESTED_ASSISTANT")${HELIX_NESTED_ASSISTANT_SCRIPT:+#$HELIX_NESTED_ASSISTANT_SCRIPT}" "$TIERS" > "$XDG_STATE_HOME/helix/agent/grants.json"
+  chmod 600 "$XDG_STATE_HOME/helix/agent/grants.json"
 fi
 cat > "$SCRATCH/niri.kdl" <<KDL
 hotkey-overlay { skip-at-startup; }

@@ -7,7 +7,7 @@
 #include <array>
 #include <utility>
 
-namespace noctalia::config::schema {
+namespace helix::config::schema {
   namespace {
 
     template <typename T> SectionSpec makeSection(std::string_view name, T Config::* member, const Schema<T>& schema) {
@@ -57,8 +57,6 @@ namespace noctalia::config::schema {
         t.push_back(makeSection("system", &Config::system, systemSchema()));
         t.push_back(makeSection("weather", &Config::weather, weatherSchema()));
         t.push_back(makeSection("tailscale", &Config::tailscale, tailscaleSchema()));
-        t.push_back(makeSection("localsend", &Config::localsend, localsendSchema()));
-        t.push_back(makeSection("phone", &Config::phone, phoneSchema()));
         t.push_back(makeSection("calendar", &Config::calendar, calendarSchema()));
         t.push_back(makeSection("audio", &Config::audio, audioSchema()));
         t.push_back(makeSection("brightness", &Config::brightness, brightnessSchema()));
@@ -105,4 +103,4 @@ namespace noctalia::config::schema {
     return findSection(name) != nullptr || std::ranges::find(customRootKeys(), name) != customRootKeys().end();
   }
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

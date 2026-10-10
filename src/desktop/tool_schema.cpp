@@ -26,8 +26,8 @@ bool meaningfulOptional(const std::string& command, std::string_view positional)
   return kept.contains({command, std::string(positional)});
 }
 
-std::vector<const noctalia::cli::Positional*> offeredPositionals(const noctalia::cli::Command& command) {
-  std::vector<const noctalia::cli::Positional*> out;
+std::vector<const helix::cli::Positional*> offeredPositionals(const helix::cli::Command& command) {
+  std::vector<const helix::cli::Positional*> out;
   for (const auto& positional : command.positionals)
     if (positional.required || !positional.choices.empty() || meaningfulOptional(std::string(command.name), positional.name)) out.push_back(&positional);
   return out;
@@ -44,7 +44,7 @@ json stringSchema(std::span<const std::string_view> choices, const std::set<std:
 }
 
 // `allowedFirst`, when set, limits the first positional (or the subcommand name) to those choices.
-json callSchema(const noctalia::cli::Command& command, const std::set<std::string>* allowedFirst) {
+json callSchema(const helix::cli::Command& command, const std::set<std::string>* allowedFirst) {
   json prefix = json::array();
   std::size_t required = 0;
   bool open = false;  // accepts any number of further strings
@@ -83,7 +83,7 @@ json callSchema(const noctalia::cli::Command& command, const std::set<std::strin
 
 }  // namespace
 
-json toolCallSchema(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+json toolCallSchema(const helix::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
                     const std::set<std::string>* onlyTools, bool includeDecline) {
   json alternatives = json::array();
   for (const auto& command : msgRoot.subcommands) {
@@ -152,7 +152,7 @@ std::vector<std::string> ToolHints::commands() const {
   return out;
 }
 
-std::string toolCatalog(const noctalia::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
+std::string toolCatalog(const helix::cli::Command& msgRoot, const RiskPolicy& policy, const std::set<Tier>& tiers,
                         const std::set<std::string>* onlyTools, bool includeDecline, const ToolHints* hints) {
   std::string out;
   for (const auto& command : msgRoot.subcommands) {

@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-namespace noctalia::packages {
+namespace helix::packages {
 
   enum class Action : std::uint8_t { Install, Remove, Update };
 
@@ -57,4 +57,4 @@ namespace noctalia::packages {
   void notePendingUpdates(Kind kind, std::size_t count) noexcept;
   [[nodiscard]] bool refreshPendingUpdateCount(std::function<void()> onComplete = {});
 
-} // namespace noctalia::packages
+} // namespace helix::packages

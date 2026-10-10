@@ -571,5 +571,5 @@ void NotificationService::emitActivationToken(uint32_t id, const std::string& ac
 }
 
 std::tuple<std::string, std::string, std::string, std::string> NotificationService::onGetServerInformation() {
-  return {"noctalia", "noctalia-dev", NOCTALIA_VERSION, "1.2"};
+  return {"Helix Shell", "helix", HELIX_VERSION, "1.2"};
 }

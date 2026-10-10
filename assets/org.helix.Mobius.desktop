@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Mobius
+Comment=Helix AI hub — conversations, personas, and model routing
+Exec=helix-mobius
+Icon=org.helix.Mobius
+Terminal=false
+Categories=Utility;Office;
+StartupWMClass=org.helix.Mobius

@@ -16,7 +16,7 @@ namespace {
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
   std::filesystem::path makeTempDir() {
-    auto path = std::filesystem::temp_directory_path() / ("noctalia-niri-window-rules-" + std::to_string(::getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("helix-niri-window-rules-" + std::to_string(::getpid()));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -53,12 +53,12 @@ int main() {
   const auto config = dir / "config.kdl";
   {
     std::ofstream out(config);
-    out << "spawn-at-startup \"noctalia\"\n";
+    out << "spawn-at-startup \"helix\"\n";
   }
   const auto saved = compositors::niri::saveWindowRulesInto(config, {.drawBorderWithBackground = false});
   ok = expect(saved.ok, "saves window rules into a temp niri config") && ok;
   ok = expect(
-      compositors::niri::hasInclude(compositors::niri::readFile(config), "noctalia-window-rules.kdl"),
+      compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-window-rules.kdl"),
       "appends include"
   ) && ok;
 

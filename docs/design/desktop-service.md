@@ -1,17 +1,20 @@
 # Desktop service and adaptive Settings
 
-Helix Shell retains its renderer. `helix-service` is a separate session process;
-`helix-settings` is an independent GTK4/libadwaita application (`org.helix.Settings`).
-The shell uses service adapters for configuration writes, appearance exports,
-NetworkManager, BlueZ and audio control. PipeWire observation/playback stays local
-where shell surfaces need it; the service owns the WirePlumber mixer.
+Product placement: `product-structure.md`. Cutover: `cpp-to-rust.md`.
+
+Helix Shell retains its renderer. Desktop authority is a separate session process:
+live **C++ `helix-service`**, target **Rust `helix-desktop`**. `helix-settings` is
+an independent Tauri application (`apps/helix-settings`). The shell uses the
+desktop API for configuration writes, appearance, NetworkManager, BlueZ and audio
+control. The service owns device backends long-term; PipeWire observation may
+stay local where a surface still needs it until that domain cuts over.
 
 ## Versioned session API
 
 Bus name: `org.helix.Desktop`. Object: `/org/helix/Desktop`.
-Interfaces: `org.helix.Desktop.Configuration1`, `Appearance1`, `Audio1`,
-`Network1`, and `Bluetooth1` (each with the same full prefix).
-Introspection in `src/desktop/service_main.cpp` is authoritative for wire types.
+Interfaces: `Configuration1`, `Appearance1`, `Audio1`, `Network1`, `Bluetooth1`,
+`Displays1`, `AgentSurface1`, `AgentSurfaceActivity1` (full prefix `org.helix.Desktop.*`).
+**`protocols/dbus/org.helix.Desktop.xml` is authoritative for wire types.**
 
 Every domain provides `GetSnapshot() → a{sv}` and `Changed` notifications.
 A capability is available only when its snapshot says so. Configuration reports
@@ -176,7 +179,7 @@ battery-state and language controls remain pending, as do live suspend/lid check
 
 ## Development and validation
 
-Build with `meson compile -C build-debug helix-service helix-settings noctalia`.
+Build with `meson compile -C build-debug helix-service helix-settings helix`.
 GTK4 >= 4.12 and libadwaita >= 1.7 development files are required for Settings;
 `-Ddesktop_apps=enabled` makes missing dependencies an error. The development
 shell launches its sibling service; installed builds use D-Bus activation and the
@@ -206,11 +209,10 @@ recovery are now implemented; real audio/microphone hardware validation is pendi
 Other Settings destinations and extracted applications
 are still pending in the inventory. The quick-controls-only Control Center,
 removal of other compositor integrations, and full desktop cutover have not happened.
-The legacy Settings editors were explicitly retired by the user on 2026-10-05;
-Settings entry points now launch GTK Settings. The top bar is an enhanced GNOME floating
-status area; status widgets open a floating Control Center (Quick Settings only) and the
-clock/notifications widgets open Notification Center, with hold-drag reorder for bar
-widgets and the Quick Settings tile grid.
+The legacy in-shell Settings editors were retired on 2026-10-05; Settings entry points
+launch Tauri `helix-settings` (`apps/helix-settings`). The session shell is Tauri
+(`shell/helix-shell-tauri`); Control Center and Notification Center are shell surfaces,
+not a GNOME status area.
 Advanced editors without native replacements are unavailable and identified in the app.
 Real Wi-Fi/pairing mutation tests, screen readers, touch/on-screen keyboards,
 non-Helix desktop and Linux mobile hardware, and multi-monitor coverage must be
@@ -272,7 +274,7 @@ available. GPU metrics, per-interface/per-core charts and advanced screen-time r
 need migration; the corresponding inventory entries remain partial.
 
 The Screen Time page reads existing saved daily, per-application and hourly usage
-without creating or modifying history. It honors `NOCTALIA_STATE_HOME` and XDG state
+without creating or modifying history. It honors `HELIX_STATE_HOME` and XDG state
 paths through the shared path resolver. Historical window-title suffixes are stripped
 and combined by app ID. Missing, malformed or restricted files have an explicit state;
 a temporarily unreadable file preserves the previously loaded report and retries.
@@ -307,7 +309,7 @@ chooser retains access to other wallpaper formats supported by the shell.
 Wallhaven supports text search, categories, purity, sorting/order, resolution and
 aspect-ratio filters, paging, thumbnails, cancellation and Download & Apply. Search
 is explicit. Existing wallpaper.wallhaven settings take precedence over the legacy
-noctalia/wallhaven plugin settings. API keys stay inside the service; snapshots expose
+helix/wallhaven plugin settings. API keys stay inside the service; snapshots expose
 only their availability. The native password dialog can save a replacement key. The
 download folder is an ordinary validated folder setting.
 
@@ -352,7 +354,7 @@ not only scroll position:
 and `media` on Desktop & Dock;
 `colors`, `type`, `roundness`, `glass`, `icons`, `effects`, `templates`, `wallpaper`/`theme`,
 `video-wallpaper` and `backdrop` on Appearance; `wifi-prefs`, `dns` and `tailscale` on
-Network; `clock`, `calendar`, `localsend`, `language`, `setup` and `advanced` on System;
+Network; `clock`, `calendar`, `language`, `setup` and `advanced` on System;
 `sounds` on Sound; `clipboard`, `privacy`/`firewall`/`security`, `lock-screen`, `location`,
 `authentication` and `storage` on Privacy & Security; `scale` on Accessibility. It may be
 combined with the matching `--page`; other page combinations and unknown sections are

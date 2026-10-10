@@ -5,7 +5,7 @@
 #include <ranges>
 #include <system_error>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -90,4 +90,4 @@ namespace noctalia::theme {
     return changed;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

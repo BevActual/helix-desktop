@@ -7,7 +7,7 @@ SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log;
 STATE=$SCRATCH/state; SETTINGS=$STATE/fake-settings-actions.log
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 for _ in $(seq 1 120); do grep -q "AGENT-IPC serving" "$LOG" 2>/dev/null && break; sleep 0.25; done
-SOCK=$(ls "$STATE"/noctalia-*.sock 2>/dev/null | head -1); TOOLS=$(ls "$STATE"/helix-shell-tools-* 2>/dev/null | head -1)
+SOCK=$(ls "$STATE"/helix-*.sock 2>/dev/null | head -1); TOOLS=$(ls "$STATE"/helix-shell-tools-* 2>/dev/null | head -1)
 [ -S "$SOCK" ] && echo "ok: the shell serves $(basename "$SOCK")" || { fail "no socket"; exit 1; }
 sleep 2
 send() { python3 - "$SOCK" "$1" <<'PY'
@@ -62,8 +62,22 @@ expect_reply "window-close $ID" "ok"; sleep 1.5
 niri msg --json windows | python3 -c "import json,sys; sys.exit(1 if any(x['app_id']=='agentwin' for x in json.load(sys.stdin)) else 0)" && echo "ok: the window is gone" || fail "the window is still there"
 kill $WIN 2>/dev/null
 
+echo "--- 2c. app launch and clipboard (same paths agents use after Agent Surface Allow)"
+grep -qx "app-launch" "$TOOLS" && grep -qx "clipboard-copy" "$TOOLS" && grep -qx "clipboard-text" "$TOOLS" && echo "ok: tool list includes launch and clipboard" || fail "missing launch/clipboard in tool list"
+expect_error "app-launch"
+expect_error "app-launch no-such-helix-app-zzz"
+expect_error "clipboard-copy"
+MARKER="helix-agent-ipc-$(date +%s)"
+expect_reply "clipboard-copy $MARKER" "ok"
+GOT=$(send "clipboard-text")
+[ "$GOT" = "$MARKER" ] && echo "ok: clipboard round-trip" || fail "clipboard-text gave '$GOT', wanted '$MARKER'"
+expect_reply "clipboard-clear" "ok"
+CLEARED=$(send "clipboard-text")
+[ -z "$CLEARED" ] && echo "ok: clipboard cleared" || fail "clipboard still held '$CLEARED'"
+grep -q "$MARKER" "$LOG" && fail "clipboard text was logged" || echo "ok: clipboard text stayed out of the log"
+
 echo "--- 3. what must be refused"
-for bad in "window-close abc" "window-close -1" "workspace-switch up" "status now" "bar-toggle" "session" "wallpaper-next" "clipboard-copy secret" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
+for bad in "window-close abc" "window-close -1" "workspace-switch up" "status now" "bar-toggle" "session" "wallpaper-next" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
 n=$(grep -c "UPDATE" "$SETTINGS"); sleep 0.3
 expect_error "theme-mode-set sepia" >/dev/null; [ "$(grep -c UPDATE "$SETTINGS")" = "$n" ] && echo "ok: a refused command changed nothing" || fail "a refused command changed a setting"
 echo "--- 4. nothing about the arguments reaches the log"

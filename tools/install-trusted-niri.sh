@@ -7,7 +7,7 @@
 # Applies to the user only (~/.local/bin, ~/.config/niri): no root, nothing under /usr.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-NIRI_SRC=${HELIX_NIRI_SRC:-$ROOT/../helix-niri}
+NIRI_SRC=${HELIX_NIRI_SRC:-$ROOT/compositor}
 NEW=$NIRI_SRC/target/release/niri
 BIN=$HOME/.local/bin/niri
 CONF_DIR=$HOME/.config/niri
@@ -17,7 +17,7 @@ INCLUDE='include "helix-trusted-surface.kdl"'
 STAMP=$(date +%Y%m%d-%H%M%S)
 
 shell_exes() {  # every path the shell may run from, so the compositor can recognise it
-  for candidate in "$ROOT/rust/target/release/helix-shell-tauri" "$ROOT/rust/target/fast/helix-shell-tauri" /usr/local/bin/helix-shell-tauri /usr/bin/helix-shell-tauri; do
+  for candidate in "$ROOT/target/release/helix-shell-tauri" "$ROOT/target/fast/helix-shell-tauri" /usr/local/bin/helix-shell-tauri /usr/bin/helix-shell-tauri; do
     [ -e "$candidate" ] && readlink -f "$candidate"
   done | sort -u
 }

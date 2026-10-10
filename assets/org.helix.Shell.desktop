@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Helix Shell
+Comment=niri-first Wayland desktop shell
+Exec=helix-shell-tauri
+Icon=org.helix.Shell
+Terminal=false
+Categories=System;
+StartupNotify=false
+Actions=Settings;
+Keywords=desktop;shell;wayland;helix;
+
+[Desktop Action Settings]
+Name=Open Settings
+Exec=helix-settings

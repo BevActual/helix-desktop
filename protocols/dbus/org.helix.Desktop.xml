@@ -68,7 +68,7 @@
 <!-- Design: docs/design/agent-and-inference.md. Caller identity is the D-Bus connection (pid, exe, Flatpak id),
      never an argument. Three roles share the interface: client (any granted app), confirmer (the shell, one owner),
      manager (Settings, one owner). Role methods are rejected for other senders, as RegisterDesktop is today. -->
-<interface name="org.helix.Desktop.Agent1">
+<interface name="org.helix.Desktop.AgentSurface1">
  <!-- Client role -->
  <method name="Hello"><arg name="label" type="s" direction="in"/><arg name="version" type="s" direction="in"/><arg name="session" type="a{sv}" direction="out"/></method>
  <!-- First-use consent: the confirmer asks the user, who may approve fewer tiers. Completes via Completed with the held tiers.
@@ -100,7 +100,7 @@
  <!-- Shell-facing agent visibility. Only the registered desktop (RegisterDesktop) may call these.
       Read-only activity and pending state, stop (cancel pending without revoking grants), grant
       revoke, and a kill switch. Does not replace the manager role (Settings still owns SetGrant). -->
- <interface name="org.helix.Desktop.AgentActivity1">
+ <interface name="org.helix.Desktop.AgentSurfaceActivity1">
   <method name="GetActivity"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
   <method name="ListPending"><arg type="av" direction="out"/></method>
   <method name="Stop"><arg name="operation" type="t" direction="in"/></method>

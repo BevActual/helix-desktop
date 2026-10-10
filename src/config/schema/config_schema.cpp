@@ -16,7 +16,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace noctalia::config::schema {
+namespace helix::config::schema {
 
   const Schema<AudioConfig>& audioSchema() {
     static const Schema<AudioConfig> s = {
@@ -43,28 +43,6 @@ namespace noctalia::config::schema {
         field(&TailscaleConfig::refreshIntervalSeconds, "refresh_interval_seconds", kTailscaleRefreshSecondsRange),
         field(&TailscaleConfig::notifyOnPeerChange, "notify_on_peer_change"),
         field(&TailscaleConfig::adminUrl, "admin_url"),
-    };
-    return s;
-  }
-
-  const Schema<PhoneConfig>& phoneSchema() {
-    static const Schema<PhoneConfig> s = {
-        field(&PhoneConfig::mirrorAlwaysOn, "mirror_always_on"),
-        field(&PhoneConfig::notifications, "notifications"),
-        field(&PhoneConfig::castAudio, "cast_audio"),
-    };
-    return s;
-  }
-
-  const Schema<LocalSendConfig>& localsendSchema() {
-    static const Schema<LocalSendConfig> s = {
-        field(&LocalSendConfig::enabled, "enabled"),
-        field(&LocalSendConfig::alias, "alias"),
-        field(&LocalSendConfig::pin, "pin"),
-        field(&LocalSendConfig::downloadDir, "download_dir"),
-        field(&LocalSendConfig::autoAccept, "auto_accept"),
-        field(&LocalSendConfig::notifyOnReceive, "notify_on_receive"),
-        field(&LocalSendConfig::port, "port", kLocalSendPortRange),
     };
     return s;
   }
@@ -2467,4 +2445,4 @@ namespace noctalia::config::schema {
     return s;
   }
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

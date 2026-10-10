@@ -5,7 +5,7 @@
 if [ -z "${HELIX_LOOK_INNER:-}" ]; then
   ROOT=$(cd "$(dirname "$0")/../.." && pwd)
   rm -rf /tmp/helix-nested/look/named
-  HELIX_LOOK_INNER=1 HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/rust/target/fast/helix-shell-tauri}" HELIX_NESTED_SETTLE=8 \
+  HELIX_LOOK_INNER=1 HELIX_SHELL_BIN="${HELIX_SHELL_BIN:-$ROOT/target/fast/helix-shell-tauri}" HELIX_NESTED_SETTLE=8 \
     HELIX_NESTED_SCRIPT="$ROOT/tools/nested/look.sh" "$ROOT/tools/nested/run.sh" look "$ROOT/tools/nested/tauri-fake-desktop.sh" >/dev/null 2>&1
   ls /tmp/helix-nested/look/named/
   exit 0

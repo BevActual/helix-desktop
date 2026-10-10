@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-using noctalia::config::schema::isKnownConfigPath;
+using helix::config::schema::isKnownConfigPath;
 
 namespace {
   int g_failures = 0;

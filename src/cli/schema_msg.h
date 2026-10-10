@@ -6,10 +6,10 @@
 #include <array>
 #include <string_view>
 
-namespace noctalia::cli {
+namespace helix::cli {
 
   inline constexpr std::array<std::string_view, 10> kBuiltinPaletteNames{
-      "Ayu", "Catppuccin", "Dracula", "Eldritch", "Gruvbox", "Kanagawa", "Noctalia", "Nord", "Rosé Pine", "Tokyo-Night",
+      "Ayu", "Catppuccin", "Dracula", "Eldritch", "Gruvbox", "Kanagawa", "Helix", "Nord", "Rosé Pine", "Tokyo-Night",
   };
 
   inline constexpr std::array kMsgColorSchemeSetBuiltinPositionals{
@@ -187,9 +187,6 @@ namespace noctalia::cli {
   };
   inline constexpr std::array kMsgTaskbarCyclePositionals{
       Positional{"direction", {}, kMsgTaskbarCycleDirectionChoices, true, false, false},
-  };
-  inline constexpr std::array kMsgPhoneDevicePositionals{
-      Positional{"device", "Paired device name or id; omit when only one device is paired", {}, false, false, false},
   };
   inline constexpr std::array kMsgThemeModeSetPositionals{
       Positional{"mode", {}, kMsgThemeModeSetModeChoices, true, false, false},
@@ -451,12 +448,6 @@ namespace noctalia::cli {
     };
     inline constexpr Command caffeineToggle{
         "caffeine-toggle", "Toggle caffeine (idle inhibitor)", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command castShareToggle{
-        "cast-share-toggle", "Toggle sharing this screen over RDP", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command castStatus{
-        "cast-status", "Print screen sharing and wireless display status", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command clipboardClear{"clipboard-clear", "Clear clipboard history", {}, {}, {}, {}, {}, false};
     inline constexpr Command clipboardCopy{
@@ -893,34 +884,6 @@ namespace noctalia::cli {
     inline constexpr Command tailscaleUp{
         "tailscale-up", "Connect this machine to the Tailscale network", {}, {}, {}, {}, {}, false
     };
-    inline constexpr Command localsendAnnounce{
-        "localsend-announce", "Broadcast this machine on the LocalSend network", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command localsendStatus{
-        "localsend-status", "Print LocalSend listen state and nearby peer count", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command localsendToggle{
-        "localsend-toggle", "Enable or disable LocalSend nearby sharing", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command phonePing{
-        "phone-ping", "Ping a paired phone through KDE Connect", {}, {}, {}, kMsgPhoneDevicePositionals, {}, false
-    };
-    inline constexpr Command phoneRing{
-        "phone-ring", "Ring a paired phone through KDE Connect", {}, {}, {}, kMsgPhoneDevicePositionals, {}, false
-    };
-    inline constexpr Command phoneStatus{
-        "phone-status", "Print KDE Connect daemon and paired-device status", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command phoneCast{
-        "phone-cast",
-        "Toggle the phone mirror: scrcpy on Android, AirPlay receiver (Helix Phone) on iPhone",
-        {},
-        {},
-        {},
-        kMsgPhoneDevicePositionals,
-        {},
-        false
-    };
     inline constexpr Command firewallPanicToggle{
         "firewall-panic-toggle", "Toggle firewalld panic mode", {}, {}, {}, {}, {}, false
     };
@@ -942,15 +905,6 @@ namespace noctalia::cli {
     };
     inline constexpr Command printersStatus{
         "printers-status", "Print CUPS status and default printer", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command syncthingStart{
-        "syncthing-start", "Start the local Syncthing daemon", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command syncthingStatus{
-        "syncthing-status", "Print Syncthing daemon and folder status", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command syncthingStop{
-        "syncthing-stop", "Stop the local Syncthing daemon", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
@@ -1141,8 +1095,6 @@ namespace noctalia::cli {
       msg::caffeineDisable,
       msg::caffeineEnable,
       msg::caffeineToggle,
-      msg::castShareToggle,
-      msg::castStatus,
       msg::clipboardClear,
       msg::clipboardCopy,
       msg::clipboardText,
@@ -1180,9 +1132,6 @@ namespace noctalia::cli {
       msg::keyboardBacklightToggle,
       msg::keyboardBacklightUp,
       msg::keyboardLayoutCycle,
-      msg::localsendAnnounce,
-      msg::localsendStatus,
-      msg::localsendToggle,
       msg::lockscreenWidgetsEdit,
       msg::lockscreenWidgetsExit,
       msg::lockscreenWidgetsToggleEdit,
@@ -1213,10 +1162,6 @@ namespace noctalia::cli {
       msg::panelClose,
       msg::panelOpen,
       msg::panelToggle,
-      msg::phoneCast,
-      msg::phonePing,
-      msg::phoneRing,
-      msg::phoneStatus,
       msg::privacyStatus,
       msg::printersStart,
       msg::printersStatus,
@@ -1241,9 +1186,6 @@ namespace noctalia::cli {
       msg::settingsOpenWidget,
       msg::settingsToggle,
       msg::status,
-      msg::syncthingStart,
-      msg::syncthingStatus,
-      msg::syncthingStop,
       msg::tailscaleDown,
       msg::tailscaleStatus,
       msg::tailscaleToggle,
@@ -1289,4 +1231,4 @@ namespace noctalia::cli {
     return nullptr;
   }
 
-} // namespace noctalia::cli
+} // namespace helix::cli

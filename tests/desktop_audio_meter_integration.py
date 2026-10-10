@@ -40,7 +40,7 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
                DBUS_SYSTEM_BUS_ADDRESS=os.environ["DBUS_SESSION_BUS_ADDRESS"], GSETTINGS_BACKEND="memory")
     for role in ("CONFIG", "STATE", "DATA", "CACHE"):
         env[f"XDG_{role}_HOME"] = str(root / role.lower())
-        env[f"NOCTALIA_{role}_HOME"] = str(root / role.lower())
+        env[f"HELIX_{role}_HOME"] = str(root / role.lower())
     env.pop("WAYLAND_DISPLAY", None)
     env.pop("DISPLAY", None)
     daemon = None

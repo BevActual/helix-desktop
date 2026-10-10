@@ -10,7 +10,7 @@
 #include <vector>
 
 // The decisions of the Helix assistant that need no D-Bus: reading the model's reply and deciding what happens to it.
-// Everything a model says is a suggestion. The Agent1 service still decides what is allowed; this only decides what the
+// Everything a model says is a suggestion. The Agent Surface service still decides what is allowed; this only decides what the
 // assistant shows the person first. Design: docs/design/agent-and-inference.md.
 namespace helix::assistant {
 

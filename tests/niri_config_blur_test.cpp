@@ -16,7 +16,7 @@ namespace {
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
   std::filesystem::path makeTempDir() {
-    auto path = std::filesystem::temp_directory_path() / ("noctalia-niri-blur-" + std::to_string(::getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("helix-niri-blur-" + std::to_string(::getpid()));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -55,7 +55,7 @@ int main() {
   ok = expect(enabled.find("passes 2") != std::string::npos, "enabled kdl sets default blur passes") && ok;
   ok = expect(enabled.find("offset 3.0") != std::string::npos, "enabled kdl sets default blur offset") && ok;
   ok = expect(enabled.find("noise 0.03") != std::string::npos, "enabled kdl sets default blur noise") && ok;
-  ok = expect(enabled.find("noctalia-window-switcher") != std::string::npos, "enabled kdl covers the window switcher")
+  ok = expect(enabled.find("helix-window-switcher") != std::string::npos, "enabled kdl covers the window switcher")
       && ok;
   ok = expect(enabled.find("liquid-glass {") == std::string::npos, "stock niri never emits liquid-glass") && ok;
 
@@ -71,7 +71,7 @@ int main() {
 
   const auto disabled = compositors::niri::kdlForBlur({.enabled = false});
   ok = expect(disabled.find("blur false") != std::string::npos, "disabled kdl clears blur") && ok;
-  ok = expect(disabled.find("^noctalia-") != std::string::npos, "disabled kdl matches all noctalia layers") && ok;
+  ok = expect(disabled.find("^helix-") != std::string::npos, "disabled kdl matches all helix layers") && ok;
   ok = expect(disabled.find("passes") == std::string::npos, "disabled kdl does not set global blur params") && ok;
   ok = expect(disabled.find("liquid-glass {") == std::string::npos, "disabled kdl never emits liquid-glass") && ok;
 
@@ -140,23 +140,23 @@ int main() {
   const auto config = dir / "config.kdl";
   {
     std::ofstream out(config);
-    out << "spawn-at-startup \"noctalia\"\n";
+    out << "spawn-at-startup \"helix\"\n";
   }
 
   ok = expect(!compositors::niri::blurIncludeExists(config), "no include before save") && ok;
   const auto saved = compositors::niri::saveNiriBlurInto(config, {.enabled = true});
   ok = expect(saved.ok, "saves blur into a temp niri config") && ok;
-  ok = expect(compositors::niri::blurIncludeExists(config), "creates noctalia-blur.kdl") && ok;
+  ok = expect(compositors::niri::blurIncludeExists(config), "creates helix-blur.kdl") && ok;
   ok = expect(
-      compositors::niri::hasInclude(compositors::niri::readFile(config), "noctalia-blur.kdl"), "appends include"
+      compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-blur.kdl"), "appends include"
   ) && ok;
 
-  const auto includeText = compositors::niri::readFile(dir / "noctalia-blur.kdl");
+  const auto includeText = compositors::niri::readFile(dir / "helix-blur.kdl");
   ok = expect(includeText.find("blur true") != std::string::npos, "owned file has enabled blur") && ok;
 
   const auto off = compositors::niri::saveNiriBlurInto(config, {.enabled = false});
   ok = expect(off.ok, "rewrites blur include when disabled") && ok;
-  const auto offText = compositors::niri::readFile(dir / "noctalia-blur.kdl");
+  const auto offText = compositors::niri::readFile(dir / "helix-blur.kdl");
   ok = expect(offText.find("blur false") != std::string::npos, "owned file has disabled blur") && ok;
 
   std::filesystem::remove_all(dir);

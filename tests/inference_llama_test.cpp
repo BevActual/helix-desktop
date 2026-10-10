@@ -76,8 +76,8 @@ int main(int argc, char** argv) {
   auto policy = agent::RiskPolicy::load(std::filesystem::path(argv[1]) / "protocols/ipc/msg-risk.toml");
   TEST_CHECK(policy.has_value());
   const std::set<agent::Tier> tiers{agent::Tier::Observe, agent::Tier::ObservePrivate, agent::Tier::Act};
-  const json schema = agent::toolCallSchema(noctalia::cli::kMsgCmd, *policy, tiers);
-  const std::string catalog = agent::toolCatalog(noctalia::cli::kMsgCmd, *policy, tiers);
+  const json schema = agent::toolCallSchema(helix::cli::kMsgCmd, *policy, tiers);
+  const std::string catalog = agent::toolCatalog(helix::cli::kMsgCmd, *policy, tiers);
 
   auto backend = std::make_shared<inference::LlamaBackend>(inference::LlamaBackend::Config{.modelDir = model.parent_path()});
   Waiter waiter;
@@ -193,9 +193,9 @@ int main(int argc, char** argv) {
       // If the group stage fails, fall back to the whole list instead of asking for a call from an empty one.
       const std::set<std::string> shortlist(groups[group].begin(), groups[group].end());
       const bool haveGroup = !shortlist.empty();
-      const json narrowed = agent::toolCallSchema(noctalia::cli::kMsgCmd, *policy, tiers, haveGroup ? &shortlist : nullptr);
+      const json narrowed = agent::toolCallSchema(helix::cli::kMsgCmd, *policy, tiers, haveGroup ? &shortlist : nullptr);
       const auto [op, outcome] = ask(c.request, "You control a Linux desktop. Answer with exactly one JSON tool call for the user's request. "
-                                                "Use only these tools:\n" + agent::toolCatalog(noctalia::cli::kMsgCmd, *policy, tiers, haveGroup ? &shortlist : nullptr),
+                                                "Use only these tools:\n" + agent::toolCatalog(helix::cli::kMsgCmd, *policy, tiers, haveGroup ? &shortlist : nullptr),
                                      narrowed.dump(), 96);
       json reply;
       bool valid = false;

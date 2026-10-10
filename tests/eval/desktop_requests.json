@@ -980,17 +980,6 @@
   },
   {
    "category": "status",
-   "request": "Is my phone connected?",
-   "accept": [
-    {
-     "tool": "phone-status",
-     "args": []
-    }
-   ],
-   "id": 70
-  },
-  {
-   "category": "status",
    "request": "Is anything using my camera or microphone?",
    "accept": [
     {
@@ -1021,28 +1010,6 @@
     }
    ],
    "id": 73
-  },
-  {
-   "category": "status",
-   "request": "Is Syncthing running?",
-   "accept": [
-    {
-     "tool": "syncthing-status",
-     "args": []
-    }
-   ],
-   "id": 74
-  },
-  {
-   "category": "status",
-   "request": "Is anyone sharing my screen?",
-   "accept": [
-    {
-     "tool": "cast-status",
-     "args": []
-    }
-   ],
-   "id": 75
   },
   {
    "category": "capture",

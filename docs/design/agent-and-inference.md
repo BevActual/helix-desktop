@@ -1,11 +1,14 @@
 # Agent Surface v2 and built-in inference
 
-Status: **draft**. Contracts are in `protocols/dbus/drafts/` (`org.helix.Desktop.Agent1`,
-`org.helix.Inference1`). Nothing here is implemented yet. `agentic-os.md` describes what ships today.
+Status: living design + implementation notes. Wire contracts for Agent Surface / Inference1 live in
+`protocols/dbus/org.helix.Desktop.xml` (and related). `agentic-os.md` is the product north star;
+sections below mark what ships versus what is still open.
+Product homes: live under `src/assistant/` and `src/inference/`; target
+`services/helix-assistant` and `services/helix-inference` (`product-structure.md`).
 
 ## Why a second design
 
-v1 is `tools/helix-agent` (MCP) in front of `noctalia msg`. Its risk policy
+v1 is `tools/helix-agent` (MCP) in front of `helix-panel`. Its risk policy
 (`protocols/ipc/msg-risk.toml`) is enforced **in the adapter only**. The IPC socket accepts every command
 from any process of the user, and the `confirm` tier has no confirmation path. v2 moves enforcement into a
 service every agent client must go through, and adds the built-in model runtime those clients talk to.
@@ -23,15 +26,15 @@ service every agent client must go through, and adds the built-in model runtime 
 identity and grants constrain *cooperative* clients (our own apps, MCP adapters). Constraining a hostile
 same-user process needs sandboxing: Flatpak or `systemd-run --user` with a restricted filesystem view for
 agent runners, and SELinux confinement on Fedora. The agent socket and D-Bus names are therefore the only
-route we hand to sandboxed agent clients; the human `noctalia msg` socket stays for the user's own tools.
+route we hand to sandboxed agent clients; the human `helix-panel` socket stays for the user's own tools.
 
-## Agent1
+## Agent Surface
 
 Served by `helix-service` (D-Bus activated, runs without the shell). One interface, three roles:
 
 - **Client.** `Hello` registers a label; identity is read from the connection (pid, `/proc/<pid>/exe`,
   Flatpak app id), not from arguments. `ListTools` returns the tools the caller may use, generated from
-  `noctalia schema-json` plus `msg-risk.toml`. `Action(tool, args)` returns an operation id. `Completed`
+  `helix schema-json` plus `msg-risk.toml`. `Action(tool, args)` returns an operation id. `Completed`
   goes to the requester only, as in the other interfaces.
 - **Confirmer.** The shell calls `RegisterConfirmer` (one owner, same pattern as `RegisterDesktop`). A
   `confirm`-tier action emits `ConfirmationRequested` to that owner only; the shell shows a native dialog
@@ -45,7 +48,7 @@ Served by `helix-service` (D-Bus activated, runs without the shell). One interfa
 A client with no grants calls `RequestAccess(tiers)`. The service sends the confirmer a request of kind
 `grant` naming the client (label and verified identity) and the tiers asked for. The user can approve fewer
 tiers than requested; `blocked` is never offered. The grant is written to
-`<state dir>/agent/grants.json` (mode 0600; `~/.local/state/noctalia/` until the rename) and applied only if the write succeeds. Tiers a client
+`<state dir>/agent/grants.json` (mode 0600; `~/.local/state/helix/` until the rename) and applied only if the write succeeds. Tiers a client
 already holds complete immediately without a dialog. Revoking a client or editing its tiers later is the
 manager role's job (Settings). A request with no confirmer present is denied, so a headless session cannot
 grant itself access.
@@ -73,11 +76,11 @@ confirms or the client reconnects. This does not stop injection; it makes the hu
 
 Append-only JSON lines in `<state dir>/agent/audit.jsonl`: time, client, tool, argv (literal
 arguments truncated, secrets never logged), tier, decision, outcome. Readable by the manager role
-(`GetAudit`) and by the shell via `AgentActivity1.GetActivity` (below). Clients still must not read it.
+(`GetAudit`) and by the shell via `AgentSurfaceActivity1.GetActivity` (below). Clients still must not read it.
 
-### AgentActivity1 (shell visibility; workstream 2)
+### AgentSurfaceActivity1 (shell visibility; workstream 2)
 
-New interface `org.helix.Desktop.AgentActivity1` on the same object path. **Only the registered
+New interface `org.helix.Desktop.AgentSurfaceActivity1` on the same object path. **Only the registered
 desktop** (`RegisterDesktop` owner) may call it — not every session process, and not by widening
 `RegisterManager`. Settings keeps the manager role for `SetGrant` and the full Agents page.
 
@@ -128,13 +131,13 @@ a silent fallback.
 
 ## Implementation status
 
-`Agent1` is registered by `helix-service` (`agent_endpoint`, `agent_broker`, `agent_policy`) and covered by an
+`Agent Surface` is registered by `helix-service` (`agent_endpoint`, `agent_broker`, `agent_policy`) and covered by an
 end-to-end test (`tests/desktop_agent_integration.py`). It needs `msg-risk.toml` (installed to
 `<datadir>/helix/`, or `HELIX_RISK_POLICY`); without it every method fails closed with the reason. Caller identity
 is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
 Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent
 runners is the real fix (see the limit above). The C++ shell registers as confirmer and shows `agent-confirm`
-(`src/shell/agent/`): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
+(`src/desktop/` (confirmation queue)): a queue (sanitized text, at most 8 pending and 3 per client, refused beyond that) and a panel
 where Enter never approves, Escape denies, Allow stays disabled for 700 ms after each new request, grant tiers
 default to least privilege and closing the panel denies what is pending. It was checked in a nested helix-niri
 session with isolated state: a real access request opened the dialog and closing it denied the request. Not yet
@@ -147,7 +150,7 @@ confirm-tier action layout. The same queue and panel rules are ported in Rust as
 exclusive keyboard. Text reaches the page only as a sanitized `ConfirmerView` (`textContent`).
 Arming starts when the page is ready (`present()`), not when the D-Bus signal arrives ahead of
 the webview, so Allow is not already live after a slow load. Nested e2e
-(`tools/nested/assistant-flow-test.sh`, which runs `confirmer-test.sh`) against real Agent1 with a real pointer:
+(`tools/nested/assistant-flow-test.sh`, which runs `confirmer-test.sh`) against real Agent Surface with a real pointer:
 
 1. Enter never approves; Escape denies → `the user declined`.
 2. Pointer Deny → declined.
@@ -162,7 +165,7 @@ clients — otherwise dbus activates the installed service with the daemon's rea
 WebKit reap after destroy must only kill PIDs that existed at destroy time or it kills the
 next confirmer's web process; confirmer layout is written to `layout-confirmer.json` (shell
 `layout.json` must not overwrite it); nested tests run
-`rust/target/release/helix-shell-tauri` so release builds are required. The MCP adapter now uses `Agent1` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
+`target/release/helix-shell-tauri` so release builds are required. The MCP adapter now uses `Agent Surface` (see `tools/helix-agent/README.md`). Settings has an **Agents** page (manager
 role): apps with access, per-tier switches, remove, and recent activity. It was checked in a nested session against
 seeded hostile data (markup, bidi controls, newlines in names and arguments): all rendered inert. App names shown
 to the user come from the verified identity only (`friendlyClientName`: ASCII letters, digits and `._+-`, everything
@@ -171,9 +174,9 @@ pressing Remove with a pointer, and the unavailable state.
 
 ## Implementation status: agent actions under the Tauri shell (2026-10-08)
 
-Until now an approved action was carried out by sending `noctalia msg` commands to the **native** shell's socket, so under the Tauri shell
-every action failed with "noctalia is not running". The Tauri shell now serves that socket (`noctalia-<WAYLAND_DISPLAY>.sock`, mode 0600,
-`rust/helix-shell-tauri/src-tauri/src/agent_ipc.rs`) and understands exactly the commands in `helix_shell_core::agent_msg::SUPPORTED`
+Until now an approved action was carried out by sending `helix-panel` commands to the **native** shell's socket, so under the Tauri shell
+every action failed with "helix is not running". The Tauri shell now serves that socket (`helix-<WAYLAND_DISPLAY>.sock`, mode 0600,
+`shell/helix-shell-tauri/src-tauri/src/agent_ipc.rs`) and understands exactly the commands in `helix_shell_core::agent_msg::SUPPORTED`
 (volume, brightness, theme mode, night light, do not disturb, open and close its own panels). Every other command gets
 `error: unknown command (this shell does not support it)`. The line is parsed by a pure, mutation-tested model (whole numbers in range,
 listed words only, no extra arguments, no control characters, 1 KiB limit) and executes through the code the sliders and key bindings use.
@@ -182,15 +185,18 @@ A test checks that each supported command is classified in `msg-risk.toml` and n
 The shell also writes `helix-shell-tools-<display>` (first line its pid, then the command names). `ListTools` offers only those names while that
 shell is alive (a file whose pid is gone is ignored), so the model is not offered `bar-toggle` or `wallpaper-next` under a shell that cannot
 do them; with no live list every classified command is offered, as for the native shell. Socket choice no longer trusts the newest
-`noctalia-wayland*.sock`: sockets that nobody answers on (left by tests or a crashed shell) are skipped.
+`helix-wayland*.sock`: sockets that nobody answers on (left by tests or a crashed shell) are skipped.
 Tests: `tools/nested/agent-ipc-test.sh` (the wire protocol, effects and refusals), `tests/desktop_agent_integration.py` steps 12 to 13
 (tool list, stale list, dead socket). `HELIX_AGENT_IPC_DIR` moves both files for tests; nested sessions always set it.
-Accepted limit, as for `org.helix.Shell1`: the socket does not authenticate other processes of the same user; Agent1 is what gates agents.
+Accepted limit, as for `org.helix.Shell1`: the socket does not authenticate other processes of the same user; Agent Surface is what gates agents.
 Also supported now: `status` (observe: the desktop's state, windows by id and application name only, **never a title or any other program text**: `agent_status.rs`),
 `workspace-switch next|prev` (act) and `window-close <id>` (confirm: only a window the shell knows can be named, never "the focused one", which can change before Allow; the approval dialog says in the
 shell's own words which window the id is, `describe_window_close`, and a gloss can never come from the request). The window's application name comes from
 the desktop entry when the window really is that application (`identity.rs`), otherwise it is the sanitized program name and `verified` is false.
-Not yet reachable: focusing a window by id, app launch, media, files, clipboard. Each needs its taint rules first.
+Also supported now: `app-launch` (confirm: exact desktop id, exact name, or a single unambiguous search hit from the shell's catalog),
+`clipboard-text` (observe-private), `clipboard-copy` / `clipboard-clear` (confirm; clipboard text is never logged).
+Chat → act bridge: `org.helix.Shell1.AssistantSubmit` opens the bar Assistant and runs the same path as typing there
+(Mobius Act on desktop). Not yet reachable: focusing a window by id, media, files, notification-show.
 
 ### Measured: a shell that carries out only some of the tools (2026-10-08)
 
@@ -225,7 +231,7 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
   outside private temporary space, read-only home, restricted system calls, no capabilities, `AF_UNIX` only).
   `tools/check-inference-sandbox.py` applies exactly those properties to transient units and confirms the network and home
   writes are blocked, the model directory is readable, and the real service still sees the GPU and runs a model.
-- **Caller identity differs from Agent1.** Any hardened user unit runs in its own user namespace, where another process's
+- **Caller identity differs from Agent Surface.** Any hardened user unit runs in its own user namespace, where another process's
   `/proc/<pid>/exe` cannot be read. So this service identifies callers by `pid:<n>` from the bus and uses that only for
   per-caller limits. Ownership of a request is the caller's unique bus name. There are no per-program grants yet: any
   same-user process may use the model, within the queue limits. Per-client grants for inference belong with the Settings
@@ -240,7 +246,7 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
 
 `helix-assistant "<request>"` (`src/assistant/`). Plain English in, one desktop action out.
 
-1. `Hello` to Agent1 to learn this client's grants. With none, it asks once (`RequestAccess observe, act`); the shell
+1. `Hello` to Agent Surface to learn this client's grants. With none, it asks once (`RequestAccess observe, act`); the shell
    shows the usual approval dialog. With no shell running it stops: a headless session cannot grant itself access.
 2. The tool list and grammar are built from the grants (`observe`, `observe-private`, `act`), the same measured
    configuration as the evaluation (flat catalog, decline tool, 5 examples, tool hints), and sent to helix-inference.
@@ -248,7 +254,7 @@ cleanup when a caller disappears) and `tests/inference_llama_test.cpp` runs a re
 4. Reading runs at once. Anything that changes the desktop is shown first as the tool's plain-words description plus
    the exact call (`Step to the next power profile (power-cycle next)`), and runs only after a typed `y`. No terminal or
    no answer means no. `--dry-run` shows the plan and stops.
-5. The call goes through Agent1 like any client's: grants, confirmations, taint and audit all still apply. Results
+5. The call goes through Agent Surface like any client's: grants, confirmations, taint and audit all still apply. Results
    from outside sources are labelled.
 
 The plain-words description in step 4 exists because of a real result: the model answers "Restart my laptop" with
@@ -265,7 +271,7 @@ measurements). `helix-assistant --warm` loads it and primes its prompt cache wit
 request takes about 0.7 s instead of 25 s (measured live). `assets/services/helix-assistant-warm.service.in` runs it at
 login; it is not installed or enabled by default, and the model is freed again after the idle timeout (300 s).
 
-Packaging: `meson install` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`scripts/install_engine.py`)
+Packaging: `meson install` puts the engine's runtime libraries in a private `<prefix>/lib64/helix` (`tools/scripts/install_engine.py`)
 and gives `helix-inference` an install rpath to it, so nothing system-wide changes and the repo's `third_party/` is
 not needed at run time. `tools/install-assistant.sh <staged tree>` installs only the model runtime, the assistant and
 `helix-service` (backing up the old one), restarts nothing, and has `--uninstall`. Installed on the development machine
@@ -273,7 +279,7 @@ not needed at run time. `tools/install-assistant.sh <staged tree>` installs only
 
 ### The shell panel
 
-`noctalia msg panel-toggle assistant` opens the assistant panel (bind it to a key in the compositor config).
+`helix-panel panel-toggle assistant` opens the assistant panel (bind it to a key in the compositor config).
 It is a thin face over `helix-assistant --json`, which prints one JSON object per call (`done`, `confirm`, `explain`,
 `error`). The panel never talks to the model and holds no authority: grants, confirmations and audit belong to the
 `helix-assistant` client identity, so a broken or closed panel cannot widen anything.
@@ -284,10 +290,10 @@ It is a thin face over `helix-assistant --json`, which prints one JSON object pe
 - Enter never confirms (focus stays in the input, and a submit while a change is waiting is ignored), Do it is disabled
   for 700 ms after it appears, Escape backs out of a pending request before it closes the panel, and opening the panel
   always starts fresh.
-- The state machine (`src/shell/assistant/assistant_session.*`) has no UI in it and is unit tested, including late answers
+- The state machine (`src/assistant/assistant_session.*`) has no UI in it and is unit tested, including late answers
   after cancel, a second yes, malformed output, and display-safety of model text. Mutation-checked.
 - Tried in a nested niri session on a private bus with the real 7B model: typing, "Thinking...", the confirmation, two
-  stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent1, audited as allowed), the
+  stray Enter presses (nothing ran, audit empty), keyboard-driven Do it (ran through Agent Surface, audited as allowed), the
   honest failure when there is no backlight, and focus returning to the input. Mouse clicks were not tried.
 
 The confirmation shows the tool's plain-words description, which for near-neighbours includes the disambiguation written
@@ -385,12 +391,12 @@ Read the held-out numbers with care: the hints were written after seeing which n
 set is no longer fully independent. The honest claim is "about 90% exact on requests of this kind", not a precise figure.
 Declining is the weak spot and hints did not move it: 5/8 impossible requests still get a nearby tool, including
 `power-cycle next` for "Restart my laptop" and `session lock` for "Log me out". That is why the assistant client must
-show every state-changing call before running it and rely on the Agent1 tiers, never on the model refusing.
+show every state-changing call before running it and rely on the Agent Surface tiers, never on the model refusing.
 
 ## Build order
 
 1. Contracts and tests (done: drafts, contract test, `msg-risk.toml`, `schema-json`).
-2. `Agent1` in helix-service: identity, grants, audit, `Action` for `observe`/`act` tiers. Point the MCP
+2. `Agent Surface` in helix-service: identity, grants, audit, `Action` for `observe`/`act` tiers. Point the MCP
    adapter at it; keep `confirm` refusing until step 3.
 3. Shell confirmer dialog and the taint rule; then enable `confirm`.
 4. Generate MCP tools and the GBNF grammar from `schema-json`.
@@ -401,13 +407,13 @@ show every state-changing call before running it and rely on the Agent1 tiers, n
 
 - How is the manager role authenticated? Proposal: exe path equals the installed `helix-settings`, verified
   from `/proc/<pid>/exe`, plus Flatpak app id where applicable.
-- Does `Agent1` stay on `org.helix.Desktop` or move to its own bus name so it can be sandboxed separately?
+- Does `Agent Surface` stay on `org.helix.Desktop` or move to its own bus name so it can be sandboxed separately?
 - A11y tree observation (AT-SPI) tier: `observe-private` by default?
 - Per-window `agent-visibility` rule in helix-niri so capture can exclude password managers and secrets.
 
 ### The Agents panel in the Tauri shell (workstream 2)
 
-`helix-desktop-api::ActivityClient` wraps `AgentActivity1` (a contract test pins the method list to the XML, and a second test
+`helix-desktop-api::ActivityClient` wraps `AgentSurfaceActivity1` (a contract test pins the method list to the XML, and a second test
 keeps `SetGrant`, `RegisterManager` and every client verb out of it). `helix-shell-core::activity` is the pure model: every field an
 agent can influence is sanitized, a tier that is not exactly one of the five names is shown as `unknown` (sanitizing could otherwise
 turn `ob<bidi>serve` into a real tier name), `stop` is refused unless the last snapshot listed that operation, `revoke` unless it
@@ -416,7 +422,7 @@ waiting with Stop, who has access with Revoke, the kill switch, a Stop-all butto
 "Agents", "Agents · N waiting" or "Agents off" and is hidden when the shell is not the registered desktop.
 
 Constraints worth knowing:
-- Only the **connection that called `RegisterDesktop`** may use `AgentActivity1`, so the shell uses that one connection (set by the
+- Only the **connection that called `RegisterDesktop`** may use `AgentSurfaceActivity1`, so the shell uses that one connection (set by the
   confirmer once registered), not its shared one. The live trial runs beside the C++ shell, which holds the role, so the panel is
   enabled by the same opt-in as the confirmer (`HELIX_SHELL_CONFIRMER`) and the trial shows nothing.
 - While a confirmation is on screen its Overlay covers the output, so the panel's Stop is reachable for requests queued behind
@@ -432,5 +438,5 @@ panel open in the nested session: USS about 119 MB (PSS 172 MB without the servi
 
 `org.helix.Shell1` (panels, volume, brightness, do-not-disturb, night light, dark theme) is served to the whole session bus: it does what a
 person's own key binds do and carries no grant check. An agent that can reach the session bus can call it, so agent processes must be confined
-(sandbox with no session-bus access except `org.helix.Desktop.Agent1`), not merely trusted to use Agent1. The model service already runs sandboxed;
+(sandbox with no session-bus access except `org.helix.Desktop.AgentSurface1`), not merely trusted to use Agent Surface. The model service already runs sandboxed;
 the assistant and any third-party agent must be packaged the same way before they are treated as untrusted-but-contained.

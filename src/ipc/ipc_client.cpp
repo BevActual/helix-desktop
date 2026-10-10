@@ -25,7 +25,7 @@ namespace {
     if (display == nullptr || display[0] == '\0') {
       display = "wayland-0";
     }
-    return std::string(runtime) + "/noctalia-" + display + ".sock";
+    return std::string(runtime) + "/helix-" + display + ".sock";
   }
 
 } // namespace
@@ -56,7 +56,7 @@ bool IpcClient::exchange(const std::string& line, std::string& response, std::st
   std::memcpy(addr.sun_path, path.c_str(), path.size() + 1);
 
   if (::connect(fd, reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)) < 0) {
-    error = "noctalia is not running";
+    error = "helix is not running";
     ::close(fd);
     return false;
   }

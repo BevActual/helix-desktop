@@ -853,7 +853,7 @@
       "calendar-google-connect-start-failed": "Impossibile avviare l'autorizzazione Google. Controlla la connessione di rete e riprova.",
       "calendar-google-connect-start-http": "Impossibile avviare l'autorizzazione Google. Il broker OAuth ha restituito HTTP {status}.",
       "calendar-google-connect-timeout": "Autorizzazione Google scaduta. Avvia di nuovo la connessione quando sei pronto ad accedere.",
-      "config-migration-body": "Aggiorna {path} nel source file. Helix applica questa sostituzione solo temporaneamente. Esegui noctalia config validate per elencare tutte le modifiche richieste.",
+      "config-migration-body": "Aggiorna {path} nel source file. Helix applica questa sostituzione solo temporaneamente. Esegui helix config validate per elencare tutte le modifiche richieste.",
       "config-migration-title": "È necessario l'aggiornamento della configurazione",
       "dbus-disabled": "Notifiche DBus disabilitate",
       "desktop-widgets-editor": "Editor widget",
@@ -862,12 +862,12 @@
       "greeter-sync-pending": "Sincronizzazione dell'aspetto con il greeter. Se viene visualizzato un prompt amministratore, approvarlo; l'autorizzazione senza password segue le policy di sistema.",
       "greeter-sync-pending-console": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione, approvare la richiesta polkit in Helix, su un TTY o su una console.",
       "greeter-sync-pending-legacy": "Sincronizzazione tramite l'assistente legacy autenticato. È richiesta l'approvazione dell'amministratore.",
-      "greeter-sync-pending-manual": "I file vengono preparati per la sincronizzazione legacy autenticata. Eseguire l'helper di applicazione posizionale in un terminale, mantenendo NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato, oppure configurare shell.greeter_sync.privilege_command e sincronizzare di nuovo.",
-      "greeter-sync-pending-manual-pkexec": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione dell'amministratore e non viene visualizzato alcun messaggio, eseguire in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "I file vengono preparati per la sincronizzazione legacy autenticata. Eseguire l'helper di applicazione posizionale in un terminale, mantenendo HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato, oppure configurare shell.greeter_sync.privilege_command e sincronizzare di nuovo.",
+      "greeter-sync-pending-manual-pkexec": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione dell'amministratore e non viene visualizzato alcun messaggio, eseguire in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Aspetto sincronizzato. Le modifiche si applicano alla prossima schermata di accesso.",
       "greeter-sync-timeout": "La sincronizzazione del greeter è ancora in attesa di autorizzazione. Controlla un terminale TTY o una console per visualizzare il prompt del polkit, abilita l'agente polkit nelle impostazioni di sicurezza oppure esegui pkexec manualmente.",
-      "greeter-sync-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
-      "greeter-sync-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
+      "greeter-sync-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "Questa scorciatoia accetta un singolo tasto senza modificatori.",
       "keybind-invalid-printable": "I tasti stampabili (lettere, numeri, simboli) richiedono un modificatore come Ctrl o Alt.",
@@ -1236,8 +1236,8 @@
       "support-report": "Salvataggio report di supporto non riuscito.",
       "sync-greeter": "Impossibile sincronizzare l'aspetto con Helix Greeter.",
       "sync-greeter-timeout": "La sincronizzazione del greeter è ancora in attesa di autorizzazione. Controlla un terminale TTY o una console per visualizzare il prompt del polkit, abilita l'agente polkit nelle impostazioni di sicurezza oppure esegui pkexec manualmente.",
-      "sync-greeter-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
-      "sync-greeter-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
+      "sync-greeter-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Impossibile rinominare il widget con nome."
       },
@@ -1651,8 +1651,8 @@
         },
         "kind-label": "Tipo",
         "location-label": "Indirizzo",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID sorgente",
         "name-placeholder": "miei-plugin",
         "precedence-hint": "Sorgenti inferiori prevalgono su quelle in alto se offrono lo stesso plugin.",
@@ -1674,7 +1674,7 @@
         "installed": "Installato",
         "loading": "Caricamento catalogo...",
         "no-readme": "Nessuna descrizione disponibile.",
-        "open-page": "Apri la pagina plugin su noctalia.dev",
+        "open-page": "Apri la pagina plugin su helix.dev",
         "open-source": "Apri il repository dei sorgenti dei plugin",
         "results-count": "{count} plugin",
         "search-placeholder": "Ricerca plugin...",
@@ -1734,7 +1734,7 @@
           "label": "Arrotondamento angoli"
         },
         "custom-palette": {
-          "description": "Scegli una palette da ~/.config/noctalia/palettes/",
+          "description": "Scegli una palette da ~/.config/helix/palettes/",
           "label": "Palette personalizzata",
           "search-placeholder": "Cerca palette personalizzate..."
         },
@@ -2224,7 +2224,7 @@
             "label": "Al cambio modalità tema"
           },
           "wallpaper-changed": {
-            "description": "Comando da eseguire quando cambia lo sfondo; fornisce NOCTALIA_WALLPAPER_PATH e NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Comando da eseguire quando cambia lo sfondo; fornisce HELIX_WALLPAPER_PATH e HELIX_WALLPAPER_CONNECTOR",
             "label": "Al cambio sfondo"
           },
           "wifi-disabled": {
@@ -2749,7 +2749,7 @@
           "placeholder": "Città, Paese"
         },
         "location-auto-locate": {
-          "description": "Rileva automaticamente la tua posizione in base al tuo indirizzo IP via noctalia.dev",
+          "description": "Rileva automaticamente la tua posizione in base al tuo indirizzo IP via helix.dev",
           "label": "Localizzazione automatica (IP)"
         },
         "longitude": {
@@ -2972,7 +2972,7 @@
           "label": "Formato data"
         },
         "external-ip": {
-          "description": "Risolvi l'IP WAN pubblico della connessione (tramite api.noctalia.dev) e mostralo nella scheda rete del Control Center",
+          "description": "Risolvi l'IP WAN pubblico della connessione (tramite a public IP lookup service) e mostralo nella scheda rete del Control Center",
           "label": "Mostra IP WAN"
         },
         "greeter-sync-auto": {
@@ -3724,7 +3724,7 @@
             "label": "Apri impostazioni"
           },
           "settings-open-plugin": {
-            "description": "Apri la finestra delle impostazioni del plugin (ad esempio, noctalia/notes)",
+            "description": "Apri la finestra delle impostazioni del plugin (ad esempio, helix/notes)",
             "label": "Apri le impostazioni del plugin"
           },
           "settings-open-widget": {
@@ -4571,7 +4571,7 @@
       "export-config": "Esporta configurazione...",
       "export-config-saved": "Esportazione configurazione salvata.",
       "filter-overridden": "Sovrascritto",
-      "legacy-config-warning": "Impostazione legacy: {issue}. Modifica questa voce; Helix applica la sostituzione solo temporaneamente. Esegui noctalia config validate per elencare tutte le modifiche richieste.",
+      "legacy-config-warning": "Impostazione legacy: {issue}. Modifica questa voce; Helix applica la sostituzione solo temporaneamente. Esegui helix config validate per elencare tutte le modifiche richieste.",
       "native-title": "Impostazioni Helix",
       "no-results": "Nessuna impostazione trovata",
       "no-results-hint": "Prova un nome impostazione o una chiave configurazione diversa.",

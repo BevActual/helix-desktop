@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "Login greeter window; no desktop-session privileges",
+  "windows": ["greeter"],
+  "permissions": ["core:default"]
+}

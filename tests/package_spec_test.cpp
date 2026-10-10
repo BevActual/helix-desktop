@@ -17,7 +17,7 @@ namespace {
 } // namespace
 
 int main() {
-  using namespace noctalia::packages;
+  using namespace helix::packages;
   bool ok = true;
 
   ok = expect(isValidRpmName("helix"), "plain name") && ok;
@@ -29,14 +29,14 @@ int main() {
 
   {
     PackageHit update{
-        .name = "noctalia",
+        .name = "helix",
         .version = "5.2.1",
         .release = "1.fc44",
         .arch = "x86_64",
         .repo = "updates",
     };
     ok = expect(
-        pkconPackageId(update) == "noctalia;5.2.1-1.fc44;x86_64;updates", "packagekit id"
+        pkconPackageId(update) == "helix;5.2.1-1.fc44;x86_64;updates", "packagekit id"
     ) && ok;
     ok = expect(isValidPkconPackageId(pkconPackageId(update)), "packagekit id valid") && ok;
     PackageHit epoch{
@@ -53,31 +53,31 @@ int main() {
     PackageHit nameOnly{.name = "htop"};
     ok = expect(pkconPackageId(nameOnly).empty(), "incomplete id empty") && ok;
     ok = expect(pkconPackageRef(nameOnly) == "htop", "name fallback ref") && ok;
-    ok = expect(isValidPkconPackageRef("noctalia;5.2.1-1.fc44;x86_64;updates"), "id ref") && ok;
+    ok = expect(isValidPkconPackageRef("helix;5.2.1-1.fc44;x86_64;updates"), "id ref") && ok;
     ok = expect(isValidPkconPackageRef("htop"), "name ref") && ok;
     ok = expect(!isValidPkconPackageRef("bad;"), "bad ref") && ok;
     PackageHit caret{
-        .name = "noctalia-nightly",
+        .name = "helix-nightly",
         .version = "5.2.1^20261004git.e639a87",
         .release = "1.fc44",
         .arch = "x86_64",
         .repo = "terra",
     };
     ok = expect(
-        pkconPackageId(caret) == "noctalia-nightly;5.2.1^20261004git.e639a87-1.fc44;x86_64;terra",
+        pkconPackageId(caret) == "helix-nightly;5.2.1^20261004git.e639a87-1.fc44;x86_64;terra",
         "caret version id"
     ) && ok;
     ok = expect(
-        pkconPackageRefForAction(update, false) == "noctalia;5.2.1-1.fc44;x86_64;updates", "action install id"
+        pkconPackageRefForAction(update, false) == "helix;5.2.1-1.fc44;x86_64;updates", "action install id"
     ) && ok;
     ok = expect(
-        pkconPackageRefForAction(update, true) == "noctalia;5.2.1-1.fc44;x86_64;installed:updates",
+        pkconPackageRefForAction(update, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates",
         "action remove id"
     ) && ok;
     PackageHit alreadyInstalled = update;
     alreadyInstalled.repo = "installed:updates";
     ok = expect(
-        pkconPackageRefForAction(alreadyInstalled, true) == "noctalia;5.2.1-1.fc44;x86_64;installed:updates",
+        pkconPackageRefForAction(alreadyInstalled, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates",
         "remove keeps installed data"
     ) && ok;
   }
@@ -90,8 +90,8 @@ int main() {
   ok = expect(hasSafeSearchChars("h"), "one char") && ok;
   ok = expect(!hasSafeSearchChars("h;"), "bad char") && ok;
 
-  ok = expect(isProtectedPackage("noctalia"), "noctalia") && ok;
-  ok = expect(isProtectedPackage("noctalia-greeter"), "greeter") && ok;
+  ok = expect(isProtectedPackage("helix"), "helix") && ok;
+  ok = expect(isProtectedPackage("helix-greeter"), "greeter") && ok;
   ok = expect(isProtectedPackage("helix-shell"), "helix-shell") && ok;
   ok = expect(isProtectedPackage("filesystem"), "essential filesystem protected") && ok;
   ok = expect(isProtectedPackage("systemd"), "session manager protected") && ok;

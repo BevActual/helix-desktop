@@ -1,18 +1,20 @@
 <node>
 <!-- Served by helix-inference at org.helix.Inference, /org/helix/Inference (D-Bus activated, sandboxed by its unit).
-     Design and measurements: docs/design/agent-and-inference.md. Mutating work goes through Action like every other Helix service.
+     Design: docs/design/agent-and-inference.md and docs/design/inference-fabric.md.
 
      Action "chat"; args (a{sv}):
        messages     av of a{sv} {role: s, content: s}   required
-       model        s                                    optional, a name from ListModels; default: the first model
-       schema       s                                    optional; a tool-call JSON Schema (see desktop/tool_schema.h); the reply is
-                                                          then guaranteed to conform to it. Other schemas are refused.
+       task         s                                    optional; profile: act|chat|summarize|vision|code (default chat).
+                                                          Selects local model slot from inference-routing.toml when model is unset.
+       model        s                                    optional; GGUF id from ListModels, or remote id when using a LAN gateway
+       schema       s                                    optional; tool-call JSON Schema; reply conforms. Only for on-device act.
        max_tokens   any integer                          optional, clamped by the service
        temperature  d                                    optional, 0 = greedy
        priority     s                                    "interactive" (default) or "background"
-     Delta(operation, text) streams the reply to the requester only, in whole UTF-8 characters. Completed(operation, ok, result)
-     ends it; result is JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens}. A reply cut off by
-     the token limit while a schema is set is ok=false, truncated=true. -->
+     Non-local backends (LAN/cloud) are not run inside the PrivateNetwork sandbox; Mobius or a network gateway
+     performs those turns. GetSnapshot.backends lists configured backends; GetSnapshot.profiles maps task → route.
+     Delta(operation, text) streams to the requester only. Completed(operation, ok, result) ends it;
+     result JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens, task, backend}. -->
 <interface name="org.helix.Inference1">
  <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
  <method name="ListModels"><arg type="av" direction="out"/></method>

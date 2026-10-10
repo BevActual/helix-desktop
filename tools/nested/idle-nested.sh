@@ -11,4 +11,4 @@ lock_command = ["$ROOT/tools/nested/idle-hook.sh", "lock"]
 screen_off_command = ["$ROOT/tools/nested/idle-hook.sh", "off"]
 screen_on_command = ["$ROOT/tools/nested/idle-hook.sh", "on"]
 TOML
-exec "$ROOT/rust/target/release/helix-idle"
+exec "$ROOT/target/release/helix-idle"

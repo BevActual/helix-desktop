@@ -22,7 +22,7 @@ namespace {
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
   std::filesystem::path makeTempDir() {
-    auto path = std::filesystem::temp_directory_path() / ("noctalia-niri-binds-" + std::to_string(::getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("helix-niri-binds-" + std::to_string(::getpid()));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -34,24 +34,24 @@ int main() {
   bool ok = true;
 
   const char* kConfig = R"(
-    include "noctalia.kdl"
+    include "helix.kdl"
     // include "commented-binds.kdl"
     binds {
         Mod+Q { close-window; }
-        Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }
+        Mod+Space { spawn-sh "helix-panel panel-toggle launcher"; }
         Mod+T hotkey-overlay-title="Terminal" { spawn "alacritty"; }
-        XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
-        Mod+S { spawn "noctalia" "msg" "panel-toggle" "control-center"; }
+        XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "helix-panel volume-up"; }
+        Mod+S { spawn "helix" "msg" "panel-toggle" "control-center"; }
     }
   )";
 
   const auto parsed = compositors::niri::parseBinds(kConfig);
   ok = expect(parsed.size() == 5, "parses five bind statements") && ok;
   if (parsed.size() >= 5) {
-    ok = expect(parsed[0].key == "Mod+Q" && parsed[0].ipcCommand.empty(), "keeps non-noctalia binds") && ok;
+    ok = expect(parsed[0].key == "Mod+Q" && parsed[0].ipcCommand.empty(), "keeps non-helix binds") && ok;
     ok = expect(
              parsed[1].key == "Mod+Space" && parsed[1].ipcCommand == "panel-toggle launcher",
-             "reads spawn-sh noctalia msg"
+             "reads spawn-sh helix-panel"
          )
         && ok;
     ok = expect(
@@ -61,13 +61,13 @@ int main() {
         && ok;
     ok = expect(
              parsed[4].key == "Mod+S" && parsed[4].ipcCommand == "panel-toggle control-center",
-             "reads spawn argv noctalia msg"
+             "reads spawn argv helix-panel"
          )
         && ok;
   }
 
   const auto includes = compositors::niri::parseIncludes(kConfig, "/tmp/config.kdl");
-  ok = expect(includes.size() == 1 && includes[0].filename() == "noctalia.kdl", "parses include and ignores comments")
+  ok = expect(includes.size() == 1 && includes[0].filename() == "helix.kdl", "parses include and ignores comments")
       && ok;
 
   const auto dir = makeTempDir();
@@ -82,7 +82,7 @@ int main() {
   ok = expect(installed.added > 0, "adds recommended binds") && ok;
 
   const auto scan = compositors::niri::scanConfigFile(config);
-  ok = expect(scan.hasBindsInclude, "appends noctalia-binds.kdl include") && ok;
+  ok = expect(scan.hasBindsInclude, "appends helix-binds.kdl include") && ok;
   const auto missing = compositors::niri::missingRecommended(scan);
   ok = expect(missing.empty(), "recommended binds are present after install") && ok;
 

@@ -1,4 +1,4 @@
-"""The Agent1 manager role (what Settings uses): set, revoke, read grants and audit, against the real service.
+"""The Agent Surface manager role (what Settings uses): set, revoke, read grants and audit, against the real service.
 
 The service only lets the installed Settings executable (by canonical path) register as manager, so the manager calls run in a
 child process whose interpreter is a copy of python at the one path the service is told to accept (HELIX_MANAGER_EXE). A second
@@ -21,7 +21,7 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 service_bin, policy = sys.argv[1], sys.argv[2]
-NAME, PATH, AGENT = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1"
+NAME, PATH, AGENT = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.AgentSurface1"
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-agent-mgr-"))
 
 CHILD = r'''
@@ -32,7 +32,7 @@ from gi.repository import Gio, GLib
 conn = Gio.DBusConnection.new_for_address_sync(os.environ["DBUS_SESSION_BUS_ADDRESS"],
     Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
 def call(method, params=None, reply="()"):
-    return conn.call_sync("org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1", method, params,
+    return conn.call_sync("org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.AgentSurface1", method, params,
                           GLib.VariantType(reply), Gio.DBusCallFlags.NONE, 5000, None).unpack()
 def fails(method, params, reply="()"):
     try:
@@ -64,7 +64,7 @@ from gi.repository import Gio, GLib
 conn = Gio.DBusConnection.new_for_address_sync(os.environ["DBUS_SESSION_BUS_ADDRESS"],
     Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION, None, None)
 try:
-    conn.call_sync("org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1", "RegisterManager", None, None, Gio.DBusCallFlags.NONE, 5000, None)
+    conn.call_sync("org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.AgentSurface1", "RegisterManager", None, None, Gio.DBusCallFlags.NONE, 5000, None)
     print("REGISTERED")
 except GLib.Error as error:
     print("REFUSED " + error.message)
@@ -84,7 +84,7 @@ impostor.chmod(impostor.stat().st_mode | stat.S_IXUSR)
 
 env = dict(os.environ, HELIX_MANAGER_EXE=str(copy), HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"), XDG_CONFIG_HOME=str(scratch / "config"),
            XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"))
-for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
+for key in ("HELIX_STATE_HOME", "HELIX_CONFIG_HOME", "HELIX_DATA_HOME", "HELIX_CACHE_HOME"):
     env.pop(key, None)
 service = subprocess.Popen([service_bin], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 try:
@@ -126,7 +126,7 @@ try:
     # Every change that succeeded is in the audit log, with who and what; refused changes are not.
     changes = [(r["client"], r["outcome"], sorted(r["args"])) for r in out["audit"]]
     assert changes == [(client, "set", ["act", "observe"]), (client, "set", ["observe"]), (client, "revoked", [])], changes
-    state = scratch / "state" / "noctalia" / "agent"
+    state = scratch / "state" / "helix" / "agent"
     assert stat.S_IMODE((state / "audit.jsonl").stat().st_mode) == 0o600
     print("manager integration ok")
 finally:

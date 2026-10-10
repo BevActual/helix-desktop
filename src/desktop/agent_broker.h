@@ -16,7 +16,7 @@ namespace helix::agent {
 
 struct Request {
   std::string client;                // identity resolved by the service from the bus connection
-  std::string tool;                  // a `noctalia msg` command from msg-risk.toml
+  std::string tool;                  // a `helix-panel` command from msg-risk.toml
   std::vector<std::string> argv;     // fixed arguments
   std::vector<std::string> literal;  // model-supplied text; sent after `--`
   std::string reason;                // shown in confirmation dialogs
@@ -27,7 +27,7 @@ using Done = std::function<void(bool ok, std::string resultJson)>;
 using Executor = std::function<void(const std::string& command, const std::vector<std::string>& args,
                                      const std::vector<std::string>& literal, std::function<void(bool, std::string)> done)>;
 
-// The stateful half of Agent1: decisions, confirmation queue, taint and audit. No D-Bus, no clocks of its
+// The stateful half of Agent Surface: decisions, confirmation queue, taint and audit. No D-Bus, no clocks of its
 // own, no threads; the service calls it and delivers completions as signals.
 class AgentBroker {
 public:

@@ -1,17 +1,21 @@
 # Helix Shell
 
-Helix is a niri-first Linux desktop: login, compositor, and shell as one product. **Helix Shell** is the desktop shell — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets — built directly on Wayland and OpenGL ES with no Qt or GTK dependency.
+Helix is a niri-first Linux desktop: login, compositor, and shell as one product. **Helix Shell** is the desktop shell — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets.
 
-The other two packages are [helix-niri](https://github.com/BevActual/helix-niri) (compositor) and [helix-greeter](https://github.com/BevActual/helix-greeter) (login). Stock niri, Hyprland, and other compositors remain fallbacks.
+Product structure and runtime roles: [docs/design/product-structure.md](docs/design/product-structure.md). Design index: [docs/design/README.md](docs/design/README.md).
 
-It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, LocalSend, Phone, Syncthing, Firewall, Printers, Cast, Privacy, and similar tools).
+The **live session shell is the Tauri/Rust build** (`shell/helix-shell-tauri`, installed with `tools/switch-shell.sh install`). The C++ session UI is removed; see [docs/design/session-shell.md](docs/design/session-shell.md). Desktop authority is `org.helix.Desktop` (live C++ `helix-service`, Rust target `services/helix-desktop`); contracts under `protocols/` are the shared boundary.
 
-The command, config directory, and IPC stay `noctalia` so existing installs keep working. The name in the UI is Helix Shell.
+The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; own Cargo workspace). Login is the Tauri greeter at [`greeter/`](greeter/) (`helix-greeter`). **Fedora + helix-niri are the sole shell target**; other compositors are not a supported product surface.
+
+It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, Firewall, Printers, Privacy, and similar tools).
+
+The product name, install paths, and IPC are **Helix** (see `docs/design/helix-identity.md`).
 
 <p><br/></p>
 
 <p align="center">
-  <img src="assets/noctalia.svg" alt="Helix Shell" style="width: 192px" />
+  <img src="assets/helix.svg" alt="Helix Shell" style="width: 192px" />
 </p>
 
 <p><br/></p>
@@ -24,7 +28,7 @@ can be flexible, but it also makes a complete desktop feel fragile and hard to k
 
 Helix solves that by owning the common desktop surfaces and the service layer in Control Center, while still fitting into
 compositor-driven Wayland workflows. Tabs you do not use can be hidden. A service whose daemon is missing stays in the
-sidebar with a start or empty card, the same pattern as Tailscale and Phone.
+sidebar with a start or empty card, the same pattern as Tailscale.
 
 ## What It Includes
 
@@ -32,50 +36,44 @@ sidebar with a start or empty card, the same pattern as Tailscale and Phone.
   weather, clipboard, and custom script-backed widgets.
 - Dock, launcher, control center, notification toasts/history, wallpaper picker, OSD overlays, lock screen, session
   panel, and desktop widgets.
-- Control Center services: packages, Tailscale, LocalSend, Phone (KDE Connect), Syncthing, Firewall, Printers, Cast,
-  Privacy, screen time, AI, capture, and clipboard history.
+- Control Center services: packages, Tailscale, Firewall, Printers, Privacy, screen time, AI, capture, and clipboard
+  history.
 - TOML configuration with hot reload, GUI-managed overrides, theme/palette support, template application, and IPC for
   runtime control.
 - Direct Wayland integration for layer-shell, session lock, idle behavior, clipboard, foreign toplevels, workspaces,
   fractional scaling, and compositor-specific workspace backends where needed.
 
-## Wayland Compositor Support
+## Wayland compositor
 
-Helix Shell is built for [helix-niri](https://github.com/BevActual/helix-niri). It also supports Wayland compositors that provide the layer-shell
-protocols it needs for shell surfaces. Workspace integration works through compositor-native backends where needed, or
-through `ext-workspace-v1` on compositors that implement it.
-
-Current compositor integrations include niri (helix-niri and stock), Hyprland, Sway, Scroll, Mango, Labwc, Triad, dwl,
-and other compatible Wayland compositors. Other compositors may run Helix but can have reduced workspace, window,
-output, or session-action integration depending on the protocols and IPC they expose.
+Helix Shell targets the in-tree compositor at [`compositor/`](compositor/) (helix-niri). That fork owns window
+management and tiling; the shell owns layer-shell chrome and desktop services. **Fedora + helix-niri is the sole
+supported product surface** — see [docs/design/product-structure.md](docs/design/product-structure.md).
 
 ## Scope
 
-Helix Shell is the desktop shell around your Wayland compositor. It owns bars, panels, launcher, notifications, dock,
+Helix Shell is the desktop shell around helix-niri. It owns bars, panels, launcher, notifications, dock,
 lock screen, idle behavior, OSDs, theming, wallpapers, desktop widgets, multi-monitor shell surfaces, and the Control
 Center service layer.
-
-The compositor still owns window management and tiling. Helix does not replace helix-niri, niri, Hyprland, or Sway as a
-window manager.
 
 First-party Control Center services are in scope when they have live state, a primary action, and a native backend.
 Hide any tab except Home with `hidden_tabs` or **Control Center → Control Center**. A missing backend is an empty or
 start card, not a reason to leave the feature out of Helix.
 
-Login lives in helix-greeter. Helix Shell syncs appearance to that greeter; it does not replace greetd.
+Login lives in `greeter/` (`helix-greeter`). Helix Shell syncs appearance to that greeter; it does not replace greetd.
 
 The Luau plugin system was removed (2026-10-05). Extra bar widgets, launcher providers, panels and shortcuts will
 return as first-party features or as a new extension mechanism.
 
 ## Build from source
 
-Source dependencies, distro-specific package commands, build modes, and install layouts live in
-[BUILDING.md](BUILDING.md).
+**Session shell and apps (live path):** see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
+
+**Desktop authority:** Meson builds live C++ `helix-service` (+ assistant/inference). Rust scaffold: `cargo build -p helix-desktop`. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
 
 ## Configuration
 
 A ready-to-use starting config with all defaults is at [example.toml](example.toml). The configuration reference lives
-in [`docs/user/`](docs/user/). Config files still use `~/.config/noctalia/`. Sync docs to a local docs checkout with
+in [`docs/user/`](docs/user/). Config files still use `~/.config/helix/`. Sync docs to a local docs checkout with
 `tools/sync-docs.sh`.
 
 ## Contributing
@@ -92,18 +90,8 @@ MIT License. See [LICENSE](LICENSE) for details.
 Distro packaging notes (description, deps, install layout, Meson options) live in
 [PACKAGING.md](PACKAGING.md).
 
-## Lineage
-
-This tree started from [Noctalia](https://github.com/noctalia-dev/noctalia). Helix keeps that on-disk command and config
-layout so existing setups keep working.
-
 ### Native desktop applications
 
-Helix Settings (`helix-settings`) and Helix System Monitor (`helix-system-monitor`)
-are independent GTK4/libadwaita applications built in this repository under `src/apps`.
-Settings uses the desktop service and hides Helix-only preferences on other desktops.
-System Monitor reads local Linux resources without the shell or service, with live
-CPU/memory graphs, searchable processes and saved screen-time reports. Native controls
-and adaptive navigation are shared; graphical content adds palette, wallpaper and data
-previews. Advanced migration is ongoing and existing Control Center destinations remain
-available. See `docs/design/desktop-service.md` for coverage and remaining work.
+Helix Settings, Software, and System Monitor are Tauri apps under `apps/`.
+Settings talks to `helix-service`; System Monitor reads local Linux resources without the shell.
+See `docs/design/desktop-service.md` and `docs/design/rust-workspace.md`.

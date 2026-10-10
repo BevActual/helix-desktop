@@ -44,13 +44,13 @@ namespace {
     return rgb;
   }
 
-  uint32_t token(const noctalia::theme::GeneratedPalette& palette, const std::string& name) {
+  uint32_t token(const helix::theme::GeneratedPalette& palette, const std::string& name) {
     const auto it = palette.dark.find(name);
     return it == palette.dark.end() ? 0U : it->second;
   }
 
   double saturation(uint32_t argb) {
-    const auto color = noctalia::theme::Color::fromArgb(argb);
+    const auto color = helix::theme::Color::fromArgb(argb);
     const auto [h, s, l] = color.toHsl();
     (void)h;
     (void)l;
@@ -58,22 +58,22 @@ namespace {
   }
 
   bool checkSchemeStrings() {
-    using noctalia::theme::Scheme;
+    using helix::theme::Scheme;
     bool ok = true;
-    const auto parsed = noctalia::theme::schemeFromString("soft");
+    const auto parsed = helix::theme::schemeFromString("soft");
     ok = expect(parsed.has_value() && *parsed == Scheme::Soft, "parses canonical soft scheme") && ok;
-    ok = expect(noctalia::theme::schemeToString(Scheme::Soft) == "soft", "serializes canonical soft scheme") && ok;
-    ok = expect(!noctalia::theme::schemeFromString("softened").has_value(), "rejects non-canonical soft alias") && ok;
+    ok = expect(helix::theme::schemeToString(Scheme::Soft) == "soft", "serializes canonical soft scheme") && ok;
+    ok = expect(!helix::theme::schemeFromString("softened").has_value(), "rejects non-canonical soft alias") && ok;
     return ok;
   }
 
   bool checkSoftGeneration() {
-    using noctalia::theme::Scheme;
+    using helix::theme::Scheme;
 
     const auto rgb = makeColorfulBuffer();
-    const auto faithful = noctalia::theme::generateCustom(rgb, Scheme::Faithful);
-    const auto soft = noctalia::theme::generateCustom(rgb, Scheme::Soft);
-    const auto muted = noctalia::theme::generateCustom(rgb, Scheme::Muted);
+    const auto faithful = helix::theme::generateCustom(rgb, Scheme::Faithful);
+    const auto soft = helix::theme::generateCustom(rgb, Scheme::Soft);
+    const auto muted = helix::theme::generateCustom(rgb, Scheme::Muted);
 
     bool ok = true;
     const std::string required[] = {
@@ -114,16 +114,16 @@ namespace {
   bool checkContainerSaturationHeadroom() {
     bool ok = true;
 
-    const auto* catppuccin = noctalia::theme::findBuiltinPalette("Catppuccin");
+    const auto* catppuccin = helix::theme::findBuiltinPalette("Catppuccin");
     if (!expect(catppuccin != nullptr, "finds Catppuccin builtin palette"))
       return false;
 
-    const auto fixed = noctalia::theme::expandBuiltinPalette(*catppuccin);
-    const auto fixedContainer = noctalia::theme::Color::fromArgb(token(fixed, "primary_container"));
+    const auto fixed = helix::theme::expandBuiltinPalette(*catppuccin);
+    const auto fixedContainer = helix::theme::Color::fromArgb(token(fixed, "primary_container"));
     ok = expect(fixedContainer.toHex() == "#6d10da", "fixed palette container saturation scales by remaining headroom")
         && ok;
 
-    const auto custom = noctalia::theme::generateCustom(makeColorfulBuffer(), noctalia::theme::Scheme::Faithful);
+    const auto custom = helix::theme::generateCustom(makeColorfulBuffer(), helix::theme::Scheme::Faithful);
     const double customPrimarySaturation = saturation(token(custom, "primary"));
     const double customContainerSaturation = saturation(token(custom, "primary_container"));
     ok = expect(
@@ -136,33 +136,33 @@ namespace {
   }
 
   bool checkPerceptualContrastAdjustment() {
-    const auto background = noctalia::theme::Color::fromHex("#fbf8ff");
-    const auto paleLavender = noctalia::theme::Color::fromHex("#bdc2ff");
-    const auto adjusted = noctalia::theme::ensureContrast(paleLavender, background, 4.5);
+    const auto background = helix::theme::Color::fromHex("#fbf8ff");
+    const auto paleLavender = helix::theme::Color::fromHex("#bdc2ff");
+    const auto adjusted = helix::theme::ensureContrast(paleLavender, background, 4.5);
     bool ok = true;
     ok = expect(
-             noctalia::theme::contrastRatio(adjusted, background) >= 4.5,
+             helix::theme::contrastRatio(adjusted, background) >= 4.5,
              "OKLCH-adjusted foreground has readable contrast"
          )
         && ok;
     ok = expect(adjusted.toHex() == "#6b6ea6", "OKLCH adjustment preserves pale lavender character") && ok;
 
-    const auto readable = noctalia::theme::Color::fromHex("#5158a1");
+    const auto readable = helix::theme::Color::fromHex("#5158a1");
     ok = expect(
-             noctalia::theme::ensureContrast(readable, background, 4.5).toArgb() == readable.toArgb(),
+             helix::theme::ensureContrast(readable, background, 4.5).toArgb() == readable.toArgb(),
              "already-readable foreground remains unchanged"
          )
         && ok;
 
-    const auto impossibleBackground = noctalia::theme::Color::fromHex("#777777");
-    const auto impossibleForeground = noctalia::theme::Color::fromHex("#888888");
-    const auto bestPossible = noctalia::theme::ensureContrast(impossibleForeground, impossibleBackground, 7.0, 1);
+    const auto impossibleBackground = helix::theme::Color::fromHex("#777777");
+    const auto impossibleForeground = helix::theme::Color::fromHex("#888888");
+    const auto bestPossible = helix::theme::ensureContrast(impossibleForeground, impossibleBackground, 7.0, 1);
     ok = expect(bestPossible.toHex() == "#000000", "impossible target returns the best-contrast endpoint") && ok;
     return ok;
   }
 
   bool checkTerminalContrast() {
-    using noctalia::theme::Scheme;
+    using helix::theme::Scheme;
 
     constexpr std::array schemes{
         Scheme::TonalSpot, Scheme::Content,  Scheme::FruitSalad, Scheme::Rainbow,       Scheme::Monochrome,
@@ -178,8 +178,8 @@ namespace {
     const auto rgb = makeColorfulBuffer();
     bool ok = true;
     for (const Scheme scheme : schemes) {
-      const auto generated = noctalia::theme::generate(rgb, scheme);
-      if (!expect(generated.has_value(), std::string(noctalia::theme::schemeToString(scheme)) + " palette generated")) {
+      const auto generated = helix::theme::generate(rgb, scheme);
+      if (!expect(generated.has_value(), std::string(helix::theme::schemeToString(scheme)) + " palette generated")) {
         ok = false;
         continue;
       }
@@ -188,7 +188,7 @@ namespace {
         const auto backgroundIt = tokens.find("terminal_background");
         if (!expect(
                 backgroundIt != tokens.end(),
-                std::string(noctalia::theme::schemeToString(scheme))
+                std::string(helix::theme::schemeToString(scheme))
                     + " "
                     + std::string(mode)
                     + " terminal background exists"
@@ -196,13 +196,13 @@ namespace {
           return false;
         }
 
-        const auto background = noctalia::theme::Color::fromArgb(backgroundIt->second);
+        const auto background = helix::theme::Color::fromArgb(backgroundIt->second);
         bool modeOk = true;
         for (const std::string_view key : colorKeys) {
           const auto colorIt = tokens.find(std::string(key));
           if (!expect(
                   colorIt != tokens.end(),
-                  std::string(noctalia::theme::schemeToString(scheme))
+                  std::string(helix::theme::schemeToString(scheme))
                       + " "
                       + std::string(mode)
                       + " "
@@ -212,10 +212,10 @@ namespace {
             modeOk = false;
             continue;
           }
-          const auto color = noctalia::theme::Color::fromArgb(colorIt->second);
+          const auto color = helix::theme::Color::fromArgb(colorIt->second);
           modeOk = expect(
-                       noctalia::theme::contrastRatio(color, background) >= 4.5,
-                       std::string(noctalia::theme::schemeToString(scheme))
+                       helix::theme::contrastRatio(color, background) >= 4.5,
+                       std::string(helix::theme::schemeToString(scheme))
                            + " "
                            + std::string(mode)
                            + " "
@@ -230,7 +230,7 @@ namespace {
           const auto foregroundColorIt = tokens.find("on_" + std::string(key));
           if (!expect(
                   backgroundColorIt != tokens.end() && foregroundColorIt != tokens.end(),
-                  std::string(noctalia::theme::schemeToString(scheme))
+                  std::string(helix::theme::schemeToString(scheme))
                       + " "
                       + std::string(mode)
                       + " "
@@ -240,11 +240,11 @@ namespace {
             modeOk = false;
             continue;
           }
-          const auto backgroundColor = noctalia::theme::Color::fromArgb(backgroundColorIt->second);
-          const auto foregroundColor = noctalia::theme::Color::fromArgb(foregroundColorIt->second);
+          const auto backgroundColor = helix::theme::Color::fromArgb(backgroundColorIt->second);
+          const auto foregroundColor = helix::theme::Color::fromArgb(foregroundColorIt->second);
           modeOk = expect(
-                       noctalia::theme::contrastRatio(foregroundColor, backgroundColor) >= 4.5,
-                       std::string(noctalia::theme::schemeToString(scheme))
+                       helix::theme::contrastRatio(foregroundColor, backgroundColor) >= 4.5,
+                       std::string(helix::theme::schemeToString(scheme))
                            + " "
                            + std::string(mode)
                            + " "

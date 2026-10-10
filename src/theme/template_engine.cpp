@@ -37,7 +37,7 @@
 #include <variant>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -1784,4 +1784,4 @@ namespace noctalia::theme {
     return ok;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

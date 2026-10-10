@@ -15,7 +15,7 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
 
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
-AGENT = "org.helix.Desktop.Agent1"
+AGENT = "org.helix.Desktop.AgentSurface1"
 NO_AUTO = Gio.DBusCallFlags.NO_AUTO_START
 
 conn = Gio.DBusConnection.new_for_address_sync(

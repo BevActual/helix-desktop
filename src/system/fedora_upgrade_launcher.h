@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-namespace noctalia::fedora_upgrade {
+namespace helix::fedora_upgrade {
 
   using Completion = std::function<void(bool success, std::string error)>;
 
@@ -19,4 +19,4 @@ namespace noctalia::fedora_upgrade {
   // Runs pkexec on the installed helper. onComplete runs on the worker thread.
   [[nodiscard]] Launch start(Completion onComplete);
 
-} // namespace noctalia::fedora_upgrade
+} // namespace helix::fedora_upgrade

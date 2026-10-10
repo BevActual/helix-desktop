@@ -113,7 +113,7 @@ namespace compositors::niri {
         command.pop_back();
         command = StringUtils::trim(command);
       }
-      constexpr std::string_view kPrefix = "noctalia msg ";
+      constexpr std::string_view kPrefix = "helix-panel ";
       if (command.starts_with(kPrefix)) {
         command = StringUtils::trim(command.substr(kPrefix.size()));
       }
@@ -139,7 +139,7 @@ namespace compositors::niri {
         return {};
       }
       const std::string binary = fileNameOf(args[0]);
-      if (binary != "noctalia" || args[1] != "msg") {
+      if (binary != "helix" || args[1] != "msg") {
         return {};
       }
       std::string command;
@@ -385,7 +385,7 @@ namespace compositors::niri {
       return {
           .key = resolvedKey,
           .ipcCommand = std::string(bind.ipcCommand),
-          .action = "spawn-sh \"noctalia msg " + std::string(bind.ipcCommand) + "\";",
+          .action = "spawn-sh \"helix-panel " + std::string(bind.ipcCommand) + "\";",
           .allowWhenLocked = bind.allowWhenLocked,
       };
     }
@@ -414,7 +414,7 @@ namespace compositors::niri {
         }
         body += " { ";
         if (!bind.ipcCommand.empty()) {
-          body += "spawn-sh \"noctalia msg ";
+          body += "spawn-sh \"helix-panel ";
           body += bind.ipcCommand;
           body += "\";";
         } else if (!bind.spawnArgs.empty()) {
@@ -549,7 +549,7 @@ namespace compositors::niri {
     if (bind.key == "F19" || bind.key == "Caps_Lock") {
       line += " repeat=false";
     }
-    line += " { spawn-sh \"noctalia msg " + std::string(bind.ipcCommand) + "\"; }";
+    line += " { spawn-sh \"helix-panel " + std::string(bind.ipcCommand) + "\"; }";
     return line;
   }
 
@@ -572,7 +572,7 @@ namespace compositors::niri {
         && (spawnSh + 8 >= stripped.size() || !isIdent(stripped[spawnSh + 8]))) {
       std::size_t i = spawnSh + 8;
       if (const auto quoted = parseQuoted(stripped, i); quoted.has_value()) {
-        if (quoted->find("noctalia msg") != std::string::npos) {
+        if (quoted->find("helix-panel") != std::string::npos) {
           const std::string ipc = normalizeIpc(*quoted);
           if (!ipc.empty()) {
             return ipc;

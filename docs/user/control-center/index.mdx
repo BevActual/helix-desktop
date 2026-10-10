@@ -6,21 +6,21 @@ sidebar:
 ---
 
 Control Center opens as a quick menu for sound, brightness, Wi-Fi, Bluetooth,
-power, media, capture and phone controls. Detailed preferences open **Helix
-Settings**, the GTK4/libadwaita application. The old embedded Settings editors
+power, media, and capture controls. Detailed preferences open **Helix
+Settings** (`helix-settings`, the Tauri app). The old embedded Settings editors
 have been retired, including their advanced plugin, widget, hook and Niri forms.
 Existing configuration remains active.
 
 ```sh
-noctalia msg panel-toggle control-center
-noctalia msg panel-toggle control-center home
-noctalia msg settings-toggle appearance
-noctalia msg settings-toggle control-center
+helix-panel panel-toggle control-center
+helix-panel panel-toggle control-center home
+helix-panel settings-toggle appearance
+helix-panel settings-toggle control-center
 helix-settings --page network
 ```
 
 Settings commands activate the existing Settings window or open a new one. The
-Control Center closes when navigating to Settings. The `noctalia` commands and
+Control Center closes when navigating to Settings. The `helix-shell` commands and
 existing configuration paths remain supported.
 
 ## Detailed preferences
@@ -39,14 +39,14 @@ built; they do not fall back to an old editor.
 ## Quick controls and shell surfaces
 
 Direct contexts for live surfaces remain available, including `audio`, `network`,
-`bluetooth`, `notifications`, `media`, `capture`, `clipboard`, `phone`, `calendar`
+`bluetooth`, `notifications`, `media`, `capture`, `clipboard`, `calendar`
 and `weather`. Their settings buttons launch Helix Settings. Dedicated Settings
 and customization tabs have been removed from the shell sidebar.
 
 ```sh
-noctalia msg panel-toggle control-center audio
-noctalia msg panel-open control-center capture
-noctalia msg panel-toggle control-center clipboard
+helix-panel panel-toggle control-center audio
+helix-panel panel-open control-center capture
+helix-panel panel-toggle control-center clipboard
 ```
 
 ## Control Center preferences

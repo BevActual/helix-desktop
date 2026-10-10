@@ -1,0 +1,5 @@
+[
+  {"id": "org.helix.Demo", "title": "Demo App", "summary": "A fake Flatpak for nested tests", "kind": "flatpak", "installed": false, "update": false, "remote": "flathub"},
+  {"id": "org.helix.Editor", "title": "Editor", "summary": "Already installed", "kind": "flatpak", "installed": true, "update": true, "remote": "flathub"},
+  {"id": "firefox", "title": "Firefox", "summary": "RPM package", "kind": "rpm", "installed": true, "update": false, "remote": "fedora"}
+]

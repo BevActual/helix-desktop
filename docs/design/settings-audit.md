@@ -1,7 +1,7 @@
 # Settings audit (2026-10-09)
 
 Question asked of every Settings control: **does anything running in this session act on it?** The Tauri shell replaced the native
-Noctalia shell, but Settings still listed the old shell's service settings. Checked by reading the consumers and, for theming, by changing
+Helix shell, but Settings still listed the old shell's service settings. Checked by reading the consumers and, for theming, by changing
 the setting on the live service and seeing which files changed.
 
 | Page | Setting | Acted on by | Verdict |

@@ -1,6 +1,6 @@
 #!/bin/bash
-# HELIX_NESTED_SCRIPT: Agent1 confirmer Overlay (required) and optional assistant panel flow.
-#   Agent1 confirmer (always):
+# HELIX_NESTED_SCRIPT: Agent Surface confirmer Overlay (required) and optional assistant panel flow.
+#   Agent Surface confirmer (always):
 #     HELIX_NESTED_SCRIPT=tools/nested/assistant-flow-test.sh tools/nested/run.sh flow tools/nested/tauri-shell.sh
 #   Plus real-model assistant Do it (optional):
 #     HELIX_MODEL_DIR=<models> HELIX_NESTED_ASSISTANT=<build>/helix-assistant PATH=<build>:$PATH \
@@ -10,7 +10,7 @@ SCRATCH=$1
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 LOG=$SCRATCH/program.log
 
-# --- Phase 1: Agent1 confirmer Overlay against the real service (exact Completed results) ---
+# --- Phase 1: Agent Surface confirmer Overlay against the real service (exact Completed results) ---
 bash "$ROOT/tools/nested/confirmer-test.sh" "$SCRATCH" || exit 1
 
 # --- Phase 2 (optional): assistant panel + real model ---

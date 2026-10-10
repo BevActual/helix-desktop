@@ -370,52 +370,31 @@ namespace FileUtils {
     return text;
   }
 
-  [[nodiscard]] inline std::string configDir() {
-    const char* noctalia = std::getenv("NOCTALIA_CONFIG_HOME");
-    if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
+  [[nodiscard]] inline std::string resolveNamedDir(
+      const char* overrideEnv, const char* xdgEnv, const char* homeSuffix, const char* leaf
+  ) {
+    if (const char* overrideHome = std::getenv(overrideEnv); overrideHome != nullptr && overrideHome[0] != '\0') {
+      return std::string(overrideHome) + "/" + leaf;
     }
-    const char* xdg = std::getenv("XDG_CONFIG_HOME");
-    if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
+    if (const char* xdg = std::getenv(xdgEnv); xdg != nullptr && xdg[0] != '\0') {
+      return std::string(xdg) + "/" + leaf;
     }
-    const char* home = std::getenv("HOME");
-    if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.config/noctalia";
+    if (const char* home = std::getenv("HOME"); home != nullptr && home[0] != '\0') {
+      return std::string(home) + homeSuffix + leaf;
     }
     return {};
+  }
+
+  [[nodiscard]] inline std::string configDir() {
+    return resolveNamedDir("HELIX_CONFIG_HOME", "XDG_CONFIG_HOME", "/.config/", "helix");
   }
 
   [[nodiscard]] inline std::string stateDir() {
-    const char* noctalia = std::getenv("NOCTALIA_STATE_HOME");
-    if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
-    }
-    const char* xdg = std::getenv("XDG_STATE_HOME");
-    if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
-    }
-    const char* home = std::getenv("HOME");
-    if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.local/state/noctalia";
-    }
-    return {};
+    return resolveNamedDir("HELIX_STATE_HOME", "XDG_STATE_HOME", "/.local/state/", "helix");
   }
 
   [[nodiscard]] inline std::string dataDir() {
-    const char* noctalia = std::getenv("NOCTALIA_DATA_HOME");
-    if (noctalia != nullptr && noctalia[0] != '\0') {
-      return std::string(noctalia) + "/noctalia";
-    }
-    const char* xdg = std::getenv("XDG_DATA_HOME");
-    if (xdg != nullptr && xdg[0] != '\0') {
-      return std::string(xdg) + "/noctalia";
-    }
-    const char* home = std::getenv("HOME");
-    if (home != nullptr && home[0] != '\0') {
-      return std::string(home) + "/.local/share/noctalia";
-    }
-    return {};
+    return resolveNamedDir("HELIX_DATA_HOME", "XDG_DATA_HOME", "/.local/share/", "helix");
   }
 
   // Git-source repo caches. Host-managed, re-fetchable, so they live under the
@@ -439,7 +418,7 @@ namespace FileUtils {
   }
 
   // Persistent per-plugin data directory. Survives plugin updates (unlike the
-  // materialized runtime dir) and honors the NOCTALIA_STATE_HOME override.
+  // materialized runtime dir) and honors the HELIX_STATE_HOME override.
   // Caller is responsible for creating it. Empty if no state home resolves.
   [[nodiscard]] inline std::string pluginDataDir(const std::string& pluginId) {
     const std::string base = stateDir();

@@ -1,19 +1,20 @@
 # Helix Agentic OS
 
 Helix is becoming an **agentic OS**: one desktop that **humans and machines** share through
-the same contracts. Cursor (or any MCP client) is a *brain*; Helix owns eyes, hands, and
-session context.
+the same contracts. MCP-capable apps and agents are *brains* on the Surface; Helix owns eyes,
+hands, and session context. Fabric (Mobius, routing, MCP layer): `inference-fabric.md`.
 
 ## Target product
 
 | Piece | Role |
 |-------|------|
 | **Agent Surface** | Session APIs — observe, semantic act, vision; later synthetic input |
-| **Agent Center** | Multi-agent hub (Muse / ChatGPT / Gemini style) — conversations, specialized agents, history, routing, grants |
-| **Helix Assistant** | Siri-like presence — bar/hotkey/voice; looks at the desktop and acts via the Surface |
+| **Mobius** | AI hub — conversations, personas, model routing, Act handoff (was “Agent Center” / helix-chat) |
+| **Helix Assistant** | Explicit act presence — bar / Caps Lock act; never the long-form hub |
+| **Helix MCP server** | `tools/helix-agent` — MCP protocol onto Agent Surface for any MCP-capable client |
 
-Both Hub and Assistant are **clients** of the Agent Surface. Do not ship their UIs before the
-Surface can see and act.
+Mobius and the bar Assistant are **not** Agent Surface grant holders for the model path Mobius uses for talk;
+desktop act goes through `helix-assistant` or MCP clients with their own grants. See `inference-fabric.md`.
 
 ## Capability tiers
 
@@ -29,19 +30,19 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 
 ### IPC
 
-- Existing: `noctalia msg …` (panels, bar, settings, clipboard, notifications, workspaces, …)
-- New: `noctalia msg desktop-capture [output|all]` → `ok <png-path>\n` for agent vision
+- Existing: `helix-panel …` (panels, bar, settings, clipboard, notifications, workspaces, …)
+- New: `helix-panel desktop-capture [output|all]` → `ok <png-path>\n` for agent vision
 - Windows: `niri msg` / `NIRI_SOCKET` (list + focus) until first-class Helix wrappers exist
 
-### MCP adapter
+### MCP adapter (Helix MCP server)
 
-`tools/helix-agent/` — stdio MCP wrapping the allowlisted tools below. Wired for Cursor via
-`.cursor/mcp.json`. Other runners can speak the same IPC without MCP.
+`tools/helix-agent/` — stdio MCP wrapping the allowlisted tools below for **any MCP-capable app or
+agent**. Cursor may use it via `.cursor/mcp.json` as one consumer; it is not the product definition.
 
 | Tool | Backend |
 |------|---------|
-| `desktop_status` | `noctalia msg status` |
-| `desktop_capture` | `noctalia msg desktop-capture` |
+| `desktop_status` | `helix-panel status` |
+| `desktop_capture` | `helix-panel desktop-capture` |
 | `desktop_context` | status JSON + focused niri window |
 | `panel_toggle` / `panel_open` / `panel_close` | `panel-*` |
 | `settings_open` | `settings-open` |
@@ -61,21 +62,33 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 
 ### Risk tiers
 
-`protocols/ipc/msg-risk.toml` assigns every `noctalia msg` command a tier: `observe`, `observe-private`
+`protocols/ipc/msg-risk.toml` assigns every `helix-panel` command a tier: `observe`, `observe-private`
 (returns screen, clipboard or notification content; output is untrusted data), `act`, `confirm`, or `blocked`.
 `tests/msg_risk_policy_test.py` fails when a command has no tier, so new commands cannot ship unclassified.
-The MCP adapter enforces the policy in one place (`noctalia_msg`), refuses `blocked` and unknown commands
+The MCP adapter enforces the policy in one place (`helix_msg`), refuses `blocked` and unknown commands
 regardless of configuration, and grants the tiers listed in `tools/helix-agent/allowlist.toml`. Model-supplied
-text is passed after `--` so it is never parsed as a flag. `noctalia schema-json` dumps the full msg schema
+text is passed after `--` so it is never parsed as a flag. `helix schema-json` dumps the full msg schema
 for generated tooling.
 
 **Not yet enforced:** the policy lives in the adapter. The IPC socket itself still accepts every command from
 any process in the user session, so a client with a shell bypasses the adapter. The `confirm` tier is granted
-only because no shell-side confirmation exists yet. Closing both is the `Agent1` D-Bus interface (peer
+only because no shell-side confirmation exists yet. Closing both is the `Agent Surface` D-Bus interface (peer
 identity, per-client grants, confirmation, audit log); see `agent-and-inference.md` for that design and the
 built-in inference service.
 
 `notification-show` JSON may set `"history": false` for toast-only; CLI/MCP default is history on so agents can drive the unread badge.
+
+## Interconnected surfaces (ships today)
+
+| Surface | Talk | Act | Oversight |
+|---|---|---|---|
+| **Mobius** | Inference1 | `org.helix.Shell1.AssistantSubmit` → bar → `helix-assistant` → Agent Surface | Open Agents / Assistant; never holds Agent Surface |
+| **Bar Assistant** | via `helix-assistant` | Agent Surface (never holds grants in the shell binary) | Island + confirmer |
+| **Agents panel** | — | Stop / revoke / kill switch | AgentSurfaceActivity1 |
+| **Settings → Privacy & agents** | — | Manager `SetGrant` | Full audit |
+| **Helix MCP server** | — | Agent Surface (per MCP client) | Same confirmer / audit |
+
+Ambiguous ask → Mobius; explicit act → bar. Fabric: `inference-fabric.md`.
 
 ## Human entry
 
@@ -92,7 +105,7 @@ assistant window.
   context `desktop_context` gives an agent. Settings, Software, and System
   Monitor switch to the open window when that app is already running. Workspace
   rows name the workspace you are on.
-- `noctalia msg app-launch <id-or-name>` opens any installed application.
+- `helix-panel app-launch <id-or-name>` opens any installed application.
   Settings and Software use the shell's existing app launch path.
 
 ## Phased roadmap
@@ -100,11 +113,11 @@ assistant window.
 1. **v1:** Agent Surface + MCP — capture + semantic desktop control  
 2. **v1.1:** CC/NC polish, notify→history/badge, `desktop_context` (focused window)  
 3. **Phase 2:** selection / a11y + synthetic input + grants UI  
-4. **Phase 3:** Agent Center (hub) + Assistant presence sharing the Surface
+4. **Phase 3:** Mobius hub personas + Inference fabric routing (see `inference-fabric.md`)
 
 ## Non-goals (v1)
 
 - Pixel click/type
 - Network-exposed agent socket
-- Full Agent Center / Assistant UI
-- Cross-user or sandboxed third-party agents
+- Remote emission of Agent Surface tool JSON
+- Cross-user or sandboxed third-party agents without Agent Surface grants

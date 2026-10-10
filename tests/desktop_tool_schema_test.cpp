@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
   TEST_CHECK(argc >= 2);
   auto policy = RiskPolicy::load(std::filesystem::path(argv[1]) / "protocols/ipc/msg-risk.toml");
   TEST_CHECK(policy.has_value());
-  const auto& root = noctalia::cli::kMsgCmd;
+  const auto& root = helix::cli::kMsgCmd;
 
   // Read-only and everyday tiers: no command that needs approval, and nothing blocked.
   const auto everyday = toolCallSchema(root, *policy, {Tier::Observe, Tier::ObservePrivate, Tier::Act});

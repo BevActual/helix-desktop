@@ -26,7 +26,7 @@
 #include <sstream>
 #include <string>
 
-using namespace noctalia::config::schema;
+using namespace helix::config::schema;
 
 namespace {
 
@@ -233,8 +233,6 @@ namespace {
     c.audio = AudioConfig{true, true, 0.73F, "freedesktop"};
     c.weather = WeatherConfig{false, false, 17, "imperial"};
     c.tailscale = TailscaleConfig{15, true, "https://example.invalid/admin"};
-    c.localsend = LocalSendConfig{false, "Studio", "2468", "~/Downloads/LocalSend", true, false, 53318};
-    c.phone = PhoneConfig{.mirrorAlwaysOn = false, .notifications = false, .castAudio = false};
     c.osd.position = "bottom_left";
     c.osd.positionVertical = "top_right";
     c.osd.orientation = "vertical";
@@ -340,7 +338,7 @@ namespace {
          "user",
          {"personal"},
          CalendarCredentialSource::File,
-         "/run/agenix/noctalia-caldav"},
+         "/run/agenix/helix-caldav"},
     };
     // Explicit chords so write→read round-trips (empty would emit defaults instead).
     c.keybinds.validate = {*parseKeyChordSpec("Return")};
@@ -383,7 +381,7 @@ namespace {
     c.shell.clipboardHistoryMaxEntries = 80;
     c.shell.clipboardAutoPaste = ClipboardAutoPasteMode::CtrlV;
     c.storage.keySource = StorageKeySource::File;
-    c.storage.keyFile = "/run/agenix/noctalia-storage-key";
+    c.storage.keyFile = "/run/agenix/helix-storage-key";
     c.shell.avatarPath = "/home/u/face.png";
     c.shell.animation.speed = 1.5F;
     c.shell.shadow.direction = ShadowDirection::UpLeft;
@@ -555,7 +553,7 @@ provider = "custom"
 server_url = "https://dav.example.com/"
 username = "user"
 credential_source = "file"
-password_file = "/run/agenix/noctalia-caldav"
+password_file = "/run/agenix/helix-caldav"
 )");
     if (valid.hasErrors()) {
       fail("calendar: valid file credential source was rejected");
@@ -578,7 +576,7 @@ type = "caldav"
 provider = "icloud"
 username = "user"
 credential_source = "secret-service"
-password_file = "/run/agenix/noctalia-caldav"
+password_file = "/run/agenix/helix-caldav"
 )");
     if (!conflictingFile.hasErrors()) {
       fail("calendar: secret-service credential source accepted password_file");
@@ -637,7 +635,7 @@ credential_source = "automatic"
 
     const Diagnostics valid = parse(R"(
 key_source = "file"
-key_file = "/run/agenix/noctalia-storage-key"
+key_file = "/run/agenix/helix-storage-key"
 )");
     if (valid.hasErrors()) {
       fail("storage: valid file key source was rejected");
@@ -652,7 +650,7 @@ key_source = "file"
 
     const Diagnostics conflictingFile = parse(R"(
 key_source = "secret-service"
-key_file = "/run/agenix/noctalia-storage-key"
+key_file = "/run/agenix/helix-storage-key"
 )");
     if (!conflictingFile.hasErrors()) {
       fail("storage: secret-service key source accepted key_file");
@@ -660,7 +658,7 @@ key_file = "/run/agenix/noctalia-storage-key"
 
     const Diagnostics relativeFile = parse(R"(
 key_source = "file"
-key_file = "noctalia-storage-key"
+key_file = "helix-storage-key"
 )");
     if (!relativeFile.hasErrors()) {
       fail("storage: file key source accepted a relative key_file");

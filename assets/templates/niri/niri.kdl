@@ -1,3 +1,3 @@
-// Palette-driven niri colors are written to noctalia-layout.kdl by
+// Palette-driven niri colors are written to helix-layout.kdl by
 // Control Center → Theme. This include stays so existing configs keep
-// `include "noctalia.kdl"` after a template apply.
+// `include "helix.kdl"` after a template apply.

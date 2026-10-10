@@ -11,9 +11,9 @@
 #include "config/launcher_providers.h"
 #include "config/widget_action.h"
 #include "config/widget_gesture.h"
-#include "shell/desktop/desktop_widget_settings_registry.h"
-#include "shell/lockscreen/lockscreen_login_box.h"
-#include "shell/settings/widget_settings_registry.h"
+#include "config/widgets/desktop_widget_settings_registry.h"
+#include "config/widgets/lockscreen_login_box_type.h"
+#include "config/widgets/widget_settings_registry.h"
 #include "system/day_night_schedule.h"
 #include "time/time_format.h"
 
@@ -27,7 +27,7 @@
 #include <utility>
 #include <vector>
 
-namespace noctalia::config {
+namespace helix::config {
   namespace {
 
     std::string formatBound(double value) {
@@ -299,11 +299,11 @@ namespace noctalia::config {
             if (!gestureActions) {
               continue;
             }
-            if (!noctalia::bar::parseGestureKey(mapKey.str()).has_value()) {
+            if (!helix::bar::parseGestureKey(mapKey.str()).has_value()) {
               reportError(entryPath, "unknown gesture");
               continue;
             }
-            if (auto action = noctalia::bar::parseWidgetAction(*value); !action.has_value()) {
+            if (auto action = helix::bar::parseWidgetAction(*value); !action.has_value()) {
               reportError(entryPath, action.error());
             }
           }
@@ -711,4 +711,4 @@ namespace noctalia::config {
     return diag;
   }
 
-} // namespace noctalia::config
+} // namespace helix::config

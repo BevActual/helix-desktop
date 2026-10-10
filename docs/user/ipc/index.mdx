@@ -1,6 +1,6 @@
 ---
 title: IPC & Keybinds
-description: Commands you can run with noctalia msg for keybinds, scripts, and automation.
+description: Commands you can run with helix-panel for keybinds, scripts, and automation.
 sidebar:
   label: Overview
   order: 0
@@ -13,30 +13,30 @@ IPC commands let you control Helix from a terminal, a compositor keybind, a scri
 All commands use this shape:
 
 ```sh
-noctalia msg <command>
+helix-panel <command>
 ```
 
 For example:
 
 ```sh
-noctalia msg dock-toggle
-noctalia msg volume-up
-noctalia msg panel-toggle launcher
-noctalia msg screenshot-region
+helix-panel dock-toggle
+helix-panel volume-up
+helix-panel panel-toggle launcher
+helix-panel screenshot-region
 ```
 
 <Aside type="note">
-These pages list commands exactly as you run them. The same `noctalia msg ...` form is used in terminals, compositor keybinds, hooks, hot-corner commands, and idle command fields.
+These pages list commands exactly as you run them. The same `helix-panel ...` form is used in terminals, compositor keybinds, hooks, hot-corner commands, and idle command fields.
 </Aside>
 
 ## Command lists
 
 <CardGrid>
-  <LinkCard title="Shell" description="Status, config reload, settings, window switcher, and session actions." href="/noctalia/ipc/shell/" />
-  <LinkCard title="Surfaces" description="Bar, panels, dock, desktop widgets, and lockscreen widgets." href="/noctalia/ipc/surfaces/" />
-  <LinkCard title="Media & UI" description="Notifications, clipboard, media controls, wallpaper, theme, and screenshots." href="/noctalia/ipc/media-and-ui/" />
-  <LinkCard title="Plugins" description="Plugin event dispatch and plugin/source management." href="/noctalia/ipc/plugins/" />
-  <LinkCard title="System Controls" description="Volume, microphone, brightness, night light, Wi-Fi, Bluetooth, caffeine, power profile, and display power." href="/noctalia/ipc/system-controls/" />
+  <LinkCard title="Shell" description="Status, config reload, settings, window switcher, and session actions." href="/helix/ipc/shell/" />
+  <LinkCard title="Surfaces" description="Bar, panels, dock, desktop widgets, and lockscreen widgets." href="/helix/ipc/surfaces/" />
+  <LinkCard title="Media & UI" description="Notifications, clipboard, media controls, wallpaper, theme, and screenshots." href="/helix/ipc/media-and-ui/" />
+  <LinkCard title="Plugins" description="Plugin event dispatch and plugin/source management." href="/helix/ipc/plugins/" />
+  <LinkCard title="System Controls" description="Volume, microphone, brightness, night light, Wi-Fi, Bluetooth, caffeine, power profile, and display power." href="/helix/ipc/system-controls/" />
 </CardGrid>
 
 ## Compositor keybinds
@@ -44,27 +44,26 @@ These pages list commands exactly as you run them. The same `noctalia msg ...` f
 A compositor keybind only needs to launch a Helix command. The command part is compositor-agnostic:
 
 ```sh
-noctalia msg panel-toggle launcher
-noctalia msg panel-toggle control-center
-noctalia msg settings-toggle
-noctalia msg volume-up
+helix-panel panel-toggle launcher
+helix-panel panel-toggle control-center
+helix-panel settings-toggle
+helix-panel volume-up
 ```
 
 Use your compositor's normal `exec`, `spawn`, or command-binding syntax to run those commands.
 
 <CardGrid>
-  <LinkCard title="Niri" description="Niri bind syntax, overview integration, wallpaper backdrop, and blur." href="/noctalia/compositor-settings/niri/" />
-  <LinkCard title="Hyprland" description="Hyprland Lua bind syntax, persistent workspaces, and blur." href="/noctalia/compositor-settings/hyprland/" />
-  <LinkCard title="Sway / Scroll" description="Sway-style bind syntax for Helix launcher, panels, settings, audio, and brightness." href="/noctalia/compositor-settings/sway-scroll/" />
-  <LinkCard title="Mango" description="Mango effects and bind syntax for Helix launcher, panels, settings, audio, and brightness." href="/noctalia/compositor-settings/mango/" />
+  <LinkCard title="Niri (supported)" description="helix-niri bind syntax, overview, wallpaper backdrop, and blur." href="/helix/compositor-settings/niri/" />
 </CardGrid>
+
+Other compositor bind pages under Compositor settings are unsupported historical notes only.
 
 ## Discovering commands
 
 Not sure what else you can control? You can see all IPC commands via this terminal command:
 
 ```bash
-noctalia msg --help
+helix-panel --help
 ```
 
 ## Using IPC in config
@@ -75,8 +74,8 @@ Config command fields run through the shell. Use the canonical IPC CLI when a co
 [idle.behavior.custom]
 timeout = 660
 action = "command"
-command = "noctalia msg session lock && notify-send 'Session locked'"
+command = "helix-panel session lock && notify-send 'Session locked'"
 
 [hooks]
-started = "noctalia msg panel-toggle launcher"
+started = "helix-panel panel-toggle launcher"
 ```

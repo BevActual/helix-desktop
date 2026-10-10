@@ -10,7 +10,7 @@
 #include <string_view>
 #include <utility>
 
-namespace noctalia::config {
+namespace helix::config {
   namespace {
 
     constexpr int kNegativeBarRadiusMigrationVersion = 1;
@@ -30,6 +30,10 @@ namespace noctalia::config {
     constexpr int kLaunchAppsAsSystemdServicesMigrationVersion = 15;
     constexpr int kClockTimezonesMigrationVersion = 16;
     constexpr int kControlCenterShortcutLabelsMigrationVersion = 17;
+    constexpr int kRetiredControlCenterServicesMigrationVersion = 18;
+    constexpr std::array<std::string_view, 4> kRetiredControlCenterServiceTabs = {
+        "phone", "localsend", "syncthing", "cast",
+    };
     constexpr std::int64_t kMaxBarRadius = 500;
     constexpr std::array<std::string_view, 5> kBarRadiusKeys = {
         "radius", "radius_top_left", "radius_top_right", "radius_bottom_left", "radius_bottom_right",
@@ -768,6 +772,69 @@ namespace noctalia::config {
       });
     }
 
+    bool isRetiredControlCenterServiceTab(std::string_view id) {
+      return std::ranges::find(kRetiredControlCenterServiceTabs, id) != kRetiredControlCenterServiceTabs.end();
+    }
+
+    template <typename OnChanged> void migrateRetiredControlCenterServices(toml::table& root, OnChanged&& onChanged) {
+      if (root.erase("localsend") > 0) {
+        onChanged("localsend");
+      }
+      if (root.erase("phone") > 0) {
+        onChanged("phone");
+      }
+
+      auto* controlCenter = root["control_center"].as_table();
+      if (controlCenter == nullptr) {
+        return;
+      }
+
+      if (auto* shortcuts = (*controlCenter)["shortcuts"].as_array()) {
+        toml::array filtered;
+        bool changed = false;
+        for (auto& entry : *shortcuts) {
+          bool drop = false;
+          if (auto* shortcut = entry.as_table()) {
+            if (const auto shortcutType = (*shortcut)["type"].value<std::string>()) {
+              drop = isRetiredControlCenterServiceTab(*shortcutType);
+            }
+          }
+          if (drop) {
+            changed = true;
+            continue;
+          }
+          filtered.push_back(entry);
+        }
+        if (changed) {
+          controlCenter->insert_or_assign("shortcuts", std::move(filtered));
+          onChanged("control_center.shortcuts");
+        }
+      }
+
+      if (auto* hiddenTabs = (*controlCenter)["hidden_tabs"].as_array()) {
+        toml::array filtered;
+        bool changed = false;
+        for (auto& entry : *hiddenTabs) {
+          const auto tab = entry.value<std::string>();
+          if (tab && isRetiredControlCenterServiceTab(*tab)) {
+            changed = true;
+            continue;
+          }
+          filtered.push_back(entry);
+        }
+        if (changed) {
+          controlCenter->insert_or_assign("hidden_tabs", std::move(filtered));
+          onChanged("control_center.hidden_tabs");
+        }
+      }
+    }
+
+    void migrateRetiredControlCenterServicesSidecar(toml::table& root, schema::Diagnostics& diag) {
+      migrateRetiredControlCenterServices(root, [&diag](const std::string& path) {
+        diag.warn(path, "removed retired Control Center service configuration");
+      });
+    }
+
     void migrateCalendarTimezonesToClockSidecar(toml::table& root, schema::Diagnostics& diag) {
       migrateCalendarTimezonesToClock(root, [&diag](const std::string& path, bool keptCanonical) {
         diag.warn(
@@ -921,6 +988,11 @@ namespace noctalia::config {
             .toVersion = kControlCenterShortcutLabelsMigrationVersion,
             .summary = "control-center: drop show_shortcut_labels (Home pins always show labels)",
             .apply = migrateControlCenterShortcutLabelsSidecar,
+        },
+        {
+            .toVersion = kRetiredControlCenterServicesMigrationVersion,
+            .summary = "control-center: drop retired phone, LocalSend, Syncthing, and Cast settings",
+            .apply = migrateRetiredControlCenterServicesSidecar,
         },
     };
     return migrations;
@@ -1093,6 +1165,13 @@ namespace noctalia::config {
           .message = "show_shortcut_labels no longer does anything; Home pins always show labels",
       });
     });
+    migrateRetiredControlCenterServices(root, [&issues](const std::string& path) {
+      issues.push_back({
+          .migrationVersion = kRetiredControlCenterServicesMigrationVersion,
+          .path = path,
+          .message = "removed retired Control Center service configuration",
+      });
+    });
   }
 
   std::string legacyConfigIssueFingerprint(const LegacyConfigIssues& issues) {
@@ -1122,4 +1201,4 @@ namespace noctalia::config {
         || nowEpochSeconds - previousEpochSeconds >= kLegacyConfigReminderIntervalSeconds;
   }
 
-} // namespace noctalia::config
+} // namespace helix::config

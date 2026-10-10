@@ -3,7 +3,7 @@
 Decision (owner): build the Helix shell and apps on Rust and Tauri, replacing the C++ shell surface by surface. The C++
 shell keeps running until each replacement is at parity. This document records what is known, so work starts from facts.
 
-## Evidence from the spike (`rust/helix-shell-tauri`)
+## Evidence from the spike (`shell/helix-shell-tauri`)
 
 - A Tauri 2 window becomes a layer-shell surface with `gtk-layer-shell`. Verified in a nested niri: the bar is a Top-layer,
   full-width surface that reserves space, no keyboard; the panel is an Overlay-layer surface with exclusive keyboard.
@@ -25,9 +25,9 @@ shell keeps running until each replacement is at parity. This document records w
 1. **The contracts are the boundary.** D-Bus interfaces in `protocols/dbus/*.xml` and the msg command schema stay the single
    source of truth. The Rust code generates or checks against them. Do not invent parallel APIs.
 2. **The model's authority never lives in the shell.** The assistant stays a separate process (`helix-assistant`) with its
-   own Agent1 identity and grants. The shell UI only shows its JSON (`--json`, `--execute`). A shell bug must not widen
-   what any agent may do. Do not give the shell binary Agent1 grants.
-3. **Approval surfaces are not spoofable by content.** The Agent1 approval dialog, the lock screen and the greeter must
+   own Agent Surface identity and grants. The shell UI only shows its JSON (`--json`, `--execute`). A shell bug must not widen
+   what any agent may do. Do not give the shell binary Agent Surface grants.
+3. **Approval surfaces are not spoofable by content.** The Agent Surface approval dialog, the lock screen and the greeter must
    render only trusted, escaped text, never HTML from a model, app or notification. All external text is set as text
    (`textContent`), never as markup. Strict CSP, no remote content, no `eval`, minimal Tauri capabilities, each Tauri
    command takes validated typed arguments.
@@ -36,15 +36,27 @@ shell keeps running until each replacement is at parity. This document records w
    with no UI in them (see `src/shell/assistant/assistant_session.*` and its test).
 6. **Layering ratchet.** Pure logic in plain crates with no Tauri dependency; the Tauri crate is a thin face.
 
-## Target layout (grow into it; do not create empty crates in advance)
+## Target layout
 
 ```
-rust/
-  Cargo.toml                       workspace
+Cargo.toml (workspace root)
+  core/
+  shell/
+  apps/
+  services/                       workspace (see docs/design/rust-workspace.md)
+  shared-ui/                       style.css + icons.js; each app build.rs copies into dist/
   helix-desktop-api/               zbus client for org.helix.Desktop (+ Inference), types from protocols/dbus/*.xml
-  helix-shell-core/                pure logic: panel state machines, assistant session, confirm queue (no Tauri, no GTK)
-  helix-shell-tauri/               the shell app: layer-shell surfaces (bar, panels), commands, frontend in dist/ or ui/
+  helix-shell-core/                pure logic (shell/, desktop/, agent/, apps/); no Tauri, no GTK
+  helix-shell-tauri/               session shell: layer-shell bar + panels + confirmer Overlay
+  helix-settings/                  Settings toplevel (Agent Surface manager)
+  helix-chat/                      Mobius hub (helix-mobius) over org.helix.Inference
+  helix-software/                  package store (Flatpak / Fedora / firmware)
+  helix-system-monitor/            Overview / Processes / Screen Time
+  helix-wallpaper/                 background wallpaper process (not in shell USS)
+  helix-idle/                      idle → lock / screen-off
+  helix-attacker/                  nested trust probe only
 ```
+
 
 ## Milestones (each ends with: tests, a nested-session screenshot, and the budget table below)
 
@@ -99,7 +111,7 @@ If a milestone blows a budget, stop and report; do not push on.
 - Commit small, one topic each, with the repo's message style. Update this document when a fact changes.
 
 
-## Experiment: one surface for the bar and all panels (`rust/experiments/single-surface`)
+## Experiment: one surface for the bar and all panels (`dev/experiments/single-surface`)
 
 The cost that breaks the budget is the second web process that appears when a panel opens (about 131 MB). A single full-output
 layer surface avoids it: the bar and the panel live in one page, one web process, with the input region trimmed so clicks
@@ -398,13 +410,13 @@ back with `pw-dump`).
 Not done: a brightness slider (nothing safe to drive it: the backlight is the native shell's, and writing it needs logind or elevated access),
 Do Not Disturb and keep-awake (they belong to the native shell today), airplane mode, media controls, and notifications in the panel.
 
-## The Tauri shell as the session shell (2026-10-07)
+## The Tauri shell as the session shell (2026-10-07; native retired 2026-10-09)
 
-`tools/switch-shell.sh tauri|native|status` chooses the session shell. It touches only the person's user units and niri key binds.
-The Tauri unit (`helix-shell-tauri.service`, generated from `tools/systemd/helix-shell-tauri.service.in`) conflicts with the native
-unit, so only one runs, and it runs with `HELIX_SHELL_CONFIRMER=1`: the shell is then the registered desktop and the Agent1 confirmer, and
-the Agents panel is live. Key binds call `~/.local/bin/helix-panel`, which drives whichever shell is active, so switching back
-(`tools/switch-shell.sh native`) needs no config edit. niri's config was backed up to `config.kdl.bak-helix-<time>` before the binds changed.
+`tools/switch-shell.sh install|status` installs the Tauri session shell. The C++ unit (`helix-shell-dev`) is disabled and masked;
+`native` is no longer a switch target (see `docs/design/session-shell.md`). The Tauri unit
+(`helix-shell-tauri.service`, from `tools/systemd/helix-shell-tauri.service.in`) runs with `HELIX_SHELL_CONFIRMER=1`: the shell is
+the registered desktop and the Agent Surface confirmer. Key binds call `~/.local/bin/helix-panel`. niri config is backed up to
+`config.kdl.bak-helix-<time>` before binds change.
 
 When the service restarts its roles are gone, so the shell follows the name's owner (a signal) and claims them again; the nested
 test restarts the service and checks an approval dialog still works afterwards (and fails without the re-registration).
@@ -434,7 +446,7 @@ The approval dialog is deliberately unlike everything else: a modal on a dimmed 
 fills while it is still arming. Glass: the shell tells niri which rectangles to blur through `ext-background-effect-v1` (`src/blur.rs`, its own event queue on GTK's
 connection; only ever sets the blur region and commits). The page reports the bar, the open panel and the toasts from their layout boxes, so the blur is in
 place from the first frame of an opening panel; `helix_shell_core::glass` turns them into rectangles with the rounded corners cut in. The layer namespace is
-`noctalia-panel`, which the person's generated niri rule (blur and liquid glass from their Theme settings) already matches, so no config is added.
+`helix-panel`, which the person's generated niri rule (blur and liquid glass from their Theme settings) already matches, so no config is added.
 With blur active the page lightens its glass tokens. `tools/nested/blur-look.sh` screenshots panels over a striped window with that rule enabled.
 Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tools/nested/look.sh` (a screenshot of every panel), `tools/nested/ui-suite.sh`
 (every nested UI test, each from an empty scratch directory). The layout report waits 300 ms so panel animations have settled before positions are read.
@@ -449,7 +461,7 @@ typed or copied is never written to the log.
 ## Wallpaper (2026-10-07)
 
 `helix-wallpaper` is a separate small process (so its memory is not the shell's): one layer surface per output on the background layer,
-namespace `noctalia-wallpaper` (the person's overview rule already matches it). It reads the choice from the settings file the shell always
+namespace `helix-wallpaper` (the person's overview rule already matches it). It reads the choice from the settings file the shell always
 used (`[wallpaper.default]`, `[wallpaper.monitors.<connector>]`, `color:#rrggbb` allowed), renders at the output's real fractional scale
 (`wp_fractional_scale_v1` + `wp_viewporter`), crops to cover without distortion, and keeps no decoded image: it decodes, crops and scales once per
 draw, frees the scratch memory and keeps only the buffer on screen (about 17 MB private on a 2561x1601 output, 0.00% idle CPU). An unreadable
@@ -499,7 +511,7 @@ could stop the real lock (the guard is gone; swaylock refuses a second lock itse
 was opened over (the target window is captured at open and verified before inserting) or run as commands in a terminal (multi-line text is refused
 into a terminal); `glass` overflowed on absurd coordinates. Not changed: `org.helix.Shell1` accepts calls from any process on the session bus. It is a
 UI interface (the same things a person's key binds do), not an authority boundary; confining agent processes away from the session bus except
-through Agent1 is a deployment requirement, recorded in `agent-and-inference.md`.
+through Agent Surface is a deployment requirement, recorded in `agent-and-inference.md`.
 
 ## Workspaces and the tray (2026-10-07)
 
@@ -535,6 +547,6 @@ streams), timers, and a "Today" panel with a calendar behind the date. `tools/ne
 
 ## Manager identity
 
-The Agent1 manager (the Settings app) is recognised by the canonical path of its executable (`/usr/local/bin/helix-settings` or `/usr/bin/helix-settings`), no longer
+The Agent Surface manager (the Settings app) is recognised by the canonical path of its executable (`/usr/local/bin/helix-settings` or `/usr/bin/helix-settings`), no longer
 by a file name any program could carry; the service reads one extra accepted path from `HELIX_MANAGER_EXE` in its own environment, which the integration test sets and
 a same-named impostor in another directory is refused.

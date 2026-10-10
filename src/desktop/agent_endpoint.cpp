@@ -41,7 +41,7 @@ struct Invalid : std::invalid_argument { using std::invalid_argument::invalid_ar
 std::filesystem::path locatePolicy() {
   namespace fs = std::filesystem;
   if (const char* env = std::getenv("HELIX_RISK_POLICY"); env && *env) return env;
-  const fs::path installed = fs::path(NOCTALIA_INSTALL_PREFIX) / NOCTALIA_INSTALL_DATADIR / "helix" / "msg-risk.toml";
+  const fs::path installed = fs::path(HELIX_INSTALL_PREFIX) / HELIX_INSTALL_DATADIR / "helix" / "msg-risk.toml";
   std::error_code ec;
   if (fs::exists(installed, ec)) return installed;
   // Development builds run from <repo>/<builddir>/.
@@ -77,13 +77,13 @@ std::string shellSocket() {
   const char* display = std::getenv("WAYLAND_DISPLAY");
   std::error_code ec;
   if (display && *display) {
-    const fs::path named = runtime / (std::string("noctalia-") + display + ".sock");
+    const fs::path named = runtime / (std::string("helix-") + display + ".sock");
     if (fs::exists(named, ec)) return named.string();
   }
   std::vector<std::pair<fs::file_time_type, fs::path>> found;
   for (const auto& entry : fs::directory_iterator(runtime, ec)) {
     const std::string name = entry.path().filename().string();
-    if (!name.starts_with("noctalia-wayland") || !name.ends_with(".sock")) continue;
+    if (!name.starts_with("helix-wayland") || !name.ends_with(".sock")) continue;
     found.emplace_back(entry.last_write_time(ec), entry.path());
   }
   std::sort(found.begin(), found.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
@@ -188,7 +188,7 @@ void AgentEndpoint::emit(const char* signal, GVariant* value, const std::string&
 void AgentEndpoint::emitActivity(const char* signal, GVariant* value) {
   const std::string owner = desktopOwner_ ? desktopOwner_() : std::string{};
   g_dbus_connection_emit_signal(bus_, owner.empty() ? nullptr : owner.c_str(), objectPath_.c_str(),
-                                agentActivityInterface, signal, value, nullptr);
+                                agentSurfaceActivityInterface, signal, value, nullptr);
 }
 
 void AgentEndpoint::requireDesktop(const std::string& sender) const {

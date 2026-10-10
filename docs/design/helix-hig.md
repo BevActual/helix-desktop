@@ -310,12 +310,12 @@ sums all sources; the Updates page hints when another source still has pending u
 catalogs and media off the UI thread; keep search, paging, and cancel available while a list is
 busy.
 
-## Sibling repos
+## Product packages
 
-Helix is three repos and one product: helix-shell (this repo), helix-niri (compositor; draws
-liquid glass, reports `niri msg helix-capabilities`), and helix-greeter (login; syncs palette,
-wallpaper, `corner_radius_scale`, `glass`, `refraction`, and font). A change to a shared
-contract lands in all three in the same piece of work.
+Helix is one product tree: this repo holds Helix Shell, **greeter/** (Tauri login;
+syncs palette, wallpaper, `corner_radius_scale`, `glass`, `refraction`, and font), and
+**compositor/** (helix-niri; draws liquid glass, reports `niri msg helix-capabilities`).
+A change to a shared contract lands in shell, greeter, and compositor in the same piece of work.
 
 ## Known gaps
 

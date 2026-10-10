@@ -2,7 +2,6 @@
 
 #include "config/config_types.h"
 #include "core/timer_manager.h"
-#include "render/animation/animation_manager.h"
 #include "theme/palette.h"
 #include "theme/color_roles.h"
 
@@ -17,7 +16,7 @@ class ConfigService;
 class HttpClient;
 class IpcService;
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   class ThemeService {
   public:
@@ -40,7 +39,7 @@ namespace noctalia::theme {
     void toggleLightDark();
     void cycleMode();
     [[nodiscard]] ThemeMode configuredMode() const noexcept;
-    // Noctalia's own resolved mode ([theme].shell_mode, or [theme].mode when it follows).
+    // Helix's own resolved mode ([theme].shell_mode, or [theme].mode when it follows).
     [[nodiscard]] bool isLightMode() const noexcept;
     [[nodiscard]] std::string_view resolvedShellMode() const noexcept;
     // The resolved [theme].mode, which drives apps.
@@ -60,7 +59,7 @@ namespace noctalia::theme {
 
     void registerIpc(IpcService& ipc);
 
-    // Writes the current wallpaper-generated palette to ~/.config/noctalia/palettes/
+    // Writes the current wallpaper-generated palette to ~/.config/helix/palettes/
     // and switches palette source to custom.
     [[nodiscard]] bool saveWallpaperPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut = nullptr);
     // Forks the active palette into a new custom file (wallpaper palettes keep a
@@ -106,11 +105,9 @@ namespace noctalia::theme {
     std::string m_pendingResolvedMode;
     std::uint64_t m_resolvedCallbackGeneration = 0;
 
-    AnimationManager m_animations;
     Timer m_transitionTimer;
     Palette m_fromPalette{};
     Palette m_targetPalette{};
-    AnimationManager::Id m_transitionAnimId = 0;
     bool m_transitionResolvedCallbackFlushed = false;
     bool m_isShellLightMode = false;
     bool m_isLightMode = false;
@@ -119,4 +116,4 @@ namespace noctalia::theme {
     Timer m_autoTimer;
   };
 
-} // namespace noctalia::theme
+} // namespace helix::theme

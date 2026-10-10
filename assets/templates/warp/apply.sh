@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme_file="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/noctalia.yaml"
+theme_file="${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/helix.yaml"
 config_file="${XDG_CONFIG_HOME:-$HOME/.config}/warp-terminal/settings.toml"
 custom_table="{ custom = { name = \"Helix\", path = \"${theme_file}\" } }"
 

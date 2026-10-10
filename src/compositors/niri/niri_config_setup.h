@@ -10,7 +10,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kSetupIncludeFileName = "noctalia-setup.kdl";
+  inline constexpr std::string_view kSetupIncludeFileName = "helix-setup.kdl";
 
   struct SetupItem {
     std::string_view id;

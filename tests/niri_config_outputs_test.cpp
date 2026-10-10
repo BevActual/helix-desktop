@@ -18,7 +18,7 @@ namespace {
   bool expect(bool cond, const char* message) { return cond ? true : fail(message); }
 
   std::filesystem::path makeTempDir() {
-    auto path = std::filesystem::temp_directory_path() / ("noctalia-niri-outputs-" + std::to_string(::getpid()));
+    auto path = std::filesystem::temp_directory_path() / ("helix-niri-outputs-" + std::to_string(::getpid()));
     std::filesystem::remove_all(path);
     std::filesystem::create_directories(path);
     return path;
@@ -75,9 +75,9 @@ int main() {
 
   const auto saved = compositors::niri::saveOutputsInto(config, outputs);
   ok = expect(saved.ok, "saves outputs into a temp niri config") && ok;
-  const auto includeText = compositors::niri::readFile(dir / "noctalia-outputs.kdl");
+  const auto includeText = compositors::niri::readFile(dir / "helix-outputs.kdl");
   ok = expect(includeText.find("HDMI-A-1") != std::string::npos, "owned include contains HDMI-A-1") && ok;
-  ok = expect(compositors::niri::hasInclude(compositors::niri::readFile(config), "noctalia-outputs.kdl"), "appends include")
+  ok = expect(compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-outputs.kdl"), "appends include")
       && ok;
   ok = expect(compositors::niri::savedLayoutMatches(outputs, config), "saved layout matches live snapshot") && ok;
 

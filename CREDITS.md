@@ -1,11 +1,9 @@
 # Credits
 
-Helix Shell builds on [Noctalia](https://github.com/noctalia-dev/noctalia) and the open-source projects below.
+Helix Shell builds on the open-source projects below.
 
 ## Design & Branding
 
-- **MrDowntempo** — Creator of the Noctalia Owl and moon logo
-- **[SaberJ2X](https://www.reddit.com/user/SaberJ64/)** — Creator of Talia, the Noctalia mascot
 - **[Tabler Icons](https://tabler.io/icons)** — Icon set used throughout the shell
 - **[Riyan Resdian on Noun Project](https://thenounproject.com/creator/yaicon/)** — Plug icon
 

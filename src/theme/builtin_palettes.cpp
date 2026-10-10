@@ -5,7 +5,7 @@
 #include <array>
 #include <string_view>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -667,7 +667,7 @@ namespace noctalia::theme {
                         },
                 },
                 {
-                    .name = "Noctalia",
+                    .name = "Helix",
                     .dark =
                         FixedPaletteMode{
                             .palette =
@@ -1125,4 +1125,4 @@ namespace noctalia::theme {
     return generated;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

@@ -764,7 +764,7 @@
       "calendar-google-connect-start-failed": "לא ניתן היה להתחיל את אימות Google. נא לבדוק את חיבור הרשת ולנסות שוב.",
       "calendar-google-connect-start-http": "לא ניתן להתחיל את אימות Google. מתווך ה-OAuth החזיר HTTP {status}.",
       "calendar-google-connect-timeout": "פג תוקף האישור של Google. התחל את החיבור מחדש כשתהיה מוכן להתחבר.",
-      "config-migration-body": "יש לעדכן את {path} בקובץ המקור. Helix מיישמת החלפה זו באופן זמני בלבד. יש להריץ את noctalia config validate כדי להציג רשימה של כל השינויים הנדרשים.",
+      "config-migration-body": "יש לעדכן את {path} בקובץ המקור. Helix מיישמת החלפה זו באופן זמני בלבד. יש להריץ את helix config validate כדי להציג רשימה של כל השינויים הנדרשים.",
       "config-migration-title": "נדרש עדכון תצורה",
       "dbus-disabled": "התראות DBus מושבתות",
       "desktop-widgets-editor": "עורך וידג'טים",
@@ -772,10 +772,10 @@
       "greeter-sync": "מקבל הפנים של Helix",
       "greeter-sync-pending": "ממתין לאישור מנהל כדי לכתוב ל-greeter.",
       "greeter-sync-pending-console": "ממתין לאישור מנהל. יש לאשר את בקשת ה־polkit ב־Helix, ב־TTY או במסוף, או להריץ את pkexec באופן ידני.",
-      "greeter-sync-pending-manual": "הקבצים מוכנים. הריצו במסוף: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\". או הגדירו את shell.greeter_sync.privilege_command (לדוגמה ghostty -e pkexec) וסנכרנו שוב.",
+      "greeter-sync-pending-manual": "הקבצים מוכנים. הריצו במסוף: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\". או הגדירו את shell.greeter_sync.privilege_command (לדוגמה ghostty -e pkexec) וסנכרנו שוב.",
       "greeter-sync-success": "המראה סונכרן. השינויים יחולו במסך הכניסה הבא.",
       "greeter-sync-timeout": "סנכרון ה-Greeter עדיין ממתין לאישור מנהל. בדוק ב-TTY או בקונסולה להנחיית polkit, הפעל את סוכן ה-polkit ב'הגדרות אבטחה', או הרץ את pkexec באופן ידני.",
-      "greeter-sync-timeout-manual": "סנכרון ה-Greeter עדיין דורש אישור מנהל. הרץ בטרמינל: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "סנכרון ה-Greeter עדיין דורש אישור מנהל. הרץ בטרמינל: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "קיצור דרך זה מקבל מקש בודד ללא מקשי צירוף.",
       "keybind-invalid-printable": "מקשים הניתנים להדפסה (אותיות, מספרים, סמלים) דורשים מקש שינוי כגון Ctrl או Alt.",
@@ -1139,7 +1139,7 @@
       "support-report": "שמירת דוח התמיכה נכשלה.",
       "sync-greeter": "לא ניתן היה לסנכרן את המראה עם Helix Greeter.",
       "sync-greeter-timeout": "סנכרון Greeter עדיין ממתין לאישור מנהל. יש לבדוק ב־TTY או בקונסולה אם מופיעה בקשת polkit, להפעיל את סוכן ה־polkit בהגדרות האבטחה, או להריץ את pkexec באופן ידני.",
-      "sync-greeter-timeout-manual": "סנכרון ה-Greeter עדיין דורש אישור מנהל. יש להריץ בטרמינל: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "סנכרון ה-Greeter עדיין דורש אישור מנהל. יש להריץ בטרמינל: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
       "widget": {
         "rename": "לא ניתן היה לשנות את שם הווידג'ט."
       },
@@ -1538,8 +1538,8 @@
         },
         "kind-label": "סוג",
         "location-label": "מיקום",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "מזהה מקור",
         "name-placeholder": "הפלאגינים שלי",
         "precedence-hint": "מקורות נמוכים יותר דורסים את הגבוהים יותר כאשר הם מציעים את אותו התוסף.",
@@ -1560,7 +1560,7 @@
         "incompatible-hint": "נדרש API תוספים {required}; ‏Helix תומך ב־{oldest}–{current}.",
         "loading": "טוען קטלוג…",
         "no-readme": "אין תיאור זמין.",
-        "open-page": "פתח את דף התוסף ב-noctalia.dev",
+        "open-page": "פתח את דף התוסף ב-helix.dev",
         "open-source": "פתח את מאגר המקור של התוסף",
         "results-count": "{count} תוספים",
         "search-placeholder": "חיפוש תוספים…",
@@ -1620,7 +1620,7 @@
           "label": "עיגול פינות"
         },
         "custom-palette": {
-          "description": "בחר פלטה מ-~/.config/noctalia/palettes/",
+          "description": "בחר פלטה מ-~/.config/helix/palettes/",
           "label": "פלטת צבעים מותאמת אישית",
           "search-placeholder": "חיפוש פלטות מותאמות אישית…"
         },
@@ -2106,7 +2106,7 @@
             "label": "בעת שינוי מצב העיצוב"
           },
           "wallpaper-changed": {
-            "description": "פקודה להרצה בעת שינוי הרקע; מספקת את המשתנים NOCTALIA_WALLPAPER_PATH ו־NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "פקודה להרצה בעת שינוי הרקע; מספקת את המשתנים HELIX_WALLPAPER_PATH ו־HELIX_WALLPAPER_CONNECTOR",
             "label": "בעת שינוי טפט"
           },
           "wifi-disabled": {
@@ -2615,7 +2615,7 @@
           "placeholder": "עיר, מדינה"
         },
         "location-auto-locate": {
-          "description": "זיהוי המיקום שלך באופן אוטומטי מכתובת ה-IP שלך דרך noctalia.dev",
+          "description": "זיהוי המיקום שלך באופן אוטומטי מכתובת ה-IP שלך דרך helix.dev",
           "label": "איתור אוטומטי (IP)"
         },
         "longitude": {
@@ -2838,7 +2838,7 @@
           "label": "פורמט תאריך"
         },
         "external-ip": {
-          "description": "בצע רזולוציה לכתובת ה-WAN הציבורית של החיבור (דרך api.noctalia.dev) והצג אותה בלשונית הרשת של ה-Control Center",
+          "description": "בצע רזולוציה לכתובת ה-WAN הציבורית של החיבור (דרך a public IP lookup service) והצג אותה בלשונית הרשת של ה-Control Center",
           "label": "הצג כתובת WAN IP"
         },
         "greeter-sync-auto": {
@@ -3940,7 +3940,7 @@
       "export-config": "ייצוא הגדרה…",
       "export-config-saved": "ייצוא ה-Config נשמר.",
       "filter-overridden": "עוקף",
-      "legacy-config-warning": "הגדרה מיושנת: {issue}. ערוך את רשומת המקור הזו; Helix מחילה את ההחלפה באופן זמני בלבד. הרץ noctalia config validate כדי להציג את כל השינויים הנדרשים.",
+      "legacy-config-warning": "הגדרה מיושנת: {issue}. ערוך את רשומת המקור הזו; Helix מחילה את ההחלפה באופן זמני בלבד. הרץ helix config validate כדי להציג את כל השינויים הנדרשים.",
       "native-title": "הגדרות Helix",
       "no-results": "לא נמצאו הגדרות",
       "no-results-hint": "נסה שם הגדרה או מפתח תצורה אחר.",

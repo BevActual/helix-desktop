@@ -13,19 +13,19 @@ fail() {
 
 meson install --no-rebuild --destdir "$stage" -C "$build_dir" --quiet
 
-binary=$(find "$stage" -type f -path '*/bin/noctalia' -print -quit)
+binary=$(find "$stage" -type f -path '*/bin/helix' -print -quit)
 [ -n "$binary" ] || fail 'installed shell binary is missing'
-prefix=${binary%/bin/noctalia}
-assets="$prefix/share/noctalia/assets"
+prefix=${binary%/bin/helix}
+assets="$prefix/share/helix/assets"
 
-for asset in emoji.json fonts/noctalia-tabler.ttf templates/builtin.toml translations/en.json; do
+for asset in emoji.json fonts/helix-tabler.ttf templates/builtin.toml translations/en.json; do
   [ -f "$assets/$asset" ] || fail "installed asset is missing: $asset"
 done
 
-[ -f "$prefix/share/applications/dev.noctalia.Noctalia.desktop" ] || fail 'desktop entry is missing'
-[ -f "$prefix/share/icons/hicolor/scalable/apps/noctalia.svg" ] || fail 'application icon is missing'
-[ -f "$prefix/share/polkit-1/actions/dev.noctalia.Noctalia.upgrade.policy" ] || fail 'upgrade policy is missing'
-helper=$(find "$stage" -type f -name noctalia-system-upgrade -print -quit)
+[ -f "$prefix/share/applications/org.helix.Helix.desktop" ] || fail 'desktop entry is missing'
+[ -f "$prefix/share/icons/hicolor/scalable/apps/helix.svg" ] || fail 'application icon is missing'
+[ -f "$prefix/share/polkit-1/actions/org.helix.Shell.upgrade.policy" ] || fail 'upgrade policy is missing'
+helper=$(find "$stage" -type f -name helix-system-upgrade -print -quit)
 [ -n "$helper" ] || fail 'system-upgrade helper is missing'
 "$helper" --help > /dev/null 2>&1 || fail 'installed system-upgrade helper could not start'
 
@@ -49,7 +49,7 @@ fi
 
 version_output=$("$binary" --version) || fail 'installed shell --version failed'
 case "$version_output" in
-  noctalia\ *) ;;
+  helix\ *) ;;
   *) fail "unexpected version output: $version_output" ;;
 esac
 

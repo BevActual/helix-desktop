@@ -5,7 +5,7 @@
 #include <span>
 #include <string_view>
 
-namespace noctalia::bar {
+namespace helix::bar {
 
   // Pointer gestures a bar widget can bind an action to. The bar surface never holds keyboard
   // focus (layer surfaces are created with LayerShellKeyboard::None), so modifier chords such as
@@ -71,4 +71,4 @@ namespace noctalia::bar {
   // Mouse buttons that trigger `gesture`, for building an InputArea button mask. Back/Forward
   // yield two codes each; scroll gestures yield none, being delivered on the axis path instead.
   [[nodiscard]] std::span<const std::uint32_t> buttonsForGesture(Gesture gesture) noexcept;
-} // namespace noctalia::bar
+} // namespace helix::bar

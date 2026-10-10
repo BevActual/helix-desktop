@@ -16,14 +16,14 @@
 #include <utility>
 #include <vector>
 
-namespace noctalia::packages {
+namespace helix::packages {
 
   namespace {
 
     constexpr std::array kProtectedNames = {
         std::string_view{"helix-shell"},
-        std::string_view{"noctalia"},
-        std::string_view{"noctalia-greeter"},
+        std::string_view{"helix"},
+        std::string_view{"helix-greeter"},
         std::string_view{"helix-greeter"},
         std::string_view{"helix-niri"},
         std::string_view{"niri"},
@@ -2237,5 +2237,5 @@ namespace noctalia::packages {
     return details;
   }
 
-} // namespace noctalia::packages
+} // namespace helix::packages
 

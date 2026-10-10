@@ -8,6 +8,8 @@
  <!-- Opens the panel, or closes it if it is the one that is open. What a key binding wants. -->
  <method name="TogglePanel"><arg name="id" type="s" direction="in"/></method>
  <method name="ClosePanel"/>
+ <!-- Opens the assistant panel and submits a request (same path as typing there or Caps Lock act). Peer apps such as Mobius use this to hand off desktop actions; helix-assistant still holds Agent Surface. Empty or overlong requests are refused. -->
+ <method name="AssistantSubmit"><arg name="request" type="s" direction="in"/></method>
  <!-- What key bindings for the matching quick settings want: flip the setting from its current state. -->
  <method name="ToggleDoNotDisturb"/>
  <method name="ToggleNightLight"/>

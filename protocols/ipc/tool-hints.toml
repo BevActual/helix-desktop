@@ -1,5 +1,5 @@
 # One-line descriptions of desktop tools for the model's tool list, in the words a person uses. They replace the
-# command's own summary (written for `noctalia msg --help`) wherever a hint exists. They exist to tell near-neighbours
+# command's own summary (written for `helix-shell msg --help`) wherever a hint exists. They exist to tell near-neighbours
 # apart: sound from screen brightness, the desktop's state from the AI assistant's state, a panel from a list of past items.
 # Hints are descriptions, not policy: what a tool may do is decided by msg-risk.toml. tests/msg_risk_policy_test.py checks
 # that every key is a real command.
@@ -91,12 +91,8 @@ bluetooth-status = "Report whether Bluetooth is on and what is connected"
 wifi-status = "Report the Wi-Fi connection"
 tailscale-status = "Report the Tailscale VPN connection"
 firewall-status = "Report whether the firewall is running"
-phone-status = "Report whether the phone is connected (KDE Connect)"
 privacy-status = "Report whether the camera, microphone or screen is being used or recorded, and the location setting"
-cast-status = "Report whether the screen is being shared or cast"
-localsend-status = "Report nearby file-sharing (LocalSend) devices"
 printers-status = "Report the printers and the default printer"
-syncthing-status = "Report the Syncthing file synchronisation"
 
 # Capture
 screenshot-fullscreen = "Take a screenshot of the whole screen or a monitor"

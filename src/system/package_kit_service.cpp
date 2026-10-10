@@ -16,7 +16,7 @@
 #include <unordered_set>
 #include <utility>
 
-namespace noctalia::packages {
+namespace helix::packages {
 
   namespace {
 
@@ -1054,4 +1054,4 @@ namespace noctalia::packages {
     );
   }
 
-} // namespace noctalia::packages
+} // namespace helix::packages

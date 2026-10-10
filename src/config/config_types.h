@@ -256,7 +256,7 @@ struct ShellSessionConfig {
   // Optional overrides for built-in session power commands. Empty = auto-detect at runtime.
   struct ShellSessionPowerConfig {
     // Shell strings run with `/bin/sh -lc` (shell=True).
-    // When unset, Noctalia tries a prioritized backend list (systemd/logind/privileged helpers).
+    // When unset, Helix tries a prioritized backend list (systemd/logind/privileged helpers).
     std::optional<std::string> suspend;
     std::optional<std::string> reboot;
     std::optional<std::string> shutdown;
@@ -1207,7 +1207,7 @@ struct ShellConfig {
   /// stays pasteable. Independent of history retention: this keeps the live clipboard, not the stored history.
   bool clipboardKeepFromClosedApps = true;
   /// Maximum unpinned clipboard history entries retained (pinned entries are exempt).
-  int clipboardHistoryMaxEntries = static_cast<int>(noctalia::config::kClipboardHistoryDefaultEntries);
+  int clipboardHistoryMaxEntries = static_cast<int>(helix::config::kClipboardHistoryDefaultEntries);
   /// When true, clearing clipboard history or deleting unpinned entries from the Control Center
   /// tab asks for confirmation first.
   bool clipboardConfirmClearHistory = true;
@@ -1253,32 +1253,6 @@ struct TailscaleConfig {
   std::string adminUrl;
 
   bool operator==(const TailscaleConfig&) const = default;
-};
-
-struct PhoneConfig {
-  // Keep the AirPlay receiver (UxPlay) and the Helix Phone Bluetooth pointer up whenever an
-  // iPhone is paired through KDE Connect, so mirroring is one tap on the phone.
-  bool mirrorAlwaysOn = true;
-  // Mirror iPhone notifications to the desktop over Apple Notification Center Service on the
-  // Helix Phone Bluetooth link. The phone has to allow "Share System Notifications" for it.
-  bool notifications = true;
-  // Play the Android phone's audio on this computer while it casts (scrcpy audio forwarding,
-  // Android 11+). The phone itself goes quiet for the session, like a cast should.
-  bool castAudio = true;
-
-  bool operator==(const PhoneConfig&) const = default;
-};
-
-struct LocalSendConfig {
-  bool enabled = true;
-  std::string alias;
-  std::string pin;
-  std::string downloadDir;
-  bool autoAccept = false;
-  bool notifyOnReceive = true;
-  std::int32_t port = 53317;
-
-  bool operator==(const LocalSendConfig&) const = default;
 };
 
 struct StorageConfig {
@@ -1339,55 +1313,55 @@ struct SystemConfig {
     float networkPollSeconds = 3.0F;
     float diskPollSeconds = 10.0F;
     double cpuUsageActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuUsage).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).activityDefault;
     double cpuUsageCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuUsage).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).criticalDefault;
     double cpuTempActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuTemp).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).activityDefault;
     double cpuTempCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuTemp).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).criticalDefault;
     double cpuFreqActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuFreq).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).activityDefault;
     double cpuFreqCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuFreq).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).criticalDefault;
     double gpuTempActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuTemp).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).activityDefault;
     double gpuTempCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuTemp).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).criticalDefault;
     double gpuUsageActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuUsage).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).activityDefault;
     double gpuUsageCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuUsage).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).criticalDefault;
     double gpuVramActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuVram).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).activityDefault;
     double gpuVramCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuVram).criticalDefault;
-    double ramPctActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::RamPct).activityDefault;
-    double ramPctCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::RamPct).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).criticalDefault;
+    double ramPctActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).activityDefault;
+    double ramPctCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).criticalDefault;
     double swapPctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::SwapPct).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).activityDefault;
     double swapPctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::SwapPct).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).criticalDefault;
     double diskUsedPctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsedPct).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).activityDefault;
     double diskUsedPctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsedPct).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).criticalDefault;
     double diskUsedActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsed).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).activityDefault;
     double diskUsedCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsed).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).criticalDefault;
     double diskFreePctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFreePct).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).activityDefault;
     double diskFreePctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFreePct).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).criticalDefault;
     double diskFreeActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFree).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).activityDefault;
     double diskFreeCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFree).criticalDefault;
-    double netRxActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetRx).activityDefault;
-    double netRxCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetRx).criticalDefault;
-    double netTxActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetTx).activityDefault;
-    double netTxCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetTx).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).criticalDefault;
+    double netRxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).activityDefault;
+    double netRxCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).criticalDefault;
+    double netTxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetTx).activityDefault;
+    double netTxCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetTx).criticalDefault;
 
     bool operator==(const MonitorConfig&) const = default;
   };
@@ -1586,7 +1560,7 @@ constexpr EnumOption<ThemeMode> kThemeModes[] = {
     {ThemeMode::Auto, "auto", "common.states.auto"},
 };
 
-// Noctalia's own light/dark mode. `follow` tracks [theme].mode, which always drives apps
+// Helix's own light/dark mode. `follow` tracks [theme].mode, which always drives apps
 // (templates and the GTK color scheme); the other values pin the shell independently.
 enum class ShellThemeMode : std::uint8_t {
   Follow = 0,
@@ -1728,9 +1702,9 @@ struct ThemeConfig {
   };
 
   // Whether niri's own window decorations (focus ring / border) follow this palette. Applied by
-  // writing niri's managed `noctalia-layout.kdl` include; see compositors::niri::saveNiriLayoutTheme.
-  // `blur` writes `noctalia-blur.kdl` and requires niri 26.04 or newer.
-  // `overview` writes `noctalia-overview.kdl` for wallpaper/overview presets.
+  // writing niri's managed `helix-layout.kdl` include; see compositors::niri::saveNiriLayoutTheme.
+  // `blur` writes `helix-blur.kdl` and requires niri 26.04 or newer.
+  // `overview` writes `helix-overview.kdl` for wallpaper/overview presets.
   // `gaps` is written into the same layout include only when set, so an existing niri
   // `gaps` value is left alone until Settings → Niri changes it.
   struct NiriLayoutThemeConfig {
@@ -1750,7 +1724,7 @@ struct ThemeConfig {
   };
 
   PaletteSource source = PaletteSource::Builtin;
-  std::string builtinPalette = "Noctalia";
+  std::string builtinPalette = "Helix";
   std::string communityPalette = "Oxocarbon";
   std::string customPalette;
   std::string wallpaperScheme = "m3-content";
@@ -1763,7 +1737,7 @@ struct ThemeConfig {
   bool operator==(const ThemeConfig&) const = default;
 };
 
-// The theme mode Noctalia's own surfaces run in, still expressed as a ThemeMode so `auto`
+// The theme mode Helix's own surfaces run in, still expressed as a ThemeMode so `auto`
 // keeps resolving against the day/night schedule.
 [[nodiscard]] constexpr ThemeMode shellThemeMode(const ThemeConfig& theme) noexcept {
   switch (theme.shellMode) {
@@ -1886,8 +1860,6 @@ struct Config {
   NotificationConfig notification;
   WeatherConfig weather;
   TailscaleConfig tailscale;
-  LocalSendConfig localsend;
-  PhoneConfig phone;
   CalendarConfig calendar;
   SystemConfig system;
   AudioConfig audio;
@@ -1919,7 +1891,6 @@ struct ConfigChangeSet {
   bool notification = true;
   bool weather = true;
   bool tailscale = true;
-  bool localsend = true;
   bool calendar = true;
   bool system = true;
   bool audio = true;
@@ -1950,7 +1921,6 @@ struct ConfigChangeSet {
         || notification
         || weather
         || tailscale
-        || localsend
         || calendar
         || system
         || audio

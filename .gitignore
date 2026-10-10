@@ -32,3 +32,22 @@ result-*
 /third_party/llama.cpp-*.tar.gz
 /third_party/.llama-build/
 /third_party/llama-install/
+
+# Shared UI is copied into each app's dist/ at build time
+apps/*/dist/style.css
+apps/*/dist/icons.js
+shell/*/dist/style.css
+shell/*/dist/icons.js
+greeter/*/dist/style.css
+greeter/*/dist/icons.js
+
+!core/shared-ui/
+!core/shared-ui/**
+
+# Cargo workspace target (repo root)
+/target/
+
+# compositor (nested Cargo workspace)
+/compositor/target/
+/compositor/result
+/compositor/result-*

@@ -7,7 +7,7 @@
 #include <format>
 #include <utility>
 
-namespace noctalia::bar {
+namespace helix::bar {
 
   namespace {
 
@@ -150,4 +150,4 @@ namespace noctalia::bar {
     return mask;
   }
 
-} // namespace noctalia::bar
+} // namespace helix::bar

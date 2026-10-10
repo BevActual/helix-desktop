@@ -1,16 +1,16 @@
 # Trusted surface: the compositor protects the approval dialog
 
-Status: design, 2026-10-08. For review before any change to the compositor fork (`helix-niri`). Nothing here is built.
+Status: design, 2026-10-08. For review before any change to the compositor fork (`compositor/`). Nothing here is built.
 
 ## The problem, with evidence
 
-Agent1 makes an agent ask a person before a risky action. The person's answer is a click on **Allow** in a dialog the shell draws
-(`rust/helix-shell-tauri/src-tauri/src/confirmer.rs`: an Overlay layer surface, namespace `helix-tauri-confirmer`, exclusive keyboard).
+Agent Surface makes an agent ask a person before a risky action. The person's answer is a click on **Allow** in a dialog the shell draws
+(`shell/helix-shell-tauri/src-tauri/src/confirmer.rs`: an Overlay layer surface, namespace `helix-tauri-confirmer`, exclusive keyboard).
 The design says "a client can never confirm its own request" because the confirmer is a different D-Bus connection. That holds on D-Bus. It
 does not hold on the screen:
 
 1. **Synthetic input.** The compositor offers `zwlr_virtual_pointer_v1`, `zwp_virtual_keyboard_v1` and `zwp_input_method_v2` to every client that is
-   not in a sandbox (`client_is_unrestricted` in `helix-niri/src/niri.rs`). An agent that runs as the person can ask for an approval and then click
+   not in a sandbox (`client_is_unrestricted` in `compositor/src/niri.rs`). An agent that runs as the person can ask for an approval and then click
    Allow itself. **This is already demonstrated by our own test**: `tools/nested/confirmer-test.sh` approves a dialog with a virtual-pointer click
    (`click_id confirm-allow`). The 700 ms arming delay and "Enter never approves" do not help against a pointer click that waits 700 ms.
 2. **Capture.** `wlr-screencopy`, `ext-image-copy-capture` and the PipeWire screencast can read the dialog (the arguments an action will run with,
@@ -73,7 +73,7 @@ The shell's behaviour:
 
 ### 4. What stays the same
 
-Agent1, the broker, tiers, the arming delay, "Enter never approves", the queue, the audit. The compositor adds the guarantee that the surface those
+Agent Surface, the broker, tiers, the arming delay, "Enter never approves", the queue, the audit. The compositor adds the guarantee that the surface those
 rules protect cannot be clicked, read or covered by the agent.
 
 ## Tests (written before the code, all nested, all must fail without the change)
@@ -100,7 +100,7 @@ receives real clicks), so the existing pointer tool that uses virtual pointers w
   (role), `src/handlers/mod.rs` (origin marks), `niri-config` (the block), `niri-ipc` and `src/ipc/*` (capabilities + the list). No change to layout
   code. Listed in `HELIX.md` as the fork grows.
 * **Lock-out**: a trusted surface that never closes would hold the focus. It is only ever the shell's approval dialog, which closes on a decision, on
-  Escape, on timeout (60 s in Agent1) and when the confirmer disconnects. The person's own key bindings (power, switch to a terminal) stay.
+  Escape, on timeout (60 s in Agent Surface) and when the confirmer disconnects. The person's own key bindings (power, switch to a terminal) stay.
 * **Tests that use virtual pointers** (all our nested UI tests) are unaffected: the role exists only in the confirmer test, which gets a device-input
   path; every other test never opens a trusted surface.
 * **Not a sandbox**: see Non-goals.
@@ -110,7 +110,7 @@ receives real clicks), so the existing pointer tool that uses virtual pointers w
 Decision (the person): when the role is missing, **confirm-tier actions are refused** (default; `HELIX_ALLOW_UNPROTECTED_APPROVALS=1` or
 `allow_unprotected` in `~/.config/helix/approvals.json` allows them, and the dialog says so).
 
-**Built.** In the fork (`helix-niri`, branch `trusted-surface`, see its `HELIX.md`): the `trusted-surface` config block, role detection by
+**Built.** In the fork (`compositor/`, see `compositor/HELIX.md`): the `trusted-surface` config block, role detection by
 namespace and `/proc/<pid>/exe`, always-on-top rendering and hit testing, keyboard priority, forced capture block-out, dropping of virtual-pointer and
 touch input while mapped, `niri msg layers` ("Trusted: yes") and `helix-capabilities` (`trusted-surfaces`). In the shell: the dialog asks the
 compositor whether it holds the role (`niri_query.rs`, `Confirmer::set_protection`), shows nothing until it knows, arms Allow 700 ms after, refuses
@@ -131,7 +131,7 @@ a Settings switch (Privacy & agents > Approvals) that writes `~/.config/helix/ap
 The real-device path was checked on the real session: a click with the real mouse approved a protected dialog.
 
 **Not built.** An audit mark for approvals made without protection (the confirm call to the service has no field for it; adding one is a change to the
-Agent1 contract and the service, which the person installs with sudo).
+Agent Surface contract and the service, which the person installs with sudo).
 
 **Deploying.** The compositor needs the fork build installed and this block in the person's niri config, then a new session; until then the shell
 (which is the confirmer) refuses confirm-tier actions. Nothing here touches the running session.

@@ -12,6 +12,7 @@
 #include "theme/community_templates.h"
 #include "theme/custom_palettes.h"
 #include "i18n/i18n_service.h"
+#include "inference/routing.h"
 #include "theme/color_roles.h"
 #include <sstream>
 #include <array>
@@ -77,7 +78,7 @@ constexpr Setting settings[] = {
   {"shell.clipboard_enabled", "privacy-security", "Keep clipboard history", "Clipboard", "boolean", true},
   {"shell.clipboard_keep_from_closed_apps", "privacy-security", "Keep copied items after apps close", "Clipboard", "boolean", true},
   {"shell.clipboard_history_max_entries", "privacy-security", "History size", "Clipboard", "integer", true,
-    double(noctalia::config::kClipboardHistoryMinEntries), double(noctalia::config::kClipboardHistoryMaxEntries)},
+    double(helix::config::kClipboardHistoryMinEntries), double(helix::config::kClipboardHistoryMaxEntries)},
   {"shell.clipboard_confirm_clear_history", "privacy-security", "Confirm history deletion", "Clipboard", "boolean", true},
   {"shell.clipboard_auto_paste", "privacy-security", "Paste selected items automatically", "Clipboard", "clipboard-paste", true},
   {"shell.clipboard_image_action_command", "privacy-security", "Image editor command", "Clipboard", "string", true},
@@ -91,6 +92,11 @@ constexpr Setting settings[] = {
   {"lockscreen.blur_intensity", "privacy-security", "Background blur", "Lock Screen", "number", true, 0, 1},
   {"lockscreen.tint_intensity", "privacy-security", "Background tint", "Lock Screen", "number", true, 0, 1},
   {"lockscreen.monitors", "privacy-security", "Lock-screen displays", "Lock Screen", "display-list", true},
+  // Mirror keys for search; values live in ~/.local/state/helix/inference-routing.toml (Mobius).
+  {"ai.act_model", "privacy-security", "On-device act model (GGUF id)", "Models & routing", "string", false},
+  {"ai.chat_model", "privacy-security", "On-device chat model (GGUF id)", "Models & routing", "string", false},
+  {"ai.lan_endpoint", "privacy-security", "LAN OpenAI-compatible endpoint", "Models & routing", "string", false},
+  {"ai.allow_remote_on_battery_saver", "privacy-security", "Allow LAN/cloud on battery saver", "Models & routing", "boolean", false},
   {"battery.warning_threshold", "power", "Low battery warning (%)", "Power", "integer", true, 0, 100},
   {"lockscreen.lock_before_suspend", "power", "Lock before system suspend", "Session", "boolean", true},
   {"lockscreen.lid_close_keep_external_displays", "power", "Keep external displays active when closing the lid", "Session", "boolean", true},
@@ -375,25 +381,17 @@ constexpr Setting settings[] = {
   {"tailscale.refresh_interval_seconds", "network", "Tailscale refresh (seconds)", "Tailscale", "integer", true, 3, 120},
   {"tailscale.notify_on_peer_change", "network", "Notify when Tailscale peers change", "Tailscale", "boolean", true},
   {"tailscale.admin_url", "network", "Tailscale admin URL", "Tailscale", "string", true},
-  {"localsend.enabled", "system", "Enable LocalSend", "LocalSend", "boolean", true},
-  {"localsend.alias", "system", "Device name", "LocalSend", "string", true},
-  {"localsend.pin", "system", "PIN", "LocalSend", "string", true},
-  {"localsend.download_dir", "system", "Download folder", "LocalSend", "directory", true},
-  {"localsend.auto_accept", "system", "Accept transfers automatically", "LocalSend", "boolean", true},
-  {"localsend.notify_on_receive", "system", "Notify on received files", "LocalSend", "boolean", true},
-  {"localsend.port", "system", "Port", "LocalSend", "integer", true, 1024, 65535},
   {"shell.session.power.suspend", "power", "Suspend command", "Session Commands", "string", true},
   {"shell.session.power.reboot", "power", "Restart command", "Session Commands", "string", true},
   {"shell.session.power.shutdown", "power", "Shut down command", "Session Commands", "string", true},
 };
 constexpr std::pair<std::string_view, std::string_view> controlCenterTabs[] = {
-  {"network", "Network"}, {"bluetooth", "Bluetooth"}, {"tailscale", "Tailscale"}, {"phone", "Phone"},
+  {"network", "Network"}, {"bluetooth", "Bluetooth"}, {"tailscale", "Tailscale"},
   {"notifications", "Notifications"}, {"audio", "Sound"}, {"screen-time", "Screen Time"}, {"theme", "Appearance"},
   {"control-center", "Control Center"}, {"launcher", "Launcher"}, {"privacy-security", "Privacy & Security"},
   {"system", "System Monitor"}, {"packages", "Software"}, {"clock", "Clock"}, {"desktop", "Desktop & Dock"},
   {"monitor", "Displays"}, {"wallpaper", "Wallpaper"}, {"power", "Power"}, {"keybinds", "Keyboard"},
-  {"shell", "Shell"}, {"printers", "Printers"}, {"camera", "Camera"}, {"localsend", "LocalSend"},
-  {"syncthing", "Sync"}, {"cast", "Cast"}, {"calendar", "Calendar"}, {"weather", "Weather"},
+  {"shell", "Shell"}, {"printers", "Printers"}, {"camera", "Camera"}, {"calendar", "Calendar"}, {"weather", "Weather"},
   {"media", "Media"}, {"capture", "Capture"}, {"clipboard", "Clipboard"}, {"ai", "AI Usage"},
   {"templates", "Templates"}, {"hooks", "Automation"}, {"niri", "Niri"},
 };
@@ -401,6 +399,19 @@ const Setting* find(std::string_view id) {
   for (const auto& setting : settings) if (setting.id == id) return &setting;
   return nullptr;
 }
+
+Json inferenceRoutingMirrorValue(std::string_view id, const inference::RoutingTable& routing) {
+  if (id == "ai.act_model") return routing.route("act").model;
+  if (id == "ai.chat_model") return routing.route("chat").model;
+  if (id == "ai.allow_remote_on_battery_saver") return routing.allowRemoteOnBatterySaver;
+  if (id == "ai.lan_endpoint") {
+    for (const auto& backend : routing.backends)
+      if (backend.kind == "openai" && !backend.baseUrl.empty()) return backend.baseUrl;
+    return "";
+  }
+  return Json{};
+}
+
 }
 std::vector<std::string> settingPath(std::string_view id) {
   if (id == "control_center.visible_tabs") return {"control_center", "hidden_tabs"};
@@ -442,6 +453,7 @@ ConfigOverrideValue settingValue(const Json& value, std::string_view id) {
 }
 Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailable) {
   auto table = config_export::serialize(config.config());
+  const inference::RoutingTable inferenceRouting = inference::loadRouting();
   Json result = Json::array();
   for (const auto& setting : settings) {
     if (setting.desktop && !helixDesktop) continue;
@@ -481,11 +493,19 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
       result.push_back({{"id", setting.id}, {"page", setting.page}, {"title", setting.title}, {"group", setting.group}, {"type", setting.type},
         {"value", values}, {"options", Json::array()}, {"minimum", 0}, {"maximum", 256}, {"overridden", config.hasOverride(path)}}); continue;
     }
+    if (std::string_view(setting.id).starts_with("ai.")) {
+      Json value = inferenceRoutingMirrorValue(setting.id, inferenceRouting);
+      if (value.is_null()) continue;
+      result.push_back({{"id", setting.id}, {"page", setting.page}, {"title", setting.title}, {"group", setting.group},
+        {"type", setting.type}, {"value", value}, {"options", Json::array()}, {"minimum", setting.minimum},
+        {"maximum", setting.maximum}, {"overridden", false}});
+      continue;
+    }
     const toml::node* node = &table;
     for (const auto& part : path) { auto* parent = node ? node->as_table() : nullptr; node = parent ? parent->get(part) : nullptr; }
     Json value;
     if (!node && std::string_view(setting.id) == "shell.panel.glass") value = static_cast<double>(resolvedPanelGlass(config.config().shell.panel));
-    else if (!node && (std::string_view(setting.id) == "shell.lang" || std::string_view(setting.id) == "shell.app_icon_color" || std::string_view(setting.id) == "shell.panel_anchor_bar" || std::string_view(setting.id) == "dock.launcher_custom_image" || std::string_view(setting.id) == "lockscreen.wallpaper" || std::string_view(setting.id) == "shell.screenshot.directory" || std::string_view(setting.id) == "shell.screenshot.filename_pattern" || std::string_view(setting.id) == "shell.screenshot.pipe_command" || std::string_view(setting.id) == "shell.screen_record.directory" || std::string_view(setting.id) == "shell.screen_record.filename_pattern" || std::string_view(setting.id) == "wallpaper.daily.bing_market" || std::string_view(setting.id) == "wallpaper.video.mpv_options" || std::string_view(setting.id) == "wallpaper.fill_color" || std::string_view(setting.id) == "location.address" || std::string_view(setting.id) == "location.sunrise" || std::string_view(setting.id) == "location.sunset" || std::string_view(setting.id) == "shell.privacy.mic_filter_regex" || std::string_view(setting.id) == "shell.privacy.cam_filter_regex" || std::string_view(setting.id) == "shell.privacy.screen_filter_regex" || std::string_view(setting.id) == "shell.avatar_path" || std::string_view(setting.id) == "storage.key_file" || std::string_view(setting.id) == "shell.greeter_sync.privilege_command" || std::string_view(setting.id) == "shell.launch_apps_custom_command" || std::string_view(setting.id) == "control_center.network.custom_dns" || std::string_view(setting.id) == "control_center.network.nextdns_id" || std::string_view(setting.id) == "tailscale.admin_url" || std::string_view(setting.id) == "localsend.alias" || std::string_view(setting.id) == "localsend.pin" || std::string_view(setting.id) == "shell.session.power.suspend" || std::string_view(setting.id) == "shell.session.power.reboot" || std::string_view(setting.id) == "shell.session.power.shutdown" || std::string_view(setting.id).starts_with("hooks."))) value = "";
+    else if (!node && (std::string_view(setting.id) == "shell.lang" || std::string_view(setting.id) == "shell.app_icon_color" || std::string_view(setting.id) == "shell.panel_anchor_bar" || std::string_view(setting.id) == "dock.launcher_custom_image" || std::string_view(setting.id) == "lockscreen.wallpaper" || std::string_view(setting.id) == "shell.screenshot.directory" || std::string_view(setting.id) == "shell.screenshot.filename_pattern" || std::string_view(setting.id) == "shell.screenshot.pipe_command" || std::string_view(setting.id) == "shell.screen_record.directory" || std::string_view(setting.id) == "shell.screen_record.filename_pattern" || std::string_view(setting.id) == "wallpaper.daily.bing_market" || std::string_view(setting.id) == "wallpaper.video.mpv_options" || std::string_view(setting.id) == "wallpaper.fill_color" || std::string_view(setting.id) == "location.address" || std::string_view(setting.id) == "location.sunrise" || std::string_view(setting.id) == "location.sunset" || std::string_view(setting.id) == "shell.privacy.mic_filter_regex" || std::string_view(setting.id) == "shell.privacy.cam_filter_regex" || std::string_view(setting.id) == "shell.privacy.screen_filter_regex" || std::string_view(setting.id) == "shell.avatar_path" || std::string_view(setting.id) == "storage.key_file" || std::string_view(setting.id) == "shell.greeter_sync.privilege_command" || std::string_view(setting.id) == "shell.launch_apps_custom_command" || std::string_view(setting.id) == "control_center.network.custom_dns" || std::string_view(setting.id) == "control_center.network.nextdns_id" || std::string_view(setting.id) == "tailscale.admin_url" || std::string_view(setting.id) == "shell.session.power.suspend" || std::string_view(setting.id) == "shell.session.power.reboot" || std::string_view(setting.id) == "shell.session.power.shutdown" || std::string_view(setting.id).starts_with("hooks."))) value = "";
     else if (!node && std::string_view(setting.id) == "location.latitude") value = config.config().location.latitude.value_or(0.0);
     else if (!node && std::string_view(setting.id) == "location.longitude") value = config.config().location.longitude.value_or(0.0);
     else if (!node && std::string_view(setting.id) == "wallpaper.transition") value = Json::array({"fade", "wipe", "disc", "stripes", "zoom", "honeycomb"});
@@ -513,11 +533,11 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     if (type == "source") {
       options = {"builtin"};
       if (helixDesktop) options.push_back("wallpaper");
-      if (!noctalia::theme::availableCommunityPalettes().empty()) options.push_back("community");
-      if (!noctalia::theme::availableCustomPalettes().empty()) options.push_back("custom");
+      if (!helix::theme::availableCommunityPalettes().empty()) options.push_back("community");
+      if (!helix::theme::availableCustomPalettes().empty()) options.push_back("custom");
     }
-    if (type == "community") for (const auto& palette : noctalia::theme::availableCommunityPalettes()) options.push_back(palette.name);
-    if (type == "custom") for (const auto& palette : noctalia::theme::availableCustomPalettes()) options.push_back(palette.name);
+    if (type == "community") for (const auto& palette : helix::theme::availableCommunityPalettes()) options.push_back(palette.name);
+    if (type == "custom") for (const auto& palette : helix::theme::availableCustomPalettes()) options.push_back(palette.name);
     if ((type == "community" || type == "custom") && options.empty()) continue;
     if (type == "shell-layer") options = {"top", "overlay"};
     if (type == "shell-mode") options = {"follow", "dark", "light", "auto"};
@@ -555,7 +575,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     }
     if (type == "template-list") {
       const auto templates = std::string_view(setting.id) == "theme.templates.community_ids"
-          ? noctalia::theme::CommunityTemplateService::availableTemplates() : noctalia::theme::availableTemplates();
+          ? helix::theme::CommunityTemplateService::availableTemplates() : helix::theme::availableTemplates();
       for (const auto& item : templates) options.push_back(item.id);
       if (value.is_array()) for (const auto& item : value) if (item.is_string() && std::ranges::find(options, item) == options.end()) options.push_back(item);
     }
@@ -565,7 +585,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
       for (const auto& token : kColorRoleTokens) options.push_back(std::string(token.token));
       if (value.is_string() && !value.get_ref<const std::string&>().empty() && std::ranges::find(options, value) == options.end()) options.push_back(value);
     }
-    if (type == "palette") for (const auto& palette : noctalia::theme::builtinPalettes()) options.push_back(palette.name);
+    if (type == "palette") for (const auto& palette : helix::theme::builtinPalettes()) options.push_back(palette.name);
     Json labels = options;
     if (type == "mode") labels = {"Dark", "Light", "Automatic"};
     if (type == "source") {
@@ -588,7 +608,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     if (type == "template-list") {
       labels = Json::array();
       const auto templates = std::string_view(setting.id) == "theme.templates.community_ids"
-          ? noctalia::theme::CommunityTemplateService::availableTemplates() : noctalia::theme::availableTemplates();
+          ? helix::theme::CommunityTemplateService::availableTemplates() : helix::theme::availableTemplates();
       std::map<std::string, std::string> names;
       for (const auto& item : templates) names.emplace(item.id, item.displayName.empty() ? item.id : item.displayName);
       for (const auto& option : options) {
@@ -639,7 +659,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
   for (auto& entry : result) {
     const auto id = entry.at("id").get<std::string>();
     if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") entry["step"] = 100;
-    if (id == "shell.clipboard_history_max_entries") entry["step"] = noctalia::config::kClipboardHistoryStepEntries;
+    if (id == "shell.clipboard_history_max_entries") entry["step"] = helix::config::kClipboardHistoryStepEntries;
     if (id == "nightlight.enabled") entry["description"] = "Use warmer display colors through the Helix compositor's gamma-control capability.";
     if (id == "nightlight.force") entry["description"] = "Use the night temperature all day. Otherwise Night Light follows the existing location-based schedule.";
     if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") entry["description"] = "Lower values are warmer. Temperatures stay at least 100 K apart; changing one adjusts the other when necessary. Reset restores both configured temperatures.";
@@ -655,6 +675,8 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     if (id == "hot_corners.delay_ms") entry["description"] = "Keep the pointer in a corner for this long before triggering its action. Zero triggers immediately.";
     if (id.starts_with("hot_corners.") && id.ends_with(".command")) entry["description"] = "Runs when hot corners are enabled and this corner uses Custom command. Saving does not run the command.";
 
+    if (entry.at("id").get<std::string>().starts_with("ai."))
+      entry["description"] = "Managed in Mobius (Models & routing). Helix Settings lists this for search; edit inference-routing.toml via Mobius, not Configuration1.";
     if (entry.at("id") == "shell.offline_mode") entry["description"] = "Blocks Helix Shell HTTP requests. Does not disconnect the network or restrict other applications.";
     if (entry.at("id") == "shell.external_ip_enabled") entry["description"] = "Uses an external service to resolve your public address. Unavailable while shell network requests are restricted.";
     if (entry.at("id") == "shell.telemetry_enabled") entry["description"] = "Sends an anonymous ping when Helix Shell starts. Unavailable while shell network requests are restricted.";
@@ -740,13 +762,6 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     if (entry.at("id") == "tailscale.refresh_interval_seconds") entry["description"] = "How often Tailscale peer status is refreshed.";
     if (entry.at("id") == "tailscale.notify_on_peer_change") entry["description"] = "Shows a notification when Tailscale peers connect or disconnect.";
     if (entry.at("id") == "tailscale.admin_url") entry["description"] = "URL opened by Tailscale admin actions. Leave blank for the default admin console.";
-    if (entry.at("id") == "localsend.enabled") entry["description"] = "Advertises this computer for LocalSend file transfers.";
-    if (entry.at("id") == "localsend.alias") entry["description"] = "Name shown to other LocalSend devices. Leave blank for the hostname.";
-    if (entry.at("id") == "localsend.pin") entry["description"] = "Optional PIN required before accepting transfers.";
-    if (entry.at("id") == "localsend.download_dir") entry["description"] = "Folder for received LocalSend files. Leave blank for the Downloads folder.";
-    if (entry.at("id") == "localsend.auto_accept") entry["description"] = "Accepts incoming LocalSend transfers without confirmation.";
-    if (entry.at("id") == "localsend.notify_on_receive") entry["description"] = "Shows a notification when a LocalSend transfer completes.";
-    if (entry.at("id") == "localsend.port") entry["description"] = "UDP/TCP port used by LocalSend.";
     if (entry.at("id") == "shell.session.power.suspend" || entry.at("id") == "shell.session.power.reboot" || entry.at("id") == "shell.session.power.shutdown") entry["description"] = "Optional shell command override. Leave blank to auto-detect the session backend.";
     if (id == "shell.shadow.alpha" || id == "shell.panel.glass" || id == "dock.background_opacity" || id == "dock.active_opacity" || id == "dock.inactive_opacity" || id == "osd.background_opacity" || id == "backdrop.blur_intensity" || id == "backdrop.tint_intensity" || id == "wallpaper.edge_smoothness") entry["step"] = 0.01;
     if (id == "dock.border_width") entry["step"] = 0.5;
@@ -779,7 +794,7 @@ Json settingsCatalog(ConfigService& config, bool helixDesktop, bool gammaAvailab
     if (entry.at("id") == "hooks.logging_out") entry["description"] = "Runs before logging out.";
     if (entry.at("id") == "hooks.rebooting") entry["description"] = "Runs before rebooting.";
     if (entry.at("id") == "hooks.shutting_down") entry["description"] = "Runs before shutdown.";
-    if (entry.at("id") == "hooks.wallpaper_changed") entry["description"] = "Runs when the wallpaper changes. Provides NOCTALIA_WALLPAPER_PATH and NOCTALIA_WALLPAPER_CONNECTOR.";
+    if (entry.at("id") == "hooks.wallpaper_changed") entry["description"] = "Runs when the wallpaper changes. Provides HELIX_WALLPAPER_PATH and HELIX_WALLPAPER_CONNECTOR.";
     if (entry.at("id") == "hooks.colors_changed") entry["description"] = "Runs when the active color palette changes.";
     if (entry.at("id") == "hooks.theme_mode_changed") entry["description"] = "Runs when the resolved theme mode changes between light and dark.";
     if (entry.at("id") == "hooks.wifi_enabled") entry["description"] = "Runs when Wi-Fi is enabled.";

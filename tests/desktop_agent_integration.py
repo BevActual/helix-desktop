@@ -1,4 +1,4 @@
-"""Agent1 end to end: real helix-service, a fake shell socket, a client connection and a 'shell' connection.
+"""Agent Surface end to end: real helix-service, a fake shell socket, a client connection and a 'shell' connection.
 
 Run under dbus-run-session: desktop_agent_integration.py <helix-service> <msg-risk.toml>
 """
@@ -21,15 +21,15 @@ from gi.repository import Gio, GLib  # noqa: E402
 
 service_bin, policy = sys.argv[1], sys.argv[2]
 NAME, PATH = "org.helix.Desktop", "/org/helix/Desktop"
-AGENT = "org.helix.Desktop.Agent1"
-ACTIVITY = "org.helix.Desktop.AgentActivity1"
+AGENT = "org.helix.Desktop.AgentSurface1"
+ACTIVITY = "org.helix.Desktop.AgentSurfaceActivity1"
 CFG = "org.helix.Desktop.Configuration1"
 
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-agent-it-"))
 runtime = scratch / "run"   # the shell socket and tool list live here (HELIX_AGENT_IPC_DIR), never in the real runtime directory
 runtime.mkdir()
 display = f"wayland-helix-it-{os.getpid()}"
-sock_path = runtime / f"noctalia-{display}.sock"
+sock_path = runtime / f"helix-{display}.sock"
 
 # --- fake shell: records each wire line, answers `status` and `app-launch`, errors on anything else ---
 received = []
@@ -64,7 +64,7 @@ threading.Thread(target=serve, daemon=True).start()
 
 env = dict(os.environ, HELIX_AGENT_IPC_DIR=str(runtime), WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=policy, XDG_STATE_HOME=str(scratch / "state"),
            XDG_CONFIG_HOME=str(scratch / "config"), XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"))
-for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
+for key in ("HELIX_STATE_HOME", "HELIX_CONFIG_HOME", "HELIX_DATA_HOME", "HELIX_CACHE_HOME"):
     env.pop(key, None)
 
 
@@ -213,7 +213,7 @@ try:
     ok, result = client.finish(operation)
     assert not ok and "cancelled" in result["error"], result
 
-    # 8c. AgentActivity1: only the registered desktop; Stop cancels without revoking; safe mode fails closed.
+    # 8c. AgentSurfaceActivity1: only the registered desktop; Stop cancels without revoking; safe mode fails closed.
     def activity(method, params=None, reply="()"):
         return shell.call(ACTIVITY, method, params, reply)
 
@@ -259,7 +259,7 @@ try:
     assert not ok and "unavailable" in result["error"], result
 
     # 10. State is private and the audit trail records decisions.
-    state = scratch / "state" / "noctalia" / "agent"
+    state = scratch / "state" / "helix" / "agent"
     for name in ("grants.json", "audit.jsonl"):
         assert stat.S_IMODE((state / name).stat().st_mode) == 0o600, name
     lines = [json.loads(line) for line in (state / "audit.jsonl").read_text().splitlines()]
@@ -295,7 +295,7 @@ try:
     gone.unlink()
 
     # 13. A socket left behind by a program that has gone is not the shell: the newest one that answers is.
-    dead = runtime / "noctalia-wayland-dead.sock"
+    dead = runtime / "helix-wayland-dead.sock"
     leftover = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     leftover.bind(str(dead))
     leftover.close()

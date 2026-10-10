@@ -7,15 +7,15 @@ sidebar:
 
 import FaqItem from '../../../../components/FaqItem.astro';
 
-Find answers to common setup and troubleshooting questions for Helix Shell. The installed command still uses `noctalia`.
+Find answers to common setup and troubleshooting questions for Helix Shell. The installed command still uses `helix-shell`.
 
 ## Setup
 
 <FaqItem question="What distributions are supported?">
 
-Helix Shell currently installs from this repository's source on Linux distributions with the required build and runtime dependencies. Distribution packages named `noctalia` generally install upstream Noctalia, not Helix Shell. The Nix flake in this repository provides a Helix package for Nix users.
+Helix Shell currently installs from this repository's source on Linux distributions with the required build and runtime dependencies. Distribution packages named `helix-shell` generally install upstream Helix, not Helix Shell. The Nix flake in this repository provides a Helix package for Nix users.
 
-See the [Installation guide](/noctalia/getting-started/installation/) for the source install steps and distribution-specific build dependencies.
+See the [Installation guide](/helix/getting-started/installation/) for the source install steps and distribution-specific build dependencies.
 
 </FaqItem>
 
@@ -27,74 +27,35 @@ Touch dragging requires the compositor to send `wl_touch.motion` events. If taps
 
 </FaqItem>
 
-<FaqItem question="Will Noctalia v4 automatically upgrade to Helix, and can I keep both installed?">
+<FaqItem question="Will Helix v4 automatically upgrade to Helix, and can I keep both installed?">
 
-No. Helix Shell (and Noctalia v5) is a fresh install, not an automatic upgrade from the Quickshell-based v4 line. It ships as a separate package, your package manager will not replace v4, and v4 settings are not migrated.
+No. Helix Shell (and Helix v5) is a fresh install, not an automatic upgrade from the Quickshell-based v4 line. It ships as a separate package, your package manager will not replace v4, and v4 settings are not migrated.
 
 On most distributions, you can keep v4 installed while you try Helix. The packages do not conflict, so you can install both and run whichever version you want. Their configuration files do not conflict either: v4 config is JSON-only, Helix/v5 config is TOML, and their config file names are different.
 
-The main thing you need to adjust is your **compositor** keybinds. Keybinds live in your compositor config, so update the bindings that launch the launcher, panels, settings UI, or other `noctalia` commands.
+The main thing you need to adjust is your **compositor** keybinds. Keybinds live in your compositor config, so update the bindings that launch the launcher, panels, settings UI, or other `helix-shell` commands.
 
-See the [Installation guide](/noctalia/getting-started/installation/) and [Running Helix](/noctalia/getting-started/running-the-shell/) for setup steps.
+See the [Installation guide](/helix/getting-started/installation/) and [Running Helix](/helix/getting-started/running-the-shell/) for setup steps.
 
 </FaqItem>
 
-<FaqItem question="Should I use v4 or noctalia-qs instructions with v5?">
+<FaqItem question="Should I use v4 or helix-qs instructions with v5?">
 
-No. Helix is a native C++ and OpenGL ES shell launched with `noctalia`. The v4 line is Quickshell-based and uses `qs` / `noctalia-qs`, so v4 commands and configuration examples should not be copied into a Helix setup.
+No. Helix Shell is the Tauri session shell (`helix-shell-tauri` / `helix`) on helix-niri. The v4 line is Quickshell-based and uses `qs` / `helix-qs`, so v4 commands and configuration examples should not be copied into a Helix setup.
 
-If you are using the Quickshell-based version, use the [v4 documentation](/noctalia-shell-legacy/) instead.
+If you are using the Quickshell-based version, use the [v4 documentation](/helix-shell-legacy/) instead.
 
 </FaqItem>
 
 <FaqItem question="How do I start Helix automatically?">
 
-Helix does not manage session autostart from its Settings app. Use your compositor's autostart mechanism instead.
+Helix does not manage session autostart from its Settings app. On the supported **helix-niri** session, add to `~/.config/niri/config.kdl`:
 
-Examples for each supported compositor:
-
-:::note[Niri]
-Add to `~/.config/niri/config.kdl`:
 ```ini
-spawn-at-startup "noctalia"
+spawn-at-startup "helix"
 ```
-:::
 
-:::note[Hyprland]
-Add to your `hyprland.start` event hook in `~/.config/hypr/hyprland.lua`:
-```lua
-hl.on("hyprland.start", function()
-  hl.exec_cmd("noctalia")
-end)
-```
-:::
-
-:::note[Sway / Scroll]
-Add to `~/.config/sway/config` (or equivalent):
-```bash
-exec noctalia
-```
-:::
-
-:::note[Labwc]
-Add to `~/.config/labwc/autostart`:
-```
-noctalia
-```
-:::
-
-:::note[Mango]
-Add to `~/.config/mango/config.conf`:
-```bash
-exec-once=noctalia
-```
-:::
-
-:::note[KDE Plasma]
-Add `noctalia` under System Settings → Autostart, or see [KDE Plasma](/noctalia/compositor-settings/kde/) for Plasma-specific limits (clipboard, blur, screenshots, and more).
-:::
-
-If your compositor expects startup commands to return after the shell has initialized, use `noctalia --daemon`. See the [Running Helix](/noctalia/getting-started/running-the-shell/) page for details.
+If the session expects the startup command to return after the shell has initialized, use `helix --daemon`. See [Running Helix](/helix/getting-started/running-the-shell/).
 
 </FaqItem>
 
@@ -103,15 +64,15 @@ If your compositor expects startup commands to return after the shell has initia
 <FaqItem question="Where should I put my config, and why is my setting ignored?">
 
 If you only use Settings, you normally do not need to edit config files. Settings writes your changes to
-`~/.local/state/noctalia/settings.toml`.
+`~/.local/state/helix/settings.toml`.
 
-If you write config by hand, put it in `~/.config/noctalia/`. Helix reads every `*.toml` file in that directory,
+If you write config by hand, put it in `~/.config/helix/`. Helix reads every `*.toml` file in that directory,
 sorted alphabetically, and merges them.
 
 Settings changes load after hand-written config, so they win when both layers define the same setting. If a value in your
-file looks ignored, check Settings first, or inspect `~/.local/state/noctalia/settings.toml`.
+file looks ignored, check Settings first, or inspect `~/.local/state/helix/settings.toml`.
 
-See [How configuration works](/noctalia/configuration/) for the full load order and export options.
+See [How configuration works](/helix/configuration/) for the full load order and export options.
 
 </FaqItem>
 
@@ -148,7 +109,7 @@ type = "sysmon"
 # settings for the second sysmon
 ```
 
-See [Widget definitions](/noctalia/bar/widgets/#widget-definitions) for more examples.
+See [Widget definitions](/helix/bar/widgets/#widget-definitions) for more examples.
 
 </FaqItem>
 
@@ -175,7 +136,7 @@ For Helix-specific sizing in Settings:
 
 In text config, the main keys are `shell.ui_scale`, `[bar.<name>].scale`, and `[widget.<name>].scale`.
 
-See [Shell settings](/noctalia/configuration/shell/#shell-settings) and [Bars](/noctalia/bar/).
+See [Shell settings](/helix/configuration/shell/#shell-settings) and [Bars](/helix/bar/).
 
 </FaqItem>
 
@@ -183,7 +144,7 @@ See [Shell settings](/noctalia/configuration/shell/#shell-settings) and [Bars](/
 
 On Niri, making a bar transparent only changes Helix surface opacity. When Niri `ext-background-effects` support is active, Helix still publishes blur regions for its layer surfaces, so the compositor can keep blurring behind the bar.
 
-The default xray blur samples the wallpaper, which can also appear as faint wallpaper-colored pixels around rounded corners. Use `xray false` to blur the actual content behind Helix, or `blur false` to disable the effect. See [Niri compositor settings: Blur](/noctalia/compositor-settings/niri/?section=blur) for the full rules and explanation.
+The default xray blur samples the wallpaper, which can also appear as faint wallpaper-colored pixels around rounded corners. Use `xray false` to blur the actual content behind Helix, or `blur false` to disable the effect. See [Niri compositor settings: Blur](/helix/compositor-settings/niri/?section=blur) for the full rules and explanation.
 
 </FaqItem>
 
@@ -195,7 +156,7 @@ Attached panels (like the control center) sit flush against the bar, so the line
 
 **Embrace the cut with `contact_shadow`.** Instead of hiding the seam, this draws a dark gradient where the panel meets the bar, giving the panel a lifted-off-the-bar feel. It is independent of the bar's `shadow` and only affects attached panels; the change applies the next time a panel opens. In Settings it lives under **Bar → Effects**.
 
-**Mind the compositor blur.** The bar and an attached panel are separate Wayland surfaces, so the compositor blurs each one on its own. With a large blur sampling offset the two blur passes don't line up at the seam, and the gap between them becomes visible. How much shows up depends on the compositor: Hyprland handles it well, while Niri tends to reveal the split more. If the seam looks off with blur, lower your compositor's blur size/passes (or its sampling offset) rather than chasing it with `panel_overlap`.
+**Mind the compositor blur.** The bar and an attached panel are separate Wayland surfaces, so helix-niri blurs each one on its own. With a large blur sampling offset the two blur passes don't line up at the seam, and the gap between them can show. If the seam looks off with blur, lower blur size/passes (or sampling offset) rather than chasing it with `panel_overlap`.
 
 ```toml
 [bar.default]
@@ -203,7 +164,7 @@ panel_overlap  = 0      # 1 is default; 0 removes the overlap, negative pushes t
 contact_shadow = true   # dark gradient at the seam for a lifted look
 ```
 
-See [Bars](/noctalia/bar/) for the full per-bar and per-monitor field list.
+See [Bars](/helix/bar/) for the full per-bar and per-monitor field list.
 
 </FaqItem>
 
@@ -253,7 +214,7 @@ wallpaper_scheme = "m3-content"
 After your wallpaper app sets a new image, tell Helix which file to use for color extraction:
 
 ```sh
-noctalia msg wallpaper-set ~/Pictures/Wallpapers/new-wallpaper.png
+helix-panel wallpaper-set ~/Pictures/Wallpapers/new-wallpaper.png
 ```
 
 Helix extracts colors from that image, generates a palette with the configured scheme, and cross-fades the shell to the new colors even though it is not displaying the wallpaper itself. The path is persisted across restarts.
@@ -267,13 +228,13 @@ Helix extracts colors from that image, generates a palette with the configured s
 Check these points first:
 
 1. Make sure Helix is running.
-2. Use v5 IPC commands in the form `noctalia msg ...`.
+2. Use v5 IPC commands in the form `helix-panel ...`.
 3. Verify that your compositor bind syntax is correct.
 4. Test the command in a terminal before putting it in a compositor config.
 
-Helix Settings does not replace your compositor config. On niri, **Settings → Keybinds** can record Super/Mod chords, copy recommended `spawn-sh` lines, or add a `noctalia-binds.kdl` include; **Settings → Niri → Setup** can add `noctalia-setup.kdl`. Other compositors still need the binds pasted into their own config.
+Helix Settings does not replace your compositor config. On niri, **Settings → Keybinds** can record Super/Mod chords, copy recommended `spawn-sh` lines, or add a `helix-binds.kdl` include; **Settings → Niri → Setup** can add `helix-setup.kdl`. Other compositors still need the binds pasted into their own config.
 
-See the [IPC overview](/noctalia/ipc/), [Niri](/noctalia/compositor-settings/niri/), and [Shell commands](/noctalia/ipc/shell/).
+See the [IPC overview](/helix/ipc/), [Niri](/helix/compositor-settings/niri/), and [Shell commands](/helix/ipc/shell/).
 
 </FaqItem>
 
@@ -290,7 +251,7 @@ services.upower.enable = true;
 The battery widget defaults to the system battery. If you want to show a peripheral or second battery, middle-click the
 battery widget and choose its **Device** setting. In text config, set the widget's `device` key.
 
-See the [`battery` widget docs](/noctalia/bar/widgets/battery/).
+See the [`battery` widget docs](/helix/bar/widgets/battery/).
 
 </FaqItem>
 
@@ -303,7 +264,7 @@ Helix discovers desktop applications from `.desktop` files in standard applicati
 - `$HOME/.nix-profile/share/applications/`
 - `/etc/profiles/per-user/$USER/share/applications/`
 
-For dock pins, match the desktop entry ID, `StartupWMClass`, display name, or full desktop entry path. See the [Dock](/noctalia/dock/) page for matching rules.
+For dock pins, match the desktop entry ID, `StartupWMClass`, display name, or full desktop entry path. See the [Dock](/helix/dock/) page for matching rules.
 
 </FaqItem>
 
@@ -321,7 +282,7 @@ In text config, Weather requires `[weather] enabled = true` plus a resolved `[lo
 
 Weather, Theme `auto`, and Night Light all share the same location source.
 
-See [Location](/noctalia/services/location/), [Theme](/noctalia/theming/#mode), and [Night Light](/noctalia/services/night-light/).
+See [Location](/helix/services/location/), [Theme](/helix/theming/#mode), and [Night Light](/helix/services/night-light/).
 
 </FaqItem>
 

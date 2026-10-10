@@ -101,7 +101,7 @@ back = "media previous"
 forward = "media next"
 ```
 
-All nine gestures are available, and an action is an IPC command, `exec <command line>`, or `none` - see [Widget Actions](/noctalia/bar/actions/) for the full vocabulary. Panel actions anchor at the pointer, since there is no widget to anchor to.
+All nine gestures are available, and an action is an IPC command, `exec <command line>`, or `none` - see [Widget Actions](/helix/bar/actions/) for the full vocabulary. Panel actions anchor at the pointer, since there is no widget to anchor to.
 
 Right-click opens Control Center unless you bind `right` to something else. While an attached panel is open, right-click anywhere on the bar still toggles Control Center unless the click lands in the dead zone and `right` is bound.
 
@@ -174,10 +174,10 @@ Set auto-hide to **Smart** in bar settings (or `smart_auto_hide = true` with `au
 
 - Mutually exclusive with pointer auto-hide (`auto_hide = true`); if both are set in config, smart auto-hide takes precedence.
 - Uses the same slide animation and edge reveal strip while hidden.
-- On compositors that report overview state (Niri, Triad), the bar is kept visible while overview is open.
+- On helix-niri, the bar is kept visible while overview is open.
 - Re-evaluates on workspace changes, window open/close, and overview toggles.
 
-`margin_opposite_edge` adds extra reserved space on the inward side of the bar (below a top bar, above a bottom bar, and so on for vertical bars). The bar itself does not move; the compositor exclusive zone grows so tiled and maximized windows stop further away. Use it when a compositor ignores or under-reserves struts - for example Labwc with a maximized window that still touches the bar. Requires `reserve_space = true`. The default is `0`.
+`margin_opposite_edge` adds extra reserved space on the inward side of the bar (below a top bar, above a bottom bar, and so on for vertical bars). The bar itself does not move; the compositor exclusive zone grows so tiled and maximized windows stop further away. Use it when exclusive zones under-reserve. Requires `reserve_space = true`. The default is `0`.
 
 `layer = "overlay"` shows the bar above fullscreen apps. Attached panels (for example Control Center when it attaches to the bar) follow the bar's layer. Floating panels keep their own layer (typically overlay), including when their screen position is `center`.
 
@@ -185,8 +185,8 @@ The IPC `bar-layer-set <top|overlay> [bar-name] [monitor-selector]` switches the
 
 ```kdl
 binds {
-    Mod+B { spawn-sh "noctalia msg bar-layer-set overlay"; }
-    Mod+Shift+B { spawn-sh "noctalia msg bar-layer-set top"; }
+    Mod+B { spawn-sh "helix-panel bar-layer-set overlay"; }
+    Mod+Shift+B { spawn-sh "helix-panel bar-layer-set top"; }
 }
 ```
 

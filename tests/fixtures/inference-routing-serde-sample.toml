@@ -1,0 +1,25 @@
+allow_remote_on_battery_saver = true
+
+[[backends]]
+id = "local"
+kind = "local"
+base_url = ""
+label = "On this computer"
+
+[[backends]]
+id = "lan"
+kind = "openai"
+base_url = "http://127.0.0.1:11434/v1"
+label = "LAN"
+
+[profiles.act]
+backend = "local"
+model = "qwen-act-q4.gguf"
+
+[profiles.chat]
+backend = "local"
+model = "qwen-chat-q4.gguf"
+
+[profiles.code]
+backend = "lan"
+model = "codellama"

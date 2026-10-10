@@ -1,4 +1,4 @@
-#include "shell/assistant/assistant_session.h"
+#include "assistant/assistant_session.h"
 #include "tests/test_check.h"
 
 #include <deque>

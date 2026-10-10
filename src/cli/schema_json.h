@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace noctalia::cli {
+namespace helix::cli {
 
   // Machine-readable dump of the `msg` command schema, including hidden commands.
   // Consumed by tools that generate typed wrappers (the agent MCP server) and by the
@@ -13,4 +13,4 @@ namespace noctalia::cli {
 
   int runSchemaJsonCli(int argc, char* argv[]);
 
-} // namespace noctalia::cli
+} // namespace helix::cli

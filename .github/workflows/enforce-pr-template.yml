@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   enforce:
-    if: ${{ github.repository == 'noctalia-dev/noctalia' }}
+    if: ${{ github.repository == 'helix-dev/helix' }}
     runs-on: ubuntu-latest
     permissions:
       # GitHub's GraphQL draft mutation requires both write permissions.

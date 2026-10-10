@@ -50,7 +50,7 @@ namespace {
 
   std::vector<std::string> installedAllowlistedPackages() {
     std::vector<std::string> installed;
-    for (const auto name : noctalia::fedora_upgrade::kAllowlistedPackages) {
+    for (const auto name : helix::fedora_upgrade::kAllowlistedPackages) {
       if (rpmQuietInstalled(name)) {
         installed.emplace_back(name);
       }
@@ -59,13 +59,13 @@ namespace {
   }
 
   void printHelp() {
-    std::cerr << "noctalia-system-upgrade\n"
+    std::cerr << "helix-system-upgrade\n"
               << "Upgrade the hardcoded Helix Shell Fedora packages via dnf.\n"
               << "Run through pkexec. Extra arguments are rejected.\n";
   }
 
-  const char* statusMessage(noctalia::fedora_upgrade::HelperStatus status) {
-    using noctalia::fedora_upgrade::HelperStatus;
+  const char* statusMessage(helix::fedora_upgrade::HelperStatus status) {
+    using helix::fedora_upgrade::HelperStatus;
     switch (status) {
     case HelperStatus::ExtraArguments:
       return "this helper does not accept arguments";
@@ -99,7 +99,7 @@ namespace {
 } // namespace
 
 int main(int argc, char* argv[]) {
-  using namespace noctalia::fedora_upgrade;
+  using namespace helix::fedora_upgrade;
 
   const auto plan = planHelper(
       argc, argv, ::geteuid() == 0, osReleaseText(), std::filesystem::exists("/run/ostree-booted"),

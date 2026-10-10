@@ -11,7 +11,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kOutputsIncludeFileName = "noctalia-outputs.kdl";
+  inline constexpr std::string_view kOutputsIncludeFileName = "helix-outputs.kdl";
 
   struct ParsedOutput {
     std::string name;

@@ -13,7 +13,7 @@
 #include <string_view>
 #include <vector>
 
-// Policy core for org.helix.Desktop.Agent1: risk tiers, per-client grants, taint and audit.
+// Policy core for org.helix.Desktop.AgentSurface1: risk tiers, per-client grants, taint and audit.
 // No D-Bus or shell dependencies, so it can be tested alone. Design: docs/design/agent-and-inference.md.
 namespace helix::agent {
 

@@ -22,11 +22,11 @@ gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
 root, service_bin = pathlib.Path(sys.argv[1]), sys.argv[2]
-NAME, PATH, AGENT = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.Agent1"
+NAME, PATH, AGENT = "org.helix.Desktop", "/org/helix/Desktop", "org.helix.Desktop.AgentSurface1"
 scratch = pathlib.Path(tempfile.mkdtemp(prefix="helix-adapter-it-"))
 runtime = pathlib.Path(os.environ["XDG_RUNTIME_DIR"])
 display = f"wayland-helix-ad-{os.getpid()}"
-sock_path = runtime / f"noctalia-{display}.sock"
+sock_path = runtime / f"helix-{display}.sock"
 
 # Fake shell socket: records every wire line.
 received = []
@@ -54,8 +54,8 @@ def serve():
 
 threading.Thread(target=serve, daemon=True).start()
 
-# A fake `noctalia` that must never run when the service is reachable: it records any use.
-fake = scratch / "noctalia"
+# A fake `helix-shell` that must never run when the service is reachable: it records any use.
+fake = scratch / "helix"
 marker = scratch / "legacy-used"
 fake.write_text(f'#!/bin/sh\necho used >> "{marker}"\nprintf "legacy:"; for a in "$@"; do printf " [%s]" "$a"; done; printf "\\n"\n')
 fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
@@ -63,7 +63,7 @@ fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
 env = dict(os.environ, WAYLAND_DISPLAY=display, HELIX_RISK_POLICY=str(root / "protocols/ipc/msg-risk.toml"),
            XDG_STATE_HOME=str(scratch / "state"), XDG_CONFIG_HOME=str(scratch / "config"),
            XDG_DATA_HOME=str(scratch / "data"), XDG_CACHE_HOME=str(scratch / "cache"))
-for key in ("NOCTALIA_STATE_HOME", "NOCTALIA_CONFIG_HOME", "NOCTALIA_DATA_HOME", "NOCTALIA_CACHE_HOME"):
+for key in ("HELIX_STATE_HOME", "HELIX_CONFIG_HOME", "HELIX_DATA_HOME", "HELIX_CACHE_HOME"):
     env.pop(key, None)
 service = subprocess.Popen([service_bin], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -115,7 +115,7 @@ class ShellStub:
 
 shell = ShellStub()
 
-os.environ["HELIX_NOCTALIA"] = str(fake)
+os.environ["HELIX_SHELL"] = str(fake)
 spec = importlib.util.spec_from_file_location("helix_agent_server", root / "tools/helix-agent/server.py")
 server = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(server)
@@ -170,20 +170,22 @@ try:
     assert server.window_focus(7).startswith("error: act is not granted"), server.window_focus(7)
     server.GRANTED_TIERS.update(saved)
 
-    # 6. auto falls back to the direct path only when Agent1 is missing; agent1 mode refuses instead.
+    # 6. auto falls back to the direct path only when Agent Surface is missing; surface mode refuses instead.
     def unavailable(self):
-        raise server.AgentUnavailable("test: no Agent1")
+        raise server.AgentUnavailable("test: no Agent Surface")
 
     original = server.AgentClient.connect
     server.AgentClient.connect = unavailable
     fresh("auto")
     assert server.desktop_status().startswith("legacy:") and marker.exists()
-    fresh("agent1")
-    assert "Agent1 is required" in server.desktop_status()
+    fresh("surface")
+    assert "Agent Surface is required" in server.desktop_status()
+    fresh("agent1")  # legacy alias for surface
+    assert "Agent Surface is required" in server.desktop_status()
     server.AgentClient.connect = original
 
     # 7. The service enforced blocked tiers regardless of what the adapter asks: grants and audit exist and are private.
-    state = scratch / "state" / "noctalia" / "agent"
+    state = scratch / "state" / "helix" / "agent"
     assert stat.S_IMODE((state / "grants.json").stat().st_mode) == 0o600
     audit = [json.loads(line) for line in (state / "audit.jsonl").read_text().splitlines()]
     assert any(e["tool"] == "app-launch" and e["decision"] == "confirmed" for e in audit), audit

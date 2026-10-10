@@ -12,20 +12,20 @@ import option3 from '../../assets/niri-overview/option3-v5.png';
 
 Add the following settings to your Niri configuration file (usually located at `~/.config/niri/config.kdl`).
 
-**Settings → Niri → Setup** can copy missing snippets or write them to `noctalia-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body. Theme, Wallpaper, Windows, and Monitor write their own includes (`noctalia-layout.kdl`, `noctalia-blur.kdl`, `noctalia-overview.kdl`, `noctalia-outputs.kdl`) the same way.
+**Settings → Niri → Setup** can copy missing snippets or write them to `helix-setup.kdl` and include that file. It does not rewrite your existing `config.kdl` body. Theme, Wallpaper, Windows, and Monitor write their own includes (`helix-layout.kdl`, `helix-blur.kdl`, `helix-overview.kdl`, `helix-outputs.kdl`) the same way.
 
-The stack is **greetd → helix-greeter → helix-niri + Helix Shell**. Helix stays the session shell; niri still owns windows; greetd still starts the login session. Keep those as **sibling packages** (this tree, `helix-niri`, `helix-greeter`); a distro metapackage can depend on all three. Do not merge them into one binary. Stock niri, Hyprland, and other compositors remain fallbacks: layer-shell still works, and refraction stays off.
+The stack is **greetd → helix-greeter → helix-niri + Helix Shell**. Helix stays the session shell; niri still owns windows; greetd still starts the login session. Shell, greeter (`greeter/`), and compositor (`compositor/`, own Cargo workspace) live in this tree. Do not merge them into one binary. **Fedora + helix-niri is the sole supported product surface**; stock niri without Helix capabilities will not get liquid-glass refraction.
 
-**Control Center → Theme** owns niri decorations in `noctalia-layout.kdl` (focus-ring, border, tab-indicator, insert-hint, recent-windows) plus compositor blur (`noctalia-blur.kdl`) and `draw-border-with-background` in `noctalia-window-rules.kdl`. **Control Center → Desktop → Windows** writes `gaps`, `struts`, and `default-column-width` into the same layout include, only after you change those controls. The niri color template no longer writes a second `layout` block into `noctalia.kdl`. Helix writes `liquid-glass { … }` only after a capability probe (`niri msg helix-capabilities`) succeeds, falling back to a version string that contains `helix` (helix-niri). When the probe lists `liquid_glass_params`, only those child keys are written. Refraction strength follows `[shell.panel].glass`. High Contrast omits liquid-glass.
+**Control Center → Theme** owns niri decorations in `helix-layout.kdl` (focus-ring, border, tab-indicator, insert-hint, recent-windows) plus compositor blur (`helix-blur.kdl`) and `draw-border-with-background` in `helix-window-rules.kdl`. **Control Center → Desktop → Windows** writes `gaps`, `struts`, and `default-column-width` into the same layout include, only after you change those controls. The niri color template no longer writes a second `layout` block into `helix.kdl`. Helix writes `liquid-glass { … }` only after a capability probe (`niri msg helix-capabilities`) succeeds, falling back to a version string that contains `helix` (helix-niri). When the probe lists `liquid_glass_params`, only those child keys are written. Refraction strength follows `[shell.panel].glass`. High Contrast omits liquid-glass.
 
 ## Display layout
 
-Control Center → Monitor can arrange niri outputs live. Those IPC positions are forgotten when niri reloads unless you click **Save to niri**, which writes `noctalia-outputs.kdl` next to your config and appends `include "noctalia-outputs.kdl"`.
+Control Center → Monitor can arrange niri outputs live. Those IPC positions are forgotten when niri reloads unless you click **Save to niri**, which writes `helix-outputs.kdl` next to your config and appends `include "helix-outputs.kdl"`.
 
 ## Autostart Helix
 
 ```kdl
-spawn-at-startup "noctalia"
+spawn-at-startup "helix"
 ```
 
 ## Compositor Settings
@@ -51,41 +51,41 @@ debug {
 
 Both `spawn-sh` and `spawn` are usable to run Helix keybinds.
 
-Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds** to record Super/Mod chords, copy missing lines, or install them into `noctalia-binds.kdl`. That include is appended last, so it overrides stock keys from an earlier `include` such as Fedora's `/usr/share/doc/niri/default-config.kdl` without rewriting your `binds { }` block. **Mod+Shift+P** replaces niri's `power-off-monitors` with the session panel. App shortcuts on that page write `spawn` lines into the same include:
+Add these binds to your `~/.config/niri/config.kdl`, or use **Settings → Keybinds** to record Super/Mod chords, copy missing lines, or install them into `helix-binds.kdl`. That include is appended last, so it overrides stock keys from an earlier `include` such as Fedora's `/usr/share/doc/niri/default-config.kdl` without rewriting your `binds { }` block. **Mod+Shift+P** replaces niri's `power-off-monitors` with the session panel. App shortcuts on that page write `spawn` lines into the same include:
 
 ```kdl
 binds {
     // Core Helix binds
-    Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }
-    Mod+S { spawn-sh "noctalia msg panel-toggle control-center"; }
-    Mod+Comma { spawn-sh "noctalia msg settings-toggle"; }
-    Alt+Tab { spawn-sh "noctalia msg window-switcher"; }
+    Mod+Space { spawn-sh "helix-panel panel-toggle launcher"; }
+    Mod+S { spawn-sh "helix-panel panel-toggle control-center"; }
+    Mod+Comma { spawn-sh "helix-panel settings-toggle"; }
+    Alt+Tab { spawn-sh "helix-panel window-switcher"; }
     // Niri has a built-in window switcher you might want to try it to see which one you prefer.
-    Mod+Escape { spawn-sh "noctalia msg session lock"; }
-    Print { spawn-sh "noctalia msg screenshot-region"; }
-    Shift+Print { spawn-sh "noctalia msg screenshot-fullscreen"; }
-    Mod+V { spawn-sh "noctalia msg panel-toggle clipboard"; }
+    Mod+Escape { spawn-sh "helix-panel session lock"; }
+    Print { spawn-sh "helix-panel screenshot-region"; }
+    Shift+Print { spawn-sh "helix-panel screenshot-fullscreen"; }
+    Mod+V { spawn-sh "helix-panel panel-toggle clipboard"; }
     // Caps Lock key. Helix remaps it to F19 so it does not toggle Caps.
-    F19 repeat=false { spawn-sh "noctalia msg panel-toggle quick-insert"; }
-    Mod+W { spawn-sh "noctalia msg panel-toggle wallpaper"; }
-    Mod+Shift+P { spawn-sh "noctalia msg panel-toggle session"; }
-    Mod+Shift+N { spawn-sh "noctalia msg nightlight-toggle"; }
-    Mod+N { spawn-sh "noctalia msg panel-toggle notifications"; }
-    Mod+Shift+C { spawn-sh "noctalia msg caffeine-toggle"; }
-    Mod+Shift+R { spawn-sh "noctalia msg screen-record-toggle"; }
-    Mod+Shift+D { spawn-sh "noctalia msg notification-dnd-toggle"; }
-    Mod+Shift+O { spawn-sh "noctalia msg screenshot-ocr"; }
-    XF86AudioPlay allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
-    XF86AudioNext allow-when-locked=true { spawn-sh "noctalia msg media next"; }
-    XF86AudioPrev allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
-    XF86AudioMicMute allow-when-locked=true { spawn-sh "noctalia msg mic-mute"; }
+    F19 repeat=false { spawn-sh "helix-panel panel-toggle quick-insert"; }
+    Mod+W { spawn-sh "helix-panel panel-toggle wallpaper"; }
+    Mod+Shift+P { spawn-sh "helix-panel panel-toggle session"; }
+    Mod+Shift+N { spawn-sh "helix-panel nightlight-toggle"; }
+    Mod+N { spawn-sh "helix-panel panel-toggle notifications"; }
+    Mod+Shift+C { spawn-sh "helix-panel caffeine-toggle"; }
+    Mod+Shift+R { spawn-sh "helix-panel screen-record-toggle"; }
+    Mod+Shift+D { spawn-sh "helix-panel notification-dnd-toggle"; }
+    Mod+Shift+O { spawn-sh "helix-panel screenshot-ocr"; }
+    XF86AudioPlay allow-when-locked=true { spawn-sh "helix-panel media toggle"; }
+    XF86AudioNext allow-when-locked=true { spawn-sh "helix-panel media next"; }
+    XF86AudioPrev allow-when-locked=true { spawn-sh "helix-panel media previous"; }
+    XF86AudioMicMute allow-when-locked=true { spawn-sh "helix-panel mic-mute"; }
 
     // Audio & Brightness
-    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
-    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
-    XF86AudioMute allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
-    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
-    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "helix-panel volume-up"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "helix-panel volume-down"; }
+    XF86AudioMute allow-when-locked=true { spawn-sh "helix-panel volume-mute"; }
+    XF86MonBrightnessUp allow-when-locked=true { spawn-sh "helix-panel brightness-up"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "helix-panel brightness-down"; }
 }
 ```
 
@@ -102,7 +102,7 @@ You can also enable this from **Control Center → Launcher**.
 
 ## Wallpapers setup
 
-**Control Center → Wallpaper** writes `noctalia-overview.kdl` for one of the presets below. It also turns the Helix Shell backdrop layer on for **Blurred backdrop** and off for **Stationary wallpaper** and **Flat color**. Backdrop blur and tint live on Wallpaper’s gear. You can still paste the same rules by hand.
+**Control Center → Wallpaper** writes `helix-overview.kdl` for one of the presets below. It also turns the Helix Shell backdrop layer on for **Blurred backdrop** and off for **Stationary wallpaper** and **Flat color**. Backdrop blur and tint live on Wallpaper’s gear. You can still paste the same rules by hand.
 
 Next, choose one of the following options for your wallpaper and overview setup.
 
@@ -118,13 +118,13 @@ This configuration places Helix's dedicated backdrop layer (a blurred and tinted
 
 ```kdl
 layer-rule {
-  match namespace="^noctalia-backdrop"
+  match namespace="^helix-backdrop"
   place-within-backdrop true
 }
 ```
 
 :::note
-Option 1 requires the `[niri/backdrop]` section to be enabled in your Helix configuration. See [Wallpaper and backdrop](/noctalia/desktop/wallpaper/) for the relevant options.
+Option 1 requires the `[niri/backdrop]` section to be enabled in your Helix configuration. See [Wallpaper and backdrop](/helix/desktop/wallpaper/) for the relevant options.
 :::
 
 ### Option 2: Stationary Wallpaper
@@ -136,7 +136,7 @@ If you prefer a stationary wallpaper that is visible at all times and does not s
 ```kdl
 // Place the regular wallpaper on the backdrop.
 layer-rule {
-  match namespace="^noctalia-wallpaper"
+  match namespace="^helix-wallpaper"
   place-within-backdrop true
 }
 
@@ -180,7 +180,7 @@ Option 3 should be used with the `[backdrop]` section disabled in your Helix con
 Blur support was introduced in Niri version 26.04. Adding these rules to earlier versions of Niri will result in configuration errors.
 :::
 
-**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `noctalia-blur.kdl` next to your config and append `include "noctalia-blur.kdl"`. Helix also rewrites that include when niri IPC connects, so a probe that ran before helix-niri was ready still lands `liquid-glass`. Turning blur off writes disable rules so Helix's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer. **Chrome → Glass → Refraction** on helix-niri adds a `liquid-glass { }` child for Helix chrome namespaces (bars, panels, dock, OSD, notifications, idle-grace, capture overlays). Strength follows the Solid→Glass slider. Refraction without layout blur writes `blur false` on those chrome rules so client `ext-background-effect` blur does not stack with liquid-glass. Stock niri never emits `liquid-glass`. High Contrast frosts chrome and omits refraction.
+**Control Center → Theme** can turn compositor blur on or off and tune passes, offset, and noise. Those write `helix-blur.kdl` next to your config and append `include "helix-blur.kdl"`. Helix also rewrites that include when niri IPC connects, so a probe that ran before helix-niri was ready still lands `liquid-glass`. Turning blur off writes disable rules so Helix's client-requested blur is also cleared. The shell only offers these controls when niri reports 26.04 or newer. **Chrome → Glass → Refraction** on helix-niri adds a `liquid-glass { }` child for Helix chrome namespaces (bars, panels, dock, OSD, notifications, idle-grace, capture overlays). Strength follows the Solid→Glass slider. Refraction without layout blur writes `blur false` on those chrome rules so client `ext-background-effect` blur does not stack with liquid-glass. Stock niri never emits `liquid-glass`. High Contrast frosts chrome and omits refraction.
 
 You can also paste the same rules by hand:
 
@@ -199,16 +199,16 @@ window-rule {
   Helix publishes blur regions automatically when ext-background-effects is available.
 */
 layer-rule {
-  match namespace="^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
+  match namespace="^helix-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
   background-effect {
     xray false
     // blur false
   }
 }
 
-/* Enable blur on noctalia's window switcher and disable xray. */
+/* Enable blur on helix's window switcher and disable xray. */
 layer-rule {
-    match namespace="noctalia-window-switcher"
+    match namespace="helix-window-switcher"
     background-effect {
         blur true
         xray false
@@ -234,7 +234,7 @@ With Niri's default xray behavior, that blur samples the wallpaper. On contrasti
 
 ```kdl
 layer-rule {
-  match namespace="^noctalia-"
+  match namespace="^helix-"
   background-effect {
     blur false
   }
@@ -249,7 +249,7 @@ Omitting the Helix `layer-rule` is not enough to disable its client-requested bl
 Each desktop widget lives on its own layer-shell surface with a unique namespace, so you can target an individual widget with a `layer-rule`. The namespace is:
 
 ```
-noctalia-desktop-widget-<type>-<id>
+helix-desktop-widget-<type>-<id>
 ```
 
 where `<type>` is the widget kind (`clock`, `weather`, `sysmon`, …) and `<id>` is the widget's stable id. Run `niri msg layers` to list all layer surfaces and see the exact namespaces on your setup:
@@ -257,16 +257,16 @@ where `<type>` is the widget kind (`clock`, `weather`, `sysmon`, …) and `<id>`
 ```text
 Bottom layer:
   Surface:
-    Namespace: "noctalia-desktop-widget-clock-000000000000000a"
+    Namespace: "helix-desktop-widget-clock-000000000000000a"
   Surface:
-    Namespace: "noctalia-desktop-widget-weather-000000000000000b"
+    Namespace: "helix-desktop-widget-weather-000000000000000b"
 ```
 
-Match on `^noctalia-desktop-widget-` to target every desktop widget at once, or narrow the pattern by type or full id for a single widget. For example, to match just the weather widget:
+Match on `^helix-desktop-widget-` to target every desktop widget at once, or narrow the pattern by type or full id for a single widget. For example, to match just the weather widget:
 
 ```kdl
 layer-rule {
-  match namespace="^noctalia-desktop-widget-weather-"
+  match namespace="^helix-desktop-widget-weather-"
 }
 ```
 
@@ -276,11 +276,11 @@ With the lock screen enabled, Helix locks before sleep by default (`[lockscreen]
 
 **Keep using other displays** (`[lockscreen].lid_close_keep_external_displays`, default `true`) is on Control Center → Power. When another display is on, Helix blocks logind from suspending on lid close. niri still turns off the laptop panel, so you can keep working on the external display. Turn the setting off if you want the lid to suspend even while docked.
 
-If you install the optional niri setup snippet, lid close runs `noctalia msg session lid-close`: it is a no-op in that clamshell case, and otherwise locks and suspends (useful when logind lid handling is ignored).
+If you install the optional niri setup snippet, lid close runs `helix-panel session lid-close`: it is a no-op in that clamshell case, and otherwise locks and suspends (useful when logind lid handling is ignored).
 
 ``` kdl
 switch-events {
-    lid-close { spawn "noctalia" "msg" "session" "lid-close"; }
+    lid-close { spawn "helix" "msg" "session" "lid-close"; }
 }
 ```
 

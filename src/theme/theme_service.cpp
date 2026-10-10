@@ -15,8 +15,8 @@
 #include "theme/image_loader.h"
 #include "theme/palette_generator.h"
 #include "theme/palette_transform.h"
+#include "theme/runtime_palette.h"
 #include "theme/scheme.h"
-#include "ui/app_icon_colorization.h"
 #include "util/checksum.h"
 #include "util/string_utils.h"
 
@@ -32,7 +32,7 @@
 #include <string_view>
 #include <system_error>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -44,7 +44,7 @@ namespace noctalia::theme {
     struct ResolvedTheme {
       GeneratedPalette generated;
       Palette palette;
-      // Resolved [theme].mode (apps) and the mode Noctalia itself runs in.
+      // Resolved [theme].mode (apps) and the mode Helix itself runs in.
       std::string mode;
       std::string shellMode;
     };
@@ -52,8 +52,8 @@ namespace noctalia::theme {
     ResolvedTheme resolveBuiltin(const ThemeConfig& cfg, std::string_view mode, std::string_view shellMode) {
       const auto* palette = findBuiltinPalette(cfg.builtinPalette);
       if (palette == nullptr) {
-        kLog.warn("unknown builtin palette '{}', falling back to Noctalia", cfg.builtinPalette);
-        palette = findBuiltinPalette("Noctalia");
+        kLog.warn("unknown builtin palette '{}', falling back to Helix", cfg.builtinPalette);
+        palette = findBuiltinPalette("Helix");
       }
       const GeneratedPalette generated = expandBuiltinPalette(*palette);
       return {
@@ -430,6 +430,17 @@ namespace noctalia::theme {
     std::error_code ec;
     std::filesystem::create_directories(cachePath.parent_path(), ec);
     const std::string url = communityPaletteDownloadUrl(name);
+    if (url.empty()) {
+      kLog.warn(
+          "community palette '{}' requested but HELIX_COMMUNITY_PALETTE_URL_BASE is unset; using local cache only",
+          name
+      );
+      m_inflightCommunityName.clear();
+      if (parseCommunityPaletteJson(cachePath).has_value()) {
+        resolveAndSet(/*animate=*/true);
+      }
+      return;
+    }
     kLog.info("fetching community palette '{}' from {}", name, url);
     m_httpClient.download(url, cachePath, [this, name, cachePath](bool success) {
       if (m_inflightCommunityName == name) {
@@ -589,21 +600,15 @@ namespace noctalia::theme {
 
     if (animate) {
       setResolvedThemeLight(m_isShellLightMode);
-      notifyShellAppIconColorizationChanged();
       startTransition(resolved->palette);
     } else {
-      if (m_transitionAnimId == 0 && palette == resolved->palette) {
+      if (palette == resolved->palette) {
         flushResolvedCallback(/*defer=*/false);
         rescheduleAutoTimer();
         return;
       }
-      if (m_transitionAnimId != 0) {
-        m_animations.cancel(m_transitionAnimId);
-        m_transitionAnimId = 0;
-      }
       m_transitionTimer.stop();
       setResolvedThemeLight(m_isShellLightMode);
-      notifyShellAppIconColorizationChanged();
       setPalette(resolved->palette);
       if (m_changeCallback) {
         m_changeCallback();
@@ -632,46 +637,17 @@ namespace noctalia::theme {
   }
 
   void ThemeService::startTransition(const Palette& target) {
-    if (m_transitionAnimId == 0 && palette == target) {
-      flushResolvedCallback(/*defer=*/false);
-      return;
-    }
-    if (m_transitionAnimId != 0 && m_targetPalette == target) {
-      flushResolvedCallback(/*defer=*/true);
-      return;
-    }
-    // Capture the currently-displayed palette (possibly mid-fade) so a new
-    // transition starts from wherever the previous one had reached.
-    if (m_transitionAnimId != 0) {
-      m_animations.cancel(m_transitionAnimId);
-      m_transitionAnimId = 0;
-    }
-    m_fromPalette = palette;
+    // Palette cross-fade lived in the display layer; platform ThemeService snaps.
     m_targetPalette = target;
-    m_transitionResolvedCallbackFlushed = false;
-    m_transitionAnimId = m_animations.animate(
-        0.0F, 1.0F, kTransitionDurationMs, Easing::EaseOutCubic,
-        [this](float t) {
-          setPalette(lerpPalette(m_fromPalette, m_targetPalette, t));
-          if (m_changeCallback) {
-            m_changeCallback();
-          }
-          if (!m_transitionResolvedCallbackFlushed) {
-            m_transitionResolvedCallbackFlushed = true;
-            flushResolvedCallback(/*defer=*/true);
-          }
-        },
-        [this]() { finishTransition(/*deferResolvedCallback=*/false); }
-    );
-    if (m_transitionAnimId == 0) {
-      m_transitionTimer.stop();
-      return;
+    m_transitionTimer.stop();
+    setPalette(target);
+    if (m_changeCallback) {
+      m_changeCallback();
     }
-    m_transitionTimer.startRepeating(kTransitionTick, [this] { tickTransition(); });
+    flushResolvedCallback(/*defer=*/false);
   }
 
   void ThemeService::finishTransition(bool deferResolvedCallback) {
-    m_transitionAnimId = 0;
     m_transitionTimer.stop();
     setPalette(m_targetPalette);
     if (m_changeCallback) {
@@ -680,13 +656,7 @@ namespace noctalia::theme {
     flushResolvedCallback(deferResolvedCallback);
   }
 
-  void ThemeService::tickTransition() {
-    if (!m_animations.hasActive()) {
-      m_transitionTimer.stop();
-      return;
-    }
-    m_animations.tick(static_cast<float>(kTransitionTick.count()));
-  }
+  void ThemeService::tickTransition() { m_transitionTimer.stop(); }
 
   bool ThemeService::saveWallpaperPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut) {
     if (m_remoteSource) {
@@ -851,12 +821,12 @@ namespace noctalia::theme {
   }
 
   void ThemeService::registerIpc(IpcService& ipc) {
-    ipc.bind(noctalia::cli::msg::themeModeToggle, [this](const std::string&) -> std::string {
+    ipc.bind(helix::cli::msg::themeModeToggle, [this](const std::string&) -> std::string {
       toggleLightDark();
       return "ok\n";
     });
     ipc.bind(
-        noctalia::cli::msg::themeModeGet,
+        helix::cli::msg::themeModeGet,
         [this](const std::string&) -> std::string {
           std::string out(resolvedMode());
           out.push_back('\n');
@@ -864,7 +834,7 @@ namespace noctalia::theme {
         },
         IpcService::HandlerOptions{.actionEditorVisibility = IpcService::ActionEditorVisibility::Hidden}
     );
-    ipc.bind(noctalia::cli::msg::themeModeSet, [this](const std::string& args) -> std::string {
+    ipc.bind(helix::cli::msg::themeModeSet, [this](const std::string& args) -> std::string {
       const std::string token = StringUtils::trim(args);
       const auto mode = enumFromKey(kThemeModes, token);
       if (!mode.has_value()) {
@@ -874,11 +844,11 @@ namespace noctalia::theme {
       return "ok\n";
     });
     ipc.bind(
-        noctalia::cli::msg::colorSchemeGet,
+        helix::cli::msg::colorSchemeGet,
         [this](const std::string&) -> std::string { return formatColorSchemeLine(m_config.config().theme); },
         IpcService::HandlerOptions{.actionEditorVisibility = IpcService::ActionEditorVisibility::Hidden}
     );
-    ipc.bind(noctalia::cli::msg::colorSchemeSet, [this](const std::string& args) -> std::string {
+    ipc.bind(helix::cli::msg::colorSchemeSet, [this](const std::string& args) -> std::string {
       PaletteSource source = PaletteSource::Builtin;
       std::string value;
       std::string error;
@@ -892,4 +862,4 @@ namespace noctalia::theme {
     });
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

@@ -54,8 +54,8 @@ Json audioNodes(const std::vector<AudioNode>& nodes) {
 Json palettePreviews() {
   static const Json builtins = [] {
     Json result = Json::array();
-    for (const auto& palette : noctalia::theme::builtinPalettes()) {
-      const auto colors = noctalia::theme::expandBuiltinPalette(palette);
+    for (const auto& palette : helix::theme::builtinPalettes()) {
+      const auto colors = helix::theme::expandBuiltinPalette(palette);
       auto mode = [](const auto& tokens) {
         Json accents = Json::array();
         for (const char* role : {"primary", "secondary", "tertiary"})
@@ -86,9 +86,9 @@ Json palettePreviews() {
     result.push_back({{"source", source}, {"name", palette.name}, {"dark", mode(palette.preview.dark)}, {"light", mode(palette.preview.light)}});
   };
   unsigned shown = 0;
-  for (const auto& palette : noctalia::theme::availableCommunityPalettes()) { if (++shown > 100) break; add(palette, "community"); }
+  for (const auto& palette : helix::theme::availableCommunityPalettes()) { if (++shown > 100) break; add(palette, "community"); }
   shown = 0;
-  for (const auto& palette : noctalia::theme::availableCustomPalettes()) { if (++shown > 100) break; add(palette, "custom"); }
+  for (const auto& palette : helix::theme::availableCustomPalettes()) { if (++shown > 100) break; add(palette, "custom"); }
   return result;
 }
 struct Operation {
@@ -105,9 +105,9 @@ public:
   ConfigService config;
   HttpClient http;
   WallhavenService wallhaven{config, http, [this] { return desktop(); }};
-  noctalia::theme::CommunityPaletteService paletteCatalog{http};
-  noctalia::theme::ThemeService theme{config, http};
-  noctalia::theme::TemplateApplyService templates{config};
+  helix::theme::CommunityPaletteService paletteCatalog{http};
+  helix::theme::ThemeService theme{config, http};
+  helix::theme::TemplateApplyService templates{config};
   std::unique_ptr<SystemBus> system;
   std::unique_ptr<NetworkManagerService> network;
   std::unique_ptr<NetworkSecretAgent> secrets;
@@ -243,7 +243,7 @@ public:
       }
       emit(appearanceInterface, "Applied", g_variant_new("(sb)", std::string(mode).c_str(), changed));
     });
-    theme.setResolvedCallback([this](const noctalia::theme::GeneratedPalette& palette, std::string_view mode) {
+    theme.setResolvedCallback([this](const helix::theme::GeneratedPalette& palette, std::string_view mode) {
       const bool paletteChanged = appearance.value("mode", std::string{}) != mode ||
         !appearance.contains("dark") || appearance.at("dark") != Json(palette.dark) || appearance.at("light") != Json(palette.light);
       appearance = {{"available", true}, {"mode", mode}, {"shell-mode", theme.resolvedShellMode()},
@@ -495,12 +495,12 @@ public:
     // second, and counting those kept the service at the fast rate forever.
     const bool readOnly = name.starts_with("Get") || name.starts_with("List") || name.starts_with("Read");
     if (!readOnly) wake();
-    if (interface == agentInterface) {
+    if (interface == agentSurfaceInterface) {
       if (agentEndpoint) agentEndpoint->method(sender, name, parameters, invocation);
       else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
       return;
     }
-    if (interface == agentActivityInterface) {
+    if (interface == agentSurfaceActivityInterface) {
       if (agentEndpoint) agentEndpoint->activity(sender, name, parameters, invocation);
       else g_dbus_method_invocation_return_dbus_error(invocation, "org.helix.Desktop.Error.Failed", "The agent surface is not running");
       return;
@@ -622,6 +622,8 @@ public:
           if (name == "Update" && id == "control_center.shortcuts") throw std::invalid_argument("Quick shortcuts require UpdateOrderedList");
           if (name == "Update" && (id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids")) throw std::invalid_argument("Template selections require UpdateOrderedList");
           if (name == "Update" && id == "wallpaper.transition") throw std::invalid_argument("Wallpaper transitions require UpdateOrderedList");
+          if (id.starts_with("ai."))
+            throw std::invalid_argument("Model routing is managed in Mobius (helix-mobius), not Helix Settings.");
           if (name == "Update") validateSettingValue(config, id, args.at(1), desktop(), gammaAvailable());
           bool ok;
           if (id == "nightlight.temperature_day" || id == "nightlight.temperature_night") {
@@ -821,7 +823,7 @@ public:
       if (!id) throw std::runtime_error(error ? error->message : "Service registration failed");
       registrations.push_back(id);
     }
-    agentEndpoint = std::make_unique<agent::AgentEndpoint>(bus, objectPath, agentInterface, [this] { return desktopOwner; });
+    agentEndpoint = std::make_unique<agent::AgentEndpoint>(bus, objectPath, agentSurfaceInterface, [this] { return desktopOwner; });
     ownerWatch = g_dbus_connection_signal_subscribe(bus, "org.freedesktop.DBus", "org.freedesktop.DBus",
       "NameOwnerChanged", "/org/freedesktop/DBus", nullptr, G_DBUS_SIGNAL_FLAGS_NONE,
       [](GDBusConnection*, const gchar*, const gchar*, const gchar*, const gchar*, GVariant* value, gpointer data) {
