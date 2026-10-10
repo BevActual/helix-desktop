@@ -109,6 +109,11 @@ impl State {
             return true;
         }
 
+        let before_zone = {
+            let map = layer_map_for_output(&output);
+            map.non_exclusive_zone()
+        };
+
         let mut map = layer_map_for_output(&output);
 
         // Arrange the layers before sending the initial configure to respect any size the
@@ -226,8 +231,18 @@ impl State {
 
         drop(map);
 
-        // This will call queue_redraw() inside.
-        self.niri.output_resized(&output);
+        // Same rule as layer_destroyed: only treat this as an output geometry change when
+        // the usable work area actually moved. Remapping helix-panel / helix-panels (zone -1)
+        // must not configure every tiled window — that storm has crashed Electron/Cursor.
+        let after_zone = {
+            let map = layer_map_for_output(&output);
+            map.non_exclusive_zone()
+        };
+        if before_zone != after_zone {
+            self.niri.output_resized(&output);
+        } else {
+            self.niri.queue_redraw(&output);
+        }
 
         true
     }

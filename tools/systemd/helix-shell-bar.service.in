@@ -5,12 +5,11 @@ After=graphical-session.target helix-service.service helix-shell-strut.service
 Conflicts=helix-shell-dev.service
 # Prefer the split pair over the legacy monolith unit.
 Conflicts=helix-shell-tauri.service
-# Strut holds the exclusive zone; Wants it up with the bar but must NOT Upholds=
-# (Upholds would stop the strut when the bar restarts — the whole point of the split).
+# Strut / panels: Wants= starts them with the bar at login. Do NOT Upholds= either —
+# Upholds stops the dependency when this unit goes inactive, so restart-bar would
+# tear down Overlay (and used to flap every tiled window / crash Cursor).
 Wants=helix-shell-strut.service
-# Keep Overlay panels alive while the bar is up (panels BindsTo the bar the other way).
 Wants=helix-shell-panels.service
-Upholds=helix-shell-panels.service
 
 [Service]
 Type=simple

@@ -186,17 +186,20 @@ case "${1:-install}" in
     ;;
   restart)
     write_units_and_links
-    echo "Restarting shell bar+panels (strut stays; GUI apps keep work area)…"
+    echo "Restarting shell bar+panels (strut stays)…"
     systemctl --user stop helix-shell-tauri.service 2>/dev/null || true
     systemctl --user start helix-shell-strut.service
-    systemctl --user restart helix-shell-bar.service helix-shell-panels.service
+    # Restart separately so a momentary bar inactive state cannot cascade (Upholds removed,
+    # but restarting both at once still tears Overlay while Cursor is open).
+    systemctl --user restart helix-shell-bar.service
+    systemctl --user restart helix-shell-panels.service
     if [ -f "$UNITS/helix-idle.service" ]; then
       systemctl --user restart helix-idle.service
     fi
     if [ -f "$UNITS/helix-wallpaper.service" ]; then
       systemctl --user restart helix-wallpaper.service
     fi
-    echo "Restarted (strut left running)."
+    echo "Restarted (strut left running). Prefer restart-bar alone while Cursor is open."
     ;;
   native)
     echo "The C++ session shell is retired. Use: $0 install" >&2
