@@ -14,10 +14,314 @@ $("close").onclick = () => window.__TAURI__.window.getCurrentWindow().close();
 
 let reporting = false;
 let reportTimer = null;
-let view = { id: "", title: "New chat", messages: [], streaming: false, error: "" };
+let view = { id: "", title: "New chat", messages: [], streaming: false, error: "", temporary: false, pinned: false, project: "" };
 let status = { inference: "ready", backend: "On this computer", left_device: false };
 let personas = { active: "helix", personas: [] };
+let editingPersonaId = "helix";
+let editingMessageIndex = null;
 let stickToBottom = true;
+let chatItems = [];
+let chatFilter = "";
+let projectFilter = "";
+let currentModel = "";
+let currentBackend = "local";
+let searchHits = null;
+let searchTimer = null;
+let pendingQueue = "";
+let promptHistory = [];
+let promptHistoryIndex = -1;
+let promptDraft = "";
+let slashIndex = 0;
+let pendingAttachments = [];
+let findMatches = [];
+let findIndex = -1;
+
+const PROMPT_HISTORY_KEY = "mobius.promptHistory";
+const SLASH_COMMANDS = [
+  { cmd: "/new", desc: "Start a new chat", run: () => invoke("chat_new").then(() => { input.focus(); closeSideDrawer(); }) },
+  { cmd: "/temp", desc: "Temporary chat (not saved)", run: () => invoke("chat_temporary").then(() => { input.focus(); closeSideDrawer(); }) },
+  { cmd: "/model", desc: "Pick chat model / backend", run: () => openModelPicker() },
+  { cmd: "/models", desc: "Models & routing page", run: () => openRouting() },
+  { cmd: "/route", desc: "Models & routing page", run: () => openRouting() },
+  { cmd: "/attach", desc: "Attach text / source files", run: () => pickAttachments() },
+  { cmd: "/find", desc: "Find in this chat", run: () => { openFindBar(); return Promise.resolve(); } },
+  { cmd: "/fork", desc: "Fork this chat", run: () => forkChat() },
+  { cmd: "/export", desc: "Copy chat as Markdown", run: () => $("export-chat").click() },
+  { cmd: "/retry", desc: "Regenerate the last reply", run: () => invoke("chat_regenerate").catch(report) },
+  { cmd: "/stop", desc: "Stop the current reply", run: () => invoke("chat_stop") },
+  { cmd: "/act", desc: "Have Mobius act on the desktop", run: () => {
+    const rest = input.value.replace(/^\/act\b/i, "").trim();
+    const text = rest || lastActableText();
+    if (!text.trim()) { report("Write something to act on."); return Promise.resolve(); }
+    return actOnDesktop(text);
+  } },
+  { cmd: "/search", desc: "Focus chat search", run: () => {
+    openSideDrawer();
+    $("chat-search").focus();
+    $("chat-search").select();
+    return Promise.resolve();
+  } },
+  { cmd: "/help", desc: "Show slash commands", run: () => { showSlashMenu(""); return Promise.resolve(); } },
+];
+
+function lastActableText() {
+  const msgs = view.messages || [];
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m && m.text && m.text.trim()) return m.text.trim();
+  }
+  return "";
+}
+
+function drawAttachChips() {
+  const host = $("attach-chips");
+  if (!pendingAttachments.length) {
+    host.hidden = true;
+    host.replaceChildren();
+    syncSendEnabled();
+    return;
+  }
+  host.hidden = false;
+  host.replaceChildren();
+  pendingAttachments.forEach((file, index) => {
+    const chip = el("div", "attach-chip");
+    chip.append(el("span", "", file.name + " · " + file.chars + " ch"));
+    const remove = el("button", "", "×");
+    remove.type = "button";
+    remove.title = "Remove";
+    remove.onclick = () => {
+      pendingAttachments.splice(index, 1);
+      drawAttachChips();
+    };
+    chip.append(remove);
+    host.append(chip);
+  });
+  syncSendEnabled();
+}
+
+function pickAttachments() {
+  return invoke("chat_pick_attachments")
+    .then((files) => {
+      const list = Array.isArray(files) ? files : [];
+      if (!list.length) return;
+      list.forEach((file) => {
+        if (pendingAttachments.some((a) => a.path === file.path)) return;
+        if (pendingAttachments.length >= 6) return;
+        pendingAttachments.push({
+          name: file.name,
+          path: file.path,
+          chars: file.chars,
+          content: file.content,
+        });
+      });
+      drawAttachChips();
+      input.focus();
+    })
+    .catch(report);
+}
+
+function clearAttachments() {
+  pendingAttachments = [];
+  drawAttachChips();
+}
+
+function attachmentPayload() {
+  return pendingAttachments.map((a) => ({ name: a.name, content: a.content }));
+}
+
+function openFindBar() {
+  $("find-bar").hidden = false;
+  $("find-input").focus();
+  $("find-input").select();
+  runFind();
+}
+
+function closeFindBar() {
+  $("find-bar").hidden = true;
+  $("find-input").value = "";
+  findMatches = [];
+  findIndex = -1;
+  clearFindHighlights();
+  $("find-count").textContent = "";
+}
+
+function clearFindHighlights() {
+  document.querySelectorAll("mark.find-hit").forEach((mark) => {
+    const parent = mark.parentNode;
+    if (!parent) return;
+    parent.replaceChild(document.createTextNode(mark.textContent), mark);
+    parent.normalize();
+  });
+}
+
+function highlightInNode(node, needle) {
+  if (!needle || node.nodeType !== Node.ELEMENT_NODE) return;
+  if (node.matches && node.matches("mark.find-hit")) return;
+  const walker = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+  const texts = [];
+  while (walker.nextNode()) texts.push(walker.currentNode);
+  const lowerNeedle = needle.toLowerCase();
+  texts.forEach((textNode) => {
+    const value = textNode.nodeValue || "";
+    const lower = value.toLowerCase();
+    let start = 0;
+    let idx = lower.indexOf(lowerNeedle, start);
+    if (idx === -1) return;
+    const frag = document.createDocumentFragment();
+    while (idx !== -1) {
+      if (idx > start) frag.append(document.createTextNode(value.slice(start, idx)));
+      const mark = document.createElement("mark");
+      mark.className = "find-hit";
+      mark.textContent = value.slice(idx, idx + needle.length);
+      frag.append(mark);
+      findMatches.push(mark);
+      start = idx + needle.length;
+      idx = lower.indexOf(lowerNeedle, start);
+    }
+    if (start < value.length) frag.append(document.createTextNode(value.slice(start)));
+    textNode.parentNode.replaceChild(frag, textNode);
+  });
+}
+
+function runFind() {
+  clearFindHighlights();
+  findMatches = [];
+  findIndex = -1;
+  const needle = $("find-input").value.trim();
+  if (!needle) {
+    $("find-count").textContent = "";
+    return;
+  }
+  document.querySelectorAll("#messages .msg-body").forEach((body) => highlightInNode(body, needle));
+  $("find-count").textContent = findMatches.length ? ("1 / " + findMatches.length) : "0";
+  if (findMatches.length) {
+    findIndex = 0;
+    focusFindMatch(0);
+  }
+}
+
+function focusFindMatch(index) {
+  if (!findMatches.length) return;
+  findIndex = (index + findMatches.length) % findMatches.length;
+  findMatches.forEach((m, i) => m.classList.toggle("current", i === findIndex));
+  $("find-count").textContent = (findIndex + 1) + " / " + findMatches.length;
+  findMatches[findIndex].scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+try {
+  const raw = localStorage.getItem(PROMPT_HISTORY_KEY);
+  const parsed = raw ? JSON.parse(raw) : [];
+  if (Array.isArray(parsed)) promptHistory = parsed.filter((t) => typeof t === "string" && t.trim()).slice(0, 50);
+} catch (_) { /* ignore */ }
+
+function rememberPrompt(text) {
+  const trimmed = text.trim();
+  if (!trimmed || trimmed.startsWith("/")) return;
+  promptHistory = [trimmed, ...promptHistory.filter((t) => t !== trimmed)].slice(0, 50);
+  try { localStorage.setItem(PROMPT_HISTORY_KEY, JSON.stringify(promptHistory)); } catch (_) { /* ignore */ }
+  promptHistoryIndex = -1;
+  promptDraft = "";
+}
+
+function forkChat(throughIndex) {
+  closeHubMenu();
+  return invoke("chat_fork", { throughIndex: throughIndex == null ? null : throughIndex })
+    .then(() => { input.focus(); closeSideDrawer(); })
+    .catch(report);
+}
+
+function drawQueueChip() {
+  const chip = $("queue-chip");
+  if (!pendingQueue) {
+    chip.hidden = true;
+    chip.textContent = "";
+    return;
+  }
+  chip.hidden = false;
+  const short = pendingQueue.length > 42 ? pendingQueue.slice(0, 42) + "…" : pendingQueue;
+  chip.textContent = "Queued · " + short;
+  chip.title = "Click to clear queue";
+}
+
+function flushQueue() {
+  if (!pendingQueue || view.streaming) return;
+  const text = pendingQueue;
+  pendingQueue = "";
+  drawQueueChip();
+  stickToBottom = true;
+  invoke("chat_send", { text, attachments: null })
+    .then(() => invoke("chat_status").then((s) => { status = s; drawComposerMeta(); }))
+    .catch((error) => { pendingQueue = text; drawQueueChip(); report(error); });
+}
+
+function updateJumpLatest() {
+  $("jump-latest").hidden = stickToBottom || view.messages.length === 0;
+}
+
+function filteredSlash(filter) {
+  const needle = (filter || "").toLowerCase();
+  return SLASH_COMMANDS.filter((c) => !needle || c.cmd.slice(1).startsWith(needle) || c.cmd.includes(needle) || c.desc.toLowerCase().includes(needle));
+}
+
+function hideSlashMenu() {
+  $("slash-menu").hidden = true;
+  $("slash-menu").replaceChildren();
+}
+
+function showSlashMenu(filter) {
+  const host = $("slash-menu");
+  const items = filteredSlash(filter);
+  if (!items.length) { hideSlashMenu(); return; }
+  slashIndex = Math.max(0, Math.min(slashIndex, items.length - 1));
+  host.replaceChildren();
+  items.forEach((item, index) => {
+    const row = el("button", "slash-item" + (index === slashIndex ? " active" : ""));
+    row.type = "button";
+    row.append(el("span", "slash-cmd", item.cmd), el("span", "slash-desc", item.desc));
+    row.onmousedown = (event) => { event.preventDefault(); runSlash(item); };
+    host.append(row);
+  });
+  host.hidden = false;
+}
+
+function runSlash(item) {
+  hideSlashMenu();
+  input.value = "";
+  grow();
+  Promise.resolve(item.run()).catch(report);
+}
+
+function maybeSlashFromInput() {
+  const value = input.value;
+  if (!value.startsWith("/")) { hideSlashMenu(); return false; }
+  if (value.includes("\n")) { hideSlashMenu(); return false; }
+  const space = value.indexOf(" ");
+  if (space !== -1 && !value.startsWith("/act") && !value.startsWith("/search") && !value.startsWith("/help")) {
+    hideSlashMenu();
+    return false;
+  }
+  const filter = space === -1 ? value.slice(1) : value.slice(1, space);
+  showSlashMenu(filter);
+  return true;
+}
+
+function tryRunSlashSubmit() {
+  const value = input.value.trim();
+  if (!value.startsWith("/")) return false;
+  const token = value.split(/\s+/)[0].toLowerCase();
+  const item = SLASH_COMMANDS.find((c) => c.cmd === token);
+  if (!item) {
+    const open = filteredSlash(token.slice(1));
+    if (open.length === 1) {
+      runSlash(open[0]);
+      return true;
+    }
+    showSlashMenu(token.slice(1));
+    return true;
+  }
+  runSlash(item);
+  return true;
+}
 
 function drawSpans(parent, spans) {
   spans.forEach((span) => {
@@ -67,10 +371,31 @@ function messageNode(message, index, last) {
   if (message.role === "user") {
     body.textContent = message.text;
     const actions = el("div", "msg-actions");
-    const act = el("button", "mini", "Act on desktop");
+    const edit = el("button", "mini", "Edit");
+    edit.dataset.test = "edit-" + index;
+    edit.onclick = () => editUserMessage(index, message.text);
+    const act = el("button", "mini", "Act");
     act.dataset.test = "act-" + index;
+    act.title = "Have Mobius change the desktop using this";
     act.onclick = () => actOnDesktop(message.text);
-    actions.append(act);
+    const quote = el("button", "mini", "Quote");
+    quote.dataset.test = "quote-" + index;
+    quote.title = "Insert into the composer";
+    quote.onclick = () => {
+      const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";
+      input.value = input.value + prefix + message.text;
+      grow();
+      syncSendEnabled();
+      input.focus();
+    };
+    actions.append(edit, act, quote);
+    if (!view.streaming) {
+      const fork = el("button", "mini", "Fork");
+      fork.dataset.test = "fork-user-" + index;
+      fork.title = "Continue from here in a new chat";
+      fork.onclick = () => forkChat(index);
+      actions.append(fork);
+    }
     row.append(body, actions);
     return row;
   }
@@ -81,34 +406,102 @@ function messageNode(message, index, last) {
   copy.dataset.test = "copy-" + index;
   copy.onclick = () => invoke("chat_copy", { text: message.text });
   actions.append(copy);
+  if (!view.streaming && message.text.trim()) {
+    const act = el("button", "mini", "Act");
+    act.dataset.test = "act-assistant-" + index;
+    act.title = "Have Mobius act from this reply";
+    act.onclick = () => actOnDesktop(message.text);
+    actions.append(act);
+  }
+  if (!view.streaming) {
+    const fork = el("button", "mini", "Fork");
+    fork.dataset.test = "fork-" + index;
+    fork.title = "Continue from here in a new chat";
+    fork.onclick = () => forkChat(index);
+    actions.append(fork);
+  }
+  if (last && !view.streaming) {
+    const regen = el("button", "mini", "Regenerate");
+    regen.dataset.test = "regenerate";
+    regen.onclick = () => invoke("chat_regenerate").catch(report);
+    actions.append(regen);
+  }
   row.append(body, actions);
   if (last && view.streaming) row.classList.add("live");
   return row;
 }
 
+function editUserMessage(index, current) {
+  editingMessageIndex = index;
+  $("edit-text").value = current;
+  $("edit-dialog").showModal();
+  $("edit-text").focus();
+}
+
+$("edit-form").addEventListener("submit", (event) => {
+  const submitter = event.submitter;
+  if (!submitter || submitter.value !== "save") return;
+  event.preventDefault();
+  const text = $("edit-text").value.trim();
+  if (!text) { report("Write something to send."); return; }
+  const index = editingMessageIndex;
+  editingMessageIndex = null;
+  $("edit-dialog").close();
+  stickToBottom = true;
+  invoke("chat_edit", { index, text })
+    .then(() => invoke("chat_status").then((s) => { status = s; drawComposerMeta(); }))
+    .catch(report);
+});
+
 function actOnDesktop(text) {
   invoke("chat_act_on_desktop", { text })
     .then(() => {
       const banner = $("banner");
-      banner.textContent = "Sent to the desktop assistant. Confirm there if it asks.";
+      banner.textContent = "Sent to Mobius Act. Confirm in the bar if it asks.";
       banner.hidden = false;
-      setTimeout(() => { if (banner.textContent.startsWith("Sent to the desktop")) banner.hidden = true; }, 4000);
+      setTimeout(() => { if (banner.textContent.startsWith("Sent to Mobius Act")) banner.hidden = true; }, 4000);
     })
     .catch(report);
 }
 
-function drawRouteChip() {
+function drawComposerMeta() {
   const chip = $("route-chip");
   const label = status.backend || "";
-  if (!label) { chip.hidden = true; return; }
-  chip.hidden = false;
-  chip.textContent = status.left_device ? ("Left device · " + label) : label;
-  chip.classList.toggle("remote", !!status.left_device);
+  if (!label) { chip.hidden = true; }
+  else {
+    chip.hidden = false;
+    chip.textContent = status.left_device ? ("Left device · " + label) : label;
+    chip.classList.toggle("remote", !!status.left_device);
+  }
+  $("meta-route").textContent = label || "On this computer";
+  $("meta-route").classList.toggle("remote", !!status.left_device);
+  const modelLabel = currentModel
+    ? (currentBackend !== "local" ? (currentBackend + " · " + currentModel) : currentModel)
+    : (currentBackend !== "local" ? (currentBackend + " · Auto") : "Auto model");
+  $("meta-model").textContent = modelLabel;
+  document.body.classList.toggle("temporary", !!view.temporary);
+  $("temp-banner").hidden = !view.temporary;
+  $("chat-title").disabled = !!view.temporary;
+  $("chat-title").title = view.temporary ? "Temporary chats are not renamed" : "Rename chat";
+  const canOrganize = !view.temporary && !!view.id && view.messages.length > 0;
+  $("pin-chat").hidden = !canOrganize;
+  $("project-chat").hidden = !canOrganize;
+  $("pin-chat").classList.toggle("active", !!view.pinned);
+  $("pin-chat").title = view.pinned ? "Unpin chat" : "Pin chat";
+  $("project-chat").title = view.project ? ("Project: " + view.project) : "Move to project";
+  drawQueueChip();
+  drawProjectFilter();
+  updateJumpLatest();
+}
+
+function syncSendEnabled() {
+  // While streaming, Enter still queues a follow-up; keep Send enabled when there is text or attachments.
+  $("send").disabled = !input.value.trim() && !pendingAttachments.length;
 }
 
 function drawChat() {
-  $("chat-title").textContent = view.title;
-  drawRouteChip();
+  $("chat-title").textContent = view.temporary ? "Temporary chat" : (view.title || "New chat");
+  drawComposerMeta();
   const host = $("messages");
   host.replaceChildren();
   view.messages.forEach((message, index) => host.append(messageNode(message, index, index === view.messages.length - 1)));
@@ -116,24 +509,40 @@ function drawChat() {
   $("send").hidden = view.streaming;
   $("stop").hidden = !view.streaming;
   $("input").disabled = false;
+  syncSendEnabled();
   const banner = $("banner");
   const text = status.inference !== "ready"
-    ? "Inference is not running. It starts when needed; try again in a moment."
+    ? "Inference is offline. It starts when needed — click to check again."
     : view.error;
   banner.textContent = text;
   banner.hidden = !text;
+  banner.classList.toggle("clickable", status.inference !== "ready" && !view.error);
+  banner.onclick = status.inference !== "ready" && !view.error
+    ? () => invoke("chat_status").then((s) => { status = s; drawChat(); }).catch(report)
+    : null;
   if (stickToBottom) scrollDown();
+  if (!$("find-bar").hidden && $("find-input").value.trim()) runFind();
   queueReport();
 }
 function scrollDown() {
   const scroller = $("scroller");
   scroller.scrollTop = scroller.scrollHeight;
+  stickToBottom = true;
+  updateJumpLatest();
 }
 $("scroller").addEventListener("scroll", () => {
   const s = $("scroller");
   stickToBottom = s.scrollHeight - s.scrollTop - s.clientHeight < 60;
+  updateJumpLatest();
 });
-listen("chat-view", (event) => { view = event.payload; drawChat(); });
+$("jump-latest").onclick = () => scrollDown();
+$("queue-chip").onclick = () => { pendingQueue = ""; drawQueueChip(); };
+listen("chat-view", (event) => {
+  const wasStreaming = view.streaming;
+  view = event.payload;
+  drawChat();
+  if (wasStreaming && !view.streaming) flushQueue();
+});
 listen("chat-stream", (event) => {
   const last = $("messages").lastElementChild;
   if (!last || !last.classList.contains("assistant")) return;
@@ -141,14 +550,88 @@ listen("chat-stream", (event) => {
   if (stickToBottom) scrollDown();
 });
 
+function projectNames() {
+  const names = new Set();
+  chatItems.forEach((item) => { if (item.project) names.add(item.project); });
+  return Array.from(names).sort((a, b) => a.localeCompare(b));
+}
+
+function drawProjectFilter() {
+  const host = $("project-filter");
+  const names = projectNames();
+  if (!names.length && !projectFilter) {
+    host.hidden = true;
+    host.replaceChildren();
+    return;
+  }
+  host.hidden = false;
+  host.replaceChildren();
+  const all = el("button", "project-pill" + (!projectFilter ? " active" : ""), "All");
+  all.type = "button";
+  all.onclick = () => { projectFilter = ""; drawList(); drawComposerMeta(); };
+  host.append(all);
+  names.forEach((name) => {
+    const pill = el("button", "project-pill" + (projectFilter === name ? " active" : ""), name);
+    pill.type = "button";
+    pill.onclick = () => { projectFilter = name; drawList(); drawComposerMeta(); };
+    host.append(pill);
+  });
+}
+
 function drawList(items) {
+  if (items) chatItems = items;
   const host = $("chats");
   host.replaceChildren();
-  items.forEach((item, index) => {
-    const row = el("div", "chat-row" + (item.id === view.id ? " current" : ""));
+  const needle = chatFilter.trim().toLowerCase();
+  let filtered;
+  const snippetById = {};
+  if (needle.length >= 2 && Array.isArray(searchHits)) {
+    filtered = searchHits.map((hit) => {
+      snippetById[hit.id] = hit.snippet || "";
+      return {
+        id: hit.id,
+        title: hit.title,
+        updated: hit.updated,
+        pinned: hit.pinned,
+        project: hit.project || "",
+        preview: hit.snippet || "",
+      };
+    });
+  } else {
+    filtered = chatItems;
+    if (projectFilter) filtered = filtered.filter((item) => item.project === projectFilter);
+    if (needle) {
+      filtered = filtered.filter((item) =>
+        (item.title || "").toLowerCase().includes(needle)
+        || (item.project || "").toLowerCase().includes(needle)
+        || (item.preview || "").toLowerCase().includes(needle));
+    }
+  }
+  if (projectFilter && needle.length >= 2 && Array.isArray(searchHits)) {
+    filtered = filtered.filter((item) => item.project === projectFilter);
+  }
+  if (!filtered.length) {
+    host.append(el("div", "chat-empty", needle || projectFilter ? "No matching chats" : "No chats yet"));
+  }
+  filtered.forEach((item, index) => {
+    const row = el("div", "chat-row" + (item.id === view.id ? " current" : "") + (item.pinned ? " pinned" : ""));
     row.dataset.test = "chat-" + index;
-    const open = el("button", "chat-open", item.title);
-    open.onclick = () => invoke("chat_open", { id: item.id }).catch(report);
+    const open = el("button", "chat-open");
+    const title = el("span", "chat-open-title", item.title);
+    open.append(title);
+    if (item.project) open.append(el("span", "chat-open-project", item.project));
+    const snippet = snippetById[item.id] || (needle && item.preview) || "";
+    if (snippet && needle) open.append(el("span", "chat-open-snippet", snippet));
+    if (item.pinned) {
+      const mark = el("span", "chat-pin-mark");
+      mark.append(icon("pin"));
+      open.prepend(mark);
+    }
+    open.onclick = () => {
+      clearAttachments();
+      invoke("chat_open", { id: item.id }).catch(report);
+      closeSideDrawer();
+    };
     const del = el("button", "chat-delete");
     del.dataset.test = "chat-delete-" + index;
     del.title = "Delete";
@@ -158,28 +641,197 @@ function drawList(items) {
     row.append(open, del);
     host.append(row);
   });
+  drawProjectFilter();
   queueReport();
 }
 listen("chat-list", (event) => drawList(event.payload));
+$("chat-search").addEventListener("input", () => {
+  chatFilter = $("chat-search").value;
+  const needle = chatFilter.trim();
+  clearTimeout(searchTimer);
+  if (needle.length < 2) {
+    searchHits = null;
+    drawList();
+    return;
+  }
+  searchTimer = setTimeout(() => {
+    invoke("chat_search", { query: needle })
+      .then((hits) => { searchHits = Array.isArray(hits) ? hits : []; drawList(); })
+      .catch(() => { searchHits = null; drawList(); });
+  }, 160);
+});
+$("pin-chat").onclick = () => {
+  invoke("chat_pin", { pinned: !view.pinned }).catch(report);
+};
+$("project-chat").onclick = () => {
+  $("project-name").value = view.project || "";
+  const list = $("project-suggestions");
+  list.replaceChildren(...projectNames().map((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    return opt;
+  }));
+  $("project-dialog").showModal();
+  $("project-name").focus();
+};
+$("project-form").addEventListener("submit", (event) => {
+  const submitter = event.submitter;
+  if (!submitter || (submitter.value !== "save" && submitter.value !== "clear")) return;
+  event.preventDefault();
+  const project = submitter.value === "clear" ? "" : $("project-name").value.trim();
+  invoke("chat_set_project", { project })
+    .then(() => $("project-dialog").close())
+    .catch(report);
+});
+$("chat-title").onclick = () => {
+  if (view.temporary) return;
+  $("rename-title").value = view.title || "New chat";
+  $("rename-dialog").showModal();
+  $("rename-title").focus();
+  $("rename-title").select();
+};
+$("rename-form").addEventListener("submit", (event) => {
+  const submitter = event.submitter;
+  if (!submitter || submitter.value !== "save") return;
+  event.preventDefault();
+  const title = $("rename-title").value.trim();
+  if (!title) { report("Give the chat a title."); return; }
+  invoke("chat_rename", { title })
+    .then(() => $("rename-dialog").close())
+    .catch(report);
+});
+
+function activePersona() {
+  return (personas.personas || []).find((p) => p.id === personas.active) || (personas.personas || [])[0];
+}
+
+function personaInitials(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return (parts[0] || "?").slice(0, 2).toUpperCase();
+}
+
+function personaHue(id) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash + id.charCodeAt(i)) | 0;
+  return Math.abs(hash) % 360;
+}
+
+function startNewPersona() {
+  const stamp = Date.now().toString(36).slice(-6);
+  fillPersonaForm({
+    id: "persona-" + stamp,
+    name: "New persona",
+    system_prompt: "",
+    task: "chat",
+    backend: "",
+    model: "",
+  });
+  closeHubMenu();
+  $("persona-dialog").showModal();
+  $("persona-edit-name").focus();
+  $("persona-edit-name").select();
+}
+
+function drawPersonaDots() {
+  const host = $("persona-dots");
+  host.replaceChildren();
+  (personas.personas || []).forEach((p, index) => {
+    const item = el("button", "persona-dot" + (p.id === personas.active ? " active" : ""));
+    item.type = "button";
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", p.id === personas.active ? "true" : "false");
+    item.dataset.test = "persona-dot-" + index;
+    item.title = p.name + " — click to use, double-click to edit";
+    item.style.setProperty("--dot-hue", String(personaHue(p.id)));
+    const face = el("span", "persona-dot-face", personaInitials(p.name));
+    const label = el("span", "persona-dot-label", p.name);
+    item.append(face, label);
+    item.onclick = () => {
+      if (p.id === personas.active) {
+        openPersonaSheet(p);
+        return;
+      }
+      invoke("personas_set_active", { id: p.id }).catch(report);
+    };
+    item.ondblclick = (event) => {
+      event.preventDefault();
+      openPersonaSheet(p);
+    };
+    host.append(item);
+  });
+  const add = el("button", "persona-dot persona-dot-add");
+  add.type = "button";
+  add.dataset.test = "persona-dot-add";
+  add.title = "New persona";
+  add.setAttribute("aria-label", "New persona");
+  const face = el("span", "persona-dot-face");
+  face.append(icon("plus"));
+  add.append(face, el("span", "persona-dot-label", "New"));
+  add.onclick = () => startNewPersona();
+  host.append(add);
+}
 
 function drawPersonas(store) {
   personas = store;
-  const select = $("persona");
-  const previous = select.value;
-  select.replaceChildren();
+  const pick = $("persona-pick");
+  const previous = pick.value || editingPersonaId;
+  pick.replaceChildren();
   (store.personas || []).forEach((p) => {
     const opt = document.createElement("option");
     opt.value = p.id;
     opt.textContent = p.name;
-    if (p.id === store.active) opt.selected = true;
-    select.append(opt);
+    if (p.id === (previous || store.active)) opt.selected = true;
+    pick.append(opt);
   });
-  if (!select.value && previous) select.value = previous;
+  if (!pick.value && store.active) pick.value = store.active;
+  editingPersonaId = pick.value || store.active;
+  drawPersonaDots();
+  drawComposerMeta();
 }
 listen("personas-view", (event) => drawPersonas(event.payload));
-$("persona").onchange = () => {
-  invoke("personas_set_active", { id: $("persona").value }).catch(report);
+
+function fillPersonaForm(persona) {
+  if (!persona) return;
+  editingPersonaId = persona.id;
+  $("persona-edit-name").value = persona.name || "";
+  $("persona-edit-prompt").value = persona.system_prompt || "";
+  $("persona-edit-task").value = persona.task || "chat";
+  $("persona-edit-backend").value = persona.backend || "";
+  $("persona-edit-model").value = persona.model || "";
+  $("persona-pick").value = persona.id;
+}
+
+function openPersonaSheet(persona) {
+  fillPersonaForm(persona || activePersona());
+  closeHubMenu();
+  $("persona-dialog").showModal();
+  $("persona-edit-name").focus();
+}
+
+$("persona-pick").onchange = () => {
+  const next = (personas.personas || []).find((p) => p.id === $("persona-pick").value);
+  fillPersonaForm(next);
 };
+$("persona-new").onclick = () => startNewPersona();
+$("persona-form").addEventListener("submit", (event) => {
+  const submitter = event.submitter;
+  if (!submitter || submitter.value !== "save") return;
+  event.preventDefault();
+  const persona = {
+    id: editingPersonaId || ("persona-" + Date.now().toString(36).slice(-6)),
+    name: $("persona-edit-name").value.trim(),
+    system_prompt: $("persona-edit-prompt").value,
+    task: $("persona-edit-task").value || "chat",
+    backend: $("persona-edit-backend").value.trim(),
+    model: $("persona-edit-model").value.trim(),
+  };
+  if (!persona.name) { report("Give the persona a name."); return; }
+  invoke("personas_upsert", { persona })
+    .then(() => invoke("personas_set_active", { id: persona.id }))
+    .then(() => $("persona-dialog").close())
+    .catch(report);
+});
 
 function report(error) {
   const banner = $("banner");
@@ -191,37 +843,380 @@ const input = $("input");
 function grow() {
   input.style.height = "auto";
   input.style.height = Math.min(180, input.scrollHeight) + "px";
+  syncSendEnabled();
 }
-input.addEventListener("input", grow);
+input.addEventListener("input", () => {
+  grow();
+  maybeSlashFromInput();
+  if (promptHistoryIndex >= 0 && input.value !== promptHistory[promptHistoryIndex]) {
+    promptHistoryIndex = -1;
+    promptDraft = "";
+  }
+});
 input.addEventListener("keydown", (event) => {
+  const slashOpen = !$("slash-menu").hidden;
+  if (slashOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+    event.preventDefault();
+    const items = filteredSlash(input.value.trim().split(/\s+/)[0].slice(1));
+    if (!items.length) return;
+    slashIndex = event.key === "ArrowDown"
+      ? (slashIndex + 1) % items.length
+      : (slashIndex - 1 + items.length) % items.length;
+    showSlashMenu(input.value.trim().split(/\s+/)[0].slice(1));
+    return;
+  }
+  if (slashOpen && event.key === "Tab") {
+    event.preventDefault();
+    const items = filteredSlash(input.value.trim().split(/\s+/)[0].slice(1));
+    if (items[slashIndex]) runSlash(items[slashIndex]);
+    return;
+  }
+  if (slashOpen && event.key === "Escape") {
+    event.preventDefault();
+    hideSlashMenu();
+    return;
+  }
+  if (!slashOpen && (event.key === "ArrowUp" || event.key === "ArrowDown") && !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey) {
+    const atStart = input.selectionStart === 0 && input.selectionEnd === 0;
+    const empty = !input.value;
+    if ((empty || atStart) && promptHistory.length) {
+      event.preventDefault();
+      if (event.key === "ArrowUp") {
+        if (promptHistoryIndex < 0) promptDraft = input.value;
+        promptHistoryIndex = Math.min(promptHistoryIndex + 1, promptHistory.length - 1);
+        input.value = promptHistory[promptHistoryIndex] || "";
+      } else if (promptHistoryIndex >= 0) {
+        promptHistoryIndex -= 1;
+        input.value = promptHistoryIndex < 0 ? promptDraft : (promptHistory[promptHistoryIndex] || "");
+      }
+      grow();
+      input.setSelectionRange(input.value.length, input.value.length);
+      return;
+    }
+  }
   if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
     event.preventDefault();
+    if (slashOpen) {
+      const items = filteredSlash(input.value.trim().split(/\s+/)[0].slice(1));
+      if (items[slashIndex]) { runSlash(items[slashIndex]); return; }
+    }
     $("composer").requestSubmit();
   }
 });
 $("composer").addEventListener("submit", (event) => {
   event.preventDefault();
+  hideSlashMenu();
   const text = input.value;
-  if (!text.trim() || view.streaming) return;
+  if (!text.trim() && !pendingAttachments.length) return;
+  if (text.trim().startsWith("/") && tryRunSlashSubmit()) return;
+  if (view.streaming) {
+    if (!text.trim()) { report("Wait for the reply, or stop it."); return; }
+    pendingQueue = text.trim();
+    rememberPrompt(text);
+    input.value = "";
+    grow();
+    drawQueueChip();
+    return;
+  }
+  const attachments = attachmentPayload();
+  rememberPrompt(text);
   input.value = "";
   grow();
   stickToBottom = true;
-  invoke("chat_send", { text })
-    .then(() => invoke("chat_status").then((s) => { status = s; drawRouteChip(); }))
+  invoke("chat_send", { text, attachments: attachments.length ? attachments : null })
+    .then(() => {
+      clearAttachments();
+      return invoke("chat_status").then((s) => { status = s; drawComposerMeta(); });
+    })
     .catch((error) => { input.value = text; grow(); report(error); });
 });
 $("stop").onclick = () => invoke("chat_stop");
+$("attach").onclick = () => pickAttachments();
 $("act").onclick = () => {
   const text = input.value.trim() || (view.messages.slice().reverse().find((m) => m.role === "user") || {}).text || "";
   if (!text.trim()) { report("Write something to act on."); return; }
   actOnDesktop(text);
 };
-$("open-assistant").onclick = () => invoke("chat_open_shell_panel", { id: "assistant" }).catch(report);
-$("open-agents").onclick = () => invoke("chat_open_shell_panel", { id: "agents" }).catch(report);
-$("open-settings-agents").onclick = () => invoke("open_settings_agents").catch(report);
-$("new-chat").onclick = () => invoke("chat_new").then(() => input.focus()).catch(report);
+$("new-chat").onclick = () => {
+  invoke("chat_new").then(() => { clearAttachments(); input.focus(); closeSideDrawer(); }).catch(report);
+};
+$("temp-chat").onclick = () => {
+  invoke("chat_temporary").then(() => { clearAttachments(); input.focus(); closeSideDrawer(); }).catch(report);
+};
+$("fork-chat").onclick = () => forkChat();
+$("find-input").addEventListener("input", runFind);
+$("find-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (event.shiftKey) focusFindMatch(findIndex - 1);
+    else focusFindMatch(findIndex + 1);
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeFindBar();
+    input.focus();
+  }
+});
+$("find-prev").onclick = () => focusFindMatch(findIndex - 1);
+$("find-next").onclick = () => focusFindMatch(findIndex + 1);
+$("find-close").onclick = () => { closeFindBar(); input.focus(); };
+$("meta-model").onclick = () => openModelPicker().catch(report);
 
-// Routing dialog --------------------------------------------------------------------------------------------------------------------
+async function fillModelList(backend) {
+  const host = $("model-list");
+  host.replaceChildren();
+  const auto = el("button", "model-option" + (!currentModel ? " active" : ""), "Auto (default)");
+  auto.type = "button";
+  auto.onclick = () => {
+    $("model-custom").value = "";
+    host.querySelectorAll(".model-option").forEach((n) => n.classList.remove("active"));
+    auto.classList.add("active");
+  };
+  host.append(auto);
+  let models = [];
+  if (backend === "local") {
+    models = await invoke("routing_list_models");
+  } else {
+    models = await invoke("routing_list_remote_models", { backendId: backend });
+  }
+  (Array.isArray(models) ? models : []).forEach((id) => {
+    const row = el("button", "model-option" + (currentModel === id ? " active" : ""), id);
+    row.type = "button";
+    row.onclick = () => {
+      $("model-custom").value = id;
+      host.querySelectorAll(".model-option").forEach((n) => n.classList.remove("active"));
+      row.classList.add("active");
+    };
+    host.append(row);
+  });
+}
+
+async function openModelPicker() {
+  const route = await invoke("chat_current_route");
+  currentModel = (route && route.model) || "";
+  currentBackend = (route && route.backend) || "local";
+  $("model-custom").value = currentModel || "";
+  const select = $("model-backend");
+  if (![...select.options].some((o) => o.value === currentBackend)) {
+    const opt = document.createElement("option");
+    opt.value = currentBackend;
+    opt.textContent = (route && route.label) || currentBackend;
+    select.append(opt);
+  }
+  select.value = currentBackend;
+  if (currentBackend === "openrouter") {
+    await invoke("routing_ensure_openrouter").catch(() => {});
+  }
+  await fillModelList(select.value);
+  $("model-dialog").showModal();
+}
+$("model-backend").onchange = () => {
+  const backend = $("model-backend").value;
+  const ensure = backend === "openrouter"
+    ? invoke("routing_ensure_openrouter")
+    : Promise.resolve();
+  ensure.then(() => fillModelList(backend)).catch(report);
+};
+$("model-form").addEventListener("submit", (event) => {
+  const submitter = event.submitter;
+  if (!submitter || (submitter.value !== "save" && submitter.value !== "auto")) return;
+  event.preventDefault();
+  const backend = $("model-backend").value || "local";
+  const model = submitter.value === "auto" ? "" : $("model-custom").value.trim();
+  const ensure = backend === "openrouter"
+    ? invoke("routing_ensure_openrouter")
+    : Promise.resolve();
+  ensure
+    .then(() => invoke("chat_set_route", { backend, model }))
+    .then(() => {
+      currentBackend = backend;
+      currentModel = model;
+      $("model-dialog").close();
+      drawComposerMeta();
+    })
+    .catch(report);
+});
+$("export-chat").onclick = () => {
+  closeHubMenu();
+  invoke("chat_export_markdown")
+    .then((markdown) => invoke("chat_copy", { text: markdown }))
+    .then(() => {
+      const banner = $("banner");
+      banner.textContent = "Copied conversation as Markdown.";
+      banner.hidden = false;
+      setTimeout(() => { if (banner.textContent.startsWith("Copied conversation")) banner.hidden = true; }, 2500);
+    })
+    .catch(report);
+};
+
+// Hub menu --------------------------------------------------------------------------------------------------------------------------
+function closeHubMenu() {
+  $("hub-menu").hidden = true;
+  $("hub-toggle").setAttribute("aria-expanded", "false");
+}
+function toggleHubMenu() {
+  const open = $("hub-menu").hidden;
+  $("hub-menu").hidden = !open;
+  $("hub-toggle").setAttribute("aria-expanded", open ? "true" : "false");
+}
+$("hub-toggle").onclick = (event) => { event.stopPropagation(); toggleHubMenu(); };
+document.addEventListener("click", (event) => {
+  if (!$("hub-menu").hidden && !$("side-footer").contains(event.target)) closeHubMenu();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    if (!$("find-bar").hidden) {
+      closeFindBar();
+      return;
+    }
+    if (!$("slash-menu").hidden) {
+      hideSlashMenu();
+      return;
+    }
+    if (pendingQueue) {
+      pendingQueue = "";
+      drawQueueChip();
+      return;
+    }
+    if (view.streaming) invoke("chat_stop");
+    closeHubMenu();
+    closeSideDrawer();
+    return;
+  }
+  const meta = event.metaKey || event.ctrlKey;
+  if (meta && event.key.toLowerCase() === "n" && !event.shiftKey) {
+    event.preventDefault();
+    $("new-chat").click();
+  }
+  if (meta && event.shiftKey && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    $("temp-chat").click();
+  }
+  if (meta && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    openSideDrawer();
+    $("chat-search").focus();
+    $("chat-search").select();
+  }
+  if (meta && event.shiftKey && event.key.toLowerCase() === "c") {
+    event.preventDefault();
+    $("export-chat").click();
+  }
+  if (meta && event.key.toLowerCase() === "f" && !event.shiftKey) {
+    event.preventDefault();
+    openFindBar();
+  }
+  if (meta && event.shiftKey && event.key.toLowerCase() === "f") {
+    event.preventDefault();
+    forkChat();
+  }
+  if (meta && event.key.toLowerCase() === "u") {
+    event.preventDefault();
+    pickAttachments();
+  }
+  if (meta && event.key === "/") {
+    event.preventDefault();
+    input.focus();
+    input.value = "/";
+    grow();
+    showSlashMenu("");
+  }
+  if (meta && event.key.toLowerCase() === "l" && !event.shiftKey) {
+    event.preventDefault();
+    input.focus();
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+  }
+  if (meta && event.key.toLowerCase() === "m" && !event.shiftKey) {
+    event.preventDefault();
+    openRouting();
+  }
+  if (meta && event.shiftKey && event.key.toLowerCase() === "a") {
+    event.preventDefault();
+    const text = (window.getSelection() && String(window.getSelection())) || lastActableText();
+    if (!text.trim()) { report("Nothing to act on yet."); return; }
+    actOnDesktop(text.trim());
+  }
+  if (meta && event.key === "Enter" && event.shiftKey) {
+    event.preventDefault();
+    const draft = input.value.trim() || lastActableText();
+    if (!draft) { report("Write something to act on."); return; }
+    actOnDesktop(draft);
+  }
+});
+
+// Drag files onto the composer to attach.
+["dragenter", "dragover"].forEach((name) => {
+  $("composer").addEventListener(name, (event) => {
+    event.preventDefault();
+    $("composer").classList.add("drop-target");
+  });
+});
+["dragleave", "drop"].forEach((name) => {
+  $("composer").addEventListener(name, (event) => {
+    event.preventDefault();
+    if (name === "dragleave" && $("composer").contains(event.relatedTarget)) return;
+    $("composer").classList.remove("drop-target");
+  });
+});
+$("composer").addEventListener("drop", (event) => {
+  event.preventDefault();
+  $("composer").classList.remove("drop-target");
+  const files = event.dataTransfer && event.dataTransfer.files;
+  if (!files || !files.length) return;
+  // File paths from the OS drop are not readable in the webview; open the native picker instead.
+  pickAttachments();
+});
+
+$("open-assistant").onclick = () => { closeHubMenu(); invoke("chat_open_shell_panel", { id: "assistant" }).catch(report); };
+$("open-agents").onclick = () => { closeHubMenu(); invoke("chat_open_shell_panel", { id: "agents" }).catch(report); };
+$("open-settings-agents").onclick = () => { closeHubMenu(); invoke("open_settings_agents").catch(report); };
+
+// Narrow sidebar drawer -------------------------------------------------------------------------------------------------------------
+function closeSideDrawer() {
+  document.body.classList.remove("side-open");
+  $("side-toggle").setAttribute("aria-expanded", "false");
+  $("side-scrim").hidden = true;
+}
+function openSideDrawer() {
+  document.body.classList.add("side-open");
+  $("side-toggle").setAttribute("aria-expanded", "true");
+  $("side-scrim").hidden = false;
+}
+$("side-toggle").onclick = () => {
+  if (document.body.classList.contains("side-open")) closeSideDrawer();
+  else openSideDrawer();
+};
+$("side-scrim").onclick = () => closeSideDrawer();
+window.matchMedia("(min-width: 720px)").addEventListener("change", (event) => {
+  if (event.matches) closeSideDrawer();
+});
+
+// Models page -----------------------------------------------------------------------------------------------------------------------
+const ROUTE_SOURCES = [
+  { id: "local", label: "My computer", short: "This PC", kind: "local" },
+  { id: "lan", label: "LAN", short: "LAN", kind: "remote" },
+  { id: "openrouter", label: "Cloud", short: "Cloud", kind: "remote" },
+];
+const ROUTE_TASKS = [
+  { id: "chat", kicker: "Talk", title: "Chat", locked: false },
+  { id: "act", kicker: "Desktop", title: "Act", locked: true },
+  { id: "code", kicker: "Dev", title: "Code", locked: false },
+  { id: "summarize", kicker: "Quick", title: "Summarize", locked: false },
+  { id: "vision", kicker: "Sight", title: "Vision", locked: false },
+];
+
+let routeDraft = null;
+let routeSource = "local";
+let routeModelCache = { local: [], lan: [], openrouter: [] };
+let routeModelsLoading = false;
+let modelsSection = "overview";
+let modelsDirty = false;
+
+function sourceLabel(id) {
+  return (ROUTE_SOURCES.find((s) => s.id === id) || {}).short || id || "This PC";
+}
+
 function attachModelList(ids) {
   const listId = "local-gguf-models";
   let datalist = document.getElementById(listId);
@@ -230,78 +1225,512 @@ function attachModelList(ids) {
     datalist.id = listId;
     document.body.appendChild(datalist);
   }
-  datalist.replaceChildren(...ids.map((id) => {
+  datalist.replaceChildren(...(ids || []).map((id) => {
     const option = document.createElement("option");
     option.value = id;
     return option;
   }));
-  ["route-chat-model", "route-act-model", "route-code-model"].forEach((inputId) => {
-    $(inputId).setAttribute("list", listId);
+  const personaModel = $("persona-edit-model");
+  if (personaModel) personaModel.setAttribute("list", listId);
+}
+
+function markModelsDirty() {
+  modelsDirty = true;
+}
+
+function syncRouteHidden() {
+  if (!routeDraft) return;
+  $("route-chat-model").value = routeDraft.profiles.chat.model || "";
+  $("route-act-model").value = routeDraft.profiles.act.model || "";
+  $("route-code-model").value = routeDraft.profiles.code.model || "";
+  $("route-chat-backend").value = routeDraft.profiles.chat.backend || "local";
+  $("route-code-backend").value = routeDraft.profiles.code.backend || "local";
+}
+
+function profileOf(task) {
+  if (!routeDraft.profiles[task]) routeDraft.profiles[task] = { backend: "local", model: "" };
+  return routeDraft.profiles[task];
+}
+
+function showModelsSection(id) {
+  modelsSection = id;
+  document.querySelectorAll(".models-nav-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.modelsSection === id);
+  });
+  document.querySelectorAll(".models-panel").forEach((panel) => {
+    const on = panel.dataset.modelsPanel === id;
+    panel.hidden = !on;
+    panel.classList.toggle("active", on);
+  });
+  if (id === "local") {
+    routeSource = "local";
+    loadRouteModels("local").catch(report);
+  } else if (id === "lan") {
+    routeSource = "lan";
+    loadRouteModels("lan").catch(report);
+  } else if (id === "cloud") {
+    routeSource = "openrouter";
+    loadRouteModels("openrouter").catch(report);
+  }
+}
+
+function drawModelsInfo(info) {
+  const host = $("models-info-cards");
+  host.replaceChildren();
+  const cards = [
+    { kicker: "Inference", value: info && info.inference_ready ? "Ready" : "Offline", detail: (info && info.local_model_count || 0) + " local GGUF(s)", ok: !!(info && info.inference_ready), warn: !(info && info.inference_ready) },
+    { kicker: "Chat route", value: sourceLabel(profileOf("chat").backend), detail: profileOf("chat").model || "Auto model", ok: true },
+    { kicker: "LAN", value: info && info.lan_configured ? "Configured" : "Not set", detail: routeDraft.lanUrl || "No endpoint", ok: !!(info && info.lan_configured), warn: !(info && info.lan_configured) },
+    { kicker: "Cloud", value: info && info.has_cloud_key ? "Key saved" : "No key", detail: routeDraft.cloudUrl || "OpenRouter", ok: !!(info && info.has_cloud_key), warn: !(info && info.has_cloud_key) },
+  ];
+  cards.forEach((c) => {
+    const card = el("div", "models-info-card" + (c.ok ? " ok" : "") + (c.warn ? " warn" : ""));
+    card.append(el("div", "kicker", c.kicker));
+    card.append(el("div", "value", c.value));
+    card.append(el("div", "detail", c.detail));
+    host.append(card);
+  });
+  if (info && info.config_path) $("route-config-path").textContent = info.config_path;
+}
+
+function drawRouteTasks() {
+  const host = $("route-tasks");
+  host.replaceChildren();
+  ROUTE_TASKS.forEach((task) => {
+    const profile = profileOf(task.id);
+    const card = el("article", "route-task" + (task.locked ? " locked" : ""));
+    card.dataset.task = task.id;
+    card.append(el("div", "route-task-kicker", task.kicker));
+    card.append(el("div", "route-task-title", task.title));
+    card.append(el("div", "route-task-dest", sourceLabel(task.locked ? "local" : profile.backend)));
+    card.append(el("div", "route-task-model", profile.model || "Auto (default)"));
+    if (task.locked) {
+      card.append(el("p", "route-task-lock", "Local only — tools stay on-device"));
+    } else {
+      const picks = el("div", "route-task-picks");
+      ROUTE_SOURCES.forEach((source) => {
+        const btn = el("button", "route-dest-btn" + (profile.backend === source.id ? " active" : ""), source.short);
+        btn.type = "button";
+        btn.onclick = () => {
+          profile.backend = source.id;
+          if (source.id === "lan" && !routeDraft.lanUrl) showModelsSection("lan");
+          if (source.id === "openrouter") showModelsSection("cloud");
+          markModelsDirty();
+          syncRouteHidden();
+          drawModelsPage();
+        };
+        picks.append(btn);
+      });
+      card.append(picks);
+    }
+    host.append(card);
   });
 }
 
-async function openRouting() {
-  const routing = await invoke("routing_get");
-  $("route-chat-model").value = (routing.profiles && routing.profiles.chat && routing.profiles.chat.model) || "";
-  $("route-act-model").value = (routing.profiles && routing.profiles.act && routing.profiles.act.model) || "";
-  $("route-code-model").value = (routing.profiles && routing.profiles.code && routing.profiles.code.model) || "";
-  $("route-battery").checked = !!routing.allow_remote_on_battery_saver;
-  const lan = (routing.backends || []).find((b) => b.id === "lan" || b.kind === "openai");
-  $("route-lan-url").value = lan ? (lan.base_url || "") : "";
-  const codeBackend = (routing.profiles && routing.profiles.code && routing.profiles.code.backend) || "local";
-  $("route-code-backend").value = codeBackend === "local" ? "local" : "lan";
-  $("routing-dialog").showModal();
-  const models = await invoke("routing_list_models");
-  if (Array.isArray(models) && models.length) attachModelList(models);
+function modelBadges(source, id) {
+  const badges = [];
+  ROUTE_TASKS.forEach((task) => {
+    const profile = profileOf(task.id);
+    const backend = task.locked ? "local" : profile.backend;
+    if (backend === source && profile.model === id) badges.push(task.title);
+  });
+  return badges;
 }
-$("open-routing").onclick = () => openRouting().catch(report);
-$("routing-form").addEventListener("submit", (event) => {
-  const submitter = event.submitter;
-  if (!submitter || submitter.value !== "save") return;
-  event.preventDefault();
-  invoke("routing_get").then((routing) => {
-    if (!routing.profiles) routing.profiles = {};
-    if (!routing.backends) routing.backends = [];
-    const ensureProfile = (name) => {
-      if (!routing.profiles[name]) routing.profiles[name] = { backend: "local", model: "" };
-    };
-    ["act", "chat", "summarize", "vision", "code"].forEach(ensureProfile);
-    routing.profiles.chat.model = $("route-chat-model").value.trim();
-    routing.profiles.act.model = $("route-act-model").value.trim();
-    routing.profiles.act.backend = "local";
-    routing.profiles.code.model = $("route-code-model").value.trim();
-    routing.allow_remote_on_battery_saver = $("route-battery").checked;
-    const url = $("route-lan-url").value.trim();
-    let lan = routing.backends.find((b) => b.id === "lan");
-    if (url) {
-      if (!lan) {
-        lan = { id: "lan", kind: "openai", base_url: url, label: "LAN" };
-        routing.backends.push(lan);
-      } else {
-        lan.kind = "openai";
-        lan.base_url = url;
-        if (!lan.label) lan.label = "LAN";
-      }
+
+function fillModelGrid(hostId, emptyId, source, needle) {
+  const host = $(hostId);
+  const empty = $(emptyId);
+  if (!host) return;
+  let models = routeModelCache[source] || [];
+  if (needle) models = models.filter((id) => id.toLowerCase().includes(needle));
+  host.replaceChildren();
+  if (routeModelsLoading && !models.length) {
+    empty.hidden = false;
+    empty.textContent = "Loading models…";
+    return;
+  }
+  const autoSelected = ROUTE_TASKS.some((task) => {
+    const profile = profileOf(task.id);
+    const backend = task.locked ? "local" : profile.backend;
+    return backend === source && !profile.model;
+  });
+  const auto = el("button", "route-model-card" + (autoSelected ? " selected" : ""));
+  auto.type = "button";
+  const autoMain = el("div");
+  autoMain.append(el("div", "route-model-name", "Auto (default)"));
+  autoMain.append(el("div", "route-model-meta", source === "local" ? "Inference service default" : "Provider default"));
+  auto.append(autoMain);
+  const autoActions = el("div", "route-model-actions");
+  ROUTE_TASKS.forEach((task) => {
+    if (task.locked && source !== "local") return;
+    const profile = profileOf(task.id);
+    const backend = task.locked ? "local" : profile.backend;
+    const active = backend === source && !profile.model;
+    const btn = el("button", "route-use-btn" + (active ? " active" : ""), "Use for " + task.title);
+    btn.type = "button";
+    btn.onclick = (event) => { event.stopPropagation(); assignRouteModel(task.id, source, ""); };
+    autoActions.append(btn);
+  });
+  auto.append(autoActions);
+  auto.onclick = () => assignRouteModel("chat", source, "");
+  host.append(auto);
+  models.forEach((id) => {
+    const badges = modelBadges(source, id);
+    const card = el("button", "route-model-card" + (badges.length ? " selected" : ""));
+    card.type = "button";
+    const main = el("div");
+    main.append(el("div", "route-model-name", id));
+    main.append(el("div", "route-model-meta",
+      source === "local" ? "Local GGUF" : (source === "lan" ? "LAN · OpenAI-compatible" : "OpenRouter")));
+    card.append(main);
+    if (badges.length) {
+      const badgeHost = el("div", "route-model-badges");
+      badges.forEach((b) => badgeHost.append(el("span", "route-badge", b)));
+      card.append(badgeHost);
     }
-    routing.profiles.code.backend = $("route-code-backend").value === "lan" && url ? "lan" : "local";
-    if (!routing.backends.some((b) => b.id === "local")) {
-      routing.backends.unshift({ id: "local", kind: "local", base_url: "", label: "On this computer" });
+    const actions = el("div", "route-model-actions");
+    ROUTE_TASKS.forEach((task) => {
+      if (task.locked && source !== "local") return;
+      const active = badges.includes(task.title);
+      const btn = el("button", "route-use-btn" + (active ? " active" : ""), "Use for " + task.title);
+      btn.type = "button";
+      btn.onclick = (event) => { event.stopPropagation(); assignRouteModel(task.id, source, id); };
+      actions.append(btn);
+    });
+    card.append(actions);
+    card.onclick = () => assignRouteModel("chat", source, id);
+    host.append(card);
+  });
+  empty.hidden = models.length > 0 || routeModelsLoading;
+  if (!models.length && !routeModelsLoading) {
+    empty.textContent = source === "local"
+      ? "No local GGUFs yet. Inference lists them when available."
+      : (source === "lan"
+        ? "Set a LAN URL, then Refresh / Test connection."
+        : "Add an API key, then Test connection (suggestions appear if catalog is offline).");
+  }
+}
+
+function drawRouteModels() {
+  const needle = ($("route-model-search-local") && $("route-model-search-local").value || "").trim().toLowerCase();
+  fillModelGrid("route-model-grid", "route-model-empty", "local", needle);
+  fillModelGrid("route-lan-model-grid", "route-lan-model-empty", "lan", "");
+  fillModelGrid("route-cloud-model-grid", "route-cloud-model-empty", "openrouter", "");
+}
+
+function assignRouteModel(task, source, modelId) {
+  if (!routeDraft) return;
+  if (task === "act" && source !== "local") {
+    report("Act must stay on this computer.");
+    return;
+  }
+  const profile = profileOf(task);
+  profile.backend = task === "act" ? "local" : source;
+  profile.model = modelId;
+  markModelsDirty();
+  syncRouteHidden();
+  drawModelsPage();
+}
+
+function drawGenerationFields() {
+  if (!routeDraft) return;
+  $("route-temperature").value = String(routeDraft.temperature);
+  $("route-temperature-value").textContent = Number(routeDraft.temperature).toFixed(2);
+  $("route-max-tokens").value = String(routeDraft.maxTokens);
+  $("route-timeout").value = String(routeDraft.timeoutSecs);
+  $("route-battery").checked = !!routeDraft.battery;
+}
+
+async function drawModelsPage(info) {
+  drawRouteTasks();
+  drawRouteModels();
+  drawGenerationFields();
+  if (info) drawModelsInfo(info);
+  else {
+    try {
+      const page = await invoke("routing_page_info");
+      drawModelsInfo(page);
+    } catch (_) { /* ignore */ }
+  }
+}
+
+async function refreshCloudKeyStatus() {
+  const keyStatus = await invoke("routing_secret_status", { apiKeyRef: "openrouter" });
+  const has = !!(keyStatus && keyStatus.has_key);
+  if (routeDraft) routeDraft.hasCloudKey = has;
+  $("route-cloud-key-status").textContent = has
+    ? "API key is saved securely."
+    : "No API key saved yet.";
+}
+
+async function loadRouteModels(source) {
+  routeModelsLoading = true;
+  drawRouteModels();
+  try {
+    if (source === "local") {
+      const models = await invoke("routing_list_models");
+      routeModelCache.local = Array.isArray(models) ? models : [];
+      attachModelList(routeModelCache.local);
+    } else {
+      if (source === "openrouter") await invoke("routing_ensure_openrouter").catch(() => {});
+      // Persist draft URL into routing before listing if needed — list uses saved backends.
+      // For LAN/cloud draft URLs not yet saved, still try via ensure + current saved config.
+      const models = await invoke("routing_list_remote_models", { backendId: source });
+      routeModelCache[source] = Array.isArray(models) ? models : [];
+    }
+  } catch (_) {
+    routeModelCache[source] = routeModelCache[source] || [];
+  } finally {
+    routeModelsLoading = false;
+    drawRouteModels();
+  }
+}
+
+function closeModelsPage() {
+  document.body.classList.remove("models-open");
+  $("models-page").hidden = true;
+  modelsDirty = false;
+}
+
+async function openRouting() {
+  closeHubMenu();
+  closeSideDrawer();
+  await invoke("routing_ensure_openrouter").catch(() => {});
+  const routing = await invoke("routing_get");
+  const lan = (routing.backends || []).find((b) => b.id === "lan");
+  const cloud = (routing.backends || []).find((b) => b.id === "openrouter");
+  const profiles = {};
+  ["chat", "act", "summarize", "vision", "code"].forEach((name) => {
+    const p = (routing.profiles && routing.profiles[name]) || { backend: "local", model: "" };
+    profiles[name] = {
+      backend: name === "act" ? "local" : (["local", "lan", "openrouter"].includes(p.backend) ? p.backend : "local"),
+      model: p.model || "",
+    };
+  });
+  const talk = routing.talk || {};
+  routeDraft = {
+    profiles,
+    lanUrl: lan ? (lan.base_url || "") : "",
+    cloudUrl: cloud ? (cloud.base_url || "https://openrouter.ai/api/v1") : "https://openrouter.ai/api/v1",
+    battery: !!routing.allow_remote_on_battery_saver,
+    temperature: talk.temperature != null ? talk.temperature : 0.6,
+    maxTokens: talk.max_tokens != null ? talk.max_tokens : 1024,
+    timeoutSecs: talk.remote_timeout_secs != null ? talk.remote_timeout_secs : 120,
+    hasCloudKey: false,
+  };
+  routeSource = profiles.chat.backend || "local";
+  $("route-lan-url").value = routeDraft.lanUrl;
+  $("route-cloud-url").value = routeDraft.cloudUrl;
+  $("route-cloud-key").value = "";
+  if ($("route-model-search-local")) $("route-model-search-local").value = "";
+  $("route-probe-lan-status").textContent = "";
+  $("route-probe-cloud-status").textContent = "";
+  syncRouteHidden();
+  await refreshCloudKeyStatus().catch(() => { $("route-cloud-key-status").textContent = ""; });
+  const info = await invoke("routing_page_info").catch(() => null);
+  document.body.classList.add("models-open");
+  $("models-page").hidden = false;
+  showModelsSection("overview");
+  await drawModelsPage(info);
+  modelsDirty = false;
+  loadRouteModels("local").catch(report);
+}
+
+async function saveModelsPage() {
+  if (!routeDraft) return;
+  const lanUrl = $("route-lan-url").value.trim();
+  const cloudUrl = $("route-cloud-url").value.trim() || "https://openrouter.ai/api/v1";
+  routeDraft.lanUrl = lanUrl;
+  routeDraft.cloudUrl = cloudUrl;
+  routeDraft.battery = $("route-battery").checked;
+  routeDraft.temperature = Number($("route-temperature").value);
+  routeDraft.maxTokens = Number($("route-max-tokens").value);
+  routeDraft.timeoutSecs = Number($("route-timeout").value);
+  if (routeDraft.profiles.chat.backend === "lan" && !lanUrl) {
+    report("Set a LAN URL before routing Chat there.");
+    showModelsSection("lan");
+    return;
+  }
+  if (routeDraft.profiles.code.backend === "lan" && !lanUrl) {
+    report("Set a LAN URL before routing Code there.");
+    showModelsSection("lan");
+    return;
+  }
+  const cloudKey = $("route-cloud-key").value.trim();
+  const keyStep = cloudKey
+    ? invoke("routing_set_secret", { apiKeyRef: "openrouter", secret: cloudKey })
+    : Promise.resolve();
+  await keyStep;
+  const routing = await invoke("routing_get");
+  if (!routing.profiles) routing.profiles = {};
+  if (!routing.backends) routing.backends = [];
+  ["act", "chat", "summarize", "vision", "code"].forEach((name) => {
+    if (!routing.profiles[name]) routing.profiles[name] = { backend: "local", model: "" };
+    routing.profiles[name].backend = routeDraft.profiles[name].backend || "local";
+    routing.profiles[name].model = routeDraft.profiles[name].model || "";
+  });
+  routing.profiles.act.backend = "local";
+  routing.allow_remote_on_battery_saver = !!routeDraft.battery;
+  routing.talk = {
+    temperature: routeDraft.temperature,
+    max_tokens: routeDraft.maxTokens,
+    remote_timeout_secs: routeDraft.timeoutSecs,
+  };
+  let lan = routing.backends.find((b) => b.id === "lan");
+  if (lanUrl) {
+    if (!lan) {
+      lan = { id: "lan", kind: "openai", base_url: lanUrl, label: "LAN", api_key_ref: "" };
+      routing.backends.push(lan);
+    } else {
+      lan.kind = "openai";
+      lan.base_url = lanUrl;
+      if (!lan.label) lan.label = "LAN";
+      if (lan.api_key_ref == null) lan.api_key_ref = "";
+    }
+  }
+  let cloud = routing.backends.find((b) => b.id === "openrouter");
+  if (!cloud) {
+    cloud = { id: "openrouter", kind: "openai", base_url: cloudUrl, label: "OpenRouter", api_key_ref: "openrouter" };
+    routing.backends.push(cloud);
+  } else {
+    cloud.kind = "openai";
+    cloud.base_url = cloudUrl;
+    cloud.label = cloud.label || "OpenRouter";
+    cloud.api_key_ref = cloud.api_key_ref || "openrouter";
+  }
+  if (!routing.backends.some((b) => b.id === "local")) {
+    routing.backends.unshift({ id: "local", kind: "local", base_url: "", label: "On this computer", api_key_ref: "" });
+  }
+  await invoke("routing_save", { routing });
+  currentBackend = routeDraft.profiles.chat.backend || "local";
+  currentModel = routeDraft.profiles.chat.model || "";
+  status = await invoke("chat_status");
+  drawComposerMeta();
+  modelsDirty = false;
+  closeModelsPage();
+}
+
+$("open-routing").onclick = () => openRouting().catch(report);
+$("open-models").onclick = () => openRouting().catch(report);
+$("route-chip").onclick = () => openRouting().catch(report);
+$("meta-route").onclick = () => openRouting().catch(report);
+$("models-back").onclick = () => {
+  if (modelsDirty && !window.confirm("Discard unsaved model changes?")) return;
+  closeModelsPage();
+};
+$("models-discard").onclick = () => {
+  if (modelsDirty && !window.confirm("Discard unsaved model changes?")) return;
+  closeModelsPage();
+};
+$("models-save").onclick = () => saveModelsPage().catch(report);
+document.querySelectorAll(".models-nav-btn").forEach((btn) => {
+  btn.onclick = () => showModelsSection(btn.dataset.modelsSection);
+});
+if ($("route-model-search-local")) {
+  $("route-model-search-local").addEventListener("input", () => drawRouteModels());
+}
+$("route-refresh-models").onclick = () => loadRouteModels(routeSource === "openrouter" || routeSource === "lan" ? routeSource : "local").catch(report);
+$("route-lan-url").addEventListener("input", () => { if (routeDraft) { routeDraft.lanUrl = $("route-lan-url").value.trim(); markModelsDirty(); } });
+$("route-cloud-url").addEventListener("input", () => { if (routeDraft) { routeDraft.cloudUrl = $("route-cloud-url").value.trim(); markModelsDirty(); } });
+$("route-battery").addEventListener("change", () => { if (routeDraft) { routeDraft.battery = $("route-battery").checked; markModelsDirty(); } });
+$("route-temperature").addEventListener("input", () => {
+  $("route-temperature-value").textContent = Number($("route-temperature").value).toFixed(2);
+  if (routeDraft) { routeDraft.temperature = Number($("route-temperature").value); markModelsDirty(); }
+});
+$("route-max-tokens").addEventListener("change", () => { if (routeDraft) { routeDraft.maxTokens = Number($("route-max-tokens").value); markModelsDirty(); } });
+$("route-timeout").addEventListener("change", () => { if (routeDraft) { routeDraft.timeoutSecs = Number($("route-timeout").value); markModelsDirty(); } });
+$("route-clear-key").onclick = () => {
+  invoke("routing_clear_secret", { apiKeyRef: "openrouter" })
+    .then(() => { $("route-cloud-key").value = ""; return refreshCloudKeyStatus(); })
+    .then(() => invoke("routing_page_info").then(drawModelsInfo))
+    .catch(report);
+};
+$("route-reset-defaults").onclick = () => {
+  if (!routeDraft) return;
+  routeDraft.temperature = 0.6;
+  routeDraft.maxTokens = 1024;
+  routeDraft.timeoutSecs = 120;
+  markModelsDirty();
+  drawGenerationFields();
+};
+$("route-probe-lan").onclick = () => {
+  // Save URL into draft routing temporarily via routing_save of URL only is heavy; probe uses saved backend.
+  // Persist LAN URL first into draft file by a lightweight ensure.
+  const url = $("route-lan-url").value.trim();
+  if (!url) { report("Enter a LAN URL first."); return; }
+  invoke("routing_get").then((routing) => {
+    if (!routing.backends) routing.backends = [];
+    let lan = routing.backends.find((b) => b.id === "lan");
+    if (!lan) {
+      lan = { id: "lan", kind: "openai", base_url: url, label: "LAN", api_key_ref: "" };
+      routing.backends.push(lan);
+    } else {
+      lan.base_url = url;
+      lan.kind = "openai";
     }
     return invoke("routing_save", { routing });
-  }).then(() => {
-    $("routing-dialog").close();
-  }).catch(report);
-});
+  }).then(() => invoke("routing_probe", { backendId: "lan" }))
+    .then((msg) => {
+      const node = $("route-probe-lan-status");
+      node.textContent = msg;
+      node.className = "models-inline-status ok";
+      return loadRouteModels("lan");
+    })
+    .catch((error) => {
+      const node = $("route-probe-lan-status");
+      node.textContent = String(error);
+      node.className = "models-inline-status bad";
+    });
+};
+$("route-probe-cloud").onclick = () => {
+  const cloudKey = $("route-cloud-key").value.trim();
+  const url = $("route-cloud-url").value.trim() || "https://openrouter.ai/api/v1";
+  const keyStep = cloudKey
+    ? invoke("routing_set_secret", { apiKeyRef: "openrouter", secret: cloudKey })
+    : Promise.resolve();
+  keyStep.then(() => invoke("routing_ensure_openrouter"))
+    .then(() => invoke("routing_get"))
+    .then((routing) => {
+      let cloud = (routing.backends || []).find((b) => b.id === "openrouter");
+      if (!cloud) {
+        cloud = { id: "openrouter", kind: "openai", base_url: url, label: "OpenRouter", api_key_ref: "openrouter" };
+        routing.backends.push(cloud);
+      } else {
+        cloud.base_url = url;
+      }
+      return invoke("routing_save", { routing });
+    })
+    .then(() => invoke("routing_probe", { backendId: "openrouter" }))
+    .then((msg) => {
+      const node = $("route-probe-cloud-status");
+      node.textContent = msg;
+      node.className = "models-inline-status ok";
+      return refreshCloudKeyStatus().then(() => loadRouteModels("openrouter"));
+    })
+    .catch((error) => {
+      const node = $("route-probe-cloud-status");
+      node.textContent = String(error);
+      node.className = "models-inline-status bad";
+    });
+};
 
 (function buildEmpty() {
   const host = $("empty");
+  host.append(el("div", "empty-kicker", "Mobius"));
   host.append(el("div", "empty-title", "How can I help?"));
-  host.append(el("div", "empty-note", "Mobius talks on this computer (or LAN if you grant it). Use Act to change the desktop through the bar Assistant."));
+  host.append(el("div", "empty-note", "Talk here for longer chats. The bar sparkle is the same Mobius for quick asks, Act, and Agents. Type / for commands · ⌘⇧A to Act."));
   const suggestions = el("div", "suggestions");
-  ["Explain what a cron job is", "Write a bash one-liner to find large files", "Summarise the difference between TCP and UDP", "Help me plan a week of focused work"].forEach((text, index) => {
+  [
+    "Explain what a cron job is",
+    "Write a bash one-liner to find large files",
+    "Summarise TCP versus UDP",
+    "Help me plan a focused week",
+    "Draft a polite status update",
+    "What changed in my last few messages?",
+  ].forEach((text, index) => {
     const button = el("button", "suggestion", text);
     button.dataset.test = "suggestion-" + index;
-    button.onclick = () => { input.value = text; $("composer").requestSubmit(); };
+    button.onclick = () => { input.value = text; grow(); $("composer").requestSubmit(); };
     suggestions.append(button);
   });
   host.append(suggestions);
@@ -325,6 +1754,25 @@ new MutationObserver(queueReport).observe(document.body, { childList: true, subt
 
 invoke("layout_reporting").then((on) => { reporting = on; if (on) queueReport(); });
 invoke("chat_status").then((s) => { status = s; drawChat(); });
+invoke("chat_current_route").then((route) => {
+  currentModel = (route && route.model) || "";
+  currentBackend = (route && route.backend) || "local";
+  drawComposerMeta();
+}).catch(() => {});
 invoke("personas_get").then(drawPersonas);
 invoke("chat_view").then((v) => { view = v; drawChat(); invoke("chat_list").then(drawList); });
 input.focus();
+syncSendEnabled();
+
+function pollBarHandoff() {
+  invoke("chat_take_bar_handoff").then((changed) => {
+    if (!changed) return;
+    invoke("chat_view").then((v) => { view = v; drawChat(); });
+    invoke("chat_list").then(drawList);
+  }).catch(() => {});
+}
+window.addEventListener("focus", pollBarHandoff);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") pollBarHandoff();
+});
+setInterval(pollBarHandoff, 2500);

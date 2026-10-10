@@ -110,8 +110,32 @@ listen("live-value", (event) => {
   $("live").textContent = String(event.payload); // kept for tests and logs; not shown
 });
 listen("assistant-view", (event) => show(event.payload));
+
+function applyMobiusMode(mode) {
+  const door = mode === "act" || mode === "agents" ? mode : "talk";
+  $("panel").dataset.mobius = door;
+  document.querySelectorAll("[data-mobius-mode]").forEach((btn) => {
+    const on = btn.dataset.mobiusMode === door;
+    btn.classList.toggle("active", on);
+    if (on) btn.setAttribute("aria-current", "page");
+    else btn.removeAttribute("aria-current");
+  });
+  $("mobius-talk").hidden = door !== "talk";
+  $("mobius-act").hidden = door !== "act";
+  $("mobius-agents").hidden = door !== "agents";
+  if (door === "talk") {
+    $("talk-q").focus();
+  } else if (door === "act") {
+    $("q").focus();
+  } else if (door === "agents") {
+    invoke("activity_view").then(drawAgents);
+  }
+}
+
 listen("shell-mode", (event) => {
   const panel = event.payload.panel;
+  const role = event.payload.role || "monolith";
+  document.body.dataset.role = role;
   document.body.classList.toggle("open", panel !== null);
   if (panel === null && !dockPrefs.auto_hide) setDock(true);
   if (panel) document.body.dataset.panel = panel;
@@ -122,8 +146,10 @@ listen("shell-mode", (event) => {
     showMonth(0);
   }
   if (panel === "assistant") {
-    $("q").value = "";
-    $("q").focus();
+    applyMobiusMode(event.payload.mobius || "talk");
+    if ((event.payload.mobius || "talk") === "act") {
+      $("q").value = "";
+    }
   } else if (panel === "control-center") {
     showDetail(null);
     tickClock();
@@ -138,8 +164,6 @@ listen("shell-mode", (event) => {
     $("qi-input").value = "";
     qiSearch();
     $("qi-input").focus();
-  } else if (panel === "agents") {
-    invoke("activity_view").then(drawAgents);
   } else if (panel === "launcher") {
     $("lq").value = "";
     search();
@@ -394,8 +418,8 @@ function drawIsland(view) {
 listen("island-view", (event) => drawIsland(event.payload));
 invoke("island_view").then(drawIsland);
 $("island").onclick = () => {
-  if (islandKind === "approval") invoke("panel_open", { id: "agents" });
-  else if (islandKind === "assistant") invoke("panel_open", { id: "assistant" });
+  if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
+  else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
   else if (islandKind === "media") invoke("media_toggle");
 };
 
@@ -437,7 +461,11 @@ function drawAgents(view) {
   bar.style.display = view.available ? "" : "none";
   bar.classList.toggle("busy", view.available && view.enabled && view.busy);
   bar.classList.toggle("off", view.available && !view.enabled);
-  bar.title = !view.enabled ? "Agents are off" : view.busy ? view.pending.length + " waiting for you" : "Agents";
+  bar.title = !view.enabled
+    ? "Mobius · Agents are off"
+    : view.busy
+      ? "Mobius · " + view.pending.length + " waiting for you"
+      : "Mobius · Agents";
   $("agent-state").textContent = !view.available
     ? "Agent activity is shown by the registered shell."
     : view.enabled ? "Agents may ask to act. Nothing runs without the checks in Settings." : "Agents are off. Every request is refused until you turn them on.";
@@ -471,14 +499,96 @@ function drawAgents(view) {
 }
 listen("activity-view", (event) => drawAgents(event.payload));
 invoke("activity_view").then(drawAgents);
-$("agentsbtn").onclick = () => invoke("panel_open", { id: "agents" });
-$("agent-ask").onclick = () => invoke("panel_open", { id: "assistant" });
-$("assistant-agents").onclick = () => invoke("panel_open", { id: "agents" });
+$("agentsbtn").onclick = () => invoke("mobius_open", { mode: "agents" });
+document.querySelectorAll("[data-mobius-mode]").forEach((btn) => {
+  btn.onclick = () => invoke("mobius_set_mode", { mode: btn.dataset.mobiusMode });
+});
 $("agent-stopall").onclick = () => invoke("activity_stop_all");
 $("agent-toggle").onclick = () => invoke("activity_set_enabled", { enabled: $("agent-toggle").textContent === "Turn on" });
 $("apps").onclick = () => invoke("panel_open", { id: "launcher" });
 $("clock").onclick = () => invoke("panel_open", { id: "notifications" });
 $("controlbtn").onclick = () => invoke("panel_open", { id: "control-center" });
+
+(function buildTalkSuggestions() {
+  const host = $("talk-suggestions");
+  if (!host) return;
+  [
+    "What can you help with?",
+    "Dim the screen a bit",
+    "Summarise what Agents are for",
+    "How do I switch models?",
+  ].forEach((text, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = text;
+    button.dataset.test = "talk-suggestion-" + index;
+    button.onclick = () => {
+      $("talk-q").value = text;
+      sendTalk();
+    };
+    host.append(button);
+  });
+})();
+
+function sendTalk() {
+  const text = $("talk-q").value;
+  $("talk-q").value = "";
+  invoke("mobius_talk", { text }).catch((error) => {
+    $("talk-status").textContent = String(error);
+  });
+}
+
+function drawTalk(view) {
+  const thread = $("talk-thread");
+  thread.replaceChildren();
+  (view.history || []).forEach((line) => {
+    const row = document.createElement("div");
+    row.className = "talk-line " + (line.role === "user" ? "user" : "assistant");
+    row.textContent = line.text;
+    thread.append(row);
+  });
+  if (view.phase === "streaming" && view.reply) {
+    const row = document.createElement("div");
+    row.className = "talk-line assistant";
+    row.textContent = view.reply;
+    thread.append(row);
+  }
+  thread.scrollTop = thread.scrollHeight;
+  const hasHistory = (view.history || []).length > 0 || (view.phase === "streaming" && view.reply);
+  $("talk-empty").hidden = !!hasHistory;
+  const status = $("talk-status");
+  if (view.phase === "thinking") status.textContent = "Thinking…";
+  else if (view.phase === "streaming") status.textContent = "";
+  else if (view.phase === "failed") status.textContent = view.error || "Something went wrong.";
+  else status.textContent = "";
+  const busy = view.phase === "thinking" || view.phase === "streaming";
+  $("talk-stop").hidden = !busy;
+  $("talk-clear").hidden = busy || !hasHistory;
+  $("talk-act").hidden = busy || !(view.history || []).some((line) => line.role === "user");
+  $("talk-open-full").textContent = hasHistory ? "Continue in Mobius" : "Open full Mobius";
+  $("talk-q").disabled = busy;
+  $("talk-send").disabled = busy;
+}
+listen("mobius-talk-view", (event) => drawTalk(event.payload));
+invoke("mobius_talk_view").then(drawTalk).catch(() => {});
+$("talk-open-full").onclick = () => {
+  const label = $("talk-open-full").textContent;
+  const go = label === "Continue in Mobius"
+    ? invoke("mobius_continue_full")
+    : invoke("open_mobius");
+  go.catch((error) => { $("talk-status").textContent = String(error); });
+};
+$("talk-stop").onclick = () => invoke("mobius_talk_cancel").then(() => invoke("mobius_talk_view").then(drawTalk));
+$("talk-clear").onclick = () => invoke("mobius_talk_clear").then(() => invoke("mobius_talk_view").then(drawTalk));
+$("talk-act").onclick = () => invoke("mobius_act_from_talk", { text: null }).catch((error) => {
+  $("talk-status").textContent = String(error);
+});
+$("talk-send").onclick = () => sendTalk();
+$("talk-q").addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  sendTalk();
+});
 
 // Sound. Rust owns the audio state and every write; the page sends "volume 40", "mute" or "make this output the default" and
 // never names a device it was not given. Names are drawn with textContent.
@@ -684,7 +794,7 @@ $("btscan").onclick = () => invoke("bluetooth_scan", { on: $("btscan").dataset.s
 
 $("mute").onclick = () => invoke("audio_set_mute", { muted: $("mute").dataset.muted !== "1" });
 
-$("ask").onclick = () => invoke("panel_open", { id: "assistant" });
+$("ask").onclick = () => invoke("mobius_open", { mode: "talk" });
 $("scrim").addEventListener("click", () => invoke("panel_outside"));
 $("q").addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
@@ -698,6 +808,10 @@ $("doit").onclick = () => invoke("assistant_confirm").then(show);
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (document.body.dataset.panel === "control-center" && detail) { showDetail(null); return; }
+  if (document.body.dataset.panel === "assistant" && $("panel").dataset.mobius === "talk" && !$("talk-stop").hidden) {
+    invoke("mobius_talk_cancel");
+    return;
+  }
   invoke("panel_escape");
 });
 
@@ -1098,7 +1212,7 @@ queueInteractive();
 // Glass. The compositor blurs what is behind rectangles the shell names; the shell is one surface over the whole output, so what to blur
 // is whatever is drawn as glass right now: the bar, the open panel and the toasts. Boxes come from the layout (offsets), not from the
 // animated transform, so the blur is in place from the first frame of an opening panel.
-const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "agents", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
+const GLASS_PANEL = { "control-center": "controls", notifications: "notifs", agents: "panel", launcher: "launcher", assistant: "panel", "quick-insert": "quickinsert" };
 function layoutBox(element) {
   let x = 0, y = 0;
   for (let node = element; node; node = node.offsetParent) { x += node.offsetLeft; y += node.offsetTop; }
@@ -1132,7 +1246,7 @@ listen("blur-active", (event) => { document.documentElement.dataset.blur = event
 new MutationObserver(queueGlass).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });
 new MutationObserver(queueGlass).observe($("toasts"), { childList: true });
 const glassResize = new ResizeObserver(queueGlass);
-["bar", "controls", "notifs", "agents", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
+["bar", "controls", "notifs", "launcher", "panel", "quickinsert", "toasts", "osd", "dock", "tray-menu", "island"].forEach((id) => glassResize.observe($(id)));
 window.addEventListener("resize", queueGlass);
 queueGlass();
 

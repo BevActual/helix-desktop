@@ -1,7 +1,11 @@
-//! The Helix shell: one layer surface hosting the bar and every panel in a single page. The assistant is a separate process
-//! (`helix-assistant`); this binary never holds Agent Surface client grants and never talks to the model. It may take the Agent Surface
-//! confirmer role via a separate Overlay surface (`confirmer`). What the shell surface looks like in each state is decided
-//! by helix_shell_core::ShellSurface; layer.rs only applies it.
+//! The Helix shell: bar and panels.
+//!
+//! Default (**monolith**): one layer surface for bar + panels (legacy).
+//! **Split** (`HELIX_SHELL_ROLE=bar|panels`): bar stays Top forever; panels own Overlay and
+//! talk over `panels_ipc` so bouncing panels does not tear down the bar exclusive zone.
+//!
+//! Assistant is a separate process (`helix-assistant`); this binary never holds Agent Surface
+//! client grants. Confirmer Overlay is opt-in (`HELIX_SHELL_CONFIRMER`).
 
 mod apps;
 mod backlight;
@@ -15,7 +19,10 @@ mod insert;
 mod island;
 mod niri_query;
 mod layer;
+mod mobius_talk;
 mod notify;
+mod panels_bridge;
+mod role;
 mod tray;
 
 use std::sync::{Arc, Mutex};
@@ -35,14 +42,47 @@ use helix_shell_core::network::{
 use helix_shell_core::power::view as power_view;
 use helix_shell_core::quick::{Quick, QuickView, RequestError as QuickError, SettingUpdate};
 use helix_shell_core::{
-    Confirmation, ConfirmerView, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS,
+    Confirmation, ConfirmerView, Escape, Phase, Session, ShellSurface, Spawn, ARMING_MS, BAR_PLAN,
+    PANEL_CLOSED,
 };
+use helix_shell_core::panels_ipc::{PanelsReply, PanelsRequest};
+use role::ShellRole;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum MobiusMode {
+    Talk,
+    Act,
+    Agents,
+}
+
+impl MobiusMode {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Talk => "talk",
+            Self::Act => "act",
+            Self::Agents => "agents",
+        }
+    }
+
+    fn parse(value: &str) -> Option<Self> {
+        match value {
+            "talk" => Some(Self::Talk),
+            "act" | "assistant" => Some(Self::Act),
+            "agents" => Some(Self::Agents),
+            _ => None,
+        }
+    }
+}
 
 struct ShellState {
     session: Session,
     confirmation: Confirmation,
+    /// Which Mobius door is showing in the bar dropdown (Talk / Act / Agents).
+    mobius_mode: MobiusMode,
+    /// Ephemeral bar Talk session (Inference only).
+    talk: mobius_talk::TalkState,
     surface: ShellSurface,
     /// The applications the launcher lists, read each time it opens. The page refers to them by id only.
     apps: Vec<helix_shell_core::launcher::App>,
@@ -179,11 +219,30 @@ fn launch_assistant(app: AppHandle, spawn: Spawn) {
 #[derive(Clone, Serialize)]
 struct ShellMode {
     panel: Option<String>,
+    /// `talk` | `act` | `agents` when the Mobius dropdown is open.
+    mobius: Option<&'static str>,
+    /// `monolith` | `bar` | `panels` — page hides the half it does not own when split.
+    role: &'static str,
+}
+
+fn shell_role_label() -> &'static str {
+    match ShellRole::from_env() {
+        ShellRole::Monolith => "monolith",
+        ShellRole::Bar => "bar",
+        ShellRole::Panels => "panels",
+    }
 }
 
 fn emit_mode(app: &AppHandle, shell: &ShellState) {
+    let panel = shell.surface.open_panel_id().map(str::to_string);
+    let mobius = panel
+        .as_deref()
+        .filter(|&id| id == "assistant")
+        .map(|_| shell.mobius_mode.as_str());
     let mode = ShellMode {
-        panel: shell.surface.open_panel_id().map(str::to_string),
+        panel,
+        mobius,
+        role: shell_role_label(),
     };
     let _ = app.emit("shell-mode", mode);
 }
@@ -195,7 +254,103 @@ fn reset_assistant(shell: &mut ShellState) {
     shell.last_phase = Phase::Idle;
 }
 
+fn open_mobius_panel(app: &AppHandle, mode: MobiusMode) {
+    if ShellRole::from_env().forwards_panels() {
+        let mode_str = mode.as_str().to_string();
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            match panels_bridge::open_panel("assistant", Some(&mode_str)).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    eprintln!("PANELS forward missed — falling back in-process");
+                    open_mobius_panel_local(&app, mode);
+                }
+                Err(error) => eprintln!("PANELS forward: {error}"),
+            }
+        });
+        return;
+    }
+    open_mobius_panel_local(app, mode);
+}
+
+fn open_mobius_panel_local(app: &AppHandle, mode: MobiusMode) {
+    let state = shell_state(app);
+    let mut shell = state.lock().expect("shell state");
+    let previous = shell.surface.open_panel_id().map(str::to_owned);
+    let already = previous.as_deref() == Some("assistant");
+    if already {
+        shell.mobius_mode = mode;
+        let view = assistant_view(&shell);
+        emit_mode(app, &shell);
+        drop(shell);
+        emit_view(app, &view);
+        mobius_talk::emit(app);
+        if mode == MobiusMode::Agents {
+            let refreshing = app.clone();
+            tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
+        }
+        return;
+    }
+    let plan = match shell.surface.open_panel("assistant") {
+        Ok(plan) => plan,
+        Err(error) => {
+            eprintln!("open panel assistant: {error:?}");
+            return;
+        }
+    };
+    let Some(plan) = plan else { return };
+    reset_assistant(&mut shell);
+    shell.mobius_mode = mode;
+    let view = assistant_view(&shell);
+    emit_mode(app, &shell);
+    drop(shell);
+    apply_panel_plan(app, plan);
+    eprintln!("PANEL open mobius/{}", mode.as_str());
+    emit_view(app, &view);
+    mobius_talk::emit(app);
+    if mode == MobiusMode::Agents {
+        let refreshing = app.clone();
+        tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
+    }
+}
+
+/// Bar process never promotes its surface to Overlay.
+fn apply_panel_plan(app: &AppHandle, plan: helix_shell_core::Plan) {
+    match ShellRole::from_env() {
+        ShellRole::Bar => layer::apply(app, BAR_PLAN),
+        ShellRole::Panels | ShellRole::Monolith => layer::apply(app, plan),
+    }
+}
+
 fn open_panel(app: &AppHandle, id: &str) {
+    // Agents is a Mobius door, not a second panel.
+    if id == "agents" {
+        open_mobius_panel(app, MobiusMode::Agents);
+        return;
+    }
+    if id == "assistant" {
+        open_mobius_panel(app, MobiusMode::Act);
+        return;
+    }
+    if ShellRole::from_env().forwards_panels() {
+        let id = id.to_string();
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            match panels_bridge::open_panel(&id, None).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    eprintln!("PANELS forward missed — falling back in-process for {id}");
+                    open_panel_local(&app, &id);
+                }
+                Err(error) => eprintln!("PANELS forward: {error}"),
+            }
+        });
+        return;
+    }
+    open_panel_local(app, id);
+}
+
+fn open_panel_local(app: &AppHandle, id: &str) {
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
     let plan = match shell.surface.open_panel(id) {
@@ -219,10 +374,6 @@ fn open_panel(app: &AppHandle, id: &str) {
         let reading = app.clone();
         tauri::async_runtime::spawn(async move { notify::notifications_read(reading).await });
     }
-    if id == "agents" {
-        let refreshing = app.clone();
-        tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
-    }
     if id == "control-center" {
         let refreshing = app.clone();
         tauri::async_runtime::spawn(async move {
@@ -236,12 +387,20 @@ fn open_panel(app: &AppHandle, id: &str) {
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
     drop(shell);
-    layer::apply(app, plan);
+    apply_panel_plan(app, plan);
     eprintln!("PANEL open");
     emit_view(app, &view);
 }
 
 fn close_panel(app: &AppHandle) {
+    if ShellRole::from_env().forwards_panels() {
+        tauri::async_runtime::spawn(async move {
+            let _ = panels_bridge::close_panel().await;
+        });
+        // Bar surface stays Top / bar-only.
+        layer::apply(app, BAR_PLAN);
+        return;
+    }
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
     let Some(plan) = shell.surface.close() else {
@@ -251,9 +410,51 @@ fn close_panel(app: &AppHandle) {
     let view = assistant_view(&shell);
     emit_mode(app, &shell);
     drop(shell);
-    layer::apply(app, plan);
+    apply_panel_plan(app, plan);
     eprintln!("PANEL closed");
     emit_view(app, &view);
+}
+
+fn handle_panels_ipc(app: &AppHandle, req: PanelsRequest) -> PanelsReply {
+    match req {
+        PanelsRequest::Ping => PanelsReply::Pong,
+        PanelsRequest::Open { id, mode } => {
+            if id == "assistant" {
+                let door = mode
+                    .as_deref()
+                    .and_then(MobiusMode::parse)
+                    .unwrap_or(MobiusMode::Talk);
+                open_mobius_panel_local(app, door);
+            } else {
+                open_panel_local(app, &id);
+            }
+            let panel = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .surface
+                .open_panel_id()
+                .map(str::to_string);
+            PanelsReply::Status { panel }
+        }
+        PanelsRequest::Close => {
+            close_panel(app);
+            PanelsReply::Ok
+        }
+        PanelsRequest::Escape => {
+            dismiss_escape(app);
+            PanelsReply::Ok
+        }
+        PanelsRequest::Outside => {
+            // Same as outside click on scrim.
+            close_panel(app);
+            PanelsReply::Ok
+        }
+        PanelsRequest::AssistantSubmit { request } => {
+            open_mobius_panel_local(app, MobiusMode::Act);
+            submit_request(app, &request);
+            PanelsReply::Ok
+        }
+    }
 }
 
 /// Escape backs out of a request or a confirmation first; only when there is nothing to back out of does the panel close.
@@ -1322,6 +1523,104 @@ fn panel_open(app: AppHandle, id: String) {
     open_panel(&app, &id);
 }
 
+/// Opens the full Mobius window (longer Talk). Bar Talk stays in the dropdown.
+#[tauri::command]
+fn open_mobius() {
+    for bin in ["helix-mobius", "helix-chat"] {
+        match std::process::Command::new(bin)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(_) => return,
+            Err(error) => eprintln!("MOBIUS launch via {bin}: {error}"),
+        }
+    }
+}
+
+/// Opens the bar Mobius dropdown on a door (`talk` | `act` | `agents`).
+#[tauri::command]
+fn mobius_open(app: AppHandle, mode: String) {
+    let mode = MobiusMode::parse(&mode).unwrap_or(MobiusMode::Talk);
+    open_mobius_panel(&app, mode);
+}
+
+#[tauri::command]
+fn mobius_set_mode(app: AppHandle, mode: String) {
+    let Some(mode) = MobiusMode::parse(&mode) else {
+        return;
+    };
+    let state = shell_state(&app);
+    let mut shell = state.lock().expect("shell state");
+    if shell.surface.open_panel_id() != Some("assistant") {
+        drop(shell);
+        open_mobius_panel(&app, mode);
+        return;
+    }
+    shell.mobius_mode = mode;
+    emit_mode(&app, &shell);
+    drop(shell);
+    mobius_talk::emit(&app);
+    if mode == MobiusMode::Agents {
+        let refreshing = app.clone();
+        tauri::async_runtime::spawn(async move { refresh_activity(&refreshing).await });
+    }
+}
+
+#[tauri::command]
+async fn mobius_talk(app: AppHandle, text: String) -> Result<(), String> {
+    // Ensure the dropdown is on Talk while answering.
+    {
+        let state = shell_state(&app);
+        let mut shell = state.lock().expect("shell state");
+        if shell.surface.open_panel_id() != Some("assistant") {
+            drop(shell);
+            open_mobius_panel(&app, MobiusMode::Talk);
+        } else {
+            shell.mobius_mode = MobiusMode::Talk;
+            emit_mode(&app, &shell);
+        }
+    }
+    mobius_talk::submit(app, text).await
+}
+
+#[tauri::command]
+async fn mobius_talk_cancel(app: AppHandle) {
+    mobius_talk::cancel(app).await;
+}
+
+#[tauri::command]
+fn mobius_talk_view(app: AppHandle) -> mobius_talk::TalkView {
+    mobius_talk::talk_view(&app)
+}
+
+#[tauri::command]
+fn mobius_talk_clear(app: AppHandle) {
+    mobius_talk::clear(&app);
+}
+
+/// Continue bar Talk in the full Mobius window (writes a one-shot handoff file).
+#[tauri::command]
+fn mobius_continue_full(app: AppHandle) -> Result<(), String> {
+    mobius_talk::write_handoff(&app)?;
+    open_mobius();
+    Ok(())
+}
+
+/// Switch to Act with the last bar Talk question (or `text` if provided).
+#[tauri::command]
+fn mobius_act_from_talk(app: AppHandle, text: Option<String>) -> Result<(), String> {
+    let request = text
+        .map(|t| t.trim().to_string())
+        .filter(|t| !t.is_empty())
+        .or_else(|| mobius_talk::last_user_text(&app))
+        .ok_or_else(|| "Ask something first, then Act.".to_string())?;
+    open_mobius_panel(&app, MobiusMode::Act);
+    submit_request(&app, &request);
+    Ok(())
+}
+
 #[tauri::command]
 fn panel_outside(app: AppHandle) {
     dismiss_outside(&app);
@@ -1336,10 +1635,12 @@ fn assistant_submit(app: AppHandle, request: String) -> AssistantView {
 pub(crate) fn submit_request(app: &AppHandle, request: &str) -> AssistantView {
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
+    shell.mobius_mode = MobiusMode::Act;
     shell.session.submit(request);
     let arm = note_phase(&mut shell);
     let spawns = shell.session.take_spawns();
     let view = assistant_view(&shell);
+    emit_mode(app, &shell);
     drop(shell);
     for spawn in spawns {
         launch_assistant(app.clone(), spawn);
@@ -1492,6 +1793,15 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             ready,
             panel_open,
+            open_mobius,
+            mobius_open,
+            mobius_set_mode,
+            mobius_talk,
+            mobius_talk_cancel,
+            mobius_talk_view,
+            mobius_talk_clear,
+            mobius_continue_full,
+            mobius_act_from_talk,
             panel_outside,
             assistant_submit,
             assistant_confirm,
@@ -1577,11 +1887,22 @@ fn main() {
                     .build()?;
 
             let surface = ShellSurface::new();
-            layer::setup(&window, surface.plan())?;
-            layer::reserve_bar_space();
+            let role = ShellRole::from_env();
+            eprintln!("SHELL role={role:?}");
+            let initial_plan = match role {
+                ShellRole::Bar => BAR_PLAN,
+                ShellRole::Panels => PANEL_CLOSED,
+                ShellRole::Monolith => surface.plan(),
+            };
+            layer::setup(&window, initial_plan)?;
+            if role.is_bar_side() {
+                layer::reserve_bar_space();
+            }
             let state = Arc::new(Mutex::new(ShellState {
                 session: Session::new(|_| true),
                 confirmation: Confirmation::new(),
+                mobius_mode: MobiusMode::Talk,
+                talk: mobius_talk::TalkState::default(),
                 surface,
                 // Scanned at startup so Agent Surface `app-launch` works before the launcher panel is opened.
                 apps: apps::scan(),
@@ -1611,10 +1932,15 @@ fn main() {
             }));
             app.manage(state);
             let handle = app.handle().clone();
+            {
+                let shared = shell_state(&handle);
+                let shell = shared.lock().expect("shell state");
+                emit_mode(&handle, &shell);
+            }
 
-            // Opt-in: the live trial binary must not steal the C++ shell's confirmer role.
             // Nested tests set HELIX_SHELL_CONFIRMER=1 via tauri-shell.sh.
-            if std::env::var_os("HELIX_SHELL_CONFIRMER").is_some() {
+            // Confirmer lives with panels (or monolith). Bar never RegisterDesktop.
+            if std::env::var_os("HELIX_SHELL_CONFIRMER").is_some() && !role.forwards_panels() {
                 let (answer_tx, answer_rx) = tokio::sync::mpsc::unbounded_channel();
                 let confirmer_host = Arc::new(Mutex::new(confirmer::ConfirmerHost::new(
                     answer_tx, started,
@@ -1630,13 +1956,35 @@ fn main() {
             watch_network(handle.clone());
             watch_bluetooth(handle.clone());
             watch_quick(handle.clone());
-            control::serve(handle.clone());
-            agent_ipc::serve(handle.clone());
-            notify::serve(handle.clone());
-            tray::serve(handle.clone());
-            island::watch_media(handle.clone());
-            insert::watch_clipboard(handle.clone());
-            dock::start(handle.clone());
+            if role.claims_shell1() {
+                control::serve(handle.clone());
+                agent_ipc::serve(handle.clone());
+            }
+            if role.serves_panels_socket() {
+                panels_bridge::serve(handle.clone(), move |app, req| {
+                    let (tx, rx) = std::sync::mpsc::channel();
+                    let app_main = app.clone();
+                    let ok = app.run_on_main_thread(move || {
+                        let _ = tx.send(handle_panels_ipc(&app_main, req));
+                    });
+                    if ok.is_err() {
+                        return PanelsReply::Err {
+                            message: "panels main thread unavailable".into(),
+                        };
+                    }
+                    rx.recv_timeout(std::time::Duration::from_secs(2))
+                        .unwrap_or_else(|_| PanelsReply::Err {
+                            message: "panels main thread timed out".into(),
+                        })
+                });
+            }
+            if role.is_bar_side() {
+                notify::serve(handle.clone());
+                tray::serve(handle.clone());
+                island::watch_media(handle.clone());
+                insert::watch_clipboard(handle.clone());
+                dock::start(handle.clone());
+            }
             if let Some(path) = std::env::var_os("HELIX_SURFACE_CONTROL") {
                 let path = std::path::PathBuf::from(path);
                 if let Some(parent) = path.parent() {

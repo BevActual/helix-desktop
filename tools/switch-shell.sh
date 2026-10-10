@@ -1,13 +1,14 @@
 #!/bin/bash
 # Install or refresh the Tauri session shell. The C++ session shell is retired; there is no `native` switch-back.
-#   tools/switch-shell.sh           same as install (no shell restart)
-#   tools/switch-shell.sh install   write units + links + enable at login; does NOT restart the live shell
-#   tools/switch-shell.sh restart   restart helix-shell-tauri (and wallpaper/idle). Avoid while Cursor is open.
+#   tools/switch-shell.sh                same as install (no shell restart)
+#   tools/switch-shell.sh install        write units + links + enable at login; does NOT restart live shells
+#   tools/switch-shell.sh restart-panels bounce Overlay panels only (safe while Cursor is open)
+#   tools/switch-shell.sh restart        bounce bar+panels (or legacy monolith). Avoid while Cursor is open.
 #   tools/switch-shell.sh status
-# Key binds call ~/.local/bin/helix-panel → helix-shell-tauri.
+# Key binds call ~/.local/bin/helix-panel → Shell1 on the bar.
 #
-# Restarting the session shell tears down layer-shell surfaces and can crash GUI apps (including Cursor).
-# Install therefore never restarts the shell; use `restart` only when you mean to bounce the desktop shell.
+# Split: helix-shell-bar (Top / exclusive zone) + helix-shell-panels (Overlay). Restarting panels does not
+# tear down the bar. Restarting the bar still can disrupt Cursor — prefer restart-panels for UI work.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 UNITS=$HOME/.config/systemd/user
@@ -58,7 +59,10 @@ write_units_and_links() {
       "$HOME/.local/bin/helix-chat" 2>/dev/null || true
   fi
   escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
+  # Legacy monolith unit (kept for nested tests / rollback).
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-tauri.service.in" > "$UNITS/helix-shell-tauri.service"
+  sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-bar.service.in" > "$UNITS/helix-shell-bar.service"
+  sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-panels.service.in" > "$UNITS/helix-shell-panels.service"
   python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/helix-setup.kdl" "$HOME/.config/niri/helix-binds.kdl" <<'PY'
 import os, shutil, sys, time
 panel = '"' + os.path.expanduser('~/.local/bin/helix-panel') + '"'
@@ -104,7 +108,9 @@ PY
   rm -f "$UNITS/helix-shell-dev.service" "$UNITS/helix-shell-tauri-trial.service"
   rm -rf "$UNITS/helix-shell-dev.service.d"
   systemctl --user daemon-reload
-  systemctl --user enable helix-shell-tauri.service
+  # Prefer split bar+panels; leave monolith unit installed but disabled when split is enabled.
+  systemctl --user enable helix-shell-bar.service helix-shell-panels.service
+  systemctl --user disable helix-shell-tauri.service 2>/dev/null || true
   if [ -f "$UNITS/helix-idle.service" ]; then
     systemctl --user enable helix-idle.service
   fi
@@ -113,28 +119,42 @@ PY
   fi
 }
 
+shell_live() {
+  systemctl --user is-active --quiet helix-shell-bar.service \
+    || systemctl --user is-active --quiet helix-shell-tauri.service \
+    || systemctl --user is-active --quiet helix-shell-panels.service
+}
+
 case "${1:-install}" in
   install|tauri)
     write_units_and_links
-    # If the shell is not running yet, start it once; never restart a live one from install.
-    if systemctl --user is-active --quiet helix-shell-tauri.service; then
+    # If any shell half is running, never bounce from install.
+    if shell_live; then
       echo "Links and units updated. Shell already running — not restarted (avoids crashing Cursor)."
-      echo "When you want a bounce: $0 restart"
+      echo "UI / panels bounce: $0 restart-panels"
+      echo "Full bar bounce (can disrupt Cursor): $0 restart"
     else
-      systemctl --user start helix-shell-tauri.service
+      systemctl --user start helix-shell-bar.service helix-shell-panels.service
       if [ -f "$UNITS/helix-idle.service" ]; then
         systemctl --user start helix-idle.service 2>/dev/null || true
       fi
       if [ -f "$UNITS/helix-wallpaper.service" ]; then
         systemctl --user start helix-wallpaper.service 2>/dev/null || true
       fi
-      echo "Tauri Helix Shell started (C++ helix-shell-dev disabled)."
+      echo "Helix Shell started (bar + panels)."
     fi
+    ;;
+  restart-panels)
+    write_units_and_links
+    echo "Restarting helix-shell-panels only (bar exclusive zone stays up)…"
+    systemctl --user restart helix-shell-panels.service
+    echo "Panels restarted."
     ;;
   restart)
     write_units_and_links
-    echo "Restarting helix-shell-tauri (GUI apps on this session may briefly lose the shell)…"
-    systemctl --user restart helix-shell-tauri.service
+    echo "Restarting shell bar+panels (GUI apps on this session may briefly lose the bar)…"
+    systemctl --user stop helix-shell-tauri.service 2>/dev/null || true
+    systemctl --user restart helix-shell-bar.service helix-shell-panels.service
     if [ -f "$UNITS/helix-idle.service" ]; then
       systemctl --user restart helix-idle.service
     fi
@@ -148,7 +168,7 @@ case "${1:-install}" in
     exit 2
     ;;
   status)
-    for unit in helix-shell-tauri helix-wallpaper helix-idle helix-service; do
+    for unit in helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     if systemctl --user is-enabled helix-shell-dev.service >/dev/null 2>&1; then
@@ -156,9 +176,10 @@ case "${1:-install}" in
     fi
     ;;
   *)
-    echo "usage: $0 [install|restart|status]" >&2
-    echo "  install  update links/units; start shell only if not already running" >&2
-    echo "  restart  bounce the shell (can disrupt Cursor — prefer a terminal outside Cursor)" >&2
+    echo "usage: $0 [install|restart-panels|restart|status]" >&2
+    echo "  install         update links/units; start shell only if not already running" >&2
+    echo "  restart-panels  bounce Overlay panels only (safe with Cursor open)" >&2
+    echo "  restart         bounce bar+panels (can disrupt Cursor — prefer a terminal outside Cursor)" >&2
     exit 2
     ;;
 esac

@@ -1,7 +1,8 @@
-//! The Caps Lock palette as a pure model: emoji, clipboard history and desktop actions behind one search field, plus an "Ask Helix"
-//! row when what was typed is better said to the assistant. The page only ever holds display rows and sends back the *position* of
-//! the row the person chose; what that position means (text to type, text to paste, an action, a question) comes from the results
-//! of the last query kept here, so the page can neither invent text to insert nor name an action it was not offered.
+//! The Caps Lock palette as a pure model: emoji, clipboard history and desktop actions behind one search field, plus an
+//! "Ask Mobius:" row when what was typed is better said to the desktop AI. The page only ever holds display rows and sends back
+//! the *position* of the row the person chose; what that position means (text to type, text to paste, an action, a question)
+//! comes from the results of the last query kept here, so the page can neither invent text to insert nor name an action it was
+//! not offered.
 
 use std::collections::{HashMap, VecDeque};
 
@@ -101,14 +102,14 @@ const ACTIONS: &[(Action, &str, &str, &[&str])] = &[
     (
         Action::OpenAgents,
         "Open Agents",
-        "What agents did and may do",
-        &["activity", "ai", "access", "permissions"],
+        "Mobius · see and stop desktop tools",
+        &["activity", "ai", "access", "permissions", "mobius"],
     ),
     (
         Action::OpenAssistant,
-        "Ask the Assistant",
-        "Tell Helix what to do",
-        &["ai", "helix", "chat"],
+        "Ask Mobius",
+        "Change something on the desktop",
+        &["ai", "helix", "act", "assistant", "do"],
     ),
     (
         Action::ToggleDoNotDisturb,
@@ -144,7 +145,7 @@ pub enum Outcome {
     /// Put this text on the clipboard and paste it (so a terminal receives it as a paste, never as keystrokes).
     Paste(String),
     Do(Action),
-    /// A sentence for the assistant.
+    /// A sentence for Mobius (Act).
     Ask(String),
 }
 
@@ -362,8 +363,8 @@ impl QuickInsert {
         if !needle.is_empty() {
             let question: String = text.trim().chars().take(MAX_QUESTION_CHARS).collect();
             rows.push(Row {
-                label: format!("Ask Helix: {}", sanitize_for_display(&question, 80)),
-                detail: "Let the assistant do it".to_string(),
+                label: format!("Ask Mobius: {}", sanitize_for_display(&question, 80)),
+                detail: "Have Mobius change the desktop".to_string(),
                 glyph: None,
                 ask: true,
             });
@@ -601,7 +602,7 @@ mod tests {
         let mut p = palette();
         let rows = p.query(Source::Emoji, "make the screen dimmer");
         assert_eq!(rows.len(), 1);
-        assert!(rows[0].ask && rows[0].label.starts_with("Ask Helix: make the screen"));
+        assert!(rows[0].ask && rows[0].label.starts_with("Ask Mobius: make the screen"));
         assert_eq!(
             p.activate(p.generation(), 0),
             Ok(Outcome::Ask("make the screen dimmer".into()))
@@ -704,7 +705,11 @@ mod tests {
             names[..3].iter().all(|n| n.starts_with("Toggle")),
             "{names:?}"
         );
-        assert_eq!(names[3], "Ask the Assistant");
+        let ask = names.iter().position(|n| n == "Ask Mobius");
+        assert!(
+            ask.is_some_and(|i| i >= 3),
+            "weaker Ask Mobius hit must follow Toggle prefix matches: {names:?}"
+        );
     }
 
     #[test]

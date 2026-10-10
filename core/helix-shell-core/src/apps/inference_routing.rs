@@ -23,6 +23,34 @@ pub struct Backend {
     pub base_url: String,
     #[serde(default)]
     pub label: String,
+    /// Secret-service account id for a Bearer token. Empty = no Authorization header.
+    /// Never store the key itself in routing TOML (see inference-fabric.md).
+    #[serde(default)]
+    pub api_key_ref: String,
+}
+
+/// OpenRouter as an OpenAI-compatible cloud preset (talk only; never Act tools).
+pub fn openrouter_preset() -> Backend {
+    Backend {
+        id: "openrouter".into(),
+        kind: BackendKind::Openai,
+        base_url: "https://openrouter.ai/api/v1".into(),
+        label: "OpenRouter".into(),
+        api_key_ref: "openrouter".into(),
+    }
+}
+
+/// Suggested remote model ids when the cloud catalog is unreachable.
+pub fn openrouter_suggested_models() -> &'static [&'static str] {
+    &[
+        "openai/gpt-4o-mini",
+        "openai/gpt-4o",
+        "anthropic/claude-sonnet-4",
+        "google/gemini-2.5-flash",
+        "meta-llama/llama-3.3-70b-instruct",
+        "deepseek/deepseek-chat",
+        "mistralai/mistral-small-3.1-24b-instruct",
+    ]
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,7 +62,51 @@ pub struct ProfileRoute {
     pub model: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+fn default_temperature() -> f64 {
+    0.6
+}
+fn default_max_tokens() -> u32 {
+    1024
+}
+fn default_remote_timeout_secs() -> u32 {
+    120
+}
+
+/// Generation defaults applied to Talk / Code / remote turns (Act may ignore).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct TalkSettings {
+    #[serde(default = "default_temperature")]
+    pub temperature: f64,
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+    /// HTTP timeout for LAN/cloud completions.
+    #[serde(default = "default_remote_timeout_secs")]
+    pub remote_timeout_secs: u32,
+}
+
+impl Default for TalkSettings {
+    fn default() -> Self {
+        Self {
+            temperature: default_temperature(),
+            max_tokens: default_max_tokens(),
+            remote_timeout_secs: default_remote_timeout_secs(),
+        }
+    }
+}
+
+impl TalkSettings {
+    pub fn clamped(mut self) -> Self {
+        if !self.temperature.is_finite() {
+            self.temperature = default_temperature();
+        }
+        self.temperature = self.temperature.clamp(0.0, 2.0);
+        self.max_tokens = self.max_tokens.clamp(64, 8192);
+        self.remote_timeout_secs = self.remote_timeout_secs.clamp(15, 600);
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Routing {
     #[serde(default)]
     pub backends: Vec<Backend>,
@@ -43,6 +115,9 @@ pub struct Routing {
     /// When power profile is saver, refuse non-local backends unless true.
     #[serde(default)]
     pub allow_remote_on_battery_saver: bool,
+    /// Sampling / remote request defaults for talk profiles.
+    #[serde(default)]
+    pub talk: TalkSettings,
 }
 
 impl Default for Routing {
@@ -89,9 +164,11 @@ impl Default for Routing {
                 kind: BackendKind::Local,
                 base_url: String::new(),
                 label: "On this computer".into(),
+                api_key_ref: String::new(),
             }],
             profiles,
             allow_remote_on_battery_saver: false,
+            talk: TalkSettings::default(),
         }
     }
 }
@@ -173,7 +250,9 @@ pub fn save(routing: &Routing) -> Result<(), String> {
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let path = routing_path();
     let temporary = path.with_extension("tmp");
-    let text = routing.to_toml()?;
+    let mut cleaned = routing.clone();
+    cleaned.talk = cleaned.talk.clamped();
+    let text = cleaned.to_toml()?;
     std::fs::write(&temporary, text).map_err(|e| e.to_string())?;
     std::fs::rename(&temporary, &path).map_err(|e| e.to_string())
 }
@@ -230,6 +309,7 @@ mod tests {
             kind: BackendKind::Openai,
             base_url: "http://127.0.0.1:11434/v1".into(),
             label: "LAN".into(),
+            api_key_ref: String::new(),
         });
         r.allow_remote_on_battery_saver = true;
         let mirror = SettingsMirror::from_routing(&r);
@@ -239,6 +319,16 @@ mod tests {
         assert!(mirror.allow_remote_on_battery_saver);
     }
 
+    #[test]
+    fn openrouter_preset_is_openai_with_key_ref() {
+        let b = openrouter_preset();
+        assert_eq!(b.id, "openrouter");
+        assert_eq!(b.kind, BackendKind::Openai);
+        assert!(b.base_url.contains("openrouter.ai"));
+        assert_eq!(b.api_key_ref, "openrouter");
+    }
+
+    #[test]
     fn round_trip_toml() {
         let mut r = Routing::default();
         r.backends.push(Backend {
@@ -246,7 +336,9 @@ mod tests {
             kind: BackendKind::Openai,
             base_url: "http://127.0.0.1:11434/v1".into(),
             label: "Home Ollama".into(),
+            api_key_ref: String::new(),
         });
+        r.backends.push(openrouter_preset());
         r.profiles.insert(
             "code".into(),
             ProfileRoute {
@@ -254,9 +346,31 @@ mod tests {
                 model: "codellama".into(),
             },
         );
+        r.talk.temperature = 0.4;
+        r.talk.max_tokens = 2048;
         let text = r.to_toml().unwrap();
         let back = Routing::parse(&text).unwrap();
         assert_eq!(back.route("code").model, "codellama");
         assert!(!back.is_local_route("code"));
+        let cloud = back.backend("openrouter").unwrap();
+        assert_eq!(cloud.api_key_ref, "openrouter");
+        assert!((back.talk.temperature - 0.4).abs() < f64::EPSILON);
+        assert_eq!(back.talk.max_tokens, 2048);
+    }
+
+    #[test]
+    fn legacy_toml_without_talk_uses_defaults() {
+        let text = r#"
+[[backends]]
+id = "local"
+kind = "local"
+
+[profiles.chat]
+backend = "local"
+model = ""
+"#;
+        let r = Routing::parse(text).unwrap();
+        assert_eq!(r.talk.max_tokens, 1024);
+        assert!((r.talk.temperature - 0.6).abs() < f64::EPSILON);
     }
 }

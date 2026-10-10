@@ -5,13 +5,16 @@ Product shape (greeter / compositor / shell / services): `product-structure.md`.
 **Live session shell:** Tauri `shell/helix-shell-tauri`.
 
 ```sh
-tools/switch-shell.sh install   # links + units; starts shell only if not already running
-tools/switch-shell.sh restart   # bounce the shell — can disrupt Cursor; prefer a plain terminal
+tools/switch-shell.sh install          # links + units; starts shell only if not already running
+tools/switch-shell.sh restart-panels   # bounce Overlay panels only — safe while Cursor is open
+tools/switch-shell.sh restart          # bounce bar+panels — can disrupt Cursor; prefer a plain terminal
 tools/switch-shell.sh status
-tools/iterate.sh                # fast rebuild + unit drop-in; no restart unless --restart
+tools/iterate.sh                       # fast rebuild + unit drop-in; no restart unless --restart
 ```
 
-`install` / `iterate` never restart a live shell (restarting layer-shell has crashed Cursor on this session).
+`install` / `iterate` never restart a live shell. Prefer `restart-panels` for UI work: the bar Top-layer exclusive zone stays up. Full `restart` (bar) still tears down layer-shell and has crashed Cursor on this session.
+
+Split processes: `helix-shell-bar` (`HELIX_SHELL_ROLE=bar`) + `helix-shell-panels` (`HELIX_SHELL_ROLE=panels`), same binary. Legacy monolith unit `helix-shell-tauri.service` remains for nested tests / rollback.
 
 ## Retired (removed)
 

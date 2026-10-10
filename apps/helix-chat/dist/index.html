@@ -1,57 +1,312 @@
 <!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
 <body class="chat">
 <div id="app" data-test="app">
-  <aside id="side">
+  <aside id="side" data-test="side">
     <div id="titlebar" data-tauri-drag-region>
       <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
       <span id="brand">Mobius</span>
     </div>
-    <label class="side-label" for="persona">Persona</label>
-    <select id="persona" data-test="persona"></select>
-    <button id="new-chat" data-test="new-chat"><i data-icon="plus"></i><span>New chat</span></button>
+    <div class="side-actions">
+      <button id="new-chat" data-test="new-chat"><i data-icon="plus"></i><span>New chat</span></button>
+      <button id="temp-chat" class="temp-chat" data-test="temp-chat" type="button" title="Temporary chat — not saved">
+        <i data-icon="eye"></i><span>Temporary</span>
+      </button>
+      <button id="open-models" class="open-models" data-test="open-models" type="button" title="Models &amp; routing">
+        <i data-icon="sparkle"></i><span>Models</span>
+      </button>
+    </div>
+    <label class="chat-search" for="chat-search">
+      <i data-icon="search"></i>
+      <input id="chat-search" data-test="chat-search" type="search" placeholder="Search chats &amp; messages" autocomplete="off">
+    </label>
+    <div id="project-filter" class="project-filter" data-test="project-filter" hidden></div>
     <nav id="chats" data-test="chats"></nav>
-    <div id="side-links">
-      <button id="open-routing" data-test="open-routing" type="button" title="Models and routing">Models &amp; routing</button>
-      <button id="open-assistant" data-test="open-assistant" type="button" title="Bar Assistant">Desktop assistant</button>
-      <button id="open-agents" data-test="open-agents" type="button" title="Agent activity">Agents</button>
-      <button id="open-settings-agents" data-test="open-settings-agents" type="button" title="Grants in Settings">Privacy &amp; agents</button>
+    <div id="side-footer">
+      <div id="hub-menu" class="hub-menu" hidden data-test="hub-menu">
+        <div class="hub-menu-label">Mobius</div>
+        <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Act on the desktop</span></button>
+        <button id="open-agents" data-test="open-agents" type="button"><i data-icon="shield"></i><span>Agents</span></button>
+        <button id="open-routing" data-test="open-routing" type="button"><i data-icon="sparkle"></i><span>Models &amp; routing</span></button>
+        <button id="open-settings-agents" data-test="open-settings-agents" type="button"><i data-icon="lock"></i><span>Privacy &amp; agents</span></button>
+        <div class="hub-menu-label">This chat</div>
+        <button id="fork-chat" data-test="fork-chat" type="button"><i data-icon="fork"></i><span>Fork chat</span></button>
+        <button id="export-chat" data-test="export-chat" type="button"><i data-icon="clipboard"></i><span>Copy as Markdown</span></button>
+      </div>
+      <button id="hub-toggle" class="hub-toggle" data-test="hub-toggle" type="button" aria-expanded="false" aria-controls="hub-menu" title="Mobius">
+        <i data-icon="dots"></i><span>Mobius</span>
+      </button>
     </div>
   </aside>
+  <div id="side-scrim" data-test="side-scrim" hidden></div>
   <main id="main">
-    <header data-tauri-drag-region>
-      <h2 id="chat-title" data-test="chat-title">New chat</h2>
-      <span id="route-chip" data-test="route-chip" hidden></span>
-    </header>
-    <div id="banner" data-test="banner" hidden></div>
-    <div id="scroller"><div id="messages" data-test="messages"></div><div id="empty" data-test="empty"></div></div>
-    <form id="composer" data-test="composer">
-      <textarea id="input" data-test="input" rows="1" placeholder="Ask anything" autocomplete="off" spellcheck="true"></textarea>
-      <button id="act" type="button" data-test="act" title="Act on desktop" aria-label="Act on desktop">Act</button>
-      <button id="send" type="submit" data-test="send" title="Send" aria-label="Send"><i data-icon="arrow-up"></i></button>
-      <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
-    </form>
+    <div id="chat-surface" data-test="chat-surface">
+      <header data-tauri-drag-region>
+        <button id="side-toggle" class="side-toggle" data-test="side-toggle" type="button" title="Conversations" aria-label="Conversations" aria-controls="side" aria-expanded="false"><i data-icon="sidebar"></i></button>
+        <button id="chat-title" class="chat-title" data-test="chat-title" type="button" title="Rename chat">New chat</button>
+        <div class="header-actions">
+          <button id="pin-chat" class="icon-btn" data-test="pin-chat" type="button" title="Pin chat" aria-label="Pin chat" hidden><i data-icon="pin"></i></button>
+          <button id="project-chat" class="icon-btn" data-test="project-chat" type="button" title="Move to project" aria-label="Move to project" hidden><i data-icon="folder"></i></button>
+          <button id="route-chip" class="route-chip" data-test="route-chip" type="button" hidden title="Models and routing"></button>
+        </div>
+      </header>
+      <div id="temp-banner" class="temp-banner" data-test="temp-banner" hidden>Temporary chat — this conversation will not be saved.</div>
+      <div id="find-bar" class="find-bar" data-test="find-bar" hidden>
+        <input id="find-input" data-test="find-input" type="search" placeholder="Find in chat" autocomplete="off">
+        <span id="find-count" class="find-count" data-test="find-count"></span>
+        <button id="find-prev" type="button" data-test="find-prev" title="Previous">↑</button>
+        <button id="find-next" type="button" data-test="find-next" title="Next">↓</button>
+        <button id="find-close" type="button" data-test="find-close" title="Close">✕</button>
+      </div>
+      <div id="banner" data-test="banner" hidden></div>
+      <section id="persona-rail" class="persona-rail" data-test="persona-rail" aria-label="Personas">
+        <div id="persona-dots" class="persona-dots" data-test="persona" role="listbox" aria-label="Choose a persona"></div>
+      </section>
+      <div id="scroller"><div id="messages" data-test="messages"></div><div id="empty" data-test="empty"></div></div>
+      <button id="jump-latest" class="jump-latest" data-test="jump-latest" type="button" hidden title="Jump to latest">Latest</button>
+      <div class="composer-wrap">
+        <div id="composer-meta" class="composer-meta" data-test="composer-meta">
+          <button id="meta-model" class="meta-chip" data-test="meta-model" type="button" title="Chat model">Model</button>
+          <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
+          <span id="queue-chip" class="queue-chip" data-test="queue-chip" hidden></span>
+        </div>
+        <div id="attach-chips" class="attach-chips" data-test="attach-chips" hidden></div>
+        <div id="slash-menu" class="slash-menu" data-test="slash-menu" hidden></div>
+        <form id="composer" data-test="composer">
+          <button id="attach" type="button" data-test="attach" title="Attach files" aria-label="Attach files"><i data-icon="paperclip"></i></button>
+          <textarea id="input" data-test="input" rows="1" placeholder="Ask anything — / for commands" autocomplete="off" spellcheck="true"></textarea>
+          <div class="composer-actions">
+            <button id="act" type="button" data-test="act" title="Have Mobius act on the desktop" aria-label="Have Mobius act on the desktop">Act</button>
+            <button id="send" type="submit" data-test="send" title="Send" aria-label="Send" disabled><i data-icon="arrow-up"></i></button>
+            <button id="stop" type="button" data-test="stop" title="Stop" aria-label="Stop" hidden><i data-icon="stop"></i></button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <section id="models-page" class="models-page" data-test="models-page" hidden>
+      <header class="models-page-head" data-tauri-drag-region>
+        <button id="models-back" class="icon-btn" data-test="models-back" type="button" title="Back to chat" aria-label="Back to chat"><i data-icon="chevron-left"></i></button>
+        <div class="models-page-titles">
+          <h2>Models &amp; routing</h2>
+          <p>Where Talk, Act, and Code run — and how replies are generated.</p>
+        </div>
+        <div class="models-page-actions">
+          <button id="models-discard" type="button" data-test="models-discard">Discard</button>
+          <button id="models-save" class="primary" type="button" data-test="models-save">Save</button>
+        </div>
+      </header>
+      <div class="models-page-body">
+        <nav class="models-nav" aria-label="Models sections">
+          <button type="button" class="models-nav-btn active" data-models-section="overview" data-test="models-nav-overview">Overview</button>
+          <button type="button" class="models-nav-btn" data-models-section="local" data-test="models-nav-local">My computer</button>
+          <button type="button" class="models-nav-btn" data-models-section="lan" data-test="models-nav-lan">LAN</button>
+          <button type="button" class="models-nav-btn" data-models-section="cloud" data-test="models-nav-cloud">Cloud</button>
+          <button type="button" class="models-nav-btn" data-models-section="generation" data-test="models-nav-generation">Generation</button>
+          <button type="button" class="models-nav-btn" data-models-section="advanced" data-test="models-nav-advanced">Advanced</button>
+        </nav>
+        <div class="models-panels">
+          <section class="models-panel active" data-models-panel="overview" data-test="models-panel-overview">
+            <div id="models-info-cards" class="models-info-cards" data-test="models-info-cards"></div>
+            <h3 class="models-h3">Task map</h3>
+            <p class="models-lead">Each Helix task can use a different brain. Act is locked local so desktop tools never leave this machine.</p>
+            <div id="route-tasks" class="route-tasks" aria-label="Task destinations"></div>
+          </section>
+
+          <section class="models-panel" data-models-panel="local" data-test="models-panel-local" hidden>
+            <h3 class="models-h3">Models on this computer</h3>
+            <p class="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Act, or Code.</p>
+            <div class="route-source-toolbar">
+              <label class="route-search" for="route-model-search-local">
+                <i data-icon="search"></i>
+                <input id="route-model-search-local" data-test="route-model-search" type="search" placeholder="Search local models" autocomplete="off">
+              </label>
+              <button id="route-refresh-models" type="button" data-test="route-refresh-models">Refresh</button>
+            </div>
+            <div id="route-model-grid" class="route-model-grid" data-test="route-model-grid"></div>
+            <p id="route-model-empty" class="route-model-empty" data-test="route-model-empty" hidden></p>
+          </section>
+
+          <section class="models-panel" data-models-panel="lan" data-test="models-panel-lan" hidden>
+            <h3 class="models-h3">LAN / OpenAI-compatible server</h3>
+            <p class="models-lead">Point Mobius at Ollama, LM Studio, vLLM, or any <code>/v1</code> chat endpoint on your network.</p>
+            <div class="models-form-card">
+              <label class="sheet-field">Base URL<input id="route-lan-url" data-test="route-lan-url" type="url" placeholder="http://host:11434/v1"></label>
+              <div class="models-form-row">
+                <button id="route-probe-lan" type="button" data-test="route-probe-lan">Test connection</button>
+                <span id="route-probe-lan-status" class="models-inline-status" data-test="route-probe-lan-status"></span>
+              </div>
+            </div>
+            <h4 class="models-h4">Models from server</h4>
+            <div id="route-lan-model-grid" class="route-model-grid" data-test="route-lan-model-grid"></div>
+            <p id="route-lan-model-empty" class="route-model-empty" hidden></p>
+          </section>
+
+          <section class="models-panel" data-models-panel="cloud" data-test="models-panel-cloud" hidden>
+            <h3 class="models-h3">Cloud (OpenRouter)</h3>
+            <p class="models-lead">OpenAI-compatible cloud. API keys live in the Secret Service — never in transcripts or routing TOML. Remotes never get Act tools.</p>
+            <div class="models-form-card">
+              <label class="sheet-field">API URL<input id="route-cloud-url" data-test="route-cloud-url" type="url" placeholder="https://openrouter.ai/api/v1"></label>
+              <label class="sheet-field">API key<input id="route-cloud-key" data-test="route-cloud-key" type="password" autocomplete="off" placeholder="Paste to update; leave blank to keep"></label>
+              <div class="models-form-row">
+                <p id="route-cloud-key-status" class="sheet-note" data-test="route-cloud-key-status"></p>
+                <button id="route-clear-key" type="button" data-test="route-clear-key">Clear key</button>
+                <button id="route-probe-cloud" type="button" data-test="route-probe-cloud">Test connection</button>
+              </div>
+              <span id="route-probe-cloud-status" class="models-inline-status" data-test="route-probe-cloud-status"></span>
+            </div>
+            <h4 class="models-h4">Catalog</h4>
+            <div id="route-cloud-model-grid" class="route-model-grid" data-test="route-cloud-model-grid"></div>
+            <p id="route-cloud-model-empty" class="route-model-empty" hidden></p>
+          </section>
+
+          <section class="models-panel" data-models-panel="generation" data-test="models-panel-generation" hidden>
+            <h3 class="models-h3">Generation defaults</h3>
+            <p class="models-lead">Applied to Talk and Code turns (local Inference and remote). Act still uses the local tool slot.</p>
+            <div class="models-form-card">
+              <label class="sheet-field">Temperature
+                <div class="models-slider-row">
+                  <input id="route-temperature" data-test="route-temperature" type="range" min="0" max="2" step="0.05" value="0.6">
+                  <output id="route-temperature-value" for="route-temperature">0.60</output>
+                </div>
+              </label>
+              <label class="sheet-field">Max tokens
+                <input id="route-max-tokens" data-test="route-max-tokens" type="number" min="64" max="8192" step="64" value="1024">
+              </label>
+              <label class="sheet-field">Remote timeout (seconds)
+                <input id="route-timeout" data-test="route-timeout" type="number" min="15" max="600" step="15" value="120">
+              </label>
+            </div>
+          </section>
+
+          <section class="models-panel" data-models-panel="advanced" data-test="models-panel-advanced" hidden>
+            <h3 class="models-h3">Advanced</h3>
+            <div class="models-form-card">
+              <label class="sheet-check"><input id="route-battery" data-test="route-battery" type="checkbox"><span>Allow remote models when battery saver is on</span></label>
+              <div class="models-kv"><span>Config file</span><code id="route-config-path" data-test="route-config-path"></code></div>
+              <p class="models-lead">Profiles: chat, act, summarize, vision, code. Only Act is forced local.</p>
+              <button id="route-reset-defaults" type="button" data-test="route-reset-defaults">Reset generation defaults</button>
+            </div>
+          </section>
+        </div>
+      </div>
+      <!-- Hidden mirrors for persona datalist / legacy hooks -->
+      <input id="route-chat-model" type="hidden" data-test="route-chat-model">
+      <input id="route-act-model" type="hidden" data-test="route-act-model">
+      <input id="route-code-model" type="hidden" data-test="route-code-model">
+      <input id="route-chat-backend" type="hidden" data-test="route-chat-backend" value="local">
+      <input id="route-code-backend" type="hidden" data-test="route-code-backend" value="local">
+      <input id="route-model-search" type="hidden">
+    </section>
   </main>
 </div>
-<dialog id="routing-dialog" data-test="routing-dialog">
-  <form method="dialog" id="routing-form">
-    <h3>Models &amp; routing</h3>
-    <p class="dialog-note">Managed in Mobius. Act stays on-device. LAN replies never run desktop tools.</p>
-    <label>Chat model (local GGUF id)<input id="route-chat-model" data-test="route-chat-model" type="text" placeholder="optional"></label>
-    <label>Act model (local GGUF id)<input id="route-act-model" data-test="route-act-model" type="text" placeholder="optional"></label>
-    <label>Code model<input id="route-code-model" data-test="route-code-model" type="text" placeholder="optional"></label>
-    <label>LAN OpenAI-compat URL<input id="route-lan-url" data-test="route-lan-url" type="url" placeholder="http://host:11434/v1"></label>
-    <label>Route <code>code</code> via LAN
-      <select id="route-code-backend" data-test="route-code-backend">
-        <option value="local">On this computer</option>
-        <option value="lan">LAN</option>
-      </select>
-    </label>
-    <label class="check"><input id="route-battery" data-test="route-battery" type="checkbox"> Allow remote on battery saver</label>
-    <div class="dialog-actions">
+
+<dialog id="model-dialog" class="sheet sheet-sm" data-test="model-dialog">
+  <form method="dialog" id="model-form" class="sheet-body">
+    <header class="sheet-head">
+      <h3>Chat model</h3>
+      <p class="sheet-note">Local, LAN, or cloud for talk. Act stays on its own local model — remotes never run desktop tools.</p>
+    </header>
+    <div class="sheet-scroll">
+      <label class="sheet-field">Backend
+        <select id="model-backend" data-test="model-backend">
+          <option value="local">On this computer</option>
+          <option value="lan">LAN</option>
+          <option value="openrouter">OpenRouter</option>
+        </select>
+      </label>
+      <div id="model-list" class="model-list" data-test="model-list"></div>
+      <label class="sheet-field">Custom id<input id="model-custom" data-test="model-custom" type="text" placeholder="GGUF id or provider/model"></label>
+    </div>
+    <div class="sheet-actions">
+      <button type="submit" value="auto" data-test="model-auto">Auto</button>
+      <span class="sheet-actions-spacer"></span>
       <button type="submit" value="cancel">Cancel</button>
-      <button id="routing-save" type="submit" value="save" class="primary">Save</button>
+      <button type="submit" value="save" class="primary">Use</button>
     </div>
   </form>
 </dialog>
+
+<dialog id="project-dialog" class="sheet sheet-sm" data-test="project-dialog">
+  <form method="dialog" id="project-form" class="sheet-body">
+    <header class="sheet-head">
+      <h3>Project</h3>
+      <p class="sheet-note">Group related chats. Leave empty to remove from a project.</p>
+    </header>
+    <div class="sheet-scroll">
+      <label class="sheet-field">Name<input id="project-name" data-test="project-name" type="text" maxlength="40" placeholder="e.g. Work, Homelab" list="project-suggestions"></label>
+      <datalist id="project-suggestions"></datalist>
+    </div>
+    <div class="sheet-actions">
+      <button type="submit" value="clear" data-test="project-clear">No project</button>
+      <span class="sheet-actions-spacer"></span>
+      <button type="submit" value="cancel">Cancel</button>
+      <button type="submit" value="save" class="primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="rename-dialog" class="sheet sheet-sm" data-test="rename-dialog">
+  <form method="dialog" id="rename-form" class="sheet-body">
+    <header class="sheet-head">
+      <h3>Rename chat</h3>
+    </header>
+    <div class="sheet-scroll">
+      <label class="sheet-field">Title<input id="rename-title" data-test="rename-title" type="text" maxlength="48" required></label>
+    </div>
+    <div class="sheet-actions">
+      <button type="submit" value="cancel">Cancel</button>
+      <button type="submit" value="save" class="primary" data-test="rename-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="edit-dialog" class="sheet" data-test="edit-dialog">
+  <form method="dialog" id="edit-form" class="sheet-body">
+    <header class="sheet-head">
+      <h3>Edit message</h3>
+      <p class="sheet-note">Later replies in this chat will be removed and a new answer will be generated.</p>
+    </header>
+    <div class="sheet-scroll">
+      <label class="sheet-field">Message<textarea id="edit-text" data-test="edit-text" rows="8" maxlength="4000" required></textarea></label>
+    </div>
+    <div class="sheet-actions">
+      <button type="submit" value="cancel">Cancel</button>
+      <button type="submit" value="save" class="primary" data-test="edit-save">Send</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="persona-dialog" class="sheet" data-test="persona-dialog">
+  <form method="dialog" id="persona-form" class="sheet-body">
+    <header class="sheet-head">
+      <h3>Persona</h3>
+      <p class="sheet-note">A hub mind for talk. Desktop change still goes through Act and the bar Assistant.</p>
+    </header>
+    <div class="sheet-scroll">
+      <label class="sheet-field">Name<input id="persona-edit-name" data-test="persona-edit-name" type="text" maxlength="40" required></label>
+      <label class="sheet-field">System prompt<textarea id="persona-edit-prompt" data-test="persona-edit-prompt" rows="6" maxlength="4000" placeholder="Optional. Empty uses the default Mobius prompt."></textarea></label>
+      <label class="sheet-field">Task profile
+        <select id="persona-edit-task" data-test="persona-edit-task">
+          <option value="chat">Chat</option>
+          <option value="code">Code</option>
+          <option value="summarize">Summarize</option>
+          <option value="vision">Vision</option>
+        </select>
+      </label>
+      <label class="sheet-field">Backend override<input id="persona-edit-backend" data-test="persona-edit-backend" type="text" placeholder="optional, e.g. local or lan"></label>
+      <label class="sheet-field">Model override<input id="persona-edit-model" data-test="persona-edit-model" type="text" placeholder="optional GGUF id"></label>
+      <label class="sheet-field">Switch to
+        <select id="persona-pick" data-test="persona-pick"></select>
+      </label>
+    </div>
+    <div class="sheet-actions">
+      <button id="persona-new" type="button" data-test="persona-new" value="new">New</button>
+      <span class="sheet-actions-spacer"></span>
+      <button type="submit" value="cancel">Cancel</button>
+      <button id="persona-save" type="submit" value="save" class="primary" data-test="persona-save">Save</button>
+    </div>
+  </form>
+</dialog>
+
 <script src="icons.js"></script>
 <script src="chat.js"></script>

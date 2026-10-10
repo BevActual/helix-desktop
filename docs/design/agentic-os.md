@@ -80,15 +80,19 @@ built-in inference service.
 
 ## Interconnected surfaces (ships today)
 
+**Mobius** = Helix’s desktop AI. Talk · Act · Agents are doors under that brand;
+processes stay separate (see `inference-fabric.md`).
+
 | Surface | Talk | Act | Oversight |
 |---|---|---|---|
-| **Mobius** | Inference1 | `org.helix.Shell1.AssistantSubmit` → bar → `helix-assistant` → Agent Surface | Open Agents / Assistant; never holds Agent Surface |
-| **Bar Assistant** | via `helix-assistant` | Agent Surface (never holds grants in the shell binary) | Island + confirmer |
-| **Agents panel** | — | Stop / revoke / kill switch | AgentSurfaceActivity1 |
+| **Mobius** (window) | Inference1 | `org.helix.Shell1.AssistantSubmit` → bar → `helix-assistant` → Agent Surface | Hub → Act / Agents; never holds Agent Surface |
+| **Bar Mobius** (Talk) | Inference1 (quick) | — | Open full Mobius for long chat |
+| **Bar Mobius** (Act) | Switch to Talk door | Agent Surface via `helix-assistant` (shell never holds grants) | Island + confirmer; Agents door |
+| **Bar Mobius** (Agents) | Switch to Talk door | Act door; Stop / revoke / kill switch | AgentSurfaceActivity1 |
 | **Settings → Privacy & agents** | — | Manager `SetGrant` | Full audit |
 | **Helix MCP server** | — | Agent Surface (per MCP client) | Same confirmer / audit |
 
-Ambiguous ask → Mobius; explicit act → bar. Fabric: `inference-fabric.md`.
+Ambiguous ask → Mobius Talk; explicit desktop change → Mobius Act. Fabric: `inference-fabric.md`.
 
 ## Human entry
 

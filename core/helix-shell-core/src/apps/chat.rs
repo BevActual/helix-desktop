@@ -13,10 +13,14 @@ pub const MAX_MESSAGES: usize = 400;
 pub const MAX_MESSAGE_CHARS: usize = 20_000;
 /// How much history goes to the model with a turn (characters; a token is about four).
 pub const CONTEXT_CHARS: usize = 12_000;
+/// Attached file bodies included with a turn (total, after truncation).
+pub const MAX_ATTACH_CHARS: usize = 8_000;
+pub const MAX_ATTACH_FILES: usize = 6;
+pub const MAX_ATTACH_FILE_CHARS: usize = 6_000;
 
-pub const SYSTEM_PROMPT: &str = "You are Helix, the assistant built into the person's Linux desktop. Be direct and brief. \
+pub const SYSTEM_PROMPT: &str = "You are Mobius, the AI built into the person's Helix Linux desktop. Be direct and brief. \
 Use plain text; use a fenced code block for code and commands. If asked to change something on the desktop, tell them to use \
-Act on desktop (or the bar Assistant). Do not claim to have done it yourself.";
+Ask Mobius / Act (bar). Do not claim to have done it yourself.";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -47,6 +51,10 @@ pub struct Conversation {
     pub messages: Vec<Message>,
     /// Seconds since the epoch, for ordering.
     pub updated: u64,
+    /// Pinned chats stay at the top of the sidebar (ChatGPT-style).
+    pub pinned: bool,
+    /// Optional project / folder name for grouping.
+    pub project: String,
 }
 
 /// An id is 16 lowercase hex digits (it names a file).
@@ -64,6 +72,35 @@ fn tidy(text: &str, max: usize) -> String {
     cleaned
 }
 
+fn fence_lang_for(name: &str) -> &'static str {
+    let ext = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    match ext.as_str() {
+        "rs" => "rust",
+        "py" => "python",
+        "js" | "mjs" | "cjs" => "javascript",
+        "ts" | "tsx" => "typescript",
+        "jsx" => "jsx",
+        "json" => "json",
+        "toml" => "toml",
+        "yaml" | "yml" => "yaml",
+        "md" | "markdown" => "markdown",
+        "sh" | "bash" | "zsh" => "bash",
+        "css" => "css",
+        "html" | "htm" => "html",
+        "c" | "h" => "c",
+        "cpp" | "cc" | "cxx" | "hpp" => "cpp",
+        "go" => "go",
+        "java" => "java",
+        "kt" => "kotlin",
+        "swift" => "swift",
+        "sql" => "sql",
+        "xml" => "xml",
+        "csv" => "csv",
+        "txt" | "log" | "text" => "text",
+        _ => "",
+    }
+}
+
 fn title_of(text: &str) -> String {
     let line = text.lines().find(|l| !l.trim().is_empty()).unwrap_or("New chat");
     let title = sanitize_for_display(line.trim(), 48);
@@ -76,7 +113,36 @@ fn title_of(text: &str) -> String {
 
 impl Conversation {
     pub fn new(id: &str, now: u64) -> Option<Conversation> {
-        valid_id(id).then(|| Conversation { id: id.to_string(), title: "New chat".into(), messages: Vec::new(), updated: now })
+        valid_id(id).then(|| Conversation {
+            id: id.to_string(),
+            title: "New chat".into(),
+            messages: Vec::new(),
+            updated: now,
+            pinned: false,
+            project: String::new(),
+        })
+    }
+
+    /// Seed turns from the bar quick-Talk handoff (user/assistant pairs). Caps length like a normal send.
+    pub fn seed_from_bar(&mut self, turns: &[(Role, String)], now: u64) {
+        self.messages.clear();
+        for (role, text) in turns {
+            let text = tidy(text, MAX_MESSAGE_CHARS);
+            if text.trim().is_empty() {
+                continue;
+            }
+            if self.messages.len() >= MAX_MESSAGES {
+                break;
+            }
+            self.messages.push(Message {
+                role: *role,
+                text,
+            });
+        }
+        self.updated = now;
+        if let Some(first) = self.messages.iter().find(|m| m.role == Role::User) {
+            self.title = title_of(&first.text);
+        }
     }
 
     /// The messages to send for the next turn: the system prompt, then the newest history that fits, oldest first. The last user message
@@ -111,9 +177,118 @@ impl Conversation {
         out
     }
 
+    /// Build a user message from typed text plus `(name, body)` attachments.
+    /// Bodies are truncated to fit [`MAX_ATTACH_CHARS`]; returns `(composed, truncated)`.
+    pub fn compose_with_attachments(
+        text: &str,
+        attachments: &[(String, String)],
+    ) -> (String, bool) {
+        let mut body = text.trim_end().to_string();
+        if attachments.is_empty() {
+            return (body, false);
+        }
+        let mut budget = MAX_ATTACH_CHARS;
+        let mut truncated = false;
+        if !body.is_empty() {
+            body.push_str("\n\n");
+        }
+        for (index, (name, content)) in attachments.iter().enumerate() {
+            if index >= MAX_ATTACH_FILES {
+                truncated = true;
+                break;
+            }
+            if budget == 0 {
+                truncated = true;
+                break;
+            }
+            let safe_name = sanitize_for_display(name.trim(), 80);
+            let name = if safe_name.is_empty() {
+                "file".to_string()
+            } else {
+                safe_name
+            };
+            let fence = fence_lang_for(&name);
+            let mut chunk = content.clone();
+            if chunk.chars().count() > MAX_ATTACH_FILE_CHARS {
+                chunk = chunk.chars().take(MAX_ATTACH_FILE_CHARS).collect();
+                truncated = true;
+            }
+            if chunk.chars().count() > budget {
+                chunk = chunk.chars().take(budget).collect();
+                truncated = true;
+            }
+            budget = budget.saturating_sub(chunk.chars().count());
+            body.push_str("Attached: ");
+            body.push_str(&name);
+            body.push('\n');
+            body.push_str("```");
+            body.push_str(fence);
+            body.push('\n');
+            body.push_str(&chunk);
+            if !chunk.ends_with('\n') {
+                body.push('\n');
+            }
+            body.push_str("```\n\n");
+        }
+        if truncated {
+            body.push_str("(Some attachment content was truncated to fit the context budget.)\n");
+        }
+        (body.trim_end().to_string(), truncated)
+    }
+
+    /// First user turn preview for sidebar search (trimmed, capped).
+    pub fn preview(&self) -> String {
+        self.messages
+            .iter()
+            .find(|m| m.role == Role::User)
+            .map(|m| {
+                let line = m.text.lines().find(|l| !l.trim().is_empty()).unwrap_or("");
+                sanitize_for_display(line.trim(), 96)
+            })
+            .unwrap_or_default()
+    }
+
+    /// Copy this conversation into a new id, optionally cutting after `through` (inclusive).
+    pub fn fork(&self, new_id: &str, through: Option<usize>, now: u64) -> Option<Conversation> {
+        let mut next = Conversation::new(new_id, now)?;
+        if self.messages.is_empty() {
+            next.title = "Forked chat".into();
+            next.project = self.project.clone();
+            return Some(next);
+        }
+        let last = self.messages.len() - 1;
+        let end = through.map(|i| i.min(last)).unwrap_or(last);
+        next.messages = self.messages[..=end].to_vec();
+        // Drop a trailing empty assistant bubble (interrupted stream).
+        if next
+            .messages
+            .last()
+            .is_some_and(|m| m.role == Role::Assistant && m.text.trim().is_empty())
+        {
+            next.messages.pop();
+        }
+        if next.messages.is_empty() {
+            next.title = "Forked chat".into();
+        } else {
+            let base = if self.title.trim().is_empty() || self.title == "New chat" {
+                title_of(&next.messages[0].text)
+            } else {
+                self.title.clone()
+            };
+            let forked = format!("{base} (fork)");
+            next.title = sanitize_for_display(&forked, 48);
+        }
+        next.project = self.project.clone();
+        next.pinned = false;
+        next.updated = now;
+        Some(next)
+    }
+
     pub fn to_json(&self) -> String {
         json!({
             "version": 1, "id": self.id, "title": self.title, "updated": self.updated,
+            "pinned": self.pinned,
+            "project": self.project,
             "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text})).collect::<Vec<_>>(),
         })
         .to_string()
@@ -144,6 +319,12 @@ impl Conversation {
             title: value.get("title").and_then(Value::as_str).map(|t| sanitize_for_display(t, 48)).filter(|t| !t.is_empty()).or(first_user).unwrap_or_else(|| "New chat".into()),
             messages,
             updated: value.get("updated").and_then(Value::as_u64).unwrap_or(0),
+            pinned: value.get("pinned").and_then(Value::as_bool).unwrap_or(false),
+            project: value
+                .get("project")
+                .and_then(Value::as_str)
+                .map(|t| sanitize_for_display(t, 40))
+                .unwrap_or_default(),
         })
     }
 }
@@ -154,6 +335,8 @@ pub enum ChatError {
     TooLong,
     Busy,
     Full,
+    /// No completed assistant reply to regenerate, or no user turn to edit.
+    NothingToReplay,
 }
 
 /// A turn the app should start: these messages to the model.
@@ -186,6 +369,8 @@ pub struct Chat {
     streaming: Option<Streaming>,
     generation: u64,
     pub error: String,
+    /// When true, the hub must not write this conversation to disk (ChatGPT temporary chat).
+    pub temporary: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -202,6 +387,9 @@ pub struct ChatView {
     pub messages: Vec<MessageView>,
     pub streaming: bool,
     pub error: String,
+    pub temporary: bool,
+    pub pinned: bool,
+    pub project: String,
 }
 
 fn view_of(message: &Message) -> MessageView {
@@ -214,7 +402,20 @@ fn view_of(message: &Message) -> MessageView {
 
 impl Chat {
     pub fn new(conversation: Conversation) -> Chat {
-        Chat { conversation, streaming: None, generation: 0, error: String::new() }
+        Chat {
+            conversation,
+            streaming: None,
+            generation: 0,
+            error: String::new(),
+            temporary: false,
+        }
+    }
+
+    pub fn temporary(conversation: Conversation) -> Chat {
+        let mut chat = Chat::new(conversation);
+        chat.temporary = true;
+        chat.conversation.title = "Temporary chat".into();
+        chat
     }
 
     pub fn is_streaming(&self) -> bool {
@@ -228,29 +429,105 @@ impl Chat {
 
     /// Like [`send`] but uses a persona system prompt (empty → [`SYSTEM_PROMPT`]).
     pub fn send_with_system(&mut self, text: &str, now: u64, system: &str) -> Result<Turn, ChatError> {
+        self.send_limited(text, MAX_INPUT_CHARS, now, system)
+    }
+
+    /// Send a pre-composed user turn (e.g. text + attached files). Cap is [`MAX_MESSAGE_CHARS`].
+    pub fn send_composed(&mut self, text: &str, now: u64, system: &str) -> Result<Turn, ChatError> {
+        self.send_limited(text, MAX_MESSAGE_CHARS, now, system)
+    }
+
+    fn send_limited(
+        &mut self,
+        text: &str,
+        max_chars: usize,
+        now: u64,
+        system: &str,
+    ) -> Result<Turn, ChatError> {
         if self.streaming.is_some() {
             return Err(ChatError::Busy);
         }
-        let text = tidy(text, MAX_INPUT_CHARS + 1);
+        let text = tidy(text, max_chars + 1);
         if text.trim().is_empty() {
             return Err(ChatError::Empty);
         }
-        if text.chars().count() > MAX_INPUT_CHARS {
+        if text.chars().count() > max_chars {
             return Err(ChatError::TooLong);
         }
         if self.conversation.messages.len() + 2 > MAX_MESSAGES {
             return Err(ChatError::Full);
         }
-        if self.conversation.messages.is_empty() {
+        if self.conversation.messages.is_empty() && !self.temporary {
             self.conversation.title = title_of(&text);
         }
-        self.conversation.messages.push(Message { role: Role::User, text });
+        self.conversation.messages.push(Message {
+            role: Role::User,
+            text,
+        });
+        self.begin_assistant_turn(now, system)
+    }
+
+    /// Rename the conversation (ChatGPT-style). Empty titles are refused.
+    pub fn set_title(&mut self, title: &str, now: u64) -> Result<(), ChatError> {
+        let title = sanitize_for_display(title.trim(), 48);
+        if title.is_empty() {
+            return Err(ChatError::Empty);
+        }
+        self.conversation.title = title;
+        self.conversation.updated = now;
+        Ok(())
+    }
+
+    pub fn set_pinned(&mut self, pinned: bool, now: u64) {
+        self.conversation.pinned = pinned;
+        self.conversation.updated = now;
+    }
+
+    pub fn set_project(&mut self, project: &str, now: u64) {
+        self.conversation.project = sanitize_for_display(project.trim(), 40);
+        self.conversation.updated = now;
+    }
+
+    /// Drop the last assistant reply and ask again with the same user turn (ChatGPT Regenerate).
+    pub fn regenerate_with_system(&mut self, now: u64, system: &str) -> Result<Turn, ChatError> {
+        if self.streaming.is_some() {
+            return Err(ChatError::Busy);
+        }
+        match self.conversation.messages.last() {
+            Some(m) if m.role == Role::Assistant => {
+                self.conversation.messages.pop();
+            }
+            _ => return Err(ChatError::NothingToReplay),
+        }
+        if !self.conversation.messages.last().is_some_and(|m| m.role == Role::User) {
+            return Err(ChatError::NothingToReplay);
+        }
+        self.begin_assistant_turn(now, system)
+    }
+
+    /// Replace the user message at `index`, drop everything after it, and resend (ChatGPT Edit).
+    pub fn edit_and_resend(&mut self, index: usize, text: &str, now: u64, system: &str) -> Result<Turn, ChatError> {
+        if self.streaming.is_some() {
+            return Err(ChatError::Busy);
+        }
+        if index >= self.conversation.messages.len()
+            || self.conversation.messages[index].role != Role::User
+        {
+            return Err(ChatError::NothingToReplay);
+        }
+        self.conversation.messages.truncate(index);
+        self.send_with_system(text, now, system)
+    }
+
+    fn begin_assistant_turn(&mut self, now: u64, system: &str) -> Result<Turn, ChatError> {
+        if self.conversation.messages.len() + 1 > MAX_MESSAGES {
+            return Err(ChatError::Full);
+        }
         self.conversation.messages.push(Message { role: Role::Assistant, text: String::new() });
         self.conversation.updated = now;
         self.generation += 1;
         self.error.clear();
         self.streaming = Some(Streaming { generation: self.generation, ..Streaming::default() });
-        // The reply being written is not part of what is sent.
         let mut sent = self.conversation.clone();
         sent.messages.pop();
         Ok(Turn {
@@ -378,12 +655,42 @@ impl Chat {
             messages: self.conversation.messages.iter().map(view_of).collect(),
             streaming: self.streaming.is_some(),
             error: self.error.clone(),
+            temporary: self.temporary,
+            pinned: self.conversation.pinned,
+            project: self.conversation.project.clone(),
         }
     }
 
     /// The reply being written, as blocks (what a streaming update sends).
     pub fn last_blocks(&self) -> Vec<Block> {
         self.conversation.messages.last().filter(|m| m.role == Role::Assistant).map(|m| markdown::parse(&m.text)).unwrap_or_default()
+    }
+
+    /// Markdown export of the conversation (ChatGPT share/export shape).
+    pub fn to_markdown(&self) -> String {
+        let mut out = String::new();
+        let title = if self.temporary {
+            "Temporary chat"
+        } else if self.conversation.title.trim().is_empty() {
+            "Chat"
+        } else {
+            self.conversation.title.as_str()
+        };
+        out.push_str("# ");
+        out.push_str(title);
+        out.push_str("\n\n");
+        for message in &self.conversation.messages {
+            let role = match message.role {
+                Role::User => "You",
+                Role::Assistant => "Mobius",
+            };
+            out.push_str("## ");
+            out.push_str(role);
+            out.push_str("\n\n");
+            out.push_str(message.text.trim());
+            out.push_str("\n\n");
+        }
+        out
     }
 }
 
@@ -392,6 +699,22 @@ pub struct Summary {
     pub id: String,
     pub title: String,
     pub updated: u64,
+    pub pinned: bool,
+    pub project: String,
+    /// Short preview of the first user message (sidebar + light search).
+    #[serde(default)]
+    pub preview: String,
+}
+
+/// Full-text search hit across conversation bodies.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct SearchHit {
+    pub id: String,
+    pub title: String,
+    pub snippet: String,
+    pub updated: u64,
+    pub pinned: bool,
+    pub project: String,
 }
 
 #[cfg(test)]
@@ -437,6 +760,54 @@ mod tests {
         assert_eq!(c.send(&"x".repeat(MAX_INPUT_CHARS + 1), 0).unwrap_err(), ChatError::TooLong);
         assert!(c.send("hi", 0).is_ok());
         assert_eq!(c.send("again", 0).unwrap_err(), ChatError::Busy);
+    }
+
+    #[test]
+    fn rename_regenerate_and_edit() {
+        let mut c = chat();
+        c.set_title("  My notes  ", 2).unwrap();
+        assert_eq!(c.conversation.title, "My notes");
+        assert_eq!(c.set_title("   ", 3).unwrap_err(), ChatError::Empty);
+        assert_eq!(c.regenerate_with_system(4, SYSTEM_PROMPT).unwrap_err(), ChatError::NothingToReplay);
+
+        let turn = c.send("alpha", 5).unwrap();
+        c.started(turn.generation, 1);
+        c.delta(1, "A");
+        c.complete(1, true, "{\"ok\":true}");
+        let again = c.regenerate_with_system(6, SYSTEM_PROMPT).unwrap();
+        assert!(c.is_streaming());
+        assert_eq!(c.conversation.messages.len(), 2);
+        assert_eq!(c.conversation.messages[0].text, "alpha");
+        assert_eq!(c.conversation.messages[1].text, "");
+        c.started(again.generation, 2);
+        c.delta(2, "B");
+        c.complete(2, true, "{\"ok\":true}");
+
+        let edited = c.edit_and_resend(0, "beta", 7, SYSTEM_PROMPT).unwrap();
+        assert_eq!(c.conversation.messages[0].text, "beta");
+        assert_eq!(c.conversation.messages.len(), 2);
+        c.started(edited.generation, 3);
+        c.delta(3, "ok");
+        assert_eq!(c.complete(3, true, "{\"ok\":true}"), Some(Outcome::Finished));
+        assert_eq!(c.conversation.messages[1].text, "ok");
+    }
+
+    #[test]
+    fn temporary_chat_keeps_title_and_exports_markdown() {
+        let mut c = Chat::temporary(Conversation::new(ID, 1).unwrap());
+        assert!(c.temporary);
+        assert_eq!(c.conversation.title, "Temporary chat");
+        let turn = c.send("secret question", 2).unwrap();
+        assert_eq!(c.conversation.title, "Temporary chat");
+        c.started(turn.generation, 1);
+        c.delta(1, "quiet answer");
+        c.complete(1, true, "{\"ok\":true}");
+        let md = c.to_markdown();
+        assert!(md.contains("# Temporary chat"));
+        assert!(md.contains("## You"));
+        assert!(md.contains("secret question"));
+        assert!(md.contains("## Mobius"));
+        assert!(md.contains("quiet answer"));
     }
 
     #[test]
@@ -539,5 +910,41 @@ mod tests {
         assert!(v.messages[0].blocks.is_empty() && v.messages[0].text == "show **me**");
         assert_eq!(v.messages[1].blocks.len(), 2);
         assert!(v.streaming);
+    }
+
+    #[test]
+    fn compose_attachments_fences_and_truncates() {
+        let (out, truncated) = Conversation::compose_with_attachments(
+            "Explain this",
+            &[("demo.rs".into(), "fn main() {}\n".into())],
+        );
+        assert!(out.contains("Explain this"));
+        assert!(out.contains("Attached: demo.rs"));
+        assert!(out.contains("```rust"));
+        assert!(out.contains("fn main()"));
+        assert!(!truncated);
+        let big = "x".repeat(MAX_ATTACH_CHARS + 500);
+        let (_, cut) = Conversation::compose_with_attachments("hi", &[("big.txt".into(), big)]);
+        assert!(cut);
+    }
+
+    #[test]
+    fn fork_copies_history_and_renames() {
+        let mut c = chat();
+        let t = c.send("plan the week", 1).unwrap();
+        c.started(t.generation, 1);
+        c.delta(1, "focus mornings");
+        c.complete(1, true, "{\"ok\":true}");
+        c.conversation.project = "Life".into();
+        assert_eq!(c.conversation.preview(), "plan the week");
+        let forked = c.conversation.fork("fedcba9876543210", Some(0), 9).unwrap();
+        assert_eq!(forked.id, "fedcba9876543210");
+        assert_eq!(forked.messages.len(), 1);
+        assert_eq!(forked.messages[0].text, "plan the week");
+        assert!(forked.title.contains("fork"));
+        assert_eq!(forked.project, "Life");
+        assert!(!forked.pinned);
+        let full = c.conversation.fork("aaaaaaaaaaaaaaaa", None, 10).unwrap();
+        assert_eq!(full.messages.len(), 2);
     }
 }

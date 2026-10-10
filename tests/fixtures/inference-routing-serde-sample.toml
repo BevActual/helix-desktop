@@ -11,6 +11,14 @@ id = "lan"
 kind = "openai"
 base_url = "http://127.0.0.1:11434/v1"
 label = "LAN"
+api_key_ref = ""
+
+[[backends]]
+id = "openrouter"
+kind = "openai"
+base_url = "https://openrouter.ai/api/v1"
+label = "OpenRouter"
+api_key_ref = "openrouter"
 
 [profiles.act]
 backend = "local"

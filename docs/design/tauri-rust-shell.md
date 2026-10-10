@@ -453,7 +453,7 @@ Tools: `tools/iterate.sh` (12 s edit-to-desktop loop on the live session), `tool
 
 **Caps Lock palette (`quick-insert`).** Caps Lock is remapped to F19 in the keymap and bound to this panel. `helix-shell-core::quick_insert` searches emoji
 (ranked: exact, prefix, word, keyword, stem, substring; what you use comes first), the clipboard history and desktop actions; typing always adds an
-"Ask Helix" row that hands the sentence to the assistant. The page sends only the position of the chosen row; what it means comes from the last query's
+"Ask Mobius:" row that hands the sentence to Mobius (Act). The page sends only the position of the chosen row; what it means comes from the last query's
 results. Emoji are typed with `wtype`; clipboard entries go on the clipboard and are pasted with Shift+Insert, so a terminal receives a bracketed paste
 and never keystrokes. The history is in memory only, text only, at most 50 entries of 64 KiB, and skips anything a password manager flags. What was
 typed or copied is never written to the log.

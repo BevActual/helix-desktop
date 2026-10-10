@@ -2,7 +2,7 @@
 <div id="bar">
   <div class="side">
     <button class="bar-btn icon" id="apps" data-test="apps" title="Apps"><i data-icon="grid"></i></button>
-    <button class="bar-btn icon" id="ask" data-test="ask" title="Assistant"><i data-icon="sparkle"></i></button>
+    <button class="bar-btn icon" id="ask" data-test="ask" title="Mobius"><i data-icon="sparkle"></i></button>
     <div id="workspaces" data-test="workspaces"></div>
   </div>
   <div id="center">
@@ -11,7 +11,7 @@
   </div>
   <div class="side right">
     <div id="tray" data-test="tray"></div>
-    <button class="bar-btn icon" id="agentsbtn" data-test="agentsbtn" style="display:none" title="Agents"><i data-icon="shield"></i></button>
+    <button class="bar-btn icon" id="agentsbtn" data-test="agentsbtn" style="display:none" title="Mobius · Agents"><i data-icon="shield"></i></button>
     <button class="bar-btn icon" id="notifbtn" data-test="notifbtn" title="Notifications"><i data-icon="bell" data-slot="bell"></i><span class="badge" id="notif-badge" hidden></span></button>
     <button class="bar-btn" id="controlbtn" data-test="controlbtn" title="Control Center">
       <span id="status"><i data-icon="wifi" data-slot="wifi"></i><i data-icon="bluetooth" data-slot="bt"></i><i data-icon="volume" data-slot="vol"></i><span id="batt"><i data-icon="battery" data-slot="batt"></i><span id="batt-label"></span></span></span>
@@ -85,13 +85,6 @@
   <div id="notif-head"><h3>Notifications</h3><button id="notif-dnd" data-test="notif-dnd">Do not disturb</button><button id="notif-clear" data-test="notif-clear">Clear all</button></div>
   <div id="notif-list"></div><div id="notif-empty"></div>
 </div>
-<div id="agents" class="panel glass">
-  <div id="agent-head"><h3>Agents</h3><button id="agent-ask" data-test="agent-ask">Ask assistant</button><button id="agent-stopall" data-test="agent-stopall">Stop all</button><button id="agent-toggle" data-test="agent-toggle">Turn off</button></div>
-  <div id="agent-state"></div>
-  <h4>Waiting for you</h4><div id="agent-pending"></div>
-  <h4>Access</h4><div id="agent-grants"></div>
-  <h4>Recent</h4><div id="agent-history"></div>
-</div>
 <div id="quickinsert" class="panel glass">
   <div id="qi-field"><i data-icon="search"></i><input id="qi-input" placeholder="Search emoji, clipboard and actions" autocomplete="off"></div>
   <div id="qi-tabs" role="tablist">
@@ -106,8 +99,55 @@
   <div id="qi-hint"><span>↵ insert</span><span>⇥ switch</span><span>esc close</span></div>
 </div>
 <div id="launcher" class="panel glass"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
-<div id="panel" class="panel glass"><div id="panel-head"><i data-icon="sparkle"></i><h3>Assistant</h3><button id="assistant-agents" data-test="assistant-agents" type="button" title="Agent activity">Agents</button></div><input id="q" placeholder="What should I do?" autocomplete="off">
-  <div id="body"></div><div id="reason"></div><div id="note"></div>
-  <div id="buttons"><button id="cancel">Cancel</button><button id="doit" class="primary" disabled>Do it</button></div></div>
+<div id="panel" class="panel glass" data-mobius="talk">
+  <div id="panel-head">
+    <i data-icon="sparkle"></i>
+    <h3>Mobius</h3>
+    <nav class="ai-rail" aria-label="Mobius">
+      <button type="button" class="ai-rail-btn" data-test="mobius-talk" data-mobius-mode="talk" title="Talk">Talk</button>
+      <button type="button" class="ai-rail-btn" data-test="mobius-act" data-mobius-mode="act" title="Act on the desktop">Act</button>
+      <button type="button" class="ai-rail-btn" data-test="mobius-agents" data-mobius-mode="agents" title="Agent activity">Agents</button>
+    </nav>
+  </div>
+
+  <div id="mobius-talk" class="mobius-pane" data-test="mobius-talk-pane">
+    <div id="talk-empty" class="talk-empty" data-test="talk-empty">
+      <div class="talk-empty-title">Ask Mobius</div>
+      <div class="talk-empty-note">Quick answers here. Continue in the full window anytime.</div>
+      <div id="talk-suggestions" class="talk-suggestions" data-test="talk-suggestions"></div>
+    </div>
+    <div id="talk-thread" data-test="talk-thread"></div>
+    <div id="talk-status" data-test="talk-status"></div>
+    <div class="talk-compose">
+      <input id="talk-q" data-test="talk-q" placeholder="Ask Mobius…" autocomplete="off">
+      <button id="talk-send" class="primary" data-test="talk-send" type="button" title="Ask" aria-label="Ask">Ask</button>
+    </div>
+    <div class="mobius-talk-actions">
+      <button id="talk-stop" data-test="talk-stop" type="button" hidden>Stop</button>
+      <button id="talk-clear" data-test="talk-clear" type="button" hidden>Clear</button>
+      <button id="talk-act" data-test="talk-act" type="button" hidden title="Act on the last question">Act</button>
+      <button id="talk-open-full" data-test="talk-open-full" type="button">Continue in Mobius</button>
+    </div>
+  </div>
+
+  <div id="mobius-act" class="mobius-pane" data-test="mobius-act-pane" hidden>
+    <p class="ai-rail-note">Change the desktop. Confirm here when Mobius asks.</p>
+    <input id="q" placeholder="What should Mobius change?" autocomplete="off">
+    <div id="body"></div><div id="reason"></div><div id="note"></div>
+    <div id="buttons"><button id="cancel">Cancel</button><button id="doit" class="primary" disabled>Do it</button></div>
+  </div>
+
+  <div id="mobius-agents" class="mobius-pane" data-test="mobius-agents-pane" hidden>
+    <p class="ai-rail-note">See and stop what Mobius can do on the desktop.</p>
+    <div id="agent-toolbar">
+      <button id="agent-stopall" data-test="agent-stopall">Stop all</button>
+      <button id="agent-toggle" data-test="agent-toggle">Turn off</button>
+    </div>
+    <div id="agent-state"></div>
+    <h4>Waiting for you</h4><div id="agent-pending"></div>
+    <h4>Access</h4><div id="agent-grants"></div>
+    <h4>Recent</h4><div id="agent-history"></div>
+  </div>
+</div>
 <script src="icons.js"></script>
 <script src="shell.js"></script>

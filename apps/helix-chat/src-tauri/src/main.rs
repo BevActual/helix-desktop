@@ -1,18 +1,23 @@
-//! Mobius — Helix AI hub. Talks via `org.helix.Inference` (local) or OpenAI-compat LAN (this process).
+//! Mobius — Helix’s desktop AI (Talk hub). Talks via `org.helix.Inference` (local) or OpenAI-compat LAN (this process).
 //! Desktop act hands off to the bar Assistant (`Shell1.AssistantSubmit`). Never holds Agent Surface grants.
 
+mod attach;
 mod lan;
+mod secrets;
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use futures_util::StreamExt;
 use helix_shell_core::apps::assistant::MAX_REQUEST_CHARS;
-use helix_shell_core::chat::{valid_id, Chat, ChatError, ChatView, Conversation, Outcome, Summary, SYSTEM_PROMPT};
+use helix_shell_core::chat::{
+    valid_id, Chat, ChatError, ChatView, Conversation, Outcome, Role, SearchHit, Summary,
+    SYSTEM_PROMPT,
+};
 use helix_shell_core::inference_routing::{self, BackendKind, Routing};
 use helix_shell_core::markdown::Block;
 use helix_shell_core::personas::{self, Persona, PersonaStore};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use zbus::zvariant::{Array, Signature, Value};
 
@@ -74,6 +79,56 @@ fn new_id() -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+fn bar_handoff_path() -> PathBuf {
+    inference_routing::state_dir().join("mobius-bar-handoff.json")
+}
+
+/// Consumes a one-shot handoff written by the bar Talk dropdown.
+fn take_bar_handoff() -> Option<Vec<(Role, String)>> {
+    let path = bar_handoff_path();
+    let text = std::fs::read_to_string(&path).ok()?;
+    let _ = std::fs::remove_file(&path);
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let list = value.get("messages")?.as_array()?;
+    let mut turns = Vec::new();
+    for item in list {
+        let role = item.get("role")?.as_str()?;
+        let content = item.get("content")?.as_str()?.to_string();
+        if content.trim().is_empty() {
+            continue;
+        }
+        let role = match role {
+            "user" => Role::User,
+            "assistant" => Role::Assistant,
+            _ => continue,
+        };
+        turns.push((role, content));
+        if turns.len() >= 24 {
+            break;
+        }
+    }
+    (!turns.is_empty()).then_some(turns)
+}
+
+fn apply_bar_handoff(app: &AppHandle) -> bool {
+    let Some(turns) = take_bar_handoff() else {
+        return false;
+    };
+    let shared = shared(app);
+    let mut state = shared.lock().expect("state");
+    if state.chat.is_streaming() {
+        return false;
+    }
+    if !state.chat.temporary && !state.chat.conversation.messages.is_empty() {
+        save(&state.chat.conversation);
+    }
+    let mut conversation = Conversation::new(&new_id(), now()).expect("fresh id");
+    conversation.seed_from_bar(&turns, now());
+    state.chat = Chat::new(conversation);
+    save(&state.chat.conversation);
+    true
+}
+
 fn save(conversation: &Conversation) {
     use std::io::Write;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
@@ -130,16 +185,25 @@ fn summaries() -> Vec<Summary> {
             }
             if let Some(c) = load(id) {
                 if !c.messages.is_empty() {
+                    let preview = c.preview();
                     all.push(Summary {
                         id: c.id,
                         title: c.title,
                         updated: c.updated,
+                        pinned: c.pinned,
+                        project: c.project,
+                        preview,
                     });
                 }
             }
         }
     }
-    all.sort_by(|a, b| b.updated.cmp(&a.updated).then(a.id.cmp(&b.id)));
+    all.sort_by(|a, b| {
+        b.pinned
+            .cmp(&a.pinned)
+            .then(b.updated.cmp(&a.updated))
+            .then(a.id.cmp(&b.id))
+    });
     all.truncate(MAX_CONVERSATIONS);
     all
 }
@@ -186,14 +250,15 @@ fn chat_args(
         list.append(Value::Value(Box::new(Value::Dict(entry))))
             .map_err(zbus::Error::from)?;
     }
+    let talk = inference_routing::load().talk.clamped();
     let mut args = std::collections::HashMap::new();
     args.insert("messages", Value::Array(list));
     args.insert("task", Value::from(task.to_string()));
     if !model.is_empty() {
         args.insert("model", Value::from(model.to_string()));
     }
-    args.insert("temperature", Value::F64(0.6));
-    args.insert("max_tokens", Value::I64(1024));
+    args.insert("temperature", Value::F64(talk.temperature));
+    args.insert("max_tokens", Value::U32(talk.max_tokens));
     args.insert("priority", Value::from("interactive".to_string()));
     Ok(args)
 }
@@ -236,14 +301,18 @@ fn emit_routing(app: &AppHandle) {
     let _ = app.emit("routing-view", inference_routing::load());
 }
 
+fn persist(app: &AppHandle) {
+    let shared = shared(app);
+    let state = shared.lock().expect("state");
+    if !state.chat.temporary {
+        save(&state.chat.conversation);
+    }
+}
+
 /// What a turn's ending means for the page and the disk.
 fn ended(app: &AppHandle, outcome: Outcome) {
     eprintln!("MOBIUS turn ended {outcome:?}");
-    {
-        let shared = shared(app);
-        let state = shared.lock().expect("state");
-        save(&state.chat.conversation);
-    }
+    persist(app);
     emit_view(app);
     emit_list(app);
 }
@@ -395,27 +464,23 @@ fn error_text(error: &ChatError) -> &'static str {
         ChatError::TooLong => "That message is too long.",
         ChatError::Busy => "Wait for the reply to finish, or stop it.",
         ChatError::Full => "This chat is full. Start a new one.",
+        ChatError::NothingToReplay => "Nothing to regenerate or edit yet.",
     }
 }
 
-#[tauri::command]
-async fn chat_send(app: AppHandle, text: String) -> Result<(), String> {
-    let store = personas::load();
-    let persona = store.active_persona().clone();
-    let prompt = if persona.system_prompt.trim().is_empty() {
+fn active_prompt(persona: &Persona) -> &str {
+    if persona.system_prompt.trim().is_empty() {
         SYSTEM_PROMPT
     } else {
         persona.system_prompt.as_str()
-    };
+    }
+}
+
+async fn dispatch_turn(app: AppHandle, turn: helix_shell_core::chat::Turn) -> Result<(), String> {
+    let store = personas::load();
+    let persona = store.active_persona().clone();
     let routing = inference_routing::load();
     let (task, model, is_local, label) = resolve_route(&routing, &persona);
-
-    let turn = shared(&app)
-        .lock()
-        .expect("state")
-        .chat
-        .send_with_system(&text, now(), prompt)
-        .map_err(|e| error_text(&e).to_string())?;
     {
         let shared = shared(&app);
         let mut state = shared.lock().expect("state");
@@ -425,8 +490,7 @@ async fn chat_send(app: AppHandle, text: String) -> Result<(), String> {
 
     if !is_local {
         if !routing.allow_remote_on_battery_saver && power_saver_active() {
-            let shared = shared(&app);
-            shared.lock().expect("state").chat.failed_to_start(
+            shared(&app).lock().expect("state").chat.failed_to_start(
                 turn.generation,
                 "Battery saver is on. Enable “Allow remote on battery saver” in Models & routing, or use a local route.",
             );
@@ -441,8 +505,7 @@ async fn chat_send(app: AppHandle, text: String) -> Result<(), String> {
         };
         let backend = routing.backend(backend_key).cloned();
         let Some(backend) = backend.filter(|b| b.kind == BackendKind::Openai) else {
-            let shared = shared(&app);
-            shared.lock().expect("state").chat.failed_to_start(
+            shared(&app).lock().expect("state").chat.failed_to_start(
                 turn.generation,
                 "This persona’s route is not a local or OpenAI-compatible backend.",
             );
@@ -453,7 +516,23 @@ async fn chat_send(app: AppHandle, text: String) -> Result<(), String> {
         let messages = turn.messages.clone();
         let model = model.clone();
         let base = backend.base_url.clone();
-        let result = lan::chat_completions(&base, &model, &messages).await;
+        let api_key = secrets::for_backend(&backend.id, &backend.api_key_ref);
+        if base.contains("openrouter.ai") && api_key.is_none() {
+            shared(&app).lock().expect("state").chat.failed_to_start(
+                turn.generation,
+                "Add an OpenRouter API key in Models & routing.",
+            );
+            emit_view(&app);
+            return Ok(());
+        }
+        let talk = routing.talk.clamped();
+        let options = lan::RemoteOptions {
+            temperature: talk.temperature,
+            max_tokens: talk.max_tokens,
+            timeout_secs: u64::from(talk.remote_timeout_secs),
+        };
+        let result =
+            lan::chat_completions(&base, &model, &messages, api_key.as_deref(), options).await;
         let fake_op = generation.saturating_mul(1_000_003).saturating_add(7);
         {
             let shared = shared(&app);
@@ -532,6 +611,240 @@ async fn chat_send(app: AppHandle, text: String) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Clone, Deserialize)]
+struct AttachmentIn {
+    name: String,
+    content: String,
+}
+
+#[tauri::command]
+fn chat_pick_attachments() -> Result<Vec<attach::Attachment>, String> {
+    attach::pick_and_read()
+}
+
+#[tauri::command]
+async fn chat_send(
+    app: AppHandle,
+    text: String,
+    attachments: Option<Vec<AttachmentIn>>,
+) -> Result<(), String> {
+    let store = personas::load();
+    let persona = store.active_persona().clone();
+    let prompt = active_prompt(&persona);
+    let attachments = attachments.unwrap_or_default();
+    let has_attachments = !attachments.is_empty();
+    let composed = if !has_attachments {
+        text
+    } else {
+        let pairs: Vec<(String, String)> = attachments
+            .into_iter()
+            .take(helix_shell_core::chat::MAX_ATTACH_FILES)
+            .map(|a| {
+                let name = a.name.chars().take(120).collect::<String>();
+                let content = a
+                    .content
+                    .chars()
+                    .take(helix_shell_core::chat::MAX_ATTACH_FILE_CHARS)
+                    .collect();
+                (name, content)
+            })
+            .collect();
+        let typed = text.trim();
+        if typed.chars().count() > helix_shell_core::chat::MAX_INPUT_CHARS {
+            return Err(error_text(&ChatError::TooLong).to_string());
+        }
+        Conversation::compose_with_attachments(typed, &pairs).0
+    };
+    let turn = {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if has_attachments {
+            state
+                .chat
+                .send_composed(&composed, now(), prompt)
+                .map_err(|e| error_text(&e).to_string())?
+        } else {
+            state
+                .chat
+                .send_with_system(&composed, now(), prompt)
+                .map_err(|e| error_text(&e).to_string())?
+        }
+    };
+    dispatch_turn(app, turn).await
+}
+
+#[tauri::command]
+async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
+    let store = personas::load();
+    let persona = store.active_persona().clone();
+    let prompt = active_prompt(&persona);
+    let turn = shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .regenerate_with_system(now(), prompt)
+        .map_err(|e| error_text(&e).to_string())?;
+    dispatch_turn(app, turn).await
+}
+
+#[tauri::command]
+async fn chat_edit(app: AppHandle, index: usize, text: String) -> Result<(), String> {
+    let store = personas::load();
+    let persona = store.active_persona().clone();
+    let prompt = active_prompt(&persona);
+    let turn = shared(&app)
+        .lock()
+        .expect("state")
+        .chat
+        .edit_and_resend(index, &text, now(), prompt)
+        .map_err(|e| error_text(&e).to_string())?;
+    dispatch_turn(app, turn).await
+}
+
+#[tauri::command]
+fn chat_rename(app: AppHandle, title: String) -> Result<(), String> {
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.temporary {
+            return Err("Temporary chats are not renamed — they are not saved.".into());
+        }
+        state
+            .chat
+            .set_title(&title, now())
+            .map_err(|e| error_text(&e).to_string())?;
+        save(&state.chat.conversation);
+    }
+    emit_view(&app);
+    emit_list(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn chat_pin(app: AppHandle, pinned: bool) -> Result<(), String> {
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.temporary {
+            return Err("Temporary chats cannot be pinned.".into());
+        }
+        state.chat.set_pinned(pinned, now());
+        save(&state.chat.conversation);
+    }
+    emit_view(&app);
+    emit_list(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn chat_set_project(app: AppHandle, project: String) -> Result<(), String> {
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.temporary {
+            return Err("Temporary chats cannot join a project.".into());
+        }
+        state.chat.set_project(&project, now());
+        save(&state.chat.conversation);
+    }
+    emit_view(&app);
+    emit_list(&app);
+    Ok(())
+}
+
+/// Sets the chat-profile model (empty = default / auto). Persists in inference routing.
+#[tauri::command]
+fn chat_set_model(app: AppHandle, model: String) -> Result<(), String> {
+    chat_set_route(app, None, Some(model))
+}
+
+/// Sets chat profile backend and/or model. Act stays untouched.
+#[tauri::command]
+fn chat_set_route(
+    app: AppHandle,
+    backend: Option<String>,
+    model: Option<String>,
+) -> Result<(), String> {
+    let mut routing = inference_routing::load();
+    let resolved_backend = if let Some(backend) = backend {
+        let backend = backend.trim().chars().take(64).collect::<String>();
+        if backend.is_empty() || backend == "local" {
+            Some("local".to_string())
+        } else {
+            let Some(b) = routing.backend(&backend).cloned() else {
+                return Err(format!("Unknown backend “{backend}”."));
+            };
+            if b.kind != BackendKind::Openai && b.kind != BackendKind::Local {
+                return Err("Chat backend must be local or OpenAI-compatible.".into());
+            }
+            if b.kind == BackendKind::Openai && b.base_url.trim().is_empty() {
+                return Err("That backend has no URL yet. Set it in Models & routing.".into());
+            }
+            Some(b.id)
+        }
+    } else {
+        None
+    };
+    let entry = routing.profiles.entry("chat".into()).or_insert_with(|| {
+        helix_shell_core::inference_routing::ProfileRoute {
+            backend: "local".into(),
+            model: String::new(),
+        }
+    });
+    if let Some(backend) = resolved_backend {
+        entry.backend = backend;
+    }
+    if let Some(model) = model {
+        entry.model = model.trim().chars().take(120).collect::<String>();
+    }
+    inference_routing::save(&routing)?;
+    emit_routing(&app);
+    Ok(())
+}
+
+#[derive(Clone, Serialize)]
+struct ChatRouteView {
+    backend: String,
+    model: String,
+    label: String,
+}
+
+#[tauri::command]
+fn chat_current_model() -> String {
+    inference_routing::load().route("chat").model
+}
+
+#[tauri::command]
+fn chat_current_route() -> ChatRouteView {
+    let routing = inference_routing::load();
+    let profile = routing.route("chat");
+    let label = routing
+        .backend(&profile.backend)
+        .map(|b| {
+            if b.label.is_empty() {
+                b.id.clone()
+            } else {
+                b.label.clone()
+            }
+        })
+        .unwrap_or_else(|| {
+            if profile.backend.is_empty() || profile.backend == "local" {
+                "On this computer".into()
+            } else {
+                profile.backend.clone()
+            }
+        });
+    ChatRouteView {
+        backend: if profile.backend.is_empty() {
+            "local".into()
+        } else {
+            profile.backend
+        },
+        model: profile.model,
+        label,
+    }
+}
+
 /// Hands `text` to the bar Assistant (Agent Surface path). Does not call the model.
 #[tauri::command]
 async fn chat_act_on_desktop(text: String) -> Result<(), String> {
@@ -575,6 +888,17 @@ async fn chat_open_shell_panel(id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Picks up a bar Talk handoff if the window was already open when Continue was pressed.
+#[tauri::command]
+fn chat_take_bar_handoff(app: AppHandle) -> bool {
+    let changed = apply_bar_handoff(&app);
+    if changed {
+        emit_view(&app);
+        emit_list(&app);
+    }
+    changed
+}
+
 #[tauri::command]
 async fn chat_stop(app: AppHandle) {
     let operation = shared(&app).lock().expect("state").chat.stop();
@@ -594,8 +918,27 @@ fn switch_to(app: &AppHandle, next: Conversation) -> Result<(), String> {
         if state.chat.is_streaming() {
             return Err("Wait for the reply to finish, or stop it.".into());
         }
-        save(&state.chat.conversation);
+        if !state.chat.temporary {
+            save(&state.chat.conversation);
+        }
         state.chat = Chat::new(next);
+    }
+    emit_view(app);
+    emit_list(app);
+    Ok(())
+}
+
+fn switch_to_chat(app: &AppHandle, next: Chat) -> Result<(), String> {
+    {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        if !state.chat.temporary {
+            save(&state.chat.conversation);
+        }
+        state.chat = next;
     }
     emit_view(app);
     emit_list(app);
@@ -604,23 +947,166 @@ fn switch_to(app: &AppHandle, next: Conversation) -> Result<(), String> {
 
 #[tauri::command]
 fn chat_new(app: AppHandle) -> Result<(), String> {
-    let empty = shared(&app)
-        .lock()
-        .expect("state")
-        .chat
-        .conversation
-        .messages
-        .is_empty();
+    let empty = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        state.chat.conversation.messages.is_empty() && !state.chat.temporary
+    };
     if empty {
         return Ok(());
     }
+    // Leaving a temporary (even empty) or a filled chat starts a normal saved conversation.
     switch_to(&app, Conversation::new(&new_id(), now()).ok_or("no id")?)
+}
+
+#[tauri::command]
+fn chat_temporary(app: AppHandle) -> Result<(), String> {
+    let fresh = Conversation::new(&new_id(), now()).ok_or("no id")?;
+    switch_to_chat(&app, Chat::temporary(fresh))
+}
+
+#[tauri::command]
+fn chat_export_markdown(app: AppHandle) -> Result<String, String> {
+    let markdown = shared(&app).lock().expect("state").chat.to_markdown();
+    if markdown.trim().is_empty() {
+        return Err("Nothing to export yet.".into());
+    }
+    Ok(markdown)
 }
 
 #[tauri::command]
 fn chat_open(app: AppHandle, id: String) -> Result<(), String> {
     let conversation = load(&id).ok_or("That chat could not be opened.")?;
     switch_to(&app, conversation)
+}
+
+/// Fork the active chat into a new conversation. `through_index` keeps messages through that index.
+#[tauri::command]
+fn chat_fork(app: AppHandle, through_index: Option<u32>) -> Result<(), String> {
+    let (source, temporary) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        if state.chat.is_streaming() {
+            return Err("Wait for the reply to finish, or stop it.".into());
+        }
+        if state.chat.conversation.messages.is_empty() {
+            return Err("Nothing to fork yet.".into());
+        }
+        (state.chat.conversation.clone(), state.chat.temporary)
+    };
+    if temporary {
+        return Err("Temporary chats cannot be forked. Start a normal chat first.".into());
+    }
+    let through = through_index.map(|i| i as usize);
+    let forked = source
+        .fork(&new_id(), through, now())
+        .ok_or("Could not fork this chat.")?;
+    if forked.messages.is_empty() {
+        return Err("Nothing to fork yet.".into());
+    }
+    save(&forked);
+    switch_to(&app, forked)
+}
+
+fn snippet_around(haystack: &str, needle: &str) -> Option<String> {
+    let lower_h = haystack.to_lowercase();
+    let lower_n = needle.to_lowercase();
+    let byte_pos = lower_h.find(&lower_n)?;
+    // Lowercasing can change length for some scripts — fall back to a prefix.
+    if lower_h.len() != haystack.len() {
+        return Some(haystack.chars().take(96).collect());
+    }
+    let start = haystack[..byte_pos]
+        .char_indices()
+        .rev()
+        .nth(28)
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let after = (byte_pos + needle.len()).min(haystack.len());
+    let end = haystack[after..]
+        .char_indices()
+        .nth(56)
+        .map(|(i, _)| after + i)
+        .unwrap_or(haystack.len());
+    let mut snippet = String::new();
+    if start > 0 {
+        snippet.push('…');
+    }
+    snippet.push_str(haystack[start..end].trim());
+    if end < haystack.len() {
+        snippet.push('…');
+    }
+    Some(snippet.chars().take(120).collect())
+}
+
+/// Search titles, projects, and message bodies. Empty query returns nothing (use chat_list).
+#[tauri::command]
+fn chat_search(query: String) -> Vec<SearchHit> {
+    let needle = query.trim();
+    if needle.chars().count() < 2 {
+        return Vec::new();
+    }
+    let needle_lower = needle.to_ascii_lowercase();
+    let mut hits = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for dir in [data_dir(), legacy_data_dir()] {
+        for entry in std::fs::read_dir(dir).into_iter().flatten().flatten() {
+            let name = match entry.file_name().into_string() {
+                Ok(n) => n,
+                Err(_) => continue,
+            };
+            let Some(id) = name.strip_suffix(".json") else { continue };
+            if !seen.insert(id.to_string()) {
+                continue;
+            }
+            let Some(c) = load(id) else { continue };
+            if c.messages.is_empty() {
+                continue;
+            }
+            let title_hit = c.title.to_ascii_lowercase().contains(&needle_lower);
+            let project_hit = c.project.to_ascii_lowercase().contains(&needle_lower);
+            let mut snippet = String::new();
+            if title_hit {
+                snippet = c.title.clone();
+            } else if project_hit {
+                snippet = format!("Project: {}", c.project);
+            } else {
+                for message in &c.messages {
+                    if let Some(around) = snippet_around(&message.text, needle) {
+                        snippet = around;
+                        break;
+                    }
+                }
+            }
+            if snippet.is_empty() && !title_hit && !project_hit {
+                continue;
+            }
+            if snippet.is_empty() {
+                snippet = c.preview();
+            }
+            hits.push(SearchHit {
+                id: c.id,
+                title: c.title,
+                snippet,
+                updated: c.updated,
+                pinned: c.pinned,
+                project: c.project,
+            });
+            if hits.len() >= 80 {
+                break;
+            }
+        }
+        if hits.len() >= 80 {
+            break;
+        }
+    }
+    hits.sort_by(|a, b| {
+        b.pinned
+            .cmp(&a.pinned)
+            .then(b.updated.cmp(&a.updated))
+            .then(a.id.cmp(&b.id))
+    });
+    hits
 }
 
 #[tauri::command]
@@ -714,9 +1200,71 @@ fn personas_upsert(app: AppHandle, persona: Persona) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Clone, Serialize)]
+struct RoutingSecretStatus {
+    ref_id: String,
+    has_key: bool,
+}
+
 #[tauri::command]
 fn routing_get() -> Routing {
     inference_routing::load()
+}
+
+#[tauri::command]
+fn routing_secret_status(api_key_ref: String) -> RoutingSecretStatus {
+    let ref_id = api_key_ref.trim().to_string();
+    RoutingSecretStatus {
+        has_key: !ref_id.is_empty() && secrets::has(&ref_id),
+        ref_id,
+    }
+}
+
+#[tauri::command]
+fn routing_set_secret(api_key_ref: String, secret: String) -> Result<(), String> {
+    secrets::set(&api_key_ref, &secret)
+}
+
+#[tauri::command]
+fn routing_clear_secret(api_key_ref: String) -> Result<(), String> {
+    secrets::clear(&api_key_ref)
+}
+
+/// Ensures the OpenRouter cloud preset exists (URL + key ref). Does not overwrite a custom URL.
+#[tauri::command]
+fn routing_ensure_openrouter(app: AppHandle) -> Result<Routing, String> {
+    let mut routing = inference_routing::load();
+    let preset = inference_routing::openrouter_preset();
+    match routing.backends.iter_mut().find(|b| b.id == "openrouter") {
+        Some(existing) => {
+            existing.kind = BackendKind::Openai;
+            if existing.base_url.trim().is_empty() {
+                existing.base_url = preset.base_url.clone();
+            }
+            if existing.label.trim().is_empty() {
+                existing.label = preset.label.clone();
+            }
+            if existing.api_key_ref.trim().is_empty() {
+                existing.api_key_ref = preset.api_key_ref.clone();
+            }
+        }
+        None => routing.backends.push(preset),
+    }
+    if !routing.backends.iter().any(|b| b.id == "local") {
+        routing.backends.insert(
+            0,
+            helix_shell_core::inference_routing::Backend {
+                id: "local".into(),
+                kind: BackendKind::Local,
+                base_url: String::new(),
+                label: "On this computer".into(),
+                api_key_ref: String::new(),
+            },
+        );
+    }
+    inference_routing::save(&routing)?;
+    emit_routing(&app);
+    Ok(routing)
 }
 
 /// GGUF ids from `org.helix.Inference` (empty when the service is offline).
@@ -750,6 +1298,88 @@ async fn routing_list_models() -> Vec<String> {
     ids.sort_unstable();
     ids.dedup();
     ids
+}
+
+/// Remote model ids for an OpenAI-compatible backend (catalog + OpenRouter suggestions).
+#[tauri::command]
+async fn routing_list_remote_models(backend_id: String) -> Vec<String> {
+    let routing = inference_routing::load();
+    let Some(backend) = routing.backend(backend_id.trim()).cloned() else {
+        return Vec::new();
+    };
+    if backend.kind != BackendKind::Openai || backend.base_url.trim().is_empty() {
+        return Vec::new();
+    }
+    let api_key = secrets::for_backend(&backend.id, &backend.api_key_ref);
+    match lan::list_models(&backend.base_url, api_key.as_deref()).await {
+        Ok(mut ids) if !ids.is_empty() => {
+            if backend.id == "openrouter" || backend.base_url.contains("openrouter.ai") {
+                for suggested in inference_routing::openrouter_suggested_models() {
+                    if !ids.iter().any(|id| id == suggested) {
+                        ids.insert(0, (*suggested).to_string());
+                    }
+                }
+            }
+            ids.truncate(80);
+            ids
+        }
+        _ => {
+            if backend.id == "openrouter" || backend.base_url.contains("openrouter.ai") {
+                inference_routing::openrouter_suggested_models()
+                    .iter()
+                    .map(|s| (*s).to_string())
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct RoutingPageInfo {
+    config_path: String,
+    local_model_count: usize,
+    inference_ready: bool,
+    has_cloud_key: bool,
+    lan_configured: bool,
+    cloud_configured: bool,
+}
+
+#[tauri::command]
+async fn routing_page_info() -> RoutingPageInfo {
+    let routing = inference_routing::load();
+    let local_models = routing_list_models().await;
+    let lan = routing.backend("lan");
+    let cloud = routing.backend("openrouter");
+    let has_cloud_key = cloud
+        .map(|b| secrets::for_backend(&b.id, &b.api_key_ref).is_some())
+        .unwrap_or(false);
+    let inference_ready = match connection().await {
+        Ok(conn) => proxy(&conn).await.is_ok(),
+        Err(_) => false,
+    };
+    RoutingPageInfo {
+        config_path: inference_routing::routing_path().display().to_string(),
+        local_model_count: local_models.len(),
+        inference_ready,
+        has_cloud_key,
+        lan_configured: lan.map(|b| !b.base_url.trim().is_empty()).unwrap_or(false),
+        cloud_configured: cloud.map(|b| !b.base_url.trim().is_empty()).unwrap_or(false),
+    }
+}
+
+#[tauri::command]
+async fn routing_probe(backend_id: String) -> Result<String, String> {
+    let routing = inference_routing::load();
+    let Some(backend) = routing.backend(backend_id.trim()).cloned() else {
+        return Err("Unknown backend.".into());
+    };
+    if backend.kind != BackendKind::Openai || backend.base_url.trim().is_empty() {
+        return Err("That backend has no OpenAI-compatible URL.".into());
+    }
+    let api_key = secrets::for_backend(&backend.id, &backend.api_key_ref);
+    lan::probe(&backend.base_url, api_key.as_deref()).await
 }
 
 #[tauri::command]
@@ -795,11 +1425,25 @@ fn main() {
             chat_list,
             chat_status,
             chat_send,
+            chat_pick_attachments,
+            chat_regenerate,
+            chat_edit,
+            chat_rename,
+            chat_pin,
+            chat_set_project,
+            chat_set_model,
+            chat_set_route,
+            chat_current_model,
+            chat_current_route,
+            chat_temporary,
+            chat_export_markdown,
             chat_act_on_desktop,
             chat_open_shell_panel,
             chat_stop,
             chat_new,
             chat_open,
+            chat_fork,
+            chat_search,
             chat_delete,
             chat_copy,
             layout_reporting,
@@ -808,16 +1452,33 @@ fn main() {
             personas_set_active,
             personas_upsert,
             routing_get,
+            routing_secret_status,
+            routing_set_secret,
+            routing_clear_secret,
+            routing_ensure_openrouter,
             routing_list_models,
+            routing_list_remote_models,
+            routing_page_info,
+            routing_probe,
             routing_save,
             open_settings_agents,
+            chat_take_bar_handoff,
         ])
         .setup(|app| {
-            let fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
+            let mut fresh = Conversation::new(&new_id(), now()).expect("a fresh id is valid");
+            if let Some(turns) = take_bar_handoff() {
+                fresh.seed_from_bar(&turns, now());
+            }
+            let seeded = !fresh.messages.is_empty();
             app.manage::<Shared>(Arc::new(Mutex::new(State {
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
             })));
+            if seeded {
+                let shared = shared(app.handle());
+                let state = shared.lock().expect("state");
+                save(&state.chat.conversation);
+            }
             WebviewWindowBuilder::new(app, WINDOW, WebviewUrl::App("index.html".into()))
                 .title("Mobius")
                 .decorations(false)

@@ -10,14 +10,20 @@ After changes that need a **running** shell update, prefer a soft path first:
 1. Rebuild the binary (`cargo build --profile fast` / `--release`).
 2. Run `tools/switch-shell.sh install` to refresh symlinks and units **without** restarting if the shell is already active.
 
-Only restart when the change cannot apply without a bounce:
+Prefer bouncing **panels only** when the change is Overlay UI (Mobius dropdown, launcher, CC, …):
 
 ```sh
-systemctl --user restart helix-shell-tauri.service
+./tools/switch-shell.sh restart-panels
 ```
 
-or `tools/switch-shell.sh restart`.
+That keeps the bar Top-layer exclusive zone up and avoids crashing Cursor.
 
-Do **not** restart the shell as a routine step while Cursor is open on this session: bouncing `helix-shell-tauri` tears down layer-shell surfaces and has crashed Cursor. Prefer telling the user a restart is pending, or run `restart` from a plain terminal outside Cursor.
+Only bounce the **bar** (or full pair) when the change cannot apply without it:
+
+```sh
+./tools/switch-shell.sh restart
+```
+
+Do **not** restart the bar as a routine step while Cursor is open: tearing down the bar layer-shell surface has crashed Cursor. Prefer `restart-panels`, or run a full `restart` from a plain terminal outside Cursor.
 
 The C++ `helix-shell-dev.service` unit is retired; do not restart it.

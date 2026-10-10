@@ -6,7 +6,12 @@
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
 set -u
 cmd=${1:?usage: helix-panel <command>}
-tauri() { systemctl --user is-active --quiet helix-shell-tauri.service; }
+# Split shell: bar owns org.helix.Shell; legacy monolith used helix-shell-tauri.service.
+tauri() {
+  systemctl --user is-active --quiet helix-shell-bar.service \
+    || systemctl --user is-active --quiet helix-shell-tauri.service \
+    || busctl --user status org.helix.Shell >/dev/null 2>&1
+}
 if tauri; then
   case "$cmd" in
     launcher|control-center|assistant|agents|notifications|quick-insert)

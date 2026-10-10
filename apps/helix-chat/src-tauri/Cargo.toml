@@ -3,7 +3,7 @@ name = "helix-mobius"
 version = "0.1.0"
 edition = "2021"
 publish = false
-description = "Mobius: Helix AI hub — conversations, personas, and model routing. Talks via org.helix.Inference; desktop act hands off to the bar Assistant."
+description = "Mobius: Helix’s desktop AI — conversations, personas, and model routing. Talks via org.helix.Inference; Act hands off to the bar."
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -20,6 +20,7 @@ tokio = { version = "1", features = ["time", "sync", "macros", "fs", "io-util", 
 futures-util = { version = "0.3", default-features = false }
 toml = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+keyring = "3"
 
 [[bin]]
 name = "helix-mobius"

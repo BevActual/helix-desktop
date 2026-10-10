@@ -196,7 +196,7 @@ the desktop entry when the window really is that application (`identity.rs`), ot
 Also supported now: `app-launch` (confirm: exact desktop id, exact name, or a single unambiguous search hit from the shell's catalog),
 `clipboard-text` (observe-private), `clipboard-copy` / `clipboard-clear` (confirm; clipboard text is never logged).
 Chat → act bridge: `org.helix.Shell1.AssistantSubmit` opens the bar Assistant and runs the same path as typing there
-(Mobius Act on desktop). Not yet reachable: focusing a window by id, media, files, notification-show.
+(Mobius Act). Not yet reachable: focusing a window by id, media, files, notification-show.
 
 ### Measured: a shell that carries out only some of the tools (2026-10-08)
 

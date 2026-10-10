@@ -143,8 +143,16 @@ pub fn setup(window: &WebviewWindow, plan: Plan) -> Result<(), String> {
     let gtk_window = window.gtk_window().map_err(|e| e.to_string())?;
     gtk_window.set_size_request(1, 1);
     gtk_window.init_layer_shell();
-    // "helix-panel" matches Helix Theme blur / liquid-glass rules generated for panels.
-    gtk_window.set_namespace("helix-panel");
+    // Bar keeps `helix-panel` (theme blur). Split panels process uses `helix-panels`.
+    let namespace = match std::env::var("HELIX_SHELL_ROLE")
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "panels" | "panel" => "helix-panels",
+        _ => "helix-panel",
+    };
+    gtk_window.set_namespace(namespace);
     for edge in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         gtk_window.set_anchor(edge, true);
     }

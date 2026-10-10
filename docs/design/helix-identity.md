@@ -9,7 +9,10 @@ The product is **Helix**. Install names, IPC, UI strings, config paths, and docs
 | Session shell binary | `helix-shell-tauri` (`tools/switch-shell.sh install`) |
 | Panel helper | `~/.local/bin/helix-panel` |
 | Settings / Software / Monitor | `helix-settings`, `helix-software`, `helix-system-monitor` |
-| AI hub (Mobius) | Display **Mobius**; binary `helix-mobius` (transition: `helix-chat`); desktop id `org.helix.Mobius` |
+| **Mobius** (desktop AI) | Brand for Talk / Act / Agents — like Siri or Gemini for Helix |
+| Mobius — Talk | Bar dropdown (quick ask) + window **Mobius**; binary `helix-mobius` (transition: `helix-chat`); desktop id `org.helix.Mobius` |
+| Mobius — Act | Same bar dropdown (Act mode) + `helix-assistant`; Caps Lock `Ask Mobius:` rows |
+| Mobius — Agents | Same bar dropdown (Agents mode) + Settings **Privacy & agents** (grants) |
 | Desktop service (live) | `helix-service` / `org.helix.Desktop` |
 | Desktop service (Rust target) | `helix-desktop` / same bus name (`services/helix-desktop`) |
 | Assistant / inference | `helix-assistant`, `helix-inference` (live under `src/`; target `services/`) |

@@ -29,12 +29,20 @@ const ICONS = {
   contrast: [["circle", 12, 12, 8.4], ["half", 12, 12, 8.4]],
   "chevron-right": [["path", "M9.5 5.5l6.5 6.5-6.5 6.5"]],
   "chevron-left": [["path", "M14.5 5.5L8 12l6.5 6.5"]],
+  "chevron-down": [["path", "M6 9.5l6 6 6-6"]],
+  settings: [["circle", 12, 12, 3], ["path", "M12 2.8v2.2M12 19v2.2M2.8 12h2.2M19 12h2.2M5.5 5.5l1.6 1.6M16.9 16.9l1.6 1.6M5.5 18.5l1.6-1.6M16.9 7.1l1.6-1.6"]],
+  dots: [["dot", 6, 12], ["dot", 12, 12], ["dot", 18, 12]],
+  pin: [["path", "M9 3.5h6l-.8 6.2 2.8 2.8V14H13v6l-1 1-1-1v-6H7v-1.5l2.8-2.8z"]],
+  folder: [["path", "M3.5 7.5V18a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2V9.5a2 2 0 0 0-2-2h-6.2L10.5 5.5H5.5a2 2 0 0 0-2 2z"]],
+  sidebar: [["rect", 3.5, 4.5, 17, 15, 2.4], ["path", "M9.5 4.5v15"]],
   battery: [["rect", 2.5, 7.5, 16, 9, 2.6], ["path", "M21 10.6v2.8"]],
   bolt: [["path", "M13 3L5.5 13.5H11L10 21l7.5-10.5H12z"]],
   music: [["path", "M9 17.5V6.2l9-2v11.3"], ["circle", 6.8, 17.6, 2.6], ["circle", 15.8, 15.6, 2.6]],
   x: [["path", "M6.5 6.5l11 11M17.5 6.5l-11 11"]],
   search: [["circle", 10.8, 10.8, 6.3], ["path", "M15.6 15.6l5 5"]],
   clipboard: [["rect", 5.5, 4.5, 13, 16, 2.4], ["path", "M9 4.5V4a1.6 1.6 0 0 1 1.6-1.6h2.8A1.6 1.6 0 0 1 15 4v.5"]],
+  fork: [["path", "M7 4v8.5a3 3 0 0 0 3 3h4"], ["path", "M17 20v-4.5a3 3 0 0 0-3-3H10"], ["circle", 7, 4, 2], ["circle", 17, 20, 2], ["circle", 17, 8, 2], ["path", "M17 10V4"]],
+  paperclip: [["path", "M8.5 12.5l6.2-6.2a2.8 2.8 0 0 1 4 4L9.8 19.2a4.5 4.5 0 0 1-6.4-6.4l8.3-8.3a2 2 0 0 1 2.8 2.8L7.2 14.6"]],
 };
 function icon(name) {
   const svg = document.createElementNS(SVG, "svg");

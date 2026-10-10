@@ -1,0 +1,17 @@
+[Unit]
+Description=Helix Shell bar (Top layer)
+PartOf=graphical-session.target
+After=graphical-session.target helix-service.service
+Conflicts=helix-shell-dev.service
+# Prefer the split pair over the legacy monolith unit.
+Conflicts=helix-shell-tauri.service
+
+[Service]
+Type=simple
+ExecStart=@SHELL_BIN@
+Restart=on-failure
+RestartSec=1
+Environment=HELIX_SHELL_ROLE=bar
+
+[Install]
+WantedBy=graphical-session.target

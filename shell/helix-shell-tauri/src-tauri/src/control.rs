@@ -107,7 +107,7 @@ impl Control {
         on_main(&self.app, close_panel)
     }
 
-    /// Opens the assistant panel and submits `request` (chat Act on desktop, Caps Lock Ask, …).
+    /// Opens Mobius Act and submits `request` (Mobius Ask Mobius / Caps Lock, …).
     async fn assistant_submit(&self, request: String) -> zbus::fdo::Result<()> {
         let trimmed = request.trim_matches(|c: char| c.is_ascii_whitespace());
         if trimmed.is_empty() {
@@ -124,10 +124,25 @@ impl Control {
             ));
         }
         let request = trimmed.to_string();
-        on_main(&self.app, move |app| {
-            open_panel(app, "assistant");
-            submit_request(app, &request);
-        })
+        let app = self.app.clone();
+        // Bar role forwards Act to the panels process; monolith/panels run locally.
+        tauri::async_runtime::spawn(async move {
+            if crate::role::ShellRole::from_env().forwards_panels() {
+                match crate::panels_bridge::assistant_submit(&request).await {
+                    Ok(true) => return,
+                    Ok(false) => eprintln!("PANELS assistant_submit missed — local fallback"),
+                    Err(error) => {
+                        eprintln!("PANELS assistant_submit: {error}");
+                        return;
+                    }
+                }
+            }
+            let _ = on_main(&app, move |app| {
+                open_panel(app, "assistant");
+                submit_request(app, &request);
+            });
+        });
+        Ok(())
     }
 
     async fn get_status(&self) -> std::collections::HashMap<String, OwnedValue> {

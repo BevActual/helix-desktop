@@ -1,6 +1,9 @@
-//! The one layer surface that hosts the bar and every panel. It covers the whole output, so there is a single WebKit web process
-//! however many panels exist. The surface itself never changes size; what changes is the layer it sits on, whether it takes the
-//! keyboard, and which part of it accepts the pointer. Everything else passes through to the windows underneath.
+//! Combined bar+panel surface (legacy single-process shell).
+//!
+//! **Split shell:** prefer [`crate::shell::bar_surface::BarSurface`] (always Top) and
+//! [`crate::shell::panel_surface::PanelSurface`] (Overlay only) in separate processes so restarting
+//! panels does not tear down the bar exclusive zone. This type remains for the transitional
+//! monolithic binary and existing tests.
 //!
 //! No GTK and no display: [`Plan`] says what the shell must apply. Verified against a real pointer and keyboard in
 //! `tools/nested/single-surface-pointer-test.sh`.

@@ -32,17 +32,30 @@ Do not merge Mobius, the bar Assistant, and the Agents panel into one process.
    LAN/cloud replies unless a local Act slot re-grounds the plan.
 5. **MCP is a protocol layer**, not a Cursor feature. Product name: Helix MCP server.
 
+## One product, three doors
+
+**Mobius** is Helix’s desktop AI (same role as Siri or Gemini). The bar sparkle opens one **Mobius
+dropdown** with Talk / Act / Agents doors (same panel). Processes stay separate for trust:
+
+| Door | Verb | Surface | Does |
+|---|---|---|---|
+| **Talk** | Ask, chat, reason | **Bar dropdown** (quick) + **Mobius window** (long) | Bar Talk → Inference only; full window for personas/models/history |
+| **Act** | Change the desktop | **Bar Mobius** (Act mode) | Caps Lock `Ask Mobius:` / Act rail → `helix-assistant` → Agent Surface |
+| **Agents** | See / stop / pause | **Bar Mobius** (Agents mode) + Settings for grants | Activity, kill switch, audit — not a second panel |
+
+Rail switches doors in-panel. Opening Agents no longer replaces the dropdown with another sheet.
+
 ## Invocation
 
 | Person does | Opens | Then |
 |---|---|---|
-| Ambiguous hotkey / voice / “ask” | **Mobius** | Active persona + Inference talk |
-| Explicit act (Act on desktop, Caps Lock act) | Bar Assistant | Act slot → Agent Surface |
-| Manage models / personas | Mobius | Hub UI |
+| Ambiguous hotkey / voice / “ask” | **Mobius** (Talk) | Active persona + Inference talk |
+| Explicit act (Ask Mobius / Act, Caps Lock `Ask Mobius:`) | Bar Mobius (Act) | Act slot → Agent Surface |
+| Manage models / personas | Mobius | Models page |
 | MCP-capable app connects | MCP adapter | Own Agent Surface client |
 | Selection / share (later) | Mobius thread | Act only if chosen |
 
-Ambiguous presence opens Mobius; the bar stays the dedicated act door.
+Ambiguous presence opens Mobius; the bar stays the dedicated Act door.
 
 ## Task profiles
 
@@ -67,7 +80,7 @@ First-class hub-side minds (not Agent Surface grant holders):
 | Default task profile + model route | Direct desktop tool execution |
 | “Suggest Act” UX | Confirmer / SetGrant |
 
-Desktop change: persona turn → **Act on desktop** → `AssistantSubmit` → bar → `helix-assistant` → Agent Surface.
+Desktop change: persona turn → **Ask Mobius** / Act → `AssistantSubmit` → bar → `helix-assistant` → Agent Surface.
 
 ## Trust and data
 
@@ -78,7 +91,8 @@ Desktop change: persona turn → **Act on desktop** → `AssistantSubmit` → ba
 | Routing config | Mobius-edited; Inference-read (`~/.local/state/helix/inference-routing.toml`) |
 | Transcripts | Mobius data dir (migrate from `~/.local/share/helix/chats`) |
 | Local weights | `~/.local/share/helix/models/` |
-| LAN/cloud secrets | Secret service; never in transcripts |
+| LAN/cloud secrets | Secret service (`org.helix.Mobius`); file fallback under state; never in transcripts or routing TOML |
+| Cloud preset | OpenRouter via OpenAI-compat (`backends.openrouter`); talk only |)
 | MCP allowlist | `tools/helix-agent/allowlist.toml` |
 
 Mobius may read AgentSurfaceActivity1 for display; never SetGrant / RegisterConfirmer.

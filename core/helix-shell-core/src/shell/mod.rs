@@ -1,3 +1,4 @@
+pub mod bar_surface;
 pub mod calendar;
 pub mod dbusmenu;
 pub mod dock;
@@ -7,6 +8,8 @@ pub mod island;
 pub mod launcher;
 pub mod niri;
 pub mod notifications;
+pub mod panel_surface;
+pub mod panels_ipc;
 pub mod quick_insert;
 pub mod shell_surface;
 pub mod surfaces;
