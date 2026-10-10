@@ -709,6 +709,11 @@ function drawNetwork(view) {
       : net.action === "enterprise" ? "Enterprise" : net.saved ? "Saved" : net.secured ? "Secured" : "Open";
     row.append(tag);
     if (joinable) row.addEventListener("click", () => invoke("network_connect", { path: net.path }));
+    if (net.action === "password") {
+      row.classList.add("clickable");
+      row.classList.remove("unavailable");
+      row.addEventListener("click", () => openWifiPassword(net.path, net.ssid));
+    }
     if (net.saved) {
       const forget = document.createElement("button");
       forget.textContent = "Forget";
@@ -772,10 +777,14 @@ function drawBluetooth(view) {
     const tag = document.createElement("span");
     tag.className = "tag";
     const battery = device.battery === null || device.battery === undefined ? "" : " · " + device.battery + "%";
-    if (device.action === "pair") tag.title = "Pairing a new device is not available yet";
-    tag.textContent = (device.action === "pair" ? "Not paired"
+    tag.textContent = (device.action === "pair" ? "Pair"
       : device.action === "busy" ? "Connecting…" : device.connected ? "Connected" : "Paired") + battery;
     row.append(tag);
+    if (device.action === "pair") {
+      row.classList.add("clickable");
+      row.classList.remove("unavailable");
+      row.addEventListener("click", () => invoke("bluetooth_pair", { path: device.path }));
+    }
     if (device.action === "connect") row.addEventListener("click", () => invoke("bluetooth_connect", { path: device.path }));
     if (device.action === "disconnect") row.addEventListener("click", () => invoke("bluetooth_disconnect", { path: device.path }));
     if (device.paired) {
@@ -885,9 +894,67 @@ function showDetail(name) {
 $("tile-wifi-open").onclick = () => showDetail("wifi");
 $("tile-bt-open").onclick = () => showDetail("bluetooth");
 $("sound-open").onclick = () => showDetail("sound");
-$("back").onclick = () => showDetail(null);
+$("back").onclick = () => { hideWifiPassword(); showDetail(null); };
 
+let wifiPasswordPath = null;
+function openWifiPassword(path, ssid) {
+  wifiPasswordPath = path;
+  $("wifi-password").style.display = "";
+  $("wifi-password-ssid").textContent = "Join “" + ssid + "”";
+  $("wifi-password-input").value = "";
+  $("wifi-password-error").textContent = "";
+  $("wifi-password-input").focus();
+}
+function hideWifiPassword() {
+  wifiPasswordPath = null;
+  $("wifi-password").style.display = "none";
+  $("wifi-password-error").textContent = "";
+}
+function joinWifiPassword() {
+  if (!wifiPasswordPath) return;
+  const password = $("wifi-password-input").value;
+  $("wifi-password-error").textContent = "";
+  invoke("network_connect_password", { path: wifiPasswordPath, password })
+    .then(() => hideWifiPassword())
+    .catch((error) => {
+      $("wifi-password-error").textContent = String(error || "Could not join");
+    });
+}
+$("wifi-password-cancel").onclick = hideWifiPassword;
+$("wifi-password-join").onclick = joinWifiPassword;
+$("wifi-password-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") { event.preventDefault(); joinWifiPassword(); }
+  if (event.key === "Escape") { event.preventDefault(); hideWifiPassword(); }
+});
 
+function drawMedia(view) {
+  const row = $("qs-media");
+  if (!view || !view.title) {
+    row.style.display = "none";
+    return;
+  }
+  row.style.display = "";
+  $("qs-media-title").textContent = view.title;
+  $("qs-media-artist").textContent = view.artist || "";
+  swapIcon(slot("qs-media-toggle"), view.playing ? "pause" : "play");
+}
+listen("media-view", (event) => drawMedia(event.payload));
+invoke("media_view").then(drawMedia);
+$("qs-media-toggle").onclick = () => invoke("media_toggle");
+$("qs-media-next").onclick = () => invoke("media_next");
+$("qs-media-prev").onclick = () => invoke("media_previous");
+
+function showPowerSheet(on) {
+  $("qs-power-sheet").style.display = on ? "" : "none";
+}
+$("qs-settings").onclick = () => invoke("open_settings", { page: null });
+$("qs-lock").onclick = () => invoke("session_lock");
+$("qs-suspend").onclick = () => invoke("session_suspend");
+$("qs-power").onclick = () => showPowerSheet($("qs-power-sheet").style.display === "none");
+$("qs-power-cancel").onclick = () => showPowerSheet(false);
+$("qs-logout").onclick = () => invoke("session_logout");
+$("qs-reboot").onclick = () => invoke("session_reboot");
+$("qs-shutdown").onclick = () => invoke("session_poweroff");
 
 // The on-screen indicator for the volume and brightness keys: Rust says what changed and to what; this draws it for a moment.
 let osdTimer = null;

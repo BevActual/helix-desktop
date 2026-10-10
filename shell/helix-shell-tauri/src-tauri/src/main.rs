@@ -718,6 +718,16 @@ async fn network_connect(app: AppHandle, path: String) -> Result<(), String> {
     send_network(network_request(&app, |n| n.connect(&path))).await
 }
 
+/// Joins a secured network with the password the person typed in Control Center.
+#[tauri::command]
+async fn network_connect_password(
+    app: AppHandle,
+    path: String,
+    password: String,
+) -> Result<(), String> {
+    send_network(network_request(&app, |n| n.connect_with_password(&path, &password))).await
+}
+
 #[tauri::command]
 async fn network_disconnect(app: AppHandle) -> Result<(), String> {
     send_network(network_request(&app, Network::disconnect)).await
@@ -830,6 +840,78 @@ async fn bluetooth_disconnect(app: AppHandle, path: String) -> Result<(), String
 #[tauri::command]
 async fn bluetooth_forget(app: AppHandle, path: String) -> Result<(), String> {
     send_bluetooth(bluetooth_request(&app, |b| b.forget(&path))).await
+}
+
+#[tauri::command]
+async fn bluetooth_pair(app: AppHandle, path: String) -> Result<(), String> {
+    send_bluetooth(bluetooth_request(&app, |b| b.pair(&path))).await
+}
+
+/// Opens Settings and dismisses Control Center.
+#[tauri::command]
+fn open_settings(app: AppHandle, page: Option<String>) {
+    let mut command = std::process::Command::new("helix-settings");
+    if let Some(page) = page.filter(|p| !p.is_empty()) {
+        command.arg("--page").arg(page);
+    }
+    let _ = command.spawn();
+    close_panel(&app);
+}
+
+#[tauri::command]
+fn session_lock(app: AppHandle) {
+    insert::lock_session();
+    close_panel(&app);
+}
+
+#[tauri::command]
+fn session_suspend(app: AppHandle) {
+    close_panel(&app);
+    let _ = std::process::Command::new("systemctl")
+        .args(["suspend"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+#[tauri::command]
+fn session_logout(app: AppHandle) {
+    close_panel(&app);
+    let _ = std::process::Command::new("loginctl")
+        .args(["terminate-user", &whoami()])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+#[tauri::command]
+fn session_reboot(app: AppHandle) {
+    close_panel(&app);
+    let _ = std::process::Command::new("systemctl")
+        .args(["reboot"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+#[tauri::command]
+fn session_poweroff(app: AppHandle) {
+    close_panel(&app);
+    let _ = std::process::Command::new("systemctl")
+        .args(["poweroff"])
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+}
+
+fn whoami() -> String {
+    std::env::var("USER")
+        .or_else(|_| std::env::var("LOGNAME"))
+        .unwrap_or_else(|_| "self".into())
 }
 
 /// AgentSurfaceActivity1 may only be called by the registered desktop. The live trial runs beside the C++ shell, which holds that role,
@@ -1845,6 +1927,7 @@ fn main() {
             network_set_wifi,
             network_scan,
             network_connect,
+            network_connect_password,
             network_disconnect,
             network_forget,
             network_vpn,
@@ -1854,6 +1937,15 @@ fn main() {
             report_glass,
             island::island_view,
             island::media_toggle,
+            island::media_next,
+            island::media_previous,
+            island::media_view,
+            open_settings,
+            session_lock,
+            session_suspend,
+            session_logout,
+            session_reboot,
+            session_poweroff,
             tray::tray_view,
             tray::tray_activate,
             tray::tray_context,
@@ -1890,6 +1982,7 @@ fn main() {
             bluetooth_connect,
             bluetooth_disconnect,
             bluetooth_forget,
+            bluetooth_pair,
             quick_view,
             quick_set_dark,
             quick_set_night_light,

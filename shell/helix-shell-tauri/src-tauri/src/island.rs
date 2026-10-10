@@ -59,11 +59,13 @@ pub fn watch_media(app: AppHandle) {
             for line in BufReader::new(out).lines().map_while(Result::ok) {
                 shell_state(&app).lock().expect("shell state").media = parse_media_line(&line);
                 publish(&app);
+                emit_media(&app);
             }
         }
         let _ = child.wait();
         shell_state(&app).lock().expect("shell state").media = None;
         publish(&app);
+        emit_media(&app);
         std::thread::sleep(Duration::from_secs(10));
     });
 }
@@ -76,4 +78,43 @@ pub fn media_toggle() {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status();
+}
+
+#[tauri::command]
+pub fn media_next() {
+    let _ = Command::new("playerctl")
+        .arg("next")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[tauri::command]
+pub fn media_previous() {
+    let _ = Command::new("playerctl")
+        .arg("previous")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct MediaView {
+    pub playing: bool,
+    pub artist: String,
+    pub title: String,
+}
+
+#[tauri::command]
+pub fn media_view(app: AppHandle) -> Option<MediaView> {
+    shell_state(&app).lock().expect("shell state").media.as_ref().map(|m| MediaView {
+        playing: m.playing,
+        artist: m.artist.clone(),
+        title: m.title.clone(),
+    })
+}
+
+fn emit_media(app: &AppHandle) {
+    let view = media_view(app.clone());
+    let _ = app.emit("media-view", view);
 }

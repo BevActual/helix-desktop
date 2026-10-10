@@ -49,6 +49,25 @@
       <span id="micpercent"></span>
       <span class="end-slot"></span>
     </div>
+    <div id="qs-media" class="qs-media" style="display:none" data-test="qs-media">
+      <span class="qs-media-ico"><i data-icon="music"></i></span>
+      <div class="qs-media-main"><div id="qs-media-title" class="qs-media-title"></div><div id="qs-media-artist" class="qs-media-sub"></div></div>
+      <button id="qs-media-prev" data-test="qs-media-prev" title="Previous"><i data-icon="skip-back"></i></button>
+      <button id="qs-media-toggle" data-test="qs-media-toggle" title="Play or pause"><i data-icon="pause" data-slot="qs-media-toggle"></i></button>
+      <button id="qs-media-next" data-test="qs-media-next" title="Next"><i data-icon="skip-forward"></i></button>
+    </div>
+    <div id="qs-system" class="qs-system" data-test="qs-system">
+      <button id="qs-settings" data-test="qs-settings" title="Settings"><i data-icon="settings"></i></button>
+      <button id="qs-lock" data-test="qs-lock" title="Lock"><i data-icon="lock"></i></button>
+      <button id="qs-suspend" data-test="qs-suspend" title="Suspend"><i data-icon="moon"></i></button>
+      <button id="qs-power" data-test="qs-power" title="Power"><i data-icon="power"></i></button>
+    </div>
+    <div id="qs-power-sheet" class="qs-sheet" style="display:none" data-test="qs-power-sheet">
+      <button id="qs-logout" data-test="qs-logout">Log out</button>
+      <button id="qs-reboot" data-test="qs-reboot">Restart</button>
+      <button id="qs-shutdown" data-test="qs-shutdown" class="danger">Shut down</button>
+      <button id="qs-power-cancel" data-test="qs-power-cancel">Cancel</button>
+    </div>
   </div>
   <div id="qs-detail" style="display:none">
     <div id="detail-head"><button id="back" data-test="back" title="Back"><i data-icon="chevron-left"></i></button><h3 id="detail-title"></h3></div>
@@ -58,6 +77,15 @@
       <div id="wifi-status"></div>
       <div id="networks"></div>
       <div id="vpns"></div>
+      <div id="wifi-password" class="qs-sheet" style="display:none" data-test="wifi-password">
+        <div id="wifi-password-ssid" class="qs-sheet-title"></div>
+        <input id="wifi-password-input" data-test="wifi-password-input" type="password" autocomplete="current-password" placeholder="Password" />
+        <div id="wifi-password-error" class="qs-sheet-error" data-test="wifi-password-error"></div>
+        <div class="qs-sheet-actions">
+          <button id="wifi-password-cancel" data-test="wifi-password-cancel">Cancel</button>
+          <button id="wifi-password-join" data-test="wifi-password-join" class="primary">Join</button>
+        </div>
+      </div>
     </div>
     <div class="page" id="bluetooth">
       <div id="bt-head"><button id="btscan" data-test="bt-scan">Scan</button><button id="bttoggle" data-test="bt-toggle">Turn off</button></div>

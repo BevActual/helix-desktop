@@ -10,28 +10,31 @@ After changes that need a **running** shell update, prefer a soft path first:
 1. Rebuild the binary (`cargo build --profile fast` / `--release`).
 2. Run `tools/switch-shell.sh install` to refresh symlinks and units **without** restarting if the shell is already active.
 
-Prefer bouncing **panels only** when the change is Overlay UI (Mobius dropdown, launcher, CC, …):
+## Verified safe while Cursor is open
+
+These keep `helix-shell-strut` mapped and do **not** tear Overlay via bar `Upholds`/`BindsTo` (that path crashed Cursor before):
 
 ```sh
-./tools/switch-shell.sh restart-panels
+./tools/switch-shell.sh restart-panels   # Overlay UI (Mobius, launcher, CC, …)
+./tools/switch-shell.sh restart-bar      # painted bar / Shell1 / dock bridge
 ```
 
-That keeps the bar and the exclusive-zone strut up and avoids crashing Cursor.
+`restart-bar` was tested: strut PID stable, panels PID stable, Cursor survived, window size unchanged. **Prefer `restart-bar` over full `restart` whenever Cursor is open.**
 
-Bounce the **painted bar** when bar chrome / Shell1 / dock code changed:
+## Avoid while Cursor is open
 
 ```sh
-./tools/switch-shell.sh restart-bar
+./tools/switch-shell.sh restart          # bounces panels too — use only outside Cursor
+./tools/switch-shell.sh restart-strut    # flaps exclusive zone / work area
+# restarting niri / logging out
 ```
 
-The strut (`helix-shell-strut`) stays mapped, so niri work area should not flap. Still prefer a plain terminal outside Cursor if unsure.
+Only bounce the strut when the strut binary or `BAR_HEIGHT` itself changed, from a plain terminal outside Cursor. Same for a full compositor (niri) restart.
 
-Full pair (bar + panels, strut stays):
+## Layout reminder
 
-```sh
-./tools/switch-shell.sh restart
-```
-
-**Do not** bounce the strut as a routine step while Cursor is open — tearing down `helix-shell-reserve` flaps work area and has crashed Cursor. Only use `restart-strut` when the strut binary or `BAR_HEIGHT` itself changed, from a terminal outside Cursor.
+- `helix-shell-strut` — exclusive zones (top bar + dock reserve); must survive bar restarts
+- `helix-shell-bar` — painted Top chrome; must **not** `Upholds=`/`BindsTo=` strut or panels
+- `helix-shell-panels` — Overlay; bounce independently
 
 The C++ `helix-shell-dev.service` unit is retired; do not restart it.
