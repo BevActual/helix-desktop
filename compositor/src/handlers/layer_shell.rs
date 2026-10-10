@@ -57,14 +57,23 @@ impl WlrLayerShellHandler for State {
                     .cloned();
                 layer.map(|layer| (o.clone(), map, layer))
             }) {
+            // Destroying a painted shell / Overlay with exclusive_zone=-1 must not flap every
+            // tiled window (Electron/Cursor has crashed on that configure storm). Only resize
+            // when the usable work area actually changes.
+            let before = map.non_exclusive_zone();
             map.unmap_layer(&layer);
+            let after = map.non_exclusive_zone();
             self.niri.mapped_layer_surfaces.remove(&layer);
-            Some(output)
+            Some((output, before != after))
         } else {
             None
         };
-        if let Some(output) = output {
-            self.niri.output_resized(&output);
+        if let Some((output, zone_changed)) = output {
+            if zone_changed {
+                self.niri.output_resized(&output);
+            } else {
+                self.niri.queue_redraw(&output);
+            }
         }
     }
 

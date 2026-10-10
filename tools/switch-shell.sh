@@ -3,13 +3,15 @@
 #   tools/switch-shell.sh                same as install (no shell restart)
 #   tools/switch-shell.sh install        write units + links + enable at login; does NOT restart live shells
 #   tools/switch-shell.sh restart-panels bounce Overlay panels only (safe while Cursor is open)
-#   tools/switch-shell.sh restart-bar    bounce Top bar only (panels revive via Wants/Upholds; can disrupt Cursor)
-#   tools/switch-shell.sh restart        bounce bar+panels (or legacy monolith). Avoid while Cursor is open.
+#   tools/switch-shell.sh restart-bar    bounce painted Top bar; exclusive-zone strut stays up
+#   tools/switch-shell.sh restart-strut  bounce exclusive-zone holder only (rare; flaps work area)
+#   tools/switch-shell.sh restart        bounce bar+panels (strut stays). Avoid strut bounce while Cursor is open.
 #   tools/switch-shell.sh status
 # Key binds call ~/.local/bin/helix-panel → Shell1 on the bar.
 #
-# Split: helix-shell-bar (Top / exclusive zone) + helix-shell-panels (Overlay). Restarting panels does not
-# tear down the bar. Restarting the bar still can disrupt Cursor — prefer restart-panels for UI work.
+# Split: helix-shell-strut (exclusive zone) + helix-shell-bar (painted Top) + helix-shell-panels (Overlay).
+# Restarting panels or the bar does not tear down the strut. Restarting the strut flaps niri work area
+# and can crash Cursor — same danger the old bar restart had.
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 UNITS=$HOME/.config/systemd/user
@@ -44,8 +46,13 @@ write_units_and_links() {
     echo "build it first: (cargo build --release -p helix-shell-tauri)" >&2
     exit 1
   }
+  STRUT=$(pick_bin helix-shell-strut) || {
+    echo "build it first: (cargo build --release -p helix-shell-strut)" >&2
+    exit 1
+  }
   mkdir -p "$UNITS" "$HOME/.local/bin"
   install -m 0755 "$ROOT/tools/helix-panel" "$HOME/.local/bin/helix-panel"
+  ln -sf "$STRUT" "$HOME/.local/bin/helix-shell-strut"
   link_app helix-settings org.helix.Settings.desktop || true
   if [ -L "$HOME/.local/bin/helix-settings" ] || [ -x "$HOME/.local/bin/helix-settings" ]; then
     ln -sf "$(readlink -f "$HOME/.local/bin/helix-settings" 2>/dev/null || echo "$HOME/.local/bin/helix-settings")" \
@@ -60,10 +67,12 @@ write_units_and_links() {
       "$HOME/.local/bin/helix-chat" 2>/dev/null || true
   fi
   escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
+  strut_escaped=$(printf '%s' "$STRUT" | sed 's/ /\\\\x20/g')
   # Legacy monolith unit (kept for nested tests / rollback).
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-tauri.service.in" > "$UNITS/helix-shell-tauri.service"
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-bar.service.in" > "$UNITS/helix-shell-bar.service"
   sed "s|@SHELL_BIN@|$escaped|" "$ROOT/tools/systemd/helix-shell-panels.service.in" > "$UNITS/helix-shell-panels.service"
+  sed "s|@STRUT_BIN@|$strut_escaped|" "$ROOT/tools/systemd/helix-shell-strut.service.in" > "$UNITS/helix-shell-strut.service"
   python3 - "$HOME/.config/niri/config.kdl" "$HOME/.config/niri/helix-setup.kdl" "$HOME/.config/niri/helix-binds.kdl" <<'PY'
 import os, shutil, sys, time
 panel = '"' + os.path.expanduser('~/.local/bin/helix-panel') + '"'
@@ -109,8 +118,8 @@ PY
   rm -f "$UNITS/helix-shell-dev.service" "$UNITS/helix-shell-tauri-trial.service"
   rm -rf "$UNITS/helix-shell-dev.service.d"
   systemctl --user daemon-reload
-  # Prefer split bar+panels; leave monolith unit installed but disabled when split is enabled.
-  systemctl --user enable helix-shell-bar.service helix-shell-panels.service
+  # Prefer strut + bar + panels; leave monolith unit installed but disabled when split is enabled.
+  systemctl --user enable helix-shell-strut.service helix-shell-bar.service helix-shell-panels.service
   systemctl --user disable helix-shell-tauri.service 2>/dev/null || true
   if [ -f "$UNITS/helix-idle.service" ]; then
     systemctl --user enable helix-idle.service
@@ -133,38 +142,53 @@ case "${1:-install}" in
     if shell_live; then
       echo "Links and units updated. Shell already running — not restarted (avoids crashing Cursor)."
       echo "UI / panels bounce: $0 restart-panels"
-      echo "Bar-only bounce (can disrupt Cursor): $0 restart-bar"
-      echo "Full pair bounce (can disrupt Cursor): $0 restart"
+      echo "Bar bounce (strut takes over exclusive zone): $0 restart-bar"
+      echo "Strut bounce (flaps work area — avoid with Cursor open): $0 restart-strut"
+      echo "Full bar+panels bounce: $0 restart"
+      # Do not start strut while a live bar may still reserve in-process — that would stack two zones.
+      if systemctl --user is-active --quiet helix-shell-strut.service; then
+        echo "Strut already active."
+      else
+        echo "Strut unit installed; it starts on the next restart-bar (avoids a double exclusive zone)."
+      fi
     else
-      systemctl --user start helix-shell-bar.service helix-shell-panels.service
+      systemctl --user start helix-shell-strut.service helix-shell-bar.service helix-shell-panels.service
       if [ -f "$UNITS/helix-idle.service" ]; then
         systemctl --user start helix-idle.service 2>/dev/null || true
       fi
       if [ -f "$UNITS/helix-wallpaper.service" ]; then
         systemctl --user start helix-wallpaper.service 2>/dev/null || true
       fi
-      echo "Helix Shell started (bar + panels)."
+      echo "Helix Shell started (strut + bar + panels)."
     fi
     ;;
   restart-panels)
     write_units_and_links
-    echo "Restarting helix-shell-panels only (bar exclusive zone stays up)…"
+    echo "Restarting helix-shell-panels only (strut + bar stay up)…"
     systemctl --user restart helix-shell-panels.service
     echo "Panels restarted."
     ;;
   restart-bar)
     write_units_and_links
-    echo "Restarting helix-shell-bar (can disrupt Cursor)…"
+    echo "Restarting helix-shell-bar (strut + panels stay mapped)…"
     systemctl --user stop helix-shell-tauri.service 2>/dev/null || true
+    systemctl --user start helix-shell-strut.service
+    # Panels no longer BindsTo the bar — leave them running across bar bounce.
     systemctl --user restart helix-shell-bar.service
-    # BindsTo stops panels with the bar; Wants/Upholds should revive them — start explicitly anyway.
     systemctl --user start helix-shell-panels.service
-    echo "Bar restarted; panels ensured."
+    echo "Bar restarted; strut and panels left running."
+    ;;
+  restart-strut)
+    write_units_and_links
+    echo "Restarting helix-shell-strut (work area will flap — can disrupt Cursor)…"
+    systemctl --user restart helix-shell-strut.service
+    echo "Strut restarted."
     ;;
   restart)
     write_units_and_links
-    echo "Restarting shell bar+panels (GUI apps on this session may briefly lose the bar)…"
+    echo "Restarting shell bar+panels (strut stays; GUI apps keep work area)…"
     systemctl --user stop helix-shell-tauri.service 2>/dev/null || true
+    systemctl --user start helix-shell-strut.service
     systemctl --user restart helix-shell-bar.service helix-shell-panels.service
     if [ -f "$UNITS/helix-idle.service" ]; then
       systemctl --user restart helix-idle.service
@@ -172,14 +196,14 @@ case "${1:-install}" in
     if [ -f "$UNITS/helix-wallpaper.service" ]; then
       systemctl --user restart helix-wallpaper.service
     fi
-    echo "Restarted."
+    echo "Restarted (strut left running)."
     ;;
   native)
     echo "The C++ session shell is retired. Use: $0 install" >&2
     exit 2
     ;;
   status)
-    for unit in helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
+    for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     if systemctl --user is-enabled helix-shell-dev.service >/dev/null 2>&1; then
@@ -187,11 +211,12 @@ case "${1:-install}" in
     fi
     ;;
   *)
-    echo "usage: $0 [install|restart-panels|restart-bar|restart|status]" >&2
+    echo "usage: $0 [install|restart-panels|restart-bar|restart-strut|restart|status]" >&2
     echo "  install         update links/units; start shell only if not already running" >&2
     echo "  restart-panels  bounce Overlay panels only (safe with Cursor open)" >&2
-    echo "  restart-bar     bounce Top bar; ensures panels (can disrupt Cursor)" >&2
-    echo "  restart         bounce bar+panels (can disrupt Cursor — prefer a terminal outside Cursor)" >&2
+    echo "  restart-bar     bounce painted bar; strut stays (safer for Cursor)" >&2
+    echo "  restart-strut   bounce exclusive-zone holder (flaps work area — avoid with Cursor)" >&2
+    echo "  restart         bounce bar+panels; strut stays" >&2
     exit 2
     ;;
 esac

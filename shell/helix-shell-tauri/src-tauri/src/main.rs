@@ -2,7 +2,9 @@
 //!
 //! Default (**monolith**): one layer surface for bar + panels (legacy).
 //! **Split** (`HELIX_SHELL_ROLE=bar|panels`): bar stays Top forever; panels own Overlay and
-//! talk over `panels_ipc` so bouncing panels does not tear down the bar exclusive zone.
+//! talk over `panels_ipc` so bouncing panels does not tear down the painted bar.
+//! The exclusive-zone strut is a separate process (`helix-shell-strut`) so `restart-bar`
+//! does not flap niri's work area (which has crashed Cursor).
 //!
 //! Assistant is a separate process (`helix-assistant`); this binary never holds Agent Surface
 //! client grants. Confirmer Overlay is opt-in (`HELIX_SHELL_CONFIRMER`).
@@ -23,6 +25,7 @@ mod mobius_talk;
 mod notify;
 mod panels_bridge;
 mod role;
+mod strut;
 mod tray;
 
 use std::sync::{Arc, Mutex};
@@ -1917,8 +1920,16 @@ fn main() {
                 ShellRole::Monolith => surface.plan(),
             };
             layer::setup(&window, initial_plan)?;
-            if role.is_bar_side() {
-                layer::reserve_bar_space();
+            // Bar role: exclusive zone lives in helix-shell-strut (survives restart-bar).
+            // Monolith (and bar without a strut unit) still reserves in-process.
+            match role {
+                ShellRole::Bar => {
+                    if !strut::prefer_external_strut() {
+                        layer::reserve_bar_space();
+                    }
+                }
+                ShellRole::Monolith => layer::reserve_bar_space(),
+                ShellRole::Panels => {}
             }
             let state = Arc::new(Mutex::new(ShellState {
                 session: Session::new(|_| true),

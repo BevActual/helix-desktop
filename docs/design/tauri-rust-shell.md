@@ -350,10 +350,12 @@ password prompt flow (`Network1.Prompt` and `Reply`).
 
 Measured in a nested niri with a probe window: a tiled window was 905 px tall with and without the Tauri shell, so the bar did **not** reserve
 space; windows would have slid underneath it. A surface anchored to all four edges has no single edge to reserve on, so its exclusive zone is
-ignored. Fix: `layer::reserve_bar_space` creates a second surface, a plain transparent GTK window with no web view (no extra web process),
-anchored to the top and sides, with the exclusive zone and an empty input region. The shell surface now uses zone `-1` (cover the whole
-output regardless of other surfaces' zones). Using the bar's own zone with the second surface present pushed the shell surface 42 px down
-(the pointer test caught it: keys leaked and clicks missed); with `-1` the pointer test is back to all-pass and a probe window is 863 px tall
+ignored. Fix: a second surface (`helix-shell-reserve`), a plain transparent GTK window with no web view, anchored to the top and sides,
+with the exclusive zone and an empty input region. On the split shell that surface lives in `helix-shell-strut` so `restart-bar` does not
+destroy it (niri would otherwise `output_resized` every tiled window — which has crashed Cursor). Monolith / missing strut unit still
+calls `layer::reserve_bar_space` in-process. The shell surface now uses zone `-1` (cover the whole output regardless of other surfaces'
+zones). Using the bar's own zone with the second surface present pushed the shell surface 42 px down (the pointer test caught it: keys
+leaked and clicks missed); with `-1` the pointer test is back to all-pass and a probe window is 863 px tall
 (905 - 42). `tools/nested/idle-program.sh` is the do-nothing baseline for such comparisons.
 
 ## M5 control center: Bluetooth (done)

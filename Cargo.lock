@@ -1623,6 +1623,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-shell-strut"
+version = "0.1.0"
+dependencies = [
+ "gtk",
+ "gtk-layer-shell",
+ "helix-shell-core",
+]
+
+[[package]]
 name = "helix-shell-tauri"
 version = "0.1.0"
 dependencies = [

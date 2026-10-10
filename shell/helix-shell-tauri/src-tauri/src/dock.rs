@@ -44,7 +44,11 @@ fn read_prefs() -> helix_shell_core::dock_prefs::DockPrefs {
 }
 
 /// Applies what is not the page's business: the strip the compositor keeps free for the dock.
+/// When `helix-shell-strut` is running it owns the dock exclusive zone so bar restart does not flap it.
 fn apply_reserve(app: &AppHandle, prefs: &helix_shell_core::dock_prefs::DockPrefs) {
+    if crate::strut::strut_unit_active() {
+        return;
+    }
     let height = prefs.reserved_height();
     let _ = app.run_on_main_thread(move || crate::layer::set_dock_strut(height));
 }

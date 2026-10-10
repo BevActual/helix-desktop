@@ -8,6 +8,7 @@ members = [
     "services/helix-idle",
     "services/helix-desktop",
     "shell/helix-shell-tauri/src-tauri",
+    "shell/helix-shell-strut",
     "greeter/helix-greeter-tauri/src-tauri",
     "apps/helix-settings/src-tauri",
     "apps/helix-chat/src-tauri", # package helix-mobius (Mobius hub)

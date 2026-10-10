@@ -4,7 +4,8 @@ PartOf=graphical-session.target
 After=graphical-session.target helix-shell-bar.service helix-service.service
 Conflicts=helix-shell-dev.service
 Conflicts=helix-shell-tauri.service
-BindsTo=helix-shell-bar.service
+# Do NOT BindsTo the bar: restart-bar would stop Overlay and destroy its layer surface,
+# which (before the compositor skip) resized every tiled window. Bar Upholds=panels instead.
 
 [Service]
 Type=simple

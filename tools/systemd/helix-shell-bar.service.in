@@ -1,10 +1,13 @@
 [Unit]
 Description=Helix Shell bar (Top layer)
 PartOf=graphical-session.target
-After=graphical-session.target helix-service.service
+After=graphical-session.target helix-service.service helix-shell-strut.service
 Conflicts=helix-shell-dev.service
 # Prefer the split pair over the legacy monolith unit.
 Conflicts=helix-shell-tauri.service
+# Strut holds the exclusive zone; Wants it up with the bar but must NOT Upholds=
+# (Upholds would stop the strut when the bar restarts — the whole point of the split).
+Wants=helix-shell-strut.service
 # Keep Overlay panels alive while the bar is up (panels BindsTo the bar the other way).
 Wants=helix-shell-panels.service
 Upholds=helix-shell-panels.service

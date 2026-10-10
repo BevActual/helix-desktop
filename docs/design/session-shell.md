@@ -7,14 +7,16 @@ Product shape (greeter / compositor / shell / services): `product-structure.md`.
 ```sh
 tools/switch-shell.sh install          # links + units; starts shell only if not already running
 tools/switch-shell.sh restart-panels   # bounce Overlay panels only — safe while Cursor is open
-tools/switch-shell.sh restart          # bounce bar+panels — can disrupt Cursor; prefer a plain terminal
+tools/switch-shell.sh restart-bar      # bounce painted bar; exclusive-zone strut stays mapped
+tools/switch-shell.sh restart-strut    # bounce strut — flaps niri work area; avoid with Cursor open
+tools/switch-shell.sh restart          # bounce bar+panels (strut stays)
 tools/switch-shell.sh status
 tools/iterate.sh                       # fast rebuild + unit drop-in; no restart unless --restart
 ```
 
-`install` / `iterate` never restart a live shell. Prefer `restart-panels` for UI work: the bar Top-layer exclusive zone stays up. Full `restart` (bar) still tears down layer-shell and has crashed Cursor on this session.
+`install` / `iterate` never restart a live shell. Prefer `restart-panels` for UI work. `restart-bar` leaves `helix-shell-strut` (top + dock exclusive zones) and panels up. Cursor crashes came from niri calling `output_resized` on **every** layer destroy — helix-niri now skips that when the usable zone is unchanged; still avoid `restart-strut` while Cursor is open.
 
-Split processes: `helix-shell-bar` (`HELIX_SHELL_ROLE=bar`) + `helix-shell-panels` (`HELIX_SHELL_ROLE=panels`), same binary. Legacy monolith unit `helix-shell-tauri.service` remains for nested tests / rollback.
+Split processes: `helix-shell-strut` (exclusive zone) + `helix-shell-bar` (`HELIX_SHELL_ROLE=bar`) + `helix-shell-panels` (`HELIX_SHELL_ROLE=panels`). Strut is its own tiny binary; bar and panels share `helix-shell-tauri`. Legacy monolith unit `helix-shell-tauri.service` remains for nested tests / rollback.
 
 ## Retired (removed)
 
