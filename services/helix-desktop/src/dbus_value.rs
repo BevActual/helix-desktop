@@ -33,10 +33,8 @@ pub fn json_to_owned(value: &serde_json::Value) -> Option<OwnedValue> {
         serde_json::Value::Number(number) => {
             if let Some(unsigned) = number.as_u64() {
                 Some(owned_u64(unsigned))
-            } else if let Some(float) = number.as_f64() {
-                Some(owned_f64(float))
             } else {
-                None
+                number.as_f64().map(owned_f64)
             }
         }
         serde_json::Value::String(text) => Some(owned_str(text)),

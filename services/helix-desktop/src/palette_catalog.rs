@@ -144,7 +144,7 @@ fn parse_community_catalog(path: &Path) -> Vec<AvailablePalette> {
             light: mode_preview_from_catalog(item, "light"),
         });
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     out.dedup_by(|a, b| a.name == b.name);
     out.truncate(MAX_COMMUNITY);
     out
@@ -184,7 +184,7 @@ fn load_custom(config_dir: &Path) -> Vec<AvailablePalette> {
             light,
         });
     }
-    out.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    out.sort_by_key(|a| a.name.to_lowercase());
     out.truncate(MAX_CUSTOM);
     out
 }

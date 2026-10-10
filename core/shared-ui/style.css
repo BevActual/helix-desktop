@@ -537,7 +537,7 @@ body.settings #content::-webkit-scrollbar { height: 0; }
 body.no-dots .dock-item.running::after, body.no-dots .dock-item.focused::after { display: none; }
 .setting-value { color: var(--label-2); font-size: 13px; text-align: right; max-width: 55%; }
 
-/* Mobius hub (apps/helix-chat → helix-mobius) */
+/* Mobius hub (apps/helix-mobius) */
 body.chat { background: transparent; font-size: 14px; }
 body.chat #app { height: 100vh; display: grid; grid-template-columns: 268px 1fr; background: var(--glass-solid); border-radius: 18px; overflow: hidden; box-shadow: inset 0 0 0 .5px var(--hairline); position: relative; }
 body.chat #side { background: color-mix(in srgb, var(--fill-1) 88%, transparent); display: flex; flex-direction: column; padding: 0 12px 12px; gap: 8px; min-height: 0; border-right: .5px solid var(--sep); z-index: 3; }

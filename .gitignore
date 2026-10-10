@@ -51,3 +51,6 @@ greeter/*/dist/icons.js
 /compositor/target/
 /compositor/result
 /compositor/result-*
+
+# stray rustc outputs
+rust_out

@@ -26,7 +26,3 @@ keyring = "3"
 name = "helix-mobius"
 path = "src/main.rs"
 
-# Transition alias until launchers and docs finish migrating.
-[[bin]]
-name = "helix-chat"
-path = "src/main.rs"

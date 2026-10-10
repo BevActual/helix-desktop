@@ -544,7 +544,7 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
 /// Deep-link into Mobius for models & routing (grants stay in Settings).
 #[tauri::command]
 fn open_mobius() -> Result<(), String> {
-    for bin in ["helix-mobius", "helix-chat"] {
+    for bin in ["helix-mobius"] {
         match std::process::Command::new(bin)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -555,7 +555,7 @@ fn open_mobius() -> Result<(), String> {
             Err(_) => continue,
         }
     }
-    Err("Mobius is not installed (helix-mobius / helix-chat).".into())
+    Err("Mobius is not installed (helix-mobius).".into())
 }
 
 #[derive(Serialize)]

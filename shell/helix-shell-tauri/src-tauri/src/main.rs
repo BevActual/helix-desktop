@@ -1633,7 +1633,7 @@ fn panel_open(app: AppHandle, id: String) {
 /// Opens the full Mobius window (longer Talk). Bar Talk stays in the dropdown.
 #[tauri::command]
 fn open_mobius() {
-    for bin in ["helix-mobius", "helix-chat"] {
+    for bin in ["helix-mobius"] {
         match std::process::Command::new(bin)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())

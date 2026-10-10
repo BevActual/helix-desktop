@@ -76,7 +76,7 @@ fn pick_paths() -> Result<Vec<PathBuf>, String> {
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
             let paths: Vec<PathBuf> = text
-                .split(|c| c == '\n' || c == ' ')
+                .split(['\n', ' '])
                 .map(str::trim)
                 .filter(|l| !l.is_empty())
                 .map(PathBuf::from)
@@ -161,6 +161,7 @@ pub fn pick_and_read() -> Result<Vec<Attachment>, String> {
 }
 
 /// Read explicit paths (e.g. future drag-drop). Same safety checks as the picker.
+#[allow(dead_code)]
 pub fn read_paths(paths: &[String]) -> Result<Vec<Attachment>, String> {
     let mut out = Vec::new();
     for path in paths.iter().take(MAX_ATTACH_FILES) {

@@ -10,7 +10,7 @@ The product is **Helix**. Install names, IPC, UI strings, config paths, and docs
 | Panel helper | `~/.local/bin/helix-panel` |
 | Settings / Software / Monitor | `helix-settings`, `helix-software`, `helix-system-monitor` |
 | **Mobius** (desktop AI) | Brand for Talk / Act / Agents — like Siri or Gemini for Helix |
-| Mobius — Talk | Bar dropdown (quick ask) + window **Mobius**; binary `helix-mobius` (transition: `helix-chat`); desktop id `org.helix.Mobius` |
+| Mobius — Talk | Bar dropdown (quick ask) + window **Mobius**; binary `helix-mobius`; desktop id `org.helix.Mobius` |
 | Mobius — Act | Same bar dropdown (Act mode) + `helix-assistant`; Caps Lock `Ask Mobius:` rows |
 | Mobius — Agents | Same bar dropdown (Agents mode) + Settings **Privacy & agents** (grants) |
 | Desktop service (live) | `helix-service` / `org.helix.Desktop` |
@@ -34,4 +34,4 @@ Product layout: `product-structure.md`. Agentic fabric: `inference-fabric.md`.
 ## Renamed (transition)
 
 - **Helix Chat** / `helix-chat` / `org.helix.Chat` → **Mobius** / `helix-mobius` / `org.helix.Mobius`.
-  Tree may stay `apps/helix-chat/` until the path rename; product strings and desktop id use Mobius.
+  Tree: `apps/helix-mobius/`.

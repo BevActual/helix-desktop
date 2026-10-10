@@ -210,7 +210,7 @@ def _backend() -> AgentClient | None:
     with _agent_lock:
         if _agent_checked:
             return _agent
-        mode = BACKEND_MODE
+        mode = "surface" if BACKEND_MODE == "agent1" else BACKEND_MODE  # the old name is an alias
         if mode != "legacy":
             client = AgentClient()
             try:

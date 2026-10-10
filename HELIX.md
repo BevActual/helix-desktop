@@ -38,7 +38,7 @@ Standalone apps under `apps/` (shared UI in `core/shared-ui/`). Desktop authorit
 | `compositor/` | niri fork (excluded from root Cargo workspace) |
 | `core/` | Pure core, desktop API client, shared-ui |
 | `shell/` | Live session shell (Tauri) |
-| `apps/` | Settings, Software, Monitor, Mobius (`helix-chat` tree → `helix-mobius`) |
+| `apps/` | Settings, Software, Monitor, Mobius (`helix-mobius`) |
 | `services/` | `helix-desktop` (Rust Desktop scaffold), wallpaper, idle |
 | `dev/` | Nested probes only |
 | `protocols/` | D-Bus / IPC contracts |

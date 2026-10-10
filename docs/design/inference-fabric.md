@@ -101,7 +101,7 @@ Mobius may read AgentSurfaceActivity1 for display; never SetGrant / RegisterConf
 
 | Path | Role |
 |---|---|
-| `apps/helix-chat/` → Mobius (`org.helix.Mobius`, command `helix-mobius`) | Hub app |
+| `apps/helix-mobius/` → Mobius (`org.helix.Mobius`, command `helix-mobius`) | Hub app |
 | `src/inference/` → `services/helix-inference` | Fabric |
 | `src/assistant/` → `services/helix-assistant` | Act client |
 | `tools/helix-agent/` | Helix MCP server |

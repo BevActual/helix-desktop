@@ -106,7 +106,9 @@ int main(int argc, char** argv) {
   assert(snapshot.at("system").at("os").is_string());
   assert(snapshot.at("system").at("architecture").is_string());
   for (const auto& item : client.call("configuration", "GetSettings"))
-    assert(item.at("page") != "notifications" && item.at("page") != "accessibility" && item.at("page") != "keyboard" && item.at("page") != "system" && item.at("page") != "power" && item.at("page") != "privacy-security" && item.at("page") != "desktop-dock");
+    // privacy-security carries only the read-only Mobius routing mirror (ai.*), which exists for search.
+    assert(item.at("page") != "notifications" && item.at("page") != "accessibility" && item.at("page") != "keyboard" && item.at("page") != "system" && item.at("page") != "power" && item.at("page") != "desktop-dock" &&
+           (item.at("page") != "privacy-security" || item.at("id").get<std::string>().starts_with("ai.")));
   assert(rejects(client, "configuration", "Update", g_variant_new("(sv)", "notification.show_actions", g_variant_new_boolean(false))));
   assert(!snapshot.at("bluetooth").get<bool>());
   Child bluez; bluez.start(argv[0], "--fake-bluez");

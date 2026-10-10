@@ -22,8 +22,6 @@ namespace helix::packages {
 
     constexpr std::array kProtectedNames = {
         std::string_view{"helix-shell"},
-        std::string_view{"helix"},
-        std::string_view{"helix-greeter"},
         std::string_view{"helix-greeter"},
         std::string_view{"helix-niri"},
         std::string_view{"niri"},

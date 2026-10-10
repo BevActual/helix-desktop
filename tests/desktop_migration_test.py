@@ -4,7 +4,7 @@ import pathlib
 import sys
 
 root = pathlib.Path(sys.argv[1])
-inventory = json.loads((root / "docs/design/desktop-migration.json").read_text())
+inventory = json.loads((root / "docs/design/archive/desktop-migration.json").read_text())
 entries = inventory["entries"]
 assert len({(entry["kind"], entry["id"]) for entry in entries}) == len(entries)
 assert all(entry["destination"] and entry["status"] in {"pending", "partial", "verified"} for entry in entries)

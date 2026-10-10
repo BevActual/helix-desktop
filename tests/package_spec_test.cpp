@@ -90,7 +90,6 @@ int main() {
   ok = expect(hasSafeSearchChars("h"), "one char") && ok;
   ok = expect(!hasSafeSearchChars("h;"), "bad char") && ok;
 
-  ok = expect(isProtectedPackage("helix"), "helix") && ok;
   ok = expect(isProtectedPackage("helix-greeter"), "greeter") && ok;
   ok = expect(isProtectedPackage("helix-shell"), "helix-shell") && ok;
   ok = expect(isProtectedPackage("filesystem"), "essential filesystem protected") && ok;

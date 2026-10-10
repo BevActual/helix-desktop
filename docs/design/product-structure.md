@@ -86,7 +86,7 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `helix-shell-tauri` | session UI; Desktop registrant | `shell/` |
 | `helix-desktop` | `org.helix.Desktop` owner | `services/helix-desktop` (scaffold) ← replaces `src/desktop/` / `helix-service` |
 | `helix-settings` etc. | Desktop clients | `apps/` |
-| **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-chat/` → rename |
+| **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
 | `helix-assistant` | Agent Surface client; never in the shell | `src/assistant/` → **`services/helix-assistant`** |
 | `helix-inference` | `org.helix.Inference` fabric | `src/inference/` → **`services/helix-inference`** |

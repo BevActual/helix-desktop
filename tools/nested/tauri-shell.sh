@@ -3,6 +3,7 @@
 # The service pid is recorded so the nested script can stop it by pid. This never touches the real session.
 set -u
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
+BUILD=${HELIX_BUILD_DIR:-$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)}   # the meson build that has the C++ service
 # Unless HELIX_SHELL_BIN says otherwise, run whichever build (fast or release) was made last, so a test never silently runs a stale binary.
 newest_shell_bin() { ls -t "$ROOT/target/fast/helix-shell-tauri" "$ROOT/target/release/helix-shell-tauri" 2>/dev/null | head -1; }
 export PIPEWIRE_REMOTE="${PIPEWIRE_REMOTE:-helix-nested-no-audio}"
@@ -24,7 +25,7 @@ export HELIX_BACKLIGHT_DIR="${XDG_STATE_HOME}/backlight"
 export HELIX_SURFACE_CONTROL="${XDG_STATE_HOME}/surface-control"
 export HELIX_UI_LAYOUT_LOG="${XDG_STATE_HOME}/layout.json"   # where the page reports its named controls (tests click by name)
 # C++ meson build by default; set HELIX_SERVICE_BIN to target/debug/helix-desktop for the Rust scaffold.
-SERVICE="${HELIX_SERVICE_BIN:-$ROOT/build-debug/helix-service}"
+SERVICE="${HELIX_SERVICE_BIN:-$BUILD/helix-service}"
 SHELL_BIN="${HELIX_SHELL_BIN:-$(newest_shell_bin)}"
 "$SERVICE" > "${XDG_STATE_HOME}/helix-service.log" 2>&1 &
 echo $! > "${XDG_STATE_HOME}/helix-service.pid"

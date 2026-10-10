@@ -122,7 +122,7 @@ pub fn decode_reply(line: &str) -> Result<PanelsReply, PanelsIpcError> {
 fn validate_request(req: &PanelsRequest) -> Result<(), PanelsIpcError> {
     match req {
         PanelsRequest::Open { id, mode } => {
-            if !PANELS.iter().any(|known| *known == id.as_str()) {
+            if !PANELS.contains(&id.as_str()) {
                 return Err(PanelsIpcError::UnknownPanel);
             }
             if let Some(mode) = mode {

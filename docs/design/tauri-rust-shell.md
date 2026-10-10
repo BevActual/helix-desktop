@@ -49,7 +49,7 @@ Cargo.toml (workspace root)
   helix-shell-core/                pure logic (shell/, desktop/, agent/, apps/); no Tauri, no GTK
   helix-shell-tauri/               session shell: layer-shell bar + panels + confirmer Overlay
   helix-settings/                  Settings toplevel (Agent Surface manager)
-  helix-chat/                      Mobius hub (helix-mobius) over org.helix.Inference
+  helix-mobius/                    Mobius hub over org.helix.Inference
   helix-software/                  package store (Flatpak / Fedora / firmware)
   helix-system-monitor/            Overview / Processes / Screen Time
   helix-wallpaper/                 background wallpaper process (not in shell USS)

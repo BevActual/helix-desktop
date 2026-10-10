@@ -121,7 +121,7 @@ kill "$OLD"
 for _ in $(seq 1 40); do kill -0 "$OLD" 2>/dev/null || break; sleep 0.25; done
 registered=$(grep -c "CONFIRMER registered" "$LOG" || true)
 HELIX_RISK_POLICY="$ROOT/protocols/ipc/msg-risk.toml" PIPEWIRE_REMOTE=helix-nested-no-audio \
-  "${HELIX_SERVICE_BIN:-$ROOT/build-debug/helix-service}" >>"$SCRATCH/state/helix-service.log" 2>&1 &
+  "${HELIX_SERVICE_BIN:-${HELIX_BUILD_DIR:-$(ls -d "$ROOT/build-debug" "$ROOT/build-native-clean" 2>/dev/null | head -1)}/helix-service}" >>"$SCRATCH/state/helix-service.log" 2>&1 &
 echo $! >"$SCRATCH/state/helix-service.pid"
 wait_for "CONFIRMER service restarted" 1 80 || fail "the shell did not notice the new service"
 wait_for "CONFIRMER registered" $((registered + 1)) 80 || fail "the shell did not register again"

@@ -750,7 +750,7 @@ mod tests {
         assert_eq!(c.complete(7, true, "{\"ok\":true}"), Some(Outcome::Finished));
         assert!(!c.is_streaming());
         assert_eq!(c.conversation.messages[1].text, "A cron job runs on a schedule.");
-        assert_eq!(c.send("again", 6).is_ok(), true);
+        assert!(c.send("again", 6).is_ok());
     }
 
     #[test]

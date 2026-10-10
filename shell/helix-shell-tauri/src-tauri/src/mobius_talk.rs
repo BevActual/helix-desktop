@@ -21,8 +21,9 @@ const MAX_QUESTION: usize = 2000;
 const MAX_HISTORY_TURNS: usize = 6;
 const MAX_REPLY_CHARS: usize = 8_000;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TalkPhase {
+    #[default]
     Idle,
     Thinking,
     Streaming,
@@ -39,12 +40,6 @@ pub struct TalkState {
     pub error: String,
     /// Recent turns for short in-bar context: ("user"|"assistant", text).
     pub history: Vec<(String, String)>,
-}
-
-impl Default for TalkPhase {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 
 #[derive(Clone, Serialize)]

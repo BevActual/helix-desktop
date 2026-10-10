@@ -61,11 +61,8 @@ write_units_and_links() {
   link_app helix-software org.helix.Software.desktop
   link_app helix-system-monitor org.helix.SystemMonitor.desktop
   link_app helix-mobius org.helix.Mobius.desktop || true
-  # Transition alias until launchers finish migrating from helix-chat.
-  if [ -L "$HOME/.local/bin/helix-mobius" ] || [ -x "$HOME/.local/bin/helix-mobius" ]; then
-    ln -sf "$(readlink -f "$HOME/.local/bin/helix-mobius" 2>/dev/null || echo "$HOME/.local/bin/helix-mobius")" \
-      "$HOME/.local/bin/helix-chat" 2>/dev/null || true
-  fi
+  # The old name is gone; drop a link left by an earlier install.
+  rm -f "$HOME/.local/bin/helix-chat"
   escaped=$(printf '%s' "$BIN" | sed 's/ /\\\\x20/g')
   strut_escaped=$(printf '%s' "$STRUT" | sed 's/ /\\\\x20/g')
   # Legacy monolith unit (kept for nested tests / rollback).

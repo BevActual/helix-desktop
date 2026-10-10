@@ -158,7 +158,7 @@ fn save(conversation: &Conversation) {
     }
 }
 
-fn load_from(dir: &PathBuf, id: &str) -> Option<Conversation> {
+fn load_from(dir: &std::path::Path, id: &str) -> Option<Conversation> {
     if !valid_id(id) {
         return None;
     }

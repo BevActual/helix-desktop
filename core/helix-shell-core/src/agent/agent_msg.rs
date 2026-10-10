@@ -153,7 +153,7 @@ fn literal_payload(rest: &str) -> Result<String, MsgError> {
     if rest.contains('\x1e') || rest.contains('\0') {
         return Err(MsgError::Usage("control characters are not allowed"));
     }
-    let text = rest.trim_end_matches(|c| c == '\n' || c == '\r');
+    let text = rest.trim_end_matches(['\n', '\r']);
     if text.chars().count() > MAX_LITERAL_CHARS {
         return Err(MsgError::Usage("text is too long"));
     }

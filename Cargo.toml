@@ -11,7 +11,7 @@ members = [
     "shell/helix-shell-strut",
     "greeter/helix-greeter-tauri/src-tauri",
     "apps/helix-settings/src-tauri",
-    "apps/helix-chat/src-tauri", # package helix-mobius (Mobius hub)
+    "apps/helix-mobius/src-tauri", # Mobius hub
     "apps/helix-software/src-tauri",
     "apps/helix-system-monitor/src-tauri",
     "dev/helix-attacker",

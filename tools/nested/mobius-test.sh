@@ -1,7 +1,7 @@
 #!/bin/bash -x
 # Mobius against the real model service with a scripted backend: send a message, watch the reply stream in as formatted text,
 # stop a reply, start a new chat, reopen the first, delete it. Every control is clicked by name with the real pointer.
-#   HELIX_NESTED_SCRIPT=tools/nested/chat-test.sh tools/nested/run.sh chat tools/nested/chat-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+#   HELIX_NESTED_SCRIPT=tools/nested/mobius-test.sh tools/nested/run.sh mobius tools/nested/mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log; FAILED=0
 source "$ROOT/tools/nested/ui-lib.sh"
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
@@ -10,7 +10,7 @@ CHATS=$SCRATCH/data/helix/chats
 for _ in $(seq 1 80); do [ -f "$SCRATCH/state/layout.json" ] && has_id input && break; sleep 0.25; done; sleep 1
 loc=$(python3 - <<'PY'
 import json, subprocess
-w = next(x for x in json.loads(subprocess.check_output(["niri","msg","--json","windows"])) if "chat" in (x["app_id"] or "").lower())
+w = next(x for x in json.loads(subprocess.check_output(["niri","msg","--json","windows"])) if "mobius" in (x["app_id"] or "").lower())
 o = next(iter(json.loads(subprocess.check_output(["niri","msg","--json","outputs"])).values()))["logical"]
 l = w["layout"]; t = l.get("tile_pos_in_workspace_view") or [0,0]; f = l.get("window_offset_in_tile") or [0,0]
 print(f'{t[0]+f[0]} {t[1]+f[1]}|{o["width"]} {o["height"]}')
