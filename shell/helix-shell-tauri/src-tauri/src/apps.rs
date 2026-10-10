@@ -210,6 +210,11 @@ pub fn save_history(history: &helix_shell_core::launcher::History) {
     {
         return;
     }
+    // The folder may have been made by another process with looser permissions; what is kept here is the person's alone.
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700));
+    }
     let entries: Vec<serde_json::Value> = history
         .entries()
         .map(|(id, count, last)| serde_json::json!({"id": id, "count": count, "last": last}))

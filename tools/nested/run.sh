@@ -22,7 +22,7 @@ export HELIX_ALLOW_UNPROTECTED_APPROVALS=${HELIX_ALLOW_UNPROTECTED_APPROVALS-1}
 # The real system bus (NetworkManager, BlueZ, logind, polkit) is out of reach of everything started here. A test that needs one
 # provides its own with HELIX_NESTED_SYSTEM_BUS=unix:path=...; otherwise services see "unavailable", never the person's real devices.
 export DBUS_SYSTEM_BUS_ADDRESS="${HELIX_NESTED_SYSTEM_BUS:-unix:path=/nonexistent/helix-nested-system-bus}"
-unset NIRI_SOCKET HELIX_STATE_HOME HELIX_CONFIG_HOME HELIX_DATA_HOME HELIX_CACHE_HOME
+unset HELIX_SHELL_ROLE HELIX_SHELL_CONFIRMER NIRI_SOCKET HELIX_STATE_HOME HELIX_CONFIG_HOME HELIX_DATA_HOME HELIX_CACHE_HOME
 for kv in "$@"; do export "$kv"; done
 # HELIX_NESTED_ASSISTANT=<path to helix-assistant>: pre-grant observe and act to that binary, as if the person had approved it once.
 # HELIX_NESTED_ASSISTANT_TIERS (default `observe act`) and HELIX_NESTED_ASSISTANT_SCRIPT (an interpreter is known by the script it runs).

@@ -12,8 +12,8 @@ source "$ROOT/tools/nested/ui-lib.sh"
 wait_for "LIVE Sound" 1 120 || exit 1; sleep 2
 echo control-center >> "$CONTROL"; wait_for "PANEL open" 1 && sleep 2
 click_id tile-bt-open; shot bt-open
-echo "--- 1. a device that is not paired sends nothing"
-click_id "bt:Kitchen Speaker"; [ ! -s "$ACTIONS" ] && echo "ok: nothing sent for the unpaired speaker" || echo "FAIL: something was sent"
+echo "--- 1. a device that is not paired starts pairing (and nothing else)"
+click_id "bt:Kitchen Speaker"; grep -q '^ACTION pair {"path": "/d/speaker"}$' "$ACTIONS" && echo "ok: pairing was started for the unpaired speaker" || echo "FAIL: pairing was not started"
 echo "--- 2. clicking a connected device disconnects it"; click_id "bt:Earbuds"
 echo "--- 3. clicking a paired idle device connects it"; click_id "bt:Phone"; shot bt-phone
 echo "--- 4. the other one too"; click_id "bt:Earbuds"
@@ -21,7 +21,8 @@ echo "--- 5. Forget removes a paired device"; click_id "bt-forget:Earbuds"; shot
 echo "--- 6. Scan starts, then Stop stops"; click_id bt-scan; click_id bt-scan
 echo "--- 7. Bluetooth off, then on"; click_id bt-toggle; shot bt-off; click_id bt-toggle
 wtype -k Escape; sleep 1; wtype -k Escape; wait_for "PANEL closed" 1 20 && echo "ok: Escape went back, then closed the panel"
-EXPECTED='ACTION disconnect {"path": "/d/buds"}
+EXPECTED='ACTION pair {"path": "/d/speaker"}
+ACTION disconnect {"path": "/d/buds"}
 ACTION connect {"path": "/d/phone"}
 ACTION connect {"path": "/d/buds"}
 ACTION forget {"path": "/d/buds"}
@@ -30,5 +31,5 @@ ACTION stop-scan {}
 ACTION enable {"value": false}
 ACTION enable {"value": true}'
 echo "=== actions the service received, in order:"; cat "$ACTIONS"
-if [ "$(grep '^ACTION' "$ACTIONS")" = "$EXPECTED" ]; then echo "PASS: exactly the expected actions, in order (nothing for the unpaired device)"; else echo "FAIL: the actions differ from what was expected"; fi
+if [ "$(grep '^ACTION' "$ACTIONS")" = "$EXPECTED" ]; then echo "PASS: exactly the expected actions, in order (pairing, not connecting, for the unpaired device)"; else echo "FAIL: the actions differ from what was expected"; fi
 echo "refused by the service (the shell must never send these): $(grep -c '^REFUSED' "$ACTIONS" 2>/dev/null || true)"

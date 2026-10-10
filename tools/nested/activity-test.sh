@@ -73,8 +73,8 @@ wait_view 'last=status/allowed' || fail "allowed action not in the history"
 
 echo "--- 4. The Agents panel opens from the bar button"
 click_id agentsbtn
-for _ in $(seq 1 20); do grep -q '"panel": *"agents"' "$LAYOUT" 2>/dev/null && break; sleep 0.25; done
-grep -q '"panel": *"agents"' "$LAYOUT" || fail "agents panel did not open"
+for _ in $(seq 1 20); do grep -q '"panel": *"assistant"' "$LAYOUT" 2>/dev/null && break; sleep 0.25; done
+grep -q '"panel": *"assistant"' "$LAYOUT" || fail "the Mobius agents view did not open"
 for _ in $(seq 1 40); do has_id agent-toggle && has_id revoke-0 && break; sleep 0.25; done
 has_id revoke-0 || fail "revoke-0 missing"
 shot activity-panel

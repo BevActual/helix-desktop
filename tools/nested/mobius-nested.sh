@@ -11,7 +11,7 @@ HELIX_INFERENCE_BACKEND=fake HELIX_FAKE_REPLY="${HELIX_FAKE_REPLY:-Sure. Here is
 
 \`\`\`sh
 crontab -e
-\`\`\`}" HELIX_FAKE_DELAY_MS="${HELIX_FAKE_DELAY_MS:-80}" "$BUILD/helix-inference" > "$XDG_STATE_HOME/helix-inference.log" 2>&1 &
+\`\`\`}" HELIX_FAKE_DELAY_MS="${HELIX_FAKE_DELAY_MS:-250}" "$BUILD/helix-inference" > "$XDG_STATE_HOME/helix-inference.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 sleep 1
 echo $$ > "$XDG_STATE_HOME/shell.pid"

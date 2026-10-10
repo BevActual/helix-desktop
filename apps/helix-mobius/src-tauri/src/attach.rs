@@ -43,6 +43,22 @@ fn is_probably_text(path: &Path, bytes: &[u8]) -> bool {
     ) || std::str::from_utf8(bytes).is_ok()
 }
 
+/// Files that hold secrets are never sent to a model, whatever the person picked: a private key or a credentials file is one slip away
+/// from leaving the computer when the backend is a remote one.
+fn is_secret_file(path: &Path, text: &str) -> bool {
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_ascii_lowercase();
+    let by_name = matches!(
+        name.as_str(),
+        "id_rsa" | "id_dsa" | "id_ecdsa" | "id_ed25519" | ".netrc" | "_netrc" | ".pgpass" | "credentials" | ".git-credentials" | "secrets.toml" | "secrets.json" | "secrets.yaml" | "secrets.yml" | "kdbx"
+    ) || name.ends_with(".pem")
+        || name.ends_with(".key")
+        || name.ends_with(".p12")
+        || name.ends_with(".pfx")
+        || name.ends_with(".kdbx")
+        || name.ends_with(".gpg");
+    by_name || text.contains("-----BEGIN") && text.contains("PRIVATE KEY-----")
+}
+
 fn pick_paths() -> Result<Vec<PathBuf>, String> {
     // Prefer portal-friendly zenity; fall back to kdialog.
     if let Ok(output) = Command::new("zenity")
@@ -70,13 +86,14 @@ fn pick_paths() -> Result<Vec<PathBuf>, String> {
         }
     }
     if let Ok(output) = Command::new("kdialog")
-        .args(["--getopenfilename", "--multiple", "."])
+        .args(["--getopenfilename", "--multiple", "--separate-output", "."])
         .output()
     {
         if output.status.success() {
             let text = String::from_utf8_lossy(&output.stdout);
+            // One path per line (`--separate-output`): a path may well have spaces in it.
             let paths: Vec<PathBuf> = text
-                .split(['\n', ' '])
+                .lines()
                 .map(str::trim)
                 .filter(|l| !l.is_empty())
                 .map(PathBuf::from)
@@ -110,6 +127,12 @@ fn read_one(path: &Path) -> Result<Attachment, String> {
             path.file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or("file")
+        ));
+    }
+    if is_secret_file(path, &String::from_utf8_lossy(&bytes)) {
+        return Err(format!(
+            "{} looks like it holds a key or credentials, so it is not attached.",
+            path.file_name().and_then(|n| n.to_str()).unwrap_or("file")
         ));
     }
     let mut text = String::from_utf8_lossy(&bytes).into_owned();
@@ -172,4 +195,38 @@ pub fn read_paths(paths: &[String]) -> Result<Vec<Attachment>, String> {
         out.push(read_one(&path)?);
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keys_and_credentials_are_not_attached() {
+        for name in ["id_rsa", "id_ed25519", ".netrc", "server.pem", "tls.key", "store.p12", "vault.kdbx", ".git-credentials"] {
+            assert!(is_secret_file(Path::new(&format!("/home/me/{name}")), ""), "{name}");
+        }
+        assert!(is_secret_file(Path::new("/tmp/notes.txt"), "x\n-----BEGIN OPENSSH PRIVATE KEY-----\nabc"));
+        assert!(!is_secret_file(Path::new("/tmp/notes.txt"), "a public key is -----BEGIN PUBLIC KEY----- fine"));
+        assert!(!is_secret_file(Path::new("/src/main.rs"), "fn main() {}"));
+    }
+
+    #[test]
+    fn a_secret_file_is_refused_when_read() {
+        let dir = std::env::temp_dir().join(format!("mobius-attach-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let key = dir.join("id_ed25519");
+        std::fs::write(&key, "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n").unwrap();
+        let note = dir.join("note.md");
+        std::fs::write(&note, "hello").unwrap();
+        assert!(read_one(&key).unwrap_err().contains("key or credentials"));
+        assert_eq!(read_one(&note).unwrap().content, "hello");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn binary_and_text_are_told_apart() {
+        assert!(!is_probably_text(Path::new("a.bin"), &[0, 1, 2]));
+        assert!(is_probably_text(Path::new("a.txt"), b"hello"));
+    }
 }

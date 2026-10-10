@@ -276,6 +276,12 @@ async function drawKeyboard() {
         });
         form.append(field, save, cancel);
         line.replaceWith(form);
+        // Typing replaces what is there: the whole chord list is selected when the field opens or is entered again.
+        let justEntered = true;
+        field.addEventListener("focus", () => { justEntered = true; field.select(); });
+        field.addEventListener("mouseup", (event) => { if (justEntered) { event.preventDefault(); justEntered = false; } });
+        field.addEventListener("keydown", (event) => { if (event.key === "Enter") save.click(); else if (event.key === "Escape") { event.stopPropagation(); cancel.click(); } });
+        field.focus();
         queueReport();
       };
       line.append(text, keys, edit);

@@ -20,6 +20,34 @@ impl Default for RemoteOptions {
     }
 }
 
+/// Whether an API key may be sent to `base`. Over https always; over plain http only to this computer or a local network address,
+/// so a key is never put on the open internet in clear text (a typo of `http://` for a cloud service would do that).
+pub fn key_allowed(base: &str) -> bool {
+    let base = base.trim();
+    if base.starts_with("https://") {
+        return true;
+    }
+    let Some(rest) = base.strip_prefix("http://") else { return false };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
+    if authority.contains('@') {
+        return false;
+    }
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or("").to_string(),
+        None => authority.rsplit_once(':').map_or(authority, |(h, port)| if port.chars().all(|c| c.is_ascii_digit()) { h } else { authority }).to_string(),
+    };
+    let host = host.to_ascii_lowercase();
+    if host == "localhost" || host.ends_with(".localhost") || host.ends_with(".local") || host == "::1" {
+        return true;
+    }
+    let octets: Vec<u8> = host.split('.').filter_map(|p| p.parse().ok()).collect();
+    if octets.len() == 4 && host.split('.').count() == 4 {
+        return matches!(octets[..], [127, ..] | [10, ..] | [192, 168, ..] | [169, 254, ..]) || (octets[0] == 172 && (16..=31).contains(&octets[1]));
+    }
+    // Carrier-grade NAT and unique-local IPv6 are private too.
+    host.starts_with("fd") && host.contains(':') || host.starts_with("fe80:")
+}
+
 /// POST `{base}/chat/completions`. `base` is e.g. `http://host:11434/v1` (no trailing slash required).
 /// `api_key` becomes `Authorization: Bearer …` when present (OpenRouter, OpenAI, etc.).
 pub async fn chat_completions(
@@ -35,6 +63,9 @@ pub async fn chat_completions(
     }
     if !(base.starts_with("http://") || base.starts_with("https://")) {
         return Err("Remote URL must start with http:// or https://.".into());
+    }
+    if api_key.map(str::trim).is_some_and(|k| !k.is_empty()) && !key_allowed(base) {
+        return Err("An API key is only sent over https, or to this computer or your local network.".into());
     }
     let url = format!("{base}/chat/completions");
     let temperature = if options.temperature.is_finite() {
@@ -93,6 +124,9 @@ pub async fn list_models(base_url: &str, api_key: Option<&str>) -> Result<Vec<St
     let base = base_url.trim().trim_end_matches('/');
     if base.is_empty() {
         return Err("Remote backend has no URL.".into());
+    }
+    if api_key.map(str::trim).is_some_and(|k| !k.is_empty()) && !key_allowed(base) {
+        return Err("An API key is only sent over https, or to this computer or your local network.".into());
     }
     let url = format!("{base}/models");
     let client = reqwest::Client::builder()
@@ -176,6 +210,24 @@ fn extract_model_ids(value: &Value) -> Result<Vec<String>, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_key_never_goes_to_the_internet_in_clear_text() {
+        for ok in [
+            "https://api.openai.com/v1", "https://openrouter.ai/api/v1", "http://localhost:11434/v1", "http://127.0.0.1:8080/v1",
+            "http://192.168.1.20:1234/v1", "http://10.0.0.5/v1", "http://172.16.4.1/v1", "http://172.31.255.1/v1", "http://[::1]:8080/v1",
+            "http://studio.local:11434/v1", "http://169.254.1.1/v1",
+        ] {
+            assert!(key_allowed(ok), "{ok}");
+        }
+        for bad in [
+            "http://api.openai.com/v1", "http://8.8.8.8/v1", "http://172.32.0.1/v1", "http://172.15.0.1/v1", "http://192.169.1.1/v1",
+            "http://localhost@evil.example/v1", "http://example.com:80/v1", "ftp://x", "file:///etc/passwd", "", "api.openai.com",
+            "http://10.0.0.5.evil.example/v1", "http://127.0.0.1.evil.example/v1",
+        ] {
+            assert!(!key_allowed(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn extracts_content() {

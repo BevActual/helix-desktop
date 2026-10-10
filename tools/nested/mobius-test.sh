@@ -6,7 +6,7 @@ SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log;
 source "$ROOT/tools/nested/ui-lib.sh"
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 shot() { niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/$1.png"; }
-CHATS=$SCRATCH/data/helix/chats
+CHATS=$SCRATCH/data/helix/mobius/chats
 for _ in $(seq 1 80); do [ -f "$SCRATCH/state/layout.json" ] && has_id input && break; sleep 0.25; done; sleep 1
 loc=$(python3 - <<'PY'
 import json, subprocess
@@ -24,8 +24,8 @@ click_id input; wtype "How does cron work?"; wtype -k Return
 for _ in $(seq 1 120); do has_id msg-1 && has_id copy-1 && break; sleep 0.25; done
 has_id msg-0 && has_id msg-1 && echo "ok: the question and the reply are on screen" || fail "no messages"
 sleep 1.5; shot chat-reply
-for _ in $(seq 1 80); do grep -q "CHAT turn ended" "$LOG" && break; sleep 0.25; done
-grep -q "CHAT turn ended Finished" "$LOG" && echo "ok: the turn finished" || fail "the turn did not finish: $(tail -3 "$LOG")"
+for _ in $(seq 1 80); do grep -q "MOBIUS turn ended" "$LOG" && break; sleep 0.25; done
+grep -q "MOBIUS turn ended Finished" "$LOG" && echo "ok: the turn finished" || fail "the turn did not finish: $(tail -3 "$LOG")"
 F=$(ls "$CHATS"/*.json 2>/dev/null | head -1)
 [ -n "$F" ] && grep -q "scheduler" "$F" && [ "$(stat -c %a "$F")" = 600 ] && echo "ok: saved, owner only" || fail "not saved: $F"
 has_id chat-0 && echo "ok: the chat is in the list" || fail "not listed"
@@ -39,10 +39,10 @@ echo "--- 3. stop a reply"
 click_id new-chat; sleep 0.8
 HELIX=1
 click_id input; wtype "Tell me a long story"; wtype -k Return
-for _ in $(seq 1 40); do has_id stop && break; sleep 0.1; done
+for _ in $(seq 1 6); do has_id stop && break; done
 if has_id stop; then click_id stop; echo "ok: stop pressed"; else fail "no stop button"; shot chat-nostop; tail -4 "$LOG" | cut -c1-140; fi
 sleep 1.5
-grep -c "CHAT turn ended" "$LOG" | sed 's/^/turns ended so far: /'
+grep -c "MOBIUS turn ended" "$LOG" | sed 's/^/turns ended so far: /'
 echo "--- 4. delete"
 N=$(ls "$CHATS"/*.json 2>/dev/null | wc -l)
 pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" chat-0 0.5) && "$PT" $pos; sleep 0.6
