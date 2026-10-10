@@ -25,51 +25,13 @@ const WINDOW: &str = "settings";
 /// The service settings the Appearance page shows, in order. A change to any other id is refused before it is sent.
 const APPEARANCE: &[&str] = &["theme.mode", "theme.pure_black_dark"];
 
-const DISPLAYS: &[&str] = &[
-    "nightlight.enabled",
-    "nightlight.force",
-    "nightlight.temperature_day",
-    "nightlight.temperature_night",
-    "brightness.sync_all_monitors",
-    "brightness.enable_ddcutil",
-    "brightness.minimum_brightness",
-];
-const ACCESSIBILITY: &[&str] = &["accessibility.ui_scale", "accessibility.high_contrast"];
-const SOUND: &[&str] = &["audio.enable_sounds", "audio.sound_volume", "audio.enable_overdrive"];
-const NOTIFICATIONS: &[&str] = &[
-    "notification.enable_daemon",
-    "notification.show_app_name",
-    "notification.show_actions",
-    "notification.max_visible",
-    "notification.collapse_on_dismiss",
-    "notification.border",
-    "notification.background_opacity",
-    "notification.scale",
-    "notification.offset_x",
-    "notification.offset_y",
-    "notification.keep_dismissed_in_history",
-    "notification.history_retention_hours",
-];
-const POWER: &[&str] = &[
-    "lockscreen.enabled",
-    "lockscreen.lock_before_suspend",
-    "lockscreen.lid_close_keep_external_displays",
-    "lockscreen.allow_empty_password",
-    "lockscreen.blurred_desktop",
-    "lockscreen.blur_intensity",
-    "lockscreen.tint_intensity",
-    "idle.pre_action_fade_seconds",
-    "battery.warning_threshold",
-];
+/// Only what something on this desktop acts on (the service applies high contrast to GTK applications).
+const ACCESSIBILITY: &[&str] = &["accessibility.high_contrast"];
 
 /// Every page that is only rows of service settings: its name (the page's id in the window) and the ids it shows.
-const ROW_PAGES: [(&str, &[&str]); 6] = [
+const ROW_PAGES: [(&str, &[&str]); 2] = [
     ("appearance", APPEARANCE),
     ("accessibility", ACCESSIBILITY),
-    ("displays", DISPLAYS),
-    ("sound", SOUND),
-    ("notifications", NOTIFICATIONS),
-    ("power", POWER),
 ];
 
 fn page_ids(page: &str) -> Option<&'static [&'static str]> {
@@ -834,6 +796,94 @@ fn dock_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, St
     Ok(next.rows())
 }
 
+fn idle_prefs_file() -> Option<std::path::PathBuf> {
+    dock_prefs_file().map(|p| p.with_file_name("idle.toml"))
+}
+
+fn read_idle_prefs() -> (helix_shell_core::idle_prefs::IdlePrefs, String) {
+    let text = idle_prefs_file().and_then(|path| std::fs::read_to_string(path).ok()).unwrap_or_default();
+    (helix_shell_core::idle_prefs::IdlePrefs::parse(&text), text)
+}
+
+/// The Power & lock page: when the session locks and the screen goes off (`idle.toml`, read by helix-idle).
+#[tauri::command]
+fn power_rows() -> Vec<RowView> {
+    read_idle_prefs().0.rows()
+}
+
+#[tauri::command]
+fn power_change(id: String, change: serde_json::Value) -> Result<Vec<RowView>, String> {
+    use std::io::Write;
+    use std::os::unix::fs::OpenOptionsExt;
+    let change = match (change.get("kind").and_then(|k| k.as_str()), change.get("value")) {
+        (Some("switch"), Some(v)) => Change::Switch(v.as_bool().ok_or("not a boolean")?),
+        (Some("number"), Some(v)) => Change::Number(v.as_f64().ok_or("not a number")?),
+        _ => return Err("unknown change".into()),
+    };
+    let (current, text) = read_idle_prefs();
+    let next = current.apply(&id, &change).map_err(|error| format!("{error:?}"))?;
+    let path = idle_prefs_file().ok_or("no folder for the settings")?;
+    std::fs::create_dir_all(path.parent().ok_or("no folder")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("tmp");
+    {
+        let mut file = std::fs::OpenOptions::new().write(true).create(true).truncate(true).mode(0o600).open(&temporary).map_err(|e| e.to_string())?;
+        file.write_all(next.write_into(&text).as_bytes()).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, &path).map_err(|e| e.to_string())?;
+    // helix-idle reads the file when it starts, so it is started again (a fixed command; nothing typed reaches it).
+    let _ = std::process::Command::new("systemctl").args(["--user", "restart", "helix-idle.service"]).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status();
+    eprintln!("SETTINGS power {id} changed");
+    Ok(next.rows())
+}
+
+/// The Displays page: what is connected, as the compositor reports it (read only).
+#[tauri::command]
+fn displays_rows() -> Vec<RowView> {
+    use std::io::{BufRead, BufReader, Write};
+    use std::os::unix::net::UnixStream;
+    let Some(path) = std::env::var_os("NIRI_SOCKET") else { return Vec::new() };
+    let Ok(mut stream) = UnixStream::connect(path) else { return Vec::new() };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(1)));
+    if stream.write_all(b"\"Outputs\"\n").is_err() {
+        return Vec::new();
+    }
+    let mut line = String::new();
+    if BufReader::new(stream).read_line(&mut line).is_err() {
+        return Vec::new();
+    }
+    let Ok(reply) = serde_json::from_str::<serde_json::Value>(&line) else { return Vec::new() };
+    let Some(outputs) = reply.pointer("/Ok/Outputs").and_then(|o| o.as_object()) else { return Vec::new() };
+    let mut rows: Vec<RowView> = outputs
+        .iter()
+        .map(|(name, output)| {
+            let text = |key: &str| output.get(key).and_then(|v| v.as_str()).unwrap_or("");
+            let make = format!("{} {}", text("make"), text("model")).trim().to_string();
+            let mode = output
+                .get("current_mode")
+                .and_then(|i| i.as_u64())
+                .and_then(|i| output.pointer(&format!("/modes/{i}")))
+                .map(|m| {
+                    let w = m.get("width").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let h = m.get("height").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let hz = m.get("refresh_rate").and_then(|v| v.as_u64()).unwrap_or(0) as f64 / 1000.0;
+                    format!("{w} × {h} at {hz:.0} Hz")
+                })
+                .unwrap_or_default();
+            let scale = output.pointer("/logical/scale").and_then(|v| v.as_f64()).map(|s| format!(", scale {s}")).unwrap_or_default();
+            RowView {
+                id: name.chars().take(40).collect(),
+                title: helix_shell_core::sanitize_for_display(name, 40),
+                group: "Connected".into(),
+                description: helix_shell_core::sanitize_for_display(&make, 80),
+                overridden: false,
+                control: helix_shell_core::catalog::Control::Text { value: helix_shell_core::sanitize_for_display(&format!("{mode}{scale}"), 80) },
+            }
+        })
+        .collect();
+    rows.sort_by(|a, b| a.id.cmp(&b.id));
+    rows
+}
+
 /// A change to one row. The page names the row and what it wants; the catalog model decides whether that is a legal write.
 #[tauri::command]
 async fn setting_change(
@@ -918,6 +968,9 @@ fn main() {
             wallpaper_choose_image,
             wallpaper_choose_swatch,
             dock_rows,
+            power_rows,
+            power_change,
+            displays_rows,
             dock_change,
             wallhaven::wallhaven_search,
             wallhaven::wallhaven_thumb,

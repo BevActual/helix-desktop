@@ -19,6 +19,7 @@ pub mod dock;
 pub mod dock_prefs;
 pub mod glass;
 pub mod identity;
+pub mod idle_prefs;
 pub mod grants;
 pub mod island;
 pub mod launcher;

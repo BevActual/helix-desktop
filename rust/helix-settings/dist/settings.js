@@ -22,14 +22,12 @@ const PAGES = [
   { name: "appearance", title: "Appearance", icon: "palette", rows: true },
   { name: "wallpaper", title: "Wallpaper", icon: "image", rows: false },
   { name: "accessibility", title: "Accessibility", icon: "eye", rows: true },
-  { name: "displays", title: "Displays", icon: "sun", rows: true },
+  { name: "displays", title: "Displays", icon: "sun", rows: false },
   { name: "network", title: "Network", icon: "wifi", rows: false },
   { name: "bluetooth", title: "Bluetooth", icon: "bluetooth", rows: false },
   { name: "keyboard", title: "Keyboard", icon: "keyboard", rows: false },
-  { name: "sound", title: "Sound", icon: "volume", rows: true },
   { name: "dock", title: "Dock", icon: "grid", rows: false },
-  { name: "notifications", title: "Notifications", icon: "bell", rows: true },
-  { name: "power", title: "Power & lock", icon: "lock", rows: true },
+  { name: "power", title: "Power & lock", icon: "lock", rows: false },
   { name: "agents", title: "Privacy & agents", icon: "shield", rows: false },
   { name: "about", title: "About", icon: "sparkle", rows: false },
 ];
@@ -46,7 +44,7 @@ function buildPages() {
     link.append(icon(page.icon), el("span", "", page.title));
     link.onclick = () => showPage(page.name);
     nav.append(link);
-    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock") {
+    if (page.name === "network" || page.name === "bluetooth" || page.name === "about" || page.name === "keyboard" || page.name === "wallpaper" || page.name === "dock" || page.name === "power" || page.name === "displays") {
       const section = el("section", "settings-page");
       section.id = "page-" + page.name;
       section.hidden = true;
@@ -85,6 +83,8 @@ function showPage(name) {
   if (name === "keyboard") drawKeyboard();
   if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
   if (name === "dock") invoke("dock_rows").then(drawDock);
+  if (name === "power") invoke("power_rows").then(drawPower);
+  if (name === "displays") invoke("displays_rows").then(drawDisplays);
   queueReport();
 }
 buildPages();
@@ -271,7 +271,7 @@ function rowLine(page, row) {
   if (row.description) text.append(el("div", "setting-about", row.description));
   line.append(text);
   const control = row.control;
-  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
+  const send = (change) => (page === "dock" ? invoke("dock_change", { id: row.id, change }).then(drawDock) : page === "power" ? invoke("power_change", { id: row.id, change }).then(drawPower) : invoke("setting_change", { page, id: row.id, change })).catch((error) => { console.error(error); invoke("ui_error", { text: row.id + ": " + String(error) }); });
   if (control.kind === "switch") {
     const box = el("input");
     box.type = "checkbox";
@@ -319,6 +319,8 @@ function rowLine(page, row) {
     });
     wrap.append(range, readout);
     line.append(wrap);
+  } else if (control.kind === "text") {
+    line.append(el("div", "setting-value", control.value));
   } else if (control.kind === "choice") {
     const segments = el("div", "segments");
     control.options.forEach((option) => {
@@ -354,6 +356,22 @@ function drawDock(rows) {
   if (searching()) drawSearch();
   queueReport();
 }
+function drawPower(rows) {
+  pageRows.power = rows;
+  const host = $("power-host");
+  host.replaceChildren();
+  drawGroups(host, "power", rows);
+  if (searching()) drawSearch();
+  queueReport();
+}
+function drawDisplays(rows) {
+  const host = $("displays-host");
+  host.replaceChildren();
+  drawGroups(host, "displays", rows);
+  if (!rows.length) host.append(el("div", "empty", "No displays reported."));
+  host.append(el("div", "setting-about note", "Resolution, scale and arrangement are set in the compositor's configuration."));
+  queueReport();
+}
 function drawRows(view) {
   pageRows[view.page] = view.rows;
   const host = $(view.page + "-rows");
@@ -364,6 +382,7 @@ function drawRows(view) {
   queueReport();
 }
 invoke("dock_rows").then((rows) => { pageRows.dock = rows; });
+invoke("power_rows").then((rows) => { pageRows.power = rows; });
 listen("rows-view", (event) => drawRows(event.payload)).then(() => invoke("rows_view").then((pages) => pages.forEach(drawRows)));
 
 // Search: matching rows from every page, under the page they belong to ------------------------------------------------------------

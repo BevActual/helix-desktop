@@ -468,3 +468,4 @@ body.settings #content::-webkit-scrollbar { height: 0; }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
 body.no-dots .dock-item.running::after, body.no-dots .dock-item.focused::after { display: none; }
+.setting-value { color: var(--label-2); font-size: 13px; text-align: right; max-width: 55%; }
