@@ -32,13 +32,29 @@ struct Control {
     app: AppHandle,
 }
 
-pub(crate) fn current_panel(app: &AppHandle) -> Option<String> {
+/// Local surface panel id (panels / monolith). On the bar this is always empty — use [`current_panel`].
+pub(crate) fn local_panel(app: &AppHandle) -> Option<String> {
     shell_state(app)
         .lock()
         .expect("shell state")
         .surface
         .open_panel_id()
         .map(str::to_string)
+}
+
+/// Open panel id as seen by Shell1 / agent status. Bar queries panels over IPC.
+pub(crate) async fn current_panel(app: &AppHandle) -> Option<String> {
+    if crate::role::ShellRole::from_env().forwards_panels() {
+        match crate::panels_bridge::open_status().await {
+            Ok(panel) => panel,
+            Err(error) => {
+                eprintln!("PANELS status: {error}");
+                None
+            }
+        }
+    } else {
+        local_panel(app)
+    }
 }
 
 /// Runs `work` on the main thread, where GTK must be touched.
@@ -68,7 +84,7 @@ impl Control {
 
     async fn toggle_panel(&self, id: String) -> zbus::fdo::Result<()> {
         known(&id)?;
-        let is_open = current_panel(&self.app).as_deref() == Some(id.as_str());
+        let is_open = current_panel(&self.app).await.as_deref() == Some(id.as_str());
         on_main(&self.app, move |app| {
             if is_open {
                 close_panel(app);
@@ -125,17 +141,17 @@ impl Control {
         }
         let request = trimmed.to_string();
         let app = self.app.clone();
-        // Bar role forwards Act to the panels process; monolith/panels run locally.
+        // Bar role forwards Act to the panels process; never open Overlay in-process on the bar.
         tauri::async_runtime::spawn(async move {
             if crate::role::ShellRole::from_env().forwards_panels() {
                 match crate::panels_bridge::assistant_submit(&request).await {
-                    Ok(true) => return,
-                    Ok(false) => eprintln!("PANELS assistant_submit missed — local fallback"),
-                    Err(error) => {
-                        eprintln!("PANELS assistant_submit: {error}");
-                        return;
-                    }
+                    Ok(true) => {}
+                    Ok(false) => eprintln!(
+                        "PANELS assistant_submit missed (no in-process Overlay on bar)"
+                    ),
+                    Err(error) => eprintln!("PANELS assistant_submit: {error}"),
                 }
+                return;
             }
             let _ = on_main(&app, move |app| {
                 open_panel(app, "assistant");
@@ -146,7 +162,7 @@ impl Control {
     }
 
     async fn get_status(&self) -> std::collections::HashMap<String, OwnedValue> {
-        let panel = current_panel(&self.app).unwrap_or_default();
+        let panel = current_panel(&self.app).await.unwrap_or_default();
         let mut status = std::collections::HashMap::new();
         if let Ok(value) = OwnedValue::try_from(Value::from(panel)) {
             status.insert("panel".to_string(), value);

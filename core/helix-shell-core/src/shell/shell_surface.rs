@@ -25,6 +25,8 @@ pub const PANELS: &[&str] = &[
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputRegion {
+    /// No hits. Used by the panels process when idle so Overlay does not steal the bar strip.
+    None,
     /// Only the bar. Clicks anywhere else go to the window underneath.
     BarOnly,
     /// The whole surface, so a click outside the panel lands on the scrim and dismisses it.

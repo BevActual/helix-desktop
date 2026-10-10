@@ -26,18 +26,29 @@ fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width:
     let Some(gdk_window) = window.window() else {
         return;
     };
-    let rect = match region {
-        InputRegion::BarOnly => (0, 0, width.max(1), BAR_HEIGHT),
-        InputRegion::Whole => (0, 0, width.max(1), height.max(1)),
-    };
     let shape = gtk::cairo::Region::create();
-    let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(
-        rect.0, rect.1, rect.2, rect.3,
-    ));
-    // The extras only matter while the pointer is otherwise limited to the bar; a panel's region already covers everything.
-    if region == InputRegion::BarOnly {
-        for (x, y, w, h) in EXTRA.lock().expect("extra input").iter() {
-            let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(*x, *y, *w, *h));
+    match region {
+        InputRegion::None => {
+            // Empty shape: clicks pass through (idle panels Overlay must not steal the bar strip).
+        }
+        InputRegion::BarOnly => {
+            let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(
+                0,
+                0,
+                width.max(1),
+                BAR_HEIGHT,
+            ));
+            for (x, y, w, h) in EXTRA.lock().expect("extra input").iter() {
+                let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(*x, *y, *w, *h));
+            }
+        }
+        InputRegion::Whole => {
+            let _ = shape.union_rectangle(&gtk::cairo::RectangleInt::new(
+                0,
+                0,
+                width.max(1),
+                height.max(1),
+            ));
         }
     }
     gdk_window.input_shape_combine_region(&shape, 0, 0);

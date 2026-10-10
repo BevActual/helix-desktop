@@ -219,7 +219,7 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
     }
     emit(&app);
 
-    let (Ok(mut deltas), Ok(mut done)) = (
+    let (Ok(deltas), Ok(done)) = (
         proxy.receive_signal("Delta").await,
         proxy.receive_signal("Completed").await,
     ) else {
@@ -227,9 +227,17 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
         return Ok(());
     };
 
-    loop {
-        tokio::select! {
-            Some(message) = deltas.next() => {
+    enum TalkEv {
+        Delta(zbus::Message),
+        Done(zbus::Message),
+    }
+    let mut events = futures_util::stream::select(
+        deltas.map(TalkEv::Delta),
+        done.map(TalkEv::Done),
+    );
+    while let Some(event) = events.next().await {
+        match event {
+            TalkEv::Delta(message) => {
                 if let Ok((op, chunk)) = message.body().deserialize::<(u64, String)>() {
                     if op != operation {
                         continue;
@@ -254,7 +262,7 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
                     emit(&app);
                 }
             }
-            Some(message) = done.next() => {
+            TalkEv::Done(message) => {
                 if let Ok((op, ok, result)) = message.body().deserialize::<(u64, bool, String)>() {
                     if op != operation {
                         continue;
@@ -263,12 +271,10 @@ pub async fn submit(app: AppHandle, text: String) -> Result<(), String> {
                     return Ok(());
                 }
             }
-            else => {
-                fail(&app, generation, "The reply ended unexpectedly.");
-                return Ok(());
-            }
         }
     }
+    fail(&app, generation, "The reply ended unexpectedly.");
+    Ok(())
 }
 
 fn fail(app: &AppHandle, generation: u64, reason: &str) {

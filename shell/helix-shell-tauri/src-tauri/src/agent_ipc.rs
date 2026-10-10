@@ -112,7 +112,7 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             ok()
         }
         Command::PanelToggle(id) => {
-            let is_open = current_panel(app).as_deref() == Some(id.as_str());
+            let is_open = current_panel(app).await.as_deref() == Some(id.as_str());
             on_main(app, move |app| {
                 if is_open {
                     close_panel(app)
@@ -124,13 +124,14 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             ok()
         }
         Command::Status => {
+            let panel = current_panel(app).await;
             let state = shell_state(app);
             let shell = state.lock().expect("shell state");
             let now = crate::notify::now_ms_of(&shell);
             let audio = shell.audio.view();
             let quick = shell.quick.view();
             let input = StatusInput {
-                panel: shell.surface.open_panel_id().map(str::to_string),
+                panel,
                 dark: quick.dark,
                 night_light: quick.night_light,
                 do_not_disturb: shell.notifications.view(now).dnd,
@@ -169,7 +170,7 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             ok()
         }
         Command::PanelClose(which) => {
-            let open = current_panel(app);
+            let open = current_panel(app).await;
             // Closing a named panel that is not the open one does nothing, like the native shell.
             if which.is_none() || which == open {
                 on_main(app, close_panel).map_err(|e| e.to_string())?;

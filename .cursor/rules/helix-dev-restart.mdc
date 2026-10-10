@@ -21,9 +21,10 @@ That keeps the bar Top-layer exclusive zone up and avoids crashing Cursor.
 Only bounce the **bar** (or full pair) when the change cannot apply without it:
 
 ```sh
-./tools/switch-shell.sh restart
+./tools/switch-shell.sh restart-bar   # bar only; panels revive via Wants/Upholds
+./tools/switch-shell.sh restart       # bar + panels
 ```
 
-Do **not** restart the bar as a routine step while Cursor is open: tearing down the bar layer-shell surface has crashed Cursor. Prefer `restart-panels`, or run a full `restart` from a plain terminal outside Cursor.
+Do **not** restart the bar as a routine step while Cursor is open: tearing down the bar layer-shell surface has crashed Cursor. Prefer `restart-panels`, or run `restart-bar` / `restart` from a plain terminal outside Cursor.
 
 The C++ `helix-shell-dev.service` unit is retired; do not restart it.

@@ -1,6 +1,7 @@
 //! Client (bar → panels) and server (panels process) for [`helix_shell_core::panels_ipc`].
 
 use std::path::PathBuf;
+use std::process::Stdio;
 use std::time::Duration;
 
 use helix_shell_core::panels_ipc::{
@@ -10,8 +11,14 @@ use helix_shell_core::panels_ipc::{
 use tauri::AppHandle;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::time::timeout;
 
 use crate::role::ShellRole;
+
+/// Hard cap on one client round-trip so a hung panels process cannot block D-Bus / keybinds.
+const CALL_TIMEOUT: Duration = Duration::from_secs(2);
+const ENSURE_POLL: Duration = Duration::from_millis(50);
+const ENSURE_ATTEMPTS: u32 = 40;
 
 fn runtime_dir() -> Option<PathBuf> {
     std::env::var_os("HELIX_PANELS_IPC_DIR")
@@ -52,8 +59,7 @@ async fn read_line(stream: &mut UnixStream) -> Result<String, String> {
     Ok(line)
 }
 
-/// One request/reply round-trip. `Ok(None)` when the socket is missing (panels not running).
-pub async fn call(req: PanelsRequest) -> Result<Option<PanelsReply>, String> {
+async fn call_once(req: PanelsRequest) -> Result<Option<PanelsReply>, String> {
     let Some(path) = socket_path() else {
         return Ok(None);
     };
@@ -71,56 +77,114 @@ pub async fn call(req: PanelsRequest) -> Result<Option<PanelsReply>, String> {
     Ok(Some(reply))
 }
 
+/// One request/reply round-trip with a deadline. `Ok(None)` when the socket is missing or dead.
+pub async fn call(req: PanelsRequest) -> Result<Option<PanelsReply>, String> {
+    match timeout(CALL_TIMEOUT, call_once(req)).await {
+        Ok(result) => result,
+        Err(_) => Err("panels ipc timed out".into()),
+    }
+}
+
 pub async fn ping() -> bool {
     matches!(call(PanelsRequest::Ping).await, Ok(Some(PanelsReply::Pong)))
 }
 
-/// Best-effort: start the panels unit/binary if the socket is down.
-pub fn ensure_panels_started() {
-    if socket_path().is_some_and(|p| p.exists()) {
-        return;
-    }
-    // Prefer user unit when installed.
-    let _ = std::process::Command::new("systemctl")
-        .args(["--user", "start", "helix-shell-panels.service"])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
-    // Fallback: same binary with panels role (dev / before units exist).
-    if let Ok(exe) = std::env::current_exe() {
-        let mut cmd = std::process::Command::new(exe);
-        cmd.env("HELIX_SHELL_ROLE", "panels")
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-        // Confirmer stays on panels when split.
-        if std::env::var_os("HELIX_SHELL_CONFIRMER").is_some() {
-            cmd.env("HELIX_SHELL_CONFIRMER", "1");
-        }
-        let _ = cmd.spawn();
+/// Which panel is open on the panels process (`None` if closed or unreachable).
+pub async fn open_status() -> Result<Option<String>, String> {
+    match call(PanelsRequest::Status).await? {
+        Some(PanelsReply::Status { panel }) => Ok(panel),
+        Some(PanelsReply::Err { message }) => Err(message),
+        Some(_) => Ok(None),
+        None => Ok(None),
     }
 }
 
-pub async fn open_panel(id: &str, mode: Option<&str>) -> Result<bool, String> {
-    ensure_panels_started();
-    // Brief wait for the socket after spawn.
-    for _ in 0..40 {
-        if ping().await {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    let req = PanelsRequest::Open {
-        id: id.to_string(),
-        mode: mode.map(str::to_string),
+fn panels_unit_installed() -> bool {
+    std::process::Command::new("systemctl")
+        .args(["--user", "cat", "helix-shell-panels.service"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn unlink_stale_socket() {
+    let Some(path) = socket_path() else {
+        return;
     };
+    if path.exists() {
+        let _ = std::fs::remove_file(&path);
+        eprintln!("PANELS ipc: removed stale socket {}", path.display());
+    }
+}
+
+fn start_panels_via_systemd() -> bool {
+    std::process::Command::new("systemctl")
+        .args(["--user", "start", "helix-shell-panels.service"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+fn start_panels_via_exe() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let mut cmd = std::process::Command::new(exe);
+    cmd.env("HELIX_SHELL_ROLE", "panels")
+        .env("HELIX_SHELL_CONFIRMER", "1")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    match cmd.spawn() {
+        Ok(_) => eprintln!("PANELS ipc: spawned panels role (no systemd unit)"),
+        Err(error) => eprintln!("PANELS ipc: spawn failed: {error}"),
+    }
+}
+
+/// Best-effort: revive panels if Ping fails. Prefer systemd; never double-spawn when the unit exists.
+pub async fn ensure_panels_started() {
+    if ping().await {
+        return;
+    }
+    unlink_stale_socket();
+    if panels_unit_installed() {
+        if !start_panels_via_systemd() {
+            eprintln!("PANELS ipc: systemctl start helix-shell-panels failed");
+        }
+    } else {
+        start_panels_via_exe();
+    }
+    for _ in 0..ENSURE_ATTEMPTS {
+        if ping().await {
+            return;
+        }
+        tokio::time::sleep(ENSURE_POLL).await;
+    }
+    eprintln!("PANELS ipc: panels did not answer Ping after ensure");
+}
+
+async fn wait_ready_then(req: PanelsRequest) -> Result<bool, String> {
+    ensure_panels_started().await;
     match call(req).await? {
         Some(PanelsReply::Ok) | Some(PanelsReply::Status { .. }) => Ok(true),
         Some(PanelsReply::Err { message }) => Err(message),
         Some(_) => Ok(true),
         None => Ok(false),
     }
+}
+
+pub async fn open_panel(id: &str, mode: Option<&str>) -> Result<bool, String> {
+    wait_ready_then(PanelsRequest::Open {
+        id: id.to_string(),
+        mode: mode.map(str::to_string),
+    })
+    .await
 }
 
 pub async fn close_panel() -> Result<bool, String> {
@@ -130,23 +194,25 @@ pub async fn close_panel() -> Result<bool, String> {
     }
 }
 
-pub async fn assistant_submit(request: &str) -> Result<bool, String> {
-    ensure_panels_started();
-    for _ in 0..40 {
-        if ping().await {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
-    let req = PanelsRequest::AssistantSubmit {
-        request: request.to_string(),
-    };
-    match call(req).await? {
-        Some(PanelsReply::Ok) => Ok(true),
-        Some(PanelsReply::Err { message }) => Err(message),
+pub async fn escape() -> Result<bool, String> {
+    match call(PanelsRequest::Escape).await? {
         Some(_) => Ok(true),
         None => Ok(false),
     }
+}
+
+pub async fn outside() -> Result<bool, String> {
+    match call(PanelsRequest::Outside).await? {
+        Some(_) => Ok(true),
+        None => Ok(false),
+    }
+}
+
+pub async fn assistant_submit(request: &str) -> Result<bool, String> {
+    wait_ready_then(PanelsRequest::AssistantSubmit {
+        request: request.to_string(),
+    })
+    .await
 }
 
 /// Panels process: accept connections and dispatch via `on_request`.
@@ -190,6 +256,7 @@ where
             tauri::async_runtime::spawn(async move {
                 let reply = match read_line(&mut stream).await {
                     Ok(line) => match decode_request(&line) {
+                        // Caller (`main`) hops to the GTK main thread; do not nest another hop here.
                         Ok(req) => handler.lock().expect("panels handler")(&app, req),
                         Err(error) => PanelsReply::Err {
                             message: error.to_string(),

@@ -15,6 +15,8 @@ pub const MAX_LINE: usize = 8 * 1024;
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum PanelsRequest {
     Ping,
+    /// Ask which panel is open (bar uses this for Toggle / GetStatus).
+    Status,
     Open {
         id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -145,6 +147,7 @@ fn validate_request(req: &PanelsRequest) -> Result<(), PanelsIpcError> {
             Ok(())
         }
         PanelsRequest::Ping
+        | PanelsRequest::Status
         | PanelsRequest::Close
         | PanelsRequest::Escape
         | PanelsRequest::Outside => Ok(()),
@@ -191,5 +194,12 @@ mod tests {
         };
         let line = encode_reply(&reply).unwrap();
         assert_eq!(decode_reply(&line).unwrap(), reply);
+    }
+
+    #[test]
+    fn status_request_round_trips() {
+        let req = PanelsRequest::Status;
+        let line = encode_request(&req).unwrap();
+        assert_eq!(decode_request(&line).unwrap(), req);
     }
 }

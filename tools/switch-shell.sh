@@ -3,6 +3,7 @@
 #   tools/switch-shell.sh                same as install (no shell restart)
 #   tools/switch-shell.sh install        write units + links + enable at login; does NOT restart live shells
 #   tools/switch-shell.sh restart-panels bounce Overlay panels only (safe while Cursor is open)
+#   tools/switch-shell.sh restart-bar    bounce Top bar only (panels revive via Wants/Upholds; can disrupt Cursor)
 #   tools/switch-shell.sh restart        bounce bar+panels (or legacy monolith). Avoid while Cursor is open.
 #   tools/switch-shell.sh status
 # Key binds call ~/.local/bin/helix-panel → Shell1 on the bar.
@@ -132,7 +133,8 @@ case "${1:-install}" in
     if shell_live; then
       echo "Links and units updated. Shell already running — not restarted (avoids crashing Cursor)."
       echo "UI / panels bounce: $0 restart-panels"
-      echo "Full bar bounce (can disrupt Cursor): $0 restart"
+      echo "Bar-only bounce (can disrupt Cursor): $0 restart-bar"
+      echo "Full pair bounce (can disrupt Cursor): $0 restart"
     else
       systemctl --user start helix-shell-bar.service helix-shell-panels.service
       if [ -f "$UNITS/helix-idle.service" ]; then
@@ -149,6 +151,15 @@ case "${1:-install}" in
     echo "Restarting helix-shell-panels only (bar exclusive zone stays up)…"
     systemctl --user restart helix-shell-panels.service
     echo "Panels restarted."
+    ;;
+  restart-bar)
+    write_units_and_links
+    echo "Restarting helix-shell-bar (can disrupt Cursor)…"
+    systemctl --user stop helix-shell-tauri.service 2>/dev/null || true
+    systemctl --user restart helix-shell-bar.service
+    # BindsTo stops panels with the bar; Wants/Upholds should revive them — start explicitly anyway.
+    systemctl --user start helix-shell-panels.service
+    echo "Bar restarted; panels ensured."
     ;;
   restart)
     write_units_and_links
@@ -176,9 +187,10 @@ case "${1:-install}" in
     fi
     ;;
   *)
-    echo "usage: $0 [install|restart-panels|restart|status]" >&2
+    echo "usage: $0 [install|restart-panels|restart-bar|restart|status]" >&2
     echo "  install         update links/units; start shell only if not already running" >&2
     echo "  restart-panels  bounce Overlay panels only (safe with Cursor open)" >&2
+    echo "  restart-bar     bounce Top bar; ensures panels (can disrupt Cursor)" >&2
     echo "  restart         bounce bar+panels (can disrupt Cursor — prefer a terminal outside Cursor)" >&2
     exit 2
     ;;

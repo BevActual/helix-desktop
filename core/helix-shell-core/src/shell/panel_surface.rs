@@ -4,11 +4,11 @@ use crate::surfaces::{KeyboardMode, Layer};
 
 use super::shell_surface::{Escape, InputRegion, Plan, SurfaceError, PANELS};
 
-/// Hidden / no panel: panels process may unmap or keep a zero-input Overlay.
+/// Hidden / no panel: Overlay stays mapped but takes no pointer input (must not cover the bar strip).
 pub const PANEL_CLOSED: Plan = Plan {
     layer: Layer::Overlay,
     keyboard: KeyboardMode::None,
-    input: InputRegion::BarOnly, // no real bar — means "no hits"; host maps to empty input region
+    input: InputRegion::None,
 };
 
 pub const PANEL_OPEN: Plan = Plan {
@@ -76,6 +76,7 @@ mod tests {
         let surface = PanelSurface::new();
         assert_eq!(surface.plan().layer, Layer::Overlay);
         assert_eq!(surface.plan().keyboard, KeyboardMode::None);
+        assert_eq!(surface.plan().input, InputRegion::None);
         assert_eq!(surface.open_panel_id(), None);
     }
 

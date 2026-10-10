@@ -257,14 +257,10 @@ fn reset_assistant(shell: &mut ShellState) {
 fn open_mobius_panel(app: &AppHandle, mode: MobiusMode) {
     if ShellRole::from_env().forwards_panels() {
         let mode_str = mode.as_str().to_string();
-        let app = app.clone();
         tauri::async_runtime::spawn(async move {
             match panels_bridge::open_panel("assistant", Some(&mode_str)).await {
                 Ok(true) => {}
-                Ok(false) => {
-                    eprintln!("PANELS forward missed — falling back in-process");
-                    open_mobius_panel_local(&app, mode);
-                }
+                Ok(false) => eprintln!("PANELS forward missed for mobius/{mode_str} (no in-process Overlay on bar)"),
                 Err(error) => eprintln!("PANELS forward: {error}"),
             }
         });
@@ -315,10 +311,19 @@ fn open_mobius_panel_local(app: &AppHandle, mode: MobiusMode) {
 }
 
 /// Bar process never promotes its surface to Overlay.
+/// Panels process keeps Overlay even when closed (`PANEL_CLOSED` / no input) — never Top/BarOnly from legacy ShellSurface.
 fn apply_panel_plan(app: &AppHandle, plan: helix_shell_core::Plan) {
     match ShellRole::from_env() {
         ShellRole::Bar => layer::apply(app, BAR_PLAN),
-        ShellRole::Panels | ShellRole::Monolith => layer::apply(app, plan),
+        ShellRole::Panels => {
+            let plan = if plan.input == helix_shell_core::shell_surface::InputRegion::Whole {
+                plan
+            } else {
+                PANEL_CLOSED
+            };
+            layer::apply(app, plan);
+        }
+        ShellRole::Monolith => layer::apply(app, plan),
     }
 }
 
@@ -334,14 +339,10 @@ fn open_panel(app: &AppHandle, id: &str) {
     }
     if ShellRole::from_env().forwards_panels() {
         let id = id.to_string();
-        let app = app.clone();
         tauri::async_runtime::spawn(async move {
             match panels_bridge::open_panel(&id, None).await {
                 Ok(true) => {}
-                Ok(false) => {
-                    eprintln!("PANELS forward missed — falling back in-process for {id}");
-                    open_panel_local(&app, &id);
-                }
+                Ok(false) => eprintln!("PANELS forward missed for {id} (no in-process Overlay on bar)"),
                 Err(error) => eprintln!("PANELS forward: {error}"),
             }
         });
@@ -418,6 +419,15 @@ fn close_panel(app: &AppHandle) {
 fn handle_panels_ipc(app: &AppHandle, req: PanelsRequest) -> PanelsReply {
     match req {
         PanelsRequest::Ping => PanelsReply::Pong,
+        PanelsRequest::Status => {
+            let panel = shell_state(app)
+                .lock()
+                .expect("shell state")
+                .surface
+                .open_panel_id()
+                .map(str::to_string);
+            PanelsReply::Status { panel }
+        }
         PanelsRequest::Open { id, mode } => {
             if id == "assistant" {
                 let door = mode
@@ -459,6 +469,12 @@ fn handle_panels_ipc(app: &AppHandle, req: PanelsRequest) -> PanelsReply {
 
 /// Escape backs out of a request or a confirmation first; only when there is nothing to back out of does the panel close.
 fn dismiss_escape(app: &AppHandle) {
+    if ShellRole::from_env().forwards_panels() {
+        tauri::async_runtime::spawn(async move {
+            let _ = panels_bridge::escape().await;
+        });
+        return;
+    }
     let state = shell_state(app);
     let mut shell = state.lock().expect("shell state");
     // Only the assistant has a request to back out of; Escape in the launcher just closes it.
@@ -482,6 +498,12 @@ fn dismiss_escape(app: &AppHandle) {
 }
 
 fn dismiss_outside(app: &AppHandle) {
+    if ShellRole::from_env().forwards_panels() {
+        tauri::async_runtime::spawn(async move {
+            let _ = panels_bridge::outside().await;
+        });
+        return;
+    }
     close_panel(app);
 }
 

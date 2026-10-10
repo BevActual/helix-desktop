@@ -5,6 +5,9 @@ After=graphical-session.target helix-service.service
 Conflicts=helix-shell-dev.service
 # Prefer the split pair over the legacy monolith unit.
 Conflicts=helix-shell-tauri.service
+# Keep Overlay panels alive while the bar is up (panels BindsTo the bar the other way).
+Wants=helix-shell-panels.service
+Upholds=helix-shell-panels.service
 
 [Service]
 Type=simple
