@@ -10,15 +10,16 @@ const MAX_ID: usize = 200;
 const MAX_TITLE: usize = 120;
 const MAX_QUERY: usize = 120;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Kind {
+    #[default]
     Flatpak,
     Rpm,
     Firmware,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
 pub struct Package {
     pub id: String,
     pub title: String,
@@ -27,6 +28,12 @@ pub struct Package {
     pub installed: bool,
     pub update: bool,
     pub remote: String,
+    /// Display version (empty when unknown).
+    pub version: String,
+    /// Download or installed size in bytes (0 when unknown).
+    pub size: u64,
+    /// `user` or `system` for Flatpak; empty otherwise.
+    pub installation: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -38,6 +45,16 @@ pub struct PackageView {
     pub installed: bool,
     pub update: bool,
     pub remote: String,
+    pub version: String,
+    pub size: u64,
+    pub installation: String,
+}
+
+/// One page of a result list (the catalog is thousands of rows; the page asks for a window).
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Page {
+    pub total: usize,
+    pub rows: Vec<PackageView>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,6 +92,9 @@ impl Store {
                 installed: p.installed,
                 update: p.update,
                 remote: sanitize_for_display(&p.remote, 80),
+                version: sanitize_for_display(&p.version, 40),
+                size: p.size,
+                installation: sanitize_for_display(&p.installation, 16),
             })
             .collect();
     }
@@ -94,16 +114,56 @@ impl Store {
             .collect()
     }
 
-    pub fn library(&self, kind: Kind) -> Vec<PackageView> {
-        self.packages
+    /// A ranked window of the catalog: title matches first (exact, prefix, word prefix, contains), then id, then summary; ties by title.
+    pub fn explore_page(&self, kind: Kind, query: &str, offset: usize, limit: usize) -> Page {
+        let q = sanitize_for_display(query, MAX_QUERY).to_ascii_lowercase();
+        let mut ranked: Vec<(u8, String, &Package)> = self
+            .packages
             .iter()
-            .filter(|p| p.kind == kind && p.installed)
-            .map(view_of)
-            .collect()
+            .filter(|p| p.kind == kind)
+            .filter_map(|p| {
+                let title = p.title.to_ascii_lowercase();
+                let rank = if q.is_empty() {
+                    0
+                } else if title == q {
+                    0
+                } else if title.starts_with(&q) {
+                    1
+                } else if title.split(|c: char| !c.is_alphanumeric()).any(|word| word.starts_with(&q)) {
+                    2
+                } else if title.contains(&q) {
+                    3
+                } else if p.id.to_ascii_lowercase().contains(&q) {
+                    4
+                } else if p.summary.to_ascii_lowercase().contains(&q) {
+                    5
+                } else {
+                    return None;
+                };
+                Some((rank, title, p))
+            })
+            .collect();
+        ranked.sort_by(|a, b| (a.0, &a.1).cmp(&(b.0, &b.1)));
+        Page {
+            total: ranked.len(),
+            rows: ranked.into_iter().skip(offset).take(limit).map(|(_, _, p)| view_of(p)).collect(),
+        }
+    }
+
+    pub fn library(&self, kind: Kind) -> Vec<PackageView> {
+        let mut rows: Vec<PackageView> = self.packages.iter().filter(|p| p.kind == kind && p.installed).map(view_of).collect();
+        rows.sort_by_key(|row| row.title.to_ascii_lowercase());
+        rows
     }
 
     pub fn updates(&self) -> Vec<PackageView> {
-        self.packages.iter().filter(|p| p.update).map(view_of).collect()
+        let mut rows: Vec<PackageView> = self.packages.iter().filter(|p| p.update).map(view_of).collect();
+        rows.sort_by_key(|row| row.title.to_ascii_lowercase());
+        rows
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.packages.is_empty()
     }
 
     pub fn detail(&self, id: &str) -> Option<PackageView> {
@@ -154,6 +214,108 @@ fn view_of(package: &Package) -> PackageView {
         installed: package.installed,
         update: package.update,
         remote: package.remote.clone(),
+        version: package.version.clone(),
+        size: package.size,
+        installation: package.installation.clone(),
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum JobState {
+    Running,
+    Done,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct JobView {
+    pub id: u64,
+    /// Package id, or `*` for "all updates".
+    pub package_id: String,
+    pub title: String,
+    pub action: &'static str,
+    pub state: JobState,
+    pub percent: Option<u8>,
+    pub message: String,
+}
+
+/// The queue of install, remove and update jobs. The host runs the backend; this records what is running and what just finished, so the
+/// page can show progress, offer Cancel and say how it ended.
+#[derive(Clone, Debug, Default)]
+pub struct Jobs {
+    next: u64,
+    jobs: Vec<JobView>,
+}
+
+const KEEP_FINISHED: usize = 4;
+
+impl Jobs {
+    pub fn start(&mut self, package_id: &str, title: &str, mutation: Mutation) -> u64 {
+        self.next += 1;
+        let id = self.next;
+        self.jobs.push(JobView {
+            id,
+            package_id: package_id.to_string(),
+            title: sanitize_for_display(title, MAX_TITLE),
+            action: match mutation {
+                Mutation::Install => "install",
+                Mutation::Remove => "remove",
+                Mutation::Update => "update",
+            },
+            state: JobState::Running,
+            percent: None,
+            message: String::new(),
+        });
+        id
+    }
+
+    pub fn progress(&mut self, id: u64, percent: u8) {
+        if let Some(job) = self.jobs.iter_mut().find(|j| j.id == id && j.state == JobState::Running) {
+            job.percent = Some(percent.min(100));
+        }
+    }
+
+    pub fn finish(&mut self, id: u64, state: JobState, message: &str) {
+        if let Some(job) = self.jobs.iter_mut().find(|j| j.id == id) {
+            if job.state == JobState::Running {
+                job.state = state;
+                job.message = sanitize_for_display(message, 200);
+                if state == JobState::Done {
+                    job.percent = Some(100);
+                }
+            }
+        }
+        let finished = self.jobs.iter().filter(|j| j.state != JobState::Running).count();
+        if finished > KEEP_FINISHED {
+            let mut drop = finished - KEEP_FINISHED;
+            self.jobs.retain(|j| {
+                if j.state != JobState::Running && drop > 0 {
+                    drop -= 1;
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+    }
+
+    /// Forget a finished job (the person dismissed it).
+    pub fn dismiss(&mut self, id: u64) {
+        self.jobs.retain(|j| !(j.id == id && j.state != JobState::Running));
+    }
+
+    pub fn running(&self) -> bool {
+        self.jobs.iter().any(|j| j.state == JobState::Running)
+    }
+
+    pub fn is_running_for(&self, package_id: &str) -> bool {
+        self.jobs.iter().any(|j| j.state == JobState::Running && (j.package_id == package_id || j.package_id == "*"))
+    }
+
+    pub fn view(&self) -> Vec<JobView> {
+        self.jobs.clone()
     }
 }
 
@@ -178,6 +340,7 @@ mod tests {
                 installed: false,
                 update: false,
                 remote: "flathub".into(),
+                ..Default::default()
             },
             Package {
                 id: "org.gnome.TextEditor".into(),
@@ -187,6 +350,7 @@ mod tests {
                 installed: true,
                 update: true,
                 remote: "flathub".into(),
+                ..Default::default()
             },
             Package {
                 id: "firefox".into(),
@@ -196,6 +360,7 @@ mod tests {
                 installed: true,
                 update: false,
                 remote: "fedora".into(),
+                ..Default::default()
             },
         ]);
         s
@@ -243,6 +408,57 @@ mod tests {
     }
 
     #[test]
+    fn explore_pages_are_ranked_and_windowed() {
+        let mut s = Store::default();
+        let p = |id: &str, title: &str, summary: &str| Package {
+            id: id.into(),
+            title: title.into(),
+            summary: summary.into(),
+            ..Default::default()
+        };
+        s.set(vec![
+            p("a.One", "Zebra Calc", ""),
+            p("b.Two", "Calc", ""),
+            p("c.Three", "Calculator", ""),
+            p("d.Four", "Spreadsheet", "does calc things"),
+            p("e.Five", "Notes", ""),
+        ]);
+        let page = s.explore_page(Kind::Flatpak, "calc", 0, 10);
+        let titles: Vec<_> = page.rows.iter().map(|r| r.title.as_str()).collect();
+        assert_eq!(titles, vec!["Calc", "Calculator", "Zebra Calc", "Spreadsheet"]);
+        assert_eq!(page.total, 4);
+        let window = s.explore_page(Kind::Flatpak, "calc", 1, 2);
+        assert_eq!(window.rows.len(), 2);
+        assert_eq!(window.total, 4);
+        // No query: every package, by title.
+        assert_eq!(s.explore_page(Kind::Flatpak, "", 0, 100).rows.first().unwrap().title, "Calc");
+    }
+
+    #[test]
+    fn jobs_track_progress_and_keep_only_recent_results() {
+        let mut jobs = Jobs::default();
+        let a = jobs.start("org.x.A", "A", Mutation::Install);
+        assert!(jobs.running());
+        assert!(jobs.is_running_for("org.x.A") && !jobs.is_running_for("org.x.B"));
+        jobs.progress(a, 40);
+        assert_eq!(jobs.view()[0].percent, Some(40));
+        jobs.finish(a, JobState::Done, "");
+        assert!(!jobs.running());
+        assert_eq!(jobs.view()[0].percent, Some(100));
+        // A finished job cannot be revived by late progress.
+        jobs.progress(a, 10);
+        assert_eq!(jobs.view()[0].percent, Some(100));
+        for i in 0..8 {
+            let id = jobs.start(&format!("org.x.P{i}"), "P", Mutation::Update);
+            jobs.finish(id, JobState::Failed, "no network");
+        }
+        assert_eq!(jobs.view().len(), 4);
+        let last = jobs.view().last().unwrap().id;
+        jobs.dismiss(last);
+        assert_eq!(jobs.view().len(), 3);
+    }
+
+    #[test]
     fn odd_ids_are_dropped_from_the_catalog() {
         let mut s = Store::default();
         s.set(vec![Package {
@@ -253,6 +469,7 @@ mod tests {
             installed: false,
             update: false,
             remote: "".into(),
+            ..Default::default()
         }]);
         assert!(s.explore(Kind::Flatpak, "").is_empty());
     }

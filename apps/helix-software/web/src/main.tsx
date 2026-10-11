@@ -1,27 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, IconTile, SearchField, Sidebar, SidebarItem, Sheet, hueOf, invoke, useLayoutReport } from "@helix/ui";
-
-type Page = "explore" | "library" | "updates" | "sources";
-
-interface PackageView {
-  id: string;
-  title: string;
-  summary: string;
-  kind: string;
-  installed: boolean;
-  update: boolean;
-  remote: string;
-}
-interface PendingView { id: string; title: string; action: "install" | "remove" | "update"; }
-interface PageView {
-  explore: PackageView[];
-  library: PackageView[];
-  updates: PackageView[];
-  pending: PendingView | null;
-  sources: string[];
-  update_count: number;
-}
+import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, Icon, SearchField, Sheet, Sidebar, SidebarItem, Spinner, invoke, listen, useLayoutReport } from "@helix/ui";
+import { Detail } from "./detail";
+import { forgetIcons } from "./hooks";
+import { JobsBar } from "./jobs";
+import { PackageRow, SkeletonRows } from "./rows";
+import { VERB, type JobView, type Page, type PackageView, type PageView } from "./types";
 
 const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "explore", title: "Explore", icon: "sparkle" },
@@ -29,106 +13,146 @@ const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "updates", title: "Updates", icon: "sun" },
   { id: "sources", title: "Sources", icon: "wifi" },
 ];
-
-const VERB = { install: "Install", remove: "Remove", update: "Update" } as const;
-
-function PackageRow({ pkg, busy, focus, onAction }: { pkg: PackageView; busy: boolean; focus: boolean; onAction: (action: "install" | "remove" | "update") => void }) {
-  const action = pkg.update ? "update" : pkg.installed ? "remove" : "install";
-  const name = pkg.title || pkg.id;
-  return (
-    <HxRow
-      test={`pkg:${pkg.id}`}
-      focus={focus}
-      leading={<IconTile large letter={Array.from(name)[0]?.toUpperCase() || "•"} hue={hueOf(name)} />}
-      title={<>{name} {pkg.update ? <Chip tone="accent">Update available</Chip> : pkg.installed ? <Chip>Installed</Chip> : null}</>}
-      sub={<>{pkg.summary}{pkg.summary && pkg.remote ? " · " : ""}{pkg.remote}</>}
-      trailing={
-        <Button kind={action === "remove" ? undefined : "primary"} small data-test={`action:${pkg.id}`} disabled={busy} onClick={() => onAction(action)}>
-          {VERB[action]}
-        </Button>
-      }
-    />
-  );
-}
+const PAGE_SIZE = 60;
 
 function Software({ start }: { start: { page: Page | null; app: string | null } }) {
   const [page, setPage] = useState<Page>(start.page ?? "explore");
   const [query, setQuery] = useState("");
+  const [limit, setLimit] = useState(PAGE_SIZE);
   const [view, setView] = useState<PageView | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [detail, setDetail] = useState<PackageView | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(start.app);
   const [error, setError] = useState("");
-  const [focusId, setFocusId] = useState<string | null>(start.app);
+  const [busy, setBusy] = useState(false);
   const search = useRef<HTMLInputElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const current = useRef({ page, query, limit });
+  current.current = { page, query, limit };
   useLayoutReport("software");
 
-  const read = useCallback(
-    (nextPage: Page, nextQuery: string) =>
-      invoke<PageView>("software_view", { page: nextPage, query: nextPage === "explore" ? nextQuery : "", kind: "flatpak" }).then(setView, (e) => setError(String(e))),
-    [],
-  );
+  const read = useCallback(() => {
+    const { page: p, query: q, limit: l } = current.current;
+    invoke<PageView>("software_view", { page: p, query: p === "explore" || p === "library" ? q : "", offset: 0, limit: l }).then(setView, (e) => setError(String(e)));
+  }, []);
 
-  // A deep link opens on the page the package belongs to.
+  // Rust says when anything changed (a catalog read, a job's progress, a result); the page reads then, and at once on its own changes.
+  useEffect(() => {
+    const stop = listen<null>("software-changed", read);
+    return () => { stop.then((fn) => fn()); };
+  }, [read]);
+  useEffect(() => {
+    const timer = setTimeout(read, page === "explore" ? 120 : 0);
+    return () => clearTimeout(timer);
+  }, [page, query, limit, read]);
+  useEffect(() => { setLimit(PAGE_SIZE); }, [page, query]);
+
+  // Icons are read again once a catalog read has finished (an install may have brought new ones), not on every progress tick.
+  const wasLoading = useRef(false);
+  useEffect(() => {
+    if (wasLoading.current && view && !view.loading) forgetIcons();
+    wasLoading.current = !!view?.loading;
+  }, [view]);
+
+  // A deep link opens the package.
   useEffect(() => {
     if (!start.app) return;
-    invoke<PackageView | null>("software_detail", { id: start.app }).then((detail) => {
-      if (detail) setPage(detail.installed ? "library" : "explore");
+    invoke<PackageView | null>("software_detail", { id: start.app }).then((value) => {
+      if (value) {
+        setDetail(value);
+        setPage(value.installed ? "library" : "explore");
+      }
     });
   }, [start.app]);
 
-  // Typing is read after a short pause; a page change is read at once.
+  // The open package is kept current from the catalog as it changes.
   useEffect(() => {
-    const timer = setTimeout(() => { read(page, query); }, page === "explore" ? 120 : 0);
-    return () => clearTimeout(timer);
-  }, [page, query, read]);
+    if (!detailId) return;
+    invoke<PackageView | null>("software_detail", { id: detailId }).then((value) => setDetail(value), () => undefined);
+  }, [detailId, view]);
+
+  // More rows as the end of the list scrolls into view.
+  const total = view?.total ?? 0;
+  const shown = view?.rows.length ?? 0;
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || (page !== "explore" && page !== "library")) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setLimit((old) => (old < total ? old + PAGE_SIZE : old));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [page, total, shown, detailId]);
 
   useEffect(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key === "/" && document.activeElement !== search.current) {
+      const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+      if (event.key === "/" && !typing) {
         event.preventDefault();
         search.current?.focus();
+      } else if (event.key === "Escape" && detailId && !view?.pending) {
+        setDetailId(null);
       }
     };
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, []);
+  }, [detailId, view?.pending]);
 
   const request = (id: string, action: "install" | "remove" | "update") => {
     setError("");
-    invoke("software_request", { id, action }).then(() => read(page, query), (e) => setError(String(e)));
+    invoke("software_request", { id, action }).then(read, (e) => setError(String(e)));
   };
+  const open = (id: string) => invoke("software_open", { id }).catch((e) => setError(String(e)));
   const confirm = useCallback((accept: boolean) => {
-    setBusy(accept);
-    setError("");
+    setBusy(true);
     invoke("software_confirm", { accept })
       .catch((e) => setError(String(e)))
-      .finally(() => {
-        setBusy(false);
-        setFocusId(null);
-        read(page, query);
-      });
-  }, [page, query, read]);
+      .finally(() => { setBusy(false); read(); });
+  }, [read]);
 
-  const rows = useMemo(() => {
-    if (!view) return [];
-    if (page === "explore") return view.explore;
-    if (page === "updates") return view.updates;
-    // The catalog search is Rust's; the library is short enough to filter here.
-    const needle = query.trim().toLowerCase();
-    return view.library.filter((row) => !needle || (row.title + " " + row.id).toLowerCase().includes(needle));
-  }, [view, page, query]);
+  const jobFor = useMemo(() => {
+    const byPackage = new Map<string, JobView>();
+    (view?.jobs ?? []).forEach((job) => {
+      const existing = byPackage.get(job.package_id);
+      if (!existing || job.state === "running") byPackage.set(job.package_id, job);
+    });
+    return (id: string) => byPackage.get(id);
+  }, [view?.jobs]);
+  const running = (view?.jobs ?? []).some((job) => job.state === "running");
 
-  const title = PAGES.find((entry) => entry.id === page)?.title ?? "";
   const pending = view?.pending ?? null;
+  const rows = view?.rows ?? [];
+  const title = detailId && detail ? detail.title || detail.id : PAGES.find((entry) => entry.id === page)?.title ?? "";
+  const loading = !view || (view.loading && !rows.length);
+  const allError = error || view?.error || "";
   const emptyText =
     page === "explore" ? (query ? `Nothing matches “${query}”.` : "The catalog is empty. Check your sources.")
     : page === "library" ? (query ? `Nothing installed matches “${query}”.` : "Nothing is installed yet. Find apps in Explore.")
     : "Everything is up to date.";
-  const emptyIcon = page === "updates" ? "shield" : "search";
+
+  const toolbar = detailId ? null : page === "updates" ? (
+    <>
+      <Button data-test="check-updates" disabled={view?.checking} onClick={() => { setError(""); invoke("software_refresh", { network: true }); }}>
+        {view?.checking ? <><Spinner /> Checking…</> : "Check for Updates"}
+      </Button>
+      {view && view.update_count > 0 ? (
+        <Button kind="primary" data-test="update-all" disabled={running || !!pending} onClick={() => request("*", "update")}>Update All ({view.update_count})</Button>
+      ) : null}
+    </>
+  ) : page === "explore" || page === "library" ? (
+    <SearchField test="search" value={query} onChange={setQuery} inputRef={search} />
+  ) : (
+    <Button data-test="refresh" disabled={view?.checking || view?.loading} onClick={() => invoke("software_refresh", { network: true })}>Refresh</Button>
+  );
 
   return (
     <>
       <AppFrame
         title={title}
+        leading={detailId ? (
+          <Button kind="plain" data-test="back" aria-label="Back" onClick={() => setDetailId(null)}>
+            <Icon name="chevron-left" /> {PAGES.find((entry) => entry.id === page)?.title}
+          </Button>
+        ) : undefined}
         sidebar={
           <Sidebar>
             {PAGES.map((entry) => (
@@ -139,48 +163,92 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
                 test={`page-${entry.id}`}
                 current={entry.id === page}
                 count={entry.id === "updates" ? view?.update_count : undefined}
-                onClick={() => { setPage(entry.id); setError(""); }}
+                onClick={() => { setPage(entry.id); setDetailId(null); setError(""); }}
               />
             ))}
           </Sidebar>
         }
-        toolbar={page === "explore" || page === "library" ? <SearchField test="search" value={query} onChange={setQuery} inputRef={search} /> : null}
+        toolbar={toolbar}
       >
-        {error ? <Banner tone="error" test="error">{error}</Banner> : null}
-        <div data-test="list">
-          {page === "sources" ? (
-            <Group title="Where software comes from">
-              {(view?.sources ?? []).map((name) => (
-                <HxRow key={name} test={`source:${name}`} title={name} />
-              ))}
-            </Group>
-          ) : view && !rows.length ? (
-            <EmptyState icon={emptyIcon}>{emptyText}</EmptyState>
-          ) : (
-            <Group>
-              {rows.map((pkg) => (
-                <PackageRow key={pkg.id} pkg={pkg} busy={busy || !!pending} focus={focusId === pkg.id} onAction={(action) => request(pkg.id, action)} />
-              ))}
-            </Group>
-          )}
-        </div>
+        {allError ? (
+          <Banner tone="error" test="error" action={<Button small onClick={() => { setError(""); invoke("software_refresh", { network: false }); }}>Try Again</Button>}>
+            {allError}
+          </Banner>
+        ) : null}
+
+        {detailId && detail ? (
+          <Detail pkg={detail} job={jobFor(detail.id)} blocked={running || !!pending} onOpen={() => open(detail.id)} onRequest={(action) => request(detail.id, action)} />
+        ) : (
+          <div data-test="list">
+            {page === "sources" ? (
+              <Group title="Where software comes from">
+                {(view?.sources ?? []).map((remote) => (
+                  <HxRow
+                    key={`${remote.installation}:${remote.name}`}
+                    test={`source:${remote.name}`}
+                    title={remote.title}
+                    sub={remote.url}
+                    trailing={<Chip>{remote.installation === "user" ? "This user" : "System"}</Chip>}
+                  />
+                ))}
+              </Group>
+            ) : loading ? (
+              <SkeletonRows />
+            ) : !rows.length ? (
+              <EmptyState icon={page === "updates" ? "shield" : "search"}>{emptyText}</EmptyState>
+            ) : (
+              <>
+                {page === "explore" || page === "library" ? (
+                  <h2 className="hx-group-title" data-test="count">{total.toLocaleString()} {page === "library" ? "installed" : query ? "results" : "apps"}</h2>
+                ) : null}
+                <Group>
+                  {rows.map((pkg) => (
+                    <PackageRow
+                      key={pkg.id}
+                      pkg={pkg}
+                      job={jobFor(pkg.id)}
+                      blocked={running || !!pending}
+                      focus={start.app === pkg.id && !detailId}
+                      library={page === "library"}
+                      onOpen={() => open(pkg.id)}
+                      onDetail={() => { setDetail(pkg); setDetailId(pkg.id); }}
+                      onRequest={(action) => request(pkg.id, action)}
+                    />
+                  ))}
+                </Group>
+                {total > shown ? <div ref={sentinel} className="hx-more"><Spinner /></div> : <div ref={sentinel} />}
+              </>
+            )}
+          </div>
+        )}
       </AppFrame>
+      <JobsBar jobs={view?.jobs ?? []} onOpen={open} />
       {pending ? (
         <Sheet
           alert
           test="confirm-bar"
-          title={`${VERB[pending.action]} “${pending.title}”?`}
+          title={pending.id === "*" ? "Update all?" : `${VERB[pending.action] === "Get" ? "Install" : VERB[pending.action]} “${pending.title}”?`}
           onCancel={() => confirm(false)}
           actions={
             <>
               <Button data-test="confirm-no" disabled={busy} onClick={() => confirm(false)}>Cancel</Button>
               <Button kind={pending.action === "remove" ? "destructive" : "primary"} data-test="confirm-yes" disabled={busy} onClick={() => confirm(true)}>
-                {busy ? "Working…" : VERB[pending.action]}
+                {pending.id === "*" ? "Update All" : pending.action === "install" ? "Install" : VERB[pending.action]}
               </Button>
             </>
           }
         >
-          <p>{pending.action === "remove" ? "It will be removed from this computer." : pending.action === "update" ? "The new version replaces the installed one." : "It will be installed from its source."}</p>
+          <p>
+            {pending.kind === "firmware"
+              ? "Firmware updates are applied by the system and may need a restart."
+              : pending.id === "*"
+                ? `${view?.update_count ?? 0} updates will be installed.`
+                : pending.action === "remove"
+                  ? "It will be removed from this computer. Its settings and data are kept."
+                  : pending.action === "update"
+                    ? "The new version replaces the installed one."
+                    : "It will be installed from its source."}
+          </p>
         </Sheet>
       ) : null}
     </>

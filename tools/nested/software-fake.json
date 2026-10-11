@@ -1,5 +1,49 @@
 [
-  {"id": "org.helix.Demo", "title": "Demo App", "summary": "A fake Flatpak for nested tests", "kind": "flatpak", "installed": false, "update": false, "remote": "flathub"},
-  {"id": "org.helix.Editor", "title": "Editor", "summary": "Already installed", "kind": "flatpak", "installed": true, "update": true, "remote": "flathub"},
-  {"id": "firefox", "title": "Firefox", "summary": "RPM package", "kind": "rpm", "installed": true, "update": false, "remote": "fedora"}
+ {
+  "id": "org.helix.Demo",
+  "title": "Demo App",
+  "summary": "A fake Flatpak for nested tests",
+  "kind": "flatpak",
+  "installed": false,
+  "update": false,
+  "remote": "flathub",
+  "version": "1.2.0",
+  "size": 88200000,
+  "icon": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAKklEQVR4nGO4E2BDU8QwasGoBaMWjFowasGoBaMWjFowasGoBaMWDBULAIvioExIRTc5AAAAAElFTkSuQmCC",
+  "description": [
+   "Demo App exists so the store can be tested without touching the system.",
+   "It does nothing, beautifully."
+  ]
+ },
+ {
+  "id": "org.helix.Editor",
+  "title": "Editor",
+  "summary": "Already installed",
+  "kind": "flatpak",
+  "installed": true,
+  "update": true,
+  "remote": "flathub",
+  "version": "3.4.1",
+  "size": 12000000
+ },
+ {
+  "id": "org.helix.Notes",
+  "title": "Notes",
+  "summary": "Quick notes that sync nowhere",
+  "kind": "flatpak",
+  "installed": true,
+  "update": false,
+  "remote": "flathub",
+  "version": "0.9",
+  "size": 4500000
+ },
+ {
+  "id": "firefox",
+  "title": "Firefox",
+  "summary": "RPM package",
+  "kind": "rpm",
+  "installed": true,
+  "update": false,
+  "remote": "fedora"
+ }
 ]

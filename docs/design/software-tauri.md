@@ -14,6 +14,24 @@ Standalone package store as a Tauri toplevel. Pure package models live in `helix
 - `--app=<id>` deep-link only accepts a short allowlisted id shape (alphanumeric, `.`, `-`, `_`); unknown ids open Explore empty.
 - The app does not hold Agent Surface roles and does not talk to the desktop service for v1 catalog work.
 
+## What it does today (Flatpak)
+
+| Area | Behaviour |
+|---|---|
+| Catalog | `flatpak remote-ls --cached` per installation (user, system) merged with `flatpak list` and `remote-ls --updates`; one row per application id, a user remote winning (installs there need no authentication). Read in the background; the window opens first and shows a skeleton. The installed apps still show when a remote has no cached summary. |
+| Explore | Ranked search (exact, prefix, word prefix, contains, id, summary) over thousands of apps, served in pages of 60 as the list scrolls. Icons are the appstream icons of the remote, loaded lazily. |
+| Detail | Description, developer, licence, categories and release from the remote's appstream data (`zcat` + a component scan, on demand), plus version, size and source. |
+| Jobs | Install, remove, update and Update All run as jobs on their own thread with progress parsed from Flatpak's output, **Cancel**, a result that explains a failure, and a bar that dismisses successes itself. Only one mutation per package at a time; the page never builds a command. |
+| Library | Installed apps with **Open** (`flatpak run`, detached); Remove from the detail page. |
+| Updates | The count on the sidebar, **Check for Updates** (fetches appstream first, falls back to the cached catalog offline), **Update All** behind one confirmation. Firmware updates (fwupd) are listed and applied by the system. |
+| Sources | The configured remotes, their URLs and whether they are user or system. |
+
+Tests: `cargo test -p helix-software` (parsers), `tools/nested/ui-suite.sh software` (fake catalog, windowed list, search, detail, install
+with progress, Update All) and `software-real` (this machine's real catalog and library, read-only; skipped without Flatpak apps).
+
+Not done: the Fedora RPM backend (PackageKit), adding or removing sources, screenshots, ratings, and following the system's light theme (apps
+render dark until the appearance mode is exposed to them).
+
 ## Backends
 
 | Backend | Pages | Host commands (thin) |

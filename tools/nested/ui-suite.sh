@@ -45,6 +45,7 @@ pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_
 pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick software-real && run software-real software-real-test.sh software-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick monitor        && run monitor system-monitor-test.sh system-monitor-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick models         && run models models-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

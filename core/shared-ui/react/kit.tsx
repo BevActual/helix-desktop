@@ -35,10 +35,12 @@ export interface AppFrameProps {
   children: ReactNode;
   /** The scrolling content is a single centred column of at most 720 px. */
   column?: boolean;
+  /** Before the title in the toolbar row (a Back button). */
+  leading?: ReactNode;
 }
 
 /** A window: close control, material sidebar, unified titlebar and toolbar over a solid scrolling content area. */
-export function AppFrame({ title, sidebar, toolbar, children, column = true }: AppFrameProps) {
+export function AppFrame({ title, sidebar, toolbar, children, column = true, leading }: AppFrameProps) {
   useWindowState();
   const [scrolled, setScrolled] = useState(false);
   return (
@@ -53,6 +55,7 @@ export function AppFrame({ title, sidebar, toolbar, children, column = true }: A
       </aside>
       <section className="hx-main">
         <header className={`hx-titlebar${scrolled ? " scrolled" : ""}`} data-tauri-drag-region>
+          {leading}
           <h1 className="hx-title" id="page-title">{title}</h1>
           <div className="hx-toolbar">{toolbar}</div>
         </header>
@@ -214,4 +217,8 @@ export function Sheet({ title, children, actions, alert, onCancel, test }: { tit
       </div>
     </div>
   );
+}
+
+export function Spinner({ label = "Working" }: { label?: string }) {
+  return <span className="hx-spinner" role="progressbar" aria-label={label} />;
 }

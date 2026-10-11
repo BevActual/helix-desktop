@@ -1066,3 +1066,36 @@ body.chat .sheet-actions button { padding: 8px 14px; border-radius: 10px; font-w
 @keyframes hx-fade { from { opacity: 0; } }
 @keyframes hx-sheet { from { transform: translateY(-16px); opacity: 0; } }
 @keyframes hx-pop { from { transform: scale(.96); opacity: 0; } }
+
+.hx-spinner { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--fill-3); border-top-color: var(--accent); animation: hx-spin 800ms linear infinite; vertical-align: -2px; }
+@keyframes hx-spin { to { transform: rotate(360deg); } }
+.hx-skeleton { display: flex; align-items: center; gap: 12px; min-height: var(--row-h); padding: 10px 16px; }
+.hx-skeleton i { display: block; border-radius: 6px; background: linear-gradient(90deg, var(--fill-1), var(--fill-2), var(--fill-1)); background-size: 200% 100%; animation: hx-shimmer 1.4s ease-in-out infinite; }
+@keyframes hx-shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+.hx-hero { display: flex; gap: 18px; align-items: flex-start; }
+.hx-hero-text { flex: 1; min-width: 0; }
+.hx-hero h2 { margin: 0; font: 700 22px/28px var(--font-display); letter-spacing: -.02em; }
+.hx-hero p { margin: 2px 0 0; color: var(--label-2); }
+.hx-hero-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.hx-dock-bar { position: absolute; left: 0; right: 0; bottom: 16px; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.hx-job { pointer-events: auto; display: flex; align-items: center; gap: 12px; width: min(460px, calc(100% - 48px)); padding: 10px 12px 10px 14px; border-radius: 14px;
+          background: var(--glass-solid); box-shadow: var(--shadow-small), inset 0 0 0 .5px var(--hairline); animation: hx-pop 220ms var(--ease-spring) both; }
+:root[data-blur="1"] .hx-job { backdrop-filter: blur(24px) saturate(1.4); }
+.hx-job .hx-job-text { flex: 1; min-width: 0; } .hx-job .hx-job-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-job .hx-job-sub { color: var(--label-2); font-size: 12px; }
+.hx-job .hx-meter { margin-top: 6px; }
+.hx-job.failed .hx-job-sub { color: var(--danger); }
+.hx-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; border-radius: var(--r-group); background: var(--group); box-shadow: inset 0 0 0 .5px var(--hairline); }
+.hx-fact { padding: 12px 16px; min-width: 0; } .hx-fact + .hx-fact { border-left: .5px solid var(--hairline); }
+.hx-fact-label { color: var(--label-3); font-size: 11px; font-weight: 600; }
+.hx-fact-value { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hx-prose p { margin: 0 0 10px; line-height: 1.5; user-select: text; }
+.hx-prose { max-width: 62ch; }
+.hx-icon-img { flex: none; object-fit: contain; border-radius: 22%; }
+.hx-more { display: flex; justify-content: center; padding: 16px; color: var(--label-3); }
+.hx-row-button { outline: none; border-radius: var(--r-group); cursor: default; }
+.hx-row-button:hover > .hx-row { background: var(--fill-1); }
+.hx-row-button:focus-visible > .hx-row { box-shadow: inset 0 0 0 2px var(--accent); border-radius: var(--r-group); }
+.hx-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.hx-btn.plain svg.i { width: 16px; height: 16px; }
+.hx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
