@@ -66,4 +66,11 @@ for _ in $(seq 1 40); do has_id fork-user-0 && break; sleep 0.25; done
 click_id fork-user-0; sleep 1.5
 M=$(ls "$CHATS"/*.json | wc -l)
 [ "$M" -gt "$N" ] && echo "ok: a fork is a new chat ($N -> $M)" || fail "no fork ($N -> $M)"
+echo "--- 8. slash menu"
+click_id input; wtype "/"; sleep 0.8
+has_id slash-item-0 && echo "ok: the slash menu lists commands" || fail "no slash menu"
+wtype "mod"; sleep 0.6
+has_id slash-item-0 && ! has_id slash-item-3 && echo "ok: typing narrows the commands" || fail "slash menu not narrowed"
+wtype -k Escape; sleep 0.6
+has_id slash-item-0 && fail "Escape left the slash menu open" || echo "ok: Escape closed the slash menu"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

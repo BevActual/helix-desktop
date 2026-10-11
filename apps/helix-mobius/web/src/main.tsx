@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
 import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
+import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
 import { Dialogs, type DialogHandle, type DialogHooks } from "./dialogs";
 import { Thread, type Block, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
 import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
@@ -21,6 +22,14 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
 }
 
 (window as unknown as { HelixMobiusReact: unknown }).HelixMobiusReact = {
+  chips: (host: HTMLElement, onRemove: (index: number) => void) => {
+    const run = handled<ChipsHandle>(host, (register) => <AttachChips register={register} onRemove={onRemove} />);
+    return { set: (files: Attachment[]) => run((h) => h.set(files)) };
+  },
+  slash: (host: HTMLElement, onPick: (index: number) => void) => {
+    const run = handled<SlashHandle>(host, (register) => <SlashMenu register={register} onPick={onPick} />);
+    return { set: (items: SlashItem[], active: number) => run((h) => h.set(items, active)) };
+  },
   thread: (host: HTMLElement, hooks: ThreadHooks) => {
     const run = handled<ThreadHandle>(host, (register) => <Thread register={register} hooks={hooks} />);
     return {

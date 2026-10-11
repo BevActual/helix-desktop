@@ -73,8 +73,23 @@ function lastActableText() {
   return "";
 }
 
+// The attachment chips and the slash menu are drawn by React when the bundle is present; the state and logic stay here.
+const reactChips = window.HelixMobiusReact
+  ? window.HelixMobiusReact.chips($("attach-chips"), (index) => { pendingAttachments.splice(index, 1); drawAttachChips(); })
+  : null;
+let slashShown = [];
+const reactSlash = window.HelixMobiusReact
+  ? window.HelixMobiusReact.slash($("slash-menu"), (index) => { if (slashShown[index]) runSlash(slashShown[index]); })
+  : null;
+
 function drawAttachChips() {
   const host = $("attach-chips");
+  if (reactChips) {
+    host.hidden = !pendingAttachments.length;
+    reactChips.set(pendingAttachments.map((file) => ({ name: file.name, chars: file.chars })));
+    syncSendEnabled();
+    return;
+  }
   if (!pendingAttachments.length) {
     host.hidden = true;
     host.replaceChildren();
@@ -277,7 +292,9 @@ function filteredSlash(filter) {
 
 function hideSlashMenu() {
   $("slash-menu").hidden = true;
-  $("slash-menu").replaceChildren();
+  slashShown = [];
+  if (reactSlash) reactSlash.set([], 0);
+  else $("slash-menu").replaceChildren();
 }
 
 function showSlashMenu(filter) {
@@ -285,6 +302,12 @@ function showSlashMenu(filter) {
   const items = filteredSlash(filter);
   if (!items.length) { hideSlashMenu(); return; }
   slashIndex = Math.max(0, Math.min(slashIndex, items.length - 1));
+  if (reactSlash) {
+    slashShown = items;
+    reactSlash.set(items.map((item) => ({ cmd: item.cmd, desc: item.desc })), slashIndex);
+    host.hidden = false;
+    return;
+  }
   host.replaceChildren();
   items.forEach((item, index) => {
     const row = el("button", "slash-item" + (index === slashIndex ? " active" : ""));
