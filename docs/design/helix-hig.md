@@ -5,6 +5,9 @@ Control Center, notifications, OSD, lock screen, and desktop widgets. When a cha
 something looks, it should point back to a rule here. When a rule here is wrong, change the rule
 first.
 
+> **Applications:** the visual language for apps is `app-visual-language.md` (decided: an Apple-grade desktop and applications). Where this
+> page says applications should use stock GTK/libadwaita controls, that page supersedes it. Shell chrome rules below still apply.
+
 Helix uses GTK4/libadwaita as its shared control and application design baseline. Restrained craft
 within libadwaita / GNOME conventions means clear navigation and polished behavior without replacing
 native control shapes. The shell is **enhanced GNOME with Apple-style status surfaces**—editable

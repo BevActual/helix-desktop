@@ -6,7 +6,8 @@ alwaysApply: false
 
 # Helix app frontend
 
-Full rules: `docs/design/frontend-stack.md`. Short version:
+Full rules: `docs/design/frontend-stack.md`; how it should look: `docs/design/app-visual-language.md` (Apple-grade: unified titlebar,
+material sidebar, solid content, one global accent, one of each component). Short version:
 
 - Apps under `apps/` and the session shell (`shell/helix-shell-tauri`) are **Tauri + React + TypeScript + Vite**. The shell moves in
   slices: a React island renders into an existing container and `shell.js` keeps the mode, input regions and glass until the last slice;
