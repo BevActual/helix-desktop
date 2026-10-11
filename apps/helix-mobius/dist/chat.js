@@ -551,12 +551,24 @@ listen("chat-stream", (event) => {
 });
 
 function projectNames() {
+  if (window.HelixMobiusReact) return reactProjectNames;
   const names = new Set();
   chatItems.forEach((item) => { if (item.project) names.add(item.project); });
   return Array.from(names).sort((a, b) => a.localeCompare(b));
 }
 
+// The sidebar list (search, project filter, chats) is React when the bundle is present; the hand-written drawing is the fallback.
+const reactChats = window.HelixMobiusReact
+  ? window.HelixMobiusReact.chats($("chat-list-host"), {
+    opened: () => { clearAttachments(); closeSideDrawer(); },
+    projects: (names) => { reactProjectNames = names; },
+    report: (error) => report(error),
+  })
+  : null;
+let reactProjectNames = [];
+
 function drawProjectFilter() {
+  if (reactChats) return;
   const host = $("project-filter");
   const names = projectNames();
   if (!names.length && !projectFilter) {
@@ -580,6 +592,7 @@ function drawProjectFilter() {
 
 function drawList(items) {
   if (items) chatItems = items;
+  if (reactChats) { reactChats.set(chatItems, view.id); return; }
   const host = $("chats");
   host.replaceChildren();
   const needle = chatFilter.trim().toLowerCase();

@@ -29,6 +29,12 @@ grep -q "MOBIUS turn ended Finished" "$LOG" && echo "ok: the turn finished" || f
 F=$(ls "$CHATS"/*.json 2>/dev/null | head -1)
 [ -n "$F" ] && grep -q "scheduler" "$F" && [ "$(stat -c %a "$F")" = 600 ] && echo "ok: saved, owner only" || fail "not saved: $F"
 has_id chat-0 && echo "ok: the chat is in the list" || fail "not listed"
+echo "--- 1b. search narrows the list"
+click_id chat-search; wtype "zzqqxx"; sleep 1.2
+has_id chat-0 && fail "a search with no match still lists the chat" || echo "ok: no match, no rows"
+click_id chat-search 0.93; sleep 1   # the search field's own clear button
+shot search-cleared
+has_id chat-0 && echo "ok: clearing the search brings the chat back" || fail "chat missing after clearing the search"
 echo "--- 2. a new chat, then back to the first"
 click_id new-chat; sleep 1.5; shot chat-new
 for _ in $(seq 1 20); do has_id empty && break; sleep 0.25; done

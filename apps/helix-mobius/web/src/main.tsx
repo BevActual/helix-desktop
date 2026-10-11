@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client";
+import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
 import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
 
 /** Mounts a component that registers a handle once it is ready; calls made before that wait and run when it is. */
@@ -18,6 +19,10 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
 }
 
 (window as unknown as { HelixMobiusReact: unknown }).HelixMobiusReact = {
+  chats: (host: HTMLElement, hooks: ChatListHooks) => {
+    const run = handled<ChatListHandle>(host, (register) => <ChatList register={register} hooks={hooks} />);
+    return { set: (items: ChatItem[], currentId: string) => run((h) => h.set(items, currentId)) };
+  },
   models: (host: HTMLElement, hooks: ModelsHooks) => {
     const run = handled<ModelsHandle>(host, (register) => <ModelsPage register={register} hooks={hooks} />);
     return { open: () => run((h) => h.open()) };
