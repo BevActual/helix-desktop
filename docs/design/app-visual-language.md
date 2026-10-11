@@ -74,8 +74,9 @@ wide soft one), never a single hard drop shadow.
 
 ## 5. Typography
 
-One family: **Inter** (variable, bundled with the shell; OFL) with the feature set `cv11`, `ss03` and `tnum` for numerals. It stands in for the
-system face, so the scale below is the whole contract, not the font name.
+One family: **Inter** (OFL; a packaging dependency: `rsms-inter-fonts` on Fedora, `inter` on Nix), with **Inter Display** for titles
+(optical size) and Cantarell / Noto Sans as the fallback. Feature set `cv11`, `ss03`; tabular numerals where numbers align. It stands in for
+the system face, so the scale below is the whole contract, not the font name.
 
 | Role | Size / line | Weight | Use |
 |---|---|---|---|
@@ -156,13 +157,12 @@ than three type sizes visible in one view; truncate with an ellipsis, never wrap
 
 ## 12. Gaps against this document (the work list)
 
-1. **Font.** `style.css` names Inter but it is not installed on the target machines (falls back to Noto Sans). Bundle Inter Variable in
-   `core/shared-ui/fonts/` and `@font-face` it (CSP already allows `'self'`).
-2. **Tokens.** Add `--content`, `--sidebar`, `--sidebar-solid`, `--density`, the accent set, type-scale and radius tokens; remove the
-   per-app literal values (chips, meters, banners added ad hoc in Software and Monitor).
-3. **Primitives in `@helix/ui`.** `AppFrame` (titlebar + sidebar + content + inactive state), `Toolbar`, `Group`/`Row`, `Segmented`,
+1. ~~Font~~ Done: tokens name Inter / Inter Display with fallbacks; packaging lists the font package (it is installed on the dev machine).
+2. ~~Tokens~~ Done in `style.css` (`--content`, `--sidebar`, `--density`, accent set, radii, spring); remove the old per-app classes as
+   each app moves to the kit.
+3. ~~Primitives~~ Done in `core/shared-ui/react/kit.tsx` (Software is the first app on it; Settings, Monitor, Mobius next). **Primitives in `@helix/ui`:** `AppFrame` (titlebar + sidebar + content + inactive state), `Toolbar`, `Group`/`Row`, `Segmented`,
    `Switch`, `Field`/`SearchField`, `Sheet`, `Alert`, `Banner`, `EmptyState`, `Meter`, `Chip`, `IconTile`. Apps compose these; `style.css`
    classes become an implementation detail.
-4. **Window state.** Host sets `data-window="active|inactive"` on focus; apps and the sidebar react.
+4. ~~Window state~~ Done: `AppFrame` sets `data-window` from window focus.
 5. **Audit.** Settings, Software, Monitor and Mobius against sections 2–9; fix density, titlebar and empty states first.
 6. **Appearance.** Accent choice and density setting in Settings → Appearance, stored once and read by every app.

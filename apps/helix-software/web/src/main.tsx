@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { closeWindow, invoke, useLayoutReport } from "@helix/ui";
+import { AppFrame, Banner, Button, Chip, EmptyState, Group, HxRow, IconTile, SearchField, Sidebar, SidebarItem, Sheet, hueOf, invoke, useLayoutReport } from "@helix/ui";
 
 type Page = "explore" | "library" | "updates" | "sources";
 
@@ -30,47 +30,24 @@ const PAGES: { id: Page; title: string; icon: string }[] = [
   { id: "sources", title: "Sources", icon: "wifi" },
 ];
 
-declare function icon(name: string): SVGElement;
-function Icon({ name }: { name: string }) {
-  const host = useRef<HTMLSpanElement>(null);
-  useEffect(() => { host.current?.replaceChildren(icon(name)); }, [name]);
-  return <span ref={host} style={{ display: "contents" }} />;
-}
-
 const VERB = { install: "Install", remove: "Remove", update: "Update" } as const;
-const hue = (name: string) => {
-  let hash = 0;
-  for (const ch of name) hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
-  return hash % 360;
-};
 
 function PackageRow({ pkg, busy, focus, onAction }: { pkg: PackageView; busy: boolean; focus: boolean; onAction: (action: "install" | "remove" | "update") => void }) {
-  const row = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (focus) row.current?.scrollIntoView({ block: "center" });
-  }, [focus]);
   const action = pkg.update ? "update" : pkg.installed ? "remove" : "install";
   const name = pkg.title || pkg.id;
   return (
-    <div ref={row} className={`setting-row pkg-row${focus ? " focus" : ""}`} data-test={`pkg:${pkg.id}`}>
-      <span className="pkg-icon" style={{ background: `hsl(${hue(name)} 45% 42%)` }}>{Array.from(name)[0]?.toUpperCase() || "•"}</span>
-      <div className="setting-text pkg-text">
-        <div className="setting-title">
-          {name}
-          {pkg.update ? <span className="chip update">Update available</span> : pkg.installed ? <span className="chip">Installed</span> : null}
-        </div>
-        {pkg.summary ? <div className="setting-about">{pkg.summary}</div> : null}
-        {pkg.remote ? <div className="setting-about pkg-remote">{pkg.remote}</div> : null}
-      </div>
-      <button
-        className={`segment pkg-action${action === "install" || action === "update" ? " primary-action" : ""}`}
-        data-test={`action:${pkg.id}`}
-        disabled={busy}
-        onClick={() => onAction(action)}
-      >
-        {VERB[action]}
-      </button>
-    </div>
+    <HxRow
+      test={`pkg:${pkg.id}`}
+      focus={focus}
+      leading={<IconTile large letter={Array.from(name)[0]?.toUpperCase() || "•"} hue={hueOf(name)} />}
+      title={<>{name} {pkg.update ? <Chip tone="accent">Update available</Chip> : pkg.installed ? <Chip>Installed</Chip> : null}</>}
+      sub={<>{pkg.summary}{pkg.summary && pkg.remote ? " · " : ""}{pkg.remote}</>}
+      trailing={
+        <Button kind={action === "remove" ? undefined : "primary"} small data-test={`action:${pkg.id}`} disabled={busy} onClick={() => onAction(action)}>
+          {VERB[action]}
+        </Button>
+      }
+    />
   );
 }
 
@@ -119,7 +96,7 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
     setError("");
     invoke("software_request", { id, action }).then(() => read(page, query), (e) => setError(String(e)));
   };
-  const confirm = (accept: boolean) => {
+  const confirm = useCallback((accept: boolean) => {
     setBusy(accept);
     setError("");
     invoke("software_confirm", { accept })
@@ -129,7 +106,7 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
         setFocusId(null);
         read(page, query);
       });
-  };
+  }, [page, query, read]);
 
   const rows = useMemo(() => {
     if (!view) return [];
@@ -144,87 +121,76 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
   const pending = view?.pending ?? null;
   const emptyText =
     page === "explore" ? (query ? `Nothing matches “${query}”.` : "The catalog is empty. Check your sources.")
-    : page === "library" ? (query ? `Nothing installed matches “${query}”.` : "Nothing is installed yet.")
+    : page === "library" ? (query ? `Nothing installed matches “${query}”.` : "Nothing is installed yet. Find apps in Explore.")
     : "Everything is up to date.";
+  const emptyIcon = page === "updates" ? "shield" : "search";
 
   return (
     <>
-      <aside id="side">
-        <div id="titlebar" data-tauri-drag-region>
-          <button id="close" className="win-btn" data-test="close" title="Close" aria-label="Close" onClick={() => closeWindow()}>
-            <Icon name="x" />
-          </button>
-        </div>
-        <nav id="pages">
-          {PAGES.map((entry) => (
-            <button
-              key={entry.id}
-              className={`page-link${entry.id === page ? " current" : ""}`}
-              data-page={entry.id}
-              data-test={`page-${entry.id}`}
-              onClick={() => { setPage(entry.id); setError(""); }}
-            >
-              <Icon name={entry.icon} />
-              <span>{entry.title}</span>
-              {entry.id === "updates" && view && view.update_count > 0 ? <span className="count-badge" data-test="updates-count">{view.update_count}</span> : null}
-            </button>
-          ))}
-        </nav>
-      </aside>
-      <main id="content" data-test="content">
-        <header data-tauri-drag-region>
-          <h2 id="page-title">{title}</h2>
-          {page === "explore" || page === "library" ? (
-            <input
-              id="search"
-              data-test="search"
-              ref={search}
-              type="search"
-              placeholder="Search"
-              autoComplete="off"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => { if (event.key === "Escape") { setQuery(""); event.currentTarget.blur(); } }}
-            />
-          ) : null}
-        </header>
-        {pending ? (
-          <div id="confirm" data-test="confirm-bar" role="alertdialog" aria-label="Confirm">
-            <div className="setting-row">
-              <div className="setting-about confirm-text">{VERB[pending.action]} <b>{pending.title}</b>?</div>
-              <button className="segment" data-test="confirm-no" disabled={busy} onClick={() => confirm(false)}>Cancel</button>
-              <button className="segment primary-action" data-test="confirm-yes" disabled={busy} onClick={() => confirm(true)}>
-                {busy ? "Working…" : "Allow"}
-              </button>
-            </div>
-          </div>
-        ) : null}
-        {error ? <div className="banner error" data-test="error" role="alert">{error}</div> : null}
-        <div id="list" data-test="list">
+      <AppFrame
+        title={title}
+        sidebar={
+          <Sidebar>
+            {PAGES.map((entry) => (
+              <SidebarItem
+                key={entry.id}
+                icon={entry.icon}
+                label={entry.title}
+                test={`page-${entry.id}`}
+                current={entry.id === page}
+                count={entry.id === "updates" ? view?.update_count : undefined}
+                onClick={() => { setPage(entry.id); setError(""); }}
+              />
+            ))}
+          </Sidebar>
+        }
+        toolbar={page === "explore" || page === "library" ? <SearchField test="search" value={query} onChange={setQuery} inputRef={search} /> : null}
+      >
+        {error ? <Banner tone="error" test="error">{error}</Banner> : null}
+        <div data-test="list">
           {page === "sources" ? (
-            <div className="rows-card">
+            <Group title="Where software comes from">
               {(view?.sources ?? []).map((name) => (
-                <div key={name} className="setting-row" data-test={`source:${name}`}>
-                  <div className="setting-title">{name}</div>
-                </div>
+                <HxRow key={name} test={`source:${name}`} title={name} />
               ))}
-            </div>
+            </Group>
           ) : view && !rows.length ? (
-            <div className="empty">{emptyText}</div>
+            <EmptyState icon={emptyIcon}>{emptyText}</EmptyState>
           ) : (
-            <div className="rows-card">
+            <Group>
               {rows.map((pkg) => (
                 <PackageRow key={pkg.id} pkg={pkg} busy={busy || !!pending} focus={focusId === pkg.id} onAction={(action) => request(pkg.id, action)} />
               ))}
-            </div>
+            </Group>
           )}
         </div>
-      </main>
+      </AppFrame>
+      {pending ? (
+        <Sheet
+          alert
+          test="confirm-bar"
+          title={`${VERB[pending.action]} “${pending.title}”?`}
+          onCancel={() => confirm(false)}
+          actions={
+            <>
+              <Button data-test="confirm-no" disabled={busy} onClick={() => confirm(false)}>Cancel</Button>
+              <Button kind={pending.action === "remove" ? "destructive" : "primary"} data-test="confirm-yes" disabled={busy} onClick={() => confirm(true)}>
+                {busy ? "Working…" : VERB[pending.action]}
+              </Button>
+            </>
+          }
+        >
+          <p>{pending.action === "remove" ? "It will be removed from this computer." : pending.action === "update" ? "The new version replaces the installed one." : "It will be installed from its source."}</p>
+        </Sheet>
+      ) : null}
     </>
   );
 }
 
 function mount(host: HTMLElement) {
+  // The hand-written page styles `body.settings #app`; the React page brings its own frame.
+  document.body.classList.remove("settings");
+  document.body.classList.add("hx");
   const params = new URLSearchParams(location.search);
   const startPage = params.get("page");
   const page = PAGES.some((entry) => entry.id === startPage) ? (startPage as Page) : null;
