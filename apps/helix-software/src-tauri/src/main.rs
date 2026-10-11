@@ -159,13 +159,21 @@ fn refresh_catalog(state: &mut State) {
 }
 
 #[derive(Serialize)]
+struct PendingView {
+    id: String,
+    title: String,
+    action: &'static str,
+}
+
+#[derive(Serialize)]
 struct PageView {
     explore: Vec<PackageView>,
     library: Vec<PackageView>,
     updates: Vec<PackageView>,
     detail: Option<PackageView>,
-    pending: Option<String>,
+    pending: Option<PendingView>,
     sources: Vec<String>,
+    update_count: usize,
 }
 
 #[tauri::command]
@@ -177,12 +185,21 @@ fn software_view(app: AppHandle, page: String, query: String, kind: String) -> P
     };
     let shared = shared(&app);
     let state = shared.lock().expect("state");
-    let pending = state.pending.as_ref().map(|(id, m)| format!("{id}:{:?}", m));
+    let pending = state.pending.as_ref().map(|(id, mutation)| PendingView {
+        title: state.store.detail(id).map(|package| package.title).filter(|title| !title.is_empty()).unwrap_or_else(|| id.clone()),
+        id: id.clone(),
+        action: match mutation {
+            Mutation::Install => "install",
+            Mutation::Remove => "remove",
+            Mutation::Update => "update",
+        },
+    });
     PageView {
         explore: if page == "explore" { state.store.explore(kind, &query) } else { Vec::new() },
         library: if page == "library" { state.store.library(kind) } else { Vec::new() },
         updates: if page == "updates" { state.store.updates() } else { Vec::new() },
         detail: None,
+        update_count: state.store.updates().len(),
         pending,
         sources: if page == "sources" {
             vec!["flathub".into(), "fedora".into(), "fwupd".into()]

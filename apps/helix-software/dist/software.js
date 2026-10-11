@@ -1,4 +1,9 @@
 // Helix Software. Draws package views as text only; mutations go through request → confirm.
+// With the React bundle present it draws everything; the hand-written page below is the fallback for a build without node.
+if (window.HelixSoftwareReact) {
+  window.HelixSoftwareReact.mount(document.getElementById("app"));
+} else {
+(function legacy() {
 const { invoke } = window.__TAURI__.core;
 const $ = (id) => document.getElementById(id);
 function el(tag, className, text) {
@@ -113,3 +118,5 @@ $("search").oninput = () => { if (page === "explore") draw(); };
   await draw();
   if (window.__layout) setInterval(report, 500);
 })();
+})();
+}

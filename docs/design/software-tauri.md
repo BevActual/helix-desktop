@@ -1,6 +1,8 @@
 # Helix Software (Tauri)
 
-Frontend direction: React + TypeScript + Vite like the other apps (`frontend-stack.md`); the page is hand-written until it next grows a page.
+Frontend: React + TypeScript + Vite (`apps/helix-software/web`, workspace `helix-software-web`, built into `dist/react/helix-software.js`); the hand-written page in `dist/software.js` is the fallback for a build without node. Rust still decides what is listed and what a mutation means; the page draws `PageView` and sends back an id and one of install/remove/update, then Allow or Cancel.
+
+The React page adds: package icons, Installed / Update available chips, the update count on the sidebar, a named confirmation ("Install Demo App?"), a working state and an error banner, per-page empty states, library filtering, `/` to focus search, and a highlighted row for `--app=`.
 
 Standalone package store as a Tauri toplevel. Pure package models live in `helix-shell-core::software`; the host runs Flatpak / PackageKit / fwupd and draws text-only UI from `core/shared-ui`.
 

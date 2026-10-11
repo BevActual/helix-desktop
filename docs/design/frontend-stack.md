@@ -84,7 +84,8 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 | **Lock screen** | `swaylock` themed with the shared tokens through `helix-panel lock`. A Helix-drawn lock needs an ext-session-lock host for a webview (`gtk-session-lock`, not installed here); until then it stays native so the lock can never depend on a web page |
 | Shell: bar (its glyph slots, workspaces, clock; the dock's magnify lens, hide timer, tooltip and menu also stay in `shell.js` because the input regions and glass are measured from them) | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
 | Mobius app (`helix-mobius`) | Hand-written (`dist/chat.js`, ~1,800 lines). Next app to move: streaming messages, edit/branch, search, attachments, personas, model picker |
-| Software, System Monitor | Hand-written (small). Move when they next grow a page |
+| **Software** | **React** (`apps/helix-software/web`); hand-written page kept as the no-node fallback |
+| System Monitor | Hand-written (small). Moves when it next grows a page |
 
 ## Measured cost (release builds, same nested tests)
 

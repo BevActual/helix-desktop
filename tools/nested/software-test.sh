@@ -28,6 +28,7 @@ has_id "pkg:org.helix.Demo" && echo "ok: explore lists demo" || fail "demo missi
 click_id "action:org.helix.Demo"; sleep 1.2
 for _ in $(seq 1 20); do has_id confirm-yes && break; sleep 0.25; done
 has_id confirm-yes && echo "ok: install confirm shown" || fail "no confirm"
+niri msg action screenshot-screen --show-pointer false >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/software-confirm.png"
 click_id confirm-yes; sleep 1
 click_id page-library; sleep 1
 for _ in $(seq 1 20); do has_id "pkg:org.helix.Demo" && break; sleep 0.25; done
