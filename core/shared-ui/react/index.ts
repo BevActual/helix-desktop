@@ -11,3 +11,6 @@ export type { Results } from "./bindings/Results";
 export type { NetworkRow } from "./bindings/NetworkRow";
 export type { NetworkView } from "./bindings/NetworkView";
 export type { VpnRow } from "./bindings/VpnRow";
+export type { DeviceRow } from "./bindings/DeviceRow";
+export type { BluetoothView } from "./bindings/BluetoothView";
+export type { PairingView } from "./bindings/PairingView";

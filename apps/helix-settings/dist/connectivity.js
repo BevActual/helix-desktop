@@ -176,6 +176,7 @@ function askEnterprise(line, net) {
 }
 
 function drawNetworkPage(view) {
+  if (reactPages.network) return;   // the React page listens for this event itself
   if (asking) { deferred = view; return; }
   const host = $("network-host");
   host.replaceChildren();
@@ -220,6 +221,7 @@ function drawNetworkPage(view) {
 }
 
 function drawBluetoothPage(view) {
+  if (reactPages.bluetooth) return;
   const host = $("bt-main");
   host.replaceChildren();
   if (!view.available) { host.append(el("div", "empty", "Bluetooth is not available on this computer.")); queueReport(); return; }
@@ -258,6 +260,7 @@ function drawBluetoothPage(view) {
 
 // The question a device asks while it is being paired. What is typed goes to Rust once and the field is emptied; nothing is kept.
 function drawPairing(view) {
+  if (reactPages.bluetooth) return;
   const host = $("bt-pairing");
   host.replaceChildren();
   if (!view.active) { queueReport(); return; }

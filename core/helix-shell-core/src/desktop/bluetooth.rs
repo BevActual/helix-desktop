@@ -57,6 +57,7 @@ pub struct Request {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct DeviceRow {
     pub path: String,
     pub name: String,
@@ -69,6 +70,7 @@ pub struct DeviceRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct BluetoothView {
     pub available: bool,
     pub enabled: bool,

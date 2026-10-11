@@ -64,6 +64,7 @@ pub enum PairingError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct PairingView {
     pub active: bool,
     pub device: String,
