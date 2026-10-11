@@ -47,3 +47,4 @@ pick greeter-session && run greeter-session greeter-session-test.sh greeter-sess
 pick software       && run software software-test.sh software-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick monitor        && run monitor system-monitor-test.sh system-monitor-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick models         && run models models-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

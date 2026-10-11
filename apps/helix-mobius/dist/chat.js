@@ -567,6 +567,15 @@ const reactChats = window.HelixMobiusReact
   : null;
 let reactProjectNames = [];
 
+// The persona rail and the rename, project, persona and model sheets are React when the bundle is present.
+const reactDialogs = window.HelixMobiusReact
+  ? window.HelixMobiusReact.dialogs($("dialogs-host"), $("persona-dots"), {
+    report: (error) => report(error),
+    routeChanged: (backend, model) => { currentBackend = backend; currentModel = model; drawComposerMeta(); },
+    closeMenu: () => closeHubMenu(),
+  })
+  : null;
+
 function drawProjectFilter() {
   if (reactChats) return;
   const host = $("project-filter");
@@ -677,6 +686,7 @@ $("pin-chat").onclick = () => {
   invoke("chat_pin", { pinned: !view.pinned }).catch(report);
 };
 $("project-chat").onclick = () => {
+  if (reactDialogs) { reactDialogs.openProject(view.project || "", projectNames()); return; }
   $("project-name").value = view.project || "";
   const list = $("project-suggestions");
   list.replaceChildren(...projectNames().map((name) => {
@@ -698,6 +708,7 @@ $("project-form").addEventListener("submit", (event) => {
 });
 $("chat-title").onclick = () => {
   if (view.temporary) return;
+  if (reactDialogs) { reactDialogs.openRename(view.title || "New chat"); return; }
   $("rename-title").value = view.title || "New chat";
   $("rename-dialog").showModal();
   $("rename-title").focus();
@@ -731,6 +742,7 @@ function personaHue(id) {
 }
 
 function startNewPersona() {
+  if (reactDialogs) { reactDialogs.openPersona(true); return; }
   const stamp = Date.now().toString(36).slice(-6);
   fillPersonaForm({
     id: "persona-" + stamp,
@@ -787,6 +799,7 @@ function drawPersonaDots() {
 
 function drawPersonas(store) {
   personas = store;
+  if (reactDialogs) { drawComposerMeta(); return; } // the rail and sheets draw their own
   const pick = $("persona-pick");
   const previous = pick.value || editingPersonaId;
   pick.replaceChildren();
@@ -816,6 +829,7 @@ function fillPersonaForm(persona) {
 }
 
 function openPersonaSheet(persona) {
+  if (reactDialogs) { reactDialogs.openPersona(false); return; }
   fillPersonaForm(persona || activePersona());
   closeHubMenu();
   $("persona-dialog").showModal();
@@ -1005,6 +1019,7 @@ async function fillModelList(backend) {
 }
 
 async function openModelPicker() {
+  if (reactDialogs) { reactDialogs.openModel(); return; }
   const route = await invoke("chat_current_route");
   currentModel = (route && route.model) || "";
   currentBackend = (route && route.backend) || "local";
@@ -1782,7 +1797,7 @@ function sendReport() {
   invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements } });
 }
 window.addEventListener("resize", queueReport);
-new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true });
+new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden"] });
 
 invoke("layout_reporting").then((on) => { reporting = on; if (on) queueReport(); });
 invoke("chat_status").then((s) => { status = s; drawChat(); });
