@@ -1,5 +1,7 @@
 # Helix Software (Tauri)
 
+Frontend direction: React + TypeScript + Vite like the other apps (`frontend-stack.md`); the page is hand-written until it next grows a page.
+
 Standalone package store as a Tauri toplevel. Pure package models live in `helix-shell-core::software`; the host runs Flatpak / PackageKit / fwupd and draws text-only UI from `core/shared-ui`.
 
 ## Threat model

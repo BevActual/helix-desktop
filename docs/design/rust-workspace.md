@@ -14,6 +14,8 @@ Domain layout under `core/` / `shell/` / `greeter/` / `apps/` / `services/`:
 | `dev/` | Nested probes only (`helix-attacker`, `experiments/`) |
 | `compositor/` | helix-niri fork (own Cargo workspace; excluded from this one) |
 
+**Apps have a React frontend** built by the npm workspace at the repo root (`apps/<app>/web`, `core/shared-ui/react`; see `frontend-stack.md`). A Rust-only checkout still builds: without `node_modules` the hand-written pages are used.
+
 **The session shell is Tauri** (`tools/switch-shell.sh install`). C++ session UI and GTK apps are deleted; `helix-service` stays in C++ under `src/desktop/`.
 
 ## Build
@@ -25,6 +27,8 @@ cargo clippy -- -D warnings
 cargo build --release -p helix-shell-tauri -p helix-greeter -p helix-settings -p helix-software -p helix-system-monitor
 cargo build --profile fast -p helix-shell-tauri -p helix-greeter
 ```
+
+Frontend (apps): `npm install` once at the repo root, then `npm run typecheck && npm run lint`; `cargo build -p <app>` builds the React bundle first.
 
 Binaries still land in `target/{fast,release}/` (workspace target dir unchanged).
 

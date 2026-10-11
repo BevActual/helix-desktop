@@ -12,6 +12,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 | [helix-identity.md](helix-identity.md) | Product names, paths, retired brand leftovers |
 | [helix-hig.md](helix-hig.md) | Visual / interaction language (chrome vs leftover vs modules) |
 | [rust-workspace.md](rust-workspace.md) | Cargo workspace members and build profiles |
+| [frontend-stack.md](frontend-stack.md) | **How app UIs are built**: Tauri + React + TypeScript + Vite; what stays hand-written |
 
 ## Contracts and platforms
 
@@ -28,6 +29,7 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 |---|---|
 | [tauri-rust-shell.md](tauri-rust-shell.md) | Session shell (Tauri) milestones and nested testing |
 | [greeter-tauri.md](greeter-tauri.md) | Login greeter |
+| [frontend-stack.md](frontend-stack.md) | App frontend stack, shared components, generated bindings, status per app |
 | [settings-tauri.md](settings-tauri.md) | Settings app |
 | [software-tauri.md](software-tauri.md) | Software app |
 | [system-monitor-tauri.md](system-monitor-tauri.md) | System Monitor |

@@ -1,6 +1,6 @@
 # Settings, rebuilt as a Rust + Tauri application
 
-Status: live on the Tauri session path. Pages include Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard (compositor binds + Helix navigation chords via UpdateOrderedList), Wallpaper, Dock, Power & lock, Privacy & agents (manager), About. Install: `tools/switch-shell.sh install` → `~/.local/bin/helix-settings`.
+Status: live on the Tauri session path; **every page is a React page** (`apps/helix-settings/web`, `docs/design/frontend-stack.md`) over the same Rust commands. Pages include Appearance, Accessibility, Displays, Network, Bluetooth, Keyboard (compositor binds + Helix navigation chords via UpdateOrderedList), Wallpaper, Dock, Power & lock, Privacy & agents (manager), About. Install: `tools/switch-shell.sh install` → `~/.local/bin/helix-settings`.
 
 ## Why rebuild it, and what not to carry over
 

@@ -28,6 +28,17 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 | App framework | Tauri 2, GTK3, WebKitGTK 4.1, `gtk-layer-shell` |
 | D-Bus client/server | `zbus`, `tokio` |
 | Serialization | `serde`, `serde_json` |
+| TypeScript bindings | `ts-rs` (feature `ts`, `tools/gen-bindings.sh`) |
+
+### Frontend (apps under `apps/`)
+
+| Layer | Library |
+|-------|---------|
+| UI | React 19, TypeScript, Vite (npm workspace at the repo root, Node 22+) |
+| Shared components | `@helix/ui` in `core/shared-ui/react/` over the shared CSS tokens |
+| Lint | ESLint with `react/no-danger`; text from models, apps and the system is only ever a React child |
+
+The shell, the approval dialog and the greeter are hand-written HTML/CSS/JS with no build step. Rules and status: `docs/design/frontend-stack.md`.
 
 ### C++ platform (desktop service / assistant / inference — shrinking)
 

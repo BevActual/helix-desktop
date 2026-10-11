@@ -28,7 +28,7 @@ cd compositor && cargo build --release
 cargo build --profile fast -p helix-greeter
 ```
 
-Standalone apps under `apps/` (shared UI in `core/shared-ui/`). Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
+Standalone apps under `apps/` are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`). The shell and the approval dialog stay hand-written. Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
 
 ## Repository map
 
@@ -53,7 +53,8 @@ Standalone apps under `apps/` (shared UI in `core/shared-ui/`). Desktop authorit
 ## Checks
 
 ```sh
-tools/check-all.sh              # clippy -D warnings, cargo test, meson test, then the nested UI suite
+npm install                     # once: the React app workspace (Node 22+)
+tools/check-all.sh              # typecheck + lint, clippy -D warnings, cargo test, meson test, then the nested UI suite
 tools/check-all.sh --no-nested  # skip the nested compositor runs
 tools/nested/ui-suite.sh dock mobius   # just some of the nested tests
 tools/migrate-state.sh --dry-run       # what would be copied from the old noctalia folders (additive, never overwrites)

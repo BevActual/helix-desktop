@@ -45,6 +45,7 @@ Cargo.toml (workspace root)
   apps/
   services/                       workspace (see docs/design/rust-workspace.md)
   shared-ui/                       style.css + icons.js; each app build.rs copies into dist/
+  shared-ui/react/                 @helix/ui: React components + generated TS bindings (apps only; see frontend-stack.md)
   helix-desktop-api/               zbus client for org.helix.Desktop (+ Inference), types from protocols/dbus/*.xml
   helix-shell-core/                pure logic (shell/, desktop/, agent/, apps/); no Tauri, no GTK
   helix-shell-tauri/               session shell: layer-shell bar + panels + confirmer Overlay

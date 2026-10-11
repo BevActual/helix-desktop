@@ -56,9 +56,9 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `protocols/` | D-Bus XML + IPC schemas (source of truth) | Implementation |
 | `core/helix-shell-core` | Pure models, risk policy, config catalog helpers | D-Bus servers, UI |
 | `core/helix-desktop-api` | Typed client for `org.helix.Desktop` | Service logic |
-| `core/shared-ui` | Shared Tauri UI pieces | Session policy |
+| `core/shared-ui` | Shared CSS tokens, icons, and `react/` (`@helix/ui` components, generated TS bindings) | Session policy |
 | `shell/` | Live session UI (layer-shell) | Device backends |
-| `apps/` | Standalone Helix apps (Settings, …) | Claiming the Desktop bus |
+| `apps/` | Standalone Helix apps (Settings, …): Tauri host + React/TypeScript frontend (`frontend-stack.md`) | Claiming the Desktop bus |
 | `services/helix-desktop` | Rust desktop authority (migration target) | Compositor |
 | `services/helix-wallpaper`, `helix-idle` | Small session helpers | Desktop bus name |
 | `greeter/` | Login only | Session shell surfaces |
@@ -76,6 +76,8 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 4. **Backends are replaceable behind snapshots.** Unavailable backends return readable empty/unavailable snapshots; pages still navigate.
 5. **Migration is domain cutover, not a big bang.** Parity on nested/unit tests, then delete the C++ domain in the same change (`cpp-to-rust.md`).
 6. **Visual language is one HIG.** GTK4/libadwaita for shared controls; glass only on floating chrome (`helix-hig.md`).
+7. **Apps are React; the shell is not.** App UIs are Tauri + React + TypeScript + Vite over typed commands; the always-on shell and the
+   trust surfaces (approval dialog, greeter) stay hand-written (`frontend-stack.md`).
 
 ## Process inventory (target end state)
 

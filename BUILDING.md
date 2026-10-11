@@ -158,6 +158,21 @@ The sources are built as C++23, which requires GCC 13+ or Clang 16+. Current rol
 Fedora 38+, Debian 13, Ubuntu 24.04+) ship a new enough compiler by default. On Debian 12 "bookworm" install `g++-13`
 and point Meson at it (e.g. `CXX=g++-13 just configure`).
 
+## Frontend (apps)
+
+The Tauri apps have a React + TypeScript frontend. It is optional for a Rust-only build (the hand-written pages are used), and needed for the
+React pages:
+
+```sh
+# Node 22+ and npm
+npm install                 # once, at the repo root
+npm run typecheck && npm run lint
+cargo build --release -p helix-settings   # builds the React bundle first when node_modules exists
+# HELIX_SKIP_FRONTEND=1 skips the frontend build
+```
+
+Design and rules: [docs/design/frontend-stack.md](docs/design/frontend-stack.md).
+
 ## Building and installing
 
 Requires [just](https://github.com/casey/just) and [meson](https://mesonbuild.com/).
