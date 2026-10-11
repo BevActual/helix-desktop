@@ -15,6 +15,8 @@ interface Route { backend?: string; model?: string; label?: string; }
 
 export interface DialogHooks {
   report: (error: unknown) => void;
+  /** A message was edited and sent: the chat should follow the new reply. */
+  edited: (index: number, text: string) => void;
   /** The chat route was changed from the picker. */
   routeChanged: (backend: string, model: string) => void;
   /** Close the hub menu when a dialog opens from it. */
@@ -25,6 +27,7 @@ export interface DialogHandle {
   openProject: (current: string, suggestions: string[]) => void;
   openModel: () => void;
   openPersona: (create?: boolean) => void;
+  openEdit: (index: number, text: string) => void;
 }
 
 function initials(name: string): string {
@@ -74,7 +77,9 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   }, []);
 
   // which sheet is open
-  const [sheet, setSheet] = useState<"" | "rename" | "project" | "persona" | "model">("");
+  const [sheet, setSheet] = useState<"" | "rename" | "project" | "persona" | "model" | "edit">("");
+  const [editIndex, setEditIndex] = useState(0);
+  const [editText, setEditText] = useState("");
   const closeSheet = useCallback(() => setSheet(""), []);
 
   // rename
@@ -120,6 +125,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
       openRename: (value) => { setTitle(value || "New chat"); setSheet("rename"); },
       openProject: (value, names) => { setProject(value || ""); setSuggestions(names); setSheet("project"); },
       openPersona,
+      openEdit: (index, text) => { setEditIndex(index); setEditText(text); setSheet("edit"); },
       openModel: async () => {
         try {
           const route = await invoke<Route>("chat_current_route");
@@ -186,6 +192,33 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
             rail,
           )
         : null}
+
+      <Sheet id="edit-dialog" test="edit-dialog" open={sheet === "edit"} onClose={closeSheet}>
+        <form
+          className="sheet-body"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const value = editText.trim();
+            if (!value) { report("Write something to send."); return; }
+            closeSheet();
+            hooksRef.current.edited(editIndex, value);
+          }}
+        >
+          <header className="sheet-head">
+            <h3>Edit message</h3>
+            <p className="sheet-note">Later replies in this chat will be removed and a new answer will be generated.</p>
+          </header>
+          <div className="sheet-scroll">
+            <label className="sheet-field">Message
+              <textarea id="edit-text" data-test="edit-text" rows={8} maxLength={4000} required value={editText} onChange={(event) => setEditText(event.target.value)} />
+            </label>
+          </div>
+          <div className="sheet-actions">
+            <button type="button" onClick={closeSheet}>Cancel</button>
+            <button type="submit" className="primary" data-test="edit-save">Send</button>
+          </div>
+        </form>
+      </Sheet>
 
       <Sheet id="rename-dialog" test="rename-dialog" small open={sheet === "rename"} onClose={closeSheet}>
         <form

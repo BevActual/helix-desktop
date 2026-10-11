@@ -46,4 +46,24 @@ click_id meta-model; sleep 1.2
 has_id model-auto && echo "ok: the model picker opened" || fail "no model picker"
 click_id model-auto; sleep 1
 has_id model-auto && fail "the picker stayed open" || echo "ok: Auto closed the picker"
+echo "--- 5. find in the chat"
+click_id input; wtype "/find"; sleep 0.4; wtype -k Return; sleep 0.8
+has_id find-input && echo "ok: the find bar opened" || fail "no find bar"
+wtype "cron"; sleep 1
+has_id find-hit && echo "ok: matches are highlighted in the thread" || fail "no highlighted match"
+click_id find-close; sleep 0.6
+has_id find-hit && fail "highlights stayed after closing find" || echo "ok: highlights cleared"
+echo "--- 6. edit a message"
+click_id edit-0; sleep 0.8
+has_id edit-text && echo "ok: the edit sheet opened" || fail "no edit sheet"
+wtype " please"; sleep 0.3; click_id edit-save; sleep 1.5
+for _ in $(seq 1 60); do grep -c "MOBIUS turn ended" "$LOG" | grep -q "^[2-9]" && break; sleep 0.25; done
+G=$(grep -l "please" "$CHATS"/*.json 2>/dev/null | head -1)
+[ -n "$G" ] && echo "ok: the edited message was saved" || fail "edit not saved"
+echo "--- 7. fork"
+N=$(ls "$CHATS"/*.json | wc -l)
+for _ in $(seq 1 40); do has_id fork-user-0 && break; sleep 0.25; done
+click_id fork-user-0; sleep 1.5
+M=$(ls "$CHATS"/*.json | wc -l)
+[ "$M" -gt "$N" ] && echo "ok: a fork is a new chat ($N -> $M)" || fail "no fork ($N -> $M)"
 [ $FAILED = 0 ] && echo "ALL ok" || echo FAILED

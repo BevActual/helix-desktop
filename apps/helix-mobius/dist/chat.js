@@ -137,6 +137,7 @@ function openFindBar() {
 }
 
 function closeFindBar() {
+  if (reactThread) reactThread.find("");
   $("find-bar").hidden = true;
   $("find-input").value = "";
   findMatches = [];
@@ -146,6 +147,7 @@ function closeFindBar() {
 }
 
 function clearFindHighlights() {
+  if (reactThread) return; // the thread draws its own highlights from the needle
   document.querySelectorAll("mark.find-hit").forEach((mark) => {
     const parent = mark.parentNode;
     if (!parent) return;
@@ -184,6 +186,16 @@ function highlightInNode(node, needle) {
 }
 
 function runFind() {
+  if (reactThread) {
+    const needle = $("find-input").value.trim();
+    reactThread.find(needle);
+    findMatches = Array.from(document.querySelectorAll("#messages mark.find-hit"));
+    findIndex = -1;
+    if (!needle) { $("find-count").textContent = ""; return; }
+    $("find-count").textContent = findMatches.length ? ("1 / " + findMatches.length) : "0";
+    if (findMatches.length) { findIndex = 0; focusFindMatch(0); }
+    return;
+  }
   clearFindHighlights();
   findMatches = [];
   findIndex = -1;
@@ -432,6 +444,7 @@ function messageNode(message, index, last) {
 }
 
 function editUserMessage(index, current) {
+  if (reactDialogs) { reactDialogs.openEdit(index, current); return; }
   editingMessageIndex = index;
   $("edit-text").value = current;
   $("edit-dialog").showModal();
@@ -502,9 +515,13 @@ function syncSendEnabled() {
 function drawChat() {
   $("chat-title").textContent = view.temporary ? "Temporary chat" : (view.title || "New chat");
   drawComposerMeta();
-  const host = $("messages");
-  host.replaceChildren();
-  view.messages.forEach((message, index) => host.append(messageNode(message, index, index === view.messages.length - 1)));
+  if (reactThread) {
+    reactThread.set(view.messages, view.streaming);
+  } else {
+    const host = $("messages");
+    host.replaceChildren();
+    view.messages.forEach((message, index) => host.append(messageNode(message, index, index === view.messages.length - 1)));
+  }
   $("empty").hidden = view.messages.length > 0;
   $("send").hidden = view.streaming;
   $("stop").hidden = !view.streaming;
@@ -544,6 +561,11 @@ listen("chat-view", (event) => {
   if (wasStreaming && !view.streaming) flushQueue();
 });
 listen("chat-stream", (event) => {
+  if (reactThread) {
+    reactThread.stream(event.payload.blocks);
+    if (stickToBottom) scrollDown();
+    return;
+  }
   const last = $("messages").lastElementChild;
   if (!last || !last.classList.contains("assistant")) return;
   drawBlocks(last.querySelector(".msg-body"), event.payload.blocks);
@@ -573,6 +595,29 @@ const reactDialogs = window.HelixMobiusReact
     report: (error) => report(error),
     routeChanged: (backend, model) => { currentBackend = backend; currentModel = model; drawComposerMeta(); },
     closeMenu: () => closeHubMenu(),
+    edited: (index, text) => {
+      stickToBottom = true;
+      invoke("chat_edit", { index, text })
+        .then(() => invoke("chat_status").then((s) => { status = s; drawComposerMeta(); }))
+        .catch(report);
+    },
+  })
+  : null;
+
+// The message thread is React when the bundle is present; the hand-written drawing is the fallback.
+const reactThread = window.HelixMobiusReact
+  ? window.HelixMobiusReact.thread($("messages"), {
+    edit: (index, text) => editUserMessage(index, text),
+    act: (text) => actOnDesktop(text),
+    quote: (text) => {
+      const prefix = input.value && !input.value.endsWith("\n") ? "\n\n" : "";
+      input.value = input.value + prefix + text;
+      grow();
+      syncSendEnabled();
+      input.focus();
+    },
+    fork: (index) => forkChat(index),
+    report: (error) => report(error),
   })
   : null;
 
