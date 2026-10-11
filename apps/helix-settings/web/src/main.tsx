@@ -7,6 +7,7 @@ import { KeyboardPage } from "./pages/KeyboardPage";
 import { WallpaperPage } from "./pages/WallpaperPage";
 import { NetworkPage } from "./pages/NetworkPage";
 import { BluetoothPage } from "./pages/BluetoothPage";
+import { AgentsPage } from "./pages/AgentsPage";
 
 export interface MountOptions {
   /** Rows the host page already has (service settings arrive as events, not from a command). */
@@ -53,6 +54,7 @@ const custom: Record<string, (props: { register: (handle: PageHandle) => void; o
   wallpaper: ({ register }) => <WallpaperPage register={register} report={report} />,
   network: ({ register }) => <NetworkPage register={register} />,
   bluetooth: ({ register }) => <BluetoothPage register={register} />,
+  agents: ({ register }) => <AgentsPage register={register} />,
 };
 
 function mountPage(name: string, host: HTMLElement, options: MountOptions): Controller | null {

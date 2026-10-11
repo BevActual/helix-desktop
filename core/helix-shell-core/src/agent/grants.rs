@@ -49,6 +49,7 @@ pub enum RequestError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct TierSwitch {
     pub name: &'static str,
     pub on: bool,
@@ -56,6 +57,7 @@ pub struct TierSwitch {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ClientView {
     /// Opaque key handed back to the model. Never shown.
     pub id: String,
@@ -70,6 +72,7 @@ pub struct ClientView {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct GrantsView {
     pub clients: Vec<ClientView>,
     /// Newest first.

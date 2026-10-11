@@ -84,6 +84,7 @@ pub struct GrantRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct HistoryRow {
     pub time: String,
     pub who: String,

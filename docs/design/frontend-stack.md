@@ -44,12 +44,12 @@ The cost is about 3 MB on a 150 MB app (the WebKit baseline dominates) and no me
 
 ## Ported so far
 
-Settings: Dock, Power & lock, Displays, Appearance, Accessibility (all the "rows" pages; one generic `RowsPage` in `apps/helix-settings/web`
-driven by a small spec per page). Each keeps the hand-written drawing as its fallback in `settings.js`. The nested `settings` and
-`settings-dock` tests pass unchanged, and the pages are pixel-for-pixel what the hand-written ones drew.
+**All Settings pages are React**: Dock, Power & lock, Displays, Appearance, Accessibility (one generic `RowsPage` driven by a spec per page),
+and About, Keyboard, Wallpaper (with Wallhaven search), Network (password, enterprise, VPN), Bluetooth (pairing), Privacy & agents (own
+components). The sidebar, search and the page chrome stay in `settings.js`, and each page keeps its hand-written drawing as the fallback for a
+build without node. The nested `settings`, `settings-net` and `settings-dock` tests and the Wallhaven test pass unchanged.
 
 ## Next
 
-Wallpaper (Wallhaven search is the first real use of React state), Network, Bluetooth, Keyboard, Privacy & agents, About; then Mobius
-(streaming messages, edit/branch, search, attachments), Software and Monitor. When a page is ported and a release has run on it, its
-hand-written fallback is deleted in the same change.
+Mobius (streaming messages, edit/branch, search, attachments), Software and Monitor. Then the Settings shell itself (sidebar, search page) and
+the deletion of the hand-written page drawing once a release has run on the React pages.

@@ -502,6 +502,7 @@ $("search").addEventListener("input", () => {
 
 // Approvals: whether an approval may be given where the desktop cannot protect the dialog -----------------------------------------------
 function drawApprovals(allow) {
+  if (reactPages.agents) return;
   const card = $("approvals-card");
   card.replaceChildren();
   const line = el("div", "setting-row");
@@ -530,6 +531,7 @@ $("open-mobius").onclick = () => invoke("open_mobius").catch((error) => {
 
 // Privacy & agents ------------------------------------------------------------------------------------------------------------------
 function drawAgents(view) {
+  if (reactPages.agents) return;   // the React page listens for this event itself
   const note = $("agents-note");
   note.textContent = view.status === "connected" ? "" :
     view.status === "denied" ? "This copy of Settings is not the installed one, so it cannot manage agent access." :
