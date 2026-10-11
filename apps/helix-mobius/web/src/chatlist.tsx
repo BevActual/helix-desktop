@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@helix/ui";
 
 declare function icon(name: string): SVGElement;
@@ -27,6 +27,24 @@ export interface ChatListHooks {
 }
 export interface ChatListHandle {
   set: (items: ChatItem[], currentId: string) => void;
+}
+
+/** The date section a chat opens: Pinned, Today, Yesterday, Previous 7 Days, Earlier; shown once, above its first chat. */
+function bucket(item: ChatItem, now: number): string {
+  if (item.pinned) return "Pinned";
+  const age = now - Number(item.updated || 0);
+  const day = 86_400;
+  const startOfToday = now - (now % day);
+  const updated = Number(item.updated || 0);
+  if (updated >= startOfToday) return "Today";
+  if (updated >= startOfToday - day) return "Yesterday";
+  if (age < 7 * day) return "Previous 7 days";
+  if (age < 30 * day) return "Previous 30 days";
+  return "Earlier";
+}
+function sectionOf(item: ChatItem, index: number, all: ChatItem[], now: number): string {
+  const mine = bucket(item, now);
+  return index === 0 || bucket(all[index - 1], now) !== mine ? mine : "";
 }
 
 /** The sidebar's search, project filter and chat list. Rust owns the chats and the full-text search; this filters what it was given and
@@ -63,6 +81,8 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
   }, [needle]);
 
   const lower = needle.toLowerCase();
+  const searching = lower.length >= 2;
+  const now = Math.floor(Date.now() / 1000);
   const snippets: Record<string, string> = {};
   let shown: ChatItem[];
   if (lower.length >= 2 && hits) {
@@ -95,8 +115,10 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
         {!shown.length ? <div className="chat-empty">{lower || project ? "No matching chats" : "No chats yet"}</div> : null}
         {shown.map((item, index) => {
           const snippet = snippets[item.id] || (lower && item.preview) || "";
-          return (
-            <div key={item.id} className={`chat-row${item.id === currentId ? " current" : ""}${item.pinned ? " pinned" : ""}`} data-test={`chat-${index}`}>
+          const label = !searching ? sectionOf(item, index, shown, now) : "";
+          return (<Fragment key={item.id}>
+            {label ? <div className="chat-section">{label}</div> : null}
+            <div className={`chat-row${item.id === currentId ? " current" : ""}${item.pinned ? " pinned" : ""}`} data-test={`chat-${index}`}>
               <button
                 className="chat-open"
                 onClick={() => {
@@ -122,7 +144,7 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
                 <Icon name="trash" />
               </button>
             </div>
-          );
+          </Fragment>);
         })}
       </nav>
     </>

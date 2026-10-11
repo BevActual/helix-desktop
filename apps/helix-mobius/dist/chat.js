@@ -1833,7 +1833,7 @@ $("route-probe-cloud").onclick = () => {
   const host = $("empty");
   host.append(el("div", "empty-kicker", "Mobius"));
   host.append(el("div", "empty-title", "How can I help?"));
-  host.append(el("div", "empty-note", "Talk here for longer chats. The bar sparkle is the same Mobius for quick asks, Act, and Agents. Type / for commands · ⌘⇧A to Act."));
+  host.append(el("div", "empty-note", "Ask anything, or type / for commands. Press Ctrl+Shift+A to have Mobius act on the desktop."));
   const suggestions = el("div", "suggestions");
   [
     "Explain what a cron job is",

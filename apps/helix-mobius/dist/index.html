@@ -3,17 +3,9 @@
 <div id="app" data-test="app">
   <aside id="side" data-test="side">
     <div id="titlebar" data-tauri-drag-region>
-      <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
+      <button id="close" class="win-btn hx-close" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
       <span id="brand">Mobius</span>
-    </div>
-    <div class="side-actions">
-      <button id="new-chat" data-test="new-chat"><i data-icon="plus"></i><span>New chat</span></button>
-      <button id="temp-chat" class="temp-chat" data-test="temp-chat" type="button" title="Temporary chat — not saved">
-        <i data-icon="eye"></i><span>Temporary</span>
-      </button>
-      <button id="open-models" class="open-models" data-test="open-models" type="button" title="Models &amp; routing">
-        <i data-icon="sparkle"></i><span>Models</span>
-      </button>
+      <button id="new-chat" class="compose" data-test="new-chat" title="New chat" aria-label="New chat"><i data-icon="plus"></i><span>New chat</span></button>
     </div>
     <div id="chat-list-host" style="display: contents">
     <label class="chat-search" for="chat-search">
@@ -24,6 +16,12 @@
     <nav id="chats" data-test="chats"></nav>
     </div>
     <div id="side-footer">
+      <button id="temp-chat" class="temp-chat" data-test="temp-chat" type="button" title="Temporary chat — not saved">
+        <i data-icon="eye"></i><span>Temporary chat</span>
+      </button>
+      <button id="open-models" class="open-models" data-test="open-models" type="button" title="Models &amp; routing">
+        <i data-icon="sparkle"></i><span>Models &amp; routing</span>
+      </button>
       <div id="hub-menu" class="hub-menu" hidden data-test="hub-menu">
         <div class="hub-menu-label">Mobius</div>
         <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Act on the desktop</span></button>

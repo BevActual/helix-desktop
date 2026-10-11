@@ -7,4 +7,4 @@ click_id() {
   pos=$(python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1" "${2:-0.5}") || { echo "NOT FOUND: $1"; return 1; }
   "$PT" ${pos} click; sleep "${CLICK_PAUSE:-0.8}"
 }
-has_id() { python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1" >/dev/null 2>&1; }
+has_id() { UI_POS_NOWAIT=1 python3 "$ROOT/tools/nested/ui_pos.py" "$LAYOUT" "$1" >/dev/null 2>&1; }
