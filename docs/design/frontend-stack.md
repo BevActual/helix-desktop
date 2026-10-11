@@ -108,7 +108,17 @@ processes and the service; two runs each, release builds):
 | Idle | 160.4 / 161.9 MB | 167.2 / 166.5 MB |
 | Shade open | 162.3 / 163.8 MB | 168.9 / 168.7 MB |
 
-Bundle: 243 KB (75 KB gzip). The cost is about **+5 MB** (the React runtime, four roots, and the control center's state), above the run-to-run
+Re-measured with every shell island (adds quick insert, Mobius dropdown, island, OSD, tray, dock icons), three interleaved release runs each:
+
+| | hand-written | React islands |
+|---|---|---|
+| Idle (PSS) | 111.9 / 113.8 / 113.5 MB | 118.8 / 119.0 / 119.0 MB |
+
+About **+5.5 MB** with all islands, so later slices cost almost nothing: the React runtime is the fixed part. (Absolute numbers are lower than
+the table above because the nested environment changed; compare only within one table. Runs that overlap a build or a lingering nested
+session read 200–300 MB: measure alone.) Shell bundle is now 258 KB (79 KB gzip).
+
+Earlier table: bundle 243 KB (75 KB gzip). The cost was about **+5 MB** (the React runtime, four roots, and the control center's state), above the run-to-run
 noise of about 1.5 MB. It grows slowly per slice now because the runtime is the fixed part. Re-measure with `tools/nested/measure-settings-test.sh` and
 `tools/nested/measure-shell-test.sh` as slices land and when the bundle or dependency set grows; the budget table in `tauri-rust-shell.md`
 is the limit.
