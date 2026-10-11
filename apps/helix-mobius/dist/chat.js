@@ -1492,9 +1492,28 @@ function closeModelsPage() {
   modelsDirty = false;
 }
 
+// The Models & routing page is React when the bundle is present; the hand-written page below is the fallback.
+const reactModels = window.HelixMobiusReact
+  ? window.HelixMobiusReact.models($("models-page"), {
+    visible: (shown) => {
+      document.body.classList.toggle("models-open", shown);
+      $("models-page").hidden = !shown;
+      queueReport();
+    },
+    saved: (backend, model) => {
+      currentBackend = backend;
+      currentModel = model;
+      invoke("chat_status").then((next) => { status = next; drawComposerMeta(); });
+    },
+    localModels: (ids) => attachModelList(ids),
+    report: (error) => report(error),
+  })
+  : null;
+
 async function openRouting() {
   closeHubMenu();
   closeSideDrawer();
+  if (reactModels) { reactModels.open(); return; }
   await invoke("routing_ensure_openrouter").catch(() => {});
   const routing = await invoke("routing_get");
   const lan = (routing.backends || []).find((b) => b.id === "lan");
