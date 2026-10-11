@@ -25,7 +25,13 @@ if tauri; then
     screenshot-screen) exec niri msg action screenshot-screen ;;
     lock|lid-close)
       # swaylock speaks ext-session-lock-v1 (niri keeps the session locked even if the locker dies) and authenticates with PAM.
-      exec swaylock --daemonize --color 0e1028 ;;
+      # The colours are the shared tokens (core/shared-ui/style.css: accent, danger, ok) so the lock matches the login card.
+      exec swaylock --daemonize --color 0e1028 --indicator-idle-visible --indicator-radius 70 --indicator-thickness 6 \
+        --inside-color 1e1e22dd --inside-clear-color 1e1e22dd --inside-ver-color 1e1e22dd --inside-wrong-color 1e1e22dd \
+        --ring-color ffffff24 --ring-clear-color ffffff24 --ring-ver-color 0a84ffff --ring-wrong-color ff453aff \
+        --key-hl-color 0a84ffff --bs-hl-color ff453aff --line-color 00000000 --separator-color 00000000 \
+        --text-color ffffffe6 --text-clear-color ffffffe6 --text-ver-color ffffffe6 --text-wrong-color ff453aff \
+        --font Inter ;;
     settings) exec helix-settings ;;
     window-switcher) exec niri msg action focus-window-previous ;;
     volume-up) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustVolume i 5 && exit 0; exec wpctl set-volume -l 1.0 @DEFAULT_AUDIO_SINK@ 5%+ ;;

@@ -5,7 +5,7 @@
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); FAILED=0
 fail() { echo "FAIL: $*" >&2; FAILED=1; }
 sleep 3
-niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5
+niri msg action screenshot-screen --show-pointer false >/dev/null 2>&1; sleep 1.5
 SHOT=$(ls -t "$SCRATCH"/shots/*.png | head -1); cp "$SHOT" "$SCRATCH/wallpaper.png"
 python3 - "$SCRATCH/wallpaper.png" <<'PY' || FAILED=1
 import sys, gi
@@ -24,7 +24,7 @@ PY
 echo "--- a choice written by Settings replaces the wallpaper without a restart"
 printf '[wallpaper.default]\npath = "color:#ff00ff"\n' > "$SCRATCH/state/choice.toml.tmp" && mv "$SCRATCH/state/choice.toml.tmp" "$SCRATCH/state/choice.toml"
 sleep 3
-niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5
+niri msg action screenshot-screen --show-pointer false >/dev/null 2>&1; sleep 1.5
 cp "$(ls -t "$SCRATCH"/shots/*.png | head -1)" "$SCRATCH/wallpaper-changed.png"
 python3 - "$SCRATCH/wallpaper-changed.png" <<'PY' || FAILED=1
 import sys, gi
