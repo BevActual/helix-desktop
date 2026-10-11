@@ -9,12 +9,18 @@ This page is the source of truth for how app UIs are built. When code and this p
 
 | Surface | Stack | Why |
 |---|---|---|
-| Apps under `apps/` (Settings, Mobius, Software, System Monitor, new apps) | **Tauri + React + TypeScript + Vite** | Run on demand, so a framework's memory and startup cost is small next to the WebKit baseline; polish and maintainability matter more |
-| Session shell: bar, panels, dock, island, OSD (`shell/`) | Tauri + hand-written HTML/CSS/JS (no build step) | Always running, memory-sensitive |
-| Approval dialog (confirmer), greeter, lock-adjacent surfaces | Tauri + hand-written HTML/CSS/JS | Security-critical: small enough to audit, no framework between the person and the decision |
+| Apps under `apps/` (Settings, Mobius, Software, System Monitor, new apps) | **Tauri + React + TypeScript + Vite** | Run on demand; polish and maintainability matter most |
+| Session shell: bar, panels, dock, island, OSD (`shell/helix-shell-tauri`) | **Tauri + React + TypeScript + Vite**, moved in slices (see Status) | Decided 2026-10-11 after measuring: the framework costs 0–3 MB per process in the nested harness, inside run-to-run noise |
+| Approval dialog (confirmer), greeter | Tauri + hand-written HTML/CSS/JS, no build step | Security-critical: small enough to audit, no framework between the person and the decision |
 | Helpers (`services/`) | Rust only | No UI |
 
-A new app starts as React. A shell or trust surface does not become React without changing this page first.
+A new app starts as React. The confirmer and greeter do not become React without changing this page first.
+
+**How the shell moves.** The shell page (`shell/helix-shell-tauri/dist`) hosts the bar and every panel in one document, with geometry
+reporting (input regions, glass rectangles, test layout) tied to element ids. It moves slice by slice: a React island renders into an
+existing container (its id and geometry stay), `shell.js` keeps the mode, the regions and the glass until the last slice, and each slice
+keeps the hand-written drawing as the fallback for a build without node. When every slice is React, `shell.js` becomes the thin React
+entry point and the fallbacks are deleted.
 
 ## Layout
 
@@ -69,14 +75,17 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 
 ## Status
 
-| App | State |
+| Surface | State |
 |---|---|
-| **Settings** | **All pages React** (Appearance, Wallpaper + Wallhaven, Accessibility, Displays, Network, Bluetooth, Keyboard, Dock, Power & lock, Privacy & agents, About). Sidebar, search and page chrome still in `settings.js`; each page's hand-written drawing is the fallback and is deleted after a release has run on the React page |
-| Mobius (`helix-mobius`) | Hand-written today (`dist/chat.js`, ~1,800 lines). **Next**: streaming messages, edit/branch, search, attachments, personas, model picker |
-| Software | Hand-written (small). Port when it next grows a page |
-| System Monitor | Hand-written (small). Port when it next grows a page |
+| **Settings** | **All pages React**. Sidebar, search and page chrome still in `settings.js`; each page's hand-written drawing is the fallback and is deleted after a release has run on the React page |
+| **Shell: notifications** | **React islands** (toasts and the shade). Do-not-disturb marks, badge and buttons still drawn by `shell.js` |
+| Shell: launcher, Today, control center (sound, Wi-Fi, Bluetooth, tiles, media, brightness), Mobius dropdown, quick insert, island, OSD, tray, dock, bar | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
+| Mobius app (`helix-mobius`) | Hand-written (`dist/chat.js`, ~1,800 lines). Next app to move: streaming messages, edit/branch, search, attachments, personas, model picker |
+| Software, System Monitor | Hand-written (small). Move when they next grow a page |
 
-## Measured cost (Settings, release builds, same nested test)
+## Measured cost (release builds, same nested tests)
+
+Settings (whole app React vs hand-written):
 
 | | hand-written | React |
 |---|---|---|
@@ -85,8 +94,18 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 | Script shipped | none | 250 KB (77 KB gzip) |
 | Time to show a page | no measurable difference | |
 
-About 3–4 MB on a 150 MB app: the WebKit baseline dominates. Re-measure with `tools/nested/measure-settings-test.sh` when the bundle or
-the dependency set grows.
+About 3–4 MB on a 150 MB app: the WebKit baseline dominates.
+
+Shell (notification islands React vs hand-written; total PSS of the shell, its WebKit processes and the service; two runs each):
+
+| | hand-written | React islands |
+|---|---|---|
+| Idle | 164.9 / 161.7 MB | 164.2 / 164.0 MB |
+| Shade open | 164.5 / 164.0 MB | 166.6 / 166.4 MB |
+
+Run-to-run noise is about 3 MB, the same size as the difference. Re-measure with `tools/nested/measure-settings-test.sh` and
+`tools/nested/measure-shell-test.sh` as slices land and when the bundle or dependency set grows; the budget table in `tauri-rust-shell.md`
+is the limit.
 
 ## Known costs and open questions
 

@@ -1,6 +1,6 @@
 ---
-description: Helix app UIs are Tauri + React + TypeScript + Vite; the shell and trust surfaces stay hand-written
-globs: apps/**/web/**,core/shared-ui/react/**
+description: Helix app and shell UIs are Tauri + React + TypeScript + Vite; only the approval dialog and greeter stay hand-written
+globs: apps/**/web/**,shell/**/web/**,core/shared-ui/react/**
 alwaysApply: false
 ---
 
@@ -8,8 +8,10 @@ alwaysApply: false
 
 Full rules: `docs/design/frontend-stack.md`. Short version:
 
-- Apps under `apps/` are **Tauri + React + TypeScript + Vite**. The shell (`shell/`), the approval dialog and the greeter are hand-written
-  HTML/CSS/JS with no build step: do not move them to React.
+- Apps under `apps/` and the session shell (`shell/helix-shell-tauri`) are **Tauri + React + TypeScript + Vite**. The shell moves in
+  slices: a React island renders into an existing container and `shell.js` keeps the mode, input regions and glass until the last slice;
+  keep the hand-written fallback until a slice has run. The approval dialog (`confirmer.*`) and the greeter stay hand-written with no
+  build step: do not move them to React.
 - **Rust owns state and authority.** A page draws the views it is sent and calls typed Tauri commands. Never build a command or an id the
   view did not list.
 - **Text is a text node.** No `dangerouslySetInnerHTML`, no `innerHTML`. Model, app and system text is only ever a React child.

@@ -18,3 +18,5 @@ export type { GrantsView } from "./bindings/GrantsView";
 export type { ClientView } from "./bindings/ClientView";
 export type { TierSwitch } from "./bindings/TierSwitch";
 export type { HistoryRow } from "./bindings/HistoryRow";
+export type { NotificationsView } from "./bindings/NotificationsView";
+export type { ItemView as NotificationItem } from "./bindings/ItemView";

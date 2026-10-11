@@ -76,8 +76,8 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 4. **Backends are replaceable behind snapshots.** Unavailable backends return readable empty/unavailable snapshots; pages still navigate.
 5. **Migration is domain cutover, not a big bang.** Parity on nested/unit tests, then delete the C++ domain in the same change (`cpp-to-rust.md`).
 6. **Visual language is one HIG.** GTK4/libadwaita for shared controls; glass only on floating chrome (`helix-hig.md`).
-7. **Apps are React; the shell is not.** App UIs are Tauri + React + TypeScript + Vite over typed commands; the always-on shell and the
-   trust surfaces (approval dialog, greeter) stay hand-written (`frontend-stack.md`).
+7. **Apps and the shell are Tauri + React + TypeScript + Vite** over typed commands (the shell moves in slices); only the trust surfaces
+   (approval dialog, greeter) stay hand-written (`frontend-stack.md`).
 
 ## Process inventory (target end state)
 

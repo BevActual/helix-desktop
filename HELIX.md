@@ -28,7 +28,7 @@ cd compositor && cargo build --release
 cargo build --profile fast -p helix-greeter
 ```
 
-Standalone apps under `apps/` are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`). The shell and the approval dialog stay hand-written. Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
+Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`); the shell moves in slices. Only the approval dialog and the greeter stay hand-written. Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
 
 ## Repository map
 

@@ -3,7 +3,11 @@
   "private": true,
   "type": "module",
   "description": "Frontend workspace for the React apps (apps/*/web) and the shared component package (core/shared-ui/react). The shell and greeter are not in it: they stay hand-written.",
-  "workspaces": ["core/shared-ui/react", "apps/helix-settings/web"],
+  "workspaces": [
+    "core/shared-ui/react",
+    "apps/helix-settings/web",
+    "shell/helix-shell-tauri/web"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",

@@ -58,3 +58,4 @@ rust_out
 # frontend workspace
 node_modules/
 apps/*/dist/react/
+shell/*/dist/react/

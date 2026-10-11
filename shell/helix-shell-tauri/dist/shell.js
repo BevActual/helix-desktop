@@ -260,7 +260,15 @@ function notificationBody(item) {
   if (item.body) text.append(ntext("nbody", item.body));
   return text;
 }
+let reactNotifications = null;   // set by shell-react.js when the React bundle is present
+let lastNotifications = null;
 function drawNotifications(view) {
+  lastNotifications = view;
+  if (reactNotifications) {
+    reactNotifications.update(view);
+    drawNotificationChrome(view);
+    return;
+  }
   const toasts = $("toasts");
   toasts.replaceChildren();
   view.toasts.forEach((item) => {
@@ -292,6 +300,10 @@ function drawNotifications(view) {
     row.append(appBadge(item.app), text, dismiss);
     list.append(row);
   });
+  drawNotificationChrome(view);
+}
+// Everything around the lists: the empty line, the buttons, the do-not-disturb marks and the badge (drawn by shell.js either way).
+function drawNotificationChrome(view) {
   $("notif-empty").textContent = view.items.length ? "" : "No notifications";
   $("notif-clear").disabled = !view.items.length;
   $("notif-dnd").textContent = "Do not disturb";
@@ -1339,7 +1351,7 @@ function sendReport() {
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
     if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, elements } });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: reactNotifications ? ["notifications"] : [], elements } });
 }
 window.addEventListener("resize", () => queueReport());
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });

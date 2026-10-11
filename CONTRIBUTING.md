@@ -30,7 +30,7 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 | Serialization | `serde`, `serde_json` |
 | TypeScript bindings | `ts-rs` (feature `ts`, `tools/gen-bindings.sh`) |
 
-### Frontend (apps under `apps/`)
+### Frontend (apps under `apps/` and the session shell)
 
 | Layer | Library |
 |-------|---------|
@@ -38,7 +38,7 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 | Shared components | `@helix/ui` in `core/shared-ui/react/` over the shared CSS tokens |
 | Lint | ESLint with `react/no-danger`; text from models, apps and the system is only ever a React child |
 
-The shell, the approval dialog and the greeter are hand-written HTML/CSS/JS with no build step. Rules and status: `docs/design/frontend-stack.md`.
+The approval dialog and the greeter are hand-written HTML/CSS/JS with no build step; the shell is moving to React in slices. Rules and status: `docs/design/frontend-stack.md`.
 
 ### C++ platform (desktop service / assistant / inference — shrinking)
 

@@ -32,6 +32,7 @@ pub const CLOSED_UNDEFINED: u32 = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum Urgency {
     Low,
     Normal,
@@ -99,11 +100,13 @@ pub struct Notifications {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ActionView {
     pub label: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ItemView {
     pub id: u32,
     pub revision: u32,
@@ -117,6 +120,7 @@ pub struct ItemView {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct NotificationsView {
     pub dnd: bool,
     pub unread: usize,
