@@ -1,4 +1,17 @@
-export type Page = "explore" | "library" | "updates" | "sources";
+export type Page = "discover" | "category" | "library" | "updates" | "sources";
+
+/** The store categories: appstream name, name on screen, sidebar icon (matches `CATEGORIES` in helix-shell-core). */
+export const CATEGORIES: { id: string; title: string; icon: string }[] = [
+  { id: "Office", title: "Productivity", icon: "clipboard" },
+  { id: "Graphics", title: "Graphics & Design", icon: "palette" },
+  { id: "AudioVideo", title: "Audio & Video", icon: "music" },
+  { id: "Development", title: "Developer Tools", icon: "fork" },
+  { id: "Game", title: "Games", icon: "play" },
+  { id: "Network", title: "Internet", icon: "wifi" },
+  { id: "Education", title: "Education", icon: "sparkle" },
+  { id: "Science", title: "Science", icon: "sun" },
+  { id: "Utility", title: "Utilities", icon: "settings" },
+];
 
 export interface PackageView {
   id: string;
@@ -11,7 +24,10 @@ export interface PackageView {
   version: string;
   size: number;
   installation: string;
+  verified: boolean;
 }
+export interface Shelf { title: string; category: string; rows: PackageView[]; }
+export interface Discover { hero: PackageView | null; shelves: Shelf[]; }
 export interface PendingView { id: string; title: string; action: "install" | "remove" | "update"; kind: string; }
 export interface Remote { name: string; title: string; url: string; installation: string; enabled: boolean; }
 export interface JobView {
@@ -34,7 +50,10 @@ export interface PageView {
   checking: boolean;
   error: string;
   jobs: JobView[];
+  discover: Discover | null;
+  indexing: boolean;
 }
+export interface Screen { caption: string; uri: string; }
 export interface InfoView {
   found: boolean;
   developer: string;

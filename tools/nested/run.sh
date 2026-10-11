@@ -47,7 +47,7 @@ NIRI_SOCKET=$(grep -oE "/run/user/[0-9]+/niri\.[^ ]*\.sock" "$SCRATCH/niri.log" 
 export NIRI_SOCKET
 DISPLAY_NAME=$(grep -oE "wayland-[0-9]+" "$SCRATCH/niri.log" | tail -1)
 sleep "$SETTLE"
-if [ -n "${HELIX_NESTED_SCRIPT:-}" ]; then WAYLAND_DISPLAY=$DISPLAY_NAME bash "$HELIX_NESTED_SCRIPT" "$SCRATCH"; fi
+if [ -n "${HELIX_NESTED_SCRIPT:-}" ]; then WAYLAND_DISPLAY=$DISPLAY_NAME bash ${HELIX_NESTED_BASH_FLAGS:-} "$HELIX_NESTED_SCRIPT" "$SCRATCH"; fi
 niri msg action screenshot-screen >/dev/null 2>&1; sleep 1.5
 ls -t "$SCRATCH"/shots/*.png 2>/dev/null | head -1 | xargs -I{} cp {} "$SCRATCH/screen.png"
 kill "$NIRI" 2>/dev/null; sleep 1; kill -9 "$NIRI" 2>/dev/null

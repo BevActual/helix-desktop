@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Banner, Button, Chip, Group, HxRow, invoke } from "@helix/ui";
-import { AppIcon, JobProgress, actionFor } from "./rows";
-import { VERB, formatSize, type InfoView, type JobView, type PackageView } from "./types";
+import { AppIcon, Ring, actionFor } from "./rows";
+import { VERB, formatSize, type InfoView, type JobView, type PackageView, type Screen } from "./types";
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
@@ -28,6 +28,15 @@ export function Detail({ pkg, job, blocked, onOpen, onRequest }: {
     return () => { live = false; };
   }, [pkg.id]);
 
+  // Screenshots come from the remote's media host and may take a moment (or be unavailable offline).
+  const [shots, setShots] = useState<Screen[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setShots(null);
+    invoke<Screen[]>("software_screenshots", { id: pkg.id }).then((list) => { if (live) setShots(list); }, () => { if (live) setShots([]); });
+    return () => { live = false; };
+  }, [pkg.id]);
+
   const action = actionFor(pkg);
   const name = pkg.title || pkg.id;
   const source = [pkg.remote, pkg.installation && `${pkg.installation} installation`].filter(Boolean).join(" · ");
@@ -41,7 +50,7 @@ export function Detail({ pkg, job, blocked, onOpen, onRequest }: {
           {pkg.summary ? <p>{pkg.summary}</p> : null}
           <div className="hx-hero-actions">
             {job && job.state === "running" ? (
-              <JobProgress job={job} />
+              <Ring job={job} />
             ) : (
               <>
                 {action === "open" ? (
@@ -58,6 +67,14 @@ export function Detail({ pkg, job, blocked, onOpen, onRequest }: {
           </div>
         </div>
       </div>
+
+      {shots === null ? (
+        <div className="hx-shots" aria-hidden="true"><div className="hx-shot ghost" /><div className="hx-shot ghost" /></div>
+      ) : shots.length ? (
+        <div className="hx-shots" data-test="screenshots">
+          {shots.map((shot, index) => <img key={index} className="hx-shot" src={shot.uri} alt={shot.caption} draggable={false} />)}
+        </div>
+      ) : null}
 
       <div className="hx-facts" data-test="facts">
         <Fact label="Version" value={info?.release || pkg.version} />

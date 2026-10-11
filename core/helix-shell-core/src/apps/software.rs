@@ -34,6 +34,20 @@ pub struct Package {
     pub size: u64,
     /// `user` or `system` for Flatpak; empty otherwise.
     pub installation: String,
+    /// Appstream categories as published (`Utility`, `Game`, …); empty until the appstream index has been read.
+    pub categories: Vec<String>,
+    /// Unix time of the newest release (0 when unknown).
+    pub released: u64,
+    /// The publisher is verified by its remote.
+    pub verified: bool,
+}
+
+/// What the appstream index adds to a package.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Meta {
+    pub categories: Vec<String>,
+    pub released: u64,
+    pub verified: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -48,6 +62,40 @@ pub struct PackageView {
     pub version: String,
     pub size: u64,
     pub installation: String,
+    pub verified: bool,
+}
+
+/// A row of apps on the Discover page.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Shelf {
+    pub title: String,
+    /// The category this shelf stands for (empty for "Recently updated"); "See All" opens it.
+    pub category: String,
+    pub rows: Vec<PackageView>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct Discover {
+    pub hero: Option<PackageView>,
+    pub shelves: Vec<Shelf>,
+}
+
+/// The categories the store shows: (appstream category, name on screen).
+pub const CATEGORIES: [(&str, &str); 9] = [
+    ("Office", "Productivity"),
+    ("Graphics", "Graphics & Design"),
+    ("AudioVideo", "Audio & Video"),
+    ("Development", "Developer Tools"),
+    ("Game", "Games"),
+    ("Network", "Internet"),
+    ("Education", "Education"),
+    ("Science", "Science"),
+    ("Utility", "Utilities"),
+];
+
+/// A package belongs to a store category when any of its appstream categories maps to it (Audio and Video count as AudioVideo).
+fn in_category(package: &Package, category: &str) -> bool {
+    package.categories.iter().any(|c| c == category || (category == "AudioVideo" && (c == "Audio" || c == "Video")))
 }
 
 /// One page of a result list (the catalog is thousands of rows; the page asks for a window).
@@ -95,6 +143,9 @@ impl Store {
                 version: sanitize_for_display(&p.version, 40),
                 size: p.size,
                 installation: sanitize_for_display(&p.installation, 16),
+                categories: p.categories.into_iter().take(8).map(|c| sanitize_for_display(&c, 32)).collect(),
+                released: p.released,
+                verified: p.verified,
             })
             .collect();
     }
@@ -116,11 +167,17 @@ impl Store {
 
     /// A ranked window of the catalog: title matches first (exact, prefix, word prefix, contains), then id, then summary; ties by title.
     pub fn explore_page(&self, kind: Kind, query: &str, offset: usize, limit: usize) -> Page {
+        self.explore_in(kind, query, "", offset, limit)
+    }
+
+    /// As `explore_page`, limited to one store category (an appstream name from [`CATEGORIES`]; empty = all).
+    pub fn explore_in(&self, kind: Kind, query: &str, category: &str, offset: usize, limit: usize) -> Page {
         let q = sanitize_for_display(query, MAX_QUERY).to_ascii_lowercase();
         let mut ranked: Vec<(u8, String, &Package)> = self
             .packages
             .iter()
             .filter(|p| p.kind == kind)
+            .filter(|p| category.is_empty() || in_category(p, category))
             .filter_map(|p| {
                 let title = p.title.to_ascii_lowercase();
                 let rank = if q.is_empty() {
@@ -160,6 +217,54 @@ impl Store {
         let mut rows: Vec<PackageView> = self.packages.iter().filter(|p| p.update).map(view_of).collect();
         rows.sort_by_key(|row| row.title.to_ascii_lowercase());
         rows
+    }
+
+    /// Attaches what the appstream index found (categories, newest release, verified publisher).
+    pub fn apply_meta(&mut self, meta: &std::collections::HashMap<String, Meta>) {
+        for package in &mut self.packages {
+            if let Some(found) = meta.get(&package.id) {
+                package.categories = found.categories.iter().take(8).map(|c| sanitize_for_display(c, 32)).collect();
+                package.released = found.released;
+                package.verified = found.verified;
+            }
+        }
+    }
+
+    /// The Discover page: one hero and a shelf per category, built from the index. `day` rotates the hero daily; `has_icon` keeps apps
+    /// that would show a lettered tile off the shelves.
+    pub fn discover(&self, kind: Kind, day: u64, per_shelf: usize, has_icon: &dyn Fn(&Package) -> bool) -> Discover {
+        let good = |p: &&Package| p.kind == kind && !p.title.is_empty() && !p.summary.is_empty() && has_icon(p);
+        // Quality order: verified first, then the most recently released.
+        let order = |a: &&Package, b: &&Package| (b.verified, b.released).cmp(&(a.verified, a.released));
+        let mut all: Vec<&Package> = self.packages.iter().filter(good).collect();
+        all.sort_by(order);
+        let recent_cut = all.iter().map(|p| p.released).max().unwrap_or(0).saturating_sub(180 * 86_400);
+        let heroes: Vec<&&Package> = all.iter().filter(|p| p.verified && p.released >= recent_cut && p.released > 0).take(30).collect();
+        let hero = if heroes.is_empty() { None } else { Some(view_of(heroes[(day as usize) % heroes.len()])) };
+        let hero_id = hero.as_ref().map(|h| h.id.clone());
+        let mut shelves = Vec::new();
+        let mut recent: Vec<&Package> = all.iter().copied().filter(|p| p.released > 0 && Some(&p.id) != hero_id.as_ref()).collect();
+        recent.sort_by_key(|p| std::cmp::Reverse(p.released));
+        if !recent.is_empty() {
+            shelves.push(Shelf {
+                title: "Recently updated".into(),
+                category: String::new(),
+                rows: recent.into_iter().take(per_shelf).map(view_of).collect(),
+            });
+        }
+        for (category, title) in CATEGORIES {
+            let rows: Vec<PackageView> = all
+                .iter()
+                .copied()
+                .filter(|p| in_category(p, category) && Some(&p.id) != hero_id.as_ref())
+                .take(per_shelf)
+                .map(view_of)
+                .collect();
+            if rows.len() >= 3 {
+                shelves.push(Shelf { title: title.into(), category: category.into(), rows });
+            }
+        }
+        Discover { hero, shelves }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -217,6 +322,7 @@ fn view_of(package: &Package) -> PackageView {
         version: package.version.clone(),
         size: package.size,
         installation: package.installation.clone(),
+        verified: package.verified,
     }
 }
 
@@ -432,6 +538,46 @@ mod tests {
         assert_eq!(window.total, 4);
         // No query: every package, by title.
         assert_eq!(s.explore_page(Kind::Flatpak, "", 0, 100).rows.first().unwrap().title, "Calc");
+    }
+
+    #[test]
+    fn discover_builds_a_hero_and_shelves_from_the_index() {
+        let mut s = Store::default();
+        let mut meta = std::collections::HashMap::new();
+        for i in 0..8u64 {
+            let id = format!("org.t.App{i}");
+            s.set(
+                s.packages
+                    .iter()
+                    .cloned()
+                    .chain([Package {
+                        id: id.clone(),
+                        title: format!("App {i}"),
+                        summary: "something".into(),
+                        ..Default::default()
+                    }])
+                    .collect(),
+            );
+            meta.insert(
+                id,
+                Meta { categories: vec![if i % 2 == 0 { "Game".into() } else { "Utility".into() }], released: 1_700_000_000 + i * 1000, verified: i != 0 },
+            );
+        }
+        s.apply_meta(&meta);
+        let found = s.discover(Kind::Flatpak, 3, 12, &|_| true);
+        let hero = found.hero.expect("a hero");
+        assert!(hero.verified);
+        let titles: Vec<_> = found.shelves.iter().map(|shelf| shelf.title.as_str()).collect();
+        assert_eq!(titles.first(), Some(&"Recently updated"));
+        assert!(titles.contains(&"Games") && titles.contains(&"Utilities"));
+        // The hero is not repeated on a shelf.
+        assert!(found.shelves.iter().all(|shelf| shelf.rows.iter().all(|r| r.id != hero.id)));
+        // An app without an icon is kept off the shelves.
+        let none = s.discover(Kind::Flatpak, 0, 12, &|_| false);
+        assert!(none.hero.is_none() && none.shelves.is_empty());
+        // Category pages use the same grouping.
+        let games = s.explore_in(Kind::Flatpak, "", "Game", 0, 50);
+        assert_eq!(games.total, 4);
     }
 
     #[test]

@@ -14,12 +14,16 @@ use std::time::Duration;
 
 use base64::Engine;
 use catalog::{Info, Remote};
-use helix_shell_core::software::{valid_id, JobState, JobView, Jobs, Kind, Mutation, Package, PackageView, Store};
+use helix_shell_core::software::{
+    valid_id, Discover, JobState, JobView, Jobs, Kind, Mutation, Package, PackageView, Store,
+};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 const WINDOW: &str = "software";
-const PAGES: [&str; 4] = ["explore", "library", "updates", "sources"];
+const PAGES: [&str; 5] = ["discover", "explore", "library", "updates", "sources"];
+/// Screenshots are fetched only from the remote's own media host, and only when a detail page asks.
+const SCREENSHOT_HOSTS: [&str; 1] = ["https://dl.flathub.org/"];
 
 struct State {
     store: Store,
@@ -34,6 +38,10 @@ struct State {
     icons: HashMap<String, Option<String>>,
     fake_icons: HashMap<String, String>,
     fake_info: HashMap<String, Vec<String>>,
+    fake_screens: HashMap<String, Vec<String>>,
+    indexing: bool,
+    /// The last appstream index, kept so a catalog read can re-attach it at once.
+    meta: HashMap<String, helix_shell_core::software::Meta>,
     cancels: HashMap<u64, Arc<AtomicBool>>,
 }
 
@@ -83,7 +91,13 @@ fn flatpak(args: &[&str]) -> Result<String, String> {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     } else {
         let message = String::from_utf8_lossy(&output.stderr);
-        Err(message.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or("Flatpak failed.").trim().to_string())
+        Err(message
+            .lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or("Flatpak failed.")
+            .trim()
+            .to_string())
     }
 }
 
@@ -105,18 +119,35 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             Ok(text) => remote_text.push_str(&text),
             Err(error) => remote_error = error,
         }
-        if let Ok(text) = flatpak(&[scope, "remote-ls", "--cached", "--updates", "--app", "--columns=application"]) {
+        if let Ok(text) = flatpak(&[
+            scope,
+            "remote-ls",
+            "--cached",
+            "--updates",
+            "--app",
+            "--columns=application",
+        ]) {
             update_text.push_str(&text);
         }
     }
-    let installed = flatpak(&["list", "--app", "--columns=application,name,version,origin,installation,size"]);
+    let installed = flatpak(&[
+        "list",
+        "--app",
+        "--columns=application,name,version,origin,installation,size",
+    ]);
     let remotes = flatpak(&["remotes", "--columns=name,title,url,options"]);
     let mut guard = state.lock().expect("state");
     guard.loading = false;
     match installed {
         Ok(installed) => {
-            let remotes = remotes.map(|text| catalog::parse_remotes(&text)).unwrap_or_default();
-            let user_remotes: Vec<String> = remotes.iter().filter(|r| r.installation == "user").map(|r| r.name.clone()).collect();
+            let remotes = remotes
+                .map(|text| catalog::parse_remotes(&text))
+                .unwrap_or_default();
+            let user_remotes: Vec<String> = remotes
+                .iter()
+                .filter(|r| r.installation == "user")
+                .map(|r| r.name.clone())
+                .collect();
             let mut packages = catalog::merge(
                 catalog::parse_remote_ls(&remote_text),
                 catalog::parse_list(&installed),
@@ -125,6 +156,8 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
             );
             packages.extend(firmware_updates());
             guard.store.set(packages);
+            let kept = guard.meta.clone();
+            guard.store.apply_meta(&kept);
             guard.remotes = remotes;
             guard.icons.clear();
             if remote_text.trim().is_empty() && !remote_error.is_empty() {
@@ -139,11 +172,63 @@ fn read_catalog(state: &Shared, app: &AppHandle) {
     }
     drop(guard);
     changed(app);
+    build_index(state, app);
+}
+
+/// Reads the appstream documents of the configured remotes once and attaches categories, release dates and verification to the catalog,
+/// which is what Discover and the category pages are made from. Runs on the catalog thread, after the list is already on screen.
+fn build_index(state: &Shared, app: &AppHandle) {
+    let remotes = {
+        let mut guard = state.lock().expect("state");
+        if guard.fake || guard.indexing || !guard.meta.is_empty() {
+            return;
+        }
+        guard.indexing = true;
+        guard.remotes.clone()
+    };
+    let mut meta = HashMap::new();
+    for remote in &remotes {
+        if remote.name.contains('/') || remote.name.contains("..") {
+            continue;
+        }
+        let path = catalog::installation_base(&remote.installation)
+            .join("appstream")
+            .join(&remote.name)
+            .join(catalog::arch())
+            .join("active/appstream.xml.gz");
+        if !path.is_file() {
+            continue;
+        }
+        let Ok(mut child) = Command::new("zcat")
+            .arg(&path)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+        else {
+            continue;
+        };
+        if let Some(stdout) = child.stdout.take() {
+            for (id, found) in catalog::index_appstream(BufReader::new(stdout)) {
+                meta.entry(id).or_insert(found);
+            }
+        }
+        let _ = child.wait();
+    }
+    let mut guard = state.lock().expect("state");
+    guard.indexing = false;
+    guard.store.apply_meta(&meta);
+    guard.meta = meta;
+    drop(guard);
+    changed(app);
 }
 
 /// Firmware updates fwupd already knows about (best effort; empty when fwupd is not running).
 fn firmware_updates() -> Vec<Package> {
-    let Ok(output) = Command::new("fwupdmgr").args(["get-updates", "--json", "--no-authenticate"]).stdin(Stdio::null()).output() else {
+    let Ok(output) = Command::new("fwupdmgr")
+        .args(["get-updates", "--json", "--no-authenticate"])
+        .stdin(Stdio::null())
+        .output()
+    else {
         return Vec::new();
     };
     if !output.status.success() {
@@ -161,15 +246,17 @@ fn firmware_updates() -> Vec<Package> {
         .enumerate()
         .map(|(i, device)| Package {
             id: format!("fwupd-{i}"),
-            title: device.get("Name").and_then(|v| v.as_str()).unwrap_or("Firmware").to_string(),
+            title: device
+                .get("Name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Firmware")
+                .to_string(),
             summary: "Firmware update".into(),
             kind: Kind::Firmware,
             installed: true,
             update: true,
             remote: "fwupd".into(),
-            version: String::new(),
-            size: 0,
-            installation: String::new(),
+            ..Default::default()
         })
         .collect()
 }
@@ -188,6 +275,9 @@ fn refresh_in_background(app: &AppHandle, network: bool) {
             let result = flatpak(&["update", "--appstream", "-y", "--noninteractive"]);
             let mut guard = state.lock().expect("state");
             guard.checking = false;
+            if result.is_ok() {
+                guard.meta.clear();
+            }
             if let Err(error) = result {
                 guard.error = format!("Could not check for updates: {error}");
                 drop(guard);
@@ -195,7 +285,11 @@ fn refresh_in_background(app: &AppHandle, network: bool) {
             }
         }
         let had_error = !state.lock().expect("state").error.is_empty();
-        let kept = if had_error && network { Some(state.lock().expect("state").error.clone()) } else { None };
+        let kept = if had_error && network {
+            Some(state.lock().expect("state").error.clone())
+        } else {
+            None
+        };
         read_catalog(&state, &app);
         if let Some(message) = kept {
             let mut guard = state.lock().expect("state");
@@ -230,6 +324,9 @@ struct PageView {
     checking: bool,
     error: String,
     jobs: Vec<JobView>,
+    discover: Option<Discover>,
+    /// The appstream index is still being read (Discover and categories fill in when it finishes).
+    indexing: bool,
 }
 
 fn action_name(mutation: Mutation) -> &'static str {
@@ -241,14 +338,61 @@ fn action_name(mutation: Mutation) -> &'static str {
 }
 
 #[tauri::command]
-fn software_view(app: AppHandle, page: String, query: String, offset: usize, limit: usize) -> PageView {
+fn software_view(
+    app: AppHandle,
+    page: String,
+    query: String,
+    category: String,
+    offset: usize,
+    limit: usize,
+) -> PageView {
     let shared = shared(&app);
     let state = shared.lock().expect("state");
     let limit = limit.clamp(1, 200);
     let needle = query.trim().to_ascii_lowercase();
+    let mut discover = None;
     let (rows, total) = match page.as_str() {
-        "explore" => {
-            let page = state.store.explore_page(Kind::Flatpak, &query, offset, limit);
+        // Discover with a query is a search over everything; without one it is the curated page.
+        "discover" if needle.is_empty() => {
+            let day = std::env::var("HELIX_SOFTWARE_FAKE_DAY")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or_else(|| {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs() / 86_400)
+                        .unwrap_or(0)
+                });
+            let fake = state.fake;
+            let has_icon = |p: &Package| {
+                fake || catalog::icon_paths(&p.remote, &p.id, &p.installation)
+                    .iter()
+                    .any(|path| path.is_file())
+            };
+            let found = state.store.discover(Kind::Flatpak, day, 12, &has_icon);
+            if std::env::var_os("HELIX_SOFTWARE_DEBUG").is_some() {
+                eprintln!(
+                    "SOFTWARE discover hero={} shelves={:?}",
+                    found.hero.is_some(),
+                    found
+                        .shelves
+                        .iter()
+                        .map(|s| (s.title.clone(), s.rows.len()))
+                        .collect::<Vec<_>>()
+                );
+            }
+            discover = Some(found);
+            (Vec::new(), 0)
+        }
+        "discover" | "explore" | "category" => {
+            let in_category = if page == "category" {
+                category.as_str()
+            } else {
+                ""
+            };
+            let page = state
+                .store
+                .explore_in(Kind::Flatpak, &query, in_category, offset, limit);
             (page.rows, page.total)
         }
         "library" => {
@@ -256,7 +400,11 @@ fn software_view(app: AppHandle, page: String, query: String, offset: usize, lim
                 .store
                 .library(Kind::Flatpak)
                 .into_iter()
-                .filter(|p| needle.is_empty() || p.title.to_ascii_lowercase().contains(&needle) || p.id.to_ascii_lowercase().contains(&needle))
+                .filter(|p| {
+                    needle.is_empty()
+                        || p.title.to_ascii_lowercase().contains(&needle)
+                        || p.id.to_ascii_lowercase().contains(&needle)
+                })
                 .collect();
             let total = all.len();
             (all.into_iter().skip(offset).take(limit).collect(), total)
@@ -274,7 +422,11 @@ fn software_view(app: AppHandle, page: String, query: String, offset: usize, lim
             title: if id == "*" {
                 "all updates".to_string()
             } else {
-                detail.as_ref().map(|p| p.title.clone()).filter(|t| !t.is_empty()).unwrap_or_else(|| id.clone())
+                detail
+                    .as_ref()
+                    .map(|p| p.title.clone())
+                    .filter(|t| !t.is_empty())
+                    .unwrap_or_else(|| id.clone())
             },
             kind: detail.map(|p| p.kind).unwrap_or(Kind::Flatpak),
             id: id.clone(),
@@ -285,13 +437,19 @@ fn software_view(app: AppHandle, page: String, query: String, offset: usize, lim
         rows,
         total,
         pending,
-        sources: if page == "sources" { state.remotes.clone() } else { Vec::new() },
+        sources: if page == "sources" {
+            state.remotes.clone()
+        } else {
+            Vec::new()
+        },
         update_count: state.store.updates().len(),
         installed_count: state.store.library(Kind::Flatpak).len(),
         loading: state.loading,
         checking: state.checking,
         error: state.error.clone(),
         jobs: state.jobs.view(),
+        discover,
+        indexing: state.indexing,
     }
 }
 
@@ -319,33 +477,64 @@ async fn software_info(app: AppHandle, id: String) -> InfoView {
     };
     if let Some(description) = fake_text {
         return InfoView {
-            info: Info { developer: "Helix Test".into(), license: "MIT".into(), description, categories: vec!["Utility".into()], ..Default::default() },
+            info: Info {
+                developer: "Helix Test".into(),
+                license: "MIT".into(),
+                description,
+                categories: vec!["Utility".into()],
+                ..Default::default()
+            },
             found: true,
         };
     }
     let Some(package) = package else {
-        return InfoView { info: Info::default(), found: false };
+        return InfoView {
+            info: Info::default(),
+            found: false,
+        };
     };
     tauri::async_runtime::spawn_blocking(move || {
-        let order: [&str; 2] = if package.installation == "system" { ["system", "user"] } else { ["user", "system"] };
+        let order: [&str; 2] = if package.installation == "system" {
+            ["system", "user"]
+        } else {
+            ["user", "system"]
+        };
         for which in order {
-            let path = catalog::installation_base(which).join("appstream").join(&package.remote).join(catalog::arch()).join("active/appstream.xml.gz");
+            let path = catalog::installation_base(which)
+                .join("appstream")
+                .join(&package.remote)
+                .join(catalog::arch())
+                .join("active/appstream.xml.gz");
             if !path.is_file() || package.remote.contains('/') {
                 continue;
             }
             if let Some(block) = find_component(&path, &package.id) {
-                return InfoView { info: catalog::parse_component(&block), found: true };
+                return InfoView {
+                    info: catalog::parse_component(&block),
+                    found: true,
+                };
             }
         }
-        InfoView { info: Info::default(), found: false }
+        InfoView {
+            info: Info::default(),
+            found: false,
+        }
     })
     .await
-    .unwrap_or(InfoView { info: Info::default(), found: false })
+    .unwrap_or(InfoView {
+        info: Info::default(),
+        found: false,
+    })
 }
 
 /// Streams the decompressed appstream XML and returns the `<component>` block whose `<id>` is `id`.
 fn find_component(path: &PathBuf, id: &str) -> Option<String> {
-    let mut child = Command::new("zcat").arg(path).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+    let mut child = Command::new("zcat")
+        .arg(path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
     let reader = BufReader::new(child.stdout.take()?);
     let wanted = format!("<id>{id}</id>");
     let wanted_desktop = format!("<id>{id}.desktop</id>");
@@ -353,25 +542,30 @@ fn find_component(path: &PathBuf, id: &str) -> Option<String> {
     let mut inside = false;
     let mut hit = false;
     let mut found = None;
-    for line in reader.lines().map_while(Result::ok) {
-        if line.trim_start().starts_with("<component") {
-            inside = true;
-            hit = false;
-            block.clear();
-        }
-        if inside {
-            block.push_str(&line);
-            block.push('\n');
-            if line.contains(&wanted) || line.contains(&wanted_desktop) {
-                hit = true;
+    for raw in reader.lines().map_while(Result::ok) {
+        for line in catalog::split_components(&raw) {
+            if line.trim_start().starts_with("<component") {
+                inside = true;
+                hit = false;
+                block.clear();
             }
-            if line.trim_start().starts_with("</component>") {
-                inside = false;
-                if hit {
-                    found = Some(std::mem::take(&mut block));
-                    break;
+            if inside {
+                block.push_str(&line);
+                block.push('\n');
+                if line.contains(&wanted) || line.contains(&wanted_desktop) {
+                    hit = true;
+                }
+                if line.trim_start().starts_with("</component>") {
+                    inside = false;
+                    if hit {
+                        found = Some(std::mem::take(&mut block));
+                        break;
+                    }
                 }
             }
+        }
+        if found.is_some() {
+            break;
         }
     }
     let _ = child.kill();
@@ -379,8 +573,136 @@ fn find_component(path: &PathBuf, id: &str) -> Option<String> {
     found
 }
 
+#[derive(Serialize)]
+struct ScreenView {
+    caption: String,
+    uri: String,
+}
+
+fn image_uri(bytes: &[u8]) -> Option<String> {
+    let mime = if bytes.starts_with(b"\x89PNG") {
+        "image/png"
+    } else if bytes.starts_with(&[0xFF, 0xD8]) {
+        "image/jpeg"
+    } else if bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP") {
+        "image/webp"
+    } else {
+        return None;
+    };
+    Some(format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
+/// An application's screenshots, fetched on demand from the remote's media host and cached on disk. Anything that is not an image, is
+/// over 3 MB, or is not on the allowed host is dropped.
+#[tauri::command]
+async fn software_screenshots(app: AppHandle, id: String) -> Vec<ScreenView> {
+    let (package, fake) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        (
+            state.store.detail(&id),
+            state.fake_screens.get(&id).cloned(),
+        )
+    };
+    if let Some(list) = fake {
+        return list
+            .into_iter()
+            .map(|uri| ScreenView {
+                caption: String::new(),
+                uri,
+            })
+            .collect();
+    }
+    let Some(package) = package else {
+        return Vec::new();
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut shots = Vec::new();
+        let order: [&str; 2] = if package.installation == "system" {
+            ["system", "user"]
+        } else {
+            ["user", "system"]
+        };
+        for which in order {
+            let path = catalog::installation_base(which)
+                .join("appstream")
+                .join(&package.remote)
+                .join(catalog::arch())
+                .join("active/appstream.xml.gz");
+            if package.remote.contains('/') || !path.is_file() {
+                continue;
+            }
+            if let Some(block) = find_component(&path, &package.id) {
+                shots = catalog::parse_component(&block).screenshots;
+                break;
+            }
+        }
+        let cache = std::env::var_os("XDG_CACHE_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))
+            .unwrap_or_default()
+            .join("helix/software/screens");
+        let _ = std::fs::create_dir_all(&cache);
+        let mut out = Vec::new();
+        for (index, shot) in shots.into_iter().take(5).enumerate() {
+            if !SCREENSHOT_HOSTS
+                .iter()
+                .any(|host| shot.url.starts_with(host))
+                || shot.url.contains("..")
+            {
+                continue;
+            }
+            let file = cache.join(format!("{}-{}.img", package.id, index));
+            let bytes = match std::fs::read(&file) {
+                Ok(bytes) if !bytes.is_empty() => bytes,
+                _ => {
+                    let ok = Command::new("curl")
+                        .args([
+                            "-fsSL",
+                            "--max-time",
+                            "12",
+                            "--max-filesize",
+                            "3000000",
+                            "-o",
+                        ])
+                        .arg(&file)
+                        .arg(&shot.url)
+                        .stdin(Stdio::null())
+                        .stderr(Stdio::null())
+                        .status()
+                        .map(|s| s.success())
+                        .unwrap_or(false);
+                    if !ok {
+                        let _ = std::fs::remove_file(&file);
+                        continue;
+                    }
+                    std::fs::read(&file).unwrap_or_default()
+                }
+            };
+            if bytes.len() > 3_000_000 {
+                continue;
+            }
+            if let Some(uri) = image_uri(&bytes) {
+                out.push(ScreenView {
+                    caption: shot.caption,
+                    uri,
+                });
+            }
+        }
+        out
+    })
+    .await
+    .unwrap_or_default()
+}
+
 fn icon_uri(bytes: &[u8]) -> String {
-    format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes))
+    format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
 }
 
 /// An application's icon as a data URI, from the appstream icons of its remote (None → the page draws a lettered tile).
@@ -397,7 +719,11 @@ fn software_icon(app: AppHandle, id: String) -> Option<String> {
     let package = state.store.detail(&id)?;
     let found = catalog::icon_paths(&package.remote, &package.id, &package.installation)
         .into_iter()
-        .find_map(|path| std::fs::read(path).ok().filter(|bytes| bytes.len() < 400_000))
+        .find_map(|path| {
+            std::fs::read(path)
+                .ok()
+                .filter(|bytes| bytes.len() < 400_000)
+        })
         .map(|bytes| icon_uri(&bytes));
     state.icons.insert(id, found.clone());
     found
@@ -423,7 +749,10 @@ fn software_request(app: AppHandle, id: String, action: String) -> Result<(), St
             return Err("There is nothing to update.".into());
         }
     } else {
-        state.store.prepare(&id, mutation).map_err(|e| format!("{e:?}"))?;
+        state
+            .store
+            .prepare(&id, mutation)
+            .map_err(|e| format!("{e:?}"))?;
     }
     state.pending = Some((id, mutation));
     drop(state);
@@ -435,7 +764,14 @@ fn last_percent(chunk: &str) -> Option<u8> {
     let bytes = chunk.as_bytes();
     let mut at = bytes.len();
     while let Some(i) = chunk[..at].rfind('%') {
-        let digits: String = chunk[..i].chars().rev().take_while(|c| c.is_ascii_digit()).collect::<Vec<_>>().into_iter().rev().collect();
+        let digits: String = chunk[..i]
+            .chars()
+            .rev()
+            .take_while(|c| c.is_ascii_digit())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         if let Ok(value) = digits.parse::<u16>() {
             if value <= 100 {
                 return Some(value as u8);
@@ -459,8 +795,15 @@ fn software_confirm(app: AppHandle, accept: bool) -> Result<(), String> {
             changed(&app);
             return Ok(());
         }
-        let package = if id == "*" { None } else { state.store.detail(&id) };
-        let title = package.as_ref().map(|p| p.title.clone()).unwrap_or_else(|| "All updates".into());
+        let package = if id == "*" {
+            None
+        } else {
+            state.store.detail(&id)
+        };
+        let title = package
+            .as_ref()
+            .map(|p| p.title.clone())
+            .unwrap_or_else(|| "All updates".into());
         let plan = plan_command(&state, &id, mutation, package.as_ref())?;
         let job = state.jobs.start(&id, &title, mutation);
         let cancel = Arc::new(AtomicBool::new(false));
@@ -474,7 +817,12 @@ fn software_confirm(app: AppHandle, accept: bool) -> Result<(), String> {
 }
 
 /// The backend command for a mutation; chosen from what the store knows, never from the page.
-fn plan_command(state: &State, id: &str, mutation: Mutation, package: Option<&PackageView>) -> Result<Vec<String>, String> {
+fn plan_command(
+    state: &State,
+    id: &str,
+    mutation: Mutation,
+    package: Option<&PackageView>,
+) -> Result<Vec<String>, String> {
     if state.fake {
         return Ok(Vec::new());
     }
@@ -486,25 +834,75 @@ fn plan_command(state: &State, id: &str, mutation: Mutation, package: Option<&Pa
     if package.kind == Kind::Firmware {
         return Ok(s(&["fwupdmgr", "update", "-y", "--no-reboot-check"]));
     }
-    let scope = |installation: &str| if installation == "user" { "--user" } else { "--system" };
+    let scope = |installation: &str| {
+        if installation == "user" {
+            "--user"
+        } else {
+            "--system"
+        }
+    };
     Ok(match mutation {
         Mutation::Install => {
             // A user installation of the remote needs no authentication, so it wins.
-            let user = state.remotes.iter().any(|r| r.name == package.remote && r.installation == "user");
-            let system = state.remotes.iter().any(|r| r.name == package.remote && r.installation == "system");
-            let installation = if user { "user" } else if system { "system" } else { return Err("That source is no longer configured.".into()) };
-            vec!["flatpak".into(), "install".into(), "-y".into(), "--noninteractive".into(), scope(installation).into(), package.remote.clone(), package.id.clone()]
+            let user = state
+                .remotes
+                .iter()
+                .any(|r| r.name == package.remote && r.installation == "user");
+            let system = state
+                .remotes
+                .iter()
+                .any(|r| r.name == package.remote && r.installation == "system");
+            let installation = if user {
+                "user"
+            } else if system {
+                "system"
+            } else {
+                return Err("That source is no longer configured.".into());
+            };
+            vec![
+                "flatpak".into(),
+                "install".into(),
+                "-y".into(),
+                "--noninteractive".into(),
+                scope(installation).into(),
+                package.remote.clone(),
+                package.id.clone(),
+            ]
         }
-        Mutation::Remove => vec!["flatpak".into(), "uninstall".into(), "-y".into(), "--noninteractive".into(), scope(&package.installation).into(), package.id.clone()],
-        Mutation::Update => vec!["flatpak".into(), "update".into(), "-y".into(), "--noninteractive".into(), scope(&package.installation).into(), package.id.clone()],
+        Mutation::Remove => vec![
+            "flatpak".into(),
+            "uninstall".into(),
+            "-y".into(),
+            "--noninteractive".into(),
+            scope(&package.installation).into(),
+            package.id.clone(),
+        ],
+        Mutation::Update => vec![
+            "flatpak".into(),
+            "update".into(),
+            "-y".into(),
+            "--noninteractive".into(),
+            scope(&package.installation).into(),
+            package.id.clone(),
+        ],
     })
 }
 
-fn run_job(app: AppHandle, job: u64, id: String, mutation: Mutation, plan: Vec<String>, cancel: Arc<AtomicBool>) {
+fn run_job(
+    app: AppHandle,
+    job: u64,
+    id: String,
+    mutation: Mutation,
+    plan: Vec<String>,
+    cancel: Arc<AtomicBool>,
+) {
     let state = shared(&app);
     let (state_result, message) = if plan.is_empty() {
         // Fake backend: a few visible steps so the page can be tested.
-        let delay = std::env::var("HELIX_SOFTWARE_FAKE_STEP_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(250);
+        let delay = std::env::var("HELIX_SOFTWARE_FAKE_STEP_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(250);
         let mut outcome = (JobState::Done, String::new());
         for step in 1..=4u8 {
             std::thread::sleep(Duration::from_millis(delay));
@@ -512,7 +910,11 @@ fn run_job(app: AppHandle, job: u64, id: String, mutation: Mutation, plan: Vec<S
                 outcome = (JobState::Cancelled, "Cancelled.".into());
                 break;
             }
-            state.lock().expect("state").jobs.progress(job, step * 25 - 5);
+            state
+                .lock()
+                .expect("state")
+                .jobs
+                .progress(job, step * 25 - 5);
             changed(&app);
         }
         if outcome.0 == JobState::Done && std::env::var_os("HELIX_SOFTWARE_FAKE_FAIL").is_some() {
@@ -535,7 +937,19 @@ fn run_job(app: AppHandle, job: u64, id: String, mutation: Mutation, plan: Vec<S
             Ok(mut child) => {
                 let tail = Arc::new(Mutex::new(String::new()));
                 let mut readers = Vec::new();
-                for stream in [child.stdout.take().map(|s| Box::new(s) as Box<dyn Read + Send>), child.stderr.take().map(|s| Box::new(s) as Box<dyn Read + Send>)].into_iter().flatten() {
+                for stream in [
+                    child
+                        .stdout
+                        .take()
+                        .map(|s| Box::new(s) as Box<dyn Read + Send>),
+                    child
+                        .stderr
+                        .take()
+                        .map(|s| Box::new(s) as Box<dyn Read + Send>),
+                ]
+                .into_iter()
+                .flatten()
+                {
                     let app = app.clone();
                     let tail = tail.clone();
                     readers.push(std::thread::spawn(move || {
@@ -547,7 +961,11 @@ fn run_job(app: AppHandle, job: u64, id: String, mutation: Mutation, plan: Vec<S
                             }
                             let text = String::from_utf8_lossy(&buffer[..n]).into_owned();
                             if let Some(percent) = last_percent(&text) {
-                                shared(&app).lock().expect("state").jobs.progress(job, percent);
+                                shared(&app)
+                                    .lock()
+                                    .expect("state")
+                                    .jobs
+                                    .progress(job, percent);
                                 changed(&app);
                             }
                             let mut tail = tail.lock().expect("tail");
@@ -579,8 +997,16 @@ fn run_job(app: AppHandle, job: u64, id: String, mutation: Mutation, plan: Vec<S
                     Some(status) if status.success() => (JobState::Done, String::new()),
                     Some(_) => {
                         let tail = tail.lock().expect("tail");
-                        let last = tail.split(['\n', '\r']).rev().map(str::trim).find(|l| !l.is_empty() && !l.ends_with('%')).unwrap_or("The command failed.");
-                        (JobState::Failed, last.trim_start_matches("error: ").to_string())
+                        let last = tail
+                            .split(['\n', '\r'])
+                            .rev()
+                            .map(str::trim)
+                            .find(|l| !l.is_empty() && !l.ends_with('%'))
+                            .unwrap_or("The command failed.");
+                        (
+                            JobState::Failed,
+                            last.trim_start_matches("error: ").to_string(),
+                        )
                     }
                 }
             }
@@ -675,34 +1101,86 @@ fn load_fake(path: &PathBuf, state: &mut State) {
         let Some(id) = row.get("id").and_then(|v| v.as_str()) else {
             continue;
         };
-        let text = |key: &str| row.get(key).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let text = |key: &str| {
+            row.get(key)
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        };
         if let Some(icon) = row.get("icon").and_then(|v| v.as_str()) {
             state.fake_icons.insert(id.to_string(), icon.to_string());
         }
+        if let Some(list) = row.get("screenshots").and_then(|v| v.as_array()) {
+            state.fake_screens.insert(
+                id.to_string(),
+                list.iter()
+                    .filter_map(|l| l.as_str().map(str::to_string))
+                    .collect(),
+            );
+        }
         if let Some(lines) = row.get("description").and_then(|v| v.as_array()) {
-            state.fake_info.insert(id.to_string(), lines.iter().filter_map(|l| l.as_str().map(str::to_string)).collect());
+            state.fake_info.insert(
+                id.to_string(),
+                lines
+                    .iter()
+                    .filter_map(|l| l.as_str().map(str::to_string))
+                    .collect(),
+            );
         }
         packages.push(Package {
             id: id.to_string(),
             title: text("title"),
             summary: text("summary"),
-            kind: match row.get("kind").and_then(|v| v.as_str()).unwrap_or("flatpak") {
+            kind: match row
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .unwrap_or("flatpak")
+            {
                 "rpm" => Kind::Rpm,
                 "firmware" => Kind::Firmware,
                 _ => Kind::Flatpak,
             },
-            installed: row.get("installed").and_then(|v| v.as_bool()).unwrap_or(false),
+            installed: row
+                .get("installed")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
             update: row.get("update").and_then(|v| v.as_bool()).unwrap_or(false),
             remote: text("remote"),
             version: text("version"),
             size: row.get("size").and_then(|v| v.as_u64()).unwrap_or(0),
             installation: String::new(),
+            categories: row
+                .get("categories")
+                .and_then(|v| v.as_array())
+                .map(|list| {
+                    list.iter()
+                        .filter_map(|c| c.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            released: row.get("released").and_then(|v| v.as_u64()).unwrap_or(0),
+            verified: row
+                .get("verified")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false),
         });
     }
     state.store.set(packages);
     state.remotes = vec![
-        Remote { name: "flathub".into(), title: "Flathub".into(), url: "https://dl.flathub.org/repo/".into(), installation: "user".into(), enabled: true },
-        Remote { name: "fedora".into(), title: "Fedora Flatpaks".into(), url: "oci+https://registry.fedoraproject.org".into(), installation: "system".into(), enabled: true },
+        Remote {
+            name: "flathub".into(),
+            title: "Flathub".into(),
+            url: "https://dl.flathub.org/repo/".into(),
+            installation: "user".into(),
+            enabled: true,
+        },
+        Remote {
+            name: "fedora".into(),
+            title: "Fedora Flatpaks".into(),
+            url: "oci+https://registry.fedoraproject.org".into(),
+            installation: "system".into(),
+            enabled: true,
+        },
     ];
     state.fake = true;
 }
@@ -741,6 +1219,7 @@ fn main() {
             software_detail,
             software_info,
             software_icon,
+            software_screenshots,
             software_request,
             software_confirm,
             software_cancel,
@@ -763,6 +1242,9 @@ fn main() {
                 icons: HashMap::new(),
                 fake_icons: HashMap::new(),
                 fake_info: HashMap::new(),
+                fake_screens: HashMap::new(),
+                indexing: false,
+                meta: HashMap::new(),
                 cancels: HashMap::new(),
             };
             let fake_path = std::env::var_os("HELIX_SOFTWARE_FAKE").map(PathBuf::from);

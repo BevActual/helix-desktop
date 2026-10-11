@@ -22,8 +22,12 @@ click_id page-library; sleep 1
 for _ in $(seq 1 80); do has_id "pkg:$APP" && break; sleep 0.25; done
 has_id "pkg:$APP" && echo "ok: an installed application is in the real library" || fail "installed app $APP missing"
 shot software-real-library
-click_id page-explore; sleep 2
+click_id page-discover; sleep 1
+for _ in $(seq 1 120); do has_id hero && break; sleep 0.5; done
+has_id hero && echo "ok: Discover has a featured app from the real appstream index" || fail "no hero (index not built?)"
+shot software-real-discover
+click_id "cat-Game"; sleep 2
 for _ in $(seq 1 40); do has_id count && break; sleep 0.25; done
-has_id count && echo "ok: the real catalog loaded in Explore" || fail "no catalog"
-shot software-real-explore
+has_id count && echo "ok: a category page lists real apps" || fail "no category list"
+shot software-real-category
 [ $FAILED = 0 ] && echo "PASS: software real" || exit 1

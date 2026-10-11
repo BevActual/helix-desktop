@@ -166,3 +166,12 @@ than three type sizes visible in one view; truncate with an ellipsis, never wrap
 4. ~~Window state~~ Done: `AppFrame` sets `data-window` from window focus.
 5. **Audit.** Settings, Software, Monitor and Mobius against sections 2–9; fix density, titlebar and empty states first.
 6. **Appearance.** Accent choice and density setting in Settings → Appearance, stored once and read by every app.
+
+## 13. Patterns proven in Software
+
+- **Large title** at the top of the content; the toolbar title appears only when it has scrolled away (`AppFrame largeTitle`).
+- **Shelves**: a titled horizontal rail of tiles (icon, name, one line, one control) with *See All*.
+- **Hero**: one featured object, tinted from its own icon, never a banner ad.
+- **Ring control**: a running job is the arc of a circle with a stop square; it replaces the button in place.
+- **Detail page**: hero (icon, developer, summary, one primary), screenshots rail, facts strip, prose, then metadata chips.
+- Real artwork is always preferred; a lettered tile is the fallback, never the design.

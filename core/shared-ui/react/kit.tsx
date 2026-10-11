@@ -37,10 +37,12 @@ export interface AppFrameProps {
   column?: boolean;
   /** Before the title in the toolbar row (a Back button). */
   leading?: ReactNode;
+  /** A large title at the top of the content; the toolbar title appears only once it has scrolled away. */
+  largeTitle?: boolean;
 }
 
 /** A window: close control, material sidebar, unified titlebar and toolbar over a solid scrolling content area. */
-export function AppFrame({ title, sidebar, toolbar, children, column = true, leading }: AppFrameProps) {
+export function AppFrame({ title, sidebar, toolbar, children, column = true, leading, largeTitle }: AppFrameProps) {
   useWindowState();
   const [scrolled, setScrolled] = useState(false);
   return (
@@ -56,11 +58,16 @@ export function AppFrame({ title, sidebar, toolbar, children, column = true, lea
       <section className="hx-main">
         <header className={`hx-titlebar${scrolled ? " scrolled" : ""}`} data-tauri-drag-region>
           {leading}
-          <h1 className="hx-title" id="page-title">{title}</h1>
+          <h1 className="hx-title" id="page-title" style={largeTitle && !scrolled ? { opacity: 0 } : undefined}>{title}</h1>
           <div className="hx-toolbar">{toolbar}</div>
         </header>
-        <div className="hx-scroll" data-test="content" onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 4)}>
-          {column ? <div className="hx-column">{children}</div> : children}
+        <div className="hx-scroll" data-test="content" onScroll={(event) => setScrolled(event.currentTarget.scrollTop > (largeTitle ? 34 : 4))}>
+          {column ? (
+            <div className="hx-column">
+              {largeTitle ? <h2 className="hx-large-title" data-test="large-title">{title}</h2> : null}
+              {children}
+            </div>
+          ) : children}
         </div>
       </section>
     </div>
@@ -221,4 +228,8 @@ export function Sheet({ title, children, actions, alert, onCancel, test }: { tit
 
 export function Spinner({ label = "Working" }: { label?: string }) {
   return <span className="hx-spinner" role="progressbar" aria-label={label} />;
+}
+
+export function SidebarLabel({ children }: { children: ReactNode }) {
+  return <div className="hx-nav-label">{children}</div>;
 }

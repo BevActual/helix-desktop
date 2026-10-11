@@ -17,13 +17,23 @@ fn main() {
     let skip = std::env::var_os("HELIX_SKIP_FRONTEND").is_some_and(|v| !v.is_empty());
     if !skip && root.join("node_modules").is_dir() {
         match std::process::Command::new("npm")
-            .args(["run", "build", "--workspace", "helix-software-web", "--silent"])
+            .args([
+                "run",
+                "build",
+                "--workspace",
+                "helix-software-web",
+                "--silent",
+            ])
             .current_dir(root)
             .status()
         {
             Ok(status) if status.success() => {}
-            Ok(status) => println!("cargo:warning=Software UI did not build ({status}); the hand-written page is used"),
-            Err(error) => println!("cargo:warning=npm not available ({error}); the hand-written page is used"),
+            Ok(status) => println!(
+                "cargo:warning=Software UI did not build ({status}); the hand-written page is used"
+            ),
+            Err(error) => {
+                println!("cargo:warning=npm not available ({error}); the hand-written page is used")
+            }
         }
     }
     tauri_build::build()

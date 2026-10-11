@@ -1077,7 +1077,7 @@ body.chat .sheet-actions button { padding: 8px 14px; border-radius: 10px; font-w
 .hx-hero h2 { margin: 0; font: 700 22px/28px var(--font-display); letter-spacing: -.02em; }
 .hx-hero p { margin: 2px 0 0; color: var(--label-2); }
 .hx-hero-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
-.hx-dock-bar { position: absolute; left: 0; right: 0; bottom: 16px; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.hx-dock-bar { position: absolute; left: 240px; right: 0; bottom: 16px; z-index: 4; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
 .hx-job { pointer-events: auto; display: flex; align-items: center; gap: 12px; width: min(460px, calc(100% - 48px)); padding: 10px 12px 10px 14px; border-radius: 14px;
           background: var(--glass-solid); box-shadow: var(--shadow-small), inset 0 0 0 .5px var(--hairline); animation: hx-pop 220ms var(--ease-spring) both; }
 :root[data-blur="1"] .hx-job { backdrop-filter: blur(24px) saturate(1.4); }
@@ -1099,3 +1099,41 @@ body.chat .sheet-actions button { padding: 8px 14px; border-radius: 10px; font-w
 .hx-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
 .hx-btn.plain svg.i { width: 16px; height: 16px; }
 .hx-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* Large title, shelves, tiles, hero, ring button, screenshots. */
+.hx-large-title { margin: 0 0 -6px; font: 700 28px/34px var(--font-display); letter-spacing: -.026em; }
+.hx-title { transition: opacity 160ms var(--ease); }
+.hx-shelf { display: flex; flex-direction: column; gap: 10px; }
+.hx-shelf-head { display: flex; align-items: baseline; gap: 12px; }
+.hx-shelf-head h3 { font: 700 19px/24px var(--font-display); letter-spacing: -.02em; flex: 1; }
+.hx-rail { display: flex; gap: 14px; overflow-x: auto; margin: 0 -28px; padding: 4px 28px 8px; scroll-snap-type: x proximity; scroll-padding-inline: 28px; scrollbar-width: none; }
+.hx-rail::-webkit-scrollbar { display: none; }
+.hx-tile-card { flex: none; width: 148px; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; background: var(--group); box-shadow: inset 0 0 0 .5px var(--hairline);
+                scroll-snap-align: start; cursor: default; outline: none; transition: transform 160ms var(--ease-spring), background 160ms var(--ease); }
+.hx-tile-card:hover { background: var(--fill-1); transform: translateY(-2px); } .hx-tile-card:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.hx-tile-card .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-tile-card .sum { color: var(--label-2); font-size: 12px; line-height: 16px; height: 32px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.hx-tile-card .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; min-height: 26px; }
+.hx-hero-card { position: relative; display: flex; align-items: center; gap: 20px; padding: 22px 24px; border-radius: 18px; overflow: hidden; cursor: default; outline: none;
+                background: linear-gradient(135deg, var(--hero, #3a3a44), color-mix(in srgb, var(--hero, #3a3a44) 55%, #000)); color: #fff; box-shadow: var(--shadow-small); }
+.hx-hero-card:focus-visible { box-shadow: 0 0 0 3px var(--accent); }
+.hx-hero-card .over { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .72; }
+.hx-hero-card h2 { margin: 2px 0 2px; font: 700 26px/30px var(--font-display); letter-spacing: -.025em; }
+.hx-hero-card p { margin: 0; opacity: .85; max-width: 44ch; }
+.hx-hero-card .hx-btn { background: rgba(255,255,255,.22); color: #fff; margin-top: 14px; } .hx-hero-card .hx-btn.primary { background: #fff; color: #111; }
+.hx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 20px; }
+.hx-card-row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-radius: 12px; outline: none; cursor: default; position: relative; }
+.hx-card-row + .hx-card-row { }
+.hx-card-row:hover { background: var(--fill-1); } .hx-card-row:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.hx-card-row .text { flex: 1; min-width: 0; } .hx-card-row .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-card-row .sum { color: var(--label-2); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hx-ring { position: relative; width: 28px; height: 28px; flex: none; display: grid; place-items: center; background: transparent; padding: 0; border-radius: 50%; }
+.hx-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.hx-ring .track { stroke: var(--fill-3); } .hx-ring .arc { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 300ms var(--ease-spring); }
+.hx-ring.indeterminate svg { animation: hx-spin 1s linear infinite; }
+.hx-ring .stop { width: 8px; height: 8px; border-radius: 2px; background: var(--accent); }
+.hx-shots { display: flex; gap: 12px; overflow-x: auto; margin: 0 -28px; padding: 2px 28px 8px; scrollbar-width: none; }
+.hx-shots::-webkit-scrollbar { display: none; }
+.hx-shot { flex: none; height: 230px; border-radius: 10px; box-shadow: 0 0 0 .5px var(--hairline), var(--shadow-small); background: var(--fill-1); }
+img.hx-shot { object-fit: cover; }
+.hx-shot.ghost { width: 300px; animation: hx-shimmer 1.4s ease-in-out infinite; background: linear-gradient(90deg, var(--fill-1), var(--fill-2), var(--fill-1)); background-size: 200% 100%; }
