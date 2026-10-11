@@ -1,5 +1,7 @@
 # Helix System Monitor (Tauri)
 
+> **Frontend:** React + TypeScript + Vite (`apps/helix-system-monitor/web`, built into `dist/react/helix-monitor.js`); `dist/monitor.js` is the no-node fallback. Rust samples and emits `monitor`; the page reads when told. The React page adds meters, a minute of CPU and memory history, sortable processes (CPU time, memory, name, PID) with a memory bar, and screen-time bars.
+
 Frontend direction: React + TypeScript + Vite like the other apps (`frontend-stack.md`); the page is hand-written until it next grows a page.
 
 Standalone resource viewer. Reads `/proc` and screen-time report files directly (no shell, no desktop service). Pure parsing and list models in `helix-shell-core::monitor`; thin Tauri host schedules polls.

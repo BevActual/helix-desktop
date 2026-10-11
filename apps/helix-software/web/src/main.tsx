@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { closeWindow, invoke } from "@helix/ui";
+import { closeWindow, invoke, useLayoutReport } from "@helix/ui";
 
 type Page = "explore" | "library" | "updates" | "sources";
 
@@ -44,29 +44,6 @@ const hue = (name: string) => {
   return hash % 360;
 };
 
-/** Reports where every named control is, so a nested test can click by name (only when a layout log was asked for). */
-function useLayoutReport() {
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined;
-    invoke<boolean>("layout_reporting").then((wanted) => {
-      if (!wanted) return;
-      const send = () => {
-        const elements: Record<string, { x: number; y: number; w: number; h: number }> = {};
-        document.querySelectorAll<HTMLElement>("[data-test]").forEach((node) => {
-          const box = node.getBoundingClientRect();
-          if (box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden") {
-            elements[node.dataset.test as string] = { x: box.x, y: box.y, w: box.width, h: box.height };
-          }
-        });
-        invoke("report_layout", { report: { width: innerWidth, height: innerHeight, islands: ["software"], elements } }).catch(() => undefined);
-      };
-      send();
-      timer = setInterval(send, 500);
-    });
-    return () => { if (timer) clearInterval(timer); };
-  }, []);
-}
-
 function PackageRow({ pkg, busy, focus, onAction }: { pkg: PackageView; busy: boolean; focus: boolean; onAction: (action: "install" | "remove" | "update") => void }) {
   const row = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -105,7 +82,7 @@ function Software({ start }: { start: { page: Page | null; app: string | null } 
   const [error, setError] = useState("");
   const [focusId, setFocusId] = useState<string | null>(start.app);
   const search = useRef<HTMLInputElement>(null);
-  useLayoutReport();
+  useLayoutReport("software");
 
   const read = useCallback(
     (nextPage: Page, nextQuery: string) =>

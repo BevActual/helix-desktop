@@ -85,7 +85,7 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 | Shell: bar (its glyph slots, workspaces, clock; the dock's magnify lens, hide timer, tooltip and menu also stay in `shell.js` because the input regions and glass are measured from them) | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
 | Mobius app (`helix-mobius`) | Hand-written (`dist/chat.js`, ~1,800 lines). Next app to move: streaming messages, edit/branch, search, attachments, personas, model picker |
 | **Software** | **React** (`apps/helix-software/web`); hand-written page kept as the no-node fallback |
-| System Monitor | Hand-written (small). Moves when it next grows a page |
+| **System Monitor** | **React** (`apps/helix-system-monitor/web`); hand-written page kept as the no-node fallback |
 
 ## Measured cost (release builds, same nested tests)
 

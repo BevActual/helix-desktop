@@ -1,4 +1,5 @@
 export { closeWindow, invoke, listen } from "./tauri";
+export { useLayoutReport } from "./layout";
 export { Row, RowGroups, Segments, Slider, Switch, type Change } from "./Rows";
 export type { RowView } from "./bindings/RowView";
 export type { Control } from "./bindings/Control";

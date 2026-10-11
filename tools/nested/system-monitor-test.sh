@@ -27,6 +27,7 @@ for _ in $(seq 1 40); do has_id stat-cpu && break; sleep 0.25; done
 has_id stat-cpu && has_id stat-mem && has_id stat-gpu && echo "ok: overview stats" || fail "overview missing"
 for _ in $(seq 1 30); do grep -q "MONITOR gpu probe" "$SCRATCH/program.log" && break; sleep 0.5; done
 grep -q "MONITOR gpu probe" "$SCRATCH/program.log" && echo "ok: gpu polled on overview" || fail "no gpu probe"
+sleep 2.5; niri msg action screenshot-screen --show-pointer false >/dev/null 2>&1; sleep 1.5; ls -t "$SCRATCH"/shots/*.png | head -1 | xargs -I{} cp {} "$SCRATCH/monitor-overview.png"
 click_id page-processes; sleep 1
 for _ in $(seq 1 20); do has_id "proc:42" && break; sleep 0.25; done
 has_id "proc:42" && echo "ok: process listed" || fail "process missing"

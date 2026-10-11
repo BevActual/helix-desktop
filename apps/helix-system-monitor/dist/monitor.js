@@ -1,4 +1,9 @@
 // Helix System Monitor. Host owns polls; this page only draws the latest view as text.
+// With the React bundle present it draws everything; the hand-written page below is the fallback for a build without node.
+if (window.HelixMonitorReact) {
+  window.HelixMonitorReact.mount(document.getElementById("app"));
+} else {
+(function legacy() {
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 const $ = (id) => document.getElementById(id);
@@ -109,3 +114,5 @@ $("search").oninput = () => draw();
   await draw();
   if (window.__layout) setInterval(report, 500);
 })();
+})();
+}
