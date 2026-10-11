@@ -42,7 +42,14 @@ Same nested tests (`settings`, `settings-dock`) pass against the React page.
 
 The cost is about 3 MB on a 150 MB app (the WebKit baseline dominates) and no measurable change in time to show the page.
 
+## Ported so far
+
+Settings: Dock, Power & lock, Displays, Appearance, Accessibility (all the "rows" pages; one generic `RowsPage` in `apps/helix-settings/web`
+driven by a small spec per page). Each keeps the hand-written drawing as its fallback in `settings.js`. The nested `settings` and
+`settings-dock` tests pass unchanged, and the pages are pixel-for-pixel what the hand-written ones drew.
+
 ## Next
 
-Port Settings pages in this order: Power & lock, Appearance, Accessibility, Displays, Wallpaper, Network, Bluetooth, Keyboard, Privacy & agents.
-Then Mobius (a larger move: streaming messages, edit/branch, search, attachments), Software and Monitor.
+Wallpaper (Wallhaven search is the first real use of React state), Network, Bluetooth, Keyboard, Privacy & agents, About; then Mobius
+(streaming messages, edit/branch, search, attachments), Software and Monitor. When a page is ported and a release has run on it, its
+hand-written fallback is deleted in the same change.

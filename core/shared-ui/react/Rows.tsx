@@ -1,6 +1,6 @@
 // The Helix settings row family. The markup and class names are the same as the hand-written pages use, so both look identical and the
 // nested tests find the same controls by `data-test`. Text only ever goes through React children (never as HTML).
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { Choice } from "./bindings/Choice";
 import type { RowView } from "./bindings/RowView";
 
@@ -103,14 +103,15 @@ export function RowGroups({ rows, onChange }: { rows: RowView[]; onChange: (id: 
   return (
     <>
       {groups.map((group) => (
-        <div key={group.name}>
+        // A fragment, not a wrapper: the page's spacing rules are written for heading and card as siblings.
+        <Fragment key={group.name}>
           <h4>{group.name}</h4>
           <div className="rows-card">
             {group.rows.map((row) => (
               <Row key={row.id} row={row} onChange={onChange} />
             ))}
           </div>
-        </div>
+        </Fragment>
       ))}
     </>
   );
