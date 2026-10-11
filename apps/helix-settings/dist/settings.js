@@ -82,7 +82,7 @@ function showPage(name) {
   if (name === "about") drawAbout();
   if (name === "keyboard") drawKeyboard();
   if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
-  if (name === "dock") invoke("dock_rows").then(drawDock);
+  if (name === "dock" && !showDockReact()) invoke("dock_rows").then(drawDock);
   if (name === "power") invoke("power_rows").then(drawPower);
   if (name === "displays") invoke("displays_rows").then(drawDisplays);
   queueReport();
@@ -400,7 +400,21 @@ function drawGroups(host, page, rows) {
   });
 }
 // The Dock page: settings the shell honours (kept in a file it watches), drawn with the same rows as the service's pages.
+// The Dock page is a React page when its bundle is there (apps/helix-settings/web); the hand-written version below is the fallback.
+let dockReact = null;
+function showDockReact() {
+  if (!window.HelixReact) return false;
+  if (dockReact) {
+    dockReact.refresh();
+  } else {
+    dockReact = window.HelixReact.mountDock($("dock-host"), {
+      onRows: (rows) => { pageRows.dock = rows; if (searching()) drawSearch(); },
+    });
+  }
+  return true;
+}
 function drawDock(rows) {
+  if (dockReact) { dockReact.setRows(rows); return; }
   pageRows.dock = rows;
   const host = $("dock-host");
   host.replaceChildren();

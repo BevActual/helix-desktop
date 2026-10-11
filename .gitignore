@@ -54,3 +54,7 @@ greeter/*/dist/icons.js
 
 # stray rustc outputs
 rust_out
+
+# frontend workspace
+node_modules/
+apps/*/dist/react/

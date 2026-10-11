@@ -11,6 +11,11 @@ step "stop leftovers of earlier nested runs"
 for p in $(pgrep -x niri 2>/dev/null); do
   case "$(tr '\0' ' ' < /proc/$p/cmdline)" in *"-c /tmp/helix-nested/"*) kill -9 "$p" 2>/dev/null || true;; esac
 done
+if [ -d node_modules ]; then
+  step "frontend typecheck and lint"
+  npm run typecheck --silent
+  npm run lint --silent
+fi
 step "cargo clippy (warnings are errors)"
 cargo clippy --release --workspace --all-targets -- -D warnings
 step "cargo test"

@@ -9,3 +9,8 @@ description = "Pure Helix shell logic. No Tauri, GTK, or D-Bus."
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 toml = "0.8"
+ts-rs = { version = "10", optional = true }
+
+[features]
+# Generates TypeScript types for the views the React apps receive: tools/gen-bindings.sh
+ts = ["dep:ts-rs"]

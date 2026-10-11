@@ -11,6 +11,7 @@ use crate::display::sanitize_for_display;
 const MAX_TEXT: usize = 500;
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Choice {
     pub value: String,
     pub label: String,
@@ -18,6 +19,7 @@ pub struct Choice {
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "lowercase")]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub enum Control {
     Switch { on: bool },
     Choice { options: Vec<Choice>, current: String },
@@ -26,6 +28,7 @@ pub enum Control {
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct RowView {
     pub id: String,
     pub title: String,
