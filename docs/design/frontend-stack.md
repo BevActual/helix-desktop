@@ -11,10 +11,11 @@ This page is the source of truth for how app UIs are built. When code and this p
 |---|---|---|
 | Apps under `apps/` (Settings, Mobius, Software, System Monitor, new apps) | **Tauri + React + TypeScript + Vite** | Run on demand; polish and maintainability matter most |
 | Session shell: bar, panels, dock, island, OSD (`shell/helix-shell-tauri`) | **Tauri + React + TypeScript + Vite**, moved in slices (see Status) | Decided 2026-10-11 after measuring: the framework costs 0–3 MB per process in the nested harness, inside run-to-run noise |
-| Approval dialog (confirmer), greeter | Tauri + hand-written HTML/CSS/JS, no build step | Security-critical: small enough to audit, no framework between the person and the decision |
+| Approval dialog (confirmer) | Tauri + hand-written HTML/CSS/JS, no build step | Security-critical: small enough to audit, no framework between the person and the decision |
+| Greeter | Tauri + React; lock screen stays native `swaylock` for now | Decided with the owner: the greeter is a React page over a Rust greetd client that offers only listed accounts and sessions; the lock cannot depend on a web page until a session-lock host exists |
 | Helpers (`services/`) | Rust only | No UI |
 
-A new app starts as React. The confirmer and greeter do not become React without changing this page first.
+A new app starts as React. The confirmer does not become React without changing this page first.
 
 **How the shell moves.** The shell page (`shell/helix-shell-tauri/dist`) hosts the bar and every panel in one document, with geometry
 reporting (input regions, glass rectangles, test layout) tied to element ids. It moves slice by slice: a React island renders into an
@@ -78,8 +79,10 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 | Surface | State |
 |---|---|
 | **Settings** | **All pages React**. Sidebar, search and page chrome still in `settings.js`; each page's hand-written drawing is the fallback and is deleted after a release has run on the React page |
-| **Shell: notifications, launcher, Today, control center** | **React islands**. Control center = the whole panel body (clock and battery, tiles, brightness, sound and microphone sliders, media, system buttons and power sheet, the Sound, Internet and Bluetooth detail pages, the Wi-Fi password sheet). `shell.js` keeps the bar's own glyphs, the theme attribute, the mode and the regions, and leaves the panel DOM to React when its bundle is present. Improvements that came with the move: launcher shows a "Suggested" label, highlights the match, keeps the selected row in view, Home/End, hover selection, an Enter hint; Today picks a day, and Left/Right/T move through months |
-| Shell: Mobius dropdown, quick insert, island, OSD, tray, dock, bar | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
+| **Shell: notifications, launcher, Today, control center, quick insert, Mobius dropdown, island, OSD content and tray (icons and the application's menu), dock icons** | **React islands**. Control center = the whole panel body (clock and battery, tiles, brightness, sound and microphone sliders, media, system buttons and power sheet, the Sound, Internet and Bluetooth detail pages, the Wi-Fi password sheet). The Mobius dropdown (Talk, Act, Agents) draws Rust's conversation, pending request and audit views and sends back only a typed request, the one confirm, or an id it was given; the bar's agent glyph stays in `shell.js`. Quick insert (the Caps Lock palette) draws Rust's rows and sends back only the index and generation of the one chosen. `shell.js` keeps the bar's own glyphs, the theme attribute, the mode and the regions, and leaves the panel DOM to React when its bundle is present. Improvements that came with the move: launcher shows a "Suggested" label, highlights the match, keeps the selected row in view, Home/End, hover selection, an Enter hint; Today picks a day, and Left/Right/T move through months |
+| **Greeter** | **React** (`greeter/helix-greeter-tauri/web`); greetd protocol and the account/session lists are Rust, see `greeter-tauri.md` |
+| **Lock screen** | `swaylock` themed with the shared tokens through `helix-panel lock`. A Helix-drawn lock needs an ext-session-lock host for a webview (`gtk-session-lock`, not installed here); until then it stays native so the lock can never depend on a web page |
+| Shell: bar (its glyph slots, workspaces, clock; the dock's magnify lens, hide timer, tooltip and menu also stay in `shell.js` because the input regions and glass are measured from them) | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
 | Mobius app (`helix-mobius`) | Hand-written (`dist/chat.js`, ~1,800 lines). Next app to move: streaming messages, edit/branch, search, attachments, personas, model picker |
 | Software, System Monitor | Hand-written (small). Move when they next grow a page |
 
@@ -96,7 +99,7 @@ Settings (whole app React vs hand-written):
 
 About 3–4 MB on a 150 MB app: the WebKit baseline dominates.
 
-Shell (React islands for notifications, launcher, Today and the control center vs hand-written; total PSS of the shell, its WebKit
+Shell (React islands for notifications, launcher, Today, the control center, quick insert, the Mobius dropdown and the island/OSD content and tray vs hand-written; total PSS of the shell, its WebKit
 processes and the service; two runs each, release builds):
 
 | | hand-written | React islands |

@@ -10,7 +10,13 @@ const $ = (id) => document.getElementById(id);
 // the control center. The clock opens the notification shade. Everything here is drawn from the same views the panels use.
 let reactLauncher = null;   // set by shell-react.js when the React bundle is present
 let reactToday = null;
-let reactControls = null;   // the control center panel body
+let reactControls = null;
+let reactQuickInsert = null;
+let reactMobius = null;
+let reactIsland = null;
+let reactTray = null;
+let reactDock = null;
+let reactOsd = null;   // the control center panel body
 const statusState = { wifi: "off", bt: false };
 function drawStatus() {
   const wifi = slot("wifi");
@@ -92,6 +98,7 @@ function everyMinute() {
 }
 
 function show(view) {
+  if (reactMobius) return; // the Act pane is React
   const phase = view.phase;
   let body = "";
   let reason = "";
@@ -127,6 +134,10 @@ function applyMobiusMode(mode) {
     if (on) btn.setAttribute("aria-current", "page");
     else btn.removeAttribute("aria-current");
   });
+  if (reactMobius) {
+    reactMobius.setMode(door);
+    return;
+  }
   $("mobius-talk").hidden = door !== "talk";
   $("mobius-act").hidden = door !== "act";
   $("mobius-agents").hidden = door !== "agents";
@@ -157,7 +168,7 @@ listen("shell-mode", (event) => {
   }
   if (panel === "assistant") {
     applyMobiusMode(event.payload.mobius || "talk");
-    if ((event.payload.mobius || "talk") === "act") {
+    if (!reactMobius && (event.payload.mobius || "talk") === "act") {
       $("q").value = "";
     }
   } else if (panel === "control-center" && reactControls) {
@@ -172,6 +183,8 @@ listen("shell-mode", (event) => {
     invoke("quick_view").then(drawQuick);
     invoke("brightness_view").then(drawBrightness);
     invoke("battery_view").then(drawBattery);
+  } else if (panel === "quick-insert" && reactQuickInsert) {
+    reactQuickInsert.open();
   } else if (panel === "quick-insert") {
     qiSource = "emoji"; // always opens on emoji, so the same keys do the same thing every time
     $("qi-input").value = "";
@@ -438,9 +451,13 @@ function drawIsland(view) {
   pill.hidden = view.kind === "none";
   pill.className = "bar-btn " + view.kind;
   if (view.kind === "none") { queueReport(); queueGlass(); return; }
-  swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : "sparkle");
-  $("island-text").textContent = view.text;
-  $("island-detail").textContent = view.detail;
+  if (reactIsland) {
+    reactIsland.set(view);
+  } else {
+    swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : "sparkle");
+    $("island-text").textContent = view.text;
+    $("island-detail").textContent = view.detail;
+  }
   pill.title = view.detail ? view.text + " · " + view.detail : view.text;
   queueReport();
   queueGlass();
@@ -496,6 +513,10 @@ function drawAgents(view) {
     : view.busy
       ? "Mobius · " + view.pending.length + " waiting for you"
       : "Mobius · Agents";
+  if (reactMobius) {
+    queueReport();
+    return; // the dropdown is React; only the bar's own agent glyph is drawn here
+  }
   $("agent-state").textContent = !view.available
     ? "Agent activity is shown by the registered shell."
     : view.enabled ? "Agents may ask to act. Nothing runs without the checks in Settings." : "Agents are off. Every request is refused until you turn them on.";
@@ -569,6 +590,7 @@ function sendTalk() {
 }
 
 function drawTalk(view) {
+  if (reactMobius) return; // the Talk pane is React
   const thread = $("talk-thread");
   thread.replaceChildren();
   (view.history || []).forEach((line) => {
@@ -1009,7 +1031,13 @@ listen("osd", (event) => {
   const { kind, percent, muted, text } = event.payload;
   const osd = $("osd");
   osd.classList.toggle("notice", kind === "notice");
-  if (kind === "notice") {
+  if (reactOsd) {
+    reactOsd.set({ kind, percent: percent ?? 0, muted: !!muted, text: text ?? null });
+    if (kind !== "notice") {
+      osd.style.setProperty("--pct", percent + "%");
+      osd.classList.toggle("muted", !!muted);
+    }
+  } else if (kind === "notice") {
     swapIcon(slot("osd-ico"), "shield");
     $("osd-text").textContent = text || "";
   } else {
@@ -1097,7 +1125,10 @@ async function openTrayMenu(item, button, at) {
   try { items = await invoke("tray_menu", { key: item.key }); } catch (error) { items = []; }
   if (!items.length) { invoke("tray_context", at); return; }
   const menu = $("tray-menu");
-  menu.replaceChildren();
+  if (reactTray) {
+    reactTray.showMenu(item.key, items, closeTrayMenu);
+    items = [];
+  } else menu.replaceChildren();
   const add = (entry, sub) => {
     if (entry.kind === "separator") { const sep = document.createElement("div"); sep.className = "menu-sep"; menu.append(sep); return; }
     const row = document.createElement("div");
@@ -1127,6 +1158,7 @@ document.addEventListener("pointerdown", (event) => { if (trayMenuOpen && !event
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && trayMenuOpen) { event.stopPropagation(); closeTrayMenu(); } }, true);
 
 function drawTray(items) {
+  if (reactTray) { queueReport(); queueGlass(); return; } // the tray icons are React
   const host = $("tray");
   host.replaceChildren();
   items.forEach((item, index) => {
@@ -1167,6 +1199,12 @@ function dockLetterTile(name) {
 function drawDock(items) {
   dockItems = items;
   const row = $("dock-items");
+  if (reactDock) {
+    reactDock.set(items);
+    queueInteractive();
+    queueGlass();
+    return;
+  }
   row.replaceChildren();
   items.forEach((item, index) => {
     const cell = document.createElement("div");
@@ -1387,7 +1425,7 @@ function sendReport() {
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
     if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls"].filter(Boolean), elements } });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls", reactQuickInsert && "quick-insert", reactMobius && "mobius", reactIsland && "island", reactOsd && "osd", reactTray && "tray", reactDock && "dock"].filter(Boolean), elements } });
 }
 window.addEventListener("resize", () => queueReport());
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });

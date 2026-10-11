@@ -4,11 +4,16 @@ import { Shade, Toasts } from "./notifications";
 import { Launcher, type LauncherHandle } from "./launcher";
 import { Today, type TodayHandle } from "./today";
 import { ControlCenter, type ControlsHandle } from "./controls";
+import { Mobius, type MobiusHandle } from "./mobius";
+import { IslandBody, OsdBody, type IslandView, type OsdView } from "./indicators";
+import { Tray, TrayMenu, type TrayHooks, type TrayMenuHandle } from "./tray";
+import { DockItems, type DockHandle, type DockHooks, type DockItem } from "./dock";
+import { QuickInsert, type QuickInsertHandle } from "./quickinsert";
 
 type Subscriber = (set: (view: NotificationsView) => void) => void;
 
 /** A host element and a way to push the newest view into the component once it has mounted (none are lost before that). */
-function island(host: HTMLElement, Component: (props: { subscribe: Subscriber }) => React.ReactElement) {
+function island(host: HTMLElement, Component: (props: { subscribe: Subscriber }) => React.ReactElement | null) {
   let push: ((view: NotificationsView) => void) | null = null;
   let latest: NotificationsView | null = null;
   const subscribe: Subscriber = (set) => {
@@ -43,6 +48,35 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
 (window as unknown as { HelixShellReact: unknown }).HelixShellReact = {
   launcher: (host: HTMLElement) => {
     const run = handled<LauncherHandle>(host, (register) => <Launcher register={register} />);
+    return { open: () => run((h) => h.open()) };
+  },
+  mobius: (host: HTMLElement) => {
+    const run = handled<MobiusHandle>(host, (register) => <Mobius register={register} />);
+    return { setMode: (mode: string) => run((h) => h.setMode(mode)) };
+  },
+  island: (host: HTMLElement) => {
+    const run = handled<{ set: (view: IslandView) => void }>(host, (ready) => (
+      <IslandBody register={(set) => ready({ set })} />
+    ));
+    return { set: (view: IslandView) => run((h) => h.set(view)) };
+  },
+  osd: (host: HTMLElement) => {
+    const run = handled<{ set: (view: OsdView) => void }>(host, (ready) => (
+      <OsdBody register={(set) => ready({ set })} />
+    ));
+    return { set: (view: OsdView) => run((h) => h.set(view)) };
+  },
+  tray: (host: HTMLElement, menuHost: HTMLElement, hooks: TrayHooks) => {
+    createRoot(host).render(<Tray hooks={hooks} />);
+    const run = handled<TrayMenuHandle>(menuHost, (register) => <TrayMenu register={register} />);
+    return { showMenu: (key: string, entries: import("./tray").MenuEntry[], chosen: () => void) => run((h) => h.set(key, entries, chosen)) };
+  },
+  dock: (host: HTMLElement, hooks: DockHooks) => {
+    const run = handled<DockHandle>(host, (register) => <DockItems hooks={hooks} register={register} />);
+    return { set: (items: DockItem[]) => run((h) => h.set(items)) };
+  },
+  quickInsert: (host: HTMLElement) => {
+    const run = handled<QuickInsertHandle>(host, (register) => <QuickInsert register={register} />);
     return { open: () => run((h) => h.open()) };
   },
   controls: (host: HTMLElement) => {
