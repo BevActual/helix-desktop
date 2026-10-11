@@ -8,6 +8,8 @@ const $ = (id) => document.getElementById(id);
 
 // The bar's right side is the system status, in the manner of a menu bar: Wi-Fi, Bluetooth, sound and battery, one button that opens
 // the control center. The clock opens the notification shade. Everything here is drawn from the same views the panels use.
+let reactLauncher = null;   // set by shell-react.js when the React bundle is present
+let reactToday = null;
 const statusState = { wifi: "off", bt: false };
 function drawStatus() {
   const wifi = slot("wifi");
@@ -78,7 +80,8 @@ $("cal-today").onclick = () => { calMonth = null; showMonth(0); };
 function everyMinute() {
   tickClock();
   const today = localToday();
-  if (calDay !== null && calDay !== today.year * 10000 + today.month * 100 + today.day) { drawToday(); calMonth = null; showMonth(0); }
+  if (reactToday) reactToday.tick();
+  else if (calDay !== null && calDay !== today.year * 10000 + today.month * 100 + today.day) { drawToday(); calMonth = null; showMonth(0); }
   invoke("battery_view").then(drawBattery);
   clearTimeout(clockTimer);
   clockTimer = setTimeout(everyMinute, 60000 - (Date.now() % 60000) + 50);
@@ -141,9 +144,12 @@ listen("shell-mode", (event) => {
   if (panel) document.body.dataset.panel = panel;
   else delete document.body.dataset.panel;
   if (panel === "notifications") {
-    drawToday();
-    calMonth = null;
-    showMonth(0);
+    if (reactToday) reactToday.open();
+    else {
+      drawToday();
+      calMonth = null;
+      showMonth(0);
+    }
   }
   if (panel === "assistant") {
     applyMobiusMode(event.payload.mobius || "talk");
@@ -165,9 +171,12 @@ listen("shell-mode", (event) => {
     qiSearch();
     $("qi-input").focus();
   } else if (panel === "launcher") {
-    $("lq").value = "";
-    search();
-    $("lq").focus();
+    if (reactLauncher) reactLauncher.open();
+    else {
+      $("lq").value = "";
+      search();
+      $("lq").focus();
+    }
   }
 });
 
@@ -1351,7 +1360,7 @@ function sendReport() {
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
     if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: reactNotifications ? ["notifications"] : [], elements } });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today"].filter(Boolean), elements } });
 }
 window.addEventListener("resize", () => queueReport());
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });

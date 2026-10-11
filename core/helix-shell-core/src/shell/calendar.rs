@@ -21,6 +21,7 @@ pub enum CalendarError {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Cell {
     pub year: i32,
     pub month: u32,
@@ -31,6 +32,7 @@ pub struct Cell {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Week {
     /// ISO 8601 week number of the week's Thursday (so the rows around New Year count the way the rest of the world does).
     pub iso_week: u32,
@@ -38,6 +40,7 @@ pub struct Week {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct MonthView {
     pub year: i32,
     pub month: u32,

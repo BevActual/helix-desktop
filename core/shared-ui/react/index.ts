@@ -20,3 +20,6 @@ export type { TierSwitch } from "./bindings/TierSwitch";
 export type { HistoryRow } from "./bindings/HistoryRow";
 export type { NotificationsView } from "./bindings/NotificationsView";
 export type { ItemView as NotificationItem } from "./bindings/ItemView";
+export type { MonthView } from "./bindings/MonthView";
+export type { Week as CalendarWeek } from "./bindings/Week";
+export type { Cell as CalendarCell } from "./bindings/Cell";

@@ -45,7 +45,9 @@ wtype -M ctrl a -m ctrl; wtype "zzzqqq"; sleep 0.8; shot launcher-nomatch; wtype
 wait_for "PANEL closed" 3 20 && echo "ok: Escape closed the launcher"
 echo "--- 5. a click launches the first row (the shorter name ranks first: Another Tool)"
 echo launcher >> "$CONTROL"; wait_for "PANEL open" 4; sleep 0.8; wtype "another"; sleep 1
-"$PT" 0.5 0.262 click; wait_for "LAUNCH another-tool.desktop" 1 20 && echo "ok: click launched"; sleep 1
+source "$ROOT/tools/nested/ui-lib.sh"; LAYOUT=$SCRATCH/state/layout.json
+if has_id "launcher-row:another-tool.desktop"; then click_id "launcher-row:another-tool.desktop"; else "$PT" 0.5 0.262 click; fi   # the React rows are named by the application they stand for; the hand-written ones are found by position
+wait_for "LAUNCH another-tool.desktop" 1 20 && echo "ok: click launched"; sleep 1
 [ -e "$M/another-tool" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
 echo "--- 6. arrow keys move the selection (query limited to the fake apps: Another Tool, then Another Thing)"
 echo launcher >> "$CONTROL"; wait_for "PANEL open" 5; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return

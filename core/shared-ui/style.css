@@ -900,3 +900,13 @@ body.chat .sheet-actions button { padding: 8px 14px; border-radius: 10px; font-w
   body.chat #side { transition: none; }
   body.chat .persona-dot, body.chat .persona-dot-face { transition: none; }
 }
+
+/* Launcher: suggestions label, match highlight, Enter hint (React launcher) */
+.launcher-label { padding: 8px 14px 2px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--label-2); }
+#results .row .name mark { background: transparent; color: var(--accent); font-weight: 700; }
+#results .row.selected .name mark { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+#results .row .enter-hint { margin-left: auto; padding-left: 10px; color: var(--label-2); opacity: .8; }
+#results .row .generic + .enter-hint { margin-left: 8px; }
+/* Today: the day the person picked */
+#cal-grid .cal-day { cursor: default; }
+#cal-grid .cal-day.picked:not(.today) { box-shadow: inset 0 0 0 1.5px var(--accent); border-radius: 50%; }

@@ -78,8 +78,8 @@ CSS/icons plus the optional frontend build); add the app to `tools/check-all.sh`
 | Surface | State |
 |---|---|
 | **Settings** | **All pages React**. Sidebar, search and page chrome still in `settings.js`; each page's hand-written drawing is the fallback and is deleted after a release has run on the React page |
-| **Shell: notifications** | **React islands** (toasts and the shade). Do-not-disturb marks, badge and buttons still drawn by `shell.js` |
-| Shell: launcher, Today, control center (sound, Wi-Fi, Bluetooth, tiles, media, brightness), Mobius dropdown, quick insert, island, OSD, tray, dock, bar | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
+| **Shell: notifications, launcher, Today** | **React islands** (toasts and shade; launcher panel body; Today panel). `shell.js` still draws the do-not-disturb marks, badge, buttons, the mode and the regions. Improvements that came with the move: launcher shows a "Suggested" label, highlights the match, keeps the selected row in view, Home/End, hover selection, an Enter hint; Today picks a day, and Left/Right/T move through months |
+| Shell: control center (sound, Wi-Fi, Bluetooth, tiles, media, brightness), Mobius dropdown, quick insert, island, OSD, tray, dock, bar | Hand-written; moving in that order (the dock and bar last: the magnify and region maths are the most geometry-coupled) |
 | Mobius app (`helix-mobius`) | Hand-written (`dist/chat.js`, ~1,800 lines). Next app to move: streaming messages, edit/branch, search, attachments, personas, model picker |
 | Software, System Monitor | Hand-written (small). Move when they next grow a page |
 
@@ -96,14 +96,16 @@ Settings (whole app React vs hand-written):
 
 About 3–4 MB on a 150 MB app: the WebKit baseline dominates.
 
-Shell (notification islands React vs hand-written; total PSS of the shell, its WebKit processes and the service; two runs each):
+Shell (React islands for notifications, launcher and Today vs hand-written; total PSS of the shell, its WebKit processes and the service;
+two runs each, release builds):
 
 | | hand-written | React islands |
 |---|---|---|
-| Idle | 164.9 / 161.7 MB | 164.2 / 164.0 MB |
-| Shade open | 164.5 / 164.0 MB | 166.6 / 166.4 MB |
+| Idle | 161.7 / 161.6 MB | 165.5 / 165.7 MB |
+| Shade open | 164.2 / 163.8 MB | 168.0 / 168.0 MB |
 
-Run-to-run noise is about 3 MB, the same size as the difference. Re-measure with `tools/nested/measure-settings-test.sh` and
+Bundle: 229 KB (72 KB gzip). The cost is a steady **+4 MB** per measurement set (the React runtime and its roots), which is now above the
+noise. Re-measure with `tools/nested/measure-settings-test.sh` and
 `tools/nested/measure-shell-test.sh` as slices land and when the bundle or dependency set grows; the budget table in `tauri-rust-shell.md`
 is the limit.
 
