@@ -126,6 +126,7 @@ fn is_wifi_password(text: &str) -> bool {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct NetworkRow {
     pub path: String,
     pub ssid: String,
@@ -138,6 +139,7 @@ pub struct NetworkRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct VpnRow {
     pub path: String,
     pub name: String,
@@ -145,6 +147,7 @@ pub struct VpnRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct NetworkView {
     pub available: bool,
     pub wifi_enabled: bool,

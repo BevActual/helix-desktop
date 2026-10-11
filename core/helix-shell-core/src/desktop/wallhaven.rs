@@ -107,6 +107,7 @@ impl Search {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Hit {
     pub id: String,
     pub resolution: String,
@@ -121,6 +122,7 @@ pub struct Hit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct Results {
     pub hits: Vec<Hit>,
     pub page: u32,

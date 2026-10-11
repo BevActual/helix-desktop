@@ -20,6 +20,7 @@ pub struct Bind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ShortcutRow {
     pub keys: Vec<String>,
     pub title: String,
@@ -28,6 +29,7 @@ pub struct ShortcutRow {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct ShortcutGroup {
     pub name: &'static str,
     pub rows: Vec<ShortcutRow>,

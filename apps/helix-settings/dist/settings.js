@@ -99,12 +99,12 @@ function showPage(name) {
   document.querySelectorAll(".page-link").forEach((node) => node.classList.toggle("current", node.dataset.page === name));
   $("page-title").textContent = TITLES[name];
   $("refresh").style.display = name === "agents" ? "" : "none";
-  if (name === "about") drawAbout();
-  if (name === "keyboard") drawKeyboard();
-  if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
   if (showReactPage(name)) {
     // drawn by React
   } else {
+    if (name === "about") drawAbout();
+    if (name === "keyboard") drawKeyboard();
+    if (name === "wallpaper") invoke("wallpaper_view").then(drawWallpaper);
     if (name === "dock") invoke("dock_rows").then(drawDock);
     if (name === "power") invoke("power_rows").then(drawPower);
     if (name === "displays") invoke("displays_rows").then(drawDisplays);
@@ -135,6 +135,7 @@ async function drawAbout() {
 // Wallpaper: a grid of the pictures in the folder; choosing one writes the choice and the wallpaper process reloads by itself ---------
 let thumbObserver = null;
 function drawWallpaper(view) {
+  if (reactPages.wallpaper) return;   // the React page listens for this event itself
   const host = $("wallpaper-host");
   host.replaceChildren();
   host.append(el("h4", "", "Colours"));

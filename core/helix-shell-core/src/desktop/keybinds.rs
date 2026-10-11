@@ -13,6 +13,7 @@ const MAX_SPEC: usize = 128;
 
 /// One navigation action and the chords currently bound to it.
 #[derive(Clone, Debug, PartialEq, Serialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS), ts(export))]
 pub struct KeybindRow {
     pub id: String,
     pub title: String,
