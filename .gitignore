@@ -59,3 +59,4 @@ rust_out
 node_modules/
 apps/*/dist/react/
 shell/*/dist/react/
+greeter/*/dist/react/

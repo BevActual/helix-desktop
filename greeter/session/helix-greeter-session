@@ -1,0 +1,51 @@
+#!/bin/sh
+# The command greetd runs as the greeter user: a private compositor with the Helix greeter as its only client.
+# If the greeter cannot start or stops with an error, it falls back to greetd's own text login (agreety) so a broken
+# greeter can never leave the machine without a way to sign in.
+set -u
+BIN=${HELIX_GREETER_BIN:-/usr/local/bin/helix-greeter}
+NIRI=${HELIX_GREETER_NIRI:-/usr/bin/niri}
+CONFIG=${HELIX_GREETER_NIRI_CONFIG:-/usr/local/share/helix-greeter/niri.kdl}
+SESSION=${HELIX_GREETER_SESSION_CMD:-/usr/bin/niri-session}
+FALLBACK=${HELIX_GREETER_FALLBACK:-/usr/bin/agreety}
+
+# Extra environment for this machine (e.g. WEBKIT_DISABLE_COMPOSITING_MODE=1), written by the administrator.
+[ -r /etc/helix-greeter/env ] && . /etc/helix-greeter/env
+LOG=${HELIX_GREETER_LOG:-}
+
+fallback() {
+  echo "helix-greeter-session: $1; using the text login" >&2
+  exec "$FALLBACK" --cmd "$SESSION"
+}
+
+[ -x "$BIN" ] || fallback "no greeter at $BIN"
+[ -x "$NIRI" ] || fallback "no compositor at $NIRI"
+[ -r "$CONFIG" ] || fallback "no compositor config at $CONFIG"
+
+# The greeter user has no home worth using; keep everything it writes in a private runtime directory.
+if [ -z "${HELIX_GREETER_NESTED:-}" ]; then
+  XDG_RUNTIME_DIR=/tmp/helix-greeter-runtime-$(id -u)
+  export XDG_RUNTIME_DIR
+  mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+  unset WAYLAND_DISPLAY
+fi
+# Without an explicit log, the greeter's output goes to a file in its private runtime directory, so a first failed login can be read
+# afterwards:  sudo cat /tmp/helix-greeter-runtime-*/greeter.log
+[ -z "$LOG" ] && [ -z "${HELIX_GREETER_NESTED:-}" ] && LOG="$XDG_RUNTIME_DIR/greeter.log"
+export XDG_CACHE_HOME="${XDG_RUNTIME_DIR:-/tmp}/cache"
+export XDG_SESSION_TYPE=wayland
+export GREETER_BIN="$BIN"
+
+run() {
+  if command -v dbus-run-session >/dev/null 2>&1 && [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    dbus-run-session -- "$NIRI" -c "$CONFIG" -- "$BIN"
+  else
+    "$NIRI" -c "$CONFIG" -- "$BIN"
+  fi
+}
+
+if [ -n "$LOG" ]; then run >>"$LOG" 2>&1; else run >/dev/null 2>&1; fi
+status=$?
+# The greeter exits 0 after greetd accepted the session (greetd then ends this process itself). Anything else means it never worked.
+[ "$status" -eq 0 ] && exit 0
+fallback "the greeter stopped with status $status"

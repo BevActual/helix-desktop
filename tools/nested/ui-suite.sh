@@ -42,3 +42,5 @@ pick settings-net   && run settings-net settings-net-test.sh settings-fake-neste
 pick settings-dock  && run settings-dock settings-dock-test.sh settings-fake-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick dock-prefs     && run dock-prefs dock-prefs-test.sh dock-nested.sh
 pick mobius         && run mobius mobius-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick greeter        && run greeter greeter-test.sh greeter-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick greeter-session && run greeter-session greeter-session-test.sh greeter-session-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -12,9 +16,21 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "paths": { "@helix/ui": ["./core/shared-ui/react/index.ts"] },
+    "paths": {
+      "@helix/ui": [
+        "./core/shared-ui/react/index.ts"
+      ]
+    },
     "baseUrl": "."
   },
-  "include": ["core/shared-ui/react", "apps/*/web/src"],
-  "exclude": ["**/node_modules", "**/dist"]
+  "include": [
+    "core/shared-ui/react",
+    "apps/*/web/src",
+    "shell/*/web/src",
+    "greeter/*/web/src"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/dist"
+  ]
 }

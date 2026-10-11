@@ -1,0 +1,188 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createRoot } from "react-dom/client";
+import { invoke } from "@helix/ui";
+
+interface User { username: string; name: string; }
+interface Session { id: string; name: string; }
+interface Offer { users: User[]; sessions: Session[]; dark: boolean; }
+type Step =
+  | { kind: "prompt"; secret: boolean; message: string }
+  | { kind: "info"; message: string; error: boolean }
+  | { kind: "ready" }
+  | { kind: "failed"; message: string };
+
+function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  return ((words[0]?.[0] ?? "?") + (words.length > 1 ? words[words.length - 1][0] : "")).toUpperCase();
+}
+
+function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <div className="g-clock" data-test="clock">
+      <div className="g-time">{now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</div>
+      <div className="g-date">{now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</div>
+    </div>
+  );
+}
+
+/** The login card. Rust holds the greetd conversation; this shows one step at a time and sends back typed text, a listed account
+ * and a listed session, so it can neither name an account nor a command it was not offered. */
+function Greeter() {
+  const [offer, setOffer] = useState<Offer | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [step, setStep] = useState<Step | null>(null);
+  const [text, setText] = useState("");
+  const [session, setSession] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const field = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    invoke<Offer>("greeter_offer").then((value) => {
+      setOffer(value);
+      document.documentElement.dataset.theme = value.dark ? "dark" : "light";
+      setSession(value.sessions[0]?.id ?? "");
+    });
+  }, []);
+
+  useEffect(() => {
+    field.current?.focus();
+  }, [step, user]);
+
+  const fail = (error: unknown) => {
+    setNotice(String(error));
+    setStep(null);
+    setUser(null);
+    setBusy(false);
+  };
+
+  const advance = useCallback(
+    (next: Step) => {
+      setBusy(false);
+      if (next.kind === "info") {
+        // greetd wants the line acknowledged before the next step.
+        setNotice(next.message);
+        setBusy(true);
+        invoke<Step>("greeter_respond", { response: null }).then(advance, fail);
+        return;
+      }
+      if (next.kind === "failed") setNotice(next.message);
+      setStep(next);
+    },
+    [],
+  );
+
+  const choose = (picked: User) => {
+    setUser(picked);
+    setNotice("");
+    setText("");
+    setBusy(true);
+    invoke<Step>("greeter_begin", { username: picked.username }).then(advance, fail);
+  };
+
+  const back = () => {
+    invoke("greeter_cancel");
+    setUser(null);
+    setStep(null);
+    setText("");
+    setNotice("");
+  };
+
+  const submit = () => {
+    if (step?.kind !== "prompt" || busy) return;
+    const answer = text;
+    setText("");
+    setBusy(true);
+    invoke<Step>("greeter_respond", { response: answer }).then(advance, fail);
+  };
+
+  // Authentication is done: start the chosen session.
+  useEffect(() => {
+    if (step?.kind === "ready" && session) {
+      invoke("greeter_start", { session }).catch(fail);
+    }
+  }, [step, session]);
+
+  // A failed attempt opens a fresh conversation for the same account.
+  const retry = () => user && choose(user);
+
+  // One account on the machine: no picker.
+  const only = offer?.users.length === 1 ? offer.users[0] : null;
+  useEffect(() => {
+    if (only && !user && !notice) choose(only);
+  }, [only]);
+
+  const sessions = offer?.sessions ?? [];
+  const users = offer?.users ?? [];
+  return (
+    <main className="g-stage" data-test="app">
+      <Clock />
+      <section className="g-card glass" data-test="login-card">
+        {!offer ? (
+          <p className="g-note">Starting…</p>
+        ) : !user ? (
+          <>
+            <h1>Welcome</h1>
+            {users.length ? (
+              <div className="g-users" data-test="users">
+                {users.map((entry) => (
+                  <button key={entry.username} className="g-user" data-test={`user-${entry.username}`} onClick={() => choose(entry)}>
+                    <span className="g-avatar">{initials(entry.name)}</span>
+                    <span className="g-name">{entry.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="g-note">No accounts can sign in here.</p>
+            )}
+          </>
+        ) : (
+          <>
+            <span className="g-avatar big">{initials(user.name)}</span>
+            <h1 data-test="user-name">{user.name}</h1>
+            {step?.kind === "prompt" ? (
+              <input
+                ref={field}
+                className="g-input"
+                data-test="answer"
+                type={step.secret ? "password" : "text"}
+                placeholder={step.message.replace(/:\s*$/, "") || "Password"}
+                autoComplete="off"
+                disabled={busy}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") submit();
+                  else if (event.key === "Escape") back();
+                }}
+              />
+            ) : null}
+            {step?.kind === "failed" ? (
+              <button className="g-primary" data-test="try-again" onClick={retry}>Try again</button>
+            ) : null}
+            {step?.kind === "ready" ? <p className="g-note">Signing in…</p> : null}
+            {!step && busy ? <p className="g-note">One moment…</p> : null}
+            <div className={`g-notice${step?.kind === "failed" ? " error" : ""}`} data-test="notice" role="status">{notice}</div>
+            <div className="g-actions">
+              <button className="g-link" data-test="back" onClick={back}>Not you?</button>
+              {sessions.length > 1 ? (
+                <select className="g-session" data-test="session" value={session} onChange={(event) => setSession(event.target.value)}>
+                  {sessions.map((entry) => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
+                </select>
+              ) : null}
+            </div>
+          </>
+        )}
+        {offer && !user && notice ? <div className="g-notice error" role="status">{notice}</div> : null}
+      </section>
+    </main>
+  );
+}
+
+const host = document.getElementById("app");
+if (host) createRoot(host).render(<Greeter />);

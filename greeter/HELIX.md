@@ -8,7 +8,7 @@ Product placement: [`docs/design/product-structure.md`](../docs/design/product-s
 
 | Path | Role |
 |---|---|
-| `greeter/helix-greeter-tauri/` | Tauri greeter (workspace member `helix-greeter`) |
+| `greeter/helix-greeter-tauri/` | Tauri greeter (workspace member `helix-greeter`); login card is React in `web/` |
 
 ```sh
 cargo build --profile fast -p helix-greeter
