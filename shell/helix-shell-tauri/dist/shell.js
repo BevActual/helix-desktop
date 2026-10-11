@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 // the control center. The clock opens the notification shade. Everything here is drawn from the same views the panels use.
 let reactLauncher = null;   // set by shell-react.js when the React bundle is present
 let reactToday = null;
+let reactControls = null;   // the control center panel body
 const statusState = { wifi: "off", bt: false };
 function drawStatus() {
   const wifi = slot("wifi");
@@ -20,8 +21,10 @@ function drawStatus() {
 let clockTimer = null;
 function tickClock() {
   const now = new Date();
-  $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  if (!reactControls) {
+    $("qs-time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    $("qs-date").textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  }
   document.querySelector("#clock .day").textContent = now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   document.querySelector("#clock .time").textContent = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }
@@ -80,6 +83,7 @@ $("cal-today").onclick = () => { calMonth = null; showMonth(0); };
 function everyMinute() {
   tickClock();
   const today = localToday();
+  if (reactControls) reactControls.tick();
   if (reactToday) reactToday.tick();
   else if (calDay !== null && calDay !== today.year * 10000 + today.month * 100 + today.day) { drawToday(); calMonth = null; showMonth(0); }
   invoke("battery_view").then(drawBattery);
@@ -156,6 +160,9 @@ listen("shell-mode", (event) => {
     if ((event.payload.mobius || "talk") === "act") {
       $("q").value = "";
     }
+  } else if (panel === "control-center" && reactControls) {
+    reactControls.open();
+    tickClock();
   } else if (panel === "control-center") {
     showDetail(null);
     tickClock();
@@ -317,9 +324,11 @@ function drawNotificationChrome(view) {
   $("notif-clear").disabled = !view.items.length;
   $("notif-dnd").textContent = "Do not disturb";
   $("notif-dnd").classList.toggle("on", view.dnd);
-  $("tile-dnd").classList.toggle("on", view.dnd);
-  $("tile-dnd").dataset.on = view.dnd ? "1" : "0";
-  $("tile-dnd-sub").textContent = view.dnd ? "On" : "Off";
+  if (!reactControls) {
+    $("tile-dnd").classList.toggle("on", view.dnd);
+    $("tile-dnd").dataset.on = view.dnd ? "1" : "0";
+    $("tile-dnd-sub").textContent = view.dnd ? "On" : "Off";
+  }
   swapIcon(slot("bell"), view.dnd ? "moon" : "bell");
   $("dnd-mark").hidden = !view.dnd;
   $("notif-badge").hidden = !view.unread;
@@ -620,6 +629,14 @@ let micLatest = 0;
 let sendTimer = null;
 let latest = 0;
 function drawAudio(view) {
+  if (reactControls) {
+    // The panel is React; only the bar's own volume glyph is drawn here.
+    const on = view.available && view.output;
+    slot("vol").style.display = on ? "" : "none";
+    if (on) swapIcon(slot("vol"), view.muted ? "volume-mute" : "volume");
+    queueReport();
+    return;
+  }
   const usable = view.available && view.output;
   $("audio-note").textContent = view.available ? (view.output ? "" : "No output device") : "Sound is unavailable";
   $("volrow").style.display = usable ? "" : "none";
@@ -698,6 +715,7 @@ const bars = (strength) => (strength >= 75 ? "▂▄▆█" : strength >= 50 ? "
 function drawNetwork(view) {
   statusState.wifi = !view.available || !view.wifi_enabled ? "off" : view.connected ? "on" : "idle";
   drawStatus();
+  if (reactControls) return;
   $("tile-wifi").style.display = view.available ? "" : "none";
   if (!view.available) return;
   $("tile-wifi").classList.toggle("on", view.wifi_enabled);
@@ -771,6 +789,7 @@ $("disconnect").onclick = () => invoke("network_disconnect");
 function drawBluetooth(view) {
   statusState.bt = view.available && view.enabled;
   drawStatus();
+  if (reactControls) return;
   $("tile-bt").style.display = view.available ? "" : "none";
   if (!view.available) return;
   $("tile-bt").classList.toggle("on", view.enabled);
@@ -837,7 +856,10 @@ $("cancel").onclick = () => invoke("assistant_cancel").then(show);
 $("doit").onclick = () => invoke("assistant_confirm").then(show);
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (document.body.dataset.panel === "control-center" && detail) { showDetail(null); return; }
+  if (document.body.dataset.panel === "control-center") {
+    if (reactControls) { if (reactControls.back()) return; }
+    else if (detail) { showDetail(null); return; }
+  }
   if (document.body.dataset.panel === "assistant" && $("panel").dataset.mobius === "talk" && !$("talk-stop").hidden) {
     invoke("mobius_talk_cancel");
     return;
@@ -859,6 +881,7 @@ $("tile-night").addEventListener("click", () => invoke("quick_set_night_light", 
 function drawQuick(view) {
   // The shell follows the system theme: the same setting the Dark theme tile changes.
   document.documentElement.dataset.theme = view.dark === false ? "light" : "dark";
+  if (reactControls) { queueReport(); return; }
   const dark = view.dark !== null && view.dark !== undefined;
   $("tile-dark").style.display = dark ? "" : "none";
   if (dark) {
@@ -878,11 +901,13 @@ function drawQuick(view) {
 listen("quick-view", (event) => drawQuick(event.payload));
 
 function drawBattery(view) {
-  $("qs-battery").style.display = view.present ? "" : "none";
+  if (!reactControls) $("qs-battery").style.display = view.present ? "" : "none";
   $("batt").style.display = view.present ? "" : "none";
   if (!view.present) return;
-  $("qs-battery").textContent = view.label + (view.state ? " · " + view.state : "");
-  $("qs-battery").classList.toggle("low", view.low);
+  if (!reactControls) {
+    $("qs-battery").textContent = view.label + (view.state ? " · " + view.state : "");
+    $("qs-battery").classList.toggle("low", view.low);
+  }
   $("batt-label").textContent = view.label;
   $("batt").classList.toggle("low", view.low);
   $("batt").classList.toggle("charging", view.charging);
@@ -949,6 +974,7 @@ $("wifi-password-input").addEventListener("keydown", (event) => {
 });
 
 function drawMedia(view) {
+  if (reactControls) return;
   const row = $("qs-media");
   if (!view || !view.title) {
     row.style.display = "none";
@@ -1003,6 +1029,7 @@ let brightTimer = null;
 let brightLatest = 0;
 let brightDragging = false;
 function drawBrightness(view) {
+  if (reactControls) return;
   $("brightrow").style.display = view.available ? "" : "none";
   if (!view.available || brightDragging) { queueReport(); return; }
   $("brightness").value = view.percent;
@@ -1360,7 +1387,7 @@ function sendReport() {
     // A closed panel is laid out but invisible (visibility is inherited): it has no controls to click.
     if (box.width > 0 && box.height > 0 && getComputedStyle(element).visibility !== "hidden") elements[element.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today"].filter(Boolean), elements } });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, panel: document.body.dataset.panel || "", detail, islands: [reactNotifications && "notifications", reactLauncher && "launcher", reactToday && "today", reactControls && "controls"].filter(Boolean), elements } });
 }
 window.addEventListener("resize", () => queueReport());
 new MutationObserver(() => queueReport(300)).observe(document.body, { attributes: true, attributeFilter: ["data-panel", "class"] });

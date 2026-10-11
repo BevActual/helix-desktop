@@ -3,6 +3,7 @@ import type { NotificationsView } from "@helix/ui";
 import { Shade, Toasts } from "./notifications";
 import { Launcher, type LauncherHandle } from "./launcher";
 import { Today, type TodayHandle } from "./today";
+import { ControlCenter, type ControlsHandle } from "./controls";
 
 type Subscriber = (set: (view: NotificationsView) => void) => void;
 
@@ -43,6 +44,20 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   launcher: (host: HTMLElement) => {
     const run = handled<LauncherHandle>(host, (register) => <Launcher register={register} />);
     return { open: () => run((h) => h.open()) };
+  },
+  controls: (host: HTMLElement) => {
+    let ready: ControlsHandle | null = null;
+    const waiting: ((h: ControlsHandle) => void)[] = [];
+    createRoot(host).render(
+      <ControlCenter
+        register={(handle) => {
+          ready = handle;
+          waiting.splice(0).forEach((call) => call(handle));
+        }}
+      />,
+    );
+    const run = (call: (h: ControlsHandle) => void) => (ready ? call(ready) : waiting.push(call));
+    return { open: () => run((h) => h.open()), tick: () => run((h) => h.tick()), back: () => (ready ? ready.back() : false) };
   },
   today: (host: HTMLElement) => {
     const run = handled<TodayHandle>(host, (register) => <Today register={register} />);

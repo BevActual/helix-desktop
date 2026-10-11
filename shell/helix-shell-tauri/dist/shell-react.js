@@ -5,9 +5,10 @@ if (window.HelixShellReact) {
   if (lastNotifications) reactNotifications.update(lastNotifications);
   reactLauncher = window.HelixShellReact.launcher($("launcher"));
   reactToday = window.HelixShellReact.today($("today"));
+  reactControls = window.HelixShellReact.controls($("controls"));
 }
 // React updates its islands without going through shell.js's draw functions, so the test layout report is asked for after they change.
 if (window.HelixShellReact) {
   const again = new MutationObserver(() => queueReport());
-  ["launcher", "today", "toasts", "notif-list"].forEach((id) => again.observe($(id), { childList: true, subtree: true }));
+  ["launcher", "today", "toasts", "notif-list", "controls"].forEach((id) => again.observe($(id), { childList: true, subtree: true }));
 }
