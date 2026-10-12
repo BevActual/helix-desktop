@@ -17,6 +17,7 @@ let reportTimer = null;
 let view = { id: "", title: "New chat", messages: [], streaming: false, error: "", temporary: false, pinned: false, project: "" };
 let status = { inference: "ready", backend: "On this computer", left_device: false };
 let personas = { active: "helix", personas: [] };
+let lab = null; // the experiments and this chat's style, from the React dialogs
 let editingPersonaId = "helix";
 let editingMessageIndex = null;
 let stickToBottom = true;
@@ -61,6 +62,8 @@ const SLASH_COMMANDS = [
     $("chat-search").select();
     return Promise.resolve();
   } },
+  { cmd: "/style", desc: "Set this chat's style (concise, teacher, …)", run: () => { openMeta("style"); return Promise.resolve(); } },
+  { cmd: "/persona", desc: "Switch persona", run: () => { openMeta("persona"); return Promise.resolve(); } },
   { cmd: "/help", desc: "Show slash commands", run: () => { showSlashMenu(""); return Promise.resolve(); } },
 ];
 
@@ -500,7 +503,63 @@ function actOnDesktop(text) {
     .catch(report);
 }
 
+function activePersonaNow() {
+  const list = personas.personas || [];
+  return list.find((p) => p.id === personas.active) || list[0] || null;
+}
+
+const DEFAULT_STARTERS = [
+  "Explain what a cron job is",
+  "Write a bash one-liner to find large files",
+  "Summarise TCP versus UDP",
+  "Help me plan a focused week",
+  "Draft a polite status update",
+  "What changed in my last few messages?",
+];
+let suggestionKey = "";
+// An empty chat offers the persona's own starters when that experiment is on, the generic ones otherwise.
+function drawSuggestions() {
+  const host = document.querySelector("#empty .suggestions");
+  if (!host) return;
+  const persona = activePersonaNow();
+  const own = lab && lab.experiments.persona_starters && persona && persona.starters && persona.starters.length ? persona.starters : null;
+  const list = own || DEFAULT_STARTERS;
+  const key = list.join("\n");
+  if (key === suggestionKey) return;
+  suggestionKey = key;
+  host.replaceChildren();
+  list.forEach((text, index) => {
+    const button = el("button", "suggestion", text);
+    button.dataset.test = "suggestion-" + index;
+    button.onclick = () => { input.value = text; grow(); $("composer").requestSubmit(); };
+    host.append(button);
+  });
+}
+
+function openMeta(kind) {
+  const anchor = $(kind === "persona" ? "meta-persona" : "meta-style");
+  const box = (!anchor.hidden ? anchor : $("composer")).getBoundingClientRect();
+  if (reactDialogs) reactDialogs.openMenu(kind, { left: box.left, top: box.top, width: box.width });
+}
+
+function drawLabChips() {
+  const chipOn = !!(lab && lab.experiments.persona_chip);
+  const persona = activePersonaNow();
+  $("meta-persona").hidden = !chipOn;
+  $("meta-persona").textContent = persona ? persona.name : "Helix";
+  $("meta-persona").classList.toggle("remote", false);
+  // The rail under the title is the way to switch persona only while the chip experiment is off.
+  const rail = $("persona-rail");
+  if (rail) rail.hidden = chipOn;
+  const styleOn = !!(lab && lab.experiments.style_overlays);
+  $("meta-style").hidden = !styleOn;
+  const current = styleOn && lab.style ? (lab.styles.find((s) => s.id === lab.style) || { label: lab.style }).label : "";
+  $("meta-style").textContent = current ? "Style · " + current : "Style";
+  drawSuggestions();
+}
+
 function drawComposerMeta() {
+  drawLabChips();
   const chip = $("route-chip");
   const label = status.backend || "";
   if (!label) { chip.hidden = true; }
@@ -618,6 +677,7 @@ const reactDialogs = window.HelixMobiusReact
     report: (error) => report(error),
     routeChanged: (backend, model) => { currentBackend = backend; currentModel = model; drawComposerMeta(); },
     closeMenu: () => closeHubMenu(),
+    labChanged: (value) => { lab = value; drawComposerMeta(); },
     edited: (index, text) => {
       stickToBottom = true;
       invoke("chat_edit", { index, text })
@@ -1056,6 +1116,8 @@ $("find-prev").onclick = () => focusFindMatch(findIndex - 1);
 $("find-next").onclick = () => focusFindMatch(findIndex + 1);
 $("find-close").onclick = () => { closeFindBar(); input.focus(); };
 $("meta-model").onclick = () => openModelPicker().catch(report);
+$("meta-persona").onclick = () => openMeta("persona");
+$("meta-style").onclick = () => openMeta("style");
 
 async function fillModelList(backend) {
   const host = $("model-list");
@@ -1835,20 +1897,8 @@ $("route-probe-cloud").onclick = () => {
   host.append(el("div", "empty-title", "How can I help?"));
   host.append(el("div", "empty-note", "Ask anything, or type / for commands. Press Ctrl+Shift+A to have Mobius act on the desktop."));
   const suggestions = el("div", "suggestions");
-  [
-    "Explain what a cron job is",
-    "Write a bash one-liner to find large files",
-    "Summarise TCP versus UDP",
-    "Help me plan a focused week",
-    "Draft a polite status update",
-    "What changed in my last few messages?",
-  ].forEach((text, index) => {
-    const button = el("button", "suggestion", text);
-    button.dataset.test = "suggestion-" + index;
-    button.onclick = () => { input.value = text; grow(); $("composer").requestSubmit(); };
-    suggestions.append(button);
-  });
   host.append(suggestions);
+  drawSuggestions();
 })();
 
 function queueReport() {

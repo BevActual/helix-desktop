@@ -16,6 +16,7 @@ use helix_shell_core::chat::{
 };
 use helix_shell_core::inference_routing::{self, BackendKind, Routing};
 use helix_shell_core::markdown::Block;
+use helix_shell_core::mobius_lab::{self, Experiments, StyleView};
 use helix_shell_core::personas::{self, Persona, PersonaStore};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
@@ -472,15 +473,28 @@ fn error_text(error: &ChatError) -> &'static str {
     }
 }
 
-fn active_prompt(persona: &Persona) -> &str {
-    if persona.system_prompt.trim().is_empty() {
-        SYSTEM_PROMPT
-    } else {
-        persona.system_prompt.as_str()
-    }
+/// The system prompt for this turn: the persona's identity, then the project's instructions, then the chat's style (each layer only
+/// while its experiment is on). Composed in one place so every send, edit and regenerate agrees.
+fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
+    let identity = if persona.system_prompt.trim().is_empty() { SYSTEM_PROMPT } else { persona.system_prompt.as_str() };
+    let lab = mobius_lab::load();
+    let (project, style) = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        (state.chat.conversation.project.clone(), state.chat.conversation.style.clone())
+    };
+    let project_text = if lab.experiments.project_instructions { lab.project_instructions(&project).to_string() } else { String::new() };
+    let style_text = if lab.experiments.style_overlays { lab.style_prompt(&style).unwrap_or_default() } else { String::new() };
+    mobius_lab::compose_system(identity, &project_text, &style_text)
 }
 
 async fn dispatch_turn(app: AppHandle, turn: helix_shell_core::chat::Turn) -> Result<(), String> {
+    if std::env::var_os("HELIX_MOBIUS_LOG_PROMPT").is_some() {
+        // Tests read the composed system prompt from the program log (never set in normal use).
+        if let Some((_, text)) = turn.messages.iter().find(|(role, _)| *role == "system") {
+            eprintln!("MOBIUS system-prompt {}", text.replace('\n', " ⏎ "));
+        }
+    }
     let store = personas::load();
     let persona = store.active_persona().clone();
     let routing = inference_routing::load();
@@ -634,7 +648,7 @@ async fn chat_send(
 ) -> Result<(), String> {
     let store = personas::load();
     let persona = store.active_persona().clone();
-    let prompt = active_prompt(&persona);
+    let prompt = active_prompt(&app, &persona);
     let attachments = attachments.unwrap_or_default();
     let has_attachments = !attachments.is_empty();
     let composed = if !has_attachments {
@@ -665,12 +679,12 @@ async fn chat_send(
         if has_attachments {
             state
                 .chat
-                .send_composed(&composed, now(), prompt)
+                .send_composed(&composed, now(), &prompt)
                 .map_err(|e| error_text(&e).to_string())?
         } else {
             state
                 .chat
-                .send_with_system(&composed, now(), prompt)
+                .send_with_system(&composed, now(), &prompt)
                 .map_err(|e| error_text(&e).to_string())?
         }
     };
@@ -681,12 +695,12 @@ async fn chat_send(
 async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
     let store = personas::load();
     let persona = store.active_persona().clone();
-    let prompt = active_prompt(&persona);
+    let prompt = active_prompt(&app, &persona);
     let turn = shared(&app)
         .lock()
         .expect("state")
         .chat
-        .regenerate_with_system(now(), prompt)
+        .regenerate_with_system(now(), &prompt)
         .map_err(|e| error_text(&e).to_string())?;
     dispatch_turn(app, turn).await
 }
@@ -695,12 +709,12 @@ async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
 async fn chat_edit(app: AppHandle, index: usize, text: String) -> Result<(), String> {
     let store = personas::load();
     let persona = store.active_persona().clone();
-    let prompt = active_prompt(&persona);
+    let prompt = active_prompt(&app, &persona);
     let turn = shared(&app)
         .lock()
         .expect("state")
         .chat
-        .edit_and_resend(index, &text, now(), prompt)
+        .edit_and_resend(index, &text, now(), &prompt)
         .map_err(|e| error_text(&e).to_string())?;
     dispatch_turn(app, turn).await
 }
@@ -753,6 +767,87 @@ fn chat_set_project(app: AppHandle, project: String) -> Result<(), String> {
     }
     emit_view(&app);
     emit_list(&app);
+    Ok(())
+}
+
+#[derive(Clone, Serialize)]
+struct LabView {
+    experiments: Experiments,
+    styles: Vec<StyleView>,
+    /// The current chat's style id ("" = none).
+    style: String,
+    project: String,
+    project_instructions: String,
+}
+
+#[tauri::command]
+fn lab_get(app: AppHandle) -> LabView {
+    let lab = mobius_lab::load();
+    let (style, project) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        (state.chat.conversation.style.clone(), state.chat.conversation.project.clone())
+    };
+    LabView {
+        styles: lab.styles(),
+        project_instructions: lab.project_instructions(&project).to_string(),
+        experiments: lab.experiments,
+        style,
+        project,
+    }
+}
+
+fn emit_lab(app: &AppHandle) {
+    let _ = app.emit("lab-view", lab_get(app.clone()));
+}
+
+#[tauri::command]
+fn lab_set_experiment(app: AppHandle, key: String, on: bool) -> Result<(), String> {
+    let mut lab = mobius_lab::load();
+    match key.as_str() {
+        "persona_chip" => lab.experiments.persona_chip = on,
+        "style_overlays" => lab.experiments.style_overlays = on,
+        "project_instructions" => lab.experiments.project_instructions = on,
+        "persona_starters" => lab.experiments.persona_starters = on,
+        _ => return Err("Unknown experiment.".into()),
+    }
+    mobius_lab::save(&lab)?;
+    emit_lab(&app);
+    Ok(())
+}
+
+#[tauri::command]
+fn lab_set_project_instructions(app: AppHandle, project: String, text: String) -> Result<(), String> {
+    let mut lab = mobius_lab::load();
+    lab.set_project_instructions(&project, &text)?;
+    mobius_lab::save(&lab)?;
+    emit_lab(&app);
+    Ok(())
+}
+
+/// Warnings about text that is about to become part of a prompt (shown beside the editor; never blocks saving).
+#[tauri::command]
+fn lab_scan(text: String) -> Vec<String> {
+    mobius_lab::scan(&text)
+}
+
+#[tauri::command]
+fn chat_set_style(app: AppHandle, style: String) -> Result<(), String> {
+    let lab = mobius_lab::load();
+    if !lab.is_style(style.trim()) {
+        return Err("Unknown style.".into());
+    }
+    {
+        let shared = shared(&app);
+        let mut state = shared.lock().expect("state");
+        state.chat.set_style(style.trim(), now());
+        if !state.chat.temporary {
+            save(&state.chat.conversation);
+        }
+    }
+    emit_view(&app);
+    emit_list(&app);
+    emit_lab(&app);
     Ok(())
 }
 
@@ -1458,6 +1553,11 @@ fn main() {
             chat_copy,
             layout_reporting,
             report_layout,
+            lab_get,
+            lab_set_experiment,
+            lab_set_project_instructions,
+            lab_scan,
+            chat_set_style,
             personas_get,
             personas_set_active,
             personas_upsert,

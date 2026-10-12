@@ -1194,3 +1194,24 @@ body.chat #act { box-shadow: none; background: transparent; }
 body.chat .msg.user .msg-body { font-size: 15px; }
 body.chat .msg.assistant .msg-body { font-size: 15px; line-height: 1.6; }
 body.chat .code-block { border-radius: 10px; }
+
+/* Mobius lab: menus, icon choices, warnings. */
+.hx-menu { position: fixed; z-index: 30; display: flex; flex-direction: column; gap: 1px; padding: 6px; border-radius: 12px; background: var(--glass-solid); max-height: 60vh; overflow-y: auto;
+           box-shadow: var(--shadow), inset 0 0 0 .5px var(--hairline); animation: hx-pop 160ms var(--ease-spring) both; transform-origin: bottom left; }
+:root[data-blur="1"] .hx-menu { backdrop-filter: blur(24px) saturate(1.4); }
+.hx-menu-label { padding: 6px 10px 4px; color: var(--label-3); font-size: 11px; font-weight: 650; }
+.hx-menu-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 10px; border-radius: 8px; background: transparent; text-align: left; font-weight: 500; }
+.hx-menu-item:hover { background: var(--accent); color: var(--on-accent); } .hx-menu-item:hover .mi-sub { color: rgba(255,255,255,.8); }
+.hx-menu-item .mi-face { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; color: #fff; font-size: 10px; font-weight: 700; background: hsl(var(--dot-hue, 210) 55% 48%); }
+.hx-menu-item .mi-face svg { width: 14px; height: 14px; }
+.hx-menu-item .mi-text { flex: 1; min-width: 0; display: flex; flex-direction: column; } .hx-menu-item .mi-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-menu-item .mi-sub { color: var(--label-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hx-menu-item .mi-check { flex: none; color: var(--accent); font-weight: 700; } .hx-menu-item:hover .mi-check { color: inherit; }
+.hx-menu-sep { height: .5px; margin: 5px 8px; background: var(--hairline); }
+.icon-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.icon-choice { width: 34px; height: 34px; padding: 0; border-radius: 9px; display: grid; place-items: center; background: var(--fill-1); }
+.icon-choice.current { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.icon-choice svg { width: 17px; height: 17px; }
+.sheet-warning { padding: 8px 10px; border-radius: 9px; font-size: 12.5px; background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }
+.experiment { align-items: flex-start; }
+body.chat #persona-rail[hidden] { display: none; }

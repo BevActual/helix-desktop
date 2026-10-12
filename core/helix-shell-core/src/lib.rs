@@ -38,6 +38,7 @@ pub use apps::assistant;
 pub use apps::chat;
 pub use apps::inference_routing;
 pub use apps::markdown;
+pub use apps::mobius_lab;
 pub use apps::monitor;
 pub use apps::personas;
 pub use apps::software;

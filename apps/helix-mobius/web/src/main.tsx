@@ -45,6 +45,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
       openProject: (current: string, suggestions: string[]) => run((h) => h.openProject(current, suggestions)),
       openModel: () => run((h) => h.openModel()),
       openPersona: (create?: boolean) => run((h) => h.openPersona(create)),
+      openMenu: (kind: "persona" | "style", anchor: { left: number; top: number; width: number }) => run((h) => h.openMenu(kind, anchor)),
       openEdit: (index: number, text: string) => run((h) => h.openEdit(index, text)),
     };
   },

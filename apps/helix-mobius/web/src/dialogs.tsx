@@ -9,12 +9,23 @@ function Icon({ name }: { name: string }) {
   return <span ref={host} style={{ display: "contents" }} />;
 }
 
-interface Persona { id: string; name: string; system_prompt: string; task: string; backend: string; model: string; }
+interface Persona { id: string; name: string; system_prompt: string; task: string; backend: string; model: string; icon: string; description: string; starters: string[]; }
+export interface LabView {
+  experiments: { persona_chip: boolean; style_overlays: boolean; project_instructions: boolean; persona_starters: boolean };
+  styles: { id: string; label: string; builtin: boolean }[];
+  style: string;
+  project: string;
+  project_instructions: string;
+}
+/** The symbols a persona may pick from (must match `ICONS` in helix-shell-core). */
+const ICONS = ["sparkle", "music", "palette", "fork", "clipboard", "eye", "shield", "sun", "moon", "bolt", "pin", "image", "folder", "lock"];
 interface PersonaStore { active: string; personas: Persona[]; }
 interface Route { backend?: string; model?: string; label?: string; }
 
 export interface DialogHooks {
   report: (error: unknown) => void;
+  /** The experiments, styles and the chat's style changed (the composer chips and the persona rail follow). */
+  labChanged: (lab: LabView) => void;
   /** A message was edited and sent: the chat should follow the new reply. */
   edited: (index: number, text: string) => void;
   /** The chat route was changed from the picker. */
@@ -28,6 +39,8 @@ export interface DialogHandle {
   openModel: () => void;
   openPersona: (create?: boolean) => void;
   openEdit: (index: number, text: string) => void;
+  /** A small menu above an anchor: the persona list or the style list. */
+  openMenu: (kind: "persona" | "style", anchor: { left: number; top: number; width: number }) => void;
 }
 
 function initials(name: string): string {
@@ -76,6 +89,29 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     return () => { stop.then((fn) => fn()); };
   }, []);
 
+  // the experiments and the current chat's style, re-read when the chat changes
+  const [lab, setLab] = useState<LabView | null>(null);
+  const readLab = useCallback(() => {
+    invoke<LabView>("lab_get").then((value) => { setLab(value); hooksRef.current.labChanged(value); }, () => undefined);
+  }, []);
+  useEffect(() => {
+    const stops = [listen<LabView>("lab-view", (value) => { setLab(value); hooksRef.current.labChanged(value); }), listen<unknown>("chat-view", readLab)];
+    readLab();
+    return () => { stops.forEach((stop) => stop.then((fn) => fn())); };
+  }, [readLab]);
+  const [menu, setMenu] = useState<{ kind: "persona" | "style"; left: number; top: number; width: number } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent && event.key !== "Escape") return;
+      if (event instanceof MouseEvent && (event.target as HTMLElement | null)?.closest(".hx-menu")) return;
+      setMenu(null);
+    };
+    window.addEventListener("mousedown", close);
+    window.addEventListener("keydown", close);
+    return () => { window.removeEventListener("mousedown", close); window.removeEventListener("keydown", close); };
+  }, [menu]);
+
   // which sheet is open
   const [sheet, setSheet] = useState<"" | "rename" | "project" | "persona" | "model" | "edit">("");
   const [editIndex, setEditIndex] = useState(0);
@@ -86,9 +122,18 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const [title, setTitle] = useState("");
   // project
   const [project, setProject] = useState("");
+  const [projectText, setProjectText] = useState("");
+  const [scanned, setScanned] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   // persona
-  const [draft, setDraft] = useState<Persona>({ id: "helix", name: "", system_prompt: "", task: "chat", backend: "", model: "" });
+  const [draft, setDraft] = useState<Persona>({ id: "helix", name: "", system_prompt: "", task: "chat", backend: "", model: "", icon: "", description: "", starters: [] });
+  useEffect(() => {
+    if (sheet !== "persona") return;
+    const timer = setTimeout(() => {
+      invoke<string[]>("lab_scan", { text: draft.system_prompt }).then(setScanned, () => setScanned([]));
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [sheet, draft.system_prompt]);
   // model
   const [backend, setBackend] = useState("local");
   const [backends, setBackends] = useState<{ value: string; label: string }[]>([
@@ -115,7 +160,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   const edit = (persona: Persona) => setDraft({ ...persona });
   const openPersona = (create?: boolean) => {
     hooksRef.current.closeMenu();
-    if (create) edit({ id: newPersonaId(), name: "New persona", system_prompt: "", task: "chat", backend: "", model: "" });
+    if (create) edit({ id: newPersonaId(), name: "New persona", system_prompt: "", task: "chat", backend: "", model: "", icon: "sparkle", description: "", starters: [] });
     else edit(store.personas.find((p) => p.id === store.active) ?? store.personas[0] ?? draft);
     setSheet("persona");
   };
@@ -123,7 +168,13 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
   useEffect(() => {
     register({
       openRename: (value) => { setTitle(value || "New chat"); setSheet("rename"); },
-      openProject: (value, names) => { setProject(value || ""); setSuggestions(names); setSheet("project"); },
+      openProject: (value, names) => {
+        setProject(value || "");
+        setSuggestions(names);
+        invoke<LabView>("lab_get").then((view) => setProjectText(view.project_instructions || ""), () => setProjectText(""));
+        setSheet("project");
+      },
+      openMenu: (kind, anchor) => setMenu({ kind, ...anchor }),
       openPersona,
       openEdit: (index, text) => { setEditIndex(index); setEditText(text); setSheet("edit"); },
       openModel: async () => {
@@ -180,7 +231,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
                   }}
                   onDoubleClick={(event) => { event.preventDefault(); edit(p); hooksRef.current.closeMenu(); setSheet("persona"); }}
                 >
-                  <span className="persona-dot-face">{initials(p.name)}</span>
+                  <span className="persona-dot-face">{p.icon ? <Icon name={p.icon} /> : initials(p.name)}</span>
                   <span className="persona-dot-label">{p.name}</span>
                 </button>
               ))}
@@ -190,6 +241,41 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
               </button>
             </>,
             rail,
+          )
+        : null}
+
+      {menu
+        ? createPortal(
+            <div className="hx-menu" data-test={`menu-${menu.kind}`} style={{ left: menu.left, bottom: window.innerHeight - menu.top + 6, minWidth: Math.max(220, menu.width) }} role="menu">
+              {menu.kind === "persona" ? (
+                <>
+                  <div className="hx-menu-label">Persona</div>
+                  {store.personas.map((p, index) => (
+                    <button key={p.id} className={`hx-menu-item${p.id === store.active ? " current" : ""}`} role="menuitemradio" aria-checked={p.id === store.active} data-test={`menu-persona-${index}`}
+                      onClick={() => { setMenu(null); if (p.id !== store.active) invoke("personas_set_active", { id: p.id }).catch(report); }}>
+                      <span className="mi-face" style={{ ["--dot-hue" as string]: String(hue(p.id)) }}>{p.icon ? <Icon name={p.icon} /> : initials(p.name)}</span>
+                      <span className="mi-text"><span className="mi-title">{p.name}</span>{p.description ? <span className="mi-sub">{p.description}</span> : null}</span>
+                      {p.id === store.active ? <span className="mi-check">✓</span> : null}
+                    </button>
+                  ))}
+                  <div className="hx-menu-sep" />
+                  <button className="hx-menu-item" data-test="menu-persona-manage" onClick={() => { setMenu(null); openPersona(false); }}><span className="mi-text"><span className="mi-title">Edit “{(store.personas.find((p) => p.id === store.active) ?? store.personas[0])?.name}”…</span></span></button>
+                  <button className="hx-menu-item" data-test="menu-persona-new" onClick={() => { setMenu(null); openPersona(true); }}><span className="mi-text"><span className="mi-title">New persona…</span></span></button>
+                </>
+              ) : (
+                <>
+                  <div className="hx-menu-label">Style for this chat</div>
+                  {[{ id: "", label: "None", builtin: true }, ...(lab?.styles ?? [])].map((style) => (
+                    <button key={style.id || "none"} className={`hx-menu-item${(lab?.style ?? "") === style.id ? " current" : ""}`} role="menuitemradio" aria-checked={(lab?.style ?? "") === style.id} data-test={`menu-style-${style.id || "none"}`}
+                      onClick={() => { setMenu(null); invoke("chat_set_style", { style: style.id }).catch(report); }}>
+                      <span className="mi-text"><span className="mi-title">{style.label}</span></span>
+                      {(lab?.style ?? "") === style.id ? <span className="mi-check">✓</span> : null}
+                    </button>
+                  ))}
+                </>
+              )}
+            </div>,
+            document.body,
           )
         : null}
 
@@ -248,7 +334,11 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
           className="sheet-body"
           onSubmit={(event) => {
             event.preventDefault();
-            invoke("chat_set_project", { project: project.trim() }).then(closeSheet).catch(report);
+            const name = project.trim();
+            invoke("chat_set_project", { project: name })
+              .then(() => (name && lab?.experiments.project_instructions ? invoke("lab_set_project_instructions", { project: name, text: projectText }) : undefined))
+              .then(closeSheet)
+              .catch(report);
           }}
         >
           <header className="sheet-head">
@@ -260,6 +350,11 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
               <input id="project-name" data-test="project-name" type="text" maxLength={40} placeholder="e.g. Work, Homelab" list="project-suggestions" autoFocus value={project} onChange={(event) => setProject(event.target.value)} />
             </label>
             <datalist id="project-suggestions">{suggestions.map((name) => <option key={name} value={name} />)}</datalist>
+            {lab?.experiments.project_instructions ? (
+              <label className="sheet-field">Instructions for chats in this project
+                <textarea id="project-instructions" data-test="project-instructions" rows={5} maxLength={2000} placeholder="Optional. Applied to every chat in this project, after the persona." value={projectText} onChange={(event) => setProjectText(event.target.value)} />
+              </label>
+            ) : null}
           </div>
           <div className="sheet-actions">
             <button type="button" data-test="project-clear" onClick={() => { invoke("chat_set_project", { project: "" }).then(closeSheet).catch(report); }}>No project</button>
@@ -291,8 +386,28 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
             <label className="sheet-field">Name
               <input id="persona-edit-name" data-test="persona-edit-name" type="text" maxLength={40} required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
             </label>
+            <div className="sheet-field">Icon
+              <div className="icon-grid" data-test="persona-icons">
+                {ICONS.map((name) => (
+                  <button key={name} type="button" className={`icon-choice${draft.icon === name ? " current" : ""}`} data-test={`persona-icon-${name}`} aria-label={name} onClick={() => setDraft({ ...draft, icon: name })}>
+                    <Icon name={name} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="sheet-field">Description
+              <input id="persona-edit-description" data-test="persona-edit-description" type="text" maxLength={120} placeholder="What this persona is for" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
+            </label>
             <label className="sheet-field">System prompt
               <textarea id="persona-edit-prompt" data-test="persona-edit-prompt" rows={6} maxLength={4000} placeholder="Optional. Empty uses the default Mobius prompt." value={draft.system_prompt} onChange={(event) => setDraft({ ...draft, system_prompt: event.target.value })} />
+            </label>
+            {scanned.length ? (
+              <div className="sheet-warning" data-test="persona-scan" role="status">
+                {scanned.map((warning) => <div key={warning}>⚠ {warning}</div>)}
+              </div>
+            ) : null}
+            <label className="sheet-field">Starter prompts (one per line, up to 4)
+              <textarea id="persona-edit-starters" data-test="persona-edit-starters" rows={3} value={draft.starters.join("\n")} onChange={(event) => setDraft({ ...draft, starters: event.target.value.split("\n") })} />
             </label>
             <label className="sheet-field">Task profile
               <select id="persona-edit-task" data-test="persona-edit-task" value={draft.task || "chat"} onChange={(event) => setDraft({ ...draft, task: event.target.value })}>
@@ -316,7 +431,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
             </label>
           </div>
           <div className="sheet-actions">
-            <button id="persona-new" type="button" data-test="persona-new" onClick={() => edit({ id: newPersonaId(), name: "New persona", system_prompt: "", task: "chat", backend: "", model: "" })}>New</button>
+            <button id="persona-new" type="button" data-test="persona-new" onClick={() => edit({ id: newPersonaId(), name: "New persona", system_prompt: "", task: "chat", backend: "", model: "", icon: "sparkle", description: "", starters: [] })}>New</button>
             <span className="sheet-actions-spacer" />
             <button type="button" onClick={closeSheet}>Cancel</button>
             <button id="persona-save" type="submit" className="primary" data-test="persona-save">Save</button>

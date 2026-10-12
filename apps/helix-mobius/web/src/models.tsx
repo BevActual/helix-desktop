@@ -171,6 +171,7 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
   const [needle, setNeedle] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [experiments, setExperiments] = useState<Record<string, boolean> | null>(null);
   const [lanProbe, setLanProbe] = useState<Probe | null>(null);
   const [cloudProbe, setCloudProbe] = useState<Probe | null>(null);
   const sourceRef = useRef<Source>("local");
@@ -239,6 +240,7 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
           sourceRef.current = next.profiles.chat.backend as Source;
           await refreshKeyStatus().catch(() => setHasKey(null));
           setInfo(await invoke<PageInfo>("routing_page_info").catch(() => null));
+          invoke<{ experiments: Record<string, boolean> }>("lab_get").then((view) => setExperiments(view.experiments), () => setExperiments(null));
           setDirty(false);
           setOpen(true);
           hooksRef.current.visible(true);
@@ -498,7 +500,27 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
           </section>
 
           <section className={`models-panel${section === "advanced" ? " active" : ""}`} data-models-panel="advanced" data-test="models-panel-advanced" hidden={section !== "advanced"}>
-            <h3 className="models-h3">Advanced</h3>
+            <h3 className="models-h3">Experiments</h3>
+            <p className="models-lead">Things being tried in Mobius. Each can be switched off to compare with how it worked before.</p>
+            <div className="models-form-card" data-test="experiments">
+              {([
+                ["persona_chip", "Persona chip in the composer", "Switch persona from the composer; replaces the rail under the title."],
+                ["style_overlays", "Style overlays", "Concise, Plain language, Teacher… per chat, from the composer or /style."],
+                ["project_instructions", "Project instructions", "Instructions attached to a project and applied to its chats."],
+                ["persona_starters", "Persona starter prompts", "An empty chat shows the persona's own example prompts."],
+              ] as const).map(([key, title, note]) => (
+                <label key={key} className="sheet-check experiment">
+                  <input type="checkbox" data-test={`experiment-${key}`} checked={!!experiments?.[key]} disabled={!experiments}
+                    onChange={(event) => {
+                      const on = event.target.checked;
+                      setExperiments((old) => (old ? { ...old, [key]: on } : old));
+                      invoke("lab_set_experiment", { key, on }).catch(report);
+                    }} />
+                  <span><strong>{title}</strong><br /><span className="models-lead" style={{ margin: 0 }}>{note}</span></span>
+                </label>
+              ))}
+            </div>
+            <h3 className="models-h3" style={{ marginTop: 22 }}>Advanced</h3>
             <div className="models-form-card">
               <label className="sheet-check">
                 <input id="route-battery" data-test="route-battery" type="checkbox" checked={draft.battery} onChange={(event) => change({ battery: event.target.checked })} />

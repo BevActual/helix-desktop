@@ -55,6 +55,8 @@ pub struct Conversation {
     pub pinned: bool,
     /// Optional project / folder name for grouping.
     pub project: String,
+    /// The style overlay for this chat (an id from the lab; empty = none).
+    pub style: String,
 }
 
 /// An id is 16 lowercase hex digits (it names a file).
@@ -120,6 +122,7 @@ impl Conversation {
             updated: now,
             pinned: false,
             project: String::new(),
+            style: String::new(),
         })
     }
 
@@ -279,6 +282,7 @@ impl Conversation {
             next.title = sanitize_for_display(&forked, 48);
         }
         next.project = self.project.clone();
+        next.style = self.style.clone();
         next.pinned = false;
         next.updated = now;
         Some(next)
@@ -289,6 +293,7 @@ impl Conversation {
             "version": 1, "id": self.id, "title": self.title, "updated": self.updated,
             "pinned": self.pinned,
             "project": self.project,
+            "style": self.style,
             "messages": self.messages.iter().map(|m| json!({"role": m.role.wire(), "text": m.text})).collect::<Vec<_>>(),
         })
         .to_string()
@@ -322,6 +327,11 @@ impl Conversation {
             pinned: value.get("pinned").and_then(Value::as_bool).unwrap_or(false),
             project: value
                 .get("project")
+                .and_then(Value::as_str)
+                .map(|t| sanitize_for_display(t, 40))
+                .unwrap_or_default(),
+            style: value
+                .get("style")
                 .and_then(Value::as_str)
                 .map(|t| sanitize_for_display(t, 40))
                 .unwrap_or_default(),
@@ -390,6 +400,7 @@ pub struct ChatView {
     pub temporary: bool,
     pub pinned: bool,
     pub project: String,
+    pub style: String,
 }
 
 fn view_of(message: &Message) -> MessageView {
@@ -480,6 +491,11 @@ impl Chat {
 
     pub fn set_pinned(&mut self, pinned: bool, now: u64) {
         self.conversation.pinned = pinned;
+        self.conversation.updated = now;
+    }
+
+    pub fn set_style(&mut self, style: &str, now: u64) {
+        self.conversation.style = sanitize_for_display(style.trim(), 40);
         self.conversation.updated = now;
     }
 
@@ -666,6 +682,7 @@ impl Chat {
             temporary: self.temporary,
             pinned: self.conversation.pinned,
             project: self.conversation.project.clone(),
+            style: self.conversation.style.clone(),
         }
     }
 
