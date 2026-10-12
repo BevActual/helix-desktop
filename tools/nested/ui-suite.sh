@@ -48,5 +48,6 @@ pick software       && run software software-test.sh software-nested.sh "HELIX_N
 pick software-real && run software-real software-real-test.sh software-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick monitor        && run monitor system-monitor-test.sh system-monitor-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick models         && run models models-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+pick mobius-real    && [ -n "${HELIX_SUITE_HEAVY:-}" -o ${#sel[@]} -gt 0 ] && run mobius-real mobius-real-test.sh mobius-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-lab     && run mobius-lab mobius-lab-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_MOBIUS_LOG_PROMPT=1

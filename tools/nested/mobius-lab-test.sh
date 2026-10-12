@@ -57,6 +57,13 @@ LAST=$(grep -a "MOBIUS system-prompt" "$LOG" | tail -1)
 # A slow nested compositor can auto-repeat a held key, doubling letters; the match tolerates repeats.
 echo "$LAST" | grep -q "Instructions for this project" && echo "$LAST" | grep -qE "P+r+e+f+e+r+ +s+y+s+t+e+m+d+" && echo "ok: the project's instructions are in the system prompt" || { fail "project instructions not in the prompt"; echo "$LAST" | cut -c1-400; }
 echo "$LAST" | grep -q "Style for this conversation" && echo "ok: the style is still applied" || fail "style lost"
+echo "--- 5b. notes and usage"
+click_id input; wtype "/note export a chat as markdown"; wtype -k Return; sleep 1.5
+W=$(find "$SCRATCH/state" -name wishlist.md 2>/dev/null | head -1)
+[ -n "$W" ] && grep -qE "e+x+p+o+r+t+" "$W" && echo "ok: /note wrote a line to the wishlist" || fail "no wishlist line"
+U=$(find "$SCRATCH/state" -name usage.jsonl 2>/dev/null | head -1)
+[ -n "$U" ] && grep -q '"kind":"send"' "$U" && grep -q '"kind":"turn"' "$U" && echo "ok: usage events are logged (no message text)" || fail "no usage log"
+grep -q "cron" "$U" && fail "message text leaked into the usage log" || echo "ok: the usage log holds no message text"
 echo "--- 6. experiments switch the layers off"
 click_id open-models; sleep 1.5
 wait_id models-nav-advanced && click_id models-nav-advanced; sleep 0.8

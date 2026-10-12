@@ -32,6 +32,8 @@ const SHELL_IFACE: &str = "org.helix.Shell1";
 const MAX_CONVERSATIONS: usize = 200;
 
 struct State {
+    /// When the turn now in flight was sent (for the duration in the usage log).
+    turn_started: Option<std::time::Instant>,
     chat: Chat,
     /// Last backend label shown after a turn (local / LAN name).
     last_backend: String,
@@ -315,8 +317,26 @@ fn persist(app: &AppHandle) {
 }
 
 /// What a turn's ending means for the page and the disk.
+/// Appends one line to the local usage log: what was done, with which persona and style, and how it went. Never message text, and
+/// nothing for a temporary chat.
+fn record(app: &AppHandle, kind: &str, ms: u64, ok: bool) {
+    let (style, temporary) = {
+        let shared = shared(app);
+        let state = shared.lock().expect("state");
+        (state.chat.conversation.style.clone(), state.chat.temporary)
+    };
+    if temporary {
+        return;
+    }
+    let persona = personas::load().active_persona().name.clone();
+    let _ = mobius_lab::append_line(&mobius_lab::usage_path(), &mobius_lab::usage_line(now(), kind, &persona, &style, ms, ok));
+}
+
 fn ended(app: &AppHandle, outcome: Outcome) {
     eprintln!("MOBIUS turn ended {outcome:?}");
+    let started = shared(app).lock().expect("state").turn_started.take();
+    let ms = started.map_or(0, |at| at.elapsed().as_millis() as u64);
+    record(app, "turn", ms, matches!(outcome, Outcome::Finished));
     persist(app);
     emit_view(app);
     emit_list(app);
@@ -489,6 +509,7 @@ fn active_prompt(app: &AppHandle, persona: &Persona) -> String {
 }
 
 async fn dispatch_turn(app: AppHandle, turn: helix_shell_core::chat::Turn) -> Result<(), String> {
+    shared(&app).lock().expect("state").turn_started = Some(std::time::Instant::now());
     if std::env::var_os("HELIX_MOBIUS_LOG_PROMPT").is_some() {
         // Tests read the composed system prompt from the program log (never set in normal use).
         if let Some((_, text)) = turn.messages.iter().find(|(role, _)| *role == "system") {
@@ -688,6 +709,7 @@ async fn chat_send(
                 .map_err(|e| error_text(&e).to_string())?
         }
     };
+    record(&app, "send", 0, true);
     dispatch_turn(app, turn).await
 }
 
@@ -702,6 +724,7 @@ async fn chat_regenerate(app: AppHandle) -> Result<(), String> {
         .chat
         .regenerate_with_system(now(), &prompt)
         .map_err(|e| error_text(&e).to_string())?;
+    record(&app, "regenerate", 0, true);
     dispatch_turn(app, turn).await
 }
 
@@ -716,6 +739,7 @@ async fn chat_edit(app: AppHandle, index: usize, text: String) -> Result<(), Str
         .chat
         .edit_and_resend(index, &text, now(), &prompt)
         .map_err(|e| error_text(&e).to_string())?;
+    record(&app, "edit", 0, true);
     dispatch_turn(app, turn).await
 }
 
@@ -829,6 +853,33 @@ fn lab_set_project_instructions(app: AppHandle, project: String, text: String) -
 #[tauri::command]
 fn lab_scan(text: String) -> Vec<String> {
     mobius_lab::scan(&text)
+}
+
+/// `/note`: one line added to the wishlist file with what the assistant was set to. Returns the file's path.
+#[tauri::command]
+fn lab_note(app: AppHandle, text: String) -> Result<String, String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err("Write what you wish it did: /note <text>".into());
+    }
+    let (style, project) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        (state.chat.conversation.style.clone(), state.chat.conversation.project.clone())
+    };
+    let persona = personas::load().active_persona().name.clone();
+    let path = mobius_lab::wishlist_path();
+    mobius_lab::append_line(&path, &mobius_lab::note_line(now(), &persona, &style, &project, text))?;
+    record(&app, "note", 0, true);
+    Ok(path.display().to_string())
+}
+
+/// `/usage`: what the log says about the last `days` days, as one line.
+#[tauri::command]
+fn lab_usage(days: u64) -> String {
+    let since = now().saturating_sub(days.clamp(1, 365) * 86_400);
+    let text = std::fs::read_to_string(mobius_lab::usage_path()).unwrap_or_default();
+    format!("Last {} days — {}", days.clamp(1, 365), mobius_lab::summarize(&text, since))
 }
 
 #[tauri::command]
@@ -1000,6 +1051,7 @@ fn chat_take_bar_handoff(app: AppHandle) -> bool {
 
 #[tauri::command]
 async fn chat_stop(app: AppHandle) {
+    record(&app, "stop", 0, true);
     let operation = shared(&app).lock().expect("state").chat.stop();
     if let Some(operation) = operation {
         if let Ok(connection) = connection().await {
@@ -1557,6 +1609,8 @@ fn main() {
             lab_set_experiment,
             lab_set_project_instructions,
             lab_scan,
+            lab_note,
+            lab_usage,
             chat_set_style,
             personas_get,
             personas_set_active,
@@ -1581,6 +1635,7 @@ fn main() {
             }
             let seeded = !fresh.messages.is_empty();
             app.manage::<Shared>(Arc::new(Mutex::new(State {
+                turn_started: None,
                 chat: Chat::new(fresh),
                 last_backend: "On this computer".into(),
             })));

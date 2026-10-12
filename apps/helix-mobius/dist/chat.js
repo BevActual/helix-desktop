@@ -50,8 +50,8 @@ const SLASH_COMMANDS = [
   { cmd: "/export", desc: "Copy chat as Markdown", run: () => $("export-chat").click() },
   { cmd: "/retry", desc: "Regenerate the last reply", run: () => invoke("chat_regenerate").catch(report) },
   { cmd: "/stop", desc: "Stop the current reply", run: () => invoke("chat_stop") },
-  { cmd: "/act", desc: "Have Mobius act on the desktop", run: () => {
-    const rest = input.value.replace(/^\/act\b/i, "").trim();
+  { cmd: "/act", desc: "Have Mobius act on the desktop", run: (typed) => {
+    const rest = (typed || "").replace(/^\/act\b/i, "").trim();
     const text = rest || lastActableText();
     if (!text.trim()) { report("Write something to act on."); return Promise.resolve(); }
     return actOnDesktop(text);
@@ -62,6 +62,14 @@ const SLASH_COMMANDS = [
     $("chat-search").select();
     return Promise.resolve();
   } },
+  { cmd: "/note", desc: "Write down something Mobius should do better", run: (typed) => {
+    const text = (typed || "").replace(/^\/note\b/i, "").trim();
+    if (!text) { report("Write what you wish it did: /note <text>"); return Promise.resolve(); }
+    return invoke("lab_note", { text }).then((path) => {
+      info("Noted. Saved to " + path);
+    });
+  } },
+  { cmd: "/usage", desc: "How Mobius has been used (last 7 days)", run: () => invoke("lab_usage", { days: 7 }).then((text) => info(text, 12000)) },
   { cmd: "/style", desc: "Set this chat's style (concise, teacher, …)", run: () => { openMeta("style"); return Promise.resolve(); } },
   { cmd: "/persona", desc: "Switch persona", run: () => { openMeta("persona"); return Promise.resolve(); } },
   { cmd: "/help", desc: "Show slash commands", run: () => { showSlashMenu(""); return Promise.resolve(); } },
@@ -324,9 +332,10 @@ function showSlashMenu(filter) {
 
 function runSlash(item) {
   hideSlashMenu();
+  const typed = input.value; // commands that take text (/note, /act) read it here; the field is cleared first
   input.value = "";
   grow();
-  Promise.resolve(item.run()).catch(report);
+  Promise.resolve(item.run(typed)).catch(report);
 }
 
 function maybeSlashFromInput() {
@@ -987,6 +996,15 @@ $("persona-form").addEventListener("submit", (event) => {
     .then(() => $("persona-dialog").close())
     .catch(report);
 });
+
+// A quiet message in the banner (a confirmation, a summary), cleared after a while.
+function info(text, ms = 5000) {
+  const banner = $("banner");
+  banner.textContent = text;
+  banner.hidden = false;
+  clearTimeout(info.timer);
+  info.timer = setTimeout(() => { if (banner.textContent === text) banner.hidden = true; }, ms);
+}
 
 function report(error) {
   const banner = $("banner");
