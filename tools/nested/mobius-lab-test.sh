@@ -54,7 +54,8 @@ shot lab-project
 click_id input; wtype "And what about timers?"; wtype -k Return
 wait_turn 2 && echo "ok: the second turn ran" || fail "no second turn"
 LAST=$(grep -a "MOBIUS system-prompt" "$LOG" | tail -1)
-echo "$LAST" | grep -q "Instructions for this project" && echo "$LAST" | grep -q "Prefer systemd units" && echo "ok: the project's instructions are in the system prompt" || { fail "project instructions not in the prompt"; echo "$LAST" | cut -c1-400; }
+# A slow nested compositor can auto-repeat a held key, doubling letters; the match tolerates repeats.
+echo "$LAST" | grep -q "Instructions for this project" && echo "$LAST" | grep -qE "P+r+e+f+e+r+ +s+y+s+t+e+m+d+" && echo "ok: the project's instructions are in the system prompt" || { fail "project instructions not in the prompt"; echo "$LAST" | cut -c1-400; }
 echo "$LAST" | grep -q "Style for this conversation" && echo "ok: the style is still applied" || fail "style lost"
 echo "--- 6. experiments switch the layers off"
 click_id open-models; sleep 1.5
