@@ -42,7 +42,7 @@ agent**. Cursor may use it via `.cursor/mcp.json` as one consumer; it is not the
 
 | Tool | Backend |
 |------|---------|
-| `desktop_status` | agent socket `status` |
+| `desktop_status` | agent socket `status` (`helix-panel status` for scripts) |
 | `desktop_capture` | agent socket `desktop-capture` (`helix-panel desktop-capture` for scripts) |
 | `desktop_context` | status JSON + focused niri window |
 | `panel_toggle` / `panel_open` / `panel_close` | `panel-*` |
