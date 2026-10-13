@@ -122,6 +122,17 @@ async fn main() -> zbus::Result<()> {
         }
     });
 
+    let expire_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let mut locked = expire_state.lock().await;
+            agent_support::expire_confirmations(&mut locked).await;
+        }
+    });
+
     tracing::info!(
         bus = BUS_NAME,
         path = OBJECT_PATH,

@@ -1,6 +1,7 @@
 //! Shared Agent Surface helpers (audit, dbus signals, JSON result shape).
 
 use std::path::Path;
+use std::time::Instant;
 
 use helix_shell_core::{AuditRecord, RiskTier};
 use serde_json::json;
@@ -119,13 +120,59 @@ pub fn audit_record(
 }
 
 pub async fn finish_pending_denied(state: &mut State, pending: PendingConfirm, operation: u64, reason: &str) {
-    let record = audit_record(&pending, RiskTier::Confirm, "cancelled", "stopped");
-    append_audit(state, record).await;
+    complete_pending_denial(
+        state,
+        pending,
+        operation,
+        reason,
+        "cancelled",
+        "stopped",
+    )
+    .await;
+}
+
+async fn complete_pending_denial(
+    state: &mut State,
+    pending: PendingConfirm,
+    operation: u64,
+    user_message: &str,
+    audit_decision: &str,
+    audit_outcome: &str,
+) {
+    append_audit(
+        state,
+        audit_record(&pending, RiskTier::Confirm, audit_decision, audit_outcome),
+    )
+    .await;
     let conn = state.bus.as_ref().expect("bus connected");
     crate::agent::Agent::notify_confirmation_ended(conn, operation).await;
     crate::agent_activity::AgentActivity::notify_changed(conn).await;
-    crate::agent::Agent::notify_completed(conn, operation, false, &denial_json(reason)).await;
+    crate::agent::Agent::notify_completed(conn, operation, false, &denial_json(user_message)).await;
     crate::agent_activity::AgentActivity::notify_pending_changed(conn).await;
+}
+
+pub async fn expire_confirmations(state: &mut State) {
+    let now = Instant::now();
+    let due: Vec<u64> = state
+        .pending
+        .iter()
+        .filter(|(_, pending)| pending.deadline <= now)
+        .map(|(operation, _)| *operation)
+        .collect();
+    for operation in due {
+        let Some(pending) = state.pending.remove(&operation) else {
+            continue;
+        };
+        complete_pending_denial(
+            state,
+            pending,
+            operation,
+            "the confirmation timed out",
+            "denied",
+            "confirmation timed out",
+        )
+        .await;
+    }
 }
 
 pub async fn confirmer_disconnected(state: &mut State) {
