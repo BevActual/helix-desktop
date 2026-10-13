@@ -14,6 +14,7 @@ mod backlight;
 mod battery;
 mod blur;
 mod confirmer;
+mod admin_auth;
 mod agent_ipc;
 mod capture;
 mod control;
@@ -2012,7 +2013,9 @@ fn main() {
             confirmer_deny,
             confirmer_enter,
             confirmer_escape,
-            confirmer_set_tier
+            confirmer_set_tier,
+            admin_auth::admin_auth_submit,
+            admin_auth::admin_auth_cancel,
         ])
         .setup(move |app| {
             let window =

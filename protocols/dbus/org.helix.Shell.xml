@@ -20,5 +20,7 @@
  <method name="AdjustBrightness"><arg name="delta" type="i" direction="in"/></method>
  <!-- {panel: s}, empty when none is open -->
  <method name="GetStatus"><arg type="a{sv}" direction="out"/></method>
+ <!-- Graphical administrator password for `sudo -A` via `helix-askpass` (SUDO_ASKPASS). Cancelled when the person dismisses the dialog. -->
+ <method name="PromptAdminPassword"><arg name="prompt" type="s" direction="in"/><arg type="s" direction="out"/></method>
 </interface>
 </node>

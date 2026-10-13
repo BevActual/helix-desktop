@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# SUDO_ASKPASS helper: Helix shell shows a password dialog; this prints the secret on stdout (no newline).
+set -eu
+prompt="${1:-${SUDO_PROMPT:-Authentication is required to run this command as administrator.}}"
+if ! busctl --user status org.helix.Shell >/dev/null 2>&1; then
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --password --title="Helix" --text="$prompt" && exit 0
+    exit 1
+  fi
+  echo "helix-askpass: Helix shell is not running (org.helix.Shell)" >&2
+  exit 1
+fi
+raw=$(busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 PromptAdminPassword s "$prompt") || exit 1
+python3 - "$raw" <<'PY'
+import ast, shlex, sys
+parts = shlex.split(sys.argv[1].strip(), 1)
+if len(parts) != 2 or parts[0] != "s":
+    sys.exit(1)
+secret = ast.literal_eval(parts[1])
+if not isinstance(secret, str) or not secret:
+    sys.exit(1)
+sys.stdout.write(secret)
+PY

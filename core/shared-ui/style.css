@@ -257,6 +257,10 @@ body.open #toasts { display: none; }
 
 /* Approval dialog: a modal on a dimmed screen, deliberately unlike a toast or a panel, so nothing else can pass for it. */
 body.confirmer { display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .42); }
+.admin-auth-field { display: block; margin: 8px 0 4px; font-size: 12px; font-weight: 600; color: var(--label-2); }
+#admin-password { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 12px; border: none; background: var(--fill-1); color: var(--label); font-size: 14px; }
+#admin-error { min-height: 1.2em; color: var(--danger); font-size: 12px; margin-top: 6px; }
+#admin-error:empty { display: none; }
 #card { width: 480px; padding: 22px; display: flex; flex-direction: column; gap: 12px; border-radius: 26px; background: var(--glass-solid); animation: cardin 320ms var(--ease) both; }
 @keyframes cardin { from { opacity: 0; transform: scale(.94) translateY(8px); } }
 #head { display: flex; align-items: center; gap: 12px; }

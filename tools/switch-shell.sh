@@ -52,6 +52,9 @@ write_units_and_links() {
   }
   mkdir -p "$UNITS" "$HOME/.local/bin"
   install -m 0755 "$ROOT/tools/helix-panel" "$HOME/.local/bin/helix-panel"
+  install -m 0755 "$ROOT/tools/helix-askpass" "$HOME/.local/bin/helix-askpass"
+  mkdir -p "$HOME/.config/environment.d"
+  printf 'SUDO_ASKPASS=%s\n' "$HOME/.local/bin/helix-askpass" > "$HOME/.config/environment.d/helix-sudo.conf"
   ln -sf "$STRUT" "$HOME/.local/bin/helix-shell-strut"
   link_app helix-settings org.helix.Settings.desktop || true
   if [ -L "$HOME/.local/bin/helix-settings" ] || [ -x "$HOME/.local/bin/helix-settings" ]; then

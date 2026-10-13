@@ -6,7 +6,13 @@
 set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BUILD=${HELIX_BUILD_DIR:-$ROOT/build-native-clean}
-[ "$(id -u)" -eq 0 ] || { echo "run as root: sudo $0" >&2; exit 1; }
+if [ "$(id -u)" -ne 0 ]; then
+  if [ -n "${SUDO_ASKPASS:-}" ] && command -v sudo >/dev/null 2>&1; then
+    exec sudo -A "$0" "$@"
+  fi
+  echo "run as root: sudo -A $0   (set SUDO_ASKPASS to ~/.local/bin/helix-askpass after tools/switch-shell.sh install)" >&2
+  exit 1
+fi
 [ -x "$BUILD/helix-inference" ] && [ -x "$BUILD/helix-transcribe" ] || { echo "build first: ninja -C $BUILD helix-inference helix-transcribe" >&2; exit 1; }
 for f in helix-inference helix-transcribe; do
   [ -f "/usr/local/bin/$f" ] && cp -p "/usr/local/bin/$f" "/usr/local/bin/$f.helix-previous"

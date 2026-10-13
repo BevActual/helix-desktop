@@ -161,6 +161,22 @@ impl Control {
         Ok(())
     }
 
+    /// Used by `helix-askpass` (`SUDO_ASKPASS`) for graphical `sudo -A`.
+    async fn prompt_admin_password(&self, prompt: String) -> zbus::fdo::Result<String> {
+        if !crate::role::ShellRole::from_env().claims_shell1() {
+            return Err(zbus::fdo::Error::Failed(
+                "admin prompts are served by the bar process".into(),
+            ));
+        }
+        match crate::admin_auth::prompt(self.app.clone(), prompt).await {
+            Ok(secret) => Ok(secret),
+            Err(error) if error == "cancelled" => {
+                Err(zbus::fdo::Error::AccessDenied("cancelled".into()))
+            }
+            Err(error) => Err(zbus::fdo::Error::Failed(error)),
+        }
+    }
+
     async fn get_status(&self) -> std::collections::HashMap<String, OwnedValue> {
         let panel = current_panel(&self.app).await.unwrap_or_default();
         let mut status = std::collections::HashMap::new();
