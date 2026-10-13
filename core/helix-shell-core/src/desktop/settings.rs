@@ -16,6 +16,10 @@ pub enum SettingKind {
     String,
     Mode,
     Material,
+    /// `shell-layer` (notification popups, etc.).
+    ShellLayer,
+    /// `screen-position` (notification/OSD anchors).
+    ScreenPosition,
     /// Desktop-entry id list (`dock.pinned`, launcher pins).
     ApplicationList,
 }
@@ -61,6 +65,8 @@ impl SettingDef {
             SettingKind::String => "string",
             SettingKind::Mode => "mode",
             SettingKind::Material => "material",
+            SettingKind::ShellLayer => "shell-layer",
+            SettingKind::ScreenPosition => "screen-position",
             SettingKind::ApplicationList => "application-list",
         }
     }
@@ -69,6 +75,25 @@ impl SettingDef {
         match self.kind {
             SettingKind::Mode => Some((&["dark", "light", "auto"], &["Dark", "Light", "Automatic"])),
             SettingKind::Material => Some((&["solid", "soft", "glass"], &["Solid", "Soft", "Glass"])),
+            SettingKind::ShellLayer => Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"])),
+            SettingKind::ScreenPosition => Some((
+                &[
+                    "top_left",
+                    "top_center",
+                    "top_right",
+                    "bottom_left",
+                    "bottom_center",
+                    "bottom_right",
+                ],
+                &[
+                    "Top left",
+                    "Top center",
+                    "Top right",
+                    "Bottom left",
+                    "Bottom center",
+                    "Bottom right",
+                ],
+            )),
             _ => None,
         }
     }
@@ -472,6 +497,127 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 20.0,
         default: DefaultValue::Number(3.0),
+    },
+    SettingDef {
+        id: "notification.show_actions",
+        page: "notifications",
+        title: "Show notification actions",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.position",
+        page: "notifications",
+        title: "Popup position",
+        group: "Popups",
+        kind: SettingKind::ScreenPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top_right"),
+    },
+    SettingDef {
+        id: "notification.scale",
+        page: "notifications",
+        title: "Popup scale",
+        group: "Popups",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.5,
+        maximum: 2.5,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "notification.offset_x",
+        page: "notifications",
+        title: "Horizontal margin",
+        group: "Popups",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "notification.offset_y",
+        page: "notifications",
+        title: "Vertical margin",
+        group: "Popups",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "notification.layer",
+        page: "notifications",
+        title: "Popup layer",
+        group: "Popups",
+        kind: SettingKind::ShellLayer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top"),
+    },
+    SettingDef {
+        id: "notification.background_opacity",
+        page: "notifications",
+        title: "Popup opacity",
+        group: "Popups",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "notification.border",
+        page: "notifications",
+        title: "Show popup outline",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.collapse_on_dismiss",
+        page: "notifications",
+        title: "Collapse dismissed popups",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "notification.keep_dismissed_in_history",
+        page: "notifications",
+        title: "Keep dismissed notifications",
+        group: "History",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.history_retention_hours",
+        page: "notifications",
+        title: "History retention (hours)",
+        group: "History",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 8760.0,
+        default: DefaultValue::Number(168.0),
     },
     SettingDef {
         id: "control_center.width",
@@ -1100,9 +1246,11 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         SettingKind::Boolean => Value::Bool(value.as_bool().unwrap_or(false)),
         SettingKind::Number => Value::from(value.as_float().or_else(|| value.as_integer().map(|n| n as f64)).unwrap_or(0.0)),
         SettingKind::Integer => Value::from(value.as_integer().unwrap_or(0) as f64),
-        SettingKind::String | SettingKind::Mode | SettingKind::Material => {
-            Value::String(value.as_str().unwrap_or("").to_string())
-        }
+        SettingKind::String
+        | SettingKind::Mode
+        | SettingKind::Material
+        | SettingKind::ShellLayer
+        | SettingKind::ScreenPosition => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -1184,7 +1332,7 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
             .as_str()
             .map(|text| Value::String(text.to_string()))
             .ok_or_else(|| "expected string".into()),
-        SettingKind::Mode | SettingKind::Material => {
+        SettingKind::Mode | SettingKind::Material | SettingKind::ShellLayer | SettingKind::ScreenPosition => {
             let text = value.as_str().ok_or("expected string")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {

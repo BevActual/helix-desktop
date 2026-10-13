@@ -60,7 +60,8 @@ print("setting_count=", len(ids))
 assert len(ids) >= 40, ids
 for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
-    "shell.offline_mode", "notification.enable_daemon", "control_center.width", "osd.kinds.volume",
+    "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
+    "control_center.width", "osd.kinds.volume",
 ]:
     assert want in ids, want
 print("catalog=OK")
