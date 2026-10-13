@@ -57,8 +57,15 @@ pub struct HelperSession {
 
 impl HelperSession {
     pub fn new(uid: Uid, cookie: &str) -> Result<Self, HelperError> {
-        if !Path::new(SOCKET).exists() {
-            return Err(HelperError::NoSocket);
+        // polkitd may create the helper socket just after BeginAuthentication; brief wait.
+        for attempt in 0..40 {
+            if Path::new(SOCKET).exists() {
+                break;
+            }
+            if attempt == 39 {
+                return Err(HelperError::NoSocket);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
         }
         let user = User::from_uid(uid)
             .map_err(|_| HelperError::UserNotFound)?
