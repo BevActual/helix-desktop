@@ -11,8 +11,8 @@ use std::time::Duration;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, LayerShell};
+use helix_shell_core::bar_visibility::read as read_top_strut;
 use helix_shell_core::dock_prefs::DockPrefs;
-use helix_shell_core::BAR_HEIGHT;
 
 fn dock_prefs_path() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_CONFIG_HOME")
@@ -55,21 +55,39 @@ fn empty_input(window: &gtk::Window) {
     }
 }
 
-fn make_top_strut() -> gtk::Window {
-    let window = gtk::Window::new(gtk::WindowType::Toplevel);
-    make_transparent(&window);
-    window.set_size_request(1, BAR_HEIGHT);
-    window.init_layer_shell();
-    window.set_namespace("helix-shell-reserve");
-    window.set_layer(gtk_layer_shell::Layer::Top);
-    for edge in [Edge::Top, Edge::Left, Edge::Right] {
-        window.set_anchor(edge, true);
+struct TopStrut {
+    window: gtk::Window,
+    zone: i32,
+}
+
+impl TopStrut {
+    fn new() -> Self {
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        make_transparent(&window);
+        window.init_layer_shell();
+        window.set_namespace("helix-shell-reserve");
+        window.set_layer(gtk_layer_shell::Layer::Top);
+        for edge in [Edge::Top, Edge::Left, Edge::Right] {
+            window.set_anchor(edge, true);
+        }
+        window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+        window.show_all();
+        empty_input(&window);
+        let mut this = Self { window, zone: -1 };
+        this.apply_zone(read_top_strut().exclusive_zone);
+        this
     }
-    window.set_exclusive_zone(BAR_HEIGHT);
-    window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
-    window.show_all();
-    empty_input(&window);
-    window
+
+    fn apply_zone(&mut self, zone: i32) {
+        if self.zone == zone {
+            return;
+        }
+        self.zone = zone;
+        let height = zone.max(0);
+        self.window.set_size_request(1, height.max(1));
+        self.window.set_exclusive_zone(zone);
+        eprintln!("STRUT top reserve exclusive_zone={zone}");
+    }
 }
 
 struct DockStrut {
@@ -139,8 +157,24 @@ fn main() {
         std::process::exit(1);
     }
 
-    let top = make_top_strut();
-    eprintln!("STRUT helix-shell-reserve exclusive_zone={BAR_HEIGHT} (survives bar restart)");
+    let top = Rc::new(RefCell::new(TopStrut::new()));
+    eprintln!("STRUT helix-shell-reserve (survives bar restart)");
+
+    let top_watch = top.clone();
+    let mut top_seen = helix_shell_core::bar_visibility::state_path()
+        .and_then(|p| std::fs::metadata(p).ok())
+        .and_then(|m| m.modified().ok());
+    gtk::glib::timeout_add_local(Duration::from_millis(400), move || {
+        let now = helix_shell_core::bar_visibility::state_path()
+            .and_then(|p| std::fs::metadata(p).ok())
+            .and_then(|m| m.modified().ok());
+        if now != top_seen {
+            top_seen = now;
+            let zone = read_top_strut().exclusive_zone;
+            top_watch.borrow_mut().apply_zone(zone);
+        }
+        gtk::glib::ControlFlow::Continue
+    });
 
     let dock = Rc::new(RefCell::new(DockStrut::new()));
     dock.borrow_mut().apply(read_dock_prefs().reserved_height());

@@ -548,6 +548,13 @@ playing (click plays/pauses). Titles come from `playerctl --follow` (one long-li
 player or no player means no pill. A moon sits beside the time while Do Not Disturb is on. Not yet: mic or camera in use (the desktop service does not expose capture
 streams), timers, and a "Today" panel with a calendar behind the date. `tools/nested/island-test.sh` drives it with a stand-in MPRIS player and a real approval request.
 
+## Session gaps (Tauri vs C++ shell, 2026-10)
+
+- **Polkit agent:** the C++ shell registers `org.helix.Shell` as a Polkit authentication agent (`src/dbus/polkit/`). The Tauri session shell does not yet; privileged installs still use `SUDO_ASKPASS` / `helix-askpass` or an external agent (`plasma-polkit-agent`). Port or document before dropping the native shell on Fedora-style NM/polkit paths.
+- **Inference install:** Settings → Agents spawns `helix-install-inference` in the background and sets `SUDO_ASKPASS` to `~/.local/bin/helix-askpass` when the session has not exported it yet (`switch-shell.sh install`).
+- **Bar visibility IPC:** `bar-show` / `bar-hide` / `bar-toggle` on the agent socket, launcher `act`, and `org.helix.Shell1` `BarShow` / `BarHide` / `BarToggle` (bar process; `helix-panel` forwards). Top gap via `helix-top-strut.json` + `helix-shell-strut` (or in-process reserve on the GTK main thread). `tools/nested/agent-ipc-test.sh` covers bar commands and `desktop-capture focused`.
+- **Desktop capture:** `desktop-capture all` uses `HelixScreenshotAllOutputs`; named outputs use `HelixScreenshotOutput`. Stock niri ignores those Helix actions.
+
 ## Manager identity
 
 The Agent Surface manager (the Settings app) is recognised by the canonical path of its executable (`/usr/local/bin/helix-settings` or `/usr/bin/helix-settings`), no longer

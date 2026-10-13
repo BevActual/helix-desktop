@@ -10,7 +10,7 @@ pub enum CaptureScope {
     FocusedOutput,
     /// A specific connector name (e.g. `DP-1`).
     Output(String),
-    /// Every output (callers may stitch; shell may fall back to focused until stitching exists).
+    /// Every output stitched into one image (helix-niri `HelixScreenshotAllOutputs`).
     AllOutputs,
 }
 

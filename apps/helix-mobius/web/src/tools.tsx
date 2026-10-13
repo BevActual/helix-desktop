@@ -16,7 +16,12 @@ export function ChatTools({ register }: { register: (handle: ToolsHandle) => voi
     <header className="sheet-head"><h3 id="tools-title">Tools for this chat</h3><p className="sheet-note">Each send can search the web, read pages, and optionally run shell commands in a project folder. Steps appear in the thread; you approve lookups and commands before they run.</p></header>
     <div className="sheet-scroll">
       <label className="sheet-field"><span><input type="checkbox" data-test="tools-enabled" checked={enabled} disabled={busy || view?.streaming} onChange={(event) => setEnabled(event.target.checked)} /> Enable Tools mode</span></label>
-      <p>With Tools on, Mobius plans in the background, then answers with source links. Desktop changes still use <strong>Act</strong> (apps open on your Helix agent desk when enabled in Settings).</p>
+      <p>With Tools on, Mobius plans in the background, then answers with source links. Desktop changes still use <strong>Act</strong>. When agent-desk placement is on, the first approved shell command also opens a terminal on the agent desk (sandboxed runs still happen in the background).</p>
+      <div className="sheet-actions">
+        <button type="button" data-test="tools-show-desk" disabled={busy} onClick={() => invoke("agent_desk_focus").catch((reason) => setError(String(reason)))}>Show agent desk</button>
+        <button type="button" data-test="tools-open-desk-terminal" disabled={busy || !folder} onClick={() => invoke("tools_open_desk_terminal").catch((reason) => setError(String(reason)))}>Open folder on agent desk</button>
+        <button type="button" data-test="tools-agent-settings" disabled={busy} onClick={() => invoke("open_settings_agents").catch((reason) => setError(String(reason)))}>Agent desk settings</button>
+      </div>
       <label className="sheet-field">Project folder (optional for web-only)<code data-test="tools-folder">{folder || "No folder selected"}</code></label>
       <div className="sheet-actions"><button type="button" data-test="tools-choose" disabled={busy || view?.streaming} onClick={choose}>Choose folder</button><button type="button" disabled={!folder || busy || view?.streaming} onClick={() => setFolder("")}>Clear</button></div>
       <p className="sheet-note">Commands can read and change this folder. You review the exact command before every run. Commands have no network access, home folder, or desktop session.</p>

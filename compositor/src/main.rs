@@ -183,12 +183,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Increase the buffer size so that it's harder to crash a frozen client with a 1000 Hz mouse.
     set_default_max_buffer_size(&display, 1024 * 1024);
 
+    let headless = env::var_os("HELIX_NESTED_HEADLESS")
+        .is_some_and(|v| v != "0" && !v.is_empty());
+    if headless {
+        for var in ["WAYLAND_DISPLAY", "WAYLAND_SOCKET", "DISPLAY"] {
+            env::remove_var(var);
+        }
+    }
+
     let mut state = State::new(
         config,
         event_loop.handle(),
         event_loop.get_signal(),
         display,
-        false,
+        headless,
         true,
         cli.session,
     )

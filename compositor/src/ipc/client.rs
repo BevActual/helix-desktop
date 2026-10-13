@@ -21,7 +21,9 @@ pub fn handle_msg(mut msg: Msg, json: bool, print_request: bool) -> anyhow::Resu
         action:
             Action::Screenshot { path, .. }
             | Action::ScreenshotScreen { path, .. }
-            | Action::ScreenshotWindow { path, .. },
+            | Action::ScreenshotWindow { path, .. }
+            | Action::HelixScreenshotOutput { path, .. }
+            | Action::HelixScreenshotAllOutputs { path, .. },
     } = &mut msg
     {
         if let Some(path) = path {
@@ -583,6 +585,7 @@ pub fn handle_msg(mut msg: Msg, json: bool, print_request: bool) -> anyhow::Resu
 
             println!("liquid-glass: {}", caps.liquid_glass);
             println!("trusted-surfaces: {}", caps.trusted_surfaces);
+            println!("agent-desk: {}", caps.agent_desk);
             if !caps.liquid_glass_params.is_empty() {
                 println!("liquid-glass params: {}", caps.liquid_glass_params.join(" "));
             }

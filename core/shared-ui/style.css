@@ -924,6 +924,7 @@ body.chat .sheet-actions button { padding: 8px 14px; border-radius: 10px; font-w
 
 /* Launcher: suggestions label, match highlight, Enter hint (React launcher) */
 .launcher-label { padding: 8px 14px 2px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--label-2); }
+#results .row.action .name::before { content: "⚡ "; opacity: .85; }
 #results .row .name mark { background: transparent; color: var(--accent); font-weight: 700; }
 #results .row.selected .name mark { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 #results .row .enter-hint { margin-left: auto; padding-left: 10px; color: var(--label-2); opacity: .8; }

@@ -39,6 +39,9 @@ pub const SUPPORTED: &[&str] = &[
     "clipboard-clear",
     "desktop-capture",
     "agent-desk-focus",
+    "bar-show",
+    "bar-hide",
+    "bar-toggle",
 ];
 
 /// How long free text on the wire may be (`app-launch` query, `clipboard-copy` payload).
@@ -92,6 +95,9 @@ pub enum Command {
     DesktopCapture(Option<String>),
     /// Focus the Helix agent desk workspace (helix-niri).
     AgentDeskFocus,
+    BarShow,
+    BarHide,
+    BarToggle,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -347,6 +353,18 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
             no_args(&args)?;
             Command::AgentDeskFocus
         }
+        "bar-show" => {
+            no_args(&args)?;
+            Command::BarShow
+        }
+        "bar-hide" => {
+            no_args(&args)?;
+            Command::BarHide
+        }
+        "bar-toggle" => {
+            no_args(&args)?;
+            Command::BarToggle
+        }
         _ => return Err(MsgError::Unknown),
     })
 }
@@ -497,7 +515,7 @@ mod tests {
 
     #[test]
     fn anything_else_is_not_supported_and_odd_lines_are_refused() {
-        for unknown in ["bar-toggle", "session", "wallpaper-next", "VOLUME-UP", "volume-up;ls", "session", "window-switcher"] {
+        for unknown in ["session", "wallpaper-next", "VOLUME-UP", "volume-up;ls", "session", "window-switcher"] {
             assert_eq!(parse(unknown), Err(MsgError::Unknown), "{unknown}");
         }
         assert_eq!(parse(""), Err(MsgError::Empty));
@@ -546,12 +564,29 @@ mod tests {
             "theme-mode-toggle", "theme-mode-get", "nightlight-enable", "nightlight-disable", "nightlight-toggle", "notification-dnd-set on",
             "notification-dnd-toggle", "notification-dnd-status", "panel-open launcher", "panel-close", "panel-toggle launcher", "settings-open", "status", "window-close", "workspace-switch next",
             "app-launch Helix Settings", "clipboard-text", "clipboard-copy hello world", "clipboard-clear",
-            "desktop-capture agent-desk", "agent-desk-focus",
+            "desktop-capture agent-desk", "agent-desk-focus", "bar-show", "bar-hide", "bar-toggle",
         ];
         assert_eq!(examples.len(), SUPPORTED.len());
         for (example, name) in examples.iter().zip(SUPPORTED) {
             assert!(example.starts_with(name), "{example} vs {name}");
             assert!(parse(example).is_ok(), "{example}");
         }
+    }
+
+    #[test]
+    fn desktop_capture_accepts_optional_targets() {
+        assert!(matches!(
+            parse("desktop-capture").unwrap(),
+            Command::DesktopCapture(None)
+        ));
+        assert!(matches!(
+            parse("desktop-capture all").unwrap(),
+            Command::DesktopCapture(Some(t)) if t == "all"
+        ));
+        assert!(matches!(
+            parse("desktop-capture DP-1").unwrap(),
+            Command::DesktopCapture(Some(t)) if t == "DP-1"
+        ));
+        assert!(parse("desktop-capture a b").is_err());
     }
 }

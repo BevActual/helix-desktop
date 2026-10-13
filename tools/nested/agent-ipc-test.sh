@@ -10,9 +10,10 @@ for _ in $(seq 1 120); do grep -q "AGENT-IPC serving" "$LOG" 2>/dev/null && brea
 SOCK=$(ls "$STATE"/helix-*.sock 2>/dev/null | head -1); TOOLS=$(ls "$STATE"/helix-shell-tools-* 2>/dev/null | head -1)
 [ -S "$SOCK" ] && echo "ok: the shell serves $(basename "$SOCK")" || { fail "no socket"; exit 1; }
 sleep 2
-send() { python3 - "$SOCK" "$1" <<'PY'
+send() { python3 - "$SOCK" "$1" "${2:-5}" <<'PY'
 import socket, sys
-s = socket.socket(socket.AF_UNIX); s.settimeout(5); s.connect(sys.argv[1])
+timeout = float(sys.argv[3])
+s = socket.socket(socket.AF_UNIX); s.settimeout(timeout); s.connect(sys.argv[1])
 s.sendall(("/\x1e" + sys.argv[2]).encode()); s.shutdown(socket.SHUT_WR)
 data = b""
 while True:
@@ -22,12 +23,12 @@ while True:
 print(data.decode().strip())
 PY
 }
-expect_reply() { local got; got=$(send "$1"); [ "$got" = "$2" ] && echo "ok: '$1' -> $2" || fail "'$1' gave '$got', wanted '$2'"; }
+expect_reply() { local got; got=$(send "$1" "${3:-5}"); [ "$got" = "$2" ] && echo "ok: '$1' -> $2" || fail "'$1' gave '$got', wanted '$2'"; }
 expect_error() { local got; got=$(send "$1"); case "$got" in error:*) echo "ok: '$1' refused ($got)";; *) fail "'$1' was not refused: '$got'";; esac; }
 echo "--- 1. the socket and the tool list are private and say what is supported"
 [ "$(stat -c %a "$SOCK")" = 600 ] && echo "ok: the socket is owner only" || fail "socket mode $(stat -c %a "$SOCK")"
 [ "$(head -1 "$TOOLS")" = "$(cat "$STATE/shell.pid")" ] || [ -n "$(head -1 "$TOOLS")" ] && echo "ok: the tool list starts with the shell's pid" || fail "no pid line"
-grep -qx "theme-mode-set" "$TOOLS" && grep -qx "volume-up" "$TOOLS" && ! grep -qx "bar-toggle" "$TOOLS" && echo "ok: it lists supported commands only" || fail "tool list wrong: $(tr '\n' ' ' < "$TOOLS")"
+grep -qx "theme-mode-set" "$TOOLS" && grep -qx "volume-up" "$TOOLS" && grep -qx "bar-toggle" "$TOOLS" && echo "ok: it lists supported commands only" || fail "tool list wrong: $(tr '\n' ' ' < "$TOOLS")"
 echo "--- 2. commands do what they say"
 expect_reply "theme-mode-set light" "ok"; sleep 0.5
 grep -q 'UPDATE theme.mode "light"' "$SETTINGS" && echo "ok: the desktop was told to use the light theme" || fail "no light update: $(cat "$SETTINGS")"
@@ -42,6 +43,12 @@ expect_reply "notification-dnd-status" "off"
 expect_reply "panel-open launcher" "ok"; sleep 1
 grep -q "PANEL open" "$LOG" && echo "ok: the launcher opened" || fail "no panel opened"
 expect_reply "panel-close" "ok"; sleep 0.8
+expect_reply "bar-hide" "ok"; sleep 0.5
+grep -q "BAR hidden" "$LOG" && echo "ok: bar-hide hid the bar" || fail "no BAR hidden log line"
+sleep 0.5
+expect_reply "bar-show" "ok" 15; sleep 0.5
+grep -q "BAR shown" "$LOG" && echo "ok: bar-show restored the bar" || fail "no BAR shown log line"
+expect_reply "bar-toggle" "ok"; sleep 0.3
 echo "--- 2b. status describes the desktop without anything a program wrote; windows are closed by the ids it lists"
 APP_ID=agentwin TARGET_FILE="$STATE/agentwin.txt" python3 "$ROOT/tools/nested/text-target.py" >/dev/null 2>&1 & WIN=$!
 for _ in $(seq 1 40); do send "status" | grep -q '"agentwin"' && break; sleep 0.25; done
@@ -76,8 +83,48 @@ CLEARED=$(send "clipboard-text")
 [ -z "$CLEARED" ] && echo "ok: clipboard cleared" || fail "clipboard still held '$CLEARED'"
 grep -q "$MARKER" "$LOG" && fail "clipboard text was logged" || echo "ok: clipboard text stayed out of the log"
 
+echo "--- 2d. desktop-capture focused returns a png path"
+grep -qx "desktop-capture" "$TOOLS" && echo "ok: tool list includes desktop-capture" || fail "missing desktop-capture in tool list"
+CAP=$(send "desktop-capture focused" 30)
+case "$CAP" in
+  ok*)
+    PNG=$(printf '%s' "$CAP" | sed 's/^ok //')
+    [ -f "$PNG" ] && echo "ok: desktop-capture wrote a png" || fail "desktop-capture path missing: $PNG"
+    ;;
+  *) fail "desktop-capture focused: $CAP";;
+esac
+
+if grep -qE 'starting version .* helix' "$SCRATCH/niri.log" 2>/dev/null; then
+  echo "--- 2e. helix-niri desktop-capture all stitches outputs"
+  CAP=$(send "desktop-capture all" 45)
+  case "$CAP" in
+    ok*)
+      PNG=$(printf '%s' "$CAP" | sed 's/^ok //')
+      [ -f "$PNG" ] && echo "ok: desktop-capture all wrote a png" || fail "desktop-capture all path missing: $PNG"
+      ;;
+    *) fail "desktop-capture all: $CAP";;
+  esac
+  OUT_NAME=$(grep -oE 'putting output \K\S+' "$SCRATCH/niri.log" 2>/dev/null | head -1)
+  if [ -z "$OUT_NAME" ] && [ -n "${NIRI_SOCKET:-}" ]; then
+    OUT_NAME=$(niri msg --json outputs 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); v=next(iter(d.values()), None) if isinstance(d, dict) else (d[0] if d else None); print(v.get('name','') if isinstance(v, dict) else '')" 2>/dev/null || true)
+  fi
+  if [ -n "$OUT_NAME" ]; then
+    echo "--- 2f. helix-niri desktop-capture named output ($OUT_NAME)"
+    CAP=$(send "desktop-capture $OUT_NAME" 45)
+    case "$CAP" in
+      ok*)
+        PNG=$(printf '%s' "$CAP" | sed 's/^ok //')
+        [ -f "$PNG" ] && echo "ok: desktop-capture output wrote a png" || fail "desktop-capture output path missing: $PNG"
+        ;;
+      *) fail "desktop-capture $OUT_NAME: $CAP";;
+    esac
+  else
+    echo "skip: no output name from niri msg outputs"
+  fi
+fi
+
 echo "--- 3. what must be refused"
-for bad in "window-close abc" "window-close -1" "workspace-switch up" "status now" "bar-toggle" "session" "wallpaper-next" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
+for bad in "window-close abc" "window-close -1" "workspace-switch up" "status now" "bar-toggle extra" "session" "wallpaper-next" "volume-up 500" "volume-up -5" "volume-set" "theme-mode-set sepia" "panel-open settings" "panel-open launcher extra" "notification-dnd-set maybe" "volume-up;touch x" ""; do expect_error "$bad"; done
 n=$(grep -c "UPDATE" "$SETTINGS"); sleep 0.3
 expect_error "theme-mode-set sepia" >/dev/null; [ "$(grep -c UPDATE "$SETTINGS")" = "$n" ] && echo "ok: a refused command changed nothing" || fail "a refused command changed a setting"
 echo "--- 4. nothing about the arguments reaches the log"

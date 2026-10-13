@@ -17,13 +17,21 @@ ROOT=$(cd "$(dirname "$0")/.." && pwd)
 UNITS=$HOME/.config/systemd/user
 
 pick_bin() {
-  local name=$1 build
+  local name=$1 build path mtime best= best_mtime=0
   for build in release fast; do
-    if [ -x "$ROOT/target/$build/$name" ]; then
-      printf '%s' "$ROOT/target/$build/$name"
-      return 0
+    path="$ROOT/target/$build/$name"
+    if [ -x "$path" ]; then
+      mtime=$(stat -c %Y "$path" 2>/dev/null || echo 0)
+      if [ "$mtime" -gt "$best_mtime" ]; then
+        best_mtime=$mtime
+        best=$path
+      fi
     fi
   done
+  if [ -n "$best" ]; then
+    printf '%s' "$best"
+    return 0
+  fi
   return 1
 }
 
@@ -53,6 +61,7 @@ write_units_and_links() {
   mkdir -p "$UNITS" "$HOME/.local/bin"
   install -m 0755 "$ROOT/tools/helix-panel" "$HOME/.local/bin/helix-panel"
   install -m 0755 "$ROOT/tools/helix-askpass" "$HOME/.local/bin/helix-askpass"
+  ln -sf "$ROOT/tools/install-inference.sh" "$HOME/.local/bin/helix-install-inference"
   mkdir -p "$HOME/.config/environment.d"
   printf 'SUDO_ASKPASS=%s\n' "$HOME/.local/bin/helix-askpass" > "$HOME/.config/environment.d/helix-sudo.conf"
   ln -sf "$STRUT" "$HOME/.local/bin/helix-shell-strut"
@@ -209,6 +218,12 @@ case "${1:-install}" in
     for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
+    if systemctl --user is-active --quiet plasma-polkit-agent.service 2>/dev/null \
+      || systemctl --user is-active --quiet polkit-kde-authentication-agent-1.service 2>/dev/null; then
+      echo "polkit agent          user unit active"
+    else
+      echo "polkit agent          not running (use plasma-polkit-agent or helix-askpass for sudo only)"
+    fi
     if systemctl --user is-enabled helix-shell-dev.service >/dev/null 2>&1; then
       echo "helix-shell-dev        still enabled (legacy — run: $0 install)" >&2
     fi

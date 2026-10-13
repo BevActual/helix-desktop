@@ -228,9 +228,26 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
             crate::insert::clear_clipboard_selection();
             ok()
         }
-        Command::DesktopCapture(target) => crate::capture::desktop_capture(app, target),
+        Command::DesktopCapture(target) => {
+            let app = app.clone();
+            tokio::task::spawn_blocking(move || crate::capture::desktop_capture(&app, target))
+                .await
+                .map_err(|_| "desktop capture failed".to_string())?
+        }
         Command::AgentDeskFocus => {
             crate::dock::agent_desk_focus()?;
+            ok()
+        }
+        Command::BarShow => {
+            crate::bar::set_visible(app, true)?;
+            ok()
+        }
+        Command::BarHide => {
+            crate::bar::set_visible(app, false)?;
+            ok()
+        }
+        Command::BarToggle => {
+            crate::bar::toggle(app)?;
             ok()
         }
     }

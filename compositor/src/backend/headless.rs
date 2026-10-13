@@ -37,7 +37,15 @@ impl Headless {
         }
     }
 
-    pub fn init(&mut self, _niri: &mut Niri) {}
+    pub fn init(&mut self, niri: &mut Niri) {
+        if std::env::var_os("HELIX_NESTED_HEADLESS")
+            .is_some_and(|v| v != "0" && !v.is_empty())
+        {
+            if self.add_renderer().is_ok() {
+                self.add_output(niri, 1, (1280, 720));
+            }
+        }
+    }
 
     pub fn add_renderer(&mut self) -> anyhow::Result<()> {
         if self.renderer.is_some() {

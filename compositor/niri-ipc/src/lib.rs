@@ -986,6 +986,32 @@ pub enum Action {
         #[cfg_attr(feature = "clap", arg(long))]
         path: Option<String>,
     },
+    /// Helix: screenshot a specific output (connector or make/model/serial).
+    HelixScreenshotOutput {
+        /// Output name to match (same rules as `niri msg output`).
+        output: String,
+        /// Write the screenshot to disk in addition to putting it in your clipboard.
+        #[cfg_attr(feature = "clap", arg(short = 'd', long, action = clap::ArgAction::Set, default_value_t = true))]
+        write_to_disk: bool,
+        /// Whether to include the mouse pointer in the screenshot.
+        #[cfg_attr(feature = "clap", arg(short = 'p', long, action = clap::ArgAction::Set, default_value_t = true))]
+        show_pointer: bool,
+        /// Path to save the screenshot to (must be absolute).
+        #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set))]
+        path: Option<String>,
+    },
+    /// Helix: screenshot every output stitched into one image.
+    HelixScreenshotAllOutputs {
+        /// Write the screenshot to disk in addition to putting it in your clipboard.
+        #[cfg_attr(feature = "clap", arg(short = 'd', long, action = clap::ArgAction::Set, default_value_t = true))]
+        write_to_disk: bool,
+        /// Whether to include the mouse pointer in the screenshot.
+        #[cfg_attr(feature = "clap", arg(short = 'p', long, action = clap::ArgAction::Set, default_value_t = true))]
+        show_pointer: bool,
+        /// Path to save the screenshot to (must be absolute).
+        #[cfg_attr(feature = "clap", arg(long, action = clap::ArgAction::Set))]
+        path: Option<String>,
+    },
     /// Helix: queue the next opened toplevel(s) to land on the agent desk without stealing focus.
     HelixPlaceOnAgentDesk {
         #[serde(default = "helix_default_place_count")]

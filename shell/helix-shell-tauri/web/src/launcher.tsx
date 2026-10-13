@@ -85,7 +85,7 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
       <input
         id="lq"
         ref={input}
-        placeholder="Search applications"
+        placeholder="Apps, or act … for desktop actions"
         autoComplete="off"
         spellCheck={false}
         value={query}
@@ -112,11 +112,14 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
         }}
       />
       {asked && !query.trim() && hits.length ? <div className="launcher-label">Suggested</div> : null}
+      {asked && /^act(\s|:|$)/i.test(query.trim()) && hits.some((hit) => hit.id.startsWith("helix:desktop:")) ? (
+        <div className="launcher-label">Desktop actions</div>
+      ) : null}
       <div id="results" ref={list}>
         {hits.map((hit, index) => (
           <div
             key={hit.id}
-            className={`row${index === selected ? " selected" : ""}`}
+            className={`row${index === selected ? " selected" : ""}${hit.id.startsWith("helix:desktop:") ? " action" : ""}`}
             data-test={`launcher-row:${hit.id}`}
             // The pointer only moves the selection when it really moves (a list that redraws under a still pointer must not steal it).
             onMouseMove={() => { if (selected !== index) setSelected(index); }}
@@ -131,7 +134,13 @@ export function Launcher({ register }: { register: (handle: LauncherHandle) => v
           </div>
         ))}
       </div>
-      <div id="empty">{asked && !hits.length && query.trim() ? "No matching applications" : ""}</div>
+      <div id="empty">
+        {asked && !hits.length && query.trim()
+          ? /^act(\s|:|$)/i.test(query.trim())
+            ? "No matching desktop actions"
+            : "No matching applications"
+          : ""}
+      </div>
     </>
   );
 }

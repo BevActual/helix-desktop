@@ -26,6 +26,10 @@ pub const METHODS: &[&str] = &[
     "AdjustVolume",
     "ToggleMute",
     "AdjustBrightness",
+    "PromptAdminPassword",
+    "BarShow",
+    "BarHide",
+    "BarToggle",
 ];
 
 struct Control {
@@ -117,6 +121,35 @@ impl Control {
 
     async fn toggle_dark_theme(&self) {
         crate::toggle_dark_theme(&self.app).await;
+    }
+
+    async fn bar_show(&self) -> zbus::fdo::Result<()> {
+        if !crate::role::ShellRole::from_env().claims_shell1() {
+            return Err(zbus::fdo::Error::Failed(
+                "bar visibility is served by the bar process".into(),
+            ));
+        }
+        crate::bar::set_visible(&self.app, true)
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn bar_hide(&self) -> zbus::fdo::Result<()> {
+        if !crate::role::ShellRole::from_env().claims_shell1() {
+            return Err(zbus::fdo::Error::Failed(
+                "bar visibility is served by the bar process".into(),
+            ));
+        }
+        crate::bar::set_visible(&self.app, false)
+            .map_err(zbus::fdo::Error::Failed)
+    }
+
+    async fn bar_toggle(&self) -> zbus::fdo::Result<()> {
+        if !crate::role::ShellRole::from_env().claims_shell1() {
+            return Err(zbus::fdo::Error::Failed(
+                "bar visibility is served by the bar process".into(),
+            ));
+        }
+        crate::bar::toggle(&self.app).map_err(zbus::fdo::Error::Failed)
     }
 
     async fn close_panel(&self) -> zbus::fdo::Result<()> {

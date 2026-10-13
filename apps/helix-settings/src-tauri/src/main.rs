@@ -584,6 +584,95 @@ fn compositor_focus_agent_desk() -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize)]
+struct InferenceRuntimeView {
+    installed: bool,
+    service_active: bool,
+}
+
+fn inference_installed() -> bool {
+    std::path::Path::new("/usr/local/bin/helix-inference").is_file()
+}
+
+fn apply_sudo_askpass(cmd: &mut std::process::Command) {
+    if std::env::var_os("SUDO_ASKPASS").is_some() {
+        return;
+    }
+    if let Ok(home) = std::env::var("HOME") {
+        let askpass = std::path::PathBuf::from(home).join(".local/bin/helix-askpass");
+        if askpass.is_file() {
+            cmd.env("SUDO_ASKPASS", askpass);
+        }
+    }
+}
+
+fn spawn_inference_installer(path: &std::path::Path) -> Result<(), std::io::Error> {
+    let mut cmd = std::process::Command::new(path);
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    apply_sudo_askpass(&mut cmd);
+    cmd.spawn().map(|_| ())
+}
+
+fn inference_service_active() -> bool {
+    std::process::Command::new("systemctl")
+        .args(["--user", "is-active", "--quiet", "helix-inference.service"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn inference_runtime_view() -> InferenceRuntimeView {
+    InferenceRuntimeView {
+        installed: inference_installed(),
+        service_active: inference_service_active(),
+    }
+}
+
+#[tauri::command]
+fn inference_install() -> Result<(), String> {
+    if inference_installed() {
+        return Err("helix-inference is already installed under /usr/local/bin.".into());
+    }
+    let mut candidates: Vec<std::path::PathBuf> = Vec::new();
+    if let Ok(home) = std::env::var("HOME") {
+        candidates.push(std::path::PathBuf::from(home).join(".local/bin/helix-install-inference"));
+    }
+    for path in candidates {
+        if !path.is_file() {
+            continue;
+        }
+        if spawn_inference_installer(&path).is_ok() {
+            return Ok(());
+        }
+    }
+    if spawn_inference_installer(std::path::Path::new("helix-install-inference")).is_ok() {
+        return Ok(());
+    }
+    Err(
+        "helix-install-inference is not on PATH. Run tools/switch-shell.sh install, then helix-install-inference from a terminal."
+            .into(),
+    )
+}
+
+#[tauri::command]
+fn inference_restart_service() -> Result<(), String> {
+    if !inference_installed() {
+        return Err("Install the model runtime first.".into());
+    }
+    let status = std::process::Command::new("systemctl")
+        .args(["--user", "restart", "helix-inference.service"])
+        .status()
+        .map_err(|error| format!("could not restart helix-inference: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("systemctl could not restart helix-inference.service".into())
+    }
+}
+
 #[tauri::command]
 fn compositor_open_config(which: String) -> Result<(), String> {
     let dir = helix_shell_core::compositor_config::niri_config_dir().ok_or("no config home")?;
@@ -1104,6 +1193,9 @@ fn main() {
             compositor_set_placement,
             compositor_focus_agent_desk,
             compositor_open_config,
+            inference_runtime_view,
+            inference_install,
+            inference_restart_service,
             rows_view,
             ui_error,
             approvals_view,

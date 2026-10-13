@@ -1,6 +1,6 @@
 //! Reviewed project commands. No host home, session sockets, network, or desktop grants.
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 use tokio::io::AsyncReadExt;
 use tokio::sync::{mpsc, watch};
@@ -36,6 +36,35 @@ pub fn display(text: &str, max: usize) -> String {
 }
 
 pub struct Output { pub text: String, pub code: Option<i32>, pub stopped: bool, pub limited: bool }
+
+/// Open a visible terminal on the agent desk with the project folder as cwd (best-effort).
+pub fn open_on_agent_desk(folder: &Path) -> Result<(), String> {
+    let dir = folder
+        .to_str()
+        .ok_or("The project folder path is not valid UTF-8.")?;
+    helix_shell_core::compositor_ipc::place_on_agent_desk(1)?;
+    let dir_arg = dir.to_string();
+    let attempts: [(&str, Vec<&str>); 5] = [
+        ("foot", vec!["-D", &dir_arg]),
+        ("ptyxis", vec!["--working-directory", &dir_arg]),
+        ("alacritty", vec!["--working-directory", &dir_arg]),
+        ("kgx", vec!["--working-directory", &dir_arg]),
+        ("gnome-terminal", vec!["--working-directory", &dir_arg]),
+    ];
+    for (bin, args) in attempts {
+        if Command::new(bin)
+            .args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .is_ok()
+        {
+            return Ok(());
+        }
+    }
+    Err("No supported terminal (foot, Ptyxis, Alacritty, Console, or GNOME Terminal) is installed.".into())
+}
 
 pub async fn run(folder: &Path, script: &str, mut cancel: watch::Receiver<bool>, progress: impl Fn(String)) -> Result<Output, String> {
     safe_input(script, 2000)?;

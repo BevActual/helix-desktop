@@ -374,6 +374,19 @@ pub enum Action {
     #[knuffel(skip)]
     LoadConfigFile(#[knuffel(argument)] Option<String>),
     #[knuffel(skip)]
+    HelixScreenshotOutput {
+        output: String,
+        write_to_disk: bool,
+        show_pointer: bool,
+        path: Option<String>,
+    },
+    #[knuffel(skip)]
+    HelixScreenshotAllOutputs {
+        write_to_disk: bool,
+        show_pointer: bool,
+        path: Option<String>,
+    },
+    #[knuffel(skip)]
     HelixPlaceOnAgentDesk {
         count: u8,
     },
@@ -710,6 +723,26 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::SetWindowUrgent { id } => Self::SetWindowUrgent(id),
             niri_ipc::Action::UnsetWindowUrgent { id } => Self::UnsetWindowUrgent(id),
             niri_ipc::Action::LoadConfigFile { path } => Self::LoadConfigFile(path),
+            niri_ipc::Action::HelixScreenshotOutput {
+                output,
+                write_to_disk,
+                show_pointer,
+                path,
+            } => Self::HelixScreenshotOutput {
+                output,
+                write_to_disk,
+                show_pointer,
+                path,
+            },
+            niri_ipc::Action::HelixScreenshotAllOutputs {
+                write_to_disk,
+                show_pointer,
+                path,
+            } => Self::HelixScreenshotAllOutputs {
+                write_to_disk,
+                show_pointer,
+                path,
+            },
             niri_ipc::Action::HelixPlaceOnAgentDesk { count } => Self::HelixPlaceOnAgentDesk { count },
             niri_ipc::Action::HelixFocusAgentDesk {} => Self::HelixFocusAgentDesk {},
         }

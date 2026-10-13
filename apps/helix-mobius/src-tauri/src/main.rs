@@ -895,6 +895,20 @@ fn tools_configure(app: AppHandle, chat_id: String, enabled: bool, workspace: St
 }
 
 #[tauri::command]
+fn tools_open_desk_terminal(app: AppHandle) -> Result<(), String> {
+    let workspace = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        if state.chat.conversation.workspace.is_empty() {
+            return Err("Choose a project folder first.".into());
+        }
+        state.chat.conversation.workspace.clone()
+    };
+    let folder = terminal::workspace(&workspace)?;
+    terminal::open_on_agent_desk(&folder)
+}
+
+#[tauri::command]
 fn tools_review(app: AppHandle, activity_id: String, approved: bool) -> Result<(), String> { app.state::<agent::Runtime>().review(&activity_id, approved) }
 
 #[tauri::command]
@@ -1321,10 +1335,7 @@ fn agent_desk_glance() -> AgentDeskGlanceView {
 
 #[tauri::command]
 fn agent_desk_focus() -> Result<(), String> {
-    let line = serde_json::json!({"Action": {"HelixFocusAgentDesk": {}}}).to_string();
-    helix_shell_core::compositor_ipc::request_json(&line)
-        .ok_or_else(|| "Could not focus the agent desk — is helix-niri running?".to_string())?;
-    Ok(())
+    helix_shell_core::compositor_ipc::focus_agent_desk()
 }
 
 /// Hands `text` to the bar Assistant (Agent Surface path). Does not call the model.
@@ -2162,6 +2173,7 @@ fn main() {
             chat_pick_attachments,
             tools_pick_folder,
             tools_configure,
+            tools_open_desk_terminal,
             tools_review,
             web_lookup,
             web_cancel,

@@ -112,6 +112,35 @@ fn shoot_window(id: u64, path: &Path) -> Result<(), String> {
     )
 }
 
+fn shoot_output(name: &str, path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().into_owned();
+    shoot(
+        json!({
+            "HelixScreenshotOutput": {
+                "output": name,
+                "write_to_disk": true,
+                "show_pointer": false,
+                "path": path_str,
+            }
+        }),
+        path,
+    )
+}
+
+fn shoot_all_outputs(path: &Path) -> Result<(), String> {
+    let path_str = path.to_string_lossy().into_owned();
+    shoot(
+        json!({
+            "HelixScreenshotAllOutputs": {
+                "write_to_disk": true,
+                "show_pointer": false,
+                "path": path_str,
+            }
+        }),
+        path,
+    )
+}
+
 fn shoot_screen(path: &Path) -> Result<(), String> {
     let path_str = path.to_string_lossy().into_owned();
     shoot(
@@ -146,8 +175,24 @@ pub fn desktop_capture(app: &AppHandle, target: Option<String>) -> Result<String
                 .ok_or("there are no windows on the agent desk to capture")?;
             shoot_window(window, &path)?;
         }
-        CaptureScope::FocusedOutput | CaptureScope::AllOutputs | CaptureScope::Output(_) => {
-            // Per-output selection is a follow-up; focused screen matches legacy agent behaviour.
+        CaptureScope::AllOutputs => {
+            if !helix_shell_core::compositor_ipc::is_helix_compositor() {
+                return Err(
+                    "capturing every output requires helix-niri; use focused or agent-desk on stock niri"
+                        .into(),
+                );
+            }
+            shoot_all_outputs(&path)?;
+        }
+        CaptureScope::Output(name) => {
+            if !helix_shell_core::compositor_ipc::is_helix_compositor() {
+                return Err(format!(
+                    "capturing output {name} requires helix-niri; use focused or agent-desk on stock niri"
+                ));
+            }
+            shoot_output(&name, &path)?;
+        }
+        CaptureScope::FocusedOutput => {
             shoot_screen(&path)?;
         }
     }

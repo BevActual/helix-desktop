@@ -58,6 +58,7 @@ const SLASH_COMMANDS = [
   { cmd: "/attach", desc: "Attach text / source files", run: () => pickAttachments() },
   { cmd: "/web", desc: "Pick online sources yourself", run: (text) => { openWeb(text.replace(/^\/web\s*/i, "")); return Promise.resolve(); } },
   { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { reactTools?.open(view); return Promise.resolve(); } },
+  { cmd: "/desk", desc: "Show the Helix agent desk workspace", run: () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report) },
   { cmd: "/context", desc: "Review recent history and chat brief", run: () => { openChatContext(); return Promise.resolve(); } },
   { cmd: "/find", desc: "Find in this chat", run: () => { openFindBar(); return Promise.resolve(); } },
   { cmd: "/fork", desc: "Fork this chat", run: () => forkChat() },

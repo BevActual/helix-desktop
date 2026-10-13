@@ -102,9 +102,11 @@ Prox-style command surfaces put **actions** next to search; Helix keeps that
 list on the existing launcher and Caps Lock insert instead of adding an
 assistant window.
 
-- Launcher prefix `act` (also in global search): Notification Center, Control
-  Center, Settings, Helix Software, System Monitor, Do Not Disturb, workspace
-  step, bar visibility, and close the focused window.
+- Launcher prefix `act` (also in global search): agent desk, panels (launcher,
+  assistant, agents, notifications, control center), Settings, Privacy & agents,
+  Mobius, Helix Software, System Monitor, Do Not Disturb, Night Light, dark
+  theme, lock screen, bar show/hide/toggle, workspace step, and close the focused
+  window.
 - Caps Lock opens **Actions** first (emoji, screenshots, and clipboard stay one
   Tab away). The row under the search field names the focused window, the same
   context `desktop_context` gives an agent. Settings, Software, and System
@@ -121,7 +123,7 @@ windows opened on behalf of agents. The shell queues placement with `HelixPlaceO
 **without stealing focus**. The bar workspace strip marks that pill; click still switches desks
 explicitly. `niri msg` request `HelixAgentDesk` reports id, window count, and pending placements.
 The bar island shows a glance when the agent desk has windows and you are on another workspace (tap to
-focus the desk). **Caps Lock → Actions** includes **Show agent desk**; Mobius shows an agent-desk meta chip when Tools is on or the desk has windows. `desktop-capture` defaults to the agent desk for granted agents. Next: per-output capture, visible Tools terminals on the desk.
+focus the desk). **Caps Lock → Actions** includes **Show agent desk**; Mobius shows an agent-desk meta chip when Tools is on or the desk has windows. `desktop-capture` defaults to the agent desk for granted agents. Mobius Tools opens a visible terminal on the agent desk (foot, Ptyxis, …) on the first approved project command when placement is on; sandboxed command output still streams in the thread. `all` and named outputs use `HelixScreenshotAllOutputs` / `HelixScreenshotOutput` on helix-niri.
 
 **Settings integration:** Privacy & agents edits `~/.config/niri/helix-setup.kdl` (and ensures
 `include "helix-setup.kdl"` in `config.kdl`), reloads the compositor, and stores session placement

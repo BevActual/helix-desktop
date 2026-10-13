@@ -42,7 +42,9 @@ helix {
 }
 ```
 
-IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
+IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixScreenshotOutput`, `HelixScreenshotAllOutputs`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
+
+Nested tests (`tools/nested/run.sh`) set `HELIX_NESTED_HEADLESS=1` so niri starts with the headless backend and a 1280×720 output instead of winit on the host display.
 
 ## Rebase onto niri main
 

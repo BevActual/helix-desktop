@@ -2,10 +2,13 @@
 # Runs a program inside a nested niri on a private D-Bus, with its own HOME and XDG dirs, so it never touches the real session.
 #   tools/nested/run.sh <name> <program> [ENV=VALUE ...]
 # Leaves <scratch>/<name>/screen.png (niri screenshot incl. layer surfaces), shots/, niri.log and program.log.
+# Env: HELIX_NESTED_SCRIPT=test.sh  HELIX_NESTED_SETTLE=seconds  HELIX_NIRI_BIN=path/to/niri
+#      HELIX_NESTED_HEADLESS=1 (default via run.sh) uses compositor headless backend; HELIX_NESTED_WINIT=1 uses host winit.
 # Never use `pkill -f` here: it matches the calling shell. Processes are stopped by PID.
 set -u
 NAME=${1:?name}; PROGRAM=${2:?program}; shift 2
 HERE=$(cd "$(dirname "$0")" && pwd)
+ROOT=$(cd "$HERE/../.." && pwd)
 SCRATCH=${HELIX_NESTED_DIR:-${TMPDIR:-/tmp}/helix-nested}/$NAME
 SETTLE=${HELIX_NESTED_SETTLE:-14}
 if [ -z "${HELIX_NESTED_INNER:-}" ]; then
@@ -13,7 +16,9 @@ if [ -z "${HELIX_NESTED_INNER:-}" ]; then
   exec env HELIX_NESTED_INNER=1 dbus-run-session --config-file="$HERE/bus.conf" -- "$0" "$NAME" "$PROGRAM" "$@"
 fi
 export HOME=$SCRATCH/home XDG_CONFIG_HOME=$SCRATCH/config XDG_STATE_HOME=$SCRATCH/state XDG_DATA_HOME=$SCRATCH/data XDG_CACHE_HOME=$SCRATCH/cache
-mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+export XDG_RUNTIME_DIR="$XDG_STATE_HOME/run"
+mkdir -p "$HOME" "$XDG_CONFIG_HOME" "$XDG_STATE_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME" "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
 # The shell's command socket and tool list go in the scratch directory, never the real runtime directory.
 export HELIX_AGENT_IPC_DIR=$XDG_STATE_HOME
 # Approvals on a compositor that cannot protect the dialog are refused unless the person allows them. The nested compositor is stock niri, so
@@ -40,10 +45,24 @@ KDL
 # HELIX_NESTED_KDL: extra niri configuration for this run (a test of compositor-side behaviour, such as blur rules).
 [ -n "${HELIX_NESTED_KDL:-}" ] && printf '%s\n' "$HELIX_NESTED_KDL" >> "$SCRATCH/niri.kdl"
 # HELIX_NIRI_BIN: a compositor build to test (the fork under development); otherwise the installed one.
-"${HELIX_NIRI_BIN:-niri}" -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
+# HELIX_NESTED_WINIT=1: use winit on the host display instead of headless (blur/visual tests).
+if [ -z "${HELIX_NESTED_WINIT:-}" ]; then
+  export HELIX_NESTED_HEADLESS=1
+fi
+NIRI_BIN="${HELIX_NIRI_BIN:-$ROOT/compositor/target/debug/niri}"
+[ -x "$NIRI_BIN" ] || NIRI_BIN=niri
+"$NIRI_BIN" -c "$SCRATCH/niri.kdl" > "$SCRATCH/niri.log" 2>&1 &
 NIRI=$!
 for _ in $(seq 1 60); do grep -q "IPC listening" "$SCRATCH/niri.log" && break; sleep 0.3; done
-NIRI_SOCKET=$(grep -oE "/run/user/[0-9]+/niri\.[^ ]*\.sock" "$SCRATCH/niri.log" | tail -1)
+if ! grep -q "IPC listening" "$SCRATCH/niri.log"; then
+  echo "nested niri failed to start (see $SCRATCH/niri.log)" >&2
+  tail -20 "$SCRATCH/niri.log" >&2
+  exit 1
+fi
+NIRI_SOCKET=$(grep -oE 'IPC listening on: [^ ]+' "$SCRATCH/niri.log" | tail -1 | sed 's/IPC listening on: //')
+if [ -z "$NIRI_SOCKET" ]; then
+  NIRI_SOCKET=$(grep -oE "/run/user/[0-9]+/niri\.[^ ]*\.sock" "$SCRATCH/niri.log" | tail -1)
+fi
 export NIRI_SOCKET
 DISPLAY_NAME=$(grep -oE "wayland-[0-9]+" "$SCRATCH/niri.log" | tail -1)
 sleep "$SETTLE"

@@ -4,6 +4,11 @@ import type { PageHandle } from "./RowsPage";
 
 type AgentsView = GrantsView & { status: string };
 
+type InferenceRuntimeView = {
+  installed: boolean;
+  service_active: boolean;
+};
+
 type CompositorSettingsView = {
   config: {
     niri_dir: string;
@@ -61,6 +66,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
   const [allow, setAllow] = useState<boolean | null>(null);
   const [note, setNote] = useState("");
   const [compositor, setCompositor] = useState<CompositorSettingsView | null>(null);
+  const [inference, setInference] = useState<InferenceRuntimeView | null>(null);
   const [deskName, setDeskName] = useState("");
 
   const refreshCompositor = useCallback(() => {
@@ -70,17 +76,22 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
     });
   }, []);
 
+  const refreshInference = useCallback(() => {
+    invoke<InferenceRuntimeView>("inference_runtime_view").then(setInference);
+  }, []);
+
   useEffect(() => {
     const load = () => {
       invoke<AgentsView>("agents_view").then(setView);
       invoke<boolean>("approvals_view").then(setAllow);
       refreshCompositor();
+      refreshInference();
     };
     register({ setRows: () => undefined, refresh: load });
     const unlisten = listen<AgentsView>("agents-view", setView);
     load();
     return () => { unlisten.then((stop) => stop()); };
-  }, [register, refreshCompositor]);
+  }, [register, refreshCompositor, refreshInference]);
 
   const status =
     !view || view.status === "connected" ? ""
@@ -100,6 +111,46 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
         >
           Open Mobius
         </button>
+      </div>
+      <h4>Local model runtime</h4>
+      <div className="rows-card" data-test="inference-runtime-card">
+        <p className="setting-about note">
+          Mobius talks to <code>helix-inference</code> on this machine. Install copies the built binaries to <code>/usr/local</code> and uses the Helix admin password dialog when needed.
+        </p>
+        {inference ? (
+          <p className="setting-about" data-test="inference-runtime-status">
+            {inference.installed
+              ? `Installed${inference.service_active ? " · service running" : " · service not running"}.`
+              : "Not installed yet."}
+          </p>
+        ) : null}
+        <div className="setting-row">
+          <button
+            type="button"
+            data-test="inference-install"
+            disabled={inference?.installed === true}
+            onClick={() =>
+              invoke("inference_install")
+                .then(() => setNote("Installing model runtime — approve the admin password if asked."), (error) => setNote(String(error)))
+            }
+          >
+            Install model runtime
+          </button>
+          <button
+            type="button"
+            data-test="inference-restart"
+            disabled={!inference?.installed}
+            onClick={() =>
+              invoke("inference_restart_service")
+                .then(() => refreshInference(), (error) => setNote(String(error)))
+            }
+          >
+            Restart inference service
+          </button>
+          <button type="button" data-test="inference-refresh" onClick={() => refreshInference()}>
+            Refresh status
+          </button>
+        </div>
       </div>
       <h4>Agent desk &amp; compositor</h4>
       <div className="rows-card" data-test="compositor-card">
@@ -202,6 +253,15 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
             </div>
           </>
         ) : null}
+      </div>
+      <h4>Administrator authentication</h4>
+      <div className="rows-card" data-test="admin-auth-card">
+        <p className="setting-about note">
+          Graphical <code>sudo</code> uses <code>helix-askpass</code> (Helix overlay). Install the shell with <code>tools/switch-shell.sh install</code> so <code>SUDO_ASKPASS</code> is set for new sessions.
+        </p>
+        <p className="setting-about">
+          System polkit prompts (for example NetworkManager profile edits) still need a separate agent such as <code>plasma-polkit-agent</code> until the Tauri shell registers as a Polkit agent. Use a TTY or install KDE&apos;s agent if privileged dialogs never appear.
+        </p>
       </div>
       <h4>Approvals</h4>
       <div className="rows-card">

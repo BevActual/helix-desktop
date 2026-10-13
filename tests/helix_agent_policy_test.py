@@ -1,4 +1,8 @@
-"""The agent MCP adapter must enforce msg-risk.toml at its single `helix-panel` choke point."""
+"""The agent MCP adapter must enforce msg-risk.toml at its single `helix-panel` choke point.
+
+Run from the repo root:
+  tools/helix-agent/.venv/bin/python tests/helix_agent_policy_test.py .
+"""
 import importlib.util
 import os
 import pathlib
@@ -51,7 +55,7 @@ with tempfile.TemporaryDirectory() as tmp:
 
     # Every tool the adapter exposes maps to commands that have a tier (no silent fail-closed surprises).
     tiers = server.RISK_POLICY["tiers"]
-    for command in ("status", "desktop-capture", "panel-open", "panel-toggle", "panel-close", "settings-open", "bar-show",
+    for command in ("status", "desktop-capture", "panel-open", "panel-toggle", "panel-close", "settings-open", "bar-show", "bar-hide", "bar-toggle",
                     "clipboard-text", "clipboard-copy", "notification-history", "notification-show", "workspace-switch",
                     "app-launch", "window-close", "notification-dnd-toggle", "notification-dnd-status"):
         assert command in tiers, f"{command} has no tier"

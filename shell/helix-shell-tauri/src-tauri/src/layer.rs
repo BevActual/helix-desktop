@@ -54,20 +54,19 @@ fn set_input_region(window: &gtk::ApplicationWindow, region: InputRegion, width:
     gdk_window.input_shape_combine_region(&shape, 0, 0);
 }
 
-/// A surface anchored to all four edges has no single edge for the compositor to reserve space on, so the exclusive zone set on the
-/// shell surface is ignored and windows would slide under the bar. This is a second, empty, transparent surface (a plain GTK window,
-/// no web view, so no extra web process) anchored to the top and sides whose only job is to reserve the bar's strip.
-pub fn reserve_bar_space() {
-    let window = gtk::Window::new(gtk::WindowType::Toplevel);
+thread_local! {
+    static TOP_STRUT: std::cell::RefCell<Option<gtk::Window>> = const { std::cell::RefCell::new(None) };
+}
+
+fn make_transparent_top(window: &gtk::Window) {
     window.set_decorated(false);
     window.set_accept_focus(false);
     window.set_app_paintable(true);
     if let Some(visual) =
-        gtk::prelude::WidgetExt::screen(&window).and_then(|screen| screen.rgba_visual())
+        gtk::prelude::WidgetExt::screen(window).and_then(|screen| screen.rgba_visual())
     {
         window.set_visual(Some(&visual));
     }
-    // Nothing of this window is ever drawn: it is fully transparent and takes no pointer input.
     let css = gtk::CssProvider::new();
     if css
         .load_from_data(b"window, window * { background: transparent; }")
@@ -77,19 +76,45 @@ pub fn reserve_bar_space() {
             .style_context()
             .add_provider(&css, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
-    window.set_size_request(1, BAR_HEIGHT);
-    window.init_layer_shell();
-    window.set_namespace("helix-shell-reserve");
-    window.set_layer(gtk_layer_shell::Layer::Top);
-    for edge in [Edge::Top, Edge::Left, Edge::Right] {
-        window.set_anchor(edge, true);
-    }
-    window.set_exclusive_zone(BAR_HEIGHT);
-    window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
-    window.show_all();
-    if let Some(gdk_window) = window.window() {
-        gdk_window.input_shape_combine_region(&gtk::cairo::Region::create(), 0, 0);
-    }
+}
+
+/// A surface anchored to all four edges has no single edge for the compositor to reserve space on, so the exclusive zone set on the
+/// shell surface is ignored and windows would slide under the bar. This is a second, empty, transparent surface (a plain GTK window,
+/// no web view, so no extra web process) anchored to the top and sides whose only job is to reserve the bar's strip.
+pub fn reserve_bar_space() {
+    set_top_reserve_zone(BAR_HEIGHT);
+}
+
+/// In-process top strut when `helix-shell-strut` is not running. `zone` is `BAR_HEIGHT` or `0`.
+/// Must run on the GTK main thread (agent IPC and dbus bar commands use `on_main`).
+pub fn set_top_reserve_zone(zone: i32) {
+    TOP_STRUT.with(|slot| {
+        let zone = zone.max(0);
+        if let Some(window) = slot.borrow().as_ref() {
+            window.set_size_request(1, zone.max(1));
+            window.set_exclusive_zone(zone);
+            return;
+        }
+        if zone == 0 {
+            return;
+        }
+        let window = gtk::Window::new(gtk::WindowType::Toplevel);
+        make_transparent_top(&window);
+        window.set_size_request(1, zone);
+        window.init_layer_shell();
+        window.set_namespace("helix-shell-reserve");
+        window.set_layer(gtk_layer_shell::Layer::Top);
+        for edge in [Edge::Top, Edge::Left, Edge::Right] {
+            window.set_anchor(edge, true);
+        }
+        window.set_exclusive_zone(zone);
+        window.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+        window.show_all();
+        if let Some(gdk_window) = window.window() {
+            gdk_window.input_shape_combine_region(&gtk::cairo::Region::create(), 0, 0);
+        }
+        *slot.borrow_mut() = Some(window);
+    });
 }
 
 thread_local! {

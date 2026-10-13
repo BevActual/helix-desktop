@@ -4,7 +4,6 @@ use std::sync::Mutex;
 
 use gtk::prelude::*;
 use gtk_layer_shell::{Edge, KeyboardMode, Layer, LayerShell};
-use helix_desktop_api::Desktop;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 use tokio::sync::oneshot;
@@ -12,7 +11,6 @@ use tokio::sync::oneshot;
 pub const WINDOW: &str = "admin-auth";
 
 struct Pending {
-    prompt: String,
     reply: oneshot::Sender<Result<String, String>>,
 }
 
@@ -82,10 +80,7 @@ pub async fn prompt(app: AppHandle, prompt: String) -> Result<String, String> {
         return Err("another authentication is already in progress".into());
     }
     let (tx, rx) = oneshot::channel();
-    PENDING.lock().expect("admin auth").replace(Pending {
-        prompt: trimmed.to_string(),
-        reply: tx,
-    });
+    PENDING.lock().expect("admin auth").replace(Pending { reply: tx });
     let app2 = app.clone();
     let text = trimmed.to_string();
     let shown = tauri::async_runtime::spawn_blocking(move || {

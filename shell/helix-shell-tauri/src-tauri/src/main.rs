@@ -15,9 +15,11 @@ mod battery;
 mod blur;
 mod confirmer;
 mod admin_auth;
+mod bar;
 mod agent_ipc;
 mod capture;
 mod control;
+mod desktop_action;
 mod dock;
 mod insert;
 mod island;
@@ -1841,13 +1843,27 @@ fn launcher_query(app: AppHandle, query: String) -> Vec<AppHit> {
         return Vec::new();
     }
     let query: String = query.chars().take(MAX_QUERY_CHARS).collect();
-    let found = helix_shell_core::launcher::search_with_history(
-        &shell.apps,
-        &query,
-        LAUNCHER_ROWS,
-        &shell.history,
-    );
-    let mut hits = Vec::with_capacity(found.len());
+    let actions = helix_shell_core::desktop_actions::search(&query, LAUNCHER_ROWS);
+    let mut hits = Vec::with_capacity(actions.len() + LAUNCHER_ROWS);
+    for action in actions {
+        hits.push(AppHit {
+            id: action.id.to_string(),
+            name: action.name.to_string(),
+            generic: action.detail.to_string(),
+            icon: String::new(),
+        });
+    }
+    let app_slots = LAUNCHER_ROWS.saturating_sub(hits.len());
+    let found = if app_slots == 0 {
+        Vec::new()
+    } else {
+        helix_shell_core::launcher::search_with_history(
+            &shell.apps,
+            &query,
+            app_slots,
+            &shell.history,
+        )
+    };
     for index in found {
         let entry = shell.apps[index].clone();
         let icon = shell
@@ -1879,6 +1895,13 @@ fn launcher_launch(app: AppHandle, id: String) -> bool {
     let shell = state.lock().expect("shell state");
     if shell.surface.open_panel_id() != Some("launcher") {
         return false;
+    }
+    if id.starts_with("helix:desktop:") {
+        let ok = desktop_action::run(&app, &id).is_ok();
+        if ok {
+            close_panel(&app);
+        }
+        return ok;
     }
     let Some(entry) = shell
         .apps

@@ -2359,6 +2359,52 @@ impl State {
                 }
                 self.niri.queue_redraw_all();
             }
+            Action::HelixScreenshotAllOutputs {
+                write_to_disk,
+                show_pointer,
+                path,
+            } => {
+                if !write_to_disk {
+                    warn!("HelixScreenshotAllOutputs requires write_to_disk");
+                } else if let Some(path) = path {
+                    self.backend.with_primary_renderer(|renderer| {
+                        if let Err(err) = self.niri.screenshot_all_outputs(
+                            renderer,
+                            show_pointer,
+                            Some(std::path::PathBuf::from(path)),
+                            true,
+                            None,
+                        ) {
+                            warn!("error taking all-outputs screenshot: {err:?}");
+                        }
+                    });
+                } else {
+                    warn!("HelixScreenshotAllOutputs requires an absolute path");
+                }
+            }
+            Action::HelixScreenshotOutput {
+                output,
+                write_to_disk,
+                show_pointer,
+                path,
+            } => {
+                let target = self.niri.output_by_name_match(&output).cloned();
+                if let Some(target) = target {
+                    self.backend.with_primary_renderer(|renderer| {
+                        if let Err(err) = self.niri.screenshot(
+                            renderer,
+                            &target,
+                            write_to_disk,
+                            show_pointer,
+                            path,
+                        ) {
+                            warn!("error taking screenshot: {err:?}");
+                        }
+                    });
+                } else {
+                    warn!("unknown output for screenshot: {output}");
+                }
+            }
             Action::HelixPlaceOnAgentDesk { count } => {
                 self.helix_place_on_agent_desk(count.max(1) as u32);
             }

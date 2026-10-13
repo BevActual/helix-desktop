@@ -53,7 +53,11 @@ echo "--- 6. arrow keys move the selection (query limited to the fake apps: Anot
 echo launcher >> "$CONTROL"; wait_for "PANEL open" 5; sleep 0.8; wtype "another"; sleep 1; wtype -k Down; sleep 0.4; wtype -k Return
 wait_for "LAUNCH another-thing.desktop" 1 20 && echo "ok: Down moved to the second result and launched it"; sleep 1
 [ -e "$M/another-thing" ] && echo "ok: the application ran (marker exists)" || echo "FAIL: marker missing"
-echo "--- 7. nothing but the fake applications was ever launched"
+echo "--- 7. act prefix lists desktop actions without launching apps"
+echo launcher >> "$CONTROL"; wait_for "PANEL open" 6; sleep 0.8; wtype "act agent"; sleep 1
+grep "LAUNCHER results" "$LOG" | tail -1 | grep -q "helix:desktop:agent-desk" && echo "ok: act agent surfaces agent desk" || echo "FAIL: act agent missing from launcher results"
+wtype -k Escape; wait_for "PANEL closed" 3 20
+echo "--- 8. nothing but the fake applications was ever launched"
 LAUNCHED=$(grep '^LAUNCH ' "$LOG" | grep -v 'refused' | awk '{print $2}' | sort -u | tr '\n' ' ')
 echo "launched: $LAUNCHED"
 case "$LAUNCHED" in *[!a-z.\ -]*) echo "FAIL: odd ids";; esac

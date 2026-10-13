@@ -36,6 +36,6 @@ export function Welcome({ register, hooks }: { register: (handle: WelcomeHandle)
     </div>
     <div className="welcome-models"><span>Local tools may need a model or setup.</span><button type="button" className="mini" data-test="welcome-models" onClick={() => hooks.action("models")}>Model library</button></div>
     {starters.length > 0 && <section className="welcome-starters" aria-label="Writing starters"><h3>Or start a conversation</h3><div className="suggestions">{starters.map((text, index) => <button key={`${index}:${text}`} type="button" className="suggestion" data-test={`suggestion-${index}`} onClick={() => hooks.starter(text)}>{text}</button>)}</div></section>}
-    <p className="welcome-hint">Starters fill your draft for review. Type / for more commands.</p>
+    <p className="welcome-hint">Starters fill your draft for review. Type / for slash commands, or open Apps and search <strong>act</strong> for desktop actions.</p>
   </>;
 }

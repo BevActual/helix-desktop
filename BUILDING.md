@@ -274,7 +274,11 @@ The service does not require a display server. Run integration tests in an isola
 the test redirects both session and system buses and all configuration paths to temporary locations.
 
 System Monitor is the Tauri app `apps/helix-system-monitor` (`cargo build -p helix-system-monitor`).
-Use nested helpers under `tools/nested/` for isolated runs.
+Use nested helpers under `tools/nested/` for isolated runs. Agent socket coverage:
+`HELIX_NESTED_SCRIPT=tools/nested/agent-ipc-test.sh tools/nested/run.sh agent-ipc tools/nested/tauri-fake-desktop.sh`.
+Launcher and `act` desktop actions: `HELIX_NESTED_SCRIPT=tools/nested/launcher-test.sh tools/nested/run.sh launcher tools/nested/tauri-shell.sh`.
+Nested runs use `HELIX_NESTED_HEADLESS=1` and the repo `compositor/target/debug/niri` when present (`cargo build` in `compositor/`). The agent-ipc script then checks helix capture IPC (`desktop-capture all` and a named output).
+Python agent policy: `tools/helix-agent/.venv/bin/python tests/helix_agent_policy_test.py .` (create the venv from `tools/helix-agent/requirements.txt` first).
 
 Online Accounts support uses optional `goa-backend-1.0 >= 3.56`. On Fedora install
 `gnome-online-accounts` and `gnome-online-accounts-devel` for the activation daemon and

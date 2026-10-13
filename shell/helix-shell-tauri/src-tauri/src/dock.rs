@@ -151,10 +151,7 @@ fn request(json: &str) -> Result<String, String> {
 
 /// Queue the next opened window(s) on the Helix agent desk without stealing focus.
 pub(crate) fn place_on_agent_desk(count: u8) -> Result<(), String> {
-    if !helix_shell_core::agent_desk::placement_enabled() {
-        return Ok(());
-    }
-    niri_action(&serde_json::json!({"HelixPlaceOnAgentDesk": {"count": count.max(1)}}))
+    helix_shell_core::compositor_ipc::place_on_agent_desk(count)
 }
 
 /// One niri action (`{"CloseWindow": {"id": 3}}`); `Ok` only when niri said so.
@@ -440,7 +437,7 @@ pub fn workspaces_view(app: AppHandle) -> Vec<helix_shell_core::niri::WorkspaceV
 /// Focus the Helix agent desk workspace (helix-niri).
 #[tauri::command]
 pub fn agent_desk_focus() -> Result<(), String> {
-    niri_action(&serde_json::json!({"HelixFocusAgentDesk": {}}))
+    helix_shell_core::compositor_ipc::focus_agent_desk()
 }
 
 /// Switches to a workspace of the strip the bar shows; any other id is refused here and never sent to niri.

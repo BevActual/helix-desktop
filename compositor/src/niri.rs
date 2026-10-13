@@ -2290,9 +2290,13 @@ impl State {
                 }
             };
 
-            let res = self
-                .niri
-                .screenshot_all_outputs(renderer, include_cursor, on_done);
+            let res = self.niri.screenshot_all_outputs(
+                renderer,
+                include_cursor,
+                None,
+                false,
+                Some(Box::new(on_done)),
+            );
 
             if let Err(err) = res {
                 warn!("error taking a screenshot: {err:?}");
@@ -6461,12 +6465,13 @@ impl Niri {
         Ok(())
     }
 
-    #[cfg(feature = "dbus")]
     pub fn screenshot_all_outputs(
         &mut self,
         renderer: &mut GlesRenderer,
         include_pointer: bool,
-        on_done: impl FnOnce(PathBuf) + Send + 'static,
+        path_override: Option<PathBuf>,
+        notify_ipc: bool,
+        on_done: Option<Box<dyn FnOnce(PathBuf) + Send + 'static>>,
     ) -> anyhow::Result<()> {
         use smithay::backend::renderer::{Bind as _, ExportMem as _};
 
@@ -6556,9 +6561,12 @@ impl Niri {
             .context("error mapping texture")?;
         let pixels = copy.to_vec();
 
-        let path = make_screenshot_path(&self.config.borrow())
-            .ok()
-            .flatten()
+        let path = path_override
+            .or_else(|| {
+                make_screenshot_path(&self.config.borrow())
+                    .ok()
+                    .flatten()
+            })
             .unwrap_or_else(|| {
                 let mut path = env::temp_dir();
                 path.push("screenshot.png");
@@ -6566,11 +6574,29 @@ impl Niri {
             });
         debug!("saving screenshot to {path:?}");
 
+        let ipc_event_tx = if notify_ipc {
+            let (event_tx, event_rx) = calloop::channel::sync_channel::<Option<String>>(1);
+            self.event_loop
+                .insert_source(event_rx, move |event, _, state| match event {
+                    calloop::channel::Event::Msg(path) => {
+                        state.ipc_screenshot_taken(path);
+                    }
+                    calloop::channel::Event::Closed => (),
+                })
+                .unwrap();
+            Some(event_tx)
+        } else {
+            None
+        };
+
         thread::spawn(move || {
             let file = match std::fs::File::create(&path) {
                 Ok(file) => file,
                 Err(err) => {
                     warn!("error creating file: {err:?}");
+                    if let Some(tx) = ipc_event_tx {
+                        let _ = tx.send(None);
+                    }
                     return;
                 }
             };
@@ -6578,10 +6604,19 @@ impl Niri {
             let w = std::io::BufWriter::new(file);
             if let Err(err) = write_png_rgba8(w, geo.size.w as u32, geo.size.h as u32, &pixels) {
                 warn!("error encoding screenshot image: {err:?}");
+                if let Some(tx) = ipc_event_tx {
+                    let _ = tx.send(None);
+                }
                 return;
             }
 
-            on_done(path);
+            if let Some(tx) = ipc_event_tx {
+                let path_string = path.to_str().map(|s| s.to_owned());
+                let _ = tx.send(path_string);
+            }
+            if let Some(done) = on_done {
+                done(path);
+            }
         });
 
         Ok(())

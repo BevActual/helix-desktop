@@ -40,6 +40,9 @@ if tauri; then
     mic-mute) exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle ;;
     brightness-up) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustBrightness i 5 && exit 0; exec brightnessctl --quiet set 5%+ ;;
     brightness-down) busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 AdjustBrightness i -- -5 && exit 0; exec brightnessctl --quiet set 5%- ;;
+    bar-show) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarShow ;;
+    bar-hide) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarHide ;;
+    bar-toggle) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarToggle ;;
     *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
   esac
 fi

@@ -42,6 +42,11 @@ pub fn helix_capabilities() -> HelixCaps {
     serde_json::from_value(ok).unwrap_or_default()
 }
 
+/// True when the compositor answers `HelixCapabilities` (helix-niri, not stock niri).
+pub fn is_helix_compositor() -> bool {
+    request_json("\"HelixCapabilities\"").is_some()
+}
+
 pub fn agent_desk_status() -> AgentDeskStatus {
     let Some(ok) = request_json("\"HelixAgentDesk\"") else {
         return AgentDeskStatus::default();
@@ -55,4 +60,66 @@ pub fn agent_desk_status() -> AgentDeskStatus {
 pub fn reload_config() {
     let line = serde_json::json!({"Action": {"LoadConfigFile": {}}}).to_string();
     let _ = request_json(&line);
+}
+
+/// Queue the next opened window(s) on the Helix agent desk without stealing focus.
+pub fn place_on_agent_desk(count: u8) -> Result<(), String> {
+    if !crate::compositor_config::agent_desk_placement_enabled() {
+        return Ok(());
+    }
+    if !helix_capabilities().agent_desk {
+        return Err("agent desk is not available on this compositor".into());
+    }
+    let line = serde_json::json!({"Action": {"HelixPlaceOnAgentDesk": {"count": count.max(1)}}}).to_string();
+    if request_json(&line).is_none() {
+        return Err("the compositor did not accept agent desk placement".into());
+    }
+    Ok(())
+}
+
+/// Switch keyboard focus to the agent desk workspace.
+pub fn focus_agent_desk() -> Result<(), String> {
+    if !helix_capabilities().agent_desk {
+        return Err("agent desk is not available on this compositor".into());
+    }
+    let line = serde_json::json!({"Action": {"HelixFocusAgentDesk": {}}}).to_string();
+    if request_json(&line).is_none() {
+        return Err("the compositor did not focus the agent desk".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn focus_fails_when_compositor_does_not_report_agent_desk() {
+        std::env::remove_var("NIRI_SOCKET");
+        let err = focus_agent_desk().unwrap_err();
+        assert!(err.contains("agent desk"));
+    }
+
+    #[test]
+    fn place_is_noop_when_placement_pref_is_off() {
+        std::env::remove_var("NIRI_SOCKET");
+        let root = std::env::temp_dir().join(format!("helix-place-off-{}", std::process::id()));
+        let helix = root.join("helix");
+        std::fs::create_dir_all(&helix).unwrap();
+        std::fs::write(helix.join("compositor-prefs.toml"), "agent_desk_placement = false\n").unwrap();
+        let prev_cfg = std::env::var("XDG_CONFIG_HOME").ok();
+        let prev_env = std::env::var("HELIX_AGENT_DESK").ok();
+        std::env::set_var("XDG_CONFIG_HOME", root.to_string_lossy().as_ref());
+        std::env::remove_var("HELIX_AGENT_DESK");
+        assert!(place_on_agent_desk(1).is_ok());
+        if let Some(prev) = prev_cfg {
+            std::env::set_var("XDG_CONFIG_HOME", prev);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
+        if let Some(prev) = prev_env {
+            std::env::set_var("HELIX_AGENT_DESK", prev);
+        }
+        std::fs::remove_dir_all(root).ok();
+    }
 }

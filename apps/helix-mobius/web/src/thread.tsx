@@ -130,17 +130,30 @@ function Blocks({ blocks, needle, report, onSaveSnippet }: { blocks: Block[]; ne
             );
           }
           case "table": {
-            const copy = () => {
+            const tableCellText = (value: Span[]) => value.map((span) => span.text).join("");
+            const tableTsv = () => {
               // TSV pastes directly into spreadsheets; quoting preserves tabs and newlines in cells.
               const cell = (value: Span[]) => {
-                const text = value.map((span) => span.text).join("");
+                const text = tableCellText(value);
                 return /[\t\n\r"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
               };
-              const text = [block.headers, ...block.rows].map((row) => row.map(cell).join("\t")).join("\n");
-              invoke("chat_copy", { text }).catch(report);
+              return [block.headers, ...block.rows].map((row) => row.map(cell).join("\t")).join("\n");
+            };
+            const copy = () => invoke("chat_copy", { text: tableTsv() }).catch(report);
+            const saveCsv = () => {
+              const cell = (value: Span[]) => {
+                const text = tableCellText(value);
+                return /[,\n\r"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+              };
+              const text = [block.headers, ...block.rows].map((row) => row.map(cell).join(",")).join("\n");
+              invoke("chat_reply_save", { content: text, defaultFilename: "table.csv" }).catch(report);
             };
             return <div key={index} className="reply-table" data-test="reply-table">
-              <div className="code-bar"><span>Table</span><button className="mini" data-test="copy-table" onClick={copy}>Copy table</button></div>
+              <div className="code-bar">
+                <span>Table</span>
+                <button className="mini" data-test="copy-table" onClick={copy}>Copy table</button>
+                <button className="mini" data-test="save-table-csv" onClick={saveCsv}>Save as CSV</button>
+              </div>
               <div className="reply-table-scroll" tabIndex={0} role="region" aria-label="Reply table">
                 <table>
                   <thead><tr>{block.headers.map((cell, i) => <th key={i} scope="col" style={{ textAlign: block.alignments[i] }}><Spans spans={cell} needle={needle} /></th>)}</tr></thead>

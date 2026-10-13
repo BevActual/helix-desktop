@@ -1,5 +1,7 @@
 pub mod agent_desk;
+pub mod desktop_actions;
 pub mod bar_surface;
+pub mod bar_visibility;
 pub mod calendar;
 pub mod dbusmenu;
 pub mod dock;

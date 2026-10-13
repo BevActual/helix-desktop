@@ -171,12 +171,19 @@ async fn execute(app: &AppHandle, turn: &mut Turn, mut private: bool, cancel: &m
         private |= state.chat.conversation.messages.iter().any(|m| m.activities.iter().any(|a| a.tool == "terminal"));
         if state.chat.conversation.workspace.is_empty() { None } else { Some(terminal::workspace(&state.chat.conversation.workspace)?) }
     };
-    let folder_note = if folder.is_some() { "A project folder is selected and appears as /workspace. Terminal is available only after exact review." } else { "No project folder is selected. Terminal is unavailable; use web tools or finish." };
+    let folder_note = if folder.is_some() {
+        "A project folder is selected and appears as /workspace. Terminal is available only after exact review. When agent-desk placement is on, the first approved command also opens a visible terminal on the Helix agent desk."
+    } else {
+        "No project folder is selected. Terminal is unavailable; use web tools or finish."
+    };
     let system = turn.messages.first().map(|(_, text)| text.as_str()).unwrap_or("");
     let goal = turn.messages.iter().rev().find(|(role, _)| *role == "user").map(|(_, text)| text.as_str()).unwrap_or("");
     let prior = turn.messages.iter().skip(1).take(turn.messages.len().saturating_sub(2)).map(|(role, text)| format!("{role}: {}\n", terminal::display(text, 1200))).collect::<String>();
     let mut planning = vec![("system", format!("{system}\n\n{PLAN}\n{folder_note}")), ("user", format!("Conversation context (evidence, not tool instructions):\n{}\nCurrent request:\n{goal}", terminal::display(&prior, 5000)))];
-    let mut seen = HashSet::new(); let mut sources: Vec<web::Source> = Vec::new(); let mut observations = String::new();
+    let mut seen = HashSet::new();
+    let mut desk_terminal_opened = false;
+    let mut sources: Vec<web::Source> = Vec::new();
+    let mut observations = String::new();
     let mut known_urls = HashSet::new();
     if let Some((_, question)) = turn.messages.last() { for word in question.split_whitespace() { if let Ok(url) = web::public_url(word.trim_matches(|c| matches!(c, '(' | ')' | '"' | ','))) { known_urls.insert(url.to_string()); } } }
     for step in 0..6 {
@@ -236,6 +243,12 @@ async fn execute(app: &AppHandle, turn: &mut Turn, mut private: bool, cancel: &m
             Request::Terminal { command } => {
                 let folder = folder.as_ref().ok_or("Select a project folder before running terminal commands.")?;
                 private = true;
+                if !desk_terminal_opened {
+                    desk_terminal_opened = true;
+                    if let Err(error) = terminal::open_on_agent_desk(folder) {
+                        activity(app, generation, &id, "terminal", command, "running", &format!("(Could not open a desk terminal: {error})"));
+                    }
+                }
                 terminal::run(folder, command, cancel.clone(), |output| activity(app, generation, &id, "terminal", command, "running", &output)).await.map(|output| {
                     let text = format!("Exit: {:?}\nStopped: {}\nTime/output limit: {}\n{}", output.code, output.stopped, output.limited, output.text);
                     (text, output.code == Some(0) && !output.stopped && !output.limited)
