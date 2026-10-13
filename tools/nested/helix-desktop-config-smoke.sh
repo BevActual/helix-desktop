@@ -57,11 +57,11 @@ raw = subprocess.check_output([
 ], text=True)
 ids = re.findall(r"'id': <'([^']+)'>", raw)
 print("setting_count=", len(ids))
-assert len(ids) >= 40, ids
+assert len(ids) >= 80, ids
 for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
     "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
-    "control_center.width", "osd.kinds.volume",
+    "control_center.width", "osd.kinds.volume", "osd.position", "osd.kinds.wifi",
 ]:
     assert want in ids, want
 print("catalog=OK")
