@@ -279,7 +279,8 @@ System Monitor is the Tauri app `apps/helix-system-monitor` (`cargo build -p hel
 Use nested helpers under `tools/nested/` for isolated runs. Agent socket coverage:
 `HELIX_NESTED_SCRIPT=tools/nested/agent-ipc-test.sh tools/nested/run.sh agent-ipc tools/nested/tauri-fake-desktop.sh`.
 Launcher and `act` desktop actions: `HELIX_NESTED_SCRIPT=tools/nested/launcher-test.sh tools/nested/run.sh launcher tools/nested/tauri-shell.sh`.
-Nested runs use `HELIX_NESTED_HEADLESS=1` and the repo `compositor/target/debug/niri` when present (`cargo build` in `compositor/`). The agent-ipc script then checks helix capture IPC (`desktop-capture all` and a named output).
+Nested runs use `HELIX_NESTED_HEADLESS=1` and the repo `compositor/target/debug/niri` when present (`cargo build` in `compositor/`). The agent-ipc script then checks helix capture IPC (`desktop-capture all` and a named output) and `helix-panel desktop-capture`.
+On the live desktop, after `tools/install-trusted-niri.sh apply`, run `tools/install-trusted-niri.sh status` to see whether the running compositor still needs a logout to pick up the new binary.
 Python agent policy: `tools/helix-agent/.venv/bin/python tests/helix_agent_policy_test.py .` (create the venv from `tools/helix-agent/requirements.txt` first).
 
 Online Accounts support uses optional `goa-backend-1.0 >= 3.56`. On Fedora install

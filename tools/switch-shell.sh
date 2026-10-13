@@ -191,6 +191,9 @@ case "${1:-install}" in
       else
         echo "Strut unit installed; it starts on the next restart-bar (avoids a double exclusive zone)."
       fi
+      if [ -f "$UNITS/helix-polkit-agent.service" ]; then
+        systemctl --user start helix-polkit-agent.service 2>/dev/null || true
+      fi
     else
       systemctl --user start helix-shell-strut.service helix-shell-bar.service helix-shell-panels.service
       if [ -f "$UNITS/helix-idle.service" ]; then
