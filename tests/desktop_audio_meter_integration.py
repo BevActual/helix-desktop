@@ -11,6 +11,7 @@ import time
 from gi.repository import Gio, GLib
 
 service_binary, server_config = map(os.path.abspath, sys.argv[1:])
+service_tag = Path(service_binary).name
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 levels = []
 bus.signal_subscribe("org.helix.Desktop", "org.helix.Desktop.Audio1", "InputLevel",
@@ -20,6 +21,33 @@ bus.signal_subscribe("org.helix.Desktop", "org.helix.Desktop.Audio1", "InputLeve
 def call(method, args=None, connection=bus):
     return connection.call_sync("org.helix.Desktop", "/org/helix/Desktop",
                                 "org.helix.Desktop.Audio1", method, args, None, 0, 2000, None).unpack()
+
+def wait_for_bus_name():
+    probe = Gio.DBusConnection.new_for_address_sync(
+        os.environ["DBUS_SESSION_BUS_ADDRESS"],
+        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT
+        | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
+        None,
+        None,
+    )
+    for _ in range(100):
+        owner = probe.call_sync(
+            "org.freedesktop.DBus",
+            "/org/freedesktop/DBus",
+            "org.freedesktop.DBus",
+            "NameHasOwner",
+            GLib.Variant("(s)", ("org.helix.Desktop",)),
+            None,
+            Gio.DBusCallFlags.NONE,
+            1000,
+            None,
+        )
+        if owner[0]:
+            probe.close_sync(None)
+            return
+        time.sleep(0.1)
+    probe.close_sync(None)
+    raise AssertionError("desktop service did not claim org.helix.Desktop")
 
 def until(predicate, seconds=8):
     deadline = time.monotonic() + seconds
@@ -47,6 +75,7 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
     with (root / "service.log").open("w") as log:
         service = subprocess.Popen([service_binary], env=env, stdout=log, stderr=log)
         try:
+            wait_for_bus_name()
             until(lambda: not call("GetSnapshot")[0]["available"])
             def start_server():
                 return subprocess.Popen(["pipewire", "-c", server_config], env=env,
@@ -64,11 +93,11 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
             for node in capture_nodes():
                 command("pw-cli", "set-param", str(node["id"]), "PortConfig",
                         "{ direction = Input mode = dsp format = { mediaType = audio mediaSubtype = raw format = F32 rate = 48000 channels = 1 position = [ MONO ] } }")
-            until(lambda: "helix-service" in command("pw-link", "-i"))
+            until(lambda: service_tag in command("pw-link", "-i"))
             for output in command("pw-link", "-o").splitlines():
                 if "Helix-Test-Source" in output:
                     for input_port in command("pw-link", "-i").splitlines():
-                        if "helix-service" in input_port:
+                        if service_tag in input_port:
                             command("pw-link", output, input_port)
             until(lambda: any(available and math.isfinite(peak) and 0 <= peak <= 1
                               for _, peak, available in levels))

@@ -5,10 +5,11 @@ use tokio::sync::Mutex;
 use zbus::fdo;
 use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
+use serde_json::Value as JsonValue;
 use zbus::zvariant::{OwnedValue, Value};
 use zbus::{interface, Connection};
 
-use crate::dbus_value::{json_to_owned, owned_bool, owned_str};
+use crate::dbus_value::{json_to_owned, owned_bool, owned_str, owned_to_json};
 use crate::peer::resolve_peer;
 use crate::state::State;
 
@@ -42,27 +43,62 @@ fn require_desktop(state: &State, sender: &str) -> fdo::Result<()> {
     }
 }
 
-fn string_from_owned(value: &OwnedValue) -> fdo::Result<String> {
-    match &**value {
-        Value::Str(text) => Ok(text.to_string()),
-        Value::Value(inner) => match &**inner {
-            Value::Str(text) => Ok(text.to_string()),
-            _ => Err(fdo::Error::InvalidArgs(
-                "Application IDs must be text".into(),
-            )),
-        },
-        _ => Err(fdo::Error::InvalidArgs(
-            "Application IDs must be text".into(),
-        )),
-    }
-}
-
-fn string_list_from_owned(items: &[OwnedValue]) -> fdo::Result<serde_json::Value> {
+fn json_array_from_owned(items: &[OwnedValue]) -> fdo::Result<JsonValue> {
     let mut out = Vec::with_capacity(items.len());
     for item in items {
-        out.push(serde_json::Value::String(string_from_owned(item)?));
+        out.push(
+            owned_to_json(item).ok_or_else(|| {
+                fdo::Error::InvalidArgs("Ordered list values must be JSON-compatible".into())
+            })?,
+        );
     }
-    Ok(serde_json::Value::Array(out))
+    Ok(JsonValue::Array(out))
+}
+
+fn apply_ordered_list_update(
+    state: &mut State,
+    sender: &str,
+    id: &str,
+    expected: &[OwnedValue],
+    value: &[OwnedValue],
+) -> fdo::Result<()> {
+    use helix_shell_core::desktop::ordered_lists;
+    require_desktop(state, sender)?;
+    let catalog = state.config.full_catalog(true);
+    let entry = ordered_lists::catalog_entry(&catalog, id).ok_or_else(|| {
+        fdo::Error::InvalidArgs("Unknown ordered desktop list".into())
+    })?;
+    let type_name = entry
+        .get("type")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| fdo::Error::InvalidArgs("Unknown ordered desktop list".into()))?;
+    if !ordered_lists::supports_ordered_type(type_name) {
+        return Err(fdo::Error::InvalidArgs(
+            "Unknown ordered desktop list".into(),
+        ));
+    }
+    let expected_json = json_array_from_owned(expected)?;
+    let value_json = json_array_from_owned(value)?;
+    let current = ordered_lists::current_value(&state.config, &catalog, id).unwrap_or(JsonValue::Null);
+    if current != expected_json {
+        return Err(fdo::Error::InvalidArgs(
+            "The list changed. Refresh and try again".into(),
+        ));
+    }
+    let validated = ordered_lists::validate_update(&catalog, id, &value_json)
+        .map_err(fdo::Error::InvalidArgs)?;
+    if type_name == "application-list" {
+        state
+            .config
+            .set(id, validated)
+            .map_err(fdo::Error::InvalidArgs)?;
+    } else {
+        state
+            .config
+            .apply_ordered_list(id, validated)
+            .map_err(|message| fdo::Error::InvalidArgs(message))?;
+    }
+    Ok(())
 }
 
 #[interface(name = "org.helix.Desktop.Configuration1")]
@@ -72,9 +108,9 @@ impl Configuration {
         let mut map = HashMap::new();
         map.insert("available".into(), owned_bool(true));
         map.insert("helix-desktop".into(), owned_bool(state.desktop.is_some()));
-        map.insert("audio".into(), owned_bool(true));
-        map.insert("network".into(), owned_bool(true));
-        map.insert("bluetooth".into(), owned_bool(true));
+        map.insert("audio".into(), owned_bool(state.audio.is_available()));
+        map.insert("network".into(), owned_bool(state.network.is_available()));
+        map.insert("bluetooth".into(), owned_bool(state.bluetooth.is_available()));
         map.insert("implementation".into(), owned_str("rust"));
         map.insert(
             "settings".into(),
@@ -93,9 +129,10 @@ impl Configuration {
 
     async fn get_settings(&self) -> Vec<OwnedValue> {
         let state = self.state.lock().await;
+        let include_desktop = state.desktop.is_some();
         state
             .config
-            .catalog()
+            .full_catalog(include_desktop)
             .iter()
             .filter_map(json_to_owned)
             .collect()
@@ -109,6 +146,31 @@ impl Configuration {
     ) -> fdo::Result<()> {
         let json = value_from_zvariant(&value)
             .ok_or_else(|| fdo::Error::InvalidArgs("unsupported value type".into()))?;
+        if id.starts_with("keybinds.") {
+            return Err(fdo::Error::InvalidArgs(
+                "Keyboard shortcuts require UpdateOrderedList".into(),
+            ));
+        }
+        if id == "control_center.shortcuts" {
+            return Err(fdo::Error::InvalidArgs(
+                "Quick shortcuts require UpdateOrderedList".into(),
+            ));
+        }
+        if id == "control_center.visible_tabs" {
+            return Err(fdo::Error::InvalidArgs(
+                "Control Center pages require UpdateOrderedList".into(),
+            ));
+        }
+        if id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids" {
+            return Err(fdo::Error::InvalidArgs(
+                "Template selections require UpdateOrderedList".into(),
+            ));
+        }
+        if id == "wallpaper.transition" {
+            return Err(fdo::Error::InvalidArgs(
+                "Wallpaper transitions require UpdateOrderedList".into(),
+            ));
+        }
         let mut state = self.state.lock().await;
         state
             .config
@@ -116,7 +178,7 @@ impl Configuration {
             .map_err(fdo::Error::InvalidArgs)?;
         if id == "audio.sound_volume" {
             if let Some(volume) = json.as_f64() {
-                if let Some(sink) = state.audio.sinks.iter().find(|node| node.is_default) {
+                if let Some(sink) = state.audio.sinks().iter().find(|node| node.is_default) {
                     let sink_id = sink.id;
                     let _ = state.audio.set_volume(sink_id, volume);
                 }
@@ -129,13 +191,27 @@ impl Configuration {
 
     async fn update_ordered_list(
         &self,
-        _id: &str,
-        _expected: Vec<OwnedValue>,
-        _value: Vec<OwnedValue>,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        id: &str,
+        expected: Vec<OwnedValue>,
+        value: Vec<OwnedValue>,
     ) -> fdo::Result<()> {
-        Err(fdo::Error::Failed(
-            "UpdateOrderedList not implemented in Rust helix-desktop yet".into(),
-        ))
+        let sender = header
+            .sender()
+            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
+            .to_string();
+        let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Ordered desktop lists require Helix desktop".into(),
+            ));
+        }
+        state.config.force_reload();
+        apply_ordered_list_update(&mut state, &sender, id, &expected, &value)?;
+        drop(state);
+        Self::changed(&emitter).await.ok();
+        Ok(())
     }
 
     async fn update_application_list(
@@ -150,27 +226,9 @@ impl Configuration {
             .sender()
             .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
             .to_string();
-        let expected_json = string_list_from_owned(&expected)?;
-        let value_json = string_list_from_owned(&value)?;
         let mut state = self.state.lock().await;
-        require_desktop(&state, &sender)?;
-        let def = helix_shell_core::settings::find_def(id)
-            .ok_or_else(|| fdo::Error::InvalidArgs("Unknown ordered desktop list".into()))?;
-        if def.type_name() != "application-list" {
-            return Err(fdo::Error::InvalidArgs(
-                "Unknown ordered desktop list".into(),
-            ));
-        }
-        let current = state.config.get(id);
-        if current != expected_json {
-            return Err(fdo::Error::InvalidArgs(
-                "The list changed. Refresh and try again".into(),
-            ));
-        }
-        state
-            .config
-            .set(id, value_json)
-            .map_err(fdo::Error::InvalidArgs)?;
+        state.config.force_reload();
+        apply_ordered_list_update(&mut state, &sender, id, &expected, &value)?;
         drop(state);
         Self::changed(&emitter).await.ok();
         Ok(())
@@ -188,10 +246,26 @@ impl Configuration {
         Ok(())
     }
 
-    async fn commit_overrides(&self, _baseline: &str, _candidate: &str) -> fdo::Result<()> {
-        Err(fdo::Error::Failed(
-            "CommitOverrides not implemented in Rust helix-desktop yet".into(),
-        ))
+    async fn commit_overrides(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        baseline: &str,
+        candidate: &str,
+    ) -> fdo::Result<()> {
+        let sender = header
+            .sender()
+            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
+            .to_string();
+        let mut state = self.state.lock().await;
+        require_desktop(&state, &sender)?;
+        state
+            .config
+            .commit_remote_overrides(baseline, candidate)
+            .map_err(|message| fdo::Error::Failed(message))?;
+        drop(state);
+        Self::changed(&emitter).await.ok();
+        Ok(())
     }
 
     async fn register_desktop(

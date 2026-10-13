@@ -25,43 +25,12 @@ fn snapshot_map(value: &serde_json::Value) -> HashMap<String, OwnedValue> {
     map
 }
 
-/// Mock inventory matching C++ `DisplayInventory` shape (no niri query yet).
-fn mock_snapshot(desktop_registered: bool) -> serde_json::Value {
-    if !desktop_registered {
-        return serde_json::json!({
-            "available": false,
-            "outputs": [],
-            "capabilities": [],
-            "reason": "Display inventory requires an active Helix desktop and its compositor connection.",
-        });
-    }
-    serde_json::json!({
-        "available": true,
-        "outputs": [{
-            "name": "eDP-1",
-            "label": "Built-in Display",
-            "enabled": true,
-            "width": 1920,
-            "height": 1080,
-            "refresh-millihertz": 60000,
-            "scale": 1.0,
-            "x": 0,
-            "y": 0,
-            "logical-width": 1920,
-            "logical-height": 1080,
-            "transform": "Normal",
-            "vrr-supported": false,
-            "vrr-enabled": false,
-        }],
-        "capabilities": ["inventory"],
-    })
-}
-
 #[interface(name = "org.helix.Desktop.Displays1")]
 impl Displays {
     async fn get_snapshot(&self) -> HashMap<String, OwnedValue> {
         let state = self.state.lock().await;
-        snapshot_map(&mock_snapshot(state.desktop.is_some()))
+        let desktop = state.desktop.is_some();
+        snapshot_map(&state.displays.snapshot(desktop))
     }
 
     #[zbus(signal)]

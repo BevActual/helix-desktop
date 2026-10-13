@@ -1,44 +1,35 @@
-//! In-memory Bluetooth1 backend for the Rust service scaffold (no BlueZ yet).
+//! In-memory Bluetooth1 backend for nested / offline sessions.
 
-use serde_json::{json, Value};
+use serde_json::Value;
 
-#[derive(Clone, Debug)]
-pub struct Device {
-    pub path: String,
-    pub address: String,
-    pub name: String,
-    pub kind: u32,
-    pub paired: bool,
-    pub trusted: bool,
-    pub connected: bool,
-    pub connecting: bool,
-    pub battery: Option<u8>,
-}
+use super::{snapshot_from_parts, BluetoothFields, Device};
 
 #[derive(Clone, Debug)]
-pub struct BluetoothBackend {
-    pub available: bool,
-    pub enabled: bool,
-    pub scanning: bool,
-    pub name: String,
-    pub discoverable: bool,
-    pub pairable: bool,
-    pub soft_blocked: bool,
-    pub hard_blocked: bool,
-    pub devices: Vec<Device>,
+pub struct MockBackend {
+    fields: BluetoothFields,
+    devices: Vec<Device>,
 }
 
-impl BluetoothBackend {
+pub fn force_mock() -> bool {
+    matches!(
+        std::env::var("HELIX_DESKTOP_MOCK_BLUETOOTH").ok().as_deref(),
+        Some("1") | Some("true") | Some("yes")
+    )
+}
+
+impl MockBackend {
     pub fn new() -> Self {
         Self {
-            available: true,
-            enabled: true,
-            scanning: false,
-            name: "Helix".into(),
-            discoverable: false,
-            pairable: true,
-            soft_blocked: false,
-            hard_blocked: false,
+            fields: BluetoothFields {
+                available: true,
+                enabled: true,
+                scanning: false,
+                name: "Helix".into(),
+                discoverable: false,
+                pairable: true,
+                soft_blocked: false,
+                hard_blocked: false,
+            },
             devices: vec![
                 Device {
                     path: "/org/helix/mock/bt/1".into(),
@@ -49,7 +40,10 @@ impl BluetoothBackend {
                     trusted: true,
                     connected: true,
                     connecting: false,
-                    battery: Some(72),
+                    has_battery: true,
+                    battery: 72,
+                    has_rssi: false,
+                    rssi: 0,
                 },
                 Device {
                     path: "/org/helix/mock/bt/2".into(),
@@ -60,7 +54,10 @@ impl BluetoothBackend {
                     trusted: true,
                     connected: false,
                     connecting: false,
-                    battery: None,
+                    has_battery: false,
+                    battery: 0,
+                    has_rssi: false,
+                    rssi: 0,
                 },
                 Device {
                     path: "/org/helix/mock/bt/3".into(),
@@ -71,46 +68,30 @@ impl BluetoothBackend {
                     trusted: false,
                     connected: false,
                     connecting: false,
-                    battery: None,
+                    has_battery: false,
+                    battery: 0,
+                    has_rssi: false,
+                    rssi: 0,
                 },
             ],
         }
     }
 
+    pub fn is_available(&self) -> bool {
+        true
+    }
+
     pub fn snapshot(&self) -> Value {
-        json!({
-            "available": self.available,
-            "enabled": self.enabled,
-            "scanning": self.scanning,
-            "name": self.name,
-            "discoverable": self.discoverable,
-            "pairable": self.pairable,
-            "soft-blocked": self.soft_blocked,
-            "hard-blocked": self.hard_blocked,
-            "devices": self.devices.iter().map(|device| json!({
-                "path": device.path,
-                "address": device.address,
-                "name": device.name,
-                "kind": device.kind,
-                "paired": device.paired,
-                "trusted": device.trusted,
-                "connected": device.connected,
-                "connecting": device.connecting,
-                "has-battery": device.battery.is_some(),
-                "battery": device.battery.unwrap_or(0),
-                "has-rssi": false,
-                "rssi": 0,
-            })).collect::<Vec<_>>(),
-        })
+        snapshot_from_parts(&self.fields, &self.devices)
     }
 
     pub fn set_enabled(&mut self, enabled: bool) -> Result<(), String> {
-        if enabled && self.hard_blocked {
+        if enabled && self.fields.hard_blocked {
             return Err("Bluetooth is blocked by a hardware switch".into());
         }
-        self.enabled = enabled;
+        self.fields.enabled = enabled;
         if !enabled {
-            self.scanning = false;
+            self.fields.scanning = false;
             for device in &mut self.devices {
                 device.connected = false;
                 device.connecting = false;
@@ -120,10 +101,10 @@ impl BluetoothBackend {
     }
 
     pub fn set_scanning(&mut self, on: bool) -> Result<(), String> {
-        if !self.enabled {
+        if !self.fields.enabled {
             return Err("Bluetooth is off".into());
         }
-        self.scanning = on;
+        self.fields.scanning = on;
         Ok(())
     }
 
@@ -135,7 +116,7 @@ impl BluetoothBackend {
     }
 
     pub fn connect(&mut self, path: &str) -> Result<(), String> {
-        if !self.enabled {
+        if !self.fields.enabled {
             return Err("Bluetooth is off".into());
         }
         let device = self.device_mut(path)?;
@@ -151,7 +132,7 @@ impl BluetoothBackend {
     }
 
     pub fn disconnect(&mut self, path: &str) -> Result<(), String> {
-        if !self.enabled {
+        if !self.fields.enabled {
             return Err("Bluetooth is off".into());
         }
         let device = self.device_mut(path)?;
@@ -164,7 +145,7 @@ impl BluetoothBackend {
     }
 
     pub fn pair(&mut self, path: &str) -> Result<(), String> {
-        if !self.enabled {
+        if !self.fields.enabled {
             return Err("Bluetooth is off".into());
         }
         let device = self.device_mut(path)?;
@@ -173,6 +154,16 @@ impl BluetoothBackend {
         }
         device.paired = true;
         device.trusted = true;
+        Ok(())
+    }
+
+    pub fn set_trusted(&mut self, path: &str, trusted: bool) -> Result<(), String> {
+        let device = self.device_mut(path)?;
+        device.trusted = trusted;
+        Ok(())
+    }
+
+    pub fn cancel_pair(&mut self, _path: &str) -> Result<(), String> {
         Ok(())
     }
 

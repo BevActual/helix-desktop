@@ -1,15 +1,20 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use helix_shell_core::{AuditLog, ConfigStore, GrantStore, RiskPolicy, TaintTracker};
 use serde_json::Value;
 use zbus::Connection;
 
+use crate::agents::AgentHub;
 use crate::audio_backend::AudioBackend;
+use crate::audio_meter::AudioMeterManager;
 use crate::bluetooth_backend::BluetoothBackend;
+use crate::displays_backend::DisplaysBackend;
 use crate::network_backend::NetworkBackend;
 use crate::palette_catalog::load_palette_previews;
+use crate::desktop_operations::DesktopOperation;
 use crate::runtime_state::RuntimeState;
 
 /// Same window as C++ `AgentBroker::kConfirmationDeadline`.
@@ -46,13 +51,16 @@ pub enum ConfirmKind {
 }
 
 pub struct State {
+    pub agents: Arc<AgentHub>,
     pub risk: RiskPolicy,
     pub grants: GrantStore,
     pub taint: TaintTracker,
     pub config: ConfigStore,
     pub audio: AudioBackend,
+    pub audio_meters: AudioMeterManager,
     pub network: NetworkBackend,
     pub bluetooth: BluetoothBackend,
+    pub displays: DisplaysBackend,
     /// Last wallpaper path from Appearance1.SetWallpaper (scaffold; not applied to compositor).
     pub wallpaper: String,
     /// Cached Appearance1 `palette-previews` (builtins + community catalog + custom files).
@@ -62,6 +70,7 @@ pub struct State {
     pub desktop_capabilities: HashMap<String, bool>,
     pub clients: HashMap<String, ClientSession>,
     pub next_operation: u64,
+    pub desktop_operations: Vec<DesktopOperation>,
     pub pending: HashMap<u64, PendingConfirm>,
     /// Confirmer bus unique name (must stay on one connection for signals).
     pub confirmer: Option<String>,
@@ -85,7 +94,7 @@ impl State {
         Instant::now() + seconds
     }
 
-    pub fn new() -> Self {
+    pub fn new(agents: Arc<AgentHub>) -> Self {
         let config = ConfigStore::load(helix_shell_core::ConfigPaths::from_env());
         let initial_volume = config
             .get("audio.sound_volume")
@@ -108,12 +117,15 @@ impl State {
         let palette_previews =
             load_palette_previews(&config.paths().config_dir, &config.paths().settings_toml);
         Self {
+            agents,
             risk: RiskPolicy::from_env(),
             grants,
             taint: TaintTracker::default(),
             audio: AudioBackend::new(initial_volume),
+            audio_meters: AudioMeterManager::new(),
             network: NetworkBackend::new(),
             bluetooth: BluetoothBackend::new(),
+            displays: DisplaysBackend::new(),
             wallpaper: String::new(),
             palette_previews,
             runtime,
@@ -121,6 +133,7 @@ impl State {
             config,
             clients: HashMap::new(),
             next_operation: 1,
+            desktop_operations: Vec::new(),
             pending: HashMap::new(),
             confirmer: None,
             manager: None,

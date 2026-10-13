@@ -1,6 +1,7 @@
 //! Bootstrap Configuration1 catalog: definitions + TOML load/save for the settings the
 //! Tauri shell and Settings app need today. Full C++ catalog ports later.
 
+use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -828,6 +829,29 @@ impl ConfigStore {
         self.save_overrides()
     }
 
+    /// Re-read `settings.toml` from disk (C++ `ConfigService::forceReload` for overrides).
+    pub fn force_reload(&mut self) {
+        self.overrides =
+            read_toml_file(&self.paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+    }
+
+    /// Optimistic concurrency for `Configuration1.CommitOverrides` (C++ `commitRemoteOverrides`).
+    pub fn commit_remote_overrides(&mut self, baseline: &str, candidate: &str) -> Result<(), String> {
+        self.force_reload();
+        let baseline_table = toml::from_str::<Toml>(baseline)
+            .map_err(|_| "Invalid settings document".to_string())?;
+        if baseline_table != self.overrides {
+            return Err("Settings changed in another client. Refresh and try again.".into());
+        }
+        let candidate_table = toml::from_str::<Toml>(candidate)
+            .map_err(|_| "Invalid settings document".to_string())?;
+        if candidate_table == self.overrides {
+            return Ok(());
+        }
+        self.overrides = candidate_table;
+        self.save_overrides()
+    }
+
     fn save_overrides(&self) -> Result<(), String> {
         if let Some(parent) = self.paths.settings_toml.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -838,6 +862,57 @@ impl ConfigStore {
             String::new()
         };
         fs::write(&self.paths.settings_toml, text).map_err(|error| error.to_string())
+    }
+
+    pub fn overridden_path(&self, id: &str) -> bool {
+        let path = storage_path(id);
+        toml_get(&self.overrides, path.as_ref()).is_some()
+    }
+
+    pub fn get_json_value(&self, id: &str) -> Option<Value> {
+        let path = storage_path(id);
+        let toml = toml_get(&self.overrides, path.as_ref())
+            .or_else(|| toml_get(&self.base, path.as_ref()))?;
+        Some(toml_to_json_value(toml))
+    }
+
+    pub fn set_json_value(&mut self, id: &str, value: Value) -> Result<(), String> {
+        let path = storage_path(id);
+        toml_set(&mut self.overrides, path.as_ref(), json_to_toml(&value))?;
+        self.save_overrides()
+    }
+
+    pub(crate) fn merged_node(&self, id: &str) -> Option<Toml> {
+        let base = toml_get(&self.base, id).cloned();
+        let overrides = toml_get(&self.overrides, id).cloned();
+        match (base, overrides) {
+            (None, None) => None,
+            (Some(node), None) => Some(node),
+            (None, Some(node)) => Some(node),
+            (Some(left), Some(right)) => Some(merge_toml_values(left, right)),
+        }
+    }
+
+    pub fn get_raw_list(&self, id: &str) -> Option<Value> {
+        self.get_json_value(id).and_then(|value| value.as_array().cloned().map(Value::Array))
+    }
+
+    pub fn set_raw_list(&mut self, id: &str, value: Value) -> Result<(), String> {
+        value
+            .as_array()
+            .ok_or_else(|| "expected list value".to_string())?;
+        self.set_json_value(id, value)
+    }
+
+    pub fn apply_ordered_list(&mut self, id: &str, value: Value) -> Result<(), String> {
+        super::ordered_lists::apply_update(self, id, value)
+    }
+
+    /// Bootstrap catalog plus ordered-list extensions (key-chords, Control Center tabs, …).
+    pub fn full_catalog(&self, include_desktop: bool) -> Vec<Value> {
+        let mut rows = self.catalog();
+        rows.extend(super::ordered_lists::extension_entries(self, include_desktop));
+        rows
     }
 
     /// Catalog rows for `Configuration1.GetSettings`.
@@ -921,8 +996,33 @@ fn deep_merge(into: &mut toml::map::Map<String, Toml>, from: toml::map::Map<Stri
     }
 }
 
+/// Maps catalog ids to TOML override paths (C++ `settingPath`).
+pub fn storage_path(id: &str) -> Cow<'_, str> {
+    if id == "control_center.visible_tabs" {
+        return Cow::Borrowed("control_center.hidden_tabs");
+    }
+    if let Some(rest) = id.strip_prefix("bar:") {
+        if let Some((bar_name, field)) = rest.rsplit_once(':') {
+            if matches!(field, "start" | "center" | "end") {
+                return Cow::Owned(format!("bar.{bar_name}.{field}"));
+            }
+        }
+    }
+    Cow::Borrowed(id)
+}
+
 fn path_parts(id: &str) -> Vec<&str> {
     id.split('.').collect()
+}
+
+fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
+    match (base, overrides) {
+        (Toml::Table(mut left), Toml::Table(right)) => {
+            deep_merge(&mut left, right);
+            Toml::Table(left)
+        }
+        (_, value) => value,
+    }
 }
 
 fn toml_get<'a>(root: &'a Toml, id: &str) -> Option<&'a Toml> {
@@ -977,6 +1077,24 @@ fn toml_remove(root: &mut Toml, id: &str) {
     cursor.remove(parts[parts.len() - 1]);
 }
 
+fn toml_to_json_value(value: &Toml) -> Value {
+    match value {
+        Toml::Boolean(flag) => Value::Bool(*flag),
+        Toml::Integer(number) => Value::from(*number),
+        Toml::Float(number) => Value::from(*number),
+        Toml::String(text) => Value::String(text.clone()),
+        Toml::Array(items) => Value::Array(items.iter().map(toml_to_json_value).collect()),
+        Toml::Table(table) => {
+            let mut object = serde_json::Map::new();
+            for (key, item) in table {
+                object.insert(key.clone(), toml_to_json_value(item));
+            }
+            Value::Object(object)
+        }
+        Toml::Datetime(datetime) => Value::String(datetime.to_string()),
+    }
+}
+
 fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
     match def.kind {
         SettingKind::Boolean => Value::Bool(value.as_bool().unwrap_or(false)),
@@ -1003,28 +1121,28 @@ fn json_to_toml(value: &Value) -> Toml {
     match value {
         Value::Bool(flag) => Toml::Boolean(*flag),
         Value::Number(number) => {
-            if let Some(float) = number.as_f64() {
-                if float.fract() == 0.0 && float.abs() < i64::MAX as f64 {
-                    Toml::Integer(float as i64)
-                } else {
-                    Toml::Float(float)
-                }
+            if let Some(integer) = number.as_i64() {
+                Toml::Integer(integer)
+            } else if let Some(float) = number.as_f64() {
+                Toml::Float(float)
             } else {
                 Toml::Float(0.0)
             }
         }
         Value::String(text) => Toml::String(text.clone()),
-        Value::Array(items) => Toml::Array(
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(|text| Toml::String(text.to_string())))
-                .collect(),
-        ),
-        _ => Toml::String(String::new()),
+        Value::Array(items) => Toml::Array(items.iter().map(json_to_toml).collect()),
+        Value::Object(map) => {
+            let mut table = toml::map::Map::new();
+            for (key, item) in map {
+                table.insert(key.clone(), json_to_toml(item));
+            }
+            Toml::Table(table)
+        }
+        Value::Null => Toml::String(String::new()),
     }
 }
 
-fn validate_application_list(value: Value) -> Result<Value, String> {
+pub(crate) fn validate_application_list(value: Value) -> Result<Value, String> {
     let items = value.as_array().ok_or("expected application list")?;
     if items.len() > 256 {
         return Err("Expected at most 256 application IDs".into());
@@ -1151,5 +1269,24 @@ mod tests {
         assert!(reloaded
             .set("dock.pinned", json!(["bad/id.desktop"]))
             .is_err());
+    }
+
+    #[test]
+    fn commit_remote_overrides_checks_baseline() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths.clone());
+        store.set("theme.mode", json!("light")).unwrap();
+        let stale = std::fs::read_to_string(&paths.settings_toml).unwrap();
+        store.set("theme.mode", json!("dark")).unwrap();
+        assert_eq!(
+            store.commit_remote_overrides(&stale, "[theme]\nmode = \"light\"\n"),
+            Err("Settings changed in another client. Refresh and try again.".into())
+        );
+        store.force_reload();
+        let baseline = std::fs::read_to_string(&paths.settings_toml).unwrap();
+        store
+            .commit_remote_overrides(&baseline, "[theme]\nmode = \"light\"\n")
+            .unwrap();
+        assert_eq!(store.get("theme.mode"), json!("light"));
     }
 }

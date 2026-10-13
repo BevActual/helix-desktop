@@ -38,14 +38,14 @@ HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop tools/nested/…
 1. ~~Scaffold `helix-desktop` + risk policy in `helix-shell-core`~~
 2. ~~Agent Surface (grants, Hello/Action/Confirm, ListTools, manager)~~ — Rust `Action` runs shell IPC via `helix_shell_core::shell_ipc`; `tests/desktop_agent_integration.py` and `desktop_agent_manager_integration.py` pass against `helix-desktop` (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-agent`)
 3. ~~Configuration1 bootstrap catalog + writes~~ (theme/audio/accessibility/shell chrome; growing)
-4. ~~Audio1 in-memory backend~~ (volume/mute/default; PipeWire later) · ~~Appearance1 GetSnapshot stub~~
-5. ~~Network1 in-memory mock~~ (enable/scan/connect/disconnect/forget/vpn; no NM yet)
-6. ~~Bluetooth1 in-memory mock~~ (power/scan/connect/pair/forget; no BlueZ yet)
-7. ~~Displays1 GetSnapshot stub~~ (mock inventory when desktop registered; no niri query yet)
+4. ~~Audio1 in-memory backend~~ · **PipeWire via `wpctl`** when WirePlumber is present (`HELIX_DESKTOP_MOCK_AUDIO=1` for nested smoke); **`StartInputMeter` / `StopInputMeter` / `InputLevel`** via `audio_meter` + PipeWire capture (`Helix microphone level`, 8s lease, 80ms emit) · ~~Appearance1 GetSnapshot stub~~
+5. ~~Network1 in-memory mock~~ · **NetworkManager** on system bus when present (`HELIX_DESKTOP_MOCK_NETWORK=1` for nested); **SecretAgent** + `Prompt`/`Reply`; **enterprise**, **SetDns**, **wired** / **cellular** actions; async `Completed`
+6. ~~Bluetooth1 in-memory mock~~ · **BlueZ** when present (`HELIX_DESKTOP_MOCK_BLUETOOTH=1` for nested); **Agent1** + `Prompt`/`Reply`; **trust**, **cancel-pair**
+7. ~~Displays1 GetSnapshot stub~~ · **niri** `msg --json outputs` when `NIRI_SOCKET` is set and desktop is registered (`HELIX_DESKTOP_MOCK_DISPLAYS=1` for nested)
 8. ~~Appearance1 builtin palette-previews + SetWallpaper path~~ (no Material expand / wallhaven / apply yet)
-9. ~~Configuration1 RegisterCapabilities + Get/Set/ClearState + catalog growth~~ (ordered lists / CommitOverrides still stub)
+9. ~~Configuration1 RegisterCapabilities + Get/Set/ClearState + catalog growth~~ · **`UpdateOrderedList`** + **`CommitOverrides`** with ordered-list catalog parity (**application-list**, **key-chords**, **tab-list**, **shortcut-list**, **notification-rules**, **display-list**, **template-list**, **transition-list**, **widget-list** / `bar:*`); full static C++ catalog (~hundreds of scalar rows) still grows incrementally
 10. ~~AgentSurfaceActivity1~~ (desktop-only kill switch, pending, grants view)
 11. ~~Community/custom palette-previews~~ + ~~opt-in catalog HTTP sync~~ (`HELIX_COMMUNITY_PALETTE_CATALOG_URL`)
-12. ~~UpdateApplicationList for dock/launcher pins~~ (other ordered-list types still stub)
+12. ~~UpdateApplicationList for dock/launcher pins~~ (remaining ordered-list catalog rows still stub)
 13. Real backends (PW/NM/BlueZ/niri) · remaining ordered lists · theme apply
 14. Assistant, then inference

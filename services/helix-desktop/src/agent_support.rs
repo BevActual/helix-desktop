@@ -54,24 +54,28 @@ fn bus_destination(name: Option<&str>) -> Option<BusName<'_>> {
 }
 
 pub async fn emit_activity_changed(conn: &Connection, _desktop: Option<&str>) {
-    let _ = conn.emit_signal(
-        None::<&str>,
-        OBJECT_PATH,
-        ACTIVITY_INTERFACE,
-        "Changed",
-        &(),
-    );
+    let _ = conn
+        .emit_signal(
+            None::<&str>,
+            OBJECT_PATH,
+            ACTIVITY_INTERFACE,
+            "Changed",
+            &(),
+        )
+        .await;
 }
 
 pub async fn emit_activity_pending_changed(conn: &Connection, desktop: Option<&str>) {
     let destination = bus_destination(desktop);
-    let _ = conn.emit_signal(
-        destination.as_deref(),
-        OBJECT_PATH,
-        ACTIVITY_INTERFACE,
-        "PendingChanged",
-        &(),
-    );
+    let _ = conn
+        .emit_signal(
+            destination.as_deref(),
+            OBJECT_PATH,
+            ACTIVITY_INTERFACE,
+            "PendingChanged",
+            &(),
+        )
+        .await;
 }
 
 pub async fn append_audit(state: &mut State, record: AuditRecord) {

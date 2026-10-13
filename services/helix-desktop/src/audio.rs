@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::{OwnedValue, Value};
 use zbus::interface;
@@ -85,7 +86,7 @@ impl Audio {
                     .audio
                     .set_volume(id, volume)
                     .map_err(fdo::Error::Failed)?;
-                if state.audio.sinks.iter().any(|node| node.id == id) {
+                if state.audio.sinks().iter().any(|node| node.id == id) {
                     let _ = state
                         .config
                         .set("audio.sound_volume", serde_json::json!(volume.clamp(0.0, 1.0)));
@@ -123,11 +124,36 @@ impl Audio {
         Ok(())
     }
 
-    async fn start_input_meter(&self, _source: u32) -> fdo::Result<()> {
+    async fn start_input_meter(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        source: u32,
+    ) -> fdo::Result<()> {
+        let sender = header
+            .sender()
+            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
+            .to_string();
+        let state = self.state.lock().await;
+        if !state.audio.is_available() {
+            return Err(fdo::Error::Failed("Audio unavailable".into()));
+        }
+        if !state.audio.has_source(source) {
+            return Err(fdo::Error::InvalidArgs(
+                "Microphone is no longer available".into(),
+            ));
+        }
+        let live = state.audio.uses_live_pipewire();
+        state.audio_meters.start(&sender, source, live);
         Ok(())
     }
 
-    async fn stop_input_meter(&self) -> fdo::Result<()> {
+    async fn stop_input_meter(&self, #[zbus(header)] header: Header<'_>) -> fdo::Result<()> {
+        let sender = header
+            .sender()
+            .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
+            .to_string();
+        let state = self.state.lock().await;
+        state.audio_meters.stop(&sender);
         Ok(())
     }
 
