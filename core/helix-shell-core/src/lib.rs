@@ -54,6 +54,7 @@ pub use desktop::catalog;
 pub use desktop::capture;
 pub use desktop::compositor_config;
 pub use desktop::compositor_ipc;
+pub use agent::shell_ipc;
 pub use desktop::settings;
 pub use settings::{
     shell_polkit_agent_enabled, ConfigPaths, ConfigStore, BOOTSTRAP as SETTINGS_BOOTSTRAP,

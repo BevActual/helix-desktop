@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use helix_shell_core::{evaluate, Decision, RiskTier, Verdict};
+use helix_shell_core::{evaluate, result_is_untrusted, shell_ipc, Decision, RiskTier, Verdict};
 use serde_json::json;
 use tokio::sync::Mutex;
 use zbus::fdo;
@@ -74,11 +74,23 @@ fn string_field(value: &OwnedValue) -> String {
     }
 }
 
-fn action_args(args: &HashMap<String, OwnedValue>) -> (Vec<String>, String) {
-    let mut argv = args.get("argv").map(string_list).unwrap_or_default();
-    argv.extend(args.get("literal").map(string_list).unwrap_or_default());
+fn action_args(args: &HashMap<String, OwnedValue>) -> (Vec<String>, Vec<String>, String) {
+    let argv = args.get("argv").map(string_list).unwrap_or_default();
+    let literal = args.get("literal").map(string_list).unwrap_or_default();
     let reason = args.get("reason").map(string_field).unwrap_or_default();
-    (argv, reason)
+    (argv, literal, reason)
+}
+
+fn combined_args(argv: &[String], literal: &[String]) -> Vec<String> {
+    argv.iter().chain(literal.iter()).cloned().collect()
+}
+
+fn action_content(response: &str) -> serde_json::Value {
+    if response.starts_with("error:") {
+        json!(response.strip_prefix("error:").unwrap_or(response).trim())
+    } else {
+        serde_json::from_str(response).unwrap_or_else(|_| json!(response))
+    }
 }
 
 #[interface(name = "org.helix.Desktop.AgentSurface1")]
@@ -126,10 +138,12 @@ impl Agent {
 
     async fn list_tools(&self) -> Vec<OwnedValue> {
         let state = self.state.lock().await;
+        let supported = shell_ipc::shell_supported_tools();
         state
             .risk
             .commands()
             .into_iter()
+            .filter(|name| supported.is_empty() || supported.contains(name))
             .map(|name| {
                 let tier = state.risk.tier_for(&name, &[]);
                 dict_entry(HashMap::from([
@@ -181,7 +195,8 @@ impl Agent {
             client: peer.client.clone(),
             kind: ConfirmKind::Grant,
             tool: String::new(),
-            args: Vec::new(),
+            argv: Vec::new(),
+            literal: Vec::new(),
             reason: String::new(),
             tiers: wanted.iter().map(|tier| tier.name().to_string()).collect(),
             tainted: state.taint.tainted(&peer.client),
@@ -203,7 +218,8 @@ impl Agent {
     ) -> fdo::Result<u64> {
         let sender = sender_name(&header)?;
         let peer = resolve_peer(connection, &sender).await?;
-        let (argv, reason) = action_args(&args);
+        let (argv, literal, reason) = action_args(&args);
+        let all_args = combined_args(&argv, &literal);
 
         let mut state = self.state.lock().await;
         if !state.agent_enabled {
@@ -222,7 +238,7 @@ impl Agent {
             &state.taint,
             &peer.client,
             action,
-            &argv,
+            &all_args,
         );
         let operation = state.alloc_operation();
         match verdict {
@@ -234,18 +250,19 @@ impl Agent {
                 Ok(operation)
             }
             Verdict::Allow => {
-                if helix_shell_core::result_is_untrusted(tier) {
-                    state.taint.mark_untrusted(&peer.client);
-                }
-                let trust = if helix_shell_core::result_is_untrusted(tier) {
-                    "untrusted"
-                } else {
-                    "trusted"
-                };
-                let result = json!({"trust": trust, "content": {"ok": true, "tool": action, "args": argv}});
-                Self::completed(&emitter, operation, true, &result.to_string())
-                    .await
-                    .ok();
+                let client = peer.client.clone();
+                let tool = action.to_string();
+                drop(state);
+                self.run_shell_action(
+                    &emitter,
+                    operation,
+                    tier,
+                    &client,
+                    &tool,
+                    &argv,
+                    &literal,
+                )
+                .await?;
                 Ok(operation)
             }
             Verdict::NeedsConfirmation => {
@@ -258,7 +275,8 @@ impl Agent {
                     client: peer.client,
                     kind: ConfirmKind::Action,
                     tool: action.to_string(),
-                    args: argv,
+                    argv,
+                    literal,
                     reason,
                     tiers: vec![tier.name().into()],
                     tainted,
@@ -350,14 +368,22 @@ impl Agent {
             }
             ConfirmKind::Action => {
                 state.taint.clear(&pending.client);
-                let result = json!({
-                    "trust": "trusted",
-                    "content": { "ok": true, "tool": pending.tool, "args": pending.args }
-                });
+                let tier = parse_tiers(&pending.tiers)?.into_iter().next().unwrap_or(RiskTier::Confirm);
+                let client = pending.client.clone();
+                let tool = pending.tool.clone();
+                let argv = pending.argv.clone();
+                let literal = pending.literal.clone();
                 drop(state);
-                Self::completed(&emitter, operation, true, &result.to_string())
-                    .await
-                    .ok();
+                self.run_shell_action(
+                    &emitter,
+                    operation,
+                    tier,
+                    &client,
+                    &tool,
+                    &argv,
+                    &literal,
+                )
+                .await?;
             }
         }
         Ok(())
@@ -474,6 +500,56 @@ impl Agent {
 }
 
 impl Agent {
+    async fn run_shell_action(
+        &self,
+        emitter: &SignalEmitter<'_>,
+        operation: u64,
+        tier: RiskTier,
+        client: &str,
+        tool: &str,
+        argv: &[String],
+        literal: &[String],
+    ) -> fdo::Result<()> {
+        let line = match shell_ipc::build_wire_command(tool, argv, literal) {
+            Ok(line) => line,
+            Err(error) => {
+                let result = json!({"trust": "trusted", "content": {"error": error}});
+                Self::completed(emitter, operation, false, &result.to_string())
+                    .await
+                    .ok();
+                return Ok(());
+            }
+        };
+        let response = tokio::task::spawn_blocking(move || shell_ipc::exchange(&line, None))
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?;
+        let response = match response {
+            Ok(body) => body,
+            Err(error) => {
+                let result = json!({"trust": "trusted", "content": {"error": error}});
+                Self::completed(emitter, operation, false, &result.to_string())
+                    .await
+                    .ok();
+                return Ok(());
+            }
+        };
+        let ok = !response.starts_with("error:");
+        if ok && result_is_untrusted(tier) {
+            self.state.lock().await.taint.mark_untrusted(client);
+        }
+        let trust = if ok && result_is_untrusted(tier) {
+            "untrusted"
+        } else {
+            "trusted"
+        };
+        let content = action_content(&response);
+        let result = json!({"trust": trust, "content": content});
+        Self::completed(emitter, operation, ok, &result.to_string())
+            .await
+            .ok();
+        Ok(())
+    }
+
     async fn emit_confirmation(
         emitter: &SignalEmitter<'_>,
         operation: u64,
@@ -493,7 +569,8 @@ impl Agent {
         details.insert("tainted".into(), owned_bool(pending.tainted));
         details.insert(
             "args".into(),
-            OwnedValue::try_from(Value::from(pending.args.clone())).expect("args"),
+            OwnedValue::try_from(Value::from(combined_args(&pending.argv, &pending.literal)))
+                .expect("args"),
         );
         details.insert(
             "tiers".into(),

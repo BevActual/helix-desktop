@@ -10,3 +10,4 @@ pub mod grant_store;
 pub mod grants;
 pub mod peer;
 pub mod risk;
+pub mod shell_ipc;
