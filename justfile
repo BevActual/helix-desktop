@@ -120,3 +120,7 @@ clean m=mode:
     rm -rf build-{{m}}
 
 rebuild m=mode: (clean m) (build m)
+
+# Tauri session shell: core lib tests, nested agent-ipc/launcher, agent policy (safe with Cursor open).
+verify-shell-integrations:
+    tools/verify-shell-integrations.sh
