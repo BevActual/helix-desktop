@@ -22,7 +22,7 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} helix-shell helix-system-upgrade
+    meson compile -C build-{{m}} helix-service helix-system-upgrade
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
@@ -52,7 +52,7 @@ _ensure-configured m=mode:
     fi
 
 run m=mode: (build m)
-    ./build-{{m}}/helix-shell
+    ./build-{{m}}/helix-service
 
 # Build and run the unit tests, enabling their targets when auto mode omits them.
 test m=mode *args: (_ensure-configured m)
@@ -74,8 +74,8 @@ test-install m=mode: (build m)
 install m:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ ! -x "build-{{m}}/helix-shell" ]]; then
-        echo "error: build-{{m}}/helix-shell is missing; run 'just build {{m}}' before installing" >&2
+    if [[ ! -x "build-{{m}}/helix-service" ]]; then
+        echo "error: build-{{m}}/helix-service is missing; run 'just build {{m}}' before installing" >&2
         exit 1
     fi
     meson install --no-rebuild -C build-{{m}}
