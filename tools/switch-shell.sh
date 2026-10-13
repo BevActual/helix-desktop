@@ -265,6 +265,9 @@ case "${1:-install}" in
     if systemctl --user is-active --quiet helix-shell-bar.service 2>/dev/null \
       && journalctl --user -u helix-shell-bar.service -b -o cat --no-pager 2>/dev/null | grep -q 'POLKIT agent registered'; then
       echo "polkit agent          native (helix-shell-bar)"
+      if [ ! -S /run/polkit/agent-helper.socket ] 2>/dev/null; then
+        echo "polkit helper         missing (sudo systemctl enable --now polkit-agent-helper.socket)" >&2
+      fi
     elif systemctl --user is-active --quiet helix-polkit-agent.service 2>/dev/null; then
       echo "polkit agent          helix-polkit-agent (external binary)"
     elif systemctl --user is-active --quiet plasma-polkit-agent.service 2>/dev/null \
