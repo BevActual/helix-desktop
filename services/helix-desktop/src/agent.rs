@@ -256,6 +256,7 @@ impl Agent {
             tiers: wanted.iter().map(|tier| tier.name().to_string()).collect(),
             tainted: state.taint.tainted(&peer.client),
             label,
+            deadline: State::confirmation_deadline(),
         };
         state.pending.insert(operation, pending.clone());
         let bus = state.bus.clone();
@@ -321,6 +322,7 @@ impl Agent {
                         .get(&peer.client)
                         .map(|session| session.label.clone())
                         .unwrap_or_default(),
+                    deadline: State::confirmation_deadline(),
                 };
                 audit_and_notify(
                     &mut state,
@@ -352,6 +354,7 @@ impl Agent {
                     tiers: vec![tier.name().into()],
                     tainted,
                     label,
+                    deadline: State::confirmation_deadline(),
                 };
                 let decision = if tier == RiskTier::Confirm {
                     "confirmed"
@@ -393,6 +396,7 @@ impl Agent {
                             .get(&peer.client)
                             .map(|session| session.label.clone())
                             .unwrap_or_default(),
+                        deadline: State::confirmation_deadline(),
                     };
                     audit_and_notify(
                         &mut state,
@@ -428,6 +432,7 @@ impl Agent {
                     tiers: vec![tier.name().into()],
                     tainted,
                     label,
+                    deadline: State::confirmation_deadline(),
                 };
                 state.pending.insert(operation, pending.clone());
                 let bus = state.bus.clone();

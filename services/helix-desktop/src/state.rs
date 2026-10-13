@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::time::{Duration, Instant};
 
 use helix_shell_core::{AuditLog, ConfigStore, GrantStore, RiskPolicy, TaintTracker};
 use serde_json::Value;
@@ -10,6 +11,9 @@ use crate::bluetooth_backend::BluetoothBackend;
 use crate::network_backend::NetworkBackend;
 use crate::palette_catalog::load_palette_previews;
 use crate::runtime_state::RuntimeState;
+
+/// Same window as C++ `AgentBroker::kConfirmationDeadline`.
+pub const CONFIRMATION_DEADLINE: Duration = Duration::from_secs(60);
 
 #[derive(Clone, Debug)]
 pub struct ClientSession {
@@ -32,6 +36,7 @@ pub struct PendingConfirm {
     pub tiers: Vec<String>,
     pub tainted: bool,
     pub label: String,
+    pub deadline: Instant,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,6 +76,10 @@ pub struct State {
 }
 
 impl State {
+    pub fn confirmation_deadline() -> Instant {
+        Instant::now() + CONFIRMATION_DEADLINE
+    }
+
     pub fn new() -> Self {
         let config = ConfigStore::load(helix_shell_core::ConfigPaths::from_env());
         let initial_volume = config
