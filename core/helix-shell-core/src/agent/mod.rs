@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod audit_log;
 pub mod agent_confirm;
 pub mod agent_msg;
 pub mod agent_status;
@@ -10,3 +11,4 @@ pub mod grant_store;
 pub mod grants;
 pub mod peer;
 pub mod risk;
+pub mod shell_ipc;

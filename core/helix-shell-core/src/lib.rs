@@ -24,11 +24,13 @@ pub use agent::approvals;
 pub use agent::confirm;
 pub use agent::confirmer;
 pub use agent::display;
+pub use agent::audit_log;
 pub use agent::grant_store;
 pub use agent::grants;
 pub use agent::peer;
 pub use agent::risk;
 pub use peer::client_identity;
+pub use audit_log::{AuditLog, AuditRecord};
 pub use grant_store::{
     evaluate, result_is_untrusted, Decision, GrantStore, TaintTracker, Verdict,
 };
@@ -54,6 +56,7 @@ pub use desktop::catalog;
 pub use desktop::capture;
 pub use desktop::compositor_config;
 pub use desktop::compositor_ipc;
+pub use agent::shell_ipc;
 pub use desktop::settings;
 pub use settings::{
     shell_polkit_agent_enabled, ConfigPaths, ConfigStore, BOOTSTRAP as SETTINGS_BOOTSTRAP,

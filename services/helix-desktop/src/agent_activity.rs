@@ -7,7 +7,9 @@ use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedValue;
 use zbus::interface;
+use zbus::Connection;
 
+use crate::agent_support::finish_pending_denied;
 use crate::dbus_value::{dict_entry, json_to_owned, owned_bool, owned_str, owned_u64};
 use crate::state::State;
 
@@ -18,12 +20,31 @@ pub struct AgentActivity {
 fn require_desktop(state: &State, sender: &str) -> fdo::Result<()> {
     match &state.desktop {
         Some(owner) if owner == sender => Ok(()),
-        Some(_) => Err(fdo::Error::AccessDenied(
-            "Only the registered desktop may call AgentSurfaceActivity1".into(),
+        _ => Err(fdo::Error::AccessDenied(
+            "Only the registered shell may use agent activity".into(),
         )),
-        None => Err(fdo::Error::Failed(
-            "No Helix desktop is registered".into(),
-        )),
+    }
+}
+
+impl AgentActivity {
+    pub async fn notify_changed(connection: &Connection) {
+        if let Ok(iface) = connection
+            .object_server()
+            .interface::<_, AgentActivity>(crate::agent_support::OBJECT_PATH)
+            .await
+        {
+            Self::changed(iface.signal_emitter()).await.ok();
+        }
+    }
+
+    pub async fn notify_pending_changed(connection: &Connection) {
+        if let Ok(iface) = connection
+            .object_server()
+            .interface::<_, AgentActivity>(crate::agent_support::OBJECT_PATH)
+            .await
+        {
+            Self::pending_changed(iface.signal_emitter()).await.ok();
+        }
     }
 }
 
@@ -43,9 +64,8 @@ impl AgentActivity {
         require_desktop(&state, &sender)?;
         Ok(state
             .audit
+            .read_recent(_since, limit)
             .iter()
-            .rev()
-            .take(limit as usize)
             .filter_map(json_to_owned)
             .collect())
     }
@@ -88,11 +108,12 @@ impl AgentActivity {
             .to_string();
         let mut state = self.state.lock().await;
         require_desktop(&state, &sender)?;
-        if state.pending.remove(&operation).is_none() {
+        let Some(pending) = state.pending.remove(&operation) else {
             return Err(fdo::Error::InvalidArgs(
                 "There is no pending operation with that id".into(),
             ));
-        }
+        };
+        finish_pending_denied(&mut state, pending, operation, "cancelled").await;
         drop(state);
         Self::pending_changed(&emitter).await.ok();
         Ok(())

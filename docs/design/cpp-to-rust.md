@@ -36,7 +36,7 @@ HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop tools/nested/…
 ## Order
 
 1. ~~Scaffold `helix-desktop` + risk policy in `helix-shell-core`~~
-2. ~~Agent Surface (grants, Hello/Action/Confirm, ListTools, manager)~~ — Action still returns stub content (no IPC to shell yet)
+2. ~~Agent Surface (grants, Hello/Action/Confirm, ListTools, manager)~~ — Rust `Action` runs shell IPC via `helix_shell_core::shell_ipc`; `tests/desktop_agent_integration.py` and `desktop_agent_manager_integration.py` pass against `helix-desktop` (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-agent`)
 3. ~~Configuration1 bootstrap catalog + writes~~ (theme/audio/accessibility/shell chrome; growing)
 4. ~~Audio1 in-memory backend~~ (volume/mute/default; PipeWire later) · ~~Appearance1 GetSnapshot stub~~
 5. ~~Network1 in-memory mock~~ (enable/scan/connect/disconnect/forget/vpn; no NM yet)

@@ -63,6 +63,20 @@ impl RiskPolicy {
             .expect("bundled msg-risk.toml")
     }
 
+    /// `HELIX_RISK_POLICY` path when set and readable, else [`embedded`].
+    pub fn from_env() -> Self {
+        let Ok(path) = std::env::var("HELIX_RISK_POLICY") else {
+            return Self::embedded();
+        };
+        if path.is_empty() {
+            return Self::embedded();
+        }
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            return Self::embedded();
+        };
+        Self::parse(&text).unwrap_or_else(|_| Self::embedded())
+    }
+
     pub fn tier_for(&self, command: &str, args: &[String]) -> Tier {
         if let Some(first) = args.first() {
             let key = format!("{command} {first}");
@@ -116,6 +130,24 @@ fn read_section(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_env_reads_policy_file() {
+        let dir = std::env::temp_dir().join(format!("helix-risk-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("custom.toml");
+        std::fs::write(
+            &file,
+            "[tiers]\nonly-cmd = \"observe\"\n",
+        )
+        .unwrap();
+        std::env::set_var("HELIX_RISK_POLICY", &file);
+        let policy = RiskPolicy::from_env();
+        assert!(policy.knows("only-cmd"));
+        assert!(!policy.knows("status"));
+        std::env::remove_var("HELIX_RISK_POLICY");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn embedded_policy_loads_and_fail_closed() {
