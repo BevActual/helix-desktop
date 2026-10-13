@@ -32,7 +32,7 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 
 - Existing: `helix-panel …` (panels, bar, settings, clipboard, notifications, workspaces, …)
 - **Administrator password:** `SUDO_ASKPASS=~/.local/bin/helix-askpass` (installed by `tools/switch-shell.sh`) opens a Helix overlay; `sudo -A` and `tools/install-inference.sh` use it when not root.
-- New: `helix-panel desktop-capture [agent-desk|output|all]` → `ok <png-path>\n` for agent vision (empty target captures the agent desk when placement is on and helix-niri reports agent-desk support; otherwise the focused output)
+- New: agent socket `desktop-capture [agent-desk|focused|all|OUTPUT]` → `ok <png-path>\n` for agent vision (default target is agent desk when placement is on; `all` and named outputs need helix-niri). `helix-panel desktop-capture` forwards to the same socket (uses `HELIX_AGENT_IPC_DIR` in nested tests).
 - Windows: `niri msg` / `NIRI_SOCKET` (list + focus) until first-class Helix wrappers exist
 
 ### MCP adapter (Helix MCP server)
@@ -42,8 +42,8 @@ agent**. Cursor may use it via `.cursor/mcp.json` as one consumer; it is not the
 
 | Tool | Backend |
 |------|---------|
-| `desktop_status` | `helix-panel status` |
-| `desktop_capture` | `helix-panel desktop-capture` |
+| `desktop_status` | agent socket `status` |
+| `desktop_capture` | agent socket `desktop-capture` (`helix-panel desktop-capture` for scripts) |
 | `desktop_context` | status JSON + focused niri window |
 | `panel_toggle` / `panel_open` / `panel_close` | `panel-*` |
 | `settings_open` | `settings-open` |
