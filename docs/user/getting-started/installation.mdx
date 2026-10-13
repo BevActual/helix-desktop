@@ -1,21 +1,21 @@
 ---
 title: Installation
-description: Build and install Helix Shell from its source repository.
+description: Build and install Helix from the Helix Desktop source repository.
 sidebar:
   order: 1
 ---
 
-Helix Shell is currently distributed from the [Helix Shell source repository](https://github.com/BevActual/helix-shell). Install from this repository to get Helix features.
+Helix is currently distributed from the [Helix Desktop source repository](https://github.com/BevActual/helix-desktop). Install from this repository to get Helix features.
 
 The installed executable, desktop entry, and configuration paths still use `helix-shell` for compatibility. If upstream Helix is also installed, check which `helix-shell` executable your `PATH` selects before starting a session. The two builds use the same configuration and runtime paths.
 
 ## Build from source
 
-Install the build dependencies for your distribution from [BUILDING.md](https://github.com/BevActual/helix-shell/blob/main/BUILDING.md). You also need a Wayland compositor, fonts, and a running PipeWire daemon for audio features. Optional runtime services are listed in [PACKAGING.md](https://github.com/BevActual/helix-shell/blob/main/PACKAGING.md).
+Install the build dependencies for your distribution from [BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md). You also need a Wayland compositor, fonts, and a running PipeWire daemon for audio features. Optional runtime services are listed in [PACKAGING.md](https://github.com/BevActual/helix-desktop/blob/main/PACKAGING.md).
 
 ```bash
-git clone https://github.com/BevActual/helix-shell.git
-cd helix-shell
+git clone https://github.com/BevActual/helix-desktop.git
+cd helix-desktop
 just configure release "$HOME/.local"
 just build release
 just install release
@@ -27,7 +27,7 @@ Start the shell through your [compositor's startup configuration](/helix/getting
 
 ## Update or remove
 
-From the Helix Shell checkout, update and reinstall with:
+From the Helix Desktop checkout, update and reinstall with:
 
 ```bash
 git pull
@@ -37,4 +37,4 @@ just install release
 
 To remove files installed by this build, run `just uninstall release` from the same checkout and build directory. Your personal configuration and state remain under the `helix-shell` XDG directories; see [Uninstall](/helix/getting-started/uninstall/) before removing them.
 
-For build options, troubleshooting, and system-wide installation, see [BUILDING.md](https://github.com/BevActual/helix-shell/blob/main/BUILDING.md). Report Helix Shell issues in the [Helix issue tracker](https://github.com/BevActual/helix-shell/issues).
+For build options, troubleshooting, and system-wide installation, see [BUILDING.md](https://github.com/BevActual/helix-desktop/blob/main/BUILDING.md). Report issues in the [Helix issue tracker](https://github.com/BevActual/helix-desktop/issues).

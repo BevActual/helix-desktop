@@ -36,7 +36,7 @@ Helix currently builds from this tree. Keep the `helix-shell` command and config
 |---|---|
 | Product | Helix Shell |
 | Command | `helix-shell` |
-| Homepage | https://github.com/BevActual/helix-shell |
+| Homepage | https://github.com/BevActual/helix-desktop |
 | Docs | [`docs/user/`](docs/user/) |
 | License | MIT ([LICENSE](LICENSE)); also see vendored licenses under `third_party/` for SPDX completeness |
 | Version | Meson `project(... version: ...)` in [`meson.build`](meson.build) |
@@ -222,7 +222,7 @@ you maintain a `-git` / nightly package on purpose.
 
 ## Contact
 
-Report Helix Shell issues at https://github.com/BevActual/helix-shell/issues.
+Report Helix Shell issues at https://github.com/BevActual/helix-desktop/issues.
 
 ## Helix desktop service and Settings
 

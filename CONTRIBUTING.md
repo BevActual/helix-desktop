@@ -284,7 +284,7 @@ Install the source-build dependencies for your distribution using the commands i
 [BUILDING.md](BUILDING.md#dependencies), then clone the repository:
 
 ```sh
-git clone https://github.com/BevActual/helix-shell.git
+git clone https://github.com/BevActual/helix-desktop.git
 cd helix-shell
 ```
 

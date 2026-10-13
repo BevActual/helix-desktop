@@ -46,7 +46,7 @@ in
 
         systemd.user.services.helix = lib.mkIf cfg.systemd.enable {
           description = "Helix Shell (helix)";
-          documentation = [ "https://github.com/BevActual/helix-shell/tree/main/docs/user/" ];
+          documentation = [ "https://github.com/BevActual/helix-desktop/tree/main/docs/user/" ];
           partOf = [ cfg.systemd.target ];
           after = [ cfg.systemd.target ];
           wantedBy = [ cfg.systemd.target ];

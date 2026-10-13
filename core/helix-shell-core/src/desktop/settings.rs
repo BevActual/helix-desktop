@@ -350,6 +350,17 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         maximum: 0.0,
         default: DefaultValue::Bool(false),
     },
+    SettingDef {
+        id: "shell.polkit_agent",
+        page: "privacy-security",
+        title: "Handle authentication dialogs",
+        group: "Authentication",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
     // Models & routing — managed in Mobius (inference-routing.toml); mirrored in C++ settings_catalog for GetSettings search.
     SettingDef {
         id: "ai.act_model",
@@ -856,6 +867,20 @@ impl ConfigStore {
     }
 }
 
+/// Whether the session bar should register the native Polkit authentication agent.
+pub fn shell_polkit_agent_enabled() -> bool {
+    if std::env::var_os("HELIX_DISABLE_POLKIT_AGENT").is_some() {
+        return false;
+    }
+    if std::env::var_os("HELIX_ENABLE_POLKIT_AGENT").is_some() {
+        return true;
+    }
+    ConfigStore::load(ConfigPaths::from_env())
+        .get("shell.polkit_agent")
+        .as_bool()
+        .unwrap_or(false)
+}
+
 fn load_merged_config(config_dir: &Path) -> Toml {
     let mut table = toml::map::Map::new();
     let main = config_dir.join("config.toml");
@@ -1094,6 +1119,17 @@ mod tests {
         let catalog = reloaded.catalog();
         assert!(catalog.iter().any(|row| row["id"] == "theme.mode"));
         assert!(catalog.iter().any(|row| row["id"] == "audio.sound_volume"));
+    }
+
+    #[test]
+    fn polkit_agent_defaults_on_in_catalog() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        assert_eq!(store.get("shell.polkit_agent"), json!(true));
+        store
+            .set("shell.polkit_agent", json!(false))
+            .expect("set polkit");
+        assert_eq!(store.get("shell.polkit_agent"), json!(false));
     }
 
     #[test]

@@ -260,7 +260,7 @@ export function AgentsPage({ register }: { register: (handle: PageHandle) => voi
           Graphical <code>sudo</code> uses <code>helix-askpass</code> (Helix overlay). Install the shell with <code>tools/switch-shell.sh install</code> so <code>SUDO_ASKPASS</code> is set for new sessions.
         </p>
         <p className="setting-about">
-          System polkit prompts (for example NetworkManager profile edits) are handled by the session bar at <code>/org/helix/PolkitAuthenticationAgent</code> using the same overlay. Set <code>HELIX_DISABLE_POLKIT_AGENT=1</code> on the bar unit to opt out; use <code>HELIX_EXTERNAL_POLKIT=1</code> with <code>switch-shell install</code> for KDE/GNOME instead.
+          System polkit prompts (for example NetworkManager profile edits) are handled by the session bar at <code>/org/helix/PolkitAuthenticationAgent</code> when <strong>Privacy &amp; security → Handle authentication dialogs</strong> is on. Restart the bar after changing it. Override with <code>HELIX_DISABLE_POLKIT_AGENT=1</code> or <code>HELIX_EXTERNAL_POLKIT=1</code> + <code>switch-shell install</code> for KDE/GNOME instead.
         </p>
       </div>
       <h4>Approvals</h4>

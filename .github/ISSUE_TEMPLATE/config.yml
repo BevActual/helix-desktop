@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Helix docs (in-repo)
-    url: https://github.com/BevActual/helix-shell/tree/main/docs/user
+    url: https://github.com/BevActual/helix-desktop/tree/main/docs/user
     about: Guides and reference under docs/user/ in this repository.
   - name: Helix README
-    url: https://github.com/BevActual/helix-shell/blob/main/README.md
+    url: https://github.com/BevActual/helix-desktop/blob/main/README.md
     about: Product overview, build entry points, and links to HELIX.md.

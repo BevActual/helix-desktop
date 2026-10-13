@@ -61,7 +61,7 @@ in
       default = { };
       description = ''
         Configuration written to {file}`$XDG_CONFIG_HOME/helix/config.toml`.
-        See <https://github.com/BevActual/helix-shell/tree/main/docs/user/configuration/> for more information and examples.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/configuration/> for more information and examples.
       '';
       example = lib.literalExpression ''
         shell = {
@@ -82,7 +82,7 @@ in
       default = { };
       description = ''
         Custom color palettes written to {file}`$XDG_CONFIG_HOME/helix/palettes/<name>.json`.
-        See <https://github.com/BevActual/helix-shell/tree/main/docs/user/theming/palette/#custom-palette-files> for more information.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/theming/palette/#custom-palette-files> for more information.
       '';
       example = lib.literalExpression ''
         cherry-blossom = {
@@ -102,7 +102,7 @@ in
 
     systemd.services.helix = mkIf (cfg.systemd.enable) {
       description = "Helix Shell (helix)";
-      documentation = [ "https://github.com/BevActual/helix-shell/tree/main/docs/user/" ];
+      documentation = [ "https://github.com/BevActual/helix-desktop/tree/main/docs/user/" ];
       partOf = [ cfg.systemd.target ];
       after = [ cfg.systemd.target ];
       wantedBy = [ cfg.systemd.target ];

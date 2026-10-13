@@ -1,6 +1,8 @@
-# Helix Shell
+# Helix Desktop
 
-Helix is a niri-first Linux desktop: login, compositor, and shell as one product. **Helix Shell** is the desktop shell — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets.
+**Helix Desktop** is the monorepo for [Helix](docs/design/helix-identity.md): a niri-first Linux desktop — login (`greeter/`), compositor (`compositor/`), session shell, apps, and desktop services in one product tree.
+
+**Helix Shell** is the session chrome only — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets (live build: `shell/helix-shell-tauri`).
 
 Product structure and runtime roles: [docs/design/product-structure.md](docs/design/product-structure.md). Design index: [docs/design/README.md](docs/design/README.md).
 
@@ -15,7 +17,7 @@ The product name, install paths, and IPC are **Helix** (see `docs/design/helix-i
 <p><br/></p>
 
 <p align="center">
-  <img src="assets/helix.svg" alt="Helix Shell" style="width: 192px" />
+  <img src="assets/helix.svg" alt="Helix" style="width: 192px" />
 </p>
 
 <p><br/></p>

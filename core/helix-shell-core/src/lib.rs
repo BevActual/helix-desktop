@@ -55,7 +55,9 @@ pub use desktop::capture;
 pub use desktop::compositor_config;
 pub use desktop::compositor_ipc;
 pub use desktop::settings;
-pub use settings::{ConfigPaths, ConfigStore, BOOTSTRAP as SETTINGS_BOOTSTRAP};
+pub use settings::{
+    shell_polkit_agent_enabled, ConfigPaths, ConfigStore, BOOTSTRAP as SETTINGS_BOOTSTRAP,
+};
 pub use desktop::dock_prefs;
 pub use desktop::idle_prefs;
 pub use desktop::keybinds;

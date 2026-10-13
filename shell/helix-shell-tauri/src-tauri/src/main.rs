@@ -2132,7 +2132,9 @@ fn main() {
             if role.claims_shell1() {
                 control::serve(handle.clone());
                 agent_ipc::serve(handle.clone());
-                polkit_agent::start(handle.clone());
+                if helix_shell_core::shell_polkit_agent_enabled() {
+                    polkit_agent::start(handle.clone());
+                }
             }
             if role.serves_panels_socket() {
                 panels_bridge::serve(handle.clone(), move |app, req| {

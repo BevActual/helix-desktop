@@ -42,7 +42,7 @@ namespace helix::cli {
       "helix",
       "A sleek, customizable desktop shell crafted for Wayland",
       {},
-      "For more information and documentation, visit:\n  https://github.com/BevActual/helix-shell",
+      "For more information and documentation, visit:\n  https://github.com/BevActual/helix-desktop",
       kRootFlags,
       {},
       kRootSubcommands,

@@ -1,6 +1,6 @@
-# Helix
+# Helix Desktop
 
-Helix is a niri-first Linux desktop: login, compositor, and shell as one product tree.
+**Helix Desktop** is this monorepo: greeter, compositor, session shell, apps, and services for the **Helix** product (niri-first Linux desktop).
 
 **How it should be structured and run:** [`docs/design/product-structure.md`](docs/design/product-structure.md).  
 **Design index:** [`docs/design/README.md`](docs/design/README.md).

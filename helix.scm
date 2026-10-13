@@ -6,7 +6,7 @@
 ;;; --8<---------------cut here---------------start------------->8---
 ;;; (channel
 ;;;   (name 'helix)
-;;;   (url "https://github.com/BevActual/helix-shell")
+;;;   (url "https://github.com/BevActual/helix-desktop")
 ;;;   (branch "main"))
 ;;; --8<---------------cut here---------------end--------------->8---
 ;;;
@@ -123,7 +123,7 @@
            wayland
            wayland-protocols-1.48
            wireplumber))
-    (home-page "https://github.com/BevActual/helix-shell")
+    (home-page "https://github.com/BevActual/helix-desktop")
     (synopsis "Wayland shell and bar")
     (description
      "Helix is a lightweight Wayland shell and bar built directly on

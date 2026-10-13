@@ -127,7 +127,7 @@ lib.warnIf cudaSupport
 
   meta = with lib; {
     description = "Helix Shell — a niri-first Wayland desktop shell (command: helix).";
-    homepage = "https://github.com/BevActual/helix-shell";
+    homepage = "https://github.com/BevActual/helix-desktop";
     license = licenses.mit;
     platforms = platforms.linux;
     mainProgram = "helix";

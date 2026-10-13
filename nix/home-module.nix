@@ -60,7 +60,7 @@ in
           - A raw TOML string
           - A path to a `.toml` file
 
-        See <https://github.com/BevActual/helix-shell/tree/main/docs/user/configuration/> for more information and examples.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/configuration/> for more information and examples.
 
         Note: these settings can still be overwritten at runtime via the settings menu.
       '';
@@ -90,7 +90,7 @@ in
       description = ''
         Custom color pallete options.
 
-        See <https://github.com/BevActual/helix-shell/tree/main/docs/user/theming/palette/#custom-palette-files>.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/theming/palette/#custom-palette-files>.
       '';
     };
   };
@@ -99,7 +99,7 @@ in
     systemd.user.services.helix = lib.mkIf cfg.systemd.enable {
       Unit = {
         Description = "Helix Shell (helix)";
-        Documentation = "https://github.com/BevActual/helix-shell/tree/main/docs/user/";
+        Documentation = "https://github.com/BevActual/helix-desktop/tree/main/docs/user/";
         PartOf = [ config.wayland.systemd.target ];
         After = [ config.wayland.systemd.target ];
         X-Restart-Triggers =

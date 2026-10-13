@@ -17,7 +17,7 @@ To make Helix's wifi, bluetooth, power-profile, and battery feature available, p
 :::
 
 ## Installation
-The `helix-shell` package in nixpkgs is upstream Helix. To build Helix Shell, use the flake in the [Helix Shell repository](https://github.com/BevActual/helix-shell).
+The `helix-shell` package in nixpkgs is upstream Helix. To build Helix Shell, use the flake in the [Helix Shell repository](https://github.com/BevActual/helix-desktop).
 
 Add the Helix repository as an input using your preferred pinning method, then install its package or module. Builds from this input are compiled locally unless you provide a Helix-specific cache.
 
@@ -32,7 +32,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
     {
       inputs = {
         helix = {
-          url = "github:BevActual/helix-shell";
+          url = "github:BevActual/helix-desktop";
           inputs.nixpkgs.follows = "nixpkgs"; # optional: use your system's nixpkgs input
         };
       };
@@ -46,7 +46,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
   <TabItem label="tack">
     Add Helix to your tack inputs:
     ```
-    tack add helix github:BevActual/helix-shell
+    tack add helix github:BevActual/helix-desktop
     ```
 
     Keep the input pinned to a known Helix revision for reproducible builds.
@@ -83,7 +83,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
         commit = ""; # replace this with an actual commit id or tag
       in
         fetchTarball {
-          url = "https://github.com/BevActual/helix-shell/archive/${commit}.tar.gz";
+          url = "https://github.com/BevActual/helix-desktop/archive/${commit}.tar.gz";
           sha256 = ""; # replace this with hash from nix build output, or by using `nix-prefetch-url --unpack`
         };
       
@@ -99,7 +99,7 @@ Add the Helix repository as an input using your preferred pinning method, then i
     # configuration.nix
     { pkgs, ... }:
     let
-      helix-src = fetchTarball "https://github.com/BevActual/helix-shell/archive/main.tar.gz";
+      helix-src = fetchTarball "https://github.com/BevActual/helix-desktop/archive/main.tar.gz";
 
       helix = import helix-src {
         inherit pkgs; # optional: use your system's nixpkgs input

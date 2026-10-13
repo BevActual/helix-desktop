@@ -1,4 +1,4 @@
-# Rust side of Helix. Domain layout: core / shell / apps / services / dev.
+# Rust workspace for Helix Desktop (repo helix-desktop). Layout: core / shell / apps / services / dev.
 [workspace]
 resolver = "2"
 members = [

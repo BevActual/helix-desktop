@@ -62,7 +62,7 @@ body:
         If Helix crashed, include the complete output from the terminal where it was started, if available. Do not
         paste only `Segmentation fault`; that does not include the useful diagnostic output.
 
-        If a maintainer asks for an ASan report, follow the ASan guidance in [CONTRIBUTING.md](https://github.com/BevActual/helix-shell/blob/main/CONTRIBUTING.md).
+        If a maintainer asks for an ASan report, follow the ASan guidance in [CONTRIBUTING.md](https://github.com/BevActual/helix-desktop/blob/main/CONTRIBUTING.md).
 
         Examples:
         - journalctl output

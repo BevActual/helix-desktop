@@ -12,7 +12,7 @@ from typing import Any
 
 COMMENT_MARKER = "<!-- helix-pr-template-enforcement -->"
 TEMPLATE_URL = (
-    "https://github.com/BevActual/helix-shell/blob/main/.github/PULL_REQUEST_TEMPLATE.md"
+    "https://github.com/BevActual/helix-desktop/blob/main/.github/PULL_REQUEST_TEMPLATE.md"
 )
 REQUIRED_HEADINGS = (
     "## Summary",

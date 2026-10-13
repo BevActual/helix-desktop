@@ -2,6 +2,15 @@
 
 The product is **Helix**. Install names, IPC, UI strings, config paths, and docs use Helix only.
 
+## Repository
+
+| Role | Name |
+|------|------|
+| Git monorepo (this tree) | **`helix-desktop`** — compositor, greeter, session shell, apps, services, protocols, legacy C++ core |
+| Former clone URL | `helix-shell` (renamed; GitHub redirects old links) |
+
+**Helix Shell** is not the repo name: it is the **session chrome** layer (bar, Control Center, launcher, notifications, …) implemented by `helix-shell-tauri`. Do not confuse the repo with the Rust crate **`helix-desktop`** in `services/helix-desktop`, which is only the future desktop-authority process (`org.helix.Desktop`).
+
 ## Live names
 
 | Role | Name |
