@@ -1,8 +1,9 @@
 //! Pick and read text attachments for the next Mobius turn.
 //! Binary / oversized files are refused; contents stay in-memory until send.
 
-use helix_shell_core::chat::{MAX_ATTACH_FILES, MAX_ATTACH_FILE_CHARS};
+use helix_shell_core::chat::{MAX_ATTACH_CHARS, MAX_ATTACH_FILES, MAX_ATTACH_FILE_CHARS};
 use serde::Serialize;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -11,7 +12,16 @@ pub struct Attachment {
     pub name: String,
     pub path: String,
     pub chars: usize,
+    pub original_chars: usize,
     pub content: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Selection {
+    pub files: Vec<Attachment>,
+    pub warnings: Vec<String>,
+    pub max_files: usize,
+    pub max_chars: usize,
 }
 
 const TEXT_EXTENSIONS: &[&str] = &[
@@ -23,7 +33,7 @@ const TEXT_EXTENSIONS: &[&str] = &[
 ];
 
 fn is_probably_text(path: &Path, bytes: &[u8]) -> bool {
-    if bytes.iter().take(8000).any(|&b| b == 0) {
+    if bytes.contains(&0) {
         return false;
     }
     if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
@@ -59,14 +69,15 @@ fn is_secret_file(path: &Path, text: &str) -> bool {
     by_name || text.contains("-----BEGIN") && text.contains("PRIVATE KEY-----")
 }
 
-fn pick_paths() -> Result<Vec<PathBuf>, String> {
+fn pick_paths(pictures: bool) -> Result<Vec<PathBuf>, String> {
     // Prefer portal-friendly zenity; fall back to kdialog.
     if let Ok(output) = Command::new("zenity")
         .args([
             "--file-selection",
             "--multiple",
             "--separator=\n",
-            "--title=Attach files to Mobius",
+            if pictures { "--title=Add pictures to Mobius" } else { "--title=Attach files to Mobius" },
+            if pictures { "--file-filter=Pictures | *.png *.jpg *.jpeg *.gif *.webp *.bmp" } else { "--file-filter=All files | *" },
         ])
         .output()
     {
@@ -119,8 +130,14 @@ fn read_one(path: &Path) -> Result<Attachment, String> {
                 .unwrap_or("file")
         ));
     }
-    let bytes =
-        std::fs::read(path).map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    // The file may grow after metadata was read; bound the actual read as well.
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .and_then(|file| file.take(512 * 1024 + 1).read_to_end(&mut bytes))
+        .map_err(|e| format!("Could not read {}: {e}", path.display()))?;
+    if bytes.len() > 512 * 1024 {
+        return Err(format!("{} is larger than 512 KiB. Attach a smaller excerpt.", path.display()));
+    }
     if !is_probably_text(path, &bytes) {
         return Err(format!(
             "{} looks binary. Attach text or source files.",
@@ -141,7 +158,8 @@ fn read_one(path: &Path) -> Result<Attachment, String> {
         .chars()
         .filter(|c| *c == '\n' || *c == '\t' || !c.is_control())
         .collect();
-    if text.chars().count() > MAX_ATTACH_FILE_CHARS {
+    let original_chars = text.chars().count();
+    if original_chars > MAX_ATTACH_FILE_CHARS {
         text = text.chars().take(MAX_ATTACH_FILE_CHARS).collect();
     }
     let name = path
@@ -156,31 +174,29 @@ fn read_one(path: &Path) -> Result<Attachment, String> {
         name,
         path: path.display().to_string(),
         chars,
+        original_chars,
         content: text,
     })
 }
 
 /// Open a native multi-file picker and return readable text attachments.
-pub fn pick_and_read() -> Result<Vec<Attachment>, String> {
-    let paths = pick_paths()?;
-    if paths.is_empty() {
-        return Ok(Vec::new());
-    }
-    let mut out = Vec::new();
-    let mut errors = Vec::new();
-    for path in paths.into_iter().take(MAX_ATTACH_FILES) {
-        match read_one(&path) {
-            Ok(att) => out.push(att),
-            Err(reason) => errors.push(reason),
+pub fn pick_and_read() -> Result<Selection, String> {
+    Ok(read_selection(&pick_paths(false)?))
+}
+
+fn read_selection(paths: &[PathBuf]) -> Selection {
+    let mut files = Vec::new();
+    let mut warnings = Vec::new();
+    for path in paths.iter().take(MAX_ATTACH_FILES) {
+        match read_one(path) {
+            Ok(file) => files.push(file),
+            Err(reason) => warnings.push(reason),
         }
     }
-    if out.is_empty() && !errors.is_empty() {
-        return Err(errors.join(" "));
+    if paths.len() > MAX_ATTACH_FILES {
+        warnings.push(format!("Only the first {MAX_ATTACH_FILES} selected files were checked. Add the remaining files separately."));
     }
-    if !errors.is_empty() {
-        eprintln!("MOBIUS attachment warnings: {}", errors.join("; "));
-    }
-    Ok(out)
+    Selection { files, warnings, max_files: MAX_ATTACH_FILES, max_chars: MAX_ATTACH_CHARS }
 }
 
 /// Read explicit paths (e.g. future drag-drop). Same safety checks as the picker.
@@ -225,8 +241,44 @@ mod tests {
     }
 
     #[test]
+    fn selection_preserves_excerpt_counts_and_partial_errors() {
+        let dir = std::env::temp_dir().join(format!("mobius-selection-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let note = dir.join("long.txt");
+        let binary = dir.join("binary.txt");
+        std::fs::write(&note, "é".repeat(7000)).unwrap();
+        let mut bytes = vec![b'a'; 9000];
+        bytes.push(0);
+        std::fs::write(&binary, bytes).unwrap();
+        let selected = read_selection(&[note, binary]);
+        assert_eq!(selected.files.len(), 1);
+        assert_eq!(selected.files[0].original_chars, 7000);
+        assert_eq!(selected.files[0].chars, 6000);
+        assert_eq!(selected.files[0].content.chars().count(), 6000);
+        assert_eq!(selected.warnings.len(), 1);
+        assert!(selected.warnings[0].contains("binary"));
+        assert_eq!(selected.max_chars, MAX_ATTACH_CHARS);
+        let empty = read_selection(&[]);
+        assert!(empty.files.is_empty() && empty.warnings.is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn binary_and_text_are_told_apart() {
         assert!(!is_probably_text(Path::new("a.bin"), &[0, 1, 2]));
         assert!(is_probably_text(Path::new("a.txt"), b"hello"));
     }
+}
+
+/// Choose pictures with the system picker; returns their bytes (the caller checks and stores them).
+pub fn pick_pictures() -> Result<Vec<Vec<u8>>, String> {
+    let mut out = Vec::new();
+    for path in pick_paths(true)?.into_iter().take(4) {
+        let meta = std::fs::metadata(&path).map_err(|_| "Could not read that file.".to_string())?;
+        if !meta.is_file() || meta.len() > crate::images::MAX_BYTES as u64 {
+            return Err("Pictures can be up to 8 MB.".into());
+        }
+        out.push(std::fs::read(&path).map_err(|_| "Could not read that file.".to_string())?);
+    }
+    Ok(out)
 }

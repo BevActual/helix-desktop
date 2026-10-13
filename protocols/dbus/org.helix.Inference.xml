@@ -14,6 +14,7 @@
      Non-local backends (LAN/cloud) are not run inside the PrivateNetwork sandbox; Mobius or a network gateway
      performs those turns. GetSnapshot.backends lists configured backends; GetSnapshot.profiles maps task → route.
      Delta(operation, text) streams to the requester only. Completed(operation, ok, result) ends it;
+     Loading(operation, model, fraction) tells the requester how far a model swap has got (0..1) before its reply starts;
      result JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens, task, backend}. -->
 <interface name="org.helix.Inference1">
  <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
@@ -22,6 +23,8 @@
  <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
  <signal name="Delta"><arg type="t"/><arg type="s"/></signal>
  <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Loading"><arg type="t"/><arg type="s"/><arg type="d"/></signal>
+ <signal name="Progress"><arg name="operation" type="t"/><arg name="fraction" type="d"/><arg name="stage" type="s"/></signal>
  <signal name="Changed"/>
 </interface>
 </node>

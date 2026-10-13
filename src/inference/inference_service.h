@@ -26,6 +26,8 @@ public:
   void method(const std::string& sender, const std::string& name, GVariant* parameters, GDBusMethodInvocation* invocation);
   void ownerGone(const std::string& name);  // cancels what that caller still has queued or running
   void tick();                              // frees the model after a long idle spell
+  void setTranscriber(std::shared_ptr<Transcriber> transcriber) { queue_->setTranscriber(std::move(transcriber)); }
+  void setImageGenerator(std::shared_ptr<ImageGenerator> generator) { queue_->setImageGenerator(std::move(generator)); }
 
 private:
   struct Owner {

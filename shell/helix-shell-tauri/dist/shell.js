@@ -454,7 +454,7 @@ function drawIsland(view) {
   if (reactIsland) {
     reactIsland.set(view);
   } else {
-    swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : "sparkle");
+    swapIcon(slot("island-ico"), view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : view.kind === "agentdesk" ? "grid" : "sparkle");
     $("island-text").textContent = view.text;
     $("island-detail").textContent = view.detail;
   }
@@ -467,6 +467,7 @@ invoke("island_view").then(drawIsland);
 $("island").onclick = () => {
   if (islandKind === "approval") invoke("mobius_open", { mode: "agents" });
   else if (islandKind === "assistant") invoke("mobius_open", { mode: "act" });
+  else if (islandKind === "agentdesk") invoke("agent_desk_focus");
   else if (islandKind === "media") invoke("media_toggle");
 };
 
@@ -1087,10 +1088,10 @@ function drawWorkspaces(strip) {
     const pill = document.createElement("button");
     pill.className = "ws-hit";
     const mark = document.createElement("span");
-    mark.className = "ws" + (ws.active ? " active" : "") + (ws.windows ? " has-windows" : "") + (ws.urgent ? " urgent" : "");
+    mark.className = "ws" + (ws.active ? " active" : "") + (ws.windows ? " has-windows" : "") + (ws.urgent ? " urgent" : "") + (ws.agent_desk ? " agent-desk" : "");
     pill.append(mark);
     pill.dataset.test = "ws-" + index;
-    pill.title = ws.name ? ws.name : "Workspace " + ws.idx;
+    pill.title = ws.agent_desk ? (ws.name || "Agent desk") : (ws.name ? ws.name : "Workspace " + ws.idx);
     pill.setAttribute("aria-label", pill.title);
     pill.onclick = () => invoke("workspace_focus", { id: ws.id });
     host.append(pill);

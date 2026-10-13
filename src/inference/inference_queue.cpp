@@ -6,6 +6,11 @@ namespace helix::inference {
 
 InferenceQueue::InferenceQueue(std::shared_ptr<Backend> backend, Limits limits, DeltaFn onDelta, DoneFn onDone)
     : backend_(std::move(backend)), limits_(limits), onDelta_(std::move(onDelta)), onDone_(std::move(onDone)) {
+  backend_->setProgress([this](const std::string& model, double fraction) {
+    std::uint64_t operation = 0;
+    { std::lock_guard lock(mutex_); operation = runningOperation_; }
+    if (operation != 0 && onLoading_) onLoading_(operation, model, fraction);
+  });
   worker_ = std::thread([this] { run(); });
 }
 
@@ -27,11 +32,33 @@ InferenceQueue::~InferenceQueue() {
 }
 
 std::expected<std::uint64_t, std::string> InferenceQueue::submit(ChatRequest request) {
-  if (!request.messages.is_array() || request.messages.empty()) return std::unexpected("messages must be a non-empty array");
+  if (request.generateImage) {
+    if (!imageGenerator_) return std::unexpected("image generation is not available");
+    if (auto valid = validateImageRequest(request); !valid) return std::unexpected(valid.error());
+    request.messages = nlohmann::json::array();
+  } else if (request.transcribe) {
+    if (!transcriber_) return std::unexpected("speech to text is not available");
+    if (request.audio.empty() || request.audio.size() > kMaxAudioSamples) return std::unexpected("the recording is empty or too long");
+    request.messages = nlohmann::json::array();
+  } else if (!request.messages.is_array() || request.messages.empty()) {
+    return std::unexpected("messages must be a non-empty array");
+  }
   for (const auto& message : request.messages) {
-    const bool wellFormed = message.is_object() && message.contains("role") && message.at("role").is_string() &&
-                            message.contains("content") && message.at("content").is_string();
-    if (!wellFormed) return std::unexpected("each message needs a string role and a string content");
+    bool wellFormed = message.is_object() && message.contains("role") && message.at("role").is_string() &&
+                      message.contains("content");
+    if (wellFormed) {
+      const auto& content = message.at("content");
+      if (content.is_array()) {
+        for (const auto& part : content) {
+          const bool text = part.is_object() && part.value("type", "") == "text" && part.contains("text") && part.at("text").is_string();
+          const bool image = part.is_object() && part.value("type", "") == "image" && part.contains("index") && part.at("index").is_number_unsigned();
+          if (!text && !image) wellFormed = false;
+        }
+      } else if (!content.is_string()) {
+        wellFormed = false;
+      }
+    }
+    if (!wellFormed) return std::unexpected("each message needs a string role and a string content (or a list of text and image parts)");
   }
   if (request.messages.dump().size() + request.jsonSchema.size() > limits_.maxPromptBytes) return std::unexpected("the request is too large");
   request.maxTokens = std::clamp<std::uint32_t>(request.maxTokens, 1, limits_.maxTokensCap);
@@ -111,7 +138,16 @@ void InferenceQueue::run() {
 
     Outcome outcome;
     std::string error;
-    if (!entry.request.model.empty() && !backend_->load(entry.request.model, error)) {
+    if (entry.request.generateImage) {
+      if (onProgress_) onProgress_(entry.operation, 0, "Releasing chat model memory");
+      backend_->unload();  // shared queue: no chat call can race with this GPU handoff
+      outcome = imageGenerator_->generate(entry.request,
+        [&](double fraction, const std::string& stage) { if (onProgress_) onProgress_(entry.operation, fraction, stage); },
+        [this] { std::lock_guard lock(mutex_); return runningCancelled_; });
+    } else if (entry.request.transcribe) {
+      outcome = transcriber_->transcribe(AudioInput{std::move(entry.request.audio)}, entry.request.language,
+                                         [this] { std::lock_guard lock(mutex_); return runningCancelled_; });
+    } else if (!entry.request.model.empty() && !backend_->load(entry.request.model, error)) {
       outcome.error = error.empty() ? "the model could not be loaded" : error;
     } else {
       outcome = backend_->chat(

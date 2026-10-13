@@ -51,3 +51,36 @@ pick models         && run models models-test.sh mobius-nested.sh "HELIX_NESTED_
 pick mobius-real    && [ -n "${HELIX_SUITE_HEAVY:-}" -o ${#sel[@]} -gt 0 ] && run mobius-real mobius-real-test.sh mobius-real-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-dialogs && run mobius-dialogs mobius-dialogs-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 pick mobius-lab     && run mobius-lab mobius-lab-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_MOBIUS_LOG_PROMPT=1
+pick mobius-pictures && run mobius-pictures mobius-pictures-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_SEED_PICTURE=1
+pick mobius-dictate && run mobius-dictate mobius-dictate-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_NESTED_SEED_AUDIO=1
+pick mobius-library && run mobius-library mobius-library-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
+if pick mobius-image-generation; then
+  image_models=${HELIX_MODEL_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/helix/models}
+  if [ -f "$image_models/image/stable-diffusion-v2-1-turbo-Q4_0.gguf" ]; then
+    run mobius-image-generation mobius-image-generation-test.sh mobius-nested.sh "HELIX_MODEL_DIR=$image_models" "HELIX_NESTED_KDL=layout { gaps 0; }" HELIX_FAKE_IMAGE_DELAY_MS=400 RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+  else
+    echo "skip  mobius-image-generation (SD-Turbo is not installed)"
+  fi
+fi
+if pick mobius-analysis; then
+  analysis_config=${HELIX_TEST_ANALYSIS_CONFIG:-${XDG_DATA_HOME:-$HOME/.local/share}/helix/analysis-tools/config.json}
+  if [ -f "$analysis_config" ]; then
+    run mobius-analysis mobius-analysis-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" "HELIX_TEST_ANALYSIS_CONFIG=$analysis_config" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
+  else
+    echo "skip  mobius-analysis (optional analysis tools are not installed)"
+  fi
+fi
+
+if pick mobius-tables; then
+  run mobius-tables mobius-tables-test.sh mobius-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" "HELIX_FAKE_REPLY=| Model | Cost |
+| :--- | ---: |
+| **Small** | \`2|3\` |
+| Large | 5 |" HELIX_FAKE_DELAY_MS=10 RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+fi
+pick mobius-search && run mobius-search mobius-search-test.sh mobius-search-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1
+pick mobius-attachments && run mobius-attachments mobius-attachments-test.sh mobius-attachments-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10
+pick mobius-context && run mobius-context mobius-context-test.sh mobius-context-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_MOBIUS_LOG_PROMPT=1 HELIX_FAKE_DELAY_MS=400
+pick mobius-welcome && run mobius-welcome mobius-welcome-test.sh mobius-welcome-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_NESTED_SEED_AUDIO=1 HELIX_FAKE_DELAY_MS=10
+pick mobius-web && run mobius-web mobius-web-test.sh mobius-web-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
+pick mobius-tools && run mobius-tools mobius-tools-test.sh mobius-tools-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10 "HELIX_FAKE_REPLY=A sourced explanation [1]."
+pick mobius-reply-save && run mobius-reply-save mobius-reply-save-test.sh mobius-reply-save-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }" RUST_LOG=niri=info WEBKIT_DISABLE_DMABUF_RENDERER=1 WEBKIT_DISABLE_COMPOSITING_MODE=1 LIBGL_ALWAYS_SOFTWARE=1 HELIX_FAKE_DELAY_MS=10

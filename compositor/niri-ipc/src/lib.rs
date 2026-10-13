@@ -124,6 +124,8 @@ pub enum Request {
     /// Stock niri does not implement this request and replies with an error. helix-niri
     /// reports whether `background-effect { liquid-glass { } }` is accepted and rendered.
     HelixCapabilities,
+    /// Helix: agent desk workspace state (name, id, window count, focus).
+    HelixAgentDesk,
 }
 
 /// Reply from niri to client.
@@ -172,6 +174,8 @@ pub enum Response {
     Casts(Vec<Cast>),
     /// Helix compositor capabilities.
     HelixCapabilities(HelixCapabilities),
+    /// Helix agent desk state.
+    HelixAgentDesk(HelixAgentDesk),
 }
 
 /// Capabilities reported by helix-niri. Stock niri never sends this response.
@@ -190,6 +194,20 @@ pub struct HelixCapabilities {
     /// the keyboard, is blanked from captures and does not receive input from client protocols. `niri msg layers` says which surface has it.
     #[serde(default)]
     pub trusted_surfaces: bool,
+    /// Whether agent-desk IPC and window placement are available.
+    #[serde(default)]
+    pub agent_desk: bool,
+}
+
+/// State of the Helix agent desk workspace.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+pub struct HelixAgentDesk {
+    pub name: String,
+    pub workspace_id: Option<u64>,
+    pub window_count: u32,
+    pub is_focused: bool,
+    pub placements_pending: u32,
 }
 
 /// Overview information.
@@ -968,6 +986,17 @@ pub enum Action {
         #[cfg_attr(feature = "clap", arg(long))]
         path: Option<String>,
     },
+    /// Helix: queue the next opened toplevel(s) to land on the agent desk without stealing focus.
+    HelixPlaceOnAgentDesk {
+        #[serde(default = "helix_default_place_count")]
+        count: u8,
+    },
+    /// Helix: focus the agent desk workspace.
+    HelixFocusAgentDesk {},
+}
+
+fn helix_default_place_count() -> u8 {
+    1
 }
 
 /// Change in window or column size.
@@ -1500,6 +1529,9 @@ pub struct Workspace {
     pub is_focused: bool,
     /// Id of the active window on this workspace, if any.
     pub active_window_id: Option<u64>,
+    /// Helix: this workspace is the configured agent desk.
+    #[serde(default)]
+    pub is_agent_desk: bool,
 }
 
 /// Configured keyboard layouts.

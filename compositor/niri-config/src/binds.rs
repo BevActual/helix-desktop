@@ -374,6 +374,12 @@ pub enum Action {
     #[knuffel(skip)]
     LoadConfigFile(#[knuffel(argument)] Option<String>),
     #[knuffel(skip)]
+    HelixPlaceOnAgentDesk {
+        count: u8,
+    },
+    #[knuffel(skip)]
+    HelixFocusAgentDesk {},
+    #[knuffel(skip)]
     MruAdvance {
         direction: MruDirection,
         scope: Option<MruScope>,
@@ -704,6 +710,8 @@ impl From<niri_ipc::Action> for Action {
             niri_ipc::Action::SetWindowUrgent { id } => Self::SetWindowUrgent(id),
             niri_ipc::Action::UnsetWindowUrgent { id } => Self::UnsetWindowUrgent(id),
             niri_ipc::Action::LoadConfigFile { path } => Self::LoadConfigFile(path),
+            niri_ipc::Action::HelixPlaceOnAgentDesk { count } => Self::HelixPlaceOnAgentDesk { count },
+            niri_ipc::Action::HelixFocusAgentDesk {} => Self::HelixFocusAgentDesk {},
         }
     }
 }

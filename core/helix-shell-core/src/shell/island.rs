@@ -4,6 +4,7 @@
 
 use serde::Serialize;
 
+use crate::agent_desk::AgentDeskGlance;
 use crate::display::sanitize_for_display;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -37,6 +38,8 @@ pub enum Kind {
     /// Agents are waiting for the person to decide.
     Approval,
     Assistant,
+    /// Agent desk has windows while the person is on another workspace.
+    AgentDesk,
     Media,
 }
 
@@ -62,6 +65,7 @@ pub fn choose(
     pending_approvals: usize,
     agents_enabled: bool,
     assistant_phase: &str,
+    agent_desk: Option<&AgentDeskGlance>,
     media: Option<&Media>,
 ) -> IslandView {
     if agents_enabled && pending_approvals > 0 {
@@ -99,6 +103,18 @@ pub fn choose(
         }
         _ => {}
     }
+    if let Some(desk) = agent_desk.filter(|d| d.windows > 0) {
+        let text = if desk.windows == 1 {
+            "1 window on agent desk".into()
+        } else {
+            format!("{} windows on agent desk", desk.windows)
+        };
+        return IslandView {
+            kind: Kind::AgentDesk,
+            text,
+            detail: desk.label.clone(),
+        };
+    }
     if let Some(m) = media.filter(|m| m.playing && !m.title.is_empty()) {
         return IslandView {
             kind: Kind::Media,
@@ -123,9 +139,9 @@ mod tests {
 
     #[test]
     fn nothing_going_on_shows_nothing() {
-        assert_eq!(choose(0, true, "idle", None).kind, Kind::None);
+        assert_eq!(choose(0, true, "idle", None, None).kind, Kind::None);
         assert_eq!(
-            choose(0, true, "result", None).kind,
+            choose(0, true, "result", None, None).kind,
             Kind::None,
             "a finished request is not live status"
         );
@@ -134,28 +150,39 @@ mod tests {
     #[test]
     fn what_waits_on_the_person_wins_over_everything() {
         let m = playing("Song");
-        assert_eq!(choose(1, true, "thinking", Some(&m)).kind, Kind::Approval);
-        assert_eq!(choose(1, true, "idle", None).text, "Waiting for you");
-        assert_eq!(choose(3, true, "idle", None).text, "3 waiting for you");
+        assert_eq!(choose(1, true, "thinking", None, Some(&m)).kind, Kind::Approval);
+        assert_eq!(choose(1, true, "idle", None, None).text, "Waiting for you");
+        assert_eq!(choose(3, true, "idle", None, None).text, "3 waiting for you");
     }
 
     #[test]
     fn with_the_agents_switched_off_their_approvals_are_not_announced() {
-        assert_eq!(choose(2, false, "idle", None).kind, Kind::None);
+        assert_eq!(choose(2, false, "idle", None, None).kind, Kind::None);
     }
 
     #[test]
     fn the_assistant_beats_music() {
         let m = playing("Song");
-        let v = choose(0, true, "thinking", Some(&m));
+        let v = choose(0, true, "thinking", None, Some(&m));
         assert_eq!((v.kind, v.text.as_str()), (Kind::Assistant, "Thinking…"));
-        assert_eq!(choose(0, true, "acting", Some(&m)).text, "Working…");
-        assert_eq!(choose(0, true, "confirm", None).text, "Your answer needed");
+        assert_eq!(choose(0, true, "acting", None, Some(&m)).text, "Working…");
+        assert_eq!(choose(0, true, "confirm", None, None).text, "Your answer needed");
+    }
+
+    #[test]
+    fn agent_desk_beats_music_but_not_assistant_work() {
+        let desk = AgentDeskGlance {
+            windows: 2,
+            label: "Helix Agent".into(),
+        };
+        let m = playing("Song");
+        assert_eq!(choose(0, true, "idle", Some(&desk), Some(&m)).kind, Kind::AgentDesk);
+        assert_eq!(choose(0, true, "thinking", Some(&desk), None).kind, Kind::Assistant);
     }
 
     #[test]
     fn music_shows_only_while_playing_and_with_a_title() {
-        let v = choose(0, true, "idle", Some(&playing("Song")));
+        let v = choose(0, true, "idle", None, Some(&playing("Song")));
         assert_eq!(
             (v.kind, v.text.as_str(), v.detail.as_str()),
             (Kind::Media, "Song", "Artist")
@@ -164,8 +191,8 @@ mod tests {
             playing: false,
             ..playing("Song")
         };
-        assert_eq!(choose(0, true, "idle", Some(&paused)).kind, Kind::None);
-        assert_eq!(choose(0, true, "idle", Some(&playing(""))).kind, Kind::None);
+        assert_eq!(choose(0, true, "idle", None, Some(&paused)).kind, Kind::None);
+        assert_eq!(choose(0, true, "idle", None, Some(&playing(""))).kind, Kind::None);
     }
 
     #[test]

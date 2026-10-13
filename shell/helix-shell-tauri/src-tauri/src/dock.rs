@@ -149,6 +149,14 @@ fn request(json: &str) -> Result<String, String> {
     Ok(reply)
 }
 
+/// Queue the next opened window(s) on the Helix agent desk without stealing focus.
+pub(crate) fn place_on_agent_desk(count: u8) -> Result<(), String> {
+    if !helix_shell_core::agent_desk::placement_enabled() {
+        return Ok(());
+    }
+    niri_action(&serde_json::json!({"HelixPlaceOnAgentDesk": {"count": count.max(1)}}))
+}
+
 /// One niri action (`{"CloseWindow": {"id": 3}}`); `Ok` only when niri said so.
 pub(crate) fn niri_action(action: &Value) -> Result<(), String> {
     let reply = request(&serde_json::json!({ "Action": action }).to_string())?;
@@ -266,6 +274,7 @@ pub fn refresh(app: &AppHandle) {
     );
     let _ = app.emit("dock-view", view);
     publish_workspaces(app);
+    crate::island::publish(app);
 }
 
 /// Tells the page the workspace strip, but only when it differs from what it was last told (the event stream is chatty).
@@ -426,6 +435,12 @@ pub fn workspaces_view(app: AppHandle) -> Vec<helix_shell_core::niri::WorkspaceV
         .expect("shell state")
         .niri
         .workspace_strip()
+}
+
+/// Focus the Helix agent desk workspace (helix-niri).
+#[tauri::command]
+pub fn agent_desk_focus() -> Result<(), String> {
+    niri_action(&serde_json::json!({"HelixFocusAgentDesk": {}}))
 }
 
 /// Switches to a workspace of the strip the bar shows; any other id is refused here and never sent to niri.

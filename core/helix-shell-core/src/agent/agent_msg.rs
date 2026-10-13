@@ -37,6 +37,8 @@ pub const SUPPORTED: &[&str] = &[
     "clipboard-text",
     "clipboard-copy",
     "clipboard-clear",
+    "desktop-capture",
+    "agent-desk-focus",
 ];
 
 /// How long free text on the wire may be (`app-launch` query, `clipboard-copy` payload).
@@ -86,6 +88,10 @@ pub enum Command {
     ClipboardCopy(String),
     /// Clear clipboard history in the shell and the current selection.
     ClipboardClear,
+    /// PNG screenshot for agent vision (`ok <path>\n` on success).
+    DesktopCapture(Option<String>),
+    /// Focus the Helix agent desk workspace (helix-niri).
+    AgentDeskFocus,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -329,6 +335,18 @@ pub fn parse(line: &str) -> Result<Command, MsgError> {
             no_args(&args)?;
             Command::ClipboardClear
         }
+        "desktop-capture" => match args.as_slice() {
+            [] => Command::DesktopCapture(None),
+            [one] if one.len() <= 32 && one.bytes().all(|b| b.is_ascii() && !b.is_ascii_control()) => {
+                Command::DesktopCapture(Some((*one).to_string()))
+            }
+            [_] => return Err(MsgError::Usage("capture target is agent-desk, all, or an output name")),
+            _ => return Err(MsgError::Usage("desktop-capture takes at most one target")),
+        },
+        "agent-desk-focus" => {
+            no_args(&args)?;
+            Command::AgentDeskFocus
+        }
         _ => return Err(MsgError::Unknown),
     })
 }
@@ -528,6 +546,7 @@ mod tests {
             "theme-mode-toggle", "theme-mode-get", "nightlight-enable", "nightlight-disable", "nightlight-toggle", "notification-dnd-set on",
             "notification-dnd-toggle", "notification-dnd-status", "panel-open launcher", "panel-close", "panel-toggle launcher", "settings-open", "status", "window-close", "workspace-switch next",
             "app-launch Helix Settings", "clipboard-text", "clipboard-copy hello world", "clipboard-clear",
+            "desktop-capture agent-desk", "agent-desk-focus",
         ];
         assert_eq!(examples.len(), SUPPORTED.len());
         for (example, name) in examples.iter().zip(SUPPORTED) {

@@ -32,6 +32,9 @@ result-*
 /third_party/llama.cpp-*.tar.gz
 /third_party/.llama-build/
 /third_party/llama-install/
+/third_party/whisper.cpp-*/
+/third_party/whisper.cpp-*.tar.gz
+/third_party/whisper-install/
 
 # Shared UI is copied into each app's dist/ at build time
 apps/*/dist/style.css
@@ -60,3 +63,5 @@ node_modules/
 apps/*/dist/react/
 shell/*/dist/react/
 greeter/*/dist/react/
+third_party/stable-diffusion.cpp-*/
+third_party/sd-install/

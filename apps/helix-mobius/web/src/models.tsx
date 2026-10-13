@@ -62,6 +62,120 @@ interface Draft {
 }
 interface Probe { text: string; ok: boolean; }
 
+interface Progress { phase: "downloading" | "verifying" | "failed"; done: number; total: number; error: string; }
+interface Card {
+  id: string; file: string; title: string; maker: string; blurb: string; tasks: string[]; vision: boolean; license: string;
+  bytes: number; memory_gb: number; installed: boolean; loaded: boolean; in_catalog: boolean; progress: Progress | null;
+}
+
+function size(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(bytes / 1e6))} MB`;
+}
+
+const TASK_WORD: Record<string, string> = { chat: "Chat", code: "Code", vision: "Pictures", summarize: "Summaries", act: "Act", speech: "Speech", image: "Image generation" };
+
+/** The library: models installed on this computer (what each is used for, which is loaded) and ones that can be downloaded. */
+function Library({ cards, draft, needle, onAssign, report }: {
+  cards: Card[]; draft: Draft; needle: string; onAssign: (task: Task, source: Source, model: string) => void; report: (e: unknown) => void;
+}) {
+  const match = (card: Card) => !needle || `${card.title} ${card.maker} ${card.blurb} ${card.tasks.join(" ")}`.toLowerCase().includes(needle);
+  const usedFor = (card: Card) => TASKS.filter((t) => backendOf(draft.profiles[t.id], t) === "local" && draft.profiles[t.id].model === card.file);
+  const installed = cards.filter((c) => c.installed && match(c));
+  const available = cards.filter((c) => !c.installed && match(c));
+  const act = (command: string, id: string) => invoke(command, { id }).catch(report);
+  const usesAuto = TASKS.filter((t) => backendOf(draft.profiles[t.id], t) === "local" && !draft.profiles[t.id].model);
+  return (
+    <>
+      <h4 className="models-h4">Installed</h4>
+      <div className="lib-grid" data-test="library-installed">
+        {installed.map((card) => {
+          const uses = usedFor(card);
+          const speech = card.tasks.includes("speech");
+          const image = card.tasks.includes("image");
+          const assignable = speech || image ? [] : TASKS.filter((t) => !(t.id === "vision" && !card.vision) && t.id !== "summarize");
+          return (
+            <article key={card.id} className={`lib-card${uses.length ? " in-use" : ""}`} data-test={`lib-card-${card.id}`}>
+              <header>
+                <div>
+                  <div className="lib-title">{card.title}{card.loaded ? <span className="lib-loaded" title="In memory now"> ● ready</span> : null}</div>
+                  <div className="lib-sub">{[card.maker, size(card.bytes), card.memory_gb ? `≈ ${card.memory_gb} GB memory` : ""].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div className="lib-tags">
+                  {card.tasks.map((t) => <span key={t} className="lib-tag">{TASK_WORD[t] ?? t}</span>)}
+                  {card.vision ? <span className="lib-tag vision">Sees pictures</span> : null}
+                </div>
+              </header>
+              <p className="lib-blurb">{card.blurb}</p>
+              <div className="lib-uses">
+                {speech ? <span className="lib-sub">Used by the microphone button in the composer.</span> : null}
+                {image ? <span className="lib-sub">Used by Create image in the Mobius menu. {card.license}</span> : null}
+                {assignable.map((t) => {
+                  const active = uses.some((u) => u.id === t.id);
+                  return (
+                    <button key={t.id} type="button" className={`route-use-btn${active ? " active" : ""}`} data-test={`lib-use-${card.id}-${t.id}`}
+                      onClick={() => onAssign(t.id, "local", card.file)}>
+                      {active ? `Used for ${t.title}` : `Use for ${t.title}`}
+                    </button>
+                  );
+                })}
+                {card.in_catalog ? (
+                  <button type="button" className="lib-remove" data-test={`lib-remove-${card.id}`}
+                    onClick={() => { if (window.confirm(`Remove ${card.title} (${size(card.bytes)}) from this computer? You can download it again later.`)) act("library_remove", card.id); }}>
+                    Remove
+                  </button>
+                ) : null}
+              </div>
+            </article>
+          );
+        })}
+        {!installed.length ? <p className="route-model-empty" data-test="library-installed-empty">{needle ? "Nothing installed matches." : "No models installed yet. Pick one below to download."}</p> : null}
+      </div>
+      {usesAuto.length && installed.length ? (
+        <p className="models-lead">{usesAuto.map((t) => t.title).join(", ")} use{usesAuto.length === 1 ? "s" : ""} Auto: the service picks the first model in the folder.</p>
+      ) : null}
+
+      <h4 className="models-h4">Available to download</h4>
+      <div className="lib-grid" data-test="library-available">
+        {available.map((card) => {
+          const p = card.progress;
+          const percent = p && p.total ? Math.min(100, Math.round((p.done / p.total) * 100)) : 0;
+          return (
+            <article key={card.id} className="lib-card" data-test={`lib-card-${card.id}`}>
+              <header>
+                <div>
+                  <div className="lib-title">{card.title}</div>
+                  <div className="lib-sub">{[card.maker, size(card.bytes), `≈ ${card.memory_gb} GB memory`, card.license].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div className="lib-tags">
+                  {card.tasks.map((t) => <span key={t} className="lib-tag">{TASK_WORD[t] ?? t}</span>)}
+                  {card.vision ? <span className="lib-tag vision">Sees pictures</span> : null}
+                </div>
+              </header>
+              <p className="lib-blurb">{card.blurb}</p>
+              {p && p.phase !== "failed" ? (
+                <div className="lib-progress" data-test={`lib-progress-${card.id}`}>
+                  <div className="lib-bar"><div style={{ width: `${p.phase === "verifying" ? 100 : percent}%` }} className={p.phase === "verifying" ? "checking" : ""} /></div>
+                  <span>{p.phase === "verifying" ? "Checking the download…" : `${size(p.done)} of ${size(p.total)} · ${percent}%`}</span>
+                  <button type="button" onClick={() => act("library_cancel", card.id)} data-test={`lib-cancel-${card.id}`}>Cancel</button>
+                </div>
+              ) : (
+                <div className="lib-uses">
+                  {p?.phase === "failed" ? <span className="lib-error" data-test={`lib-error-${card.id}`}>{p.error}</span> : null}
+                  <button type="button" className="primary" data-test={`lib-get-${card.id}`} onClick={() => act("library_download", card.id)}>
+                    {p?.phase === "failed" ? "Try again" : `Get · ${size(card.bytes)}`}
+                  </button>
+                </div>
+              )}
+            </article>
+          );
+        })}
+        {!available.length ? <p className="route-model-empty">{needle ? "Nothing available matches." : "Everything in the library is installed."}</p> : null}
+      </div>
+    </>
+  );
+}
+
 export interface ModelsHooks {
   /** The page appeared or went away (the host element and the page's open class are the app's). */
   visible: (shown: boolean) => void;
@@ -168,6 +282,7 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
   const [dirty, setDirty] = useState(false);
   const [cache, setCache] = useState<Record<Source, string[]>>({ local: [], lan: [], openrouter: [] });
   const [loading, setLoading] = useState(false);
+  const [library, setLibrary] = useState<Card[]>([]);
   const [needle, setNeedle] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [hasKey, setHasKey] = useState<boolean | null>(null);
@@ -199,6 +314,22 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
     }
   }, []);
 
+  const refreshLibrary = useCallback(() => {
+    invoke<Card[]>("library_list").then((cards) => setLibrary(Array.isArray(cards) ? cards : []), () => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    // Downloads report their own progress; a finished one changes what is installed, so the list is fetched again then.
+    const tauri = (window as unknown as { __TAURI__?: { event?: { listen: (name: string, cb: (e: { payload: Card[] }) => void) => Promise<() => void> } } }).__TAURI__;
+    let stop: (() => void) | undefined;
+    tauri?.event?.listen("library-changed", (event) => {
+      setLibrary(event.payload);
+      if (event.payload.every((c) => !c.progress)) loadModels("local");
+    }).then((off) => { stop = off; });
+    return () => stop?.();
+  }, [open, loadModels]);
+
   const refreshKeyStatus = useCallback(async () => {
     const status = await invoke<{ has_key: boolean }>("routing_secret_status", { apiKeyRef: "openrouter" });
     setHasKey(!!status?.has_key);
@@ -210,8 +341,9 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
     if (source) {
       sourceRef.current = source;
       loadModels(source);
+      if (source === "local") refreshLibrary();
     }
-  }, [loadModels]);
+  }, [loadModels, refreshLibrary]);
 
   useEffect(() => {
     register({
@@ -245,12 +377,13 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
           setOpen(true);
           hooksRef.current.visible(true);
           loadModels("local");
+          refreshLibrary();
         } catch (error) {
           report(error);
         }
       },
     });
-  }, [register, loadModels, refreshKeyStatus]);
+  }, [register, loadModels, refreshKeyStatus, refreshLibrary]);
 
   const close = () => {
     setOpen(false);
@@ -404,7 +537,7 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
                     <div className="route-task-kicker">{task.kicker}</div>
                     <div className="route-task-title">{task.title}</div>
                     <div className="route-task-dest">{sourceLabel(task.locked ? "local" : profile.backend)}</div>
-                    <div className="route-task-model">{profile.model || "Auto (default)"}</div>
+                    <div className="route-task-model">{library.find((c) => c.file === profile.model)?.title || profile.model || "Auto (default)"}</div>
                     {task.locked ? (
                       <p className="route-task-lock">Local only — tools stay on-device</p>
                     ) : (
@@ -424,16 +557,15 @@ export function ModelsPage({ register, hooks }: { register: (handle: ModelsHandl
 
           <section className={`models-panel${section === "local" ? " active" : ""}`} data-models-panel="local" data-test="models-panel-local" hidden={section !== "local"}>
             <h3 className="models-h3">Models on this computer</h3>
-            <p className="models-lead">GGUFs exposed by <code>org.helix.Inference</code>. Assign one to Chat, Act, or Code.</p>
+            <p className="models-lead">Everything runs here. Choose what each task uses; download more when you want them. Only one model sits in memory at a time, so switching takes a few seconds.</p>
             <div className="route-source-toolbar">
               <label className="route-search" htmlFor="route-model-search-local">
                 <Icon name="search" />
-                <input id="route-model-search-local" data-test="route-model-search" type="search" placeholder="Search local models" autoComplete="off" value={needle} onChange={(event) => setNeedle(event.target.value.trim().toLowerCase())} />
+                <input id="route-model-search-local" data-test="route-model-search" type="search" placeholder="Search models" autoComplete="off" value={needle} onChange={(event) => setNeedle(event.target.value.trim().toLowerCase())} />
               </label>
-              <button id="route-refresh-models" type="button" data-test="route-refresh-models" onClick={() => loadModels(sourceRef.current)}>Refresh</button>
+              <button id="route-refresh-models" type="button" data-test="route-refresh-models" onClick={() => { loadModels("local"); refreshLibrary(); }}>Refresh</button>
             </div>
-            <ModelGrid source="local" draft={draft} models={cache.local} loading={loading} needle={needle} onAssign={assign}
-              ids={{ grid: "route-model-grid", empty: "route-model-empty", test: { grid: "route-model-grid", empty: "route-model-empty" } }} />
+            <Library cards={library} draft={draft} needle={needle} onAssign={assign} report={report} />
           </section>
 
           <section className={`models-panel${section === "lan" ? " active" : ""}`} data-models-panel="lan" data-test="models-panel-lan" hidden={section !== "lan"}>

@@ -1,3 +1,4 @@
+pub mod agent_desk;
 pub mod bar_surface;
 pub mod calendar;
 pub mod dbusmenu;

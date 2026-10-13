@@ -33,6 +33,7 @@ pub struct Workspace {
     pub active: bool,
     pub focused: bool,
     pub urgent: bool,
+    pub agent_desk: bool,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -86,6 +87,7 @@ fn workspace(value: &Value) -> Option<Workspace> {
         active: flag(value, "is_active"),
         focused: flag(value, "is_focused"),
         urgent: flag(value, "is_urgent"),
+        agent_desk: flag(value, "is_agent_desk"),
     })
 }
 
@@ -209,6 +211,7 @@ pub struct WorkspaceView {
     pub active: bool,
     pub urgent: bool,
     pub windows: usize,
+    pub agent_desk: bool,
 }
 
 impl Niri {
@@ -243,6 +246,7 @@ impl Niri {
                     .values()
                     .filter(|win| win.workspace == Some(w.id))
                     .count(),
+                agent_desk: w.agent_desk,
             })
             .collect()
     }

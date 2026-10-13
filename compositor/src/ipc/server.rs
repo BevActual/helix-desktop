@@ -468,7 +468,17 @@ async fn process(ctx: &ClientCtx, request: Request) -> Reply {
                 .map(|name| name.to_string())
                 .collect(),
             trusted_surfaces: true,
+            agent_desk: true,
         }),
+        Request::HelixAgentDesk => {
+            let (tx, rx) = async_channel::bounded(1);
+            ctx.event_loop.insert_idle(move |state| {
+                let info = state.helix_agent_desk_info();
+                let _ = tx.send_blocking(info);
+            });
+            let info = rx.recv().await.map_err(|_| String::from("agent desk query failed"))?;
+            Response::HelixAgentDesk(info)
+        }
     };
 
     Ok(response)
@@ -673,19 +683,23 @@ impl State {
         if need_workspaces_changed {
             events.clear();
 
+            let agent_desk_name = self.niri.config.borrow().helix.agent_desk_name.clone();
             let workspaces = layout
                 .workspaces()
                 .map(|(mon, ws_idx, ws)| {
                     let id = ws.id().get();
+                    let name = ws.name().cloned();
                     Workspace {
                         id,
                         idx: u8::try_from(ws_idx + 1).unwrap_or(u8::MAX),
-                        name: ws.name().cloned(),
+                        name,
                         output: mon.map(|mon| mon.output_name().clone()),
                         is_urgent: ws.is_urgent(),
                         is_active: mon.is_some_and(|mon| mon.active_workspace_idx() == ws_idx),
                         is_focused: Some(id) == focused_ws_id,
                         active_window_id: ws.active_window().map(|win| win.id().get()),
+                        is_agent_desk: !agent_desk_name.is_empty()
+                            && ws.name().is_some_and(|n| *n == agent_desk_name),
                     }
                 })
                 .collect();

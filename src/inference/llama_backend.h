@@ -7,6 +7,7 @@
 
 struct llama_context;
 struct llama_model;
+struct mtmd_context;
 
 namespace helix::inference {
 
@@ -26,6 +27,7 @@ public:
 
   std::vector<ModelInfo> models() override;
   bool load(const std::string& model, std::string& error) override;
+  void setProgress(ProgressFn fn) override { progress_ = std::move(fn); }
   void unload() override;
   bool isLoaded() const override;
   Outcome chat(const ChatRequest& request, const std::function<void(const std::string&)>& onDelta,
@@ -33,7 +35,11 @@ public:
   nlohmann::json snapshot() const override;
 
 private:
-  std::string formatPrompt(const nlohmann::json& messages) const;
+  std::string formatPrompt(const nlohmann::json& messages, const std::string& imageMarker = {}) const;
+  // The projector installed beside `model` (mmproj-<base name>-*.gguf), or empty when the model cannot read pictures.
+  std::filesystem::path projectorFor(const std::string& model) const;
+  bool ensureVision(std::string& error);
+  void freeVision();
   // The context outlives a request so the start of the next prompt (the tool list, the examples) need not be processed
   // again. `kvTokens_` is exactly what its memory holds. Touched only by the worker and by unload(), which the queue never
   // runs while a request is in flight.
@@ -47,6 +53,9 @@ private:
   std::uint32_t contextTokens_ = 0;
   std::vector<std::int32_t> kvTokens_;
   std::string loaded_;
+  ProgressFn progress_;
+  mtmd_context* vision_ = nullptr;      // created on the first picture for the loaded model, freed with it
+  bool pictureInMemory_ = false;        // the memory holds picture embeddings, which kvTokens_ cannot describe
 };
 
 }  // namespace helix::inference

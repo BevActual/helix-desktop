@@ -34,17 +34,31 @@ let promptHistoryIndex = -1;
 let promptDraft = "";
 let slashIndex = 0;
 let pendingAttachments = [];
+let attachmentWarnings = [];
+let attachmentMaxChars = 8000;
+let attachmentMaxFiles = 6;
+let pickingAttachments = false;
+let agentDeskGlance = null;
+let pendingPictures = []; // { id, url } staged in Rust, shown in the strip above the composer
 let findMatches = [];
 let findIndex = -1;
 
 const PROMPT_HISTORY_KEY = "mobius.promptHistory";
 const SLASH_COMMANDS = [
+  { cmd: "/image", desc: "Generate an image on this computer", run: (typed) => {
+    const prompt = (typed || "").replace(/^\/image\b/i, "").trim();
+    if (!prompt) { openCreateImage(); return Promise.resolve(); }
+    return invoke("chat_generate_image", { prompt, model: null, width: null, height: null, seed: null });
+  } },
   { cmd: "/new", desc: "Start a new chat", run: () => invoke("chat_new").then(() => { input.focus(); closeSideDrawer(); }) },
   { cmd: "/temp", desc: "Temporary chat (not saved)", run: () => invoke("chat_temporary").then(() => { input.focus(); closeSideDrawer(); }) },
   { cmd: "/model", desc: "Pick chat model / backend", run: () => openModelPicker() },
   { cmd: "/models", desc: "Models & routing page", run: () => openRouting() },
   { cmd: "/route", desc: "Models & routing page", run: () => openRouting() },
   { cmd: "/attach", desc: "Attach text / source files", run: () => pickAttachments() },
+  { cmd: "/web", desc: "Pick online sources yourself", run: (text) => { openWeb(text.replace(/^\/web\s*/i, "")); return Promise.resolve(); } },
+  { cmd: "/tools", desc: "Configure Tools mode (research + project commands)", run: () => { reactTools?.open(view); return Promise.resolve(); } },
+  { cmd: "/context", desc: "Review recent history and chat brief", run: () => { openChatContext(); return Promise.resolve(); } },
   { cmd: "/find", desc: "Find in this chat", run: () => { openFindBar(); return Promise.resolve(); } },
   { cmd: "/fork", desc: "Fork this chat", run: () => forkChat() },
   { cmd: "/export", desc: "Copy chat as Markdown", run: () => $("export-chat").click() },
@@ -86,7 +100,7 @@ function lastActableText() {
 
 // The attachment chips and the slash menu are drawn by React when the bundle is present; the state and logic stay here.
 const reactChips = window.HelixMobiusReact
-  ? window.HelixMobiusReact.chips($("attach-chips"), (index) => { pendingAttachments.splice(index, 1); drawAttachChips(); })
+  ? window.HelixMobiusReact.chips($("attach-chips"), (index) => { pendingAttachments.splice(index, 1); drawAttachChips(); }, () => { attachmentWarnings = []; drawAttachChips(); })
   : null;
 let slashShown = [];
 const reactSlash = window.HelixMobiusReact
@@ -96,12 +110,18 @@ const reactSlash = window.HelixMobiusReact
 function drawAttachChips() {
   const host = $("attach-chips");
   if (reactChips) {
-    host.hidden = !pendingAttachments.length;
-    reactChips.set(pendingAttachments.map((file) => ({ name: file.name, chars: file.chars })));
+    host.hidden = !pendingAttachments.length && !attachmentWarnings.length;
+    let budget = attachmentMaxChars;
+    const files = pendingAttachments.map((file) => {
+      const included_chars = Math.min(file.chars, budget);
+      budget -= included_chars;
+      return { ...file, included_chars };
+    });
+    reactChips.set(files, attachmentWarnings);
     syncSendEnabled();
     return;
   }
-  if (!pendingAttachments.length) {
+  if (!pendingAttachments.length && !attachmentWarnings.length) {
     host.hidden = true;
     host.replaceChildren();
     syncSendEnabled();
@@ -109,9 +129,12 @@ function drawAttachChips() {
   }
   host.hidden = false;
   host.replaceChildren();
+  let budget = attachmentMaxChars;
   pendingAttachments.forEach((file, index) => {
+    const included = Math.min(file.chars, budget);
+    budget -= included;
     const chip = el("div", "attach-chip");
-    chip.append(el("span", "", file.name + " · " + file.chars + " ch"));
+    chip.append(el("span", "", file.name + " · " + included + " of " + file.original_chars + " characters"));
     const remove = el("button", "", "×");
     remove.type = "button";
     remove.title = "Remove";
@@ -122,37 +145,201 @@ function drawAttachChips() {
     chip.append(remove);
     host.append(chip);
   });
+  attachmentWarnings.forEach((notice) => host.append(el("p", "attachment-note", notice)));
   syncSendEnabled();
 }
 
 function pickAttachments() {
+  if (pickingAttachments) return Promise.resolve();
+  pickingAttachments = true;
+  $("attach").disabled = true;
+  $("attach").setAttribute("aria-busy", "true");
   return invoke("chat_pick_attachments")
-    .then((files) => {
-      const list = Array.isArray(files) ? files : [];
-      if (!list.length) return;
+    .then((selection) => {
+      const list = Array.isArray(selection.files) ? selection.files : [];
+      attachmentWarnings = selection.warnings || [];
+      attachmentMaxChars = selection.max_chars;
+      attachmentMaxFiles = selection.max_files;
+      let skipped = 0;
       list.forEach((file) => {
         if (pendingAttachments.some((a) => a.path === file.path)) return;
-        if (pendingAttachments.length >= 6) return;
-        pendingAttachments.push({
-          name: file.name,
-          path: file.path,
-          chars: file.chars,
-          content: file.content,
-        });
+        if (pendingAttachments.length >= attachmentMaxFiles) { skipped++; return; }
+        pendingAttachments.push(file);
       });
+      if (skipped) attachmentWarnings.push(`${skipped} selected file${skipped === 1 ? " was" : "s were"} not added. A message can include up to ${attachmentMaxFiles} files.`);
       drawAttachChips();
       input.focus();
     })
-    .catch(report);
+    .catch(report)
+    .finally(() => {
+      pickingAttachments = false;
+      $("attach").disabled = false;
+      $("attach").removeAttribute("aria-busy");
+    });
+}
+
+// Pictures --------------------------------------------------------------------------------------------------------------------------
+const pictureUrls = new Map();
+function pictureUrl(id) {
+  if (!pictureUrls.has(id)) {
+    pictureUrls.set(id, invoke("image_data", { id }).then((bytes) => URL.createObjectURL(new Blob([bytes]))));
+  }
+  return pictureUrls.get(id);
+}
+
+function drawPictureStrip() {
+  const host = $("picture-strip");
+  host.hidden = !pendingPictures.length;
+  host.replaceChildren();
+  pendingPictures.forEach((picture, index) => {
+    const tile = el("div", "picture-tile");
+    tile.dataset.test = "picture-tile-" + index;
+    const img = el("img");
+    img.alt = "Picture to send";
+    img.src = picture.url;
+    const remove = el("button", "", "×");
+    remove.type = "button";
+    remove.title = "Remove";
+    remove.dataset.test = "picture-remove-" + index;
+    remove.onclick = () => {
+      invoke("image_discard", { id: picture.id }).catch(() => {});
+      pendingPictures.splice(index, 1);
+      drawPictureStrip();
+    };
+    tile.append(img, remove);
+    host.append(tile);
+  });
+  syncSendEnabled();
+}
+
+function addPictures(ids) {
+  for (const id of ids) {
+    if (pendingPictures.length >= 4) { report("A message can carry up to 4 pictures."); invoke("image_discard", { id }).catch(() => {}); continue; }
+    pictureUrl(id).then((url) => {
+      pendingPictures.push({ id, url });
+      drawPictureStrip();
+    }).catch(report);
+  }
+  input.focus();
+}
+
+function addPictureFiles(files) {
+  const pictures = Array.from(files).filter((file) => file.type.startsWith("image/"));
+  pictures.forEach((file) => {
+    if (file.size > 8 * 1024 * 1024) { report("Pictures can be up to 8 MB."); return; }
+    file.arrayBuffer()
+      .then((bytes) => invoke("image_stage", new Uint8Array(bytes)))
+      .then((id) => addPictures([id]))
+      .catch(report);
+  });
+  return pictures.length > 0;
+}
+
+function pickPictures() {
+  return invoke("image_pick").then((ids) => { if (ids.length) addPictures(ids); }).catch(report);
+}
+
+// Dictation -------------------------------------------------------------------------------------------------------------------------
+// The microphone is open only between the first click and the second (or Escape). Rust records and transcribes locally; the words
+// are put into the composer, never sent on their own.
+let listening = false;
+let dictationBusy = "";
+let listenTimer = null;
+let listenStarted = 0;
+const dictateButton = $("dictate");
+
+function drawListening(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = String(Math.floor(seconds % 60)).padStart(2, "0");
+  input.placeholder = "Listening… " + m + ":" + s + " — click the microphone to finish, Esc to cancel";
+}
+
+function setListening(on) {
+  listening = on;
+  drawSuggestions();
+  dictateButton.classList.toggle("recording", on);
+  dictateButton.setAttribute("aria-pressed", on ? "true" : "false");
+  dictateButton.title = on ? "Finish dictation" : "Dictate";
+  clearInterval(listenTimer);
+  if (on) {
+    listenStarted = Date.now();
+    drawListening(0);
+    listenTimer = setInterval(() => drawListening((Date.now() - listenStarted) / 1000), 500);
+  } else {
+    composerPlaceholder();
+    dictateButton.style.removeProperty("--level");
+  }
+}
+
+function insertAtCursor(text) {
+  const start = input.selectionStart == null ? input.value.length : input.selectionStart;
+  const end = input.selectionEnd == null ? start : input.selectionEnd;
+  const before = input.value.slice(0, start);
+  const after = input.value.slice(end);
+  const lead = before && !/\s$/.test(before) ? " " : "";
+  input.value = before + lead + text + after;
+  const caret = (before + lead + text).length;
+  input.setSelectionRange(caret, caret);
+  grow();
+  syncSendEnabled();
+}
+
+dictateButton.onclick = () => {
+  if (dictateButton.disabled) return;
+  if (!listening) {
+    dictateButton.disabled = true;
+    dictationBusy = "starting";
+    drawSuggestions();
+    invoke("dictate_start").then(() => setListening(true)).catch(report).finally(() => {
+      dictateButton.disabled = false;
+      dictationBusy = "";
+      drawSuggestions();
+    });
+    return;
+  }
+  setListening(false);
+  dictateButton.disabled = true;
+  dictationBusy = "transcribing";
+  drawSuggestions();
+  input.placeholder = "Transcribing…";
+  invoke("dictate_stop")
+    .then((text) => {
+      if (text) insertAtCursor(text);
+      else report("Nothing was heard.");
+    })
+    .catch(report)
+    .finally(() => {
+      dictateButton.disabled = false;
+      dictationBusy = "";
+      drawSuggestions();
+      composerPlaceholder();
+      input.focus();
+    });
+};
+listen("dictate-level", (event) => {
+  if (listening) dictateButton.style.setProperty("--level", String(Math.min(1, event.payload * 3)));
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && listening) {
+    event.preventDefault();
+    invoke("dictate_cancel").catch(() => {});
+    setListening(false);
+  }
+}, true);
+
+function clearPictures() {
+  pendingPictures = [];
+  drawPictureStrip();
 }
 
 function clearAttachments() {
   pendingAttachments = [];
+  attachmentWarnings = [];
   drawAttachChips();
 }
 
 function attachmentPayload() {
-  return pendingAttachments.map((a) => ({ name: a.name, content: a.content }));
+  return pendingAttachments.map((a) => ({ name: a.name, content: a.content, original_chars: a.original_chars }));
 }
 
 function openFindBar() {
@@ -343,7 +530,7 @@ function maybeSlashFromInput() {
   if (!value.startsWith("/")) { hideSlashMenu(); return false; }
   if (value.includes("\n")) { hideSlashMenu(); return false; }
   const space = value.indexOf(" ");
-  if (space !== -1 && !value.startsWith("/act") && !value.startsWith("/search") && !value.startsWith("/help")) {
+  if (space !== -1 && !value.startsWith("/web") && !value.startsWith("/image") && !value.startsWith("/act") && !value.startsWith("/search") && !value.startsWith("/help")) {
     hideSlashMenu();
     return false;
   }
@@ -417,6 +604,17 @@ function messageNode(message, index, last) {
   const body = el("div", "msg-body");
   if (message.role === "user") {
     body.textContent = message.text;
+    if (message.images && message.images.length) {
+      const strip = el("div", "msg-pictures");
+      message.images.forEach((id) => {
+        const img = el("img", "msg-picture");
+        img.alt = "Attached picture";
+        img.dataset.test = "msg-picture";
+        pictureUrl(id).then((url) => { img.src = url; }).catch(() => {});
+        strip.append(img);
+      });
+      row.append(strip);
+    }
     const actions = el("div", "msg-actions");
     const edit = el("button", "mini", "Edit");
     edit.dataset.test = "edit-" + index;
@@ -517,30 +715,35 @@ function activePersonaNow() {
   return list.find((p) => p.id === personas.active) || list[0] || null;
 }
 
+function useStarter(text) {
+  if (input.value.trim()) { input.focus(); report("Your draft is still here. Clear it to use a starter."); return; }
+  input.value = text;
+  grow(); syncSendEnabled(); input.focus();
+}
+
 const DEFAULT_STARTERS = [
-  "Explain what a cron job is",
-  "Write a bash one-liner to find large files",
-  "Summarise TCP versus UDP",
   "Help me plan a focused week",
   "Draft a polite status update",
-  "What changed in my last few messages?",
+  "Explain a technical concept step by step",
 ];
 let suggestionKey = "";
+let reactWelcome = null;
 // An empty chat offers the persona's own starters when that experiment is on, the generic ones otherwise.
 function drawSuggestions() {
   const host = document.querySelector("#empty .suggestions");
-  if (!host) return;
+  if (!host && !reactWelcome) return;
   const persona = activePersonaNow();
   const own = lab && lab.experiments.persona_starters && persona && persona.starters && persona.starters.length ? persona.starters : null;
   const list = own || DEFAULT_STARTERS;
-  const key = list.join("\n");
+  const key = list.join("\n") + "|" + listening + "|" + dictationBusy;
   if (key === suggestionKey) return;
   suggestionKey = key;
+  if (reactWelcome) { reactWelcome.set(list, listening, dictationBusy); return; }
   host.replaceChildren();
   list.forEach((text, index) => {
     const button = el("button", "suggestion", text);
     button.dataset.test = "suggestion-" + index;
-    button.onclick = () => { input.value = text; grow(); $("composer").requestSubmit(); };
+    button.onclick = () => useStarter(text);
     host.append(button);
   });
 }
@@ -567,8 +770,50 @@ function drawLabChips() {
   drawSuggestions();
 }
 
+function toolsChipLabel() {
+  if (!view.tools_enabled) return "Tools · off";
+  if (!view.workspace) return "Tools · on";
+  const parts = view.workspace.split("/").filter(Boolean);
+  const name = parts.length ? parts[parts.length - 1] : view.workspace;
+  return `Tools · ${name}`;
+}
+
+function composerPlaceholder() {
+  if (listening || dictationBusy === "transcribing") return;
+  if (view.analysis_job) {
+    input.placeholder = "Ask about the local analysis evidence";
+    return;
+  }
+  input.placeholder = view.tools_enabled
+    ? "Ask a task — Mobius will search, read pages, and show steps for you to approve"
+    : "Ask anything — type / for commands (try /tools for research in chat)";
+}
+
+function drawAgentDeskChip() {
+  const chip = $("meta-agent-desk");
+  if (!chip) return;
+  const g = agentDeskGlance;
+  const show = g && g.caps.agent_desk && g.placement
+    && (view.tools_enabled || g.desk.window_count > 0 || g.desk.placements_pending > 0);
+  chip.hidden = !show;
+  if (!show) return;
+  if (g.desk.placements_pending > 0) chip.textContent = "Agent desk · opening";
+  else if (g.desk.window_count > 0) {
+    chip.textContent = "Agent desk · " + g.desk.window_count + (g.desk.window_count === 1 ? " window" : " windows");
+  } else chip.textContent = "Agent desk";
+  chip.classList.toggle("agent-desk-active", g.desk.window_count > 0);
+  chip.title = g.desk.is_focused ? "Agent desk is focused — click to return" : "Jump to the agent desk workspace";
+}
+
+function refreshAgentDeskGlance() {
+  return invoke("agent_desk_glance")
+    .then((g) => { agentDeskGlance = g; drawAgentDeskChip(); })
+    .catch(() => { agentDeskGlance = null; drawAgentDeskChip(); });
+}
+
 function drawComposerMeta() {
   drawLabChips();
+  drawAgentDeskChip();
   const chip = $("route-chip");
   const label = status.backend || "";
   if (!label) { chip.hidden = true; }
@@ -582,7 +827,8 @@ function drawComposerMeta() {
   const modelLabel = currentModel
     ? (currentBackend !== "local" ? (currentBackend + " · " + currentModel) : currentModel)
     : (currentBackend !== "local" ? (currentBackend + " · Auto") : "Auto model");
-  $("meta-model").textContent = modelLabel;
+  $("meta-model").textContent = view.analysis_job ? (view.analysis_model || "Local analysis") : modelLabel;
+  $("meta-model").disabled = !!view.analysis_job;
   document.body.classList.toggle("temporary", !!view.temporary);
   $("temp-banner").hidden = !view.temporary;
   $("chat-title").disabled = !!view.temporary;
@@ -593,21 +839,49 @@ function drawComposerMeta() {
   $("pin-chat").classList.toggle("active", !!view.pinned);
   $("pin-chat").title = view.pinned ? "Unpin chat" : "Pin chat";
   $("project-chat").title = view.project ? ("Project: " + view.project) : "Move to project";
+  $("meta-tools").textContent = toolsChipLabel();
+  $("meta-tools").classList.toggle("tools-on", !!view.tools_enabled);
+  $("meta-tools").disabled = !view.id || view.streaming || !!view.analysis_job;
+  $("meta-tools").title = view.analysis_job
+    ? "Tools mode is unavailable during software analysis"
+    : view.tools_enabled
+      ? "Tools mode is on for this chat — click to change folder or turn off"
+      : "Turn on Tools mode for in-chat research and reviewed project commands";
+  const context = view.context;
+  $("meta-context").textContent = context?.omitted_messages ? "Context · recent only" : (view.brief ? "Context · brief" : "Context");
+  $("meta-context").classList.toggle("context-limited", !!context?.omitted_messages);
+  $("meta-context").disabled = !view.id;
   drawQueueChip();
   drawProjectFilter();
   updateJumpLatest();
+  composerPlaceholder();
 }
 
 function syncSendEnabled() {
   // While streaming, Enter still queues a follow-up; keep Send enabled when there is text or attachments.
-  $("send").disabled = !input.value.trim() && !pendingAttachments.length;
+  $("send").disabled = !input.value.trim() && !pendingAttachments.length && !pendingPictures.length;
 }
 
+// A model swap in progress: "Loading Qwen2.5-VL-7B…" beside the model chips until the reply starts.
+listen("model-loading", (event) => {
+  const chip = $("loading-chip");
+  const { model, fraction } = event.payload;
+  if (fraction >= 1) { chip.hidden = true; return; }
+  chip.textContent = "Loading " + model + " · " + Math.round(fraction * 100) + "%";
+  chip.hidden = false;
+});
+listen("image-progress", () => {
+  status = { ...status, backend: "On this computer", left_device: false };
+  drawComposerMeta();
+});
+
 function drawChat() {
+  $("analysis-evidence").hidden = !view.analysis_job;
+  if (!view.streaming) $("loading-chip").hidden = true;
   $("chat-title").textContent = view.temporary ? "Temporary chat" : (view.title || "New chat");
   drawComposerMeta();
   if (reactThread) {
-    reactThread.set(view.messages, view.streaming);
+    reactThread.set(view.messages, view.streaming, view.context);
   } else {
     const host = $("messages");
     host.replaceChildren();
@@ -673,12 +947,31 @@ function projectNames() {
 // The sidebar list (search, project filter, chats) is React when the bundle is present; the hand-written drawing is the fallback.
 const reactChats = window.HelixMobiusReact
   ? window.HelixMobiusReact.chats($("chat-list-host"), {
-    opened: () => { clearAttachments(); closeSideDrawer(); },
+    opened: (id, query) => {
+      clearAttachments();
+      closeSideDrawer();
+      if (!query) return;
+      invoke("chat_view").then((next) => {
+        if (next.id !== id) return;
+        view = next;
+        stickToBottom = false;
+        drawChat();
+        $("find-input").value = query;
+        openFindBar();
+      }).catch(report);
+    },
     projects: (names) => { reactProjectNames = names; },
     report: (error) => report(error),
   })
   : null;
 let reactProjectNames = [];
+
+const reactContext = window.HelixMobiusReact?.context($("context-host"));
+function openChatContext() {
+  if (reactContext && view.id) reactContext.open(view);
+  else report("Rebuild the Mobius frontend to use chat context.");
+}
+$("meta-context").onclick = openChatContext;
 
 // The persona rail and the rename, project, persona and model sheets are React when the bundle is present.
 const reactDialogs = window.HelixMobiusReact
@@ -805,6 +1098,7 @@ function drawList(items) {
 }
 listen("chat-list", (event) => drawList(event.payload));
 $("chat-search").addEventListener("input", () => {
+  if (reactChats) return;
   chatFilter = $("chat-search").value;
   const needle = chatFilter.trim();
   clearTimeout(searchTimer);
@@ -815,8 +1109,8 @@ $("chat-search").addEventListener("input", () => {
   }
   searchTimer = setTimeout(() => {
     invoke("chat_search", { query: needle })
-      .then((hits) => { searchHits = Array.isArray(hits) ? hits : []; drawList(); })
-      .catch(() => { searchHits = null; drawList(); });
+      .then((hits) => { if (chatFilter.trim() !== needle) return; searchHits = Array.isArray(hits) ? hits : []; drawList(); })
+      .catch(() => { if (chatFilter.trim() !== needle) return; searchHits = null; drawList(); });
   }, 160);
 });
 $("pin-chat").onclick = () => {
@@ -1080,10 +1374,10 @@ $("composer").addEventListener("submit", (event) => {
   event.preventDefault();
   hideSlashMenu();
   const text = input.value;
-  if (!text.trim() && !pendingAttachments.length) return;
+  if (!text.trim() && !pendingAttachments.length && !pendingPictures.length) return;
   if (text.trim().startsWith("/") && tryRunSlashSubmit()) return;
   if (view.streaming) {
-    if (!text.trim()) { report("Wait for the reply, or stop it."); return; }
+    if (!text.trim() || pendingPictures.length || pendingAttachments.length) { report("Wait for the reply, or stop it, before sending attachments."); return; }
     pendingQueue = text.trim();
     rememberPrompt(text);
     input.value = "";
@@ -1092,19 +1386,26 @@ $("composer").addEventListener("submit", (event) => {
     return;
   }
   const attachments = attachmentPayload();
+  const pictures = pendingPictures.map((p) => p.id);
   rememberPrompt(text);
   input.value = "";
   grow();
   stickToBottom = true;
-  invoke("chat_send", { text, attachments: attachments.length ? attachments : null })
+  invoke("chat_send", { text, attachments: attachments.length ? attachments : null, pictures: pictures.length ? pictures : null })
     .then(() => {
       clearAttachments();
+      clearPictures();
       return invoke("chat_status").then((s) => { status = s; drawComposerMeta(); });
     })
     .catch((error) => { input.value = text; grow(); report(error); });
 });
 $("stop").onclick = () => invoke("chat_stop");
 $("attach").onclick = () => pickAttachments();
+$("attach-picture").onclick = () => pickPictures();
+input.addEventListener("paste", (event) => {
+  const files = event.clipboardData && event.clipboardData.files;
+  if (files && files.length && addPictureFiles(files)) event.preventDefault();
+});
 $("act").onclick = () => {
   const text = input.value.trim() || (view.messages.slice().reverse().find((m) => m.role === "user") || {}).text || "";
   if (!text.trim()) { report("Write something to act on."); return; }
@@ -1340,6 +1641,7 @@ $("composer").addEventListener("drop", (event) => {
   $("composer").classList.remove("drop-target");
   const files = event.dataTransfer && event.dataTransfer.files;
   if (!files || !files.length) return;
+  if (addPictureFiles(files)) return;
   // File paths from the OS drop are not readable in the webview; open the native picker instead.
   pickAttachments();
 });
@@ -1686,6 +1988,40 @@ const reactModels = window.HelixMobiusReact
   })
   : null;
 
+const reactWeb = window.HelixMobiusReact?.web
+  ? window.HelixMobiusReact.web($("web-host"), () => { stickToBottom = true; }) : null;
+function openWeb(query) {
+  closeHubMenu(); closeSideDrawer();
+  if (reactWeb) reactWeb.open(view, query);
+  else report("Build the Mobius frontend to look online.");
+}
+$("open-web").onclick = () => openWeb();
+
+const reactAnalysis = window.HelixMobiusReact?.analysis
+  ? window.HelixMobiusReact.analysis($("analysis-host"), report)
+  : null;
+const reactCreateImage = window.HelixMobiusReact?.createImage
+  ? window.HelixMobiusReact.createImage($("create-image-host")) : null;
+function openCreateImage() {
+  closeHubMenu(); closeSideDrawer();
+  if (reactCreateImage) reactCreateImage.open();
+  else report("Build the Mobius frontend to create images.");
+}
+$("open-create-image").onclick = openCreateImage;
+window.addEventListener("mobius-image-prompt", (event) => {
+  if (typeof event.detail !== "string") return;
+  if (input.value.trim()) { reactCreateImage?.open(event.detail); return; }
+  input.value = "/image " + event.detail;
+  grow(); syncSendEnabled(); maybeSlashFromInput(); input.focus();
+});
+$("open-analysis").onclick = () => {
+  closeHubMenu();
+  closeSideDrawer();
+  if (reactAnalysis) reactAnalysis.open();
+  else report("Build the Mobius frontend to use software analysis.");
+};
+$("analysis-evidence").onclick = () => reactAnalysis?.open(view.analysis_job);
+
 async function openRouting() {
   closeHubMenu();
   closeSideDrawer();
@@ -1809,6 +2145,7 @@ $("open-routing").onclick = () => openRouting().catch(report);
 $("open-models").onclick = () => openRouting().catch(report);
 $("route-chip").onclick = () => openRouting().catch(report);
 $("meta-route").onclick = () => openRouting().catch(report);
+window.addEventListener("mobius-open-models", () => openRouting().catch(report));
 $("models-back").onclick = () => {
   if (modelsDirty && !window.confirm("Discard unsaved model changes?")) return;
   closeModelsPage();
@@ -1911,6 +2248,27 @@ $("route-probe-cloud").onclick = () => {
 
 (function buildEmpty() {
   const host = $("empty");
+  if (window.HelixMobiusReact?.welcome) {
+    reactWelcome = window.HelixMobiusReact.welcome(host, {
+      starter: useStarter,
+      action: (action) => {
+        if (action === "web") openWeb();
+        else if (action === "files") pickAttachments();
+        else if (action === "picture") pickPictures();
+        else if (action === "image") openCreateImage();
+        else if (action === "voice") dictateButton.click();
+        else if (action === "analysis") $("open-analysis").click();
+        else if (action === "brief") openChatContext();
+        else if (action === "tools") {
+          reactTools?.open(view);
+          useStarter("Research this with public sources. Cite pages in the answer.");
+        }
+        else if (action === "models") $("open-models").click();
+      },
+    });
+    drawSuggestions();
+    return;
+  }
   host.append(el("div", "empty-kicker", "Mobius"));
   host.append(el("div", "empty-title", "How can I help?"));
   host.append(el("div", "empty-note", "Ask anything, or type / for commands. Press Ctrl+Shift+A to have Mobius act on the desktop."));
@@ -1924,13 +2282,24 @@ function queueReport() {
   clearTimeout(reportTimer);
   reportTimer = setTimeout(sendReport, 120);
 }
+const layoutErrors = [];
+window.addEventListener("error", (event) => {
+  if (!reporting) return;
+  layoutErrors.push(String(event.message).slice(0, 1000));
+  queueReport();
+});
+window.addEventListener("unhandledrejection", (event) => {
+  if (!reporting) return;
+  layoutErrors.push(String(event.reason).slice(0, 1000));
+  queueReport();
+});
 function sendReport() {
   const elements = {};
   document.querySelectorAll("[data-test]").forEach((node) => {
     const box = node.getBoundingClientRect();
     if (box.width > 0 && box.height > 0 && getComputedStyle(node).visibility !== "hidden") elements[node.dataset.test] = { x: box.x, y: box.y, w: box.width, h: box.height };
   });
-  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements } });
+  invoke("report_layout", { report: { width: window.innerWidth, height: window.innerHeight, elements, errors: layoutErrors.slice(-10) } });
 }
 window.addEventListener("resize", queueReport);
 new MutationObserver(queueReport).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["open", "hidden"] });
@@ -1959,3 +2328,10 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") pollBarHandoff();
 });
 setInterval(pollBarHandoff, 2500);
+refreshAgentDeskGlance();
+setInterval(refreshAgentDeskGlance, 5000);
+window.addEventListener("focus", refreshAgentDeskGlance);
+
+const reactTools = window.HelixMobiusReact?.tools($("tools-host"));
+$("meta-tools").onclick = () => reactTools?.open(view);
+$("meta-agent-desk").onclick = () => invoke("agent_desk_focus").then(refreshAgentDeskGlance).catch(report);

@@ -31,7 +31,7 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 ### IPC
 
 - Existing: `helix-panel …` (panels, bar, settings, clipboard, notifications, workspaces, …)
-- New: `helix-panel desktop-capture [output|all]` → `ok <png-path>\n` for agent vision
+- New: `helix-panel desktop-capture [agent-desk|output|all]` → `ok <png-path>\n` for agent vision (empty target captures the agent desk when placement is on and helix-niri reports agent-desk support; otherwise the focused output)
 - Windows: `niri msg` / `NIRI_SOCKET` (list + focus) until first-class Helix wrappers exist
 
 ### MCP adapter (Helix MCP server)
@@ -111,6 +111,21 @@ assistant window.
   rows name the workspace you are on.
 - `helix-panel app-launch <id-or-name>` opens any installed application.
   Settings and Software use the shell's existing app launch path.
+
+## Agent desk (helix-niri)
+
+A **named workspace** (default `Helix Agent`, `helix { agent-desk-name "…" }` in niri config) holds
+windows opened on behalf of agents. The shell queues placement with `HelixPlaceOnAgentDesk` before
+`app-launch` (and the same path Act uses through Agent Surface): new toplevels land on the agent desk
+**without stealing focus**. The bar workspace strip marks that pill; click still switches desks
+explicitly. `niri msg` request `HelixAgentDesk` reports id, window count, and pending placements.
+The bar island shows a glance when the agent desk has windows and you are on another workspace (tap to
+focus the desk). **Caps Lock → Actions** includes **Show agent desk**; Mobius shows an agent-desk meta chip when Tools is on or the desk has windows. `desktop-capture` defaults to the agent desk for granted agents. Next: per-output capture, visible Tools terminals on the desk.
+
+**Settings integration:** Privacy & agents edits `~/.config/niri/helix-setup.kdl` (and ensures
+`include "helix-setup.kdl"` in `config.kdl`), reloads the compositor, and stores session placement
+policy in `~/.config/helix/compositor-prefs.toml`. Theme, layout, blur, and outputs stay in their
+existing Helix-managed includes (Control Center); key binds remain read-only in Settings → Keyboard.
 
 ## Phased roadmap
 

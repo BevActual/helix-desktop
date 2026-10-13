@@ -39,6 +39,8 @@ Canonical product shape: **[product-structure.md](product-structure.md)**.
 
 | Doc | When you need it |
 |---|---|
+| [mobius-product.md](mobius-product.md) | Everyday workflows, chat context/brief, and next capability/UX priorities |
+| [mobius-analysis.md](mobius-analysis.md) | REA/Ghidra software analysis capability, runner boundaries, setup, and delivery slices |
 | [inference-fabric.md](inference-fabric.md) | Mobius hub, task routing, MCP layer, Act-slot isolation |
 | [agentic-os.md](agentic-os.md) | Agent Surface / session agent surface |
 | [agent-and-inference.md](agent-and-inference.md) | Agent Surface, inference process, eval notes |

@@ -806,8 +806,8 @@ llama_prefix = meson.project_source_root() / 'third_party/llama-install'
 llama_dep = dependency('', required: false)
 if run_command('test', '-e', llama_prefix / 'lib64/libllama.so', check: false).returncode() == 0
   llama_dep = declare_dependency(
-    include_directories: include_directories('third_party/llama-install/include'),
-    link_args: ['-L' + llama_prefix / 'lib64', '-lllama', '-lggml', '-lggml-base'],
+    include_directories: include_directories('third_party/llama-install/include', is_system: true),
+    link_args: ['-L' + llama_prefix / 'lib64', '-lllama', '-lmtmd', '-lggml', '-lggml-base'],
     compile_args: ['-DHELIX_HAVE_LLAMA'],
   )
 endif
@@ -856,6 +856,8 @@ configure_file(input: 'assets/services/helix-service.service.in',
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
 
 # The model runtime: its own process, its own bus name (org.helix.Inference), sandboxed by its unit.
+image_worker_sources = files('src/inference/image_generator.cpp', 'src/inference/image_input.cpp')
+image_png_dep = dependency('libpng')
 helix_inference_introspection_h = custom_target('helix-inference-introspection',
   input: 'protocols/dbus/org.helix.Inference.xml',
   output: 'helix_inference_introspection.h',
@@ -863,19 +865,51 @@ helix_inference_introspection_h = custom_target('helix-inference-introspection',
 )
 helix_inference = executable('helix-inference',
   sources: [files('src/inference/service_main.cpp', 'src/inference/inference_service.cpp', 'src/inference/inference_queue.cpp',
-    'src/inference/schema_grammar.cpp', 'src/inference/routing.cpp'), helix_inference_introspection_h]
+    'src/inference/schema_grammar.cpp', 'src/inference/routing.cpp', 'src/inference/image_input.cpp',
+    'src/inference/transcriber.cpp', 'src/inference/image_generator.cpp'), helix_inference_introspection_h]
     + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
-  dependencies: [helix_core_dep, dependency('threads')] + (llama_dep.found() ? [llama_dep] : []),
+  dependencies: [helix_core_dep, dependency('threads'), image_png_dep] + (llama_dep.found() ? [llama_dep] : []),
   build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
   install_rpath: get_option('prefix') / 'lib64' / 'helix',  # installed: the private copy made below
   cpp_args: _helix_cpp_args,
   install: true,
+  install_tag: 'inference',
 )
 if llama_dep.found()
-  meson.add_install_script(find_program('python3'), files('tools/scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix')
+  meson.add_install_script(find_program('python3'), files('tools/scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix', install_tag: 'inference')
+endif
+
+# Speech to text: whisper.cpp (built by hand into third_party/whisper-install, CPU only) in a worker process of its own, because it
+# carries its own ggml and because decoding untrusted audio must not be able to take the chat service down.
+whisper_prefix = meson.project_source_root() / 'third_party/whisper-install'
+if run_command('test', '-e', whisper_prefix / 'lib64/libwhisper.a', check: false).returncode() == 0
+  helix_transcribe = executable('helix-transcribe',
+    sources: files('src/inference/transcribe_worker.cpp'),
+    include_directories: include_directories('third_party/whisper-install/include', is_system: true),
+    dependencies: [helix_core_dep, dependency('threads'), dependency('openmp', required: false)],
+    link_args: ['-L' + whisper_prefix / 'lib64', '-Wl,--start-group', '-lwhisper', '-lggml', '-lggml-base', '-lggml-cpu', '-Wl,--end-group', '-fopenmp'],
+    cpp_args: _helix_cpp_args,
+    install: true,
+    install_tag: 'inference',
+  )
 endif
 
 helix_inference_config = configuration_data()
+sd_prefix = meson.project_source_root() / 'third_party/sd-install'
+if run_command('test', '-e', sd_prefix / 'lib64/libstable-diffusion.a', check: false).returncode() == 0
+  sd_link_args = ['-L' + sd_prefix / 'lib64', '-Wl,--start-group', '-lstable-diffusion', '-lggml', '-lggml-base', '-lggml-cpu']
+  if run_command('test', '-e', sd_prefix / 'lib64/libggml-vulkan.a', check: false).returncode() == 0
+    sd_link_args += ['-lggml-vulkan', '-lvulkan']
+  endif
+  sd_link_args += ['-Wl,--end-group', '-fopenmp', '-ldl']
+  helix_image = executable('helix-image',
+    sources: files('src/inference/image_worker.cpp') + image_worker_sources,
+    include_directories: include_directories('third_party/sd-install/include', is_system: true),
+    dependencies: [helix_core_dep, dependency('threads'), image_png_dep, dependency('openmp', required: false)],
+    link_args: sd_link_args, cpp_args: _helix_cpp_args,
+    install: true, install_tag: 'inference',
+  )
+endif
 helix_inference_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/org.helix.Inference.service.in',
   output: 'org.helix.Inference.service', configuration: helix_inference_config,
@@ -925,11 +959,22 @@ if build_tests
   )
   test('desktop_tool_schema', helix_tool_schema_unit, args: [meson.project_source_root()])
   helix_inference_queue_unit = executable('inference_queue_test',
-    sources: files('tests/inference_queue_test.cpp', 'src/inference/inference_queue.cpp'),
-    dependencies: [helix_core_dep, dependency('threads')],
+    sources: files('tests/inference_queue_test.cpp', 'src/inference/inference_queue.cpp') + image_worker_sources,
+    dependencies: [helix_core_dep, dependency('threads'), image_png_dep],
     override_options: ['b_ndebug=false'],
   )
   test('inference_queue', helix_inference_queue_unit, timeout: 60)
+  helix_image_generation_unit = executable('inference_image_generation_test',
+    sources: files('tests/inference_image_generation_test.cpp', 'src/inference/inference_queue.cpp') + image_worker_sources,
+    dependencies: [helix_core_dep, dependency('threads'), image_png_dep], override_options: ['b_ndebug=false'],
+  )
+  test('inference_image_generation', helix_image_generation_unit, timeout: 60)
+  helix_image_input_unit = executable('inference_image_input_test',
+    sources: files('tests/inference_image_input_test.cpp', 'src/inference/image_input.cpp'),
+    dependencies: [helix_core_dep, dependency('threads')],
+    override_options: ['b_ndebug=false'],
+  )
+  test('inference_image_input', helix_image_input_unit, timeout: 60)
   helix_schema_grammar_unit = executable('inference_schema_grammar_test',
     sources: files('tests/inference_schema_grammar_test.cpp', 'src/inference/schema_grammar.cpp',
       'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
@@ -940,16 +985,16 @@ if build_tests
   if llama_dep.found()
     helix_llama_test = executable('inference_llama_test',
       sources: files('tests/inference_llama_test.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
-        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-      dependencies: [helix_core_dep, llama_dep, dependency('threads')],
+        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp') + image_worker_sources,
+      dependencies: [helix_core_dep, llama_dep, dependency('threads'), image_png_dep],
       build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
       override_options: ['b_ndebug=false'],
     )
     # Evaluation harness (not a test: it takes minutes). Run it with tools/run-inference-eval.py.
     executable('inference_eval',
       sources: files('tests/inference_eval.cpp', 'src/inference/llama_backend.cpp', 'src/inference/inference_queue.cpp',
-        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-      dependencies: [helix_core_dep, llama_dep, dependency('threads')],
+        'src/inference/schema_grammar.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp') + image_worker_sources,
+      dependencies: [helix_core_dep, llama_dep, dependency('threads'), image_png_dep],
       build_rpath: llama_prefix / 'lib64',
       override_options: ['b_ndebug=false'],
     )

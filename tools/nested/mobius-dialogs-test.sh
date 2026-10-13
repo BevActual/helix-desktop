@@ -44,6 +44,7 @@ has_id persona-dot-1 && echo "ok: the new persona is on the rail" || fail "perso
 echo "--- 4. model picker"
 click_id meta-model; sleep 1.2
 has_id model-auto && echo "ok: the model picker opened" || fail "no model picker"
+click_id meta-model; sleep 1.2
 click_id model-auto; sleep 1
 has_id model-auto && fail "the picker stayed open" || echo "ok: Auto closed the picker"
 echo "--- 5. find in the chat"

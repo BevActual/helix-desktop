@@ -9,7 +9,7 @@ Restart=on-failure
 RestartSec=2
 
 # Model files are untrusted binary input to a parser written in C++, so the process that reads them is boxed in: no
-# network, no writes outside its own temporary space, no new privileges, only the system calls a normal service needs.
+# network, no writes outside its own temporary space and private shader cache, no new privileges, only the system calls a normal service needs.
 # It can still read the models under ~/.local/share/helix and use the GPU. tools/check-inference-sandbox.py proves it.
 NoNewPrivileges=yes
 PrivateNetwork=yes
@@ -31,4 +31,7 @@ SystemCallArchitectures=native
 SystemCallFilter=@system-service
 CapabilityBoundingSet=
 UMask=0077
+CacheDirectory=helix-inference
+CacheDirectoryMode=0700
+Environment=XDG_CACHE_HOME=%C/helix-inference
 # Not set: MemoryDenyWriteExecute (GPU drivers map writable executable memory for shader code).

@@ -2359,6 +2359,12 @@ impl State {
                 }
                 self.niri.queue_redraw_all();
             }
+            Action::HelixPlaceOnAgentDesk { count } => {
+                self.helix_place_on_agent_desk(count.max(1) as u32);
+            }
+            Action::HelixFocusAgentDesk {} => {
+                self.helix_focus_agent_desk();
+            }
             Action::LoadConfigFile(path) => {
                 if let Some(watcher) = &self.niri.config_file_watcher {
                     watcher.load_config(path);

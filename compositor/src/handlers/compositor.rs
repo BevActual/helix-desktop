@@ -175,6 +175,17 @@ impl CompositorHandler for State {
                         }
                     });
 
+                    let mut workspace_id = workspace_id;
+                    let mut activate = activate;
+                    if self.niri.helix_place_on_agent_desk > 0 && toplevel.parent().is_none() {
+                        self.helix_ensure_agent_desk_workspace();
+                        if let Some(id) = self.helix_agent_desk_workspace_id() {
+                            workspace_id = Some(id);
+                            activate = ActivateWindow::No;
+                            self.niri.helix_place_on_agent_desk -= 1;
+                        }
+                    }
+
                     let parent = toplevel
                         .parent()
                         .and_then(|parent| self.niri.layout.find_window_and_output(&parent))

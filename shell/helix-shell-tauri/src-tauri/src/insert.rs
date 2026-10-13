@@ -257,6 +257,11 @@ fn do_action(app: &AppHandle, action: Action) {
             tauri::async_runtime::spawn(async move { crate::toggle_dark_theme(&app).await });
         }
         Action::LockSession => lock_session(),
+        Action::FocusAgentDesk => {
+            if crate::dock::agent_desk_focus().is_err() {
+                crate::show_notice(app, "Could not show the agent desk");
+            }
+        }
     }
 }
 

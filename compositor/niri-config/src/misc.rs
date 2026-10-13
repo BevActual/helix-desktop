@@ -236,6 +236,35 @@ pub struct TrustedSurfacePart {
     pub allow_virtual_input: Option<Flag>,
 }
 
+/// Helix-specific compositor options (agent desk, future capture scopes).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Helix {
+    /// Named workspace where agent-launched windows open without stealing focus.
+    pub agent_desk_name: String,
+}
+
+impl Default for Helix {
+    fn default() -> Self {
+        Self {
+            agent_desk_name: String::from("Helix Agent"),
+        }
+    }
+}
+
+#[derive(knuffel::Decode, Debug, Default, Clone, PartialEq, Eq)]
+pub struct HelixPart {
+    #[knuffel(child, unwrap(argument))]
+    pub agent_desk_name: Option<String>,
+}
+
+impl MergeWith<HelixPart> for Helix {
+    fn merge_with(&mut self, part: &HelixPart) {
+        if let Some(name) = &part.agent_desk_name {
+            self.agent_desk_name = name.clone();
+        }
+    }
+}
+
 impl MergeWith<TrustedSurfacePart> for TrustedSurface {
     fn merge_with(&mut self, part: &TrustedSurfacePart) {
         if let Some(namespace) = &part.namespace {

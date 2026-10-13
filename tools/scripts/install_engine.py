@@ -19,7 +19,7 @@ prefix = os.environ["MESON_INSTALL_PREFIX"]
 target = pathlib.Path(destdir + prefix) / relative if not destdir else pathlib.Path(destdir) / prefix.lstrip("/") / relative
 target.mkdir(parents=True, exist_ok=True)
 
-WANTED = re.compile(r"^lib(llama|ggml|ggml-base|ggml-cpu|ggml-vulkan)\.so(\.\d+(\.\d+)*)?$")
+WANTED = re.compile(r"^lib(llama|mtmd|ggml|ggml-base|ggml-cpu|ggml-vulkan)\.so(\.\d+(\.\d+)*)?$")
 copied = 0
 for entry in sorted(source.iterdir()):
     if not WANTED.match(entry.name) or entry.name.endswith(".so"):  # the unversioned name is for linking, not running

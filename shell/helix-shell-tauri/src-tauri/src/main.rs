@@ -15,6 +15,7 @@ mod battery;
 mod blur;
 mod confirmer;
 mod agent_ipc;
+mod capture;
 mod control;
 mod dock;
 mod insert;
@@ -1974,6 +1975,7 @@ fn main() {
             dock::dock_prefs,
             dock::workspaces_view,
             dock::workspace_focus,
+            dock::agent_desk_focus,
             dock::dock_activate,
             dock::dock_new_window,
             dock::dock_pin,

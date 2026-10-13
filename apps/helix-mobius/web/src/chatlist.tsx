@@ -20,7 +20,7 @@ interface Hit { id: string; title: string; updated?: number | string; pinned: bo
 
 export interface ChatListHooks {
   /** A chat was opened from the list: the page clears its attachments and closes the narrow drawer. */
-  opened: () => void;
+  opened: (id: string, query: string) => void;
   /** The project names now in the list (the project dialog suggests them). */
   projects: (names: string[]) => void;
   report: (error: unknown) => void;
@@ -54,7 +54,8 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
   const [currentId, setCurrentId] = useState("");
   const [filter, setFilter] = useState("");
   const [project, setProject] = useState("");
-  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [result, setResult] = useState<{ query: string; hits: Hit[] } | null>(null);
+  const [searchError, setSearchError] = useState("");
   const hooksRef = useRef(hooks);
   hooksRef.current = hooks;
 
@@ -69,19 +70,24 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
   const needle = filter.trim();
   useEffect(() => {
     if (needle.length < 2) {
-      setHits(null);
+      setResult(null);
+      setSearchError("");
       return;
     }
+    let active = true;
+    setSearchError("");
     const timer = setTimeout(() => {
       invoke<Hit[]>("chat_search", { query: needle })
-        .then((found) => setHits(Array.isArray(found) ? found : []))
-        .catch(() => setHits(null));
+        .then((found) => { if (active) setResult({ query: needle, hits: Array.isArray(found) ? found : [] }); })
+        .catch(() => { if (active) { setResult(null); setSearchError("Search failed. Change the query to retry."); } });
     }, 160);
-    return () => clearTimeout(timer);
-  }, [needle]);
+    return () => { active = false; clearTimeout(timer); };
+  }, [needle, items]);
 
   const lower = needle.toLowerCase();
   const searching = lower.length >= 2;
+  const hits = result?.query === needle ? result.hits : null;
+  const pending = searching && !hits && !searchError;
   const now = Math.floor(Date.now() / 1000);
   const snippets: Record<string, string> = {};
   let shown: ChatItem[];
@@ -91,6 +97,8 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
       return { id: hit.id, title: hit.title, updated: hit.updated, pinned: hit.pinned, project: hit.project || "", preview: hit.snippet || "" };
     });
     if (project) shown = shown.filter((item) => item.project === project);
+  } else if (searching) {
+    shown = [];
   } else {
     shown = project ? items.filter((item) => item.project === project) : items;
     if (lower) {
@@ -112,7 +120,7 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
         ))}
       </div>
       <nav id="chats" data-test="chats">
-        {!shown.length ? <div className="chat-empty">{lower || project ? "No matching chats" : "No chats yet"}</div> : null}
+        {!shown.length ? <div className="chat-empty" role="status" data-test="chat-search-status">{pending ? "Searching chats…" : searchError || (lower || project ? "No matching chats" : "No chats yet")}</div> : null}
         {shown.map((item, index) => {
           const snippet = snippets[item.id] || (lower && item.preview) || "";
           const label = !searching ? sectionOf(item, index, shown, now) : "";
@@ -122,8 +130,9 @@ export function ChatList({ register, hooks }: { register: (handle: ChatListHandl
               <button
                 className="chat-open"
                 onClick={() => {
-                  hooksRef.current.opened();
-                  invoke("chat_open", { id: item.id }).catch(hooksRef.current.report);
+                  invoke("chat_open", { id: item.id })
+                    .then(() => hooksRef.current.opened(item.id, searching ? needle : ""))
+                    .catch(hooksRef.current.report);
                 }}
               >
                 {item.pinned ? <span className="chat-pin-mark"><Icon name="pin" /></span> : null}

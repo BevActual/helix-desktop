@@ -1,6 +1,7 @@
 #include "inference/fake_backend.h"
 #include "inference/inference_service.h"
 #include "inference/protocol.h"
+#include "inference/transcriber.h"
 #include "helix_inference_introspection.h"
 
 #ifdef HELIX_HAVE_LLAMA
@@ -35,6 +36,8 @@ struct App {
   std::unique_ptr<InferenceService> service;
   std::shared_ptr<Backend> backend;
   InferenceService::Config config;
+  std::shared_ptr<Transcriber> transcriber;
+  std::shared_ptr<ImageGenerator> imageGenerator;
   guint ownerWatch = 0, tick = 0;
   std::vector<guint> registrations;
 };
@@ -42,6 +45,7 @@ struct App {
 }  // namespace
 
 int main() {
+  std::signal(SIGPIPE, SIG_IGN);  // an engine worker may fail before reading its input
   App app;
   app.config.modelDir = env("HELIX_MODEL_DIR", defaultModelDir().string());
   app.config.idleUnload = std::chrono::seconds(std::atoi(env("HELIX_INFERENCE_IDLE_SECONDS", "300").c_str()));
@@ -61,6 +65,23 @@ int main() {
 #endif
   }
 
+  // Speech to text: the worker program sits beside this one (or where HELIX_TRANSCRIBE_BIN says); models are in <models>/speech.
+  if (kind == "fake" && env("HELIX_TRANSCRIBER") != "process") {  // the scripted one, unless a test wants the real worker
+    app.transcriber = std::make_shared<FakeTranscriber>();
+  } else {
+    std::error_code ec;
+    fs::path worker = env("HELIX_TRANSCRIBE_BIN");
+    if (worker.empty()) worker = fs::read_symlink("/proc/self/exe", ec).parent_path() / "helix-transcribe";
+    app.transcriber = std::make_shared<ProcessTranscriber>(worker, fs::path(app.config.modelDir) / "speech");
+  }
+
+  if (kind == "fake" && env("HELIX_IMAGE_GENERATOR") != "process") app.imageGenerator = std::make_shared<FakeImageGenerator>();
+  else {
+    std::error_code ec;
+    fs::path worker = env("HELIX_IMAGE_BIN");
+    if (worker.empty()) worker = fs::read_symlink("/proc/self/exe", ec).parent_path() / "helix-image";
+    app.imageGenerator = std::make_shared<ProcessImageGenerator>(worker, fs::path(app.config.modelDir) / "image");
+  }
   app.loop = g_main_loop_new(nullptr, false);
   GError* error = nullptr;
   app.info = g_dbus_node_info_new_for_xml(helix::protocols::inferenceIntrospectionXml, &error);
@@ -78,6 +99,8 @@ int main() {
       auto& self = *static_cast<App*>(data);
       GError* failure = nullptr;
       self.service = std::make_unique<InferenceService>(bus, self.config, self.backend);
+      self.service->setTranscriber(self.transcriber);
+      self.service->setImageGenerator(self.imageGenerator);
       if (!g_dbus_connection_register_object(bus, objectPath, self.info->interfaces[0], &vtable, &self, nullptr, &failure)) {
         std::cerr << "helix-inference: could not register: " << (failure ? failure->message : "?") << "\n";
         g_main_loop_quit(self.loop);

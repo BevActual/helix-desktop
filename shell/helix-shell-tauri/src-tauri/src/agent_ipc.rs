@@ -199,6 +199,7 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
                 return Err("no matching application".into());
             };
             drop(shell);
+            let _ = crate::dock::place_on_agent_desk(1);
             match crate::apps::launch(&entry) {
                 Ok(()) => {
                     let mut shell = state.lock().expect("shell state");
@@ -225,6 +226,11 @@ async fn execute(app: &AppHandle, command: Command) -> Result<String, String> {
                 .insert
                 .forget_clipboard();
             crate::insert::clear_clipboard_selection();
+            ok()
+        }
+        Command::DesktopCapture(target) => crate::capture::desktop_capture(app, target),
+        Command::AgentDeskFocus => {
+            crate::dock::agent_desk_focus()?;
             ok()
         }
     }

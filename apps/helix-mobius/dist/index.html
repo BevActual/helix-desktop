@@ -24,6 +24,9 @@
       </button>
       <div id="hub-menu" class="hub-menu" hidden data-test="hub-menu">
         <div class="hub-menu-label">Mobius</div>
+        <button id="open-web" data-test="open-web" type="button"><i data-icon="search"></i><span>Pick online sources</span></button>
+        <button id="open-create-image" data-test="open-create-image" type="button"><i data-icon="image"></i><span>Create image</span></button>
+        <button id="open-analysis" data-test="open-analysis" type="button"><i data-icon="eye"></i><span>Analyze software</span></button>
         <button id="open-assistant" data-test="open-assistant" type="button"><i data-icon="sparkle"></i><span>Act on the desktop</span></button>
         <button id="open-agents" data-test="open-agents" type="button"><i data-icon="shield"></i><span>Agents</span></button>
         <button id="open-routing" data-test="open-routing" type="button"><i data-icon="sparkle"></i><span>Models &amp; routing</span></button>
@@ -68,13 +71,21 @@
           <button id="meta-persona" class="meta-chip" data-test="meta-persona" type="button" title="Persona" hidden></button>
           <button id="meta-style" class="meta-chip" data-test="meta-style" type="button" title="Style for this chat" hidden></button>
           <button id="meta-model" class="meta-chip" data-test="meta-model" type="button" title="Chat model">Model</button>
+          <button id="analysis-evidence" class="meta-chip" data-test="analysis-evidence" type="button" hidden>Local analysis · evidence</button>
           <button id="meta-route" class="meta-chip" data-test="meta-route" type="button" title="Models and routing"></button>
+          <button id="meta-tools" class="meta-chip" data-test="meta-tools" type="button" title="Configure chat tools">Tools · off</button>
+          <button id="meta-agent-desk" class="meta-chip" data-test="meta-agent-desk" type="button" title="Show the Helix agent desk" hidden>Agent desk</button>
+          <button id="meta-context" class="meta-chip" data-test="meta-context" type="button" title="Chat context and brief">Context</button>
+          <span id="loading-chip" class="queue-chip" data-test="loading-chip" hidden></span>
           <span id="queue-chip" class="queue-chip" data-test="queue-chip" hidden></span>
         </div>
+        <div id="picture-strip" class="picture-strip" data-test="picture-strip" hidden></div>
         <div id="attach-chips" class="attach-chips" data-test="attach-chips" hidden></div>
         <div id="slash-menu" class="slash-menu" data-test="slash-menu" hidden></div>
         <form id="composer" data-test="composer">
           <button id="attach" type="button" data-test="attach" title="Attach files" aria-label="Attach files"><i data-icon="paperclip"></i></button>
+          <button id="attach-picture" type="button" data-test="attach-picture" title="Add a picture" aria-label="Add a picture"><i data-icon="image"></i></button>
+          <button id="dictate" type="button" data-test="dictate" title="Dictate" aria-label="Dictate" aria-pressed="false"><i data-icon="mic"></i></button>
           <textarea id="input" data-test="input" rows="1" placeholder="Ask anything — / for commands" autocomplete="off" spellcheck="true"></textarea>
           <div class="composer-actions">
             <button id="act" type="button" data-test="act" title="Have Mobius act on the desktop" aria-label="Have Mobius act on the desktop">Act</button>
@@ -314,5 +325,10 @@
 </div>
 
 <script src="icons.js"></script>
+<div id="analysis-host"></div>
+<div id="create-image-host"></div>
+<div id="context-host"></div>
+<div id="web-host"></div>
+<div id="tools-host"></div>
 <script src="react/helix-mobius.js"></script>
 <script src="chat.js"></script>

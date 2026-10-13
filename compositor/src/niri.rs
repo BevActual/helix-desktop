@@ -431,6 +431,9 @@ pub struct Niri {
     pub inhibit_power_key_fd: Option<zbus::zvariant::OwnedFd>,
 
     pub ipc_server: Option<IpcServer>,
+
+    /// Helix: toplevel opens that should land on the agent desk without stealing focus.
+    pub helix_place_on_agent_desk: u32,
     pub ipc_outputs_changed: bool,
 
     pub satellite: Option<Satellite>,
@@ -774,6 +777,7 @@ impl State {
         state.ipc_keyboard_layouts_changed();
         // Focus the default monitor if set by the user.
         state.focus_default_monitor();
+        state.helix_ensure_agent_desk_workspace();
 
         Ok(state)
     }
@@ -1596,6 +1600,7 @@ impl State {
         for ws_config in &config.workspaces {
             self.niri.layout.ensure_named_workspace(ws_config);
         }
+        self.helix_ensure_agent_desk_workspace();
 
         let rate = 1.0 / config.animations.slowdown.max(0.001);
         self.niri.clock.set_rate(rate);
@@ -2798,6 +2803,7 @@ impl Niri {
             inhibit_power_key_fd: None,
 
             ipc_server,
+            helix_place_on_agent_desk: 0,
             ipc_outputs_changed: false,
 
             satellite: None,

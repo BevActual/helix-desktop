@@ -21,7 +21,55 @@ pub enum Block {
     Code { language: String, text: String },
     List { ordered: bool, items: Vec<Vec<Span>> },
     Quote { spans: Vec<Span> },
+    Table { headers: Vec<Vec<Span>>, rows: Vec<Vec<Vec<Span>>>, alignments: Vec<Alignment> },
     Rule,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Alignment { Left, Center, Right }
+
+/// Split cells without treating escaped pipes or pipes inside inline code as separators.
+fn table_cells(line: &str) -> Option<Vec<String>> {
+    let mut cells = Vec::new();
+    let mut cell = String::new();
+    let mut escaped = false;
+    let mut code = false;
+    let mut separators = 0;
+    for c in line.trim().chars() {
+        if escaped {
+            if c != '|' { cell.push('\\'); }
+            cell.push(c);
+            escaped = false;
+        } else if c == '\\' {
+            escaped = true;
+        } else if c == '`' {
+            code = !code;
+            cell.push(c);
+        } else if c == '|' && !code {
+            cells.push(cell.trim().to_string());
+            cell.clear();
+            separators += 1;
+        } else {
+            cell.push(c);
+        }
+    }
+    if escaped { cell.push('\\'); }
+    cells.push(cell.trim().to_string());
+    if separators == 0 { return None; }
+    if line.trim().starts_with('|') { cells.remove(0); }
+    if line.trim().ends_with('|') && cells.last().is_some_and(String::is_empty) { cells.pop(); }
+    if cells.is_empty() { None } else { Some(cells) }
+}
+
+fn table_alignment(line: &str) -> Option<Vec<Alignment>> {
+    table_cells(line)?.iter().map(|cell| {
+        let dashes = cell.trim_matches(':');
+        if dashes.len() < 3 || !dashes.chars().all(|c| c == '-') { return None; }
+        Some(if cell.ends_with(':') {
+            if cell.starts_with(':') { Alignment::Center } else { Alignment::Right }
+        } else { Alignment::Left })
+    }).collect()
 }
 
 fn text(s: &str) -> Span {
@@ -127,7 +175,8 @@ pub fn parse(input: &str) -> Vec<Block> {
         }
     }
 
-    for line in input.lines() {
+    let mut lines = input.lines().peekable();
+    while let Some(line) = lines.next() {
         if let Some((language, body)) = &mut fence {
             if line.trim_start().starts_with("```") {
                 blocks.push(Block::Code { language: language.clone(), text: body.join("\n") });
@@ -149,6 +198,24 @@ pub fn parse(input: &str) -> Vec<Block> {
             end_paragraph(&mut blocks, &mut paragraph);
             end_list(&mut blocks, &mut list);
             continue;
+        }
+        if let Some(headers) = table_cells(line) {
+            if let Some(alignments) = lines.peek().and_then(|next| table_alignment(next)) {
+                if headers.len() == alignments.len() {
+                    end_paragraph(&mut blocks, &mut paragraph);
+                    end_list(&mut blocks, &mut list);
+                    lines.next();
+                    let mut rows = Vec::new();
+                    while let Some(cells) = lines.peek().and_then(|next| table_cells(next)) {
+                        lines.next();
+                        let mut row: Vec<Vec<Span>> = cells.iter().take(headers.len()).map(|cell| spans(cell)).collect();
+                        row.resize(headers.len(), Vec::new());
+                        rows.push(row);
+                    }
+                    blocks.push(Block::Table { headers: headers.iter().map(|cell| spans(cell)).collect(), rows, alignments });
+                    continue;
+                }
+            }
         }
         let hashes = trimmed.chars().take_while(|c| *c == '#').count();
         if (1..=6).contains(&hashes) && trimmed[hashes..].starts_with(' ') {
@@ -191,12 +258,89 @@ pub fn parse(input: &str) -> Vec<Block> {
     blocks
 }
 
+/// What to show before the person picks a save location for an assistant reply.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SaveDraft {
+    pub body: String,
+    pub default_filename: String,
+}
+
+fn extension_for_language(language: &str) -> &'static str {
+    match language.trim().to_lowercase().as_str() {
+        "rust" | "rs" => "rs",
+        "python" | "py" => "py",
+        "typescript" | "ts" | "tsx" => "ts",
+        "javascript" | "js" | "jsx" => "js",
+        "bash" | "sh" | "shell" | "zsh" => "sh",
+        "json" => "json",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        "markdown" | "md" => "md",
+        "html" | "htm" => "html",
+        "css" => "css",
+        "sql" => "sql",
+        "go" => "go",
+        "java" => "java",
+        "kotlin" | "kt" => "kt",
+        "c" => "c",
+        "cpp" | "c++" | "cc" => "cpp",
+        "h" | "hpp" => "h",
+        _ => "txt",
+    }
+}
+
+/// One fenced code block becomes a snippet file; otherwise the full reply is saved as Markdown.
+pub fn save_draft(assistant_text: &str) -> SaveDraft {
+    let blocks = parse(assistant_text);
+    let mut code_blocks: Vec<(&str, &str)> = Vec::new();
+    for block in &blocks {
+        if let Block::Code { language, text } = block {
+            if !text.trim().is_empty() {
+                code_blocks.push((language.as_str(), text.as_str()));
+            }
+        }
+    }
+    if code_blocks.len() == 1 {
+        let (language, text) = code_blocks[0];
+        let ext = extension_for_language(language);
+        return SaveDraft {
+            body: text.to_string(),
+            default_filename: format!("mobius-snippet.{ext}"),
+        };
+    }
+    SaveDraft {
+        body: assistant_text.to_string(),
+        default_filename: "mobius-reply.md".into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn t(s: &str) -> Span {
         text(s)
+    }
+
+    #[test]
+    fn tables_have_alignment_and_inline_formatting() {
+        let blocks = parse("Before\n\n| Name | Cost |\n| :--- | ---: |\n| **Small** | `2|3` |\n| a\\|b |\n\nAfter");
+        assert_eq!(blocks.len(), 3);
+        assert_eq!(blocks[1], Block::Table {
+            headers: vec![vec![t("Name")], vec![t("Cost")]],
+            alignments: vec![Alignment::Left, Alignment::Right],
+            rows: vec![vec![vec![Span::Bold { text: "Small".into() }], vec![Span::Code { text: "2|3".into() }]], vec![vec![t("a|b")], vec![]]],
+        });
+        assert!(matches!(parse("a | b\n--- | :---:\nx | y")[0], Block::Table { .. }));
+    }
+
+    #[test]
+    fn incomplete_and_invalid_tables_stay_text_and_code_stays_code() {
+        for input in ["a | b", "a | b\n-- | ---", "a | b\n--- | --- | ---", "a | b\n--- | :--"] {
+            assert!(matches!(parse(input)[0], Block::Paragraph { .. }), "{input}");
+        }
+        assert!(matches!(parse("```\na | b\n--- | ---\n```")[0], Block::Code { .. }));
+        assert!(matches!(parse("a | b\n--- | ---")[0], Block::Table { .. }));
     }
 
     #[test]
@@ -252,5 +396,15 @@ mod tests {
         } else {
             panic!("not code");
         }
+    }
+
+    #[test]
+    fn save_draft_prefers_a_single_code_block() {
+        let draft = save_draft("Here is the script:\n\n```python\nprint('ok')\n```\n");
+        assert_eq!(draft.body, "print('ok')");
+        assert_eq!(draft.default_filename, "mobius-snippet.py");
+        let whole = save_draft("# Title\n\nTwo blocks:\n\n```rs\na\n```\n\n```rs\nb\n```");
+        assert!(whole.body.contains("Two blocks"));
+        assert_eq!(whole.default_filename, "mobius-reply.md");
     }
 }

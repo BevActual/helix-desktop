@@ -142,6 +142,7 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
     { value: "openrouter", label: "OpenRouter" },
   ]);
   const [models, setModels] = useState<string[]>([]);
+  const [shelf, setShelf] = useState<Record<string, { title: string; bytes: number; vision: boolean; loaded: boolean; tasks: string[] }>>({});
   const [custom, setCustom] = useState("");
   const [current, setCurrent] = useState("");
 
@@ -152,6 +153,12 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
         ? await invoke<string[]>("routing_list_models")
         : await invoke<string[]>("routing_list_remote_models", { backendId: which });
       setModels(Array.isArray(list) ? list : []);
+      if (which === "local") {
+        const cards = await invoke<{ file: string; title: string; bytes: number; vision: boolean; loaded: boolean; installed: boolean; tasks: string[] }[]>("library_list").catch(() => []);
+        const next: typeof shelf = {};
+        cards.filter((c) => c.installed).forEach((c) => { next[c.file] = c; });
+        setShelf(next);
+      }
     } catch (error) {
       report(error);
     }
@@ -453,10 +460,23 @@ export function Dialogs({ register, hooks, rail }: { register: (handle: DialogHa
             </label>
             <div id="model-list" className="model-list" data-test="model-list">
               <button type="button" className={`model-option${!custom ? " active" : ""}`} onClick={() => setCustom("")}>Auto (default)</button>
-              {models.map((id) => (
-                <button key={id} type="button" className={`model-option${custom === id ? " active" : ""}`} onClick={() => setCustom(id)}>{id}</button>
-              ))}
+              {models.map((id) => {
+                const info = backend === "local" ? shelf[id] : undefined;
+                return (
+                  <button key={id} type="button" className={`model-option${custom === id ? " active" : ""}`} data-test={`model-option-${id}`} onClick={() => setCustom(id)}>
+                    {info ? (
+                      <span className="model-option-rich">
+                        <span className="model-option-title">{info.title}{info.loaded ? <span className="lib-loaded"> ● ready</span> : null}</span>
+                        <span className="model-option-sub">{(info.bytes / 1e9).toFixed(1)} GB{info.vision ? " · sees pictures" : ""}{info.tasks.includes("code") ? " · code" : ""}</span>
+                      </span>
+                    ) : id}
+                  </button>
+                );
+              })}
             </div>
+            <p className="sheet-note">
+              Want more models? <a href="#" data-test="model-browse" onClick={(event) => { event.preventDefault(); closeSheet(); window.dispatchEvent(new CustomEvent("mobius-open-models")); }}>Browse the library</a>
+            </p>
             <label className="sheet-field">Custom id
               <input id="model-custom" data-test="model-custom" type="text" placeholder="GGUF id or provider/model" value={custom} onChange={(event) => setCustom(event.target.value)} />
             </label>

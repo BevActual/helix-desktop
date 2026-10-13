@@ -9,7 +9,7 @@ export interface OsdView { kind: string; percent: number; muted: boolean; text: 
 export function IslandBody({ register }: { register: (set: (view: IslandView) => void) => void }) {
   const [view, setView] = useState<IslandView>({ kind: "none", text: "", detail: "" });
   useEffect(() => register(setView), [register]);
-  const icon = view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : "sparkle";
+  const icon = view.kind === "approval" ? "shield" : view.kind === "media" ? "music" : view.kind === "agentdesk" ? "grid" : "sparkle";
   return (
     <>
       <Icon name={icon} />

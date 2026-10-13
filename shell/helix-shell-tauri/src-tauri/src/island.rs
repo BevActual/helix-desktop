@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::time::Duration;
 
+use helix_shell_core::agent_desk::glance_from_niri;
 use helix_shell_core::island::{choose, parse_media_line, IslandView};
 use tauri::{AppHandle, Emitter};
 
@@ -18,10 +19,12 @@ fn compute(app: &AppHandle) -> IslandView {
     let state = shell_state(app);
     let shell = state.lock().expect("shell state");
     let activity = shell.activity.view();
+    let agent_desk = glance_from_niri(&shell.niri);
     choose(
         activity.pending.len(),
         activity.enabled,
         phase_name(shell.session.view().phase),
+        agent_desk.as_ref(),
         shell.media.as_ref(),
     )
 }

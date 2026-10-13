@@ -78,6 +78,7 @@ pub enum Action {
     ToggleNightLight,
     ToggleDarkTheme,
     LockSession,
+    FocusAgentDesk,
 }
 
 const ACTIONS: &[(Action, &str, &str, &[&str])] = &[
@@ -110,6 +111,12 @@ const ACTIONS: &[(Action, &str, &str, &[&str])] = &[
         "Ask Mobius",
         "Change something on the desktop",
         &["ai", "helix", "act", "assistant", "do"],
+    ),
+    (
+        Action::FocusAgentDesk,
+        "Show agent desk",
+        "Jump to the Helix agent workspace",
+        &["agent", "desk", "mobius", "tools", "workspace"],
     ),
     (
         Action::ToggleDoNotDisturb,
@@ -595,6 +602,8 @@ mod tests {
             ACTIONS.len(),
             "no Ask row without a query"
         );
+        p.query(Source::Actions, "agent desk");
+        assert_eq!(p.activate(p.generation(), 0), Ok(Outcome::Do(Action::FocusAgentDesk)));
     }
 
     #[test]

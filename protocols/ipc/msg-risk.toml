@@ -120,6 +120,7 @@ workspace-alert-add-window = "act"
 workspace-alert-clear = "act"
 workspace-alert-clear-all = "act"
 workspace-switch = "act"
+agent-desk-focus = "act"
 
 # confirm: Changes system state, touches hardware, network, files or the clipboard, or runs other software. Needs shell-side user confirmation.
 ai-usage-localai-delete = "confirm"

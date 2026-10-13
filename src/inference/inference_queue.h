@@ -1,6 +1,8 @@
 #pragma once
 
 #include "inference/backend.h"
+#include "inference/transcriber.h"
+#include "inference/image_generator.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -28,6 +30,8 @@ class InferenceQueue {
 public:
   using DeltaFn = std::function<void(std::uint64_t operation, const std::string& text)>;
   using DoneFn = std::function<void(std::uint64_t operation, const Outcome& outcome)>;
+  using LoadingFn = std::function<void(std::uint64_t operation, const std::string& model, double fraction)>;
+  using ProgressFn = std::function<void(std::uint64_t operation, double fraction, const std::string& stage)>;
 
   InferenceQueue(std::shared_ptr<Backend> backend, Limits limits, DeltaFn onDelta, DoneFn onDone);
   ~InferenceQueue();  // cancels what is running, finishes everything waiting with "shutting down", joins the worker
@@ -41,6 +45,13 @@ public:
   // Frees the model when nothing has run, or been asked to run, for `idle`. Never while a request is running or waiting.
   // Returns true if it unloaded one. The next request loads it again (the first one after is slower).
   bool unloadIfIdle(std::chrono::steady_clock::duration idle);
+
+  // Called on the worker while the running request's model loads. Set before the first request.
+  void onLoading(LoadingFn fn) { onLoading_ = std::move(fn); }
+  // The engine for speech-to-text requests, if there is one. Set before the first request.
+  void setTranscriber(std::shared_ptr<Transcriber> transcriber) { transcriber_ = std::move(transcriber); }
+  void setImageGenerator(std::shared_ptr<ImageGenerator> generator) { imageGenerator_ = std::move(generator); }
+  void onProgress(ProgressFn fn) { onProgress_ = std::move(fn); }
 
   nlohmann::json snapshot() const;  // queue depth and the backend's own state
 
@@ -56,6 +67,10 @@ private:
   Limits limits_;
   DeltaFn onDelta_;
   DoneFn onDone_;
+  LoadingFn onLoading_;
+  std::shared_ptr<Transcriber> transcriber_;
+  std::shared_ptr<ImageGenerator> imageGenerator_;
+  ProgressFn onProgress_;
 
   mutable std::mutex mutex_;
   std::condition_variable wake_;

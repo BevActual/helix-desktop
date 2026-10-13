@@ -541,6 +541,71 @@ async fn agents_revoke(app: AppHandle, client: String) -> Result<(), String> {
     send(&app, request).await
 }
 
+#[derive(Serialize)]
+struct CompositorSettingsView {
+    config: helix_shell_core::compositor_config::CompositorConfigView,
+    caps: helix_shell_core::compositor_ipc::HelixCaps,
+    desk: helix_shell_core::compositor_ipc::AgentDeskStatus,
+}
+
+#[tauri::command]
+fn compositor_view() -> CompositorSettingsView {
+    CompositorSettingsView {
+        config: helix_shell_core::compositor_config::read_view(),
+        caps: helix_shell_core::compositor_ipc::helix_capabilities(),
+        desk: helix_shell_core::compositor_ipc::agent_desk_status(),
+    }
+}
+
+#[tauri::command]
+fn compositor_set_agent_desk_name(name: String) -> Result<(), String> {
+    helix_shell_core::compositor_config::save_snippet(
+        &helix_shell_core::compositor_config::HelixSnippet {
+            agent_desk_name: name,
+        },
+    )?;
+    helix_shell_core::compositor_ipc::reload_config();
+    Ok(())
+}
+
+#[tauri::command]
+fn compositor_set_placement(on: bool) -> Result<(), String> {
+    let prefs = helix_shell_core::compositor_config::CompositorPrefs {
+        agent_desk_placement: on,
+    };
+    helix_shell_core::compositor_config::save_prefs(&prefs)
+}
+
+#[tauri::command]
+fn compositor_focus_agent_desk() -> Result<(), String> {
+    let line = serde_json::json!({"Action": {"HelixFocusAgentDesk": {}}}).to_string();
+    helix_shell_core::compositor_ipc::request_json(&line)
+        .ok_or_else(|| "the compositor did not accept focus agent desk".to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn compositor_open_config(which: String) -> Result<(), String> {
+    let dir = helix_shell_core::compositor_config::niri_config_dir().ok_or("no config home")?;
+    let path = helix_shell_core::compositor_config::resolve_include_path(&dir, &which)
+        .ok_or_else(|| {
+            if which == "main" {
+                "niri config.kdl is not present yet".into()
+            } else {
+                format!("{which} is not on disk yet — Helix will create it when you save related settings")
+            }
+        })?;
+    let path = path.to_string_lossy().into_owned();
+    if path.is_empty() {
+        return Err("that file is not configured yet".into());
+    }
+    std::process::Command::new("xdg-open")
+        .arg(&path)
+        .spawn()
+        .map_err(|error| format!("could not open the file: {error}"))?;
+    Ok(())
+}
+
 /// Deep-link into Mobius for models & routing (grants stay in Settings).
 #[tauri::command]
 fn open_mobius() -> Result<(), String> {
@@ -1034,6 +1099,11 @@ fn main() {
             agents_revoke,
             agents_refresh,
             open_mobius,
+            compositor_view,
+            compositor_set_agent_desk_name,
+            compositor_set_placement,
+            compositor_focus_agent_desk,
+            compositor_open_config,
             rows_view,
             ui_error,
             approvals_view,

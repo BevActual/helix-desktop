@@ -32,7 +32,17 @@ A surface is trusted only when it is on the Overlay layer, has that namespace **
 
 Not covered, by design: `zwp_virtual_keyboard_v1` keys are delivered by smithay straight to the focused client and do not pass through niri, so the dialog itself refuses to be *allowed* by any key (a click produced by a key has `detail 0` and is ignored). `niri msg layers` shows `Trusted: yes` for such a surface and `niri msg helix-capabilities` reports `trusted-surfaces: true`; the shell uses these to know whether its dialog is protected.
 
-Touch points when rebasing: `niri-config/src/misc.rs` (`TrustedSurface`), `niri-config/src/lib.rs` (field, `trusted-surface` node), `src/layer/mapped.rs` (`trusted`, `block_out_from`), `src/handlers/layer_shell.rs` (decided when the surface maps), `src/niri.rs` (`layer_is_trusted`, `trusted_layer_on`, `blocks_synthetic_input`, `update_keyboard_focus`, `contents_under`, `layers_in_render_order`, the first render pass), `src/input/mod.rs` (`process_input_event`), `niri-ipc/src/lib.rs` (`LayerSurface::trusted`, `HelixCapabilities::trusted_surfaces`), `src/ipc/{server,client}.rs`.
+Touch points when rebasing: `niri-config/src/misc.rs` (`TrustedSurface`, `Helix`), `niri-config/src/lib.rs` (field, `trusted-surface` / `helix` nodes), `src/layer/mapped.rs` (`trusted`, `block_out_from`), `src/handlers/layer_shell.rs` (decided when the surface maps), `src/niri.rs` (`layer_is_trusted`, `trusted_layer_on`, `blocks_synthetic_input`, `update_keyboard_focus`, `contents_under`, `layers_in_render_order`, the first render pass), `src/input/mod.rs` (`process_input_event`), `src/handlers/compositor.rs` (agent-desk placement on map), `src/helix/agent_desk.rs`, `niri-ipc/src/lib.rs` (`LayerSurface::trusted`, `HelixCapabilities`, `HelixAgentDesk`, `Workspace::is_agent_desk`), `src/ipc/{server,client}.rs`.
+
+### Agent desk
+
+```kdl
+helix {
+    agent-desk-name "Helix Agent"
+}
+```
+
+IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
 
 ## Rebase onto niri main
 
