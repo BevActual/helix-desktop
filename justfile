@@ -22,7 +22,7 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} helix-service helix-system-upgrade
+    meson compile -C build-{{m}} helix-service helix-assistant helix-system-upgrade
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
