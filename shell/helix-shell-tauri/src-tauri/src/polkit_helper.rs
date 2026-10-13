@@ -41,7 +41,7 @@ impl From<std::io::Error> for HelperError {
 
 #[derive(Debug, Clone)]
 pub enum HelperMessage {
-    PasswordPrompt { echo_on: bool, prompt: String },
+    PasswordPrompt { prompt: String },
     Error(String),
     Info(String),
     Complete(bool),
@@ -111,13 +111,11 @@ impl HelperSession {
         let line = read_line(&mut self.stream)?;
         if let Some(stripped) = line.strip_prefix(PAM_PROMPT_ECHO_OFF) {
             return Ok(HelperMessage::PasswordPrompt {
-                echo_on: false,
                 prompt: stripped.trim().to_string(),
             });
         }
         if let Some(stripped) = line.strip_prefix(PAM_PROMPT_ECHO_ON) {
             return Ok(HelperMessage::PasswordPrompt {
-                echo_on: true,
                 prompt: stripped.trim().to_string(),
             });
         }

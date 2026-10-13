@@ -101,7 +101,7 @@ async fn run_authentication(
             .map_err(|error| PolkitError::FailedReason(error.to_string()))?;
 
             match event {
-                HelperMessage::PasswordPrompt { prompt, .. } => {
+                HelperMessage::PasswordPrompt { prompt } => {
                     let title = if message.is_empty() {
                         prompt
                     } else if prompt.is_empty() {
