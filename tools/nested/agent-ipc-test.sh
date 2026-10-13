@@ -94,6 +94,13 @@ case "$CAP" in
   *) fail "desktop-capture focused: $CAP";;
 esac
 
+echo "--- 2d-status. helix-panel status"
+STAT=$("$ROOT/tools/helix-panel" status 2>&1) || true
+case "$STAT" in
+  \{*) echo "ok: helix-panel status returned json" ;;
+  *) fail "helix-panel status: $STAT";;
+esac
+
 echo "--- 2d-panel. helix-panel desktop-capture focused"
 PANEL_OUT=$("$ROOT/tools/helix-panel" desktop-capture focused 2>&1) || true
 case "$PANEL_OUT" in

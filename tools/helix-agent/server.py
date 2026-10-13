@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Helix Agent Surface MCP — session eyes/hands for Cursor and other MCP clients.
 
-Wraps `helix-panel` and `niri msg`. See docs/design/agentic-os.md.
+Agent Surface commands go through the desktop service when present; direct socket/`helix-panel` helpers match `docs/design/agentic-os.md`. Window listing uses `niri msg`.
 """
 
 from __future__ import annotations

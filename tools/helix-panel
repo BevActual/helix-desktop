@@ -4,33 +4,26 @@
 #   helix-panel launcher | control-center | assistant | agents | notifications | quick-insert | settings | window-switcher
 #   helix-panel lock | lid-close | dnd | night-light | media-toggle | media-next | media-previous | screenshot | screenshot-screen
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
-#   helix-panel desktop-capture [agent-desk|focused|all|OUTPUT]  (agent socket; respects HELIX_AGENT_IPC_DIR in nested tests)
+#   helix-panel status | desktop-capture [agent-desk|focused|all|OUTPUT]  (agent socket; HELIX_AGENT_IPC_DIR in nested tests)
 set -u
 cmd=${1:?usage: helix-panel <command>}
 shift || true
 arg=${1-}
-# Split shell: bar owns org.helix.Shell; legacy monolith used helix-shell-tauri.service.
-tauri() {
-  systemctl --user is-active --quiet helix-shell-bar.service \
-    || systemctl --user is-active --quiet helix-shell-tauri.service \
-    || busctl --user status org.helix.Shell >/dev/null 2>&1
-}
-case "$cmd" in
-  desktop-capture)
-    ipc_dir=${HELIX_AGENT_IPC_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}}
-    disp=${WAYLAND_DISPLAY:-wayland-0}
-    sock=$ipc_dir/helix-$disp.sock
-    if [ ! -S "$sock" ]; then
-      echo "helix-panel: no agent socket at $sock (is helix-shell-bar running?)" >&2
-      exit 1
-    fi
-    line=desktop-capture
-    [ -n "$arg" ] && line="$line $arg"
-    exec python3 - "$sock" "$line" <<'PY'
+agent_socket_send() {
+  line=$1
+  timeout=${2:-60}
+  ipc_dir=${HELIX_AGENT_IPC_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}}
+  disp=${WAYLAND_DISPLAY:-wayland-0}
+  sock=$ipc_dir/helix-$disp.sock
+  if [ ! -S "$sock" ]; then
+    echo "helix-panel: no agent socket at $sock (is helix-shell-bar running?)" >&2
+    exit 1
+  fi
+  exec python3 - "$sock" "$line" "$timeout" <<'PY'
 import socket, sys
-sock, line = sys.argv[1], sys.argv[2]
+sock, line, timeout = sys.argv[1], sys.argv[2], float(sys.argv[3])
 s = socket.socket(socket.AF_UNIX)
-s.settimeout(60.0)
+s.settimeout(timeout)
 s.connect(sock)
 s.sendall(("/\x1e" + line).encode())
 s.shutdown(socket.SHUT_WR)
@@ -42,6 +35,22 @@ while True:
     data += chunk
 sys.stdout.write(data.decode())
 PY
+}
+# Split shell: bar owns org.helix.Shell; legacy monolith used helix-shell-tauri.service.
+tauri() {
+  systemctl --user is-active --quiet helix-shell-bar.service \
+    || systemctl --user is-active --quiet helix-shell-tauri.service \
+    || busctl --user status org.helix.Shell >/dev/null 2>&1
+}
+case "$cmd" in
+  status)
+    [ -z "$arg" ] || { echo "helix-panel: status takes no arguments" >&2; exit 2; }
+    agent_socket_send status 30
+    ;;
+  desktop-capture)
+    line=desktop-capture
+    [ -n "$arg" ] && line="$line $arg"
+    agent_socket_send "$line" 60
     ;;
 esac
 if tauri; then
