@@ -94,6 +94,16 @@ case "$CAP" in
   *) fail "desktop-capture focused: $CAP";;
 esac
 
+echo "--- 2d-panel. helix-panel desktop-capture focused"
+PANEL_OUT=$("$ROOT/tools/helix-panel" desktop-capture focused 2>&1) || true
+case "$PANEL_OUT" in
+  ok*)
+    PNG=$(printf '%s' "$PANEL_OUT" | sed 's/^ok //')
+    [ -f "$PNG" ] && echo "ok: helix-panel desktop-capture wrote a png" || fail "helix-panel path missing: $PNG"
+    ;;
+  *) fail "helix-panel desktop-capture: $PANEL_OUT";;
+esac
+
 if grep -qE 'starting version .* helix' "$SCRATCH/niri.log" 2>/dev/null; then
   echo "--- 2e. helix-niri desktop-capture all stitches outputs"
   CAP=$(send "desktop-capture all" 45)

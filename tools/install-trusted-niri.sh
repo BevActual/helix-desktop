@@ -64,7 +64,21 @@ case "${1:-status}" in
     ls "$BIN".bak-helix-* 2>/dev/null | sed 's/^/backup: /' || true
     [ -f "$SNIPPET" ] && { echo "config snippet:"; sed 's/^/  /' "$SNIPPET"; } || echo "config snippet: none"
     grep -qF "$INCLUDE" "$CONFIG" && echo "included in config.kdl: yes" || echo "included in config.kdl: no"
-    echo "running compositor: $(readlink /proc/$(pgrep -x niri | head -1)/exe 2>/dev/null || echo unknown)"
+    running=$(pgrep -x niri | head -1)
+    if [ -n "$running" ]; then
+      run_exe=$(readlink -f "/proc/$running/exe" 2>/dev/null || echo unknown)
+      echo "running compositor: $run_exe"
+      case "$run_exe" in
+        *\(deleted\)*)
+          echo "note: the running compositor still has the old binary mapped — log out and back in to use $BIN"
+          ;;
+      esac
+      if [ -x "$BIN" ] && [ -f "$run_exe" ] && [ "$run_exe" != "$(readlink -f "$BIN" 2>/dev/null)" ]; then
+        echo "note: running binary differs from $BIN — log out and back in to pick up the installed build"
+      fi
+    else
+      echo "running compositor: none"
+    fi
     ;;
   *) sed -n 2,9p "$0"; exit 2 ;;
 esac

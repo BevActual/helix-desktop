@@ -4,7 +4,7 @@
 #   helix-panel launcher | control-center | assistant | agents | notifications | quick-insert | settings | window-switcher
 #   helix-panel lock | lid-close | dnd | night-light | media-toggle | media-next | media-previous | screenshot | screenshot-screen
 #   helix-panel volume-up | volume-down | volume-mute | mic-mute | brightness-up | brightness-down
-#   helix-panel desktop-capture [agent-desk|focused|all|OUTPUT]  (agent socket; for scripts and debugging)
+#   helix-panel desktop-capture [agent-desk|focused|all|OUTPUT]  (agent socket; respects HELIX_AGENT_IPC_DIR in nested tests)
 set -u
 cmd=${1:?usage: helix-panel <command>}
 shift || true
@@ -15,6 +15,35 @@ tauri() {
     || systemctl --user is-active --quiet helix-shell-tauri.service \
     || busctl --user status org.helix.Shell >/dev/null 2>&1
 }
+case "$cmd" in
+  desktop-capture)
+    ipc_dir=${HELIX_AGENT_IPC_DIR:-${XDG_RUNTIME_DIR:-/run/user/$(id -u)}}
+    disp=${WAYLAND_DISPLAY:-wayland-0}
+    sock=$ipc_dir/helix-$disp.sock
+    if [ ! -S "$sock" ]; then
+      echo "helix-panel: no agent socket at $sock (is helix-shell-bar running?)" >&2
+      exit 1
+    fi
+    line=desktop-capture
+    [ -n "$arg" ] && line="$line $arg"
+    exec python3 - "$sock" "$line" <<'PY'
+import socket, sys
+sock, line = sys.argv[1], sys.argv[2]
+s = socket.socket(socket.AF_UNIX)
+s.settimeout(60.0)
+s.connect(sock)
+s.sendall(("/\x1e" + line).encode())
+s.shutdown(socket.SHUT_WR)
+data = b""
+while True:
+    chunk = s.recv(4096)
+    if not chunk:
+        break
+    data += chunk
+sys.stdout.write(data.decode())
+PY
+    ;;
+esac
 if tauri; then
   case "$cmd" in
     launcher|control-center|assistant|agents|notifications|quick-insert)
@@ -46,33 +75,6 @@ if tauri; then
     bar-show) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarShow ;;
     bar-hide) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarHide ;;
     bar-toggle) exec busctl --user call org.helix.Shell /org/helix/Shell org.helix.Shell1 BarToggle ;;
-    desktop-capture)
-      rd=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
-      disp=${WAYLAND_DISPLAY:-wayland-0}
-      sock=$rd/helix-$disp.sock
-      if [ ! -S "$sock" ]; then
-        echo "helix-panel: no agent socket at $sock (is helix-shell-bar running?)" >&2
-        exit 1
-      fi
-      line=desktop-capture
-      [ -n "$arg" ] && line="$line $arg"
-      exec python3 - "$sock" "$line" <<'PY'
-import socket, sys
-sock, line = sys.argv[1], sys.argv[2]
-s = socket.socket(socket.AF_UNIX)
-s.settimeout(60.0)
-s.connect(sock)
-s.sendall(("/\x1e" + line).encode())
-s.shutdown(socket.SHUT_WR)
-data = b""
-while True:
-    chunk = s.recv(4096)
-    if not chunk:
-        break
-    data += chunk
-sys.stdout.write(data.decode())
-PY
-      ;;
     *) echo "helix-panel: unknown command $cmd" >&2; exit 2 ;;
   esac
 fi
