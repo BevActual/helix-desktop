@@ -52,6 +52,13 @@ find_polkit_agent() {
 }
 
 write_polkit_agent_unit() {
+  # The Tauri bar registers a native agent; use HELIX_EXTERNAL_POLKIT=1 to wrap KDE/GNOME instead.
+  if [ "${HELIX_EXTERNAL_POLKIT:-0}" != 1 ]; then
+    systemctl --user disable helix-polkit-agent.service 2>/dev/null || true
+    systemctl --user stop helix-polkit-agent.service 2>/dev/null || true
+    rm -f "$UNITS/helix-polkit-agent.service"
+    return 1
+  fi
   local agent escaped
   if agent=$(find_polkit_agent); then
     escaped=$(printf '%s' "$agent" | sed 's/ /\\\\x20/g')
@@ -255,8 +262,11 @@ case "${1:-install}" in
     for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
-    if systemctl --user is-active --quiet helix-polkit-agent.service 2>/dev/null; then
-      echo "polkit agent          helix-polkit-agent (system agent binary)"
+    if systemctl --user is-active --quiet helix-shell-bar.service 2>/dev/null \
+      && journalctl --user -u helix-shell-bar.service -n 30 --no-pager 2>/dev/null | grep -q 'POLKIT agent registered'; then
+      echo "polkit agent          native (helix-shell-bar)"
+    elif systemctl --user is-active --quiet helix-polkit-agent.service 2>/dev/null; then
+      echo "polkit agent          helix-polkit-agent (external binary)"
     elif systemctl --user is-active --quiet plasma-polkit-agent.service 2>/dev/null \
       || systemctl --user is-active --quiet polkit-kde-authentication-agent-1.service 2>/dev/null; then
       echo "polkit agent          user unit active"

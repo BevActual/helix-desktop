@@ -16,6 +16,8 @@ mod blur;
 mod confirmer;
 mod admin_auth;
 mod bar;
+mod polkit_agent;
+mod polkit_helper;
 mod agent_ipc;
 mod capture;
 mod control;
@@ -2130,6 +2132,7 @@ fn main() {
             if role.claims_shell1() {
                 control::serve(handle.clone());
                 agent_ipc::serve(handle.clone());
+                polkit_agent::start(handle.clone());
             }
             if role.serves_panels_socket() {
                 panels_bridge::serve(handle.clone(), move |app, req| {

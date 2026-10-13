@@ -48,7 +48,7 @@ sudo dnf install meson gcc-c++ just \
   jemalloc-devel
 ```
 
-Optional on Fedora for system Polkit prompts (NetworkManager, etc.) until the Tauri shell registers its own agent: `sudo dnf install polkit-kde`, then `tools/switch-shell.sh install` enables `helix-polkit-agent.service` when a known agent binary is present.
+The Tauri bar registers a native Polkit agent after `restart-bar`. To use an external agent instead (KDE/GNOME): `sudo dnf install polkit-kde`, then `HELIX_EXTERNAL_POLKIT=1 tools/switch-shell.sh install`.
 
 ### openSUSE Tumbleweed / Slowroll
 
