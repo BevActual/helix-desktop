@@ -151,6 +151,21 @@ async fn complete_pending_denial(
     crate::agent_activity::AgentActivity::notify_pending_changed(conn).await;
 }
 
+pub async fn cancel_all_pending(state: &mut State) {
+    let waiting: Vec<(u64, PendingConfirm)> = state.pending.drain().collect();
+    for (operation, pending) in waiting {
+        complete_pending_denial(
+            state,
+            pending,
+            operation,
+            "cancelled",
+            "cancelled",
+            "stopped",
+        )
+        .await;
+    }
+}
+
 pub async fn expire_confirmations(state: &mut State) {
     let now = Instant::now();
     let due: Vec<u64> = state
