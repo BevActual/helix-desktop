@@ -5,6 +5,13 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
+NIRI_DEBUG="$ROOT/compositor/target/debug/niri"
+if [ ! -x "$NIRI_DEBUG" ]; then
+  echo "== compositor debug niri (for nested runs)"
+  (cd "$ROOT/compositor" && cargo build --bin niri)
+fi
+export HELIX_NIRI_BIN="${HELIX_NIRI_BIN:-$NIRI_DEBUG}"
+
 echo "== helix-shell-core (lib)"
 cargo test -p helix-shell-core --lib --quiet
 
