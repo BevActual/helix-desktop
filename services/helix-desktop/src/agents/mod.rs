@@ -53,3 +53,22 @@ pub fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
         std::future::pending::<()>().await;
     });
 }
+
+pub async fn shutdown_system_agents(nm: bool, bluez: bool) {
+    if !nm && !bluez {
+        return;
+    }
+    let system = match zbus::Connection::system().await {
+        Ok(connection) => connection,
+        Err(error) => {
+            tracing::warn!(%error, "system bus unavailable during agent shutdown");
+            return;
+        }
+    };
+    if nm {
+        nm_secret_agent::unregister(&system).await;
+    }
+    if bluez {
+        bluez_agent::unregister(&system).await;
+    }
+}

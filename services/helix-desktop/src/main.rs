@@ -103,21 +103,22 @@ async fn main() -> zbus::Result<()> {
         let mut locked = state.lock().await;
         locked.bus = Some(connection.clone());
     }
-    {
+    let (use_nm, use_bluez) = {
         let hub = {
             let locked = state.lock().await;
             Arc::clone(&locked.agents)
         };
         hub.set_session(connection.clone()).await;
-        let (use_nm, use_bluez) = {
+        let backends = {
             let locked = state.lock().await;
             (
                 locked.network.uses_network_manager(),
                 locked.bluetooth.uses_bluez(),
             )
         };
-        agents::start_system_agents(hub, use_nm, use_bluez);
-    }
+        agents::start_system_agents(hub, backends.0, backends.1);
+        backends
+    };
 
     let rule = MatchRule::builder()
         .msg_type(MessageType::Signal)
@@ -306,5 +307,6 @@ async fn main() -> zbus::Result<()> {
     );
 
     tokio::signal::ctrl_c().await.ok();
+    agents::shutdown_system_agents(use_nm, use_bluez).await;
     Ok(())
 }
