@@ -25,6 +25,10 @@ struct ListMeta {
     list_type: &'static str,
 }
 
+pub fn is_display_list_id(id: &str) -> bool {
+    DISPLAY_LISTS.iter().any(|meta| meta.id == id)
+}
+
 const DISPLAY_LISTS: &[ListMeta] = &[
     ListMeta {
         id: "lockscreen.monitors",

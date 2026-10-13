@@ -146,30 +146,21 @@ impl Configuration {
     ) -> fdo::Result<()> {
         let json = value_from_zvariant(&value)
             .ok_or_else(|| fdo::Error::InvalidArgs("unsupported value type".into()))?;
-        if id.starts_with("keybinds.") {
-            return Err(fdo::Error::InvalidArgs(
-                "Keyboard shortcuts require UpdateOrderedList".into(),
-            ));
-        }
-        if id == "control_center.shortcuts" {
-            return Err(fdo::Error::InvalidArgs(
-                "Quick shortcuts require UpdateOrderedList".into(),
-            ));
-        }
-        if id == "control_center.visible_tabs" {
-            return Err(fdo::Error::InvalidArgs(
-                "Control Center pages require UpdateOrderedList".into(),
-            ));
-        }
-        if id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids" {
-            return Err(fdo::Error::InvalidArgs(
-                "Template selections require UpdateOrderedList".into(),
-            ));
-        }
-        if id == "wallpaper.transition" {
-            return Err(fdo::Error::InvalidArgs(
-                "Wallpaper transitions require UpdateOrderedList".into(),
-            ));
+        if helix_shell_core::desktop::ordered_lists::requires_update_ordered_list(id) {
+            let message = if id.starts_with("keybinds.") {
+                "Keyboard shortcuts require UpdateOrderedList"
+            } else if id == "control_center.shortcuts" {
+                "Quick shortcuts require UpdateOrderedList"
+            } else if id == "control_center.visible_tabs" {
+                "Control Center pages require UpdateOrderedList"
+            } else if id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids" {
+                "Template selections require UpdateOrderedList"
+            } else if id == "wallpaper.transition" {
+                "Wallpaper transitions require UpdateOrderedList"
+            } else {
+                "This setting requires UpdateOrderedList"
+            };
+            return Err(fdo::Error::InvalidArgs(message.into()));
         }
         let mut state = self.state.lock().await;
         state

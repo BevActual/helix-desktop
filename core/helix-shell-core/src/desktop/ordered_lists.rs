@@ -55,12 +55,22 @@ const KEY_CHORD_META: &[(&str, &str)] = &[
 ];
 
 pub fn requires_update_ordered_list(id: &str) -> bool {
-    id.starts_with("keybinds.")
+    if id.starts_with("keybinds.")
         || id == "control_center.shortcuts"
         || id == "control_center.visible_tabs"
         || id == "theme.templates.builtin_ids"
         || id == "theme.templates.community_ids"
         || id == "wallpaper.transition"
+        || id == "notification.filter"
+    {
+        return true;
+    }
+    if let Some(rest) = id.strip_prefix("bar:") {
+        if let Some((_, field)) = rest.rsplit_once(':') {
+            return matches!(field, "start" | "center" | "end");
+        }
+    }
+    super::ordered_catalog::is_display_list_id(id)
 }
 
 pub fn supports_ordered_type(type_name: &str) -> bool {
