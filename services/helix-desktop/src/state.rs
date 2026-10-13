@@ -77,7 +77,12 @@ pub struct State {
 
 impl State {
     pub fn confirmation_deadline() -> Instant {
-        Instant::now() + CONFIRMATION_DEADLINE
+        let seconds = std::env::var("HELIX_TEST_CONFIRMATION_SECS")
+            .ok()
+            .and_then(|value| value.parse::<u64>().ok())
+            .map(Duration::from_secs)
+            .unwrap_or(CONFIRMATION_DEADLINE);
+        Instant::now() + seconds
     }
 
     pub fn new() -> Self {
