@@ -263,7 +263,7 @@ case "${1:-install}" in
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
     if systemctl --user is-active --quiet helix-shell-bar.service 2>/dev/null \
-      && journalctl --user -u helix-shell-bar.service -n 30 --no-pager 2>/dev/null | grep -q 'POLKIT agent registered'; then
+      && journalctl --user -u helix-shell-bar.service -b -o cat --no-pager 2>/dev/null | grep -q 'POLKIT agent registered'; then
       echo "polkit agent          native (helix-shell-bar)"
     elif systemctl --user is-active --quiet helix-polkit-agent.service 2>/dev/null; then
       echo "polkit agent          helix-polkit-agent (external binary)"
