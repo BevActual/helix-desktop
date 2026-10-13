@@ -35,6 +35,36 @@ pick_bin() {
   return 1
 }
 
+find_polkit_agent() {
+  local p
+  for p in \
+    /usr/libexec/polkit-kde-authentication-agent-1 \
+    /usr/libexec/kf6/polkit-kde-authentication-agent-1 \
+    /usr/bin/polkit-kde-authentication-agent-1 \
+    /usr/libexec/polkit-gnome-authentication-agent-1 \
+    /usr/bin/polkit-gnome-authentication-agent-1; do
+    if [ -x "$p" ]; then
+      printf '%s' "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+write_polkit_agent_unit() {
+  local agent escaped
+  if agent=$(find_polkit_agent); then
+    escaped=$(printf '%s' "$agent" | sed 's/ /\\\\x20/g')
+    sed "s|@POLKIT_AGENT@|$escaped|" "$ROOT/tools/systemd/helix-polkit-agent.service.in" > "$UNITS/helix-polkit-agent.service"
+    systemctl --user enable helix-polkit-agent.service
+    return 0
+  fi
+  systemctl --user disable helix-polkit-agent.service 2>/dev/null || true
+  systemctl --user stop helix-polkit-agent.service 2>/dev/null || true
+  rm -f "$UNITS/helix-polkit-agent.service"
+  return 1
+}
+
 link_app() {
   local name=$1 desktop=$2
   local bin
@@ -136,6 +166,7 @@ PY
   if [ -f "$UNITS/helix-wallpaper.service" ]; then
     systemctl --user enable helix-wallpaper.service
   fi
+  write_polkit_agent_unit || true
 }
 
 shell_live() {
@@ -167,6 +198,9 @@ case "${1:-install}" in
       fi
       if [ -f "$UNITS/helix-wallpaper.service" ]; then
         systemctl --user start helix-wallpaper.service 2>/dev/null || true
+      fi
+      if [ -f "$UNITS/helix-polkit-agent.service" ]; then
+        systemctl --user start helix-polkit-agent.service 2>/dev/null || true
       fi
       echo "Helix Shell started (strut + bar + panels)."
     fi
@@ -218,11 +252,17 @@ case "${1:-install}" in
     for unit in helix-shell-strut helix-shell-bar helix-shell-panels helix-shell-tauri helix-wallpaper helix-idle helix-service; do
       printf '%-22s %s / %s\n' "$unit" "$(systemctl --user is-active $unit.service 2>/dev/null || true)" "$(systemctl --user is-enabled $unit.service 2>/dev/null || echo disabled)"
     done
-    if systemctl --user is-active --quiet plasma-polkit-agent.service 2>/dev/null \
+    if systemctl --user is-active --quiet helix-polkit-agent.service 2>/dev/null; then
+      echo "polkit agent          helix-polkit-agent (system agent binary)"
+    elif systemctl --user is-active --quiet plasma-polkit-agent.service 2>/dev/null \
       || systemctl --user is-active --quiet polkit-kde-authentication-agent-1.service 2>/dev/null; then
       echo "polkit agent          user unit active"
     else
-      echo "polkit agent          not running (use plasma-polkit-agent or helix-askpass for sudo only)"
+      if find_polkit_agent >/dev/null; then
+        echo "polkit agent          not running (run: $0 install)"
+      else
+        echo "polkit agent          not installed (dnf install polkit-kde; helix-askpass covers sudo only)"
+      fi
     fi
     if systemctl --user is-enabled helix-shell-dev.service >/dev/null 2>&1; then
       echo "helix-shell-dev        still enabled (legacy — run: $0 install)" >&2

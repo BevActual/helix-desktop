@@ -48,6 +48,8 @@ sudo dnf install meson gcc-c++ just \
   jemalloc-devel
 ```
 
+Optional on Fedora for system Polkit prompts (NetworkManager, etc.) until the Tauri shell registers its own agent: `sudo dnf install polkit-kde`, then `tools/switch-shell.sh install` enables `helix-polkit-agent.service` when a known agent binary is present.
+
 ### openSUSE Tumbleweed / Slowroll
 
 ```sh
@@ -65,6 +67,8 @@ sudo zypper install meson gcc-c++ just \
   nlohmann_json-devel stb-devel \
   jemalloc-devel
 ```
+
+Optional on Fedora for system Polkit prompts (NetworkManager, etc.) until the Tauri shell registers its own agent: `sudo dnf install polkit-kde`, then `tools/switch-shell.sh install` writes and enables `helix-polkit-agent.service` when a known agent binary is present.
 
 ### Debian / Ubuntu
 

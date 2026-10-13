@@ -1,0 +1,14 @@
+[Unit]
+Description=Helix session Polkit authentication agent
+PartOf=graphical-session.target
+After=graphical-session.target helix-shell-bar.service
+BindsTo=helix-shell-bar.service
+
+[Service]
+Type=simple
+ExecStart=@POLKIT_AGENT@
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

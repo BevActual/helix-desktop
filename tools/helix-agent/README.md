@@ -68,7 +68,7 @@ actions and synthetic input are out of scope for v1.
 | Tool | Action |
 |------|--------|
 | `desktop_status` | Shell status JSON |
-| `desktop_capture` | PNG path via `helix-panel desktop-capture` |
+| `desktop_capture` | PNG path via agent socket (`desktop-capture`; `helix-panel desktop-capture` for scripts) |
 | `desktop_context` | Status + focused niri window |
 | `panel_toggle` / `panel_open` / `panel_close` | Panels (CC/NC via context) |
 | `settings_open` | Helix Settings (`helix-settings`) |

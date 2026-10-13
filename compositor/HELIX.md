@@ -44,6 +44,8 @@ helix {
 
 IPC: `HelixPlaceOnAgentDesk`, `HelixFocusAgentDesk`, `HelixScreenshotOutput`, `HelixScreenshotAllOutputs`, `HelixAgentDesk` request. Workspace events include `is_agent_desk`. `HelixCapabilities` reports `agent_desk: true`.
 
+After changing compositor IPC, rebuild (`cargo build --release --bin niri` in `compositor/`), run `tools/install-trusted-niri.sh apply`, and log out and back in. The session that is already running keeps its old `niri` binary until then; `desktop-capture all` and per-output capture need the installed build.
+
 Nested tests (`tools/nested/run.sh`) set `HELIX_NESTED_HEADLESS=1` so niri starts with the headless backend and a 1280×720 output instead of winit on the host display.
 
 ## Rebase onto niri main
