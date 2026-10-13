@@ -9,7 +9,7 @@ use zbus::zvariant::OwnedValue;
 use zbus::interface;
 use zbus::Connection;
 
-use crate::agent_support::finish_pending_denied;
+use crate::agent_support::{cancel_all_pending, finish_pending_denied};
 use crate::dbus_value::{dict_entry, json_to_owned, owned_bool, owned_str, owned_u64};
 use crate::state::State;
 
@@ -130,7 +130,7 @@ impl AgentActivity {
             .to_string();
         let mut state = self.state.lock().await;
         require_desktop(&state, &sender)?;
-        state.pending.clear();
+        cancel_all_pending(&mut state).await;
         drop(state);
         Self::pending_changed(&emitter).await.ok();
         Ok(())
@@ -197,7 +197,7 @@ impl AgentActivity {
         require_desktop(&state, &sender)?;
         state.agent_enabled = enabled;
         if !enabled {
-            state.pending.clear();
+            cancel_all_pending(&mut state).await;
         }
         drop(state);
         Self::changed(&emitter).await.ok();
