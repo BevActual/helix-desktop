@@ -155,9 +155,8 @@ namespace settings {
   // Schema projection (the validity half of the specs), consumed by the config
   // layer (e.g. `config validate`).
   [[nodiscard]] helix::config::schema::WidgetSettingSchema widgetSettingSchema(std::string_view type);
-  [[nodiscard]] helix::config::schema::WidgetSettingSchema widgetSettingSchema(
-      std::string_view type, const WidgetConfig* config
-  );
+  [[nodiscard]] helix::config::schema::WidgetSettingSchema
+  widgetSettingSchema(std::string_view type, const WidgetConfig* config);
   // Semantic cross-field validation for a widget config entry. Nullopt means the
   // resolved options are valid or the widget type declares no semantic rule.
   [[nodiscard]] std::optional<std::string> validateWidgetSemantics(std::string_view type, const WidgetConfig* config);

@@ -1,10 +1,9 @@
 #include "dbus/mpris/mpris_service.h"
 
-#include "dbus/bus_name_watch.h"
-
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/timer_manager.h"
+#include "dbus/bus_name_watch.h"
 #include "dbus/session_bus.h"
 #include "ipc/ipc_arg_parse.h"
 #include "ipc/ipc_service.h"
@@ -2419,9 +2418,7 @@ bool MprisService::onPlayPausePlayer(const std::string& busName) {
 
   const bool ok = playPause(busName);
   if (!ok) {
-    throw sdbus::Error(
-        sdbus::Error::Name{"org.helix.Mpris.Error.NotSupported"}, "player does not support PlayPause"
-    );
+    throw sdbus::Error(sdbus::Error::Name{"org.helix.Mpris.Error.NotSupported"}, "player does not support PlayPause");
   }
   return true;
 }
@@ -2583,9 +2580,7 @@ bool MprisService::onSetPositionPlayer(const std::string& busName, int64_t posit
   }
 
   if (!setPosition(busName, positionUs)) {
-    throw sdbus::Error(
-        sdbus::Error::Name{"org.helix.Mpris.Error.NotSupported"}, "player does not support SetPosition"
-    );
+    throw sdbus::Error(sdbus::Error::Name{"org.helix.Mpris.Error.NotSupported"}, "player does not support SetPosition");
   }
   return true;
 }

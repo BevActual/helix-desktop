@@ -1,7 +1,7 @@
 #pragma once
 
-#include "pipewire/audio_glyphs.h"
 #include "core/timer_manager.h"
+#include "pipewire/audio_glyphs.h"
 
 #include <chrono>
 #include <cstdint>

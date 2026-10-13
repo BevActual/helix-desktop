@@ -40,9 +40,8 @@ namespace compositors::niri {
   [[nodiscard]] std::vector<std::string> detectLiquidGlassParams(const NiriRuntime* runtime);
   [[nodiscard]] bool blurIncludeExists(const std::filesystem::path& configFile = {});
   [[nodiscard]] std::string kdlForBlur(const BlurSettings& settings);
-  [[nodiscard]] BlurSettings blurSettingsFromConfig(
-      const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams = {}
-  );
+  [[nodiscard]] BlurSettings
+  blurSettingsFromConfig(const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams = {});
 
   InstallResult persistBlurFromConfig(const Config& config, const NiriRuntime* runtime);
   InstallResult saveNiriBlur(const BlurSettings& settings);

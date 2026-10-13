@@ -32,7 +32,10 @@ namespace helix::config {
     constexpr int kControlCenterShortcutLabelsMigrationVersion = 17;
     constexpr int kRetiredControlCenterServicesMigrationVersion = 18;
     constexpr std::array<std::string_view, 4> kRetiredControlCenterServiceTabs = {
-        "phone", "localsend", "syncthing", "cast",
+        "phone",
+        "localsend",
+        "syncthing",
+        "cast",
     };
     constexpr std::int64_t kMaxBarRadius = 500;
     constexpr std::array<std::string_view, 5> kBarRadiusKeys = {
@@ -1153,9 +1156,9 @@ namespace helix::config {
       issues.push_back({
           .migrationVersion = kClockTimezonesMigrationVersion,
           .path = path,
-          .message = keptCanonical
-              ? "world-clock timezones are deprecated; move them to [control_center.clock] and keep the existing canonical value"
-              : "world-clock timezones are deprecated; move them to [control_center.clock]",
+          .message = keptCanonical ? "world-clock timezones are deprecated; move them to [control_center.clock] and "
+                                     "keep the existing canonical value"
+                                   : "world-clock timezones are deprecated; move them to [control_center.clock]",
       });
     });
     migrateControlCenterShortcutLabels(root, [&issues](const std::string& path) {

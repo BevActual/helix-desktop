@@ -60,9 +60,10 @@ int main() {
       .defaultColumnWidth = 0.5,
   });
   ok = expect(
-      withLayoutExtras.find("    default-column-width { proportion 0.50; }\n") != std::string::npos,
-      "writes default column width"
-  ) && ok;
+           withLayoutExtras.find("    default-column-width { proportion 0.50; }\n") != std::string::npos,
+           "writes default column width"
+       )
+      && ok;
   ok = expect(withLayoutExtras.find("        left 8\n") != std::string::npos, "writes equal struts") && ok;
 
   const auto dir = makeTempDir();
@@ -73,9 +74,8 @@ int main() {
   }
   const auto saved = compositors::niri::saveNiriLayoutThemeInto(config, settings);
   ok = expect(saved.ok, "saves layout into a temp niri config") && ok;
-  ok = expect(
-      compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-layout.kdl"), "appends include"
-  ) && ok;
+  ok = expect(compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-layout.kdl"), "appends include")
+      && ok;
 
   std::filesystem::remove_all(dir);
   return ok ? 0 : 1;

@@ -370,9 +370,8 @@ namespace FileUtils {
     return text;
   }
 
-  [[nodiscard]] inline std::string resolveNamedDir(
-      const char* overrideEnv, const char* xdgEnv, const char* homeSuffix, const char* leaf
-  ) {
+  [[nodiscard]] inline std::string
+  resolveNamedDir(const char* overrideEnv, const char* xdgEnv, const char* homeSuffix, const char* leaf) {
     if (const char* overrideHome = std::getenv(overrideEnv); overrideHome != nullptr && overrideHome[0] != '\0') {
       return std::string(overrideHome) + "/" + leaf;
     }

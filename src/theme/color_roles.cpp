@@ -6,11 +6,11 @@
 
 namespace {
 
-std::string normalizedRoleToken(std::string_view token) {
-  std::string normalized = StringUtils::trim(token);
-  StringUtils::toLowerInPlace(normalized);
-  return normalized;
-}
+  std::string normalizedRoleToken(std::string_view token) {
+    std::string normalized = StringUtils::trim(token);
+    StringUtils::toLowerInPlace(normalized);
+    return normalized;
+  }
 
 } // namespace
 

@@ -1,7 +1,7 @@
 #include "config/widgets/desktop_widget_settings_registry.h"
 
-#include "i18n/i18n.h"
 #include "config/widgets/widget_settings_registry.h"
+#include "i18n/i18n.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
@@ -284,9 +284,7 @@ namespace desktop_settings {
       add(fontFamilySpec());
       add(boolSpec("shadow", true));
     } else if (type == "folder" || type == "file") {
-      add(baseSpec(
-          "path", type == "folder" ? WidgetControlKind::Folder : WidgetControlKind::File, std::string{}
-      ));
+      add(baseSpec("path", type == "folder" ? WidgetControlKind::Folder : WidgetControlKind::File, std::string{}));
       add(glyphSpec("glyph", ""));
       add(stringSpec("label"));
       add(boolSpec("background", true));
@@ -414,8 +412,7 @@ namespace desktop_settings {
     return specs;
   }
 
-  helix::config::schema::WidgetSettingSchema
-  desktopWidgetSettingSchema(std::string_view type) {
+  helix::config::schema::WidgetSettingSchema desktopWidgetSettingSchema(std::string_view type) {
     helix::config::schema::WidgetSettingSchema out;
     for (const auto& spec : desktopWidgetSettingSpecs(type)) {
       out.push_back(spec.schema);

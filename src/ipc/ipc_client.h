@@ -10,6 +10,6 @@ public:
 
   // Sends one complete wire line (including any cwd prefix) and returns the response without printing.
   // `socketPath` overrides the default location. On failure returns false and sets `error` (no "error: " prefix).
-  static bool exchange(const std::string& line, std::string& response, std::string& error,
-                       const std::string& socketPath = {});
+  static bool
+  exchange(const std::string& line, std::string& response, std::string& error, const std::string& socketPath = {});
 };

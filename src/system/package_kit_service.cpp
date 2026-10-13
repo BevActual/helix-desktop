@@ -67,17 +67,18 @@ namespace helix::packages {
       std::size_t start = 0;
       while (start <= text.size()) {
         const auto end = text.find('\n', start);
-        auto line = std::string_view(text).substr(
-            start, end == std::string::npos ? text.size() - start : end - start
-        );
+        auto line = std::string_view(text).substr(start, end == std::string::npos ? text.size() - start : end - start);
         while (!line.empty() && (line.back() == '\r' || std::isspace(static_cast<unsigned char>(line.back())) != 0)) {
           line.remove_suffix(1);
         }
         while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front())) != 0) {
           line.remove_prefix(1);
         }
-        if (!line.empty() && !line.starts_with("Transaction:") && !line.starts_with("Status:")
-            && !line.starts_with("Percentage:") && line != "Results:") {
+        if (!line.empty()
+            && !line.starts_with("Transaction:")
+            && !line.starts_with("Status:")
+            && !line.starts_with("Percentage:")
+            && line != "Results:") {
           last = std::string(line);
         }
         if (end == std::string::npos) {
@@ -98,7 +99,9 @@ namespace helix::packages {
       return last.substr(last.size() - kMax);
     }
 
-    void feedProgress(std::string& pending, std::string_view chunk, PkconProgress& progress, const ProgressCallback& onProgress) {
+    void feedProgress(
+        std::string& pending, std::string_view chunk, PkconProgress& progress, const ProgressCallback& onProgress
+    ) {
       pending.append(chunk);
       std::size_t start = 0;
       while (start < pending.size()) {
@@ -120,8 +123,7 @@ namespace helix::packages {
         if (line.empty()) {
           continue;
         }
-        const bool changed =
-            applyPkconProgressLine(line, progress) || applyFlatpakProgressLine(line, progress);
+        const bool changed = applyPkconProgressLine(line, progress) || applyFlatpakProgressLine(line, progress);
         if (changed && onProgress) {
           onProgress(progress);
         }
@@ -138,9 +140,7 @@ namespace helix::packages {
       process::RunOptions rpmOptions;
       rpmOptions.timeout = std::chrono::seconds(8);
       rpmOptions.maxOutputBytes = 4U << 20;
-      const auto rpm = process::runSync(
-          {std::string("rpm"), "-qa", "--qf", "%{NAME}\t%{SUMMARY}\n"}, rpmOptions
-      );
+      const auto rpm = process::runSync({std::string("rpm"), "-qa", "--qf", "%{NAME}\t%{SUMMARY}\n"}, rpmOptions);
       if (rpm && !rpm.out.empty()) {
         applySummaryMap(hits, parseNameSummaryOutput(rpm.out, '\t'));
       }
@@ -160,9 +160,8 @@ namespace helix::packages {
       if (missing.empty() || !process::commandExists("dnf")) {
         return;
       }
-      std::vector<std::string> args = {
-          std::string("dnf"), "-C", "-q", "repoquery", "--queryformat", "%{name}|%{summary}\n"
-      };
+      std::vector<std::string> args = {std::string("dnf"),    "-C", "-q", "repoquery", "--queryformat",
+                                       "%{name}|%{summary}\n"};
       args.insert(args.end(), missing.begin(), missing.end());
       process::RunOptions dnfOptions;
       dnfOptions.timeout = std::chrono::seconds(12);
@@ -205,8 +204,10 @@ namespace helix::packages {
       case ParseMode::None:
         break;
       }
-      if (parse == ParseMode::FlatpakInstalled || parse == ParseMode::FlatpakUpdates
-          || parse == ParseMode::FlatpakCatalog || parse == ParseMode::FlatpakSearch) {
+      if (parse == ParseMode::FlatpakInstalled
+          || parse == ParseMode::FlatpakUpdates
+          || parse == ParseMode::FlatpakCatalog
+          || parse == ParseMode::FlatpakSearch) {
         attachFlatpakIcons(hits);
       }
       if (parse == ParseMode::FlatpakCatalog) {
@@ -306,21 +307,20 @@ namespace helix::packages {
       const bool launched = process::runAsync(
           std::move(args),
           process::RunCallbacks{
-              .stdOut =
-                  [pendingOut, progress, progressCb](std::string_view chunk) {
-                    feedProgress(*pendingOut, chunk, *progress, *progressCb);
-                  },
-              .stdErr =
-                  [pendingErr, progress, progressCb](std::string_view chunk) {
-                    feedProgress(*pendingErr, chunk, *progress, *progressCb);
-                  },
+              .stdOut = [pendingOut, progress, progressCb](
+                            std::string_view chunk
+                        ) { feedProgress(*pendingOut, chunk, *progress, *progressCb); },
+              .stdErr = [pendingErr, progress, progressCb](
+                            std::string_view chunk
+                        ) { feedProgress(*pendingErr, chunk, *progress, *progressCb); },
               .onExit =
                   [completion, cancel, enrichSummaries, parse](process::RunResult result) {
                     const bool cancelled = cancel->load(std::memory_order_acquire);
                     CommandResult out;
                     out.cancelled = cancelled;
                     const bool pkcon = parse == ParseMode::Pkcon;
-                    out.success = !cancelled && !result.timedOut
+                    out.success = !cancelled
+                        && !result.timedOut
                         && (result.exitCode == 0 || (pkcon && result.exitCode == kPkconNothingUseful));
                     out.hits = parseHits(parse, result.out);
                     if (parse == ParseMode::FlatpakRemotes) {
@@ -465,9 +465,7 @@ namespace helix::packages {
     if (!backendAvailable()) {
       return false;
     }
-    const auto host = fedora_upgrade::classifyHost(
-        osReleaseText(), std::filesystem::exists("/run/ostree-booted")
-    );
+    const auto host = fedora_upgrade::classifyHost(osReleaseText(), std::filesystem::exists("/run/ostree-booted"));
     return host == fedora_upgrade::HostKind::Fedora;
   }
 
@@ -546,8 +544,8 @@ namespace helix::packages {
       options.timeout = std::chrono::seconds(90);
       options.maxOutputBytes = 2U << 20;
       return launchFlatpak(
-          {std::string(kFlatpak), "search", "--json", std::move(query)}, std::move(options), std::move(onComplete),
-          {}, ParseMode::FlatpakSearch
+          {std::string(kFlatpak), "search", "--json", std::move(query)}, std::move(options), std::move(onComplete), {},
+          ParseMode::FlatpakSearch
       );
     }
     if (!backendAvailable()) {
@@ -625,9 +623,7 @@ namespace helix::packages {
           hit.name
       };
     } else if (kind == Kind::Fedora) {
-      seed = {
-          std::string(kPkcon), "--plain", "--noninteractive", "get-details", pkconPackageRef(hit)
-      };
+      seed = {std::string(kPkcon), "--plain", "--noninteractive", "get-details", pkconPackageRef(hit)};
     } else if (kind == Kind::Flatpak) {
       const auto remote = preferredFlatpakRemote(hit.repo);
       seed = {std::string(kFlatpak), "remote-info", "--cached"};
@@ -676,9 +672,7 @@ namespace helix::packages {
                         if (cancel->load(std::memory_order_acquire)) {
                           break;
                         }
-                        std::vector<std::string> args = {
-                            std::string(kFlatpak), "remote-info", "--cached", scope
-                        };
+                        std::vector<std::string> args = {std::string(kFlatpak), "remote-info", "--cached", scope};
                         args.push_back(remote.empty() ? "flathub" : remote);
                         args.push_back(details.hit.name);
                         const auto again = process::runSync(args, retry);
@@ -695,7 +689,8 @@ namespace helix::packages {
                       permOptions.cancel = cancel;
                       const bool installed = details.hit.state == PackageState::Installed
                           || details.hit.state == PackageState::Update
-                          || details.hit.installation == "user" || details.hit.installation == "system";
+                          || details.hit.installation == "user"
+                          || details.hit.installation == "system";
                       if (installed) {
                         std::vector<std::string> args = {std::string(kFlatpak), "info", "-M"};
                         appendFlatpakScope(args, details.hit.installation);
@@ -719,9 +714,7 @@ namespace helix::packages {
                           if (cancel->load(std::memory_order_acquire)) {
                             break;
                           }
-                          std::vector<std::string> args = {
-                              std::string(kFlatpak), "remote-info", "-m", scope
-                          };
+                          std::vector<std::string> args = {std::string(kFlatpak), "remote-info", "-m", scope};
                           args.push_back(remote.empty() ? "flathub" : remote);
                           args.push_back(details.hit.name);
                           const auto perms = process::runSync(args, permOptions);
@@ -740,9 +733,7 @@ namespace helix::packages {
                       dnfOptions.timeout = std::chrono::seconds(20);
                       dnfOptions.maxOutputBytes = 1U << 20;
                       dnfOptions.cancel = cancel;
-                      const auto dnf = process::runSync(
-                          {std::string("dnf"), "-C", "-q", "info", hit.name}, dnfOptions
-                      );
+                      const auto dnf = process::runSync({std::string("dnf"), "-C", "-q", "info", hit.name}, dnfOptions);
                       if (dnf.exitCode == 0 && !dnf.out.empty()) {
                         mergeDetails(details, parseRpmInfoOutput(dnf.out, hit));
                       }
@@ -882,9 +873,7 @@ namespace helix::packages {
       if (!firmwareAvailable()) {
         return false;
       }
-      std::vector<std::string> args = {
-          std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check"
-      };
+      std::vector<std::string> args = {std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check"};
       for (auto& name : packageRefs) {
         if (!isValidFwupdDeviceId(name)) {
           return false;
@@ -913,14 +902,14 @@ namespace helix::packages {
       process::RunOptions options;
       options.timeout = std::chrono::minutes(15);
       options.maxOutputBytes = 1U << 20;
-      return launchFlatpak(std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None);
+      return launchFlatpak(
+          std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
+      );
     }
     if (!backendAvailable()) {
       return false;
     }
-    std::vector<std::string> args = {
-        std::string(kPkcon), "--plain", "--noninteractive", "-y", "update"
-    };
+    std::vector<std::string> args = {std::string(kPkcon), "--plain", "--noninteractive", "-y", "update"};
     for (auto& packageRef : packageRefs) {
       if (!isValidPkconPackageRef(packageRef)) {
         return false;

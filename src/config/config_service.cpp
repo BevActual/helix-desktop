@@ -1,5 +1,4 @@
 #include "config/config_service.h"
-#include "desktop_api/client.h"
 
 #include "compositors/compositor_detect.h"
 #include "config/atomic_file.h"
@@ -7,20 +6,21 @@
 #include "config/config_merge.h"
 #include "config/config_migrations.h"
 #include "config/config_validate.h"
+#include "config/launcher_providers.h"
 #include "config/schema/config_schema.h"
 #include "config/schema/config_sections.h"
 #include "config/schema/engine.h"
 #include "config/widget_config.h"
+#include "config/widgets/desktop_widget_settings_registry.h"
+#include "config/widgets/widget_settings_registry.h"
 #include "core/build_info.h"
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/scoped_timer.h"
+#include "desktop_api/client.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
-#include "config/launcher_providers.h"
 #include "notification/notification_manager.h"
-#include "config/widgets/desktop_widget_settings_registry.h"
-#include "config/widgets/widget_settings_registry.h"
 #include "system/distro_info.h"
 #include "system/hardware_info.h"
 #include "util/file_utils.h"
@@ -57,8 +57,8 @@ namespace {
 
   template <typename T>
   void readConfigSection(
-      const toml::table& table, T& target, const helix::config::schema::Schema<T>& sectionSchema,
-      std::string_view path, helix::config::schema::Diagnostics& diagnostics
+      const toml::table& table, T& target, const helix::config::schema::Schema<T>& sectionSchema, std::string_view path,
+      helix::config::schema::Diagnostics& diagnostics
   ) {
     T candidate = target;
     try {
@@ -675,9 +675,14 @@ bool ConfigService::shouldRunSetupWizard() const {
 std::optional<bool> ConfigService::stateBool(std::string_view owner, std::string_view key) const {
   if (m_overrideCommitHandler) {
     try {
-      auto value = helix::desktopClient().call("configuration", "GetState", g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "boolean"));
-      if (value.at("present").get<bool>()) return value.at("value").get<bool>();
-    } catch (...) {}
+      auto value = helix::desktopClient().call(
+          "configuration", "GetState",
+          g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "boolean")
+      );
+      if (value.at("present").get<bool>())
+        return value.at("value").get<bool>();
+    } catch (...) {
+    }
     return std::nullopt;
   }
   return m_stateStore.boolValue(owner, key);
@@ -685,8 +690,15 @@ std::optional<bool> ConfigService::stateBool(std::string_view owner, std::string
 
 bool ConfigService::setStateBool(std::string_view owner, std::string_view key, bool value) {
   if (m_overrideCommitHandler) {
-    try { helix::desktopClient().call("configuration", "SetState", g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_boolean(value))); return true; }
-    catch (...) { return false; }
+    try {
+      helix::desktopClient().call(
+          "configuration", "SetState",
+          g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_boolean(value))
+      );
+      return true;
+    } catch (...) {
+      return false;
+    }
   }
   return m_stateStore.setBool(owner, key, value);
 }
@@ -694,9 +706,14 @@ bool ConfigService::setStateBool(std::string_view owner, std::string_view key, b
 std::optional<std::string> ConfigService::stateString(std::string_view owner, std::string_view key) const {
   if (m_overrideCommitHandler) {
     try {
-      auto value = helix::desktopClient().call("configuration", "GetState", g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "string"));
-      if (value.at("present").get<bool>()) return value.at("value").get<std::string>();
-    } catch (...) {}
+      auto value = helix::desktopClient().call(
+          "configuration", "GetState",
+          g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "string")
+      );
+      if (value.at("present").get<bool>())
+        return value.at("value").get<std::string>();
+    } catch (...) {
+    }
     return std::nullopt;
   }
   return m_stateStore.stringValue(owner, key);
@@ -704,16 +721,30 @@ std::optional<std::string> ConfigService::stateString(std::string_view owner, st
 
 bool ConfigService::setStateString(std::string_view owner, std::string_view key, std::string_view value) {
   if (m_overrideCommitHandler) {
-    try { helix::desktopClient().call("configuration", "SetState", g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_string(std::string(value).c_str()))); return true; }
-    catch (...) { return false; }
+    try {
+      helix::desktopClient().call(
+          "configuration", "SetState",
+          g_variant_new(
+              "(ssv)", std::string(owner).c_str(), std::string(key).c_str(),
+              g_variant_new_string(std::string(value).c_str())
+          )
+      );
+      return true;
+    } catch (...) {
+      return false;
+    }
   }
   return m_stateStore.setString(owner, key, value);
 }
 
 bool ConfigService::clearStateOwner(std::string_view owner) {
   if (m_overrideCommitHandler) {
-    try { helix::desktopClient().call("configuration", "ClearState", g_variant_new("(s)", std::string(owner).c_str())); return true; }
-    catch (...) { return false; }
+    try {
+      helix::desktopClient().call("configuration", "ClearState", g_variant_new("(s)", std::string(owner).c_str()));
+      return true;
+    } catch (...) {
+      return false;
+    }
   }
   return m_stateStore.clearOwner(owner);
 }
@@ -1377,7 +1408,8 @@ void ConfigService::deepMerge(toml::table& base, const toml::table& overlay) {
       if (auto* baseNode = base.get(k)) {
         if (auto* baseTbl = baseNode->as_table()) {
           if (k == "notification" && (*overlayTbl)["filter_replace"].value<bool>().value_or(false)) {
-            baseTbl->erase("filter"); baseTbl->erase("filter_order");
+            baseTbl->erase("filter");
+            baseTbl->erase("filter_order");
           }
           if (k == "session") {
             if (const auto* overlayActions = (*overlayTbl)["actions"].as_array()) {
@@ -1467,9 +1499,7 @@ void ConfigService::loadAll() {
       storedVersion = *parsedVersion;
       appliedVersion = helix::config::applyPendingConfigMigrations(effectiveOverrides, storedVersion, migrationDiag);
       sidecarNeedsPersist = appliedVersion != storedVersion;
-      effectiveOverrides.insert_or_assign(
-          helix::config::kConfigVersionKey, static_cast<std::int64_t>(appliedVersion)
-      );
+      effectiveOverrides.insert_or_assign(helix::config::kConfigVersionKey, static_cast<std::int64_t>(appliedVersion));
     }
   }
   origins.annotate(migrationDiag);

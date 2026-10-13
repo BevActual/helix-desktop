@@ -1,7 +1,6 @@
 #include "util/qr_code.h"
 
 #include <qrcodegen.hpp>
-
 #include <stdexcept>
 #include <string>
 

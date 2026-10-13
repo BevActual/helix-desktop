@@ -121,8 +121,7 @@ namespace settings {
     return out;
   }
 
-  WidgetReferenceInfo
-  widgetReferenceInfo(const Config& cfg, std::string_view name, bool /*includeManifestVersion*/) {
+  WidgetReferenceInfo widgetReferenceInfo(const Config& cfg, std::string_view name, bool /*includeManifestVersion*/) {
     WidgetReferenceInfo info;
     info.title = titleFromWidgetKey(name);
     const std::string type = widgetTypeForReference(cfg, name);
@@ -141,25 +140,29 @@ namespace settings {
   std::vector<WidgetPickerEntry> widgetPickerEntries(const Config& cfg) {
     std::vector<WidgetPickerEntry> entries;
     for (const auto& spec : kWidgetTypeSpecs) {
-      entries.push_back(WidgetPickerEntry{
-          .value = std::string(spec.type),
-          .label = std::string(spec.type),
-          .description = {},
-          .icon = std::string(spec.glyph),
-          .kind = WidgetReferenceKind::BuiltIn,
-      });
+      entries.push_back(
+          WidgetPickerEntry{
+              .value = std::string(spec.type),
+              .label = std::string(spec.type),
+              .description = {},
+              .icon = std::string(spec.glyph),
+              .kind = WidgetReferenceKind::BuiltIn,
+          }
+      );
     }
     for (const auto& [name, widget] : cfg.widgets) {
       if (isBuiltInWidgetType(name)) {
         continue;
       }
-      entries.push_back(WidgetPickerEntry{
-          .value = name,
-          .label = titleFromWidgetKey(name),
-          .description = widget.type,
-          .icon = {},
-          .kind = WidgetReferenceKind::Named,
-      });
+      entries.push_back(
+          WidgetPickerEntry{
+              .value = name,
+              .label = titleFromWidgetKey(name),
+              .description = widget.type,
+              .icon = {},
+              .kind = WidgetReferenceKind::Named,
+          }
+      );
     }
     return entries;
   }

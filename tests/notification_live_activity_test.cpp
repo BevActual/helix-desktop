@@ -1,9 +1,9 @@
 // Live activities: the `value` hint keeps a notification alive until it completes, the manager
 // tracks progress across replaces, and categories map to the four semantic accents.
 
+#include "core/color.h"
 #include "notification/notification_manager.h"
 #include "notification/notification_semantics.h"
-#include "core/color.h"
 
 #include <cmath>
 #include <iostream>

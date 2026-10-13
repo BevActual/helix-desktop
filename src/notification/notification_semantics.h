@@ -5,8 +5,8 @@
 // blue info. The accent tints the toast's top bar and the bar chip; the palette's own primary stays
 // for notifications that carry no meaning beyond "something happened".
 
-#include "notification/notification.h"
 #include "core/color.h"
+#include "notification/notification.h"
 
 #include <cstdint>
 #include <optional>

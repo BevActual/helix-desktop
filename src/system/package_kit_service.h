@@ -37,7 +37,8 @@ namespace helix::packages {
   [[nodiscard]] bool getDetails(PackageHit hit, CommandCompletion onComplete, Kind kind = Kind::Flatpak);
   [[nodiscard]] bool listUpdates(CommandCompletion onComplete, Kind kind = Kind::Fedora);
   [[nodiscard]] bool listInstalled(CommandCompletion onComplete, Kind kind = Kind::Fedora);
-  [[nodiscard]] bool updateAll(CommandCompletion onComplete, ProgressCallback onProgress = {}, Kind kind = Kind::Fedora);
+  [[nodiscard]] bool
+  updateAll(CommandCompletion onComplete, ProgressCallback onProgress = {}, Kind kind = Kind::Fedora);
   [[nodiscard]] bool updatePackages(
       std::vector<std::string> packageRefs, CommandCompletion onComplete, ProgressCallback onProgress = {},
       Kind kind = Kind::Fedora
@@ -48,8 +49,7 @@ namespace helix::packages {
   );
   [[nodiscard]] bool listFlatpakRemotes(CommandCompletion onComplete);
   [[nodiscard]] bool mutateFlatpakRemote(
-      FlatpakRemoteAction action, FlatpakRemote remote, CommandCompletion onComplete,
-      ProgressCallback onProgress = {}
+      FlatpakRemoteAction action, FlatpakRemote remote, CommandCompletion onComplete, ProgressCallback onProgress = {}
   );
 
   [[nodiscard]] std::size_t pendingUpdateCount() noexcept;

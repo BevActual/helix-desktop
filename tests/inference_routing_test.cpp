@@ -11,15 +11,15 @@ namespace fs = std::filesystem;
 
 namespace {
 
-std::string readFixture(const fs::path& root) {
-  std::ifstream in(root / "tests/fixtures/inference-routing-serde-sample.toml");
-  assert(in);
-  std::ostringstream body;
-  body << in.rdbuf();
-  return body.str();
-}
+  std::string readFixture(const fs::path& root) {
+    std::ifstream in(root / "tests/fixtures/inference-routing-serde-sample.toml");
+    assert(in);
+    std::ostringstream body;
+    body << in.rdbuf();
+    return body.str();
+  }
 
-}  // namespace
+} // namespace
 
 int main(int argc, char** argv) {
   if (argc < 2) {

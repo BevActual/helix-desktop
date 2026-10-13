@@ -108,8 +108,8 @@ int main() {
 
   const auto transform = display_config::parseTransform("flipped-90");
   ok = expect(transform == display_config::Transform::Flipped90, "parses CLI transform names") && ok;
-  ok = expect(display_config::jsonName(display_config::Transform::Rotate90) == "90", "json transform name for 90")
-      && ok;
+  ok =
+      expect(display_config::jsonName(display_config::Transform::Rotate90) == "90", "json transform name for 90") && ok;
   ok = expect(display_config::formatRefresh(240000) == "240 Hz", "formats whole-number refresh") && ok;
   ok = expect(display_config::formatRefresh(119880) == "119.880 Hz", "formats fractional refresh") && ok;
   ok = expect(display_config::formatScale(1.65) == "1.65×", "formats fractional scale") && ok;
@@ -125,12 +125,13 @@ int main() {
     const auto placed = display_config::snapPosition(outputs[1], outputs[0], display_config::LayoutDirection::Right);
     ok = expect(placed.x == 1552, "places HDMI to the right of the laptop") && ok;
 
-    const auto draggedRight =
-        display_config::snapDragPosition(outputs[1], outputs, 1600, 0);
+    const auto draggedRight = display_config::snapDragPosition(outputs[1], outputs, 1600, 0);
     ok = expect(draggedRight.has_value(), "drag-snap finds a neighbor") && ok;
     ok = expect(
-             draggedRight.has_value() && draggedRight->referenceName == "eDP-1"
-                 && draggedRight->direction == display_config::LayoutDirection::Right && draggedRight->position.x == 1552
+             draggedRight.has_value()
+                 && draggedRight->referenceName == "eDP-1"
+                 && draggedRight->direction == display_config::LayoutDirection::Right
+                 && draggedRight->position.x == 1552
                  && draggedRight->position.y == 0,
              "drag-snap keeps HDMI top-aligned to the right of the laptop"
          )
@@ -138,8 +139,10 @@ int main() {
 
     const auto draggedBelow = display_config::snapDragPosition(outputs[1], outputs, 0, 2000);
     ok = expect(
-             draggedBelow.has_value() && draggedBelow->direction == display_config::LayoutDirection::Bottom
-                 && draggedBelow->position.x == 0 && draggedBelow->position.y == 970,
+             draggedBelow.has_value()
+                 && draggedBelow->direction == display_config::LayoutDirection::Bottom
+                 && draggedBelow->position.x == 0
+                 && draggedBelow->position.y == 970,
              "drag-snap places HDMI below the laptop"
          )
         && ok;
@@ -147,15 +150,18 @@ int main() {
     const auto draggedDownFromRight =
         display_config::snapDragPosition(outputs[1], outputs, outputs[1].x, outputs[0].logicalHeight + 400);
     ok = expect(
-             draggedDownFromRight.has_value() && draggedDownFromRight->direction == display_config::LayoutDirection::Bottom
-                 && draggedDownFromRight->position.y == 970 && draggedDownFromRight->position.x <= 0,
+             draggedDownFromRight.has_value()
+                 && draggedDownFromRight->direction == display_config::LayoutDirection::Bottom
+                 && draggedDownFromRight->position.y == 970
+                 && draggedDownFromRight->position.x <= 0,
              "dragging a right-hand display down places it under the laptop"
          )
         && ok;
 
     const auto slidAlongRight = display_config::snapDragPosition(outputs[1], outputs, outputs[1].x, 80);
     ok = expect(
-             slidAlongRight.has_value() && slidAlongRight->direction == display_config::LayoutDirection::Right
+             slidAlongRight.has_value()
+                 && slidAlongRight->direction == display_config::LayoutDirection::Right
                  && slidAlongRight->position.x == 1552,
              "a small downward drag stays on the right and slides along the shared edge"
          )
@@ -171,11 +177,7 @@ int main() {
     const auto kept = display_config::placeAdjacent(
         outputs[1], outputs[0], display_config::LayoutDirection::Right, outputs[1].x, outputs[1].y
     );
-    ok = expect(
-             kept.x == 1552 && kept.y == 0,
-             "placeAdjacent keeps the current offset instead of recentering"
-         )
-        && ok;
+    ok = expect(kept.x == 1552 && kept.y == 0, "placeAdjacent keeps the current offset instead of recentering") && ok;
 
     auto nudged = outputs[1];
     const auto slid = display_config::placeAdjacent(
@@ -201,7 +203,8 @@ int main() {
   const auto off = display_config::powerAction(false);
   ok = expect(off.is_string() && off.get<std::string>() == "Off", "power off is unit variant") && ok;
 
-  const auto request = display_config::outputRequest("eDP-1", display_config::transformAction(display_config::Transform::Rotate90));
+  const auto request =
+      display_config::outputRequest("eDP-1", display_config::transformAction(display_config::Transform::Rotate90));
   ok = expect(request["Output"]["output"] == "eDP-1", "output request name") && ok;
   ok = expect(request["Output"]["action"]["Transform"]["transform"] == "90", "transform action json") && ok;
 

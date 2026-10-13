@@ -45,7 +45,9 @@ int main() {
 
   const auto stationary = compositors::niri::kdlForOverview({.preset = NiriOverviewPreset::Stationary});
   ok = expect(stationary.find("helix-wallpaper") != std::string::npos, "stationary matches wallpaper") && ok;
-  ok = expect(stationary.find("background-color \"transparent\"") != std::string::npos, "stationary clears workspace fill")
+  ok = expect(
+           stationary.find("background-color \"transparent\"") != std::string::npos, "stationary clears workspace fill"
+       )
       && ok;
   ok = expect(stationary.find("workspace-shadow") != std::string::npos, "stationary turns off workspace shadows") && ok;
 
@@ -62,8 +64,9 @@ int main() {
   const auto saved = compositors::niri::saveNiriOverviewInto(config, {.preset = NiriOverviewPreset::Stationary});
   ok = expect(saved.ok, "saves overview into a temp niri config") && ok;
   ok = expect(
-      compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-overview.kdl"), "appends include"
-  ) && ok;
+           compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-overview.kdl"), "appends include"
+       )
+      && ok;
   const auto includeText = compositors::niri::readFile(dir / "helix-overview.kdl");
   ok = expect(includeText.find("helix-wallpaper") != std::string::npos, "owned file has stationary rules") && ok;
 

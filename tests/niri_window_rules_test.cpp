@@ -30,24 +30,19 @@ int main() {
   const auto radiusOnly = compositors::niri::kdlForWindowCornerRadius(20);
   ok = expect(radiusOnly.find("geometry-corner-radius 20") != std::string::npos, "writes corner radius") && ok;
   ok = expect(radiusOnly.find("clip-to-geometry true") != std::string::npos, "clips to geometry") && ok;
-  ok = expect(
-      radiusOnly.find("draw-border-with-background") == std::string::npos, "omits draw-border until set"
-  ) && ok;
+  ok = expect(radiusOnly.find("draw-border-with-background") == std::string::npos, "omits draw-border until set") && ok;
 
   const auto extras = compositors::niri::kdlForWindowRules({
       .cornerRadius = 12,
       .drawBorderWithBackground = false,
   });
   ok = expect(extras.find("geometry-corner-radius 12") != std::string::npos, "keeps radius with extras") && ok;
-  ok = expect(
-      extras.find("draw-border-with-background false") != std::string::npos, "writes draw-border false"
-  ) && ok;
+  ok = expect(extras.find("draw-border-with-background false") != std::string::npos, "writes draw-border false") && ok;
 
   const auto borderOnly = compositors::niri::kdlForWindowRules({.drawBorderWithBackground = true});
   ok = expect(borderOnly.find("geometry-corner-radius") == std::string::npos, "extras-only omits radius") && ok;
-  ok = expect(
-      borderOnly.find("draw-border-with-background true") != std::string::npos, "writes draw-border true"
-  ) && ok;
+  ok =
+      expect(borderOnly.find("draw-border-with-background true") != std::string::npos, "writes draw-border true") && ok;
 
   const auto dir = makeTempDir();
   const auto config = dir / "config.kdl";
@@ -58,9 +53,10 @@ int main() {
   const auto saved = compositors::niri::saveWindowRulesInto(config, {.drawBorderWithBackground = false});
   ok = expect(saved.ok, "saves window rules into a temp niri config") && ok;
   ok = expect(
-      compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-window-rules.kdl"),
-      "appends include"
-  ) && ok;
+           compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-window-rules.kdl"),
+           "appends include"
+       )
+      && ok;
 
   std::filesystem::remove_all(dir);
   return ok ? 0 : 1;

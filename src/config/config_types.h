@@ -4,9 +4,9 @@
 #include "config/config_limits.h"
 #include "config/widget_setting_value.h"
 #include "core/input/key_chord.h"
-#include "system/sysmon_threshold_profile.h"
 #include "core/input/keybind_action.h"
 #include "core/style_defaults.h"
+#include "system/sysmon_threshold_profile.h"
 
 #include <array>
 #include <cstddef>
@@ -151,7 +151,7 @@ struct BarConfig {
   std::int32_t radiusTopRight = 18;
   std::int32_t radiusBottomLeft = 18;
   std::int32_t radiusBottomRight = 18;
-  bool concaveEdgeCorners = false; // floating bars use a full pill, not edge-carved corners
+  bool concaveEdgeCorners = false;     // floating bars use a full pill, not edge-carved corners
   std::int32_t marginEnds = 12;        // inset from each end of the bar along its main axis
   std::int32_t marginEdge = 8;         // distance from the nearest screen edge (floats the bar when > 0)
   std::int32_t marginOppositeEdge = 0; // extra reserved space on the inward side of the bar
@@ -1151,8 +1151,8 @@ struct ShellConfig {
   struct ScreenRecordConfig {
     bool audio = true;
     bool showCursor = true;
-    std::string directory;       // empty = ~/Videos/Recordings
-    std::string filenamePattern; // empty = recording_%Y%m%d_%H%M%S
+    std::string directory;            // empty = ~/Videos/Recordings
+    std::string filenamePattern;      // empty = recording_%Y%m%d_%H%M%S
     std::int32_t replayDuration = 30; // seconds, gpu-screen-recorder replay buffer
 
     bool operator==(const ScreenRecordConfig&) const = default;
@@ -1312,52 +1312,34 @@ struct SystemConfig {
     float memoryPollSeconds = 2.0F;
     float networkPollSeconds = 3.0F;
     float diskPollSeconds = 10.0F;
-    double cpuUsageActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).activityDefault;
-    double cpuUsageCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).criticalDefault;
-    double cpuTempActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).activityDefault;
-    double cpuTempCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).criticalDefault;
-    double cpuFreqActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).activityDefault;
-    double cpuFreqCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).criticalDefault;
-    double gpuTempActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).activityDefault;
-    double gpuTempCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).criticalDefault;
-    double gpuUsageActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).activityDefault;
-    double gpuUsageCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).criticalDefault;
-    double gpuVramActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).activityDefault;
-    double gpuVramCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).criticalDefault;
+    double cpuUsageActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).activityDefault;
+    double cpuUsageCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).criticalDefault;
+    double cpuTempActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).activityDefault;
+    double cpuTempCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).criticalDefault;
+    double cpuFreqActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).activityDefault;
+    double cpuFreqCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).criticalDefault;
+    double gpuTempActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).activityDefault;
+    double gpuTempCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).criticalDefault;
+    double gpuUsageActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).activityDefault;
+    double gpuUsageCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).criticalDefault;
+    double gpuVramActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).activityDefault;
+    double gpuVramCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).criticalDefault;
     double ramPctActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).activityDefault;
     double ramPctCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).criticalDefault;
-    double swapPctActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).activityDefault;
-    double swapPctCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).criticalDefault;
+    double swapPctActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).activityDefault;
+    double swapPctCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).criticalDefault;
     double diskUsedPctActivityThreshold =
         helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).activityDefault;
     double diskUsedPctCriticalThreshold =
         helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).criticalDefault;
-    double diskUsedActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).activityDefault;
-    double diskUsedCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).criticalDefault;
+    double diskUsedActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).activityDefault;
+    double diskUsedCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).criticalDefault;
     double diskFreePctActivityThreshold =
         helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).activityDefault;
     double diskFreePctCriticalThreshold =
         helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).criticalDefault;
-    double diskFreeActivityThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).activityDefault;
-    double diskFreeCriticalThreshold =
-        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).criticalDefault;
+    double diskFreeActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).activityDefault;
+    double diskFreeCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).criticalDefault;
     double netRxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).activityDefault;
     double netRxCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).criticalDefault;
     double netTxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetTx).activityDefault;
@@ -1805,10 +1787,11 @@ struct ControlCenterConfig {
   };
 
   std::vector<ShortcutConfig> shortcuts;
-  std::vector<std::string> hiddenTabs; // tab keys (built-in or plugin entry ids) the user has hidden; empty = all available shown
+  std::vector<std::string>
+      hiddenTabs; // tab keys (built-in or plugin entry ids) the user has hidden; empty = all available shown
   ControlCenterSidebarMode sidebarMode = ControlCenterSidebarMode::Compact;
   ControlCenterSidebarMode sidebarSectionMode = ControlCenterSidebarMode::Compact;
-  std::int32_t width = kDefaultWidth; // full-sidebar logical width; compact/none modes scale down from this
+  std::int32_t width = kDefaultWidth;   // full-sidebar logical width; compact/none modes scale down from this
   std::int32_t height = kDefaultHeight; // logical height; leftover catalogs fill the extra space
   bool showSessionButton = true;
   CalendarTabConfig calendarTab;

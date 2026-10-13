@@ -29,13 +29,11 @@ namespace compositors::niri {
   [[nodiscard]] std::vector<ParsedOutput> parseOutputs(std::string_view kdl);
   [[nodiscard]] std::string layoutFingerprint(std::span<const display_config::Output> outputs);
   [[nodiscard]] std::string layoutFingerprint(std::span<const ParsedOutput> outputs);
-  [[nodiscard]] bool savedLayoutMatches(
-      std::span<const display_config::Output> outputs, const std::filesystem::path& configFile = {}
-  );
+  [[nodiscard]] bool
+  savedLayoutMatches(std::span<const display_config::Output> outputs, const std::filesystem::path& configFile = {});
 
   InstallResult saveOutputs(std::span<const display_config::Output> outputs);
-  InstallResult saveOutputsInto(
-      const std::filesystem::path& configFile, std::span<const display_config::Output> outputs
-  );
+  InstallResult
+  saveOutputsInto(const std::filesystem::path& configFile, std::span<const display_config::Output> outputs);
 
 } // namespace compositors::niri

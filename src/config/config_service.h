@@ -89,7 +89,6 @@ public:
   void setOverrideCommitHandler(OverrideCommitHandler handler) { m_overrideCommitHandler = std::move(handler); }
   bool commitRemoteOverrides(std::string_view baseline, std::string_view candidate);
 
-
   // Persisted wallpaper paths (written to settings.toml, app-managed).
   [[nodiscard]] std::string getWallpaperPath(const std::string& connectorName) const;
   [[nodiscard]] const std::unordered_map<std::string, std::string>& monitorWallpaperPaths() const {

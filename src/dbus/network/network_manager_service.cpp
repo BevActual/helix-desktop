@@ -7,8 +7,8 @@
 #include "system/rfkill_helper.h"
 
 #include <algorithm>
-#include <array>
 #include <arpa/inet.h>
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <map>
@@ -1369,7 +1369,9 @@ void NetworkManagerService::requestActiveWifiPsk(WifiPskCallback callback) {
     }
   };
 
-  if (!m_state.connected || m_state.kind != NetworkConnectivity::Wireless || m_activeConnectionPath.empty()
+  if (!m_state.connected
+      || m_state.kind != NetworkConnectivity::Wireless
+      || m_activeConnectionPath.empty()
       || m_activeConnectionPath == "/") {
     done(std::nullopt);
     return;
@@ -1383,9 +1385,8 @@ void NetworkManagerService::requestActiveWifiPsk(WifiPskCallback callback) {
     active->callMethodAsync("Get")
         .onInterface(kPropertiesInterface)
         .withArguments(kNmActiveConnectionInterface, "Connection")
-        .uponReplyInvoke([this, lifetimeToken, done, active](
-                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
-                         ) {
+        .uponReplyInvoke([this, lifetimeToken, done,
+                          active](std::optional<sdbus::Error> err, sdbus::Variant connectionValue) {
           if (lifetimeToken.expired()) {
             return;
           }
@@ -1413,9 +1414,8 @@ void NetworkManagerService::requestActiveWifiPsk(WifiPskCallback callback) {
             profile->callMethodAsync("GetSecrets")
                 .onInterface(kNmSettingsConnectionInterface)
                 .withArguments("802-11-wireless-security")
-                .uponReplyInvoke([lifetimeToken, done, profile](
-                                     std::optional<sdbus::Error> secretsErr, ConnectionSettings secrets
-                                 ) {
+                .uponReplyInvoke([lifetimeToken, done,
+                                  profile](std::optional<sdbus::Error> secretsErr, ConnectionSettings secrets) {
                   if (lifetimeToken.expired()) {
                     return;
                   }
@@ -1479,9 +1479,8 @@ void NetworkManagerService::requestActiveDnsOverride(DnsOverrideQueryCallback ca
     active->callMethodAsync("Get")
         .onInterface(kPropertiesInterface)
         .withArguments(kNmActiveConnectionInterface, "Connection")
-        .uponReplyInvoke([this, lifetimeToken, done, active](
-                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
-                         ) {
+        .uponReplyInvoke([this, lifetimeToken, done,
+                          active](std::optional<sdbus::Error> err, sdbus::Variant connectionValue) {
           if (lifetimeToken.expired()) {
             return;
           }
@@ -1506,9 +1505,8 @@ void NetworkManagerService::requestActiveDnsOverride(DnsOverrideQueryCallback ca
                 std::shared_ptr<sdbus::IProxy>(sdbus::createProxy(m_bus.connection(), kNmBusName, profilePath));
             profile->callMethodAsync("GetSettings")
                 .onInterface(kNmSettingsConnectionInterface)
-                .uponReplyInvoke([lifetimeToken, done, profile](
-                                     std::optional<sdbus::Error> settingsErr, ConnectionSettings cfg
-                                 ) {
+                .uponReplyInvoke([lifetimeToken, done,
+                                  profile](std::optional<sdbus::Error> settingsErr, ConnectionSettings cfg) {
                   if (lifetimeToken.expired()) {
                     return;
                   }
@@ -1539,8 +1537,11 @@ void NetworkManagerService::setDnsOverride(const DnsOverride& override, DnsOverr
     }
   };
 
-  if (!m_state.connected || m_activeConnectionPath.empty() || m_activeConnectionPath == "/"
-      || m_activeDevicePath.empty() || m_activeDevicePath == "/") {
+  if (!m_state.connected
+      || m_activeConnectionPath.empty()
+      || m_activeConnectionPath == "/"
+      || m_activeDevicePath.empty()
+      || m_activeDevicePath == "/") {
     done(false, "Connect to a network before changing DNS");
     return;
   }
@@ -1574,9 +1575,8 @@ void NetworkManagerService::setDnsOverride(const DnsOverride& override, DnsOverr
     active->callMethodAsync("Get")
         .onInterface(kPropertiesInterface)
         .withArguments(kNmActiveConnectionInterface, "Connection")
-        .uponReplyInvoke([this, lifetimeToken, done, active, settings, args, devicePath](
-                             std::optional<sdbus::Error> err, sdbus::Variant connectionValue
-                         ) {
+        .uponReplyInvoke([this, lifetimeToken, done, active, settings, args,
+                          devicePath](std::optional<sdbus::Error> err, sdbus::Variant connectionValue) {
           if (lifetimeToken.expired()) {
             return;
           }

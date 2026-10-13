@@ -1,10 +1,9 @@
 #include "dbus/tray/tray_service.h"
 
-#include "dbus/bus_name_watch.h"
-
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/timer_manager.h"
+#include "dbus/bus_name_watch.h"
 #include "dbus/session_bus.h"
 #include "util/string_utils.h"
 

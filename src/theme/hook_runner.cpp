@@ -132,7 +132,7 @@ namespace helix::theme {
   bool HookRunner::launch(const std::shared_ptr<State>& state, QueuedHook hook) {
     process::RunCallbacks callbacks;
     callbacks.onExit = [state, command = hook.command, templateId = hook.templateId,
-                         generation = hook.generation](process::RunResult result) {
+                        generation = hook.generation](process::RunResult result) {
       if (!result) {
         kLog.warn("hook failed with exit code {}: {} (command: {})", result.exitCode, result.err, command);
         if (!templateId.empty()) {

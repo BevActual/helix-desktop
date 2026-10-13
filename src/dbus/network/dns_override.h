@@ -3,8 +3,8 @@
 #include "util/string_utils.h"
 
 #include <algorithm>
-#include <array>
 #include <arpa/inet.h>
+#include <array>
 #include <cctype>
 #include <cstdint>
 #include <netinet/in.h>
@@ -144,9 +144,8 @@ namespace dns_override {
   }
 
   template <std::size_t N>
-  [[nodiscard]] inline std::vector<std::string> withOptionalSni(
-      const std::array<std::string_view, N>& hosts, std::string_view sni
-  ) {
+  [[nodiscard]] inline std::vector<std::string>
+  withOptionalSni(const std::array<std::string_view, N>& hosts, std::string_view sni) {
     std::vector<std::string> out;
     out.reserve(N);
     for (const auto host : hosts) {
@@ -159,9 +158,8 @@ namespace dns_override {
     return out;
   }
 
-  [[nodiscard]] inline std::vector<std::string> joinFamilies(
-      const std::vector<std::string>& v4, const std::vector<std::string>& v6
-  ) {
+  [[nodiscard]] inline std::vector<std::string>
+  joinFamilies(const std::vector<std::string>& v4, const std::vector<std::string>& v6) {
     std::vector<std::string> out = v4;
     out.insert(out.end(), v6.begin(), v6.end());
     return out;
@@ -249,9 +247,7 @@ namespace dns_override {
     if (trimmed.empty() || trimmed.size() > 64) {
       return trimmed.empty();
     }
-    return std::ranges::all_of(trimmed, [](unsigned char c) {
-      return std::isalnum(c) != 0 || c == '-' || c == '_';
-    });
+    return std::ranges::all_of(trimmed, [](unsigned char c) { return std::isalnum(c) != 0 || c == '-' || c == '_'; });
   }
 
 } // namespace dns_override

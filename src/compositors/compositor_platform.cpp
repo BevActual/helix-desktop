@@ -75,7 +75,6 @@ namespace {
     );
   }
 
-
   [[nodiscard]] bool requestLoginSessionExit() {
     if (const char* sessionId = std::getenv("XDG_SESSION_ID"); sessionId != nullptr && sessionId[0] != '\0') {
       if (process::launchFirstAvailable({{"loginctl", "terminate-session", sessionId}})) {

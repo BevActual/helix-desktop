@@ -2,8 +2,8 @@
 
 #include "config/config_types.h"
 #include "core/timer_manager.h"
-#include "theme/palette.h"
 #include "theme/color_roles.h"
+#include "theme/palette.h"
 
 #include <chrono>
 #include <cstdint>

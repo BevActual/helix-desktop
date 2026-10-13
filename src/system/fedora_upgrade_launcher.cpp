@@ -60,9 +60,7 @@ namespace helix::fedora_upgrade {
   } // namespace
 
   bool available() {
-    const auto host = classifyHost(
-        osReleaseText(), std::filesystem::exists("/run/ostree-booted")
-    );
+    const auto host = classifyHost(osReleaseText(), std::filesystem::exists("/run/ostree-booted"));
     return host == HostKind::Fedora && !helperPath().empty() && process::commandExists(kPkexecName.data());
   }
 
@@ -93,17 +91,16 @@ namespace helix::fedora_upgrade {
     const bool launched = process::runAsync(
         std::vector<std::string>{std::string(kPkexecName), helper.string()},
         process::RunCallbacks{
-            .onExit =
-                [completion](process::RunResult result) {
-                  g_inProgress.store(false, std::memory_order_release);
-                  if (completion && *completion) {
-                    std::string error = result.err.empty() ? result.out : result.err;
-                    if (result.timedOut) {
-                      error = "upgrade timed out";
-                    }
-                    (*completion)(static_cast<bool>(result), std::move(error));
-                  }
-                },
+            .onExit = [completion](process::RunResult result) {
+              g_inProgress.store(false, std::memory_order_release);
+              if (completion && *completion) {
+                std::string error = result.err.empty() ? result.out : result.err;
+                if (result.timedOut) {
+                  error = "upgrade timed out";
+                }
+                (*completion)(static_cast<bool>(result), std::move(error));
+              }
+            },
         }
     );
     if (!launched) {

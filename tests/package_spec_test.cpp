@@ -35,9 +35,7 @@ int main() {
         .arch = "x86_64",
         .repo = "updates",
     };
-    ok = expect(
-        pkconPackageId(update) == "helix;5.2.1-1.fc44;x86_64;updates", "packagekit id"
-    ) && ok;
+    ok = expect(pkconPackageId(update) == "helix;5.2.1-1.fc44;x86_64;updates", "packagekit id") && ok;
     ok = expect(isValidPkconPackageId(pkconPackageId(update)), "packagekit id valid") && ok;
     PackageHit epoch{
         .name = "vim-data",
@@ -47,9 +45,7 @@ int main() {
         .epoch = "2",
         .repo = "updates",
     };
-    ok = expect(
-        pkconPackageId(epoch) == "vim-data;2:9.2.1061-1.fc44;noarch;updates", "epoch packagekit id"
-    ) && ok;
+    ok = expect(pkconPackageId(epoch) == "vim-data;2:9.2.1061-1.fc44;noarch;updates", "epoch packagekit id") && ok;
     PackageHit nameOnly{.name = "htop"};
     ok = expect(pkconPackageId(nameOnly).empty(), "incomplete id empty") && ok;
     ok = expect(pkconPackageRef(nameOnly) == "htop", "name fallback ref") && ok;
@@ -64,22 +60,22 @@ int main() {
         .repo = "terra",
     };
     ok = expect(
-        pkconPackageId(caret) == "helix-nightly;5.2.1^20261004git.e639a87-1.fc44;x86_64;terra",
-        "caret version id"
-    ) && ok;
+             pkconPackageId(caret) == "helix-nightly;5.2.1^20261004git.e639a87-1.fc44;x86_64;terra", "caret version id"
+         )
+        && ok;
+    ok = expect(pkconPackageRefForAction(update, false) == "helix;5.2.1-1.fc44;x86_64;updates", "action install id")
+        && ok;
     ok = expect(
-        pkconPackageRefForAction(update, false) == "helix;5.2.1-1.fc44;x86_64;updates", "action install id"
-    ) && ok;
-    ok = expect(
-        pkconPackageRefForAction(update, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates",
-        "action remove id"
-    ) && ok;
+             pkconPackageRefForAction(update, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates", "action remove id"
+         )
+        && ok;
     PackageHit alreadyInstalled = update;
     alreadyInstalled.repo = "installed:updates";
     ok = expect(
-        pkconPackageRefForAction(alreadyInstalled, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates",
-        "remove keeps installed data"
-    ) && ok;
+             pkconPackageRefForAction(alreadyInstalled, true) == "helix;5.2.1-1.fc44;x86_64;installed:updates",
+             "remove keeps installed data"
+         )
+        && ok;
   }
 
   ok = expect(isSafeSearchQuery("ht"), "min length") && ok;
@@ -122,7 +118,8 @@ int main() {
   ok = expect(installed.has_value(), "installed line") && ok;
   ok = expect(installed && installed->name == "helix" && installed->version == "25.07.1", "installed nevra") && ok;
   ok = expect(installed && installed->release == "11.fc44" && installed->arch == "x86_64", "installed arch") && ok;
-  ok = expect(installed && installed->repo == "fedora" && installed->state == PackageState::Installed, "installed state")
+  ok =
+      expect(installed && installed->repo == "fedora" && installed->state == PackageState::Installed, "installed state")
       && ok;
 
   const auto epoch = parsePkconLine("Available     vim-data-2:9.2.1061-1.fc44.noarch (updates)");
@@ -149,7 +146,10 @@ int main() {
   ok = expect(hits.size() == 4, "parsed four") && ok;
   const auto deduped = dedupeByName(hits);
   ok = expect(deduped.size() == 2, "deduped two names") && ok;
-  ok = expect(!deduped.empty() && deduped.front().name == "foo" && deduped.front().state == PackageState::Update, "prefer update")
+  ok = expect(
+           !deduped.empty() && deduped.front().name == "foo" && deduped.front().state == PackageState::Update,
+           "prefer update"
+       )
       && ok;
 
   auto ranked = parsePkconOutput(
@@ -198,14 +198,19 @@ int main() {
   ok = expect(rpmInstalled && rpmInstalled->name == "bash" && rpmInstalled->epoch.empty(), "rpm name") && ok;
   ok = expect(rpmInstalled && rpmInstalled->version == "5.3.0" && rpmInstalled->release == "2.fc44", "rpm version")
       && ok;
-  ok = expect(rpmInstalled && rpmInstalled->arch == "x86_64" && rpmInstalled->state == PackageState::Installed, "rpm arch")
+  ok = expect(
+           rpmInstalled && rpmInstalled->arch == "x86_64" && rpmInstalled->state == PackageState::Installed, "rpm arch"
+       )
       && ok;
   ok = expect(rpmInstalled && rpmInstalled->summary.starts_with("The GNU Bourne"), "rpm summary") && ok;
 
   const auto rpmEpoch = parseRpmInstalledLine("vim-data\t2\t9.2.1061\t1.fc44\tnoarch\tVi IMproved extra files");
   ok = expect(rpmEpoch && rpmEpoch->name == "vim-data" && rpmEpoch->epoch == "2", "rpm epoch") && ok;
   ok = expect(!parseRpmInstalledLine("Transaction: Searching"), "rpm junk") && ok;
-  ok = expect(parseRpmInstalledOutput("bash\t0\t5.3.0\t2.fc44\tx86_64\tThe GNU Bourne Again shell\n").size() == 1, "rpm one")
+  ok =
+      expect(
+          parseRpmInstalledOutput("bash\t0\t5.3.0\t2.fc44\tx86_64\tThe GNU Bourne Again shell\n").size() == 1, "rpm one"
+      )
       && ok;
 
   ok = expect(isValidFlatpakAppId("org.gnome.Calculator"), "flatpak id") && ok;
@@ -221,34 +226,54 @@ int main() {
       "org.gnome.Calculator\tCalculator\t49.1.2\tstable\tflathub\tuser", FlatpakListKind::Installed
   );
   ok = expect(flatpakInstalled && flatpakInstalled->name == "org.gnome.Calculator", "flatpak app id") && ok;
-  ok = expect(flatpakInstalled && flatpakInstalled->title == "Calculator" && flatpakInstalled->version == "49.1.2", "flatpak title")
+  ok = expect(
+           flatpakInstalled && flatpakInstalled->title == "Calculator" && flatpakInstalled->version == "49.1.2",
+           "flatpak title"
+       )
       && ok;
-  ok = expect(flatpakInstalled && flatpakInstalled->repo == "flathub" && flatpakInstalled->installation == "user", "flatpak origin")
+  ok = expect(
+           flatpakInstalled && flatpakInstalled->repo == "flathub" && flatpakInstalled->installation == "user",
+           "flatpak origin"
+       )
       && ok;
   ok = expect(flatpakInstalled && flatpakInstalled->state == PackageState::Installed, "flatpak installed state") && ok;
 
   const auto flatpakUpdate = parseFlatpakListLine(
       "org.gnome.Calculator\tCalculator\tPerform arithmetic\t49.2\tflathub", FlatpakListKind::Updates
   );
-  ok = expect(flatpakUpdate && flatpakUpdate->state == PackageState::Update && flatpakUpdate->summary.starts_with("Perform"), "flatpak update")
+  ok = expect(
+           flatpakUpdate
+               && flatpakUpdate->state == PackageState::Update
+               && flatpakUpdate->summary.starts_with("Perform"),
+           "flatpak update"
+       )
       && ok;
   const auto flatpakCatalog = parseFlatpakListLine(
       "org.gnome.Calculator\tCalculator\tPerform arithmetic\t49.2\tflathub", FlatpakListKind::Catalog
   );
   ok = expect(
-           flatpakCatalog && flatpakCatalog->state == PackageState::Available
+           flatpakCatalog
+               && flatpakCatalog->state == PackageState::Available
                && flatpakCatalog->summary.starts_with("Perform"),
            "flatpak catalog"
        )
       && ok;
-  ok = expect(!parseFlatpakListLine("runtime/org.freedesktop.Platform\tPlatform\t25.08\tstable\tflathub\tuser", FlatpakListKind::Installed), "runtime skipped")
+  ok = expect(
+           !parseFlatpakListLine(
+               "runtime/org.freedesktop.Platform\tPlatform\t25.08\tstable\tflathub\tuser", FlatpakListKind::Installed
+           ),
+           "runtime skipped"
+       )
       && ok;
 
   const auto searched = parseFlatpakSearchJson(
       R"([{"application_id":"org.gnome.Calculator","name":"Calculator","description":"Perform arithmetic","version":"49.0","remotes":"flathub,fedora"}])"
   );
   ok = expect(searched.size() == 1 && searched[0].name == "org.gnome.Calculator", "search id") && ok;
-  ok = expect(searched.size() == 1 && searched[0].title == "Calculator" && searched[0].repo == "flathub,fedora", "search title")
+  ok = expect(
+           searched.size() == 1 && searched[0].title == "Calculator" && searched[0].repo == "flathub,fedora",
+           "search title"
+       )
       && ok;
   const auto searchedAlt = parseFlatpakSearchJson(R"([{"application":"org.mozilla.firefox","name":"Firefox"}])");
   ok = expect(searchedAlt.size() == 1 && searchedAlt[0].name == "org.mozilla.firefox", "search application key") && ok;
@@ -263,36 +288,40 @@ int main() {
       R"({"Devices":[{"Name":"UEFI dbx","DeviceId":"362301da643102b9f38477387e2193e57abaa590","Summary":"UEFI revocation database","Vendor":"Microsoft","Version":"20260402","Flags":["updatable","supported"],"Releases":[{"Name":"Secure Boot dbx","Summary":"Forbidden Signature Database","Version":"20260707","RemoteId":"lvfs","Description":"<p>Updates dbx.</p>"}]}]})",
       FwupdListKind::Updates
   );
-  ok = expect(fwUpdates.size() == 1 && fwUpdates[0].name == "362301da643102b9f38477387e2193e57abaa590", "fwupd update id")
+  ok = expect(
+           fwUpdates.size() == 1 && fwUpdates[0].name == "362301da643102b9f38477387e2193e57abaa590", "fwupd update id"
+       )
       && ok;
   ok = expect(
-           fwUpdates.size() == 1 && fwUpdates[0].title == "UEFI dbx" && fwUpdates[0].version == "20260707"
-               && fwUpdates[0].state == PackageState::Update && fwUpdates[0].repo == "lvfs",
+           fwUpdates.size() == 1
+               && fwUpdates[0].title == "UEFI dbx"
+               && fwUpdates[0].version == "20260707"
+               && fwUpdates[0].state == PackageState::Update
+               && fwUpdates[0].repo == "lvfs",
            "fwupd update fields"
        )
       && ok;
-  ok = expect(
-           fwUpdates.size() == 1 && fwUpdates[0].summary.starts_with("Forbidden"), "fwupd update summary"
-       )
-      && ok;
+  ok = expect(fwUpdates.size() == 1 && fwUpdates[0].summary.starts_with("Forbidden"), "fwupd update summary") && ok;
 
   const auto fwInstalled = parseFwupdDevicesJson(
       R"({"Devices":[{"Name":"Touchpad","DeviceId":"9ec2f35557ba426df27002d8b03f67b0d4d2e7a3","Summary":"Touch Controller","Vendor":"Goodix","Version":"0.68223","Flags":["updatable"]},{"Name":"Hub","DeviceId":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","Flags":["internal"]}]})",
       FwupdListKind::Installed
   );
-  ok = expect(fwInstalled.size() == 1 && fwInstalled[0].name == "9ec2f35557ba426df27002d8b03f67b0d4d2e7a3", "fwupd installed")
+  ok = expect(
+           fwInstalled.size() == 1 && fwInstalled[0].name == "9ec2f35557ba426df27002d8b03f67b0d4d2e7a3",
+           "fwupd installed"
+       )
       && ok;
   ok = expect(
-           fwInstalled.size() == 1 && fwInstalled[0].title == "Touchpad" && fwInstalled[0].version == "0.68223"
+           fwInstalled.size() == 1
+               && fwInstalled[0].title == "Touchpad"
+               && fwInstalled[0].version == "0.68223"
                && fwInstalled[0].state == PackageState::Installed,
            "fwupd installed fields"
        )
       && ok;
   ok = expect(parseFwupdDevicesJson(R"({"Devices":[]})", FwupdListKind::Updates).empty(), "fwupd empty") && ok;
-  ok = expect(
-           fwInstalled.size() == 1 && fwInstalled[0].iconName.empty(), "fwupd installed no icon"
-       )
-      && ok;
+  ok = expect(fwInstalled.size() == 1 && fwInstalled[0].iconName.empty(), "fwupd installed no icon") && ok;
   const auto fwWithIcon = parseFwupdDevicesJson(
       R"({"Devices":[{"Name":"Touchpad","DeviceId":"9ec2f35557ba426df27002d8b03f67b0d4d2e7a3","Summary":"Touch Controller","Vendor":"Goodix","Version":"0.68223","Flags":["updatable"],"Icons":["input-touchpad"]}]})",
       FwupdListKind::Installed
@@ -349,20 +378,23 @@ int main() {
   ok = expect(details.donation == "https://example.org/donate", "appstream donation") && ok;
   ok = expect(details.helpUrl == "https://example.org/help", "appstream help") && ok;
   ok = expect(details.contentRating == "May include mild content", "appstream content rating") && ok;
-  ok = expect(details.releaseNotes.contains("1.2.3") && details.releaseNotes.contains("Fixed crash"), "appstream release notes")
+  ok = expect(
+           details.releaseNotes.contains("1.2.3") && details.releaseNotes.contains("Fixed crash"),
+           "appstream release notes"
+       )
       && ok;
   ok = expect(details.verification.contains("example.org"), "appstream verification") && ok;
   ok = expect(details.description.contains("Long description"), "appstream description") && ok;
   ok = expect(details.categories.size() == 2 && details.categories[0] == "Utility", "appstream categories") && ok;
   ok = expect(
-           !details.screenshotUrls.empty()
-               && details.screenshotUrls.front().contains("752x423"),
+           !details.screenshotUrls.empty() && details.screenshotUrls.front().contains("752x423"),
            "appstream screenshot prefers larger"
        )
       && ok;
 
   auto remoteInfo = parseFlatpakRemoteInfo(
-      "Example App\n\n            ID: org.example.App\n       Version: 1.2.3\n       License: MIT\n Download Size: 12.0 MB\nInstalled Size: 40.0 MB\n       Runtime: org.freedesktop.Platform/x86_64/25.08\n",
+      "Example App\n\n            ID: org.example.App\n       Version: 1.2.3\n       License: MIT\n Download Size: "
+      "12.0 MB\nInstalled Size: 40.0 MB\n       Runtime: org.freedesktop.Platform/x86_64/25.08\n",
       PackageHit{.name = "org.example.App"}
   );
   ok = expect(remoteInfo.hit.version == "1.2.3" && remoteInfo.license == "MIT", "remote info version") && ok;
@@ -373,7 +405,9 @@ int main() {
   ok = expect(permissions.permissions.contains("Has network access"), "permissions text") && ok;
 
   auto rpmInfo = parseRpmInfoOutput(
-      "Name        : firefox\nVersion     : 157.0\nRelease     : 1.fc44\nArchitecture: x86_64\nSize        : 304740343\nLicense     : MPL-2.0\nURL         : https://www.mozilla.org/firefox/\nSummary     : Mozilla Firefox Web browser\nDescription :\nMozilla Firefox is an open-source web browser.\n",
+      "Name        : firefox\nVersion     : 157.0\nRelease     : 1.fc44\nArchitecture: x86_64\nSize        : "
+      "304740343\nLicense     : MPL-2.0\nURL         : https://www.mozilla.org/firefox/\nSummary     : Mozilla Firefox "
+      "Web browser\nDescription :\nMozilla Firefox is an open-source web browser.\n",
       PackageHit{.name = "firefox"}
   );
   ok = expect(rpmInfo.hit.summary.starts_with("Mozilla Firefox"), "rpm info summary") && ok;
@@ -390,14 +424,15 @@ int main() {
   ok = expect(fwDetails.hit.version == "20260707", "fwupd detail version") && ok;
 
   ok = expect(plainDescription("  a\n\nb  ").contains("a"), "plain description") && ok;
-  ok = expect(plainDescription("protect what&apos;s important").contains("what's"), "plain description entities")
-      && ok;
+  ok = expect(plainDescription("protect what&apos;s important").contains("what's"), "plain description entities") && ok;
 
   const auto permissionLabels = humanizeFlatpakPermissions(
       "[Context]\nshared=network;ipc;\nsockets=x11;wayland;pulseaudio;\ndevices=dri;\nfilesystems=home;xdg-download;\n"
   );
-  ok = expect(std::ranges::find(permissionLabels, "Has network access") != permissionLabels.end(), "perm network") && ok;
-  ok = expect(std::ranges::find(permissionLabels, "Can use GPU acceleration") != permissionLabels.end(), "perm dri") && ok;
+  ok =
+      expect(std::ranges::find(permissionLabels, "Has network access") != permissionLabels.end(), "perm network") && ok;
+  ok = expect(std::ranges::find(permissionLabels, "Can use GPU acceleration") != permissionLabels.end(), "perm dri")
+      && ok;
   ok = expect(
            std::ranges::find(permissionLabels, "Can read and write your home folder") != permissionLabels.end(),
            "perm home"
@@ -429,7 +464,9 @@ int main() {
   attachFlatpakCatalogIndex(verifiedHits, meta);
   ok = expect(!verifiedHits.empty() && verifiedHits.front().verified, "verified attach") && ok;
   ok = expect(!verifiedHits.front().categories.empty(), "verified categories attach") && ok;
-  ok = expect(categorizedHits[0].categories.size() == 2 && categorizedHits[0].categories[0] == "Game", "attach categories")
+  ok = expect(
+           categorizedHits[0].categories.size() == 2 && categorizedHits[0].categories[0] == "Game", "attach categories"
+       )
       && ok;
 
   return ok ? 0 : 1;

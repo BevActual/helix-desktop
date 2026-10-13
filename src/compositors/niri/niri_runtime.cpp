@@ -136,13 +136,17 @@ namespace compositors::niri {
       return;
     }
     const nlohmann::json* caps = nullptr;
-    if (reply.json->contains("Ok") && (*reply.json)["Ok"].is_object()
+    if (reply.json->contains("Ok")
+        && (*reply.json)["Ok"].is_object()
         && (*reply.json)["Ok"].contains("HelixCapabilities")) {
       caps = &(*reply.json)["Ok"]["HelixCapabilities"];
     } else if (reply.json->contains("HelixCapabilities")) {
       caps = &(*reply.json)["HelixCapabilities"];
     }
-    if (caps != nullptr && caps->is_object() && caps->contains("liquid_glass") && (*caps)["liquid_glass"].is_boolean()) {
+    if (caps != nullptr
+        && caps->is_object()
+        && caps->contains("liquid_glass")
+        && (*caps)["liquid_glass"].is_boolean()) {
       m_helixLiquidGlass = (*caps)["liquid_glass"].get<bool>();
       m_helixLiquidGlassParams.clear();
       if (const auto params = caps->find("liquid_glass_params"); params != caps->end() && params->is_array()) {

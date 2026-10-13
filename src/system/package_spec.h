@@ -119,12 +119,10 @@ namespace helix::packages {
   [[nodiscard]] std::vector<PackageHit> parseRpmInstalledOutput(std::string_view text);
   [[nodiscard]] std::string compactSummary(std::string_view text);
   [[nodiscard]] std::string plainDescription(std::string_view text);
-  [[nodiscard]] std::optional<std::pair<std::string, std::string>> parseNameSummaryLine(
-      std::string_view line, char separator
-  );
-  [[nodiscard]] std::unordered_map<std::string, std::string> parseNameSummaryOutput(
-      std::string_view text, char separator
-  );
+  [[nodiscard]] std::optional<std::pair<std::string, std::string>>
+  parseNameSummaryLine(std::string_view line, char separator);
+  [[nodiscard]] std::unordered_map<std::string, std::string>
+  parseNameSummaryOutput(std::string_view text, char separator);
   void applySummaryMap(std::vector<PackageHit>& hits, const std::unordered_map<std::string, std::string>& summaries);
   [[nodiscard]] std::vector<PackageHit> dedupeByName(std::vector<PackageHit> hits);
   void sortHits(std::vector<PackageHit>& hits);
@@ -134,9 +132,7 @@ namespace helix::packages {
   [[nodiscard]] std::vector<std::string> flatpakAppstreamRoots();
   [[nodiscard]] std::string resolveFlatpakIconPath(std::string_view appId, std::string_view remote = {});
   void attachFlatpakIcons(std::vector<PackageHit>& hits);
-  [[nodiscard]] std::optional<std::string> extractAppstreamComponentXml(
-      std::string_view xml, std::string_view appId
-  );
+  [[nodiscard]] std::optional<std::string> extractAppstreamComponentXml(std::string_view xml, std::string_view appId);
   [[nodiscard]] PackageDetails parseAppstreamComponentXml(std::string_view componentXml, PackageHit base = {});
   [[nodiscard]] PackageDetails loadFlatpakAppstreamDetails(PackageHit base);
   [[nodiscard]] PackageDetails parseFlatpakRemoteInfo(std::string_view text, PackageHit base = {});

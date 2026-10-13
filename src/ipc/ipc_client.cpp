@@ -30,8 +30,9 @@ namespace {
 
 } // namespace
 
-bool IpcClient::exchange(const std::string& line, std::string& response, std::string& error,
-                         const std::string& socketPath) {
+bool IpcClient::exchange(
+    const std::string& line, std::string& response, std::string& error, const std::string& socketPath
+) {
   const std::string path = socketPath.empty() ? resolveSocketPath() : socketPath;
 
   const int fd = ::socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);

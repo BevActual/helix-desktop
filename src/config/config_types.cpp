@@ -1,7 +1,7 @@
 #include "config/config_types.h"
 
-#include "core/input/key_modifiers.h"
 #include "core/color.h"
+#include "core/input/key_modifiers.h"
 #include "util/string_utils.h"
 #include "wayland/wayland_connection.h"
 
@@ -50,9 +50,7 @@ namespace {
 
 } // namespace
 
-std::vector<ShortcutConfig> defaultControlCenterShortcuts() {
-  return {};
-}
+std::vector<ShortcutConfig> defaultControlCenterShortcuts() { return {}; }
 
 std::vector<SessionPanelActionConfig> defaultSessionPanelActions() {
   return {

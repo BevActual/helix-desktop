@@ -452,8 +452,7 @@ namespace {
       ok = expect(clipboard.clipboardText() == "secret", "file key source did not migrate legacy history") && ok;
       ok = expect(fs::exists(encryptedManifest), "file key source did not create encrypted history") && ok;
       ok = expect(
-               !fs::exists(stateHome / "helix/clipboard/index.json"),
-               "file key source left the legacy manifest behind"
+               !fs::exists(stateHome / "helix/clipboard/index.json"), "file key source left the legacy manifest behind"
            )
           && ok;
       auto clipboardKey = harness.keys().deriveKey(security::StorageKeyPurpose::ClipboardHistory);
@@ -566,8 +565,7 @@ int main() {
 
   bool ok = true;
   const fs::path migrationHome = root / "migration";
-  ok = expect(::setenv("HELIX_STATE_HOME", migrationHome.c_str(), 1) == 0, "failed to set migration state home")
-      && ok;
+  ok = expect(::setenv("HELIX_STATE_HOME", migrationHome.c_str(), 1) == 0, "failed to set migration state home") && ok;
   ok = migrationAndEncryptedReload(migrationHome) && ok;
 
   const fs::path unavailableHome = root / "unavailable";

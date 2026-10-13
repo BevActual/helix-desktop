@@ -591,8 +591,7 @@ bool NotificationManager::close(uint32_t id, CloseReason reason) {
   const Notification closed = m_notifications[index];
   const bool hadUnreadBefore = computeHasUnreadNotificationHistory();
   // Keep history updates for agent/internal notifies that were explicitly saved on add.
-  const bool saveHistory =
-      m_historyIndex.contains(id) || shouldSaveNotificationToHistory(m_filters, closed);
+  const bool saveHistory = m_historyIndex.contains(id) || shouldSaveNotificationToHistory(m_filters, closed);
   const bool removeDismissedHistory = reason == CloseReason::Dismissed && !m_keepDismissedInHistory;
   const bool historyHandledUnreadChange = saveHistory && removeDismissedHistory && m_historyIndex.contains(id);
   const char* reasonStr = (reason == CloseReason::Expired) ? "expired"
@@ -815,9 +814,9 @@ bool NotificationManager::hasUnreadNotificationHistory() const noexcept {
 }
 
 std::size_t NotificationManager::unreadNotificationHistoryCount() const noexcept {
-  return static_cast<std::size_t>(
-      std::ranges::count_if(m_history, [](const NotificationHistoryEntry& entry) { return !entry.seen; })
-  );
+  return static_cast<std::size_t>(std::ranges::count_if(m_history, [](const NotificationHistoryEntry& entry) {
+    return !entry.seen;
+  }));
 }
 
 void NotificationManager::markNotificationHistorySeen() {

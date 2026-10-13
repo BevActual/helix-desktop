@@ -89,27 +89,21 @@ namespace display_config {
   [[nodiscard]] bool isInternalOutputName(std::string_view name) noexcept;
   [[nodiscard]] bool hasEnabledExternalOutput(const std::vector<Output>& outputs) noexcept;
   [[nodiscard]] Size logicalSize(const Output& output);
-  [[nodiscard]] Point snapPosition(
-      const Output& moving, const Output& reference, LayoutDirection direction, int offset = 0
-  );
+  [[nodiscard]] Point
+  snapPosition(const Output& moving, const Output& reference, LayoutDirection direction, int offset = 0);
   // Place `moving` against `reference` on `direction`, keeping the proposed coordinate
   // along the shared edge. niri treats overlapping rectangles as invalid and will
   // auto-place the output to the right of everything else.
-  [[nodiscard]] Point placeAdjacent(
-      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
-  );
+  [[nodiscard]] Point
+  placeAdjacent(const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY);
   // Like placeAdjacent, but if the shared edge would only be a sliver, snap to
   // left/center/right (or top/center/bottom) so the displays actually sit against
   // each other. Use this when changing sides.
-  [[nodiscard]] Point placeAgainst(
-      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
-  );
+  [[nodiscard]] Point
+  placeAgainst(const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY);
   [[nodiscard]] bool outputsOverlap(const Output& a, const Output& b) noexcept;
-  [[nodiscard]] bool isAdjacentOn(
-      const Output& moving, const Output& reference, LayoutDirection direction
-  ) noexcept;
-  [[nodiscard]] std::optional<LayoutDirection>
-  adjacency(const Output& moving, const Output& reference) noexcept;
+  [[nodiscard]] bool isAdjacentOn(const Output& moving, const Output& reference, LayoutDirection direction) noexcept;
+  [[nodiscard]] std::optional<LayoutDirection> adjacency(const Output& moving, const Output& reference) noexcept;
   // Place `moving` against the nearest edge of another enabled output, keeping the
   // proposed coordinate along that edge so a drag can top- or bottom-align.
   [[nodiscard]] std::optional<SnapResult>
@@ -118,8 +112,7 @@ namespace display_config {
   [[nodiscard]] std::vector<Mode> refreshChoices(const Output& output, int width, int height);
   [[nodiscard]] std::size_t selectedResolutionIndex(const Output& output, const std::vector<ResolutionChoice>& choices);
   [[nodiscard]] std::size_t selectedRefreshIndex(const Output& output, const std::vector<Mode>& choices);
-  [[nodiscard]] std::optional<std::uint32_t>
-  bestRefreshMilliHz(const Output& output, int width, int height) noexcept;
+  [[nodiscard]] std::optional<std::uint32_t> bestRefreshMilliHz(const Output& output, int width, int height) noexcept;
 
   [[nodiscard]] std::vector<Output> parseOutputsReply(const nlohmann::json& reply);
   [[nodiscard]] std::string parseError(const nlohmann::json& reply);

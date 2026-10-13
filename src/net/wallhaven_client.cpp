@@ -9,9 +9,9 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <string_view>
-#include <ranges>
 #include <system_error>
 
 namespace wallpaper::wallhaven {
@@ -22,9 +22,7 @@ namespace wallpaper::wallhaven {
         "9x16", "10x16", "9x18",     "1x1",  "3x2",   "4x3",  "5x4",
     };
 
-    [[nodiscard]] bool isWallhavenIdChar(char ch) {
-      return std::isalnum(static_cast<unsigned char>(ch)) != 0;
-    }
+    [[nodiscard]] bool isWallhavenIdChar(char ch) { return std::isalnum(static_cast<unsigned char>(ch)) != 0; }
 
     [[nodiscard]] std::optional<std::string> wallpaperIdFromText(std::string_view text) {
       constexpr std::string_view kPath = "wallhaven.cc/w/";

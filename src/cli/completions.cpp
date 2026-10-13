@@ -204,21 +204,20 @@ namespace helix::cli {
 
   std::string generateBash(const Command& root) {
     const auto states = collectStates(root);
-    std::string output =
-        "# bash completion for helix; generated from the live CLI schema\n"
-        "_helix_complete_words() {\n"
-        "  local words=\"$1\"\n"
-        "  local IFS=$'\\n'\n"
-        "  COMPREPLY=( $(compgen -W \"$words\" -- \"$cur\") )\n"
-        "}\n\n"
-        "_helix_completions() {\n"
-        "  local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
-        "  local path=helix\n"
-        "  local depth=1\n"
-        "  local i token\n"
-        "  for ((i=1; i<COMP_CWORD; ++i)); do\n"
-        "    token=\"${COMP_WORDS[i]}\"\n"
-        "    case \"$path:$token\" in\n";
+    std::string output = "# bash completion for helix; generated from the live CLI schema\n"
+                         "_helix_complete_words() {\n"
+                         "  local words=\"$1\"\n"
+                         "  local IFS=$'\\n'\n"
+                         "  COMPREPLY=( $(compgen -W \"$words\" -- \"$cur\") )\n"
+                         "}\n\n"
+                         "_helix_completions() {\n"
+                         "  local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
+                         "  local path=helix\n"
+                         "  local depth=1\n"
+                         "  local i token\n"
+                         "  for ((i=1; i<COMP_CWORD; ++i)); do\n"
+                         "    token=\"${COMP_WORDS[i]}\"\n"
+                         "    case \"$path:$token\" in\n";
 
     for (const CommandState& state : states) {
       for (const Command& child : state.command->subcommands) {
@@ -347,9 +346,8 @@ namespace helix::cli {
 
   std::string generateZsh(const Command& root) {
     const auto states = collectStates(root);
-    std::string output =
-        "#compdef helix\n# generated from the live CLI schema\n\n"
-        "";
+    std::string output = "#compdef helix\n# generated from the live CLI schema\n\n"
+                         "";
 
     for (const CommandState& state : states) {
       const Command& command = *state.command;

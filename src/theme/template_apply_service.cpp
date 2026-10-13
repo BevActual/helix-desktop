@@ -1,5 +1,4 @@
 #include "theme/template_apply_service.h"
-#include "desktop_api/client.h"
 
 #include "config/config_export.h"
 #include "config/config_service.h"
@@ -7,6 +6,7 @@
 #include "core/files/resource_paths.h"
 #include "core/log.h"
 #include "core/process/process.h"
+#include "desktop_api/client.h"
 #include "ipc/ipc_service.h"
 #include "theme/community_templates.h"
 #include "theme/hook_runner.h"
@@ -202,7 +202,11 @@ namespace helix::theme {
   void TemplateApplyService::apply(
       const GeneratedPalette& palette, std::string_view defaultMode, bool force, bool paletteChanged
   ) const {
-    if (m_remoteSource) { if (force) (void)reapplyLast(); return; }
+    if (m_remoteSource) {
+      if (force)
+        (void)reapplyLast();
+      return;
+    }
     ApplyRequest request = makeRequest(palette, defaultMode);
     bool queued = false;
     std::function<void()> undeliverable;
@@ -244,7 +248,12 @@ namespace helix::theme {
 
   bool TemplateApplyService::reapplyLast() const {
     if (m_remoteSource) {
-      try { helix::desktopClient().call("appearance", "Reapply"); return true; } catch (...) { return false; }
+      try {
+        helix::desktopClient().call("appearance", "Reapply");
+        return true;
+      } catch (...) {
+        return false;
+      }
     }
     GeneratedPalette palette;
     std::string defaultMode;

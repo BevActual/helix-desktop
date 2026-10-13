@@ -46,26 +46,17 @@ int main() {
   ok = expect(argv.size() == 5 && argv[0] == "/usr/bin/dnf" && argv[1] == "upgrade" && argv[4] == "helix", "dnf argv")
       && ok;
 
-  ok = expect(
-           planHelper(2, kHelpArgv, false, fedora, false, installed).status == HelperStatus::Help, "help"
-       )
-      && ok;
+  ok = expect(planHelper(2, kHelpArgv, false, fedora, false, installed).status == HelperStatus::Help, "help") && ok;
   ok = expect(
            planHelper(2, kBadArgv, true, fedora, false, installed).status == HelperStatus::ExtraArguments,
            "rejects extra args"
        )
       && ok;
-  ok = expect(
-           planHelper(1, kPlainArgv, false, fedora, false, installed).status == HelperStatus::NotRoot, "not root"
-       )
+  ok = expect(planHelper(1, kPlainArgv, false, fedora, false, installed).status == HelperStatus::NotRoot, "not root")
       && ok;
-  ok = expect(
-           planHelper(1, kPlainArgv, true, arch, false, installed).status == HelperStatus::NotFedora, "not fedora"
-       )
+  ok = expect(planHelper(1, kPlainArgv, true, arch, false, installed).status == HelperStatus::NotFedora, "not fedora")
       && ok;
-  ok = expect(
-           planHelper(1, kPlainArgv, true, silverblue, false, installed).status == HelperStatus::Atomic, "atomic"
-       )
+  ok = expect(planHelper(1, kPlainArgv, true, silverblue, false, installed).status == HelperStatus::Atomic, "atomic")
       && ok;
   ok = expect(
            planHelper(1, kPlainArgv, true, fedora, false, std::vector<std::string>{"htop"}).status

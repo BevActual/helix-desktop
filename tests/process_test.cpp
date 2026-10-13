@@ -131,8 +131,7 @@ namespace {
     options.env.push_back({"HELIX_PROCESS_UNSET_TEST", std::nullopt});
 
     const auto result = process::runSync(
-        {"/bin/sh", "-lc", R"(printf '%s/%s' "$HELIX_PROCESS_SET_TEST" "${HELIX_PROCESS_UNSET_TEST-unset}")"},
-        options
+        {"/bin/sh", "-lc", R"(printf '%s/%s' "$HELIX_PROCESS_SET_TEST" "${HELIX_PROCESS_UNSET_TEST-unset}")"}, options
     );
     ::unsetenv("HELIX_PROCESS_UNSET_TEST");
 
@@ -157,8 +156,8 @@ namespace {
     ::setenv("HELIX_WALLPAPER_PATH", "/tmp/helix test/wallpaper.png", 1);
     ::setenv("HELIX_WALLPAPER_CONNECTOR", "DP-1", 1);
 
-    const std::string command = R"(printf '%s\n%s' "$HELIX_WALLPAPER_PATH" "$HELIX_WALLPAPER_CONNECTOR" > )"
-        + shellQuote(outPath.string());
+    const std::string command =
+        R"(printf '%s\n%s' "$HELIX_WALLPAPER_PATH" "$HELIX_WALLPAPER_CONNECTOR" > )" + shellQuote(outPath.string());
     const bool launched = process::runAsync(command);
     ::unsetenv("HELIX_WALLPAPER_PATH");
     ::unsetenv("HELIX_WALLPAPER_CONNECTOR");
@@ -209,12 +208,11 @@ namespace {
              "helix user service should be detected as user-manager managed"
          )
         && ok;
-    ok = expect(
-             !process::cgroupIndicatesSystemdUserManager(
-                 "0::/user.slice/user-1000.slice/session-2.scope/helix\n", 1000
-             ),
-             "login session scope should not be detected as user-manager managed"
-         )
+    ok =
+        expect(
+            !process::cgroupIndicatesSystemdUserManager("0::/user.slice/user-1000.slice/session-2.scope/helix\n", 1000),
+            "login session scope should not be detected as user-manager managed"
+        )
         && ok;
     ok = expect(
              !process::cgroupIndicatesSystemdUserManager(

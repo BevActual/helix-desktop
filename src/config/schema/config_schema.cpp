@@ -521,9 +521,7 @@ namespace helix::config::schema {
 
     const Schema<ControlCenterConfig::AiUsageTabConfig>& aiUsageTabSchema() {
       static const Schema<ControlCenterConfig::AiUsageTabConfig> s = {
-          field(
-              &ControlCenterConfig::AiUsageTabConfig::refreshSeconds, "refresh_seconds", kAiUsageRefreshSecondsRange
-          ),
+          field(&ControlCenterConfig::AiUsageTabConfig::refreshSeconds, "refresh_seconds", kAiUsageRefreshSecondsRange),
           enumField(&ControlCenterConfig::AiUsageTabConfig::claude, "claude", kAiUsageProviderModes),
           enumField(&ControlCenterConfig::AiUsageTabConfig::codex, "codex", kAiUsageProviderModes),
           enumField(&ControlCenterConfig::AiUsageTabConfig::gemini, "gemini", kAiUsageProviderModes),

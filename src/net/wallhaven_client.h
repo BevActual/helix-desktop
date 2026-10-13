@@ -78,9 +78,8 @@ namespace wallpaper::wallhaven {
   [[nodiscard]] std::filesystem::path thumbCacheDir();
   [[nodiscard]] std::filesystem::path thumbCachePath(std::string_view id);
   [[nodiscard]] std::filesystem::path downloadPath(const std::filesystem::path& dir, const Item& item);
-  [[nodiscard]] std::filesystem::path resolveDownloadDir(
-      std::string_view configured, std::string_view wallpaperDirectory
-  );
+  [[nodiscard]] std::filesystem::path
+  resolveDownloadDir(std::string_view configured, std::string_view wallpaperDirectory);
   [[nodiscard]] std::size_t aspectRatioCount();
   [[nodiscard]] std::string_view aspectRatioValue(std::size_t index);
 

@@ -38,18 +38,18 @@ namespace helix::cli {
   inline constexpr std::array<std::string_view, 2> kMsgBarLayerSetLayerChoices{"top", "overlay"};
   inline constexpr std::array<std::string_view, 2> kMsgEffectsProfileSetKindChoices{"output", "input"};
   inline constexpr std::array<std::string_view, 4> kMsgLogLevelSetLevelChoices{"debug", "info", "warn", "error"};
-  inline constexpr std::array<std::string_view, 9> kMsgMediaActionChoices{"next",        "previous",       "toggle",
-                                                                          "play",        "pause",          "stop",
-                                                                          "raise",       "next-player",    "previous-player"};
+  inline constexpr std::array<std::string_view, 9> kMsgMediaActionChoices{"next",  "previous",    "toggle",
+                                                                          "play",  "pause",       "stop",
+                                                                          "raise", "next-player", "previous-player"};
   inline constexpr std::array<std::string_view, 6> kMsgNotificationDndSetStateChoices{"on",    "off", "true",
                                                                                       "false", "1",   "0"};
   inline constexpr std::array<std::string_view, 2> kMsgPowerCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenshotFullscreenModeChoices{"pick", "monitor", "all"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenRecordSourceChoices{"focused", "portal", "region"};
   inline constexpr std::array<std::string_view, 2> kMsgScreenRecordReplaySourceChoices{"focused", "portal"};
-  inline constexpr std::array<std::string_view, 7> kMsgSessionActionChoices{
-      "lock", "suspend", "lock-and-suspend", "lid-close", "logout", "reboot", "shutdown"
-  };
+  inline constexpr std::array<std::string_view, 7> kMsgSessionActionChoices{"lock",      "suspend", "lock-and-suspend",
+                                                                            "lid-close", "logout",  "reboot",
+                                                                            "shutdown"};
   inline constexpr std::array<std::string_view, 2> kMsgTaskbarCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgThemeModeSetModeChoices{"dark", "light", "auto"};
   inline constexpr std::array<std::string_view, 2> kMsgWorkspaceSwitchDirectionChoices{"next", "prev"};
@@ -305,16 +305,14 @@ namespace helix::cli {
     inline constexpr Command aiUsageOllamaCancel{
         "ai-usage-ollama-cancel", "Cancel an in-progress Ollama model download", {}, {}, {}, {}, {}, false
     };
-    inline constexpr Command aiUsageOllamaDelete{
-        "ai-usage-ollama-delete",
-        "Remove an installed Ollama model",
-        {},
-        {},
-        {},
-        kMsgAiUsageOllamaModelPositionals,
-        {},
-        false
-    };
+    inline constexpr Command aiUsageOllamaDelete{"ai-usage-ollama-delete",
+                                                 "Remove an installed Ollama model",
+                                                 {},
+                                                 {},
+                                                 {},
+                                                 kMsgAiUsageOllamaModelPositionals,
+                                                 {},
+                                                 false};
     inline constexpr Command aiUsageOllamaModel{
         "ai-usage-ollama-model",
         "Load an Ollama model and persist it as the selected model",
@@ -350,16 +348,10 @@ namespace helix::cli {
     inline constexpr std::array kMsgAppLaunchPositionals{
         Positional{"query", "Desktop id or application name", {}, true, false, true},
     };
-    inline constexpr Command appLaunch{
-        "app-launch",
-        "Launch an installed application by desktop id or name",
-        {},
-        {},
-        {},
-        kMsgAppLaunchPositionals,
-        {},
-        false
-    };
+    inline constexpr Command appLaunch{"app-launch", "Launch an installed application by desktop id or name",
+                                       {},           {},
+                                       {},           kMsgAppLaunchPositionals,
+                                       {},           false};
     inline constexpr Command annotate{
         "annotate",
         "Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the "
@@ -486,13 +478,27 @@ namespace helix::cli {
     };
     inline constexpr Command configReload{"config-reload", "Reload the config file", {}, {}, {}, {}, {}, false};
     inline constexpr Command desktopAiDescribe{
-        "desktop-ai-describe", "Describe a screenshot with the LocalAI vision model", {}, {}, {}, kMsgDesktopAiPathPositionals, {}, false
+        "desktop-ai-describe",
+        "Describe a screenshot with the LocalAI vision model",
+        {},
+        {},
+        {},
+        kMsgDesktopAiPathPositionals,
+        {},
+        false
     };
     inline constexpr Command desktopAiDictate{
         "desktop-ai-dictate", "Start or stop microphone dictation through LocalAI", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command desktopAiRead{
-        "desktop-ai-read", "Read the text in an image with the LocalAI vision model", {}, {}, {}, kMsgDesktopAiPathPositionals, {}, false
+        "desktop-ai-read",
+        "Read the text in an image with the LocalAI vision model",
+        {},
+        {},
+        {},
+        kMsgDesktopAiPathPositionals,
+        {},
+        false
     };
     inline constexpr Command desktopAiRewrite{
         "desktop-ai-rewrite", "Rewrite the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
@@ -503,12 +509,22 @@ namespace helix::cli {
     inline constexpr Command desktopAiStatus{
         "desktop-ai-status", "Print the desktop LocalAI action state and last result", {}, {}, {}, {}, {}, false
     };
-    inline constexpr Command desktopAiSummarize{
-        "desktop-ai-summarize", "Summarize the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
-    };
-    inline constexpr Command desktopAiTranslate{
-        "desktop-ai-translate", "Translate the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
-    };
+    inline constexpr Command desktopAiSummarize{"desktop-ai-summarize",
+                                                "Summarize the clipboard text with LocalAI and copy the result",
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                false};
+    inline constexpr Command desktopAiTranslate{"desktop-ai-translate",
+                                                "Translate the clipboard text with LocalAI and copy the result",
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                false};
     inline constexpr Command desktopWidgetsEdit{
         "desktop-widgets-edit", "Open the desktop widgets editor", {}, {}, {}, {}, {}, false
     };
@@ -680,14 +696,7 @@ namespace helix::cli {
         "notification-dnd-toggle", "Toggle notification Do Not Disturb state", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command notificationHistory{
-        "notification-history",
-        "Print recent notification history as JSON",
-        {},
-        {},
-        {},
-        {},
-        {},
-        false
+        "notification-history", "Print recent notification history as JSON", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command notificationInvokeLatest{
         "notification-invoke-latest",
@@ -788,9 +797,14 @@ namespace helix::cli {
     inline constexpr Command screenRecordReplayStop{
         "screen-record-replay-stop", "Stop the replay buffer without saving", {}, {}, {}, {}, {}, false
     };
-    inline constexpr Command screenRecordReplaySave{
-        "screen-record-replay-save", "Save the last N seconds from the running replay buffer", {}, {}, {}, {}, {}, false
-    };
+    inline constexpr Command screenRecordReplaySave{"screen-record-replay-save",
+                                                    "Save the last N seconds from the running replay buffer",
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    false};
     inline constexpr Command screenRecordReplayToggle{
         "screen-record-replay-toggle",
         "Start or stop the replay buffer (optional source: focused or portal)",
@@ -820,9 +834,14 @@ namespace helix::cli {
     inline constexpr Command screenshotOcr{
         "screenshot-ocr", "Select a region and copy recognized text to the clipboard", {}, {}, {}, {}, {}, false
     };
-    inline constexpr Command screenshotScanQr{
-        "screenshot-scan-qr", "Select a region and copy a QR code or barcode to the clipboard", {}, {}, {}, {}, {}, false
-    };
+    inline constexpr Command screenshotScanQr{"screenshot-scan-qr",
+                                              "Select a region and copy a QR code or barcode to the clipboard",
+                                              {},
+                                              {},
+                                              {},
+                                              {},
+                                              {},
+                                              false};
     inline constexpr Command screenshotRegion{
         "screenshot-region", "Start an interactive region screenshot", {}, {}, {}, {}, {}, false
     };
@@ -891,14 +910,7 @@ namespace helix::cli {
         "firewall-status", "Print firewalld status, default zone, and panic mode", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command privacyStatus{
-        "privacy-status",
-        "Print capture activity plus telemetry and location mode",
-        {},
-        {},
-        {},
-        {},
-        {},
-        false
+        "privacy-status", "Print capture activity plus telemetry and location mode", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command printersStart{
         "printers-start", "Start the CUPS printing service", {}, {}, {}, {}, {}, false
@@ -1000,16 +1012,14 @@ namespace helix::cli {
     inline constexpr std::array kMsgWindowClosePositionals{
         Positional{"id", "Compositor window id; omit to close the focused window", {}, false, false, false},
     };
-    inline constexpr Command windowClose{
-        "window-close",
-        "Close the focused window, or a compositor window id",
-        {},
-        {},
-        {},
-        kMsgWindowClosePositionals,
-        {},
-        false
-    };
+    inline constexpr Command windowClose{"window-close",
+                                         "Close the focused window, or a compositor window id",
+                                         {},
+                                         {},
+                                         {},
+                                         kMsgWindowClosePositionals,
+                                         {},
+                                         false};
     inline constexpr Command windowSwitcher{"window-switcher",
                                             "Open or close the window switcher overlay",
                                             {},

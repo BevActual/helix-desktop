@@ -27,7 +27,6 @@ public:
   void setTheme(std::string theme);
   void setVolume(float volume);
 
-
   static void onProcess(void* userdata);
   static void onStreamStateChanged(void* userdata, pw_stream_state oldState, pw_stream_state state, const char* error);
   static void onDrained(void* userdata);

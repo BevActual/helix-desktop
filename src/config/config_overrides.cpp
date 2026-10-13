@@ -3,10 +3,10 @@
 #include "config/config_service.h"
 #include "config/config_validate.h"
 #include "config/widget_config.h"
+#include "config/widgets/widget_settings_registry.h"
 #include "core/files/resource_paths.h"
 #include "core/input/key_chord.h"
 #include "core/log.h"
-#include "config/widgets/widget_settings_registry.h"
 #include "theme/builtin_palettes.h"
 #include "theme/custom_palettes.h"
 #include "theme/scheme.h"
@@ -827,7 +827,8 @@ namespace {
   }
 
   bool overridePresenceIsSemantic(const std::vector<std::string>& path) {
-    if (path == std::vector<std::string>{"notification", "filter"}) return true;
+    if (path == std::vector<std::string>{"notification", "filter"})
+      return true;
     if (path.size() == 3 && path[0] == "widget" && path[2] == "type") {
       return true;
     }

@@ -113,8 +113,7 @@ namespace {
 
     ConfigService config;
     expect(
-        config.config().wallpaper.directory == "/tmp/wp-root/pics",
-        "wallpaper.directory did not expand $HELIX_WP_TEST"
+        config.config().wallpaper.directory == "/tmp/wp-root/pics", "wallpaper.directory did not expand $HELIX_WP_TEST"
     );
 
     ::unsetenv("HELIX_WP_TEST");

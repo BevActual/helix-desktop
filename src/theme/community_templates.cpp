@@ -694,23 +694,21 @@ namespace helix::theme {
       return;
     }
 
-    m_httpClient.download(
-        url, catalogCachePath(), [this, ids = templates.communityIds, generation](bool success) {
-          if (generation != m_generation)
-            return;
-          if (!success) {
-            kLog.warn("failed to refresh community template catalog; using cached metadata when available");
-            if (m_readyCallback) {
-              DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
-            }
-            return;
-          }
-          if (!ids.empty()) {
-            syncSelectedFromCatalog(ids, generation, true);
-          }
-          syncCatalogManifests(ids, generation);
+    m_httpClient.download(url, catalogCachePath(), [this, ids = templates.communityIds, generation](bool success) {
+      if (generation != m_generation)
+        return;
+      if (!success) {
+        kLog.warn("failed to refresh community template catalog; using cached metadata when available");
+        if (m_readyCallback) {
+          DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
         }
-    );
+        return;
+      }
+      if (!ids.empty()) {
+        syncSelectedFromCatalog(ids, generation, true);
+      }
+      syncCatalogManifests(ids, generation);
+    });
   }
 
   void CommunityTemplateService::syncCatalogManifests(

@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
-#include <cstring>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -148,8 +148,14 @@ namespace helix::packages {
 
     bool isPkconIdFieldChar(char ch) {
       // RPM/NEVRA versioning allows ~ and ^; PackageKit data may include ':'.
-      return std::isalnum(static_cast<unsigned char>(ch)) != 0 || ch == '.' || ch == '_' || ch == '+' || ch == '-'
-          || ch == ':' || ch == '~' || ch == '^';
+      return std::isalnum(static_cast<unsigned char>(ch)) != 0
+          || ch == '.'
+          || ch == '_'
+          || ch == '+'
+          || ch == '-'
+          || ch == ':'
+          || ch == '~'
+          || ch == '^';
     }
 
     bool isValidPkconIdField(std::string_view field, std::size_t maxLen = 128) {
@@ -185,17 +191,18 @@ namespace helix::packages {
     if (id.find(';', third + 1) != std::string_view::npos) {
       return false;
     }
-    return isValidRpmName(id.substr(0, first)) && isValidPkconIdField(id.substr(first + 1, second - first - 1))
+    return isValidRpmName(id.substr(0, first))
+        && isValidPkconIdField(id.substr(first + 1, second - first - 1))
         && isValidPkconIdField(id.substr(second + 1, third - second - 1), 64)
         && isValidPkconIdField(id.substr(third + 1), 256);
   }
 
-  bool isValidPkconPackageRef(std::string_view ref) {
-    return isValidPkconPackageId(ref) || isValidRpmName(ref);
-  }
+  bool isValidPkconPackageRef(std::string_view ref) { return isValidPkconPackageId(ref) || isValidRpmName(ref); }
 
   std::string pkconPackageId(const PackageHit& hit) {
-    if (!isValidRpmName(hit.name) || !isValidPkconIdField(hit.version) || !isValidPkconIdField(hit.release)
+    if (!isValidRpmName(hit.name)
+        || !isValidPkconIdField(hit.version)
+        || !isValidPkconIdField(hit.release)
         || !isValidPkconIdField(hit.arch, 64)) {
       return {};
     }
@@ -314,9 +321,8 @@ namespace helix::packages {
     std::size_t optStart = 0;
     while (optStart <= options.size()) {
       const auto optEnd = options.find(',', optStart);
-      auto token = options.substr(
-          optStart, optEnd == std::string_view::npos ? options.size() - optStart : optEnd - optStart
-      );
+      auto token =
+          options.substr(optStart, optEnd == std::string_view::npos ? options.size() - optStart : optEnd - optStart);
       token = trim(token);
       if (token == "user") {
         remote.installation = "user";
@@ -433,22 +439,33 @@ namespace helix::packages {
   }
 
   bool isRpmDevelPackage(std::string_view name) {
-    return name.ends_with("-devel") || name.ends_with("-debuginfo") || name.ends_with("-debugsource")
-        || name.ends_with("-static") || name.ends_with("-headers") || name.ends_with("-javadoc");
+    return name.ends_with("-devel")
+        || name.ends_with("-debuginfo")
+        || name.ends_with("-debugsource")
+        || name.ends_with("-static")
+        || name.ends_with("-headers")
+        || name.ends_with("-javadoc");
   }
 
   bool isRpmLibraryPackage(std::string_view name) {
     if (isRpmDevelPackage(name)) {
       return false;
     }
-    if (name.ends_with("-libs") || name.ends_with("-lib") || name.ends_with("-common")
-        || name.ends_with("-data") || name.ends_with("-locale") || name.ends_with("-langpacks")
+    if (name.ends_with("-libs")
+        || name.ends_with("-lib")
+        || name.ends_with("-common")
+        || name.ends_with("-data")
+        || name.ends_with("-locale")
+        || name.ends_with("-langpacks")
         || name.ends_with("-filesystem")) {
       return true;
     }
     // libfoo packages are usually shared libraries; keep well-known app names out.
-    if (name.starts_with("lib") && name != "libreoffice" && !name.starts_with("libreoffice-")
-        && name != "librewolf" && !name.starts_with("library")) {
+    if (name.starts_with("lib")
+        && name != "libreoffice"
+        && !name.starts_with("libreoffice-")
+        && name != "librewolf"
+        && !name.starts_with("library")) {
       return true;
     }
     return false;
@@ -564,16 +581,21 @@ namespace helix::packages {
     if (line.empty()) {
       return false;
     }
-    if (line.starts_with("Installation complete") || line.starts_with("Uninstall complete")
+    if (line.starts_with("Installation complete")
+        || line.starts_with("Uninstall complete")
         || line.starts_with("Updates complete")) {
       progress.status = std::string(line);
       progress.percent = 100;
       return true;
     }
 
-    const bool interesting = line.starts_with("Installing") || line.starts_with("Uninstalling")
-        || line.starts_with("Updating") || line.starts_with("Downloading") || line.starts_with("Looking")
-        || line.starts_with("Fetching") || line.starts_with("Pulling");
+    const bool interesting = line.starts_with("Installing")
+        || line.starts_with("Uninstalling")
+        || line.starts_with("Updating")
+        || line.starts_with("Downloading")
+        || line.starts_with("Looking")
+        || line.starts_with("Fetching")
+        || line.starts_with("Pulling");
     const auto percentAt = line.rfind('%');
     if (!interesting && percentAt == std::string_view::npos) {
       return false;
@@ -628,7 +650,11 @@ namespace helix::packages {
     if (info == "Available" || info == "Collection available" || info == "Unavailable") {
       return PackageState::Available;
     }
-    if (info == "Bug fix" || info == "Enhancement" || info == "Security" || info == "Important" || info == "Normal"
+    if (info == "Bug fix"
+        || info == "Enhancement"
+        || info == "Security"
+        || info == "Important"
+        || info == "Normal"
         || info == "Low") {
       return PackageState::Update;
     }
@@ -637,7 +663,10 @@ namespace helix::packages {
 
   std::optional<PackageHit> parsePkconLine(std::string_view line) {
     line = trim(line);
-    if (line.empty() || line.starts_with("Transaction:") || line.starts_with("Status:") || line.starts_with("Results:")) {
+    if (line.empty()
+        || line.starts_with("Transaction:")
+        || line.starts_with("Status:")
+        || line.starts_with("Results:")) {
       return std::nullopt;
     }
 
@@ -653,7 +682,8 @@ namespace helix::packages {
 
     std::string_view info;
     for (const auto label : kInfoLabels) {
-      if (body.size() > label.size() && body.substr(0, label.size()) == label
+      if (body.size() > label.size()
+          && body.substr(0, label.size()) == label
           && std::isspace(static_cast<unsigned char>(body[label.size()])) != 0) {
         info = label;
         body = trim(body.substr(label.size()));
@@ -1168,8 +1198,7 @@ namespace helix::packages {
       const auto& leftKey = left.title.empty() ? left.name : left.title;
       const auto& rightKey = right.title.empty() ? right.name : right.title;
       return std::lexicographical_compare(
-          leftKey.begin(), leftKey.end(), rightKey.begin(), rightKey.end(),
-          [](char leftCh, char rightCh) {
+          leftKey.begin(), leftKey.end(), rightKey.begin(), rightKey.end(), [](char leftCh, char rightCh) {
             return std::tolower(static_cast<unsigned char>(leftCh)) < std::tolower(static_cast<unsigned char>(rightCh));
           }
       );
@@ -1245,8 +1274,7 @@ namespace helix::packages {
         return std::string{};
       }
       const auto file = appstreamFileCache().find(it->second.xmlPath);
-      if (file == appstreamFileCache().end()
-          || it->second.start + it->second.length > file->second.text.size()) {
+      if (file == appstreamFileCache().end() || it->second.start + it->second.length > file->second.text.size()) {
         return std::nullopt;
       }
       return file->second.text.substr(it->second.start, it->second.length);
@@ -1428,8 +1456,8 @@ namespace helix::packages {
     icons.reserve(hits.size());
     // Prefer larger icons; emplace keeps the first (largest) path for each app id.
     const std::array sizes = {
-        std::string_view{"256x256"}, std::string_view{"128x128"}, std::string_view{"64x64"},
-        std::string_view{"48x48"}, std::string_view{"32x32"}
+        std::string_view{"256x256"}, std::string_view{"128x128"}, std::string_view{"64x64"}, std::string_view{"48x48"},
+        std::string_view{"32x32"}
     };
     for (const auto& root : flatpakAppstreamRoots()) {
       for (const auto size : sizes) {
@@ -2067,10 +2095,24 @@ namespace helix::packages {
       if (capture == &description) {
         if (!line.empty() && line.find(':') != std::string_view::npos) {
           const auto key = trim(line.substr(0, line.find(':')));
-          const bool looksLikeField = key == "Name" || key == "Version" || key == "Release" || key == "Architecture"
-              || key == "Install Date" || key == "Group" || key == "Size" || key == "License" || key == "Signature"
-              || key == "Source RPM" || key == "Build Date" || key == "Build Host" || key == "Relocations"
-              || key == "Packager" || key == "Vendor" || key == "URL" || key == "Summary" || key == "Description";
+          const bool looksLikeField = key == "Name"
+              || key == "Version"
+              || key == "Release"
+              || key == "Architecture"
+              || key == "Install Date"
+              || key == "Group"
+              || key == "Size"
+              || key == "License"
+              || key == "Signature"
+              || key == "Source RPM"
+              || key == "Build Date"
+              || key == "Build Host"
+              || key == "Relocations"
+              || key == "Packager"
+              || key == "Vendor"
+              || key == "URL"
+              || key == "Summary"
+              || key == "Description";
           if (looksLikeField) {
             capture = nullptr;
           }
@@ -2206,8 +2248,7 @@ namespace helix::packages {
             const auto start = text.find(*extracted);
             if (start != std::string::npos) {
               rememberAppstreamComponent(
-                  base.name,
-                  AppstreamComponentRef{.xmlPath = xmlPath, .start = start, .length = extracted->size()}
+                  base.name, AppstreamComponentRef{.xmlPath = xmlPath, .start = start, .length = extracted->size()}
               );
             }
             component = std::move(extracted);
@@ -2236,4 +2277,3 @@ namespace helix::packages {
   }
 
 } // namespace helix::packages
-

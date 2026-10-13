@@ -7,29 +7,33 @@ using namespace helix::assistant_ui;
 
 namespace {
 
-// A runner that records what was started and lets the test decide when and how each run finishes.
-struct Harness {
-  std::vector<std::vector<std::string>> started;
-  std::deque<Session::Done> pending;
-  bool canStart = true;
-  int changes = 0;
-  Session session{[this](std::vector<std::string> arguments, Session::Done done) {
-                    if (!canStart) return false;
-                    started.push_back(std::move(arguments));
-                    pending.push_back(std::move(done));
-                    return true;
-                  },
-                  [this] { ++changes; }};
-  void finish(const std::string& output, int code = 0) {
-    auto done = std::move(pending.front());
-    pending.pop_front();
-    done(code, output);
-  }
-};
+  // A runner that records what was started and lets the test decide when and how each run finishes.
+  struct Harness {
+    std::vector<std::vector<std::string>> started;
+    std::deque<Session::Done> pending;
+    bool canStart = true;
+    int changes = 0;
+    Session session{
+        [this](std::vector<std::string> arguments, Session::Done done) {
+          if (!canStart)
+            return false;
+          started.push_back(std::move(arguments));
+          pending.push_back(std::move(done));
+          return true;
+        },
+        [this] { ++changes; }
+    };
+    void finish(const std::string& output, int code = 0) {
+      auto done = std::move(pending.front());
+      pending.pop_front();
+      done(code, output);
+    }
+  };
 
-const char* kConfirm = R"j({"kind":"confirm","description":"Make the screen dimmer (`brightness-down`)","reason":"you asked","tool":"brightness-down","args":[]})j";
+  const char* kConfirm =
+      R"j({"kind":"confirm","description":"Make the screen dimmer (`brightness-down`)","reason":"you asked","tool":"brightness-down","args":[]})j";
 
-}  // namespace
+} // namespace
 
 int main() {
   // A request goes out as JSON mode; nothing runs until the person confirms.
@@ -40,13 +44,19 @@ int main() {
     TEST_CHECK(h.started.size() == 1 && h.started[0] == std::vector<std::string>({"--json", "make the screen dimmer"}));
     h.finish(kConfirm);
     TEST_CHECK(h.session.view().phase == Phase::Confirm && h.started.size() == 1);
-    TEST_CHECK(h.session.view().description == "Make the screen dimmer (`brightness-down`)" && h.session.view().reason == "you asked");
+    TEST_CHECK(
+        h.session.view().description == "Make the screen dimmer (`brightness-down`)"
+        && h.session.view().reason == "you asked"
+    );
 
     // Yes runs exactly the call that was shown, with the request as the stated reason.
     h.session.confirm();
     TEST_CHECK(h.session.view().phase == Phase::Acting && h.started.size() == 2);
-    TEST_CHECK(h.started[1] == std::vector<std::string>({"--json", "--request", "make the screen dimmer", "--execute", "brightness-down"}));
-    h.session.confirm();  // a second yes cannot run it again
+    TEST_CHECK(
+        h.started[1]
+        == std::vector<std::string>({"--json", "--request", "make the screen dimmer", "--execute", "brightness-down"})
+    );
+    h.session.confirm(); // a second yes cannot run it again
     TEST_CHECK(h.started.size() == 2);
     h.finish(R"j({"kind":"done","text":"Done."})j");
     TEST_CHECK(h.session.view().phase == Phase::Result && !h.session.view().failed && h.session.view().text == "Done.");
@@ -56,7 +66,9 @@ int main() {
   {
     Harness h;
     h.session.submit("dark mode");
-    h.finish(R"j({"kind":"confirm","description":"Switch to dark","reason":"","tool":"theme-mode-set","args":["dark"]})j");
+    h.finish(
+        R"j({"kind":"confirm","description":"Switch to dark","reason":"","tool":"theme-mode-set","args":["dark"]})j"
+    );
     h.session.confirm();
     TEST_CHECK(h.started[1].back() == "dark" && h.started[1][4] == "theme-mode-set");
   }
@@ -74,10 +86,12 @@ int main() {
     Harness h;
     h.session.submit("restart");
     h.finish(R"j({"kind":"explain","text":"I can't do that: no tool for it."})j", 3);
-    TEST_CHECK(h.session.view().failed && h.session.view().text == "I can't do that: no tool for it." && h.started.size() == 1);
-    h.session.confirm();  // nothing to confirm
+    TEST_CHECK(
+        h.session.view().failed && h.session.view().text == "I can't do that: no tool for it." && h.started.size() == 1
+    );
+    h.session.confirm(); // nothing to confirm
     TEST_CHECK(h.started.size() == 1);
-    h.session.submit("again");  // a new request can follow a result
+    h.session.submit("again"); // a new request can follow a result
     h.finish(R"j({"kind":"error","text":"The model could not answer"})j", 1);
     TEST_CHECK(h.session.view().failed);
   }
@@ -92,7 +106,7 @@ int main() {
     TEST_CHECK(h.session.view().phase == Phase::Idle);
     h.session.submit("dim");
     h.finish(kConfirm);
-    h.session.cancel();  // cancelling at the confirmation drops the call
+    h.session.cancel(); // cancelling at the confirmation drops the call
     h.session.confirm();
     TEST_CHECK(h.started.size() == 2 && h.session.view().phase == Phase::Idle);
   }
@@ -103,13 +117,14 @@ int main() {
     h.session.submit("first");
     h.session.cancel();
     h.session.submit("second");
-    h.finish(kConfirm);  // the first one finishing late (queued first)
+    h.finish(kConfirm); // the first one finishing late (queued first)
     TEST_CHECK(h.session.view().phase == Phase::Thinking);
     h.finish(R"j({"kind":"done","text":"second answer"})j");
     TEST_CHECK(h.session.view().text == "second answer");
   }
 
-  // Cancelling while a change is running does not undo it, but the late result is dropped rather than shown as a new request's.
+  // Cancelling while a change is running does not undo it, but the late result is dropped rather than shown as a new
+  // request's.
   {
     Harness h;
     h.session.submit("dim");
@@ -127,7 +142,7 @@ int main() {
     h.session.submit("two");
     TEST_CHECK(h.started.size() == 1);
     h.finish(kConfirm);
-    h.session.submit("three");  // a change is waiting for an answer
+    h.session.submit("three"); // a change is waiting for an answer
     TEST_CHECK(h.started.size() == 1 && h.session.view().phase == Phase::Confirm);
     h.session.cancel();
     h.session.submit("   ");
@@ -137,10 +152,11 @@ int main() {
   }
 
   // Output that is not what the assistant promises is an error, never a call to run.
-  for (const char* output : {"", "not json", "[]", R"j({"kind":5})j", R"j({"kind":"confirm"})j",
-                             R"j({"kind":"confirm","description":"x","tool":"","args":[]})j",
-                             R"j({"kind":"confirm","description":"x","tool":"a","args":[1]})j",
-                             R"j({"kind":"confirm","description":"","tool":"a","args":[]})j"}) {
+  for (const char* output :
+       {"", "not json", "[]", R"j({"kind":5})j", R"j({"kind":"confirm"})j",
+        R"j({"kind":"confirm","description":"x","tool":"","args":[]})j",
+        R"j({"kind":"confirm","description":"x","tool":"a","args":[1]})j",
+        R"j({"kind":"confirm","description":"","tool":"a","args":[]})j"}) {
     Harness h;
     h.session.submit("x");
     h.finish(output);
@@ -154,7 +170,10 @@ int main() {
     Harness h;
     h.session.submit("x");
     h.finish(R"j({"kind":"confirm","description":"Line one\nLine two\u0007\u202e","reason":"","tool":"a","args":[]})j");
-    TEST_CHECK(h.session.view().description.find('\n') == std::string::npos && h.session.view().description.find('\a') == std::string::npos);
+    TEST_CHECK(
+        h.session.view().description.find('\n') == std::string::npos
+        && h.session.view().description.find('\a') == std::string::npos
+    );
     TEST_CHECK(h.session.view().description.find("\xE2\x80\xAE") == std::string::npos);
   }
 

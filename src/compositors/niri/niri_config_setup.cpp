@@ -69,8 +69,7 @@ namespace compositors::niri {
         if (found == std::string_view::npos) {
           return false;
         }
-        if ((found > 0 && isIdent(text[found - 1]))
-            || (found + 16 < text.size() && isIdent(text[found + 16]))) {
+        if ((found > 0 && isIdent(text[found - 1])) || (found + 16 < text.size() && isIdent(text[found + 16]))) {
           search = found + 16;
           continue;
         }
@@ -93,8 +92,7 @@ namespace compositors::niri {
         return hasKeyword(text, "honor-xdg-activation-with-invalid-serial");
       }
       if (id == "backdrop") {
-        return text.find("helix-backdrop") != std::string_view::npos
-            && hasKeyword(text, "place-within-backdrop");
+        return text.find("helix-backdrop") != std::string_view::npos && hasKeyword(text, "place-within-backdrop");
       }
       if (id == "lid-close") {
         return hasKeyword(text, "lid-close")

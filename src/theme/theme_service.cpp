@@ -1,10 +1,10 @@
 #include "theme/theme_service.h"
-#include "desktop_api/client.h"
 
 #include "config/config_service.h"
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/scoped_timer.h"
+#include "desktop_api/client.h"
 #include "ipc/ipc_service.h"
 #include "net/http_client.h"
 #include "system/day_night_schedule.h"
@@ -222,9 +222,8 @@ namespace helix::theme {
         if (wallpaperGenerated.has_value()) {
           return ResolvedTheme{
               .generated = *wallpaperGenerated,
-              .palette = mapGeneratedPaletteMode(
-                  shellMode == "light" ? wallpaperGenerated->light : wallpaperGenerated->dark
-              ),
+              .palette =
+                  mapGeneratedPaletteMode(shellMode == "light" ? wallpaperGenerated->light : wallpaperGenerated->dark),
               .mode = std::string(mode),
               .shellMode = std::string(shellMode),
           };
@@ -432,8 +431,7 @@ namespace helix::theme {
     const std::string url = communityPaletteDownloadUrl(name);
     if (url.empty()) {
       kLog.warn(
-          "community palette '{}' requested but HELIX_COMMUNITY_PALETTE_URL_BASE is unset; using local cache only",
-          name
+          "community palette '{}' requested but HELIX_COMMUNITY_PALETTE_URL_BASE is unset; using local cache only", name
       );
       m_inflightCommunityName.clear();
       if (parseCommunityPaletteJson(cachePath).has_value()) {
@@ -520,7 +518,8 @@ namespace helix::theme {
     if (m_remoteSource) {
       try {
         const auto snapshot = helix::desktopClient().call("appearance", "GetSnapshot");
-        if (!snapshot.value("available", false)) return;
+        if (!snapshot.value("available", false))
+          return;
         GeneratedPalette generated;
         generated.dark = snapshot.at("dark").get<decltype(generated.dark)>();
         generated.light = snapshot.at("light").get<decltype(generated.light)>();
@@ -529,9 +528,16 @@ namespace helix::theme {
         setResolvedThemeLight(m_isShellLightMode);
         const auto target = mapGeneratedPaletteMode(m_isShellLightMode ? generated.light : generated.dark);
         queueResolvedCallback(generated, m_isLightMode ? "light" : "dark");
-        if (animate) startTransition(target);
-        else { setPalette(target); if (m_changeCallback) m_changeCallback(); flushResolvedCallback(false); }
-      } catch (...) {}
+        if (animate)
+          startTransition(target);
+        else {
+          setPalette(target);
+          if (m_changeCallback)
+            m_changeCallback();
+          flushResolvedCallback(false);
+        }
+      } catch (...) {
+      }
       return;
     }
     profiling::ScopedTimer t(kLog, "theme: resolveAndSet");
@@ -662,9 +668,14 @@ namespace helix::theme {
     if (m_remoteSource) {
       try {
         const auto name = helix::desktopClient().call("appearance", "SavePalette", g_variant_new("(s)", "wallpaper"));
-        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        if (paletteNameOut)
+          *paletteNameOut = name.get<std::string>();
         return true;
-      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+      } catch (...) {
+        if (errorOut)
+          *errorOut = "Palette could not be saved";
+        return false;
+      }
     }
 
     auto fail = [errorOut](std::string message) {
@@ -708,9 +719,14 @@ namespace helix::theme {
     if (m_remoteSource) {
       try {
         const auto name = helix::desktopClient().call("appearance", "SavePalette", g_variant_new("(s)", "current"));
-        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        if (paletteNameOut)
+          *paletteNameOut = name.get<std::string>();
         return true;
-      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+      } catch (...) {
+        if (errorOut)
+          *errorOut = "Palette could not be saved";
+        return false;
+      }
     }
 
     auto fail = [errorOut](std::string message) {
@@ -756,11 +772,20 @@ namespace helix::theme {
   ) {
     if (m_remoteSource) {
       try {
-        const auto rgb = std::format("#{:02x}{:02x}{:02x}", unsigned(std::clamp(color.r, 0.0F, 1.0F) * 255), unsigned(std::clamp(color.g, 0.0F, 1.0F) * 255), unsigned(std::clamp(color.b, 0.0F, 1.0F) * 255));
-        const auto name = helix::desktopClient().call("appearance", "SetRole", g_variant_new("(us)", unsigned(role), rgb.c_str()));
-        if (paletteNameOut) *paletteNameOut = name.get<std::string>();
+        const auto rgb = std::format(
+            "#{:02x}{:02x}{:02x}", unsigned(std::clamp(color.r, 0.0F, 1.0F) * 255),
+            unsigned(std::clamp(color.g, 0.0F, 1.0F) * 255), unsigned(std::clamp(color.b, 0.0F, 1.0F) * 255)
+        );
+        const auto name =
+            helix::desktopClient().call("appearance", "SetRole", g_variant_new("(us)", unsigned(role), rgb.c_str()));
+        if (paletteNameOut)
+          *paletteNameOut = name.get<std::string>();
         return true;
-      } catch (...) { if (errorOut) *errorOut = "Palette could not be saved"; return false; }
+      } catch (...) {
+        if (errorOut)
+          *errorOut = "Palette could not be saved";
+        return false;
+      }
     }
 
     auto fail = [errorOut](std::string message) {

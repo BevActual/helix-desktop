@@ -31,14 +31,8 @@ namespace compositors::niri {
          .ipcCommand = "screenshot-fullscreen",
          .key = "Shift+Print",
          .kind = BindKind::Capture},
-        {.id = "screenshot-ocr",
-         .ipcCommand = "screenshot-ocr",
-         .key = "Mod+Shift+O",
-         .kind = BindKind::Capture},
-        {.id = "screen-record",
-         .ipcCommand = "screen-record-toggle",
-         .key = "Mod+Shift+R",
-         .kind = BindKind::Capture},
+        {.id = "screenshot-ocr", .ipcCommand = "screenshot-ocr", .key = "Mod+Shift+O", .kind = BindKind::Capture},
+        {.id = "screen-record", .ipcCommand = "screen-record-toggle", .key = "Mod+Shift+R", .kind = BindKind::Capture},
         {.id = "media-toggle",
          .ipcCommand = "media toggle",
          .key = "XF86AudioPlay",
@@ -76,10 +70,7 @@ namespace compositors::niri {
          .kind = BindKind::Media},
         {.id = "window-switcher", .ipcCommand = "window-switcher", .key = "Alt+Tab"},
         {.id = "lock", .ipcCommand = "session lock", .key = "Mod+Escape", .kind = BindKind::System},
-        {.id = "night-light",
-         .ipcCommand = "nightlight-toggle",
-         .key = "Mod+Shift+N",
-         .kind = BindKind::System},
+        {.id = "night-light", .ipcCommand = "nightlight-toggle", .key = "Mod+Shift+N", .kind = BindKind::System},
         {.id = "caffeine",
          .ipcCommand = "caffeine-toggle",
          .key = "Mod+Shift+C",
@@ -103,9 +94,7 @@ namespace compositors::niri {
 
     void fillSpawn(ParsedBind& bind);
 
-    [[nodiscard]] bool isBindsInclude(std::string_view path) {
-      return fileNameOf(path) == kBindsIncludeFileName;
-    }
+    [[nodiscard]] bool isBindsInclude(std::string_view path) { return fileNameOf(path) == kBindsIncludeFileName; }
 
     [[nodiscard]] std::string normalizeIpc(std::string command) {
       command = StringUtils::trim(command);
@@ -171,8 +160,7 @@ namespace compositors::niri {
         }
         std::string key(block.substr(keyStart, i - keyStart));
         const std::size_t brace = block.find('{', i);
-        const bool allowWhenLocked =
-            brace != std::string_view::npos
+        const bool allowWhenLocked = brace != std::string_view::npos
             && block.substr(i, brace - i).find("allow-when-locked") != std::string_view::npos;
         if (brace == std::string_view::npos) {
           break;
@@ -475,9 +463,8 @@ namespace compositors::niri {
       return isBindsInclude(source.string());
     }
 
-    [[nodiscard]] bool keyTakenByProtected(
-        const ConfigScan& scan, std::string_view key, std::string_view allowedIpc = {}
-    ) {
+    [[nodiscard]] bool
+    keyTakenByProtected(const ConfigScan& scan, std::string_view key, std::string_view allowedIpc = {}) {
       for (const auto& bind : scan.binds) {
         if (bind.key != key) {
           continue;
@@ -765,8 +752,7 @@ namespace compositors::niri {
       std::string key(status.recommended.key);
       if (status.keyConflict) {
         const auto fallback = status.recommended.fallbackKey;
-        if (fallback.empty() || keyTakenByProtected(scan, fallback)
-            || managedKeys.contains(std::string(fallback))) {
+        if (fallback.empty() || keyTakenByProtected(scan, fallback) || managedKeys.contains(std::string(fallback))) {
           ++result.skippedConflicts;
           continue;
         }
@@ -791,9 +777,8 @@ namespace compositors::niri {
     return setRecommendedKeyInto(configPath(), id, niriKey);
   }
 
-  InstallResult setRecommendedKeyInto(
-      const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey
-  ) {
+  InstallResult
+  setRecommendedKeyInto(const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey) {
     InstallResult result;
     const auto* recommended = findRecommended(id);
     if (recommended == nullptr) {
@@ -899,8 +884,7 @@ namespace compositors::niri {
       if (!status.inOwnedInclude) {
         continue;
       }
-      const bool alreadyDefault =
-          status.boundKeys.size() == 1 && status.boundKeys.front() == status.recommended.key;
+      const bool alreadyDefault = status.boundKeys.size() == 1 && status.boundKeys.front() == status.recommended.key;
       if (alreadyDefault) {
         continue;
       }
@@ -996,9 +980,7 @@ namespace compositors::niri {
       }
     }
     if (!replaced) {
-      managedBinds.push_back(
-          {.key = resolvedKey, .spawnArgs = args, .spawnSh = spawnSh}
-      );
+      managedBinds.push_back({.key = resolvedKey, .spawnArgs = args, .spawnSh = spawnSh});
     }
     result.added = replaced ? 0 : 1;
 

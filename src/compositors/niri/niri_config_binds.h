@@ -83,9 +83,8 @@ namespace compositors::niri {
   InstallResult installMissing();
   InstallResult installMissingInto(const std::filesystem::path& configFile);
   InstallResult setRecommendedKey(std::string_view id, std::string_view niriKey);
-  InstallResult setRecommendedKeyInto(
-      const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey
-  );
+  InstallResult
+  setRecommendedKeyInto(const std::filesystem::path& configFile, std::string_view id, std::string_view niriKey);
   InstallResult clearRecommendedKey(std::string_view id);
   InstallResult clearRecommendedKeyInto(const std::filesystem::path& configFile, std::string_view id);
   InstallResult resetRecommendedKeys();

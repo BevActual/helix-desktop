@@ -56,7 +56,8 @@ int main() {
   ok = expect(kdl.find("position x=0 y=0") != std::string::npos, "writes laptop position") && ok;
   ok = expect(kdl.find("position x=1552 y=0") != std::string::npos, "writes tv position") && ok;
   ok = expect(kdl.find("variable-refresh-rate") != std::string::npos, "writes vrr") && ok;
-  ok = expect(kdl.find("output \"DP-2\"") != std::string::npos && kdl.find("    off") != std::string::npos, "writes off")
+  ok =
+      expect(kdl.find("output \"DP-2\"") != std::string::npos && kdl.find("    off") != std::string::npos, "writes off")
       && ok;
 
   const auto parsed = compositors::niri::parseOutputs(kdl);
@@ -77,7 +78,8 @@ int main() {
   ok = expect(saved.ok, "saves outputs into a temp niri config") && ok;
   const auto includeText = compositors::niri::readFile(dir / "helix-outputs.kdl");
   ok = expect(includeText.find("HDMI-A-1") != std::string::npos, "owned include contains HDMI-A-1") && ok;
-  ok = expect(compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-outputs.kdl"), "appends include")
+  ok =
+      expect(compositors::niri::hasInclude(compositors::niri::readFile(config), "helix-outputs.kdl"), "appends include")
       && ok;
   ok = expect(compositors::niri::savedLayoutMatches(outputs, config), "saved layout matches live snapshot") && ok;
 

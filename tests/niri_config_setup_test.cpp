@@ -63,11 +63,7 @@ int main() {
   const auto second = includeText.find("spawn-at-startup \"helix\"", first == std::string::npos ? 0 : first + 1);
   ok = expect(first == std::string::npos, "does not duplicate autostart into the owned include") && ok;
   static_cast<void>(second);
-  ok = expect(
-           includeText.find(R"(session" "lid-close")") != std::string::npos,
-           "installs lid-close IPC snippet"
-       )
-      && ok;
+  ok = expect(includeText.find(R"(session" "lid-close")") != std::string::npos, "installs lid-close IPC snippet") && ok;
 
   const auto again = compositors::niri::installSetupInto(config, true);
   ok = expect(again.ok && again.added == 0, "second setup install is a no-op") && ok;

@@ -1,17 +1,16 @@
 #include "notification_service.h"
 
 #include "compositors/compositor_detect.h"
+#include "core/image_decoder.h"
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "i18n/i18n.h"
 #include "net/uri.h"
 #include "notification/notification_manager.h"
-#include "core/image_decoder.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
-
 #include <cstdint>
 #include <tuple>
 #include <unistd.h>
@@ -42,9 +41,7 @@ namespace {
     return sdbus::createProxy(connection, kDbusBusName, kDbusObjectPath);
   }
 
-  [[nodiscard]] uint32_t notificationNameRequestFlags() {
-    return kNameFlagAllowReplacement | kNameFlagDoNotQueue;
-  }
+  [[nodiscard]] uint32_t notificationNameRequestFlags() { return kNameFlagAllowReplacement | kNameFlagDoNotQueue; }
 
 } // namespace
 

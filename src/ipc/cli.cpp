@@ -27,7 +27,8 @@ namespace helix::ipc {
     bool endOfOptions = false;
     for (int i = 3; i < argc - 1; ++i)
       endOfOptions = endOfOptions || std::string_view(argv[i]) == "--";
-    if (!endOfOptions && argc >= 4
+    if (!endOfOptions
+        && argc >= 4
         && (std::string_view(argv[argc - 1]) == "--help" || std::string_view(argv[argc - 1]) == "-h")) {
       if (const cli::Command* spec = cli::findMsgCommand(command); spec != nullptr) {
         std::string path = "helix-panel ";

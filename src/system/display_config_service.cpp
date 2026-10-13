@@ -77,9 +77,8 @@ bool DisplayConfigService::available() const noexcept {
 }
 
 const display_config::Output* DisplayConfigService::findOutput(std::string_view name) const {
-  const auto it = std::ranges::find_if(m_outputs, [&](const display_config::Output& output) {
-    return output.name == name;
-  });
+  const auto it =
+      std::ranges::find_if(m_outputs, [&](const display_config::Output& output) { return output.name == name; });
   if (it == m_outputs.end()) {
     return nullptr;
   }
@@ -265,9 +264,7 @@ void DisplayConfigService::setConfigLoadedCallback(ChangeCallback callback) {
   m_configLoadedCallback = std::move(callback);
 }
 
-void DisplayConfigService::setConnectedCallback(ChangeCallback callback) {
-  m_connectedCallback = std::move(callback);
-}
+void DisplayConfigService::setConnectedCallback(ChangeCallback callback) { m_connectedCallback = std::move(callback); }
 
 bool DisplayConfigService::apply(std::string_view name, const nlohmann::json& action, bool refreshAfter) {
   if (!available()) {

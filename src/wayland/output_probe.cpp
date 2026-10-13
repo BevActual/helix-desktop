@@ -64,8 +64,7 @@ OutputProbe::OutputProbe(WaylandConnection& wayland, std::chrono::milliseconds t
   // No output argument: the compositor assigns the surface to the output it
   // would choose for any unpinned layer surface (the focused one).
   m_layerSurface = zwlr_layer_shell_v1_get_layer_surface(
-      m_wayland.layerShell(), m_surface, nullptr, /*ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND*/ 0u,
-      "helix-output-probe"
+      m_wayland.layerShell(), m_surface, nullptr, /*ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND*/ 0u, "helix-output-probe"
   );
   if (m_layerSurface == nullptr) {
     finish(nullptr);

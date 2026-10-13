@@ -23,6 +23,6 @@ namespace helix::test {
 #define TEST_CHECK(expression)                                                                                         \
   do {                                                                                                                 \
     if (!(expression)) {                                                                                               \
-      ::helix::test::failCheck(#expression);                                                                        \
+      ::helix::test::failCheck(#expression);                                                                           \
     }                                                                                                                  \
   } while (false)

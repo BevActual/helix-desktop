@@ -898,7 +898,8 @@ timezones = ["UTC", "Europe/Berlin"]
     const auto* clockZones = sidecar["control_center"]["clock"]["timezones"].as_array();
     expect(clockZones != nullptr && clockZones->size() == 2, "clock timezones were not moved");
     expect(
-        clockZones != nullptr && (*clockZones)[0].value<std::string_view>() == std::optional<std::string_view>{"UTC"}
+        clockZones != nullptr
+            && (*clockZones)[0].value<std::string_view>() == std::optional<std::string_view>{"UTC"}
             && (*clockZones)[1].value<std::string_view>() == std::optional<std::string_view>{"Europe/Berlin"},
         "clock timezone values were not preserved"
     );
@@ -919,7 +920,8 @@ timezones = ["America/Los_Angeles"]
     (void)helix::config::applyPendingConfigMigrations(conflict, 15, conflictDiagnostics);
     const auto* kept = conflict["control_center"]["clock"]["timezones"].as_array();
     expect(
-        kept != nullptr && kept->size() == 1
+        kept != nullptr
+            && kept->size() == 1
             && (*kept)[0].value<std::string_view>() == std::optional<std::string_view>{"America/Los_Angeles"},
         "clock timezone migration overwrote the canonical list"
     );
@@ -937,7 +939,8 @@ timezones = ["Asia/Tokyo"]
     helix::config::normalizeLegacyConfig(legacyConfig, issues);
     const auto* legacyClock = legacyConfig["control_center"]["clock"]["timezones"].as_array();
     expect(
-        legacyClock != nullptr && legacyClock->size() == 1
+        legacyClock != nullptr
+            && legacyClock->size() == 1
             && (*legacyClock)[0].value<std::string_view>() == std::optional<std::string_view>{"Asia/Tokyo"},
         "legacy calendar timezones were not moved"
     );
@@ -1007,9 +1010,7 @@ radius = -10
 
     toml::table future = toml::parse("config_version = 999");
     helix::config::schema::Diagnostics futureDiag;
-    expect(
-        !helix::config::storedConfigVersion(future, futureDiag).has_value(), "future config_version was accepted"
-    );
+    expect(!helix::config::storedConfigVersion(future, futureDiag).has_value(), "future config_version was accepted");
     expect(futureDiag.hasErrors(), "future config_version did not produce an error");
     expect(futureDiag.hasFatalErrors(), "future config_version was not document-fatal");
 

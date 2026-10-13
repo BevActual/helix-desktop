@@ -46,12 +46,10 @@ int main() {
 
   writeStat(root / "cpu0/cpufreq/scaling_cur_freq", "1800000");
   writeStat(root / "cpu1/cpufreq/scaling_cur_freq", "2400000");
-  ok = expectNear(helix::system::cpu_freq::readFreqs(root).curMhz.value_or(0.0), 2100.0, "average across cores")
-      && ok;
+  ok = expectNear(helix::system::cpu_freq::readFreqs(root).curMhz.value_or(0.0), 2100.0, "average across cores") && ok;
 
   writeStat(root / "cpu0/cpufreq/scaling_cur_freq", "0");
-  ok = expectNear(helix::system::cpu_freq::readFreqs(root).curMhz.value_or(0.0), 2400.0, "zero entries skipped")
-      && ok;
+  ok = expectNear(helix::system::cpu_freq::readFreqs(root).curMhz.value_or(0.0), 2400.0, "zero entries skipped") && ok;
 
   const std::filesystem::path emptyRoot = root / "empty";
   std::filesystem::create_directory(emptyRoot);

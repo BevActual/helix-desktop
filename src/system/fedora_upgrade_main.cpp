@@ -59,9 +59,10 @@ namespace {
   }
 
   void printHelp() {
-    std::cerr << "helix-system-upgrade\n"
-              << "Upgrade the hardcoded Helix Shell Fedora packages via dnf.\n"
-              << "Run through pkexec. Extra arguments are rejected.\n";
+    std::cerr
+        << "helix-system-upgrade\n"
+        << "Upgrade the hardcoded Helix Shell Fedora packages via dnf.\n"
+        << "Run through pkexec. Extra arguments are rejected.\n";
   }
 
   const char* statusMessage(helix::fedora_upgrade::HelperStatus status) {

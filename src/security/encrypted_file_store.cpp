@@ -39,9 +39,8 @@ namespace security {
       return true;
     }
 
-    [[nodiscard]] std::optional<ByteVector> associatedData(
-        const EncryptionContext& context, std::span<const std::uint8_t, 12> magic
-    ) {
+    [[nodiscard]] std::optional<ByteVector>
+    associatedData(const EncryptionContext& context, std::span<const std::uint8_t, 12> magic) {
       ByteVector output;
       output.reserve(magic.size() + 2 + 16 + context.purpose.size() + context.objectId.size());
       output.insert(output.end(), magic.begin(), magic.end());

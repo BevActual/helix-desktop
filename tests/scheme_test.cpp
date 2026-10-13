@@ -141,8 +141,7 @@ namespace {
     const auto adjusted = helix::theme::ensureContrast(paleLavender, background, 4.5);
     bool ok = true;
     ok = expect(
-             helix::theme::contrastRatio(adjusted, background) >= 4.5,
-             "OKLCH-adjusted foreground has readable contrast"
+             helix::theme::contrastRatio(adjusted, background) >= 4.5, "OKLCH-adjusted foreground has readable contrast"
          )
         && ok;
     ok = expect(adjusted.toHex() == "#6b6ea6", "OKLCH adjustment preserves pale lavender character") && ok;
