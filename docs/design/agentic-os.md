@@ -30,7 +30,7 @@ under `$XDG_RUNTIME_DIR`). Do not expose the Surface over the network.
 
 ### IPC
 
-- Existing: `helix-panel …` (panels, bar, settings, clipboard, notifications, workspaces, …)
+- Existing: `helix-panel …` (panels, bar, settings, clipboard, notifications, workspaces, …). Agent socket helpers: `helix-panel status`, `helix-panel desktop-capture …` (no session D-Bus required).
 - **Administrator password:** `SUDO_ASKPASS=~/.local/bin/helix-askpass` (installed by `tools/switch-shell.sh`) opens a Helix overlay; `sudo -A` and `tools/install-inference.sh` use it when not root.
 - New: agent socket `desktop-capture [agent-desk|focused|all|OUTPUT]` → `ok <png-path>\n` for agent vision (default target is agent desk when placement is on; `all` and named outputs need helix-niri). `helix-panel desktop-capture` forwards to the same socket (uses `HELIX_AGENT_IPC_DIR` in nested tests).
 - Windows: `niri msg` / `NIRI_SOCKET` (list + focus) until first-class Helix wrappers exist
