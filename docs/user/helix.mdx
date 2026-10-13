@@ -1,0 +1,18 @@
+---
+title: Helix
+description: Helix is the desktop: shell, compositor, and login as one product.
+sidebar:
+  order: 1
+---
+
+Helix is one product tree:
+
+- **Helix Shell** — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, desktop widgets.
+- **compositor/** (helix-niri) — Helix compositor, own Cargo workspace. Helix Shell detects it with `niri msg helix-capabilities` (`liquid_glass`) and writes `liquid-glass { }` into `helix-blur.kdl`. The reply also lists `liquid_glass_params`; the shell writes only keys the compositor reports, so an older helix-niri never fails its config load on a newer shell.
+- **greeter/** (`helix-greeter`) — Tauri login greeter. Appearance sync carries palette, wallpaper, roundness, glass, refraction, font, high contrast, reduced motion, and UI scale.
+
+**Fedora + helix-niri are the sole supported product surface.** The command, config directory, and IPC stay `helix-shell` so existing installs keep working. The name in the UI is Helix Shell.
+
+A contract change in one package lands in the others in the same piece of work.
+
+Helix keeps that on-disk layout; the product is niri-first Control Center, first-party services, helix-niri liquid glass, and helix-greeter appearance sync.

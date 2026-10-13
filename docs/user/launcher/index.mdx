@@ -5,11 +5,11 @@ sidebar:
   order: 5
 ---
 
-The Noctalia launcher is a centralized search interface that provides quick access to your applications, system actions, and utility providers.
+The Helix launcher is a centralized search interface that provides quick access to your applications, system actions, and utility providers. To insert emoji, a recent screenshot, or a clipboard item into the focused app, use [Quick Insert](/helix/launcher/quick-insert/) instead of opening those Control Center tabs.
 
 ## How search works
 
-As you type, Noctalia queries all active **Launcher Providers**. Providers can either be "global" (always searching) or "prefixed" (triggered by a specific keyword).
+As you type, Helix queries all active **Launcher Providers**. Providers can either be "global" (always searching) or "prefixed" (triggered by a specific keyword).
 
 - **Global providers** (like Applications and Calculator) results are merged and sorted by a relevance score.
 - **Prefixed providers** (like Emoji and Wallpaper) take over the search results when their prefix is detected at the start of your query.
@@ -51,8 +51,8 @@ When `shell.launcher.app_grid` is enabled and every visible result is an applica
 - **Search**: Matches against the application name, generic name, keywords, and categories.
 - **Desktop actions**: Set `shell.launcher.show_app_actions = true` to search and launch `.desktop` actions directly alongside applications. This is disabled by default; actions remain available from an application's right-click menu.
 - **Scoring**: Uses fuzzy matching with weights. Activation count boosts the score.
-- **Pinned apps**: Drag a pinned app onto another pinned app to reorder them. Pin markers appear in both the list and app-grid views.
-- **Terminal apps**: Entries with `Terminal=true` run inside a terminal. Prefer `export TERMINAL=wezterm` (or another emulator on `PATH`); do not put `-e` in `$TERMINAL`. See [Shell: launching apps](/noctalia/configuration/shell/#shell-settings) for discovery order and how this differs from `launch_apps_custom_command`.
+- **Pinned apps**: Drag a pinned app onto another pinned app to reorder them. Pin markers appear in both the list and app-grid views. Edit the pin list from **Control Center → Launcher**.
+- **Terminal apps**: Entries with `Terminal=true` run inside a terminal. Prefer `export TERMINAL=wezterm` (or another emulator on `PATH`); do not put `-e` in `$TERMINAL`. See [Shell: launching apps](/helix/configuration/shell/#shell-settings) for discovery order and how this differs from `launch_apps_custom_command`.
 
 ### Calculator
 
@@ -71,12 +71,22 @@ A built-in expression evaluator powered by [`libqalculate`](https://qalculate.gi
 
 ### Emoji
 
-A quick way to find and copy emojis.
+A quick way to find and copy emojis. To insert an emoji into the focused app without opening the launcher, use [Quick Insert](/helix/launcher/quick-insert/).
 
 - **Prefix**: `/emo `
 - **Functionality**: Searches `emoji.json` by name, category, and keywords. Activating a result copies the emoji character directly to your clipboard.
 
 Example: `/emo heart`
+
+### Panels
+
+Open or close any panel Helix knows about, without memorizing its `helix-panel panel-toggle` id.
+
+- **Prefix**: `/pan `
+- **Source**: Every panel currently registered with Helix (built-in or from an enabled plugin), plus one row per visible Control Center tab (Audio, Network, Bluetooth, and so on).
+- **Functionality**: Fuzzy-matches against the panel's name. Activating a plain panel result toggles it; activating a tab result opens Control Center directly to that tab.
+- **Scoring**: Activation count boosts the score.
+- **Ignored panels**: `shell.launcher.panels.ignored` excludes specific panel ids from the list (defaulting to `polkit`, `setup-wizard`, `test`, and `launcher`) for panels that aren't meant to be opened on demand, or (for `launcher`) redundant to toggle from within the launcher itself. Editable under **Settings → Panels → Launcher → Providers**.
 
 ### Wallpaper
 
@@ -107,10 +117,10 @@ Find and focus any currently open window.
 
 ## Dmenu mode
 
-`noctalia dmenu` is a stdin/stdout picker for scripts that already produce newline-separated choices:
+`helix dmenu` is a stdin/stdout picker for scripts that already produce newline-separated choices:
 
 ```sh
-printf 'alpha\nbeta\ngamma\n' | noctalia dmenu -p "Pick"
+printf 'alpha\nbeta\ngamma\n' | helix dmenu -p "Pick"
 ```
 
 It opens the launcher scoped to those candidates, prints the selected line to stdout, and exits `0`. Closing the launcher
@@ -118,8 +128,8 @@ or pressing Escape prints nothing and exits `1`. `-p` / `--prompt` sets the laun
 A tab inside a candidate splits the display into title and description, but the full original line is still returned. If
 the current filter has no candidate match, pressing Enter returns the typed text.
 
-The command talks to the running Noctalia instance on the same `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY`; start Noctalia
-first, then call `noctalia dmenu` from scripts or compositor commands.
+The command talks to the running Helix instance on the same `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY`; start Helix
+first, then call `helix dmenu` from scripts or compositor commands.
 
 ### Persistent dmenu entries
 
@@ -133,10 +143,10 @@ Each entry lives under `[shell.launcher.dmenu.entry.<id>]`, where `<id>` is the 
 [shell.launcher.dmenu.entry.commands]
 command = "printf 'Open Config\nShow Date\n'"
 label = "Commands"
-prefix = "/cmd"
+prefix = "cmd"
 glyph = "terminal"
 global = false
-exec = "case \"{selection}\" in Open*) xdg-open ~/.config/noctalia ;; Show*) notify-send \"$(date)\" ;; esac"
+exec = "case \"{selection}\" in Open*) xdg-open ~/.config/helix ;; Show*) notify-send \"$(date)\" ;; esac"
 ```
 
 Open the launcher, type `/cmd`, then select one of the listed results. `command` is run to produce newline-separated
@@ -146,7 +156,7 @@ candidates. A tab in a candidate splits the display into title and description:
 [shell.launcher.dmenu.entry.commands]
 command = "printf 'DNF Upgrade\tRun dnf upgrade --refresh\n'"
 label = "Commands"
-prefix = "/cmd"
+prefix = "cmd"
 glyph = "terminal"
 global = false
 exec = "foot -e bash -lc 'pkexec dnf upgrade --refresh; read -rp \"Press Enter to close...\"'"
@@ -154,20 +164,20 @@ exec = "foot -e bash -lc 'pkexec dnf upgrade --refresh; read -rp \"Press Enter t
 
 Fields:
 
-| Key | Description |
-| --- | --- |
-| `command` | Shell command run through `/bin/sh -lc`; each stdout line becomes a launcher result |
-| `exec` | Optional shell command run when a result is activated; `{selection}` is the selected raw line, `{query}` is the typed text after the prefix |
-| `prefix` | Optional launcher prefix such as `/cmd`; if this is empty, set `global = true` or the entry is unreachable |
-| `label` | Provider title shown in the launcher provider overview; defaults to the entry id |
-| `glyph` | Tabler glyph name for results; defaults to `terminal` |
-| `global` | Whether results participate in normal non-prefixed launcher search |
-| `freeform` | Whether non-empty typed text can become an activatable result |
+| Key        | Description                                                                                                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `command`  | Shell command run through `/bin/sh -lc`; each stdout line becomes a launcher result                                                                                                  |
+| `exec`     | Optional shell command run when a result is activated; `{selection}` is the selected raw line, `{query}` is the typed text after the prefix                                          |
+| `prefix`   | Optional launcher prefix such as `cmd` (without prefix symbol like `/`, which is configured by `provider_prefix`); if this is empty, set `global = true` or the entry is unreachable |
+| `label`    | Provider title shown in the launcher provider overview; defaults to the entry id                                                                                                     |
+| `glyph`    | Tabler glyph name for results; defaults to `terminal`                                                                                                                                |
+| `global`   | Whether results participate in normal non-prefixed launcher search                                                                                                                   |
+| `freeform` | Whether non-empty typed text can become an activatable result                                                                                                                        |
 
-Noctalia runs `exec` as a detached command; it does not automatically open a terminal. For interactive commands such as
+Helix runs `exec` as a detached command; it does not automatically open a terminal. For interactive commands such as
 `dnf upgrade`, launch your terminal emulator explicitly (`foot -e ...`, `kitty -e ...`, `alacritty -e ...`, etc.).
 That is different from Application results with `Terminal=true`, which use `$TERMINAL` / terminal discovery
-(see [Shell settings](/noctalia/configuration/shell/#shell-settings)).
+(see [Shell settings](/helix/configuration/shell/#shell-settings)).
 
 Set `freeform = true` when the typed text itself should be activatable. The typed text after the prefix is available as
 `{query}`:
@@ -175,7 +185,7 @@ Set `freeform = true` when the typed text itself should be activatable. The type
 ```toml
 [shell.launcher.dmenu.entry.notify]
 label = "Notify"
-prefix = "/notify"
+prefix = "notify"
 glyph = "bell"
 global = false
 freeform = true
@@ -192,26 +202,26 @@ results.
 
 While the launcher input is focused, readline-style shortcuts are available:
 
-| Shortcut | Action |
-|---|---|
-| `Ctrl+A` | Move caret to start of line |
-| `Ctrl+E` | Move caret to end of line |
+| Shortcut            | Action                                  |
+| ------------------- | --------------------------------------- |
+| `Ctrl+A`            | Move caret to start of line             |
+| `Ctrl+E`            | Move caret to end of line               |
 | `Ctrl+B` / `Ctrl+F` | Move caret back / forward one character |
-| `Alt+B` | Move caret to start of previous word |
-| `Alt+F` | Move caret to end of next word |
-| `Ctrl+W` | Delete previous word |
-| `Ctrl+U` | Clear backward to start of line |
-| `Ctrl+K` | Delete from caret to end of line |
-| `Alt+D` | Delete next word |
+| `Alt+B`             | Move caret to start of previous word    |
+| `Alt+F`             | Move caret to end of next word          |
+| `Ctrl+W`            | Delete previous word                    |
+| `Ctrl+U`            | Clear backward to start of line         |
+| `Ctrl+K`            | Delete from caret to end of line        |
+| `Alt+D`             | Delete next word                        |
 
 ## Configuration
 
 The launcher itself is mostly automatic, but its behavior is influenced by other sections of your config:
 
-- **[Keybinds](/noctalia/configuration/shell/#keybinds)**: Customize navigation (`up`, `down`) and activation (`validate`, `cancel`).
-- **[Shell](/noctalia/configuration/shell/#shell-settings)**: `ui_scale` and `font_family` affect the launcher's appearance. `shell.launcher.categories` controls the category filters. `show_icons`, `show_app_origin_indicator`, `compact`, `app_grid`, `show_app_actions`, `sort_by_usage`, `pinned`, `fetch_exchange_rates`, and `auto_paste` adjust result layout, origin overlays, action search, ordering, pinning, currency rate refresh, and paste-after-copy (Settings → Launcher). `[shell.launcher.dmenu.entry.<id>]` adds custom dmenu-style providers backed by a shell command.
-- **[Wallpaper](/noctalia/desktop/wallpaper/)**: Defines the search paths for the Wallpaper provider.
-- **[Session actions](/noctalia/configuration/shell/#session-panel)**: Defines the actions shown by the Session provider.
+- **[Keybinds](/helix/configuration/shell/#keybinds)**: Customize navigation (`up`, `down`) and activation (`validate`, `cancel`).
+- **[Shell](/helix/configuration/shell/#shell-settings)**: `ui_scale` and `font_family` affect the launcher's appearance. `shell.launcher.categories` controls the category filters. `show_icons`, `show_app_origin_indicator`, `compact`, `app_grid`, `show_app_actions`, `sort_by_usage`, `pinned`, `fetch_exchange_rates`, and `auto_paste` adjust result layout, origin overlays, action search, ordering, pinning, currency rate refresh, and paste-after-copy (**Control Center → Launcher**; header gear for prefixes, auto-paste, and currency). `[shell.launcher.dmenu.entry.<id>]` adds custom dmenu-style providers backed by a shell command.
+- **[Wallpaper](/helix/desktop/wallpaper/)**: Defines the search paths for the Wallpaper provider.
+- **[Session actions](/helix/configuration/shell/#session-panel)**: Defines the actions shown by the Session provider.
 
 ### Provider prefixes
 
@@ -224,18 +234,18 @@ So `provider_prefix = "/"` with a trigger word of `emo` gives `/emo`. Changing `
 
 Each provider type gets its trigger word from a different place:
 
-- **Built-in providers** (Calculator, Emoji, Session, Wallpaper, Windows): `[shell.launcher.providers.<name>]`.
+- **Built-in providers** (Calculator, Emoji, Panels, Session, Wallpaper, Windows): `[shell.launcher.providers.<name>]`.
 - **Dmenu providers**: the `prefix`/`global` keys on the entry's `[shell.launcher.dmenu.entry.<id>]` table.
 - **Plugin providers**: the `[[launcher_provider]]` manifest `prefix`, optionally overridden per-user via `[shell.launcher.providers."<pluginId>:<entry>"]`.
 
-See [Shell: Launcher settings](/noctalia/configuration/shell/#shell-settings) for the full key reference, defaults, and examples.
+See [Shell: Launcher settings](/helix/configuration/shell/#shell-settings) for the full key reference, defaults, and examples.
 
 ### From the Settings UI
 
 The built-in providers can be configured without editing your config, under **Settings → Panels → Launcher → Providers**:
 
 - **Common Prefix Character**: the shared `provider_prefix` (defaults to `/`).
-- **&lt;Provider&gt; Prefix**: the trigger word for each built-in provider (Calculator, Emoji, Session, Wallpaper, Windows). Leave blank to fall back to the built-in default.
+- **&lt;Provider&gt; Prefix**: the trigger word for each built-in provider (Calculator, Emoji, Panels, Session, Wallpaper, Windows). Leave blank to fall back to the built-in default.
 - **&lt;Provider&gt; in Global Search**: toggles whether that provider also contributes results to the un-prefixed search.
 
 Dmenu and plugin provider prefixes are configured only through their config tables (see the reference linked above); they do not appear in the Settings UI.

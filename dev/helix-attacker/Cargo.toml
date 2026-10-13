@@ -1,0 +1,16 @@
+[package]
+name = "helix-attacker"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Test tool, never installed: behaves like a hostile program on the person's session (reads the screen through the screencopy protocol) so nested tests can show what the compositor does and does not stop."
+
+[dependencies]
+wayland-client = "0.31"
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+memmap2 = "0.9"
+libc = "0.2"
+
+[[bin]]
+name = "wl-capture"
+path = "src/main.rs"

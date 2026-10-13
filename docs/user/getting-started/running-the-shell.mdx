@@ -1,44 +1,43 @@
 ---
-title: Running Noctalia
-description: This page gives you a basic example on how to run the shell.
+title: Running Helix
+description: Start Helix Shell with helix-niri. The command is still helix.
 sidebar:
   order: 3
 ---
 
-:::tip[Method]
-Use compositor autostart as the primary method.
+:::tip[Supported session]
+Helix’s sole supported product surface is **Fedora + helix-niri**. See [Niri](/helix/compositor-settings/niri/) for compositor setup.
 :::
-### Autostart by your Wayland compositor
-This is the recommended method for launching noctalia, as it integrates with your window manager.
 
-For the *Niri* compositor, add the following line to the end of your configuration file, typically located at `~/.config/niri/config.kdl`
+### Autostart with helix-niri
+
+This is the recommended method. The command is still `helix-shell` / `helix` depending on your install layout; the examples below use `helix`.
+
+Add the following line to the end of your configuration file, typically `~/.config/niri/config.kdl`:
+
 ```ini
-spawn-at-startup "noctalia"
+spawn-at-startup "helix"
 ```
 
-For the *Hyprland* compositor, append this to your existing `hyprland.start` event hook in your Lua configuration file, typically located at `~/.config/hypr/hyprland.lua`
-```lua
-hl.on("hyprland.start", function()
-  hl.exec_cmd("noctalia")
-end)
-```
+If your session expects the startup command to return after the shell has initialized, run Helix Shell in daemon mode:
 
-If your compositor expects startup commands to return after the shell has initialized, run Noctalia in daemon mode:
 ```bash
-noctalia --daemon
+helix --daemon
 ```
+
 Daemon mode returns after the shell has initialized. The optional polkit authentication agent starts asynchronously after the UI is up.
 
 ---
 
-### Manual Launch for Debugging
-The most direct way to run Noctalia for testing or debugging. Open a terminal and execute:
+### Manual launch for debugging
+
 ```bash
-noctalia
+helix
 ```
 
 ### Logs
-Noctalia writes its main log to `$XDG_CACHE_HOME/noctalia/noctalia.log`. If
+
+Helix writes its main log to `$XDG_CACHE_HOME/helix/helix.log`. If
 `XDG_CACHE_HOME` is unset, the fallback path is
-`~/.cache/noctalia/noctalia.log`. The previous file is retained as
-`noctalia.log.1` when the current log reaches 1 MiB.
+`~/.cache/helix/helix.log`. The previous file is retained as
+`helix.log.1` when the current log reaches 1 MiB.

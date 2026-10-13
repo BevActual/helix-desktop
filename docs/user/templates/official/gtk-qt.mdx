@@ -5,13 +5,11 @@ sidebar:
   order: 1
 ---
 
-import { Tabs, TabItem } from '@astrojs/starlight/components';
-
 This guide covers theming applications built with GTK, Qt, and KDE Plasma toolkits.
 
 ## GTK 3/4 Applications
 
-GTK applications include most GNOME apps and many Linux applications. Noctalia can automatically theme them using the `adw-gtk3` theme.
+GTK applications include most GNOME apps and many Linux applications. Helix can automatically theme them using the `adw-gtk3` theme.
 
 ### Setup
 
@@ -27,7 +25,7 @@ GTK applications include most GNOME apps and many Linux applications. Noctalia c
 2. **Apply the GTK theme:**
    - **Using nwg-look (recommended):**
       :::tip[GTK4 Theming]
-      In nwg-look, make sure to **uncheck the GTK4 option**. Leaving GTK4 checked can prevent GTK4 applications from using Noctalia's color scheme.
+      In nwg-look, make sure to **uncheck the GTK4 option**. Leaving GTK4 checked can prevent GTK4 applications from using Helix's color scheme.
 
       If you previously applied a custom GTK4 theme, you may need to hit **"Clear"** (found in the **Preference** tab) in nwg-look before reapplying and regenerating the color scheme. This ensures the new colors are accepted by GTK4 apps.
       :::
@@ -41,14 +39,14 @@ GTK applications include most GNOME apps and many Linux applications. Noctalia c
      gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3'
      ```
 
-3. **Enable GTK theming in Noctalia:**
-  - Open **Settings → Templates**
+3. **Enable GTK theming in Helix:**
+  - Open **Control Center → Templates**
   - Toggle on **GTK 3** and/or **GTK 4**
 
-Enabling those built-in templates writes `noctalia.css` and runs the shipped
-[`apply.sh`](https://github.com/noctalia-dev/noctalia/blob/main/assets/templates/gtk/apply.sh)
+Enabling those built-in templates writes `helix.css` and runs the shipped
+[`apply.sh`](https://github.com/BevActual/helix-desktop/blob/main/assets/templates/gtk/apply.sh)
 `post_hook` (`bash '…/gtk/apply.sh' dark|light`). That script imports
-`noctalia.css` into `gtk.css` and syncs `adw-gtk3` / `adw-gtk3-dark` plus
+`helix.css` into `gtk.css` and syncs `adw-gtk3` / `adw-gtk3-dark` plus
 `org.gnome.desktop.interface.color-scheme`. A theme mode change re-applies the
 templates, so the same full hook runs again; you do not need a separate hook
 for that path.
@@ -57,16 +55,16 @@ for that path.
 
 If you are **not** using the GTK templates but still want GNOME’s
 `color-scheme` preference updated on dark/light switches, add a
-[`theme_mode_changed`](/noctalia/automation/hooks/) hook with `--appearance-only`
+[`theme_mode_changed`](/helix/automation/hooks/) hook with `--appearance-only`
 (skips the CSS import and does not change `gtk-theme`):
 
 ```toml
 [hooks]
-theme_mode_changed = "/usr/share/noctalia/assets/templates/gtk/apply.sh --appearance-only $NOCTALIA_THEME_MODE"
+theme_mode_changed = "/usr/share/helix/assets/templates/gtk/apply.sh --appearance-only $HELIX_THEME_MODE"
 ```
 
-Use `/usr/local/share/noctalia/...` instead if you installed with Meson’s default prefix.
-`$NOCTALIA_THEME_MODE` is set by the hook (`dark` or `light`). Switching
+Use `/usr/local/share/helix/...` instead if you installed with Meson’s default prefix.
+`$HELIX_THEME_MODE` is set by the hook (`dark` or `light`). Switching
 `color-scheme` can flash some apps (browsers especially); keep this opt-in.
 
 ### Troubleshooting
@@ -103,47 +101,28 @@ Qt applications include KDE apps and many cross-platform applications. KDE apps 
    - **hyprqt6engine** (https://github.com/hyprwm/hyprqt6engine)
 
 2. **Set environment variable:**
-   Add this to your window manager configuration or shell profile:
+   Add this to your helix-niri config or shell profile:
    
-   **For Niri (`config.kdl`):**
+   **For helix-niri (`config.kdl`):**
    ```kdl
    environment {
      QT_QPA_PLATFORMTHEME "qt6ct"
    }
    ```
-   
-   **For Hyprland:**
-  <Tabs>
-    <TabItem label="hyprland.conf ( 0.54.* and earlier)">
-     ```ini
-     env = QT_QPA_PLATFORMTHEME,qt6ct
-     ```
-   </TabItem>
-     <TabItem label="hyprland.lua ( 0.55.* and later)">
-     ```lua
-     hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
-     ```
-     </TabItem>
-  </Tabs>
-   
-   **For Sway (`config`):**
-   ```bash
-   setenv QT_QPA_PLATFORMTHEME qt6ct
-   ```
-   
-   **For shell profile (`~/.bashrc` or `~/.zshrc`):**
+
+   **Or in a shell profile (`~/.bashrc` or `~/.zshrc`):**
    ```bash
    export QT_QPA_PLATFORMTHEME=qt6ct
    ```
 
-3. **Enable the KColorScheme (or QT theme) in Noctalia:**
-  - Open **Settings → Templates**
+3. **Enable the KColorScheme (or QT theme) in Helix:**
+  - Open **Control Center → Templates**
   - Toggle on **KColorScheme** (or **Qt**)
 
 4. **Configure qt6ct:**
   - Run `qt6ct` from terminal
   - In the **Appearance** tab, there will be a dropdown for **"Color scheme:"**
-  - In the dropdown select `noctalia (KColorScheme)` if using a KColorScheme for KDE app compatibility, or `noctalia` for a normal QT theme without the need for KDE app compatibility.
+  - In the dropdown select `helix (KColorScheme)` if using a KColorScheme for KDE app compatibility, or `helix-shell` for a normal QT theme without the need for KDE app compatibility.
   - Click **Apply** and **OK**
    
    :::tip[KDE File Picker]
@@ -161,20 +140,20 @@ Qt applications include KDE apps and many cross-platform applications. KDE apps 
 
 ## KDE Plasma (KColorScheme)
 
-If you're using KDE Plasma, Noctalia can apply colors through the native KColorScheme system.
+If you're using KDE Plasma, Helix can apply colors through the native KColorScheme system.
 
 ### Setup
 
-1. **Enable KColorScheme in Noctalia:**
-  - Open **Settings → Templates**
+1. **Enable KColorScheme in Helix:**
+  - Open **Control Center → Templates**
   - Toggle on **KColorScheme**
 
 2. **Apply in KDE System Settings:**
   - Open **System Settings → Appearance → Colors**
-  - Select the `noctalia` color scheme
-  - The scheme will update automatically when you change colors in Noctalia
+  - Select the `helix-shell` color scheme
+  - The scheme will update automatically when you change colors in Helix
 
 ### Troubleshooting
 
 - **Scheme not appearing:** Restart KDE Plasma or log out and back in
-- **Colors not updating:** Ensure KColorScheme toggle is enabled in Noctalia settings
+- **Colors not updating:** Ensure KColorScheme toggle is enabled in Helix settings

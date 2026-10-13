@@ -37,7 +37,7 @@
 #include <variant>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -1649,6 +1649,13 @@ namespace noctalia::theme {
         }
       }
 
+      auto reportError = [&](std::string_view id, std::string error) {
+        if (!m_options.onError || id.empty() || error.empty()) {
+          return;
+        }
+        m_options.onError(std::string(id), std::move(error));
+      };
+
       auto runHook = [&](const std::string& hook, bool async) {
         if (hook.empty() || cancelRequested()) {
           return;
@@ -1656,13 +1663,29 @@ namespace noctalia::theme {
 
         const auto hookRendered = EngineImpl(m_themeData, renderOptions).render(hook);
         if (hookRendered.errorCount != 0 || hookRendered.text.empty()) {
+          reportError(entry.name, "failed to render hook");
           return;
         }
 
         if (async && renderOptions.hookRunner != nullptr) {
-          renderOptions.hookRunner->enqueue(hookRendered.text, renderOptions.generation);
+          renderOptions.hookRunner->enqueue(hookRendered.text, renderOptions.generation, entry.name);
         } else {
-          [[maybe_unused]] const bool hookOk = process::runSync(hookRendered.text);
+          const process::RunResult hookResult = process::runSync(hookRendered.text);
+          if (!hookResult) {
+            kLog.warn(
+                "hook failed with exit code {}: {} (command: {})", hookResult.exitCode, hookResult.err,
+                hookRendered.text
+            );
+            std::string text = hookResult.err.empty() ? hookResult.out : hookResult.err;
+            if (const auto pos = text.find('\n'); pos != std::string::npos) {
+              text.resize(pos);
+            }
+            text = StringUtils::trim(text);
+            if (text.empty()) {
+              text = "exit " + std::to_string(hookResult.exitCode);
+            }
+            reportError(entry.name, std::move(text));
+          }
         }
       };
 
@@ -1672,6 +1695,7 @@ namespace noctalia::theme {
         }
         if (entry.postAction != "kde-color-scheme" && entry.postAction != kFirefoxThemePostAction) {
           kLog.warn("unknown post action '{}' for template {}", entry.postAction, entry.name);
+          reportError(entry.name, "unknown post action");
           return false;
         }
         if (effectiveOutputs.size() != 1) {
@@ -1686,6 +1710,7 @@ namespace noctalia::theme {
           const KdeColorSchemeApplyResult result = applyKdeColorScheme(effectiveOutputs.front());
           if (!result.success) {
             kLog.warn("post action '{}' for template {} failed: {}", entry.postAction, entry.name, result.error);
+            reportError(entry.name, result.error.empty() ? "post action failed" : result.error);
             return false;
           }
           if (!result.notificationError.empty()) {
@@ -1697,6 +1722,7 @@ namespace noctalia::theme {
         const FirefoxThemeApplyResult result = applyFirefoxTheme(effectiveOutputs.front(), m_options.defaultMode);
         if (!result.success) {
           kLog.warn("post action '{}' for template {} failed: {}", entry.postAction, entry.name, result.error);
+          reportError(entry.name, result.error.empty() ? "post action failed" : result.error);
           return false;
         }
         if (!result.warning.empty()) {
@@ -1724,6 +1750,7 @@ namespace noctalia::theme {
           kLog.warn("failed to resolve input path for template {} -> {}; skipping", entry.name, outputPath);
           outputsOk = false;
           ok = false;
+          reportError(entry.name, "failed to resolve input path");
           continue;
         }
 
@@ -1732,6 +1759,7 @@ namespace noctalia::theme {
         if (!fileResult.success) {
           outputsOk = false;
           ok = false;
+          reportError(entry.name, "failed to render template");
           continue;
         }
       }
@@ -1756,4 +1784,4 @@ namespace noctalia::theme {
     return ok;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

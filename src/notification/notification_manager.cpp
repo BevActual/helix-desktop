@@ -102,7 +102,12 @@ namespace {
   }
 
   bool shouldRetainHistoryEntry(const NotificationHistoryEntry& entry) noexcept {
-    return shouldTrackHistory(entry.notification.origin, entry.notification.urgency, entry.notification.transient);
+    // Entries already in the store stay unless low/transient — includes Internal agent notifies.
+    if (entry.notification.urgency == Urgency::Low || entry.notification.transient) {
+      return false;
+    }
+    return entry.notification.origin == NotificationOrigin::External
+        || entry.notification.origin == NotificationOrigin::Internal;
   }
 
   bool notificationHasInvokableActions(const Notification& notification) {
@@ -241,6 +246,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
   auto& imageData = request.imageData;
   auto& category = request.category;
   auto& desktopEntry = request.desktopEntry;
+  const auto progress = request.progress;
   const auto& forcedId = request.forcedId;
 
   if (actions.size() > kMaxNotificationActions * 2) {
@@ -262,8 +268,12 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
     );
   };
 
-  const ExternalNotificationDispatch dispatch =
+  ExternalNotificationDispatch dispatch =
       evaluateExternalDispatch(origin, urgency, appName, category, desktopEntry, summary, body, transient);
+  if (request.saveToHistory) {
+    dispatch.saveHistory = true;
+    dispatch.fullySuppress = !dispatch.showToast && !dispatch.saveHistory;
+  }
   if (dispatch.bypassDnd) {
     dndPolicy = NotificationDndPolicy::Bypass;
   }
@@ -275,6 +285,13 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
   // A matching filter with allow_permanent = false expires otherwise-permanent (timeout 0) notifications.
   if (timeout == 0 && dispatch.disallowPermanent) {
     timeout = kDefaultNotificationTimeout;
+  }
+
+  // A live activity (progress below 100) stays until the sender reports completion or closes it,
+  // like Android Live Updates and iOS Live Activities, even under allow_permanent = false: it is
+  // not permanent, the sender ends it. The sender's timeout applies to its final update.
+  if (progress.has_value() && *progress < 100) {
+    timeout = 0;
   }
 
   if (replacesId != 0) {
@@ -303,7 +320,8 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
            || n.icon != icon
            || n.imageData != imageData
            || n.category != category
-           || n.desktopEntry != desktopEntry);
+           || n.desktopEntry != desktopEntry
+           || n.progress != progress);
 
       n.origin = origin;
       n.transient = transient;
@@ -318,6 +336,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
       n.imageData = std::move(imageData);
       n.category = std::move(category);
       n.desktopEntry = std::move(desktopEntry);
+      n.progress = progress;
       n.receivedTime = now;
       n.expiryTime = scheduleExpiry(now, timeout);
       n.receivedWallClock = wallNow;
@@ -375,6 +394,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
           .imageData = std::move(imageData),
           .category = std::move(category),
           .desktopEntry = std::move(desktopEntry),
+          .progress = progress,
           .receivedTime = now,
           .expiryTime = scheduleExpiry(now, timeout),
           .receivedWallClock = wallNow,
@@ -398,7 +418,7 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
   }
   const bool dndAllowsSound = !m_doNotDisturb || dndPolicy == NotificationDndPolicy::Bypass;
   if (dndAllowsSound && m_soundPlayer != nullptr && dispatch.playSound) {
-    m_soundPlayer->play("notification");
+    m_soundPlayer->play("message");
   }
 
   return n.id;
@@ -431,7 +451,8 @@ uint32_t NotificationManager::adoptExternal(uint32_t id, NotificationRequest req
 uint32_t NotificationManager::addInternal(
     std::string appName, std::string summary, std::string body, Urgency urgency, int32_t timeout,
     std::optional<std::string> icon, std::optional<NotificationImageData> imageData,
-    std::optional<std::string> category, std::optional<std::string> desktopEntry, NotificationDndPolicy dndPolicy
+    std::optional<std::string> category, std::optional<std::string> desktopEntry, NotificationDndPolicy dndPolicy,
+    bool saveToHistory
 ) {
   return addOrReplace(
       NotificationRequest{
@@ -442,6 +463,7 @@ uint32_t NotificationManager::addInternal(
           .timeout = timeout,
           .origin = NotificationOrigin::Internal,
           .dndPolicy = dndPolicy,
+          .saveToHistory = saveToHistory,
           .icon = std::move(icon),
           .imageData = std::move(imageData),
           .category = std::move(category),
@@ -568,7 +590,8 @@ bool NotificationManager::close(uint32_t id, CloseReason reason) {
   const size_t index = it->second;
   const Notification closed = m_notifications[index];
   const bool hadUnreadBefore = computeHasUnreadNotificationHistory();
-  const bool saveHistory = shouldSaveNotificationToHistory(m_filters, closed);
+  // Keep history updates for agent/internal notifies that were explicitly saved on add.
+  const bool saveHistory = m_historyIndex.contains(id) || shouldSaveNotificationToHistory(m_filters, closed);
   const bool removeDismissedHistory = reason == CloseReason::Dismissed && !m_keepDismissedInHistory;
   const bool historyHandledUnreadChange = saveHistory && removeDismissedHistory && m_historyIndex.contains(id);
   const char* reasonStr = (reason == CloseReason::Expired) ? "expired"
@@ -788,6 +811,12 @@ void NotificationManager::setSoundPlayer(SoundPlayer* soundPlayer) { m_soundPlay
 
 bool NotificationManager::hasUnreadNotificationHistory() const noexcept {
   return computeHasUnreadNotificationHistory();
+}
+
+std::size_t NotificationManager::unreadNotificationHistoryCount() const noexcept {
+  return static_cast<std::size_t>(std::ranges::count_if(m_history, [](const NotificationHistoryEntry& entry) {
+    return !entry.seen;
+  }));
 }
 
 void NotificationManager::markNotificationHistorySeen() {

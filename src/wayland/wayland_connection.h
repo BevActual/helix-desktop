@@ -39,12 +39,8 @@ struct ext_session_lock_manager_v1;
 struct zwlr_foreign_toplevel_manager_v1;
 struct zwlr_foreign_toplevel_handle_v1;
 struct ext_workspace_manager_v1;
-struct org_kde_plasma_virtual_desktop_management;
-struct zdwl_ipc_manager_v2;
 struct zwp_virtual_keyboard_manager_v1;
 struct zwp_text_input_manager_v3;
-struct hyprland_focus_grab_manager_v1;
-struct hyprland_toplevel_mapping_manager_v1;
 struct zwlr_gamma_control_manager_v1;
 struct zwlr_screencopy_manager_v1;
 struct ext_image_copy_capture_manager_v1;
@@ -55,7 +51,6 @@ struct zwlr_output_manager_v1;
 struct zwlr_output_head_v1;
 struct zwlr_output_mode_v1;
 class ClipboardService;
-class FocusGrabService;
 struct DataControlOps;
 class TextInputService;
 class VirtualKeyboardService;
@@ -143,14 +138,8 @@ public:
   // Delegate setters
   void setOutputChangeCallback(ChangeCallback callback);
   void setOutputLifecycleCallbacks(std::function<void(wl_output*)> added, std::function<void(wl_output*)> removed);
-  void setWorkspaceManagerCallbacks(
-      std::function<void(ext_workspace_manager_v1*)> extWorkspace, std::function<void(zdwl_ipc_manager_v2*)> dwlIpc
-  );
-  void setKdeVirtualDesktopManagerCallback(std::function<void(org_kde_plasma_virtual_desktop_management*)> callback);
+  void setWorkspaceManagerCallbacks(std::function<void(ext_workspace_manager_v1*)> extWorkspace);
   void setToplevelChangeCallback(ChangeCallback callback);
-  void setHyprlandToplevelMappingManagerCallback(
-      std::function<void(hyprland_toplevel_mapping_manager_v1* manager)> callback
-  );
   void setPointerEventCallback(WaylandSeat::PointerEventCallback callback);
   void setKeyboardEventCallback(WaylandSeat::KeyboardEventCallback callback);
   void setLockKeysChangeCallback(WaylandSeat::LockKeysChangeCallback callback);
@@ -160,6 +149,7 @@ public:
   void setTextInputService(TextInputService* textInputService);
   void setVirtualKeyboardService(VirtualKeyboardService* virtualKeyboardService);
   void setCursorShape(std::uint32_t serial, std::uint32_t shape);
+  void hideCursor();
 
   [[nodiscard]] int repeatPollTimeoutMs() const;
   void repeatTick();
@@ -173,8 +163,6 @@ public:
   [[nodiscard]] bool hasXdgOutputManager() const noexcept;
   [[nodiscard]] bool hasXdgShell() const noexcept;
   [[nodiscard]] bool hasExtWorkspaceManager() const noexcept;
-  [[nodiscard]] bool hasKdeVirtualDesktopManager() const noexcept;
-  [[nodiscard]] bool hasDwlIpcManager() const noexcept;
   [[nodiscard]] bool hasForeignToplevelManager() const noexcept;
   [[nodiscard]] bool hasExtForeignToplevelList() const noexcept;
   [[nodiscard]] bool hasSessionLockManager() const noexcept;
@@ -191,8 +179,6 @@ public:
   [[nodiscard]] zwlr_gamma_control_manager_v1* gammaControlManager() const noexcept;
   [[nodiscard]] ext_background_effect_manager_v1* backgroundEffectManager() const noexcept;
   [[nodiscard]] wp_fractional_scale_manager_v1* fractionalScaleManager() const noexcept;
-  [[nodiscard]] hyprland_focus_grab_manager_v1* hyprlandFocusGrabManager() const noexcept;
-  [[nodiscard]] FocusGrabService* focusGrabService() const noexcept;
   [[nodiscard]] TextInputService* textInputService() const noexcept { return m_textInputService; }
   [[nodiscard]] wp_viewporter* viewporter() const noexcept;
   [[nodiscard]] wl_display* display() const noexcept;
@@ -316,7 +302,6 @@ private:
   zwp_idle_inhibit_manager_v1* m_idleInhibitManager = nullptr;
   ext_background_effect_manager_v1* m_backgroundEffectManager = nullptr;
   wp_fractional_scale_manager_v1* m_fractionalScaleManager = nullptr;
-  hyprland_focus_grab_manager_v1* m_hyprlandFocusGrabManager = nullptr;
   zwlr_gamma_control_manager_v1* m_gammaControlManager = nullptr;
   zwlr_screencopy_manager_v1* m_screencopyManager = nullptr;
   ext_image_copy_capture_manager_v1* m_imageCopyCaptureManager = nullptr;
@@ -324,7 +309,6 @@ private:
   zwlr_output_manager_v1* m_outputManager = nullptr;
   std::unordered_map<zwlr_output_head_v1*, WaylandOutputHeadInfo> m_outputHeads;
   std::unordered_set<zwlr_output_mode_v1*> m_outputModes;
-  std::unique_ptr<FocusGrabService> m_focusGrabService;
   wp_viewporter* m_viewporter = nullptr;
   bool m_backgroundEffectBlurSupported = false;
   void* m_dataControlManager = nullptr;
@@ -336,8 +320,6 @@ private:
   VirtualKeyboardService* m_virtualKeyboardService = nullptr;
   bool m_hasLayerShellGlobal = false;
   bool m_hasExtWorkspaceGlobal = false;
-  bool m_hasKdeVirtualDesktopGlobal = false;
-  bool m_hasDwlIpcGlobal = false;
   bool m_hasForeignToplevelManagerGlobal = false;
   bool m_hasExtForeignToplevelListGlobal = false;
   std::vector<WaylandOutput> m_outputs;
@@ -346,9 +328,6 @@ private:
   std::function<void(wl_output*)> m_outputAddedCallback;
   std::function<void(wl_output*)> m_outputRemovedCallback;
   std::function<void(ext_workspace_manager_v1*)> m_extWorkspaceManagerCallback;
-  std::function<void(org_kde_plasma_virtual_desktop_management*)> m_kdeVirtualDesktopManagerCallback;
-  std::function<void(zdwl_ipc_manager_v2*)> m_dwlIpcManagerCallback;
-  std::function<void(hyprland_toplevel_mapping_manager_v1*)> m_hyprlandToplevelMappingManagerCallback;
   std::unordered_map<wl_surface*, wl_output*> m_surfaceOutputMap;
   std::unordered_map<wl_surface*, std::vector<wl_output*>> m_surfaceOutputs;
   std::unordered_map<wl_surface*, zwlr_layer_surface_v1*> m_layerSurfaceMap;

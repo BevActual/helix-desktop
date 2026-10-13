@@ -1,6 +1,6 @@
 ---
 title: System Controls
-description: IPC commands for OSDs, volume, microphone, brightness, night light, Wi-Fi, Bluetooth, caffeine, and power profile.
+description: IPC commands for OSDs, volume, microphone, brightness, keyboard backlight, night light, Wi-Fi, Bluetooth, EasyEffects, caffeine, and power profile.
 sidebar:
   order: 5
 ---
@@ -46,7 +46,7 @@ Default step is 5% when not specified. Output volume is clamped to 100% unless `
 | Show mic OSD | <IpcCommand command="mic-volume-osd" /> | Show the microphone OSD at the current volume without changing it. |
 | Show mic OSD at value | <IpcCommand command="mic-volume-osd 40%" /> | Show the microphone OSD at the given value without changing volume. |
 
-`volume-osd` and `mic-volume-osd` never change the level. Called with no value they show the current one, which suits a "show me the volume" bind. Called with a value they show that value instead, for scripts that manage volume outside Noctalia such as an MPD volume sync. Both appear on whichever monitors are configured under `[osd].monitors`, and both reflect the real mute state of the device.
+`volume-osd` and `mic-volume-osd` never change the level. Called with no value they show the current one, which suits a "show me the volume" bind. Called with a value they show that value instead, for scripts that manage volume outside Helix such as an MPD volume sync. Both appear on whichever monitors are configured under `[osd].monitors`, and both reflect the real mute state of the device.
 
 ## Brightness
 
@@ -63,6 +63,18 @@ Default step is 5% when not specified. Output volume is clamped to 100% unless `
 Targets can be `current`, `all`, `*`, a monitor connector name such as `eDP-1` or `DP-1`, or a monitor selector token. Values accept normalized `0.0` to `1.0` or percentage form such as `65`, `65%`, and `5%`.
 
 `brightness-osd` takes a value only - unlike `brightness-set`, it has no monitor target. The OSD appears on whichever monitors are configured under `[osd].monitors`.
+
+## Keyboard backlight
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Set keyboard backlight | <IpcCommand command="keyboard-backlight-set 50" /> | Set every keyboard backlight to a 0-100 percentage. |
+| Raise keyboard backlight | <IpcCommand command="keyboard-backlight-up" /> | Step every keyboard backlight up one level. |
+| Lower keyboard backlight | <IpcCommand command="keyboard-backlight-down" /> | Step every keyboard backlight down one level. |
+| Toggle keyboard backlight | <IpcCommand command="keyboard-backlight-toggle" /> | Turn every keyboard backlight off, or back to its previous level. |
+| Show keyboard backlight OSD | <IpcCommand command="keyboard-backlight-osd 65%" /> | Show the keyboard backlight OSD at the given value without changing the level. Accepts `65`, `65%`, or `0.65`. |
+
+Backlights come from UPower's `KbdBacklight` interface; the commands report `keyboard backlight unavailable` when the machine has none. `[osd.kinds] keyboard_backlight = false` silences the popup these commands would otherwise show.
 
 ## Night light
 
@@ -86,7 +98,17 @@ Targets can be `current`, `all`, `*`, a monitor connector name such as `eDP-1` o
 | Toggle Bluetooth | <IpcCommand command="bluetooth-toggle" /> | Toggle the Bluetooth adapter. |
 | Show Bluetooth status | <IpcCommand command="bluetooth-status" /> | Print `on` or `off`. |
 
+| Toggle the active network | <IpcCommand command="network-toggle" /> | Disconnect whatever is up (Wi-Fi, wired, or cellular), or reconnect when nothing is connected. This is the default right-click gesture on the network bar widget. |
+
 Wi-Fi and Bluetooth IPC commands show a short OSD when they change the state.
+
+## Audio effects
+
+Requires EasyEffects running in the session. Profile names are the presets EasyEffects lists for that direction.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Set EasyEffects profile | <IpcCommand command="effects-profile-set output Bass" /> | Load the named EasyEffects preset for `output` or `input`. Unknown names print the available presets. The volume bar widget can show the active profile with `effects_profile_glyphs`. |
 
 ## Caffeine
 
@@ -102,7 +124,7 @@ Caffeine IPC commands show a short OSD when they change the state.
 
 Requires `org.freedesktop.UPower.PowerProfiles` (same as the Control Center home shortcut). Profile ids come from the compositor/session; common values are `performance`, `balanced`, and `power-saver`.
 
-When another app or an IPC command changes the active profile, Noctalia shows a short OSD with the active mode's icon and profile name. Profile changes made through Noctalia's UI update the UI and fire hooks without showing extra OSD feedback.
+When another app or an IPC command changes the active profile, Helix shows a short OSD with the active mode's icon and profile name. Profile changes made through Helix's UI update the UI and fire hooks without showing extra OSD feedback.
 
 | Action | Command | Description |
 |--------|---------|-------------|

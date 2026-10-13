@@ -1,18 +1,23 @@
 ---
 title: Sway / Scroll
-description: Configure Sway-style keybinds for Noctalia.
+description: Unsupported historical notes for Sway/Scroll (not a Helix product surface).
 sidebar:
   order: 6
 ---
 
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
+
 Use this page for compositors that use Sway-style bind syntax.
 
-## Autostart Noctalia
+## Autostart Helix
 
 Add to your `~/.config/sway/config` (or equivalent):
 
 ```bash
-exec noctalia
+exec helix
 ```
 
 ## IPC Keybinds
@@ -20,7 +25,7 @@ exec noctalia
 Add these binds to your `~/.config/sway/config` or the equivalent compositor configuration file:
 
 ```bash
-set $ipc noctalia msg
+set $ipc helix-panel
 
 # Core binds
 bindsym $mod+space exec $ipc panel-toggle launcher

@@ -6,6 +6,7 @@
 #include "core/files/resource_paths.h"
 #include "core/log.h"
 #include "core/process/process.h"
+#include "desktop_api/client.h"
 #include "ipc/ipc_service.h"
 #include "theme/community_templates.h"
 #include "theme/hook_runner.h"
@@ -22,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -45,7 +46,7 @@ namespace noctalia::theme {
     std::filesystem::path userTemplateConfigPath() {
       const std::string configDir = FileUtils::configDir();
       if (configDir.empty()) {
-        return "noctalia.toml";
+        return "helix.toml";
       }
       return std::filesystem::path(configDir) / "config.toml";
     }
@@ -148,7 +149,7 @@ namespace noctalia::theme {
       return root;
     }
 
-    // state.toml owner/key holding the built-in template ids Noctalia has applied.
+    // state.toml owner/key holding the built-in template ids Helix has applied.
     constexpr std::string_view kStateOwner = "theme_templates";
     constexpr std::string_view kAppliedBuiltinIdsKey = "applied_builtin_ids";
 
@@ -188,9 +189,24 @@ namespace noctalia::theme {
     m_afterApplyCallback = std::move(callback);
   }
 
+  void TemplateApplyService::setFailuresChangedCallback(std::function<void()> callback) const {
+    std::scoped_lock lock(m_mutex);
+    m_failuresChangedCallback = std::move(callback);
+  }
+
+  std::unordered_map<std::string, std::string> TemplateApplyService::lastFailures() const {
+    std::scoped_lock lock(m_mutex);
+    return m_failures;
+  }
+
   void TemplateApplyService::apply(
       const GeneratedPalette& palette, std::string_view defaultMode, bool force, bool paletteChanged
   ) const {
+    if (m_remoteSource) {
+      if (force)
+        (void)reapplyLast();
+      return;
+    }
     ApplyRequest request = makeRequest(palette, defaultMode);
     bool queued = false;
     std::function<void()> undeliverable;
@@ -231,6 +247,14 @@ namespace noctalia::theme {
   }
 
   bool TemplateApplyService::reapplyLast() const {
+    if (m_remoteSource) {
+      try {
+        helix::desktopClient().call("appearance", "Reapply");
+        return true;
+      } catch (...) {
+        return false;
+      }
+    }
     GeneratedPalette palette;
     std::string defaultMode;
     {
@@ -256,7 +280,7 @@ namespace noctalia::theme {
   }
 
   void TemplateApplyService::registerIpc(IpcService& ipc) {
-    ipc.bind(noctalia::cli::msg::templatesApply, [this](const std::string& args) -> std::string {
+    ipc.bind(helix::cli::msg::templatesApply, [this](const std::string& args) -> std::string {
       if (!StringUtils::trim(args).empty()) {
         return "error: usage: templates-apply\n";
       }
@@ -283,6 +307,14 @@ namespace noctalia::theme {
 
   void TemplateApplyService::applyRequest(const ApplyRequest& request) const {
     HookRunner& hookRunner = *m_hookRunner;
+    {
+      std::scoped_lock lock(m_mutex);
+      m_collectingGeneration = request.generation;
+      m_collectingFailures.clear();
+    }
+    hookRunner.setOnFailure([this, generation = request.generation](std::string id, std::string error) {
+      recordFailure(std::move(id), std::move(error), generation);
+    });
 
     // Hooks from superseded generations must not outlive them: drop the queued ones and
     // wait out the ones already running. A started hook cannot be cancelled safely, so
@@ -300,6 +332,9 @@ namespace noctalia::theme {
     options.configTable = request.configTable;
     options.hookRunner = &hookRunner;
     options.generation = request.generation;
+    options.onError = [this, generation = request.generation](std::string id, std::string error) {
+      recordFailure(std::move(id), std::move(error), generation);
+    };
 
     TemplateEngine engine(TemplateEngine::makeThemeData(request.palette), options);
 
@@ -318,6 +353,7 @@ namespace noctalia::theme {
       const std::filesystem::path builtinConfig = builtinTemplateConfigPath();
       if (!builtinEngine.processConfigFile(builtinConfig)) {
         kLog.warn("failed to apply built-in templates from {}", builtinConfig.string());
+        recordFailure("builtin", "failed to apply built-in templates", request.generation);
       }
     }
 
@@ -335,11 +371,13 @@ namespace noctalia::theme {
         const std::filesystem::path communityConfig = communityTemplateConfigPath(id);
         if (!std::filesystem::exists(communityConfig)) {
           kLog.warn("community template '{}' is not cached yet", id);
+          recordFailure(id, "community template is not downloaded yet", request.generation);
           continue;
         }
         TemplateEngine communityEngine(TemplateEngine::makeThemeData(request.palette), options);
         if (!communityEngine.processConfigFile(communityConfig)) {
           kLog.warn("failed to apply community template '{}' from {}", id, communityConfig.string());
+          recordFailure(id, "failed to apply community template", request.generation);
         }
       }
     }
@@ -396,6 +434,32 @@ namespace noctalia::theme {
         kStateOwner, kAppliedBuiltinIdsKey,
         StringUtils::join({m_appliedBuiltinIds.begin(), m_appliedBuiltinIds.end()}, " ")
     );
+  }
+
+  void TemplateApplyService::recordFailure(std::string id, std::string error, std::uint64_t generation) const {
+    if (id.empty() || error.empty()) {
+      return;
+    }
+    std::scoped_lock lock(m_mutex);
+    if (generation != m_collectingGeneration) {
+      return;
+    }
+    m_collectingFailures.insert_or_assign(std::move(id), std::move(error));
+  }
+
+  void TemplateApplyService::publishFailures(std::uint64_t generation) const {
+    std::function<void()> callback;
+    {
+      std::scoped_lock lock(m_mutex);
+      if (generation != m_collectingGeneration) {
+        return;
+      }
+      m_failures = m_collectingFailures;
+      callback = m_failuresChangedCallback;
+    }
+    if (callback) {
+      DeferredCall::callLater(std::move(callback));
+    }
   }
 
   std::vector<std::string> TemplateApplyService::undoBuiltinTemplates(const ApplyRequest& request) const {
@@ -509,6 +573,7 @@ namespace noctalia::theme {
       // applyRequest() waits its hooks out before touching anything.
       if (!requestSuperseded(request.generation)) {
         m_hookRunner->waitIdle();
+        publishFailures(request.generation);
       }
 
       std::function<void()> afterApplyCallback;
@@ -535,4 +600,4 @@ namespace noctalia::theme {
     return m_shutdown || generation != m_nextGeneration;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

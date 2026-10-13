@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.helix.Inference
+Exec=@HELIX_BINDIR@/helix-inference
+SystemdService=helix-inference.service

@@ -7,7 +7,6 @@
 #include "config/config_validate.h"
 #include "core/log.h"
 #include "core/toml.h" // IWYU pragma: keep
-#include "shell/settings/settings_registry.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
@@ -26,7 +25,7 @@
 #include <unistd.h>
 #include <vector>
 
-namespace noctalia::config {
+namespace helix::config {
   namespace {
 
     struct ReplayOptions {
@@ -36,106 +35,11 @@ namespace noctalia::config {
       bool force = false;
     };
 
-    struct SettingsCountSet {
-      std::size_t total = 0;
-      std::size_t visibleNormal = 0;
-      std::size_t visibleAdvanced = 0;
-    };
-
-    bool passesVisibility(const Config& cfg, const settings::SettingEntry& entry) {
-      return !entry.visibleWhen || entry.visibleWhen(cfg);
-    }
-
-    bool visibleWithAdvanced(const Config& cfg, const settings::SettingEntry& entry, bool showAdvanced) {
-      return (showAdvanced || !entry.advanced) && passesVisibility(cfg, entry);
-    }
-
-    SettingsCountSet countSettingsEntries(const std::vector<settings::SettingEntry>& entries, const Config& cfg) {
-      SettingsCountSet out;
-      out.total = entries.size();
-      for (const auto& entry : entries) {
-        if (visibleWithAdvanced(cfg, entry, false)) {
-          ++out.visibleNormal;
-        }
-        if (visibleWithAdvanced(cfg, entry, true)) {
-          ++out.visibleAdvanced;
-        }
-      }
-      return out;
-    }
-
-    std::size_t countAdvancedMarked(const std::vector<settings::SettingEntry>& entries) {
-      return static_cast<std::size_t>(std::ranges::count(entries, true, &settings::SettingEntry::advanced));
-    }
-
-    std::size_t countConditionallyHidden(const std::vector<settings::SettingEntry>& entries, const Config& cfg) {
-      return static_cast<std::size_t>(std::ranges::count_if(entries, [&](const settings::SettingEntry& entry) {
-        return !passesVisibility(cfg, entry);
-      }));
-    }
-
     int runSettingsCount(int argc, char* argv[]) {
-      auto parsed = cli::parseOrReport(
-          cli::kConfigSettingsCountCmd, "noctalia config settings-count",
-          std::span<char* const>{argv + 3, static_cast<std::size_t>(argc - 3)}
-      );
-      if (!parsed)
-        return 1;
-      if (parsed->helpRequested)
-        return 0;
-
-      setLogLevel(LogLevel::Warn);
-      ConfigService configService;
-      const Config& cfg = configService.config();
-      settings::RegistryEnvironment env;
-      std::vector<settings::SettingEntry> registry = settings::buildSettingsRegistry(cfg, nullptr, nullptr, env);
-      const SettingsCountSet registryCounts = countSettingsEntries(registry, cfg);
-
-      std::println("Settings controls");
-      std::println("Unit: one SettingEntry row/control. Dropdown options are not counted.");
-      std::println("Runtime action buttons inserted by SettingsWindow are not counted.");
-
-      std::println();
-      std::println("Other totals");
-      std::println("  total registry controls:       {}", registryCounts.total);
-      std::println("  visible with Advanced off:     {}", registryCounts.visibleNormal);
-      std::println("  visible with Advanced on:      {}", registryCounts.visibleAdvanced);
-      std::println("  advanced-marked controls:      {}", countAdvancedMarked(registry));
-      std::println("  conditionally hidden controls: {}", countConditionallyHidden(registry, cfg));
-      std::println(
-          "  visible only with Advanced on: {}", registryCounts.visibleAdvanced - registryCounts.visibleNormal
-      );
-
-      std::map<std::string, SettingsCountSet> sectionCounts;
-      for (const auto& descriptor : settings::settingsSectionDescriptors()) {
-        sectionCounts.emplace(std::string(descriptor.id), SettingsCountSet{});
-      }
-      for (const auto& entry : registry) {
-        auto& counts = sectionCounts[std::string(settings::settingsSectionId(entry.section))];
-        ++counts.total;
-        if (visibleWithAdvanced(cfg, entry, false)) {
-          ++counts.visibleNormal;
-        }
-        if (visibleWithAdvanced(cfg, entry, true)) {
-          ++counts.visibleAdvanced;
-        }
-      }
-
-      std::println();
-      std::println("By section");
-      std::println("  {:<14} {:>8} {:>8} {:>8}", "section", "total", "normal", "advanced");
-      for (const auto& descriptor : settings::settingsSectionDescriptors()) {
-        const auto it = sectionCounts.find(std::string(descriptor.id));
-        if (it == sectionCounts.end() || it->second.total == 0) {
-          continue;
-        }
-        std::println(
-            "  {:<14} {:>8} {:>8} {:>8}", descriptor.id, it->second.total, it->second.visibleNormal,
-            it->second.visibleAdvanced
-        );
-      }
-
-      return 0;
+      (void)argc;
+      (void)argv;
+      std::println(stderr, "settings-count is unavailable without the retired C++ settings UI");
+      return 2;
     }
 
     std::expected<void, std::string> writeTextFile(const std::filesystem::path& path, std::string_view content) {
@@ -208,8 +112,8 @@ namespace noctalia::config {
 
       const std::filesystem::path configHome = target / "config-home";
       const std::filesystem::path stateHome = target / "state-home";
-      const std::filesystem::path configDir = configHome / "noctalia";
-      const std::filesystem::path stateDir = stateHome / "noctalia";
+      const std::filesystem::path configDir = configHome / "helix";
+      const std::filesystem::path stateDir = stateHome / "helix";
 
       if (options.force) {
         std::error_code ec;
@@ -312,7 +216,7 @@ namespace noctalia::config {
       std::println();
       std::println("Run with:");
       std::println(
-          "  NOCTALIA_CONFIG_HOME={} NOCTALIA_STATE_HOME={} {}", StringUtils::shellQuote(configHome.string()),
+          "  HELIX_CONFIG_HOME={} HELIX_STATE_HOME={} {}", StringUtils::shellQuote(configHome.string()),
           StringUtils::shellQuote(stateHome.string()), StringUtils::shellQuote(argv0)
       );
       return 0;
@@ -327,7 +231,7 @@ namespace noctalia::config {
 
     int runValidate(int argc, char* argv[]) {
       auto parsed = cli::parseOrReport(
-          cli::kConfigValidateCmd, "noctalia config validate",
+          cli::kConfigValidateCmd, "helix-shell config validate",
           std::span<char* const>{argv + 3, static_cast<std::size_t>(argc - 3)}
       );
       if (!parsed)
@@ -403,7 +307,7 @@ namespace noctalia::config {
 
     int runExport(int argc, char* argv[]) {
       auto parsed = cli::parseOrReport(
-          cli::kConfigExportCmd, "noctalia config export",
+          cli::kConfigExportCmd, "helix-shell config export",
           std::span<char* const>{argv + 3, static_cast<std::size_t>(argc - 3)}
       );
       if (!parsed)
@@ -443,7 +347,7 @@ namespace noctalia::config {
 
   int runCli(int argc, char* argv[]) {
     if (argc < 3 || std::strcmp(argv[2], "--help") == 0 || std::strcmp(argv[2], "-h") == 0) {
-      std::print("{}", cli::renderHelp(cli::kConfigCmd, "noctalia config"));
+      std::print("{}", cli::renderHelp(cli::kConfigCmd, "helix-shell config"));
       return argc < 3 ? 1 : 0;
     }
 
@@ -455,7 +359,7 @@ namespace noctalia::config {
       return runSettingsCount(argc, argv);
     if (std::strcmp(argv[2], "replay-report") == 0) {
       auto parsed = cli::parseOrReport(
-          cli::kConfigReplayReportCmd, "noctalia config replay-report",
+          cli::kConfigReplayReportCmd, "helix-shell config replay-report",
           std::span<char* const>{argv + 3, static_cast<std::size_t>(argc - 3)}
       );
       if (!parsed)
@@ -472,8 +376,8 @@ namespace noctalia::config {
     }
 
     std::println(stderr, "error: unknown command: {}", argv[2]);
-    std::println(stderr, "Run 'noctalia config --help' for usage.");
+    std::println(stderr, "Run 'helix-shell config --help' for usage.");
     return 1;
   }
 
-} // namespace noctalia::config
+} // namespace helix::config

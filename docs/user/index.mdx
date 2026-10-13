@@ -1,40 +1,40 @@
 ---
 title: Overview
-description: Guides and reference documentation for Noctalia.
+description: Guides and reference documentation for Helix Shell.
 sidebar:
   order: 0
 ---
 
-Noctalia v5 is a new generation of the shell, with a native runtime, refreshed UI, and a configuration model built for the current desktop experience.
+Helix is a niri-first desktop: **greetd → helix-greeter → helix-niri + Helix Shell**. This tree holds Helix Shell, the greeter (`greeter/`), and the compositor (`compositor/`), with Control Center, first-party services, and a configuration model built for that desktop. The command and config paths stay `helix-shell`. **Fedora + helix-niri are the sole supported product surface.**
 
+If you are setting up Helix for the first time, start with [Installation](/helix/getting-started/installation/), then [Running Helix](/helix/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/helix/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
 
-If you are setting up Noctalia for the first time, start with [Installation](/noctalia/getting-started/installation/), then [Running Noctalia](/noctalia/getting-started/running-the-shell/) for compositor startup and keybind setup. Once the shell is installed, [How configuration works](/noctalia/configuration/) explains where settings live and which file wins when the GUI and your config both set the same option.
-
-:::caution[Moving from v4?]
-- v5 installs separately and does not replace v4.
+:::caution[Coming from Helix v4?]
+- Helix Shell (and Helix v5) install separately and do not replace v4.
 - v4 settings are not migrated, but both versions can coexist on most distributions.
-- Update any compositor keybinds that launch Noctalia commands.
+- Update any compositor keybinds that launch `helix-shell` commands.
 :::
 
 ## Topics
 
-- **[Installation](/noctalia/getting-started/installation/)** - Package options, distro-specific commands, and manual install steps.
-- **[Running Noctalia](/noctalia/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
-- **[How configuration works](/noctalia/configuration/)** - Config files, GUI-managed overrides, load order, and hot reload.
-- **[Greeter installation](/greeter/)** - Install noctalia-greeter, configure greetd, and sync your login screen with Noctalia.
-- **[Shell](/noctalia/configuration/shell/)** - Global UI scale, fonts, animations, shadows, OSD, lock screen, and keybinds.
-- **[Hooks](/noctalia/automation/hooks/)** - Advanced event-driven automation.
-- **[Launcher](/noctalia/launcher/)** - Application search, calculator, emoji picker, and wallpaper browser.
-- **[Control Center](/noctalia/control-center/)** - Home tab, sidebar, shortcuts, and screen time.
-- **[Bars](/noctalia/bar/)** - Top, bottom, left, and right bars, including per-monitor changes.
-- **[Widgets](/noctalia/bar/widgets/)** - The clock, tray, volume, workspaces, media, and other things you place inside a bar.
-- **[Dock](/noctalia/dock/)** - Optional app dock, pinned apps, running apps, and auto-hide.
-- **[Desktop widgets](/noctalia/desktop/widgets/)** - On-desktop widgets, edit mode, and state file layout.
-- **[Wallpaper & backdrop](/noctalia/desktop/wallpaper/)** - Wallpaper folders, automation, per-monitor choices, and overview backdrop.
-- **[Theme](/noctalia/theming/)** - Built-in themes, wallpaper colors, and dark/light mode.
-- **[Palette](/noctalia/theming/palette/)** - Color roles, custom palette files, and terminal colors.
-- **[App Theming](/noctalia/theming/app-theming/)** - Generated themes for terminals, editors, browsers, and other apps.
-- **Services** - [Audio](/noctalia/services/audio/), [Brightness](/noctalia/services/brightness/), [Calendar](/noctalia/services/calendar/), [Idle](/noctalia/services/idle/), [Night Light](/noctalia/services/night-light/), [Notifications](/noctalia/services/notifications/), and [Weather](/noctalia/services/weather/).
-- **[IPC](/noctalia/ipc/)** - Commands for keybinds, scripts, automation, and hooks.
-- **[Plugins](/noctalia/plugins/)** - Install and configure plugins: custom bar widgets, shortcuts, and services in Luau.
+- **[Helix](/helix/helix/)** - How Helix Shell, helix-niri, and helix-greeter fit together.
+- **[Installation](/helix/getting-started/installation/)** - Package options, distro-specific commands, and manual install steps.
+- **[Running Helix](/helix/getting-started/running-the-shell/)** - Start the shell, run it from your compositor, and wire up keybinds.
+- **[How configuration works](/helix/configuration/)** - Config files, GUI-managed overrides, load order, and hot reload.
+- **[Greeter installation](/greeter/)** - Install helix-greeter (binaries stay `helix-greeter`), configure greetd, and sync your login screen with Helix.
+- **[Shell](/helix/configuration/shell/)** - Global UI scale, fonts, animations, shadows, OSD, lock screen, and keybinds.
+- **[Hooks](/helix/automation/hooks/)** - Advanced event-driven automation.
+- **[Launcher](/helix/launcher/)** - Application search, calculator, emoji picker, wallpaper browser, and [Quick Insert](/helix/launcher/quick-insert/).
+- **[Control Center](/helix/control-center/)** - Home tab, sidebar, shortcuts, and screen time.
+- **[Bars](/helix/bar/)** - Top, bottom, left, and right bars, including per-monitor changes.
+- **[Widgets](/helix/bar/widgets/)** - The clock, tray, volume, workspaces, media, and other things you place inside a bar.
+- **[Dock](/helix/dock/)** - Optional app dock, pinned apps, running apps, and auto-hide.
+- **[Desktop widgets](/helix/desktop/widgets/)** - On-desktop widgets, edit mode, and state file layout.
+- **[Wallpaper & backdrop](/helix/desktop/wallpaper/)** - Wallpaper folders, automation, per-monitor choices, and overview backdrop.
+- **[Theme](/helix/theming/)** - Built-in themes, wallpaper colors, and dark/light mode.
+- **[Palette](/helix/theming/palette/)** - Color roles, custom palette files, and terminal colors.
+- **[App Theming](/helix/theming/app-theming/)** - Generated themes for terminals, editors, browsers, and other apps.
+- **Services** - [Audio](/helix/services/audio/), [Brightness](/helix/services/brightness/), [Calendar](/helix/services/calendar/), [Idle](/helix/services/idle/), [Night Light](/helix/services/night-light/), [Notifications](/helix/services/notifications/), and [Weather](/helix/services/weather/).
+- **[IPC](/helix/ipc/)** - Commands for keybinds, scripts, automation, and hooks.
+- **[Plugins](/helix/plugins/)** - Install and configure plugins: custom bar widgets, shortcuts, and services in Luau.
 

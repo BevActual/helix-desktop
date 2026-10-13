@@ -1,0 +1,25 @@
+name: Helix
+accent: '{{colors.primary.default.hex}}'
+cursor: '{{colors.terminal_cursor.default.hex}}'
+background: '{{colors.terminal_background.default.hex}}'
+foreground: '{{colors.terminal_foreground.default.hex}}'
+details: '{{ mode }}er'
+terminal_colors:
+  normal:
+    black: '{{colors.terminal_normal_black.default.hex}}'
+    red: '{{colors.terminal_normal_red.default.hex}}'
+    green: '{{colors.terminal_normal_green.default.hex}}'
+    yellow: '{{colors.terminal_normal_yellow.default.hex}}'
+    blue: '{{colors.terminal_normal_blue.default.hex}}'
+    magenta: '{{colors.terminal_normal_magenta.default.hex}}'
+    cyan: '{{colors.terminal_normal_cyan.default.hex}}'
+    white: '{{colors.terminal_normal_white.default.hex}}'
+  bright:
+    black: '{{colors.terminal_bright_black.default.hex}}'
+    red: '{{colors.terminal_bright_red.default.hex}}'
+    green: '{{colors.terminal_bright_green.default.hex}}'
+    yellow: '{{colors.terminal_bright_yellow.default.hex}}'
+    blue: '{{colors.terminal_bright_blue.default.hex}}'
+    magenta: '{{colors.terminal_bright_magenta.default.hex}}'
+    cyan: '{{colors.terminal_bright_cyan.default.hex}}'
+    white: '{{colors.terminal_bright_white.default.hex}}'

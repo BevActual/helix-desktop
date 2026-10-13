@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ui/palette.h"
+#include "theme/color_roles.h"
 
 #include <string>
 #include <string_view>

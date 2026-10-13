@@ -1,0 +1,30 @@
+<node>
+<!-- Served by helix-inference at org.helix.Inference, /org/helix/Inference (D-Bus activated, sandboxed by its unit).
+     Design: docs/design/agent-and-inference.md and docs/design/inference-fabric.md.
+
+     Action "chat"; args (a{sv}):
+       messages     av of a{sv} {role: s, content: s}   required
+       task         s                                    optional; profile: act|chat|summarize|vision|code (default chat).
+                                                          Selects local model slot from inference-routing.toml when model is unset.
+       model        s                                    optional; GGUF id from ListModels, or remote id when using a LAN gateway
+       schema       s                                    optional; tool-call JSON Schema; reply conforms. Only for on-device act.
+       max_tokens   any integer                          optional, clamped by the service
+       temperature  d                                    optional, 0 = greedy
+       priority     s                                    "interactive" (default) or "background"
+     Non-local backends (LAN/cloud) are not run inside the PrivateNetwork sandbox; Mobius or a network gateway
+     performs those turns. GetSnapshot.backends lists configured backends; GetSnapshot.profiles maps task → route.
+     Delta(operation, text) streams to the requester only. Completed(operation, ok, result) ends it;
+     Loading(operation, model, fraction) tells the requester how far a model swap has got (0..1) before its reply starts;
+     result JSON: {ok, text, error, cancelled, truncated, prompt_tokens, cached_prompt_tokens, completion_tokens, task, backend}. -->
+<interface name="org.helix.Inference1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="ListModels"><arg type="av" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <signal name="Delta"><arg type="t"/><arg type="s"/></signal>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Loading"><arg type="t"/><arg type="s"/><arg type="d"/></signal>
+ <signal name="Progress"><arg name="operation" type="t"/><arg name="fraction" type="d"/><arg name="stage" type="s"/></signal>
+ <signal name="Changed"/>
+</interface>
+</node>

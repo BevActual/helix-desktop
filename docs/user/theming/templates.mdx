@@ -303,7 +303,7 @@ Supported iterable expressions:
 - arrays and maps from the current scope (e.g. TOML data bound via `[config]`)
 
 :::note
-Noctalia uses `<* *>` for block tags and `{{ }}` for expressions. This is different from matugen, which uses Tera syntax (`{% %}` / `{{ }}`). The two are not interchangeable: a matugen template must be adapted to use `<* *>` blocks.
+Helix uses `<* *>` for block tags and `{{ }}` for expressions. This is different from matugen, which uses Tera syntax (`{% %}` / `{{ }}`). The two are not interchangeable: a matugen template must be adapted to use `<* *>` blocks.
 :::
 
 ### `colors`
@@ -440,14 +440,14 @@ Use the generated roles through `colors.<role>.<mode>.<format>` just like built-
 }
 ```
 
-In Noctalia's main config, put the same custom color definitions under `[theme.templates.custom_colors]` and reference them from any enabled user template:
+In Helix's main config, put the same custom color definitions under `[theme.templates.custom_colors]` and reference them from any enabled user template:
 
 ```toml
 [theme.templates.custom_colors]
 warning = "#f97316"
 
 [theme.templates.user.my_app]
-input_path  = "$XDG_CONFIG_HOME/noctalia/templates/my-app.css"
+input_path  = "$XDG_CONFIG_HOME/helix/templates/my-app.css"
 output_path = "$XDG_CONFIG_HOME/my-app/theme.css"
 ```
 
@@ -505,8 +505,8 @@ Each template entry supports:
 [templates.qt]
 input_path = "./qtct.conf"
 output_path = [
-  "$XDG_CONFIG_HOME/qt5ct/colors/noctalia.conf",
-  "$XDG_CONFIG_HOME/qt6ct/colors/noctalia.conf",
+  "$XDG_CONFIG_HOME/qt5ct/colors/helix.conf",
+  "$XDG_CONFIG_HOME/qt6ct/colors/helix.conf",
 ]
 ```
 
@@ -540,7 +540,7 @@ two entries drive the same script or touch the same files, or when a later templ
 
 ```toml
 [theme.templates.user.my_app]
-input_path  = "$XDG_CONFIG_HOME/noctalia/templates/my-app.css"
+input_path  = "$XDG_CONFIG_HOME/helix/templates/my-app.css"
 output_path = "$XDG_CONFIG_HOME/my-app/theme.css"
 post_hook   = "my-app --reload-theme"
 hook_async  = false
@@ -581,7 +581,7 @@ example when two entries restart or reconfigure the same application.
 A theme change always waits for the hooks it started before reporting the theme as applied, and hooks left over from a
 superseded theme change are dropped or awaited before the next one is applied.
 
-`post_action` selects a Noctalia-owned native operation that runs after all outputs are written successfully. The
+`post_action` selects a Helix-owned native operation that runs after all outputs are written successfully. The
 canonical `kde-color-scheme` action requires exactly one output, merges that generated KDE color scheme into
 `$XDG_CONFIG_HOME/kdeglobals`, and notifies running KDE applications over the session bus. Unknown action names fail
 the template entry.
@@ -631,24 +631,24 @@ These are accessed like any other color token:
 
 ## CLI Usage
 
-Template rendering is available through `noctalia theme`.
+Template rendering is available through `helix theme`.
 
 Render one file:
 
 ```sh
-noctalia theme <image> -r input.txt:output.txt
+helix theme <image> -r input.txt:output.txt
 ```
 
 Process a TOML config:
 
 ```sh
-noctalia theme <image> -c templates.toml
+helix theme <image> -c templates.toml
 ```
 
 List available templates:
 
 ```sh
-noctalia theme --list-templates
+helix theme --list-templates
 ```
 
 Pass `-c <file>` with `--list-templates` to include entries from a standalone template TOML config.
@@ -656,7 +656,7 @@ Pass `-c <file>` with `--list-templates` to include entries from a standalone te
 Process the shipped built-in template catalog:
 
 ```sh
-noctalia theme <image> --builtin-config
+helix theme <image> --builtin-config
 ```
 
 The shipped built-in catalog lives at `assets/templates/builtin.toml`.
@@ -664,14 +664,14 @@ The shipped built-in catalog lives at `assets/templates/builtin.toml`.
 Render from a precomputed theme JSON:
 
 ```sh
-noctalia theme --theme-json theme.json -r input.txt:output.txt
+helix theme --theme-json theme.json -r input.txt:output.txt
 ```
 
 Combine both: `-c` and `-r` can be used in the same command. The config's
 `[config.custom_colors]` are loaded first, so the `-r` templates can reference them:
 
 ```sh
-noctalia theme <image> -c templates.toml -r input.txt:output.txt
+helix theme <image> -c templates.toml -r input.txt:output.txt
 ```
 
 The `-r` files are rendered first, then the templates declared in the config.
@@ -679,5 +679,5 @@ The `-r` files are rendered first, then the templates declared in the config.
 Set the default template mode:
 
 ```sh
-noctalia theme <image> --default-mode light -r input.txt:output.txt
+helix theme <image> --default-mode light -r input.txt:output.txt
 ```

@@ -1,0 +1,90 @@
+import { ChatTools, type ToolsHandle } from "./tools";
+import { createRoot } from "react-dom/client";
+import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
+import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
+import { Dialogs, type DialogHandle, type DialogHooks } from "./dialogs";
+import { Thread, type Block, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
+import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
+import { Analysis, type AnalysisHandle } from "./analysis";
+import { OnlineResearch, type WebHandle } from "./web";
+import { Welcome, type WelcomeHandle, type WelcomeHooks } from "./welcome";
+import { ChatContext, type ContextHandle, type ContextInfo } from "./context";
+import { CreateImage, type CreateImageHandle } from "./create-image";
+
+/** Mounts a component that registers a handle once it is ready; calls made before that wait and run when it is. */
+function handled<H extends object>(host: HTMLElement, render: (register: (handle: H) => void) => React.ReactElement) {
+  let handle: H | null = null;
+  const waiting: ((h: H) => void)[] = [];
+  createRoot(host).render(
+    render((ready) => {
+      handle = ready;
+      waiting.splice(0).forEach((call) => queueMicrotask(() => call(ready)));
+    }),
+  );
+  return (call: (h: H) => void) => {
+    if (handle) call(handle);
+    else waiting.push(call);
+  };
+}
+
+(window as unknown as { HelixMobiusReact: unknown }).HelixMobiusReact = {
+  tools: (host: HTMLElement) => {
+    const run = handled<ToolsHandle>(host, (register) => <ChatTools register={register} />);
+    return { open: (view: Parameters<ToolsHandle["open"]>[0]) => run((h) => h.open(view)) };
+  },
+  web: (host: HTMLElement, answered: () => void) => {
+    const run = handled<WebHandle>(host, (register) => <OnlineResearch register={register} answered={answered} />);
+    return { open: (chat: Parameters<WebHandle["open"]>[0], query?: string) => run((h) => h.open(chat, query)) };
+  },
+  welcome: (host: HTMLElement, hooks: WelcomeHooks) => {
+    const run = handled<WelcomeHandle>(host, (register) => <Welcome register={register} hooks={hooks} />);
+    return { set: (starters: string[], listening: boolean, busy: string) => run((h) => h.set(starters, listening, busy)) };
+  },
+  context: (host: HTMLElement) => {
+    const run = handled<ContextHandle>(host, (register) => <ChatContext register={register} />);
+    return { open: (view: Parameters<ContextHandle["open"]>[0]) => run((h) => h.open(view)) };
+  },
+  createImage: (host: HTMLElement) => {
+    const run = handled<CreateImageHandle>(host, (register) => <CreateImage register={register} />);
+    return { open: (prompt?: string) => run((h) => h.open(prompt)) };
+  },
+  analysis: (host: HTMLElement, report: (error: unknown) => void) => {
+    const run = handled<AnalysisHandle>(host, (register) => <Analysis register={register} report={report} />);
+    return { open: (id?: string) => run((h) => h.open(id)) };
+  },
+  chips: (host: HTMLElement, onRemove: (index: number) => void, onDismiss: () => void) => {
+    const run = handled<ChipsHandle>(host, (register) => <AttachChips register={register} onRemove={onRemove} onDismiss={onDismiss} />);
+    return { set: (files: Attachment[], warnings: string[]) => run((h) => h.set(files, warnings)) };
+  },
+  slash: (host: HTMLElement, onPick: (index: number) => void) => {
+    const run = handled<SlashHandle>(host, (register) => <SlashMenu register={register} onPick={onPick} />);
+    return { set: (items: SlashItem[], active: number) => run((h) => h.set(items, active)) };
+  },
+  thread: (host: HTMLElement, hooks: ThreadHooks) => {
+    const run = handled<ThreadHandle>(host, (register) => <Thread register={register} hooks={hooks} />);
+    return {
+      set: (messages: Message[], streaming: boolean, context?: ContextInfo) => run((h) => h.set(messages, streaming, context)),
+      stream: (blocks: Block[]) => run((h) => h.stream(blocks)),
+      find: (needle: string) => run((h) => h.find(needle)),
+    };
+  },
+  dialogs: (host: HTMLElement, rail: HTMLElement | null, hooks: DialogHooks) => {
+    const run = handled<DialogHandle>(host, (register) => <Dialogs register={register} hooks={hooks} rail={rail} />);
+    return {
+      openRename: (title: string) => run((h) => h.openRename(title)),
+      openProject: (current: string, suggestions: string[]) => run((h) => h.openProject(current, suggestions)),
+      openModel: () => run((h) => h.openModel()),
+      openPersona: (create?: boolean) => run((h) => h.openPersona(create)),
+      openMenu: (kind: "persona" | "style", anchor: { left: number; top: number; width: number }) => run((h) => h.openMenu(kind, anchor)),
+      openEdit: (index: number, text: string) => run((h) => h.openEdit(index, text)),
+    };
+  },
+  chats: (host: HTMLElement, hooks: ChatListHooks) => {
+    const run = handled<ChatListHandle>(host, (register) => <ChatList register={register} hooks={hooks} />);
+    return { set: (items: ChatItem[], currentId: string) => run((h) => h.set(items, currentId)) };
+  },
+  models: (host: HTMLElement, hooks: ModelsHooks) => {
+    const run = handled<ModelsHandle>(host, (register) => <ModelsPage register={register} hooks={hooks} />);
+    return { open: () => run((h) => h.open()) };
+  },
+};

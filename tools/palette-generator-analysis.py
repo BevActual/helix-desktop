@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-Analyze Noctalia's C++ palette generator against Python + matugen references.
+Analyze Helix's C++ palette generator against Python + matugen references.
 
 Usage:
     ./tools/palette-generator-analysis.py <wallpaper>
     ./tools/palette-generator-analysis.py <wallpaper> --fail-threshold 20
 
 Three backends:
-  - Noctalia  : ../build-debug/noctalia theme <img> --scheme <s> --dark
-  - Python    : the upstream reference in noctalia-shell/Scripts/python
+  - Helix     : ../build-debug/helix theme <img> --scheme <s> --dark
+  - Python    : the upstream reference in helix-shell/Scripts/python
   - Matugen   : Rust reference (M3 schemes only)
 
 Exit code: 0 if all diffs are under --fail-threshold (default: unlimited),
@@ -23,10 +23,10 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 REPO_DIR = SCRIPT_DIR.parent
-NOCTALIA_BIN = REPO_DIR / "build-debug" / "noctalia"
+HELIX_BIN = REPO_DIR / "build-debug" / "helix"
 
 # Absolute path into the upstream Python reference.
-PYTHON_THEMING_DIR = Path.home() / "Development/misc/noctalia/noctalia-shell/Scripts/python/src/theming"
+PYTHON_THEMING_DIR = Path.home() / "Development/misc/helix/helix-shell/Scripts/python/src/theming"
 PYTHON_PROCESSOR = PYTHON_THEMING_DIR / "template-processor.py"
 
 # Pull in Python's Hct for hue/chroma classification.
@@ -114,16 +114,16 @@ def run_matugen(image: Path, scheme: str) -> dict | None:
         return None
 
 
-def run_noctalia(image: Path, scheme: str) -> dict | None:
+def run_helix(image: Path, scheme: str) -> dict | None:
     try:
         out = subprocess.run(
-            [str(NOCTALIA_BIN), "theme", str(image),
+            [str(HELIX_BIN), "theme", str(image),
              "--scheme", scheme, "--dark"],
             capture_output=True, text=True, check=True,
         )
         return json.loads(out.stdout)
     except Exception as e:
-        print(f"  noctalia {scheme}: {e}", file=sys.stderr)
+        print(f"  helix {scheme}: {e}", file=sys.stderr)
         return None
 
 
@@ -150,14 +150,14 @@ def compare_m3(image: Path, scheme: str, has_matugen: bool) -> list[int]:
     """Return list of LSB diffs vs the best available reference."""
     print(f"\n─── {scheme} ───")
     py = run_python(image, scheme)
-    noct = run_noctalia(image, scheme)
+    noct = run_helix(image, scheme)
     mat = run_matugen(image, scheme) if has_matugen else None
 
     if not py or not noct:
         print("  ! missing reference output, skipping")
         return []
 
-    hdr = f"  {'Token':<26} {'Python':<10} {'Matugen':<10} {'Noctalia':<10} {'Δ Py↔Noct':<14} {'Δ Mat↔Noct':<14}"
+    hdr = f"  {'Token':<26} {'Python':<10} {'Matugen':<10} {'Helix':<10} {'Δ Py↔Noct':<14} {'Δ Mat↔Noct':<14}"
     print(hdr)
     print("  " + "─" * (len(hdr) - 2))
 
@@ -188,12 +188,12 @@ def compare_m3(image: Path, scheme: str, has_matugen: bool) -> list[int]:
 def compare_custom(image: Path, scheme: str) -> list[int]:
     print(f"\n─── {scheme} ───")
     py = run_python(image, scheme)
-    noct = run_noctalia(image, scheme)
+    noct = run_helix(image, scheme)
     if not py or not noct:
         print("  ! missing reference output, skipping")
         return []
 
-    hdr = f"  {'Token':<26} {'Python':<10} {'Noctalia':<10} {'Δ Py↔Noct':<14}"
+    hdr = f"  {'Token':<26} {'Python':<10} {'Helix':<10} {'Δ Py↔Noct':<14}"
     print(hdr)
     print("  " + "─" * (len(hdr) - 2))
 
@@ -213,7 +213,7 @@ def compare_custom(image: Path, scheme: str) -> list[int]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Compare Noctalia C++ palette generator vs Python/matugen"
+        description="Compare Helix C++ palette generator vs Python/matugen"
     )
     parser.add_argument("wallpaper", type=Path)
     parser.add_argument("--fail-threshold", type=int, default=-1,
@@ -226,8 +226,8 @@ def main() -> int:
     if not args.wallpaper.exists():
         print(f"error: not found: {args.wallpaper}", file=sys.stderr)
         return 1
-    if not NOCTALIA_BIN.exists():
-        print(f"error: noctalia not built: {NOCTALIA_BIN}", file=sys.stderr)
+    if not HELIX_BIN.exists():
+        print(f"error: helix not built: {HELIX_BIN}", file=sys.stderr)
         return 1
 
     has_matugen = False

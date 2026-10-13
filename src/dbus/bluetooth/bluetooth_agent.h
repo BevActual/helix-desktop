@@ -38,7 +38,7 @@ class BluetoothAgent {
 public:
   using RequestCallback = std::function<void(const BluetoothPairingRequest&)>;
 
-  explicit BluetoothAgent(SystemBus& bus);
+  explicit BluetoothAgent(SystemBus& bus, bool remote = false);
   ~BluetoothAgent();
 
   BluetoothAgent(const BluetoothAgent&) = delete;
@@ -57,6 +57,11 @@ public:
   [[nodiscard]] BluetoothPairingRequest pendingRequest() const;
 
 private:
+  bool m_remote = false;
+  unsigned m_remoteObserver = 0;
+  BluetoothPairingRequest m_remotePending;
+  RequestCallback m_remoteCallback;
+  void replyRemote(const std::string& response, bool cancel);
   struct Impl;
   std::unique_ptr<Impl> m_impl;
 };

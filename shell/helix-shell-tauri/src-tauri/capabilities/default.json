@@ -1,0 +1,6 @@
+{
+  "identifier": "default",
+  "description": "The shell window may call its own commands and listen to its events",
+  "windows": ["shell", "confirmer"],
+  "permissions": ["core:default"]
+}

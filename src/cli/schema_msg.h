@@ -6,10 +6,10 @@
 #include <array>
 #include <string_view>
 
-namespace noctalia::cli {
+namespace helix::cli {
 
   inline constexpr std::array<std::string_view, 10> kBuiltinPaletteNames{
-      "Ayu", "Catppuccin", "Dracula", "Eldritch", "Gruvbox", "Kanagawa", "Noctalia", "Nord", "Rosé Pine", "Tokyo-Night",
+      "Ayu", "Catppuccin", "Dracula", "Eldritch", "Gruvbox", "Kanagawa", "Helix", "Nord", "Rosé Pine", "Tokyo-Night",
   };
 
   inline constexpr std::array kMsgColorSchemeSetBuiltinPositionals{
@@ -33,51 +33,23 @@ namespace noctalia::cli {
       Command{"custom", "Use a custom palette", {}, {}, {}, kMsgColorSchemeSetCustomPositionals, {}, false},
   };
 
-  inline constexpr std::array kMsgPluginsEnablePositionals{
-      Positional{"author/plugin", {}, {}, true, false, false, "plugins_disabled"},
-  };
-  inline constexpr std::array kMsgPluginsDisablePositionals{
-      Positional{"author/plugin", {}, {}, true, false, false, "plugins_enabled"},
-  };
-  inline constexpr std::array kMsgPluginsUpdatePositionals{
-      Positional{"source-name", {}, {}, true, false, false},
-  };
-  inline constexpr std::array<std::string_view, 2> kMsgPluginSourceKindChoices{"git", "path"};
-  inline constexpr std::array kMsgPluginsSourceAddPositionals{
-      Positional{"name", {}, {}, true, false, false},
-      Positional{"kind", {}, kMsgPluginSourceKindChoices, true, false, false},
-      Positional{"location", {}, {}, true, false, false},
-  };
-  inline constexpr std::array kMsgPluginsSourceRemovePositionals{
-      Positional{"name", {}, {}, true, false, false},
-  };
-  inline constexpr std::array kMsgPluginsSourceSubcommands{
-      Command{"list", "List plugin sources", {}, {}, {}, {}, {}, false},
-      Command{"add", "Add a plugin source", {}, {}, {}, kMsgPluginsSourceAddPositionals, {}, false},
-      Command{"remove", "Remove a plugin source", {}, {}, {}, kMsgPluginsSourceRemovePositionals, {}, false},
-  };
-  inline constexpr std::array kMsgPluginsSubcommands{
-      Command{"list", "List installed plugins", {}, {}, {}, {}, {}, false},
-      Command{"enable", "Enable a plugin", {}, {}, {}, kMsgPluginsEnablePositionals, {}, false},
-      Command{"disable", "Disable a plugin", {}, {}, {}, kMsgPluginsDisablePositionals, {}, false},
-      Command{"update", "Update a plugin source", {}, {}, {}, kMsgPluginsUpdatePositionals, {}, false},
-      Command{"source", "Manage plugin sources", {}, {}, {}, {}, kMsgPluginsSourceSubcommands, false},
-  };
-
   inline constexpr std::array<std::string_view, 7> kMsgBarAutoHideSetStateChoices{"on",    "off", "smart", "true",
                                                                                   "false", "1",   "0"};
   inline constexpr std::array<std::string_view, 2> kMsgBarLayerSetLayerChoices{"top", "overlay"};
   inline constexpr std::array<std::string_view, 2> kMsgEffectsProfileSetKindChoices{"output", "input"};
   inline constexpr std::array<std::string_view, 4> kMsgLogLevelSetLevelChoices{"debug", "info", "warn", "error"};
-  inline constexpr std::array<std::string_view, 8> kMsgMediaActionChoices{"next",        "previous",       "toggle",
-                                                                          "play",        "pause",          "stop",
-                                                                          "next-player", "previous-player"};
+  inline constexpr std::array<std::string_view, 9> kMsgMediaActionChoices{"next",  "previous",    "toggle",
+                                                                          "play",  "pause",       "stop",
+                                                                          "raise", "next-player", "previous-player"};
   inline constexpr std::array<std::string_view, 6> kMsgNotificationDndSetStateChoices{"on",    "off", "true",
                                                                                       "false", "1",   "0"};
   inline constexpr std::array<std::string_view, 2> kMsgPowerCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgScreenshotFullscreenModeChoices{"pick", "monitor", "all"};
-  inline constexpr std::array<std::string_view, 6> kMsgSessionActionChoices{"lock",   "suspend", "lock-and-suspend",
-                                                                            "logout", "reboot",  "shutdown"};
+  inline constexpr std::array<std::string_view, 3> kMsgScreenRecordSourceChoices{"focused", "portal", "region"};
+  inline constexpr std::array<std::string_view, 2> kMsgScreenRecordReplaySourceChoices{"focused", "portal"};
+  inline constexpr std::array<std::string_view, 7> kMsgSessionActionChoices{"lock",      "suspend", "lock-and-suspend",
+                                                                            "lid-close", "logout",  "reboot",
+                                                                            "shutdown"};
   inline constexpr std::array<std::string_view, 2> kMsgTaskbarCycleDirectionChoices{"next", "prev"};
   inline constexpr std::array<std::string_view, 3> kMsgThemeModeSetModeChoices{"dark", "light", "auto"};
   inline constexpr std::array<std::string_view, 2> kMsgWorkspaceSwitchDirectionChoices{"next", "prev"};
@@ -175,12 +147,6 @@ namespace noctalia::cli {
       Positional{"id", {}, {}, true, false, false},
       Positional{"context", {}, {}, false, false, false},
   };
-  inline constexpr std::array kMsgPluginPositionals{
-      Positional{"author/plugin:entry", {}, {}, true, false, false, "plugin_prefix"},
-      Positional{"target[:bar-name]", {}, {}, true, false, false},
-      Positional{"event", {}, {}, true, false, false},
-      Positional{"payload", {}, {}, false, false, false},
-  };
   inline constexpr std::array kMsgPowerCyclePositionals{
       Positional{"direction", {}, kMsgPowerCycleDirectionChoices, false, false, false},
   };
@@ -190,14 +156,27 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgScreenshotFullscreenPositionals{
       Positional{"mode", {}, kMsgScreenshotFullscreenModeChoices, false, false, false},
   };
+  // Optional: empty = focused/preferred output, "all" = stitch every output, else connector name.
+  inline constexpr std::array kMsgDesktopCapturePositionals{
+      Positional{"target", {}, {}, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordStartPositionals{
+      Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordTogglePositionals{
+      Positional{"source", {}, kMsgScreenRecordSourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordReplayStartPositionals{
+      Positional{"source", {}, kMsgScreenRecordReplaySourceChoices, false, false, false},
+  };
+  inline constexpr std::array kMsgScreenRecordReplayTogglePositionals{
+      Positional{"source", {}, kMsgScreenRecordReplaySourceChoices, false, false, false},
+  };
   inline constexpr std::array kMsgSessionPositionals{
       Positional{"action", {}, kMsgSessionActionChoices, true, false, false},
   };
   inline constexpr std::array kMsgSettingsOpenPositionals{
       Positional{"context", {}, {}, false, false, false},
-  };
-  inline constexpr std::array kMsgSettingsOpenPluginPositionals{
-      Positional{"plugin-id", {}, {}, true, false, false},
   };
   inline constexpr std::array kMsgSettingsOpenWidgetPositionals{
       Positional{"bar-name", {}, {}, false, false, false},
@@ -255,8 +234,124 @@ namespace noctalia::cli {
   inline constexpr std::array kMsgWorkspaceSwitchPositionals{
       Positional{"direction", {}, kMsgWorkspaceSwitchDirectionChoices, true, false, false},
   };
+  inline constexpr std::array kMsgAiUsageOllamaModelPositionals{
+      Positional{"name", {}, {}, true, false, false},
+  };
+  inline constexpr std::array kMsgAiUsageLocalAiInstallPositionals{
+      Positional{"id", "Gallery id such as localai@qwen3-4b", {}, true, false, false},
+  };
+  inline constexpr std::array kMsgAiUsageLocalAiCapabilityChoices{
+      std::string_view{"chat"},       std::string_view{"vision"}, std::string_view{"tools"},
+      std::string_view{"transcript"}, std::string_view{"tts"},    std::string_view{"embeddings"},
+      std::string_view{"image"},      std::string_view{"video"},  std::string_view{"sound"},
+  };
+  inline constexpr std::array kMsgDesktopAiPathPositionals{
+      Positional{"path", {}, {}, true, false, false},
+  };
+  inline constexpr std::array kMsgAiUsageLocalAiEndpointPositionals{
+      Positional{"capability", {}, kMsgAiUsageLocalAiCapabilityChoices, false, false, false},
+  };
 
   namespace msg {
+    inline constexpr Command aiUsageLocalAiDelete{
+        "ai-usage-localai-delete",
+        "Remove an installed LocalAI model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiEndpoint{
+        "ai-usage-localai-endpoint",
+        "Print the LocalAI base URL and the model to use, optionally for one capability",
+        {},
+        {},
+        {},
+        kMsgAiUsageLocalAiEndpointPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiInstall{
+        "ai-usage-localai-install",
+        "Install a model from the LocalAI gallery",
+        {},
+        {},
+        {},
+        kMsgAiUsageLocalAiInstallPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiModel{
+        "ai-usage-localai-model",
+        "Persist a LocalAI model as the desktop's default chat model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageLocalAiOpen{
+        "ai-usage-localai-open", "Open the LocalAI web interface", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageLocalAiStart{
+        "ai-usage-localai-start", "Start the local LocalAI server", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageLocalAiStop{
+        "ai-usage-localai-stop", "Stop the local LocalAI server", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageOllamaCancel{
+        "ai-usage-ollama-cancel", "Cancel an in-progress Ollama model download", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageOllamaDelete{"ai-usage-ollama-delete",
+                                                 "Remove an installed Ollama model",
+                                                 {},
+                                                 {},
+                                                 {},
+                                                 kMsgAiUsageOllamaModelPositionals,
+                                                 {},
+                                                 false};
+    inline constexpr Command aiUsageOllamaModel{
+        "ai-usage-ollama-model",
+        "Load an Ollama model and persist it as the selected model",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageOllamaPull{
+        "ai-usage-ollama-pull",
+        "Download an Ollama model from the library",
+        {},
+        {},
+        {},
+        kMsgAiUsageOllamaModelPositionals,
+        {},
+        false
+    };
+    inline constexpr Command aiUsageOllamaStart{
+        "ai-usage-ollama-start", "Start the local Ollama daemon", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageOllamaStop{
+        "ai-usage-ollama-stop", "Stop the local Ollama daemon", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageRefresh{
+        "ai-usage-refresh", "Refetch AI usage from local tools", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command aiUsageStatus{
+        "ai-usage-status", "Print AI usage and local inference status", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr std::array kMsgAppLaunchPositionals{
+        Positional{"query", "Desktop id or application name", {}, true, false, true},
+    };
+    inline constexpr Command appLaunch{"app-launch", "Launch an installed application by desktop id or name",
+                                       {},           {},
+                                       {},           kMsgAppLaunchPositionals,
+                                       {},           false};
     inline constexpr Command annotate{
         "annotate",
         "Draw on the screen over running apps, or annotate an image file; press F or the Freeze button to capture the "
@@ -280,7 +375,7 @@ namespace noctalia::cli {
     };
     inline constexpr Command barReserveToggle{
         "bar-reserve-toggle",
-        "Toggle reserve space for one or all bars",
+        "Temporarily toggle reserve space for one or all bars",
         {},
         {},
         {},
@@ -382,6 +477,54 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command configReload{"config-reload", "Reload the config file", {}, {}, {}, {}, {}, false};
+    inline constexpr Command desktopAiDescribe{
+        "desktop-ai-describe",
+        "Describe a screenshot with the LocalAI vision model",
+        {},
+        {},
+        {},
+        kMsgDesktopAiPathPositionals,
+        {},
+        false
+    };
+    inline constexpr Command desktopAiDictate{
+        "desktop-ai-dictate", "Start or stop microphone dictation through LocalAI", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiRead{
+        "desktop-ai-read",
+        "Read the text in an image with the LocalAI vision model",
+        {},
+        {},
+        {},
+        kMsgDesktopAiPathPositionals,
+        {},
+        false
+    };
+    inline constexpr Command desktopAiRewrite{
+        "desktop-ai-rewrite", "Rewrite the clipboard text with LocalAI and copy the result", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiSpeak{
+        "desktop-ai-speak", "Read the clipboard text aloud with LocalAI", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiStatus{
+        "desktop-ai-status", "Print the desktop LocalAI action state and last result", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command desktopAiSummarize{"desktop-ai-summarize",
+                                                "Summarize the clipboard text with LocalAI and copy the result",
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                false};
+    inline constexpr Command desktopAiTranslate{"desktop-ai-translate",
+                                                "Translate the clipboard text with LocalAI and copy the result",
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                {},
+                                                false};
     inline constexpr Command desktopWidgetsEdit{
         "desktop-widgets-edit", "Open the desktop widgets editor", {}, {}, {}, {}, {}, false
     };
@@ -439,7 +582,7 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command greeterSync{
-        "greeter-sync", "Sync wallpaper, colors, and monitor layout to Noctalia Greeter", {}, {}, {}, {}, {}, false
+        "greeter-sync", "Sync wallpaper, colors, and monitor layout to Helix Greeter", {}, {}, {}, {}, {}, false
     };
     inline constexpr Command keyboardBacklightDown{
         "keyboard-backlight-down", "Decrease all keyboard backlights by one level", {}, {}, {}, {}, {}, false
@@ -552,6 +695,9 @@ namespace noctalia::cli {
     inline constexpr Command notificationDndToggle{
         "notification-dnd-toggle", "Toggle notification Do Not Disturb state", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command notificationHistory{
+        "notification-history", "Print recent notification history as JSON", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command notificationInvokeLatest{
         "notification-invoke-latest",
         "Invoke the default action of the most recent active notification",
@@ -563,7 +709,7 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command notificationShow{"notification-show",
-                                              "Show an internal Noctalia notification",
+                                              "Show an internal Helix notification",
                                               {},
                                               {},
                                               {},
@@ -599,19 +745,6 @@ namespace noctalia::cli {
         {},
         false
     };
-    inline constexpr Command plugin{
-        "plugin", "Dispatch an event to a plugin entry", {}, {}, {}, kMsgPluginPositionals, {}, false
-    };
-    inline constexpr Command plugins{
-        "plugins",
-        "Manage plugins and sources (list/enable/disable/update, source list/add/remove)",
-        {},
-        {},
-        {},
-        {},
-        kMsgPluginsSubcommands,
-        false
-    };
     inline constexpr Command powerCycle{
         "power-cycle",
         "Step through UPower's ordered profile list, forward by default (wraps)",
@@ -628,6 +761,60 @@ namespace noctalia::cli {
         {},          kMsgPowerSetPositionals,
         {},          false
     };
+    inline constexpr Command screenRecordStart{
+        "screen-record-start",
+        "Start screen recording of the focused output, a region, or a portal picker",
+        {},
+        {},
+        {},
+        kMsgScreenRecordStartPositionals,
+        {},
+        false
+    };
+    inline constexpr Command screenRecordStop{
+        "screen-record-stop", "Stop the current screen recording", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenRecordToggle{
+        "screen-record-toggle",
+        "Start or stop screen recording (optional source: focused, portal, or region)",
+        {},
+        {},
+        {},
+        kMsgScreenRecordTogglePositionals,
+        {},
+        false
+    };
+    inline constexpr Command screenRecordReplayStart{
+        "screen-record-replay-start",
+        "Start the gpu-screen-recorder replay buffer on the focused output or portal picker",
+        {},
+        {},
+        {},
+        kMsgScreenRecordReplayStartPositionals,
+        {},
+        false
+    };
+    inline constexpr Command screenRecordReplayStop{
+        "screen-record-replay-stop", "Stop the replay buffer without saving", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenRecordReplaySave{"screen-record-replay-save",
+                                                    "Save the last N seconds from the running replay buffer",
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    {},
+                                                    false};
+    inline constexpr Command screenRecordReplayToggle{
+        "screen-record-replay-toggle",
+        "Start or stop the replay buffer (optional source: focused or portal)",
+        {},
+        {},
+        {},
+        kMsgScreenRecordReplayTogglePositionals,
+        {},
+        false
+    };
     inline constexpr Command screenshotAnnotate{
         "screenshot-annotate", "Freeze the screen and annotate it, then copy or save", {}, {}, {}, {}, {}, false
     };
@@ -641,15 +828,41 @@ namespace noctalia::cli {
         {},
         false
     };
+    inline constexpr Command screenshotPickColor{
+        "screenshot-pick-color", "Freeze the screen and copy the color under the click", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenshotOcr{
+        "screenshot-ocr", "Select a region and copy recognized text to the clipboard", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command screenshotScanQr{"screenshot-scan-qr",
+                                              "Select a region and copy a QR code or barcode to the clipboard",
+                                              {},
+                                              {},
+                                              {},
+                                              {},
+                                              {},
+                                              false};
     inline constexpr Command screenshotRegion{
         "screenshot-region", "Start an interactive region screenshot", {}, {}, {}, {}, {}, false
     };
+    inline constexpr Command desktopCapture{
+        "desktop-capture",
+        "Capture the desktop for agents (non-interactive); prints ok <png-path>",
+        {},
+        {},
+        {},
+        kMsgDesktopCapturePositionals,
+        {},
+        false
+    };
     inline constexpr Command session{"session", "Run a built-in session action", {}, {},
                                      {},        kMsgSessionPositionals,          {}, false};
-    inline constexpr Command settingsClose{"settings-close", "Close the settings window", {}, {}, {}, {}, {}, false};
+    inline constexpr Command settingsClose{
+        "settings-close", "Close Control Center if it is open on a settings page", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command settingsOpen{
         "settings-open",
-        "Open the settings window, or focus it if already open, optionally at a specific section",
+        "Open Control Center on a settings page, optionally at a specific section",
         {},
         {},
         {},
@@ -657,19 +870,9 @@ namespace noctalia::cli {
         {},
         false
     };
-    inline constexpr Command settingsOpenPlugin{
-        "settings-open-plugin",
-        "Open the settings window at a plugin's settings (e.g. noctalia/notes)",
-        {},
-        {},
-        {},
-        kMsgSettingsOpenPluginPositionals,
-        {},
-        false
-    };
     inline constexpr Command settingsOpenWidget{
         "settings-open-widget",
-        "Open the settings window at a bar widget; from a widget gesture, targets that widget",
+        "Open Control Center at a bar widget; from a widget gesture, targets that widget",
         {},
         {},
         {},
@@ -679,7 +882,7 @@ namespace noctalia::cli {
     };
     inline constexpr Command settingsToggle{
         "settings-toggle",
-        "Toggle the settings window, optionally at a specific section",
+        "Toggle Control Center on a settings page, optionally at a specific section",
         {},
         {},
         {},
@@ -688,6 +891,33 @@ namespace noctalia::cli {
         false
     };
     inline constexpr Command status{"status", "Print current state as JSON", {}, {}, {}, {}, {}, false};
+    inline constexpr Command tailscaleDown{
+        "tailscale-down", "Disconnect this machine from the Tailscale network", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleStatus{
+        "tailscale-status", "Print Tailscale connection status", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleToggle{
+        "tailscale-toggle", "Connect or disconnect this machine from Tailscale", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command tailscaleUp{
+        "tailscale-up", "Connect this machine to the Tailscale network", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command firewallPanicToggle{
+        "firewall-panic-toggle", "Toggle firewalld panic mode", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command firewallStatus{
+        "firewall-status", "Print firewalld status, default zone, and panic mode", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command privacyStatus{
+        "privacy-status", "Print capture activity plus telemetry and location mode", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command printersStart{
+        "printers-start", "Start the CUPS printing service", {}, {}, {}, {}, {}, false
+    };
+    inline constexpr Command printersStatus{
+        "printers-status", "Print CUPS status and default printer", {}, {}, {}, {}, {}, false
+    };
     inline constexpr Command taskbarCycle{
         "taskbar-cycle",
         "Step to the adjacent task or workspace group in the invoking taskbar",
@@ -779,6 +1009,17 @@ namespace noctalia::cli {
     inline constexpr Command wifiEnable{"wifi-enable", "Enable Wi-Fi", {}, {}, {}, {}, {}, false};
     inline constexpr Command wifiStatus{"wifi-status", "Print Wi-Fi state", {}, {}, {}, {}, {}, false};
     inline constexpr Command wifiToggle{"wifi-toggle", "Toggle Wi-Fi", {}, {}, {}, {}, {}, false};
+    inline constexpr std::array kMsgWindowClosePositionals{
+        Positional{"id", "Compositor window id; omit to close the focused window", {}, false, false, false},
+    };
+    inline constexpr Command windowClose{"window-close",
+                                         "Close the focused window, or a compositor window id",
+                                         {},
+                                         {},
+                                         {},
+                                         kMsgWindowClosePositionals,
+                                         {},
+                                         false};
     inline constexpr Command windowSwitcher{"window-switcher",
                                             "Open or close the window switcher overlay",
                                             {},
@@ -829,6 +1070,22 @@ namespace noctalia::cli {
   } // namespace msg
 
   inline constexpr std::array kMsgSubcommands{
+      msg::aiUsageLocalAiDelete,
+      msg::aiUsageLocalAiEndpoint,
+      msg::aiUsageLocalAiInstall,
+      msg::aiUsageLocalAiModel,
+      msg::aiUsageLocalAiOpen,
+      msg::aiUsageLocalAiStart,
+      msg::aiUsageLocalAiStop,
+      msg::aiUsageOllamaCancel,
+      msg::aiUsageOllamaDelete,
+      msg::aiUsageOllamaModel,
+      msg::aiUsageOllamaPull,
+      msg::aiUsageOllamaStart,
+      msg::aiUsageOllamaStop,
+      msg::aiUsageRefresh,
+      msg::aiUsageStatus,
+      msg::appLaunch,
       msg::annotate,
       msg::barAutoHideSet,
       msg::barHide,
@@ -854,6 +1111,15 @@ namespace noctalia::cli {
       msg::colorSchemeGet,
       msg::colorSchemeSet,
       msg::configReload,
+      msg::desktopAiDescribe,
+      msg::desktopAiDictate,
+      msg::desktopAiRead,
+      msg::desktopAiRewrite,
+      msg::desktopAiSpeak,
+      msg::desktopAiStatus,
+      msg::desktopAiSummarize,
+      msg::desktopAiTranslate,
+      msg::desktopCapture,
       msg::desktopWidgetsEdit,
       msg::desktopWidgetsExit,
       msg::desktopWidgetsHide,
@@ -867,6 +1133,8 @@ namespace noctalia::cli {
       msg::dpmsOff,
       msg::dpmsOn,
       msg::effectsProfileSet,
+      msg::firewallPanicToggle,
+      msg::firewallStatus,
       msg::greeterSync,
       msg::keyboardBacklightDown,
       msg::keyboardBacklightOsd,
@@ -895,6 +1163,7 @@ namespace noctalia::cli {
       msg::notificationDndSet,
       msg::notificationDndStatus,
       msg::notificationDndToggle,
+      msg::notificationHistory,
       msg::notificationInvokeLatest,
       msg::notificationShow,
       msg::osdDisable,
@@ -903,20 +1172,34 @@ namespace noctalia::cli {
       msg::panelClose,
       msg::panelOpen,
       msg::panelToggle,
-      msg::plugin,
-      msg::plugins,
+      msg::privacyStatus,
+      msg::printersStart,
+      msg::printersStatus,
       msg::powerCycle,
       msg::powerSet,
+      msg::screenRecordReplaySave,
+      msg::screenRecordReplayStart,
+      msg::screenRecordReplayStop,
+      msg::screenRecordReplayToggle,
+      msg::screenRecordStart,
+      msg::screenRecordStop,
+      msg::screenRecordToggle,
       msg::screenshotAnnotate,
       msg::screenshotFullscreen,
+      msg::screenshotOcr,
+      msg::screenshotPickColor,
       msg::screenshotRegion,
+      msg::screenshotScanQr,
       msg::session,
       msg::settingsClose,
       msg::settingsOpen,
-      msg::settingsOpenPlugin,
       msg::settingsOpenWidget,
       msg::settingsToggle,
       msg::status,
+      msg::tailscaleDown,
+      msg::tailscaleStatus,
+      msg::tailscaleToggle,
+      msg::tailscaleUp,
       msg::taskbarCycle,
       msg::templatesApply,
       msg::themeModeGet,
@@ -936,6 +1219,7 @@ namespace noctalia::cli {
       msg::wifiEnable,
       msg::wifiStatus,
       msg::wifiToggle,
+      msg::windowClose,
       msg::windowSwitcher,
       msg::workspaceAlertAdd,
       msg::workspaceAlertAddWindow,
@@ -957,4 +1241,4 @@ namespace noctalia::cli {
     return nullptr;
   }
 
-} // namespace noctalia::cli
+} // namespace helix::cli

@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"Login greeter window; no desktop-session privileges","local":true,"windows":["greeter"],"permissions":["core:default"]}}

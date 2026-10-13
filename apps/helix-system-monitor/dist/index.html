@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<body class="settings">
+<div id="app" data-test="app">
+  <aside id="side">
+    <div id="titlebar" data-tauri-drag-region>
+      <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
+    </div>
+    <nav id="pages">
+      <button class="page-link current" data-page="overview" data-test="page-overview"><i data-icon="sun"></i><span>Overview</span></button>
+      <button class="page-link" data-page="processes" data-test="page-processes"><i data-icon="grid"></i><span>Processes</span></button>
+      <button class="page-link" data-page="screen-time" data-test="page-screen-time"><i data-icon="sparkle"></i><span>Screen Time</span></button>
+    </nav>
+  </aside>
+  <main id="content" data-test="content">
+    <header data-tauri-drag-region>
+      <h2 id="page-title">Overview</h2>
+      <input id="search" data-test="search" type="search" placeholder="Filter processes" autocomplete="off" hidden>
+    </header>
+    <div id="body" data-test="body"></div>
+  </main>
+</div>
+<script src="icons.js"></script>
+<script src="react/helix-monitor.js"></script>
+<script src="monitor.js"></script>

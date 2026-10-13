@@ -50,6 +50,9 @@ public:
   [[nodiscard]] const Config& config() const noexcept { return m_config; }
   [[nodiscard]] bool isLockScreenEnabled() const noexcept { return ::isLockScreenEnabled(m_config.lockscreen); }
   [[nodiscard]] bool shouldLockBeforeSuspend() const noexcept { return ::shouldLockBeforeSuspend(m_config.lockscreen); }
+  [[nodiscard]] bool shouldKeepSessionOnLidClose() const noexcept {
+    return ::shouldKeepSessionOnLidClose(m_config.lockscreen);
+  }
   // Which sections changed in the reload currently being dispatched. Valid while
   // reload callbacks run; subscribers consult it to skip unaffected work.
   [[nodiscard]] const ConfigChangeSet& lastChange() const noexcept { return m_lastChange; }
@@ -68,11 +71,11 @@ public:
   [[nodiscard]] bool shouldRunSetupWizard() const;
   [[nodiscard]] std::optional<bool> stateBool(std::string_view owner, std::string_view key) const;
   [[nodiscard]] std::optional<std::string> stateString(std::string_view owner, std::string_view key) const;
-  [[nodiscard]] const noctalia::config::LegacyConfigIssues& legacyConfigIssues() const noexcept {
+  [[nodiscard]] const helix::config::LegacyConfigIssues& legacyConfigIssues() const noexcept {
     return m_legacyConfigIssues;
   }
 
-  // The optional label is used only for opt-in reload profiling (NOCTALIA_PROFILE);
+  // The optional label is used only for opt-in reload profiling (HELIX_PROFILE);
   // unlabeled subscribers are reported by registration index.
   void addReloadCallback(ReloadCallback callback, std::string_view label = {});
   void setNotificationManager(NotificationManager* manager);
@@ -80,6 +83,11 @@ public:
   void forceReload();
 
   void registerIpc(IpcService& ipc);
+
+  // Shell replicas delegate persistence to the independent desktop service.
+  using OverrideCommitHandler = std::function<bool(std::string, std::string, std::string&)>;
+  void setOverrideCommitHandler(OverrideCommitHandler handler) { m_overrideCommitHandler = std::move(handler); }
+  bool commitRemoteOverrides(std::string_view baseline, std::string_view candidate);
 
   // Persisted wallpaper paths (written to settings.toml, app-managed).
   [[nodiscard]] std::string getWallpaperPath(const std::string& connectorName) const;
@@ -106,20 +114,6 @@ public:
       const std::optional<std::string>& connectorName, const std::string& path, const WallpaperFavorite* applyTheme,
       const std::vector<std::string>& allConnectors
   );
-
-  // Add/remove a plugin id ("author/plugin") from the effective [plugins].enabled
-  // list. Persists the resulting override list to settings.toml and triggers the
-  // reload pipeline. No-op if already in that state.
-  void setPluginEnabled(std::string_view pluginId, bool enabled);
-
-  // Add (replacing any same-named entry) or remove a plugin source in
-  // [[plugins.source]], then trigger the reload pipeline.
-  void addPluginSource(const PluginSourceConfig& source);
-  void removePluginSource(std::string_view name);
-
-  // Persist the global [plugins].auto_update mode to settings.toml and trigger the
-  // reload pipeline. Drives background auto-update of git sources per mode.
-  void setPluginsAutoUpdate(PluginAutoUpdateMode mode);
 
   // Persist a theme-mode override to settings.toml and trigger the reload pipeline.
   void setThemeMode(ThemeMode mode);
@@ -186,10 +180,10 @@ private:
   static void
   parseConfigTable(const toml::table& tbl, Config& config, bool logSummary, bool logSchemaDiagnostics = true);
   [[nodiscard]] std::optional<Config> configForOverrides(const toml::table& overrides) const;
-  [[nodiscard]] noctalia::config::schema::Diagnostics diagnosticsForOverrides(const toml::table& overrides) const;
+  [[nodiscard]] helix::config::schema::Diagnostics diagnosticsForOverrides(const toml::table& overrides) const;
   [[nodiscard]] bool validateOverrideMutation(
       const toml::table& candidateOverrides, const toml::table* baselineOverrides = nullptr,
-      const noctalia::config::schema::Diagnostics* candidateDiagnostics = nullptr
+      const helix::config::schema::Diagnostics* candidateDiagnostics = nullptr
   );
   [[nodiscard]] bool overridePathEffectiveInTable(
       const std::vector<std::string>& path, const toml::table& overrides, const Config* parsedWith = nullptr
@@ -212,19 +206,19 @@ private:
   // the on-screen notification puts the location in its title and the text in
   // its body. `message` is "<dotted.path>: <problem>" and never carries a location.
   struct ConfigProblem {
-    noctalia::config::schema::SourceOrigin origin;
+    helix::config::schema::SourceOrigin origin;
     std::string message;
 
     [[nodiscard]] bool empty() const { return message.empty(); }
     // Single-line form for logs and the settings status banner.
     [[nodiscard]] std::string flatten(std::string_view baseDir) const { return origin.prefixedShort(baseDir, message); }
-    [[nodiscard]] static ConfigProblem from(const noctalia::config::schema::Diagnostics::Entry& entry) {
+    [[nodiscard]] static ConfigProblem from(const helix::config::schema::Diagnostics::Entry& entry) {
       return ConfigProblem{entry.origin, entry.path + ": " + entry.message};
     }
   };
 
   void setConfigParseError(ConfigProblem problem);
-  void updateLegacyConfigIssues(noctalia::config::LegacyConfigIssues issues);
+  void updateLegacyConfigIssues(helix::config::LegacyConfigIssues issues);
   void notifyLegacyConfigIssues();
   bool writeOverridesToFile();
   void extractWallpaperFromOverrides();
@@ -241,6 +235,7 @@ private:
 
   // App-writable settings file (state dir): lives outside config dir so it
   // can still be written when the config dir is read-only (e.g. NixOS).
+  OverrideCommitHandler m_overrideCommitHandler;
   std::string m_overridesPath;
   // App-owned UI/runtime state. This is not a config layer and is never
   // deep-merged into Config.
@@ -262,7 +257,7 @@ private:
   ConfigProblem m_overridesParseError;
   ConfigProblem m_pendingError;             // parse error from initial load, notified once the manager is wired up
   uint32_t m_configErrorNotificationId = 0; // ID of the active config-error notification, 0 if none
-  noctalia::config::LegacyConfigIssues m_legacyConfigIssues;
+  helix::config::LegacyConfigIssues m_legacyConfigIssues;
   std::string m_loggedLegacyIssueFingerprint;
   bool m_legacyReminderPending = false;
   Timer m_legacyReminderTimer;

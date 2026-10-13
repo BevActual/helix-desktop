@@ -13,6 +13,9 @@ namespace {
   constexpr std::array<std::string_view, 7> kImageExtensions = {
       ".jpg", ".jpeg", ".png", ".webp", ".jxl", ".bmp", ".gif",
   };
+  constexpr std::array<std::string_view, 5> kVideoExtensions = {
+      ".mp4", ".webm", ".mkv", ".mov", ".gif",
+  };
 
 } // namespace
 
@@ -146,6 +149,11 @@ bool DirectoryScanner::isImagePath(const std::filesystem::path& path) {
   return std::ranges::contains(kImageExtensions, ext);
 }
 
+bool DirectoryScanner::isVideoPath(const std::filesystem::path& path) {
+  const std::string ext = normalizeExtension(path.extension().string());
+  return std::ranges::contains(kVideoExtensions, ext);
+}
+
 std::vector<std::string> DirectoryScanner::imageExtensionFilter(bool includeSvg) {
   std::vector<std::string> out;
   out.reserve(kImageExtensions.size() + (includeSvg ? 1U : 0U));
@@ -154,6 +162,15 @@ std::vector<std::string> DirectoryScanner::imageExtensionFilter(bool includeSvg)
   }
   if (includeSvg) {
     out.emplace_back(".svg");
+  }
+  return out;
+}
+
+std::vector<std::string> DirectoryScanner::videoExtensionFilter() {
+  std::vector<std::string> out;
+  out.reserve(kVideoExtensions.size());
+  for (std::string_view ext : kVideoExtensions) {
+    out.emplace_back(ext);
   }
   return out;
 }

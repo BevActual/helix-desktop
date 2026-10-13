@@ -1,0 +1,183 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<div id="bar">
+  <div class="side">
+    <button class="bar-btn icon" id="apps" data-test="apps" title="Apps"><i data-icon="grid"></i></button>
+    <button class="bar-btn icon" id="ask" data-test="ask" title="Mobius"><i data-icon="sparkle"></i></button>
+    <div id="workspaces" data-test="workspaces"></div>
+  </div>
+  <div id="center">
+    <button class="bar-btn" id="clock" data-test="clock" title="Today and notifications"><span class="day"></span><span class="time"></span><span id="dnd-mark" hidden><i data-icon="moon" data-slot="dnd-mark"></i></span></button>
+    <button class="bar-btn" id="island" data-test="island" hidden><i data-icon="sparkle" data-slot="island-ico"></i><span id="island-text"></span><span id="island-detail"></span></button>
+  </div>
+  <div class="side right">
+    <div id="tray" data-test="tray"></div>
+    <button class="bar-btn icon" id="agentsbtn" data-test="agentsbtn" style="display:none" title="Mobius · Agents"><i data-icon="shield"></i></button>
+    <button class="bar-btn icon" id="notifbtn" data-test="notifbtn" title="Notifications"><i data-icon="bell" data-slot="bell"></i><span class="badge" id="notif-badge" hidden></span></button>
+    <button class="bar-btn" id="controlbtn" data-test="controlbtn" title="Control Center">
+      <span id="status"><i data-icon="wifi" data-slot="wifi"></i><i data-icon="bluetooth" data-slot="bt"></i><i data-icon="volume" data-slot="vol"></i><span id="batt"><i data-icon="battery" data-slot="batt"></i><span id="batt-label"></span></span></span>
+    </button>
+  </div>
+  <span id="live" hidden></span>
+</div>
+<div id="scrim"></div>
+<div id="controls" class="panel glass">
+  <div id="qs-main">
+    <div id="qs-head"><div><div id="qs-time" data-test="time"></div><div id="qs-date"></div></div><div id="qs-battery" data-test="battery"></div></div>
+    <div id="tiles">
+      <div class="tile" id="tile-wifi" data-test="tile-wifi"><span class="tile-ico"><i data-icon="wifi"></i></span><div class="tile-main"><div class="tile-title">Internet</div><div class="tile-sub" id="tile-wifi-sub"></div></div><button class="tile-open" id="tile-wifi-open" data-test="tile-wifi-open" title="Wi-Fi details"><i data-icon="chevron-right"></i></button></div>
+      <div class="tile" id="tile-bt" data-test="tile-bt"><span class="tile-ico"><i data-icon="bluetooth"></i></span><div class="tile-main"><div class="tile-title">Bluetooth</div><div class="tile-sub" id="tile-bt-sub"></div></div><button class="tile-open" id="tile-bt-open" data-test="tile-bt-open" title="Bluetooth details"><i data-icon="chevron-right"></i></button></div>
+      <div class="tile" id="tile-dark" data-test="tile-dark"><span class="tile-ico"><i data-icon="contrast"></i></span><div class="tile-main"><div class="tile-title">Dark theme</div><div class="tile-sub" id="tile-dark-sub"></div></div></div>
+      <div class="tile" id="tile-dnd" data-test="tile-dnd"><span class="tile-ico"><i data-icon="moon"></i></span><div class="tile-main"><div class="tile-title">Do not disturb</div><div class="tile-sub" id="tile-dnd-sub"></div></div></div>
+      <div class="tile" id="tile-night" data-test="tile-night"><span class="tile-ico"><i data-icon="sun"></i></span><div class="tile-main"><div class="tile-title">Night Light</div><div class="tile-sub" id="tile-night-sub"></div></div></div>
+    </div>
+    <div class="sliderrow" id="brightrow" style="display:none">
+      <span id="bright-ico"><i data-icon="sun"></i></span>
+      <div id="brightslider"><div id="brightfill"></div><input id="brightness" data-test="brightness" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="bright-percent"></span>
+      <span class="end-slot"></span>
+    </div>
+    <div id="audio-note"></div>
+    <div class="sliderrow" id="volrow">
+      <button id="mute" data-test="mute" title="Mute"><i data-icon="volume" data-slot="mute"></i></button>
+      <div id="volslider"><div id="volfill"></div><input id="volume" data-test="volume" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="percent"></span>
+      <button class="tile-open" id="sound-open" data-test="sound-open" title="Sound settings"><i data-icon="chevron-right"></i></button>
+    </div>
+    <div class="sliderrow" id="microw" style="display:none">
+      <button id="micmute" data-test="micmute" title="Mute the microphone"><i data-icon="mic" data-slot="micmute"></i></button>
+      <div id="micslider"><div id="micfill"></div><input id="micvolume" data-test="micvolume" type="range" min="0" max="100" step="1" value="0"></div>
+      <span id="micpercent"></span>
+      <span class="end-slot"></span>
+    </div>
+    <div id="qs-media" class="qs-media" style="display:none" data-test="qs-media">
+      <span class="qs-media-ico"><i data-icon="music"></i></span>
+      <div class="qs-media-main"><div id="qs-media-title" class="qs-media-title"></div><div id="qs-media-artist" class="qs-media-sub"></div></div>
+      <button id="qs-media-prev" data-test="qs-media-prev" title="Previous"><i data-icon="skip-back"></i></button>
+      <button id="qs-media-toggle" data-test="qs-media-toggle" title="Play or pause"><i data-icon="pause" data-slot="qs-media-toggle"></i></button>
+      <button id="qs-media-next" data-test="qs-media-next" title="Next"><i data-icon="skip-forward"></i></button>
+    </div>
+    <div id="qs-system" class="qs-system" data-test="qs-system">
+      <button id="qs-settings" data-test="qs-settings" title="Settings"><i data-icon="settings"></i></button>
+      <button id="qs-lock" data-test="qs-lock" title="Lock"><i data-icon="lock"></i></button>
+      <button id="qs-suspend" data-test="qs-suspend" title="Suspend"><i data-icon="moon"></i></button>
+      <button id="qs-power" data-test="qs-power" title="Power"><i data-icon="power"></i></button>
+    </div>
+    <div id="qs-power-sheet" class="qs-sheet" style="display:none" data-test="qs-power-sheet">
+      <button id="qs-logout" data-test="qs-logout">Log out</button>
+      <button id="qs-reboot" data-test="qs-reboot">Restart</button>
+      <button id="qs-shutdown" data-test="qs-shutdown" class="danger">Shut down</button>
+      <button id="qs-power-cancel" data-test="qs-power-cancel">Cancel</button>
+    </div>
+  </div>
+  <div id="qs-detail" style="display:none">
+    <div id="detail-head"><button id="back" data-test="back" title="Back"><i data-icon="chevron-left"></i></button><h3 id="detail-title"></h3></div>
+    <div class="page" id="detail-sound"><h4>Output</h4><div id="outputs"></div><div id="input-section" style="display:none"><h4>Input</h4><div id="inputs"></div></div></div>
+    <div class="page" id="wifi">
+      <div id="wifi-head"><button id="scan" data-test="wifi-scan">Scan</button><button id="disconnect" data-test="wifi-disconnect">Disconnect</button><button id="wifitoggle" data-test="wifi-toggle">Turn off</button></div>
+      <div id="wifi-status"></div>
+      <div id="networks"></div>
+      <div id="vpns"></div>
+      <div id="wifi-password" class="qs-sheet" style="display:none" data-test="wifi-password">
+        <div id="wifi-password-ssid" class="qs-sheet-title"></div>
+        <input id="wifi-password-input" data-test="wifi-password-input" type="password" autocomplete="current-password" placeholder="Password" />
+        <div id="wifi-password-error" class="qs-sheet-error" data-test="wifi-password-error"></div>
+        <div class="qs-sheet-actions">
+          <button id="wifi-password-cancel" data-test="wifi-password-cancel">Cancel</button>
+          <button id="wifi-password-join" data-test="wifi-password-join" class="primary">Join</button>
+        </div>
+      </div>
+    </div>
+    <div class="page" id="bluetooth">
+      <div id="bt-head"><button id="btscan" data-test="bt-scan">Scan</button><button id="bttoggle" data-test="bt-toggle">Turn off</button></div>
+      <div id="bt-status"></div>
+      <div id="btdevices"></div>
+    </div>
+  </div>
+</div>
+<div id="dock-edge" data-test="dock-edge"></div>
+<div id="dock" class="glass" data-test="dock"><div id="dock-items"></div></div>
+<div id="dock-tip"></div>
+<div id="dock-menu" class="glass"></div>
+<div id="tray-menu" class="glass"></div>
+<div id="toasts"></div>
+<div id="osd"><i data-icon="volume" data-slot="osd-ico"></i><div id="osd-bar"><div id="osd-fill"></div></div><span id="osd-val"></span><span id="osd-text"></span></div>
+<div id="notifs" class="panel glass">
+  <div id="today">
+    <div id="today-head"><div id="today-weekday"></div><div id="today-date"></div></div>
+    <div id="cal-bar"><div id="cal-title"></div>
+      <button id="cal-prev" class="cal-btn" data-test="cal-prev" title="Previous month" aria-label="Previous month"><i data-icon="chevron-left"></i></button>
+      <button id="cal-today" class="cal-btn cal-now" data-test="cal-today">Today</button>
+      <button id="cal-next" class="cal-btn" data-test="cal-next" title="Next month" aria-label="Next month"><i data-icon="chevron-right"></i></button></div>
+    <div id="cal-grid"></div>
+  </div>
+  <div id="notif-head"><h3>Notifications</h3><button id="notif-dnd" data-test="notif-dnd">Do not disturb</button><button id="notif-clear" data-test="notif-clear">Clear all</button></div>
+  <div id="notif-list"></div><div id="notif-empty"></div>
+</div>
+<div id="quickinsert" class="panel glass">
+  <div id="qi-field"><i data-icon="search"></i><input id="qi-input" placeholder="Search emoji, clipboard and actions" autocomplete="off"></div>
+  <div id="qi-tabs" role="tablist">
+    <button class="qi-tab" id="qi-tab-emoji" data-test="qi-tab-emoji" data-source="emoji">Emoji</button>
+    <button class="qi-tab" id="qi-tab-clipboard" data-test="qi-tab-clipboard" data-source="clipboard">Clipboard</button>
+    <button class="qi-tab" id="qi-tab-actions" data-test="qi-tab-actions" data-source="actions">Actions</button>
+    <span id="qi-spacer"></span>
+    <button id="qi-forget" data-test="qi-forget" title="Forget everything copied so far">Clear history</button>
+  </div>
+  <div id="qi-results"></div>
+  <div id="qi-empty"></div>
+  <div id="qi-hint"><span>↵ insert</span><span>⇥ switch</span><span>esc close</span></div>
+</div>
+<div id="launcher" class="panel glass"><input id="lq" placeholder="Search applications" autocomplete="off"><div id="results"></div><div id="empty"></div></div>
+<div id="panel" class="panel glass" data-mobius="talk">
+  <div id="panel-head">
+    <i data-icon="sparkle"></i>
+    <h3>Mobius</h3>
+    <nav class="ai-rail" aria-label="Mobius">
+      <button type="button" class="ai-rail-btn" data-test="mobius-talk" data-mobius-mode="talk" title="Talk">Talk</button>
+      <button type="button" class="ai-rail-btn" data-test="mobius-act" data-mobius-mode="act" title="Act on the desktop">Act</button>
+      <button type="button" class="ai-rail-btn" data-test="mobius-agents" data-mobius-mode="agents" title="Agent activity">Agents</button>
+    </nav>
+  </div>
+
+  <div id="mobius-talk" class="mobius-pane" data-test="mobius-talk-pane">
+    <div id="talk-empty" class="talk-empty" data-test="talk-empty">
+      <div class="talk-empty-title">Ask Mobius</div>
+      <div class="talk-empty-note">Quick answers here. Continue in the full window anytime.</div>
+      <div id="talk-suggestions" class="talk-suggestions" data-test="talk-suggestions"></div>
+    </div>
+    <div id="talk-thread" data-test="talk-thread"></div>
+    <div id="talk-status" data-test="talk-status"></div>
+    <div class="talk-compose">
+      <input id="talk-q" data-test="talk-q" placeholder="Ask Mobius…" autocomplete="off">
+      <button id="talk-send" class="primary" data-test="talk-send" type="button" title="Ask" aria-label="Ask">Ask</button>
+    </div>
+    <div class="mobius-talk-actions">
+      <button id="talk-stop" data-test="talk-stop" type="button" hidden>Stop</button>
+      <button id="talk-clear" data-test="talk-clear" type="button" hidden>Clear</button>
+      <button id="talk-act" data-test="talk-act" type="button" hidden title="Act on the last question">Act</button>
+      <button id="talk-open-full" data-test="talk-open-full" type="button">Continue in Mobius</button>
+    </div>
+  </div>
+
+  <div id="mobius-act" class="mobius-pane" data-test="mobius-act-pane" hidden>
+    <p class="ai-rail-note">Change the desktop. Confirm here when Mobius asks.</p>
+    <input id="q" placeholder="What should Mobius change?" autocomplete="off">
+    <div id="body"></div><div id="reason"></div><div id="note"></div>
+    <div id="buttons"><button id="cancel">Cancel</button><button id="doit" class="primary" disabled>Do it</button></div>
+  </div>
+
+  <div id="mobius-agents" class="mobius-pane" data-test="mobius-agents-pane" hidden>
+    <p class="ai-rail-note">See and stop what Mobius can do on the desktop.</p>
+    <div id="agent-toolbar">
+      <button id="agent-stopall" data-test="agent-stopall">Stop all</button>
+      <button id="agent-toggle" data-test="agent-toggle">Turn off</button>
+    </div>
+    <div id="agent-state"></div>
+    <h4>Waiting for you</h4><div id="agent-pending"></div>
+    <h4>Access</h4><div id="agent-grants"></div>
+    <h4>Recent</h4><div id="agent-history"></div>
+  </div>
+</div>
+<script src="icons.js"></script>
+<script src="shell.js"></script>
+<script src="react/helix-shell-react.js"></script>
+<script src="shell-react.js"></script>

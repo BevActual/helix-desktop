@@ -1,0 +1,23 @@
+[Unit]
+Description=Helix Shell bar (Top layer)
+PartOf=graphical-session.target
+After=graphical-session.target helix-service.service helix-shell-strut.service
+Conflicts=helix-shell-dev.service
+# Prefer the split pair over the legacy monolith unit.
+Conflicts=helix-shell-tauri.service
+# Strut / panels: Wants= starts them with the bar at login. Do NOT Upholds= either —
+# Upholds stops the dependency when this unit goes inactive, so restart-bar would
+# tear down Overlay (and used to flap every tiled window / crash Cursor).
+Wants=helix-shell-strut.service
+Wants=helix-shell-panels.service
+
+[Service]
+Type=simple
+ExecStart=@SHELL_BIN@
+Restart=on-failure
+RestartSec=1
+Environment=HELIX_SHELL_ROLE=bar
+Environment=SUDO_ASKPASS=%h/.local/bin/helix-askpass
+
+[Install]
+WantedBy=graphical-session.target

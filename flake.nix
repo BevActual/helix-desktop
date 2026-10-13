@@ -1,5 +1,5 @@
 {
-  description = "A sleek, customizable desktop shell crafted for Wayland.";
+  description = "Helix Shell — a niri-first Wayland desktop shell (command: helix).";
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.zst";
@@ -27,7 +27,7 @@
     in
     {
       overlays.default = final: prev: {
-        noctalia = final.callPackage ./nix/package.nix { };
+        helix = final.callPackage ./nix/package.nix { };
       };
 
       packages = forEachSystem (
@@ -35,7 +35,7 @@
         rec {
           default = pkgs.callPackage ./nix/package.nix { };
           # DEPRECATED: identical to `default`; kept for compat, warns on use.
-          cuda = warn "noctalia: the `.#cuda` package output is deprecated and now identical to `.#default` (autoAddDriverRunpath is always applied); switch to `.#default`. This alias will be removed in the future." default;
+          cuda = warn "helix: the `.#cuda` package output is deprecated and now identical to `.#default` (autoAddDriverRunpath is always applied); switch to `.#default`. This alias will be removed in the future." default;
         }
       );
 
@@ -43,7 +43,7 @@
         { pkgs, system }:
         {
           default = pkgs.callPackage ./nix/devshell.nix {
-            noctalia = self.packages.${system}.default;
+            helix = self.packages.${system}.default;
           };
         }
       );
@@ -62,21 +62,21 @@
         { pkgs, lib, ... }:
         {
           imports = [ ./nix/home-module.nix ];
-          programs.noctalia.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          programs.helix.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
 
       hjemModules.default =
         { pkgs, lib, ... }:
         {
           imports = [ ./nix/hjem-module.nix ];
-          programs.noctalia.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          programs.helix.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
 
       nixosModules.default =
         { pkgs, lib, ... }:
         {
           imports = [ ./nix/nixos-module.nix ];
-          programs.noctalia.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+          programs.helix.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
         };
     };
 }

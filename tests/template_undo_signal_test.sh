@@ -14,7 +14,19 @@ fail() {
 }
 
 work_dir=$(mktemp -d)
-trap 'rm -rf "$work_dir"' EXIT
+# ghostty/reload.sh hands the pgrep result to bash's `kill` builtin, which no PATH stub
+# can intercept, so the stub must name a process this test owns. Ignore SIGUSR2 before
+# forking so the child cannot receive it before installing a handler.
+trap '' USR2
+sleep 300 &
+signal_target=$!
+trap - USR2
+cleanup() {
+  kill "$signal_target" 2>/dev/null || true
+  wait "$signal_target" 2>/dev/null || true
+  rm -rf "$work_dir"
+}
+trap cleanup EXIT
 
 stub_dir="$work_dir/bin"
 mkdir -p "$stub_dir"
@@ -32,9 +44,9 @@ done
 
 # The guards in front of a reload must not decide the outcome: report every client as
 # running, in a mode that accepts the reload.
-cat >"$stub_dir/pgrep" <<'EOF'
+cat >"$stub_dir/pgrep" <<EOF
 #!/bin/sh
-echo "4242 $*"
+echo "$signal_target \$*"
 exit 0
 EOF
 chmod +x "$stub_dir/pgrep"
@@ -53,11 +65,10 @@ run_undo() {
 
 # script:theme file relative to XDG_CONFIG_HOME
 cases="
-ghostty/undo.sh:ghostty/themes/noctalia
-kitty/undo.sh:kitty/themes/noctalia.conf
-btop/undo.sh:btop/themes/noctalia.theme
-cava/undo.sh:cava/themes/noctalia
-mango/undo.sh:mango/noctalia.conf
+ghostty/undo.sh:ghostty/themes/helix
+kitty/undo.sh:kitty/themes/helix.conf
+btop/undo.sh:btop/themes/helix.theme
+cava/undo.sh:cava/themes/helix
 "
 
 for entry in $cases; do
@@ -73,7 +84,7 @@ for entry in $cases; do
 
   config_home="$work_dir/$(dirname "$script")-themed"
   mkdir -p "$config_home/$(dirname "$theme_file")"
-  printf 'noctalia\n' >"$config_home/$theme_file"
+  printf 'helix\n' >"$config_home/$theme_file"
   run_undo "$script" "$config_home"
   if [ ! -s "$calls_file" ]; then
     fail "$script removed its theme without reloading its client"
@@ -100,13 +111,77 @@ fi
 config_home="$work_dir/wezterm-themed"
 mkdir -p "$config_home/wezterm/colors"
 config_file="$config_home/wezterm/wezterm.lua"
-printf 'local config = {}\nconfig.color_scheme = "Noctalia"\nreturn config\n' >"$config_file"
-printf 'colors\n' >"$config_home/wezterm/colors/Noctalia.toml"
+printf 'local config = {}\nconfig.color_scheme = "Helix"\nreturn config\n' >"$config_file"
+printf 'colors\n' >"$config_home/wezterm/colors/Helix.toml"
 touch -t 202001010000 "$config_file"
 run_undo "wezterm/undo.sh" "$config_home"
-if grep -q 'Noctalia' "$config_file"; then
-  fail "wezterm/undo.sh left the Noctalia color scheme in wezterm.lua"
+if grep -q 'Helix' "$config_file"; then
+  fail "wezterm/undo.sh left the Helix color scheme in wezterm.lua"
 fi
 if [ "$(stat -c '%Y' "$config_file")" = "$(date -d '2020-01-01 00:00' +%s)" ]; then
   fail "wezterm/undo.sh did not bump wezterm.lua after removing the color scheme"
 fi
+
+# Warp reloads by rewriting settings.toml; a no-op undo must not rewrite it.
+config_home="$work_dir/warp-clean"
+mkdir -p "$config_home/warp-terminal" "$config_home/data/warp-terminal/themes"
+config_file="$config_home/warp-terminal/settings.toml"
+printf '[appearance.themes]\nsystem_theme = true\n' >"$config_file"
+touch -t 202001010000 "$config_file"
+before=$(stat -c '%Y %s' "$config_file")
+run_undo "warp/undo.sh" "$config_home"
+after=$(stat -c '%Y %s' "$config_file")
+if [ "$before" != "$after" ]; then
+  fail "warp/undo.sh touched settings.toml with nothing to undo"
+fi
+
+config_home="$work_dir/warp-themed"
+mkdir -p "$config_home/warp-terminal" "$config_home/data/warp-terminal/themes"
+config_file="$config_home/warp-terminal/settings.toml"
+theme_file="$config_home/data/warp-terminal/themes/helix.yaml"
+printf '[appearance.themes]\nsystem_theme = true\ntheme = { custom = { name = "Helix", path = "%s" } }\n' "$theme_file" >"$config_file"
+printf 'name: Helix\n' >"$theme_file"
+run_undo "warp/undo.sh" "$config_home"
+if grep -q 'helix.yaml' "$config_file"; then
+  fail "warp/undo.sh left the Helix theme in settings.toml"
+fi
+if [ -e "$theme_file" ]; then
+  fail "warp/undo.sh left its theme file behind"
+fi
+
+# Cursor Agent undo removes the YAML and, when present, the Glass theme record.
+config_home="$work_dir/cursor-clean"
+mkdir -p "$config_home/Cursor/User/themes"
+run_undo "cursor/undo.sh" "$config_home"
+
+config_home="$work_dir/cursor-themed"
+mkdir -p "$config_home/Cursor/User/themes" "$config_home/Cursor/User/globalStorage"
+theme_file="$config_home/Cursor/User/themes/helix.yaml"
+db_file="$config_home/Cursor/User/globalStorage/state.vscdb"
+printf 'name: Helix\n' >"$theme_file"
+python3 - "$db_file" <<'PY'
+import json, sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+con.execute("CREATE TABLE ItemTable (key TEXT PRIMARY KEY, value TEXT)")
+themes = {"_v": 1, "themes": {"helix": {"name": "Helix", "source": "imported", "definition": {"name": "Helix"}}}}
+con.execute("INSERT INTO ItemTable(key, value) VALUES(?, ?)", ("glass.theme.customThemesV1", json.dumps(themes)))
+con.execute("INSERT INTO ItemTable(key, value) VALUES(?, ?)", ("glass.theme.settingsId", "cursor-custom-theme:helix"))
+con.commit()
+con.close()
+PY
+run_undo "cursor/undo.sh" "$config_home"
+if [ -e "$theme_file" ]; then
+  fail "cursor/undo.sh left its theme file behind"
+fi
+python3 - "$db_file" <<'PY'
+import json, sqlite3, sys
+con = sqlite3.connect(sys.argv[1])
+themes = json.loads(con.execute("SELECT value FROM ItemTable WHERE key = ?", ("glass.theme.customThemesV1",)).fetchone()[0])
+settings = con.execute("SELECT value FROM ItemTable WHERE key = ?", ("glass.theme.settingsId",)).fetchone()[0]
+con.close()
+if themes.get("themes"):
+    raise SystemExit("cursor/undo.sh left the Helix Glass theme in state.vscdb")
+if settings != "Cursor Dark":
+    raise SystemExit("cursor/undo.sh did not restore the default Agents window theme")
+PY
+

@@ -1,0 +1,3 @@
+binds {
+    Super+T hotkey-overlay-title="Another terminal" { spawn "foot"; }
+}

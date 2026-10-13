@@ -4,8 +4,9 @@
 #include "config/config_limits.h"
 #include "config/widget_setting_value.h"
 #include "core/input/key_chord.h"
+#include "core/input/keybind_action.h"
+#include "core/style_defaults.h"
 #include "system/sysmon_threshold_profile.h"
-#include "ui/style.h"
 
 #include <array>
 #include <cstddef>
@@ -139,38 +140,39 @@ struct BarConfig {
   bool reserveSpace = true;  // reserve compositor exclusive zone; applies with or without auto_hide
   std::string layer = "top"; // top | overlay; attached panels use the same layer
   std::int32_t thickness = Style::barThicknessDefault;
-  float backgroundOpacity = 1.0F;
+  // Soft glass fill so the floating bar reads like enhanced GNOME (Blur my Shell / Dynamic Panel).
+  float backgroundOpacity = 0.72F;
   // Inside outline for the bar background; attached panels inherit the resolved values.
   ColorSpec border = colorSpecFromRole(ColorRole::Outline);
   float borderWidth = 0.0F;
-  std::int32_t radius = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusTopLeft = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusTopRight = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusBottomLeft = static_cast<std::int32_t>(Style::radiusXl);
-  std::int32_t radiusBottomRight = static_cast<std::int32_t>(Style::radiusXl);
-  bool concaveEdgeCorners = true;
-  std::int32_t marginEnds = 100;       // inset from each end of the bar along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the bar when > 0)
+  // Pill radius for a floating bar (edge-docked bars can still override per corner).
+  std::int32_t radius = 18;
+  std::int32_t radiusTopLeft = 18;
+  std::int32_t radiusTopRight = 18;
+  std::int32_t radiusBottomLeft = 18;
+  std::int32_t radiusBottomRight = 18;
+  bool concaveEdgeCorners = false;     // floating bars use a full pill, not edge-carved corners
+  std::int32_t marginEnds = 12;        // inset from each end of the bar along its main axis
+  std::int32_t marginEdge = 8;         // distance from the nearest screen edge (floats the bar when > 0)
   std::int32_t marginOppositeEdge = 0; // extra reserved space on the inward side of the bar
-  std::int32_t padding = 14;           // main-axis padding from bar edges to start/end sections
-  std::int32_t widgetSpacing = 6;      // gap between widgets within a section
+  std::int32_t padding = 12;           // main-axis padding from bar edges to start/end sections
+  std::int32_t widgetSpacing = 8;      // gap between widgets within a section
   bool shadow = true;                  // use the global shell shadow
   bool contactShadow = false;          // dark gradient between attached panel and bar
   // Logical px the attached panel overlaps the bar edge so their seam is hidden. The ideal value depends on the
   // compositor and the output's fractional scale (physical-pixel rounding), so it is exposed for per-bar/per-monitor
   // tuning. Negative values pull the panel away from the bar.
   std::int32_t panelOverlap = 1;
-  float capsuleThickness = 0.76F; // capsule cross-size as a fraction of bar thickness
+  float capsuleThickness = 0.72F; // capsule cross-size as a fraction of bar thickness
   float scale = 1.0F;             // content scale multiplier for glyphs and text
   float fontScale = 1.0F;         // font scale multiplier, independent of content scale
   int fontWeight = 500;           // primary label weight for bar widgets
   // Typeface for this bar's widgets; unset inherits shell.font_family. Per-widget `font_family` overrides.
   std::optional<std::string> fontFamily;
-  std::vector<std::string> startWidgets = {"launcher", "wallpaper", "workspaces"};
-  std::vector<std::string> centerWidgets = {"clock"};
-  std::vector<std::string> endWidgets = {"media",   "tray",           "notifications", "clipboard",
-                                         "network", "bluetooth",      "volume",        "brightness",
-                                         "battery", "control-center", "session"};
+  // Enhanced GNOME floating top bar: clock on the start, status cluster on the end.
+  std::vector<std::string> startWidgets = {"clock"};
+  std::vector<std::string> centerWidgets = {};
+  std::vector<std::string> endWidgets = {"media", "notifications", "tray", "group:status"};
   // When true, widgets on this bar use a capsule unless `[widget.*] capsule = false`.
   bool widgetCapsuleDefault = false;
   ColorSpec widgetCapsuleFill = colorSpecFromRole(ColorRole::SurfaceVariant);
@@ -182,13 +184,20 @@ struct BarConfig {
   // Default icon color for all widgets on this bar (same as per-widget `color`); per-widget `color`
   // overrides.
   std::optional<ColorSpec> widgetIconColor;
-  std::vector<BarCapsuleGroupStyle> widgetCapsuleGroups;
+  // GNOME-style status capsule: icon-only connectivity and power indicators.
+  std::vector<BarCapsuleGroupStyle> widgetCapsuleGroups = {
+      BarCapsuleGroupStyle{
+          .id = "status",
+          .members = {"network", "bluetooth", "volume", "battery"},
+          .opacity = 0.55F,
+      },
+  };
   // Inner padding between capsule edge and widget content (logical px), multiplied by widget content scale on the bar.
   float widgetCapsulePadding = Style::barCapsulePadding;
   // Capsule corner radius in logical pixels before content-scale; unset means automatic pill radius.
   std::optional<double> widgetCapsuleRadius;
   // Capsule background opacity multiplier (0.0–1.0).
-  float widgetCapsuleOpacity = 1.0F;
+  float widgetCapsuleOpacity = 0.55F;
   // True when `capsule_border` appears under `[bar.*]` (empty value = no outline for widgets that inherit border).
   bool widgetCapsuleBorderSpecified = false;
   std::optional<ColorSpec> widgetCapsuleBorder;
@@ -200,8 +209,15 @@ struct BarConfig {
   bool operator==(const BarConfig&) const = default;
 };
 
+enum class ShortcutSize : std::uint8_t {
+  Small = 0,
+  Wide = 1,
+  Large = 2,
+};
+
 struct ShortcutConfig {
   std::string type;
+  ShortcutSize size = ShortcutSize::Small;
   bool operator==(const ShortcutConfig&) const = default;
 };
 
@@ -240,7 +256,7 @@ struct ShellSessionConfig {
   // Optional overrides for built-in session power commands. Empty = auto-detect at runtime.
   struct ShellSessionPowerConfig {
     // Shell strings run with `/bin/sh -lc` (shell=True).
-    // When unset, Noctalia tries a prioritized backend list (systemd/logind/privileged helpers).
+    // When unset, Helix tries a prioritized backend list (systemd/logind/privileged helpers).
     std::optional<std::string> suspend;
     std::optional<std::string> reboot;
     std::optional<std::string> shutdown;
@@ -339,20 +355,6 @@ struct ResolvedIdleBehavior {
 
 void normalizeIdleBehaviorAction(IdleBehaviorConfig& behavior);
 [[nodiscard]] ResolvedIdleBehavior resolveIdleBehaviorActions(const IdleBehaviorConfig& behavior);
-
-enum class KeybindAction : std::uint8_t {
-  Validate = 0,
-  Cancel = 1,
-  Left = 2,
-  Right = 3,
-  Up = 4,
-  Down = 5,
-  TabNext = 6,
-  TabPrevious = 7,
-  Delete = 8,
-  Copy = 9,
-  Save = 10,
-};
 
 [[nodiscard]] std::vector<KeyChord> defaultKeybindSet(KeybindAction action);
 
@@ -480,6 +482,12 @@ enum class WallpaperTransition : std::uint8_t {
   Honeycomb = 5,
 };
 
+enum class WallpaperVideoAutoPause : std::uint8_t {
+  Off = 0,
+  Max = 1,
+  Full = 2,
+};
+
 struct WallpaperMonitorOverride {
   std::string match;
   std::optional<bool> enabled;
@@ -491,18 +499,55 @@ struct WallpaperMonitorOverride {
   bool operator==(const WallpaperMonitorOverride&) const = default;
 };
 
+enum class WallpaperDailyProvider : std::uint8_t {
+  Bing = 0,
+  Nasa = 1,
+};
+
 struct WallpaperAutomationConfig {
   enum class Order : std::uint8_t {
     Random = 0,
     Alphabetical = 1,
   };
 
+  enum class Source : std::uint8_t {
+    Folder = 0,
+    Daily = 1,
+  };
+
   bool enabled = false;
   std::int32_t intervalSeconds = 1800;
   Order order = Order::Random;
-  bool recursive = true;
+  Source source = Source::Folder;
+  bool recursive = false;
 
   bool operator==(const WallpaperAutomationConfig&) const = default;
+};
+
+struct WallpaperWallhavenConfig {
+  std::string apiKey;
+  std::string downloadDir;
+
+  bool operator==(const WallpaperWallhavenConfig&) const = default;
+};
+
+struct WallpaperDailyConfig {
+  WallpaperDailyProvider provider = WallpaperDailyProvider::Bing;
+  std::string nasaApiKey;
+  std::string downloadDir;
+  std::string bingMarket; // empty = en-US
+
+  bool operator==(const WallpaperDailyConfig&) const = default;
+};
+
+struct WallpaperVideoConfig {
+  std::string directory; // empty = ~/Videos
+  bool mute = true;
+  bool hardwareDecode = true;
+  WallpaperVideoAutoPause autoPause = WallpaperVideoAutoPause::Full;
+  std::string mpvOptions;
+
+  bool operator==(const WallpaperVideoConfig&) const = default;
 };
 
 struct WallpaperConfig {
@@ -520,6 +565,9 @@ struct WallpaperConfig {
   std::string directoryDark;  // empty = directory
   bool perMonitorDirectories = false;
   WallpaperAutomationConfig automation;
+  WallpaperWallhavenConfig wallhaven;
+  WallpaperDailyConfig daily;
+  WallpaperVideoConfig video;
   std::vector<WallpaperMonitorOverride> monitorOverrides;
 
   bool operator==(const WallpaperConfig&) const = default;
@@ -538,6 +586,9 @@ struct LockscreenConfig {
   // Lock on PrepareForSleep (lid close / systemctl suspend) via logind sleep-delay inhibit.
   // Distinct from idle/session lock_and_suspend actions.
   bool lockBeforeSuspend = true;
+  // When an enabled external display is connected, inhibit logind lid-switch suspend so
+  // closing the lid blanks the laptop panel and leaves the other display usable.
+  bool lidCloseKeepExternalDisplays = true;
   bool fingerprint = true;
   bool allowEmptyPassword = false;
   bool blurredDesktop = false;
@@ -555,6 +606,10 @@ struct LockscreenConfig {
 
 [[nodiscard]] inline bool shouldLockBeforeSuspend(const LockscreenConfig& lockscreen) noexcept {
   return lockscreen.enabled && lockscreen.lockBeforeSuspend;
+}
+
+[[nodiscard]] inline bool shouldKeepSessionOnLidClose(const LockscreenConfig& lockscreen) noexcept {
+  return lockscreen.lidCloseKeepExternalDisplays;
 }
 
 template <typename T> struct EnumOption {
@@ -614,7 +669,7 @@ constexpr EnumOption<DockLauncherPosition> kDockLauncherPositions[] = {
 };
 
 struct DockConfig {
-  bool enabled = false; // opt-in; dock is hidden by default
+  bool enabled = true; // bottom app tray (macOS Dock / Android desktop taskbar)
   DockEdge position = DockEdge::Bottom;
   bool activeMonitorOnly = false;    // render only on preferred active output
   std::int32_t iconSize = 48;        // icon size in pixels (before ui_scale)
@@ -632,7 +687,7 @@ struct DockConfig {
   std::int32_t radiusBottomRight = 16; // dock background bottom-right corner radius
   bool concaveEdgeCorners = true;      // carve concave corners on the side that touches the screen edge
   std::int32_t marginEnds = 0;         // inset from each end of the dock along its main axis
-  std::int32_t marginEdge = 0;         // distance from the nearest screen edge (floats the dock when > 0)
+  std::int32_t marginEdge = 10;        // distance from the nearest screen edge (floats the dock when > 0)
   bool shadow = true;                  // use the global shell shadow
   bool showRunning = true;             // also show running apps not in pinned list
   bool autoHide = false;               // slide out when not hovered (overlay mode)
@@ -647,9 +702,9 @@ struct DockConfig {
   float magnificationScale = 1.45F; // max icon scale multiplier at the pointer center
   float activeOpacity = 1.0F;       // focused app icon opacity
   float inactiveOpacity = 0.85F;    // non-focused app icon opacity
-  bool showDots = false;            // show optional running window dots below app icons
+  bool showDots = true;             // show optional running window dots below app icons
   bool showInstanceCount = true;    // show a badge with count when app has >1 window
-  DockLauncherPosition launcherPosition = DockLauncherPosition::None;
+  DockLauncherPosition launcherPosition = DockLauncherPosition::Start;
   std::string launcherIcon = "grid-dots";   // Tabler glyph name
   std::string launcherCustomImage = "";     // image path; overrides launcherIcon glyph when set
   bool launcherCustomImageColorize = false; // tint the custom image with the icon color role
@@ -743,6 +798,7 @@ struct OsdConfig {
 };
 
 struct NotificationConfig {
+  bool filterReplace = false; // explicit whole-list override; otherwise merge named rules
   bool enableDaemon = true;
   bool showAppName = true;
   bool showActions = true;
@@ -905,6 +961,16 @@ constexpr EnumOption<WallpaperAutomationConfig::Order> kWallpaperAutomationOrder
     {WallpaperAutomationConfig::Order::Alphabetical, "alphabetical", "settings.options.wallpaper.order.alphabetical"},
 };
 
+constexpr EnumOption<WallpaperAutomationConfig::Source> kWallpaperAutomationSources[] = {
+    {WallpaperAutomationConfig::Source::Folder, "folder", "settings.options.wallpaper.source.folder"},
+    {WallpaperAutomationConfig::Source::Daily, "daily", "settings.options.wallpaper.source.daily"},
+};
+
+constexpr EnumOption<WallpaperDailyProvider> kWallpaperDailyProviders[] = {
+    {WallpaperDailyProvider::Bing, "bing", "settings.options.wallpaper.daily.bing"},
+    {WallpaperDailyProvider::Nasa, "nasa", "settings.options.wallpaper.daily.nasa"},
+};
+
 constexpr EnumOption<WallpaperTransition> kWallpaperTransitions[] = {
     {WallpaperTransition::Disc, "disc", "settings.options.wallpaper.transition.disc"},
     {WallpaperTransition::Fade, "fade", "settings.options.wallpaper.transition.fade"},
@@ -912,6 +978,12 @@ constexpr EnumOption<WallpaperTransition> kWallpaperTransitions[] = {
     {WallpaperTransition::Stripes, "stripes", "settings.options.wallpaper.transition.stripes"},
     {WallpaperTransition::Wipe, "wipe", "settings.options.wallpaper.transition.wipe"},
     {WallpaperTransition::Zoom, "zoom", "settings.options.wallpaper.transition.zoom"},
+};
+
+constexpr EnumOption<WallpaperVideoAutoPause> kWallpaperVideoAutoPauseModes[] = {
+    {WallpaperVideoAutoPause::Off, "off", "settings.options.wallpaper.video.auto-pause.off"},
+    {WallpaperVideoAutoPause::Max, "max", "settings.options.wallpaper.video.auto-pause.max"},
+    {WallpaperVideoAutoPause::Full, "full", "settings.options.wallpaper.video.auto-pause.full"},
 };
 
 // One config-driven dmenu-style launcher entry. The provider runs `command`, splits
@@ -963,31 +1035,39 @@ struct ShellConfig {
   };
 
   struct PanelConfig {
-    PanelTransparencyMode transparencyMode = PanelTransparencyMode::Solid;
+    PanelTransparencyMode transparencyMode = PanelTransparencyMode::Soft;
+    // 0 = solid chrome, 1 = clear glass. Unset derives from transparencyMode.
+    std::optional<float> glass;
+    bool refraction = true;                // compositor refraction (helix-niri) or chrome blur (stock niri)
     bool borders = true;                   // outline on floating panel surfaces
     bool shadow = true;                    // cast the global [shell.shadow] from panel surfaces
     bool listItemBackground = false;       // filled rounded background behind launcher/clipboard list items
     std::string floatingLayer = "overlay"; // top | overlay; attached panels follow their bar
     PanelPlacement launcherPlacement = PanelPlacement::Floating;
     PanelPlacement clipboardPlacement = PanelPlacement::Floating;
-    PanelPlacement controlCenterPlacement = PanelPlacement::Attached;
+    // Floating dropdown under the status area (enhanced GNOME); Attached seams to the bar.
+    PanelPlacement controlCenterPlacement = PanelPlacement::Floating;
     PanelPlacement wallpaperPlacement = PanelPlacement::Attached;
     PanelPlacement sessionPlacement = PanelPlacement::Attached;
     PanelPlacement polkitPlacement = PanelPlacement::Floating;
+    PanelPlacement quickInsertPlacement = PanelPlacement::Floating;
     // Floating screen position per panel (one of kPanelPositions). "auto" = bar-relative.
-    // Launcher/clipboard default to "center" (the historical center-screen behavior).
+    // Launcher/clipboard/quick-insert default to "center" (the historical center-screen behavior).
     std::string launcherPosition = "center";
     std::string clipboardPosition = "center";
     std::string controlCenterPosition = "auto";
     std::string wallpaperPosition = "auto";
     std::string sessionPosition = "auto";
     std::string polkitPosition = "center";
+    std::string quickInsertPosition = "center";
     std::int32_t floatingOffset = 8; // logical px gap between a floating/detached panel and the bar edge
-    bool openNearClickControlCenter = false;
+    // Align the Quick Settings dropdown under the clicked status widget.
+    bool openNearClickControlCenter = true;
     bool openNearClickLauncher = false;
     bool openNearClickClipboard = false;
     bool openNearClickWallpaper = false;
     bool openNearClickSession = false;
+    bool openNearClickQuickInsert = false;
 
     bool operator==(const PanelConfig&) const = default;
   };
@@ -1016,6 +1096,14 @@ struct ShellConfig {
 
       bool operator==(const DmenuConfig&) const = default;
     } dmenu;
+
+    struct PanelsConfig {
+      // Panel ids the panel provider never lists. Setting this in config.toml
+      // replaces the default outright, same as every other list config here.
+      std::vector<std::string> ignored{"polkit", "setup-wizard", "test", "launcher"};
+
+      bool operator==(const PanelsConfig&) const = default;
+    } panels;
 
     std::vector<LauncherProviderConfig> providers;
 
@@ -1049,13 +1137,25 @@ struct ShellConfig {
     bool rememberLastRegion = false;
     bool showCursor = false;
     bool annotate = false;
+    bool skipAnnotateOnCopySave = false;
     bool closeOnCopy = true;
+    bool closeOnSave = true;
     bool pipeToCommand = false;
     std::string pipeCommand;
     std::string directory;       // empty = XDG Pictures directory
     std::string filenamePattern; // empty = screenshot_%Y%m%d_%H%M%S
 
     bool operator==(const ScreenshotConfig&) const = default;
+  };
+
+  struct ScreenRecordConfig {
+    bool audio = true;
+    bool showCursor = true;
+    std::string directory;            // empty = ~/Videos/Recordings
+    std::string filenamePattern;      // empty = recording_%Y%m%d_%H%M%S
+    std::int32_t replayDuration = 30; // seconds, gpu-screen-recorder replay buffer
+
+    bool operator==(const ScreenRecordConfig&) const = default;
   };
 
   struct PrivacyConfig {
@@ -1096,20 +1196,20 @@ struct ShellConfig {
   AnimationConfig animation;
   std::string avatarPath;
   bool settingsShowAdvanced = true;
-  bool settingsWindowTranslucent = false;
   bool showLocation = true;
   bool appIconColorize = false;
   std::optional<ColorSpec> appIconColor;
-  bool launchAppsAsSystemdServices = false;
+  bool launchAppsAsSystemdServices = true;
   std::string launchAppsCustomCommand;
-  /// When false, disables Wayland clipboard integration (history panel, data-control binding, Input paste/copy hooks).
+  /// When false, disables clipboard history (Control Center tab, bar/control-center shortcuts).
   bool clipboardEnabled = true;
   /// When true, the shell takes over the selection once the application that copied it exits, so the last copied item
   /// stays pasteable. Independent of history retention: this keeps the live clipboard, not the stored history.
   bool clipboardKeepFromClosedApps = true;
   /// Maximum unpinned clipboard history entries retained (pinned entries are exempt).
-  int clipboardHistoryMaxEntries = static_cast<int>(noctalia::config::kClipboardHistoryDefaultEntries);
-  /// When true, clearing clipboard history or deleting unpinned entries from the panel asks for confirmation first.
+  int clipboardHistoryMaxEntries = static_cast<int>(helix::config::kClipboardHistoryDefaultEntries);
+  /// When true, clearing clipboard history or deleting unpinned entries from the Control Center
+  /// tab asks for confirmation first.
   bool clipboardConfirmClearHistory = true;
   /// Disables per-app tracking and Control Center usage UI.
   bool screenTimeEnabled = false;
@@ -1125,12 +1225,18 @@ struct ShellConfig {
   ScreenCornersConfig screenCorners;
   MprisConfig mpris;
   ScreenshotConfig screenshot;
+  ScreenRecordConfig screenRecord;
   PrivacyConfig privacy;
   ShellSessionConfig session;
   ShellGreeterSyncConfig greeterSync;
 
   bool operator==(const ShellConfig&) const = default;
 };
+
+[[nodiscard]] float resolvedPanelGlass(const ShellConfig::PanelConfig& panel) noexcept;
+[[nodiscard]] PanelTransparencyMode transparencyModeForGlass(float glass) noexcept;
+[[nodiscard]] float panelCardOpacityForGlass(float glass, float panelBackgroundOpacity) noexcept;
+[[nodiscard]] float detachedPanelBackgroundOpacityForGlass(float glass) noexcept;
 
 struct WeatherConfig {
   bool enabled = true;
@@ -1139,6 +1245,14 @@ struct WeatherConfig {
   std::string unit = "metric";
 
   bool operator==(const WeatherConfig&) const = default;
+};
+
+struct TailscaleConfig {
+  std::int32_t refreshIntervalSeconds = 10;
+  bool notifyOnPeerChange = false;
+  std::string adminUrl;
+
+  bool operator==(const TailscaleConfig&) const = default;
 };
 
 struct StorageConfig {
@@ -1198,56 +1312,38 @@ struct SystemConfig {
     float memoryPollSeconds = 2.0F;
     float networkPollSeconds = 3.0F;
     float diskPollSeconds = 10.0F;
-    double cpuUsageActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuUsage).activityDefault;
-    double cpuUsageCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuUsage).criticalDefault;
-    double cpuTempActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuTemp).activityDefault;
-    double cpuTempCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuTemp).criticalDefault;
-    double cpuFreqActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuFreq).activityDefault;
-    double cpuFreqCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::CpuFreq).criticalDefault;
-    double gpuTempActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuTemp).activityDefault;
-    double gpuTempCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuTemp).criticalDefault;
-    double gpuUsageActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuUsage).activityDefault;
-    double gpuUsageCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuUsage).criticalDefault;
-    double gpuVramActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuVram).activityDefault;
-    double gpuVramCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::GpuVram).criticalDefault;
-    double ramPctActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::RamPct).activityDefault;
-    double ramPctCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::RamPct).criticalDefault;
-    double swapPctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::SwapPct).activityDefault;
-    double swapPctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::SwapPct).criticalDefault;
+    double cpuUsageActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).activityDefault;
+    double cpuUsageCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuUsage).criticalDefault;
+    double cpuTempActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).activityDefault;
+    double cpuTempCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuTemp).criticalDefault;
+    double cpuFreqActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).activityDefault;
+    double cpuFreqCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::CpuFreq).criticalDefault;
+    double gpuTempActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).activityDefault;
+    double gpuTempCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuTemp).criticalDefault;
+    double gpuUsageActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).activityDefault;
+    double gpuUsageCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuUsage).criticalDefault;
+    double gpuVramActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).activityDefault;
+    double gpuVramCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::GpuVram).criticalDefault;
+    double ramPctActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).activityDefault;
+    double ramPctCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::RamPct).criticalDefault;
+    double swapPctActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).activityDefault;
+    double swapPctCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::SwapPct).criticalDefault;
     double diskUsedPctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsedPct).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).activityDefault;
     double diskUsedPctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsedPct).criticalDefault;
-    double diskUsedActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsed).activityDefault;
-    double diskUsedCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskUsed).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsedPct).criticalDefault;
+    double diskUsedActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).activityDefault;
+    double diskUsedCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskUsed).criticalDefault;
     double diskFreePctActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFreePct).activityDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).activityDefault;
     double diskFreePctCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFreePct).criticalDefault;
-    double diskFreeActivityThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFree).activityDefault;
-    double diskFreeCriticalThreshold =
-        noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::DiskFree).criticalDefault;
-    double netRxActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetRx).activityDefault;
-    double netRxCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetRx).criticalDefault;
-    double netTxActivityThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetTx).activityDefault;
-    double netTxCriticalThreshold = noctalia::sysmon::thresholdProfile(noctalia::sysmon::Stat::NetTx).criticalDefault;
+        helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFreePct).criticalDefault;
+    double diskFreeActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).activityDefault;
+    double diskFreeCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::DiskFree).criticalDefault;
+    double netRxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).activityDefault;
+    double netRxCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetRx).criticalDefault;
+    double netTxActivityThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetTx).activityDefault;
+    double netTxCriticalThreshold = helix::sysmon::thresholdProfile(helix::sysmon::Stat::NetTx).criticalDefault;
 
     bool operator==(const MonitorConfig&) const = default;
   };
@@ -1261,8 +1357,7 @@ struct AudioConfig {
   bool enableOverdrive = false;
   bool enableSounds = false;
   float soundVolume = 0.5F;
-  std::string volumeChangeSound;
-  std::string notificationSound;
+  std::string soundTheme = "freedesktop";
 
   bool operator==(const AudioConfig&) const = default;
 };
@@ -1447,7 +1542,7 @@ constexpr EnumOption<ThemeMode> kThemeModes[] = {
     {ThemeMode::Auto, "auto", "common.states.auto"},
 };
 
-// Noctalia's own light/dark mode. `follow` tracks [theme].mode, which always drives apps
+// Helix's own light/dark mode. `follow` tracks [theme].mode, which always drives apps
 // (templates and the GTK color scheme); the other values pin the shell independently.
 enum class ShellThemeMode : std::uint8_t {
   Follow = 0,
@@ -1485,6 +1580,52 @@ constexpr EnumOption<ControlCenterSidebarMode> kControlCenterSidebarModes[] = {
     {ControlCenterSidebarMode::Full, "full", "settings.options.control-center.sidebar.full"},
     {ControlCenterSidebarMode::Compact, "compact", "settings.options.control-center.sidebar.compact"},
     {ControlCenterSidebarMode::None, "none", "settings.options.control-center.sidebar.none"},
+};
+
+constexpr EnumOption<ShortcutSize> kShortcutSizes[] = {
+    {ShortcutSize::Small, "small", "settings.options.control-center.shortcut-size.small"},
+    {ShortcutSize::Wide, "wide", "settings.options.control-center.shortcut-size.wide"},
+    {ShortcutSize::Large, "large", "settings.options.control-center.shortcut-size.large"},
+};
+
+enum class AiUsageProviderMode : std::uint8_t {
+  Auto = 0,
+  On = 1,
+  Off = 2,
+};
+
+constexpr EnumOption<AiUsageProviderMode> kAiUsageProviderModes[] = {
+    {AiUsageProviderMode::Auto, "auto", "settings.options.ai-usage.provider-mode.auto"},
+    {AiUsageProviderMode::On, "on", "settings.options.ai-usage.provider-mode.on"},
+    {AiUsageProviderMode::Off, "off", "settings.options.ai-usage.provider-mode.off"},
+};
+
+enum class WifiBandFilter : std::uint8_t {
+  All = 0,
+  Ghz24 = 1,
+  Ghz5 = 2,
+  Ghz6 = 3,
+};
+
+constexpr EnumOption<WifiBandFilter> kWifiBandFilters[] = {
+    {WifiBandFilter::All, "all", "settings.options.wifi-band.all"},
+    {WifiBandFilter::Ghz24, "2.4", "settings.options.wifi-band.ghz24"},
+    {WifiBandFilter::Ghz5, "5", "settings.options.wifi-band.ghz5"},
+    {WifiBandFilter::Ghz6, "6", "settings.options.wifi-band.ghz6"},
+};
+
+enum class NiriOverviewPreset : std::uint8_t {
+  None = 0,
+  Backdrop = 1,
+  Stationary = 2,
+  Flat = 3,
+};
+
+constexpr EnumOption<NiriOverviewPreset> kNiriOverviewPresets[] = {
+    {NiriOverviewPreset::None, "none", "settings.options.niri.overview.none"},
+    {NiriOverviewPreset::Backdrop, "backdrop", "settings.options.niri.overview.backdrop"},
+    {NiriOverviewPreset::Stationary, "stationary", "settings.options.niri.overview.stationary"},
+    {NiriOverviewPreset::Flat, "flat", "settings.options.niri.overview.flat"},
 };
 
 struct ThemeConfig {
@@ -1542,20 +1683,43 @@ struct ThemeConfig {
     bool operator==(const TemplatesConfig&) const = default;
   };
 
+  // Whether niri's own window decorations (focus ring / border) follow this palette. Applied by
+  // writing niri's managed `helix-layout.kdl` include; see compositors::niri::saveNiriLayoutTheme.
+  // `blur` writes `helix-blur.kdl` and requires niri 26.04 or newer.
+  // `overview` writes `helix-overview.kdl` for wallpaper/overview presets.
+  // `gaps` is written into the same layout include only when set, so an existing niri
+  // `gaps` value is left alone until Settings → Niri changes it.
+  struct NiriLayoutThemeConfig {
+    bool focusRing = false;
+    bool border = false;
+    bool blur = false;
+    std::int32_t blurPasses = 2;
+    float blurOffset = 3.0F;
+    float blurNoise = 0.03F;
+    NiriOverviewPreset overview = NiriOverviewPreset::None;
+    std::optional<std::int32_t> gaps;
+    std::optional<std::int32_t> struts;
+    std::optional<double> defaultColumnWidth;
+    std::optional<bool> drawBorderWithBackground;
+
+    bool operator==(const NiriLayoutThemeConfig&) const = default;
+  };
+
   PaletteSource source = PaletteSource::Builtin;
-  std::string builtinPalette = "Noctalia";
+  std::string builtinPalette = "Helix";
   std::string communityPalette = "Oxocarbon";
   std::string customPalette;
   std::string wallpaperScheme = "m3-content";
   ThemeMode mode = ThemeMode::Dark;
   ShellThemeMode shellMode = ShellThemeMode::Follow;
   bool pureBlackDark = false;
+  NiriLayoutThemeConfig niriLayout;
   TemplatesConfig templates;
 
   bool operator==(const ThemeConfig&) const = default;
 };
 
-// The theme mode Noctalia's own surfaces run in, still expressed as a ThemeMode so `auto`
+// The theme mode Helix's own surfaces run in, still expressed as a ThemeMode so `auto`
 // keeps resolving against the day/night schedule.
 [[nodiscard]] constexpr ThemeMode shellThemeMode(const ThemeConfig& theme) noexcept {
   switch (theme.shellMode) {
@@ -1573,6 +1737,7 @@ struct ThemeConfig {
 
 struct ControlCenterConfig {
   static constexpr std::int32_t kDefaultWidth = 700;
+  static constexpr std::int32_t kDefaultHeight = 700;
 
   struct CalendarTabConfig {
     bool showEventsCard = true;
@@ -1580,78 +1745,62 @@ struct ControlCenterConfig {
     bool operator==(const CalendarTabConfig&) const = default;
   };
 
+  struct ClockTabConfig {
+    std::vector<std::string> timezones;
+    bool operator==(const ClockTabConfig&) const = default;
+  };
+
+  struct NetworkTabConfig {
+    WifiBandFilter wifiBand = WifiBandFilter::All;
+    std::vector<std::string> hiddenSsids;
+    std::string nextDnsId;
+    std::string customDns;
+    bool operator==(const NetworkTabConfig&) const = default;
+  };
+
+  struct BluetoothTabConfig {
+    bool hideUnnamed = false;
+    std::int32_t discoverySeconds = 10;
+    bool operator==(const BluetoothTabConfig&) const = default;
+  };
+
+  struct AiUsageTabConfig {
+    std::int32_t refreshSeconds = 120;
+    AiUsageProviderMode claude = AiUsageProviderMode::Auto;
+    AiUsageProviderMode codex = AiUsageProviderMode::Auto;
+    AiUsageProviderMode gemini = AiUsageProviderMode::Auto;
+    AiUsageProviderMode qwen = AiUsageProviderMode::Auto;
+    AiUsageProviderMode copilot = AiUsageProviderMode::Auto;
+    AiUsageProviderMode cursor = AiUsageProviderMode::Auto;
+    AiUsageProviderMode deepseek = AiUsageProviderMode::Auto;
+    AiUsageProviderMode ollama = AiUsageProviderMode::Auto;
+    AiUsageProviderMode localai = AiUsageProviderMode::Auto;
+    std::int32_t geminiDailyLimit = 1000;
+    std::int32_t qwenDailyLimit = 2000;
+    std::string ollamaHost;
+    std::string ollamaModel;
+    std::string localaiHost;  // empty = LOCALAI_ADDRESS or 127.0.0.1:8080
+    std::string localaiModel; // default chat model for desktop AI tools; empty = first chat-capable
+    std::int32_t warnPercent = 90;
+    std::int32_t warnResetMinutes = 30;
+    bool operator==(const AiUsageTabConfig&) const = default;
+  };
+
   std::vector<ShortcutConfig> shortcuts;
-  std::vector<std::string> hiddenTabs; // tab keys (see kTabs) the user has hidden; empty = all available shown
+  std::vector<std::string>
+      hiddenTabs; // tab keys (built-in or plugin entry ids) the user has hidden; empty = all available shown
   ControlCenterSidebarMode sidebarMode = ControlCenterSidebarMode::Compact;
   ControlCenterSidebarMode sidebarSectionMode = ControlCenterSidebarMode::Compact;
-  std::int32_t width = kDefaultWidth; // full-sidebar logical width; compact/none modes scale down from this
-  bool showShortcutLabels = true;
+  std::int32_t width = kDefaultWidth;   // full-sidebar logical width; compact/none modes scale down from this
+  std::int32_t height = kDefaultHeight; // logical height; leftover catalogs fill the extra space
   bool showSessionButton = true;
   CalendarTabConfig calendarTab;
+  ClockTabConfig clockTab;
+  NetworkTabConfig networkTab;
+  BluetoothTabConfig bluetoothTab;
+  AiUsageTabConfig aiUsage;
   bool operator==(const ControlCenterConfig&) const = default;
 };
-
-// A plugin source: where plugin code comes from. `Git` is a repo URL the host
-// caches, updates, and exports plugin runtime files from; `Path` is an
-// immutable local directory (e.g. a Nix store path) the host treats read-only
-// (update/auto-update/remove are no-ops).
-enum class PluginSourceKind : std::uint8_t {
-  Git = 0,
-  Path = 1,
-};
-
-constexpr EnumOption<PluginSourceKind> kPluginSourceKinds[] = {
-    {PluginSourceKind::Git, "git", "settings.options.plugins.source.git"},
-    {PluginSourceKind::Path, "path", "settings.options.plugins.source.path"},
-};
-
-// Background auto-update scope for git plugin sources.
-enum class PluginAutoUpdateMode : std::uint8_t {
-  None = 0,     // never auto-update
-  Official = 1, // only the built-in "official" source
-  All = 2,      // every enabled git source
-};
-
-constexpr EnumOption<PluginAutoUpdateMode> kPluginAutoUpdateModes[] = {
-    {PluginAutoUpdateMode::All, "all", "settings.options.plugins.auto-update.all"},
-    {PluginAutoUpdateMode::Official, "official", "settings.options.plugins.auto-update.official"},
-    {PluginAutoUpdateMode::None, "none", "settings.options.plugins.auto-update.none"},
-};
-
-struct PluginSourceConfig {
-  PluginSourceKind kind = PluginSourceKind::Git;
-  std::string name;     // stable handle (also the clone subdir for git sources)
-  std::string location; // git URL or local path
-  bool enabled = true;  // disabled sources are not scanned; their clone is kept
-  bool operator==(const PluginSourceConfig&) const = default;
-};
-
-// Distribution config: where plugins come from and which are turned on. User
-// intent → config (declarative-friendly); clones live under the state dir.
-struct PluginsConfig {
-  std::vector<PluginSourceConfig> sources;
-  std::vector<std::string> enabled; // active plugin ids ("author/plugin"); opt-in for every source
-  PluginAutoUpdateMode autoUpdate = PluginAutoUpdateMode::All; // background auto-update scope (startup + every 6h)
-  // Plugin-level setting overrides, keyed by plugin id then setting key. Seeded
-  // into every entry runtime of the plugin (widget/shortcut/service). Open-ended
-  // (validated against the manifest schema), so compared via configEqual rather
-  // than the defaulted operator== (which lacks int/double coercion).
-  std::unordered_map<std::string, std::unordered_map<std::string, WidgetSettingValue>> pluginSettings;
-  bool operator==(const PluginsConfig&) const = default;
-};
-
-// Default sources seeded when [plugins] declares no [[plugins.source]]: the
-// official + community plugin repos.
-[[nodiscard]] std::vector<PluginSourceConfig> defaultPluginSources();
-[[nodiscard]] bool isDefaultPluginSourceName(std::string_view name);
-// Whether the background auto-update mode covers `source` (kind, enabled state, and
-// official identity for PluginAutoUpdateMode::Official). The official source matches
-// by name AND location, so a user-added source that reuses the name is not the
-// official source. Pure, so the auto-update tick and its tests share one decision.
-[[nodiscard]] bool sourceInAutoUpdateScope(const PluginSourceConfig& source, PluginAutoUpdateMode mode);
-// Source names are stable user-facing handles and git source storage directory names.
-// Keep them flat so they can never escape the plugin source cache.
-[[nodiscard]] bool isValidPluginSourceName(std::string_view name);
 
 struct AccessibilityConfig {
   float uiScale = 1.0F;
@@ -1693,6 +1842,7 @@ struct Config {
   OsdConfig osd;
   NotificationConfig notification;
   WeatherConfig weather;
+  TailscaleConfig tailscale;
   CalendarConfig calendar;
   SystemConfig system;
   AudioConfig audio;
@@ -1705,7 +1855,6 @@ struct Config {
   HooksConfig hooks;
   ThemeConfig theme;
   ControlCenterConfig controlCenter;
-  PluginsConfig plugins;
   AccessibilityConfig accessibility;
 };
 // Which top-level config sections changed across a reload. Default-constructed
@@ -1724,6 +1873,7 @@ struct ConfigChangeSet {
   bool osd = true;
   bool notification = true;
   bool weather = true;
+  bool tailscale = true;
   bool calendar = true;
   bool system = true;
   bool audio = true;
@@ -1736,7 +1886,6 @@ struct ConfigChangeSet {
   bool hooks = true;
   bool theme = true;
   bool controlCenter = true;
-  bool plugins = true;
   bool hotCorners = true;
   bool storage = true;
   bool accessibility = true;
@@ -1754,6 +1903,7 @@ struct ConfigChangeSet {
         || osd
         || notification
         || weather
+        || tailscale
         || calendar
         || system
         || audio
@@ -1766,7 +1916,6 @@ struct ConfigChangeSet {
         || hooks
         || theme
         || controlCenter
-        || plugins
         || hotCorners
         || storage
         || accessibility;

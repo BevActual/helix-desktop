@@ -5,7 +5,7 @@
   ...
 }:
 let
-  cfg = config.programs.noctalia;
+  cfg = config.programs.helix;
   jsonFormat = pkgs.formats.json { };
   tomlFormat = pkgs.formats.toml { };
 
@@ -23,21 +23,21 @@ let
 in
 {
   # Disable the home-manager module to avoid conflicts
-  disabledModules = [ "programs/noctalia.nix" ];
+  disabledModules = [ "programs/helix.nix" ];
 
   imports = [
     (lib.mkRenamedOptionModule
-      [ "programs" "noctalia" "validateConfig" ]
-      [ "programs" "noctalia" "checkConfig" ]
+      [ "programs" "helix" "validateConfig" ]
+      [ "programs" "helix" "checkConfig" ]
     )
   ];
 
-  options.programs.noctalia = {
-    enable = lib.mkEnableOption "noctalia, a lightweight Wayland shell and bar";
+  options.programs.helix = {
+    enable = lib.mkEnableOption "helix, a lightweight Wayland shell and bar";
 
-    systemd.enable = lib.mkEnableOption "a systemd user service for noctalia";
+    systemd.enable = lib.mkEnableOption "a systemd user service for helix";
 
-    package = lib.mkPackageOption pkgs "noctalia" { nullable = true; };
+    package = lib.mkPackageOption pkgs "helix" { nullable = true; };
 
     checkConfig = lib.mkOption {
       type = lib.types.bool;
@@ -55,12 +55,12 @@ in
         ];
       default = { };
       description = ''
-        Default settings for noctalia, Can be written as:
+        Default settings for helix, Can be written as:
           - A Nix attrset (converted to TOML via nixpkgs' tomlFormat)
           - A raw TOML string
           - A path to a `.toml` file
 
-        See <https://docs.noctalia.dev/noctalia/configuration/> for more information and examples.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/configuration/> for more information and examples.
 
         Note: these settings can still be overwritten at runtime via the settings menu.
       '';
@@ -90,22 +90,22 @@ in
       description = ''
         Custom color pallete options.
 
-        See <https://docs.noctalia.dev/noctalia/theming/palette/#custom-palette-files>.
+        See <https://github.com/BevActual/helix-desktop/tree/main/docs/user/theming/palette/#custom-palette-files>.
       '';
     };
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.noctalia = lib.mkIf cfg.systemd.enable {
+    systemd.user.services.helix = lib.mkIf cfg.systemd.enable {
       Unit = {
-        Description = "Noctalia - A lightweight Wayland shell and bar";
-        Documentation = "https://docs.noctalia.dev/noctalia/";
+        Description = "Helix Shell (helix)";
+        Documentation = "https://github.com/BevActual/helix-desktop/tree/main/docs/user/";
         PartOf = [ config.wayland.systemd.target ];
         After = [ config.wayland.systemd.target ];
         X-Restart-Triggers =
-          lib.optional (cfg.settings != { }) "${config.xdg.configFile."noctalia/config.toml".source}"
+          lib.optional (cfg.settings != { }) "${config.xdg.configFile."helix/config.toml".source}"
           ++ lib.mapAttrsToList (
-            name: _: "${config.xdg.configFile."noctalia/palettes/${name}.json".source}"
+            name: _: "${config.xdg.configFile."helix/palettes/${name}.json".source}"
           ) cfg.customPalettes;
       };
 
@@ -122,12 +122,12 @@ in
     xdg = {
       configFile = lib.mkMerge [
         (lib.mkIf (cfg.settings != { }) {
-          "noctalia/config.toml".source =
+          "helix/config.toml".source =
             let
               rawConfig = generateToml "config.toml" cfg.settings;
             in
             if cfg.checkConfig && cfg.package != null then
-              pkgs.runCommand "noctalia-config.toml" { } ''
+              pkgs.runCommand "helix-config.toml" { } ''
                 ${lib.getExe cfg.package} config validate ${rawConfig}
                 cp ${rawConfig} $out
               ''
@@ -136,7 +136,7 @@ in
         })
         (lib.mapAttrs' (
           name: palette:
-          lib.nameValuePair "noctalia/palettes/${name}.json" {
+          lib.nameValuePair "helix/palettes/${name}.json" {
             source = generateJson "${name}-palette.json" palette;
           }
         ) cfg.customPalettes)
@@ -146,7 +146,7 @@ in
     assertions = [
       {
         assertion = !cfg.systemd.enable || cfg.package != null;
-        message = "programs.noctalia.package cannot be null when programs.noctalia.systemd.enable is true";
+        message = "programs.helix.package cannot be null when programs.helix.systemd.enable is true";
       }
     ];
   };

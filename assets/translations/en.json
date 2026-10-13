@@ -1,4 +1,36 @@
 {
+  "agent": {
+    "confirm": {
+      "action-title": "Allow this action?",
+      "action-subject": "{app} wants to do this on your desktop",
+      "grant-title": "Give an app access?",
+      "grant-subject": "{app} is asking to use your desktop",
+      "grant-detail": "Choose what it may do. You can change this later in Settings.",
+      "label": "It calls itself “{label}”.",
+      "reason": "It says: “{reason}”",
+      "tainted": "This app read private content (clipboard, screen or notifications) since you last approved something. That content may be influencing this request.",
+      "waiting": "{count} more waiting",
+      "allow": "Allow",
+      "deny": "Deny"
+    },
+    "tier": {
+      "observe": "See what is on your desktop (status, windows, settings)",
+      "observe-private": "Read private content (clipboard, screen, notifications)",
+      "act": "Change settings and open panels",
+      "confirm": "Do things that ask for your approval each time"
+    }
+  },
+  "assistant": {
+    "about": "About to: {what}",
+    "acting": "Doing it…",
+    "cancel": "Cancel",
+    "do-it": "Do it",
+    "placeholder": "What should I do?",
+    "reason": "The assistant says: “{reason}”",
+    "thinking": "Thinking…",
+    "title": "Assistant",
+    "unverified": "This came from outside sources (clipboard, notifications) and has not been checked."
+  },
   "auth": {
     "fingerprint": {
       "disconnected": "Fingerprint reader disconnected",
@@ -76,11 +108,26 @@
       "confirm-region": "{copy} to copy · {save} to save · Enter or Space for defaults · {cancel} to cancel · Drag to reselect",
       "fullscreen": "Full screen",
       "overlay-alloc-failed": "Could not display the screenshot overlay (GPU out of video memory?)",
+      "pick-color-hint": "Click to copy a color · {cancel} to cancel",
       "region": "Select region"
     },
     "widgets": {
       "active-window": {
         "no-active-window": "No active window"
+      },
+      "ai": {
+        "default": "AI",
+        "tooltip": {
+          "loading": "Loading",
+          "local": "Local",
+          "model": "Model",
+          "ollama": "Ollama",
+          "provider": "Assistant",
+          "quota": "Used",
+          "used": "Count",
+          "window": "Window"
+        },
+        "updating": "AI…"
       },
       "bluetooth": {
         "connected": "Connected"
@@ -100,6 +147,9 @@
       "media": {
         "nothing-playing": "Nothing Playing",
         "playing": "Playing"
+      },
+      "notifications": {
+        "live-more": "+{count}"
       },
       "network": {
         "active": "Active",
@@ -182,12 +232,28 @@
       }
     }
   },
+  "brand": {
+    "name": "Helix Shell",
+    "version": "Helix Shell {version}"
+  },
   "clipboard": {
     "actions": {
       "clear-all": "Clear everything",
+      "close": "Close",
+      "copy": "Copy",
       "delete-item": "Delete item",
-      "keep-pinned": "Keep pinned"
+      "dictate": "Dictate",
+      "image-action": "Open image",
+      "keep-pinned": "Keep pinned",
+      "pin": "Pin",
+      "rewrite": "Rewrite",
+      "speak": "Read aloud",
+      "summarize": "Summarize",
+      "translate": "Translate",
+      "unpin": "Unpin"
     },
+    "auto-paste-unavailable-body": "Auto-paste needs a Wayland virtual keyboard. The item is still copied.",
+    "auto-paste-unavailable-title": "Could not paste",
     "confirm": {
       "clear-desc": "Choose whether pinned items should be kept.",
       "clear-desc-all-pinned": "Every entry is pinned. Use Clear everything to remove them all.",
@@ -229,12 +295,226 @@
     }
   },
   "control-center": {
+    "back": "Back",
+    "ai-usage": {
+      "as-of": "As of {time}",
+      "attention-tooltip": "{provider} {window} is at {percent}%",
+      "balance-only": "Prepaid balance. No rate-limit windows.",
+      "empty": "No AI CLIs detected. Install Claude Code, Codex, Gemini CLI, Qwen Code, LocalAI, or Ollama, or run llama.cpp or vLLM locally.",
+      "empty-hint": "Use header gear to keep a provider Always on.",
+      "local": {
+        "jan": "Jan",
+        "llamacpp": "llama.cpp",
+        "lmstudio": "LM Studio",
+        "title": "Local",
+        "vllm": "vLLM"
+      },
+      "localai": {
+        "absent": "LocalAI is not installed",
+        "apply-failed": "Install failed",
+        "backends": "Backends: {list}",
+        "capability": {
+          "chat": "Chat",
+          "detection": "Detection",
+          "embeddings": "Embeddings",
+          "image": "Images",
+          "other": "Other",
+          "rerank": "Rerank",
+          "sound": "Sound",
+          "thinking": "Thinking",
+          "tools": "Tools",
+          "transcript": "Transcription",
+          "tts": "Speech",
+          "vad": "Voice detection",
+          "video": "Video",
+          "vision": "Vision"
+        },
+        "default": "Default",
+        "delete-failed": "Remove failed",
+        "empty-models": "No models installed. Install one from the Gallery.",
+        "error": "Could not reach LocalAI",
+        "gallery": "Gallery",
+        "gallery-count": "{count} models in the gallery. Search by name, task, or backend.",
+        "gallery-error": "Could not load the LocalAI gallery",
+        "gallery-hint": "Browse the LocalAI gallery and install chat, speech, image, video, and embedding models.",
+        "gallery-loading": "Loading the gallery…",
+        "gallery-more": "Keep typing to narrow the list",
+        "gallery-search": "Search the gallery",
+        "gallery-stopped": "Start LocalAI to browse the gallery",
+        "installed-search": "Filter models",
+        "loaded-count": "{count} loaded",
+        "models-count": "{count} models",
+        "queued": "Queued…",
+        "running-hint": "Desktop tools and plugins use this endpoint. The default model answers chat requests.",
+        "start-failed": "Could not start LocalAI",
+        "title": "LocalAI"
+      },
+      "now": "now",
+      "ollama": {
+        "absent": "Ollama is not installed",
+        "cancel": "Cancel",
+        "disabled": "Disabled",
+        "empty-models": "No models installed",
+        "error": "Could not reach Ollama",
+        "in-memory": "{size} in memory",
+        "in-use": "In use",
+        "install": "Install",
+        "installed": "Installed",
+        "installing": "Installing…",
+        "library": "Library",
+        "library-empty": "No models match",
+        "library-error": "Could not reach the Ollama library",
+        "library-hint": "Search the Ollama library and install a model",
+        "library-search": "Search models",
+        "load": "Load",
+        "loaded": "loaded",
+        "loaded-toggle": "Loaded",
+        "loading": "Loading…",
+        "more": "+{count} more",
+        "remove": "Remove",
+        "remove-confirm": "Remove?",
+        "removing": "Removing…",
+        "retry": "Retry",
+        "running": "Running",
+        "select": "Select",
+        "service": "Service",
+        "start": "Start",
+        "starting": "Starting…",
+        "stop": "Stop",
+        "stopped": "Stopped",
+        "stopping": "Stopping…",
+        "title": "Ollama",
+        "unloading": "Unloading…"
+      },
+      "open": "Open",
+      "providers": {
+        "claude": "Claude Code",
+        "codex": "Codex",
+        "copilot": "GitHub Copilot",
+        "cursor": "Cursor",
+        "deepseek": "DeepSeek",
+        "gemini": "Gemini CLI",
+        "qwen": "Qwen Code"
+      },
+      "refresh": "Refresh",
+      "resets-in": "resets in {time}",
+      "status": {
+        "absent": "Not installed",
+        "disabled": "Disabled",
+        "expired": "Session expired. Sign in again",
+        "http-error": "Could not reach the usage API",
+        "no-auth": "Not signed in",
+        "no-credentials": "Not signed in. Open Claude Code and sign in.",
+        "no-data": "No usage data yet",
+        "stale": "Showing last known values",
+        "unsupported": "This plan has no request quota to show"
+      },
+      "updated-at": "Updated {time}",
+      "updating": "Updating…",
+      "windows": {
+        "chat": "Chat",
+        "completions": "Completions",
+        "day": "Today",
+        "extra": "Extra",
+        "opus": "Opus (7 days)",
+        "premium": "Premium requests",
+        "session": "Session (5 h)",
+        "sonnet": "Sonnet (7 days)",
+        "weekly": "Week (7 days)"
+      }
+    },
+    "appearance": {
+      "always-dark": "Always dark",
+      "always-light": "Always light",
+      "auto-apps-dark-until": "Apps: Dark until {time}",
+      "auto-apps-light-until": "Apps: Light until {time}",
+      "auto-dark-until": "Dark until {time}",
+      "auto-light-until": "Light until {time}",
+      "auto-needs-location": "Auto needs a location. Tap to set one on Weather.",
+      "auto-open-weather": "Open Weather for location and Auto schedule",
+      "auto-schedule": "Follow sunrise and sunset",
+      "auto-shell-dark-until": "Shell: Dark until {time}",
+      "auto-shell-light-until": "Shell: Light until {time}",
+      "borders-hint": "Draw outlines around buttons, inputs, popups, and cards.",
+      "choose-font": "Choose font",
+      "choose-palette": "Choose a palette",
+      "choose-palette-tooltip": "Open the palette picker",
+      "community-empty": "No community palettes yet",
+      "contrast-off-caption": "Default contrast.",
+      "contrast-on-caption": "Stronger outlines and fills.",
+      "custom-empty": "No custom palettes yet. Tap a swatch to make one, or open the palettes folder.",
+      "custom-tint": "Custom tint",
+      "custom-tint-tooltip": "Pick a custom tint color",
+      "customize-failed": "Could not save the custom palette.",
+      "edit-role-title": "Customize {role}",
+      "edit-role-tooltip": "Customize {role}",
+      "effects-borders": "Borders",
+      "effects-shadows": "Shadows",
+      "effects-speed": "Speed",
+      "effects-speed-off": "Turn on Motion to change animation speed.",
+      "error": "Error",
+      "export-palette-tooltip": "Save the wallpaper palette as a custom palette",
+      "export-saved": "Saved as {name}",
+      "follow-theme": "Match the theme mode above",
+      "font-preview": "The quick brown fox jumps over the lazy dog.",
+      "font-search": "Search fonts",
+      "glass-glass-caption": "Clear glass over wallpaper. Leftover stays dimmed so type stays readable.",
+      "glass-refraction": "Refraction",
+      "glass-refraction-helix-caption": "helix-niri refracts wallpaper through chrome. Strength follows the slider.",
+      "glass-refraction-other-caption": "Refraction needs niri. Other compositors keep this off.",
+      "glass-refraction-stock-caption": "Stock niri uses chrome blur. liquid-glass is helix-niri only.",
+      "glass-slider": "Solid to Glass",
+      "glass-soft-caption": "Regular glass chrome. Leftover cards stay solid.",
+      "glass-solid-caption": "Opaque chrome. Leftover cards stay leftover.",
+      "icons-default": "Default",
+      "icons-default-caption": "App icons keep their original colors.",
+      "icons-tinted": "Tinted",
+      "icons-tinted-caption": "Tint dock, tray, taskbar, and launcher icons.",
+      "ink": "Ink",
+      "language-auto-caption": "Using {language} from the system locale.",
+      "language-search": "Search languages",
+      "motion-off-caption": "Reduce motion.",
+      "motion-on-caption": "Animated transitions.",
+      "no-fonts": "No fonts found",
+      "open-folder-failed": "Could not open the palettes folder.",
+      "open-glass": "Open Glass",
+      "open-icons": "Open Icons",
+      "open-palettes-folder": "Open palettes folder",
+      "open-wallpaper": "Open Wallpaper",
+      "outline": "Outline",
+      "palette": "Current palette",
+      "palette-builtin-tooltip": "Palettes shipped with Helix",
+      "palette-community-tooltip": "Palettes from the community catalog",
+      "palette-custom-tooltip": "Palettes in your palettes folder",
+      "palette-hint": "Tap a swatch to customize this light or dark mode.",
+      "palette-search": "Search palettes",
+      "palette-wallpaper-tooltip": "Colors taken from the current wallpaper",
+      "primary": "Primary",
+      "radius-large": "Large",
+      "radius-medium": "Medium",
+      "radius-small": "Small",
+      "save-custom-tooltip": "Save a copy as a custom palette",
+      "secondary": "Secondary",
+      "specimen-body": "Body",
+      "specimen-caption": "Caption",
+      "specimen-card": "Card",
+      "specimen-ghost": "Ghost",
+      "specimen-input": "Input",
+      "specimen-primary": "Primary",
+      "specimen-title": "Title",
+      "surface": "Surface",
+      "system-font": "System default",
+      "tertiary": "Tertiary",
+      "type": "Type"
+    },
     "audio": {
       "application-volumes": "Application Volumes",
+      "choose-device": "Choose device",
       "choose-effects-profile": "Choose a profile",
       "default-device": "Default device",
       "effects-profile": "Effects",
       "input-device-prefix": "Input",
+      "mute": "Mute",
       "no-application-audio": "No Application Audio",
       "no-application-audio-body": "No application playback streams are currently available.",
       "no-input-devices": "No input devices",
@@ -244,18 +524,59 @@
       "no-output-devices-body": "No playback sinks are currently available.",
       "no-output-selected": "No output device selected",
       "output-device-prefix": "Output",
-      "unavailable-body": "PipeWire is not active.",
-      "unavailable-title": "Audio unavailable"
+      "sections": {
+        "apps-caption": "Application volumes",
+        "input-caption": "Recording devices",
+        "output-caption": "Playback devices"
+      },
+      "unavailable-body": "Audio is not active.",
+      "unavailable-title": "Audio unavailable",
+      "unmute": "Unmute",
+      "pages": {
+        "output": "Output devices",
+        "input": "Input devices",
+        "apps": "App volumes",
+        "effects": "Sound Effects"
+      }
+    },
+    "bar": {
+      "auto-hide": "Auto-hide",
+      "auto-hide-off-tooltip": "Keep the bar visible",
+      "auto-hide-on-tooltip": "Hide until the pointer reaches the screen edge",
+      "auto-hide-smart-tooltip": "Show on an empty workspace; hide when windows are open",
+      "empty": "No bar configured. Create one under header gear.",
+      "enable": "Show bar",
+      "layout-caption": "Edge, auto-hide, and reserved space.",
+      "layout-tooltip": "Position and auto-hide",
+      "opacity": "Background opacity",
+      "position": "Position",
+      "reserve-space": "Reserve space",
+      "shadow": "Shadow",
+      "shape-caption": "Thickness, opacity, and shadow.",
+      "shape-tooltip": "Thickness and opacity",
+      "thickness": "Thickness"
     },
     "bluetooth": {
       "accept": "Accept",
       "address": "Address",
       "auto-reconnect": "Auto-reconnect",
       "bluetooth": "Bluetooth",
+      "connect": "Connect",
+      "copy-address": "Copy address",
+      "disconnect": "Disconnect",
       "enter-code": "Enter code",
+      "forget": "Forget device",
+      "nearby": "Nearby",
       "no-devices": "No devices found. Start scanning to discover nearby Bluetooth devices.",
       "off": "Bluetooth is off",
+      "off-title": "Off",
+      "on": "On",
+      "pair": "Pair",
       "pair-title": "Pair {device}",
+      "pages": {
+        "devices": "Device filtering",
+        "discovery": "Discovery"
+      },
       "pairing-detail": {
         "authorize": "Accept the incoming pairing request?",
         "authorize-service": "Allow access to service {uuid}?",
@@ -266,31 +587,285 @@
         "pin-code": "Enter the PIN shown on the device:"
       },
       "reject": "Reject",
+      "rescan": "Scan for nearby devices",
       "rfkill-blocked": "Bluetooth is blocked by the system. Turn it on to clear the block.",
       "sections": {
         "available": "Available",
         "connected": "Connected",
         "paired": "Paired"
       },
-      "unavailable": "Bluetooth service unavailable",
+      "unavailable": "Bluetooth is not available.",
+      "unavailable-title": "Unavailable",
       "unknown-device": "Unknown device",
       "visible": "Discoverable by nearby devices"
     },
     "calendar": {
+      "accounts": {
+        "add": "Add calendar account",
+        "disabled": "Calendar sync is off",
+        "disabled-events": "Turn on Calendar to sync events.",
+        "empty": "Add an account to see events here.",
+        "empty-title": "No calendar accounts",
+        "title": "Accounts"
+      },
       "all-day": "All day",
       "events": "Events",
+      "next-month": "Next month",
       "no-events": "No events.",
+      "previous-month": "Previous month",
+      "sections": {
+        "accounts": "Accounts",
+        "clock": "World clock",
+        "events": "Events",
+        "month": "Month"
+      },
       "today": "Today",
-      "toggle-events-card": "Toggle events card"
+      "toggle-events-card": "Toggle events card",
+      "world-clock": {
+        "add": "Add timezone",
+        "empty": "No matching timezones",
+        "invalid": "Unknown IANA timezone.",
+        "placeholder": "Search timezones…",
+        "remove": "Remove timezone",
+        "title": "World Clock"
+      }
+    },
+    "camera": {
+      "controls": {
+        "aperture-priority": "Aperture Priority",
+        "auto": "Auto",
+        "backlight": "Backlight",
+        "brightness": "Brightness",
+        "contrast": "Contrast",
+        "flicker": "Flicker",
+        "focus": "Focus",
+        "gain": "Gain",
+        "gamma": "Gamma",
+        "hue": "Hue",
+        "manual": "Manual",
+        "pan": "Pan",
+        "saturation": "Saturation",
+        "sharpness": "Sharpness",
+        "shutter": "Shutter",
+        "shutter-priority": "Shutter Priority",
+        "temperature": "Temperature",
+        "tilt": "Tilt",
+        "zoom": "Zoom"
+      },
+      "device": "Camera",
+      "empty": "No camera devices were found.",
+      "empty-hint": "Plug in a webcam to preview it and adjust controls.",
+      "off": "Off",
+      "on": "On",
+      "preview-unavailable": "This camera does not support a live preview, but its controls are still adjustable.",
+      "reset": "Reset to defaults",
+      "reset-tooltip": "Restore this camera's factory control values",
+      "sections": {
+        "exposure": "Exposure",
+        "focus": "Focus",
+        "other": "Other",
+        "picture": "Picture",
+        "white-balance": "White Balance"
+      }
+    },
+    "capture": {
+      "record": "Record",
+      "record-tooltip": "Record video or keep a replay buffer",
+      "screenshot": "Screenshot",
+      "screenshot-tooltip": "Capture a still image"
+    },
+    "captures": {
+      "delete": "Delete",
+      "delete-again": "Click again to delete",
+      "delete-failed": "Could not delete that file."
+    },
+    "cast": {
+      "connecting": "Connecting",
+      "copy": "Copy address",
+      "copy-hint": "Copy the address to connect from another device.",
+      "credentials": "Sign in as {user}",
+      "displays": "Nearby displays",
+      "displays-empty": "No TVs or displays yet. Put the other device in wireless display mode, then tap Refresh.",
+      "idle": "Ready",
+      "protocol-chromecast": "Chromecast",
+      "protocol-display": "Display",
+      "protocol-miracast": "Wireless display",
+      "ready-hint": "Turning screen sharing on…",
+      "refresh": "Refresh",
+      "share": "Share this screen",
+      "share-failed": "Could not start screen sharing.",
+      "share-hint": "Connect from another computer with Remote Desktop using this address.",
+      "share-listening": "Listening at {address}",
+      "share-missing": "Install remote desktop support to share this screen.",
+      "share-off": "Not sharing",
+      "share-off-hint": "Turn on Share this screen so another computer can view it.",
+      "share-on": "Sharing this screen",
+      "share-title": "Screen sharing",
+      "sink-error": "Could not connect",
+      "start-stream": "Cast to this display",
+      "starting": "Starting…",
+      "status-failed": "Could not list nearby displays.",
+      "stop": "Stop casting",
+      "stream-failed": "Could not start or stop casting.",
+      "streaming": "Casting",
+      "view-only": "View only",
+      "wireless-hint": "Start wireless displays to find TVs and dongles on this network.",
+      "wireless-missing": "Install Network Displays to cast to a TV from Control Center.",
+      "wireless-off": "Wireless displays off",
+      "wireless-on": "Looking for displays",
+      "wireless-on-hint": "Tap a display to cast this screen.",
+      "wireless-open": "Open Network Displays",
+      "wireless-start": "Start wireless displays",
+      "wireless-title": "Wireless displays"
+    },
+    "clock": {
+      "empty": "Add extra timezones to compare with local time.",
+      "empty-title": "No world clocks",
+      "invalid": "Unknown IANA timezone.",
+      "no-match": "No matching timezones",
+      "placeholder": "Search timezones…",
+      "relative": {
+        "same-time": "Same time",
+        "today": "Today",
+        "tomorrow": "Tomorrow",
+        "yesterday": "Yesterday"
+      },
+      "remove": "Remove timezone"
+    },
+    "desktop": {
+      "add": "Add",
+      "add-tooltip": "Add this widget to the desktop",
+      "corners": "Corners",
+      "corners-caption": "Rounded screen corners and hot-corner actions.",
+      "corners-tooltip": "Screen corners and hot corners",
+      "edit": "Edit layout",
+      "edit-tooltip": "Move and resize widgets on the desktop",
+      "empty": "No widgets yet. Click a type to add one.",
+      "hot-corners-caption": "Pointer actions when you hit a screen corner.",
+      "hot-corners-tooltip": "Hot-corner actions",
+      "off": "Widgets are off",
+      "on-desktop": "{count} on desktop",
+      "on-desktop-plural": "{count} on desktop",
+      "screen-corners-caption": "Rounded corners on the desktop.",
+      "screen-corners-tooltip": "Screen corner size",
+      "search": "Search widgets",
+      "widget-count": "{count} widget",
+      "widget-count-plural": "{count} widgets",
+      "widgets-glanceable-tooltip": "Clock, calendar, and weather",
+      "widgets-sound-tooltip": "Media, volume, and visualizers",
+      "widgets-tools-tooltip": "System monitor, buttons, labels, and stickers",
+      "widgets-tooltip": "Desktop widgets"
     },
     "display": {
+      "brightness": "Brightness",
       "disabled": "Disabled",
+      "layout": "Arrangement",
+      "layout-error": "Display layout",
+      "layout-hint": "Drag a display next to or under another. Displays stay adjacent and cannot overlap.",
+      "layout-hint-short": "Drag a display. Drag the strip onto another to set the origin.",
+      "main-display": "Main display",
+      "move": "Display to move",
+      "moving": "Moving {name}",
+      "moving-at": "Moving {name} · {x}, {y}",
       "no-displays": "No monitors available",
-      "rescan": "Rescan DDC/CI monitors",
-      "unknown-resolution": "Unknown resolution"
+      "no-displays-hint": "Connect a display, then use the header refresh button.",
+      "nudge-down": "Slide down along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-left": "Slide left along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-right": "Slide right along the shared edge (Ctrl 8px, Shift 1px)",
+      "nudge-up": "Slide up along the shared edge (Ctrl 8px, Shift 1px)",
+      "place-bottom": "Place below",
+      "place-left": "Place to the left",
+      "place-right": "Place to the right",
+      "place-top": "Place above",
+      "refresh-rate": "Refresh rate",
+      "relative-to": "Relative to",
+      "rescan": "Rescan displays",
+      "resolution": "Resolution",
+      "rotation": "Rotation",
+      "save-failed": "Could not update the niri config",
+      "save-ok": "Saved the layout to niri. It reloads on its own.",
+      "save-title": "Niri display layout",
+      "save-to-niri": "Save layout to niri",
+      "saved": "Saved the layout to niri",
+      "scale": "Scale",
+      "temporary": "Temporary · niri will forget this on reload. Save to niri to persist.",
+      "transform-180": "180°",
+      "transform-270": "270°",
+      "transform-90": "90°",
+      "transform-flipped": "Flipped",
+      "transform-flipped-180": "Flipped 180°",
+      "transform-flipped-270": "Flipped 270°",
+      "transform-flipped-90": "Flipped 90°",
+      "transform-normal": "Normal",
+      "unknown-resolution": "Unknown resolution",
+      "vrr": "Variable refresh rate",
+      "pages": {
+        "night-light": "Night Light",
+        "advanced": "Advanced"
+      }
+    },
+    "dock": {
+      "add-app": "Add an app",
+      "auto-hide": "Auto-hide",
+      "enable": "Show dock",
+      "layout-caption": "Edge, auto-hide, and running apps.",
+      "layout-tooltip": "Position and auto-hide",
+      "pinned": "Pinned apps",
+      "pinned-caption": "Apps that stay in the dock.",
+      "pinned-tooltip": "Pinned apps",
+      "position": "Position",
+      "show-running": "Show running apps"
+    },
+    "firewall": {
+      "interfaces": "Listening on {names}",
+      "missing": "Install the system firewall to manage incoming traffic from Control Center.",
+      "no-interfaces": "No network interfaces in this zone.",
+      "panic": "Block all traffic",
+      "panic-on": "Blocking all traffic",
+      "ready": "Ready",
+      "ready-hint": "Start the firewall to choose a zone and open services.",
+      "refresh": "Refresh",
+      "save": "Save for next boot",
+      "save-tooltip": "Keep the current zone and services after reboot",
+      "service-cockpit": "Cockpit",
+      "service-http": "Web (HTTP)",
+      "service-https": "Web (HTTPS)",
+      "service-kdeconnect": "KDE Connect",
+      "service-mdns": "Local discovery",
+      "service-samba-client": "Windows shares",
+      "service-ssh": "Remote login",
+      "service-syncthing": "Syncthing",
+      "service-syncthing-gui": "Syncthing web UI",
+      "service-wireguard": "WireGuard",
+      "services": "Incoming services",
+      "services-empty": "No services in this zone.",
+      "start": "Start firewall",
+      "starting": "Starting…",
+      "status-failed": "Could not read the firewall.",
+      "stopped": "Firewall is not running",
+      "title": "Firewall",
+      "visible-as": "Zone: {name}",
+      "write-failed": "Could not update the firewall. Confirm the password prompt if it appears.",
+      "zone": "Default zone",
+      "zone-block": "Block",
+      "zone-dmz": "DMZ",
+      "zone-drop": "Drop",
+      "zone-external": "External",
+      "zone-home": "Home",
+      "zone-internal": "Internal",
+      "zone-public": "Public",
+      "zone-server": "Server",
+      "zone-trusted": "Trusted",
+      "zone-work": "Work",
+      "zone-workstation": "Workstation"
     },
     "home": {
+      "quick-on": "On",
+      "quick-off": "Off",
+      "quick-unavailable": "Unavailable",
       "avatar-error-title": "Avatar not updated",
+      "change-avatar": "Change avatar",
+      "change-wallpaper": "Change wallpaper",
       "media": {
         "idle": "Idle",
         "no-active-player": "No active player",
@@ -302,22 +877,135 @@
         "unknown-artist": "Unknown artist",
         "unknown-track": "Unknown track"
       },
+      "open-calendar": "Open Calendar",
+      "open-media": "Open Media",
+      "open-power": "Open Power",
+      "open-weather": "Open Weather",
       "select-avatar": "Select Avatar",
+      "status": {
+        "ai": "{percent}% used",
+        "battery": "Battery {percent}%",
+        "caffeine": "Caffeine on",
+        "cast": "Sharing this screen",
+        "dnd": "Do Not Disturb",
+        "firewall": "Blocking all traffic",
+        "localsend": "Incoming from {name}",
+        "night-light": "Night Light on",
+        "phone": "{name}",
+        "phone-battery": "{name}  {percent}%",
+        "phone-offline": "{name} offline",
+        "privacy": "In use",
+        "privacy-camera": "Camera in use",
+        "privacy-microphone": "Mic in use",
+        "privacy-screen": "Screen in use",
+        "recording": "Recording {elapsed}",
+        "replay": "Replay {elapsed}",
+        "updates": "{count} updates waiting"
+      },
       "unknown": "unknown",
-      "uptime": "Uptime – {uptime}",
+      "uptime": "Up {uptime}",
       "weather": {
-        "data-unavailable": "Weather data unavailable.",
-        "disabled": "Weather is disabled in config.",
-        "fetching": "Fetching forecast…"
+        "data-unavailable": "Weather data unavailable",
+        "disabled": "Weather off",
+        "fetching": "Fetching forecast…",
+        "no-location": "No location"
       }
     },
+    "keybinds": {
+      "copy-missing-tooltip": "Copy missing recommended keys",
+      "in-helix-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
+      "install-tooltip": "Add the missing recommended keys",
+      "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
+      "open-folder-failed": "Could not open the compositor config folder.",
+      "open-folder-tooltip": "Open the compositor config folder",
+      "reset-tooltip": "Restore managed binds to the recommended keys",
+      "tab-apps": "Apps",
+      "tab-apps-tooltip": "Launch an installed app",
+      "tab-attention": "Attention",
+      "tab-attention-tooltip": "Unfinished or taken recommended keys",
+      "tab-capture": "Capture",
+      "tab-capture-tooltip": "Screenshot and screen record",
+      "tab-open": "Open",
+      "tab-open-tooltip": "Launcher, settings, and window switcher",
+      "tab-session": "Session",
+      "tab-session-tooltip": "Lock, logout, and power",
+      "tab-sound": "Sound",
+      "tab-sound-tooltip": "Volume and media"
+    },
+    "launcher": {
+      "add-app": "Add an app",
+      "open": "Open launcher",
+      "providers": "Always in search"
+    },
+    "localsend": {
+      "accept": "Accept",
+      "announce": "Find nearby devices",
+      "decline": "Decline",
+      "device-desktop": "Computer",
+      "device-mobile": "Phone",
+      "device-server": "Server",
+      "device-tablet": "Tablet",
+      "device-web": "Browser",
+      "disabled": "Nearby sharing is off",
+      "disabled-hint": "Turn it on to appear to LocalSend apps on this network and receive files.",
+      "enable": "Nearby sharing",
+      "files-count": "{count} files",
+      "folder-empty": "That folder has no files to send.",
+      "history": "Recent",
+      "history-empty": "Sent and received files show up here.",
+      "history-empty-title": "No transfers yet",
+      "history-failed-receive": "Could not receive {file} from {name}",
+      "history-failed-send": "Could not send {file} to {name}",
+      "history-received": "Received {file} from {name}",
+      "history-sent": "Sent {file} to {name}",
+      "incoming": "{name} wants to send files",
+      "incoming-idle": "Waiting for a file from another device.",
+      "incoming-title": "Incoming",
+      "listening": "Visible as {name} on this network.",
+      "nearby": "Nearby devices",
+      "nearby-empty": "Open LocalSend on the other device, then find nearby devices again.",
+      "nearby-empty-title": "No devices nearby",
+      "peer-gone": "That device is no longer nearby.",
+      "pin-required": "That device requires a PIN. Enter it above and send again.",
+      "port-busy": "This machine cannot receive right now. Sending still works.",
+      "progress-receive": "Receiving {index} of {count} · {file} from {name}",
+      "progress-send": "Sending {index} of {count} · {file} to {name}",
+      "received": "Received files from {name}",
+      "rejected": "The other device declined the transfer.",
+      "send-clipboard": "Send clipboard",
+      "send-failed": "Could not send.",
+      "send-file": "Send file",
+      "send-folder": "Send folder",
+      "sending": "Sending {file} to {name}…",
+      "sent": "Sent to {name}",
+      "their-pin": "Their PIN, if required",
+      "title": "LocalSend"
+    },
     "media": {
-      "active-player": "Active player",
+      "active-player": "Automatic",
+      "automatic": "Automatic",
+      "hide-player": "Hide this player",
+      "next": "Next",
       "nothing-playing": "Nothing Playing",
       "now-playing": "Now Playing",
-      "start-playback": "Start playback in an MPRIS app"
+      "open-app": "Open {name}",
+      "open-player": "Open player",
+      "players": "Media apps",
+      "pause": "Pause",
+      "play": "Play",
+      "player": "Player",
+      "previous": "Previous",
+      "repeat": "Repeat",
+      "repeat-all": "Repeat all",
+      "repeat-one": "Repeat one",
+      "shuffle": "Shuffle",
+      "start-playback": "Start playback in a music or video app",
+      "volume": "Volume"
     },
     "network": {
+      "choose-network": "Choose a network to connect.",
+      "connected": "Connected",
+      "connection-details": "Connection Details",
       "anonymous-identity": "Anonymous identity (optional)",
       "available": "Available",
       "ca-certificate": "CA certificate path (optional)",
@@ -333,51 +1021,339 @@
       "cellular-registered": "Registered",
       "cellular-searching": "Searching…",
       "connect": "Connect",
+      "copy-ip": "Copy IP",
       "current-connection": "Current Connection",
+      "disconnect": "Disconnect",
+      "dns": "DNS {servers}",
+      "dns-applied": "DNS updated",
+      "dns-apply": "Apply DNS",
+      "dns-automatic": "Automatic",
+      "dns-automatic-tooltip": "Use addresses from DHCP",
+      "dns-cloudflare": "Cloudflare",
+      "dns-cloudflare-tooltip": "Cloudflare DNS",
+      "dns-custom": "Custom",
+      "dns-custom-placeholder": "1.1.1.1, 1.0.0.1",
+      "dns-custom-tooltip": "Enter your own DNS addresses",
+      "dns-google": "Google",
+      "dns-google-tooltip": "Google Public DNS",
+      "dns-invalid": "Enter valid IPv4 or IPv6 addresses",
+      "dns-label": "DNS",
+      "dns-nextdns": "NextDNS",
+      "dns-nextdns-placeholder": "NextDNS config ID (optional)",
+      "dns-nextdns-tooltip": "NextDNS; optional config ID below",
+      "dns-requires-connection": "Connect to a network to change DNS",
+      "dns-requires-networkmanager": "This DNS option needs the system network service.",
       "domain-suffix-match": "Server domain suffix",
       "eap-method": "EAP method",
       "enterprise-prompt-for": "Sign in to {ssid}",
       "error-ca-not-absolute": "The certificate path must be absolute, starting with /.",
-      "error-certificate-required": "This network requires certificate-based authentication (EAP-TLS), which is not supported yet.",
-      "error-enterprise-unsupported": "The active network backend cannot configure 802.1X networks.",
+      "error-certificate-required": "This network needs a certificate sign-in, which is not supported yet.",
+      "error-enterprise-unsupported": "This network needs a work or school sign-in that this tab cannot set up.",
       "error-missing-identity": "Enter the identity your organization issued you.",
       "error-missing-password": "Enter your password.",
       "error-unsupported-phase2": "PEAP requires MSCHAPv2 inner authentication.",
       "external-ip": "WAN {ip}",
+      "forget": "Forget network",
+      "hide-password": "Hide password",
+      "hide-wifi-qr": "Hide QR code",
       "identity": "Identity",
+      "ip-copied": "IPv4 address copied",
       "no-networks": "No networks in range",
       "not-connected": "Not connected",
       "password": "Password",
       "password-prompt": "Enter password",
       "password-prompt-for": "Enter password for {ssid}",
       "phase2-auth": "Inner authentication",
+      "ping": "Ping",
+      "ping-failed": "Ping failed",
+      "ping-result": "Ping {ms} ms",
+      "ping-running": "Pinging…",
+      "rescan": "Scan for networks",
       "saved": "Saved",
-      "unavailable-detail": "Install and enable NetworkManager, wpa_supplicant, or iwd to manage networks from here.",
-      "unavailable-title": "Network service unavailable",
+      "share-wifi": "Share Wi-Fi",
+      "share-wifi-copied": "Join code copied. Scan the QR code or paste it into another device.",
+      "share-wifi-enterprise": "Enterprise Wi-Fi cannot include a password in a QR code.",
+      "share-wifi-password-missing": "Join code copied without the stored password. Enter it on the other device after scanning.",
+      "show-password": "Show password",
+      "speed-test": "Speed test",
+      "speed-test-failed": "Speed test failed",
+      "speed-test-result": "{mbps} Mbps",
+      "speed-test-running": "Measuring download…",
+      "throughput": "↓ {down}  •  ↑ {up}",
+      "unavailable-detail": "Install a network manager to control Wi-Fi from here.",
+      "unavailable-title": "Network is not available",
       "vpns": "VPNs",
       "wi-fi": "Wi-Fi",
       "wifi": "Wi-Fi",
       "wifi-off": "Wi-Fi is off",
       "wifi-on": "Wi-Fi is on",
+      "wifi-settings": "Wi-Fi Settings",
       "wired-connection": "Wired connection"
     },
     "notifications": {
       "clear-all": "Clear all notifications",
+      "collapse": "Show less",
+      "dnd": "Do Not Disturb",
       "dnd-off": "Turn Do Not Disturb Off",
       "dnd-on": "Turn Do Not Disturb On",
       "empty-body": "Recent notifications will show here.",
       "empty-title": "No Notifications",
+      "expand": "Show more",
       "filter": {
         "all": "All",
+        "all-tooltip": "Every stored notification",
         "older": "Older",
+        "older-tooltip": "Older than yesterday",
         "today": "Today",
-        "yesterday": "Yesterday"
+        "today-tooltip": "From today",
+        "yesterday": "Yesterday",
+        "yesterday-tooltip": "From yesterday"
       },
       "filter-empty-body": "No notifications match this filter.",
       "filter-empty-title": "Nothing here",
-      "untitled": "Untitled notification"
+      "history": "History",
+      "remove": "Remove",
+      "untitled": "Untitled notification",
+      "pages": {
+        "general": "Alerts",
+        "toasts": "Toasts",
+        "history": "History",
+        "filters": "Filters"
+      }
+    },
+    "osd": {
+      "border": "Border",
+      "enable": "Show OSD popups",
+      "kinds-description": "Choose which system events show a pop-up.",
+      "kinds-title": "Popups",
+      "opacity": "Background opacity",
+      "orientation": "Orientation",
+      "orientation-horizontal-tooltip": "Wide pop-up along the screen edge",
+      "orientation-vertical-tooltip": "Tall pop-up stacked as a column",
+      "placement-caption": "Orientation and screen position.",
+      "placement-tooltip": "Position on screen",
+      "position": "Position",
+      "scale": "Size",
+      "style-caption": "Size, opacity, and border.",
+      "style-tooltip": "Size and opacity"
+    },
+    "packages": {
+      "action-ok": "{name} finished.",
+      "busy": "A package task is already running.",
+      "cancel": "Cancel",
+      "cancelled": "Administrator approval is required.",
+      "cancelled-task": "The package task was cancelled.",
+      "empty": "No packages matched that search.",
+      "failed": "The package task failed.",
+      "failed-detail": "The package task failed: {error}",
+      "filter-all": "All",
+      "filter-all-tooltip": "Security and other updates",
+      "filter-available": "Available",
+      "filter-empty": "Nothing in this filter.",
+      "filter-installed": "Installed",
+      "filter-installed-placeholder": "Filter installed packages",
+      "filter-other": "Other",
+      "filter-other-tooltip": "Updates that are not marked security",
+      "filter-security": "Security",
+      "filter-security-tooltip": "Security updates only",
+      "filter-updates-placeholder": "Filter updates",
+      "hint": "Available package updates from Fedora.",
+      "hint-installed": "Installed packages on this system.",
+      "hint-search": "Type at least two characters to search names and descriptions.",
+      "install": "Install",
+      "loading-installed": "Loading installed packages…",
+      "loading-updates": "Looking for updates…",
+      "no-installed": "No installed packages were found.",
+      "no-updates": "No package updates are available.",
+      "progress": "{status} · {percent}%",
+      "protected": "Helix Shell packages cannot be removed from this tab.",
+      "refresh": "Refresh",
+      "remove": "Remove",
+      "remove-confirm": "Confirm",
+      "results": "{count} packages",
+      "results-installed": "{count} installed",
+      "results-updates": "{count} updates",
+      "search": "Search",
+      "search-invalid": "Use 2–80 letters, numbers, spaces, or ._+-.",
+      "search-placeholder": "Search packages",
+      "searching": "Searching…",
+      "showing-limited": "Showing {shown} of {total}",
+      "source-fedora": "Fedora",
+      "source-fedora-tooltip": "Packages from Fedora",
+      "source-firmware": "Firmware",
+      "source-firmware-tooltip": "Device firmware updates",
+      "source-flatpak": "Flatpak",
+      "source-flatpak-tooltip": "Apps installed with Flatpak",
+      "state-available": "Available",
+      "state-installed": "Installed",
+      "title": "Packages",
+      "unavailable": "Package updates are not available.",
+      "unavailable-firmware": "Firmware updates are not available.",
+      "unavailable-flatpak": "Flatpak apps cannot be listed.",
+      "update": "Update",
+      "update-all": "Update all",
+      "update-all-ok": "All listed updates finished.",
+      "update-count": "Update {count}",
+      "updates": "Refresh updates",
+      "updates-waiting": "{count} updates",
+      "view-installed": "Installed",
+      "view-installed-tooltip": "What is already on this machine",
+      "view-search": "Search",
+      "view-search-tooltip": "Find packages by name",
+      "view-updates": "Updates",
+      "view-updates-tooltip": "Pending upgrades",
+      "working": "Working on {name}…"
+    },
+    "panels": {
+      "chrome-caption": "Borders, shadow, and list-row tint.",
+      "chrome-tooltip": "Borders and shadow",
+      "glass-tooltip": "Blurred glass over the wallpaper",
+      "layer-overlay-tooltip": "Keep panels above fullscreen windows",
+      "layer-top-tooltip": "Use when input-method windows hide behind panels",
+      "list-rows": "Tint list rows",
+      "placement-caption": "Layer and floating offset.",
+      "placement-tooltip": "Layer and offset",
+      "soft-tooltip": "Slightly translucent",
+      "solid-tooltip": "Opaque panel background"
+    },
+    "phone": {
+      "accept": "Accept",
+      "available": "Nearby, not paired",
+      "cast-adb-connect-failed": "Could not connect ADB to {host}. Enable wireless debugging on the phone, then try again.",
+      "cast-adb-missing": "Connect with USB debugging, or enter the wireless debugging IP:port below. Optional pairing code is for first-time wireless setup.",
+      "cast-adb-pair-failed": "Could not pair with {host}. Check the pairing code and port on the phone.",
+      "cast-adb-pair-need-connect": "Paired. Enter the Connection IP:port from wireless debugging, leave the code blank, then Connect.",
+      "cast-airplay-disconnect": "Disconnect iPhone",
+      "cast-airplay-hint": "Start AirPlay, then on the iPhone open Control Center → Screen Mirroring → Helix Phone. To click through the mirror, pair Helix Phone under Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-airplay-missing": "Install UxPlay to mirror an iPhone here (AirPlay receiver).",
+      "cast-airplay-ready": "Ready — on the iPhone, Control Center → Screen Mirroring → {name}. The mirror opens here when the picture starts.",
+      "cast-airplay-start": "Start AirPlay",
+      "cast-airplay-start-failed": "Could not start UxPlay. Check that uxplay is installed and try again.",
+      "cast-airplay-started": "AirPlay is on — pick Helix Phone from Screen Mirroring. Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices for mouse and keyboard; Super is the Globe key (Super+H Home, Super+Space Search).",
+      "cast-airplay-stop": "Stop AirPlay",
+      "cast-airplay-stopped": "AirPlay receiver stopped.",
+      "cast-airplay-streaming": "The iPhone is mirroring. Close the mirror window or Disconnect to end the session; the receiver stays ready.",
+      "cast-airplay-waiting": "Waiting for the iPhone… Screen Mirroring → {name}. Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices to move the pointer.",
+      "cast-always-on": "Keep receiver ready",
+      "cast-audio": "Play phone audio here",
+      "cast-notifications": "iPhone notifications",
+      "cast-notifications-allow": "Connected. On the iPhone, allow them once: Settings → Bluetooth → Helix Phone ⓘ → Share System Notifications.",
+      "cast-notifications-starting": "Starting Helix Phone…",
+      "cast-notifications-syncing": "Syncing from the iPhone · {count} showing",
+      "cast-notifications-syncing-plural": "Syncing from the iPhone · {count} showing",
+      "cast-notifications-waiting": "Waiting for the iPhone to connect over Bluetooth. Pair Helix Phone under AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-android-only": "Cast My Apps needs an Android phone with storage sharing enabled in KDE Connect.",
+      "cast-apps-empty": "No user apps found on the connected phone.",
+      "cast-connect": "Connect",
+      "cast-connecting": "Connecting ADB to {host}…",
+      "cast-hint": "Tap an app to open it in a floating window on this desktop. Keyboard and pointer go to the phone.",
+      "cast-hint-connected": "Connected as {serial}. Tap cast on an app to open it in a floating window.",
+      "cast-host-placeholder": "IP:port from wireless debugging",
+      "cast-launch": "Cast app",
+      "cast-launching": "Casting {name}…",
+      "cast-loading": "Looking for the phone over ADB…",
+      "cast-mirror": "Mirror phone",
+      "cast-mirror-needs-setup": "This machine is missing something the iPhone mirror needs:",
+      "cast-mirror-pairing-lost": "The iPhone dropped the Helix Phone pointer, or AssistiveTouch is off. Pair again: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-mirror-pointer-ready": "Mouse and keyboard connected",
+      "cast-mirror-step-mirror": "On the iPhone: swipe down from the top-right, tap Screen Mirroring, pick Helix Phone.",
+      "cast-mirror-step-pair": "For mouse and keyboard, pair Helix Phone once: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-mirror-step-pair-short": "Pair Helix Phone in AssistiveTouch → Devices → Bluetooth Devices for mouse and keyboard.",
+      "cast-mirror-title": "iPhone",
+      "cast-mirror-waiting": "Waiting for the iPhone.\nControl Center → Screen Mirroring → Helix Phone",
+      "cast-mirroring": "Mirroring phone…",
+      "cast-need-bluetooth": "A Bluetooth LE adapter",
+      "cast-need-bluetooth-fix": "The pointer needs Bluetooth; the picture works without it.",
+      "cast-need-bluetoothd": "The Bluetooth service is not running",
+      "cast-need-decoder": "An H.264 decoder for GStreamer",
+      "cast-need-gst-base": "GStreamer base plugins (videoscale, videoconvert, filesink)",
+      "cast-need-gstreamer": "GStreamer",
+      "cast-need-python": "Python 3 with dbus and GObject bindings",
+      "cast-need-uxplay": "UxPlay (AirPlay receiver)",
+      "cast-no-peer": "Pair a phone on the compact card to cast apps.",
+      "cast-open": "Cast My Apps",
+      "cast-pair": "Pair",
+      "cast-pair-placeholder": "Pairing code",
+      "cast-pointer-connected": "Pointer connected. Keys go to the iPhone while the mirror window is focused. Super is the Globe key.",
+      "cast-pointer-control-center": "Control Center",
+      "cast-pointer-home": "Home",
+      "cast-pointer-library": "App Library",
+      "cast-pointer-lost": "The iPhone dropped the pointer, or AssistiveTouch is off. Pair Helix Phone again under AssistiveTouch → Devices → Bluetooth Devices.",
+      "cast-pointer-search": "Search",
+      "cast-pointer-setup": "Set up Bluetooth",
+      "cast-pointer-setup-hint": "bluetoothd needs Privacy on and JustWorksRepairing always so the iPhone keeps its pairing. Asks for your password.",
+      "cast-pointer-starting": "Starting the Helix Phone Bluetooth pointer…",
+      "cast-pointer-typing": "Keyboard captured — keys go to the iPhone. Move off the mirror to release.",
+      "cast-pointer-waiting": "Pointer not connected. On the iPhone: Settings → Accessibility → Touch → AssistiveTouch → Devices → Bluetooth Devices → Helix Phone.",
+      "cast-recent-meta": "Recent · {package}",
+      "cast-reconnect": "Reconnect",
+      "cast-search-empty": "No apps match that search.",
+      "cast-search-placeholder": "Search apps",
+      "cast-tools-missing": "Install scrcpy and Android platform-tools (adb) to cast phone apps here.",
+      "cast-unsupported": "Cast needs a paired phone. Android uses Cast My Apps; iPhone uses AirPlay mirroring.",
+      "charging": "Charging",
+      "code-copied": "Code copied",
+      "continue-copied": "Copied to clipboard",
+      "continue-empty": "Share a photo or link from your phone to continue it here.",
+      "continue-open": "Open",
+      "copy-code": "Copy code",
+      "devices": "Devices",
+      "devices-empty": "No phones yet. Open KDE Connect on your phone, then tap Refresh.",
+      "files-empty": "Photos from a paired Android phone show up here. iPhone shares land in Continue.",
+      "files-mount-failed": "Could not open files on this phone.",
+      "files-mounting": "Opening phone storage…",
+      "files-offline": "Bring the phone online to browse files.",
+      "files-pull-failed": "Could not save that photo here.",
+      "files-pulled": "Saved {name} to Pictures",
+      "files-unsupported": "This phone does not share storage. Use Continue for incoming shares.",
+      "missing": "Install KDE Connect to pair a phone from Control Center.",
+      "notification-dismiss": "Dismiss",
+      "notifications-empty": "Notifications and SMS codes from this phone show up here.",
+      "notifications-offline": "Bring the phone online to see notifications.",
+      "notifications-unsupported": "This phone is not sharing notifications.",
+      "offline": "Offline",
+      "online": "Online",
+      "pair": "Pair",
+      "pair-incoming": "This device wants to pair",
+      "pair-incoming-code": "Confirm this code on both devices: {code}",
+      "pair-waiting": "Waiting for the other device to accept",
+      "pair-waiting-code": "Waiting for accept · {code}",
+      "ping": "Ping",
+      "ready": "Ready",
+      "ready-hint": "Paired phones appear below. Keep KDE Connect open on the other device to find new ones.",
+      "refresh": "Refresh",
+      "reject": "Decline",
+      "ring": "Ring",
+      "send-clipboard": "Send clipboard",
+      "send-file": "Send file",
+      "source-cast": "Cast",
+      "source-continue": "Continue",
+      "source-files": "Files",
+      "source-notifications": "Notifications",
+      "start": "Start KDE Connect",
+      "starting": "Starting…",
+      "status-failed": "Could not list devices from KDE Connect.",
+      "stopped": "KDE Connect is not running",
+      "title": "Phone",
+      "unpair": "Unpair",
+      "visible-as": "Visible as {name}",
+      "files-empty-title": "No photos",
+      "notifications-empty-title": "No notifications",
+      "continue-empty-title": "Nothing to continue"
+    },
+    "plugins": {
+      "installed": "Installed",
+      "installed-tooltip": "Plugins already on this machine",
+      "loading-store": "Loading the plugin catalog…",
+      "refresh-tooltip": "Refresh plugins",
+      "store": "Store",
+      "store-empty": "No plugins in the enabled sources.",
+      "store-failed": "Could not load {sources}.",
+      "store-partial": "Loaded with errors from {sources}.",
+      "store-tooltip": "Browse and install from enabled sources"
     },
     "power": {
+      "balanced-tooltip": "Default mix of speed and battery",
       "battery": "Battery",
       "charging": {
         "configured": "Configured: {limits}",
@@ -397,65 +1373,296 @@
       },
       "design-capacity": "Of design capacity",
       "health": "Battery Health",
+      "lid-close": {
+        "description": "When another display is on, closing the lid turns off the laptop screen instead of suspending.",
+        "title": "Lid close"
+      },
       "performance-inhibited": "Performance unavailable",
+      "performance-tooltip": "Prefer speed over battery life",
       "peripherals": "Connected Devices",
       "power-profile": "Power Profile",
+      "power-saver-tooltip": "Prefer battery life over speed",
+      "session": "Session",
       "time-to-empty": "{time} remaining",
       "time-to-full": "{time} until full",
-      "unknown-device": "Unknown device"
+      "unknown-device": "Unknown device",
+      "pages": {
+        "session": "Session Menu",
+        "idle": "Idle & Sleep"
+      }
+    },
+    "printers": {
+      "cancel-jobs": "Cancel jobs",
+      "default": "Default",
+      "empty": "No printers yet. Add one in the printer setup page.",
+      "empty-hint": "Open the printer setup page to add a printer, then tap Refresh.",
+      "idle": "Idle",
+      "jobs": "{count} jobs",
+      "list": "Printers",
+      "missing": "Install printing support to manage printers from Control Center.",
+      "open": "Open printer setup",
+      "pause": "Pause printer",
+      "paused": "Paused",
+      "print-failed": "Could not send that file to the printer.",
+      "print-file": "Print a file",
+      "printing": "Printing",
+      "ready": "Ready",
+      "ready-hint": "Start printing to see printers here.",
+      "ready-hint-on": "Set a default, pause a printer, or print a file.",
+      "refresh": "Refresh",
+      "resume": "Resume printer",
+      "set-default": "Set as default",
+      "start": "Start printing",
+      "starting": "Starting…",
+      "status-failed": "Could not list printers.",
+      "stopped": "Printing is not running",
+      "title": "Printers",
+      "write-failed": "Could not update the printer. Confirm the password prompt if it appears.",
+      "empty-title": "No printers"
+    },
+    "privacy": {
+      "auto-locate": "Approximate location",
+      "auto-locate-looking": "Looking up this machine from your IP.",
+      "auto-locate-off": "Weather and night light can use an address instead.",
+      "auto-locate-on": "Look up this machine from your IP for weather and night light.",
+      "auto-locate-using": "Using {name} from your IP.",
+      "camera": "Camera",
+      "camera-idle": "No apps are using the camera.",
+      "idle": "Idle",
+      "idle-hint": "No apps are using the microphone, camera, or screen share.",
+      "in-use": "In use",
+      "in-use-camera": "An app is using the camera.",
+      "in-use-hint": "Apps are using the microphone, camera, or screen share.",
+      "in-use-microphone": "An app is using the microphone.",
+      "in-use-screen": "An app is sharing the screen.",
+      "microphone": "Microphone",
+      "microphone-idle": "No apps are using the microphone.",
+      "mute-microphone": "Mute microphone",
+      "screen": "Screen share",
+      "screen-idle": "No apps are sharing the screen.",
+      "telemetry": "Anonymous startup ping",
+      "telemetry-off": "Helix will not send a startup ping.",
+      "telemetry-on": "Helix sends a small anonymous ping when it starts.",
+      "this-machine": "This machine",
+      "title": "Privacy",
+      "unavailable": "Unavailable",
+      "unavailable-hint": "Audio is not active, so capture activity cannot be shown.",
+      "unknown-app": "Unknown app",
+      "unmute-microphone": "Unmute microphone"
+    },
+    "roundness": {
+      "bar-empty": "No bar configured",
+      "windows-description": "Round corners on application windows.",
+      "windows-save-failed": "Could not update window corners",
+      "windows-save-title": "Window Corners",
+      "windows-title": "App Windows"
+    },
+    "screen-record": {
+      "audio": "Include system audio",
+      "backend-gsr": "Using gpu-screen-recorder",
+      "backend-gsr-flatpak": "Using gpu-screen-recorder (Flatpak)",
+      "backend-wf": "Using wf-recorder",
+      "countdown": "Starting in {seconds}s",
+      "failed": "Recording failed",
+      "hint": "Control Center closes first so it is not in the video. Install gpu-screen-recorder or wf-recorder if recording is unavailable.",
+      "launch-failed": "Failed to start the recorder",
+      "missing-backend": "Install gpu-screen-recorder or wf-recorder to record the screen.",
+      "open-folder": "Open recordings folder",
+      "open-folder-failed": "Could not open the recordings folder.",
+      "recent": "Recent recordings",
+      "recent-empty": "No recordings in the save folder yet.",
+      "record": "Record",
+      "region-too-small": "The selected region is too small.",
+      "replay": "Replay buffer",
+      "replay-active": "Replay buffer running",
+      "replay-busy": "A recording is already running.",
+      "replay-hint": "Keeps the last {seconds}s. Save writes that buffer to a file.",
+      "replay-save": "Save replay",
+      "replay-saved": "Replay saved",
+      "replay-start": "Start replay buffer",
+      "replay-stop": "Stop replay buffer",
+      "replay-unavailable": "Install gpu-screen-recorder to use the replay buffer.",
+      "saved": "Recording saved",
+      "source-focused": "Focused",
+      "source-focused-tooltip": "The display with the pointer",
+      "source-portal": "Portal",
+      "source-portal-tooltip": "Pick a window or display from the desktop picker",
+      "source-region": "Region",
+      "source-region-tooltip": "Draw a rectangle to record",
+      "start": "Start recording",
+      "stop": "Stop recording",
+      "stopped-early": "Recording stopped without writing a file.",
+      "stopping": "Stopping…"
     },
     "screen-time": {
       "back": "Back",
-      "disabled": "Screen time tracking is off. Enable it in Settings to record per-app usage.",
+      "disabled": "Screen time tracking is off. Turn it on below to record per-app usage.",
       "empty": "No app usage recorded yet. Focus a window to start tracking.",
       "hour-0": "12 AM",
       "hour-12": "12 PM",
       "hour-18": "6 PM",
       "hour-6": "6 AM",
-      "most-used": "MOST USED",
+      "most-used": "Most Used",
       "range": {
         "14-days": "14 days",
+        "14-days-tooltip": "Daily totals for the last two weeks",
         "3-days": "3 days",
-        "today": "Today"
+        "3-days-tooltip": "Daily totals for the last three days",
+        "today": "Today",
+        "today-tooltip": "Hourly usage today"
+      },
+      "sections": {
+        "14-days-caption": "Daily totals for the last two weeks",
+        "3-days-caption": "Daily totals for the last three days",
+        "today-caption": "Hourly usage today"
       },
       "view-day": "View Day Details"
     },
+    "screenshot": {
+      "annotate": "Annotate",
+      "capture": "Capture",
+      "countdown": "Capturing in {seconds}s",
+      "delay-3s": "3s",
+      "delay-3s-tooltip": "Wait 3 seconds after Control Center closes",
+      "delay-5s": "5s",
+      "delay-5s-tooltip": "Wait 5 seconds after Control Center closes",
+      "delay-none": "Now",
+      "delay-none-tooltip": "Capture as soon as Control Center closes",
+      "describe": "Describe with LocalAI",
+      "fullscreen": "Fullscreen",
+      "hint": "Control Center closes first so the overlay can take the screen.",
+      "ocr": "Scan text",
+      "ocr-copied": "Text copied",
+      "ocr-empty": "No text found in that region.",
+      "ocr-failed": "Could not read text from the screen.",
+      "ocr-missing": "Install Tesseract to copy text from the screen.",
+      "open-folder": "Open screenshot folder",
+      "open-folder-failed": "Could not open the screenshot folder.",
+      "pick-color": "Pick color",
+      "pick-display": "Pick display",
+      "qr-copied": "QR code copied",
+      "qr-empty": "No QR code found in that region.",
+      "qr-failed": "Could not scan a QR code.",
+      "qr-missing": "Install ZBar to scan QR codes.",
+      "read": "Read with LocalAI",
+      "recent": "Recent screenshots",
+      "recent-empty": "No screenshots in the save folder yet.",
+      "region": "Select region",
+      "region-too-small": "The selected region is too small.",
+      "scan-qr": "Scan QR"
+    },
+    "settings": {
+      "configure": "Settings",
+      "search-placeholder": "Search pages and settings",
+      "done": "Done"
+    },
     "shortcuts": {
+      "ai": "AI",
+      "appearance": "Appearance",
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "caffeine": "Caffeine",
+      "cast": "Cast",
       "clipboard": "Clipboard",
       "dark-mode": {
         "auto": "Auto Mode",
         "dark": "Dark Mode",
         "light": "Light Mode"
       },
+      "firewall": "Firewall",
       "keyboard-layout": "Keyboard Layout",
+      "localsend": "LocalSend",
       "media": "Media",
       "mic-mute": "Microphone",
       "nightlight": "Night Light",
       "nightlight-states": {
         "forced": "Always On",
-        "off": "Night Light",
+        "off": "Off",
         "scheduled-day": "Scheduled",
         "scheduled-night": "Running"
       },
       "notification": "DND",
+      "ocr": "Scan Text",
+      "phone": "Phone",
+      "pick-color": "Pick Color",
       "power-profile": "Power",
+      "printers": "Printers",
+      "privacy": "Privacy",
+      "scan-qr": "Scan QR",
+      "screen-recorder": "Recorder",
+      "screen-replay": "Replay",
       "screen-time": "Screen Time",
+      "screenshot": "Screenshot",
       "session": "Session",
+      "syncthing": "Syncthing",
       "system": "System",
+      "tailscale": "Tailscale",
       "wallpaper": "Wallpaper",
       "weather": "Weather",
       "wifi": "Wi-Fi"
     },
+    "sidebar": {
+      "advanced": "General",
+      "appearance": "Appearance",
+      "behavior": "Input",
+      "layout": "Desktop",
+      "services": "Services",
+      "status": "Device"
+    },
+    "syncthing": {
+      "connected-count": "{count} devices connected",
+      "copy-id": "Copy this device ID",
+      "devices": "Devices",
+      "devices-empty": "No other devices yet. Add one in Syncthing, then tap Refresh.",
+      "folder-error": "Needs attention",
+      "folders": "Folders",
+      "folders-empty": "No folders yet. Add one in Syncthing.",
+      "missing": "Install Syncthing to keep folders in sync from Control Center.",
+      "offline": "Offline",
+      "online": "Online",
+      "open": "Open Syncthing",
+      "pause": "Pause folder",
+      "paused": "Paused",
+      "ready": "Ready",
+      "ready-hint": "Start Syncthing to see folders and devices.",
+      "refresh": "Refresh",
+      "resume": "Resume folder",
+      "scan": "Scan now",
+      "scanning": "Scanning",
+      "start": "Start Syncthing",
+      "starting": "Starting…",
+      "status-failed": "Could not read folders from Syncthing.",
+      "stop": "Stop",
+      "stopped": "Syncthing is not running",
+      "syncing": "Syncing",
+      "title": "Syncthing",
+      "type-both": "Send and receive",
+      "type-encrypted": "Receive encrypted",
+      "type-receive": "Receive only",
+      "type-send": "Send only",
+      "up-to-date": "Up to date",
+      "visible-as": "This machine is {name}"
+    },
     "system": {
+      "copy-info": "Copy system info",
+      "pages": {
+        "battery": "Battery Alerts",
+        "monitoring": "Monitoring"
+      },
       "labels": {
         "load": "CPU Load",
         "ram": "RAM",
         "swap": "Swap"
       },
+      "sections": {
+        "about-caption": "Machine and storage",
+        "cpu-caption": "Processor load and temperature",
+        "gpu-caption": "Graphics load, memory, and temperature",
+        "memory-caption": "Memory in use",
+        "network-caption": "Download and upload"
+      },
       "titles": {
+        "about": "About",
         "cpu": "CPU",
         "gpu": "GPU",
         "memory": "Memory",
@@ -467,21 +1674,128 @@
         "load": "Load average over 1 / 5 / 15 minutes"
       },
       "unknown": "unknown",
+      "upgrade": "Update Helix Shell",
+      "upgrade-busy": "Updating…",
+      "upgrade-description": "Upgrade the Helix Shell Fedora packages. Administrator approval is required. A local build you are running now is not replaced.",
       "uptime-prefix": "Up {uptime} · {osAge}"
     },
     "tabs": {
-      "audio": "Audio",
+      "ai": "AI",
+      "ai-usage": "AI",
+      "audio": "Sound",
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
+      "camera": "Camera",
+      "capture": "Capture",
+      "cast": "Cast",
+      "clipboard": "Clipboard",
+      "clock": "Clock",
+      "firewall": "Firewall",
       "home": "Home",
+      "localsend": "LocalSend",
       "media": "Media",
-      "monitor": "Monitor",
+      "monitor": "Displays",
       "network": "Network",
       "notifications": "Notifications",
+      "packages": "Packages",
+      "phone": "Phone",
       "power": "Power",
+      "printers": "Printers",
+      "privacy": "Privacy",
+      "privacy-security": "Privacy & Security",
+      "screen-record": "Screen Record",
       "screen-time": "Screen Time",
+      "screenshot": "Screenshot",
+      "settings": "Settings",
+      "syncthing": "Syncthing",
       "system": "System",
+      "tailscale": "Tailscale",
       "weather": "Weather"
+    },
+    "tailscale": {
+      "advertise-exit": "Advertise exit node",
+      "allow-lan": "Allow LAN while using an exit node",
+      "busy": "Working…",
+      "command-failed": "The Tailscale command failed.",
+      "connect": "Connect",
+      "connected": "Connected",
+      "copy-ip": "Copy IP",
+      "disconnect": "Disconnect",
+      "dns": "Accept DNS",
+      "exit-node": "Exit node",
+      "exit-none": "None",
+      "filter": "Filter peers…",
+      "login": "Log in",
+      "missing": "Install Tailscale to manage this machine from Control Center.",
+      "needs-login": "Needs sign-in",
+      "needs-operator": "Tailscale needs administrator approval on this machine.",
+      "offline": "Offline",
+      "online": "Online",
+      "open-admin": "Open admin console",
+      "peer-offline": "{name} went offline",
+      "peer-online": "{name} came online",
+      "peers": "Devices",
+      "peers-empty": "No other devices on this tailnet.",
+      "peers-none": "No matching devices.",
+      "preferences": "Network",
+      "refresh": "Refresh",
+      "routes": "Accept routes",
+      "shields": "Shields up",
+      "ssh": "Tailscale SSH",
+      "starting": "Starting…",
+      "status-failed": "Could not read Tailscale status.",
+      "stopped": "Stopped",
+      "stopping": "Stopping…",
+      "title": "Tailscale",
+      "use-exit": "Use as exit",
+      "peers-empty-title": "No devices",
+      "peers-none-title": "No matches"
+    },
+    "templates": {
+      "apply-failed": "Apply failed",
+      "apply-failures": "{count} templates failed to apply. Turn unused ones off, or hover a tile for the error.",
+      "apply-tooltip": "Reapply enabled templates for the current palette",
+      "built-in-tooltip": "Templates bundled with Helix",
+      "community-tooltip": "Templates from the community catalog",
+      "create-failed": "Could not create that user template.",
+      "disabled-builtin": "Turn on built-in templates to browse the bundled catalog and apply them on each theme change.",
+      "disabled-community": "Turn on community templates to download the catalog and apply them on each theme change.",
+      "disabled-user": "Pick an installed app to create a user template. If Helix already has one, that catalog entry is enabled instead.",
+      "edit-title": "Edit {id}",
+      "edit-tooltip": "Edit output path and post-hook",
+      "empty-user": "No user templates yet. Use + to create one from an installed app.",
+      "enable": "Enable",
+      "gtk-follow": "GTK Templates",
+      "gtk-follow-enable": "Enable GTK templates",
+      "gtk-follow-off": "GTK apps still use the stock theme. Enable GTK 3 and GTK 4 templates so they follow this palette.",
+      "gtk-missing-theme": "GTK 3 and GTK 4 templates are on, but adw-gtk3 is not installed. Install package adw-gtk3-theme so GTK apps follow this palette.",
+      "input-path": "Template file",
+      "new": "New template from an app",
+      "new-tooltip": "Create or enable a template for an installed app",
+      "open-folder-failed": "Could not open the templates folder.",
+      "open-folder-tooltip": "Open the user templates folder",
+      "open-input": "Open template file",
+      "open-input-failed": "Could not open the template file.",
+      "output-path": "Output path",
+      "output-path-placeholder": "$XDG_CONFIG_HOME/my-app/theme.css",
+      "output-required": "Set an output path the app will actually read.",
+      "post-hook": "Post-hook",
+      "post-hook-placeholder": "my-app --reload-theme",
+      "save": "Save",
+      "search-app": "Search applications…",
+      "user-tooltip": "Templates you created for installed apps"
+    },
+    "theme": {
+      "niri-blur": "Compositor blur",
+      "niri-blur-description": "Blur niri windows and Helix Shell surfaces. Tune strength on this card.",
+      "niri-blur-save-title": "Niri Blur",
+      "niri-border": "Themed border",
+      "niri-description": "Match niri window decorations to this palette.",
+      "niri-draw-border": "Fill behind window borders",
+      "niri-focus-ring": "Themed focus ring",
+      "niri-save-failed": "Could not update niri's config",
+      "niri-save-title": "Window Decorations",
+      "niri-title": "Niri Window Decorations"
     },
     "weather": {
       "daily": {
@@ -505,7 +1819,9 @@
         "uv-index": "UV Index",
         "wind": "Wind"
       },
-      "disabled": "Enable [weather] in config.toml",
+      "disabled": "Weather is off",
+      "disabled-hint": "Turn it on to show conditions and forecast.",
+      "enable": "Show weather",
       "fetching": "Fetching forecast…",
       "forecast-placeholder": {
         "day": "Sunday",
@@ -514,7 +1830,9 @@
       },
       "forecast-view": {
         "daily": "Daily",
-        "hourly": "Hourly"
+        "daily-tooltip": "One row per day",
+        "hourly": "Hourly",
+        "hourly-tooltip": "The next few hours"
       },
       "hourly": {
         "summary": "{condition} / Rain {precip}%",
@@ -526,11 +1844,55 @@
         }
       },
       "location-unavailable": "Location unavailable",
-      "no-location-body": "Add your address or enable auto-locate in Location settings.",
+      "no-location-body": "Use the header gear to set an address or turn on auto-locate.",
       "no-location-title": "No location set",
       "refreshing": "Refreshing weather…",
+      "sections": {
+        "daily": "Daily",
+        "daily-caption": "The next seven days",
+        "details": "Details",
+        "details-caption": "Wind, sun, and more",
+        "hourly": "Hourly",
+        "hourly-caption": "The next few hours"
+      },
       "waiting": "Waiting for weather data"
-    }
+    },
+    "windows": {
+      "columns-caption": "How wide new tiled windows start.",
+      "columns-description": "How wide new tiled windows start, as a percent of the display.",
+      "columns-title": "Columns",
+      "columns-tooltip": "Default column width",
+      "save-failed": "Could not update window layout",
+      "save-title": "Windows",
+      "spacing-caption": "Gaps between windows and outer padding.",
+      "spacing-description": "Gaps between tiled windows and extra outer padding on all four sides.",
+      "spacing-title": "Spacing",
+      "spacing-tooltip": "Gaps and outer padding"
+    },
+    "install-phone": "Install Helix Phone to open this application.",
+    "install-settings": "Install Helix Settings to open this application.",
+    "install-system-monitor": "Install Helix System Monitor to open this application.",
+    "open-phone": "Open Phone",
+    "open-system-monitor": "Open System Monitor",
+    "open-settings": "Open Settings"
+  },
+  "desktop-ai": {
+    "busy": "LocalAI is already working on something.",
+    "copied": "Copied to the clipboard.",
+    "dictate-missing": "Install pw-record, parecord, or ffmpeg to dictate.",
+    "dictate-start": "Listening…",
+    "dictate-stop": "Transcribing…",
+    "done": "Done.",
+    "empty": "Nothing to send.",
+    "failed": "LocalAI could not finish that.",
+    "needs-chat": "Install a chat model in the AI gallery.",
+    "needs-transcript": "Install a transcription model in the AI gallery.",
+    "needs-tts": "Install a speech model in the AI gallery.",
+    "needs-vision": "Install a vision model in the AI gallery.",
+    "speaking": "Speaking…",
+    "stopped": "LocalAI is not running.",
+    "too-large": "That image is too large for LocalAI.",
+    "working": "Asking LocalAI…"
   },
   "desktop-widgets": {
     "editor": {
@@ -548,6 +1910,8 @@
         "trash": "Delete"
       },
       "dialogs": {
+        "select-file": "Choose a file",
+        "select-folder": "Choose a folder",
         "select-sticker-image": "Select Sticker Image"
       },
       "settings": {
@@ -608,6 +1972,7 @@
         "network-speed-unit-kilobytes": "kB/s",
         "network-speed-unit-megabytes": "MB/s",
         "opacity": "Opacity",
+        "path": "Path",
         "primary-color": "Primary Color",
         "reset-defaults": "Reset to Defaults",
         "reversed": "Reversed",
@@ -677,6 +2042,8 @@
         "calendar": "Calendar",
         "clock": "Clock",
         "fancy-audio-visualizer": "Fancy Audio Visualizer",
+        "file": "File",
+        "folder": "Folder",
         "label": "Label",
         "login-box": "Login Box",
         "media-player": "Media Player",
@@ -706,7 +2073,11 @@
       "close": "Close",
       "close-all": "Close All"
     },
-    "launcher": "Launcher"
+    "launcher": "Launcher",
+    "missing-app": "Missing app",
+    "missing-app-body": "{id} is no longer installed. Unpin it or install the app again.",
+    "missing-app-tooltip": "Missing app · {id}",
+    "phone": "Phone"
   },
   "internal-apps": {
     "settings": {
@@ -748,6 +2119,7 @@
       "unpin-from-dock": "Unpin from Dock"
     },
     "empty": {
+      "loading": "Loading results...",
       "no-results": "No results found",
       "type-to-search": "Type to search…"
     },
@@ -760,6 +2132,34 @@
       "user": "User"
     },
     "providers": {
+      "actions": {
+        "bar-toggle": "Toggle bar",
+        "bar-toggle-sub": "Show or hide the bar",
+        "close-focused": "Close {name}",
+        "close-focused-sub": "Close the focused window",
+        "control-center": "Control Center",
+        "control-center-sub": "Open quick settings",
+        "dnd": "Do Not Disturb",
+        "dnd-sub": "Toggle notification quiet mode",
+        "monitor": "System Monitor",
+        "monitor-sub": "See processes and resource use",
+        "notifications": "Notification Center",
+        "notifications-sub": "Open notification history",
+        "settings": "Settings",
+        "settings-sub": "Open Helix Settings",
+        "software": "Helix Software",
+        "software-sub": "Browse and update applications",
+        "state-off": "Off",
+        "state-on": "On",
+        "switch-to": "Switch to {name}",
+        "title": "Actions",
+        "workspace-next": "Next workspace",
+        "workspace-next-from": "After {name}",
+        "workspace-next-sub": "Move to the next workspace",
+        "workspace-prev": "Previous workspace",
+        "workspace-prev-from": "Before {name}",
+        "workspace-prev-sub": "Move to the previous workspace"
+      },
       "applications": {
         "title": "Applications"
       },
@@ -768,6 +2168,20 @@
       },
       "emoji": {
         "title": "Emoji"
+      },
+      "panel": {
+        "builtin": {
+          "clipboard": "Clipboard",
+          "control-center": "Control Center",
+          "launcher": "Launcher",
+          "polkit": "Authentication Prompt",
+          "session": "Session",
+          "setup-wizard": "Setup Wizard",
+          "test": "Test Panel",
+          "tray-drawer": "Tray Drawer",
+          "wallpaper": "Wallpaper"
+        },
+        "title": "Panels"
       },
       "session": {
         "action-subtitle": "Run session action",
@@ -819,6 +2233,10 @@
       "placeholder": "Type a reply…"
     },
     "internal": {
+      "ai-usage-high-body": "{provider} {window} is at {percent}%.",
+      "ai-usage-high-title": "{provider} is almost spent",
+      "ai-usage-reset-body": "{provider} {window} resets in {reset} ({percent}% used).",
+      "ai-usage-reset-title": "{provider} resets soon",
       "battery": "Battery",
       "battery-critical-body": "{device}: {percent}%; your computer will shut down soon",
       "battery-critical-title": "Battery critically low",
@@ -826,7 +2244,7 @@
       "battery-low-body": "{device}: {percent}% remaining",
       "battery-low-title": "Battery low",
       "calendar": "Calendar",
-      "calendar-credential-locked-body": "Unlock the keyring used by Secret Service, then retry in Settings. With GNOME Keyring, make an automatically unlocked keyring such as Login the default.",
+      "calendar-credential-locked-body": "Unlock the keyring used by Secret Service, then tap Retry on this account. With GNOME Keyring, make an automatically unlocked keyring such as Login the default.",
       "calendar-credential-locked-title": "Calendar keyring is locked",
       "calendar-google-connect-browser-failed": "No browser opener could be launched for Google authorization. Check your default browser or xdg-open setup.",
       "calendar-google-connect-credential-store-failed": "Authorization completed, but the refresh token could not be saved. Unlock or start Secret Service, then connect again.",
@@ -838,22 +2256,22 @@
       "calendar-google-connect-start-failed": "Could not start Google authorization. Check your network connection and try again.",
       "calendar-google-connect-start-http": "Could not start Google authorization. The OAuth broker returned HTTP {status}.",
       "calendar-google-connect-timeout": "Google authorization timed out. Start the connection again when you are ready to sign in.",
-      "config-migration-body": "Update {path} in the source file. Noctalia is applying this replacement only temporarily. Run noctalia config validate to list every required change.",
+      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run helix config validate to list every required change.",
       "config-migration-title": "Configuration update needed",
       "dbus-disabled": "DBus notifications disabled",
       "desktop-widgets-editor": "Widget editor",
       "desktop-widgets-editor-enabled": "Desktop widget editor is on. Switch to an empty workspace so open windows do not cover the editor.",
-      "greeter-sync": "Noctalia Greeter",
+      "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Syncing appearance to the greeter. If an administrator prompt appears, approve it; passwordless authorization follows system policy.",
-      "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Noctalia, on a TTY, or on a console.",
+      "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Helix, on a TTY, or on a console.",
       "greeter-sync-pending-legacy": "Syncing through the authenticated legacy helper. Administrator approval is required.",
-      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving NOCTALIA_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
-      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving HELIX_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
+      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Appearance synced. Changes apply on the next login screen.",
       "greeter-sync-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
-      "keybind-app": "Noctalia",
+      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
+      "keybind-app": "Helix Shell",
       "keybind-invalid-modifier": "This shortcut accepts a single key without modifiers.",
       "keybind-invalid-printable": "Printable keys (letters, numbers, symbols) require a modifier such as Ctrl or Alt.",
       "keybind-invalid-super": "The Super/Windows key cannot be used in shell keybinds.",
@@ -863,12 +2281,20 @@
       "lockscreen-widgets-editor": "Lockscreen widget editor",
       "lockscreen-widgets-editor-blocked-locked": "Unlock the session before editing lockscreen widgets.",
       "lockscreen-widgets-editor-enabled": "Lockscreen widget editor is on. Switch to an empty workspace so open windows do not cover the editor.",
-      "mpris-disabled": "MPRIS disabled",
+      "mpris-disabled": "Media controls are off",
       "polkit-agent": "Polkit Agent",
       "polkit-no-session": "Polkit agent needs logind, elogind, or XDG_SESSION_ID. On seatd-only setups it cannot register for graphical prompts. Use terminal pkexec for greeter sync, or install elogind for in-session authentication.",
       "screen-time-reset": "Screen Time",
       "screen-time-reset-success": "Usage history cleared.",
       "session-bus-unavailable": "Session bus unavailable",
+      "shell-upgrade": "Helix Shell",
+      "shell-upgrade-busy": "An update is already running.",
+      "shell-upgrade-failed": "Could not update Helix Shell.",
+      "shell-upgrade-started": "Updating Fedora packages. Approve the polkit prompt if asked.",
+      "shell-upgrade-success": "Helix Shell packages were updated.",
+      "templates-apply": "Templates",
+      "templates-apply-pending": "Theme palette has not been resolved yet.",
+      "templates-apply-success": "Enabled templates were reapplied for the current palette.",
       "wallpaper-palette-export": "Custom Palette",
       "wallpaper-palette-export-success": "Saved \"{name}\" and switched palette source to custom."
     }
@@ -925,7 +2351,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin} targets plugin API {version}; this Noctalia supports API {oldest}–{current}.",
+      "body-incompatible": "{plugin} targets plugin API {version}; this Helix supports API {oldest}–{current}.",
       "body-timeout": "{plugin} took too long to install.",
       "title": "Plugin not enabled"
     }
@@ -956,6 +2382,22 @@
       "performance": "Performance",
       "power-saver": "Power Saver"
     }
+  },
+  "quick-insert": {
+    "empty-actions": "No matching actions",
+    "empty-clipboard": "No matching clipboard items",
+    "empty-emoji": "No matching emoji",
+    "empty-recents": "No recent screenshots",
+    "focused-window": "Focused · {name}",
+    "search-actions": "Search actions",
+    "search-clipboard": "Search clipboard",
+    "search-emoji": "Search emoji",
+    "search-placeholder": "Search actions, emoji, screenshots, or clipboard",
+    "search-recents": "Search screenshots",
+    "source-actions": "Actions",
+    "source-clipboard": "Clipboard",
+    "source-emoji": "Emoji",
+    "source-recents": "Recents"
   },
   "session": {
     "actions": {
@@ -1034,7 +2476,11 @@
         "unset-placeholder": "Click to bind…"
       },
       "list": {
-        "add-entry-placeholder": "Add entry…"
+        "add": "Add",
+        "add-entry-placeholder": "Add entry…",
+        "move-down": "Move down",
+        "move-up": "Move up",
+        "remove": "Remove"
       },
       "path-browse": {
         "file-title": "Choose file",
@@ -1053,7 +2499,7 @@
       "bar": {
         "create": "Create",
         "delete": "Delete",
-        "delete-confirm-desc": "This GUI-created bar will be removed from settings.toml.",
+        "delete-confirm-desc": "This bar was created in Control Center and will be deleted.",
         "delete-confirm-title": "Delete \"{name}\"?",
         "id-placeholder": "Bar ID",
         "label": "Bar: {name}",
@@ -1065,14 +2511,18 @@
         "rename-save": "Save"
       },
       "monitor-override": {
+        "base": "All monitors",
         "create": "Create",
+        "custom": "Custom",
         "delete": "Delete",
-        "delete-confirm-desc": "This GUI-created monitor override will be removed from settings.toml.",
+        "delete-confirm-desc": "This monitor override was created in Control Center and will be deleted.",
         "delete-confirm-title": "Delete \"{name}\"?",
+        "exists": "An override for this monitor already exists.",
         "label": "Monitor: {name}",
         "management": "Monitor Override",
         "match-placeholder": "Monitor match",
         "new": "Monitor Override",
+        "new-title": "New Monitor Override",
         "rename": "Rename",
         "rename-save": "Save"
       },
@@ -1216,10 +2666,11 @@
       },
       "reset-page": "Failed to reset some settings.",
       "support-report": "Failed to save support report.",
-      "sync-greeter": "Could not sync appearance to Noctalia Greeter.",
+      "sync-greeter": "Could not sync appearance to Helix Greeter.",
+      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "sync-greeter-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Could not rename named widget."
       },
@@ -1267,6 +2718,8 @@
     "navigation": {
       "groups": {
         "accessibility": "Accessibility",
+        "ai-usage": "AI",
+        "apps": "Apps",
         "audio": "Audio",
         "authentication": "Authentication",
         "automation": "Automation",
@@ -1274,28 +2727,36 @@
         "background": "Background",
         "battery": "Battery",
         "behavior": "Behavior",
+        "bluetooth": "Bluetooth",
         "borders": "Borders",
         "brightness": "Brightness",
         "built-in": "Built-In",
         "calendar": "Calendar",
         "capsules": "Capsules",
         "clipboard": "Clipboard",
+        "clock": "Clock",
         "community": "Community",
         "control-center": "Control Center",
+        "daily": "Daily",
         "dead-zone": "Dead Zone",
+        "devices": "Devices",
         "directories": "Directories",
+        "discovery": "Discovery",
         "display": "Display",
         "effects": "Effects",
         "filtering": "Filtering",
         "focus-styling": "Focus Styling",
         "formats": "Formats",
         "general": "General",
+        "glass": "Glass",
         "greeter": "Greeter",
         "grouping": "Grouping",
         "history": "History",
         "home": "Home",
         "hot-corners": "Hot Corners",
+        "icons": "Icons",
         "idle": "Idle",
+        "in-helix": "In Helix Shell",
         "interface": "Interface",
         "keybinds": "Keybinds",
         "keyboard-layout": "Keyboard Layout",
@@ -1314,16 +2775,32 @@
         "navigation": "Navigation",
         "network": "Network",
         "night-light": "Night Light",
+        "niri": "Niri",
+        "niri-actions": "Niri actions",
+        "niri-apps": "Apps",
+        "niri-attention": "Needs attention",
+        "niri-bound": "Bound",
+        "niri-capture": "Capture",
+        "niri-conflict": "Conflicts",
+        "niri-media": "Sound & brightness",
+        "niri-missing": "Missing",
+        "niri-open": "Open",
+        "niri-panels": "Open",
+        "niri-session": "Session",
+        "niri-system": "Session",
         "notifications": "Notifications",
         "osd": "OSD",
         "overview": "Overview",
+        "palette": "Palette",
         "pinned-apps": "Pinned Apps",
         "polkit": "Polkit",
         "power": "Power",
         "privacy": "Privacy",
         "profile": "Profile",
         "providers": "Providers",
+        "quick-insert": "Quick Insert",
         "screen-corners": "Screen Corners",
+        "screen-record": "Recording",
         "screen-time": "Screen Time",
         "screenshot": "Screenshot",
         "screenshot-annotation": "Annotation",
@@ -1331,30 +2808,43 @@
         "screenshot-output": "Output",
         "security": "Security",
         "session-panel": "Session Panel",
+        "setup": "Setup",
         "shape": "Shape",
+        "store": "Store",
         "system": "System",
         "theme": "Theme",
         "toasts": "Toasts",
         "transition": "Transition",
         "user": "User",
+        "video": "Video",
+        "wallhaven": "Wallhaven",
         "wallpaper": "Wallpaper",
         "weather": "Weather",
         "widget-list": "Widget List",
         "widgets": "Widgets",
+        "wifi": "Wi-Fi",
         "window-switcher": "Window Switcher"
       },
       "sections": {
         "accessibility": "Accessibility",
-        "appearance": "Appearance",
         "backdrop": "Backdrop",
         "bar": "Bar",
+        "bluetooth": "Bluetooth",
+        "chrome": "Chrome",
+        "clock": "Clock",
         "control-center": "Control Center",
-        "desktop": "Desktop",
+        "desktop": "Desktop & Dock",
         "dock": "Dock",
+        "effects": "Effects",
+        "glass": "Glass",
         "hooks": "Hooks",
+        "icons": "Icons",
         "keybinds": "Keybinds",
+        "language": "Language",
         "launcher": "Launcher",
+        "localsend": "LocalSend",
         "location": "Location",
+        "network": "Network",
         "niri": "Niri",
         "notifications": "Notifications",
         "osd": "OSD",
@@ -1362,13 +2852,21 @@
         "plugins": "Plugins",
         "popups": "Popups",
         "power": "Power",
+        "roundness": "Roundness",
+        "scale": "Scale",
+        "screen-record": "Screen Record",
         "screenshot": "Screenshot",
         "security": "Security",
         "services": "Services",
         "shell": "Shell",
         "system": "System",
+        "tailscale": "Tailscale",
         "templates": "Templates",
-        "wallpaper": "Wallpaper"
+        "theme": "Theme",
+        "type": "Type",
+        "umbriel": "Umbriel",
+        "wallpaper": "Wallpaper",
+        "windows": "Windows"
       }
     },
     "notifications": {
@@ -1386,10 +2884,10 @@
           "toast": "toast"
         },
         "flags-label": "When matched",
-        "match-content-label": "Content Regex",
-        "match-content-placeholder": "Regex pattern to match summary or body…",
+        "match-content-label": "Message text",
+        "match-content-placeholder": "Words in the title or body…",
         "match-label": "App",
-        "match-placeholder": "App name, desktop entry, or category…",
+        "match-placeholder": "App name, id, or category…",
         "override-duration": "Override duration",
         "play-sound": "Play sound",
         "save-history": "Save to history",
@@ -1404,6 +2902,13 @@
       "accordion-direction": {
         "end": "After first widget",
         "start": "Before first widget"
+      },
+      "ai-usage": {
+        "provider-mode": {
+          "auto": "Auto-detect",
+          "off": "Off",
+          "on": "Always on"
+        }
       },
       "bar": {
         "auto-hide": {
@@ -1420,6 +2925,11 @@
         }
       },
       "control-center": {
+        "shortcut-size": {
+          "large": "Large",
+          "small": "Small",
+          "wide": "Wide"
+        },
         "sidebar": {
           "compact": "Compact",
           "full": "Full",
@@ -1457,11 +2967,20 @@
         "control-center": "Control Center",
         "launcher": "Launcher",
         "none": "None",
+        "widgets": "Widgets",
         "window-switcher": "Window Switcher"
       },
       "layer": {
         "overlay": "Overlay",
         "top": "Top"
+      },
+      "niri": {
+        "overview": {
+          "backdrop": "Blurred backdrop",
+          "flat": "Flat color",
+          "none": "None",
+          "stationary": "Stationary wallpaper"
+        }
       },
       "notification-urgency": {
         "critical": "Critical",
@@ -1543,6 +3062,10 @@
         "default": "Default"
       },
       "wallpaper": {
+        "daily": {
+          "bing": "Bing",
+          "nasa": "NASA"
+        },
         "fill": {
           "center": "Center",
           "crop": "Crop",
@@ -1555,6 +3078,10 @@
           "alphabetical": "Alphabetical",
           "random": "Random"
         },
+        "source": {
+          "daily": "Daily",
+          "folder": "Folder"
+        },
         "transition": {
           "disc": "Disc",
           "fade": "Fade",
@@ -1562,6 +3089,13 @@
           "stripes": "Stripes",
           "wipe": "Wipe",
           "zoom": "Zoom"
+        },
+        "video": {
+          "auto-pause": {
+            "full": "Fullscreen",
+            "max": "Maximized",
+            "off": "Off"
+          }
         }
       },
       "weather": {
@@ -1569,6 +3103,12 @@
           "imperial": "Imperial",
           "metric": "Metric"
         }
+      },
+      "wifi-band": {
+        "all": "All bands",
+        "ghz24": "2.4 GHz",
+        "ghz5": "5 GHz",
+        "ghz6": "6 GHz"
       }
     },
     "plugins": {
@@ -1599,10 +3139,12 @@
         "deprecated": "deprecated",
         "empty": "No enabled plugins.",
         "held-back": "older version",
-        "held-back-hint": "v{version} needs plugin API {required}; this Noctalia supports up to {current}. Upgrade Noctalia to get it.",
+        "held-back-hint": "v{version} needs plugin API {required}; this Helix supports up to {current}. Upgrade Helix to get it.",
         "incompatible-plugin-api": "incompatible plugin API",
         "remove": "Remove plugin",
         "requires": "Requires: {dependencies}",
+        "search-empty": "No plugins match \"{query}\".",
+        "search-placeholder": "Search installed plugins",
         "title": "Plugins",
         "update-all": "Update all ({count})",
         "update-available": "update available",
@@ -1630,8 +3172,8 @@
         },
         "kind-label": "Kind",
         "location-label": "Location",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "Source ID",
         "name-placeholder": "my-plugins",
         "precedence-hint": "Lower sources override higher ones when they offer the same plugin.",
@@ -1641,19 +3183,19 @@
         "update": "Update source"
       },
       "store": {
-        "add": "Add to Noctalia",
+        "add": "Add to Helix Shell",
         "back-to-catalog": "Back to the plugin catalog",
         "categories": "Categories",
         "category-all": "All",
         "empty": "No plugins found",
         "held-back": "Older version",
-        "held-back-hint": "Installs v{version} for plugin API {resolved}. The newest v{latest} needs plugin API {latestRequired}; this Noctalia supports up to {current}.",
+        "held-back-hint": "Installs v{version} for plugin API {resolved}. The newest v{latest} needs plugin API {latestRequired}; this Helix supports up to {current}.",
         "incompatible": "Incompatible",
-        "incompatible-hint": "Needs plugin API {required}; this Noctalia supports {oldest}–{current}.",
+        "incompatible-hint": "Needs plugin API {required}; this Helix supports {oldest}–{current}.",
         "installed": "Installed",
         "loading": "Loading catalog…",
         "no-readme": "No description available.",
-        "open-page": "Open plugin page on noctalia.dev",
+        "open-page": "Open plugin page on helix.dev",
         "open-source": "Open plugin source repository",
         "results-count": "{count} plugins",
         "search-placeholder": "Search plugins…",
@@ -1672,6 +3214,78 @@
         "high-contrast": {
           "description": "Increase contrast by pushing surface and background colors towards extreme values",
           "label": "High Contrast"
+        }
+      },
+      "ai-usage": {
+        "claude": {
+          "label": "Claude Code"
+        },
+        "codex": {
+          "label": "Codex"
+        },
+        "copilot": {
+          "label": "GitHub Copilot"
+        },
+        "cursor": {
+          "label": "Cursor"
+        },
+        "deepseek": {
+          "label": "DeepSeek"
+        },
+        "gemini": {
+          "label": "Gemini CLI"
+        },
+        "gemini-daily-limit": {
+          "description": "Requests per day on your Gemini plan (1000 on the free tier). Used to compute today's percentage.",
+          "label": "Gemini Daily Request Quota"
+        },
+        "localai": {
+          "label": "LocalAI"
+        },
+        "localai-host": {
+          "description": "LocalAI HTTP endpoint. Empty uses LOCALAI_ADDRESS or 127.0.0.1:8080. Desktop tools and plugins send OpenAI-compatible requests here.",
+          "label": "LocalAI Host",
+          "placeholder": "127.0.0.1:8080"
+        },
+        "localai-model": {
+          "description": "Default chat model for desktop AI tools. Empty picks the first chat-capable model LocalAI reports. The AI tab Installed list picks it; Gallery installs more.",
+          "label": "LocalAI Model",
+          "placeholder": "qwen3-4b"
+        },
+        "ollama": {
+          "label": "Ollama"
+        },
+        "ollama-host": {
+          "description": "Ollama HTTP endpoint. Empty uses OLLAMA_HOST or 127.0.0.1:11434.",
+          "label": "Ollama Host",
+          "placeholder": "127.0.0.1:11434"
+        },
+        "ollama-model": {
+          "description": "Local model Helix loads when Ollama is running. The AI tab leftover Installed list shows downloaded models; Library installs more.",
+          "label": "Ollama Model",
+          "placeholder": "llama3.2:latest"
+        },
+        "provider-mode": {
+          "description": "Auto shows a CLI when it is on PATH. Always on keeps the row even if the CLI is missing. Cursor, Copilot, and DeepSeek are editor apps and stay hidden unless Always on. LocalAI is probed on its port even without the CLI."
+        },
+        "qwen": {
+          "label": "Qwen Code"
+        },
+        "qwen-daily-limit": {
+          "description": "Requests per day on your Qwen plan (2000 on the free OAuth tier). Used to compute today's percentage.",
+          "label": "Qwen Daily Request Quota"
+        },
+        "refresh-seconds": {
+          "description": "How often usage is refreshed while the shell is running",
+          "label": "Refresh Interval"
+        },
+        "warn-percent": {
+          "description": "Notify when a quota reaches this percent. 0 disables usage warnings.",
+          "label": "Usage Warning"
+        },
+        "warn-reset-minutes": {
+          "description": "Notify when a busy quota resets within this many minutes. 0 disables reset warnings.",
+          "label": "Reset Warning"
         }
       },
       "appearance": {
@@ -1700,7 +3314,7 @@
           "label": "Button Borders"
         },
         "card-borders": {
-          "description": "Draw outlines around section cards inside panels and the settings window",
+          "description": "Draw outlines around section cards inside panels",
           "label": "Card Borders"
         },
         "community-palette": {
@@ -1713,7 +3327,7 @@
           "label": "Corner Roundness"
         },
         "custom-palette": {
-          "description": "Choose a palette from ~/.config/noctalia/palettes/",
+          "description": "Choose a palette from ~/.config/helix/palettes/",
           "label": "Custom Palette",
           "search-placeholder": "Search custom palettes…"
         },
@@ -1723,7 +3337,7 @@
           "label": "Export Wallpaper Palette"
         },
         "font-family": {
-          "description": "Font family for the shell interface",
+          "description": "Used across Helix panels and menus",
           "label": "Font Family"
         },
         "global-shadow-alpha": {
@@ -1757,7 +3371,7 @@
           "label": "Pure Black"
         },
         "shell-theme-mode": {
-          "description": "Pin Noctalia's own light or dark mode; Follow keeps it in sync with Theme Mode",
+          "description": "Pin Helix Shell's own light or dark mode; Follow keeps it in sync with Theme Mode",
           "label": "Shell Theme Mode"
         },
         "theme-mode": {
@@ -1944,6 +3558,22 @@
           "label": "Widget Spacing"
         }
       },
+      "bluetooth": {
+        "discovery-seconds": {
+          "description": "How long Rescan keeps adapter discovery running",
+          "label": "Discovery Duration"
+        },
+        "hide-unnamed": {
+          "description": "Hide devices that only advertise a Bluetooth address",
+          "label": "Hide Unnamed Devices"
+        }
+      },
+      "clock": {
+        "timezones": {
+          "description": "IANA timezones shown on the Clock tab besides local time (for example America/Los_Angeles)",
+          "label": "World Clock"
+        }
+      },
       "desktop": {
         "hot-corners-bottom-left": {
           "description": "Action when the pointer hits the bottom left corner",
@@ -2114,7 +3744,7 @@
           "label": "Monitors"
         },
         "pinned-apps": {
-          "description": "Desktop entry IDs of apps pinned to the dock",
+          "description": "Apps pinned to the dock",
           "label": "Pinned Apps"
         },
         "position": {
@@ -2195,7 +3825,7 @@
             "label": "On Shutdown"
           },
           "started": {
-            "description": "Command to run after Noctalia starts",
+            "description": "Command to run after Helix starts",
             "label": "On Started"
           },
           "theme-mode-changed": {
@@ -2203,7 +3833,7 @@
             "label": "On Theme Mode Changed"
           },
           "wallpaper-changed": {
-            "description": "Command to run when the wallpaper changes; provides NOCTALIA_WALLPAPER_PATH and NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Command to run when the wallpaper changes; provides HELIX_WALLPAPER_PATH and HELIX_WALLPAPER_CONNECTOR",
             "label": "On Wallpaper Changed"
           },
           "wifi-disabled": {
@@ -2243,9 +3873,136 @@
           "description": "Move focus or selection down one row",
           "label": "Navigate Down"
         },
+        "duplicate": "Also bound for {actions}",
         "left": {
           "description": "Move focus or selection to the left",
           "label": "Navigate Left"
+        },
+        "niri": {
+          "actions": {
+            "brightness-down": {
+              "label": "Decrease brightness"
+            },
+            "brightness-up": {
+              "label": "Increase brightness"
+            },
+            "caffeine": {
+              "label": "Caffeine"
+            },
+            "clipboard": {
+              "label": "Clipboard"
+            },
+            "control-center": {
+              "label": "Control Center"
+            },
+            "dnd": {
+              "label": "Do not disturb"
+            },
+            "launcher": {
+              "label": "Launcher"
+            },
+            "lock": {
+              "label": "Lock session"
+            },
+            "media-next": {
+              "label": "Next track"
+            },
+            "media-previous": {
+              "label": "Previous track"
+            },
+            "media-toggle": {
+              "label": "Play / pause"
+            },
+            "mic-mute": {
+              "label": "Mute microphone"
+            },
+            "night-light": {
+              "label": "Night light"
+            },
+            "notifications": {
+              "label": "Notifications"
+            },
+            "quick-insert": {
+              "description": "Caps Lock. The key is remapped so it opens Quick Insert instead of toggling Caps.",
+              "label": "Quick Insert"
+            },
+            "screen-record": {
+              "label": "Screen record"
+            },
+            "screenshot-fullscreen": {
+              "label": "Screenshot fullscreen"
+            },
+            "screenshot-ocr": {
+              "label": "Screenshot OCR"
+            },
+            "screenshot-region": {
+              "label": "Screenshot region"
+            },
+            "session": {
+              "label": "Session"
+            },
+            "settings": {
+              "label": "Settings"
+            },
+            "volume-down": {
+              "label": "Decrease volume"
+            },
+            "volume-mute": {
+              "label": "Toggle mute"
+            },
+            "volume-up": {
+              "label": "Increase volume"
+            },
+            "wallpaper": {
+              "label": "Wallpaper"
+            },
+            "window-switcher": {
+              "label": "Window switcher"
+            }
+          },
+          "add-app": {
+            "description": "Pick an installed app, then record a chord. Helix writes a niri spawn shortcut.",
+            "empty": "No applications found",
+            "failed": "Could not prepare a launch command for that app",
+            "label": "Add app shortcut",
+            "placeholder": "Search applications",
+            "record": "Record a key"
+          },
+          "bound": "{keys}",
+          "clear-bind": "Remove",
+          "cleared": "Removed the shortcut. niri reloads on its own.",
+          "conflict": "{key} is already used by another niri bind",
+          "copied": "Copied niri bind to the clipboard",
+          "copied-missing": "Copied missing niri binds to the clipboard",
+          "copy-bind": "Copy",
+          "copy-missing": {
+            "button": "Copy missing",
+            "description": "Copy a binds { } block for recommended shortcuts that are not in your niri config yet",
+            "label": "Copy missing binds"
+          },
+          "custom": "{keys} · default {default}",
+          "install": {
+            "button": "Add to niri",
+            "description": "Add the missing recommended shortcuts to niri. Your existing niri shortcuts stay as-is.",
+            "label": "Install recommended binds"
+          },
+          "install-failed": "Could not update the niri config",
+          "install-none": "All recommended niri binds are already present",
+          "install-ok": "Added {count} niri bind(s). niri reloads the config on its own.",
+          "missing": "Recommended {key}",
+          "none-missing": "All recommended niri binds are already present",
+          "reset": {
+            "button": "Restore recommended",
+            "description": "Put managed shortcuts back on the recommended keys. Shortcuts in your niri config stay unchanged.",
+            "label": "Restore recommended keys"
+          },
+          "reset-bind": "Restore recommended key",
+          "reset-none": "Managed binds already use the recommended keys",
+          "reset-ok": "Restored {count} bind(s) to the recommended keys. niri reloads the config on its own.",
+          "reset-skipped": "Could not restore {count} bind(s) because those keys are used in your niri config",
+          "title": "Niri keybinds",
+          "updated": "Updated niri shortcuts. niri reloads on its own.",
+          "user-owned": "{keys} · in your niri config"
         },
         "right": {
           "description": "Move focus or selection to the right",
@@ -2272,6 +4029,38 @@
           "label": "Confirm"
         }
       },
+      "localsend": {
+        "alias": {
+          "description": "Name shown to other LocalSend devices. Leave empty to use this machine's hostname.",
+          "label": "Device Name",
+          "placeholder": "Hostname"
+        },
+        "auto-accept": {
+          "description": "Accept incoming files without asking. Only enable on a trusted network.",
+          "label": "Auto-Accept Incoming"
+        },
+        "download-dir": {
+          "description": "Folder for received files. Empty uses ~/Downloads.",
+          "label": "Receive Folder"
+        },
+        "enabled": {
+          "description": "Advertise this machine on the local network and accept LocalSend transfers.",
+          "label": "Nearby Sharing"
+        },
+        "notify-on-receive": {
+          "description": "Show a notification when someone sends files to this machine.",
+          "label": "Notify on Receive"
+        },
+        "pin": {
+          "description": "Optional PIN other devices must enter before sending files here.",
+          "label": "Receive PIN",
+          "placeholder": "Optional"
+        },
+        "port": {
+          "description": "TCP and UDP port for LocalSend (default 53317). Change only if that port is already taken.",
+          "label": "Port"
+        }
+      },
       "lockscreen": {
         "allow-empty-password": {
           "description": "Let Enter submit an empty password (enable for security-key or other passwordless PAM stacks; keep off to avoid accidental wake-key lockouts)",
@@ -2292,6 +4081,10 @@
         "fingerprint": {
           "description": "Unlock with a fingerprint reader via fprintd, alongside password entry",
           "label": "Fingerprint Unlock"
+        },
+        "lid-close-keep-external-displays": {
+          "description": "When another display is on, closing the lid turns off the laptop screen instead of suspending",
+          "label": "Keep Using Other Displays"
         },
         "lock-before-suspend": {
           "description": "Lock the session before sleep (lid close, systemctl suspend, hibernate); Lock & Suspend actions still lock first",
@@ -2320,13 +4113,97 @@
           "label": "Lockscreen Widget Editor"
         }
       },
+      "network": {
+        "hidden-ssids": {
+          "description": "SSIDs to omit from the available networks list",
+          "label": "Ignored SSIDs"
+        },
+        "wifi-band": {
+          "description": "Show only access points on the selected radio band. Networks with no reported frequency stay visible when All is selected.",
+          "label": "Wi-Fi Band"
+        }
+      },
+      "niri": {
+        "blur-noise": {
+          "description": "Grain added on top of niri blur to hide color banding.",
+          "label": "Blur noise"
+        },
+        "blur-offset": {
+          "description": "Sample distance per blur pass. Raise this before adding passes; too high needs more passes to avoid artifacts.",
+          "label": "Blur offset"
+        },
+        "blur-passes": {
+          "description": "Dual Kawase downsample/upsample passes. More is smoother and costs more GPU.",
+          "label": "Blur passes"
+        },
+        "default-column-width": {
+          "description": "How wide new tiled windows start, as a percent of the display. Applied the first time you change this slider.",
+          "label": "Default column width"
+        },
+        "draw-border-with-background": {
+          "description": "When off, niri draws the focus ring and border around windows instead of filling behind them. Better with client-side decorations.",
+          "label": "Fill behind window borders"
+        },
+        "gaps": {
+          "description": "Space around tiled windows, in pixels. Applied the first time you change this slider.",
+          "label": "Window gaps"
+        },
+        "overview-preset": {
+          "description": "How the wallpaper looks in niri overview.",
+          "label": "Overview wallpaper"
+        },
+        "setup": {
+          "copied": "Copied niri setup snippet to the clipboard",
+          "copied-missing": "Copied missing niri setup snippets to the clipboard",
+          "copy-missing": {
+            "button": "Copy missing",
+            "description": "Copy recommended niri setup snippets that are not in your config yet",
+            "label": "Copy missing setup"
+          },
+          "install": {
+            "button": "Add to niri",
+            "description": "Add the missing setup snippets to niri. Your existing config stays as-is.",
+            "label": "Install recommended setup"
+          },
+          "install-failed": "Could not update the niri config",
+          "install-none": "All recommended niri setup snippets are already present",
+          "install-ok": "Added {count} niri setup snippet(s). niri reloads the config on its own.",
+          "items": {
+            "autostart": {
+              "description": "Start Helix Shell when niri starts",
+              "label": "Autostart Helix Shell"
+            },
+            "backdrop": {
+              "description": "Place the Helix Shell backdrop layer in niri overview",
+              "label": "Backdrop layer-rule"
+            },
+            "lid-close": {
+              "description": "On lid close, keep using other displays when they are on; otherwise lock and suspend",
+              "label": "Lid close"
+            },
+            "xdg-activation": {
+              "description": "Allow notification actions and window activation from Helix",
+              "label": "XDG activation"
+            }
+          },
+          "missing": "Not in this config yet",
+          "none-missing": "All recommended niri setup snippets are already present",
+          "optional": "Optional",
+          "present": "Found in niri config",
+          "title": "Niri setup"
+        },
+        "struts": {
+          "description": "Extra padding on all four sides, on top of gaps and space reserved by the bar. Applied the first time you change this slider.",
+          "label": "Outer padding"
+        }
+      },
       "notifications": {
         "allowed-urgencies": {
           "description": "Only show external notifications at the selected urgency levels",
           "label": "Allowed Urgencies"
         },
         "blacklist": {
-          "description": "Hide matching senders (app name, desktop entry, or category)",
+          "description": "Hide matching senders (app name, id, or category)",
           "label": "Notification Blacklist"
         },
         "blacklist-allow-critical": {
@@ -2402,8 +4279,12 @@
           "description": "Draw an outline on floating panels",
           "label": "Borders"
         },
+        "control-center-height": {
+          "description": "Height of the Control Center window in pixels. Leftover catalogs fill the extra space.",
+          "label": "Control Center Height"
+        },
         "control-center-sidebar": {
-          "description": "Choose how to display the sidebar",
+          "description": "Sidebar in the Settings window. Home is always a menu.",
           "label": "Sidebar"
         },
         "control-center-sidebar-section": {
@@ -2415,7 +4296,7 @@
           "label": "Control Center Tabs"
         },
         "control-center-width": {
-          "description": "Width of the Control Center panel in pixels (compact and no-sidebar modes scale down from this)",
+          "description": "Width of the Control Center window in pixels (compact and no-sidebar modes scale down from this). Up to 1600, like a Settings app.",
           "label": "Control Center Width"
         },
         "floating-layer": {
@@ -2426,17 +4307,17 @@
           "description": "Gap in pixels between a floating or detached panel and the bar edge",
           "label": "Floating Offset"
         },
+        "glass": {
+          "description": "Solid to glass fill for panel chrome. Leftover cards stay leftover, not nested glass.",
+          "label": "Glass"
+        },
         "home-session-button": {
-          "description": "Show the session-actions button in the Home tab header",
-          "label": "Show Header Session Button"
+          "description": "Show lock, suspend, log out, restart, and shut down on Home",
+          "label": "Session Actions"
         },
         "home-shortcuts": {
-          "description": "Choose up to six shortcut buttons for the home tab",
-          "label": "Home Shortcuts"
-        },
-        "home-shortcuts-show-labels": {
-          "description": "Display text labels under shortcut icons in the home tab",
-          "label": "Show Shortcut Labels"
+          "description": "Extra actions under the Home modules. Empty by default; add only what you use.",
+          "label": "Home Pins"
         },
         "launcher-app-actions": {
           "description": "Show application action entries alongside applications in results",
@@ -2474,6 +4355,10 @@
           "description": "Also show emoji results in unprefixed search",
           "label": "Emoji in Global Search"
         },
+        "launcher-global-panels": {
+          "description": "Also show panels in unprefixed search",
+          "label": "Panels in Global Search"
+        },
         "launcher-global-session": {
           "description": "Also show session actions in unprefixed search",
           "label": "Session in Global Search"
@@ -2486,8 +4371,12 @@
           "description": "Also show open windows in unprefixed search",
           "label": "Windows in Global Search"
         },
+        "launcher-ignored-panels": {
+          "description": "Panels the panel provider never lists (e.g. authentication prompts, the setup wizard)",
+          "label": "Panels Ignored"
+        },
         "launcher-pinned-apps": {
-          "description": "Desktop entry IDs of apps pinned to the launcher; they appear first when the launcher opens",
+          "description": "Apps pinned at the top of the launcher.",
           "label": "Pinned Apps"
         },
         "launcher-prefix-calculator": {
@@ -2501,6 +4390,10 @@
         "launcher-prefix-emoji": {
           "description": "Trigger prefix for emoji search",
           "label": "Emoji Prefix"
+        },
+        "launcher-prefix-panels": {
+          "description": "Trigger prefix for panel search",
+          "label": "Panels Prefix"
         },
         "launcher-prefix-session": {
           "description": "Trigger prefix for session power actions",
@@ -2547,6 +4440,10 @@
           "description": "Where the launcher is positioned when opened by clicking on the bar widget",
           "label": "Along Bar"
         },
+        "open-near-click-quick-insert": {
+          "description": "Where Quick Insert is positioned when opened by clicking on the bar widget",
+          "label": "Along Bar"
+        },
         "open-near-click-session": {
           "description": "Where the session panel is positioned when opened by clicking on the bar widget",
           "label": "Along Bar"
@@ -2575,6 +4472,10 @@
           "description": "Choose whether the polkit prompt attaches to the bar or floats at a chosen screen position",
           "label": "Placement"
         },
+        "placement-quick-insert": {
+          "description": "Choose whether Quick Insert attaches to the bar or floats at a chosen screen position",
+          "label": "Placement"
+        },
         "placement-session": {
           "description": "Choose whether the session panel attaches to the bar or floats at a chosen screen position",
           "label": "Placement"
@@ -2599,6 +4500,10 @@
           "description": "Where the polkit prompt floats on screen; Follow Bar keeps it near the bar",
           "label": "Position"
         },
+        "position-quick-insert": {
+          "description": "Where Quick Insert floats on screen; Follow Bar keeps it near the bar",
+          "label": "Position"
+        },
         "position-session": {
           "description": "Where the session panel floats on screen; Follow Bar keeps it near the bar",
           "label": "Position"
@@ -2606,6 +4511,10 @@
         "position-wallpaper": {
           "description": "Where the wallpaper picker floats on screen; Follow Bar keeps it near the bar",
           "label": "Position"
+        },
+        "refraction": {
+          "description": "On helix-niri, refract the wallpaper through chrome. On stock niri, this is chrome blur.",
+          "label": "Refraction"
         },
         "shadow": {
           "description": "Cast the global surface shadow from panel surfaces"
@@ -2702,9 +4611,9 @@
           "label": "Day Temperature"
         },
         "ddcutil": {
-          "description": "Control external monitor brightness via DDC/CI",
-          "label": "DDC/CI (ddcutil)",
-          "requires-ddcutil": "Install ddcutil to enable DDC/CI brightness control"
+          "description": "Adjust brightness on external displays, not only the laptop panel.",
+          "label": "External monitor brightness",
+          "requires-ddcutil": "Install ddcutil to control external monitor brightness"
         },
         "force-night-light": {
           "description": "Always apply night light regardless of time",
@@ -2720,7 +4629,7 @@
           "placeholder": "City, Country"
         },
         "location-auto-locate": {
-          "description": "Detect your location automatically from your IP address via noctalia.dev",
+          "description": "Detect your location automatically from your IP address via helix.dev",
           "label": "Auto-Locate (IP)"
         },
         "longitude": {
@@ -2733,7 +4642,7 @@
         },
         "mpris-blacklist": {
           "description": "Players to ignore for media controls and Now Playing",
-          "label": "MPRIS Player Blacklist"
+          "label": "Ignore players"
         },
         "night-light": {
           "description": "Shift screen colors warmer at night",
@@ -2752,6 +4661,11 @@
         "shell-sounds": {
           "description": "Play sound effects for shell events",
           "label": "Shell Sounds"
+        },
+        "sound-theme": {
+          "default": "Default",
+          "description": "Sound theme used for shell sound effects",
+          "label": "Sound Theme"
         },
         "sound-volume": {
           "description": "Volume for shell sound effects",
@@ -2906,11 +4820,11 @@
           "label": "Clipboard Auto-Paste"
         },
         "clipboard-confirm-clear-history": {
-          "description": "Ask before clearing clipboard history or deleting an unpinned entry from the panel; when off, those actions apply immediately (pinned entries still ask before delete)",
+          "description": "Ask before clearing clipboard history or deleting an unpinned entry from the history tab; when off, those actions apply immediately (pinned entries still ask before delete)",
           "label": "Confirm Clear History"
         },
         "clipboard-enabled": {
-          "description": "Enable clipboard history, the clipboard panel, and copy/paste integration",
+          "description": "Enable clipboard history, the Control Center clipboard tab, and copy/paste integration",
           "label": "Clipboard"
         },
         "clipboard-history-max-entries": {
@@ -2943,7 +4857,7 @@
           "label": "Date Format"
         },
         "external-ip": {
-          "description": "Resolve the connection's public WAN IP (via api.noctalia.dev) and show it in the Control Center network tab",
+          "description": "Resolve the connection's public WAN IP (via a public IP lookup) and show it in the Control Center network tab",
           "label": "Show WAN IP"
         },
         "greeter-sync-auto": {
@@ -2959,9 +4873,9 @@
           "label": "Keyboard Layout Labels"
         },
         "launch-apps-as-systemd-services": {
-          "description": "Launches applications in separate systemd services so they don't share Noctalia's cgroup",
+          "description": "Launch apps in their own systemd units so they survive a Helix restart. Off keeps them in Helix's process group.",
           "label": "Launch Apps as systemd Services",
-          "requires-systemd-session": "Requires Noctalia to run as a systemd user service (uwsm or a systemd user unit)"
+          "requires-systemd-session": "Requires Helix to run as a systemd user service (uwsm or a systemd user unit)"
         },
         "launch-apps-custom-command": {
           "description": "Wraps apps launched from the launcher, dock, and taskbar; substitutes $CMD with the original command",
@@ -2969,7 +4883,7 @@
           "placeholder": "$CMD"
         },
         "niri-overview-type-to-launch": {
-          "description": "Open the launcher when typing in niri overview; uses a tiny keyboard-focus surface while overview is open",
+          "description": "Open the launcher when you type in niri overview.",
           "label": "Type to Launch"
         },
         "offline-mode": {
@@ -3085,16 +4999,37 @@
           "label": "Polkit Agent"
         },
         "privacy-cam-filter-regex": {
-          "description": "Regex for camera apps to ignore in privacy indicators and OSDs",
-          "label": "Camera Filter Regex"
+          "description": "App names to hide from the camera bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore camera apps"
         },
         "privacy-mic-filter-regex": {
-          "description": "Regex for microphone apps to ignore in privacy indicators and OSDs",
-          "label": "Microphone Filter Regex"
+          "description": "App names to hide from the microphone bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore microphone apps"
         },
         "privacy-screen-filter-regex": {
-          "description": "Regex for screen-sharing apps to ignore in privacy indicators and OSDs",
-          "label": "Screen Sharing Filter Regex"
+          "description": "App names to hide from the screen-share bar icon and OSD. They still appear on the Privacy tab.",
+          "label": "Ignore screen-share apps"
+        },
+        "screen-record-audio": {
+          "description": "Record desktop audio with the video when the backend supports it",
+          "label": "Record Audio"
+        },
+        "screen-record-directory": {
+          "description": "Folder for saved recordings; leave empty to use ~/Videos/Recordings",
+          "label": "Output Directory",
+          "placeholder": "~/Videos/Recordings"
+        },
+        "screen-record-filename-pattern": {
+          "description": "strftime pattern without extension (.mp4 is added); use %s for unix epoch",
+          "label": "Filename Pattern"
+        },
+        "screen-record-replay-duration": {
+          "description": "How many seconds the replay buffer keeps. Save writes that window to a file.",
+          "label": "Replay Buffer Duration"
+        },
+        "screen-record-show-cursor": {
+          "description": "Include the mouse pointer when the backend can record it",
+          "label": "Show Cursor"
         },
         "screen-time-enabled": {
           "description": "Track per-app usage and show it in Control Center",
@@ -3112,6 +5047,10 @@
         "screenshot-close-on-copy": {
           "description": "Close after a successful copy from the editor, including when opened directly",
           "label": "Close Editor After Copying"
+        },
+        "screenshot-close-on-save": {
+          "description": "Close after a successful save from the editor, including when opened directly",
+          "label": "Close Editor After Saving"
         },
         "screenshot-confirm-region": {
           "description": "After drawing a region, keep the overlay open until you confirm with Enter or Space",
@@ -3158,9 +5097,9 @@
           "description": "Include the mouse pointer in screenshots",
           "label": "Show Cursor"
         },
-        "settings-window-translucent": {
-          "description": "Make the Settings background translucent for compositor effects",
-          "label": "Settings Translucent Background"
+        "screenshot-skip-annotate-on-copy-save": {
+          "description": "Copy and Save in the region overlay deliver immediately; Enter and Space still open the editor",
+          "label": "Skip Editor on Copy or Save"
         },
         "show-location": {
           "description": "Show location name in weather widgets",
@@ -3168,8 +5107,8 @@
         },
         "sync-greeter": {
           "button": "Sync Now",
-          "description": "Copy the current appearance and monitor arrangement to Noctalia Greeter. Administrator approval is requested unless system policy authorizes passwordless sync for your user.",
-          "label": "Noctalia Greeter"
+          "description": "Copy the current appearance and monitor arrangement to Helix Greeter. Administrator approval is requested unless system policy authorizes passwordless sync for your user.",
+          "label": "Helix Greeter"
         },
         "telemetry": {
           "description": "Sends a small anonymous startup ping with version, OS, compositor, monitor resolutions, RAM, and UI scale",
@@ -3178,6 +5117,10 @@
         "time-format": {
           "description": "Default time format for shell UI without its own setting",
           "label": "Time Format"
+        },
+        "umbriel-overview-type-to-launch": {
+          "description": "Open the launcher when typing in umbriel overview; uses a tiny keyboard-focus surface while overview is open",
+          "label": "Type to Launch"
         },
         "window-switcher-mru": {
           "description": "Order windows in the switcher by most recently used rather than workspace and screen layout",
@@ -3192,6 +5135,21 @@
         "battery-warning-threshold": {
           "description": "System battery percentage at or below which the shell sends a low-battery notification and battery widgets use their warning color (0 disables)",
           "label": "Battery Warning Threshold"
+        }
+      },
+      "tailscale": {
+        "admin-url": {
+          "description": "Admin console URL opened from the Tailscale tab. Leave empty to use Tailscale's default, or the login URL when this machine needs authentication.",
+          "label": "Admin Console URL",
+          "placeholder": "https://login.tailscale.com/admin"
+        },
+        "notify-on-peer-change": {
+          "description": "Show a notification when a peer comes online or goes offline",
+          "label": "Notify on Peer Changes"
+        },
+        "refresh-interval": {
+          "description": "How often to poll Tailscale status while the shell is running",
+          "label": "Refresh Interval"
         }
       },
       "templates": {
@@ -3231,6 +5189,33 @@
         "automation-recursive": {
           "description": "Search nested folders for wallpapers",
           "label": "Include Subfolders"
+        },
+        "automation-source": {
+          "description": "Rotate images from your wallpaper folder, or apply today's Bing or NASA picture once a day",
+          "label": "Rotation Source"
+        },
+        "choose": {
+          "button": "Browse…",
+          "description": "Pick an image file to apply to all monitors",
+          "label": "Choose Wallpaper"
+        },
+        "daily-bing-market": {
+          "description": "Bing locale for daily wallpapers (for example en-US). Empty uses en-US",
+          "label": "Bing Market",
+          "placeholder": "en-US"
+        },
+        "daily-download-dir": {
+          "description": "Optional folder for Bing and NASA downloads; empty uses your wallpaper directory",
+          "label": "Daily Download Directory",
+          "placeholder": "Wallpaper directory"
+        },
+        "daily-nasa-api-key": {
+          "description": "Optional NASA key for Astronomy Picture of the Day. Leave empty to use NASA's demo key.",
+          "label": "NASA API Key"
+        },
+        "daily-provider": {
+          "description": "Source used by the Daily picker and by daily automatic rotation",
+          "label": "Daily Source"
         },
         "directory": {
           "description": "Folder containing wallpapers; leave empty to use the standard XDG Pictures directory",
@@ -3292,6 +5277,36 @@
         "transitions": {
           "description": "Effects available when changing wallpaper (one is picked at random per change)",
           "label": "Transition Effects"
+        },
+        "video-auto-pause": {
+          "description": "Pause playback when a window covers the wallpaper",
+          "label": "Auto Pause"
+        },
+        "video-directory": {
+          "description": "Folder scanned for video wallpapers; empty uses ~/Videos",
+          "label": "Video Directory",
+          "placeholder": "~/Videos"
+        },
+        "video-hardware-decode": {
+          "description": "Use hardware decoding in mpv",
+          "label": "Hardware Decode"
+        },
+        "video-mpv-options": {
+          "description": "Extra space-separated mpv options passed to mpvpaper",
+          "label": "mpv Options"
+        },
+        "video-mute": {
+          "description": "Start video wallpapers muted",
+          "label": "Mute"
+        },
+        "wallhaven-api-key": {
+          "description": "Optional Wallhaven API key for higher rate limits and NSFW results",
+          "label": "Wallhaven API Key"
+        },
+        "wallhaven-download-dir": {
+          "description": "Optional folder for Wallhaven downloads; empty uses your wallpaper directory",
+          "label": "Wallhaven Download Directory",
+          "placeholder": "Wallpaper directory"
         }
       }
     },
@@ -3337,6 +5352,7 @@
         "enabled-count": "{count} enabled",
         "filter-all": "All",
         "filter-enabled": "Enabled",
+        "filters": "Filters",
         "results-count": "{count} templates",
         "search-placeholder": "Search templates…",
         "sort-category-asc": "Sort by category (A-Z)",
@@ -3350,6 +5366,66 @@
       "actions": {
         "command-placeholder": "Shell command",
         "commands": {
+          "ai-usage-localai-delete": {
+            "description": "Remove an installed LocalAI model",
+            "label": "Remove LocalAI model"
+          },
+          "ai-usage-localai-endpoint": {
+            "description": "Print the LocalAI base URL and the model to use, optionally for one capability",
+            "label": "LocalAI endpoint"
+          },
+          "ai-usage-localai-install": {
+            "description": "Install a model from the LocalAI gallery",
+            "label": "Install LocalAI model"
+          },
+          "ai-usage-localai-model": {
+            "description": "Persist a LocalAI model as the desktop's default chat model",
+            "label": "Set LocalAI model"
+          },
+          "ai-usage-localai-open": {
+            "description": "Open the LocalAI web interface",
+            "label": "Open LocalAI"
+          },
+          "ai-usage-localai-start": {
+            "description": "Start the local LocalAI server",
+            "label": "Start LocalAI"
+          },
+          "ai-usage-localai-stop": {
+            "description": "Stop the local LocalAI server",
+            "label": "Stop LocalAI"
+          },
+          "ai-usage-ollama-cancel": {
+            "description": "Cancel an in-progress Ollama model download",
+            "label": "Cancel Ollama download"
+          },
+          "ai-usage-ollama-delete": {
+            "description": "Remove an installed Ollama model",
+            "label": "Remove Ollama model"
+          },
+          "ai-usage-ollama-model": {
+            "description": "Load an Ollama model and persist it as the selected model",
+            "label": "Set Ollama model"
+          },
+          "ai-usage-ollama-pull": {
+            "description": "Download an Ollama model from the library",
+            "label": "Install Ollama model"
+          },
+          "ai-usage-ollama-start": {
+            "description": "Start the local Ollama daemon",
+            "label": "Start Ollama"
+          },
+          "ai-usage-ollama-stop": {
+            "description": "Stop the local Ollama daemon",
+            "label": "Stop Ollama"
+          },
+          "ai-usage-refresh": {
+            "description": "Refetch AI usage from local tools",
+            "label": "Refresh AI usage"
+          },
+          "ai-usage-status": {
+            "description": "Print AI usage and local inference status",
+            "label": "AI usage status"
+          },
           "annotate": {
             "description": "Draw on the screen over running apps; press F or the Freeze button to capture the background",
             "label": "Annotate screen"
@@ -3450,6 +5526,38 @@
             "description": "Reload the config file",
             "label": "Reload config"
           },
+          "desktop-ai-describe": {
+            "description": "Describe a screenshot with the LocalAI vision model",
+            "label": "Describe image"
+          },
+          "desktop-ai-dictate": {
+            "description": "Start or stop microphone dictation through LocalAI",
+            "label": "Dictate"
+          },
+          "desktop-ai-read": {
+            "description": "Read the text in an image with the LocalAI vision model",
+            "label": "Read image"
+          },
+          "desktop-ai-rewrite": {
+            "description": "Rewrite the clipboard text with LocalAI and copy the result",
+            "label": "Rewrite clipboard"
+          },
+          "desktop-ai-speak": {
+            "description": "Read the clipboard text aloud with LocalAI",
+            "label": "Read clipboard aloud"
+          },
+          "desktop-ai-status": {
+            "description": "Print the desktop LocalAI action state and last result",
+            "label": "Desktop AI status"
+          },
+          "desktop-ai-summarize": {
+            "description": "Summarize the clipboard text with LocalAI and copy the result",
+            "label": "Summarize clipboard"
+          },
+          "desktop-ai-translate": {
+            "description": "Translate the clipboard text with LocalAI and copy the result",
+            "label": "Translate clipboard"
+          },
           "desktop-widgets-edit": {
             "description": "Open the desktop widgets editor",
             "label": "Edit desktop widgets"
@@ -3503,7 +5611,7 @@
             "label": "Set EasyEffects profile"
           },
           "greeter-sync": {
-            "description": "Sync wallpaper, colors, and monitor layout to Noctalia Greeter",
+            "description": "Sync wallpaper, colors, and monitor layout to Helix Greeter",
             "label": "Sync greeter appearance"
           },
           "keyboard-backlight-down": {
@@ -3619,7 +5727,7 @@
             "label": "Invoke latest notification action"
           },
           "notification-show": {
-            "description": "Show an internal Noctalia notification",
+            "description": "Show an internal Helix notification",
             "label": "Show a notification"
           },
           "osd-disable": {
@@ -3670,32 +5778,44 @@
             "description": "Capture the focused monitor by default, pick interactively with pick, or all outputs with all",
             "label": "Fullscreen screenshot"
           },
+          "screenshot-ocr": {
+            "description": "Select a region and copy recognized text to the clipboard",
+            "label": "Scan screenshot text"
+          },
+          "screenshot-pick-color": {
+            "description": "Freeze the screen and copy the color under the click",
+            "label": "Pick screen color"
+          },
           "screenshot-region": {
             "description": "Start an interactive region screenshot",
             "label": "Region screenshot"
+          },
+          "screenshot-scan-qr": {
+            "description": "Select a region and copy a QR code or barcode to the clipboard",
+            "label": "Scan screenshot QR"
           },
           "session": {
             "description": "Run a built-in session action",
             "label": "Session action"
           },
           "settings-close": {
-            "description": "Close the settings window",
+            "description": "Close Control Center if it is open on a settings page",
             "label": "Close settings"
           },
           "settings-open": {
-            "description": "Open the settings window, or focus it if already open, optionally at a specific section",
+            "description": "Open Control Center on a settings page, optionally at a specific section",
             "label": "Open settings"
           },
           "settings-open-plugin": {
-            "description": "Open the settings window at a plugin's settings (e.g. noctalia/notes)",
+            "description": "Open Control Center at a plugin's settings (e.g. helix/notes)",
             "label": "Open plugin settings"
           },
           "settings-open-widget": {
-            "description": "Open the settings window at a bar widget; from a widget gesture, targets that widget",
+            "description": "Open Control Center at a bar widget; from a widget gesture, targets that widget",
             "label": "Open widget settings"
           },
           "settings-toggle": {
-            "description": "Toggle the settings window, optionally at a specific section",
+            "description": "Toggle Control Center on a settings page, optionally at a specific section",
             "label": "Toggle settings"
           },
           "status": {
@@ -3944,8 +6064,8 @@
           "label": "Bands"
         },
         "cam-filter-regex": {
-          "description": "Regular expression for camera process names to ignore",
-          "label": "Camera Filter Regex"
+          "description": "App names to hide from the camera bar icon. They still appear on the Privacy tab.",
+          "label": "Ignore camera apps"
         },
         "capsule": {
           "description": "Draw a capsule behind this widget",
@@ -4005,6 +6125,10 @@
         "custom-image-colorize": {
           "description": "Tint the custom image with the widget Icon Color setting",
           "label": "Colorize Custom Image"
+        },
+        "custom-label": {
+          "description": "Custom text shown beside the glyph or custom image; remains visible when Show Glyph is disabled",
+          "label": "Custom Label"
         },
         "detached-panel": {
           "description": "Open the drawer as a floating panel instead of anchoring it to the bar edge",
@@ -4080,7 +6204,7 @@
           "volume-description": "Custom icon glyph; leave empty to use the built-in dynamic icons"
         },
         "glyph-position": {
-          "description": "In which order to display the glyph in relation to the text/graph/gauge",
+          "description": "Place the glyph or custom image and custom label relative to the value or visualization",
           "label": "Glyph Position"
         },
         "group-by-workspace": {
@@ -4141,7 +6265,7 @@
           "label": "Hide When No Connected Device"
         },
         "hide-when-no-media": {
-          "description": "Hide the media widget when no MPRIS player is active",
+          "description": "Hide the media widget when nothing is playing",
           "label": "Hide When No Media"
         },
         "hide-when-no-unread": {
@@ -4252,8 +6376,8 @@
           "label": "Max Length"
         },
         "mic-filter-regex": {
-          "description": "Regular expression for microphone app names to ignore",
-          "label": "Microphone Filter Regex"
+          "description": "App names to hide from the microphone bar icon. They still appear on the Privacy tab.",
+          "label": "Ignore microphone apps"
         },
         "min-length": {
           "description": "Minimum widget length in pixels",
@@ -4491,6 +6615,7 @@
       },
       "types": {
         "active-window": "Active Window",
+        "ai": "AI",
         "audio-visualizer": "Audio Visualizer",
         "battery": "Battery",
         "bluetooth": "Bluetooth",
@@ -4530,8 +6655,8 @@
       "export-config": "Export Config…",
       "export-config-saved": "Config export saved.",
       "filter-overridden": "Overridden",
-      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Noctalia is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
-      "native-title": "Noctalia Settings",
+      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run helix config validate to list every required change.",
+      "native-title": "Helix Shell Settings",
       "no-results": "No settings found",
       "no-results-hint": "Try a different setting name or config key.",
       "offline-mode-notice": {
@@ -4567,7 +6692,7 @@
     "no-wallpaper-selected": "No wallpaper selected",
     "select-wallpaper": "Select Wallpaper",
     "subtitle": "A few quick choices to get you started.",
-    "title": "Welcome to Noctalia",
+    "title": "Welcome to Helix Shell",
     "wallpaper": "Wallpaper",
     "wallpaper-scheme": "Wallpaper Scheme"
   },
@@ -4684,22 +6809,105 @@
   "wallpaper": {
     "panel": {
       "all-monitors": "ALL",
+      "choose": "Choose",
       "choose-color": "Choose wallpaper color",
+      "choose-file": "Choose wallpaper image",
+      "choose-file-title": "Choose wallpaper",
       "close": "Close wallpaper panel",
       "color-title": "Wallpaper color",
+      "current-empty": "No wallpaper applied",
+      "current-label": "Current",
+      "daily": {
+        "applied": "Wallpaper applied",
+        "applying": "Downloading…",
+        "bing": "Bing",
+        "download-failed": "Download failed",
+        "empty": "No daily wallpapers found.",
+        "error": "Request failed",
+        "filter-placeholder": "Filter titles…",
+        "nasa": "NASA",
+        "offline": "Daily wallpapers need network access. Turn off offline mode in Security.",
+        "title": "Daily"
+      },
+      "display": "Display",
+      "empty": "No wallpapers in this folder.",
+      "empty-filtered": "No wallpapers match this filter.",
       "favorite-current": "Add current wallpaper to favorites",
       "filter-placeholder": "Filter…",
-      "flatten": "Flatten",
+      "filters": "Filters",
+      "flatten": "Flatten Folders",
+      "flatten-disable": "Group wallpapers by folder",
+      "flatten-enable": "Show nested folders in one list",
+      "folder": "Folder",
       "loading": "Loading wallpapers…",
+      "lock-clear": "Use the desktop wallpaper on the lock screen",
+      "lock-screen": "Lock Screen",
+      "lock-set": "Use this wallpaper on the lock screen",
+      "lock-unavailable": "Apply a wallpaper before setting the lock screen",
       "navigate-up": "Go to parent folder",
       "refresh": "Refresh wallpapers",
+      "sort": "Sort",
+      "sort-date": "Date",
       "sort-date-asc": "Sort by date (oldest first)",
       "sort-date-desc": "Sort by date (newest first)",
+      "sort-name": "Name",
       "sort-name-asc": "Sort by name (A-Z)",
       "sort-name-desc": "Sort by name (Z-A)",
       "sort-random": "Sort by random (shuffle)",
       "title": "Wallpaper",
-      "unfavorite-current": "Remove current wallpaper from favorites"
+      "unfavorite-current": "Remove current wallpaper from favorites",
+      "video": {
+        "clear-tooltip": "Stop the video wallpaper on the selected monitor",
+        "empty": "No videos in this folder.",
+        "filter-placeholder": "Filter videos…",
+        "mpvpaper-missing": "Install mpvpaper to apply video wallpapers.",
+        "stop": "Stop",
+        "title": "Video"
+      },
+      "wallhaven": {
+        "applied": "Wallpaper applied",
+        "applying": "Downloading…",
+        "category-anime": "Anime",
+        "category-general": "General",
+        "category-people": "People",
+        "clear-resolution": "Clear",
+        "download-failed": "Download failed",
+        "empty": "No wallpapers found.",
+        "error": "Request failed",
+        "filter-aspect-ratio": "Aspect Ratio",
+        "filter-categories": "Categories",
+        "filter-page": "Page",
+        "filter-purity": "Purity",
+        "filter-resolution": "Resolution",
+        "filter-sort": "Sort",
+        "library": "Library",
+        "offline": "Wallhaven needs network access. Turn off offline mode in Security.",
+        "page": "{page} / {pages}",
+        "purity-nsfw": "NSFW",
+        "purity-sfw": "SFW",
+        "purity-sketchy": "Sketchy",
+        "ratio-any": "Any",
+        "ratio-portrait": "All Portrait",
+        "ratio-wide": "All Wide",
+        "resolution-from-monitor": "Use this monitor's resolution",
+        "resolution-height": "Height",
+        "resolution-mode-atleast": "At Least",
+        "resolution-mode-exact": "Exact",
+        "resolution-width": "Width",
+        "search": "Search",
+        "search-placeholder": "Tags or a Wallhaven link…",
+        "search-tooltip": "Search tags (exclude with -tag), or paste a wallpaper / search URL. Searches as you type.",
+        "sort-asc": "Ascending",
+        "sort-date-added": "Date Added",
+        "sort-desc": "Descending",
+        "sort-favorites": "Favorites",
+        "sort-hot": "Hot",
+        "sort-random": "Random",
+        "sort-relevance": "Relevance",
+        "sort-toplist": "Toplist",
+        "sort-views": "Views",
+        "title": "Wallhaven"
+      }
     }
   },
   "weather": {

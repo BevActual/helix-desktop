@@ -14,7 +14,7 @@ namespace {
   int g_failures = 0;
   int g_syntheticMigrationApplications = 0;
 
-  void countSyntheticMigration(toml::table&, noctalia::config::schema::Diagnostics&) {
+  void countSyntheticMigration(toml::table&, helix::config::schema::Diagnostics&) {
     ++g_syntheticMigrationApplications;
   }
 
@@ -25,7 +25,7 @@ namespace {
     }
   }
 
-  bool hasIssuePath(const noctalia::config::LegacyConfigIssues& issues, std::string_view path) {
+  bool hasIssuePath(const helix::config::LegacyConfigIssues& issues, std::string_view path) {
     return std::ranges::any_of(issues, [path](const auto& issue) { return issue.path == path; });
   }
 
@@ -44,8 +44,8 @@ radius = -16
 radius = -7
 )");
 
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(root, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(root, issues);
 
     expect(root["bar"]["main"]["radius"].value<std::int64_t>() == 12, "base radius was not made positive");
     expect(
@@ -66,8 +66,8 @@ radius = -7
     expect(hasIssuePath(issues, "bar.main.radius_top_left"), "corner radius issue did not identify its source key");
     expect(hasIssuePath(issues, "bar.main.monitor.dp1.radius"), "monitor radius issue did not identify its source key");
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(root, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(root, secondPassIssues);
     expect(secondPassIssues.empty(), "normalization was not idempotent");
   }
 
@@ -79,8 +79,8 @@ radius = -7
     bars.insert_or_assign("main", std::move(bar));
     root.insert_or_assign("bar", std::move(bars));
 
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(root, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(root, issues);
     expect(
         root["bar"]["main"]["radius"].value<std::int64_t>() == 500, "extreme negative radius did not normalize safely"
     );
@@ -92,8 +92,8 @@ radius = -7
 sunset = "20:30"
 sunrise = "07:30"
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(legacy, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(legacy, issues);
     expect(
         legacy["location"]["custom_schedule"].value<bool>() == true,
         "a times-only location did not opt into custom scheduling"
@@ -101,8 +101,8 @@ sunrise = "07:30"
     expect(issues.size() == 1, "times-only location did not report a legacy issue");
     expect(issues.front().path == "location.sunset", "custom schedule issue did not identify a source key");
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(legacy, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(legacy, secondPassIssues);
     expect(secondPassIssues.empty(), "custom scheduling normalization was not idempotent");
 
     // Coordinates won under the old rules, so these configs must keep using them.
@@ -110,8 +110,8 @@ sunrise = "07:30"
          {"auto_locate = true", "address = \"Toronto, ON\"", "latitude = 52.52\nlongitude = 13.405"}) {
       toml::table coords =
           toml::parse(std::format("[location]\nsunset = \"20:30\"\nsunrise = \"07:30\"\n{}\n", source));
-      noctalia::config::LegacyConfigIssues coordIssues;
-      noctalia::config::normalizeLegacyConfig(coords, coordIssues);
+      helix::config::LegacyConfigIssues coordIssues;
+      helix::config::normalizeLegacyConfig(coords, coordIssues);
       expect(
           !coords["location"]["custom_schedule"].value<bool>().has_value(),
           "a location with coordinates was switched to custom scheduling"
@@ -125,8 +125,8 @@ custom_schedule = false
 sunset = "20:30"
 sunrise = "07:30"
 )");
-    noctalia::config::LegacyConfigIssues offIssues;
-    noctalia::config::normalizeLegacyConfig(explicitOff, offIssues);
+    helix::config::LegacyConfigIssues offIssues;
+    helix::config::normalizeLegacyConfig(explicitOff, offIssues);
     expect(
         explicitOff["location"]["custom_schedule"].value<bool>() == false,
         "an explicit custom_schedule = false was overwritten"
@@ -139,8 +139,8 @@ sunrise = "07:30"
 [shell]
 middle_click_opens_widget_settings = true
 )");
-    noctalia::config::LegacyConfigIssues enabledIssues;
-    noctalia::config::normalizeLegacyConfig(enabled, enabledIssues);
+    helix::config::LegacyConfigIssues enabledIssues;
+    helix::config::normalizeLegacyConfig(enabled, enabledIssues);
     expect(
         !enabled["shell"]["middle_click_opens_widget_settings"].value<bool>().has_value(),
         "an enabled middle_click_opens_widget_settings was not dropped"
@@ -162,8 +162,8 @@ position = "top"
 [bar.secondary]
 position = "bottom"
 )");
-    noctalia::config::LegacyConfigIssues disabledIssues;
-    noctalia::config::normalizeLegacyConfig(disabled, disabledIssues);
+    helix::config::LegacyConfigIssues disabledIssues;
+    helix::config::normalizeLegacyConfig(disabled, disabledIssues);
     expect(
         !disabled["shell"]["middle_click_opens_widget_settings"].value<bool>().has_value(),
         "a disabled middle_click_opens_widget_settings was not dropped"
@@ -184,8 +184,8 @@ position = "bottom"
 [shell]
 middle_click_opens_widget_settings = false
 )");
-    noctalia::config::LegacyConfigIssues noBarIssues;
-    noctalia::config::normalizeLegacyConfig(noBars, noBarIssues);
+    helix::config::LegacyConfigIssues noBarIssues;
+    helix::config::normalizeLegacyConfig(noBars, noBarIssues);
     expect(
         noBars["bar"]["default"]["actions"]["middle"].value<std::string>() == std::optional<std::string>{"none"},
         "a disabled config without a [bar] table did not seed the default bar"
@@ -199,16 +199,16 @@ middle_click_opens_widget_settings = false
 [bar.default.actions]
 middle = "media toggle"
 )");
-    noctalia::config::LegacyConfigIssues explicitIssues;
-    noctalia::config::normalizeLegacyConfig(explicitBinding, explicitIssues);
+    helix::config::LegacyConfigIssues explicitIssues;
+    helix::config::normalizeLegacyConfig(explicitBinding, explicitIssues);
     expect(
         explicitBinding["bar"]["default"]["actions"]["middle"].value<std::string>()
             == std::optional<std::string>{"media toggle"},
         "the migration overwrote an explicit middle binding"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(disabled, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(disabled, secondPassIssues);
     expect(secondPassIssues.empty(), "widget action normalization was not idempotent");
   }
 
@@ -231,8 +231,8 @@ cycle_command = "hyprctl switchxkblayout all next"
 type = "someone/plugin:entry"
 enable_scroll = false
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     // Disabled scroll becomes an explicit unbind on both scroll gestures.
     for (const std::string_view gesture : {"scroll_up", "scroll_down"}) {
@@ -279,8 +279,8 @@ enable_scroll = false
         "enable_scroll was dropped from a widget that still uses it"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "widget gesture setting normalization was not idempotent");
   }
 
@@ -308,8 +308,8 @@ primary_click = "fullscreen"
 type = "screenshot"
 primary_click = "region"
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     for (const std::string_view gesture : {"scroll_up", "scroll_down"}) {
       expect(
@@ -354,8 +354,8 @@ primary_click = "region"
         "primary_click was not dropped"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "remaining widget gesture normalization was not idempotent");
   }
 
@@ -378,8 +378,8 @@ command = "echo old"
 [widget.explicit.actions]
 left = "media toggle"
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     // Quoting survives verbatim: the widget ran these through the same call `exec` uses.
     expect(
@@ -418,8 +418,8 @@ left = "media toggle"
         "the migration overwrote an explicit left binding"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "custom_button command normalization was not idempotent");
   }
 
@@ -435,8 +435,8 @@ scroll_up_command = "notify-send up"
 [bar.other.dead_zone]
 middle_command = ""
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     expect(
         config["bar"]["default"]["dead_zone"]["actions"]["left"].value<std::string>()
@@ -466,8 +466,8 @@ middle_command = ""
         "an empty dead zone command seeded a binding"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "dead zone normalization was not idempotent");
   }
 
@@ -507,8 +507,8 @@ show_glyph = true
 display = "text"
 show_label = false
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     expect(
         config["widget"]["gauge"]["visualization"].value<std::string>() == std::optional<std::string>{"gauge"},
@@ -563,8 +563,8 @@ show_label = false
     expect(hasIssuePath(issues, "widget.gauge.show_label"), "sysmon label issue did not identify its source key");
     expect(hasIssuePath(issues, "widget.gauge.show_icon"), "sysmon glyph issue did not identify its source key");
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "sysmon presentation normalization was not idempotent");
   }
 
@@ -606,8 +606,8 @@ display = "icon"
 [widget.workspaces]
 display = "id"
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     expect(
         config["widget"]["none"]["show_labels"].value<bool>() == std::optional<bool>{false}
@@ -654,8 +654,8 @@ display = "id"
     );
     expect(issues.size() == 6, "expected one migration issue per workspaces widget");
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "workspaces display normalization was not idempotent");
   }
 
@@ -672,8 +672,8 @@ show_glyph = false
 [widget.clock]
 show_icon = false
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     expect(
         config["widget"]["keyboard_layout"]["show_glyph"].value<bool>() == std::optional<bool>{false}
@@ -691,8 +691,8 @@ show_icon = false
     );
     expect(issues.size() == 2, "expected one migration issue per keyboard layout widget");
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "keyboard layout show_glyph normalization was not idempotent");
   }
 
@@ -719,8 +719,8 @@ type = "clock"
 [widget.clock.custom_labels]
 German = "Clock"
 )toml");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(config, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(config, issues);
 
     expect(
         config["shell"]["keyboard_layout"]["custom_labels"]["English (US)"].value<std::string>()
@@ -747,16 +747,16 @@ German = "Clock"
         "conflicting canonical keyboard layout label was not reported"
     );
 
-    noctalia::config::LegacyConfigIssues secondPassIssues;
-    noctalia::config::normalizeLegacyConfig(config, secondPassIssues);
+    helix::config::LegacyConfigIssues secondPassIssues;
+    helix::config::normalizeLegacyConfig(config, secondPassIssues);
     expect(secondPassIssues.empty(), "keyboard layout custom_labels normalization was not idempotent");
   }
 
   void checkPluginAutoUpdateModeMigration() {
     for (const bool enabled : {true, false}) {
       toml::table config = toml::parse(std::format("[plugins]\nauto_update = {}", enabled));
-      noctalia::config::LegacyConfigIssues issues;
-      noctalia::config::normalizeLegacyConfig(config, issues);
+      helix::config::LegacyConfigIssues issues;
+      helix::config::normalizeLegacyConfig(config, issues);
 
       const std::string_view expected = enabled ? "all" : "none";
       expect(
@@ -770,12 +770,52 @@ German = "Clock"
     }
 
     toml::table sidecar = toml::parse("config_version = 12\n[plugins]\nauto_update = false");
-    noctalia::config::schema::Diagnostics diagnostics;
-    const int applied = noctalia::config::applyPendingConfigMigrations(sidecar, 12, diagnostics);
-    expect(applied == noctalia::config::currentConfigVersion(), "plugin auto-update sidecar migration was not applied");
+    helix::config::schema::Diagnostics diagnostics;
+    const int applied = helix::config::applyPendingConfigMigrations(sidecar, 12, diagnostics);
+    expect(applied == helix::config::currentConfigVersion(), "plugin auto-update sidecar migration was not applied");
     expect(
         sidecar["plugins"]["auto_update"].value<std::string_view>() == std::optional<std::string_view>{"none"},
         "plugin auto-update sidecar migration did not preserve false as none"
+    );
+  }
+
+  void checkLaunchAppsAsSystemdServicesMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = false
+)");
+    helix::config::schema::Diagnostics diagnostics;
+    const int applied = helix::config::applyPendingConfigMigrations(sidecar, 14, diagnostics);
+    expect(applied == helix::config::currentConfigVersion(), "systemd launch default migration was not applied");
+    expect(
+        sidecar["shell"]["launch_apps_as_systemd_services"].value<bool>() == true,
+        "legacy false systemd launch setting was not flipped to the new default"
+    );
+
+    toml::table custom = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = false
+launch_apps_custom_command = "uwsm-app -- $CMD"
+)");
+    helix::config::schema::Diagnostics customDiagnostics;
+    (void)helix::config::applyPendingConfigMigrations(custom, 14, customDiagnostics);
+    expect(
+        custom["shell"]["launch_apps_as_systemd_services"].value<bool>() == false,
+        "systemd launch migration overrode a custom launch command"
+    );
+
+    toml::table alreadyOn = toml::parse(R"(
+config_version = 14
+[shell]
+launch_apps_as_systemd_services = true
+)");
+    helix::config::schema::Diagnostics alreadyOnDiagnostics;
+    (void)helix::config::applyPendingConfigMigrations(alreadyOn, 14, alreadyOnDiagnostics);
+    expect(
+        alreadyOn["shell"]["launch_apps_as_systemd_services"].value<bool>() == true,
+        "already-enabled systemd launch setting was changed"
     );
   }
 
@@ -786,9 +826,9 @@ config_version = 13
 event_date_format = "%Y-%m-%d"
 event_time_format = "%I:%M %p"
 )");
-    noctalia::config::schema::Diagnostics diagnostics;
-    const int applied = noctalia::config::applyPendingConfigMigrations(sidecar, 13, diagnostics);
-    expect(applied == noctalia::config::currentConfigVersion(), "calendar event format migration was not applied");
+    helix::config::schema::Diagnostics diagnostics;
+    const int applied = helix::config::applyPendingConfigMigrations(sidecar, 13, diagnostics);
+    expect(applied == helix::config::currentConfigVersion(), "calendar event format migration was not applied");
     expect(
         sidecar["calendar"]["event_date_format"].value<std::string_view>()
             == std::optional<std::string_view>{"%Y-%m-%d"},
@@ -812,8 +852,8 @@ event_time_format = "%I:%M %p"
 event_date_format = "%d.%m.%Y"
 event_time_format = "%H:%M"
 )");
-    noctalia::config::LegacyConfigIssues issues;
-    noctalia::config::normalizeLegacyConfig(legacyConfig, issues);
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(legacyConfig, issues);
     expect(
         legacyConfig["calendar"]["event_date_format"].value<std::string_view>()
             == std::optional<std::string_view>{"%d.%m.%Y"},
@@ -834,8 +874,8 @@ event_date_format = "%d"
 event_date_format = "%A"
 event_time_format = "%H:%M"
 )");
-    noctalia::config::schema::Diagnostics conflictDiagnostics;
-    (void)noctalia::config::applyPendingConfigMigrations(conflict, 13, conflictDiagnostics);
+    helix::config::schema::Diagnostics conflictDiagnostics;
+    (void)helix::config::applyPendingConfigMigrations(conflict, 13, conflictDiagnostics);
     expect(
         conflict["calendar"]["event_date_format"].value<std::string_view>() == std::optional<std::string_view>{"%d"},
         "calendar event format migration overwrote the canonical date format"
@@ -846,16 +886,105 @@ event_time_format = "%H:%M"
     );
   }
 
+  void checkClockTimezonesMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 15
+[control_center.calendar]
+timezones = ["UTC", "Europe/Berlin"]
+)");
+    helix::config::schema::Diagnostics diagnostics;
+    const int applied = helix::config::applyPendingConfigMigrations(sidecar, 15, diagnostics);
+    expect(applied == helix::config::currentConfigVersion(), "clock timezone migration was not applied");
+    const auto* clockZones = sidecar["control_center"]["clock"]["timezones"].as_array();
+    expect(clockZones != nullptr && clockZones->size() == 2, "clock timezones were not moved");
+    expect(
+        clockZones != nullptr
+            && (*clockZones)[0].value<std::string_view>() == std::optional<std::string_view>{"UTC"}
+            && (*clockZones)[1].value<std::string_view>() == std::optional<std::string_view>{"Europe/Berlin"},
+        "clock timezone values were not preserved"
+    );
+    const auto* legacyCalendar = sidecar["control_center"]["calendar"].as_table();
+    expect(
+        legacyCalendar != nullptr && legacyCalendar->get("timezones") == nullptr,
+        "legacy calendar timezones were not removed"
+    );
+
+    toml::table conflict = toml::parse(R"(
+config_version = 15
+[control_center.calendar]
+timezones = ["UTC"]
+[control_center.clock]
+timezones = ["America/Los_Angeles"]
+)");
+    helix::config::schema::Diagnostics conflictDiagnostics;
+    (void)helix::config::applyPendingConfigMigrations(conflict, 15, conflictDiagnostics);
+    const auto* kept = conflict["control_center"]["clock"]["timezones"].as_array();
+    expect(
+        kept != nullptr
+            && kept->size() == 1
+            && (*kept)[0].value<std::string_view>() == std::optional<std::string_view>{"America/Los_Angeles"},
+        "clock timezone migration overwrote the canonical list"
+    );
+    const auto* conflictCalendar = conflict["control_center"]["calendar"].as_table();
+    expect(
+        conflictCalendar != nullptr && conflictCalendar->get("timezones") == nullptr,
+        "conflicting calendar timezones were not removed"
+    );
+
+    toml::table legacyConfig = toml::parse(R"(
+[control_center.calendar]
+timezones = ["Asia/Tokyo"]
+)");
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(legacyConfig, issues);
+    const auto* legacyClock = legacyConfig["control_center"]["clock"]["timezones"].as_array();
+    expect(
+        legacyClock != nullptr
+            && legacyClock->size() == 1
+            && (*legacyClock)[0].value<std::string_view>() == std::optional<std::string_view>{"Asia/Tokyo"},
+        "legacy calendar timezones were not moved"
+    );
+    expect(hasIssuePath(issues, "control_center.calendar.timezones"), "legacy clock timezone issue was missing");
+  }
+
+  void checkControlCenterShortcutLabelsMigration() {
+    toml::table sidecar = toml::parse(R"(
+config_version = 16
+[control_center]
+show_shortcut_labels = false
+width = 700
+)");
+    helix::config::schema::Diagnostics diagnostics;
+    const int applied = helix::config::applyPendingConfigMigrations(sidecar, 16, diagnostics);
+    expect(applied == helix::config::currentConfigVersion(), "shortcut labels migration was not applied");
+    const auto* controlCenter = sidecar["control_center"].as_table();
+    expect(
+        controlCenter != nullptr && controlCenter->get("show_shortcut_labels") == nullptr,
+        "show_shortcut_labels was not removed"
+    );
+    expect(sidecar["control_center"]["width"].value<std::int64_t>() == 700, "other control_center keys were touched");
+
+    toml::table legacyConfig = toml::parse(R"(
+[control_center]
+show_shortcut_labels = true
+)");
+    helix::config::LegacyConfigIssues issues;
+    helix::config::normalizeLegacyConfig(legacyConfig, issues);
+    expect(
+        hasIssuePath(issues, "control_center.show_shortcut_labels"), "legacy show_shortcut_labels issue was missing"
+    );
+  }
+
   void checkVersionGating() {
     toml::table legacy = toml::parse(R"(
 [bar.main]
 radius = -10
 )");
-    noctalia::config::schema::Diagnostics diag;
-    const auto stored = noctalia::config::storedConfigVersion(legacy, diag);
+    helix::config::schema::Diagnostics diag;
+    const auto stored = helix::config::storedConfigVersion(legacy, diag);
     expect(stored == 0, "missing config_version was not treated as legacy version 0");
-    const int applied = noctalia::config::applyPendingConfigMigrations(legacy, stored.value_or(0), diag);
-    expect(applied == noctalia::config::currentConfigVersion(), "pending migration did not reach current version");
+    const int applied = helix::config::applyPendingConfigMigrations(legacy, stored.value_or(0), diag);
+    expect(applied == helix::config::currentConfigVersion(), "pending migration did not reach current version");
     expect(legacy["bar"]["main"]["radius"].value<std::int64_t>() == 10, "sidecar migration did not run");
 
     toml::table current = toml::parse(R"(
@@ -863,33 +992,31 @@ config_version = 1
 [bar.main]
 radius = -10
 )");
-    noctalia::config::schema::Diagnostics currentDiag;
-    const auto currentStored = noctalia::config::storedConfigVersion(current, currentDiag);
+    helix::config::schema::Diagnostics currentDiag;
+    const auto currentStored = helix::config::storedConfigVersion(current, currentDiag);
     expect(currentStored == 1, "current config_version was not read");
-    (void)noctalia::config::applyPendingConfigMigrations(current, currentStored.value_or(0), currentDiag);
+    (void)helix::config::applyPendingConfigMigrations(current, currentStored.value_or(0), currentDiag);
     expect(
         current["bar"]["main"]["radius"].value<std::int64_t>() == -10, "current sidecar replayed a historical migration"
     );
 
     toml::table invalid = toml::parse("config_version = \"one\"");
-    noctalia::config::schema::Diagnostics invalidDiag;
+    helix::config::schema::Diagnostics invalidDiag;
     expect(
-        !noctalia::config::storedConfigVersion(invalid, invalidDiag).has_value(), "invalid config_version was accepted"
+        !helix::config::storedConfigVersion(invalid, invalidDiag).has_value(), "invalid config_version was accepted"
     );
     expect(invalidDiag.hasErrors(), "invalid config_version did not produce an error");
     expect(invalidDiag.hasFatalErrors(), "invalid config_version was not document-fatal");
 
     toml::table future = toml::parse("config_version = 999");
-    noctalia::config::schema::Diagnostics futureDiag;
-    expect(
-        !noctalia::config::storedConfigVersion(future, futureDiag).has_value(), "future config_version was accepted"
-    );
+    helix::config::schema::Diagnostics futureDiag;
+    expect(!helix::config::storedConfigVersion(future, futureDiag).has_value(), "future config_version was accepted");
     expect(futureDiag.hasErrors(), "future config_version did not produce an error");
     expect(futureDiag.hasFatalErrors(), "future config_version was not document-fatal");
 
-    noctalia::config::schema::Diagnostics baseline;
+    helix::config::schema::Diagnostics baseline;
     baseline.componentError("widget.clock.timezone", "widget.clock", "unknown timezone", "clock.timezone.unknown");
-    noctalia::config::schema::Diagnostics candidate = baseline;
+    helix::config::schema::Diagnostics candidate = baseline;
     candidate.error("accessibility.ui_scale", "expected a number", "config.type.number");
     const auto introduced = candidate.introducedErrorsComparedTo(baseline);
     expect(introduced.entries.size() == 1, "diagnostic comparison did not isolate the new error");
@@ -899,66 +1026,66 @@ radius = -10
   }
 
   void checkReminderFingerprint() {
-    const noctalia::config::LegacyConfigIssues first = {{1, "bar.main", "message"}};
-    const noctalia::config::LegacyConfigIssues reordered = {
+    const helix::config::LegacyConfigIssues first = {{1, "bar.main", "message"}};
+    const helix::config::LegacyConfigIssues reordered = {
         {1, "bar.second", "message"},
         {1, "bar.main", "different display message"},
     };
-    const noctalia::config::LegacyConfigIssues sameReordered = {
+    const helix::config::LegacyConfigIssues sameReordered = {
         {1, "bar.main", "message"},
         {1, "bar.second", "message"},
     };
 
-    const std::string firstFingerprint = noctalia::config::legacyConfigIssueFingerprint(first);
-    const std::string expandedFingerprint = noctalia::config::legacyConfigIssueFingerprint(reordered);
+    const std::string firstFingerprint = helix::config::legacyConfigIssueFingerprint(first);
+    const std::string expandedFingerprint = helix::config::legacyConfigIssueFingerprint(reordered);
     expect(
-        expandedFingerprint == noctalia::config::legacyConfigIssueFingerprint(sameReordered),
+        expandedFingerprint == helix::config::legacyConfigIssueFingerprint(sameReordered),
         "fingerprint depends on issue ordering or display message"
     );
     expect(
-        noctalia::config::legacyConfigFingerprintHasNewIssues(expandedFingerprint, firstFingerprint),
+        helix::config::legacyConfigFingerprintHasNewIssues(expandedFingerprint, firstFingerprint),
         "new issue was not detected"
     );
     expect(
-        !noctalia::config::legacyConfigFingerprintHasNewIssues(firstFingerprint, expandedFingerprint),
+        !helix::config::legacyConfigFingerprintHasNewIssues(firstFingerprint, expandedFingerprint),
         "removing an issue was treated as introducing one"
     );
 
     constexpr std::int64_t kStart = 1'000'000;
     expect(
-        !noctalia::config::legacyConfigReminderIntervalElapsed(
-            kStart + noctalia::config::kLegacyConfigReminderIntervalSeconds - 1, kStart
+        !helix::config::legacyConfigReminderIntervalElapsed(
+            kStart + helix::config::kLegacyConfigReminderIntervalSeconds - 1, kStart
         ),
         "reminder became due before three days"
     );
     expect(
-        noctalia::config::legacyConfigReminderIntervalElapsed(
-            kStart + noctalia::config::kLegacyConfigReminderIntervalSeconds, kStart
+        helix::config::legacyConfigReminderIntervalElapsed(
+            kStart + helix::config::kLegacyConfigReminderIntervalSeconds, kStart
         ),
         "reminder was not due at three days"
     );
     expect(
-        noctalia::config::legacyConfigReminderIntervalElapsed(kStart - 1, kStart),
+        helix::config::legacyConfigReminderIntervalElapsed(kStart - 1, kStart),
         "backward clock change did not make the reminder due"
     );
   }
 
   void checkRegistryOrdering() {
     int expectedVersion = 1;
-    for (const auto& migration : noctalia::config::configMigrations()) {
+    for (const auto& migration : helix::config::configMigrations()) {
       expect(migration.toVersion == expectedVersion, "migration registry has a gap or is out of order");
       expect(!migration.summary.empty(), "migration registry entry has no summary");
       expect(migration.apply != nullptr, "migration registry entry has no apply function");
       ++expectedVersion;
     }
     expect(
-        expectedVersion - 1 == noctalia::config::currentConfigVersion(),
+        expectedVersion - 1 == helix::config::currentConfigVersion(),
         "current config version does not match the registry"
     );
   }
 
   void checkLargeCurrentRegistrySkipsBodies() {
-    std::vector<noctalia::config::ConfigMigration> migrations;
+    std::vector<helix::config::ConfigMigration> migrations;
     migrations.reserve(100);
     for (int version = 1; version <= 100; ++version) {
       migrations.push_back({
@@ -969,13 +1096,13 @@ radius = -10
     }
 
     toml::table root;
-    noctalia::config::schema::Diagnostics diag;
+    helix::config::schema::Diagnostics diag;
     g_syntheticMigrationApplications = 0;
-    const int current = noctalia::config::applyPendingConfigMigrations(root, 100, diag, migrations);
+    const int current = helix::config::applyPendingConfigMigrations(root, 100, diag, migrations);
     expect(current == 100, "synthetic current version changed");
     expect(g_syntheticMigrationApplications == 0, "current sidecar executed historical migration bodies");
 
-    const int upgraded = noctalia::config::applyPendingConfigMigrations(root, 99, diag, migrations);
+    const int upgraded = helix::config::applyPendingConfigMigrations(root, 99, diag, migrations);
     expect(upgraded == 100, "synthetic upgrade did not reach the current version");
     expect(g_syntheticMigrationApplications == 1, "synthetic upgrade did not execute exactly one pending body");
   }
@@ -992,6 +1119,9 @@ int main() {
   checkCustomButtonCommandsMigration();
   checkDeadZoneActionsMigration();
   checkCalendarEventFormatsMigration();
+  checkLaunchAppsAsSystemdServicesMigration();
+  checkClockTimezonesMigration();
+  checkControlCenterShortcutLabelsMigration();
   checkSysmonPresentationMigration();
   checkKeyboardLayoutShowGlyphMigration();
   checkKeyboardLayoutCustomLabelsMigration();

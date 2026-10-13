@@ -1,4 +1,5 @@
 #include "config/config_service.h"
+#include "config/config_types.h"
 
 #include <cstdlib>
 #include <filesystem>
@@ -24,20 +25,20 @@ namespace {
   // is written for the first time.
   void checkConfigSurvivesFirstSidecarWrite() {
     const std::filesystem::path root =
-        std::filesystem::temp_directory_path() / ("noctalia-wallpaper-config-file-" + std::to_string(::getpid()));
+        std::filesystem::temp_directory_path() / ("helix-wallpaper-config-file-" + std::to_string(::getpid()));
     std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root / "config" / "noctalia");
-    std::filesystem::create_directories(root / "state" / "noctalia");
+    std::filesystem::create_directories(root / "config" / "helix");
+    std::filesystem::create_directories(root / "state" / "helix");
     std::filesystem::create_directories(root / "data");
-    ::setenv("NOCTALIA_CONFIG_HOME", (root / "config").c_str(), 1);
-    ::setenv("NOCTALIA_STATE_HOME", (root / "state").c_str(), 1);
-    ::setenv("NOCTALIA_DATA_HOME", (root / "data").c_str(), 1);
+    ::setenv("HELIX_CONFIG_HOME", (root / "config").c_str(), 1);
+    ::setenv("HELIX_STATE_HOME", (root / "state").c_str(), 1);
+    ::setenv("HELIX_DATA_HOME", (root / "data").c_str(), 1);
 
     {
-      std::ofstream out(root / "config" / "noctalia" / "config.toml", std::ios::trunc);
+      std::ofstream out(root / "config" / "helix" / "config.toml", std::ios::trunc);
       out << "[wallpaper]\nenabled = true\n\n[wallpaper.default]\npath = \"/tmp/from-config.png\"\n";
     }
-    const auto sidecar = root / "state" / "noctalia" / "settings.toml";
+    const auto sidecar = root / "state" / "helix" / "settings.toml";
     expect(!std::filesystem::exists(sidecar), "state dir should start without settings.toml");
 
     ConfigService config;
@@ -51,26 +52,26 @@ namespace {
         "config.toml path was dropped by the first sidecar write"
     );
 
-    ::unsetenv("NOCTALIA_CONFIG_HOME");
-    ::unsetenv("NOCTALIA_STATE_HOME");
-    ::unsetenv("NOCTALIA_DATA_HOME");
+    ::unsetenv("HELIX_CONFIG_HOME");
+    ::unsetenv("HELIX_STATE_HOME");
+    ::unsetenv("HELIX_DATA_HOME");
     std::filesystem::remove_all(root);
   }
 
   // State settings loads last, so it should outranks config.toml
   void checkSidecarPathOutranksConfigFilePath() {
     const std::filesystem::path root =
-        std::filesystem::temp_directory_path() / ("noctalia-wallpaper-sidecar-" + std::to_string(::getpid()));
+        std::filesystem::temp_directory_path() / ("helix-wallpaper-sidecar-" + std::to_string(::getpid()));
     std::filesystem::remove_all(root);
-    std::filesystem::create_directories(root / "config" / "noctalia");
-    std::filesystem::create_directories(root / "state" / "noctalia");
+    std::filesystem::create_directories(root / "config" / "helix");
+    std::filesystem::create_directories(root / "state" / "helix");
     std::filesystem::create_directories(root / "data");
-    ::setenv("NOCTALIA_CONFIG_HOME", (root / "config").c_str(), 1);
-    ::setenv("NOCTALIA_STATE_HOME", (root / "state").c_str(), 1);
-    ::setenv("NOCTALIA_DATA_HOME", (root / "data").c_str(), 1);
+    ::setenv("HELIX_CONFIG_HOME", (root / "config").c_str(), 1);
+    ::setenv("HELIX_STATE_HOME", (root / "state").c_str(), 1);
+    ::setenv("HELIX_DATA_HOME", (root / "data").c_str(), 1);
 
     {
-      std::ofstream out(root / "config" / "noctalia" / "config.toml", std::ios::trunc);
+      std::ofstream out(root / "config" / "helix" / "config.toml", std::ios::trunc);
       out << "[wallpaper]\nenabled = true\n\n[wallpaper.default]\npath = \"/tmp/from-config.png\"\n";
     }
     ConfigService config;
@@ -85,9 +86,40 @@ namespace {
     expect(config.getWallpaperPath("DP-9") == "/tmp/dp9.png", "per-monitor path did not survive a reload");
     expect(config.getWallpaperPath("DP-8") == "/tmp/picked.png", "unconfigured monitor did not fall back to default");
 
-    ::unsetenv("NOCTALIA_CONFIG_HOME");
-    ::unsetenv("NOCTALIA_STATE_HOME");
-    ::unsetenv("NOCTALIA_DATA_HOME");
+    ::unsetenv("HELIX_CONFIG_HOME");
+    ::unsetenv("HELIX_STATE_HOME");
+    ::unsetenv("HELIX_DATA_HOME");
+    std::filesystem::remove_all(root);
+  }
+
+  // Path fields document that ~ and $VARS expand on read (see field.h
+  // pathStringField). Regression guard: wallpaper.directory must expand $VARS.
+  void checkDirectoryExpandsEnvVars() {
+    const std::filesystem::path root =
+        std::filesystem::temp_directory_path() / ("helix-wallpaper-envvar-" + std::to_string(::getpid()));
+    std::filesystem::remove_all(root);
+    std::filesystem::create_directories(root / "config" / "helix");
+    std::filesystem::create_directories(root / "state" / "helix");
+    std::filesystem::create_directories(root / "data");
+    ::setenv("HELIX_CONFIG_HOME", (root / "config").c_str(), 1);
+    ::setenv("HELIX_STATE_HOME", (root / "state").c_str(), 1);
+    ::setenv("HELIX_DATA_HOME", (root / "data").c_str(), 1);
+    ::setenv("HELIX_WP_TEST", "/tmp/wp-root", 1);
+
+    {
+      std::ofstream out(root / "config" / "helix" / "config.toml", std::ios::trunc);
+      out << "[wallpaper]\nenabled = true\ndirectory = \"$HELIX_WP_TEST/pics\"\n";
+    }
+
+    ConfigService config;
+    expect(
+        config.config().wallpaper.directory == "/tmp/wp-root/pics", "wallpaper.directory did not expand $HELIX_WP_TEST"
+    );
+
+    ::unsetenv("HELIX_WP_TEST");
+    ::unsetenv("HELIX_CONFIG_HOME");
+    ::unsetenv("HELIX_STATE_HOME");
+    ::unsetenv("HELIX_DATA_HOME");
     std::filesystem::remove_all(root);
   }
 
@@ -96,6 +128,7 @@ namespace {
 int main() {
   checkConfigSurvivesFirstSidecarWrite();
   checkSidecarPathOutranksConfigFilePath();
+  checkDirectoryExpandsEnvVars();
 
   if (g_failures == 0) {
     std::println("config_wallpaper_precedence_test: all checks passed");

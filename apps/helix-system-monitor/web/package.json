@@ -1,0 +1,12 @@
+{
+  "name": "helix-monitor-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit -p ../../../tsconfig.json && vite build",
+    "typecheck": "tsc --noEmit -p ../../../tsconfig.json"
+  },
+  "dependencies": {
+    "@helix/ui": "*"
+  }
+}

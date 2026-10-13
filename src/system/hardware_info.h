@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -15,3 +16,6 @@
 
 // "total GB (NN%)" for the filesystem containing the given mount point.
 [[nodiscard]] std::string diskUsageLabel(const std::string& mountPoint);
+
+// Used fraction [0, 1] of the filesystem containing the given mount point; nullopt when unknown.
+[[nodiscard]] std::optional<float> diskUsageFraction(const std::string& mountPoint);

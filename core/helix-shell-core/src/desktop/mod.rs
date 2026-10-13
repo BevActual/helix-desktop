@@ -1,0 +1,17 @@
+pub mod audio;
+pub mod bluetooth;
+pub mod brightness;
+pub mod catalog;
+pub mod capture;
+pub mod compositor_config;
+pub mod compositor_ipc;
+pub mod dock_prefs;
+pub mod idle_prefs;
+pub mod keybinds;
+pub mod network;
+pub mod pairing;
+pub mod power;
+pub mod quick;
+pub mod settings;
+pub mod shortcuts;
+pub mod wallhaven;

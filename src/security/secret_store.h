@@ -1,6 +1,6 @@
 #pragma once
 
-#include "app/poll_source.h"
+#include "core/poll_source.h"
 #include "security/secure_buffer.h"
 
 #include <functional>
@@ -13,7 +13,7 @@
 
 namespace security {
 
-  inline constexpr std::string_view SecretStoreSchemaName = "dev.noctalia.Secret";
+  inline constexpr std::string_view SecretStoreSchemaName = "org.helix.Secret";
 
   struct SecretId {
     std::string scope;

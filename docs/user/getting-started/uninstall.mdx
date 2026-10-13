@@ -1,32 +1,31 @@
 ---
 title: Uninstall
-description: How to uninstall Noctalia and clean up configuration files.
+description: How to uninstall Helix and clean up configuration files.
 sidebar:
   order: 99
 ---
 
-If you wish to remove Noctalia from your system, you can uninstall the `noctalia` or `noctalia-git` package using your distribution's package manager.
+If you installed Helix Shell from this repository, remove it from the same source checkout and build directory.
 
-### Manual Installation
+### Source installation
 
-If you installed manually using `just install release`, remove the files installed under your prefix:
+If you installed with `just install release`, run:
 
 ```bash
-rm ~/.local/bin/noctalia
-rm -rf ~/.local/share/noctalia
+just uninstall release
 ```
 
 ## Cleaning Up
 
-After removing the package, you may want to remove the configuration and cache files.
+The shell's personal configuration, state, and cache are separate from installed files. These paths are shared with upstream Helix, so remove them only if you no longer need that data.
 
 ### Configuration and Cache
 
-Noctalia stores its configuration and cache in the standard XDG directories. To remove them:
+Helix stores its configuration and cache in the standard XDG directories. To remove them:
 
 ```bash
-rm -rf ~/.local/state/noctalia
-rm -rf ~/.cache/noctalia
+rm -rf ~/.local/state/helix
+rm -rf ~/.cache/helix
 ```
 
 ### Generated Templates

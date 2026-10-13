@@ -1,15 +1,16 @@
 #include "notification_service.h"
 
 #include "compositors/compositor_detect.h"
+#include "core/image_decoder.h"
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "i18n/i18n.h"
 #include "net/uri.h"
 #include "notification/notification_manager.h"
-#include "render/core/image_decoder.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <tuple>
 #include <unistd.h>
@@ -29,7 +30,6 @@ namespace {
   constexpr auto kDbusInterface = "org.freedesktop.DBus";
 
   constexpr uint32_t kNameFlagAllowReplacement = 1U;
-  constexpr uint32_t kNameFlagReplaceExisting = 2U;
   constexpr uint32_t kNameFlagDoNotQueue = 4U;
 
   constexpr uint32_t kNameReplyPrimaryOwner = 1U;
@@ -41,12 +41,7 @@ namespace {
     return sdbus::createProxy(connection, kDbusBusName, kDbusObjectPath);
   }
 
-  [[nodiscard]] uint32_t notificationNameRequestFlags() {
-    if (compositors::isKde()) {
-      return kNameFlagAllowReplacement | kNameFlagReplaceExisting | kNameFlagDoNotQueue;
-    }
-    return kNameFlagAllowReplacement | kNameFlagDoNotQueue;
-  }
+  [[nodiscard]] uint32_t notificationNameRequestFlags() { return kNameFlagAllowReplacement | kNameFlagDoNotQueue; }
 
 } // namespace
 
@@ -216,6 +211,40 @@ namespace notification_dbus {
       }
     }
     return false;
+  }
+
+  std::optional<int> notifyProgressFromHints(const std::map<std::string, sdbus::Variant>& hints) {
+    const auto it = hints.find("value");
+    if (it == hints.end()) {
+      return std::nullopt;
+    }
+    const auto& v = it->second;
+    std::optional<long long> raw;
+    try {
+      if (v.containsValueOfType<int32_t>()) {
+        raw = v.get<int32_t>();
+      } else if (v.containsValueOfType<uint32_t>()) {
+        raw = v.get<uint32_t>();
+      } else if (v.containsValueOfType<int64_t>()) {
+        raw = v.get<int64_t>();
+      } else if (v.containsValueOfType<uint64_t>()) {
+        raw = static_cast<long long>(std::min<uint64_t>(v.get<uint64_t>(), 100));
+      } else if (v.containsValueOfType<uint8_t>()) {
+        raw = v.get<uint8_t>();
+      } else if (v.containsValueOfType<int16_t>()) {
+        raw = v.get<int16_t>();
+      } else if (v.containsValueOfType<uint16_t>()) {
+        raw = v.get<uint16_t>();
+      } else if (v.containsValueOfType<double>()) {
+        raw = static_cast<long long>(v.get<double>());
+      }
+    } catch (...) {
+      return std::nullopt;
+    }
+    if (!raw.has_value()) {
+      return std::nullopt;
+    }
+    return static_cast<int>(std::clamp<long long>(*raw, 0, 100));
   }
 
   std::vector<std::string> sanitizeNotifyActions(const std::vector<std::string>& actions) {
@@ -419,6 +448,7 @@ namespace notification_dbus {
             .imageData = notifyImageDataFromHints(hints),
             .category = notifyCategoryFromHints(hints),
             .desktopEntry = notifyDesktopEntryFromHints(hints),
+            .progress = notifyProgressFromHints(hints),
         }
     );
   }
@@ -538,5 +568,5 @@ void NotificationService::emitActivationToken(uint32_t id, const std::string& ac
 }
 
 std::tuple<std::string, std::string, std::string, std::string> NotificationService::onGetServerInformation() {
-  return {"noctalia", "noctalia-dev", NOCTALIA_VERSION, "1.2"};
+  return {"Helix Shell", "helix", HELIX_VERSION, "1.2"};
 }

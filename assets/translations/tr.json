@@ -27,6 +27,22 @@
     }
   },
   "bar": {
+    "annotate": {
+      "color-black": "Siyah",
+      "color-blue": "Mavi",
+      "color-green": "Yeşil",
+      "color-orange": "Turuncu",
+      "color-purple": "Mor",
+      "color-red": "Kırmızı",
+      "color-white": "Beyaz",
+      "color-yellow": "Sarı",
+      "redo": "İleri al (Ctrl+Shift+Z)",
+      "size-large": "Büyük",
+      "size-medium": "Orta",
+      "size-small": "Küçük",
+      "tool-text": "Metin (t)",
+      "undo": "Geri al (Ctrl+Z)"
+    },
     "screenshot": {
       "choose-display": "Ekran seçin",
       "confirm-region": "Kopyalamak için {copy} · Kaydetmek için {save} · Varsayılanlar için Enter veya Space · İptal etmek için {cancel} · Tekrar seçmek için sürükle",
@@ -60,6 +76,7 @@
       "network": {
         "active": "Aktif",
         "band": "Şebeke",
+        "cellular": "Hücresel",
         "connected": "Bağlandı",
         "connecting": "Bağlanıyor",
         "download": "İndirme",
@@ -73,8 +90,10 @@
         "not-connected": "Bağlı değil",
         "off": "Kapalı",
         "on": "Açık",
+        "operator": "Operatör",
         "scanning": "Taranıyor",
         "signal": "Sinyal",
+        "technology": "Teknoloji",
         "upload": "Yükleme",
         "vpn": "VPN",
         "wan-ip": "WAN adresi",
@@ -184,9 +203,10 @@
     "audio": {
       "application-volumes": "Uygulama Ses Düzeyleri",
       "choose-effects-profile": "Bir profil seç",
+      "default-device": "Varsayılan Cihaz",
       "effects-profile": "Efektler",
       "input-device-prefix": "Giriş Cihazı",
-      "no-application-audio": "Uygulama sesi yok",
+      "no-application-audio": "Uygulama Sesi Yok",
       "no-application-audio-body": "Şu anda hiçbir uygulama oynatma akışı mevcut değil.",
       "no-input-devices": "Giriş cihazı yok",
       "no-input-devices-body": "Şu anda erişilebilen bir kayıt cihazı yok.",
@@ -263,7 +283,7 @@
     },
     "media": {
       "active-player": "Aktif oynatıcı",
-      "nothing-playing": "Hiçbir şey çalmıyor",
+      "nothing-playing": "Hiçbir Şey Çalmıyor",
       "now-playing": "Şimdi çalıyor",
       "start-playback": "Bir MPRIS uygulamasında oynatmayı başlat"
     },
@@ -651,9 +671,9 @@
     "context-menu": {
       "open": "Aç",
       "pin": "Başlatıcıya Sabitle",
-      "pin-to-dock": "Dock'a sabitle",
+      "pin-to-dock": "Dok'a Sabitle",
       "unpin": "Başlatıcıdan Kaldır",
-      "unpin-from-dock": "Dock'tan çıkar"
+      "unpin-from-dock": "Dok'tan Çıkar"
     },
     "empty": {
       "no-results": "Sonuç bulunamadı",
@@ -746,19 +766,19 @@
       "calendar-google-connect-start-failed": "Google yetkilendirmesi başlatılamadı. Ağ bağlantınızı kontrol edin ve tekrar deneyin.",
       "calendar-google-connect-start-http": "Google yetkilendirmesi başlatılamadı. OAuth aracısı HTTP {status} döndürdü.",
       "calendar-google-connect-timeout": "Google yetkilendirmesi zaman aşımına uğradı. Oturum açmaya hazır olduğunuzda bağlantıyı tekrar başlatın.",
-      "config-migration-body": "Kaynak dosyadaki {path} konumunu güncelleyin. Noctalia bu değişimi sadece geçici olarak uyguluyor. Gerekli tüm değişiklikleri listelemek için noctalia config validate komutunu çalıştırın.",
+      "config-migration-body": "Kaynak dosyadaki {path} konumunu güncelleyin. Helix bu değişimi sadece geçici olarak uyguluyor. Gerekli tüm değişiklikleri listelemek için helix config validate komutunu çalıştırın.",
       "config-migration-title": "Yapılandırma güncellemesi gerekiyor",
       "dbus-disabled": "DBus bildirimleri devre dışı",
       "desktop-widgets-editor": "Bileşen düzenleyici",
       "desktop-widgets-editor-enabled": "Masaüstü bileşen düzenleyicisi açık. Açık pencerelerin düzenleyiciyi kapatmaması için boş bir çalışma alanına geçin.",
-      "greeter-sync": "Noctalia Karşılama Ekranı",
+      "greeter-sync": "Helix Karşılama Ekranı",
       "greeter-sync-pending": "Karşılama ekranına yazmak için yönetici onayı bekleniyor.",
-      "greeter-sync-pending-console": "Yönetici onayı bekleniyor. Noctalia içindeki, bir TTY veya konsoldaki polkit istemini onaylayın ya da pkexec'i manuel olarak çalıştırın.",
-      "greeter-sync-pending-manual": "Dosyalar hazırlandı. Terminalde çalıştırın: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\". Veya shell.greeter_sync.privilege_command (örneğin ghostty -e pkexec) ayarlayıp tekrar senkronize edin.",
+      "greeter-sync-pending-console": "Yönetici onayı bekleniyor. Helix içindeki, bir TTY veya konsoldaki polkit istemini onaylayın ya da pkexec'i manuel olarak çalıştırın.",
+      "greeter-sync-pending-manual": "Dosyalar hazırlandı. Terminalde çalıştırın: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\". Veya shell.greeter_sync.privilege_command (örneğin ghostty -e pkexec) ayarlayıp tekrar senkronize edin.",
       "greeter-sync-success": "Görünüm senkronize edildi. Değişiklikler bir sonraki giriş ekranında uygulanacak.",
       "greeter-sync-timeout": "Karşılama ekranı senkronizasyonu hâlâ yönetici onayı bekliyor. Polkit istemi için bir TTY veya konsolu kontrol edin, Güvenlik ayarlarında polkit aracısını etkinleştirin veya pkexec'i manuel olarak çalıştırın.",
-      "greeter-sync-timeout-manual": "Karşılama ekranı senkronizasyonu hâlâ yönetici onayı gerektiriyor. Terminalde şunu çalıştırın: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
-      "keybind-app": "Noctalia",
+      "greeter-sync-timeout-manual": "Karşılama ekranı senkronizasyonu hâlâ yönetici onayı gerektiriyor. Terminalde şunu çalıştırın: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
+      "keybind-app": "Helix",
       "keybind-invalid-modifier": "Bu kısayol, değiştirici olmadan yalnızca tek bir tuş kabul eder.",
       "keybind-invalid-printable": "Yazdırılabilir tuşlar (harfler, sayılar, semboller) Ctrl veya Alt gibi bir değiştirici tuş gerektirir.",
       "keybind-invalid-super": "Super/Windows tuşu sistem tuş atamalarında kullanılamaz.",
@@ -830,7 +850,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin}, {version} eklenti API'yını hedefliyor; bu Noctalia {oldest}–{current} API'larını destekliyor.",
+      "body-incompatible": "{plugin}, {version} eklenti API'yını hedefliyor; bu Helix {oldest}–{current} API'larını destekliyor.",
       "body-timeout": "{plugin} yüklemesi zaman aşımına uğradı.",
       "title": "Eklenti devre dışı"
     }
@@ -1119,9 +1139,9 @@
       },
       "reset-page": "Bazı ayarlar sıfırlanamadı.",
       "support-report": "Destek raporu kaydedilemedi.",
-      "sync-greeter": "Görünüm, Noctalia Karşılama Ekranı ile senkronize edilemedi.",
+      "sync-greeter": "Görünüm, Helix Karşılama Ekranı ile senkronize edilemedi.",
       "sync-greeter-timeout": "Karşılama ekranı senkronizasyonu hala yönetici onayı bekliyor. TTY veya konsoldaki polkit onayını kontrol edin, Güvenlik ayarlarından polkit aracını etkinleştirin veya pkexec komutunu manuel olarak çalıştırın.",
-      "sync-greeter-timeout-manual": "Karşılama ekranı senkronizasyonu hala yönetici onayına ihtiyaç duyuyor. Terminalde şu komutu çalıştırın: pkexec noctalia-greeter-apply-appearance \"$XDG_RUNTIME_DIR/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "Karşılama ekranı senkronizasyonu hala yönetici onayına ihtiyaç duyuyor. Terminalde şu komutu çalıştırın: pkexec helix-greeter-apply-appearance \"$XDG_RUNTIME_DIR/helix-greeter-sync\"",
       "widget": {
         "rename": "İsimlendirilmiş araç yeniden adlandırılamadı."
       },
@@ -1265,6 +1285,7 @@
         "shell": "Kabuk",
         "system": "Sistem",
         "templates": "Şablonlar",
+        "umbriel": "Umbriel",
         "wallpaper": "Duvar Kağıdı"
       }
     },
@@ -1374,6 +1395,13 @@
       "panel-position": {
         "auto": "Çubuğu Takip Et"
       },
+      "plugins": {
+        "auto-update": {
+          "all": "Tümü",
+          "none": "Hiçbiri",
+          "official": "Resmi"
+        }
+      },
       "screen-position": {
         "bottom-center": "Alt Orta",
         "bottom-left": "Alt Sol",
@@ -1415,6 +1443,9 @@
         "mode": {
           "dark": "Koyu",
           "light": "Açık"
+        },
+        "shell-mode": {
+          "follow": "Takip et"
         },
         "source": {
           "built-in": "Dahili",
@@ -1459,6 +1490,9 @@
     "plugins": {
       "browse-store": "Eklentileri Keşfet",
       "panels": {
+        "layer": {
+          "label": "Katman"
+        },
         "open-near-click": {
           "description": "Çubuk bileşenine tıklayarak açıldığında panelin nerede konumlandırılacağı",
           "label": "Çubuk Boyunca"
@@ -1480,10 +1514,12 @@
         "deprecated": "kullanımdan kaldırıldı",
         "empty": "Etkin eklenti yok.",
         "held-back": "eski sürüm",
-        "held-back-hint": "v{version} sürümü {required} eklenti API'sine ihtiyaç duyuyor; Noctalia sürümünüz en fazla {current} destekliyor. Yüklemek için Noctalia'yı güncelleyin.",
+        "held-back-hint": "v{version} sürümü {required} eklenti API'sine ihtiyaç duyuyor; Helix sürümünüz en fazla {current} destekliyor. Yüklemek için Helix'yı güncelleyin.",
         "incompatible-plugin-api": "uyumsuz eklenti API'si",
         "remove": "Eklentiyi kaldır",
         "requires": "Gereksinimler: {dependencies}",
+        "search-empty": "\"{query}\" aramasına eşleşen eklenti yok",
+        "search-placeholder": "Yüklü eklentilerde ara",
         "title": "Eklentiler",
         "update-all": "Tümünü güncelle ({count})",
         "update-available": "güncelleme mevcut",
@@ -1511,8 +1547,8 @@
         },
         "kind-label": "Tür",
         "location-label": "Konum",
-        "location-placeholder-git": "https://github.com/ben/noctalia-eklentilerim",
-        "location-placeholder-path": "~/dev/noctalia-eklentilerim",
+        "location-placeholder-git": "https://github.com/ben/helix-eklentilerim",
+        "location-placeholder-path": "~/dev/helix-eklentilerim",
         "name-label": "Kaynak ID'si",
         "name-placeholder": "eklentilerim",
         "precedence-hint": "Aynı eklentiyi sunduklarında alt sıradaki kaynaklar üst sıradakileri ezer.",
@@ -1522,18 +1558,18 @@
         "update": "Kaynağı güncelle"
       },
       "store": {
-        "add": "Noctalia'ya Ekle",
+        "add": "Helix'ya Ekle",
         "back-to-catalog": "Eklenti kataloğuna dön",
         "categories": "Kategoriler",
         "category-all": "Tümü",
         "empty": "Eklenti bulunamadı",
         "held-back": "Eski sürüm",
-        "held-back-hint": "Eklenti API'si {resolved} için v{version} kuruluyor. En yeni v{latest} sürümü, eklenti API'si {latestRequired} gerektirir; Noctalia sürümünüz en fazla {current} destekliyor.",
+        "held-back-hint": "Eklenti API'si {resolved} için v{version} kuruluyor. En yeni v{latest} sürümü, eklenti API'si {latestRequired} gerektirir; Helix sürümünüz en fazla {current} destekliyor.",
         "incompatible": "Uyumsuz",
-        "incompatible-hint": "Eklenti API'si {required} gerektirir; Noctalia sürümünüz {oldest}–{current} arasını destekliyor.",
+        "incompatible-hint": "Eklenti API'si {required} gerektirir; Helix sürümünüz {oldest}–{current} arasını destekliyor.",
         "loading": "Katalog yükleniyor...",
         "no-readme": "Açıklama mevcut değil.",
-        "open-page": "Eklentinin sayfasını noctalia.dev'de aç",
+        "open-page": "Eklentinin sayfasını helix.dev'de aç",
         "open-source": "Eklentinin kaynak kod deposunu aç",
         "results-count": "{count} eklenti",
         "search-placeholder": "Eklentilerde ara...",
@@ -1593,7 +1629,7 @@
           "label": "Köşe Yuvarlaklığı"
         },
         "custom-palette": {
-          "description": "~/.config/noctalia/palettes/ klasöründen özel bir palet seç",
+          "description": "~/.config/helix/palettes/ klasöründen özel bir palet seç",
           "label": "Özel Palet",
           "search-placeholder": "Özel paletlerde ara..."
         },
@@ -2067,7 +2103,7 @@
             "label": "Sistem Kapanırken"
           },
           "started": {
-            "description": "Noctalia başladıktan sonra çalıştırılacak komut",
+            "description": "Helix başladıktan sonra çalıştırılacak komut",
             "label": "Başlangıçta"
           },
           "theme-mode-changed": {
@@ -2075,7 +2111,7 @@
             "label": "Tema Modu Değiştiğinde"
           },
           "wallpaper-changed": {
-            "description": "Duvar kağıdı değiştiğinde çalıştırılacak komut; ortam değişkeni olarak NOCTALIA_WALLPAPER_PATH ve NOCTALIA_WALLPAPER_CONNECTOR sağlar",
+            "description": "Duvar kağıdı değiştiğinde çalıştırılacak komut; ortam değişkeni olarak HELIX_WALLPAPER_PATH ve HELIX_WALLPAPER_CONNECTOR sağlar",
             "label": "Duvar Kağıdı Değiştiğinde"
           },
           "wifi-disabled": {
@@ -2301,10 +2337,6 @@
         "home-shortcuts": {
           "description": "Ana sekme için en fazla altı kısayol butonu seçin",
           "label": "Ana Sekme Kısayolları"
-        },
-        "home-shortcuts-show-labels": {
-          "description": "Ana sekmedeki kısayol ikonlarının altında metin etiketlerini göster",
-          "label": "Kısayol Etiketlerini Göster"
         },
         "launcher-app-actions": {
           "description": "Sonuçlarda uygulamaların yanında uygulama eylem girdilerini de göster",
@@ -2584,7 +2616,7 @@
           "placeholder": "Şehir, Ülke"
         },
         "location-auto-locate": {
-          "description": "noctalia.dev aracılığıyla konumu IP üzerinden otomatik olarak tespit et",
+          "description": "helix.dev aracılığıyla konumu IP üzerinden otomatik olarak tespit et",
           "label": "Otomatik-Konumlandır (IP)"
         },
         "longitude": {
@@ -2807,7 +2839,7 @@
           "label": "Tarih Biçimi"
         },
         "external-ip": {
-          "description": "Bağlantının genel WAN IP adresini çözümle (api.noctalia.dev üzerinden) ve Kontrol Merkezi ağ sekmesinde göster",
+          "description": "Bağlantının genel WAN IP adresini çözümle (a public IP lookup service üzerinden) ve Kontrol Merkezi ağ sekmesinde göster",
           "label": "WAN IP'yi Göster"
         },
         "greeter-sync-auto": {
@@ -2823,9 +2855,9 @@
           "label": "Klavye Düzeni Etiketleri"
         },
         "launch-apps-as-systemd-services": {
-          "description": "Uygulamaları Noctalia'nın cgroup'unu paylaşmamaları için ayrı systemd servisleri olarak başlatır",
+          "description": "Uygulamaları Helix'nın cgroup'unu paylaşmamaları için ayrı systemd servisleri olarak başlatır",
           "label": "Uygulamaları systemd Servisi Olarak Başlat",
-          "requires-systemd-session": "Noctalia'nın bir systemd kullanıcı servisi olarak çalışmasını gerektirir (uwsm veya systemd kullanıcı birimi)"
+          "requires-systemd-session": "Helix'nın bir systemd kullanıcı servisi olarak çalışmasını gerektirir (uwsm veya systemd kullanıcı birimi)"
         },
         "launch-apps-custom-command": {
           "description": "Başlatıcıdan, rıhtımdan ve görev çubuğundan başlatılan uygulamaları sarar; $CMD'yi orijinal komutla değiştirir.",
@@ -3011,18 +3043,14 @@
           "description": "Ekran alıntılarına fare imlecini dahil et",
           "label": "İmleci Göster"
         },
-        "settings-window-translucent": {
-          "description": "Görüntü sunucusu efektleri için Ayarlar arka planını yarı saydam yap",
-          "label": "Yarı Saydam Ayarlar Arka Planı"
-        },
         "show-location": {
           "description": "Konum ismini hava durumu bileşenlerinde göster",
           "label": "Konumu Göster"
         },
         "sync-greeter": {
           "button": "Şimdi Senkronize Et",
-          "description": "Geçerli duvar kağıdını ve renkleri Noctalia Karşılayıcısına (Greeter) kopyala (yönetici izni gerektirir)",
-          "label": "Noctalia Karşılayıcısı"
+          "description": "Geçerli duvar kağıdını ve renkleri Helix Karşılayıcısına (Greeter) kopyala (yönetici izni gerektirir)",
+          "label": "Helix Karşılayıcısı"
         },
         "telemetry": {
           "description": "Sürüm, işletim sistemi, görüntü sunucusu, monitör çözünürlükleri, RAM ve arayüz ölçeği bilgilerini içeren küçük bir anonim başlangıç isteği gönderir",
@@ -3198,6 +3226,26 @@
     "widgets": {
       "actions": {
         "command-placeholder": "Kabuk komutu",
+        "commands": {
+          "dock-reload": {
+            "label": "Doku yenile"
+          },
+          "dock-show": {
+            "label": "Doku göster"
+          },
+          "dpms-off": {
+            "description": "Monitörleri kapat"
+          },
+          "log-level-set": {
+            "label": "Günlük seviyesini ayarla"
+          },
+          "settings-close": {
+            "label": "Ayarları kapat"
+          },
+          "settings-open-plugin": {
+            "label": "Eklenti ayarlarını kapat"
+          }
+        },
         "default": "Varsayılan",
         "disabled": "Devre Dışı",
         "run-command": "Bir komut çalıştır…",
@@ -3893,8 +3941,8 @@
       "export-config": "Yapılandırmayı Dışa Aktar...",
       "export-config-saved": "Yapılandırma dışa aktarımı kaydedildi.",
       "filter-overridden": "Üzerine yazıldı",
-      "legacy-config-warning": "Eski ayar: {issue}. Bu kaynak girişini düzenleyin; Noctalia değişimi sadece geçici olarak uyguluyor. Gerekli tüm değişiklikleri listelemek için noctalia config validate komutunu çalıştırın.",
-      "native-title": "Noctalia Ayarları",
+      "legacy-config-warning": "Eski ayar: {issue}. Bu kaynak girişini düzenleyin; Helix değişimi sadece geçici olarak uyguluyor. Gerekli tüm değişiklikleri listelemek için helix config validate komutunu çalıştırın.",
+      "native-title": "Helix Ayarları",
       "no-results": "Ayar bulunamadı",
       "no-results-hint": "Farklı bir ayar veya yapılandırma adı girin.",
       "offline-mode-notice": {
@@ -3930,7 +3978,7 @@
     "no-wallpaper-selected": "Duvar kağıdı seçilmedi",
     "select-wallpaper": "Duvar Kağıdı Seç",
     "subtitle": "Başlamanız için birkaç hızlı seçenek.",
-    "title": "Noctalia'ya Hoş Geldiniz",
+    "title": "Helix'ya Hoş Geldiniz",
     "wallpaper": "Duvar Kağıdı",
     "wallpaper-scheme": "Duvar Kağıdı Şeması"
   },

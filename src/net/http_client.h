@@ -18,13 +18,18 @@ struct HttpRequest {
   std::vector<std::string> headers; // e.g. "Authorization: Bearer …", "Depth: 1"
   std::string body;                 // sent as the request body when non-empty
   bool followRedirects = false;
-  bool allowRedirectAuth = false; // continue auth across redirect hosts; use only for trusted provider redirects
-  bool allowInsecureTls = false;  // disable origin certificate and hostname verification; use only for trusted hosts
-  bool freshConnection = false;   // bypass curl's connection cache; needed when the route may have changed
-                                  // (e.g. probing the external IP after a VPN toggle), otherwise a reused
-                                  // keep-alive connection answers via the old path
+  bool allowRedirectAuth = false;    // continue auth across redirect hosts; use only for trusted provider redirects
+  bool allowInsecureTls = false;     // disable origin certificate and hostname verification; use only for trusted hosts
+  bool allowWhenOffline = false;     // skip the shell offline gate; use only for loopback daemons
+  bool freshConnection = false;      // bypass curl's connection cache; needed when the route may have changed
+                                     // (e.g. probing the external IP after a VPN toggle), otherwise a reused
+                                     // keep-alive connection answers via the old path
+  bool quietTransportErrors = false; // liveness probe of a daemon that is usually absent: log a failed
+                                     // connect at debug, not warn
   std::string basicUsername;
   std::string basicPassword;
+  std::filesystem::path uploadPath; // when set, POST this file instead of `body`
+  long timeoutSeconds = 30;         // 0 disables the overall transfer timeout
 };
 
 struct HttpResponse {
@@ -123,6 +128,8 @@ private:
     std::string basicUsername;
     std::string basicPassword;
     std::string response;
+    FILE* uploadFile = nullptr;
+    bool quietTransportErrors = false;
     std::array<char, CURL_ERROR_SIZE> errorBuffer{};
   };
 

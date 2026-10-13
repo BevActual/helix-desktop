@@ -330,6 +330,112 @@ bool NiriWorkspaceBackend::closeWindowById(const std::string& windowId) {
   );
 }
 
+bool NiriWorkspaceBackend::activateWorkspaceById(const std::string& workspaceId, std::string_view outputName) {
+  Workspace workspace;
+  workspace.id = workspaceId;
+  workspace.name = workspaceId;
+  if (const auto idx = parseLeadingNumber(workspaceId); idx.has_value()) {
+    workspace.index = static_cast<std::uint32_t>(*idx);
+  }
+  return activateWorkspace(workspace, outputName);
+}
+
+bool NiriWorkspaceBackend::activateWorkspace(const Workspace& workspace, std::string_view outputName) {
+  const auto* resolved = resolveWorkspace(workspace, outputName);
+  if (resolved == nullptr) {
+    return false;
+  }
+  return requestFocusWorkspace(resolved->id);
+}
+
+bool NiriWorkspaceBackend::moveWindowToWorkspace(
+    const std::string& windowId, const Workspace& workspace, std::string_view outputName
+) {
+  const auto id = parseUnsigned(windowId);
+  const auto* resolved = resolveWorkspace(workspace, outputName);
+  if (!id.has_value() || resolved == nullptr) {
+    return false;
+  }
+  return requestMoveWindowToWorkspace(*id, resolved->id);
+}
+
+bool NiriWorkspaceBackend::moveWindowToOutput(const std::string& windowId, std::string_view outputName) {
+  const auto id = parseUnsigned(windowId);
+  if (!id.has_value() || outputName.empty()) {
+    return false;
+  }
+  return m_runtime.requestAction(
+      nlohmann::json{
+          {"MoveWindowToMonitor", nlohmann::json{{"id", *id}, {"output", std::string(outputName)}}},
+      }
+  );
+}
+
+const NiriWorkspaceBackend::WorkspaceState*
+NiriWorkspaceBackend::resolveWorkspace(const Workspace& workspace, std::string_view outputName) const {
+  const auto candidates = sortedWorkspaceCandidatesForOutput(std::string(outputName));
+
+  auto find = [&](auto&& predicate) -> const WorkspaceState* {
+    for (const auto* candidate : candidates) {
+      if (predicate(*candidate)) {
+        return candidate;
+      }
+    }
+    return nullptr;
+  };
+
+  if (const auto parsedId = parseUnsigned(workspace.id); parsedId.has_value()) {
+    if (const auto* match = find([&](const WorkspaceState& candidate) { return candidate.id == *parsedId; })) {
+      return match;
+    }
+  }
+  if (!workspace.name.empty()) {
+    if (const auto* match = find([&](const WorkspaceState& candidate) { return candidate.name == workspace.name; })) {
+      return match;
+    }
+  }
+
+  std::optional<std::size_t> parsedIndex;
+  if (workspace.index > 0) {
+    parsedIndex = static_cast<std::size_t>(workspace.index);
+  }
+  if (!parsedIndex.has_value()) {
+    parsedIndex = parseLeadingNumber(workspace.id);
+  }
+  if (!parsedIndex.has_value()) {
+    parsedIndex = parseLeadingNumber(workspace.name);
+  }
+  if (parsedIndex.has_value()) {
+    if (const auto* match = find([&](const WorkspaceState& candidate) {
+          return static_cast<std::size_t>(candidate.idx) == *parsedIndex;
+        })) {
+      return match;
+    }
+  }
+  return nullptr;
+}
+
+bool NiriWorkspaceBackend::requestFocusWorkspace(std::uint64_t workspaceId) {
+  return m_runtime.requestAction(
+      nlohmann::json{
+          {"FocusWorkspace", nlohmann::json{{"reference", nlohmann::json{{"Id", workspaceId}}}}},
+      }
+  );
+}
+
+bool NiriWorkspaceBackend::requestMoveWindowToWorkspace(std::uint64_t windowId, std::uint64_t workspaceId) {
+  return m_runtime.requestAction(
+      nlohmann::json{
+          {"MoveWindowToWorkspace",
+           nlohmann::json{
+               {"window_id", windowId},
+               {"reference", nlohmann::json{{"Id", workspaceId}}},
+               {"focus", true},
+           }},
+      }
+  );
+}
+
 void NiriWorkspaceBackend::cleanup() { m_runtime.cleanup(); }
 
 void NiriWorkspaceBackend::handleStreamReset() {

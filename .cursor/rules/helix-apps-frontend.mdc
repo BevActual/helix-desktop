@@ -1,0 +1,22 @@
+---
+description: Helix app and shell UIs are Tauri + React + TypeScript + Vite; only the approval dialog and greeter stay hand-written
+globs: apps/**/web/**,shell/**/web/**,core/shared-ui/react/**
+alwaysApply: false
+---
+
+# Helix app frontend
+
+Full rules: `docs/design/frontend-stack.md`; how it should look: `docs/design/app-visual-language.md` (Apple-grade: unified titlebar,
+material sidebar, solid content, one global accent, one of each component). Short version:
+
+- Apps under `apps/` and the session shell (`shell/helix-shell-tauri`) are **Tauri + React + TypeScript + Vite**. The shell moves in
+  slices: a React island renders into an existing container and `shell.js` keeps the mode, input regions and glass until the last slice;
+  keep the hand-written fallback until a slice has run. The approval dialog (`confirmer.*`) and the greeter stay hand-written with no
+  build step: do not move them to React.
+- **Rust owns state and authority.** A page draws the views it is sent and calls typed Tauri commands. Never build a command or an id the
+  view did not list.
+- **Text is a text node.** No `dangerouslySetInnerHTML`, no `innerHTML`. Model, app and system text is only ever a React child.
+- Use the shared components and CSS classes from `@helix/ui` (`core/shared-ui/react`). No literal colours or sizes.
+- Types for Rust views are generated (`tools/gen-bindings.sh`); do not edit `core/shared-ui/react/bindings/` by hand.
+- Keep `data-test` names stable: the nested tests click by name.
+- Verify with `npm run typecheck && npm run lint` and the matching nested test (`tools/nested/ui-suite.sh settings`, `mobius`, …).

@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 
-COMMENT_MARKER = "<!-- noctalia-pr-template-enforcement -->"
+COMMENT_MARKER = "<!-- helix-pr-template-enforcement -->"
 TEMPLATE_URL = (
-    "https://github.com/noctalia-dev/noctalia/blob/main/.github/PULL_REQUEST_TEMPLATE.md"
+    "https://github.com/BevActual/helix-desktop/blob/main/.github/PULL_REQUEST_TEMPLATE.md"
 )
 REQUIRED_HEADINGS = (
     "## Summary",
@@ -132,7 +132,7 @@ def github_request(
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
-            "User-Agent": "noctalia-pr-template-enforcement",
+            "User-Agent": "helix-pr-template-enforcement",
             "X-GitHub-Api-Version": "2022-11-28",
         },
     )

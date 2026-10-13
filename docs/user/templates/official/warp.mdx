@@ -1,0 +1,23 @@
+---
+title: Warp
+description: Theme Warp with Helix terminal colors.
+sidebar:
+  order: 10
+---
+
+The built-in Warp template writes a custom Warp theme and selects it in Warp's settings.
+
+## Setup
+
+1. Enable **Warp** under **Settings → Templates → Terminals**.
+2. Open Warp. The **Helix** theme is selected automatically when `~/.config/warp-terminal/settings.toml` exists.
+
+Helix writes the theme to `${XDG_DATA_HOME:-$HOME/.local/share}/warp-terminal/themes/helix.yaml` and points both the active theme and the system light/dark slots at that file. Warp reloads custom themes from that directory within a few seconds.
+
+If you have not created a Warp settings file yet, pick **Helix** once in **Settings → Appearance → Themes**. Later palette changes keep using the same file.
+
+## Troubleshooting
+
+- **Theme not listed:** Wait a few seconds after the first apply, or restart Warp so it scans `themes/`.
+- **Colors not updating:** Confirm the template is enabled, then apply the current palette from **Templates → Apply**. Warp should pick up the rewritten YAML without a restart.
+- **Settings reverted:** Warp Settings Sync can overwrite `theme` with a machine-specific path. Re-apply the template after sync, or keep the Helix YAML on every machine.

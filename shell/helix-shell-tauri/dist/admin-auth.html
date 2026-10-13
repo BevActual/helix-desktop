@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<body class="confirmer">
+<div id="card" class="glass" data-test="admin-auth-card">
+  <div id="head"><span id="shield"><i data-icon="shield"></i></span><div id="title">Administrator password</div></div>
+  <div id="subject" data-test="admin-auth-prompt"></div>
+  <label class="admin-auth-field" for="admin-password">Password</label>
+  <input id="admin-password" data-test="admin-password" type="password" autocomplete="current-password" />
+  <div id="admin-error" data-test="admin-auth-error"></div>
+  <div id="actions">
+    <button type="button" data-test="admin-auth-cancel" id="cancel">Cancel</button>
+    <button type="button" data-test="admin-auth-ok" id="ok" class="primary">Authenticate</button>
+  </div>
+</div>
+<script src="icons.js"></script>
+<script src="admin-auth.js"></script>

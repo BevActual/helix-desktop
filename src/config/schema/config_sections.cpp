@@ -7,7 +7,7 @@
 #include <array>
 #include <utility>
 
-namespace noctalia::config::schema {
+namespace helix::config::schema {
   namespace {
 
     template <typename T> SectionSpec makeSection(std::string_view name, T Config::* member, const Schema<T>& schema) {
@@ -56,6 +56,7 @@ namespace noctalia::config::schema {
         t.push_back(makeSection("osd", &Config::osd, osdSchema()));
         t.push_back(makeSection("system", &Config::system, systemSchema()));
         t.push_back(makeSection("weather", &Config::weather, weatherSchema()));
+        t.push_back(makeSection("tailscale", &Config::tailscale, tailscaleSchema()));
         t.push_back(makeSection("calendar", &Config::calendar, calendarSchema()));
         t.push_back(makeSection("audio", &Config::audio, audioSchema()));
         t.push_back(makeSection("brightness", &Config::brightness, brightnessSchema()));
@@ -67,7 +68,6 @@ namespace noctalia::config::schema {
         t.push_back(makeSection("dock", &Config::dock, dockSchema()));
         t.push_back(makeSection("hot_corners", &Config::hotCorners, hotCornersSchema()));
         t.push_back(makeSection("control_center", &Config::controlCenter, controlCenterSchema()));
-        t.push_back(makeSection("plugins", &Config::plugins, pluginsSchema()));
         t.push_back(makeSection("hooks", &Config::hooks, hooksSchema()));
 
         return t;
@@ -86,12 +86,11 @@ namespace noctalia::config::schema {
   }
 
   std::span<const std::string_view> customRootKeys() {
-    static constexpr std::array<std::string_view, 8> kKeys = {
+    static constexpr std::array<std::string_view, 7> kKeys = {
         "bar",
         "widget",
         "desktop_widgets",
         "lockscreen_widgets",
-        "plugin_settings",
         "include",
         "config_version",
         // Template palette files (e.g. user-templates.toml) use [config.custom_colors].
@@ -104,4 +103,4 @@ namespace noctalia::config::schema {
     return findSection(name) != nullptr || std::ranges::find(customRootKeys(), name) != customRootKeys().end();
   }
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

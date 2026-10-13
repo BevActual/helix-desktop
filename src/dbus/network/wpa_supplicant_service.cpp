@@ -51,6 +51,7 @@ namespace {
     std::string ssid;
     std::int16_t signal = -100;
     bool secured = false;
+    std::uint32_t frequencyMhz = 0;
   };
 
   std::optional<BssInfo> readBssInfo(sdbus::IProxy& proxy) {
@@ -74,6 +75,9 @@ namespace {
 
       if (const auto it = all.find("Signal"); it != all.end()) {
         info.signal = it->second.get<std::int16_t>();
+      }
+      if (const auto it = all.find("Frequency"); it != all.end()) {
+        info.frequencyMhz = it->second.get<std::uint16_t>();
       }
 
       // Secured if RSN or WPA map is non-empty.
@@ -460,7 +464,12 @@ void WpaSupplicantService::rebuildState() {
 
         auto existing = std::ranges::find(aps, info->ssid, &AccessPointInfo::ssid);
         if (existing != aps.end()) {
-          existing->strength = std::max(pct, existing->strength);
+          if (pct > existing->strength) {
+            existing->strength = pct;
+            existing->frequencyMhz = info->frequencyMhz;
+          } else {
+            existing->strength = std::max(pct, existing->strength);
+          }
           if (active)
             existing->active = true;
         } else {
@@ -471,6 +480,7 @@ void WpaSupplicantService::rebuildState() {
           ap.strength = pct;
           ap.secured = info->secured;
           ap.active = active;
+          ap.frequencyMhz = info->frequencyMhz;
           aps.push_back(std::move(ap));
         }
       }

@@ -55,11 +55,14 @@ struct NotificationRequest {
   NotificationOrigin origin = NotificationOrigin::External;
   NotificationDndPolicy dndPolicy = NotificationDndPolicy::Respect;
   bool transient = false;
+  // When true, force history even for Internal (agent/IPC notify). Default keeps toast-only internals.
+  bool saveToHistory = false;
   std::vector<std::string> actions;
   std::optional<std::string> icon = std::nullopt;
   std::optional<NotificationImageData> imageData = std::nullopt;
   std::optional<std::string> category = std::nullopt;
   std::optional<std::string> desktopEntry = std::nullopt;
+  std::optional<int> progress = std::nullopt;
   std::optional<uint32_t> forcedId = std::nullopt;
 };
 
@@ -83,12 +86,13 @@ public:
   uint32_t adoptExternal(uint32_t id, NotificationRequest request);
 
   // Adds an internal notification to the same store as external notifications.
+  // saveToHistory: also land in notification history (unread badge); default toast-only.
   uint32_t addInternal(
       std::string appName, std::string summary, std::string body, Urgency urgency = Urgency::Normal,
       int32_t timeout = kDefaultNotificationTimeout, std::optional<std::string> icon = std::nullopt,
       std::optional<NotificationImageData> imageData = std::nullopt, std::optional<std::string> category = std::nullopt,
       std::optional<std::string> desktopEntry = std::nullopt,
-      NotificationDndPolicy dndPolicy = NotificationDndPolicy::Respect
+      NotificationDndPolicy dndPolicy = NotificationDndPolicy::Respect, bool saveToHistory = false
   );
 
   void setActionInvokeCallback(ActionInvokeCallback callback);
@@ -140,8 +144,9 @@ public:
   void setSoundPlayer(class SoundPlayer* soundPlayer);
 
   // Bar indicator: true when at least one notification was added since the user last
-  // viewed the notification history (control center notifications tab).
+  // viewed the notification history (Notification Center).
   [[nodiscard]] bool hasUnreadNotificationHistory() const noexcept;
+  [[nodiscard]] std::size_t unreadNotificationHistoryCount() const noexcept;
   void markNotificationHistorySeen();
 
   /// Loads persisted history from disk (call once at startup before emitting events).

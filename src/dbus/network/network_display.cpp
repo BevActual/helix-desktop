@@ -60,22 +60,38 @@ namespace network_display {
     }
   }
 
-  const char* wifiFrequencyBandLabel(std::uint32_t frequencyMhz) noexcept {
+  WifiRadioBand wifiFrequencyBand(std::uint32_t frequencyMhz) noexcept {
     // Broad envelopes around each band rather than exact channel centers — the input
     // is whatever operating frequency the backend reports. Band membership follows
     // cfg80211: 802.11j 4.9 GHz channels and the U-NII-4/ITS block are 5 GHz, and
     // 5925 MHz is the 5/6 GHz boundary.
     if (frequencyMhz >= 2400 && frequencyMhz <= 2500) {
-      return "2.4 GHz";
+      return WifiRadioBand::Ghz24;
     }
     if (frequencyMhz >= 4900 && frequencyMhz <= 5924) {
-      return "5 GHz";
+      return WifiRadioBand::Ghz5;
     }
     if (frequencyMhz >= 5925 && frequencyMhz <= 7125) {
-      return "6 GHz";
+      return WifiRadioBand::Ghz6;
     }
     if (frequencyMhz >= 57000 && frequencyMhz <= 71000) {
+      return WifiRadioBand::Ghz60;
+    }
+    return WifiRadioBand::Unknown;
+  }
+
+  const char* wifiFrequencyBandLabel(std::uint32_t frequencyMhz) noexcept {
+    switch (wifiFrequencyBand(frequencyMhz)) {
+    case WifiRadioBand::Ghz24:
+      return "2.4 GHz";
+    case WifiRadioBand::Ghz5:
+      return "5 GHz";
+    case WifiRadioBand::Ghz6:
+      return "6 GHz";
+    case WifiRadioBand::Ghz60:
       return "60 GHz";
+    case WifiRadioBand::Unknown:
+      break;
     }
     return nullptr;
   }

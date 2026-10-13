@@ -75,6 +75,7 @@ LogindService::LogindService(SystemBus& bus) : m_bus(bus) {
 }
 
 LogindService::~LogindService() {
+  releaseLidSwitchInhibit();
   releaseSleepDelayInhibit();
   releaseIdleInhibit();
 }
@@ -162,7 +163,7 @@ bool LogindService::acquireIdleInhibit() {
     sdbus::UnixFd fd;
     m_managerProxy->callMethod("Inhibit")
         .onInterface(kLogindManagerInterface)
-        .withArguments(std::string("idle"), std::string("noctalia"), std::string("Caffeine"), std::string("block"))
+        .withArguments(std::string("idle"), std::string("helix"), std::string("Caffeine"), std::string("block"))
         .storeResultsTo(fd);
     m_idleInhibitFd = fd.release();
     if (m_idleInhibitFd < 0) {
@@ -207,7 +208,7 @@ bool LogindService::acquireSleepDelayInhibit() {
     m_managerProxy->callMethod("Inhibit")
         .onInterface(kLogindManagerInterface)
         .withArguments(
-            std::string("sleep"), std::string("noctalia"), std::string("Lock before sleep"), std::string("delay")
+            std::string("sleep"), std::string("helix"), std::string("Lock before sleep"), std::string("delay")
         )
         .storeResultsTo(fd);
     m_sleepDelayInhibitFd = fd.release();
@@ -236,4 +237,59 @@ void LogindService::releaseSleepDelayInhibit() {
   ::close(m_sleepDelayInhibitFd);
   m_sleepDelayInhibitFd = -1;
   kLog.info("logind sleep delay inhibit released");
+}
+
+bool LogindService::hasLidSwitchInhibit() const noexcept { return m_lidSwitchInhibitFd >= 0; }
+
+bool LogindService::acquireLidSwitchInhibit() {
+  if (m_lidSwitchInhibitFd >= 0) {
+    return true;
+  }
+  if (m_managerProxy == nullptr) {
+    return false;
+  }
+
+  try {
+    sdbus::UnixFd fd;
+    m_managerProxy->callMethod("Inhibit")
+        .onInterface(kLogindManagerInterface)
+        .withArguments(
+            std::string("handle-lid-switch"), std::string("helix"), std::string("External display connected"),
+            std::string("block")
+        )
+        .storeResultsTo(fd);
+    m_lidSwitchInhibitFd = fd.release();
+    if (m_lidSwitchInhibitFd < 0) {
+      kLog.warn("logind lid switch inhibit returned invalid fd");
+      return false;
+    }
+    if (!setCloexec(m_lidSwitchInhibitFd)) {
+      kLog.warn("failed to set CLOEXEC on logind lid switch inhibit fd");
+      ::close(m_lidSwitchInhibitFd);
+      m_lidSwitchInhibitFd = -1;
+      return false;
+    }
+    kLog.info("logind lid switch inhibit acquired");
+    return true;
+  } catch (const sdbus::Error& e) {
+    kLog.warn("failed to acquire logind lid switch inhibit: {}", e.what());
+    return false;
+  }
+}
+
+void LogindService::releaseLidSwitchInhibit() {
+  if (m_lidSwitchInhibitFd < 0) {
+    return;
+  }
+  ::close(m_lidSwitchInhibitFd);
+  m_lidSwitchInhibitFd = -1;
+  kLog.info("logind lid switch inhibit released");
+}
+
+void LogindService::setLidSwitchInhibitEnabled(bool enabled) {
+  if (!enabled) {
+    releaseLidSwitchInhibit();
+    return;
+  }
+  (void)acquireLidSwitchInhibit();
 }

@@ -1,57 +1,36 @@
-# Noctalia
+# Helix Desktop
 
-Noctalia is a native Wayland desktop shell for people who want a polished, configurable Linux desktop without stitching
-together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, and settings UI.
+**Helix Desktop** is the monorepo for [Helix](docs/design/helix-identity.md): a niri-first Linux desktop — login (`greeter/`), compositor (`compositor/`), session shell, apps, and desktop services in one product tree.
 
-It provides the shell layer around your compositor: bars, widgets, dock, launcher, control center, notifications,
-wallpaper, lock screen, session actions, clipboard history, OSDs, tray integration, and desktop widgets. The project is
-built directly on Wayland and OpenGL ES with no Qt or GTK dependency, so the UI, rendering, configuration, and IPC model
-are designed as one cohesive shell instead of a collection of unrelated panels and scripts.
+**Helix Shell** is the session chrome only — bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, and desktop widgets (live build: `shell/helix-shell-tauri`).
 
-<p><br/></p>
+Product structure and runtime roles: [docs/design/product-structure.md](docs/design/product-structure.md). Design index: [docs/design/README.md](docs/design/README.md).
 
-<p align="center">
-  <img src="https://assets.noctalia.dev/noctalia-logo.svg?v=2" alt="Noctalia Logo" style="width: 192px" />
-</p>
+The **live session shell is the Tauri/Rust build** (`shell/helix-shell-tauri`, installed with `tools/switch-shell.sh install`). The C++ session UI is removed; see [docs/design/session-shell.md](docs/design/session-shell.md). Desktop authority is `org.helix.Desktop` (live C++ `helix-service`, Rust target `services/helix-desktop`); contracts under `protocols/` are the shared boundary.
 
-<p align="center">
-  <a href="https://docs.noctalia.dev/noctalia/getting-started/installation/">
-    <img
-      src="https://img.shields.io/badge/Install_Noctalia-FFF59B?style=for-the-badge&labelColor=FFF59B"
-      alt="Install Noctalia"
-      style="height: 50px"
-    />
-  </a>
-</p>
+The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; own Cargo workspace). Login is the Tauri greeter at [`greeter/`](greeter/) (`helix-greeter`). **Fedora + helix-niri are the sole shell target**; other compositors are not a supported product surface.
+
+It gives you a polished, configurable desktop without stitching together a separate bar, launcher, notification daemon, lock screen, wallpaper tool, settings UI, and a pile of service panels. Control Center also owns first-party services (packages, Tailscale, Firewall, Printers, Privacy, and similar tools).
+
+The product name, install paths, and IPC are **Helix** (see `docs/design/helix-identity.md`).
 
 <p><br/></p>
 
 <p align="center">
-  <a href="https://github.com/noctalia-dev/noctalia/commits">
-    <img src="https://img.shields.io/github/last-commit/noctalia-dev/noctalia?style=for-the-badge&labelColor=FFF59B&color=FFF59B&logo=git&logoColor=070722&label=commit" alt="Last commit" />
-  </a>
-  <a href="https://github.com/noctalia-dev/noctalia/stargazers">
-    <img src="https://img.shields.io/github/stars/noctalia-dev/noctalia?style=for-the-badge&labelColor=FFF59B&color=FFF59B&logo=github&logoColor=070722" alt="GitHub stars" />
-  </a>
-  <a href="https://docs.noctalia.dev">
-    <img src="https://img.shields.io/badge/docs-FFF59B?style=for-the-badge&logo=gitbook&logoColor=070722&labelColor=FFF59B" alt="Documentation" />
-  </a>
-  <a href="https://discord.noctalia.dev">
-    <img src="https://img.shields.io/badge/discord-FFF59B?style=for-the-badge&labelColor=FFF59B&logo=discord&logoColor=070722" alt="Discord" />
-  </a>
+  <img src="assets/helix.svg" alt="Helix" style="width: 192px" />
 </p>
 
-## Why Noctalia?
+<p><br/></p>
+
+## Why Helix Shell?
 
 Most Wayland setups leave the desktop shell to a stack of small tools: one bar, another launcher, another notification
 daemon, a lock screen, a wallpaper daemon, scripts for session actions, and separate config formats for each piece. That
 can be flexible, but it also makes a complete desktop feel fragile and hard to keep visually consistent.
 
-Noctalia solves that by providing one configurable shell layer that owns the common desktop surfaces and services while
-still fitting into compositor-driven Wayland workflows. It is meant for users who want the control of a custom desktop
-environment with fewer moving parts and a consistent UI.
-
-To understand the values and philosophy guiding the project, read our [ethos](https://noctalia.dev/ethos).
+Helix solves that by owning the common desktop surfaces and the service layer in Control Center, while still fitting into
+compositor-driven Wayland workflows. Tabs you do not use can be hidden. A service whose daemon is missing stays in the
+sidebar with a start or empty card, the same pattern as Tailscale.
 
 ## What It Includes
 
@@ -59,73 +38,50 @@ To understand the values and philosophy guiding the project, read our [ethos](ht
   weather, clipboard, and custom script-backed widgets.
 - Dock, launcher, control center, notification toasts/history, wallpaper picker, OSD overlays, lock screen, session
   panel, and desktop widgets.
+- Control Center services: packages, Tailscale, Firewall, Printers, Privacy, screen time, AI, capture, and clipboard
+  history.
 - TOML configuration with hot reload, GUI-managed overrides, theme/palette support, template application, and IPC for
   runtime control.
 - Direct Wayland integration for layer-shell, session lock, idle behavior, clipboard, foreign toplevels, workspaces,
   fractional scaling, and compositor-specific workspace backends where needed.
 
-## Wayland Compositor Support
+## Wayland compositor
 
-Noctalia supports Wayland compositors that provide the layer-shell protocols it needs for shell surfaces. Workspace
-integration works through compositor-native backends where needed, or through `ext-workspace-v1` on compositors that
-implement it.
-
-Current compositor integrations include Niri, Hyprland, Sway, Scroll, Mango, Labwc, Triad, dwl, and other compatible
-Wayland compositors. Other compositors may run Noctalia but can have reduced workspace, window, output, or
-session-action integration depending on the protocols and IPC they expose.
+Helix Shell targets the in-tree compositor at [`compositor/`](compositor/) (helix-niri). That fork owns window
+management and tiling; the shell owns layer-shell chrome and desktop services. **Fedora + helix-niri is the sole
+supported product surface** — see [docs/design/product-structure.md](docs/design/product-structure.md).
 
 ## Scope
 
-Noctalia is a desktop shell, not a full desktop environment. It provides the visual and service layer around your
-Wayland compositor: bars, panels, launcher, notifications, dock, lock screen, idle behavior, OSDs, theming, wallpapers,
-desktop widgets, and multi-monitor shell surfaces.
+Helix Shell is the desktop shell around helix-niri. It owns bars, panels, launcher, notifications, dock,
+lock screen, idle behavior, OSDs, theming, wallpapers, desktop widgets, multi-monitor shell surfaces, and the Control
+Center service layer.
 
-Window management, tiling, file management, removable-drive mounting, printers management and screen mirroring/casting
-belong to the compositor, dedicated desktop applications, or system services.
+First-party Control Center services are in scope when they have live state, a primary action, and a native backend.
+Hide any tab except Home with `hidden_tabs` or **Control Center → Control Center**. A missing backend is an empty or
+start card, not a reason to leave the feature out of Helix.
 
-Display/login greeter support lives in the separate [Noctalia Greeter](https://github.com/noctalia-dev/noctalia-greeter)
-project. Noctalia may integrate with those pieces when useful, but it does not replace them.
+Login lives in `greeter/` (`helix-greeter`). Helix Shell syncs appearance to that greeter; it does not replace greetd.
 
-The plugin system is available for user-installed extensions. Features that are useful to some users but not essential
-to the core shell can live there: extra bar widgets, launcher providers, desktop widgets, panels, shortcuts, background
-services, compositor-specific extras, hardware-specific controls, and third-party service integrations.
+The Luau plugin system was removed (2026-10-05). Extra bar widgets, launcher providers, panels and shortcuts will
+return as first-party features or as a new extension mechanism.
 
 ## Build from source
 
-Source dependencies, distro-specific package commands, build modes, and install layouts live in
-[BUILDING.md](BUILDING.md).
+**Session shell and apps (live path):** see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
+
+**Desktop authority:** Meson builds live C++ `helix-service` (+ assistant/inference). Rust scaffold: `cargo build -p helix-desktop`. Details: [BUILDING.md](BUILDING.md), [docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md).
 
 ## Configuration
 
-A ready-to-use starting config with all defaults is at [example.toml](example.toml). The full configuration reference
-lives in the [documentation site](https://docs.noctalia.dev/noctalia/). The source MDX files are in
-[`docs/user/`](docs/user/); sync them to a local docs checkout with `tools/sync-docs.sh`.
+A ready-to-use starting config with all defaults is at [example.toml](example.toml). The configuration reference lives
+in [`docs/user/`](docs/user/). Config files still use `~/.config/helix/`. Sync docs to a local docs checkout with
+`tools/sync-docs.sh`.
 
 ## Contributing
 
 Developer notes, architecture overview, code style, project layout, and debugging commands live in
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-Bug reports, fixes, documentation updates, themes, and configuration examples are welcome. For general help and design
-discussion, join the community on [Discord](https://discord.noctalia.dev).
-
-## Credits
-
-Thank you to the [contributors](https://github.com/noctalia-dev/noctalia/graphs/contributors) and community
-members who test Noctalia, report issues, share configurations, and help shape the project.
-
-## Donations
-
-Donations are appreciated but completely optional.
-
-<p>
-  <a href="https://www.buymeacoffee.com/noctalia">
-    <img src="https://img.shields.io/badge/Buy_Me_a_Coffee-FFF59B?style=for-the-badge&logo=buymeacoffee&logoColor=070722&labelColor=FFF59B" alt="Buy Me a Coffee">
-  </a>
-  <a href="https://ko-fi.com/noctaliadev">
-    <img src="https://img.shields.io/badge/Ko--fi-FFF59B?style=for-the-badge&logo=kofi&logoColor=070722&labelColor=FFF59B" alt="Ko-fi">
-  </a>
-</p>
+[CONTRIBUTING.md](CONTRIBUTING.md). Product contracts with helix-niri and helix-greeter live in [HELIX.md](HELIX.md).
 
 ## License
 
@@ -136,10 +92,8 @@ MIT License. See [LICENSE](LICENSE) for details.
 Distro packaging notes (description, deps, install layout, Meson options) live in
 [PACKAGING.md](PACKAGING.md).
 
-## Star History
+### Native desktop applications
 
-<p align="center">
-  <a href="https://github.com/noctalia-dev/noctalia/stargazers">
-    <img src="https://api.noctalia.dev/stars" alt="Star History" />
-  </a>
-</p>
+Helix Settings, Software, and System Monitor are Tauri apps under `apps/`.
+Settings talks to `helix-service`; System Monitor reads local Linux resources without the shell.
+See `docs/design/desktop-service.md` and `docs/design/rust-workspace.md`.

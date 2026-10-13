@@ -62,6 +62,9 @@ struct Notification {
   std::optional<NotificationImageData> imageData;
   std::optional<std::string> category;
   std::optional<std::string> desktopEntry;
+  /// Freedesktop `value` hint, 0..100. Present means this is a live activity (a download, copy,
+  /// update, transfer): the toast shows real progress instead of a countdown and the bar carries a chip.
+  std::optional<int> progress;
   TimePoint receivedTime;              // add/replace time used for duplicate burst suppression
   std::optional<TimePoint> expiryTime; // absent = never expires
   /// Wall-clock receive time (history UI, persistence). Optional for pre-migration / corrupt rows.
@@ -69,3 +72,9 @@ struct Notification {
   /// Wall-clock expiry when timeout-based; mirrors expiryTime where applicable.
   std::optional<WallTimePoint> expiryWallClock;
 };
+
+/// A notification that describes ongoing work rather than an event. It stays until the sender
+/// closes it or reports completion, and the bar surfaces it as a live chip.
+[[nodiscard]] inline bool isLiveActivity(const Notification& n) noexcept {
+  return n.progress.has_value() && *n.progress < 100;
+}

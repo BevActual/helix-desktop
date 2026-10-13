@@ -3,6 +3,7 @@
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/timer_manager.h"
+#include "dbus/bus_name_watch.h"
 #include "dbus/session_bus.h"
 #include "util/string_utils.h"
 
@@ -571,27 +572,36 @@ void TrayService::start() {
 
 void TrayService::startWithWatcherDetection() {
   m_dbusProxy = sdbus::createProxy(m_bus.connection(), kDbusName, kDbusPath);
-  m_dbusProxy->uponSignal("NameOwnerChanged")
-      .onInterface(kDbusInterface)
-      .call([this](const std::string& name, const std::string& old_owner, const std::string& new_owner) {
-        if (name == std::string{kWatcherBusName}) {
-          if (m_watcherRole == WatcherRole::Client) {
-            if (old_owner.empty() && !new_owner.empty()) {
-              DeferredCall::callLater([this]() { connectToExternalWatcher(); });
-            } else if (!old_owner.empty() && new_owner.empty()) {
-              disconnectExternalWatcher();
-            }
-          }
+  // Bus-side filtered watches instead of one unfiltered NameOwnerChanged: the external
+  // watcher by exact name, the well-known SNI prefixes by namespace (appearance), and
+  // each registered item by its own bus name (disappearance, see watchItemBusName).
+  m_watcherNameWatch = dbus_watch::watchBusName(
+      m_bus.connection(), std::string_view{kWatcherBusName},
+      [this](const std::string& /*name*/, const std::string& old_owner, const std::string& new_owner) {
+        if (m_watcherRole != WatcherRole::Client) {
           return;
         }
-
-        if (old_owner.empty() && !new_owner.empty() && isStatusNotifierItemBusName(name)) {
-          DeferredCall::callLater([this, name]() { tryRegisterItemForBusName(name); });
+        if (old_owner.empty() && !new_owner.empty()) {
+          DeferredCall::callLater([this]() { connectToExternalWatcher(); });
+        } else if (!old_owner.empty() && new_owner.empty()) {
+          disconnectExternalWatcher();
         }
-        if (!old_owner.empty() && new_owner.empty()) {
-          removeItemsForBusName(name);
-        }
-      });
+      }
+  );
+  const auto onSniName = [this](const std::string& name, const std::string& old_owner, const std::string& new_owner) {
+    if (!isStatusNotifierItemBusName(name)) {
+      return;
+    }
+    if (old_owner.empty() && !new_owner.empty()) {
+      DeferredCall::callLater([this, name]() { tryRegisterItemForBusName(name); });
+    }
+    if (!old_owner.empty() && new_owner.empty()) {
+      removeItemsForBusName(name);
+    }
+  };
+  for (const char* ns : {"org.kde", "org.freedesktop", "org.ayatana"}) {
+    m_sniNamespaceWatches.push_back(dbus_watch::watchBusNamespace(m_bus.connection(), ns, onSniName));
+  }
 
   const bool useClientMode = externalWatcherHasOwner();
   if (useClientMode) {
@@ -790,7 +800,36 @@ void TrayService::removeItemById(const std::string& itemId) {
   m_menuCache.erase(itemId);
   kLog.debug("item unregistered: {}", itemId);
   notifyWatcherItemUnregistered(itemId);
+  pruneItemBusNameWatches();
   emitChanged();
+}
+
+// Items register under a unique name (":1.42") or a private well-known name that no
+// namespace rule covers, so each one gets an exact-name watch for its disappearance.
+void TrayService::watchItemBusName(const std::string& busName) {
+  if (busName.empty() || m_itemNameWatches.contains(busName)) {
+    return;
+  }
+  m_itemNameWatches.emplace(
+      busName,
+      dbus_watch::watchBusName(
+          m_bus.connection(), busName,
+          [this](const std::string& name, const std::string& old_owner, const std::string& new_owner) {
+            if (!old_owner.empty() && new_owner.empty()) {
+              removeItemsForBusName(name);
+            }
+          }
+      )
+  );
+}
+
+void TrayService::pruneItemBusNameWatches() {
+  for (auto it = m_itemNameWatches.begin(); it != m_itemNameWatches.end();) {
+    const bool inUse = std::ranges::any_of(m_items, [&](const auto& entry) {
+      return entry.second.busName == it->first || busNameFromItemId(entry.first) == it->first;
+    });
+    it = inUse ? std::next(it) : m_itemNameWatches.erase(it);
+  }
 }
 
 TrayService::~TrayService() = default;
@@ -1774,6 +1813,7 @@ void TrayService::registerOrRefreshItem(const std::string& busName, const std::s
     }
 
     kLog.debug("tray item registered id={} bus='{}' path='{}'", itemId, busName, objectPath);
+    watchItemBusName(busName);
     m_items.emplace(
         itemId,
         TrayItemInfo{
@@ -2104,6 +2144,7 @@ void TrayService::removeItemsForBusName(const std::string& busName) {
     kLog.debug("item unregistered: {}", itemId);
     notifyWatcherItemUnregistered(itemId);
   }
+  pruneItemBusNameWatches();
   emitChanged();
 }
 

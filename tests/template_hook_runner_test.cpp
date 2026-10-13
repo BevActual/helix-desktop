@@ -8,7 +8,7 @@
 namespace {
 
   std::filesystem::path sentinelPath(const char* name) {
-    return std::filesystem::temp_directory_path() / (std::string("noctalia_hook_runner_") + name);
+    return std::filesystem::temp_directory_path() / (std::string("helix_hook_runner_") + name);
   }
 
   std::string readSentinel(const std::filesystem::path& path) {
@@ -23,7 +23,7 @@ namespace {
     std::filesystem::remove(sentinel);
 
     {
-      noctalia::theme::HookRunner runner(2);
+      helix::theme::HookRunner runner(2);
       for (int i = 0; i < 4; ++i) {
         runner.enqueue("printf x >> " + sentinel.string(), /*generation=*/1);
       }
@@ -41,7 +41,7 @@ namespace {
     std::filesystem::remove(sentinel);
 
     {
-      noctalia::theme::HookRunner runner(2);
+      helix::theme::HookRunner runner(2);
       runner.invalidateBefore(2);
       // Generation 1 is already superseded: the hook must never run.
       runner.enqueue("printf stale > " + sentinel.string(), /*generation=*/1);
@@ -54,6 +54,22 @@ namespace {
     std::filesystem::remove(sentinel);
   }
 
+  void test_reports_failed_hooks_with_template_id() {
+    std::string failedId;
+    std::string error;
+    {
+      helix::theme::HookRunner runner(1);
+      runner.setOnFailure([&](std::string id, std::string message) {
+        failedId = std::move(id);
+        error = std::move(message);
+      });
+      runner.enqueue("false", /*generation=*/1, "cava");
+      runner.waitIdle();
+    }
+    assert(failedId == "cava");
+    assert(!error.empty());
+  }
+
   void test_invalidate_drops_queued_hooks() {
     const auto sentinel = sentinelPath("invalidate");
     std::filesystem::remove(sentinel);
@@ -61,7 +77,7 @@ namespace {
     {
       // A single slot occupied by a long hook keeps the rest of the batch queued, so
       // invalidateBefore() has to discard them.
-      noctalia::theme::HookRunner runner(1);
+      helix::theme::HookRunner runner(1);
       runner.enqueue("sleep 0.2", /*generation=*/1);
       runner.enqueue("printf stale > " + sentinel.string(), /*generation=*/1);
       runner.invalidateBefore(2);
@@ -79,7 +95,7 @@ namespace {
     std::filesystem::remove(queued);
 
     {
-      noctalia::theme::HookRunner runner(1);
+      helix::theme::HookRunner runner(1);
       runner.enqueue("sleep 0.2; printf ran > " + running.string(), /*generation=*/1);
       runner.enqueue("printf ran > " + queued.string(), /*generation=*/1);
       runner.requestShutdown();
@@ -98,6 +114,7 @@ namespace {
 int main() {
   test_runs_every_enqueued_hook();
   test_drops_hooks_from_superseded_generations();
+  test_reports_failed_hooks_with_template_id();
   test_invalidate_drops_queued_hooks();
   test_shutdown_drops_backlog_and_awaits_running();
   return 0;

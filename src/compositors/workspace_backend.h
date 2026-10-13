@@ -5,6 +5,7 @@
 #include <optional>
 #include <poll.h>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -94,18 +95,6 @@ public:
   virtual void bindExtWorkspace(ext_workspace_manager_v1* manager) = 0;
 };
 
-class DwlIpcWorkspaceProtocolBinder {
-public:
-  virtual ~DwlIpcWorkspaceProtocolBinder() = default;
-  virtual void bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager) = 0;
-};
-
-class KdeVirtualDesktopProtocolBinder {
-public:
-  virtual ~KdeVirtualDesktopProtocolBinder() = default;
-  virtual void bindKdeVirtualDesktop(org_kde_plasma_virtual_desktop_management* management) = 0;
-};
-
 class WorkspaceOutputNameResolver {
 public:
   using Resolver = std::function<std::string(wl_output*)>;
@@ -156,6 +145,18 @@ namespace compositors {
     // both interfaces don't hit a conflicting-return-type override.
     virtual bool focusWindowById(const std::string& /*windowId*/, bool /*warpPointer*/ = false) { return false; }
     virtual bool closeWindowById(const std::string& /*windowId*/) { return false; }
+    virtual bool activateWorkspaceById(const std::string& /*workspaceId*/, std::string_view /*outputName*/ = {}) {
+      return false;
+    }
+    virtual bool activateWorkspace(const Workspace& /*workspace*/, std::string_view /*outputName*/ = {}) {
+      return false;
+    }
+    virtual bool moveWindowToWorkspace(
+        const std::string& /*windowId*/, const Workspace& /*workspace*/, std::string_view /*outputName*/ = {}
+    ) {
+      return false;
+    }
+    virtual bool moveWindowToOutput(const std::string& /*windowId*/, std::string_view /*outputName*/) { return false; }
     [[nodiscard]] virtual bool canTrackOverviewState() const noexcept { return false; }
     [[nodiscard]] virtual bool hasOverviewState() const noexcept { return false; }
     [[nodiscard]] virtual bool isOverviewOpen() const noexcept { return true; }

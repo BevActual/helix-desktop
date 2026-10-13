@@ -7,7 +7,6 @@
 #include "config/schema/ranges.h"
 #include "core/input/key_chord.h"
 #include "notification/notification_filter.h"
-#include "scripting/plugin_id.h"
 #include "util/file_utils.h"
 
 #include <algorithm>
@@ -17,15 +16,14 @@
 #include <unordered_map>
 #include <unordered_set>
 
-namespace noctalia::config::schema {
+namespace helix::config::schema {
 
   const Schema<AudioConfig>& audioSchema() {
     static const Schema<AudioConfig> s = {
         field(&AudioConfig::enableOverdrive, "enable_overdrive"),
         field(&AudioConfig::enableSounds, "enable_sounds"),
         field(&AudioConfig::soundVolume, "sound_volume", kUnitRange),
-        field(&AudioConfig::volumeChangeSound, "volume_change_sound"),
-        field(&AudioConfig::notificationSound, "notification_sound"),
+        field(&AudioConfig::soundTheme, "sound_theme"),
     };
     return s;
   }
@@ -36,6 +34,15 @@ namespace noctalia::config::schema {
         field(&WeatherConfig::effects, "effects"),
         field(&WeatherConfig::refreshMinutes, "refresh_minutes", kRefreshMinutesRange),
         field(&WeatherConfig::unit, "unit"),
+    };
+    return s;
+  }
+
+  const Schema<TailscaleConfig>& tailscaleSchema() {
+    static const Schema<TailscaleConfig> s = {
+        field(&TailscaleConfig::refreshIntervalSeconds, "refresh_interval_seconds", kTailscaleRefreshSecondsRange),
+        field(&TailscaleConfig::notifyOnPeerChange, "notify_on_peer_change"),
+        field(&TailscaleConfig::adminUrl, "admin_url"),
     };
     return s;
   }
@@ -91,6 +98,7 @@ namespace noctalia::config::schema {
     static const Schema<LockscreenConfig> s = {
         field(&LockscreenConfig::enabled, "enabled"),
         field(&LockscreenConfig::lockBeforeSuspend, "lock_before_suspend"),
+        field(&LockscreenConfig::lidCloseKeepExternalDisplays, "lid_close_keep_external_displays"),
         field(&LockscreenConfig::fingerprint, "fingerprint"),
         field(&LockscreenConfig::allowEmptyPassword, "allow_empty_password"),
         field(&LockscreenConfig::blurredDesktop, "blurred_desktop"),
@@ -245,6 +253,7 @@ namespace noctalia::config::schema {
 
   const Schema<NotificationConfig>& notificationSchema() {
     static const Schema<NotificationConfig> s = {
+        field(&NotificationConfig::filterReplace, "filter_replace"),
         field(&NotificationConfig::enableDaemon, "enable_daemon"),
         field(&NotificationConfig::showAppName, "show_app_name"),
         field(&NotificationConfig::showActions, "show_actions"),
@@ -467,7 +476,10 @@ namespace noctalia::config::schema {
 
   namespace {
     const Schema<ShortcutConfig>& shortcutSchema() {
-      static const Schema<ShortcutConfig> s = {field(&ShortcutConfig::type, "type")};
+      static const Schema<ShortcutConfig> s = {
+          field(&ShortcutConfig::type, "type"),
+          enumField(&ShortcutConfig::size, "size", kShortcutSizes),
+      };
       return s;
     }
 
@@ -478,6 +490,63 @@ namespace noctalia::config::schema {
       };
       return s;
     }
+
+    const Schema<ControlCenterConfig::ClockTabConfig>& clockTabSchema() {
+      static const Schema<ControlCenterConfig::ClockTabConfig> s = {
+          field(&ControlCenterConfig::ClockTabConfig::timezones, "timezones"),
+      };
+      return s;
+    }
+
+    const Schema<ControlCenterConfig::NetworkTabConfig>& networkTabSchema() {
+      static const Schema<ControlCenterConfig::NetworkTabConfig> s = {
+          enumField(&ControlCenterConfig::NetworkTabConfig::wifiBand, "wifi_band", kWifiBandFilters),
+          field(&ControlCenterConfig::NetworkTabConfig::hiddenSsids, "hidden_ssids"),
+          field(&ControlCenterConfig::NetworkTabConfig::nextDnsId, "nextdns_id"),
+          field(&ControlCenterConfig::NetworkTabConfig::customDns, "custom_dns"),
+      };
+      return s;
+    }
+
+    const Schema<ControlCenterConfig::BluetoothTabConfig>& bluetoothTabSchema() {
+      static const Schema<ControlCenterConfig::BluetoothTabConfig> s = {
+          field(&ControlCenterConfig::BluetoothTabConfig::hideUnnamed, "hide_unnamed"),
+          field(
+              &ControlCenterConfig::BluetoothTabConfig::discoverySeconds, "discovery_seconds",
+              kBluetoothDiscoverySecondsRange
+          ),
+      };
+      return s;
+    }
+
+    const Schema<ControlCenterConfig::AiUsageTabConfig>& aiUsageTabSchema() {
+      static const Schema<ControlCenterConfig::AiUsageTabConfig> s = {
+          field(&ControlCenterConfig::AiUsageTabConfig::refreshSeconds, "refresh_seconds", kAiUsageRefreshSecondsRange),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::claude, "claude", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::codex, "codex", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::gemini, "gemini", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::qwen, "qwen", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::copilot, "copilot", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::cursor, "cursor", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::deepseek, "deepseek", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::ollama, "ollama", kAiUsageProviderModes),
+          enumField(&ControlCenterConfig::AiUsageTabConfig::localai, "localai", kAiUsageProviderModes),
+          field(
+              &ControlCenterConfig::AiUsageTabConfig::geminiDailyLimit, "gemini_daily_limit", kAiUsageDailyLimitRange
+          ),
+          field(&ControlCenterConfig::AiUsageTabConfig::qwenDailyLimit, "qwen_daily_limit", kAiUsageDailyLimitRange),
+          field(&ControlCenterConfig::AiUsageTabConfig::ollamaHost, "ollama_host"),
+          field(&ControlCenterConfig::AiUsageTabConfig::ollamaModel, "ollama_model"),
+          field(&ControlCenterConfig::AiUsageTabConfig::localaiHost, "localai_host"),
+          field(&ControlCenterConfig::AiUsageTabConfig::localaiModel, "localai_model"),
+          field(&ControlCenterConfig::AiUsageTabConfig::warnPercent, "warn_percent", kAiUsageWarnPercentRange),
+          field(
+              &ControlCenterConfig::AiUsageTabConfig::warnResetMinutes, "warn_reset_minutes",
+              kAiUsageWarnResetMinutesRange
+          ),
+      };
+      return s;
+    }
   } // namespace
 
   const Schema<ControlCenterConfig>& controlCenterSchema() {
@@ -485,89 +554,18 @@ namespace noctalia::config::schema {
         enumField(&ControlCenterConfig::sidebarMode, "sidebar", kControlCenterSidebarModes),
         enumField(&ControlCenterConfig::sidebarSectionMode, "sidebar_section", kControlCenterSidebarModes),
         field(&ControlCenterConfig::width, "width", kControlCenterWidthRange),
-        field(&ControlCenterConfig::showShortcutLabels, "show_shortcut_labels"),
+        field(&ControlCenterConfig::height, "height", kControlCenterHeightRange),
         field(&ControlCenterConfig::showSessionButton, "show_session_button"),
         field(&ControlCenterConfig::hiddenTabs, "hidden_tabs"),
         subTable(&ControlCenterConfig::calendarTab, "calendar", calendarTabSchema()),
+        subTable(&ControlCenterConfig::clockTab, "clock", clockTabSchema()),
+        subTable(&ControlCenterConfig::networkTab, "network", networkTabSchema()),
+        subTable(&ControlCenterConfig::bluetoothTab, "bluetooth", bluetoothTabSchema()),
+        subTable(&ControlCenterConfig::aiUsage, "ai_usage", aiUsageTabSchema()),
         arrayOf<ControlCenterConfig, ShortcutConfig>(
             &ControlCenterConfig::shortcuts, "shortcuts", shortcutSchema(),
             [](const ShortcutConfig& sc) { return !sc.type.empty(); }
         ),
-    };
-    return s;
-  }
-
-  namespace {
-    const Schema<PluginSourceConfig>& pluginSourceSchema() {
-      static const Schema<PluginSourceConfig> s = {
-          field(&PluginSourceConfig::name, "name"),
-          enumField(&PluginSourceConfig::kind, "kind", kPluginSourceKinds),
-          field(&PluginSourceConfig::location, "location"),
-          field(&PluginSourceConfig::enabled, "enabled"),
-          finalize<PluginSourceConfig>([](PluginSourceConfig& src, std::string_view parentPath, Diagnostics& diag) {
-            if (!src.name.empty() && !isValidPluginSourceName(src.name)) {
-              diag.warn(
-                  joinPath(parentPath, "name"),
-                  "invalid plugin source name; use letters, digits, '.', '_' or '-', starting with a letter or digit"
-              );
-            }
-          }),
-      };
-      return s;
-    }
-  } // namespace
-
-  const Schema<PluginsConfig>& pluginsSchema() {
-    static const Schema<PluginsConfig> s = {
-        arrayOf<PluginsConfig, PluginSourceConfig>(
-            &PluginsConfig::sources, "source", pluginSourceSchema(),
-            [](const PluginSourceConfig& src) { return isValidPluginSourceName(src.name); }
-        ),
-        field(&PluginsConfig::enabled, "enabled"),
-        // auto_update accepts only "all"|"official"|"none"
-        custom<PluginsConfig>(
-            "auto_update",
-            [](const toml::table& tbl, PluginsConfig& out, std::string_view parentPath, Diagnostics& diag) {
-              if (auto v = tbl["auto_update"].value<std::string>()) {
-                const std::string trimmed = StringUtils::trim(*v);
-                if (auto parsed = enumFromKey(kPluginAutoUpdateModes, trimmed)) {
-                  out.autoUpdate = *parsed;
-                } else {
-                  diag.error(
-                      joinPath(parentPath, "auto_update"), "unknown value \"" + *v + "\"; expected all|official|none"
-                  );
-                }
-              } else if (tbl.contains("auto_update")) {
-                diag.error(joinPath(parentPath, "auto_update"), "expected all|official|none");
-              }
-            },
-            [](toml::table& tbl, const PluginsConfig& in) {
-              tbl.insert_or_assign("auto_update", std::string(enumToKey(kPluginAutoUpdateModes, in.autoUpdate)));
-            }
-        ),
-        finalize<PluginsConfig>([](PluginsConfig& plugins, std::string_view parentPath, Diagnostics& diag) {
-          for (auto it = plugins.enabled.begin(); it != plugins.enabled.end();) {
-            if (scripting::isValidPluginId(*it)) {
-              ++it;
-              continue;
-            }
-            diag.warn(joinPath(parentPath, "enabled"), "invalid plugin id \"" + *it + "\"; expected author/plugin");
-            it = plugins.enabled.erase(it);
-          }
-          // Duplicate names would share one checkout on disk: keep the first, error on the rest.
-          std::unordered_set<std::string> seen;
-          for (auto it = plugins.sources.begin(); it != plugins.sources.end();) {
-            if (seen.insert(it->name).second) {
-              ++it;
-              continue;
-            }
-            diag.error(
-                joinPath(parentPath, "source"),
-                "duplicate plugin source name \"" + it->name + "\"; source names must be unique"
-            );
-            it = plugins.sources.erase(it);
-          }
-        }),
     };
     return s;
   }
@@ -784,10 +782,40 @@ namespace noctalia::config::schema {
       );
     }
 
+    const Schema<WallpaperWallhavenConfig>& wallpaperWallhavenSchema() {
+      static const Schema<WallpaperWallhavenConfig> s = {
+          field(&WallpaperWallhavenConfig::apiKey, "api_key"),
+          pathStringField(&WallpaperWallhavenConfig::downloadDir, "download_dir"),
+      };
+      return s;
+    }
+
+    const Schema<WallpaperDailyConfig>& wallpaperDailySchema() {
+      static const Schema<WallpaperDailyConfig> s = {
+          enumField(&WallpaperDailyConfig::provider, "provider", kWallpaperDailyProviders),
+          field(&WallpaperDailyConfig::nasaApiKey, "nasa_api_key"),
+          pathStringField(&WallpaperDailyConfig::downloadDir, "download_dir"),
+          field(&WallpaperDailyConfig::bingMarket, "bing_market"),
+      };
+      return s;
+    }
+
+    const Schema<WallpaperVideoConfig>& wallpaperVideoSchema() {
+      static const Schema<WallpaperVideoConfig> s = {
+          pathStringField(&WallpaperVideoConfig::directory, "directory"),
+          field(&WallpaperVideoConfig::mute, "mute"),
+          field(&WallpaperVideoConfig::hardwareDecode, "hardware_decode"),
+          enumField(&WallpaperVideoConfig::autoPause, "auto_pause", kWallpaperVideoAutoPauseModes),
+          field(&WallpaperVideoConfig::mpvOptions, "mpv_options"),
+      };
+      return s;
+    }
+
     const Schema<WallpaperAutomationConfig>& wallpaperAutomationSchema() {
       static const Schema<WallpaperAutomationConfig> s = {
           field(&WallpaperAutomationConfig::enabled, "enabled"),
           field(&WallpaperAutomationConfig::intervalSeconds, "interval_seconds", kWallpaperAutomationIntervalRange),
+          enumField(&WallpaperAutomationConfig::source, "source", kWallpaperAutomationSources),
           // order accepts case-insensitive random|alphabetical.
           custom<WallpaperAutomationConfig>(
               "order",
@@ -1219,6 +1247,23 @@ namespace noctalia::config::schema {
     }
   }
 
+  const Schema<ThemeConfig::NiriLayoutThemeConfig>& themeNiriLayoutSchema() {
+    static const Schema<ThemeConfig::NiriLayoutThemeConfig> s = {
+        field(&ThemeConfig::NiriLayoutThemeConfig::focusRing, "focus_ring"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::border, "border"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blur, "blur"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurPasses, "blur_passes", kNiriBlurPassesRange),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurOffset, "blur_offset", kNiriBlurOffsetRange),
+        field(&ThemeConfig::NiriLayoutThemeConfig::blurNoise, "blur_noise", kNiriBlurNoiseRange),
+        enumField(&ThemeConfig::NiriLayoutThemeConfig::overview, "overview", kNiriOverviewPresets),
+        field(&ThemeConfig::NiriLayoutThemeConfig::gaps, "gaps"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::struts, "struts"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::defaultColumnWidth, "default_column_width"),
+        field(&ThemeConfig::NiriLayoutThemeConfig::drawBorderWithBackground, "draw_border_with_background"),
+    };
+    return s;
+  }
+
   const Schema<ThemeConfig>& themeSchema() {
     static const Schema<ThemeConfig> s = {
         enumField(&ThemeConfig::source, "source", kPaletteSources),
@@ -1229,6 +1274,7 @@ namespace noctalia::config::schema {
         enumField(&ThemeConfig::mode, "mode", kThemeModes),
         enumField(&ThemeConfig::shellMode, "shell_mode", kShellThemeModes),
         field(&ThemeConfig::pureBlackDark, "pure_black_dark"),
+        subTable(&ThemeConfig::niriLayout, "niri_layout", themeNiriLayoutSchema()),
         subTable(&ThemeConfig::templates, "templates", templatesSchema()),
     };
     return s;
@@ -1312,6 +1358,20 @@ namespace noctalia::config::schema {
     const Schema<ShellConfig::PanelConfig>& shellPanelSchema() {
       static const Schema<ShellConfig::PanelConfig> s = {
           enumField(&ShellConfig::PanelConfig::transparencyMode, "transparency_mode", kPanelTransparencyModes),
+          custom<ShellConfig::PanelConfig>(
+              "glass",
+              [](const toml::table& tbl, ShellConfig::PanelConfig& out, std::string_view, Diagnostics&) {
+                if (auto v = finiteDouble(tbl["glass"])) {
+                  out.glass = applyRange(static_cast<float>(*v), kUnitRange);
+                }
+              },
+              [](toml::table& tbl, const ShellConfig::PanelConfig& in) {
+                if (in.glass.has_value()) {
+                  tbl.insert_or_assign("glass", static_cast<double>(*in.glass));
+                }
+              }
+          ),
+          field(&ShellConfig::PanelConfig::refraction, "refraction"),
           field(&ShellConfig::PanelConfig::borders, "borders"),
           field(&ShellConfig::PanelConfig::shadow, "shadow"),
           field(&ShellConfig::PanelConfig::listItemBackground, "list_item_background"),
@@ -1337,18 +1397,21 @@ namespace noctalia::config::schema {
           enumField(&ShellConfig::PanelConfig::wallpaperPlacement, "wallpaper_placement", kPanelPlacements),
           enumField(&ShellConfig::PanelConfig::sessionPlacement, "session_placement", kPanelPlacements),
           enumField(&ShellConfig::PanelConfig::polkitPlacement, "polkit_placement", kPanelPlacements),
+          enumField(&ShellConfig::PanelConfig::quickInsertPlacement, "quick_insert_placement", kPanelPlacements),
           field(&ShellConfig::PanelConfig::launcherPosition, "launcher_position"),
           field(&ShellConfig::PanelConfig::clipboardPosition, "clipboard_position"),
           field(&ShellConfig::PanelConfig::controlCenterPosition, "control_center_position"),
           field(&ShellConfig::PanelConfig::wallpaperPosition, "wallpaper_position"),
           field(&ShellConfig::PanelConfig::sessionPosition, "session_position"),
           field(&ShellConfig::PanelConfig::polkitPosition, "polkit_position"),
+          field(&ShellConfig::PanelConfig::quickInsertPosition, "quick_insert_position"),
           field(&ShellConfig::PanelConfig::floatingOffset, "floating_offset", Range<std::int64_t>{0, 100}),
           field(&ShellConfig::PanelConfig::openNearClickControlCenter, "open_near_click_control_center"),
           field(&ShellConfig::PanelConfig::openNearClickLauncher, "open_near_click_launcher"),
           field(&ShellConfig::PanelConfig::openNearClickClipboard, "open_near_click_clipboard"),
           field(&ShellConfig::PanelConfig::openNearClickWallpaper, "open_near_click_wallpaper"),
           field(&ShellConfig::PanelConfig::openNearClickSession, "open_near_click_session"),
+          field(&ShellConfig::PanelConfig::openNearClickQuickInsert, "open_near_click_quick_insert"),
       };
       return s;
     }
@@ -1357,6 +1420,13 @@ namespace noctalia::config::schema {
       static const Schema<LauncherProviderConfig> s = {
           field(&LauncherProviderConfig::prefix, "prefix"),
           optionalBoolField(&LauncherProviderConfig::global, "global"),
+      };
+      return s;
+    }
+
+    const Schema<ShellConfig::LauncherConfig::PanelsConfig>& shellLauncherPanelsSchema() {
+      static const Schema<ShellConfig::LauncherConfig::PanelsConfig> s = {
+          field(&ShellConfig::LauncherConfig::PanelsConfig::ignored, "ignored"),
       };
       return s;
     }
@@ -1375,6 +1445,7 @@ namespace noctalia::config::schema {
           field(&ShellConfig::LauncherConfig::providerPrefix, "provider_prefix"),
           enumField(&ShellConfig::LauncherConfig::autoPaste, "auto_paste", kClipboardAutoPasteModes),
           subTable(&ShellConfig::LauncherConfig::dmenu, "dmenu", shellLauncherDmenuSchema()),
+          subTable(&ShellConfig::LauncherConfig::panels, "panels", shellLauncherPanelsSchema()),
           namedMap<ShellConfig::LauncherConfig, LauncherProviderConfig>(
               &ShellConfig::LauncherConfig::providers, "providers", launcherProviderSchema(),
               [](LauncherProviderConfig& elem, std::string_view name) {
@@ -1426,11 +1497,24 @@ namespace noctalia::config::schema {
           field(&ShellConfig::ScreenshotConfig::rememberLastRegion, "remember_last_region"),
           field(&ShellConfig::ScreenshotConfig::showCursor, "show_cursor"),
           field(&ShellConfig::ScreenshotConfig::annotate, "annotate"),
+          field(&ShellConfig::ScreenshotConfig::skipAnnotateOnCopySave, "skip_annotate_on_copy_save"),
           field(&ShellConfig::ScreenshotConfig::closeOnCopy, "close_on_copy"),
+          field(&ShellConfig::ScreenshotConfig::closeOnSave, "close_on_save"),
           field(&ShellConfig::ScreenshotConfig::pipeToCommand, "pipe_to_command"),
           field(&ShellConfig::ScreenshotConfig::pipeCommand, "pipe_command"),
           field(&ShellConfig::ScreenshotConfig::directory, "directory"),
           field(&ShellConfig::ScreenshotConfig::filenamePattern, "filename_pattern"),
+      };
+      return s;
+    }
+
+    const Schema<ShellConfig::ScreenRecordConfig>& shellScreenRecordSchema() {
+      static const Schema<ShellConfig::ScreenRecordConfig> s = {
+          field(&ShellConfig::ScreenRecordConfig::audio, "audio"),
+          field(&ShellConfig::ScreenRecordConfig::showCursor, "show_cursor"),
+          field(&ShellConfig::ScreenRecordConfig::directory, "directory"),
+          field(&ShellConfig::ScreenRecordConfig::filenamePattern, "filename_pattern"),
+          field(&ShellConfig::ScreenRecordConfig::replayDuration, "replay_duration", kScreenRecordReplayDurationRange),
       };
       return s;
     }
@@ -1568,7 +1652,6 @@ namespace noctalia::config::schema {
         field(&ShellConfig::polkitAgent, "polkit_agent"),
         enumField(&ShellConfig::passwordMaskStyle, "password_style", kPasswordMaskStyles),
         field(&ShellConfig::settingsShowAdvanced, "settings_show_advanced"),
-        field(&ShellConfig::settingsWindowTranslucent, "settings_window_translucent"),
         field(&ShellConfig::showLocation, "show_location"),
         field(&ShellConfig::appIconColorize, "app_icon_colorize"),
         colorSpecField(&ShellConfig::appIconColor, "app_icon_color", /*alwaysEmit=*/false),
@@ -1595,6 +1678,7 @@ namespace noctalia::config::schema {
         subTable(&ShellConfig::screenCorners, "screen_corners", shellScreenCornersSchema()),
         subTable(&ShellConfig::mpris, "mpris", shellMprisSchema()),
         subTable(&ShellConfig::screenshot, "screenshot", shellScreenshotSchema()),
+        subTable(&ShellConfig::screenRecord, "screen_record", shellScreenRecordSchema()),
         subTable(&ShellConfig::privacy, "privacy", shellPrivacySchema()),
         subTable(&ShellConfig::session, "session", shellSessionSchema()),
         subTable(&ShellConfig::greeterSync, "greeter_sync", shellGreeterSyncSchema()),
@@ -1618,6 +1702,9 @@ namespace noctalia::config::schema {
         pathStringField(&WallpaperConfig::directoryDark, "directory_dark"),
         field(&WallpaperConfig::perMonitorDirectories, "per_monitor_directories"),
         subTable(&WallpaperConfig::automation, "automation", wallpaperAutomationSchema()),
+        subTable(&WallpaperConfig::wallhaven, "wallhaven", wallpaperWallhavenSchema()),
+        subTable(&WallpaperConfig::daily, "daily", wallpaperDailySchema()),
+        subTable(&WallpaperConfig::video, "video", wallpaperVideoSchema()),
         namedMap<WallpaperConfig, WallpaperMonitorOverride>(
             &WallpaperConfig::monitorOverrides, "monitor", wallpaperMonitorSchema(),
             [](WallpaperMonitorOverride& o, std::string_view name) { o.match = std::string(name); },
@@ -1813,12 +1900,6 @@ namespace noctalia::config::schema {
 
     if (section == "desktop_widgets" && isKnownDesktopWidgetPath(path)) {
       return true;
-    }
-
-    // [plugin_settings."author/plugin"].<key>, open schema; keys validate against
-    // the manifest in config_validate's validatePluginSettings, not here.
-    if (section == "plugin_settings") {
-      return path.size() <= 3;
     }
 
     if (path.size() < 2) {
@@ -2362,4 +2443,4 @@ namespace noctalia::config::schema {
     return s;
   }
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

@@ -1,0 +1,115 @@
+<node>
+<interface name="org.helix.Desktop.Displays1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <signal name="Changed"/>
+</interface>
+<interface name="org.helix.Desktop.Configuration1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="GetSettings"><arg type="av" direction="out"/></method>
+ <method name="Update"><arg name="id" type="s" direction="in"/><arg name="value" type="v" direction="in"/></method>
+ <method name="UpdateOrderedList"><arg type="s" direction="in"/><arg type="av" direction="in"/><arg type="av" direction="in"/></method>
+ <method name="UpdateApplicationList"><arg type="s" direction="in"/><arg type="av" direction="in"/><arg type="av" direction="in"/></method>
+ <method name="Reset"><arg name="id" type="s" direction="in"/></method>
+ <method name="CommitOverrides"><arg name="baseline" type="s" direction="in"/><arg name="candidate" type="s" direction="in"/></method>
+ <method name="RegisterDesktop"/>
+ <method name="RegisterCapabilities"><arg type="a{sv}" direction="in"/></method>
+ <method name="GetState"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="a{sv}" direction="out"/></method>
+ <method name="SetState"><arg type="s" direction="in"/><arg type="s" direction="in"/><arg type="v" direction="in"/></method>
+ <method name="ClearState"><arg type="s" direction="in"/></method>
+ <signal name="Changed"/>
+</interface>
+<interface name="org.helix.Desktop.Appearance1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="Reapply"/>
+ <method name="RefreshPalettes"/>
+ <method name="SavePalette"><arg type="s" direction="in"/><arg type="s" direction="out"/></method>
+ <method name="SetRole"><arg type="u" direction="in"/><arg type="s" direction="in"/><arg type="s" direction="out"/></method>
+ <signal name="Applied"><arg type="s"/><arg type="b"/></signal>
+ <method name="SetAccent"><arg name="color" type="s" direction="in"/></method>
+ <method name="SetWallpaper"><arg name="path" type="s" direction="in"/></method>
+ <method name="SearchWallhaven"><arg type="a{sv}" direction="in"/><arg type="t" direction="out"/></method>
+ <method name="GetWallhaven"><arg type="t" direction="in"/><arg type="a{sv}" direction="out"/></method>
+ <method name="DownloadWallhaven"><arg type="t" direction="in"/><arg type="s" direction="in"/><arg type="t" direction="out"/></method>
+ <method name="CancelWallhaven"><arg type="t" direction="in"/></method>
+ <method name="SetWallhavenApiKey"><arg type="s" direction="in"/></method>
+ <signal name="Changed"/>
+</interface>
+<interface name="org.helix.Desktop.Audio1">
+ <method name="StartInputMeter"><arg type="u" direction="in"/></method>
+ <method name="StopInputMeter"/>
+ <signal name="InputLevel"><arg type="u"/><arg type="d"/><arg type="b"/></signal>
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <signal name="Changed"/>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+</interface>
+<interface name="org.helix.Desktop.Network1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="GetWifiSecret"><arg type="s" direction="out"/></method>
+ <method name="GetDns"><arg type="a{sv}" direction="out"/></method>
+ <method name="SetDns"><arg type="a{sv}" direction="in"/><arg type="a{sv}" direction="out"/></method>
+ <method name="Reply"><arg name="secret" type="s" direction="in"/><arg name="cancel" type="b" direction="in"/></method>
+ <signal name="Changed"/>
+ <signal name="Prompt"><arg type="a{sv}"/></signal>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+</interface>
+<interface name="org.helix.Desktop.Bluetooth1">
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Reply"><arg name="response" type="s" direction="in"/><arg name="cancel" type="b" direction="in"/></method>
+ <signal name="Changed"/>
+ <signal name="Prompt"><arg type="a{sv}"/></signal>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+</interface>
+<!-- Design: docs/design/agent-and-inference.md. Caller identity is the D-Bus connection (pid, exe, Flatpak id),
+     never an argument. Three roles share the interface: client (any granted app), confirmer (the shell, one owner),
+     manager (Settings, one owner). Role methods are rejected for other senders, as RegisterDesktop is today. -->
+<interface name="org.helix.Desktop.AgentSurface1">
+ <!-- Client role -->
+ <method name="Hello"><arg name="label" type="s" direction="in"/><arg name="version" type="s" direction="in"/><arg name="session" type="a{sv}" direction="out"/></method>
+ <!-- First-use consent: the confirmer asks the user, who may approve fewer tiers. Completes via Completed with the held tiers.
+      Tiers already held complete without a dialog; "blocked" is never grantable. -->
+ <method name="RequestAccess"><arg name="tiers" type="as" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="GetSnapshot"><arg type="a{sv}" direction="out"/></method>
+ <method name="ListTools"><arg type="av" direction="out"/></method>
+ <!-- action is a tool name from protocols/ipc/msg-risk.toml. args: argv (as), literal (as, model-supplied text), reason (s, shown in confirmation). -->
+ <method name="Action"><arg name="action" type="s" direction="in"/><arg name="args" type="a{sv}" direction="in"/><arg name="operation" type="t" direction="out"/></method>
+ <method name="Cancel"><arg name="operation" type="t" direction="in"/></method>
+ <!-- Completed(operation, ok, result). Result is JSON: {trust: "trusted"|"untrusted", content: ...}. Delivered to the requester only. -->
+ <signal name="Completed"><arg type="t"/><arg type="b"/><arg type="s"/></signal>
+ <signal name="Changed"/>
+ <!-- Confirmer role: only the registered confirmer receives requests and may answer them. A confirmer that
+      disconnects denies every pending confirmation. -->
+ <method name="RegisterConfirmer"/>
+ <signal name="ConfirmationRequested"><arg type="a{sv}"/></signal>
+ <!-- The service ended a pending confirmation without an answer (cancelled, requester left, timed out). -->
+ <signal name="ConfirmationEnded"><arg type="t"/></signal>
+ <!-- options: tiers (as) narrows an access request to fewer tiers than were asked. -->
+ <method name="Confirm"><arg name="operation" type="t" direction="in"/><arg name="approved" type="b" direction="in"/><arg name="options" type="a{sv}" direction="in"/></method>
+ <!-- Manager role: grants and audit. -->
+ <method name="RegisterManager"/>
+ <method name="GetGrants"><arg type="av" direction="out"/></method>
+ <method name="SetGrant"><arg name="client" type="s" direction="in"/><arg name="tiers" type="as" direction="in"/></method>
+ <method name="RevokeClient"><arg name="client" type="s" direction="in"/></method>
+ <method name="GetAudit"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
+</interface>
+ <!-- Shell-facing agent visibility. Only the registered desktop (RegisterDesktop) may call these.
+      Read-only activity and pending state, stop (cancel pending without revoking grants), grant
+      revoke, and a kill switch. Does not replace the manager role (Settings still owns SetGrant). -->
+ <interface name="org.helix.Desktop.AgentSurfaceActivity1">
+  <method name="GetActivity"><arg name="since" type="t" direction="in"/><arg name="limit" type="u" direction="in"/><arg type="av" direction="out"/></method>
+  <method name="ListPending"><arg type="av" direction="out"/></method>
+  <method name="Stop"><arg name="operation" type="t" direction="in"/></method>
+  <method name="StopAll"/>
+  <method name="GetGrants"><arg type="av" direction="out"/></method>
+  <method name="RevokeClient"><arg name="client" type="s" direction="in"/></method>
+  <method name="GetEnabled"><arg type="b" direction="out"/></method>
+  <method name="SetEnabled"><arg name="enabled" type="b" direction="in"/></method>
+  <signal name="Changed"/>
+  <signal name="PendingChanged"/>
+ </interface>
+</node>

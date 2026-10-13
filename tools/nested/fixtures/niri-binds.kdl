@@ -1,0 +1,12 @@
+binds {
+    Mod+T hotkey-overlay-title="Open a Terminal" { spawn "warp-terminal"; }
+    Mod+D hotkey-overlay-title="Open the launcher" { spawn "/home/a/.local/bin/helix-panel" "launcher"; }
+    Mod+Space hotkey-overlay-title="Open the launcher" { spawn "/home/a/.local/bin/helix-panel" "launcher"; }
+    Mod+Shift+Comma hotkey-overlay-title="Open Settings" { spawn "/home/a/.local/bin/helix-panel" "settings"; }
+    Alt+Tab hotkey-overlay-title="Switch windows" { spawn "/home/a/.local/bin/helix-panel" "window-switcher"; }
+    Mod+C repeat=false hotkey-overlay-title="Copy" { spawn-sh "wtype -M ctrl -k Insert"; }
+    Mod+Shift+C hotkey-overlay-title="Center column" { center-column; }
+    Mod+Q { close-window; }
+    XF86AudioRaiseVolume allow-when-locked=true { spawn "/home/a/.local/bin/helix-panel" "volume-up"; }
+    XF86AudioMute allow-when-locked=true { spawn "/home/a/.local/bin/helix-panel" "volume-mute"; }
+}

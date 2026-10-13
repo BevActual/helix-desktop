@@ -88,6 +88,84 @@ namespace compositors::niri {
     return requestOk(payload, acceptNoResponse);
   }
 
+  std::optional<std::string> NiriRuntime::compositorVersion() const {
+    if (m_compositorVersionResolved) {
+      return m_compositorVersion;
+    }
+    const auto reply = this->request("\"Version\"\n");
+    if (reply.status != IpcReply::Status::Replied || !reply.json.has_value() || !reply.json->is_object()) {
+      return std::nullopt;
+    }
+    const nlohmann::json* versionNode = nullptr;
+    if (reply.json->contains("Ok") && (*reply.json)["Ok"].is_object() && (*reply.json)["Ok"].contains("Version")) {
+      versionNode = &(*reply.json)["Ok"]["Version"];
+    } else if (reply.json->contains("Version")) {
+      versionNode = &(*reply.json)["Version"];
+    }
+    if (versionNode != nullptr && versionNode->is_string()) {
+      m_compositorVersion = versionNode->get<std::string>();
+      m_compositorVersionResolved = true;
+      return m_compositorVersion;
+    }
+    if (reply.json->contains("Err")) {
+      m_compositorVersionResolved = true;
+      m_compositorVersion.reset();
+    }
+    return m_compositorVersion;
+  }
+
+  std::optional<bool> NiriRuntime::helixLiquidGlassCapability() const {
+    resolveHelixCapabilities();
+    return m_helixLiquidGlass;
+  }
+
+  std::optional<std::vector<std::string>> NiriRuntime::helixLiquidGlassParams() const {
+    resolveHelixCapabilities();
+    if (!m_helixLiquidGlass.value_or(false)) {
+      return std::nullopt;
+    }
+    return m_helixLiquidGlassParams;
+  }
+
+  void NiriRuntime::resolveHelixCapabilities() const {
+    if (m_helixLiquidGlassResolved) {
+      return;
+    }
+    const auto reply = this->request("\"HelixCapabilities\"\n");
+    if (reply.status != IpcReply::Status::Replied || !reply.json.has_value() || !reply.json->is_object()) {
+      return;
+    }
+    const nlohmann::json* caps = nullptr;
+    if (reply.json->contains("Ok")
+        && (*reply.json)["Ok"].is_object()
+        && (*reply.json)["Ok"].contains("HelixCapabilities")) {
+      caps = &(*reply.json)["Ok"]["HelixCapabilities"];
+    } else if (reply.json->contains("HelixCapabilities")) {
+      caps = &(*reply.json)["HelixCapabilities"];
+    }
+    if (caps != nullptr
+        && caps->is_object()
+        && caps->contains("liquid_glass")
+        && (*caps)["liquid_glass"].is_boolean()) {
+      m_helixLiquidGlass = (*caps)["liquid_glass"].get<bool>();
+      m_helixLiquidGlassParams.clear();
+      if (const auto params = caps->find("liquid_glass_params"); params != caps->end() && params->is_array()) {
+        for (const auto& name : *params) {
+          if (name.is_string()) {
+            m_helixLiquidGlassParams.push_back(name.get<std::string>());
+          }
+        }
+      }
+      m_helixLiquidGlassResolved = true;
+      return;
+    }
+    if (reply.json->contains("Err")) {
+      m_helixLiquidGlass = false;
+      m_helixLiquidGlassParams.clear();
+      m_helixLiquidGlassResolved = true;
+    }
+  }
+
   NiriRuntime::IpcReply NiriRuntime::request(std::string_view request) const {
     ensureResolved();
     if (m_socketPath.empty() || request.empty()) {
@@ -166,6 +244,10 @@ namespace compositors::niri {
   void NiriRuntime::refresh() {
     m_socketPath.clear();
     m_resolved = false;
+    m_compositorVersionResolved = false;
+    m_compositorVersion.reset();
+    m_helixLiquidGlassResolved = false;
+    m_helixLiquidGlass.reset();
     resolveSocketPath();
   }
 
@@ -175,6 +257,10 @@ namespace compositors::niri {
     closeSocket(false);
     m_readBuffer.clear();
     m_reconnectBackoff = kReconnectInitial;
+    m_compositorVersionResolved = false;
+    m_compositorVersion.reset();
+    m_helixLiquidGlassResolved = false;
+    m_helixLiquidGlass.reset();
     notifyStreamReset();
   }
 
@@ -183,6 +269,10 @@ namespace compositors::niri {
       return;
     }
     m_eventHandlers.push_back(handler);
+    if (m_eventSocketFd >= 0) {
+      handler->handleStreamConnected();
+      return;
+    }
     if (available()) {
       connectIfNeeded();
     }
@@ -194,6 +284,14 @@ namespace compositors::niri {
     for (auto* handler : m_eventHandlers) {
       if (handler != nullptr) {
         handler->handleEvent(key, value);
+      }
+    }
+  }
+
+  void NiriRuntime::notifyStreamConnected() const {
+    for (auto* handler : m_eventHandlers) {
+      if (handler != nullptr) {
+        handler->handleStreamConnected();
       }
     }
   }
@@ -283,7 +381,12 @@ namespace compositors::niri {
     m_nextReconnectAt = {};
     m_reconnectBackoff = kReconnectInitial;
     m_readBuffer.clear();
+    m_compositorVersionResolved = false;
+    m_compositorVersion.reset();
+    m_helixLiquidGlassResolved = false;
+    m_helixLiquidGlass.reset();
     kLog.debug("connected to niri event stream");
+    notifyStreamConnected();
   }
 
   void NiriRuntime::closeSocket(bool scheduleReconnectFlag) {

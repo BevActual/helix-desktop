@@ -1,5 +1,5 @@
-# Noctalia configuration: all settings at their defaults.
-# Copy to ~/.config/noctalia/config.toml and edit what you need.
+# Helix Shell configuration: all settings at their defaults.
+# Copy to ~/.config/helix/config.toml and edit what you need.
 # Most changes are hot-reloaded via inotify; startup-only settings are noted inline.
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
@@ -16,15 +16,14 @@ date_format           = "%A, %x"    # default shell UI date format
 offline_mode          = false        # block all outgoing HTTP when true
 # panel_anchor_bar   = "main"        # bar panels attach to without a source bar; omit = first enabled bar
 telemetry_enabled     = false        # send an anonymous startup ping
-niri_overview_type_to_launch_enabled = false # opt in to type-to-launch from niri overview
-polkit_agent          = false
+niri_overview_type_to_launch_enabled = false # Control Center → Launcher; type-to-launch from niri overview
+polkit_agent          = true           # native bar agent; false if KDE/GNOME handles Polkit
 password_style        = "default"    # default | random
-settings_show_advanced = true        # show advanced settings by default in Settings
-# settings_window_translucent = false  # translucent settings window background
+settings_show_advanced = true        # show advanced settings by default
 show_location         = true         # hide weather location text in shell UI when false
 # app_icon_colorize   = false        # recolor application icons across the shell
 # app_icon_color      = "on_surface" # ColorSpec role or #hex when colorize is enabled
-clipboard_enabled     = true         # false disables clipboard panel, history, and compositor clipboard hooks
+clipboard_enabled     = true         # false disables clipboard history (Control Center tab); live copy/paste still works
 clipboard_history_max_entries = 100 # unpinned history cap (10–10000); pinned entries are extra
 # A Wayland selection is served by the app that owns it, so it dies when that app exits.
 # With this on, the shell claims it back so the item stays pasteable. Caveat: a password
@@ -35,13 +34,22 @@ clipboard_keep_from_closed_apps = true # keep the last copied item pasteable aft
 clipboard_auto_paste  = "auto"       # off | auto | ctrl_v | ctrl_shift_v | shift_insert
 clipboard_image_action_command = ""  # image preview action: gimp {path}, or satty -f - via stdin
 # IPC example:
-# noctalia msg clipboard-clear
+# helix-shell msg clipboard-clear
 shared_gl_context     = true         # startup-only; false isolates GPU contexts for broken drivers
 # lang                = "en"
 # avatar_path         = "~/Pictures/avatar.png"
 
 [shell.screenshot]
+skip_annotate_on_copy_save = false  # Ctrl+C / Ctrl+S in the region overlay skip the annotation editor
 close_on_copy = true                # close the annotation editor after Copy or Ctrl+C succeeds
+close_on_save = true                # close the annotation editor after Save or Ctrl+S succeeds
+
+[shell.screen_record]
+# directory         = ""        # empty = ~/Videos/Recordings
+# filename_pattern   = ""        # empty = recording_%Y%m%d_%H%M%S
+# audio              = true     # capture desktop audio when the backend supports it
+# show_cursor        = true      # include the pointer when gpu-screen-recorder is used
+# replay_duration    = 30        # seconds kept in the gpu-screen-recorder replay buffer
 
 [shell.privacy]
 mic_filter_regex = ""                # microphone app names to ignore in privacy indicators and OSD
@@ -57,21 +65,23 @@ direction = "down"                  # center, up, down, left, right, up_left, up
 alpha     = 0.55                    # multiplied by each component's background opacity
 
 [shell.panel]
-transparency_mode     = "solid"     # solid | soft | glass; controls floating-panel opacity and card translucency
+transparency_mode     = "solid"     # kept in sync with glass; solid | soft | glass
+glass                 = 0.0         # 0 = solid chrome, 1 = clear glass fill/dimming
+refraction            = false       # helix-niri liquid-glass (real backdrop, not wallpaper xray); stock niri → chrome blur
 borders               = true        # panel shell outline and in-panel section cards
 shadow                = true        # cast the global [shell.shadow] from panel surfaces
 launcher_placement       = "floating" # attached | floating
-clipboard_placement      = "floating" # attached | floating
-control_center_placement = "attached" # attached | floating
+control_center_placement = "floating" # attached | floating — dropdown under the status area
 wallpaper_placement      = "attached" # attached | floating
 session_placement        = "attached" # attached | floating
+quick_insert_placement   = "floating" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
-clipboard_position       = "center"   # auto | center | top_left | … (floating only)
-open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
+quick_insert_position    = "center"   # auto | center | top_left | … (floating only)
+open_near_click_control_center = true  # align Control Center / Notification Center under the click
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
-open_near_click_clipboard      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_wallpaper      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_session        = false # for attached/floating placement, follow the bar click instead of bar-center
+open_near_click_quick_insert   = false # for attached/floating placement, follow the bar click instead of bar-center
 
 [shell.launcher]
 categories    = true                    # show category filters in the launcher
@@ -129,29 +139,49 @@ path = ""                            # optional initial/default wallpaper path
 
 [wallpaper.automation]
 enabled                    = false
-interval_seconds           = 1800    # seconds between changes
-order                      = "random" # random | alphabetical
+source                     = "folder"  # folder | daily
+interval_seconds           = 1800    # seconds between changes (folder source)
+order                      = "random" # random | alphabetical (folder source)
 recursive                  = true    # include subdirectories when picking random wallpapers
+
+[wallpaper.daily]
+provider     = "bing"                 # bing | nasa
+# nasa_api_key = ""                   # optional; else $NASA_API_KEY, else DEMO_KEY
+# download_dir = ""                   # empty uses the wallpaper directory
+# bing_market  = ""                   # empty uses en-US
 
 # ── Theme ─────────────────────────────────────────────────────────────────────
 
 [theme]
 mode   = "dark"                     # dark | light | auto
 source = "builtin"                  # builtin | wallpaper | community
-builtin = "Noctalia"                # Ayu | Catppuccin | Dracula | Eldritch | Gruvbox |
-                                    # Kanagawa | Noctalia | Nord | Rosé Pine | Tokyo-Night
-# community_palette = "Noctalia"    # fetched from api.noctalia.dev, cached locally
+builtin = "Helix"                # Ayu | Catppuccin | Dracula | Eldritch | Gruvbox |
+                                    # Kanagawa | Helix | Nord | Rosé Pine | Tokyo-Night
+# community_palette = "Helix"    # local cache or HELIX_COMMUNITY_*_URL, cached locally
 # wallpaper_scheme  = "m3-content"  # m3-tonal-spot | m3-content | m3-fruit-salad |
                                     # m3-rainbow | m3-monochrome | vibrant | faithful |
                                     # dysfunctional | muted
 pure_black_dark = false             # anchor dark surfaces to true black (OLED); applies to
                                     # every palette source, not just wallpaper-generated ones
 
+[theme.niri_layout]                 # Control Center → Theme owns decorations/blur; Windows owns gaps/struts/columns
+focus_ring = false                  # writes niri's managed helix-layout.kdl include; requires niri
+border     = false
+blur       = false                  # writes helix-blur.kdl; requires niri 26.04+
+blur_passes = 2                     # dual kawase passes (1–8)
+blur_offset = 3.0                   # sample distance per pass (0.5–8.0)
+blur_noise  = 0.03                  # grain overlay (0.0–0.2)
+overview   = "none"                 # Control Center → Wallpaper; writes helix-overview.kdl
+# gaps     = 16                     # optional; Control Center → Desktop → Windows
+# struts   = 0                      # optional equal outer padding on all sides
+# default_column_width = 0.5        # optional; fraction of the output width
+# draw_border_with_background = false  # optional; Control Center → Theme
+
 [theme.templates]
 enable_builtin_templates            = true
-builtin_ids                = []     # opt-in; list ids with: noctalia theme --list-templates
+builtin_ids                = []     # opt-in; list ids with: helix-shell theme --list-templates
 enable_community_templates = true
-community_ids              = []     # fetched from api.noctalia.dev/templates, cached locally
+community_ids              = []     # local cache or HELIX_COMMUNITY_*_URL/templates, cached locally
 
 # User-defined templates are declared directly in config.
 # [theme.templates.user.my_app]
@@ -187,9 +217,9 @@ offset_y           = 8              # absolute vertical margin from the screen e
 # bypass_dnd      = false            # bypass DND for matching notifications; play_sound still controls sound
 # allowed_urgencies = ["normal", "critical"]  # omit or list all three to allow every level
 # IPC examples:
-# noctalia msg notification-invoke-latest
-# noctalia msg notification-clear-active
-# noctalia msg notification-clear-history
+# helix-shell msg notification-invoke-latest
+# helix-shell msg notification-clear-active
+# helix-shell msg notification-clear-history
 
 # ── OSD ───────────────────────────────────────────────────────────────────────
 
@@ -222,6 +252,8 @@ privacy = true                      # microphone/camera/screen-share capture cha
 
 [lockscreen]
 enabled                 = true
+lock_before_suspend     = true        # lock on PrepareForSleep (lid close / systemctl suspend)
+lid_close_keep_external_displays = true  # close the lid and keep using other displays
 blurred_desktop         = false       # use a desktop snapshot as the lock screen background (requires wlr-screencopy)
 blur_intensity          = 0.5         # lock screen background blur (0.0 = none, 1.0 = maximum)
 tint_intensity          = 0.3         # surface-color tint over the lock screen background
@@ -250,9 +282,46 @@ event_time_format           = "%H:%M"       # time format used for events
 
 # Calendar tab of the control center.
 
+[control_center]
+# width  = 700   # full-sidebar width in pixels (600–1600); size like a Settings window
+# height = 700   # window height in pixels (480–1200); leftover catalogs fill extra space
+
 [control_center.calendar]
 show_events_card            = true
 show_week_numbers           = false         # ISO 8601 week numbers in the month grid
+
+[control_center.clock]
+timezones                   = []            # extra IANA timezones besides local time
+
+[control_center.network]
+wifi_band     = "all"                    # all | 2.4 | 5 | 6
+hidden_ssids  = []                       # SSIDs omitted from the available list
+nextdns_id    = ""                     # optional NextDNS config ID used by the Network tab
+custom_dns    = ""                     # last custom DNS server list (comma-separated)
+
+[control_center.bluetooth]
+hide_unnamed        = false
+discovery_seconds   = 10                # 5-60; how long Rescan keeps discovery running
+
+[control_center.ai_usage]
+refresh_seconds     = 120               # 30-900
+claude              = "auto"            # auto | on | off; Auto = CLI on PATH
+codex               = "auto"
+gemini              = "auto"
+qwen                = "auto"
+copilot             = "auto"            # editor app; Auto stays hidden
+cursor              = "auto"            # editor app; Auto stays hidden
+deepseek            = "auto"            # API key; Auto stays hidden
+ollama              = "auto"
+# ollama_host       = "127.0.0.1:11434"
+# ollama_model      = "llama3.2:latest"
+localai             = "auto"            # LocalAI: the desktop's AI service layer (chat, speech, images, embeddings)
+# localai_host      = "127.0.0.1:8080"
+# localai_model     = "qwen3-4b"        # default chat model for desktop tools; empty = first chat-capable
+# gemini_daily_limit = 1000
+# qwen_daily_limit   = 2000
+warn_percent        = 90                # 0 disables usage warnings
+warn_reset_minutes  = 30                # 0 disables reset-soon warnings
 
 # ── Weather ───────────────────────────────────────────────────────────────────
 
@@ -263,14 +332,18 @@ unit            = "celsius"         # celsius | fahrenheit
 effects         = true              # visual weather effects
 # Weather uses the coordinates resolved by [location] (see below).
 
+[tailscale]
+refresh_interval_seconds = 10   # 3–120; how often to poll `tailscale status`
+notify_on_peer_change = false    # toast when a peer comes online or goes offline
+# admin_url = ""                  # override the admin console URL (empty = Tailscale admin)
+
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
 [audio]
 enable_overdrive = false            # allow volume above 100% (up to 150%)
 enable_sounds = false               # master toggle for UI feedback sounds
 sound_volume = 0.5                  # 0.0 - 1.0
-volume_change_sound = ""            # empty = bundled sounds/volume-change.wav
-notification_sound = ""             # empty = bundled sounds/notification.wav
+sound_theme = "freedesktop"
 
 # ── Brightness ────────────────────────────────────────────────────────────────
 
@@ -282,7 +355,7 @@ enable_ddcutil = false
 # Per-monitor backend override:
 # [brightness.monitor.eDP-1]
 # backend = "backlight"             # auto | none | backlight | ddcutil
-# backlight_device = "intel_backlight"  # explicit sysfs device name or path; run: noctalia msg brightness-list-backlight-devices
+# backlight_device = "intel_backlight"  # explicit sysfs device name or path; run: helix-shell msg brightness-list-backlight-devices
 # [brightness.monitor.DP-1]
 # backend = "ddcutil"
 # [brightness.monitor.DP-2]
@@ -344,12 +417,12 @@ delete   = ["del"]
 [bar.main]
 position           = "top"          # top | bottom | left | right
 thickness          = 34
-background_opacity = 1.0
-radius             = 12
-margin_ends        = 180
+background_opacity = 0.72           # soft glass floating chrome
+radius             = 18             # pill corners (radius2xl family)
+margin_ends        = 12
 margin_edge        = 10
 padding            = 14
-widget_spacing     = 6
+widget_spacing     = 8
 scale              = 1.0
 font_scale         = 1.0            # text-only scale multiplier across widgets
 shadow             = true
@@ -357,20 +430,33 @@ auto_hide          = false
 # smart_auto_hide    = false       # show when the active workspace is empty; hide when it has windows
 # show_on_workspace_switch = true   # with auto_hide: briefly reveal when the active workspace changes
 reserve_space      = true
-capsule            = false
+capsule            = false          # per-widget capsules off; group:status paints its own pill
 # capsule_fill     = "surface_variant"
 # capsule_radius   = 8.0            # omit/blank in Settings for automatic pill radius; 0.0 = square
 # capsule_opacity  = 1.0
 # capsule_border   = "outline"      # uncomment for a border on all widgets
 
-start  = ["launcher", "wallpaper", "workspaces"]
-center = ["clock"]
-end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "control-center", "session"]
+# Floating glass bar: clock on the start; media / notifications / tray / status capsule on the end.
+# group:status members default to network, bluetooth, volume, battery (icon-only). Brightness,
+# control-center glyph, session, workspaces, etc. are optional extras — not part of the default row.
+start  = ["clock"]
+# center = []
+end    = ["media", "notifications", "tray", "group:status"]
+# Optional extras (uncomment / splice into a lane as needed):
+# start = ["launcher", "workspaces", "clock"]
+# end = ["media", "notifications", "tray", "group:status", "session"]
+# end = ["media", "notifications", "tray", "brightness", "group:status", "control-center"]
 
-# Commands for the bar margin outside widget sections (dead zone):
+# Status capsule membership (defaults match code when omitted):
+# [[bar.main.capsule_group]]
+# id = "status"
+# members = ["network", "bluetooth", "volume", "battery"]
+# opacity = 0.55
+
+# Commands for the bar margin outside widget sections (dead zone). Default: none.
 # [bar.main.dead_zone.actions]
 # left = "panel-toggle launcher"
-# right = "panel-toggle control-center"
+# right = "panel-toggle control-center home"
 # middle = "none"
 # scroll_up = "none"
 # scroll_down = "none"
@@ -385,7 +471,7 @@ end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth",
 # ── Dock ──────────────────────────────────────────────────────────────────────
 
 [dock]
-enabled             = false         # set true to activate
+enabled             = true          # bottom app tray (pinned + running apps)
 position            = "bottom"      # top | bottom | left | right
 icon_size           = 48
 main_axis_padding   = 16
@@ -462,7 +548,7 @@ enabled = false
 
 # ── Control Center ────────────────────────────────────────────────────────────
 
-# Shortcut buttons shown on the right side of the dashboard (up to 6).
+# Shortcut buttons pinned to the bottom of Home. Empty by default; add only what you use.
 # [[control_center.shortcuts]]
 # type = "wifi"
 # [[control_center.shortcuts]]
@@ -474,7 +560,13 @@ enabled = false
 # [[control_center.shortcuts]]
 # type = "wallpaper"
 # [[control_center.shortcuts]]
+# type = "screenshot"
+# [[control_center.shortcuts]]
+# type = "pick_color"
+# [[control_center.shortcuts]]
 # type = "screen_recorder"
+# [[control_center.shortcuts]]
+# type = "screen_replay"
 # [[control_center.shortcuts]]
 # type = "session"
 
@@ -482,10 +574,10 @@ enabled = false
 
 [hooks]
 
-# started           = "notify-send 'Noctalia' 'Shell started'"
+# started           = "notify-send 'Helix' 'Shell started'"
 # wallpaper_changed = []
 # colors_changed    = []
-# theme_mode_changed = "notify-send 'Noctalia' \"Theme mode: $NOCTALIA_THEME_MODE\""
+# theme_mode_changed = "notify-send 'Helix' \"Theme mode: $HELIX_THEME_MODE\""
 # session_locked    = []
 # session_unlocked  = []
 # logging_out       = []
@@ -495,9 +587,9 @@ enabled = false
 # wifi_disabled     = []
 # bluetooth_enabled  = []
 # bluetooth_disabled = []
-# battery_state_changed   = "notify-send 'Power' \"Battery: $NOCTALIA_BATTERY_STATE\""
-# battery_under_threshold = "notify-send 'Power' \"Battery at ${NOCTALIA_BATTERY_PERCENT}%\""
-# power_profile_changed   = "notify-send 'Power' \"Profile: $NOCTALIA_POWER_PROFILE\""
+# battery_state_changed   = "notify-send 'Power' \"Battery: $HELIX_BATTERY_STATE\""
+# battery_under_threshold = "notify-send 'Power' \"Battery at ${HELIX_BATTERY_PERCENT}%\""
+# power_profile_changed   = "notify-send 'Power' \"Profile: $HELIX_POWER_PROFILE\""
 # [widget.launcher]
 # custom_image = "/path/to/image.png"
 # custom_image_colorize = false
@@ -508,6 +600,7 @@ enabled = false
 
 # [widget.notifications]
 # hide_when_no_unread = true
+# live_max_width = 160                 # live activity chip summary width; 0 = ring only
 
 # [widget.network_rx]
 # network_speed_unit = "mb"          # auto | kb | mb
@@ -539,7 +632,7 @@ enabled = false
 # type                = "custom_button"
 # glyph               = "lock"
 # tooltip             = "Lock screen"
-# command             = "noctalia msg session lock"
+# command             = "helix-shell msg session lock"
 # right_command       = ""
 # middle_command      = ""
 # scroll_up_command   = ""

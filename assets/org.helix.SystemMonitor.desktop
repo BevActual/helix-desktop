@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Helix System Monitor
+Comment=View resource usage and running processes
+Exec=helix-system-monitor
+Icon=org.helix.SystemMonitor
+Terminal=false
+Categories=System;Monitor;
+StartupNotify=true
+Actions=Processes;ScreenTime;
+
+[Desktop Action Processes]
+Name=Processes
+Exec=helix-system-monitor --page processes
+
+[Desktop Action ScreenTime]
+Name=Screen Time
+Exec=helix-system-monitor --page screen-time

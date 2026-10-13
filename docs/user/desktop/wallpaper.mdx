@@ -33,7 +33,8 @@ path = "/home/user/Wallpapers/default.png"
 enabled                      = false
 interval_seconds             = 1800
 order                        = "random" # random | alphabetical
-recursive                    = true     # scan subdirectories when selecting random wallpapers
+source                       = "folder" # folder | daily
+recursive                    = false    # scan subdirectories when selecting random wallpapers (default: false)
 
 # Per-monitor overrides - same match rules as bar monitor overrides
 # Only active when per_monitor_directories = true
@@ -56,18 +57,93 @@ directory_dark  = "/home/user/Wallpapers/Vertical/Dark"
 - **repeat** - tiled at native size across the output.
 - **span** - a single image stretched across the whole multi-monitor desktop, so each output shows the slice that matches its position in the compositor layout. The monitors are treated as one continuous canvas, honoring each output's logical position and the offset between them, so a wide wallpaper flows across screens instead of repeating the same framing on each. Single-monitor setups behave like `crop`, and the slices refresh automatically when a monitor is moved, added, or removed.
 
-`wallpaper.default.path` sets the initial/default wallpaper for every output. It can be declared in `~/.config/noctalia/*.toml`; choosing a wallpaper through the UI or IPC writes the same key to `settings.toml`, which loads last and overrides the declarative value.
+`wallpaper.default.path` sets the initial/default wallpaper for every output. It can be declared in `~/.config/helix/*.toml`; choosing a wallpaper through the UI or IPC writes the same key to `settings.toml`, which loads last and overrides the declarative value.
 
 An empty global `wallpaper.directory` resolves to the standard XDG Pictures directory, using `XDG_PICTURES_DIR` or the `user-dirs.dirs` configuration file, and falls back to `~/Pictures`. This keeps the picker, launcher provider, and automatic rotation aligned without requiring a separate wallpaper folder.
 
-The wallpaper picker panel lists images from the resolved browse folder as a grid of thumbnails and highlights the
-wallpaper currently applied to the selected monitor. In the **ALL** monitor view, the highlight follows the default
-wallpaper path. Theme-aware directories (`directory_light` / `directory_dark`) are used when the shell is in Light or
-Dark mode; **Auto** mode falls back to `directory`. Missing per-mode paths fall back to `directory`.
+The wallpaper picker lives on Control Center's **Wallpaper** tab (`helix-panel panel-toggle control-center wallpaper`)
+and in the dedicated wallpaper panel (`helix-panel panel-toggle wallpaper`). Both list images from the resolved
+browse folder as a grid of thumbnails and highlight the wallpaper currently applied to the selected monitor. Use
+the folder button to open a file picker and choose any image, even outside that folder. Library, Wallhaven, Video, and Daily share one compact card. Browse sits on the left (icon sources, search, and that source's tools). The current wallpaper sits on the right (preview, Display, star, lock-screen). Flatten, sort, color, and Wallhaven filters stay behind the Filters control so the thumbnail grid keeps the leftover height. Hover a source icon for its name. In **Daily**, Bing/NASA sits on the search row. In **Video**, mute and Stop sit on the search row. In the **ALL** monitor
+view, the highlight follows the default wallpaper path. Theme-aware directories (`directory_light` /
+`directory_dark`) are used when the shell is in Light or Dark mode; **Auto** mode falls back to `directory`.
+Missing per-mode paths fall back to `directory`.
 
-When `per_monitor_directories` is **true**, each connected monitor can define its own `directory` / `directory_light` / `directory_dark` under `[wallpaper.monitor.<name>]`. The picker and automatic rotation resolve the folder per-monitor, so selecting a monitor in the panel toolbar switches to that monitor's override (falling back to the global folder if unset). When **false**, all monitors share the global directories regardless of which monitor is selected in the panel.
+Header gear on the Control Center tab (or `helix-panel settings-toggle wallpaper`) opens fill mode, directories,
+automation, Wallhaven API, and Daily source settings.
 
-Selecting a monitor in the panel toolbar switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers.
+When `per_monitor_directories` is **true**, each connected monitor can define its own `directory` / `directory_light` / `directory_dark` under `[wallpaper.monitor.<name>]`. The picker and automatic rotation resolve the folder per-monitor, so selecting a monitor on the Current strip switches to that monitor's override (falling back to the global folder if unset). When **false**, all monitors share the global directories regardless of which monitor is selected.
+
+Selecting a monitor on the Current strip switches to that monitor's resolved directory (falling back to the global browse folder). Clicking a tile writes the path to `settings.toml` and applies it immediately. Picking a wallpaper while **ALL** is selected applies it to every connected monitor. Picking a solid color stores it as a wallpaper source path such as `color:#FF00FF`, so it uses the same transition shader pipeline as image wallpapers. The lock-screen button writes `[lockscreen].wallpaper` to that same path; turn it off to clear the custom lock image and follow the desktop wallpaper per output. Desktop capture still takes priority when `[lockscreen].blurred_desktop` is on.
+
+## Wallhaven
+
+The wallpaper picker can search [Wallhaven](https://wallhaven.cc), download the full image into your wallpaper folder (or `[wallpaper.wallhaven].download_dir`), and apply it to the selected monitor(s). Type tags to search as you go (comma lists become separate tags; Enter searches immediately). You can paste a wallpaper page or search URL, or a `wallhaven-…` filename. Category, purity, sort, aspect ratio, and resolution open from Filters. Page controls stay on the browse row. The dimensions button fills **At Least** with the selected monitor's pixel size (the largest connected output when **ALL** is selected). Open that mode from the picker, from Control Center's Wallpaper tab, or:
+
+```sh
+helix-panel panel-toggle wallpaper wallhaven
+```
+
+```toml
+[wallpaper.wallhaven]
+# api_key = ""            # optional; higher rate limits and NSFW results
+# download_dir = ""       # empty uses the resolved wallpaper directory
+```
+
+Requires network access (`[shell].offline_mode` must be off). NSFW results require an API key. An existing `[plugin_settings."helix/wallhaven"]` API key or download directory is still read if the built-in keys are empty.
+
+## Daily
+
+The wallpaper picker can fetch recent stills from [Bing's daily homepage](https://www.bing.com) or [NASA Astronomy Picture of the Day](https://apod.nasa.gov). Switch the picker to **Daily**, then use the **Daily Source** dropdown, or:
+
+```sh
+helix-panel panel-toggle wallpaper daily
+helix-panel panel-toggle wallpaper bing
+helix-panel panel-toggle wallpaper nasa
+```
+
+```toml
+[wallpaper.daily]
+provider     = "bing"     # bing | nasa
+# nasa_api_key = ""       # optional; else $NASA_API_KEY, else NASA DEMO_KEY
+# download_dir = ""       # empty uses the resolved wallpaper directory
+# bing_market  = ""       # empty uses en-US
+```
+
+The grid shows about eight recent images. Clicking a tile downloads it (Bing tries UHD, then the standard file) into your wallpaper folder and applies it to the selected monitor(s). NASA days that are videos are skipped. Requires network access (`[shell].offline_mode` must be off). NASA's public `DEMO_KEY` is rate-limited; set `nasa_api_key` or `NASA_API_KEY` if requests start failing.
+
+To apply today's picture automatically at shell startup and once per local calendar day, set automation `source = "daily"` (interval, order, and recursive apply only to folder rotation):
+
+```toml
+[wallpaper.automation]
+enabled = true
+source  = "daily"
+```
+
+`wallpaper-next`, `wallpaper-previous`, and `wallpaper-random` still walk the local wallpaper folder.
+
+## Video
+
+The wallpaper picker can apply videos with [mpvpaper](https://github.com/GhostNaN/mpvpaper). Switch the picker to
+**Video**, or:
+
+```sh
+helix-panel panel-toggle wallpaper video
+```
+
+```toml
+[wallpaper.video]
+# directory = ""          # empty uses ~/Videos
+# mute = true
+# hardware_decode = true
+# auto_pause = "full"     # off | max | full
+# mpv_options = ""
+```
+
+The grid lists `mp4`, `webm`, `mkv`, `mov`, and `gif` files from `[wallpaper.video].directory` (`~/Videos` when empty).
+Clicking a file runs `mpvpaper` on the selected monitor (or all monitors when **ALL** is selected). Applying a still
+wallpaper or using **Stop** restores Helix Shell's own wallpaper surface. Install `mpvpaper` (which pulls in `mpv`)
+if the picker says it is missing. Assignments persist across restarts.
 
 The launcher's wallpaper provider and **automatic rotation** use the same browse-folder resolution so they stay aligned with the picker. When automation runs with `per_monitor_directories = true`, each monitor picks independently from its own resolved folder.
 
@@ -77,13 +153,14 @@ Monitor overrides may also set `fill_color`.
 
 By default, the first wallpaper on each output appears immediately with no transition. Set `transition_on_startup = true` to fade (or wipe, etc.) in from a black screen at shell startup, matching v4 behavior. Later wallpaper changes always use the configured transition pool.
 
-When automation is enabled, Noctalia picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
+When automation is enabled and `source = "folder"` (the default), Helix picks one image from the resolved browse folder at shell startup, then keeps picking on the configured interval and applies it to all connected outputs in sync.
 `order = "random"` chooses a random image each cycle.
 `order = "alphabetical"` sorts paths case-insensitively and advances to the next image each cycle (wrapping at the end).
+When `source = "daily"`, automation applies today's Bing or NASA still instead (see [Daily](#daily)); the interval is ignored.
 
 ## Favorites
 
-There is no separate Settings page for favorites. The wallpaper panel manages image favorites through tile stars, and advanced users can also declare favorites with `[[wallpaper.favorite]]` in Noctalia config.
+There is no separate Settings page for favorites. The wallpaper panel manages image favorites through tile stars, and advanced users can also declare favorites with `[[wallpaper.favorite]]` in Helix config.
 
 Starred wallpapers appear at the **top of the browse grid** at the wallpaper root (before folders and images from that folder). Inside a subfolder, only favorites whose files live in that folder (or under it when **Flatten** is on) are pinned at the top. Solid `color:#RRGGBB` favorites can be declared in config and only appear at the root. The panel can display and remove those declarative color favorites, but it does not create them from the color picker because colors are applied through a dialog, not selected from the grid. Star an image tile to bookmark it; star again to remove it. The monitor selector (**ALL** vs one output) works the same for favorites and browse entries.
 
@@ -100,10 +177,10 @@ wallpaper_scheme = "m3-content"  # when palette_source = wallpaper
 path = "color:#1a1a2e"
 theme_mode = "dark"
 palette_source = "builtin"
-builtin_palette = "Noctalia"
+builtin_palette = "Helix"
 ```
 
-The **Theme** and **Colors** row is always available under the toolbar. When no favorited image is selected, those controls persist a live global theme override, the same as changing theme mode or palette source in Settings. When the selected image is already a favorite, adjusting the controls also saves the favorite preset and re-applies that wallpaper with the updated settings.
+The **Theme** and **Colors** row appears under the Current strip only while the applied wallpaper is starred. Changing those controls updates that favorite's theme preset and re-applies the wallpaper. Theme mode and palette for non-favorites stay on Appearance.
 
 Starring an image wallpaper bookmarks the path only, except when that image is the wallpaper currently applied to the selected monitor: the favorite is saved with the active `theme_mode`, `palette_source`, and palette selection so re-applying it restores the look you already have. Declarative `color:#RRGGBB` favorites use the same stored theme fields when present. Clicking a favorite applies the wallpaper together with its stored theme settings.
 
@@ -117,7 +194,7 @@ To make the surface visible during niri overview, add a layer-rule to your niri 
 
 ```kdl
 layer-rule {
-    match namespace="^noctalia-backdrop"
+    match namespace="^helix-backdrop"
     place-within-backdrop true
 }
 ```
@@ -129,6 +206,6 @@ blur_intensity = 0.5    # 0.0 = no blur, 1.0 = maximum blur
 tint_intensity = 0.3    # 0.0 = no tint, 1.0 = fully opaque tint
 ```
 
-When `enabled` on a supported compositor, backdrop layer surfaces and wallpaper textures stay loaded in GPU memory for the lifetime of the shell. Noctalia renders the blurred/tinted backdrop at startup and reuses the cached result until the wallpaper, scale, or backdrop styling changes.
+When `enabled` on helix-niri, backdrop layer surfaces and wallpaper textures stay loaded in GPU memory for the lifetime of the shell. Helix renders the blurred/tinted backdrop at startup and reuses the cached result until the wallpaper, scale, or backdrop styling changes.
 
 The tint color is `palette.surface` and is not currently configurable.

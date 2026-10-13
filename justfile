@@ -22,7 +22,18 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    meson compile -C build-{{m}} noctalia
+    # Default targets needed for `meson install` (service, assistant, inference, upgrade helper).
+    meson compile -C build-{{m}} helix-service helix-assistant helix-inference helix-system-upgrade
+
+# Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
+build-desktop m=mode jobs="2": (_ensure-configured m)
+    mkdir -p build-{{m}}/helix-tmp
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-assistant helix-inference -j {{jobs}}
+
+# Legacy GTK Settings only (needs -Ddesktop_apps=enabled). Prefer: (cargo build -p helix-settings)
+build-settings m=mode jobs="2": (_ensure-configured m)
+    mkdir -p build-{{m}}/helix-tmp
+    TMPDIR="$(pwd)/build-{{m}}/helix-tmp" nice -n 10 ionice -c 3 meson compile -C build-{{m}} helix-service helix-settings -j {{jobs}}
 
 _ensure-configured m=mode:
     #!/usr/bin/env bash
@@ -42,7 +53,7 @@ _ensure-configured m=mode:
     fi
 
 run m=mode: (build m)
-    ./build-{{m}}/noctalia
+    ./build-{{m}}/helix-service
 
 # Build and run the unit tests, enabling their targets when auto mode omits them.
 test m=mode *args: (_ensure-configured m)
@@ -57,11 +68,15 @@ test m=mode *args: (_ensure-configured m)
 test-workflows:
     python3 -m unittest discover -s .github/workflows/scripts -p 'test_*.py'
 
+# Stage an installation in a temporary directory and exercise its installed CLI.
+test-install m=mode: (build m)
+    sh tests/install_layout_test.sh build-{{m}}
+
 install m:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [[ ! -x "build-{{m}}/noctalia" ]]; then
-        echo "error: build-{{m}}/noctalia is missing; run 'just build {{m}}' before installing" >&2
+    if [[ ! -x "build-{{m}}/helix-service" ]]; then
+        echo "error: build-{{m}}/helix-service is missing; run 'just build {{m}}' before installing" >&2
         exit 1
     fi
     meson install --no-rebuild -C build-{{m}}
@@ -82,6 +97,7 @@ format:
 _clang_tidy m=mode *args:
     #!/usr/bin/env bash
     set -euo pipefail
+    meson compile -C "build-{{m}}" wayland-protocol-headers
     src_root="$(realpath src)"
     # compile_commands.json stores build-relative paths, so clang-tidy emits header
     # diagnostics as ../src/...; the header-filter must match that form (an absolute
@@ -105,3 +121,7 @@ clean m=mode:
     rm -rf build-{{m}}
 
 rebuild m=mode: (clean m) (build m)
+
+# Tauri session shell: core lib tests, nested agent-ipc/launcher, agent policy (safe with Cursor open).
+verify-shell-integrations:
+    tools/verify-shell-integrations.sh

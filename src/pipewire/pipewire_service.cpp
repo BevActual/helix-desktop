@@ -2,6 +2,7 @@
 
 #include "config/config_service.h"
 #include "core/log.h"
+#include "desktop_api/client.h"
 #include "ipc/ipc_arg_parse.h"
 #include "ipc/ipc_service.h"
 #include "pipewire/audio_route_selection.h"
@@ -16,6 +17,7 @@
 #include <cmath>
 #include <concepts>
 #include <cstring>
+#include <format>
 #include <memory>
 #include <optional>
 #include <pipewire/device.h>
@@ -846,6 +848,8 @@ PipeWireService::PipeWireService() {
 }
 
 PipeWireService::~PipeWireService() {
+  if (m_remoteObserver)
+    helix::desktopClient().unobserve(m_remoteObserver);
   // Destroy node proxies and their listeners
   for (auto& [id, nd] : m_nodes) {
     if (nd->listener != nullptr) {
@@ -1982,6 +1986,10 @@ float PipeWireService::relativeAdjustTarget(
 }
 
 void PipeWireService::setNodeVolume(std::uint32_t id, float volume) {
+  if (m_remoteControl) {
+    remoteAction("volume", id, volume);
+    return;
+  }
   auto it = m_nodes.find(id);
   if (it == m_nodes.end()) {
     return;
@@ -2004,6 +2012,10 @@ void PipeWireService::setNodeVolume(std::uint32_t id, float volume) {
 }
 
 void PipeWireService::setNodeMuted(std::uint32_t id, bool muted) {
+  if (m_remoteControl) {
+    remoteAction("mute", id, muted ? 1 : 0);
+    return;
+  }
   auto it = m_nodes.find(id);
   if (it == m_nodes.end()) {
     return;
@@ -2014,9 +2026,9 @@ void PipeWireService::setNodeMuted(std::uint32_t id, bool muted) {
     return;
   }
 
-  // Device nodes go through WirePlumber's mixer-api to keep pipewire-pulse / pavucontrol in sync. The
-  // committed mute echoes back through onMixerVolumeChanged; swMute is set optimistically for
-  // immediate UI feedback.
+  // Device nodes with a hardware route go through WirePlumber's mixer-api to keep pipewire-pulse /
+  // pavucontrol in sync. Route-less virtual sources also need the direct SPA node mute below: the mixer
+  // write can update the optimistic UI state without stopping capture in the virtual filter graph.
   const bool isDeviceNode = nd.mediaClass == "Audio/Sink" || nd.mediaClass == "Audio/Source";
   if (isDeviceNode && m_wpMixer != nullptr) {
     m_wpMixer->setMuted(id, muted);
@@ -2031,7 +2043,9 @@ void PipeWireService::setNodeMuted(std::uint32_t id, bool muted) {
       }
       rebuildState();
     }
-    return;
+    if (nd.hasRoute) {
+      return;
+    }
   }
 
   // Program streams, and device nodes for immediate local/UI consistency.
@@ -2109,6 +2123,10 @@ void PipeWireService::setProgramOutputVolume(std::uint32_t id, float volume) { s
 void PipeWireService::setProgramOutputMuted(std::uint32_t id, bool muted) { setNodeMuted(id, muted); }
 
 void PipeWireService::setDefaultNode(std::uint32_t id, const char* key) {
+  if (m_remoteControl) {
+    remoteAction("default", id, 0, std::strcmp(key, "default.audio.source") == 0);
+    return;
+  }
   const auto it = m_nodes.find(id);
   if (it == m_nodes.end() || key == nullptr) {
     return;
@@ -2194,6 +2212,16 @@ void PipeWireService::emitChanged() {
 }
 
 void PipeWireService::moveProgramOutput(std::uint32_t programStreamId, std::uint32_t targetSinkId) {
+  if (m_remoteControl) {
+    try {
+      helix::desktopClient().call(
+          "audio", "Action",
+          g_variant_new("(s@a{sv})", "route", helix::toVariant({{"id", programStreamId}, {"sink", targetSinkId}}))
+      );
+    } catch (...) {
+    }
+    return;
+  }
   if (m_defaultMetadata == nullptr) {
     kLog.warn("moveProgramOutput: default metadata not available");
     return;
@@ -2247,8 +2275,8 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
   const auto parseVolumeStepError = "error: invalid volume step (use percent like 5 or 5%, or normalized like 0.05)\n";
 
   ipc.bind(
-      noctalia::cli::msg::volumeSet, [this, maxVolume, parseVolumeValueError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
+      helix::cli::msg::volumeSet, [this, maxVolume, parseVolumeValueError](const std::string& args) -> std::string {
+        const auto parts = helix::ipc::splitWords(args);
         if (parts.size() != 1) {
           return "error: volume-set requires <value>\n";
         }
@@ -2256,7 +2284,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
         if (!sink)
           return "error: no default output\n";
 
-        const auto amount = noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+        const auto amount = helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
         if (!amount.has_value()) {
           return parseVolumeValueError;
         }
@@ -2266,30 +2294,28 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
       }
   );
 
-  ipc.bind(
-      noctalia::cli::msg::volumeUp, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
-        if (parts.size() > 1) {
-          return "error: volume-up accepts at most one optional [step]\n";
-        }
-        const auto* sink = defaultSink();
-        if (!sink)
-          return "error: no default output\n";
+  ipc.bind(helix::cli::msg::volumeUp, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
+    const auto parts = helix::ipc::splitWords(args);
+    if (parts.size() > 1) {
+      return "error: volume-up accepts at most one optional [step]\n";
+    }
+    const auto* sink = defaultSink();
+    if (!sink)
+      return "error: no default output\n";
 
-        const auto step = parts.empty() ? std::optional<float>(kVolumeStepDefault)
-                                        : noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
-        if (!step.has_value()) {
-          return parseVolumeStepError;
-        }
+    const auto step = parts.empty() ? std::optional<float>(kVolumeStepDefault)
+                                    : helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+    if (!step.has_value()) {
+      return parseVolumeStepError;
+    }
 
-        setVolume(relativeAdjustTarget(1, *step, 1.0F, sink->volume, maxVolume()));
-        return "ok\n";
-      }
-  );
+    setVolume(relativeAdjustTarget(1, *step, 1.0F, sink->volume, maxVolume()));
+    return "ok\n";
+  });
 
   ipc.bind(
-      noctalia::cli::msg::volumeDown, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
+      helix::cli::msg::volumeDown, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
+        const auto parts = helix::ipc::splitWords(args);
         if (parts.size() > 1) {
           return "error: volume-down accepts at most one optional [step]\n";
         }
@@ -2298,7 +2324,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
           return "error: no default output\n";
 
         const auto step = parts.empty() ? std::optional<float>(kVolumeStepDefault)
-                                        : noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+                                        : helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
         if (!step.has_value()) {
           return parseVolumeStepError;
         }
@@ -2308,7 +2334,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
       }
   );
 
-  ipc.bind(noctalia::cli::msg::volumeMute, [this](const std::string&) -> std::string {
+  ipc.bind(helix::cli::msg::volumeMute, [this](const std::string&) -> std::string {
     const auto* sink = defaultSink();
     if (!sink)
       return "error: no default output\n";
@@ -2317,9 +2343,8 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
   });
 
   ipc.bind(
-      noctalia::cli::msg::micVolumeSet,
-      [this, maxVolume, parseVolumeValueError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
+      helix::cli::msg::micVolumeSet, [this, maxVolume, parseVolumeValueError](const std::string& args) -> std::string {
+        const auto parts = helix::ipc::splitWords(args);
         if (parts.size() != 1) {
           return "error: mic-volume-set requires <value>\n";
         }
@@ -2327,7 +2352,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
         if (!source)
           return "error: no default input\n";
 
-        const auto amount = noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+        const auto amount = helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
         if (!amount.has_value()) {
           return parseVolumeValueError;
         }
@@ -2338,8 +2363,8 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
   );
 
   ipc.bind(
-      noctalia::cli::msg::micVolumeUp, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
+      helix::cli::msg::micVolumeUp, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
+        const auto parts = helix::ipc::splitWords(args);
         if (parts.size() > 1) {
           return "error: mic-volume-up accepts at most one optional [step]\n";
         }
@@ -2348,7 +2373,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
           return "error: no default input\n";
 
         const auto step = parts.empty() ? std::optional<float>(kVolumeStepDefault)
-                                        : noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+                                        : helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
         if (!step.has_value()) {
           return parseVolumeStepError;
         }
@@ -2359,9 +2384,8 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
   );
 
   ipc.bind(
-      noctalia::cli::msg::micVolumeDown,
-      [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
-        const auto parts = noctalia::ipc::splitWords(args);
+      helix::cli::msg::micVolumeDown, [this, maxVolume, parseVolumeStepError](const std::string& args) -> std::string {
+        const auto parts = helix::ipc::splitWords(args);
         if (parts.size() > 1) {
           return "error: mic-volume-down accepts at most one optional [step]\n";
         }
@@ -2370,7 +2394,7 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
           return "error: no default input\n";
 
         const auto step = parts.empty() ? std::optional<float>(kVolumeStepDefault)
-                                        : noctalia::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
+                                        : helix::ipc::parseNormalizedOrPercent(parts[0], maxVolume() * 100.0F);
         if (!step.has_value()) {
           return parseVolumeStepError;
         }
@@ -2380,11 +2404,101 @@ void PipeWireService::registerIpc(IpcService& ipc, const ConfigService& config) 
       }
   );
 
-  ipc.bind(noctalia::cli::msg::micMute, [this](const std::string&) -> std::string {
+  ipc.bind(helix::cli::msg::micMute, [this](const std::string&) -> std::string {
     const auto* source = defaultSource();
     if (!source)
       return "error: no default input\n";
     setMicMuted(!source->muted);
     return "ok\n";
   });
+
+  ipc.bind(helix::cli::msg::privacyStatus, [this, &config](const std::string& args) -> std::string {
+    if (!helix::ipc::splitWords(args).empty()) {
+      return "error: privacy-status takes no arguments\n";
+    }
+    auto joinApps = [](PrivacyCaptureKind kind, const PrivacyState& state) {
+      std::string names;
+      for (const auto& capture : state.captures) {
+        if (capture.kind != kind) {
+          continue;
+        }
+        if (!names.empty()) {
+          names += ",";
+        }
+        names += capture.appName.empty() ? "-" : capture.appName;
+      }
+      return names.empty() ? std::string("-") : names;
+    };
+    const auto& location = config.config().location;
+    const char* locationMode = "off";
+    if (location.autoLocate) {
+      locationMode = "auto";
+    } else if (!location.address.empty()) {
+      locationMode = "address";
+    } else if (location.latitude.has_value() && location.longitude.has_value()) {
+      locationMode = "manual";
+    }
+    const char* telemetry = config.config().shell.telemetryEnabled ? "on" : "off";
+    if (m_privacyState.captures.empty()) {
+      return std::format("idle telemetry={} location={}\n", telemetry, locationMode);
+    }
+    return std::format(
+        "active microphone={} camera={} screen={} telemetry={} location={}\n",
+        joinApps(PrivacyCaptureKind::Microphone, m_privacyState), joinApps(PrivacyCaptureKind::Camera, m_privacyState),
+        joinApps(PrivacyCaptureKind::Screen, m_privacyState), telemetry, locationMode
+    );
+  });
+}
+
+bool PipeWireService::remoteAction(const char* action, std::uint32_t id, double value, bool input) {
+  helix::Json args = {{"id", id}};
+  if (std::string_view(action) == "mute")
+    args["value"] = value != 0;
+  else if (std::string_view(action) == "volume")
+    args["value"] = value;
+  else
+    args["input"] = input;
+  try {
+    helix::desktopClient().call("audio", "Action", g_variant_new("(s@a{sv})", action, helix::toVariant(args)));
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
+void PipeWireService::setRemoteControl(bool remote) {
+  m_remoteControl = remote;
+  m_remoteSnapshotTimer.stop();
+  m_remoteDebounce.stop();
+  if (m_remoteObserver) {
+    helix::desktopClient().unobserve(m_remoteObserver);
+    m_remoteObserver = 0;
+  }
+  if (!remote)
+    return;
+  // The service announces audio changes. They are read after a short pause so a volume drag is one read, not one per
+  // step; the slow timer only covers a signal that was missed.
+  m_remoteObserver =
+      helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json&) {
+        if (interface != helix::audioInterface || signal != "Changed")
+          return;
+        if (!m_remoteDebounce.active())
+          m_remoteDebounce.start(std::chrono::milliseconds(40), [this] { readRemoteSnapshot(); });
+      });
+  m_remoteSnapshotTimer.startRepeating(std::chrono::seconds(30), [this] { readRemoteSnapshot(); });
+  readRemoteSnapshot();
+}
+
+void PipeWireService::readRemoteSnapshot() {
+  try {
+    if (!helix::desktopClient().available())
+      return;
+    const auto snapshot = helix::desktopClient().call("audio", "GetSnapshot");
+    if (!snapshot.value("available", false))
+      return;
+    for (const std::string type : {"sinks", "sources"})
+      for (const auto& node : snapshot.at(type))
+        onMixerVolumeChanged(node.at("id"), node.at("volume"), node.at("muted"));
+  } catch (...) {
+  }
 }

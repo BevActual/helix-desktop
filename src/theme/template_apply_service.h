@@ -14,12 +14,13 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 
 class ConfigService;
 class IpcService;
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   class HookRunner;
 
@@ -40,7 +41,11 @@ namespace noctalia::theme {
     ) const;
     // The notification handler. Sticky: set once.
     void setAfterApplyCallback(std::function<void(std::string_view appliedMode, bool paletteChanged)> callback) const;
+    void setFailuresChangedCallback(std::function<void()> callback) const;
     void registerIpc(IpcService& ipc);
+    [[nodiscard]] bool reapplyLast() const;
+    void setRemoteSource(bool remote) { m_remoteSource = remote; }
+    [[nodiscard]] std::unordered_map<std::string, std::string> lastFailures() const;
 
   private:
     struct ApplyRequest {
@@ -50,27 +55,29 @@ namespace noctalia::theme {
       std::string defaultMode;
       std::string imagePath;
       std::string schemeType;
-      // Built-in templates Noctalia has applied and that are no longer enabled: their
+      // Built-in templates Helix has applied and that are no longer enabled: their
       // undo hooks run before this request's templates.
       std::vector<std::string> undoBuiltinIds;
       std::uint64_t generation = 0;
     };
 
-    [[nodiscard]] bool reapplyLast() const;
     [[nodiscard]] ApplyRequest makeRequest(const GeneratedPalette& palette, std::string_view defaultMode) const;
     [[nodiscard]] static bool sameInputs(const ApplyRequest& a, const ApplyRequest& b);
-    // Diffs the enabled built-in template ids against the ids Noctalia has applied (persisted
+    // Diffs the enabled built-in template ids against the ids Helix has applied (persisted
     // in state.toml) and returns the ids that still owe an undo. Main thread only.
     [[nodiscard]] std::vector<std::string> syncAppliedBuiltinIds(const ThemeConfig::TemplatesConfig& templates) const;
     // Clears ids whose undo hook has run from the applied/owed sets. Main thread only.
     void forgetAppliedBuiltinIds(const std::vector<std::string>& ids) const;
     void persistAppliedBuiltinIds() const;
+    void recordFailure(std::string id, std::string error, std::uint64_t generation) const;
+    void publishFailures(std::uint64_t generation) const;
     // Runs the undo hooks of request.undoBuiltinIds and returns the ids it resolved.
     [[nodiscard]] std::vector<std::string> undoBuiltinTemplates(const ApplyRequest& request) const;
     void applyRequest(const ApplyRequest& request) const;
     void workerLoop();
     [[nodiscard]] bool requestSuperseded(std::uint64_t generation) const;
 
+    bool m_remoteSource = false;
     ConfigService& m_config;
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_cv;
@@ -87,9 +94,13 @@ namespace noctalia::theme {
     mutable bool m_shutdown = false;
     mutable bool m_inFlight = false;
     mutable std::function<void(std::string_view appliedMode, bool paletteChanged)> m_afterApplyCallback;
+    mutable std::function<void()> m_failuresChangedCallback;
+    mutable std::unordered_map<std::string, std::string> m_failures;
+    mutable std::unordered_map<std::string, std::string> m_collectingFailures;
+    mutable std::uint64_t m_collectingGeneration = 0;
     // A palette change has been reported to apply() and not yet passed on to the handler.
     mutable bool m_paletteChangedOwed = false;
     mutable std::unique_ptr<HookRunner> m_hookRunner;
   };
 
-} // namespace noctalia::theme
+} // namespace helix::theme

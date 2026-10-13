@@ -5,26 +5,63 @@ sidebar:
   order: 17
 ---
 
-Shows the pending notification count. Right-clicking toggles transient Do Not Disturb (DND) mode.
+Shows a bell with an unread count badge (caps at `9+`). Right-clicking toggles transient Do Not
+Disturb (DND) mode; DND hides the badge and switches to `bell-off`. Left-click opens Notification
+Center.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `hide_when_no_unread` | bool | `false` | Hide the widget when there are no unread notifications |
+| `live_max_width` | int | `160` | Width in logical px for the live activity summary; `0` shows only the ring |
 
 ```toml
 [widget.notifications]
 hide_when_no_unread = true
+live_max_width = 200
 ```
+
+## Live activities
+
+A notification that carries the freedesktop `value` hint (0–100) is ongoing work: a copy in Files, a
+download, a system update, a phone transfer. While it is below 100 the bell gives way to a chip with a
+progress ring and the notification's summary, and the toast shows the same progress as a bar instead of
+its dismiss countdown. The notification stays until the sender reports 100 or closes it, whatever timeout
+it asked for; at 100 the sender's timeout applies again. With several running the chip shows the newest
+and a `+N` count. `hide_when_no_unread` never hides a live chip.
+
+```sh
+id=$(notify-send -p -a Files "Copying 'Fedora.iso'" "1.2 GB of 5.4 GB" -h int:value:22 -t 0)
+notify-send -r "$id" -a Files "Copying 'Fedora.iso'" "3.4 GB of 5.4 GB" -h int:value:63 -t 0
+notify-send -r "$id" -a Files "Copied 'Fedora.iso'" "5.4 GB" -h int:value:100 -t 4000
+```
+
+## Semantic accents
+
+The toast's top accent and the live chip's ring take their color from the notification's meaning, the
+same four colors iOS system colors and Android 17's semantic color API agree on. Danger is the palette's
+error color; the others are fixed hues harmonized toward the palette primary so they read as one family
+with the wallpaper.
+
+| Category | Accent |
+|----------|--------|
+| `*.error`, or critical urgency | red (palette error) |
+| `network.disconnected`, `device.removed`, `email.bounced`, `presence.offline` | orange |
+| `transfer.complete`, `network.connected`, `device.added`, `presence.online` | green |
+| other `im.*`, `email.*`, `transfer.*`, `network.*`, `device.*`, `presence.*`, `call.*` | blue |
+| anything else | palette primary |
+
+Send one with `notify-send -c transfer.complete "Copy complete"`.
 
 **Command-line controls:**
 
 ```sh
-noctalia msg notification-dnd-toggle
-noctalia msg notification-dnd-status
-noctalia msg notification-clear-active
-noctalia msg notification-clear-history
+helix-panel notification-dnd-toggle
+helix-panel notification-dnd-status
+helix-panel notification-clear-active
+helix-panel notification-clear-history
 ```
 
 Enabling DND immediately hides visible toast popups and suppresses new external notification toasts. Hidden and
-suppressed notifications remain in history/control center. Disabling DND allows new toast popups but does not replay
-the hidden or suppressed popups. Internal Noctalia notifications are not stored in history.
+suppressed notifications remain in history/control center. Disabling DND replays those toasts if they are still
+active and have not expired. Notifications filtered with `show_toast = false`, expired while DND was on, or sent
+with a DND-bypass policy are not replayed. Internal Helix notifications are not stored in history.

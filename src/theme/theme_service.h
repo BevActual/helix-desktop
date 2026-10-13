@@ -2,10 +2,10 @@
 
 #include "config/config_types.h"
 #include "core/timer_manager.h"
-#include "render/animation/animation_manager.h"
+#include "theme/color_roles.h"
 #include "theme/palette.h"
-#include "ui/palette.h"
 
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <optional>
@@ -16,7 +16,7 @@ class ConfigService;
 class HttpClient;
 class IpcService;
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   class ThemeService {
   public:
@@ -29,6 +29,7 @@ namespace noctalia::theme {
 
     // Snaps the palette to the resolved theme (no fade). Used at startup.
     void apply();
+    void setRemoteSource(bool remote) { m_remoteSource = remote; }
 
     // Resolves the target theme and cross-fades to it.
     void onConfigReload();
@@ -38,22 +39,40 @@ namespace noctalia::theme {
     void toggleLightDark();
     void cycleMode();
     [[nodiscard]] ThemeMode configuredMode() const noexcept;
-    // Noctalia's own resolved mode ([theme].shell_mode, or [theme].mode when it follows).
+    // Helix's own resolved mode ([theme].shell_mode, or [theme].mode when it follows).
     [[nodiscard]] bool isLightMode() const noexcept;
     [[nodiscard]] std::string_view resolvedShellMode() const noexcept;
     // The resolved [theme].mode, which drives apps.
     [[nodiscard]] std::string_view resolvedMode() const noexcept;
+
+    // Schedule used to resolve Auto theme/shell mode. `ready` is false until
+    // location (or a custom sunrise/sunset) is available.
+    struct AutoSchedule {
+      bool night = false;
+      bool ready = false;
+      std::chrono::system_clock::time_point nextBoundary{};
+    };
+    [[nodiscard]] AutoSchedule autoSchedule() const;
 
     void setChangeCallback(ChangeCallback callback);
     void setResolvedCallback(ResolvedCallback callback);
 
     void registerIpc(IpcService& ipc);
 
-    // Writes the current wallpaper-generated palette to ~/.config/noctalia/palettes/
+    // Writes the current wallpaper-generated palette to ~/.config/helix/palettes/
     // and switches palette source to custom.
     [[nodiscard]] bool saveWallpaperPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut = nullptr);
+    // Forks the active palette into a new custom file (wallpaper palettes keep a
+    // wallpaper-based name) and switches palette source to custom.
+    [[nodiscard]] bool saveCurrentPaletteAsCustom(std::string* paletteNameOut, std::string* errorOut = nullptr);
+    // Forks the active palette into a custom file (or overwrites the current custom
+    // palette), writes `role` for the shell's current mode, and switches source to custom.
+    [[nodiscard]] bool saveRoleColorAsCustom(
+        ColorRole role, const ::Color& color, std::string* paletteNameOut, std::string* errorOut = nullptr
+    );
 
   private:
+    bool m_remoteSource = false;
     void resolveAndSet(bool animate);
     // Decodes + generates the wallpaper palette, memoized on (path, mtime, scheme)
     // so repeated resolves for an unchanged wallpaper skip the ~100ms image decode.
@@ -86,11 +105,9 @@ namespace noctalia::theme {
     std::string m_pendingResolvedMode;
     std::uint64_t m_resolvedCallbackGeneration = 0;
 
-    AnimationManager m_animations;
     Timer m_transitionTimer;
     Palette m_fromPalette{};
     Palette m_targetPalette{};
-    AnimationManager::Id m_transitionAnimId = 0;
     bool m_transitionResolvedCallbackFlushed = false;
     bool m_isShellLightMode = false;
     bool m_isLightMode = false;
@@ -99,4 +116,4 @@ namespace noctalia::theme {
     Timer m_autoTimer;
   };
 
-} // namespace noctalia::theme
+} // namespace helix::theme

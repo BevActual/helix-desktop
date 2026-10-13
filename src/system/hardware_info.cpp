@@ -423,4 +423,15 @@ std::string diskUsageLabel(const std::string& mountPoint) {
   return std::format("{} ({:.0F}%)", FormatUnits::formatDecimalBytesUsage(used, total), percent);
 }
 
+std::optional<float> diskUsageFraction(const std::string& mountPoint) {
+  struct statvfs sv{};
+  if (::statvfs(mountPoint.c_str(), &sv) != 0 || sv.f_blocks == 0 || sv.f_frsize == 0) {
+    return std::nullopt;
+  }
+  const double total = static_cast<double>(sv.f_blocks) * static_cast<double>(sv.f_frsize);
+  const double avail = static_cast<double>(sv.f_bavail) * static_cast<double>(sv.f_frsize);
+  const double used = std::max(0.0, total - avail);
+  return static_cast<float>(std::clamp(used / total, 0.0, 1.0));
+}
+
 std::string compositorLabel() { return detectCompositor(); }

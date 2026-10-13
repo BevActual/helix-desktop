@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ui/text_input_client.h"
+#include "core/input/text_input_client.h"
 
 #include <cstdint>
 

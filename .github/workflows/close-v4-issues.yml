@@ -28,15 +28,15 @@ jobs:
               return match ? match[1].trim() : null;
             };
 
-            const version = extractValue("Noctalia version");
+            const version = extractValue("Helix version");
             if (!version) {
-              core.info("No Noctalia version field found; skipping.");
+              core.info("No Helix version field found; skipping.");
               return;
             }
 
             const isV4 = /^\s*v?4(?:\s*$|[.\s(-])/i.test(version);
             if (!isV4) {
-              core.info(`Noctalia version "${version}" is not v4; skipping.`);
+              core.info(`Helix version "${version}" is not v4; skipping.`);
               return;
             }
 

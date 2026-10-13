@@ -28,6 +28,7 @@
   },
   "bar": {
     "annotate": {
+      "capture-new-region": "Cattura nuova regione (scarta l'edit corrente)",
       "close": "Chiudi senza finalizzare (Esc)",
       "color-black": "Nero",
       "color-blue": "Blu",
@@ -39,6 +40,9 @@
       "color-yellow": "Giallo",
       "copy": "Copia l'immagine annotata (Ctrl+C)",
       "cursor": "Mostra il puntatore catturato con lo schermo (p)",
+      "cursor-capture-failed": "Attiva/disattiva puntatore non disponibile: il compositor non è riuscito a fornire un puntatore separato",
+      "cursor-live": "Blocca prima lo schermo per modificare il puntatore catturato (F)",
+      "cursor-not-captured": "Attiva/disattiva puntatore non disponibile: il compositor non supporta la cattura separata del puntatore",
       "done": "Applica le impostazioni dello screenshot (Invio)",
       "fill-off": "Riempimento forma: disattivato",
       "fill-on": "Riempimento forma: attivo",
@@ -282,6 +286,7 @@
     "display": {
       "disabled": "Disabilitato",
       "no-displays": "Nessun monitor disponibile",
+      "rescan": "Ri-scansiona DDC/CI monitors",
       "unknown-resolution": "Risoluzione sconosciuta"
     },
     "home": {
@@ -313,7 +318,9 @@
       "start-playback": "Avvia la riproduzione in un'app MPRIS"
     },
     "network": {
+      "anonymous-identity": "Identità anonima (opzionale)",
       "available": "Disponibili",
+      "ca-certificate": "Percorso CA certificate (opzionale)",
       "cellular": "Cellulare",
       "cellular-connected": "Connesso",
       "cellular-connecting": "Connessione...",
@@ -327,12 +334,23 @@
       "cellular-searching": "Ricerca in corso…",
       "connect": "Connetti",
       "current-connection": "Connessione corrente",
+      "domain-suffix-match": "Suffisso del domain server",
+      "eap-method": "Metodo EAP",
+      "enterprise-prompt-for": "Accedi a {ssid}",
+      "error-ca-not-absolute": "Il percorso del certificato deve essere assoluto, iniziando con /.",
+      "error-certificate-required": "Questa rete richiede autenticazione certificata (EAP-TLS), non ancora supportata.",
+      "error-enterprise-unsupported": "Il backend di rete attivo non può configurare reti 802.1X.",
+      "error-missing-identity": "Immetti l'identità che la tua organizzazione ti ha assegnato.",
+      "error-missing-password": "Immetti la tua password.",
+      "error-unsupported-phase2": "PEAP richiede autenticazione interna MSCHAPv2.",
       "external-ip": "WAN {ip}",
+      "identity": "Identità",
       "no-networks": "Nessuna rete nel raggio d'azione",
       "not-connected": "Non connesso",
       "password": "Password",
       "password-prompt": "Inserisci password",
       "password-prompt-for": "Inserisci password per {ssid}",
+      "phase2-auth": "Autenticazione interna",
       "saved": "Salvate",
       "unavailable-detail": "Installa e abilita NetworkManager, wpa_supplicant o iwd per gestire le reti da qui.",
       "unavailable-title": "Servizio di rete non disponibile",
@@ -730,6 +748,7 @@
       "unpin-from-dock": "Sblocca dalla dock"
     },
     "empty": {
+      "loading": "Caricamento dei risultati...",
       "no-results": "Nessun risultato trovato",
       "type-to-search": "Digita per cercare..."
     },
@@ -750,6 +769,20 @@
       },
       "emoji": {
         "title": "Emoji"
+      },
+      "panel": {
+        "builtin": {
+          "clipboard": "Appunti",
+          "control-center": "Centro di controllo",
+          "launcher": "Launcher",
+          "polkit": "Richiesta di autenticazione",
+          "session": "Sessione",
+          "setup-wizard": "Procedura setup guidata",
+          "test": "Pannello di prova",
+          "tray-drawer": "Cassetto dei vassoi",
+          "wallpaper": "Sfondo"
+        },
+        "title": "Pannelli"
       },
       "session": {
         "action-subtitle": "Esegui azione di sessione",
@@ -820,22 +853,22 @@
       "calendar-google-connect-start-failed": "Impossibile avviare l'autorizzazione Google. Controlla la connessione di rete e riprova.",
       "calendar-google-connect-start-http": "Impossibile avviare l'autorizzazione Google. Il broker OAuth ha restituito HTTP {status}.",
       "calendar-google-connect-timeout": "Autorizzazione Google scaduta. Avvia di nuovo la connessione quando sei pronto ad accedere.",
-      "config-migration-body": "Aggiorna {path} nel source file. Noctalia applica questa sostituzione solo temporaneamente. Esegui noctalia config validate per elencare tutte le modifiche richieste.",
+      "config-migration-body": "Aggiorna {path} nel source file. Helix applica questa sostituzione solo temporaneamente. Esegui helix config validate per elencare tutte le modifiche richieste.",
       "config-migration-title": "È necessario l'aggiornamento della configurazione",
       "dbus-disabled": "Notifiche DBus disabilitate",
       "desktop-widgets-editor": "Editor widget",
       "desktop-widgets-editor-enabled": "L'editor dei widget desktop è attivo. Passa a un'area di lavoro vuota in modo che le finestre aperte non coprano l'editor.",
-      "greeter-sync": "Noctalia Greeter",
+      "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Sincronizzazione dell'aspetto con il greeter. Se viene visualizzato un prompt amministratore, approvarlo; l'autorizzazione senza password segue le policy di sistema.",
-      "greeter-sync-pending-console": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione, approvare la richiesta polkit in Noctalia, su un TTY o su una console.",
+      "greeter-sync-pending-console": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione, approvare la richiesta polkit in Helix, su un TTY o su una console.",
       "greeter-sync-pending-legacy": "Sincronizzazione tramite l'assistente legacy autenticato. È richiesta l'approvazione dell'amministratore.",
-      "greeter-sync-pending-manual": "I file vengono preparati per la sincronizzazione legacy autenticata. Eseguire l'helper di applicazione posizionale in un terminale, mantenendo NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato, oppure configurare shell.greeter_sync.privilege_command e sincronizzare di nuovo.",
-      "greeter-sync-pending-manual-pkexec": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione dell'amministratore e non viene visualizzato alcun messaggio, eseguire in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "I file vengono preparati per la sincronizzazione legacy autenticata. Eseguire l'helper di applicazione posizionale in un terminale, mantenendo HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato, oppure configurare shell.greeter_sync.privilege_command e sincronizzare di nuovo.",
+      "greeter-sync-pending-manual-pkexec": "Sincronizzazione dell'aspetto con il greeter. Se è richiesta l'autorizzazione dell'amministratore e non viene visualizzato alcun messaggio, eseguire in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Aspetto sincronizzato. Le modifiche si applicano alla prossima schermata di accesso.",
       "greeter-sync-timeout": "La sincronizzazione del greeter è ancora in attesa di autorizzazione. Controlla un terminale TTY o una console per visualizzare il prompt del polkit, abilita l'agente polkit nelle impostazioni di sicurezza oppure esegui pkexec manualmente.",
-      "greeter-sync-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
-      "greeter-sync-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
-      "keybind-app": "Noctalia",
+      "greeter-sync-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
+      "greeter-sync-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
+      "keybind-app": "Helix",
       "keybind-invalid-modifier": "Questa scorciatoia accetta un singolo tasto senza modificatori.",
       "keybind-invalid-printable": "I tasti stampabili (lettere, numeri, simboli) richiedono un modificatore come Ctrl o Alt.",
       "keybind-invalid-super": "Il tasto Super/Windows non può essere usato nelle scorciatoie della shell.",
@@ -907,7 +940,7 @@
     },
     "enable-failed": {
       "body-error": "{plugin}: {error}",
-      "body-incompatible": "{plugin} richiede API plugin {versione}; questo Noctalia supporta API {oldest}–{current}.",
+      "body-incompatible": "{plugin} richiede API plugin {versione}; questo Helix supporta API {oldest}–{current}.",
       "body-timeout": "L'installazione di {plugin} ha richiesto troppo tempo.",
       "title": "Plugin non abilitato"
     }
@@ -1048,13 +1081,16 @@
       },
       "monitor-override": {
         "create": "Crea",
+        "custom": "Custom",
         "delete": "Elimina",
         "delete-confirm-desc": "Questa override monitor creato dalla GUI verrà rimosso da settings.toml.",
         "delete-confirm-title": "Eliminare \"{name}\"?",
+        "exists": "Esiste già un'opzione di override per questo monitor.",
         "label": "Monitor: {name}",
         "management": "Override monitor",
         "match-placeholder": "Corrispondenza monitor",
         "new": "Override monitor",
+        "new-title": "Nuovo override del monitor",
         "rename": "Rinomina",
         "rename-save": "Salva"
       },
@@ -1198,10 +1234,10 @@
       },
       "reset-page": "Ripristino di alcune impostazioni non riuscito.",
       "support-report": "Salvataggio report di supporto non riuscito.",
-      "sync-greeter": "Impossibile sincronizzare l'aspetto con Noctalia Greeter.",
+      "sync-greeter": "Impossibile sincronizzare l'aspetto con Helix Greeter.",
       "sync-greeter-timeout": "La sincronizzazione del greeter è ancora in attesa di autorizzazione. Controlla un terminale TTY o una console per visualizzare il prompt del polkit, abilita l'agente polkit nelle impostazioni di sicurezza oppure esegui pkexec manualmente.",
-      "sync-greeter-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere NOCTALIA_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
-      "sync-greeter-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "La sincronizzazione legacy autenticata richiede comunque l'approvazione dell'amministratore. Eseguire lo strumento di supporto per l'applicazione posizionale in un terminale e mantenere HELIX_GREETER_STATE_DIR se si utilizza un percorso personalizzato.",
+      "sync-greeter-timeout-manual-pkexec": "La sincronizzazione di Greeter richiede ancora l'autorizzazione. Esegui il comando in un terminale: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Impossibile rinominare il widget con nome."
       },
@@ -1308,6 +1344,9 @@
         "screen-corners": "Angoli schermo",
         "screen-time": "Tempo schermo",
         "screenshot": "Cattura schermo",
+        "screenshot-annotation": "Annotazione",
+        "screenshot-capture": "Cattura",
+        "screenshot-output": "Output",
         "security": "Sicurezza",
         "session-panel": "Sessione",
         "shape": "Forma",
@@ -1341,11 +1380,13 @@
         "plugins": "Plugin",
         "popups": "Popup",
         "power": "Energia",
+        "screenshot": "Screenshot",
         "security": "Sicurezza",
         "services": "Servizi",
         "shell": "Shell",
         "system": "Sistema",
         "templates": "Template",
+        "umbriel": "Umbriel",
         "wallpaper": "Sfondo"
       }
     },
@@ -1577,10 +1618,12 @@
         "deprecated": "deprecato",
         "empty": "Nessun plugin abilitato.",
         "held-back": "versione precedente",
-        "held-back-hint": "v{version} necessita plugin API {required}; questo Noctalia supporta fino a {current}. Aggiorna Noctalia per sfruttarlo.",
+        "held-back-hint": "v{version} necessita plugin API {required}; questo Helix supporta fino a {current}. Aggiorna Helix per sfruttarlo.",
         "incompatible-plugin-api": "API plugin incompatibile",
         "remove": "Rimuovi plugin",
         "requires": "Richiede: {dependencies}",
+        "search-empty": "Nessun plugin corrisponde a \"{query}\".",
+        "search-placeholder": "Cerca i plugin installati",
         "title": "Elenco plugin",
         "update-all": "Aggiorna tutti ({count})",
         "update-available": "aggiornamento disponibile",
@@ -1608,8 +1651,8 @@
         },
         "kind-label": "Tipo",
         "location-label": "Indirizzo",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID sorgente",
         "name-placeholder": "miei-plugin",
         "precedence-hint": "Sorgenti inferiori prevalgono su quelle in alto se offrono lo stesso plugin.",
@@ -1619,19 +1662,19 @@
         "update": "Aggiorna sorgente"
       },
       "store": {
-        "add": "Aggiungi a Noctalia",
+        "add": "Aggiungi a Helix",
         "back-to-catalog": "Torna al catalogo dei plugin",
         "categories": "Categorie",
         "category-all": "Tutti",
         "empty": "Nessun plugin trovato",
         "held-back": "Versione precedente",
-        "held-back-hint": "Installa v{version} per plugin API {resolved}. Il più recente v{latest} necessita plugin API {latestRequired}; questo Noctalia supporta fino a {current}.",
+        "held-back-hint": "Installa v{version} per plugin API {resolved}. Il più recente v{latest} necessita plugin API {latestRequired}; questo Helix supporta fino a {current}.",
         "incompatible": "Incompatibile",
-        "incompatible-hint": "Richiede plugin API {richiesto}; questo Noctalia supporta {oldest}–{current}.",
+        "incompatible-hint": "Richiede plugin API {richiesto}; questo Helix supporta {oldest}–{current}.",
         "installed": "Installato",
         "loading": "Caricamento catalogo...",
         "no-readme": "Nessuna descrizione disponibile.",
-        "open-page": "Apri la pagina plugin su noctalia.dev",
+        "open-page": "Apri la pagina plugin su helix.dev",
         "open-source": "Apri il repository dei sorgenti dei plugin",
         "results-count": "{count} plugin",
         "search-placeholder": "Ricerca plugin...",
@@ -1691,7 +1734,7 @@
           "label": "Arrotondamento angoli"
         },
         "custom-palette": {
-          "description": "Scegli una palette da ~/.config/noctalia/palettes/",
+          "description": "Scegli una palette da ~/.config/helix/palettes/",
           "label": "Palette personalizzata",
           "search-placeholder": "Cerca palette personalizzate..."
         },
@@ -1735,7 +1778,7 @@
           "label": "Nero puro"
         },
         "shell-theme-mode": {
-          "description": "Fissa la modalità chiara o scura di Noctalia; Segui la mantiene sincronizzata con la Modalità Tema.",
+          "description": "Fissa la modalità chiara o scura di Helix; Segui la mantiene sincronizzata con la Modalità Tema.",
           "label": "Modalità tema Shell"
         },
         "theme-mode": {
@@ -2173,7 +2216,7 @@
             "label": "Allo spegnimento"
           },
           "started": {
-            "description": "Comando da eseguire dopo l'avvio di Noctalia",
+            "description": "Comando da eseguire dopo l'avvio di Helix",
             "label": "All'avvio"
           },
           "theme-mode-changed": {
@@ -2181,7 +2224,7 @@
             "label": "Al cambio modalità tema"
           },
           "wallpaper-changed": {
-            "description": "Comando da eseguire quando cambia lo sfondo; fornisce NOCTALIA_WALLPAPER_PATH e NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Comando da eseguire quando cambia lo sfondo; fornisce HELIX_WALLPAPER_PATH e HELIX_WALLPAPER_CONNECTOR",
             "label": "Al cambio sfondo"
           },
           "wifi-disabled": {
@@ -2412,10 +2455,6 @@
           "description": "Scegli fino a sei pulsanti scorciatoia per la scheda home",
           "label": "Scorciatoie home"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Visualizza le etichette di testo sotto le icone di collegamento nella scheda Home",
-          "label": "Mostra etichette di scelta rapida"
-        },
         "launcher-app-actions": {
           "description": "Mostra le voci delle azioni accanto alle applicazioni nei risultati",
           "label": "Mostra azioni app"
@@ -2452,6 +2491,10 @@
           "description": "Mostra anche emoji nei risultati senza prefisso",
           "label": "Emoji nella ricerca globale"
         },
+        "launcher-global-panels": {
+          "description": "Mostra i pannelli anche nella ricerca senza prefisso",
+          "label": "Pannelli nella ricerca globale"
+        },
         "launcher-global-session": {
           "description": "Mostra anche i comandi sessione nei risultati senza prefisso",
           "label": "Comandi sessione nella ricerca globale"
@@ -2463,6 +2506,10 @@
         "launcher-global-windows": {
           "description": "Mostra anche le finestre aperte nei risultati senza prefisso",
           "label": "Finestre nella ricerca globale"
+        },
+        "launcher-ignored-panels": {
+          "description": "Pannelli che il provider pannello non elenca mai (ad esempio, richieste di autenticazione, procedura guidata di configurazione)",
+          "label": "Pannelli ignorati"
         },
         "launcher-pinned-apps": {
           "description": "ID desktop delle app fissate sul launcher; appaiono per primi quando si apre il launcher",
@@ -2479,6 +2526,10 @@
         "launcher-prefix-emoji": {
           "description": "Prefisso di attivazione  per ricerca emoji",
           "label": "Prefisso Emoji"
+        },
+        "launcher-prefix-panels": {
+          "description": "Prefisso di attivazione per la ricerca nel pannello",
+          "label": "Prefisso pannelli"
         },
         "launcher-prefix-session": {
           "description": "Prefisso di attivazione per comandi di sessione",
@@ -2698,7 +2749,7 @@
           "placeholder": "Città, Paese"
         },
         "location-auto-locate": {
-          "description": "Rileva automaticamente la tua posizione in base al tuo indirizzo IP via noctalia.dev",
+          "description": "Rileva automaticamente la tua posizione in base al tuo indirizzo IP via helix.dev",
           "label": "Localizzazione automatica (IP)"
         },
         "longitude": {
@@ -2921,7 +2972,7 @@
           "label": "Formato data"
         },
         "external-ip": {
-          "description": "Risolvi l'IP WAN pubblico della connessione (tramite api.noctalia.dev) e mostralo nella scheda rete del Control Center",
+          "description": "Risolvi l'IP WAN pubblico della connessione (tramite a public IP lookup service) e mostralo nella scheda rete del Control Center",
           "label": "Mostra IP WAN"
         },
         "greeter-sync-auto": {
@@ -2937,9 +2988,9 @@
           "label": "Etichette del layout della tastiera"
         },
         "launch-apps-as-systemd-services": {
-          "description": "Avvia le applicazioni in servizi systemd separati così non condividono il cgroup di Noctalia",
+          "description": "Avvia le applicazioni in servizi systemd separati così non condividono il cgroup di Helix",
           "label": "Avvia app come servizi systemd",
-          "requires-systemd-session": "Richiede che Noctalia venga eseguito come servizio utente systemd (uwsm o unità utente systemd)"
+          "requires-systemd-session": "Richiede che Helix venga eseguito come servizio utente systemd (uwsm o unità utente systemd)"
         },
         "launch-apps-custom-command": {
           "description": "Comprende le app avviate dal launcher, dal dock e dalla barra delle applicazioni; sostituisce $CMD con il comando originale",
@@ -3087,6 +3138,14 @@
           "description": "Apri l'editor di annotazioni su ogni screenshot; Fatto applica le impostazioni di salvataggio, appunti e pipe",
           "label": "Annota prima della finalizzazione"
         },
+        "screenshot-close-on-copy": {
+          "description": "Chiudi dopo una copia  riuscita dall'editor, anche quando aperto direttamente.",
+          "label": "Chiudi l'Editor dopo aver Copiato"
+        },
+        "screenshot-close-on-save": {
+          "description": "Chiudi dopo un salvataggio riuscito dall'editor, anche quando aperto direttamente",
+          "label": "Chiudi l'editor dopo aver salvato."
+        },
         "screenshot-confirm-region": {
           "description": "Dopo aver selezionato un'area, mantieni aperta l'overlay finché non confermi con Invio o Spazio",
           "label": "Conferma area selezionata"
@@ -3107,6 +3166,9 @@
         "screenshot-freeze-screen": {
           "description": "Prima della cattura congela lo schermo per bloccare il contenuto",
           "label": "Congela schermo"
+        },
+        "screenshot-output": {
+          "description": "Azioni applicate dopo la cattura, o quando scegli \"Fine\" nell'editor annotazioni."
         },
         "screenshot-pipe-command": {
           "description": "Comando eseguito come /bin/sh -lc con il PNG su stdin; per annotatori o uploader (per esempio: swappy -f - o satty -f -)",
@@ -3129,9 +3191,9 @@
           "description": "Includi il puntatore del mouse negli screenshot",
           "label": "Mostra cursore"
         },
-        "settings-window-translucent": {
-          "description": "Rendi traslucido lo sfondo delle Impostazioni per gli effetti del compositor",
-          "label": "Impostazioni Sfondo traslucido"
+        "screenshot-skip-annotate-on-copy-save": {
+          "description": "Copia e salva nella zona di sovrapposizione, il salvataggio avviene immediatamente; Invio e Spazio aprono comunque l'editor.",
+          "label": "Salta l'editor quando copi o salvi"
         },
         "show-location": {
           "description": "Mostra il nome della posizione nei widget meteo",
@@ -3139,8 +3201,8 @@
         },
         "sync-greeter": {
           "button": "Sincronizza ora",
-          "description": "Copia l'aspetto e la configurazione del monitor attuali in Noctalia Greeter. È richiesta l'approvazione dell'amministratore, a meno che le policy di sistema non autorizzino la sincronizzazione senza password per il tuo utente.",
-          "label": "Noctalia Greeter"
+          "description": "Copia l'aspetto e la configurazione del monitor attuali in Helix Greeter. È richiesta l'approvazione dell'amministratore, a meno che le policy di sistema non autorizzino la sincronizzazione senza password per il tuo utente.",
+          "label": "Helix Greeter"
         },
         "telemetry": {
           "description": "Invia un piccolo ping anonimo all'avvio con versione, OS, compositor, risoluzioni monitor, RAM e scala UI",
@@ -3149,6 +3211,10 @@
         "time-format": {
           "description": "Formato ora predefinito per la shell UI senza impostazione propria",
           "label": "Formato ora"
+        },
+        "umbriel-overview-type-to-launch": {
+          "description": "Apri il launcher mentre digiti in nella Overview di Umbriel; utilizza una piccola area di focus della tastiera mentre l'Overview è aperta",
+          "label": "Digita per avviare"
         },
         "window-switcher-mru": {
           "description": "Nello switcher di finestre queste vengono ordinate in base all'utilizzo più recente, anziché in base all'area di lavoro e al layout dello schermo.",
@@ -3474,7 +3540,7 @@
             "label": "Imposta il profilo EasyEffects"
           },
           "greeter-sync": {
-            "description": "Sincronizza lo sfondo, i colori e il layout del monitor con Noctalia Greeter.",
+            "description": "Sincronizza lo sfondo, i colori e il layout del monitor con Helix Greeter.",
             "label": "Sincronizza l'aspetto del greeter"
           },
           "keyboard-backlight-down": {
@@ -3590,7 +3656,7 @@
             "label": "Richiama l'ultima azione di notifica"
           },
           "notification-show": {
-            "description": "Mostra una notifica interna di Noctalia",
+            "description": "Mostra una notifica interna di Helix",
             "label": "Mostra una notifica"
           },
           "osd-disable": {
@@ -3658,7 +3724,7 @@
             "label": "Apri impostazioni"
           },
           "settings-open-plugin": {
-            "description": "Apri la finestra delle impostazioni del plugin (ad esempio, noctalia/notes)",
+            "description": "Apri la finestra delle impostazioni del plugin (ad esempio, helix/notes)",
             "label": "Apri le impostazioni del plugin"
           },
           "settings-open-widget": {
@@ -3977,6 +4043,10 @@
           "description": "Tinge l'immagine personalizzata con l'impostazione Colore del widget",
           "label": "Colora immagine personalizzata"
         },
+        "custom-label": {
+          "description": "Testo personalizzato visualizzato accanto al glifo o immagine personalizzata; rimane visibile anche quando l'opzione \"Mostra glifo\" è disabilitata.",
+          "label": "Etichetta personalizzata"
+        },
         "detached-panel": {
           "description": "Apri il cassetto come un pannello mobile invece di ancorarlo al bordo della barra",
           "label": "Pannello separato"
@@ -4051,7 +4121,7 @@
           "volume-description": "Glifo personalizzato; lascia vuoto per utilizzare le icone dinamiche integrate"
         },
         "glyph-position": {
-          "description": "In quale ordine visualizzare il glifo in relazione al testo/grafico/indicatore",
+          "description": "Posiziona il glifo o l'immagine personalizzata e l'etichetta personalizzata in relazione al valore o alla visualizzazione.",
           "label": "Posizione glifo"
         },
         "group-by-workspace": {
@@ -4501,8 +4571,8 @@
       "export-config": "Esporta configurazione...",
       "export-config-saved": "Esportazione configurazione salvata.",
       "filter-overridden": "Sovrascritto",
-      "legacy-config-warning": "Impostazione legacy: {issue}. Modifica questa voce; Noctalia applica la sostituzione solo temporaneamente. Esegui noctalia config validate per elencare tutte le modifiche richieste.",
-      "native-title": "Impostazioni Noctalia",
+      "legacy-config-warning": "Impostazione legacy: {issue}. Modifica questa voce; Helix applica la sostituzione solo temporaneamente. Esegui helix config validate per elencare tutte le modifiche richieste.",
+      "native-title": "Impostazioni Helix",
       "no-results": "Nessuna impostazione trovata",
       "no-results-hint": "Prova un nome impostazione o una chiave configurazione diversa.",
       "offline-mode-notice": {
@@ -4538,7 +4608,7 @@
     "no-wallpaper-selected": "Nessuno sfondo selezionato",
     "select-wallpaper": "Seleziona sfondo",
     "subtitle": "Alcune scelte rapide per iniziare.",
-    "title": "Benvenuto in Noctalia",
+    "title": "Benvenuto in Helix",
     "wallpaper": "Sfondo",
     "wallpaper-scheme": "Schema sfondo"
   },

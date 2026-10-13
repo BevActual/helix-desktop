@@ -5,7 +5,7 @@
 struct wl_output;
 
 // Origin of an IPC command that was invoked in-process rather than over the socket. Handlers that
-// need to know where a command came from, such as opening the settings window at the invoking
+// need to know where a command came from, such as opening widget settings at the invoking
 // widget, read it through IpcService::invocationContext(), which is only populated for the
 // duration of an IpcService::InvocationScope.
 //

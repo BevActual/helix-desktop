@@ -1,13 +1,13 @@
 ---
 title: Surfaces
-description: IPC commands for bar, panels, dock, desktop widgets, and lockscreen widgets.
+description: IPC commands for bar, bar widgets, workspace alerts, panels, dock, desktop widgets, and lockscreen widgets.
 sidebar:
   order: 2
 ---
 
 import IpcCommand from '../../../../components/IpcCommand.astro';
 
-These commands open, close, or adjust Noctalia UI surfaces.
+These commands open, close, or adjust Helix UI surfaces.
 
 ## Bar
 
@@ -16,11 +16,34 @@ These commands open, close, or adjust Noctalia UI surfaces.
 | Show bar | <IpcCommand command="bar-show" /> [bar-name] [monitor-selector] | Reveal matching bar instance(s). Omit both arguments to show every bar on every output. |
 | Hide bar | <IpcCommand command="bar-hide" /> [bar-name] [monitor-selector] | Hide matching bar instance(s) and block edge/pointer reveal until the next show/toggle. Omit both arguments to hide every bar. |
 | Toggle bar | <IpcCommand command="bar-toggle" /> [bar-name] [monitor-selector] | Toggle visibility for matching bar instance(s). Omit both arguments to toggle every bar. Does not block edge reveal on hide. |
-| Toggle reserve space | <IpcCommand command="bar-reserve-toggle" /> [bar-name] [monitor-selector] | Toggle reserve space for matching bar instance(s). Omit both arguments to toggle every bar. |
+| Toggle reserve space | <IpcCommand command="bar-reserve-toggle" /> [bar-name] [monitor-selector] | Temporarily toggle reserve space for matching bar instance(s). The change affects panels opened from those bars, is not written to configuration, and resets when bar configuration reloads or the shell restarts. Omit both arguments to toggle every bar. |
 | Set bar auto-hide | <IpcCommand command="bar-auto-hide-set" /> &lt;on\|off\|smart&gt; [bar-name] [monitor-selector] | Temporarily enable, disable or switch to smart auto-hide for matching bar instance(s). Omit `bar-name` to update every bar. |
 | Set bar layer | <IpcCommand command="bar-layer-set" /> &lt;top\|overlay&gt; [bar-name] [monitor-selector] | Temporarily move matching bar instance(s) to the `top` or `overlay` layer-shell layer. `overlay` shows the bar above fullscreen apps; attached panels follow the bar's layer. Omit `bar-name` to update every bar. |
 
 Use <IpcCommand command="bar-hide" /> when you want the bar to stay hidden until <IpcCommand command="bar-show" />.
+
+## Bar widgets
+
+These commands are meant for bar widget gestures (`[[bar.<name>.widget]] gestures`). Invoked from a gesture they act on the widget that received it; from a keybind or script they need the widget named explicitly or fail.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Open widget settings | <IpcCommand command="settings-open-widget" /> [bar-name] [widget-name] | Open Control Center at a bar widget's editor. With no arguments it targets the widget whose gesture invoked it (the default middle-click on every widget). |
+| Cycle taskbar entries | <IpcCommand command="taskbar-cycle next" /> | Step to the adjacent task or workspace group in the invoking taskbar widget; `next` or `prev`. Order follows that taskbar's pins, grouping, and monitor filter, so this only works from a taskbar widget gesture such as scroll. |
+| Switch workspace | <IpcCommand command="workspace-switch next" /> | Activate the adjacent workspace, `next` or `prev`, stopping at both ends. From a bar widget gesture it targets that bar's monitor; from a keybind it targets the focused one. |
+| Cycle keyboard layout | <IpcCommand command="keyboard-layout-cycle" /> | Switch to the next keyboard layout through helix-niri. The default left-click on the keyboard layout widget. |
+
+## Workspace alerts
+
+Workspace alerts mark a workspace urgent in the bar until you visit it. They are runtime state, not configuration, so scripts can flag a workspace when a build finishes or a message arrives.
+
+| Action | Command | Description |
+|--------|---------|-------------|
+| Alert a workspace | <IpcCommand command="workspace-alert-add 3" /> | Mark a workspace by index, name, or compositor id. The alert shows once the workspace is inactive and clears when you switch to it. Unknown workspaces are rejected. |
+| Alert a window's workspace | <IpcCommand command="workspace-alert-add-window 42" /> | Resolve a compositor window id (`niri msg windows`, `hyprctl clients`) to its workspace and alert that. |
+| Clear one alert | <IpcCommand command="workspace-alert-clear 3" /> | Remove an alert by the same token it was added with. |
+| Clear all alerts | <IpcCommand command="workspace-alert-clear-all" /> | Remove every workspace alert. |
+| List alerts | <IpcCommand command="workspace-alert-status" /> | Print one alert token per line, or `(no workspace alerts)`. |
 
 ## Panels
 
@@ -28,12 +51,13 @@ Use <IpcCommand command="bar-hide" /> when you want the bar to stay hidden until
 |--------|---------|-------------|
 | Open panel | <IpcCommand command="panel-open <id> [context]" /> | Open a panel by id without toggling it closed when it is already open. Optional `context` works like <IpcCommand command="panel-toggle <id> [context]" />. |
 | Close panel | <IpcCommand command="panel-close [id]" /> | Close the active panel, or close the named panel if it is active. |
-| Toggle launcher | <IpcCommand command="panel-toggle launcher [query]" /> | Open or close the app launcher. Optional `query` pre-fills the search input (e.g. `noctalia msg panel-toggle launcher "/wall"`). |
+| Toggle launcher | <IpcCommand command="panel-toggle launcher [query]" /> | Open or close the app launcher. Optional `query` pre-fills the search input (e.g. `helix-panel panel-toggle launcher "/wall"`). |
 | Toggle session menu | <IpcCommand command="panel-toggle session" /> | Open or close the logout, reboot, and shutdown menu. |
-| Toggle clipboard | <IpcCommand command="panel-toggle clipboard" /> | Open or close clipboard history. |
-| Toggle wallpaper panel | <IpcCommand command="panel-toggle wallpaper" /> | Open or close wallpaper picker. |
-| Toggle control center | <IpcCommand command="panel-toggle control-center [tab]" /> | Open or close Control Center. Optional `tab` opens the tab inside control center by default (e.g. `noctalia msg panel-toggle control-center media`). |
-| Toggle plugin panel | <IpcCommand command="panel-toggle <author/plugin:entry> [context]" /> | Open or close a plugin `[[panel]]` entry (e.g. `noctalia msg panel-toggle noctalia/wallhaven:browser`). Optional `context` is passed to `onOpen`. |
+| Toggle clipboard | <IpcCommand command="panel-toggle clipboard" /> | Open or close Control Center on the Clipboard tab. Same as `panel-toggle control-center clipboard`. |
+| Toggle Quick Insert | <IpcCommand command="panel-toggle quick-insert [source]" /> | Open or close the Quick Insert overlay. Optional `source` is `emoji`, `screenshots`, or `clipboard`. |
+| Toggle wallpaper panel | <IpcCommand command="panel-toggle wallpaper [context]" /> | Open or close the floating wallpaper picker. Pass `wallhaven` to open on Wallhaven search, or `video` to open on video wallpapers. The same picker is on Control Center's Wallpaper tab (`panel-toggle control-center wallpaper`). |
+| Toggle control center | <IpcCommand command="panel-toggle control-center [tab]" /> | Open or close Control Center. Optional `tab` opens the tab inside control center by default (e.g. `helix-panel panel-toggle control-center media`). |
+| Toggle plugin panel | <IpcCommand command="panel-toggle <author/plugin:entry> [context]" /> | Open or close a plugin `[[panel]]` entry (e.g. `helix-panel panel-toggle helix/wallhaven:browser`). Optional `context` is passed to `onOpen`. |
 
 ## Dock
 

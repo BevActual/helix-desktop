@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=Helix Software
+Comment=Browse and manage Flatpak applications and system packages
+Exec=helix-software
+Icon=system-software-install
+Terminal=false
+Categories=System;PackageManager;
+StartupNotify=true
+Actions=Installed;Updates;
+
+[Desktop Action Installed]
+Name=Installed Software
+Exec=helix-software --page=library
+
+[Desktop Action Updates]
+Name=Software Updates
+Exec=helix-software --page=updates

@@ -113,6 +113,21 @@ void WaylandSeat::setCursorShape(std::uint32_t serial, std::uint32_t shape) {
   wp_cursor_shape_device_v1_set_shape(m_cursorShapeDevice, effectiveSerial, shape);
 }
 
+void WaylandSeat::hideCursor() {
+  if (m_pointer == nullptr || m_pointerEnterSerial == 0) {
+    return;
+  }
+  // wl_pointer.set_cursor with a null surface; no cursor-shape equivalent exists.
+  // The next enter on another surface goes through the normal shape path again.
+  constexpr std::uint32_t kHiddenShape = 0xFFFFFFFFU;
+  if (m_lastCursorShapeSerial == m_pointerEnterSerial && m_lastCursorShape == kHiddenShape) {
+    return;
+  }
+  m_lastCursorShapeSerial = m_pointerEnterSerial;
+  m_lastCursorShape = kHiddenShape;
+  wl_pointer_set_cursor(m_pointer, m_pointerEnterSerial, nullptr, 0, 0);
+}
+
 void WaylandSeat::forgetSurface(wl_surface* surface) noexcept {
   if (surface == nullptr) {
     return;
@@ -176,6 +191,7 @@ void WaylandSeat::cleanup() {
     xkb_keymap_unref(m_xkbKeymap);
     m_xkbKeymap = nullptr;
   }
+  m_xkbKeymapData.clear();
   if (m_xkbContext != nullptr) {
     xkb_context_unref(m_xkbContext);
     m_xkbContext = nullptr;
@@ -606,6 +622,12 @@ void WaylandSeat::handleKeyboardKeymap(
     return;
   }
 
+  if (size == self->m_xkbKeymapData.size() && std::memcmp(buf, self->m_xkbKeymapData.data(), size) == 0) {
+    munmap(buf, size);
+    return;
+  }
+  std::string keymapData(static_cast<const char*>(buf), size);
+
   auto* keymap = xkb_keymap_new_from_string(
       self->m_xkbContext, static_cast<const char*>(buf), XKB_KEYMAP_FORMAT_TEXT_V1, XKB_KEYMAP_COMPILE_NO_FLAGS
   );
@@ -631,6 +653,7 @@ void WaylandSeat::handleKeyboardKeymap(
   }
   self->m_xkbKeymap = keymap;
   self->m_xkbState = state;
+  self->m_xkbKeymapData = std::move(keymapData);
 
   // (Re)create compose state for dead key / intl layout support
   if (self->m_composeState != nullptr) {
@@ -647,7 +670,7 @@ void WaylandSeat::handleKeyboardKeymap(
     self->m_composeState = xkb_compose_state_new(self->m_composeTable, XKB_COMPOSE_STATE_NO_FLAGS);
   }
 
-  kLog.info("keyboard: keymap loaded");
+  kLog.debug("keyboard: keymap loaded");
 }
 
 void WaylandSeat::handleKeyboardEnter(
