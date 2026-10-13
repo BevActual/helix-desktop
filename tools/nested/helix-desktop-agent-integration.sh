@@ -17,3 +17,5 @@ command -v dbus-run-session >/dev/null || {
 
 dbus-run-session -- python3 "$ROOT/tests/desktop_agent_integration.py" "$BIN" "$POLICY"
 dbus-run-session -- python3 "$ROOT/tests/desktop_agent_manager_integration.py" "$BIN" "$POLICY"
+dbus-run-session -- env HELIX_TEST_CONFIRMATION_SECS=1 \
+  python3 "$ROOT/tests/desktop_agent_confirmation_expire.py" "$BIN" "$POLICY"
