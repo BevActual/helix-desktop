@@ -6,21 +6,21 @@
 #include "config/config_merge.h"
 #include "config/config_migrations.h"
 #include "config/config_validate.h"
+#include "config/launcher_providers.h"
 #include "config/schema/config_schema.h"
 #include "config/schema/config_sections.h"
 #include "config/schema/engine.h"
 #include "config/widget_config.h"
+#include "config/widgets/desktop_widget_settings_registry.h"
+#include "config/widgets/widget_settings_registry.h"
 #include "core/build_info.h"
 #include "core/deferred_call.h"
 #include "core/log.h"
 #include "core/scoped_timer.h"
+#include "desktop_api/client.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
-#include "launcher/launcher_provider.h"
 #include "notification/notification_manager.h"
-#include "scripting/plugin_id.h"
-#include "shell/desktop/desktop_widget_settings_registry.h"
-#include "shell/settings/widget_settings_registry.h"
 #include "system/distro_info.h"
 #include "system/hardware_info.h"
 #include "util/file_utils.h"
@@ -47,7 +47,7 @@
 #include <unordered_map>
 #include <vector>
 
-namespace schema = noctalia::config::schema;
+namespace schema = helix::config::schema;
 
 namespace {
 
@@ -57,12 +57,12 @@ namespace {
 
   template <typename T>
   void readConfigSection(
-      const toml::table& table, T& target, const noctalia::config::schema::Schema<T>& sectionSchema,
-      std::string_view path, noctalia::config::schema::Diagnostics& diagnostics
+      const toml::table& table, T& target, const helix::config::schema::Schema<T>& sectionSchema, std::string_view path,
+      helix::config::schema::Diagnostics& diagnostics
   ) {
     T candidate = target;
     try {
-      noctalia::config::schema::readInto(table, candidate, sectionSchema, path, diagnostics);
+      helix::config::schema::readInto(table, candidate, sectionSchema, path, diagnostics);
       target = std::move(candidate);
     } catch (const std::exception& e) {
       diagnostics.error(std::string(path), e.what());
@@ -187,7 +187,7 @@ namespace {
   }
 
   void restoreInvalidComponents(
-      Config& candidate, const Config& active, const noctalia::config::schema::Diagnostics& diagnostics
+      Config& candidate, const Config& active, const helix::config::schema::Diagnostics& diagnostics
   ) {
     const auto restorePlacementWidget = [](std::vector<DesktopWidgetState>& candidateWidgets,
                                            const std::vector<DesktopWidgetState>& activeWidgets,
@@ -206,8 +206,8 @@ namespace {
     };
 
     for (const auto& entry : diagnostics.entries) {
-      if (entry.severity != noctalia::config::schema::Diagnostics::Severity::Error
-          || entry.recoveryScope != noctalia::config::schema::Diagnostics::RecoveryScope::Component) {
+      if (entry.severity != helix::config::schema::Diagnostics::Severity::Error
+          || entry.recoveryScope != helix::config::schema::Diagnostics::RecoveryScope::Component) {
         continue;
       }
       if (const auto barId = componentOwnerId(entry.ownerPath, "widget.")) {
@@ -278,7 +278,7 @@ namespace {
     }
     if (const auto* settingsTable = widgetTable["settings"].as_table()) {
       for (const auto& [key, value] : *settingsTable) {
-        if (auto parsed = noctalia::config::readWidgetSettingValue(value); parsed.has_value()) {
+        if (auto parsed = helix::config::readWidgetSettingValue(value); parsed.has_value()) {
           widget.settings.emplace(std::string(key.str()), std::move(*parsed));
         }
       }
@@ -480,7 +480,7 @@ namespace {
 
   std::optional<toml::table>
   mergeUserConfigSources(std::string_view configDir, std::string_view settingsPath, std::string* error) {
-    auto mergeResult = noctalia::config::mergeConfigWithIncludes(configDir);
+    auto mergeResult = helix::config::mergeConfigWithIncludes(configDir);
     toml::table merged = std::move(mergeResult.merged);
     if (!mergeResult.firstError.empty()) {
       const std::string located = mergeResult.firstErrorOrigin.prefixed(mergeResult.firstError);
@@ -495,12 +495,12 @@ namespace {
       const std::filesystem::path settingsFile{std::string(settingsPath)};
       try {
         toml::table sidecar = toml::parse_file(std::string(settingsPath));
-        noctalia::config::ConfigOriginIndex origins;
+        helix::config::ConfigOriginIndex origins;
         origins.record(settingsFile, sidecar);
         schema::Diagnostics migrationDiag;
-        const auto storedVersion = noctalia::config::storedConfigVersion(sidecar, migrationDiag);
+        const auto storedVersion = helix::config::storedConfigVersion(sidecar, migrationDiag);
         if (storedVersion.has_value()) {
-          (void)noctalia::config::applyPendingConfigMigrations(sidecar, *storedVersion, migrationDiag);
+          (void)helix::config::applyPendingConfigMigrations(sidecar, *storedVersion, migrationDiag);
         }
         origins.annotate(migrationDiag);
         for (const auto& entry : migrationDiag.entries) {
@@ -515,7 +515,7 @@ namespace {
         ConfigService::deepMerge(merged, sidecar);
       } catch (const toml::parse_error& e) {
         if (error != nullptr) {
-          *error = noctalia::config::parseErrorOrigin(e, settingsFile).prefixed(e.description());
+          *error = helix::config::parseErrorOrigin(e, settingsFile).prefixed(e.description());
           return std::nullopt;
         }
         kLog.warn("skipping parse error in merged user config export {}: {}", settingsPath, e.description());
@@ -607,7 +607,7 @@ void ConfigService::forceReload() {
 }
 
 void ConfigService::fireReloadCallbacks() {
-  if (!noctalia::profiling::enabled()) {
+  if (!helix::profiling::enabled()) {
     for (const auto& sub : m_reloadCallbacks) {
       sub.callback();
     }
@@ -646,15 +646,14 @@ void ConfigService::fireReloadCallbacks() {
     add(m_lastChange.hooks, "hooks");
     add(m_lastChange.theme, "theme");
     add(m_lastChange.controlCenter, "controlCenter");
-    add(m_lastChange.plugins, "plugins");
     add(m_lastChange.accessibility, "accessibility");
     kLog.info("reload: changed sections = [{}]", changed.empty() ? "none" : changed);
   }
 
-  noctalia::profiling::StopWatch total;
+  helix::profiling::StopWatch total;
   for (std::size_t i = 0; i < m_reloadCallbacks.size(); ++i) {
     const auto& sub = m_reloadCallbacks[i];
-    noctalia::profiling::StopWatch one;
+    helix::profiling::StopWatch one;
     sub.callback();
     const double ms = one.elapsedMs();
     if (ms >= 0.5) {
@@ -674,32 +673,91 @@ bool ConfigService::shouldRunSetupWizard() const {
 }
 
 std::optional<bool> ConfigService::stateBool(std::string_view owner, std::string_view key) const {
+  if (m_overrideCommitHandler) {
+    try {
+      auto value = helix::desktopClient().call(
+          "configuration", "GetState",
+          g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "boolean")
+      );
+      if (value.at("present").get<bool>())
+        return value.at("value").get<bool>();
+    } catch (...) {
+    }
+    return std::nullopt;
+  }
   return m_stateStore.boolValue(owner, key);
 }
 
 bool ConfigService::setStateBool(std::string_view owner, std::string_view key, bool value) {
+  if (m_overrideCommitHandler) {
+    try {
+      helix::desktopClient().call(
+          "configuration", "SetState",
+          g_variant_new("(ssv)", std::string(owner).c_str(), std::string(key).c_str(), g_variant_new_boolean(value))
+      );
+      return true;
+    } catch (...) {
+      return false;
+    }
+  }
   return m_stateStore.setBool(owner, key, value);
 }
 
 std::optional<std::string> ConfigService::stateString(std::string_view owner, std::string_view key) const {
+  if (m_overrideCommitHandler) {
+    try {
+      auto value = helix::desktopClient().call(
+          "configuration", "GetState",
+          g_variant_new("(sss)", std::string(owner).c_str(), std::string(key).c_str(), "string")
+      );
+      if (value.at("present").get<bool>())
+        return value.at("value").get<std::string>();
+    } catch (...) {
+    }
+    return std::nullopt;
+  }
   return m_stateStore.stringValue(owner, key);
 }
 
 bool ConfigService::setStateString(std::string_view owner, std::string_view key, std::string_view value) {
+  if (m_overrideCommitHandler) {
+    try {
+      helix::desktopClient().call(
+          "configuration", "SetState",
+          g_variant_new(
+              "(ssv)", std::string(owner).c_str(), std::string(key).c_str(),
+              g_variant_new_string(std::string(value).c_str())
+          )
+      );
+      return true;
+    } catch (...) {
+      return false;
+    }
+  }
   return m_stateStore.setString(owner, key, value);
 }
 
-bool ConfigService::clearStateOwner(std::string_view owner) { return m_stateStore.clearOwner(owner); }
+bool ConfigService::clearStateOwner(std::string_view owner) {
+  if (m_overrideCommitHandler) {
+    try {
+      helix::desktopClient().call("configuration", "ClearState", g_variant_new("(s)", std::string(owner).c_str()));
+      return true;
+    } catch (...) {
+      return false;
+    }
+  }
+  return m_stateStore.clearOwner(owner);
+}
 
 std::string ConfigService::buildSupportReport() const {
   toml::table root;
 
   toml::table report;
   report.insert_or_assign("format_version", std::int64_t{1});
-  report.insert_or_assign("generated_by", "noctalia");
+  report.insert_or_assign("generated_by", "helix");
   report.insert_or_assign("generated_at_utc", utcTimestamp());
-  report.insert_or_assign("noctalia_version", std::string(noctalia::build_info::version()));
-  report.insert_or_assign("git_revision", std::string(noctalia::build_info::revision()));
+  report.insert_or_assign("helix_version", std::string(helix::build_info::version()));
+  report.insert_or_assign("git_revision", std::string(helix::build_info::revision()));
   root.insert_or_assign("report", std::move(report));
 
   toml::table system;
@@ -790,9 +848,9 @@ std::string ConfigService::buildMergedUserConfigFromSources(
     return {};
   }
   toml::table normalized = *merged;
-  normalized.erase(noctalia::config::kConfigVersionKey);
-  noctalia::config::LegacyConfigIssues issues;
-  noctalia::config::normalizeLegacyConfig(normalized, issues);
+  normalized.erase(helix::config::kConfigVersionKey);
+  helix::config::LegacyConfigIssues issues;
+  helix::config::normalizeLegacyConfig(normalized, issues);
   return formatToml(normalized) + "\n";
 }
 
@@ -805,12 +863,12 @@ std::string ConfigService::buildEffectiveConfigFromSources(
   }
 
   toml::table normalized = *merged;
-  normalized.erase(noctalia::config::kConfigVersionKey);
-  noctalia::config::LegacyConfigIssues issues;
-  noctalia::config::normalizeLegacyConfig(normalized, issues);
+  normalized.erase(helix::config::kConfigVersionKey);
+  helix::config::LegacyConfigIssues issues;
+  helix::config::normalizeLegacyConfig(normalized, issues);
 
   Config config;
-  noctalia::config::seedBuiltinWidgets(config);
+  helix::config::seedBuiltinWidgets(config);
   if (normalized.empty()) {
     config = makeDefaultConfig();
   } else {
@@ -832,12 +890,11 @@ std::string ConfigService::buildEffectiveConfigFromSources(
 
 Config ConfigService::makeDefaultConfig() {
   Config config;
-  noctalia::config::seedBuiltinWidgets(config);
+  helix::config::seedBuiltinWidgets(config);
   config.idle.behaviors = defaultIdleBehaviors();
   config.bars.push_back(BarConfig{});
   config.controlCenter.shortcuts = defaultControlCenterShortcuts();
   config.shell.session.actions = defaultSessionPanelActions();
-  config.plugins.sources = defaultPluginSources();
   return config;
 }
 
@@ -1196,7 +1253,7 @@ void ConfigService::loadOverridesFromFile() {
     m_overridesTable = toml::parse_file(m_overridesPath);
     m_persistedOverridesTable = m_overridesTable;
   } catch (const toml::parse_error& e) {
-    auto origin = noctalia::config::parseErrorOrigin(e, std::filesystem::path(m_overridesPath));
+    auto origin = helix::config::parseErrorOrigin(e, std::filesystem::path(m_overridesPath));
     kLog.warn("{}", origin.prefixed(e.description()));
     m_overridesParseError = ConfigProblem{std::move(origin), std::string(e.description())};
     m_overridesTable = toml::table{};
@@ -1233,7 +1290,7 @@ void ConfigService::setConfigParseError(ConfigProblem problem) {
       m_notificationManager->addInternal("Helix", std::move(title), std::move(body), Urgency::Critical, 0);
 }
 
-void ConfigService::updateLegacyConfigIssues(noctalia::config::LegacyConfigIssues issues) {
+void ConfigService::updateLegacyConfigIssues(helix::config::LegacyConfigIssues issues) {
   std::ranges::sort(issues, [](const auto& lhs, const auto& rhs) {
     return std::tie(lhs.migrationVersion, lhs.path) < std::tie(rhs.migrationVersion, rhs.path);
   });
@@ -1244,7 +1301,7 @@ void ConfigService::updateLegacyConfigIssues(noctalia::config::LegacyConfigIssue
       issues.end()
   );
 
-  const std::string fingerprint = noctalia::config::legacyConfigIssueFingerprint(issues);
+  const std::string fingerprint = helix::config::legacyConfigIssueFingerprint(issues);
   if (fingerprint != m_loggedLegacyIssueFingerprint) {
     for (const auto& issue : issues) {
       kLog.warn(
@@ -1268,9 +1325,9 @@ void ConfigService::updateLegacyConfigIssues(noctalia::config::LegacyConfigIssue
   const auto encodedState = m_stateStore.stringValue(kMigrationReminderOwner, kMigrationReminderKey);
   const auto reminderState = encodedState.has_value() ? parseMigrationReminderState(*encodedState) : std::nullopt;
   const bool hasNewIssues = !reminderState.has_value()
-      || noctalia::config::legacyConfigFingerprintHasNewIssues(fingerprint, reminderState->issueFingerprint);
+      || helix::config::legacyConfigFingerprintHasNewIssues(fingerprint, reminderState->issueFingerprint);
   const bool intervalElapsed = !reminderState.has_value()
-      || noctalia::config::legacyConfigReminderIntervalElapsed(now, reminderState->epochSeconds);
+      || helix::config::legacyConfigReminderIntervalElapsed(now, reminderState->epochSeconds);
   m_legacyReminderPending = hasNewIssues || intervalElapsed;
   if (m_legacyReminderPending) {
     notifyLegacyConfigIssues();
@@ -1278,7 +1335,7 @@ void ConfigService::updateLegacyConfigIssues(noctalia::config::LegacyConfigIssue
   }
 
   const auto elapsed = std::chrono::seconds(now - reminderState->epochSeconds);
-  const auto remaining = std::chrono::seconds(noctalia::config::kLegacyConfigReminderIntervalSeconds) - elapsed;
+  const auto remaining = std::chrono::seconds(helix::config::kLegacyConfigReminderIntervalSeconds) - elapsed;
   m_legacyReminderTimer.start(std::chrono::duration_cast<std::chrono::milliseconds>(remaining), [this]() {
     m_legacyReminderPending = true;
     notifyLegacyConfigIssues();
@@ -1291,7 +1348,7 @@ void ConfigService::notifyLegacyConfigIssues() {
   }
 
   const auto& issue = m_legacyConfigIssues.front();
-  const std::string fingerprint = noctalia::config::legacyConfigIssueFingerprint(m_legacyConfigIssues);
+  const std::string fingerprint = helix::config::legacyConfigIssueFingerprint(m_legacyConfigIssues);
   const std::int64_t now = currentEpochSeconds();
   std::string title = issue.origin.valid() ? issue.origin.shortFormat(m_configDir)
                                            : i18n::tr("notifications.internal.config-migration-title");
@@ -1303,7 +1360,7 @@ void ConfigService::notifyLegacyConfigIssues() {
   (void)m_stateStore.setString(kMigrationReminderOwner, kMigrationReminderKey, std::format("{}\n{}", now, fingerprint));
   m_legacyReminderPending = false;
   m_legacyReminderTimer.start(
-      std::chrono::milliseconds(noctalia::config::kLegacyConfigReminderIntervalSeconds * 1000), [this]() {
+      std::chrono::milliseconds(helix::config::kLegacyConfigReminderIntervalSeconds * 1000), [this]() {
         m_legacyReminderPending = true;
         notifyLegacyConfigIssues();
       }
@@ -1350,6 +1407,10 @@ void ConfigService::deepMerge(toml::table& base, const toml::table& overlay) {
     if (const auto* overlayTbl = v.as_table()) {
       if (auto* baseNode = base.get(k)) {
         if (auto* baseTbl = baseNode->as_table()) {
+          if (k == "notification" && (*overlayTbl)["filter_replace"].value<bool>().value_or(false)) {
+            baseTbl->erase("filter");
+            baseTbl->erase("filter_order");
+          }
           if (k == "session") {
             if (const auto* overlayActions = (*overlayTbl)["actions"].as_array()) {
               mergeSessionActions(*baseTbl, *overlayActions);
@@ -1370,21 +1431,21 @@ void ConfigService::deepMerge(toml::table& base, const toml::table& overlay) {
 }
 
 void ConfigService::loadAll() {
-  noctalia::profiling::ScopedTimer parseTimer(kLog, "reload: parse (loadAll)");
+  helix::profiling::ScopedTimer parseTimer(kLog, "reload: parse (loadAll)");
   m_effectiveOverrideCache.clear();
 
   Config nextConfig;
-  noctalia::config::seedBuiltinWidgets(nextConfig);
+  helix::config::seedBuiltinWidgets(nextConfig);
 
-  auto mergeResult = noctalia::config::mergeConfigWithIncludes(m_configDir);
+  auto mergeResult = helix::config::mergeConfigWithIncludes(m_configDir);
   toml::table merged = std::move(mergeResult.merged);
   std::string firstError = std::move(mergeResult.firstError);
-  const noctalia::config::schema::SourceOrigin firstErrorOrigin = std::move(mergeResult.firstErrorOrigin);
+  const helix::config::schema::SourceOrigin firstErrorOrigin = std::move(mergeResult.firstErrorOrigin);
   m_includeLoadedFiles = std::move(mergeResult.loadedFiles);
   m_includeDirs = std::move(mergeResult.includeDirs);
 
   // Recorded after the config dir so the sidecar wins, matching the deepMerge below.
-  noctalia::config::ConfigOriginIndex origins = std::move(mergeResult.origins);
+  helix::config::ConfigOriginIndex origins = std::move(mergeResult.origins);
   if (!m_overridesPath.empty()) {
     origins.record(std::filesystem::path(m_overridesPath), m_overridesTable);
   }
@@ -1429,18 +1490,16 @@ void ConfigService::loadAll() {
   toml::table effectiveOverrides = m_overridesTable;
   schema::Diagnostics migrationDiag;
   ConfigProblem migrationError;
-  int storedVersion = noctalia::config::currentConfigVersion();
+  int storedVersion = helix::config::currentConfigVersion();
   int appliedVersion = storedVersion;
   bool sidecarNeedsPersist = false;
   if (!m_overridesTable.empty()) {
-    const auto parsedVersion = noctalia::config::storedConfigVersion(effectiveOverrides, migrationDiag);
+    const auto parsedVersion = helix::config::storedConfigVersion(effectiveOverrides, migrationDiag);
     if (parsedVersion.has_value()) {
       storedVersion = *parsedVersion;
-      appliedVersion = noctalia::config::applyPendingConfigMigrations(effectiveOverrides, storedVersion, migrationDiag);
+      appliedVersion = helix::config::applyPendingConfigMigrations(effectiveOverrides, storedVersion, migrationDiag);
       sidecarNeedsPersist = appliedVersion != storedVersion;
-      effectiveOverrides.insert_or_assign(
-          noctalia::config::kConfigVersionKey, static_cast<std::int64_t>(appliedVersion)
-      );
+      effectiveOverrides.insert_or_assign(helix::config::kConfigVersionKey, static_cast<std::int64_t>(appliedVersion));
     }
   }
   origins.annotate(migrationDiag);
@@ -1457,9 +1516,9 @@ void ConfigService::loadAll() {
   // Apply the app-writable overrides overlay last; sidecar wins. Compatibility
   // normalization must see the final effective values to preserve overlay intent.
   deepMerge(merged, effectiveOverrides);
-  merged.erase(noctalia::config::kConfigVersionKey);
-  noctalia::config::LegacyConfigIssues legacyIssues;
-  noctalia::config::normalizeLegacyConfig(merged, legacyIssues);
+  merged.erase(helix::config::kConfigVersionKey);
+  helix::config::LegacyConfigIssues legacyIssues;
+  helix::config::normalizeLegacyConfig(merged, legacyIssues);
   for (auto& issue : legacyIssues) {
     if (const auto* origin = origins.find(issue.path)) {
       issue.origin = *origin;
@@ -1489,7 +1548,7 @@ void ConfigService::loadAll() {
   schema::Diagnostics diagnostics;
   if (semanticError.empty()) {
     try {
-      diagnostics = noctalia::config::validateMergedConfig(merged, origins);
+      diagnostics = helix::config::validateMergedConfig(merged, origins);
       std::size_t errorCount = 0;
       for (const auto& entry : diagnostics.entries) {
         if (entry.severity == schema::Diagnostics::Severity::Error) {
@@ -1643,7 +1702,7 @@ void ConfigService::parseConfigTable(
       }
 
       const std::string widgetName(name.str());
-      WidgetConfig wc = noctalia::config::readBarWidgetConfig(widgetName, *entryTbl, config);
+      WidgetConfig wc = helix::config::readBarWidgetConfig(widgetName, *entryTbl, config);
 
       try {
         validateWidgetSettings(widgetName, wc);
@@ -1692,30 +1751,17 @@ void ConfigService::parseConfigTable(
   if (!hasExplicitArray("control_center", "shortcuts") && config.controlCenter.shortcuts.empty()) {
     config.controlCenter.shortcuts = defaultControlCenterShortcuts();
   }
-  if (!hasExplicitArray("plugins", "source") && config.plugins.sources.empty()) {
-    config.plugins.sources = defaultPluginSources();
-  }
   if (config.idle.behaviors.empty()) {
     config.idle.behaviors = defaultIdleBehaviors();
   }
 
   // Launcher providers are resolved after the registry pass, once config.shell is
   // populated. An empty common prefix falls back to '/', and providers that name
-  // nothing real (or a disabled plugin, or the fixed Applications provider) are
+  // nothing real (or the fixed Applications provider) are
   // dropped loudly rather than silently ignored.
   if (config.shell.launcher.providerPrefix.empty()) {
     schemaDiag.warn("shell.launcher.provider_prefix", "is empty, falling back to '/'");
     config.shell.launcher.providerPrefix = "/";
-  }
-  std::unordered_set<std::string> enabledPlugins;
-  if (const auto* pluginsTbl = tbl["plugins"].as_table()) {
-    if (const auto* enabledArr = (*pluginsTbl)["enabled"].as_array()) {
-      for (const auto& node : *enabledArr) {
-        if (const auto* strVal = node.as_string()) {
-          enabledPlugins.insert(StringUtils::toLower(strVal->get()));
-        }
-      }
-    }
   }
   std::erase_if(config.shell.launcher.providers, [&](const LauncherProviderConfig& provider) {
     if (provider.name == "applications") {
@@ -1726,25 +1772,8 @@ void ConfigService::parseConfigTable(
     }
     const auto isBuiltin = std::ranges::contains(launcher::kBuiltinProviders, provider.name);
     if (!isBuiltin) {
-      const std::size_t colon = provider.name.find(':');
-      bool isPlugin = false;
-      std::string pluginIdStr;
-      if (colon != std::string::npos) {
-        std::string_view pluginId = std::string_view(provider.name).substr(0, colon);
-        std::string_view entryName = std::string_view(provider.name).substr(colon + 1);
-        if (scripting::isValidPluginId(pluginId) && scripting::isValidPluginIdSegment(entryName)) {
-          isPlugin = true;
-          pluginIdStr = std::string(pluginId);
-        }
-      }
-      if (!isPlugin) {
-        schemaDiag.warn("shell.launcher.providers." + provider.name, "provider is nonexistent");
-        return true;
-      }
-      if (!enabledPlugins.contains(pluginIdStr)) {
-        schemaDiag.warn("shell.launcher.providers." + provider.name, "plugin '" + pluginIdStr + "' is not enabled");
-        return true;
-      }
+      schemaDiag.warn("shell.launcher.providers." + provider.name, "provider is nonexistent");
+      return true;
     }
     return false;
   });
@@ -1773,24 +1802,6 @@ void ConfigService::parseConfigTable(
     parseWidgetsPlacementSection(
         *lockscreenWidgetsTbl, lockscreenWidgets.grid, lockscreenWidgets.widgets, "lockscreen_widgets"
     );
-  }
-
-  // Parse [plugin_settings."author/plugin"] — open-ended per-plugin setting maps,
-  // validated against the manifest schema (not the static pluginsSchema). Keys may
-  // contain '/', so this is a top-level table rather than nested under [plugins].
-  if (auto* pluginSettingsTbl = tbl["plugin_settings"].as_table()) {
-    for (const auto& [pluginId, pluginNode] : *pluginSettingsTbl) {
-      const auto* perPlugin = pluginNode.as_table();
-      if (perPlugin == nullptr) {
-        continue;
-      }
-      auto& bucket = config.plugins.pluginSettings[std::string(pluginId.str())];
-      for (const auto& [key, value] : *perPlugin) {
-        if (auto parsed = noctalia::config::readWidgetSettingValue(value); parsed.has_value()) {
-          bucket[std::string(key.str())] = std::move(*parsed);
-        }
-      }
-    }
   }
 
   if (config.bars.empty()) {
@@ -1836,7 +1847,7 @@ bool ConfigService::matchesKeybind(KeybindAction action, std::uint32_t sym, std:
 }
 
 void ConfigService::registerIpc(IpcService& ipc) {
-  ipc.bind(noctalia::cli::msg::configReload, [this](const std::string&) -> std::string {
+  ipc.bind(helix::cli::msg::configReload, [this](const std::string&) -> std::string {
     forceReload();
     return "ok\n";
   });

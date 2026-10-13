@@ -1,11 +1,9 @@
 # Credits
 
-Helix Shell builds on [Noctalia](https://github.com/noctalia-dev/noctalia) and the open-source projects below.
+Helix Shell builds on the open-source projects below.
 
 ## Design & Branding
 
-- **MrDowntempo** — Creator of the Noctalia Owl and moon logo
-- **[SaberJ2X](https://www.reddit.com/user/SaberJ64/)** — Creator of Talia, the Noctalia mascot
 - **[Tabler Icons](https://tabler.io/icons)** — Icon set used throughout the shell
 - **[Riyan Resdian on Noun Project](https://thenounproject.com/creator/yaicon/)** — Plug icon
 
@@ -35,7 +33,6 @@ Provided by system packages at build time and linked dynamically where applicabl
 - **[libqalculate](https://qalculate.github.io/)** — Calculator engine for the launcher (arithmetic, unit and currency conversion) (GPL-2.0-or-later)
 - **[libxml2](https://gitlab.gnome.org/GNOME/libxml2)** — XML parser used to read CalDAV responses (MIT)
 - **[libical](https://libical.github.io/libical/)** — iCalendar parsing for calendar events (MPL-2.0)
-- **[md4c](https://github.com/mity/md4c)** — CommonMark parser used to render plugin README files (MIT)
 - **[nlohmann/json](https://github.com/nlohmann/json)** — JSON for Modern C++ (MIT)
 - **[stb](https://github.com/nothings/stb)** — Header-only image resizing and writing utilities (MIT / public domain)
 - **[toml++](https://github.com/marzer/tomlplusplus)** — TOML parser (MIT)
@@ -48,7 +45,6 @@ Provided by system packages at build time and linked dynamically where applicabl
 Bundled in `third_party/` and built from source:
 
 - **[fzy](https://github.com/jhawthorn/fzy)** — Fuzzy matching algorithm used by the launcher, search pickers, and other shell ranking (MIT)
-- **[Luau](https://luau.org/)** — Lua dialect used for scripting (MIT)
 - **[Material Color Utilities](https://github.com/material-foundation/material-color-utilities)** — Material 3 palette generation (Apache-2.0)
 - **[Wuffs](https://github.com/google/wuffs)** — Memory-safe image decoders (Apache-2.0)
 

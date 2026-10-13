@@ -5,13 +5,11 @@
 // Per-section field schemas: the single source of truth for reading, writing,
 // and validating each config section. Field order is the config_export::serialize
 // emission order.
-namespace noctalia::config::schema {
+namespace helix::config::schema {
 
   const Schema<AudioConfig>& audioSchema();
   const Schema<WeatherConfig>& weatherSchema();
   const Schema<TailscaleConfig>& tailscaleSchema();
-  const Schema<LocalSendConfig>& localsendSchema();
-  const Schema<PhoneConfig>& phoneSchema();
   const Schema<StorageConfig>& storageSchema();
   const Schema<OsdConfig>& osdSchema();
   const Schema<BackdropConfig>& backdropSchema();
@@ -26,7 +24,6 @@ namespace noctalia::config::schema {
   const Schema<BrightnessConfig>& brightnessSchema();
   const Schema<BatteryConfig>& batterySchema();
   const Schema<ControlCenterConfig>& controlCenterSchema();
-  const Schema<PluginsConfig>& pluginsSchema();
   const Schema<HotCornersConfig>& hotCornersSchema();
   const Schema<CalendarConfig>& calendarSchema();
   const Schema<KeybindsConfig>& keybindsSchema();
@@ -68,4 +65,4 @@ namespace noctalia::config::schema {
   // ConfigService dependency.
   [[nodiscard]] bool isKnownConfigPath(const std::vector<std::string>& path);
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

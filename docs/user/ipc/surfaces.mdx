@@ -31,7 +31,7 @@ These commands are meant for bar widget gestures (`[[bar.<name>.widget]] gesture
 | Open widget settings | <IpcCommand command="settings-open-widget" /> [bar-name] [widget-name] | Open Control Center at a bar widget's editor. With no arguments it targets the widget whose gesture invoked it (the default middle-click on every widget). |
 | Cycle taskbar entries | <IpcCommand command="taskbar-cycle next" /> | Step to the adjacent task or workspace group in the invoking taskbar widget; `next` or `prev`. Order follows that taskbar's pins, grouping, and monitor filter, so this only works from a taskbar widget gesture such as scroll. |
 | Switch workspace | <IpcCommand command="workspace-switch next" /> | Activate the adjacent workspace, `next` or `prev`, stopping at both ends. From a bar widget gesture it targets that bar's monitor; from a keybind it targets the focused one. |
-| Cycle keyboard layout | <IpcCommand command="keyboard-layout-cycle" /> | Switch to the next keyboard layout through the compositor (niri, Hyprland, Sway, Mango). The default left-click on the keyboard layout widget. |
+| Cycle keyboard layout | <IpcCommand command="keyboard-layout-cycle" /> | Switch to the next keyboard layout through helix-niri. The default left-click on the keyboard layout widget. |
 
 ## Workspace alerts
 
@@ -51,13 +51,13 @@ Workspace alerts mark a workspace urgent in the bar until you visit it. They are
 |--------|---------|-------------|
 | Open panel | <IpcCommand command="panel-open <id> [context]" /> | Open a panel by id without toggling it closed when it is already open. Optional `context` works like <IpcCommand command="panel-toggle <id> [context]" />. |
 | Close panel | <IpcCommand command="panel-close [id]" /> | Close the active panel, or close the named panel if it is active. |
-| Toggle launcher | <IpcCommand command="panel-toggle launcher [query]" /> | Open or close the app launcher. Optional `query` pre-fills the search input (e.g. `noctalia msg panel-toggle launcher "/wall"`). |
+| Toggle launcher | <IpcCommand command="panel-toggle launcher [query]" /> | Open or close the app launcher. Optional `query` pre-fills the search input (e.g. `helix-panel panel-toggle launcher "/wall"`). |
 | Toggle session menu | <IpcCommand command="panel-toggle session" /> | Open or close the logout, reboot, and shutdown menu. |
 | Toggle clipboard | <IpcCommand command="panel-toggle clipboard" /> | Open or close Control Center on the Clipboard tab. Same as `panel-toggle control-center clipboard`. |
 | Toggle Quick Insert | <IpcCommand command="panel-toggle quick-insert [source]" /> | Open or close the Quick Insert overlay. Optional `source` is `emoji`, `screenshots`, or `clipboard`. |
 | Toggle wallpaper panel | <IpcCommand command="panel-toggle wallpaper [context]" /> | Open or close the floating wallpaper picker. Pass `wallhaven` to open on Wallhaven search, or `video` to open on video wallpapers. The same picker is on Control Center's Wallpaper tab (`panel-toggle control-center wallpaper`). |
-| Toggle control center | <IpcCommand command="panel-toggle control-center [tab]" /> | Open or close Control Center. Optional `tab` opens the tab inside control center by default (e.g. `noctalia msg panel-toggle control-center media`). |
-| Toggle plugin panel | <IpcCommand command="panel-toggle <author/plugin:entry> [context]" /> | Open or close a plugin `[[panel]]` entry (e.g. `noctalia msg panel-toggle noctalia/wallhaven:browser`). Optional `context` is passed to `onOpen`. |
+| Toggle control center | <IpcCommand command="panel-toggle control-center [tab]" /> | Open or close Control Center. Optional `tab` opens the tab inside control center by default (e.g. `helix-panel panel-toggle control-center media`). |
+| Toggle plugin panel | <IpcCommand command="panel-toggle <author/plugin:entry> [context]" /> | Open or close a plugin `[[panel]]` entry (e.g. `helix-panel panel-toggle helix/wallhaven:browser`). Optional `context` is passed to `onOpen`. |
 
 ## Dock
 

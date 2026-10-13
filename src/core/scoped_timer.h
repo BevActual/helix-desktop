@@ -8,14 +8,14 @@
 #include <utility>
 
 // Lightweight, opt-in wall-clock profiling. Output is gated behind the
-// NOCTALIA_PROFILE env var so normal runs stay silent; set it to any non-empty
-// value to surface timing lines (e.g. `NOCTALIA_PROFILE=1 noctalia`).
-namespace noctalia::profiling {
+// HELIX_PROFILE env var so normal runs stay silent; set it to any non-empty
+// value to surface timing lines (e.g. `HELIX_PROFILE=1 helix`).
+namespace helix::profiling {
 
   // Evaluated once on first use.
   inline bool enabled() {
     static const bool value = [] {
-      const char* v = std::getenv("NOCTALIA_PROFILE");
+      const char* v = std::getenv("HELIX_PROFILE");
       return v != nullptr && v[0] != '\0';
     }();
     return value;
@@ -55,4 +55,4 @@ namespace noctalia::profiling {
     StopWatch m_watch;
   };
 
-} // namespace noctalia::profiling
+} // namespace helix::profiling

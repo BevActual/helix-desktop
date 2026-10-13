@@ -102,7 +102,12 @@ namespace {
   }
 
   bool shouldRetainHistoryEntry(const NotificationHistoryEntry& entry) noexcept {
-    return shouldTrackHistory(entry.notification.origin, entry.notification.urgency, entry.notification.transient);
+    // Entries already in the store stay unless low/transient — includes Internal agent notifies.
+    if (entry.notification.urgency == Urgency::Low || entry.notification.transient) {
+      return false;
+    }
+    return entry.notification.origin == NotificationOrigin::External
+        || entry.notification.origin == NotificationOrigin::Internal;
   }
 
   bool notificationHasInvokableActions(const Notification& notification) {
@@ -263,8 +268,12 @@ uint32_t NotificationManager::addOrReplace(NotificationRequest request) {
     );
   };
 
-  const ExternalNotificationDispatch dispatch =
+  ExternalNotificationDispatch dispatch =
       evaluateExternalDispatch(origin, urgency, appName, category, desktopEntry, summary, body, transient);
+  if (request.saveToHistory) {
+    dispatch.saveHistory = true;
+    dispatch.fullySuppress = !dispatch.showToast && !dispatch.saveHistory;
+  }
   if (dispatch.bypassDnd) {
     dndPolicy = NotificationDndPolicy::Bypass;
   }
@@ -442,7 +451,8 @@ uint32_t NotificationManager::adoptExternal(uint32_t id, NotificationRequest req
 uint32_t NotificationManager::addInternal(
     std::string appName, std::string summary, std::string body, Urgency urgency, int32_t timeout,
     std::optional<std::string> icon, std::optional<NotificationImageData> imageData,
-    std::optional<std::string> category, std::optional<std::string> desktopEntry, NotificationDndPolicy dndPolicy
+    std::optional<std::string> category, std::optional<std::string> desktopEntry, NotificationDndPolicy dndPolicy,
+    bool saveToHistory
 ) {
   return addOrReplace(
       NotificationRequest{
@@ -453,6 +463,7 @@ uint32_t NotificationManager::addInternal(
           .timeout = timeout,
           .origin = NotificationOrigin::Internal,
           .dndPolicy = dndPolicy,
+          .saveToHistory = saveToHistory,
           .icon = std::move(icon),
           .imageData = std::move(imageData),
           .category = std::move(category),
@@ -579,7 +590,8 @@ bool NotificationManager::close(uint32_t id, CloseReason reason) {
   const size_t index = it->second;
   const Notification closed = m_notifications[index];
   const bool hadUnreadBefore = computeHasUnreadNotificationHistory();
-  const bool saveHistory = shouldSaveNotificationToHistory(m_filters, closed);
+  // Keep history updates for agent/internal notifies that were explicitly saved on add.
+  const bool saveHistory = m_historyIndex.contains(id) || shouldSaveNotificationToHistory(m_filters, closed);
   const bool removeDismissedHistory = reason == CloseReason::Dismissed && !m_keepDismissedInHistory;
   const bool historyHandledUnreadChange = saveHistory && removeDismissedHistory && m_historyIndex.contains(id);
   const char* reasonStr = (reason == CloseReason::Expired) ? "expired"
@@ -799,6 +811,12 @@ void NotificationManager::setSoundPlayer(SoundPlayer* soundPlayer) { m_soundPlay
 
 bool NotificationManager::hasUnreadNotificationHistory() const noexcept {
   return computeHasUnreadNotificationHistory();
+}
+
+std::size_t NotificationManager::unreadNotificationHistoryCount() const noexcept {
+  return static_cast<std::size_t>(std::ranges::count_if(m_history, [](const NotificationHistoryEntry& entry) {
+    return !entry.seen;
+  }));
 }
 
 void NotificationManager::markNotificationHistorySeen() {

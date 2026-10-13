@@ -27,8 +27,8 @@ DND enable/disable IPC commands show a short OSD for the new state.
 `notification-show` accepts a summary, and CLI usage can pass body as a second argument:
 
 ```sh
-noctalia msg notification-show "Build finished"
-noctalia msg notification-show "Build finished" "All tests passed"
+helix-panel notification-show "Build finished"
+helix-panel notification-show "Build finished" "All tests passed"
 ```
 
 When a body argument is passed, the CLI forwards it as structured payload (`summary` + `body`) to the IPC handler.
@@ -36,7 +36,7 @@ When a body argument is passed, the CLI forwards it as structured payload (`summ
 For full control, pass a JSON payload object:
 
 ```sh
-noctalia msg notification-show '{"app_name":"Helix","summary":"Build finished","body":"All tests passed","urgency":"low","timeout_ms":4000,"icon":"circle-check"}'
+helix-panel notification-show '{"app_name":"Helix","summary":"Build finished","body":"All tests passed","urgency":"low","timeout_ms":4000,"icon":"circle-check"}'
 ```
 
 Supported JSON fields:
@@ -89,7 +89,7 @@ Supported JSON fields:
 
 Wallpaper paths accept an image path (`~` expanded) or `color:#RRGGBB` / `color:#RRGGBBAA`. Non-color paths must exist at call time.
 
-The CLI forwards everything after the command as one string (`noctalia msg wallpaper-set ...`), so `noctalia msg wallpaper-set DP-1 /home/you/My Pictures/wall.jpg` still yields a correct path when the shell passes separate arguments after the command.
+The CLI forwards everything after the command as one string (`helix-panel wallpaper-set ...`), so `helix-panel wallpaper-set DP-1 /home/you/My Pictures/wall.jpg` still yields a correct path when the shell passes separate arguments after the command.
 
 ## Theme
 
@@ -98,20 +98,20 @@ The CLI forwards everything after the command as one string (`noctalia msg wallp
 | Get theme mode | <IpcCommand command="theme-mode-get" /> | Print the current resolved theme mode: `dark` or `light` (from `[theme].mode` or from the `[location]` schedule when mode is `auto`). |
 | Toggle theme mode | <IpcCommand command="theme-mode-toggle" /> | Switch between dark and light theme mode (same as the bar control when `[theme].mode` is not `auto`). |
 | Set theme mode | <IpcCommand command="theme-mode-set dark" /> | Persist `[theme].mode` in `settings.toml` and reload. Pass `dark`, `light`, or `auto` (example shows `dark`). |
-| Get color scheme | <IpcCommand command="color-scheme-get" /> | Print the active palette selection as two tokens: `builtin Noctalia`, `wallpaper m3-content`, `community Oxocarbon`, or `custom MyScheme`. |
-| Set color scheme | <IpcCommand command="color-scheme-set builtin Noctalia" /> | Persist `[theme].source` and the palette for that source, then reload. |
+| Get color scheme | <IpcCommand command="color-scheme-get" /> | Print the active palette selection as two tokens: `builtin Helix`, `wallpaper m3-content`, `community Oxocarbon`, or `custom MyScheme`. |
+| Set color scheme | <IpcCommand command="color-scheme-set builtin Helix" /> | Persist `[theme].source` and the palette for that source, then reload. |
 | Apply templates | <IpcCommand command="templates-apply" /> | Rerender the enabled configured theme templates for the current palette without changing theme mode or firing shell palette hooks. |
 
 `color-scheme-set` accepts these source kinds:
 
-- **builtin** - built-in palette name, such as `Noctalia`
+- **builtin** - built-in palette name, such as `Helix`
 - **wallpaper** - generator scheme, such as `m3-tonal-spot`, `m3-content`, `m3-fruit-salad`, `m3-rainbow`, `m3-monochrome`, `vibrant`, `faithful`, `soft`, `dysfunctional`, or `muted`
 - **community** - community palette id
-- **custom** - palette file name without `.json` under `~/.config/noctalia/palettes/`
+- **custom** - palette file name without `.json` under `~/.config/helix/palettes/`
 
 ## Screenshots
 
-Requires compositor support for `wlr-screencopy-unstable-v1`. Uses the global `[shell.screenshot]` output policy (directory, filename pattern, freeze, save to file, clipboard, pipe command). See [Shell settings](/noctalia/configuration/shell/#shell-settings).
+Requires compositor support for `wlr-screencopy-unstable-v1`. Uses the global `[shell.screenshot]` output policy (directory, filename pattern, freeze, save to file, clipboard, pipe command). See [Shell settings](/helix/configuration/shell/#shell-settings).
 
 | Action | Command | Description |
 |--------|---------|-------------|
@@ -147,7 +147,7 @@ The live color is the swatch carrying a check mark, and the shape-fill button sh
 
 ## Screen recording {#screen-recording}
 
-Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatpak `com.dec05eba.gpu_screen_recorder`) and falls back to `wf-recorder`. Replay buffer start/stop/save also uses `gpu-screen-recorder` (`-r`). Settings live under [`[shell.screen_record]`](/noctalia/configuration/shell/#shell-settings), including `replay_duration`. This is independent of the [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder).
+Built-in recording uses `gpu-screen-recorder` when installed (native, then Flatpak `com.dec05eba.gpu_screen_recorder`) and falls back to `wf-recorder`. Replay buffer start/stop/save also uses `gpu-screen-recorder` (`-r`). Settings live under [`[shell.screen_record]`](/helix/configuration/shell/#shell-settings), including `replay_duration`. This is independent of the [`helix/screen_recorder` plugin](/helix/plugins/official-plugins/#screen_recorder).
 
 | Action | Command | Description |
 |--------|---------|-------------|
@@ -166,7 +166,7 @@ Control Center closes before a recording or replay buffer starts so it is not in
 
 ## Tailscale {#tailscale}
 
-Built-in Tailscale control uses the local `tailscale` CLI. Settings live under [`[tailscale]`](/noctalia/control-center/#tailscale). The community plugin's bar widget and panel stay independent.
+Built-in Tailscale control uses the local `tailscale` CLI. Settings live under [`[tailscale]`](/helix/control-center/#tailscale). The community plugin's bar widget and panel stay independent.
 
 | Action | Command | Description |
 |--------|---------|-------------|
@@ -177,44 +177,6 @@ Built-in Tailscale control uses the local `tailscale` CLI. Settings live under [
 
 `tailscale-status` prints `not-installed` when the CLI is missing. When connected it includes hostname, IPv4, and the selected exit node. Connect and disconnect may prompt for an administrator password unless this user is the Tailscale operator (`sudo tailscale set --operator=$USER`).
 
-## LocalSend {#localsend}
-
-Built-in LocalSend nearby sharing uses the LocalSend protocol on the LAN. Settings live under [`[localsend]`](/noctalia/control-center/#localsend).
-
-| Action | Command | Description |
-|--------|---------|-------------|
-| Toggle | <IpcCommand command="localsend-toggle" /> | Enable or disable nearby sharing and persist `[localsend].enabled`. |
-| Status | <IpcCommand command="localsend-status" /> | Print `disabled`, `listening`, or `receive-blocked`, plus alias, port, and nearby peer count. |
-| Announce | <IpcCommand command="localsend-announce" /> | Broadcast this machine on the LocalSend multicast group now. |
-
-`receive-blocked` means nearby sharing is on but TCP port 53317 (or the configured port) is already in use, so this machine can still send. Open Control Center on the LocalSend tab with `noctalia msg panel-toggle control-center localsend`.
-
-## Phone {#phone}
-
-Built-in Phone control talks to the session KDE Connect daemon. There is no Helix config block; pairing lives in KDE Connect.
-
-| Action | Command | Description |
-|--------|---------|-------------|
-| Status | <IpcCommand command="phone-status" /> | Print `not-installed`, `starting`, or `running` plus announced name and paired/reachable counts. |
-| Ping | <IpcCommand command="phone-ping" /> | Ping a paired device. Optional device name or id. |
-| Ring | <IpcCommand command="phone-ring" /> | Ring a paired device. Optional device name or id. |
-| Cast | <IpcCommand command="phone-cast" /> | Toggle the phone mirror: a scrcpy window on Android, the Helix Phone AirPlay receiver on iPhone (stopping it also pauses `[phone] mirror_always_on` until the next start). Optional device name or id. |
-
-Omit the device argument when exactly one device is paired. Open the tab with `noctalia msg panel-toggle control-center phone`.
-
-
-## Syncthing {#syncthing}
-
-Built-in Syncthing control talks to the local daemon on `127.0.0.1:8384` by default. There is no Helix config block; folders and pairing live in Syncthing.
-
-| Action | Command | Description |
-|--------|---------|-------------|
-| Status | <IpcCommand command="syncthing-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus name, folder count, and connected devices. |
-| Start | <IpcCommand command="syncthing-start" /> | Start the user systemd unit when present, otherwise `syncthing serve --no-browser`. |
-| Stop | <IpcCommand command="syncthing-stop" /> | Ask the daemon to shut down. |
-
-Open the tab with `noctalia msg panel-toggle control-center syncthing`.
-
 ## Firewall {#firewall}
 
 Built-in Firewall control talks to firewalld on the system bus. There is no Helix config block; zones and services live in firewalld.
@@ -224,7 +186,7 @@ Built-in Firewall control talks to firewalld on the system bus. There is no Heli
 | Status | <IpcCommand command="firewall-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus default zone and panic mode. |
 | Panic toggle | <IpcCommand command="firewall-panic-toggle" /> | Enable or disable panic mode (block all traffic). |
 
-Open the tab with `noctalia msg panel-toggle control-center firewall`.
+Open the tab with `helix-panel panel-toggle control-center firewall`.
 
 ## Printers {#printers}
 
@@ -235,18 +197,7 @@ Built-in Printers control talks to CUPS. There is no Helix config block; queues 
 | Status | <IpcCommand command="printers-status" /> | Print `not-installed`, `starting`, `stopped`, or `running` plus the default printer. |
 | Start | <IpcCommand command="printers-start" /> | Start the CUPS printing service. |
 
-Open the tab with `noctalia msg panel-toggle control-center printers`.
-
-## Cast {#cast}
-
-Built-in Cast control shares this screen over Remote Desktop (`grdctl`) and talks to Network Displays on the session bus for nearby TVs. There is no Helix config block.
-
-| Action | Command | Description |
-|--------|---------|-------------|
-| Status | <IpcCommand command="cast-status" /> | Print `share=on` or `share=off`, the listen address, wireless `on`/`off`/`not-installed`, and the nearby display count. |
-| Share toggle | <IpcCommand command="cast-share-toggle" /> | Toggle sharing this screen over RDP. |
-
-Open the tab with `noctalia msg panel-toggle control-center cast`.
+Open the tab with `helix-panel panel-toggle control-center printers`.
 
 ## Privacy {#privacy}
 
@@ -256,11 +207,11 @@ Built-in Privacy control reads PipeWire capture links for microphone, camera, an
 |--------|---------|-------------|
 | Status | <IpcCommand command="privacy-status" /> | Print `idle` or `active` plus comma-separated app names per kind, plus `telemetry` and `location`. |
 
-Open the tab with `noctalia msg panel-toggle control-center privacy`.
+Open the tab with `helix-panel panel-toggle control-center privacy`.
 
 ## AI {#ai}
 
-Built-in AI status reads AI CLIs on this machine (`claude`, `codex`, `gemini`, `qwen`, `ollama`, `local-ai`) plus running LocalAI and llama.cpp / vLLM servers. Settings live under [`[control_center.ai_usage]`](/noctalia/control-center/#ai).
+Built-in AI status reads AI CLIs on this machine (`claude`, `codex`, `gemini`, `qwen`, `ollama`, `local-ai`) plus running LocalAI and llama.cpp / vLLM servers. Settings live under [`[control_center.ai_usage]`](/helix/control-center/#ai).
 
 | Action | Command | Description |
 |--------|---------|-------------|
@@ -281,5 +232,5 @@ Built-in AI status reads AI CLIs on this machine (`claude`, `codex`, `gemini`, `
 | Open LocalAI | <IpcCommand command="ai-usage-localai-open" /> | Open the LocalAI web UI in the browser. |
 | Desktop AI | <IpcCommand command="desktop-ai-status" /> | One-shot LocalAI tools. `desktop-ai-summarize`, `desktop-ai-translate`, `desktop-ai-rewrite`, and `desktop-ai-speak` use the clipboard. `desktop-ai-dictate` toggles the microphone. `desktop-ai-read PATH` and `desktop-ai-describe PATH` use a vision model. Results are copied to the clipboard. `desktop-ai-status` prints the in-flight state and the last result. |
 
-Percents are utilization, not currency. Extra usage for Claude is a percent even when the OAuth payload includes credit fields. Codex prefers live `codex app-server` limits and falls back to the newest session `.jsonl`. Open the tab with `noctalia msg panel-toggle control-center ai`.
+Percents are utilization, not currency. Extra usage for Claude is a percent even when the OAuth payload includes credit fields. Codex prefers live `codex app-server` limits and falls back to the newest session `.jsonl`. Open the tab with `helix-panel panel-toggle control-center ai`.
 

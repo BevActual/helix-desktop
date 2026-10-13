@@ -7,7 +7,7 @@
 // source for both the parser's clamp (the schema `Field`'s `Range`) and the
 // settings GUI slider bounds — so the two can never drift. `min`/`max`/`step` are
 // the curated UI range; the parser ignores `step` (GUI metadata only).
-namespace noctalia::config::schema {
+namespace helix::config::schema {
 
   // Shared ranges for concepts that recur verbatim across many settings.
   inline constexpr Range<float> kUnitRange{0.0F, 1.0F, 0.01F};          // opacities, intensities, 0..1 factors
@@ -25,14 +25,13 @@ namespace noctalia::config::schema {
   inline constexpr Range<std::int64_t> kAiUsageWarnPercentRange{0, 100, 5};
   inline constexpr Range<std::int64_t> kAiUsageWarnResetMinutesRange{0, 120, 5};
   inline constexpr Range<std::int64_t> kTailscaleRefreshSecondsRange{3, 120, 1};
-  inline constexpr Range<std::int64_t> kLocalSendPortRange{1024, 65535, 1};
   inline constexpr Range<std::int64_t> kScreenCornersSizeRange{1, 100, 1};
   inline constexpr Range<std::int64_t> kHotCornersDelayMsRange{0, 2000, 50};
   inline constexpr Range<std::int64_t> kScreenRecordReplayDurationRange{2, 600, 5};
   inline constexpr Range<std::int64_t> kClipboardHistoryMaxEntriesRange{
-      noctalia::config::kClipboardHistoryMinEntries,
-      noctalia::config::kClipboardHistoryMaxEntries,
-      noctalia::config::kClipboardHistoryStepEntries,
+      helix::config::kClipboardHistoryMinEntries,
+      helix::config::kClipboardHistoryMaxEntries,
+      helix::config::kClipboardHistoryStepEntries,
   };
   inline constexpr Range<std::int64_t> kSessionGridColumnsRange{1, 5, 1};
 
@@ -64,4 +63,4 @@ namespace noctalia::config::schema {
   inline constexpr Range<float> kNiriBlurOffsetRange{0.5F, 8.0F, 0.1F};
   inline constexpr Range<float> kNiriBlurNoiseRange{0.0F, 0.2F, 0.01F};
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

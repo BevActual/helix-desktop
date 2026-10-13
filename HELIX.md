@@ -1,33 +1,70 @@
-# Helix
+# Helix Desktop
 
-Helix is a niri-first Linux desktop, not a drop-in rebrand of upstream Noctalia.
+**Helix Desktop** is this monorepo: greeter, compositor, session shell, apps, and services for the **Helix** product (niri-first Linux desktop).
 
-## Three packages
+**How it should be structured and run:** [`docs/design/product-structure.md`](docs/design/product-structure.md).  
+**Design index:** [`docs/design/README.md`](docs/design/README.md).
 
-| Package | Role |
+## Packages in this repository
+
+| Path | Role |
 |---|---|
-| **helix-greeter** | Login (greetd session) |
-| **helix-niri** | Compositor |
-| **Helix Shell** (this tree) | Bars, dock, launcher, Control Center, lock screen, wallpaper, notifications, desktop widgets |
+| **greeter/** | Login greeter (Tauri; greetd) |
+| **compositor/** | Helix compositor (niri fork; own Cargo workspace) |
+| **shell/**, **apps/**, **services/**, **core/** | Helix Shell (Tauri + desktop authority + helpers) |
 
-Login flow: **greetd → helix-greeter → helix-niri + Helix Shell**. Stock niri, Hyprland, and other compositors remain fallbacks.
+Login flow: **greetd → helix-greeter → helix-niri + Helix Shell**. Fedora and helix-niri are the sole shell target.
 
-## Names that stay `noctalia`
+## Session shell (live)
 
-Keep these until a rename is an explicit release:
+```sh
+tools/switch-shell.sh install
+```
 
-- Meson project and installed command: `noctalia`
-- Config, state, cache: `~/.config/noctalia/`, `~/.local/state/noctalia/`, and the `NOCTALIA_*` env overrides
-- IPC: `noctalia msg …`
-- Desktop entry id: `dev.noctalia.Noctalia.desktop` (the **Name** is Helix Shell)
-- Builtin palette id: `Noctalia`
+Compositor / greeter (from this tree):
 
-The name in the UI, notifications, generated niri includes, template display names, docs, and package descriptions is **Helix Shell**. Template file paths (`noctalia.yaml`, `noctalia.conf`, `Noctalia.toml`) stay as compatibility names.
+```sh
+cd compositor && cargo build --release
+cargo build --profile fast -p helix-greeter
+```
+
+Apps under `apps/` and the session shell are Tauri + **React + TypeScript + Vite** (`docs/design/frontend-stack.md`; shared UI in `core/shared-ui/`, components in `core/shared-ui/react/`); the shell moves in slices. Only the approval dialog and the greeter stay hand-written. Desktop authority: C++ `helix-service` today, Rust scaffold `services/helix-desktop` (`docs/design/cpp-to-rust.md`). Contracts: `protocols/`. Product names: `docs/design/helix-identity.md`. Tree layout: `docs/design/session-shell.md`. Compositor: `compositor/HELIX.md`. Greeter: `greeter/HELIX.md`.
+
+## Repository map
+
+| Path | Role |
+|---|---|
+| `greeter/` | Tauri login greeter (`helix-greeter`) |
+| `compositor/` | niri fork (excluded from root Cargo workspace) |
+| `core/` | Pure core, desktop API client, shared-ui |
+| `shell/` | Live session shell (Tauri) |
+| `apps/` | Settings, Software, Monitor, Mobius (`helix-mobius`) |
+| `services/` | `helix-desktop` (Rust Desktop scaffold), wallpaper, idle |
+| `dev/` | Nested probes only |
+| `protocols/` | D-Bus / IPC contracts |
+| `tools/` | Dev install, nested tests, Helix MCP server (`helix-agent`), helpers |
+| `src/desktop/` | `helix-service` (keep) |
+| `src/assistant/`, `src/inference/` | Assistant + model runtime (target: `services/helix-*`) |
+| `src/` (platform) | config, theme, dbus, wayland, … (migrating with domains) |
+| `assets/` | Branding, templates, translations |
+| `docs/` | Design + user docs (`design/archive/` for dumps) |
+
+
+## Checks
+
+```sh
+npm install                     # once: the React app workspace (Node 22+)
+tools/check-all.sh              # typecheck + lint, clippy -D warnings, cargo test, meson test, then the nested UI suite
+tools/check-all.sh --no-nested  # skip the nested compositor runs
+tools/nested/ui-suite.sh dock mobius   # just some of the nested tests
+tools/migrate-state.sh --dry-run       # what would be copied from the old noctalia folders (additive, never overwrites)
+```
+
+Nested tests run a private compositor and bus. They share the real user's systemd and login manager, so code that would touch those
+(start a unit, suspend, power off) checks `helix_shell_core::nested_test_session()` and does nothing there.
 
 ## Design
 
-Liquid Glass is a hierarchy, not a skin. The full design language (tiers, color, shape, type, motion, menus, accessibility, and known gaps) is in `docs/design/helix-hig.md`. Control Center follows Apple HIG structure without copying private Control Center visuals.
+GTK4/libadwaita defines shared controls and application styling; glass remains floating shell chrome. Full language: `docs/design/helix-hig.md`.
 
-## Lineage
-
-This tree started from [Noctalia](https://github.com/noctalia-dev/noctalia). Compatibility names above are on purpose so existing installs keep working.
+Helix is an **agentic OS** (Mobius hub + bar Assistant + MCP layer). Fabric: `docs/design/inference-fabric.md`. Surface: `docs/design/agentic-os.md`.

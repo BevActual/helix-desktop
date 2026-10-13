@@ -2,52 +2,58 @@ Contributing
 ===
 
 This file collects contributor-facing details for Helix Shell: design goals, stack notes, code style, source layout,
-runtime asset behavior, and debugging helpers. Product contracts with helix-niri and helix-greeter are in the sibling
-`HELIX.md` files and in `.cursor/rules/helix-hig.mdc`.
+runtime asset behavior, and debugging helpers. Product contracts with in-tree `compositor/` and `greeter/`
+are in their `HELIX.md` files and in `.cursor/rules/helix-hig.mdc`.
+
+Product shape (greeter / compositor / shell / apps / services): [docs/design/product-structure.md](docs/design/product-structure.md).
+Design index: [docs/design/README.md](docs/design/README.md).
 
 For dependencies and normal build commands, start with [BUILDING.md](BUILDING.md).
 
 ## Design Principles
 
-- Direct Wayland + OpenGL ES only -- no toolkit overhead
-- Minimal scene graph, domain-specific to shell UI
-- Packaging should work across all major Linux distros: Arch, NixOS, Fedora, Gentoo, Debian, Void, OpenSuse
+- Session shell and apps: Rust + Tauri 2 (GTK3 layer-shell / WebKit), shared UI in `core/shared-ui/`.
+- Desktop authority: `org.helix.Desktop` (C++ `helix-service` today; migrating to Rust — see `docs/design/cpp-to-rust.md`).
+- Applications and Controls: GTK4/libadwaita grammar for look; Fedora + helix-niri is the shell target.
+- Contracts in `protocols/` (D-Bus + IPC) are the boundary; do not invent parallel APIs.
 
 ## Stack
 
 Direct project dependencies are listed below; transitive dependencies are owned by their providing system packages.
 
+### Rust (shell, apps, greeter, migrating services)
+
 | Layer | Library |
 |-------|---------|
-| Wayland core | `libwayland-client`, `wayland-scanner`, `wayland-protocols` |
-| Surfaces | `xdg-shell`, `zwlr-layer-shell-v1` |
-| Multi-monitor | `zxdg-output-unstable-v1` |
-| Active window metadata | `zwlr-foreign-toplevel-management-unstable-v1` |
-| Workspaces | `ext-workspace-v1`, `dwl-ipc-unstable-v2` |
-| Clipboard | `ext-data-control-v1`, `wlr-data-control-unstable-v1` |
-| Activation | `xdg-activation-v1` |
-| Lockscreen | `ext-session-lock-v1` |
-| Idle | `ext-idle-notify-v1`, `idle-inhibit-unstable-v1` |
-| Cursor | `wp-cursor-shape-v1` |
-| Keyboard | `xkbcommon` |
-| Rendering | `EGL`, `OpenGL ES 2.0+`, `wayland-egl` (`libepoxy` fallback) |
-| Dynamic loading | `libdl` when provided separately by the platform |
-| Text | `cairo`, `cairo-ft`, `pango`, `pangocairo`, `pangoft2`, `harfbuzz`, `freetype2`, `fontconfig` |
-| Images | `Wuffs` (vendored), `stb_image_resize2`, `stb_image_write`, `libwebp`, `libjxl`, `libjxl_threads`, `librsvg` |
+| App framework | Tauri 2, GTK3, WebKitGTK 4.1, `gtk-layer-shell` |
+| D-Bus client/server | `zbus`, `tokio` |
+| Serialization | `serde`, `serde_json` |
+| TypeScript bindings | `ts-rs` (feature `ts`, `tools/gen-bindings.sh`) |
+
+### Frontend (apps under `apps/` and the session shell)
+
+| Layer | Library |
+|-------|---------|
+| UI | React 19, TypeScript, Vite (npm workspace at the repo root, Node 22+) |
+| Shared components | `@helix/ui` in `core/shared-ui/react/` over the shared CSS tokens |
+| Lint | ESLint with `react/no-danger`; text from models, apps and the system is only ever a React child |
+
+The approval dialog and the greeter are hand-written HTML/CSS/JS with no build step; the shell is moving to React in slices. Rules and status: `docs/design/frontend-stack.md`.
+
+### C++ platform (desktop service / assistant / inference — shrinking)
+
+| Layer | Library |
+|-------|---------|
 | IPC and service runtime | `sdbus-c++`, `glib-2.0`, `gobject-2.0`, `gio-2.0` |
+| Wayland helpers (service) | `libwayland-client`, `wayland-protocols` |
 | Audio | `libpipewire-0.3`, `wireplumber-0.5`, `libsndfile` |
 | Authentication | `PAM`, `polkit-agent-1`, `polkit-gobject-1` |
 | Credentials and encryption | `libsecret-1`, `libsodium` |
 | HTTP | `libcurl` |
-| XML | `libxml2` |
-| Calendar data | `libical` |
 | Config | `tomlplusplus` |
 | JSON | `nlohmann/json` |
-| Markdown | `md4c` |
-| Fuzzy matching | `fzy` (vendored) |
-| Math expressions | `libqalculate` |
-| Scripting | `Luau` (vendored) |
 | Theme generation | Material Color Utilities (vendored) |
+| Images (service helpers) | `libwebp`, `libjxl`, `librsvg` |
 | Memory allocation | `jemalloc` (optional) |
 
 ## Runtime Assets
@@ -55,38 +61,38 @@ Direct project dependencies are listed below; transitive dependencies are owned 
 `meson install` installs the binary and shipped assets separately using the normal prefix layout:
 
 ```text
-/usr/local/bin/noctalia
-/usr/local/share/noctalia/assets/...
+/usr/local/bin/helix
+/usr/local/share/helix/assets/...
 ```
 
 With a different Meson `prefix`/`datadir`, the same structure is preserved under that prefix.
 
-Helix Shell needs the `assets/` tree at runtime. Copying only the bare `noctalia` binary is not enough.
+Helix Shell needs the `assets/` tree at runtime. Copying only the bare `helix-shell` binary is not enough.
 
 Portable bundle layouts are also supported:
 
 ```text
 bundle/
-  noctalia
+  helix
   assets/
 ```
 
 ```text
 bundle/
-  bin/noctalia
-  share/noctalia/assets/
+  bin/helix
+  share/helix/assets/
 ```
 
 Runtime asset lookup order:
 
-1. `NOCTALIA_ASSETS_DIR`
+1. `HELIX_ASSETS_DIR`
 2. `assets/` next to the executable
 3. `assets/` one level above the executable
-4. install-style `../share/noctalia/assets` relative to the executable
-5. the compiled install path from Meson (`<prefix>/<datadir>/noctalia/assets`)
+4. install-style `../share/helix/assets` relative to the executable
+5. the compiled install path from Meson (`<prefix>/<datadir>/helix/assets`)
 6. the source-tree `assets/` directory as a development fallback
 
-An asset root is only accepted if it contains the expected shipped files such as `emoji.json`, `fonts/noctalia-tabler.ttf`,
+An asset root is only accepted if it contains the expected shipped files such as `emoji.json`, `fonts/helix-tabler.ttf`,
 `templates/builtin.toml`, and `translations/en.json`.
 
 ## Code Style
@@ -133,7 +139,7 @@ C++ identifiers.
 
 ## Translations
 
-Helix translations are managed through [Noctalia Translate](https://i18n.noctalia.dev/projects/noctalia). The JSON
+Helix translations ship as JSON under `assets/translations/`. Optional push/pull tools use `I18N_API_BASE` / `TRANSLATION_API_URL` when you run a translation service. The JSON
 files in `assets/translations/` are exported from that workflow, with `assets/translations/en.json` acting as the
 source catalog for new strings.
 
@@ -182,7 +188,7 @@ src/
   i18n/             Translation catalog and language tag handling
   idle/             Idle manager, inhibitor, grace overlay
   ipc/              IPC client/service and CLI command parsing
-  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows, plugins)
+  launcher/         Launcher providers (apps, emoji, calculator, sessions, windows)
   net/              HTTP client, URI parsing, URL opening
   notification/     Notification model, manager, filtering, history
   pipewire/         PipeWire audio service, sound playback, spectrum analyzer
@@ -193,7 +199,6 @@ src/
     programs/       GLES shader programs
     scene/          Scene graph nodes and pointer input dispatch
     text/           Cairo/Pango text and glyph rendering
-  scripting/        Luau plugin runtime, manifests, registry, source management, bindings
   shell/
     backdrop/       Backdrop layer surfaces
     bar/            Bar surface, instance, widget base/factory
@@ -236,34 +241,33 @@ assets/
   sounds/           Notification and UI sounds
   templates/        Built-in theme templates
   translations/     Exported translation catalogs
-protocols/          Vendored Wayland protocol XML files
+protocols/          D-Bus + IPC contracts (source of truth); also vendored Wayland XML
 tests/              Unit tests and config validation fixtures
 tools/              Developer and translation helper scripts
 nix/                Nix package, module, and dev shell definitions
 third_party/
   wuffs/          Raster image decoding (vendored)
   fzy/            Fuzzy matching (vendored)
-  luau/           Plugin scripting runtime (vendored)
   material_color_utilities/ Material Design color generation (vendored)
 ```
 
 
 ## Debugging
 
-All debug commands use the `dev.noctalia.Debug` D-Bus service, available at runtime.
+All debug commands use the `org.helix.Debug` D-Bus service, available at runtime.
 
 ```sh
 # Enable verbose debug logs
-gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.SetVerboseLogs true
+gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.SetVerboseLogs true
 
 # Disable verbose debug logs
-gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.SetVerboseLogs false
+gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.SetVerboseLogs false
 
 # Check current verbose log state
-gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.GetVerboseLogs
+gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.GetVerboseLogs
 
 # Emit an internal notification (app_name, summary, body, timeout_ms, urgency 0-2)
-gdbus call --session --dest dev.noctalia.Debug --object-path /dev/noctalia/Debug --method dev.noctalia.Debug.EmitInternalNotification "Helix" "Test" "Hello from debug" 5000 1
+gdbus call --session --dest org.helix.Debug --object-path /dev/helix/Debug --method org.helix.Debug.EmitInternalNotification "Helix" "Test" "Hello from debug" 5000 1
 ```
 
 ### Crash output
@@ -280,8 +284,8 @@ Install the source-build dependencies for your distribution using the commands i
 [BUILDING.md](BUILDING.md#dependencies), then clone the repository:
 
 ```sh
-git clone https://github.com/noctalia-dev/noctalia.git
-cd noctalia
+git clone https://github.com/BevActual/helix-desktop.git
+cd helix-shell
 ```
 
 Stop the Helix instance started by your compositor, then configure and build ASan:
@@ -293,9 +297,9 @@ just configure asan && just build asan
 Start the ASan binary in the foreground and save its output:
 
 ```sh
-ASAN_OPTIONS=log_path=/tmp/noctalia-asan ./build-asan/noctalia 2>&1 | tee noctalia-asan-terminal.log
+ASAN_OPTIONS=log_path=/tmp/helix-asan ./build-asan/helix-service 2>&1 | tee helix-asan-terminal.log
 ```
 
-Reproduce the crash once. If Helix does not exit, press `Ctrl+C`. Attach both `noctalia-asan-terminal.log` and every
-`/tmp/noctalia-asan.*` file to the GitHub issue. The files in `/tmp` preserve the ASan report if the crash takes down
+Reproduce the crash once. If Helix does not exit, press `Ctrl+C`. Attach both `helix-asan-terminal.log` and every
+`/tmp/helix-asan.*` file to the GitHub issue. The files in `/tmp` preserve the ASan report if the crash takes down
 the terminal. If the build or startup fails, attach that complete output instead.

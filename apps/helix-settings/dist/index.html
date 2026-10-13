@@ -1,0 +1,36 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<body class="settings">
+<div id="app" data-test="app">
+  <aside id="side">
+    <div id="titlebar" data-tauri-drag-region>
+      <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
+    </div>
+    <input id="search" data-test="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false">
+    <nav id="pages">
+      <button class="page-link" data-page="agents" data-test="page-agents"><i data-icon="shield"></i><span>Privacy &amp; agents</span></button>
+    </nav>
+  </aside>
+  <main id="content" data-test="content">
+    <header data-tauri-drag-region><h2 id="page-title">Appearance</h2><button id="refresh" data-test="refresh" title="Read again">Refresh</button></header>
+    <!-- pages made of rows of service settings are created by settings.js from PAGES -->
+    <section id="page-search" class="settings-page" hidden><div id="search-rows"></div></section>
+    <section id="page-agents" class="settings-page" hidden>
+      <div id="agents-note"></div>
+      <h4>Models &amp; routing</h4>
+      <div class="rows-card" id="ai-routing-card">
+        <p id="ai-routing-note">Personas, local model slots, and LAN endpoints are managed in Mobius. Agent grants stay here.</p>
+        <button id="open-mobius" data-test="open-mobius" type="button">Open Mobius</button>
+      </div>
+      <h4>Approvals</h4>
+      <div class="rows-card" id="approvals-card"></div>
+      <h4>Applications with access</h4>
+      <div id="agents-clients"></div>
+      <h4>Recent activity</h4>
+      <div id="agents-history"></div>
+    </section>
+  </main>
+</div>
+<script src="icons.js"></script>
+<script src="react/helix-react.js"></script>
+<script src="settings.js"></script>
+<script src="connectivity.js"></script>

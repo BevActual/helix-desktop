@@ -1,0 +1,39 @@
+# Helix Agent Surface v1 — tools exposed over MCP.
+# Dangerous session power actions and synthetic input stay off.
+
+# How tool calls reach the desktop.
+#   auto     use the desktop service's Agent Surface interface when it exists, else the direct `helix-panel` socket.
+#            A refusal from Agent Surface is final and is never retried on the direct path.
+#   surface  require Agent Surface (grants, confirmation and audit are enforced by the service). Set once installed:
+#            if the service is down the tools report an error instead of quietly using the unguarded direct path.
+#   agent1   alias for `surface` (legacy config name).
+#   legacy   always use the direct socket (no per-client grants or confirmation).
+[backend]
+mode = "surface"
+
+# Which risk tiers (protocols/ipc/msg-risk.toml) this adapter may ask for. "blocked" is never granted. The service still
+# decides: you are asked the first time a tier is needed, and "confirm" actions ask each time. Remove a tier here to make
+# the adapter refuse to even ask for it.
+[grants]
+tiers = ["observe", "observe-private", "act", "confirm"]
+
+[tools]
+desktop_status = true
+desktop_capture = true
+desktop_context = true
+panel_toggle = true
+panel_open = true
+panel_close = true
+settings_open = true
+bar_visibility = true
+clipboard_get = true
+clipboard_set = true
+notify = true
+notifications_recent = true
+workspace_step = true
+workspaces_list = true
+windows_list = true
+window_focus = true
+app_launch = true
+window_close = true
+dnd_toggle = true

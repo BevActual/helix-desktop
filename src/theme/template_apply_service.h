@@ -20,7 +20,7 @@
 class ConfigService;
 class IpcService;
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   class HookRunner;
 
@@ -44,6 +44,7 @@ namespace noctalia::theme {
     void setFailuresChangedCallback(std::function<void()> callback) const;
     void registerIpc(IpcService& ipc);
     [[nodiscard]] bool reapplyLast() const;
+    void setRemoteSource(bool remote) { m_remoteSource = remote; }
     [[nodiscard]] std::unordered_map<std::string, std::string> lastFailures() const;
 
   private:
@@ -54,7 +55,7 @@ namespace noctalia::theme {
       std::string defaultMode;
       std::string imagePath;
       std::string schemeType;
-      // Built-in templates Noctalia has applied and that are no longer enabled: their
+      // Built-in templates Helix has applied and that are no longer enabled: their
       // undo hooks run before this request's templates.
       std::vector<std::string> undoBuiltinIds;
       std::uint64_t generation = 0;
@@ -62,7 +63,7 @@ namespace noctalia::theme {
 
     [[nodiscard]] ApplyRequest makeRequest(const GeneratedPalette& palette, std::string_view defaultMode) const;
     [[nodiscard]] static bool sameInputs(const ApplyRequest& a, const ApplyRequest& b);
-    // Diffs the enabled built-in template ids against the ids Noctalia has applied (persisted
+    // Diffs the enabled built-in template ids against the ids Helix has applied (persisted
     // in state.toml) and returns the ids that still owe an undo. Main thread only.
     [[nodiscard]] std::vector<std::string> syncAppliedBuiltinIds(const ThemeConfig::TemplatesConfig& templates) const;
     // Clears ids whose undo hook has run from the applied/owed sets. Main thread only.
@@ -76,6 +77,7 @@ namespace noctalia::theme {
     void workerLoop();
     [[nodiscard]] bool requestSuperseded(std::uint64_t generation) const;
 
+    bool m_remoteSource = false;
     ConfigService& m_config;
     mutable std::mutex m_mutex;
     mutable std::condition_variable m_cv;
@@ -101,4 +103,4 @@ namespace noctalia::theme {
     mutable std::unique_ptr<HookRunner> m_hookRunner;
   };
 
-} // namespace noctalia::theme
+} // namespace helix::theme

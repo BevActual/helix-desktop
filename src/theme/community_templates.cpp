@@ -23,13 +23,20 @@
 #include <unordered_set>
 #include <utility>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
     constexpr Logger kLog("community_templates");
-    constexpr std::string_view kCatalogUrl = "https://api.noctalia.dev/templates";
-    constexpr std::string_view kCacheMetadataFilename = ".noctalia-cache.json";
+    constexpr std::string_view kCacheMetadataFilename = ".helix-cache.json";
+
+    // Remote catalog is opt-in. No default host — Helix does not call third-party template APIs.
+    [[nodiscard]] std::string catalogUrl() {
+      if (const char* env = std::getenv("HELIX_COMMUNITY_TEMPLATE_CATALOG_URL"); env != nullptr && env[0] != '\0') {
+        return env;
+      }
+      return {};
+    }
 
     struct CommunityTemplateFile {
       std::string name;
@@ -676,28 +683,43 @@ namespace noctalia::theme {
       syncSelectedFromCatalog(templates.communityIds, generation, false);
     }
 
-    m_httpClient.download(
-        kCatalogUrl, catalogCachePath(), [this, ids = templates.communityIds, generation](bool success) {
-          if (generation != m_generation)
-            return;
-          if (!success) {
-            kLog.warn("failed to refresh community template catalog; using cached metadata when available");
-            if (m_readyCallback) {
-              DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
-            }
-            return;
-          }
-          if (!ids.empty()) {
-            syncSelectedFromCatalog(ids, generation, true);
-          }
-          syncCatalogManifests(ids, generation);
+    const std::string url = catalogUrl();
+    if (url.empty()) {
+      kLog.info("community template catalog URL unset (HELIX_COMMUNITY_TEMPLATE_CATALOG_URL); using local cache only");
+      if (!templates.communityIds.empty()) {
+        syncSelectedFromCatalog(templates.communityIds, generation, true);
+      } else if (m_readyCallback) {
+        DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
+      }
+      return;
+    }
+
+    m_httpClient.download(url, catalogCachePath(), [this, ids = templates.communityIds, generation](bool success) {
+      if (generation != m_generation)
+        return;
+      if (!success) {
+        kLog.warn("failed to refresh community template catalog; using cached metadata when available");
+        if (m_readyCallback) {
+          DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
         }
-    );
+        return;
+      }
+      if (!ids.empty()) {
+        syncSelectedFromCatalog(ids, generation, true);
+      }
+      syncCatalogManifests(ids, generation);
+    });
   }
 
   void CommunityTemplateService::syncCatalogManifests(
       const std::vector<std::string>& selectedIds, std::uint64_t generation
   ) {
+    if (catalogUrl().empty()) {
+      if (m_readyCallback) {
+        DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
+      }
+      return;
+    }
     const auto catalog = parseCatalogFile(catalogCachePath());
     auto pending = std::make_shared<std::size_t>(0);
     auto completed = std::make_shared<std::size_t>(0);
@@ -732,7 +754,7 @@ namespace noctalia::theme {
 
       ++(*pending);
       const std::string url =
-          std::string(kCatalogUrl) + "/" + StringUtils::urlEncode(info.id) + "/" + urlEncodePath(manifest->name);
+          catalogUrl() + "/" + StringUtils::urlEncode(info.id) + "/" + urlEncodePath(manifest->name);
       m_httpClient.download(
           url, dest,
           [this, file = *manifest, dest, dir, metadata, generation, pending, completed, notifyIfReady,
@@ -815,11 +837,15 @@ namespace noctalia::theme {
         }
         if (!cacheFileNeedsDownload(id, file, dest, *metadata))
           continue;
+        const std::string baseUrl = catalogUrl();
+        if (baseUrl.empty()) {
+          kLog.warn("community template '{}' needs download but catalog URL is unset; skipping '{}'", id, file.name);
+          continue;
+        }
         if (dest.has_parent_path())
           std::filesystem::create_directories(dest.parent_path(), ec);
         ++(*pending);
-        const std::string url =
-            std::string(kCatalogUrl) + "/" + StringUtils::urlEncode(id) + "/" + urlEncodePath(file.name);
+        const std::string url = baseUrl + "/" + StringUtils::urlEncode(id) + "/" + urlEncodePath(file.name);
         m_httpClient.download(
             url, dest,
             [this, file, dest, dir, metadata, generation, pending, completed, notifyIfReady,
@@ -904,7 +930,7 @@ namespace noctalia::theme {
     const std::string state = FileUtils::stateDir();
     if (!state.empty())
       return std::filesystem::path(state) / "community-templates";
-    return std::filesystem::path("/tmp") / "noctalia" / "community-templates";
+    return std::filesystem::path("/tmp") / "helix" / "community-templates";
   }
 
   std::filesystem::path communityTemplateDir(std::string_view id) {
@@ -921,4 +947,4 @@ namespace noctalia::theme {
     });
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

@@ -1,12 +1,12 @@
 #include "core/build_info.h"
 
-#include "noctalia_git_revision.h"
+#include "helix_git_revision.h"
 
-namespace noctalia::build_info {
+namespace helix::build_info {
 
-  std::string_view version() noexcept { return NOCTALIA_VERSION; }
+  std::string_view version() noexcept { return HELIX_VERSION; }
 
-  std::string_view revision() noexcept { return NOCTALIA_GIT_REVISION; }
+  std::string_view revision() noexcept { return HELIX_GIT_REVISION; }
 
   std::string displayVersion() {
     std::string label = "v";
@@ -22,4 +22,4 @@ namespace noctalia::build_info {
     return label;
   }
 
-} // namespace noctalia::build_info
+} // namespace helix::build_info

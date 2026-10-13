@@ -447,7 +447,7 @@ In Helix's main config, put the same custom color definitions under `[theme.temp
 warning = "#f97316"
 
 [theme.templates.user.my_app]
-input_path  = "$XDG_CONFIG_HOME/noctalia/templates/my-app.css"
+input_path  = "$XDG_CONFIG_HOME/helix/templates/my-app.css"
 output_path = "$XDG_CONFIG_HOME/my-app/theme.css"
 ```
 
@@ -505,8 +505,8 @@ Each template entry supports:
 [templates.qt]
 input_path = "./qtct.conf"
 output_path = [
-  "$XDG_CONFIG_HOME/qt5ct/colors/noctalia.conf",
-  "$XDG_CONFIG_HOME/qt6ct/colors/noctalia.conf",
+  "$XDG_CONFIG_HOME/qt5ct/colors/helix.conf",
+  "$XDG_CONFIG_HOME/qt6ct/colors/helix.conf",
 ]
 ```
 
@@ -540,7 +540,7 @@ two entries drive the same script or touch the same files, or when a later templ
 
 ```toml
 [theme.templates.user.my_app]
-input_path  = "$XDG_CONFIG_HOME/noctalia/templates/my-app.css"
+input_path  = "$XDG_CONFIG_HOME/helix/templates/my-app.css"
 output_path = "$XDG_CONFIG_HOME/my-app/theme.css"
 post_hook   = "my-app --reload-theme"
 hook_async  = false
@@ -631,24 +631,24 @@ These are accessed like any other color token:
 
 ## CLI Usage
 
-Template rendering is available through `noctalia theme`.
+Template rendering is available through `helix theme`.
 
 Render one file:
 
 ```sh
-noctalia theme <image> -r input.txt:output.txt
+helix theme <image> -r input.txt:output.txt
 ```
 
 Process a TOML config:
 
 ```sh
-noctalia theme <image> -c templates.toml
+helix theme <image> -c templates.toml
 ```
 
 List available templates:
 
 ```sh
-noctalia theme --list-templates
+helix theme --list-templates
 ```
 
 Pass `-c <file>` with `--list-templates` to include entries from a standalone template TOML config.
@@ -656,7 +656,7 @@ Pass `-c <file>` with `--list-templates` to include entries from a standalone te
 Process the shipped built-in template catalog:
 
 ```sh
-noctalia theme <image> --builtin-config
+helix theme <image> --builtin-config
 ```
 
 The shipped built-in catalog lives at `assets/templates/builtin.toml`.
@@ -664,14 +664,14 @@ The shipped built-in catalog lives at `assets/templates/builtin.toml`.
 Render from a precomputed theme JSON:
 
 ```sh
-noctalia theme --theme-json theme.json -r input.txt:output.txt
+helix theme --theme-json theme.json -r input.txt:output.txt
 ```
 
 Combine both: `-c` and `-r` can be used in the same command. The config's
 `[config.custom_colors]` are loaded first, so the `-r` templates can reference them:
 
 ```sh
-noctalia theme <image> -c templates.toml -r input.txt:output.txt
+helix theme <image> -c templates.toml -r input.txt:output.txt
 ```
 
 The `-r` files are rendered first, then the templates declared in the config.
@@ -679,5 +679,5 @@ The `-r` files are rendered first, then the templates declared in the config.
 Set the default template mode:
 
 ```sh
-noctalia theme <image> --default-mode light -r input.txt:output.txt
+helix theme <image> --default-mode light -r input.txt:output.txt
 ```

@@ -23,7 +23,7 @@ namespace {
 } // namespace
 
 int main() {
-  char tempDir[] = "/tmp/noctalia-icon-resolver-test-XXXXXX";
+  char tempDir[] = "/tmp/helix-icon-resolver-test-XXXXXX";
   if (mkdtemp(tempDir) == nullptr) {
     std::perror("mkdtemp");
     return 1;
@@ -39,7 +39,7 @@ int main() {
   fs::create_directories(bitmapIconDir);
   std::ofstream(iconThemeRoot / "index.theme") << "[Icon Theme]\n"
                                                   "Directories = 48x48/apps, scalable/apps\n"
-                                                  "Inherits = noctalia-bare-test\n"
+                                                  "Inherits = helix-bare-test\n"
                                                   "[48x48/apps]\n"
                                                   "Size = 48\n"
                                                   "Type = Fixed\n"
@@ -50,7 +50,7 @@ int main() {
 
   // An inherited theme with no index.theme exercises the fallback search paths
   // (theme root and 512x512/apps) that only apply to index-less themes.
-  const fs::path bareThemeRoot = root / "icons/noctalia-bare-test";
+  const fs::path bareThemeRoot = root / "icons/helix-bare-test";
   const fs::path bareBitmapDir = bareThemeRoot / "512x512/apps";
   fs::create_directories(bareBitmapDir);
   const fs::path bareSizedIcon = bareBitmapDir / "bare-sized-icon.png";

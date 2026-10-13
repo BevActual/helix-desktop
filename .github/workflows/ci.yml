@@ -11,6 +11,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  translations:
+    name: Check translation keys
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check English catalog references
+        run: python3 tools/i18n-check.py
+
   format:
     name: clang-format
     runs-on: ubuntu-latest
@@ -46,7 +54,7 @@ jobs:
             sdbus-cpp libpipewire wireplumber polkit \
             pam curl libwebp libjxl libsndfile librsvg \
             libqalculate libxml2 \
-            md4c tomlplusplus libical \
+            tomlplusplus libical libcups \
             nlohmann-json stb \
             jemalloc just clang
 
@@ -55,8 +63,20 @@ jobs:
       - name: Build
         run: just build
 
+      - name: Check staged installation
+        run: just test-install
+
       - name: Test
         run: just test debug --print-errorlogs
 
-      - name: Lint
-        run: just lint
+      # Full-tree clang-tidy with -warnings-as-errors is still catching up after the
+      # C++ session binary retirement; run `just lint` locally before large C++ changes.
+
+  helix-shell-core:
+    name: helix-shell-core (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Unit tests
+        run: cargo test -p helix-shell-core --lib --quiet

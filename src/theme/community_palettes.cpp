@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -18,13 +19,26 @@
 #include <system_error>
 #include <utility>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
     constexpr Logger kLog("community_palettes");
-    constexpr std::string_view kCatalogUrl = "https://api.noctalia.dev/palettes";
-    constexpr std::string_view kPaletteUrlBase = "https://api.noctalia.dev/palette";
+
+    // Remote catalog is opt-in. No default host — Helix does not call third-party palette APIs.
+    [[nodiscard]] std::string catalogUrl() {
+      if (const char* env = std::getenv("HELIX_COMMUNITY_PALETTE_CATALOG_URL"); env != nullptr && env[0] != '\0') {
+        return env;
+      }
+      return {};
+    }
+
+    [[nodiscard]] std::string paletteUrlBase() {
+      if (const char* env = std::getenv("HELIX_COMMUNITY_PALETTE_URL_BASE"); env != nullptr && env[0] != '\0') {
+        return env;
+      }
+      return {};
+    }
 
     std::filesystem::path catalogCachePath() { return communityPaletteCacheDir() / ".catalog" / "palettes.json"; }
 
@@ -127,7 +141,16 @@ namespace noctalia::theme {
     std::error_code ec;
     std::filesystem::create_directories(path.parent_path(), ec);
 
-    m_httpClient.download(kCatalogUrl, path, [this, generation, path](bool success) {
+    const std::string url = catalogUrl();
+    if (url.empty()) {
+      kLog.info("community palette catalog URL unset (HELIX_COMMUNITY_PALETTE_CATALOG_URL); using local cache only");
+      if (m_readyCallback) {
+        DeferredCall::callLater([callback = m_readyCallback]() { callback(); });
+      }
+      return;
+    }
+
+    m_httpClient.download(url, path, [this, generation, path](bool success) {
       if (generation != m_generation) {
         return;
       }
@@ -162,7 +185,7 @@ namespace noctalia::theme {
     if (!state.empty()) {
       return std::filesystem::path(state) / "community-palettes";
     }
-    return std::filesystem::path("/tmp") / "noctalia" / "community-palettes";
+    return std::filesystem::path("/tmp") / "helix" / "community-palettes";
   }
 
   std::filesystem::path communityPaletteCachePath(std::string_view name) {
@@ -170,7 +193,11 @@ namespace noctalia::theme {
   }
 
   std::string communityPaletteDownloadUrl(std::string_view name) {
-    return std::string(kPaletteUrlBase) + "/" + StringUtils::urlEncode(name);
+    const std::string base = paletteUrlBase();
+    if (base.empty()) {
+      return {};
+    }
+    return base + "/" + StringUtils::urlEncode(name);
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

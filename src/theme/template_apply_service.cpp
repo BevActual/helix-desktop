@@ -6,6 +6,7 @@
 #include "core/files/resource_paths.h"
 #include "core/log.h"
 #include "core/process/process.h"
+#include "desktop_api/client.h"
 #include "ipc/ipc_service.h"
 #include "theme/community_templates.h"
 #include "theme/hook_runner.h"
@@ -22,7 +23,7 @@
 #include <utility>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -45,7 +46,7 @@ namespace noctalia::theme {
     std::filesystem::path userTemplateConfigPath() {
       const std::string configDir = FileUtils::configDir();
       if (configDir.empty()) {
-        return "noctalia.toml";
+        return "helix.toml";
       }
       return std::filesystem::path(configDir) / "config.toml";
     }
@@ -148,7 +149,7 @@ namespace noctalia::theme {
       return root;
     }
 
-    // state.toml owner/key holding the built-in template ids Noctalia has applied.
+    // state.toml owner/key holding the built-in template ids Helix has applied.
     constexpr std::string_view kStateOwner = "theme_templates";
     constexpr std::string_view kAppliedBuiltinIdsKey = "applied_builtin_ids";
 
@@ -201,6 +202,11 @@ namespace noctalia::theme {
   void TemplateApplyService::apply(
       const GeneratedPalette& palette, std::string_view defaultMode, bool force, bool paletteChanged
   ) const {
+    if (m_remoteSource) {
+      if (force)
+        (void)reapplyLast();
+      return;
+    }
     ApplyRequest request = makeRequest(palette, defaultMode);
     bool queued = false;
     std::function<void()> undeliverable;
@@ -241,6 +247,14 @@ namespace noctalia::theme {
   }
 
   bool TemplateApplyService::reapplyLast() const {
+    if (m_remoteSource) {
+      try {
+        helix::desktopClient().call("appearance", "Reapply");
+        return true;
+      } catch (...) {
+        return false;
+      }
+    }
     GeneratedPalette palette;
     std::string defaultMode;
     {
@@ -266,7 +280,7 @@ namespace noctalia::theme {
   }
 
   void TemplateApplyService::registerIpc(IpcService& ipc) {
-    ipc.bind(noctalia::cli::msg::templatesApply, [this](const std::string& args) -> std::string {
+    ipc.bind(helix::cli::msg::templatesApply, [this](const std::string& args) -> std::string {
       if (!StringUtils::trim(args).empty()) {
         return "error: usage: templates-apply\n";
       }
@@ -586,4 +600,4 @@ namespace noctalia::theme {
     return m_shutdown || generation != m_nextGeneration;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

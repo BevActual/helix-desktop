@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sync docs/user/**/*.mdx into ../noctalia-docs/src/content/docs/noctalia/.
+# Sync docs/user/**/*.mdx into ../helix-docs/src/content/docs/helix/.
 # The source files remain MDX so the docs site can keep using its components.
 # Documentation assets are copied from docs/assets/ into the docs site's
 # src/assets/. Existing generated pages are replaced atomically, and stale
@@ -8,13 +8,11 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-site_root="${1:-"$repo_root/../noctalia-docs"}"
+site_root="${1:-"$repo_root/../helix-docs"}"
 source_dir="$repo_root/docs/user"
-dest_dir="$site_root/src/content/docs/noctalia"
+dest_dir="$site_root/src/content/docs/helix"
 asset_source="$repo_root/docs/assets"
 asset_dest="$site_root/src/assets"
-plugin_api_source="$repo_root/docs/plugin-api.json"
-plugin_api_dest="$site_root/src/data/plugin-api.json"
 
 [[ -d "$source_dir" ]] || {
     printf 'sync-docs: source directory does not exist: %s\n' "$source_dir" >&2
@@ -28,12 +26,8 @@ plugin_api_dest="$site_root/src/data/plugin-api.json"
     printf 'sync-docs: asset directory does not exist: %s\n' "$asset_source" >&2
     exit 1
 }
-[[ -f "$plugin_api_source" ]] || {
-    printf 'sync-docs: plugin API metadata does not exist: %s\n' "$plugin_api_source" >&2
-    exit 1
-}
 
-mkdir -p "$dest_dir" "$asset_dest" "$(dirname "$plugin_api_dest")"
+mkdir -p "$dest_dir" "$asset_dest"
 
 declare -A expected_mdx=()
 source_count=0
@@ -61,9 +55,6 @@ if (( source_count == 0 )); then
 fi
 
 cp -a "$asset_source"/. "$asset_dest"/
-
-cp "$plugin_api_source" "$plugin_api_dest.tmp"
-mv "$plugin_api_dest.tmp" "$plugin_api_dest"
 
 while IFS= read -r -d '' mdx; do
     if [[ -n "${expected_mdx["$mdx"]+present}" ]]; then

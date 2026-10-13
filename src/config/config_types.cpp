@@ -1,7 +1,7 @@
 #include "config/config_types.h"
 
+#include "core/color.h"
 #include "core/input/key_modifiers.h"
-#include "render/core/color.h"
 #include "util/string_utils.h"
 #include "wayland/wayland_connection.h"
 
@@ -50,54 +50,7 @@ namespace {
 
 } // namespace
 
-std::vector<ShortcutConfig> defaultControlCenterShortcuts() {
-  return {};
-}
-
-std::vector<PluginSourceConfig> defaultPluginSources() {
-  return {
-      {.kind = PluginSourceKind::Git,
-       .name = "official",
-       .location = "https://github.com/noctalia-dev/official-plugins"},
-      {.kind = PluginSourceKind::Git,
-       .name = "community",
-       .location = "https://github.com/noctalia-dev/community-plugins"},
-  };
-}
-
-bool isDefaultPluginSourceName(std::string_view name) {
-  const auto sources = defaultPluginSources();
-  return std::ranges::contains(sources, name, &PluginSourceConfig::name);
-}
-
-bool sourceInAutoUpdateScope(const PluginSourceConfig& source, PluginAutoUpdateMode mode) {
-  if (mode == PluginAutoUpdateMode::None || source.kind != PluginSourceKind::Git || !source.enabled) {
-    return false;
-  }
-  if (mode == PluginAutoUpdateMode::All) {
-    return true;
-  }
-  const auto official = defaultPluginSources()[0];
-  return source.name == official.name && source.location == official.location;
-}
-
-bool isValidPluginSourceName(std::string_view name) {
-  if (name.empty()) {
-    return false;
-  }
-  const auto first = static_cast<unsigned char>(name.front());
-  if (std::isalnum(first) == 0) {
-    return false;
-  }
-  for (const char ch : name) {
-    const auto c = static_cast<unsigned char>(ch);
-    if (std::isalnum(c) != 0 || ch == '_' || ch == '-' || ch == '.') {
-      continue;
-    }
-    return false;
-  }
-  return name != "." && name != "..";
-}
+std::vector<ShortcutConfig> defaultControlCenterShortcuts() { return {}; }
 
 std::vector<SessionPanelActionConfig> defaultSessionPanelActions() {
   return {
@@ -316,7 +269,7 @@ const WidgetSettingValue* WidgetConfig::findSetting(const std::string& key) cons
 
 std::string WidgetConfig::getString(const std::string& key, const std::string& fallback) const {
   const auto* value = findSetting(key);
-  const auto decoded = value != nullptr ? noctalia::config::widgetSettingValueAs<std::string>(*value) : std::nullopt;
+  const auto decoded = value != nullptr ? helix::config::widgetSettingValueAs<std::string>(*value) : std::nullopt;
   return decoded.value_or(fallback);
 }
 
@@ -324,25 +277,25 @@ std::vector<std::string>
 WidgetConfig::getStringList(const std::string& key, const std::vector<std::string>& fallback) const {
   const auto* value = findSetting(key);
   const auto decoded =
-      value != nullptr ? noctalia::config::widgetSettingValueAs<std::vector<std::string>>(*value) : std::nullopt;
+      value != nullptr ? helix::config::widgetSettingValueAs<std::vector<std::string>>(*value) : std::nullopt;
   return decoded.value_or(fallback);
 }
 
 std::int64_t WidgetConfig::getInt(const std::string& key, std::int64_t fallback) const {
   const auto* value = findSetting(key);
-  const auto decoded = value != nullptr ? noctalia::config::widgetSettingValueAs<std::int64_t>(*value) : std::nullopt;
+  const auto decoded = value != nullptr ? helix::config::widgetSettingValueAs<std::int64_t>(*value) : std::nullopt;
   return decoded.value_or(fallback);
 }
 
 double WidgetConfig::getDouble(const std::string& key, double fallback) const {
   const auto* value = findSetting(key);
-  const auto decoded = value != nullptr ? noctalia::config::widgetSettingValueAs<double>(*value) : std::nullopt;
+  const auto decoded = value != nullptr ? helix::config::widgetSettingValueAs<double>(*value) : std::nullopt;
   return decoded.value_or(fallback);
 }
 
 bool WidgetConfig::getBool(const std::string& key, bool fallback) const {
   const auto* value = findSetting(key);
-  const auto decoded = value != nullptr ? noctalia::config::widgetSettingValueAs<bool>(*value) : std::nullopt;
+  const auto decoded = value != nullptr ? helix::config::widgetSettingValueAs<bool>(*value) : std::nullopt;
   return decoded.value_or(fallback);
 }
 
@@ -350,7 +303,7 @@ ColorSpec
 WidgetConfig::getColorSpec(const std::string& key, const ColorSpec& fallback, std::string_view context) const {
   const auto* value = findSetting(key);
   const auto decoded = value != nullptr
-      ? noctalia::config::widgetSettingValueAs<ColorSpec>(*value, context.empty() ? std::string_view(key) : context)
+      ? helix::config::widgetSettingValueAs<ColorSpec>(*value, context.empty() ? std::string_view(key) : context)
       : std::nullopt;
   return decoded.value_or(fallback);
 }
@@ -365,7 +318,7 @@ std::optional<ColorSpec> WidgetConfig::getOptionalColorSpec(const std::string& k
       return std::nullopt;
     }
   }
-  return noctalia::config::widgetSettingValueAs<ColorSpec>(*value, context.empty() ? std::string_view(key) : context);
+  return helix::config::widgetSettingValueAs<ColorSpec>(*value, context.empty() ? std::string_view(key) : context);
 }
 
 std::unordered_map<std::string, std::string>

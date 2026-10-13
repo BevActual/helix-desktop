@@ -1,0 +1,11 @@
+// The greeter's private compositor. No key bindings at all: nothing on this screen can open a terminal or quit the greeter.
+hotkey-overlay { skip-at-startup; }
+prefer-no-csd
+cursor { hide-when-typing; }
+input {
+    keyboard {
+        xkb {
+            layout "us"
+        }
+    }
+}

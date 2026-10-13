@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-Shows a clipboard glyph and opens or closes Control Center's Clipboard tab on click. History limits, clear/delete confirmation, auto-paste, and image actions are configured under `[shell]` - see [Shell settings](/noctalia/configuration/shell/#shell-settings) (`clipboard_*` keys).
+Shows a clipboard glyph and opens or closes Control Center's Clipboard tab on click. History limits, clear/delete confirmation, auto-paste, and image actions are configured under `[shell]` - see [Shell settings](/helix/configuration/shell/#shell-settings) (`clipboard_*` keys).
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -21,5 +21,5 @@ glyph = "clipboard-list"
 **Clear clipboard history from the command line:**
 
 ```bash
-noctalia msg clipboard-clear
+helix-panel clipboard-clear
 ```

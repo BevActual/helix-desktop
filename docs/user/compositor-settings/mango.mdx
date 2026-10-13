@@ -1,9 +1,14 @@
 ---
 title: Mango
-description: Configure Mango effects and keybinds for Helix.
+description: Unsupported historical notes for Mango (not a Helix product surface).
 sidebar:
   order: 7
 ---
+
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
 
 Configure Mango for Helix surfaces and use Mango binds to launch Helix IPC commands directly from the compositor.
 
@@ -12,7 +17,7 @@ Configure Mango for Helix surfaces and use Mango binds to launch Helix IPC comma
 Add to your `~/.config/mango/config.conf`:
 
 ```bash
-exec-once=noctalia
+exec-once=helix
 ```
 
 ## Blur and shadows
@@ -67,14 +72,14 @@ Add these binds to your `~/.config/mango/config.conf`:
 
 ```bash
 # Core binds
-bind=SUPER,space,spawn,noctalia msg panel-toggle launcher
-bind=SUPER,s,spawn,noctalia msg panel-toggle control-center
-bind=SUPER,comma,spawn,noctalia msg settings-toggle
+bind=SUPER,space,spawn,helix-panel panel-toggle launcher
+bind=SUPER,s,spawn,helix-panel panel-toggle control-center
+bind=SUPER,comma,spawn,helix-panel settings-toggle
 
 # Media keys
-bind=NONE,XF86AudioRaiseVolume,spawn,noctalia msg volume-up
-bind=NONE,XF86AudioLowerVolume,spawn,noctalia msg volume-down
-bind=NONE,XF86AudioMute,spawn,noctalia msg volume-mute
-bind=NONE,XF86MonBrightnessUp,spawn,noctalia msg brightness-up
-bind=NONE,XF86MonBrightnessDown,spawn,noctalia msg brightness-down
+bind=NONE,XF86AudioRaiseVolume,spawn,helix-panel volume-up
+bind=NONE,XF86AudioLowerVolume,spawn,helix-panel volume-down
+bind=NONE,XF86AudioMute,spawn,helix-panel volume-mute
+bind=NONE,XF86MonBrightnessUp,spawn,helix-panel brightness-up
+bind=NONE,XF86MonBrightnessDown,spawn,helix-panel brightness-down
 ```

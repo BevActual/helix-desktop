@@ -1,6 +1,6 @@
 #include "theme/image_loader.h"
 
-#include "render/core/image_decoder.h"
+#include "core/image_decoder.h"
 #include "theme/scheme.h"
 
 #include <algorithm>
@@ -11,7 +11,7 @@
 #include <fstream>
 #include <iterator>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -291,4 +291,4 @@ namespace noctalia::theme {
     return out;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

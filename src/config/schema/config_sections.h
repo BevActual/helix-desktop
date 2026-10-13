@@ -15,7 +15,7 @@
 // exporter (config_export::serialize), the validator (config_validate), schema path
 // resolution and the round-trip test all iterate this table instead of restating the
 // sections, so a section cannot exist in one of them and be missing from another.
-namespace noctalia::config::schema {
+namespace helix::config::schema {
 
   // One row per schema-backed section. Every closure is derived from the same
   // member pointer + section schema, so a row cannot be half-wired (read but not
@@ -47,12 +47,11 @@ namespace noctalia::config::schema {
   [[nodiscard]] const SectionSpec* findSection(std::string_view name);
 
   // Root keys whose shape is not a plain section schema: named tables (bar, widget),
-  // placement structures (desktop_widgets, lockscreen_widgets), the open per-plugin
-  // map (plugin_settings), and config meta keys. Their read/write/validate stay
+  // placement structures (desktop_widgets, lockscreen_widgets), and config meta keys. Their read/write/validate stay
   // hand-written in the owning file; the names live here so the known-root-key set
   // still has exactly one source.
   [[nodiscard]] std::span<const std::string_view> customRootKeys();
 
   [[nodiscard]] bool isKnownRootKey(std::string_view name);
 
-} // namespace noctalia::config::schema
+} // namespace helix::config::schema

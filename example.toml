@@ -1,5 +1,5 @@
 # Helix Shell configuration: all settings at their defaults.
-# Copy to ~/.config/noctalia/config.toml and edit what you need.
+# Copy to ~/.config/helix/config.toml and edit what you need.
 # Most changes are hot-reloaded via inotify; startup-only settings are noted inline.
 
 # ── Shell ─────────────────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ offline_mode          = false        # block all outgoing HTTP when true
 # panel_anchor_bar   = "main"        # bar panels attach to without a source bar; omit = first enabled bar
 telemetry_enabled     = false        # send an anonymous startup ping
 niri_overview_type_to_launch_enabled = false # Control Center → Launcher; type-to-launch from niri overview
-polkit_agent          = false
+polkit_agent          = true           # native bar agent; false if KDE/GNOME handles Polkit
 password_style        = "default"    # default | random
 settings_show_advanced = true        # show advanced settings by default
 show_location         = true         # hide weather location text in shell UI when false
@@ -34,7 +34,7 @@ clipboard_keep_from_closed_apps = true # keep the last copied item pasteable aft
 clipboard_auto_paste  = "auto"       # off | auto | ctrl_v | ctrl_shift_v | shift_insert
 clipboard_image_action_command = ""  # image preview action: gimp {path}, or satty -f - via stdin
 # IPC example:
-# noctalia msg clipboard-clear
+# helix-shell msg clipboard-clear
 shared_gl_context     = true         # startup-only; false isolates GPU contexts for broken drivers
 # lang                = "en"
 # avatar_path         = "~/Pictures/avatar.png"
@@ -67,17 +67,17 @@ alpha     = 0.55                    # multiplied by each component's background 
 [shell.panel]
 transparency_mode     = "solid"     # kept in sync with glass; solid | soft | glass
 glass                 = 0.0         # 0 = solid chrome, 1 = clear glass fill/dimming
-refraction            = false       # helix-niri liquid-glass; stock niri maps this to chrome blur
+refraction            = false       # helix-niri liquid-glass (real backdrop, not wallpaper xray); stock niri → chrome blur
 borders               = true        # panel shell outline and in-panel section cards
 shadow                = true        # cast the global [shell.shadow] from panel surfaces
 launcher_placement       = "floating" # attached | floating
-control_center_placement = "attached" # attached | floating
+control_center_placement = "floating" # attached | floating — dropdown under the status area
 wallpaper_placement      = "attached" # attached | floating
 session_placement        = "attached" # attached | floating
 quick_insert_placement   = "floating" # attached | floating
 launcher_position        = "center"   # auto | center | top_left | … (floating only)
 quick_insert_position    = "center"   # auto | center | top_left | … (floating only)
-open_near_click_control_center = false # for attached/floating placement, follow the bar click instead of bar-center
+open_near_click_control_center = true  # align Control Center / Notification Center under the click
 open_near_click_launcher       = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_wallpaper      = false # for attached/floating placement, follow the bar click instead of bar-center
 open_near_click_session        = false # for attached/floating placement, follow the bar click instead of bar-center
@@ -155,9 +155,9 @@ provider     = "bing"                 # bing | nasa
 [theme]
 mode   = "dark"                     # dark | light | auto
 source = "builtin"                  # builtin | wallpaper | community
-builtin = "Noctalia"                # Ayu | Catppuccin | Dracula | Eldritch | Gruvbox |
-                                    # Kanagawa | Noctalia | Nord | Rosé Pine | Tokyo-Night
-# community_palette = "Noctalia"    # fetched from api.noctalia.dev, cached locally
+builtin = "Helix"                # Ayu | Catppuccin | Dracula | Eldritch | Gruvbox |
+                                    # Kanagawa | Helix | Nord | Rosé Pine | Tokyo-Night
+# community_palette = "Helix"    # local cache or HELIX_COMMUNITY_*_URL, cached locally
 # wallpaper_scheme  = "m3-content"  # m3-tonal-spot | m3-content | m3-fruit-salad |
                                     # m3-rainbow | m3-monochrome | vibrant | faithful |
                                     # dysfunctional | muted
@@ -165,13 +165,13 @@ pure_black_dark = false             # anchor dark surfaces to true black (OLED);
                                     # every palette source, not just wallpaper-generated ones
 
 [theme.niri_layout]                 # Control Center → Theme owns decorations/blur; Windows owns gaps/struts/columns
-focus_ring = false                  # writes niri's managed noctalia-layout.kdl include; requires niri
+focus_ring = false                  # writes niri's managed helix-layout.kdl include; requires niri
 border     = false
-blur       = false                  # writes noctalia-blur.kdl; requires niri 26.04+
+blur       = false                  # writes helix-blur.kdl; requires niri 26.04+
 blur_passes = 2                     # dual kawase passes (1–8)
 blur_offset = 3.0                   # sample distance per pass (0.5–8.0)
 blur_noise  = 0.03                  # grain overlay (0.0–0.2)
-overview   = "none"                 # Control Center → Wallpaper; writes noctalia-overview.kdl
+overview   = "none"                 # Control Center → Wallpaper; writes helix-overview.kdl
 # gaps     = 16                     # optional; Control Center → Desktop → Windows
 # struts   = 0                      # optional equal outer padding on all sides
 # default_column_width = 0.5        # optional; fraction of the output width
@@ -179,9 +179,9 @@ overview   = "none"                 # Control Center → Wallpaper; writes nocta
 
 [theme.templates]
 enable_builtin_templates            = true
-builtin_ids                = []     # opt-in; list ids with: noctalia theme --list-templates
+builtin_ids                = []     # opt-in; list ids with: helix-shell theme --list-templates
 enable_community_templates = true
-community_ids              = []     # fetched from api.noctalia.dev/templates, cached locally
+community_ids              = []     # local cache or HELIX_COMMUNITY_*_URL/templates, cached locally
 
 # User-defined templates are declared directly in config.
 # [theme.templates.user.my_app]
@@ -217,9 +217,9 @@ offset_y           = 8              # absolute vertical margin from the screen e
 # bypass_dnd      = false            # bypass DND for matching notifications; play_sound still controls sound
 # allowed_urgencies = ["normal", "critical"]  # omit or list all three to allow every level
 # IPC examples:
-# noctalia msg notification-invoke-latest
-# noctalia msg notification-clear-active
-# noctalia msg notification-clear-history
+# helix-shell msg notification-invoke-latest
+# helix-shell msg notification-clear-active
+# helix-shell msg notification-clear-history
 
 # ── OSD ───────────────────────────────────────────────────────────────────────
 
@@ -337,20 +337,6 @@ refresh_interval_seconds = 10   # 3–120; how often to poll `tailscale status`
 notify_on_peer_change = false    # toast when a peer comes online or goes offline
 # admin_url = ""                  # override the admin console URL (empty = Tailscale admin)
 
-[localsend]
-enabled = true
-# alias = ""                      # empty = machine hostname
-# pin = ""                        # optional PIN required to send files to this machine
-# download_dir = "~/Downloads"    # incoming files
-auto_accept = false
-notify_on_receive = true
-port = 53317                      # TCP/UDP LocalSend port
-
-[phone]
-mirror_always_on = true           # keep the iPhone AirPlay receiver + Bluetooth pointer up while an iPhone is paired
-notifications = true              # mirror iPhone notifications to the desktop (ANCS over the Helix Phone Bluetooth link)
-cast_audio = true                 # play the Android phone's audio here while it casts (scrcpy, Android 11+)
-
 # ── Audio ─────────────────────────────────────────────────────────────────────
 
 [audio]
@@ -369,7 +355,7 @@ enable_ddcutil = false
 # Per-monitor backend override:
 # [brightness.monitor.eDP-1]
 # backend = "backlight"             # auto | none | backlight | ddcutil
-# backlight_device = "intel_backlight"  # explicit sysfs device name or path; run: noctalia msg brightness-list-backlight-devices
+# backlight_device = "intel_backlight"  # explicit sysfs device name or path; run: helix-shell msg brightness-list-backlight-devices
 # [brightness.monitor.DP-1]
 # backend = "ddcutil"
 # [brightness.monitor.DP-2]
@@ -431,12 +417,12 @@ delete   = ["del"]
 [bar.main]
 position           = "top"          # top | bottom | left | right
 thickness          = 34
-background_opacity = 1.0
-radius             = 12
-margin_ends        = 180
+background_opacity = 0.72           # soft glass floating chrome
+radius             = 18             # pill corners (radius2xl family)
+margin_ends        = 12
 margin_edge        = 10
 padding            = 14
-widget_spacing     = 6
+widget_spacing     = 8
 scale              = 1.0
 font_scale         = 1.0            # text-only scale multiplier across widgets
 shadow             = true
@@ -444,20 +430,33 @@ auto_hide          = false
 # smart_auto_hide    = false       # show when the active workspace is empty; hide when it has windows
 # show_on_workspace_switch = true   # with auto_hide: briefly reveal when the active workspace changes
 reserve_space      = true
-capsule            = false
+capsule            = false          # per-widget capsules off; group:status paints its own pill
 # capsule_fill     = "surface_variant"
 # capsule_radius   = 8.0            # omit/blank in Settings for automatic pill radius; 0.0 = square
 # capsule_opacity  = 1.0
 # capsule_border   = "outline"      # uncomment for a border on all widgets
 
-start  = ["launcher", "wallpaper", "workspaces"]
-center = ["clock"]
-end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth", "volume", "brightness", "battery", "control-center", "session"]
+# Floating glass bar: clock on the start; media / notifications / tray / status capsule on the end.
+# group:status members default to network, bluetooth, volume, battery (icon-only). Brightness,
+# control-center glyph, session, workspaces, etc. are optional extras — not part of the default row.
+start  = ["clock"]
+# center = []
+end    = ["media", "notifications", "tray", "group:status"]
+# Optional extras (uncomment / splice into a lane as needed):
+# start = ["launcher", "workspaces", "clock"]
+# end = ["media", "notifications", "tray", "group:status", "session"]
+# end = ["media", "notifications", "tray", "brightness", "group:status", "control-center"]
 
-# Commands for the bar margin outside widget sections (dead zone):
+# Status capsule membership (defaults match code when omitted):
+# [[bar.main.capsule_group]]
+# id = "status"
+# members = ["network", "bluetooth", "volume", "battery"]
+# opacity = 0.55
+
+# Commands for the bar margin outside widget sections (dead zone). Default: none.
 # [bar.main.dead_zone.actions]
 # left = "panel-toggle launcher"
-# right = "panel-toggle control-center"
+# right = "panel-toggle control-center home"
 # middle = "none"
 # scroll_up = "none"
 # scroll_down = "none"
@@ -472,7 +471,7 @@ end    = ["media", "tray", "notifications", "clipboard", "network", "bluetooth",
 # ── Dock ──────────────────────────────────────────────────────────────────────
 
 [dock]
-enabled             = false         # set true to activate
+enabled             = true          # bottom app tray (pinned + running apps)
 position            = "bottom"      # top | bottom | left | right
 icon_size           = 48
 main_axis_padding   = 16
@@ -578,7 +577,7 @@ enabled = false
 # started           = "notify-send 'Helix' 'Shell started'"
 # wallpaper_changed = []
 # colors_changed    = []
-# theme_mode_changed = "notify-send 'Helix' \"Theme mode: $NOCTALIA_THEME_MODE\""
+# theme_mode_changed = "notify-send 'Helix' \"Theme mode: $HELIX_THEME_MODE\""
 # session_locked    = []
 # session_unlocked  = []
 # logging_out       = []
@@ -588,9 +587,9 @@ enabled = false
 # wifi_disabled     = []
 # bluetooth_enabled  = []
 # bluetooth_disabled = []
-# battery_state_changed   = "notify-send 'Power' \"Battery: $NOCTALIA_BATTERY_STATE\""
-# battery_under_threshold = "notify-send 'Power' \"Battery at ${NOCTALIA_BATTERY_PERCENT}%\""
-# power_profile_changed   = "notify-send 'Power' \"Profile: $NOCTALIA_POWER_PROFILE\""
+# battery_state_changed   = "notify-send 'Power' \"Battery: $HELIX_BATTERY_STATE\""
+# battery_under_threshold = "notify-send 'Power' \"Battery at ${HELIX_BATTERY_PERCENT}%\""
+# power_profile_changed   = "notify-send 'Power' \"Profile: $HELIX_POWER_PROFILE\""
 # [widget.launcher]
 # custom_image = "/path/to/image.png"
 # custom_image_colorize = false
@@ -633,7 +632,7 @@ enabled = false
 # type                = "custom_button"
 # glyph               = "lock"
 # tooltip             = "Lock screen"
-# command             = "noctalia msg session lock"
+# command             = "helix-shell msg session lock"
 # right_command       = ""
 # middle_command      = ""
 # scroll_up_command   = ""

@@ -6,7 +6,7 @@
 
 #include <utility>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
     constexpr Logger kLog("hook_runner");
@@ -132,7 +132,7 @@ namespace noctalia::theme {
   bool HookRunner::launch(const std::shared_ptr<State>& state, QueuedHook hook) {
     process::RunCallbacks callbacks;
     callbacks.onExit = [state, command = hook.command, templateId = hook.templateId,
-                         generation = hook.generation](process::RunResult result) {
+                        generation = hook.generation](process::RunResult result) {
       if (!result) {
         kLog.warn("hook failed with exit code {}: {} (command: {})", result.exitCode, result.err, command);
         if (!templateId.empty()) {
@@ -176,4 +176,4 @@ namespace noctalia::theme {
     return false;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

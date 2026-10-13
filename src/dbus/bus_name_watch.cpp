@@ -7,9 +7,8 @@ namespace dbus_watch {
 
   namespace {
 
-    constexpr std::string_view kRulePrefix =
-        "type='signal',sender='org.freedesktop.DBus',path='/org/freedesktop/DBus',"
-        "interface='org.freedesktop.DBus',member='NameOwnerChanged',";
+    constexpr std::string_view kRulePrefix = "type='signal',sender='org.freedesktop.DBus',path='/org/freedesktop/DBus',"
+                                             "interface='org.freedesktop.DBus',member='NameOwnerChanged',";
 
     sdbus::Slot watch(sdbus::IConnection& connection, std::string rule, NameOwnerHandler handler) {
       return connection.addMatch(

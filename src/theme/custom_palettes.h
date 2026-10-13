@@ -1,14 +1,14 @@
 #pragma once
 
+#include "theme/color_roles.h"
 #include "theme/community_palettes.h"
-#include "ui/palette.h"
 
 #include <filesystem>
 #include <string>
 #include <string_view>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   struct GeneratedPalette;
 
@@ -24,4 +24,4 @@ namespace noctalia::theme {
   );
   [[nodiscard]] bool applyEditablePaletteRole(::Palette& palette, ColorRole role, const ::Color& color);
 
-} // namespace noctalia::theme
+} // namespace helix::theme

@@ -2,6 +2,7 @@
 
 #include "core/log.h"
 #include "dbus/system_bus.h"
+#include "desktop_api/client.h"
 
 #include <optional>
 #include <sdbus-c++/IConnection.h>
@@ -17,7 +18,7 @@ namespace {
 
   const sdbus::ServiceName kBluezBusName{"org.bluez"};
   const sdbus::ObjectPath kBluezRoot{"/org/bluez"};
-  const sdbus::ObjectPath kAgentObjectPath{"/org/noctalia/BluetoothAgent"};
+  const sdbus::ObjectPath kAgentObjectPath{"/org/helix/BluetoothAgent"};
   constexpr auto kAgentInterface = "org.bluez.Agent1";
   constexpr auto kAgentManagerInterface = "org.bluez.AgentManager1";
   constexpr auto kCapability = "KeyboardDisplay";
@@ -176,7 +177,32 @@ struct BluetoothAgent::Impl {
   }
 };
 
-BluetoothAgent::BluetoothAgent(SystemBus& bus) : m_impl(std::make_unique<Impl>(bus)) {
+BluetoothAgent::BluetoothAgent(SystemBus& bus, bool remote) : m_remote(remote), m_impl(std::make_unique<Impl>(bus)) {
+  if (m_remote) {
+    m_remoteObserver = helix::desktopClient().observe(
+        [this](std::string_view interface, std::string_view signal, const helix::Json& value) {
+          if (interface != helix::bluetoothInterface)
+            return;
+          if (signal == "Completed") {
+            m_remotePending = {};
+            return;
+          }
+          if (signal != "Prompt")
+            return;
+          const auto& request = value.at(0);
+          m_remotePending = {
+              .kind = BluetoothPairingKind(request.at("kind").get<int>()),
+              .devicePath = request.at("device"),
+              .passkey = request.at("passkey"),
+              .entered = request.at("entered"),
+              .pin = request.at("pin")
+          };
+          if (m_remoteCallback)
+            m_remoteCallback(m_remotePending);
+        }
+    );
+    return;
+  }
   m_impl->object = sdbus::createObject(bus.connection(), kAgentObjectPath);
 
   m_impl->object
@@ -236,6 +262,10 @@ BluetoothAgent::BluetoothAgent(SystemBus& bus) : m_impl(std::make_unique<Impl>(b
 }
 
 BluetoothAgent::~BluetoothAgent() {
+  if (m_remote) {
+    helix::desktopClient().unobserve(m_remoteObserver);
+    return;
+  }
   if (m_impl == nullptr) {
     return;
   }
@@ -249,12 +279,20 @@ BluetoothAgent::~BluetoothAgent() {
 }
 
 void BluetoothAgent::setRequestCallback(RequestCallback callback) {
+  if (m_remote) {
+    m_remoteCallback = std::move(callback);
+    return;
+  }
   if (m_impl != nullptr) {
     m_impl->requestCallback = std::move(callback);
   }
 }
 
 void BluetoothAgent::acceptConfirm() {
+  if (m_remote) {
+    replyRemote("", false);
+    return;
+  }
   if (m_impl == nullptr || !m_impl->pendingVoid) {
     m_impl->clearPending();
     return;
@@ -264,6 +302,10 @@ void BluetoothAgent::acceptConfirm() {
 }
 
 void BluetoothAgent::rejectConfirm() {
+  if (m_remote) {
+    replyRemote("", true);
+    return;
+  }
   if (m_impl == nullptr) {
     return;
   }
@@ -271,6 +313,10 @@ void BluetoothAgent::rejectConfirm() {
 }
 
 void BluetoothAgent::submitPin(const std::string& pin) {
+  if (m_remote) {
+    replyRemote(pin, false);
+    return;
+  }
   if (m_impl == nullptr || !m_impl->pendingString) {
     return;
   }
@@ -279,6 +325,10 @@ void BluetoothAgent::submitPin(const std::string& pin) {
 }
 
 void BluetoothAgent::submitPasskey(std::uint32_t passkey) {
+  if (m_remote) {
+    replyRemote(std::to_string(passkey), false);
+    return;
+  }
   if (m_impl == nullptr || !m_impl->pendingUint) {
     return;
   }
@@ -287,13 +337,31 @@ void BluetoothAgent::submitPasskey(std::uint32_t passkey) {
 }
 
 void BluetoothAgent::cancelPending() {
+  if (m_remote) {
+    replyRemote("", true);
+    return;
+  }
   if (m_impl != nullptr) {
     m_impl->cancelPending();
   }
 }
 
-bool BluetoothAgent::hasPendingRequest() const noexcept { return m_impl != nullptr && m_impl->hasPending(); }
+bool BluetoothAgent::hasPendingRequest() const noexcept {
+  return m_remote ? m_remotePending.kind != BluetoothPairingKind::None : m_impl != nullptr && m_impl->hasPending();
+}
 
 BluetoothPairingRequest BluetoothAgent::pendingRequest() const {
+  if (m_remote)
+    return m_remotePending;
   return m_impl != nullptr ? m_impl->pending : BluetoothPairingRequest{};
+}
+
+void BluetoothAgent::replyRemote(const std::string& response, bool cancel) {
+  if (m_remotePending.kind == BluetoothPairingKind::None)
+    return;
+  try {
+    helix::desktopClient().call("bluetooth", "Reply", g_variant_new("(sb)", response.c_str(), cancel));
+    m_remotePending = {};
+  } catch (...) {
+  }
 }

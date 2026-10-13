@@ -1,0 +1,12 @@
+{
+  "productName": "Helix System Monitor",
+  "version": "0.1.0",
+  "identifier": "org.helix.SystemMonitor",
+  "build": { "frontendDist": "../dist" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [],
+    "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:" }
+  },
+  "bundle": { "active": false }
+}

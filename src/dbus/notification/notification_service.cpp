@@ -1,17 +1,16 @@
 #include "notification_service.h"
 
 #include "compositors/compositor_detect.h"
+#include "core/image_decoder.h"
 #include "core/log.h"
 #include "dbus/session_bus.h"
 #include "i18n/i18n.h"
 #include "net/uri.h"
 #include "notification/notification_manager.h"
-#include "render/core/image_decoder.h"
 #include "util/file_utils.h"
 #include "util/string_utils.h"
 
 #include <algorithm>
-
 #include <cstdint>
 #include <tuple>
 #include <unistd.h>
@@ -31,7 +30,6 @@ namespace {
   constexpr auto kDbusInterface = "org.freedesktop.DBus";
 
   constexpr uint32_t kNameFlagAllowReplacement = 1U;
-  constexpr uint32_t kNameFlagReplaceExisting = 2U;
   constexpr uint32_t kNameFlagDoNotQueue = 4U;
 
   constexpr uint32_t kNameReplyPrimaryOwner = 1U;
@@ -43,12 +41,7 @@ namespace {
     return sdbus::createProxy(connection, kDbusBusName, kDbusObjectPath);
   }
 
-  [[nodiscard]] uint32_t notificationNameRequestFlags() {
-    if (compositors::isKde()) {
-      return kNameFlagAllowReplacement | kNameFlagReplaceExisting | kNameFlagDoNotQueue;
-    }
-    return kNameFlagAllowReplacement | kNameFlagDoNotQueue;
-  }
+  [[nodiscard]] uint32_t notificationNameRequestFlags() { return kNameFlagAllowReplacement | kNameFlagDoNotQueue; }
 
 } // namespace
 
@@ -575,5 +568,5 @@ void NotificationService::emitActivationToken(uint32_t id, const std::string& ac
 }
 
 std::tuple<std::string, std::string, std::string, std::string> NotificationService::onGetServerInformation() {
-  return {"noctalia", "noctalia-dev", NOCTALIA_VERSION, "1.2"};
+  return {"Helix Shell", "helix", HELIX_VERSION, "1.2"};
 }

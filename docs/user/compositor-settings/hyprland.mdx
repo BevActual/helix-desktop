@@ -1,12 +1,16 @@
 ---
 title: Hyprland
-description: Configure Hyprland for the best experience with Helix.
+description: Unsupported historical notes for Hyprland (not a Helix product surface).
 sidebar:
   order: 5
 ---
 
 import ImageLightbox from '../../../../components/ImageLightbox.astro';
 import blur1 from '../../assets/hyprland-blur/hyprland-blur-1-v5.png';
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
 
 Add the following settings to your Hyprland Lua configuration file (usually found at `~/.config/hypr/hyprland.lua`).
 
@@ -16,7 +20,7 @@ Add this to your `hyprland.start` event hook:
 
 ```lua
 hl.on("hyprland.start", function()
-  hl.exec_cmd("noctalia")
+  hl.exec_cmd("helix")
 end)
 ```
 
@@ -72,7 +76,7 @@ Add these binds to your `hyprland.lua`:
 
 ```lua
 local mainMod = "SUPER"
-local ipc = "noctalia msg "
+local ipc = "helix-panel "
 
 -- Core binds
 hl.bind(mainMod .. "+Space", hl.dsp.exec_cmd(ipc .. "panel-toggle launcher"))
@@ -89,7 +93,7 @@ hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(ipc .. "brightness-down"))
 
 -- Helix Settings
 hl.window_rule({
-    match = { class = "dev.noctalia.Noctalia" },
+    match = { class = "dev.helix.Helix" },
     float = true,
     size = { 1080, 920 },
 })
@@ -104,9 +108,9 @@ We also disable Hyprland's built-in layer animations for Helix so they do not in
 
 ```lua
 hl.layer_rule({
-  name = "noctalia",
+  name = "helix",
   match = {
-    namespace = "^noctalia-(bar-.+|notification|dock|panel|attached-panel|osd|window-switcher)$",
+    namespace = "^helix-(bar-.+|notification|dock|panel|attached-panel|osd|window-switcher)$",
   },
   no_anim = true,
   ignore_alpha = 0.5,

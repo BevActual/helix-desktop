@@ -13,7 +13,7 @@ namespace compositors::niri {
 
   class NiriRuntime;
 
-  inline constexpr std::string_view kBlurIncludeFileName = "noctalia-blur.kdl";
+  inline constexpr std::string_view kBlurIncludeFileName = "helix-blur.kdl";
 
   inline constexpr int kDefaultBlurPasses = 2;
   inline constexpr float kDefaultBlurOffset = 3.0F;
@@ -40,9 +40,8 @@ namespace compositors::niri {
   [[nodiscard]] std::vector<std::string> detectLiquidGlassParams(const NiriRuntime* runtime);
   [[nodiscard]] bool blurIncludeExists(const std::filesystem::path& configFile = {});
   [[nodiscard]] std::string kdlForBlur(const BlurSettings& settings);
-  [[nodiscard]] BlurSettings blurSettingsFromConfig(
-      const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams = {}
-  );
+  [[nodiscard]] BlurSettings
+  blurSettingsFromConfig(const Config& config, bool helixNiri, std::vector<std::string> liquidGlassParams = {});
 
   InstallResult persistBlurFromConfig(const Config& config, const NiriRuntime* runtime);
   InstallResult saveNiriBlur(const BlurSettings& settings);

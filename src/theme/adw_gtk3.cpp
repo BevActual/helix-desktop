@@ -5,7 +5,7 @@
 #include <ranges>
 #include <system_error>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -20,7 +20,8 @@ namespace noctalia::theme {
       std::size_t start = 0;
       while (start <= dirs.size()) {
         const std::size_t end = dirs.find(':', start);
-        const std::string_view part = dirs.substr(start, end == std::string_view::npos ? dirs.size() - start : end - start);
+        const std::string_view part =
+            dirs.substr(start, end == std::string_view::npos ? dirs.size() - start : end - start);
         if (!part.empty()) {
           addRoot(roots, std::filesystem::path(part) / "themes");
         }
@@ -90,4 +91,4 @@ namespace noctalia::theme {
     return changed;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

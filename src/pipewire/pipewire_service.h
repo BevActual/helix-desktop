@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/timer_manager.h"
 #include "pipewire/audio_glyphs.h"
 
 #include <chrono>
@@ -86,6 +87,7 @@ public:
   using VolumePreviewCallback = std::function<void(bool isInput, std::uint32_t id, float volume, bool muted)>;
 
   PipeWireService();
+  void setRemoteControl(bool remote);
   ~PipeWireService();
 
   PipeWireService(const PipeWireService&) = delete;
@@ -227,6 +229,12 @@ public:
   void onTargetObjectMetadata(std::uint32_t subject, const std::string& target);
 
 private:
+  bool m_remoteControl = false;
+  Timer m_remoteSnapshotTimer;
+  Timer m_remoteDebounce;
+  unsigned m_remoteObserver = 0;
+  void readRemoteSnapshot();
+  bool remoteAction(const char* action, std::uint32_t id, double value = 0, bool input = false);
   bool m_pendingDefaultAudioDevicePropsEnum = false;
   void enumDefaultAudioDeviceParams();
 

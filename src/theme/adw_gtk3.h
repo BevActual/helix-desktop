@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   inline constexpr std::string_view kGtk3TemplateId = "gtk3";
   inline constexpr std::string_view kGtk4TemplateId = "gtk4";
@@ -27,4 +27,4 @@ namespace noctalia::theme {
   // Appends gtk3 and gtk4 to `ids` when missing. Returns true if ids changed.
   bool appendGtkTemplateIds(std::vector<std::string>& ids);
 
-} // namespace noctalia::theme
+} // namespace helix::theme

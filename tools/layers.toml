@@ -1,0 +1,11 @@
+# Layering rules for src/, checked by tools/check-layers.py (meson test `layering`).
+#
+# After retiring the C++ session UI, only base + platform + independent processes remain.
+
+[layers]
+base = ["util", "core", "i18n", "time"]
+platform = ["config", "net", "security", "ipc", "dbus", "pipewire", "system", "theme", "notification", "hooks", "auth", "debug", "idle", "cli", "desktop_api", "wayland", "compositors"]
+
+[independent]
+modules = ["desktop", "apps", "inference", "assistant"]
+may_include = ["base", "platform", "independent"]

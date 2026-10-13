@@ -39,10 +39,11 @@ namespace security {
       return true;
     }
 
-    [[nodiscard]] std::optional<ByteVector> associatedData(const EncryptionContext& context) {
+    [[nodiscard]] std::optional<ByteVector>
+    associatedData(const EncryptionContext& context, std::span<const std::uint8_t, 12> magic) {
       ByteVector output;
-      output.reserve(EncryptedFileMagic.size() + 2 + 16 + context.purpose.size() + context.objectId.size());
-      output.insert(output.end(), EncryptedFileMagic.begin(), EncryptedFileMagic.end());
+      output.reserve(magic.size() + 2 + 16 + context.purpose.size() + context.objectId.size());
+      output.insert(output.end(), magic.begin(), magic.end());
       output.push_back(EncryptedFileFormatVersion);
       output.push_back(EncryptedFileAlgorithmXChaCha20Poly1305);
       if (!appendField(output, context.purpose) || !appendField(output, context.objectId)) {
@@ -86,7 +87,7 @@ namespace security {
         || plaintext.size() > static_cast<std::size_t>(crypto_aead_xchacha20poly1305_ietf_MESSAGEBYTES_MAX)) {
       return false;
     }
-    const auto aad = associatedData(context);
+    const auto aad = associatedData(context, EncryptedFileMagic);
     if (!aad.has_value()) {
       return false;
     }
@@ -172,7 +173,7 @@ namespace security {
       return {.status = EncryptedReadStatus::IoError};
     }
 
-    const auto aad = associatedData(context);
+    const auto aad = associatedData(context, EncryptedFileMagic);
     if (!aad.has_value()) {
       return {.status = EncryptedReadStatus::IoError};
     }

@@ -169,10 +169,10 @@ class TemplateValidationTests(unittest.TestCase):
 
 
 class TemplateEnforcementTests(unittest.TestCase):
-    ISSUE_URL = "https://api.github.test/repos/noctalia-dev/noctalia/issues/123"
-    PULL_REQUEST_URL = "https://api.github.test/repos/noctalia-dev/noctalia/pulls/123"
+    ISSUE_URL = "https://api.github.test/repos/BevActual/helix-desktop/issues/123"
+    PULL_REQUEST_URL = "https://api.github.test/repos/BevActual/helix-desktop/pulls/123"
     GRAPHQL_URL = "https://api.github.test/graphql"
-    COMMENT_URL = "https://api.github.test/repos/noctalia-dev/noctalia/issues/comments/7"
+    COMMENT_URL = "https://api.github.test/repos/BevActual/helix-desktop/issues/comments/7"
     NODE_ID = "PR_node123"
 
     def event(self, body: str, *, draft: bool = False) -> dict[str, object]:

@@ -5,7 +5,7 @@ sidebar:
   order: 33
 ---
 
-Shows the hottest coding-CLI quota (or a running llama.cpp / vLLM server, or the selected Ollama model, when no quota is hotter) and opens the [AI](/noctalia/control-center/#ai) Control Center tab on click. The glyph follows the hottest CLI; the percent turns red at **Usage Warning**.
+Shows the hottest coding-CLI quota (or a running llama.cpp / vLLM server, or the selected Ollama model, when no quota is hotter) and opens the [AI](/helix/control-center/#ai) Control Center tab on click. The glyph follows the hottest CLI; the percent turns red at **Usage Warning**.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -17,12 +17,12 @@ max_length = 120
 ```
 
 ```sh
-noctalia msg ai-usage-status
-noctalia msg ai-usage-refresh
-noctalia msg ai-usage-ollama-start
-noctalia msg ai-usage-ollama-stop
-noctalia msg ai-usage-ollama-model llama3.2:latest
-noctalia msg ai-usage-ollama-pull llama3.2
-noctalia msg ai-usage-ollama-cancel
-noctalia msg ai-usage-ollama-delete llama3.2:latest
+helix-panel ai-usage-status
+helix-panel ai-usage-refresh
+helix-panel ai-usage-ollama-start
+helix-panel ai-usage-ollama-stop
+helix-panel ai-usage-ollama-model llama3.2:latest
+helix-panel ai-usage-ollama-pull llama3.2
+helix-panel ai-usage-ollama-cancel
+helix-panel ai-usage-ollama-delete llama3.2:latest
 ```

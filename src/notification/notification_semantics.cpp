@@ -41,8 +41,7 @@ namespace {
 
 } // namespace
 
-NotificationSemantic
-notificationSemantic(const std::optional<std::string_view>& category, Urgency urgency) noexcept {
+NotificationSemantic notificationSemantic(const std::optional<std::string_view>& category, Urgency urgency) noexcept {
   if (urgency == Urgency::Critical) {
     return NotificationSemantic::Danger;
   }
@@ -60,8 +59,13 @@ notificationSemantic(const std::optional<std::string_view>& category, Urgency ur
   if (c == "transfer.complete" || c == "network.connected" || c == "device.added" || c == "presence.online") {
     return NotificationSemantic::Safe;
   }
-  if (c.starts_with("im") || c.starts_with("email") || c.starts_with("transfer") || c.starts_with("network")
-      || c.starts_with("device") || c.starts_with("presence") || c.starts_with("call")) {
+  if (c.starts_with("im")
+      || c.starts_with("email")
+      || c.starts_with("transfer")
+      || c.starts_with("network")
+      || c.starts_with("device")
+      || c.starts_with("presence")
+      || c.starts_with("call")) {
     return NotificationSemantic::Info;
   }
   return NotificationSemantic::None;

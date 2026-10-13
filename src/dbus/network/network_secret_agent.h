@@ -27,7 +27,7 @@ public:
 
   using RequestCallback = std::function<void(const SecretRequest&)>;
 
-  explicit NetworkSecretAgent(SystemBus& bus);
+  explicit NetworkSecretAgent(SystemBus& bus, bool remote = false);
   ~NetworkSecretAgent();
 
   NetworkSecretAgent(const NetworkSecretAgent&) = delete;
@@ -44,6 +44,11 @@ public:
   [[nodiscard]] bool hasPendingRequest() const noexcept;
 
 private:
+  bool m_remote = false;
+  bool m_remotePending = false;
+  unsigned m_remoteObserver = 0;
+  RequestCallback m_remoteCallback;
+  void replyRemote(const std::string& response, bool cancel);
   struct Impl;
   std::unique_ptr<Impl> m_impl;
 };

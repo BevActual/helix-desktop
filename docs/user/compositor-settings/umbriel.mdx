@@ -1,20 +1,25 @@
 ---
 title: Umbriel
-description: Configure Umbriel for the best experience with Helix.
+description: Unsupported historical notes for Umbriel (not a Helix product surface).
 sidebar:
   order: 6
 ---
 
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
+
 Add the following settings to your Umbriel configuration file, usually located at `~/.config/umbriel/config.toml`.
-Umbriel's packaged [`examples/config.toml`](https://github.com/noctalia-dev/umbriel/blob/main/examples/config.toml) is a useful reference for the complete configuration. Umbriel also provides dedicated documentation for [configuration](/umbriel/configuration/), [window rules](/umbriel/window-rules/), and [layer rules](/umbriel/layer-rules/).
+Umbriel's packaged [`examples/config.toml`](the upstream project repository) is a useful reference for the complete configuration. Umbriel also provides dedicated documentation for [configuration](/umbriel/configuration/), [window rules](/umbriel/window-rules/), and [layer rules](/umbriel/layer-rules/).
 
 ## Autostart Helix
 
-Add `noctalia` to the `autostart` array under `[general]`. Preserve any commands that are already in the array:
+Add `helix-shell` to the `autostart` array under `[general]`. Preserve any commands that are already in the array:
 
 ```toml
 [general]
-autostart = ["noctalia"]
+autostart = ["helix"]
 ```
 
 Umbriel runs these commands once after startup and does not run them again when its configuration is reloaded.
@@ -61,7 +66,7 @@ Helix publishes blur regions for its layer-shell surfaces when the compositor su
 
 ```toml
 [[layer_rule]]
-match.namespace = "^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
+match.namespace = "^helix-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
 blur = true
 blur_ignore_alpha = 0.5
 blur_optimized = false
@@ -83,18 +88,18 @@ Umbriel can launch Helix IPC commands directly from its `[keybinds]` table. Add 
 
 ```toml
 [keybinds]
-"Mod+Space" = "spawn:noctalia msg panel-toggle launcher"
-"Mod+S" = "spawn:noctalia msg panel-toggle control-center"
-"Mod+Comma" = "spawn:noctalia msg settings-toggle"
-"Alt+Tab" = "spawn:noctalia msg window-switcher"
-"Mod+Shift+A" = "spawn:noctalia msg screenshot-annotate"
-"Mod+Ctrl+A" = "spawn:noctalia msg annotate"
+"Mod+Space" = "spawn:helix-panel panel-toggle launcher"
+"Mod+S" = "spawn:helix-panel panel-toggle control-center"
+"Mod+Comma" = "spawn:helix-panel settings-toggle"
+"Alt+Tab" = "spawn:helix-panel window-switcher"
+"Mod+Shift+A" = "spawn:helix-panel screenshot-annotate"
+"Mod+Ctrl+A" = "spawn:helix-panel annotate"
 
-"XF86AudioRaiseVolume" = "spawn:noctalia msg volume-up"
-"XF86AudioLowerVolume" = "spawn:noctalia msg volume-down"
-"XF86AudioMute" = "spawn:noctalia msg volume-mute"
-"XF86MonBrightnessUp" = "spawn:noctalia msg brightness-up"
-"XF86MonBrightnessDown" = "spawn:noctalia msg brightness-down"
+"XF86AudioRaiseVolume" = "spawn:helix-panel volume-up"
+"XF86AudioLowerVolume" = "spawn:helix-panel volume-down"
+"XF86AudioMute" = "spawn:helix-panel volume-mute"
+"XF86MonBrightnessUp" = "spawn:helix-panel brightness-up"
+"XF86MonBrightnessDown" = "spawn:helix-panel brightness-down"
 ```
 
 `Mod` uses Umbriel's configured modifier from `general.mod_key` and defaults to Super in a native session. See [Keybinds](/umbriel/keybinds/) for more Helix IPC examples and the complete action reference.

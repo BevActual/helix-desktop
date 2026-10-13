@@ -10,10 +10,10 @@ namespace internal_apps {
 
     constexpr InternalAppDefinition kInternalApps[] = {
         {
-            .appId = "dev.noctalia.Noctalia",
+            .appId = "org.helix.Helix",
             .windowTitle = "Helix Shell Settings",
             .displayName = "Helix Shell",
-            .iconAssetPath = "noctalia.svg",
+            .iconAssetPath = "helix.svg",
         },
     };
 

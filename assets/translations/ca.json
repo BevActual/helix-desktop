@@ -747,7 +747,7 @@
       "calendar-google-connect-start-failed": "No s'ha pogut iniciar l'autorització de Google. Comprova la connexió de xarxa i torna-ho a provar.",
       "calendar-google-connect-start-http": "No s'ha pogut iniciar l'autorització de Google. El broker OAuth ha retornat HTTP {status}.",
       "calendar-google-connect-timeout": "L'autorització de Google ha superat el temps d'espera. Torna a iniciar la connexió quan estiguis preparat per iniciar sessió.",
-      "config-migration-body": "Actualitza {path} al fitxer font. Helix només aplica aquest canvi temporalment. Executa noctalia config validate per veure tots els canvis necessaris.",
+      "config-migration-body": "Actualitza {path} al fitxer font. Helix només aplica aquest canvi temporalment. Executa helix config validate per veure tots els canvis necessaris.",
       "config-migration-title": "Cal actualitzar la configuració",
       "dbus-disabled": "Notificacions DBus desactivades",
       "desktop-widgets-editor": "Editor de widgets",
@@ -755,10 +755,10 @@
       "greeter-sync": "Helix Greeter",
       "greeter-sync-pending": "Sincronitzant l'aparença amb el greeter. Si apareix una sol·licitud de l'administrador, aprova-la; l'autorització sense contrasenya segueix la política del sistema.",
       "greeter-sync-pending-console": "Sincronitzant l'aparença amb el greeter. Si es requereix autorització, aprova la sol·licitud de polkit a Helix, en una TTY o en una consola.",
-      "greeter-sync-pending-manual": "Els fitxers estan preparats per a la sincronització heretada autenticada. Executa l'assistent d'aplicació posicional en una terminal, conservant NOCTALIA_GREETER_STATE_DIR si fas servir una ruta personalitzada, o configura shell.greeter_sync.privilege_command i torna a sincronitzar.",
+      "greeter-sync-pending-manual": "Els fitxers estan preparats per a la sincronització heretada autenticada. Executa l'assistent d'aplicació posicional en una terminal, conservant HELIX_GREETER_STATE_DIR si fas servir una ruta personalitzada, o configura shell.greeter_sync.privilege_command i torna a sincronitzar.",
       "greeter-sync-success": "Aparença sincronitzada. Els canvis s'apliquen a la següent pantalla d'inici de sessió.",
       "greeter-sync-timeout": "La sincronització amb el greeter continua a l'espera d'autorització. Busca una sol·licitud de polkit en una TTY o consola, activa l'agent de polkit als ajustos de Seguretat, o executa pkexec manualment.",
-      "greeter-sync-timeout-manual": "La sincronització heretada autenticada encara necessita l'aprovació de l'administrador. Executa l'assistent d'aplicació posicional en una terminal i conserva NOCTALIA_GREETER_STATE_DIR si fas servir una ruta personalitzada.",
+      "greeter-sync-timeout-manual": "La sincronització heretada autenticada encara necessita l'aprovació de l'administrador. Executa l'assistent d'aplicació posicional en una terminal i conserva HELIX_GREETER_STATE_DIR si fas servir una ruta personalitzada.",
       "keybind-app": "Helix",
       "keybind-invalid-modifier": "Aquesta drecera accepta una sola tecla sense modificadors.",
       "keybind-invalid-printable": "Les tecles imprimibles (lletres, números, símbols) requereixen un modificador com Ctrl o Alt.",
@@ -1122,7 +1122,7 @@
       "support-report": "No s'ha pogut desar l'informe d'assistència.",
       "sync-greeter": "No s'ha pogut sincronitzar l'aparença amb el Helix Greeter.",
       "sync-greeter-timeout": "La sincronització amb el greeter continua a l'espera d'autorització. Busca una sol·licitud de polkit en una TTY o consola, activa l'agent de polkit als ajustos de Seguretat, o executa pkexec manualment.",
-      "sync-greeter-timeout-manual": "La sincronització heretada autenticada encara necessita l'aprovació de l'administrador. Executa l'assistent d'aplicació posicional en una terminal i conserva NOCTALIA_GREETER_STATE_DIR si fas servir una ruta personalitzada.",
+      "sync-greeter-timeout-manual": "La sincronització heretada autenticada encara necessita l'aprovació de l'administrador. Executa l'assistent d'aplicació posicional en una terminal i conserva HELIX_GREETER_STATE_DIR si fas servir una ruta personalitzada.",
       "widget": {
         "rename": "No s'ha pogut canviar el nom del widget."
       },
@@ -1514,8 +1514,8 @@
         },
         "kind-label": "Tipus",
         "location-label": "Ubicació",
-        "location-placeholder-git": "https://github.com/jo/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/jo/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "ID de la font",
         "name-placeholder": "els-meus-plugins",
         "precedence-hint": "Les fonts inferiors substitueixen les superiors quan ofereixen el mateix connector.",
@@ -1536,7 +1536,7 @@
         "incompatible-hint": "Necessita l'API de connectors {required}; aquesta versió de Helix admet {oldest}–{current}.",
         "loading": "Carregant el catàleg…",
         "no-readme": "No hi ha cap descripció disponible.",
-        "open-page": "Obre la pàgina del connector a noctalia.dev",
+        "open-page": "Obre la pàgina del connector a helix.dev",
         "open-source": "Obre el repositori del codi font del connector",
         "results-count": "{count} connectors",
         "search-placeholder": "Cerca connectors…",
@@ -1596,7 +1596,7 @@
           "label": "Arrodoniment de cantonades"
         },
         "custom-palette": {
-          "description": "Tria una paleta de ~/.config/noctalia/palettes/",
+          "description": "Tria una paleta de ~/.config/helix/palettes/",
           "label": "Paleta personalitzada",
           "search-placeholder": "Cerca paletes personalitzades…"
         },
@@ -2078,7 +2078,7 @@
             "label": "En canviar el mode del tema"
           },
           "wallpaper-changed": {
-            "description": "Ordre a executar quan canvia el fons de pantalla; proporciona NOCTALIA_WALLPAPER_PATH i NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Ordre a executar quan canvia el fons de pantalla; proporciona HELIX_WALLPAPER_PATH i HELIX_WALLPAPER_CONNECTOR",
             "label": "En canviar el fons de pantalla"
           },
           "wifi-disabled": {
@@ -2304,10 +2304,6 @@
         "home-shortcuts": {
           "description": "Tria fins a sis botons de drecera per a la pestanya d'inici",
           "label": "Dreceres d'inici"
-        },
-        "home-shortcuts-show-labels": {
-          "description": "Mostra etiquetes de text sota les icones de drecera a la pestanya d'inici",
-          "label": "Mostra les etiquetes de dreceres"
         },
         "launcher-app-actions": {
           "description": "Mostra entrades d'accions d'aplicació al costat de les aplicacions als resultats",
@@ -2591,7 +2587,7 @@
           "placeholder": "Ciutat, País"
         },
         "location-auto-locate": {
-          "description": "Detecta la teva ubicació automàticament a partir de la teva adreça IP mitjançant noctalia.dev",
+          "description": "Detecta la teva ubicació automàticament a partir de la teva adreça IP mitjançant helix.dev",
           "label": "Auto-localització (IP)"
         },
         "longitude": {
@@ -2814,7 +2810,7 @@
           "label": "Format de data"
         },
         "external-ip": {
-          "description": "Resol la IP WAN pública de la connexió (mitjançant api.noctalia.dev) i mostra-la a la pestanya de xarxa del Centre de control",
+          "description": "Resol la IP WAN pública de la connexió (mitjançant a public IP lookup service) i mostra-la a la pestanya de xarxa del Centre de control",
           "label": "Mostra la IP WAN"
         },
         "greeter-sync-auto": {
@@ -3908,7 +3904,7 @@
       "export-config": "Exporta la configuració…",
       "export-config-saved": "Exportació de la configuració desada.",
       "filter-overridden": "Sobreescrit",
-      "legacy-config-warning": "Configuració obsoleta: {issue}. Edita aquesta entrada font; Helix només aplica aquest canvi temporalment. Executa noctalia config validate per veure tots els canvis necessaris.",
+      "legacy-config-warning": "Configuració obsoleta: {issue}. Edita aquesta entrada font; Helix només aplica aquest canvi temporalment. Executa helix config validate per veure tots els canvis necessaris.",
       "native-title": "Configuració del Helix",
       "no-results": "No s'han trobat paràmetres",
       "no-results-hint": "Prova amb un nom de paràmetre o una clau de configuració diferent.",

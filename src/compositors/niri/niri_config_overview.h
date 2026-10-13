@@ -9,7 +9,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kOverviewIncludeFileName = "noctalia-overview.kdl";
+  inline constexpr std::string_view kOverviewIncludeFileName = "helix-overview.kdl";
   inline constexpr std::string_view kDefaultFlatOverviewColor = "#26233a";
 
   struct OverviewSettings {

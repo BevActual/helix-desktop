@@ -1,7 +1,7 @@
 #!/usr/bin/env -S bash
 
-# Push translations to Noctalia Translate API
-# Usage: NOCTALIA_TRANSLATION_PUSH_SECRET=your_secret ./i18n-push.sh [--overwrite] [--lang <code>] [/path/to/assets/translations]
+# Push translations to Helix Translate API
+# Usage: HELIX_TRANSLATION_PUSH_SECRET=your_secret ./i18n-push.sh [--overwrite] [--lang <code>] [/path/to/assets/translations]
 # Or set the secret in environment and pass the path as argument
 #
 # Options:
@@ -33,12 +33,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Configuration
-API_URL="${TRANSLATION_API_URL:-https://i18n.noctalia.dev}"
-PROJECT_SLUG="${TRANSLATION_PROJECT:-noctalia}"
+API_URL="${TRANSLATION_API_URL:?set TRANSLATION_API_URL to your Helix translation API}"
+PROJECT_SLUG="${TRANSLATION_PROJECT:-helix}"
 
 # Check for secret
-if [ -z "$NOCTALIA_TRANSLATION_PUSH_SECRET" ]; then
-    echo "Error: NOCTALIA_TRANSLATION_PUSH_SECRET environment variable is required"
+if [ -z "$HELIX_TRANSLATION_PUSH_SECRET" ]; then
+    echo "Error: HELIX_TRANSLATION_PUSH_SECRET environment variable is required"
     exit 1
 fi
 
@@ -125,7 +125,7 @@ fi
 echo "Pushing to API..."
 RESPONSE=$(echo "$COMBINED_JSON" | curl -s -w "\n%{http_code}" -X POST \
     "$PUSH_URL" \
-    -H "Authorization: Bearer $NOCTALIA_TRANSLATION_PUSH_SECRET" \
+    -H "Authorization: Bearer $HELIX_TRANSLATION_PUSH_SECRET" \
     -H "Content-Type: application/json" \
     -d @-)
 

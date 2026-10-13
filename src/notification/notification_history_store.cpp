@@ -1,8 +1,8 @@
 #include "notification/notification_history_store.h"
 
+#include "core/image_decoder.h"
 #include "core/log.h"
 #include "notification/notification_manager.h"
-#include "render/core/image_decoder.h"
 #include "util/base64.h"
 #include "util/file_utils.h"
 

@@ -1,4 +1,4 @@
-#include "shell/wallpaper/wallhaven_client.h"
+#include "net/wallhaven_client.h"
 
 #include <print>
 #include <string>
@@ -43,17 +43,20 @@ int main() {
   ok = expect(normalizeSearchQuery(" nature,  city night ") == "nature city night", "commas become tag separators")
       && ok;
   ok = expect(normalizeSearchQuery("+nature -city") == "+nature -city", "keeps include/exclude prefixes") && ok;
+  ok = expect(normalizeSearchQuery("https://wallhaven.cc/w/l81zwp") == "id:l81zwp", "wallpaper URLs become id queries")
+      && ok;
   ok = expect(
-      normalizeSearchQuery("https://wallhaven.cc/w/l81zwp") == "id:l81zwp", "wallpaper URLs become id queries"
-  ) && ok;
+           normalizeSearchQuery("https://www.wallhaven.cc/w/abc12/?ref=1") == "id:abc12",
+           "strips URL extras from wallpaper ids"
+       )
+      && ok;
   ok = expect(
-      normalizeSearchQuery("https://www.wallhaven.cc/w/abc12/?ref=1") == "id:abc12", "strips URL extras from wallpaper ids"
-  ) && ok;
-  ok = expect(
-      normalizeSearchQuery("https://wallhaven.cc/search?q=nature+city&categories=111") == "nature city",
-      "search URLs keep the q parameter"
-  ) && ok;
-  ok = expect(normalizeSearchQuery("wallhaven-l81zwp.jpg") == "id:l81zwp", "download filenames become id queries") && ok;
+           normalizeSearchQuery("https://wallhaven.cc/search?q=nature+city&categories=111") == "nature city",
+           "search URLs keep the q parameter"
+       )
+      && ok;
+  ok =
+      expect(normalizeSearchQuery("wallhaven-l81zwp.jpg") == "id:l81zwp", "download filenames become id queries") && ok;
 
   query = {};
   query.tags = "city, night";

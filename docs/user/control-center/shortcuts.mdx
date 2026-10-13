@@ -61,12 +61,8 @@ When no `[[control_center.shortcuts]]` entries are defined, Home has no pin list
 | `ocr` | Scan Text | Select a region and copy recognized text | Open screenshot tab |
 | `scan_qr` | Scan QR | Select a region and copy a QR code | Open screenshot tab |
 | `tailscale` | Tailscale | Toggle connection | Open tailscale tab |
-| `localsend` | LocalSend | Toggle nearby sharing | Open localsend tab |
-| `phone` | Phone | Open the Phone tab | Open the Phone tab |
-| `syncthing` | Syncthing | Open the Syncthing tab | Open the Syncthing tab |
 | `firewall` | Firewall | Open the Firewall tab | Open the Firewall tab |
 | `printers` | Printers | Open the Printers tab | Open the Printers tab |
-| `cast` | Cast | Open the Cast tab | Open the Cast tab |
 | `privacy` | Privacy | Open the Privacy tab | Open the Privacy tab |
 
 ## Dynamic Shortcuts
@@ -77,21 +73,13 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 `ai` shows the hottest remaining quota across detected AI CLIs (`claude`, `codex`, `gemini`, `qwen`), or a running llama.cpp / vLLM server / Ollama status. The tile lights up when a quota is at or above the usage warning threshold.
 
-`screen_recorder` is a built-in shortcut for the shell recorder (`screen-record-toggle`). While a recording is running the tile highlights, switches to a stop icon, and shows elapsed time. `screen_replay` does the same for the built-in replay buffer (`screen-record-replay-toggle`) and needs `gpu-screen-recorder`. Right-click saves the last N seconds without stopping the buffer; if the buffer is not running, right-click opens Screen Record. Record and replay tiles disable each other while the other is running. The official [`noctalia/screen_recorder` plugin](/noctalia/plugins/official-plugins/#screen_recorder) still exposes its own shortcut as `noctalia/screen_recorder:toggle` when enabled.
+`screen_recorder` is a built-in shortcut for the shell recorder (`screen-record-toggle`). While a recording is running the tile highlights, switches to a stop icon, and shows elapsed time. `screen_replay` does the same for the built-in replay buffer (`screen-record-replay-toggle`) and needs `gpu-screen-recorder`. Right-click saves the last N seconds without stopping the buffer; if the buffer is not running, right-click opens Screen Record. Record and replay tiles disable each other while the other is running. The official [`helix/screen_recorder` plugin](/helix/plugins/official-plugins/#screen_recorder) still exposes its own shortcut as `helix/screen_recorder:toggle` when enabled.
 
 `tailscale` toggles this machine's Tailscale connection. Right-click opens the Tailscale tab. The tile is disabled when the `tailscale` CLI is not installed. The community plugin's bar widget and panel remain available.
-
-`localsend` toggles nearby sharing. Right-click opens the LocalSend tab. The setting is saved under `[localsend].enabled`.
-
-`phone` opens the Phone tab. The tile highlights when a paired phone is reachable.
-
-`syncthing` opens the Syncthing tab. The tile highlights when the local daemon is running.
 
 `firewall` opens the Firewall tab. The tile highlights when panic mode is on.
 
 `printers` opens the Printers tab. The tile highlights when a printer is printing or has queued jobs.
-
-`cast` opens the Cast tab. The tile highlights when this screen is being shared.
 
 `privacy` opens the Privacy tab. The tile highlights when an app is using the microphone, camera, or screen share.
 
@@ -99,17 +87,13 @@ Toggle shortcuts show an active/inactive visual state. `power_profile`, `weather
 
 Many shortcut buttons trigger the same canonical IPC commands documented elsewhere:
 
-- [System Controls](/noctalia/ipc/system-controls/) for Wi-Fi, Bluetooth, night light, audio, caffeine, and power profile
-- [Media & UI -> Notifications](/noctalia/ipc/media-and-ui/#notifications) for DND
-- [Media & UI -> Media](/noctalia/ipc/media-and-ui/#media) for media controls
-- [Media & UI -> Theme](/noctalia/ipc/media-and-ui/#theme) for dark mode
-- [Media & UI -> Screenshots](/noctalia/ipc/media-and-ui/#screenshots) for region capture, color pick, OCR, and QR scan
-- [Media & UI -> Screen recording](/noctalia/ipc/media-and-ui/#screen-recording) for start, stop, toggle, and replay
-- [Media & UI -> Tailscale](/noctalia/ipc/media-and-ui/#tailscale) for connect, disconnect, toggle, and status
-- [Media & UI -> LocalSend](/noctalia/ipc/media-and-ui/#localsend) for toggle, status, and announce
-- [Media & UI -> Phone](/noctalia/ipc/media-and-ui/#phone) for status, ping, and ring
-- [Media & UI -> Syncthing](/noctalia/ipc/media-and-ui/#syncthing) for status, start, and stop
-- [Media & UI -> Firewall](/noctalia/ipc/media-and-ui/#firewall) for status and panic toggle
-- [Media & UI -> Printers](/noctalia/ipc/media-and-ui/#printers) for status and start
-- [Media & UI -> Cast](/noctalia/ipc/media-and-ui/#cast) for status and share toggle
-- [Media & UI -> Privacy](/noctalia/ipc/media-and-ui/#privacy) for capture status
+- [System Controls](/helix/ipc/system-controls/) for Wi-Fi, Bluetooth, night light, audio, caffeine, and power profile
+- [Media & UI -> Notifications](/helix/ipc/media-and-ui/#notifications) for DND
+- [Media & UI -> Media](/helix/ipc/media-and-ui/#media) for media controls
+- [Media & UI -> Theme](/helix/ipc/media-and-ui/#theme) for dark mode
+- [Media & UI -> Screenshots](/helix/ipc/media-and-ui/#screenshots) for region capture, color pick, OCR, and QR scan
+- [Media & UI -> Screen recording](/helix/ipc/media-and-ui/#screen-recording) for start, stop, toggle, and replay
+- [Media & UI -> Tailscale](/helix/ipc/media-and-ui/#tailscale) for connect, disconnect, toggle, and status
+- [Media & UI -> Firewall](/helix/ipc/media-and-ui/#firewall) for status and panic toggle
+- [Media & UI -> Printers](/helix/ipc/media-and-ui/#printers) for status and start
+- [Media & UI -> Privacy](/helix/ipc/media-and-ui/#privacy) for capture status

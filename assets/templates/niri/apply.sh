@@ -17,13 +17,17 @@ resolve_config_home() {
     printf '%s/.config\n' "$HOME"
 }
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 config_dir="$(resolve_config_home)/niri"
 config_file="$config_dir/config.kdl"
-output_file="$config_dir/noctalia.kdl"
-include_line='include "noctalia.kdl"'
+output_file="$config_dir/helix.kdl"
+setup_file="$config_dir/helix-setup.kdl"
+include_line='include "helix.kdl"'
+setup_include='include "helix-setup.kdl"'
 
-has_noctalia_include() {
-    grep -Eq '^[[:space:]]*include([[:space:]].*)?"([^"]*/)?noctalia\.kdl"([[:space:]]|$)' "$config_file"
+has_include() {
+    local filename="$1"
+    grep -Eq "^[[:space:]]*include([[:space:]].*)?\"([^\"]*/)?${filename}\"([[:space:]]|$)" "$config_file"
 }
 
 apply_include() {
@@ -34,7 +38,7 @@ apply_include() {
         return
     fi
 
-    if has_noctalia_include; then
+    if has_include "helix.kdl"; then
         return
     else
         local grep_status=$?
@@ -47,12 +51,34 @@ apply_include() {
     printf '\n%s\n' "$include_line" >>"$config_file"
 }
 
+apply_setup() {
+    mkdir -p "$config_dir"
+    if [ ! -f "$setup_file" ] && [ -f "$script_dir/helix-setup.kdl" ]; then
+        cp "$script_dir/helix-setup.kdl" "$setup_file"
+    fi
+    if [ ! -f "$config_file" ]; then
+        printf '%s\n' "$setup_include" >"$config_file"
+        return
+    fi
+    if has_include "helix-setup.kdl"; then
+        return
+    else
+        local grep_status=$?
+        if [ "$grep_status" -ne 1 ]; then
+            echo "error: failed to inspect $config_file" >&2
+            exit "$grep_status"
+        fi
+    fi
+    printf '\n%s\n' "$setup_include" >>"$config_file"
+}
+
 case "$command" in
     output)
         printf '%s\n' "$output_file"
         ;;
     apply)
         apply_include
+        apply_setup
         ;;
     *)
         echo "Usage: $0 {output|apply}" >&2

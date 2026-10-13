@@ -1,4 +1,36 @@
 {
+  "agent": {
+    "confirm": {
+      "action-title": "Allow this action?",
+      "action-subject": "{app} wants to do this on your desktop",
+      "grant-title": "Give an app access?",
+      "grant-subject": "{app} is asking to use your desktop",
+      "grant-detail": "Choose what it may do. You can change this later in Settings.",
+      "label": "It calls itself “{label}”.",
+      "reason": "It says: “{reason}”",
+      "tainted": "This app read private content (clipboard, screen or notifications) since you last approved something. That content may be influencing this request.",
+      "waiting": "{count} more waiting",
+      "allow": "Allow",
+      "deny": "Deny"
+    },
+    "tier": {
+      "observe": "See what is on your desktop (status, windows, settings)",
+      "observe-private": "Read private content (clipboard, screen, notifications)",
+      "act": "Change settings and open panels",
+      "confirm": "Do things that ask for your approval each time"
+    }
+  },
+  "assistant": {
+    "about": "About to: {what}",
+    "acting": "Doing it…",
+    "cancel": "Cancel",
+    "do-it": "Do it",
+    "placeholder": "What should I do?",
+    "reason": "The assistant says: “{reason}”",
+    "thinking": "Thinking…",
+    "title": "Assistant",
+    "unverified": "This came from outside sources (clipboard, notifications) and has not been checked."
+  },
   "auth": {
     "fingerprint": {
       "disconnected": "Fingerprint reader disconnected",
@@ -263,6 +295,7 @@
     }
   },
   "control-center": {
+    "back": "Back",
     "ai-usage": {
       "as-of": "As of {time}",
       "attention-tooltip": "{provider} {window} is at {percent}%",
@@ -498,7 +531,13 @@
       },
       "unavailable-body": "Audio is not active.",
       "unavailable-title": "Audio unavailable",
-      "unmute": "Unmute"
+      "unmute": "Unmute",
+      "pages": {
+        "output": "Output devices",
+        "input": "Input devices",
+        "apps": "App volumes",
+        "effects": "Sound Effects"
+      }
     },
     "bar": {
       "auto-hide": "Auto-hide",
@@ -534,6 +573,10 @@
       "on": "On",
       "pair": "Pair",
       "pair-title": "Pair {device}",
+      "pages": {
+        "devices": "Device filtering",
+        "discovery": "Discovery"
+      },
       "pairing-detail": {
         "authorize": "Accept the incoming pairing request?",
         "authorize-service": "Allow access to service {uuid}?",
@@ -755,7 +798,11 @@
       "transform-flipped-90": "Flipped 90°",
       "transform-normal": "Normal",
       "unknown-resolution": "Unknown resolution",
-      "vrr": "Variable refresh rate"
+      "vrr": "Variable refresh rate",
+      "pages": {
+        "night-light": "Night Light",
+        "advanced": "Advanced"
+      }
     },
     "dock": {
       "add-app": "Add an app",
@@ -813,6 +860,9 @@
       "zone-workstation": "Workstation"
     },
     "home": {
+      "quick-on": "On",
+      "quick-off": "Off",
+      "quick-unavailable": "Unavailable",
       "avatar-error-title": "Avatar not updated",
       "change-avatar": "Change avatar",
       "change-wallpaper": "Change wallpaper",
@@ -863,9 +913,10 @@
     },
     "keybinds": {
       "copy-missing-tooltip": "Copy missing recommended keys",
-      "in-noctalia-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
+      "in-helix-hint": "These chords navigate Helix Shell panels. Super/Mod is reserved for the compositor.",
       "install-tooltip": "Add the missing recommended keys",
       "niri-hint": "Pick a section, then record a chord to add or remap. Add an app, then record its key. Panel navigation is under the header gear.",
+      "open-folder-failed": "Could not open the compositor config folder.",
       "open-folder-tooltip": "Open the compositor config folder",
       "reset-tooltip": "Restore managed binds to the recommended keys",
       "tab-apps": "Apps",
@@ -952,6 +1003,9 @@
       "volume": "Volume"
     },
     "network": {
+      "choose-network": "Choose a network to connect.",
+      "connected": "Connected",
+      "connection-details": "Connection Details",
       "anonymous-identity": "Anonymous identity (optional)",
       "available": "Available",
       "ca-certificate": "CA certificate path (optional)",
@@ -1033,6 +1087,7 @@
       "wifi": "Wi-Fi",
       "wifi-off": "Wi-Fi is off",
       "wifi-on": "Wi-Fi is on",
+      "wifi-settings": "Wi-Fi Settings",
       "wired-connection": "Wired connection"
     },
     "notifications": {
@@ -1058,7 +1113,13 @@
       "filter-empty-title": "Nothing here",
       "history": "History",
       "remove": "Remove",
-      "untitled": "Untitled notification"
+      "untitled": "Untitled notification",
+      "pages": {
+        "general": "Alerts",
+        "toasts": "Toasts",
+        "history": "History",
+        "filters": "Filters"
+      }
     },
     "osd": {
       "border": "Border",
@@ -1324,7 +1385,11 @@
       "session": "Session",
       "time-to-empty": "{time} remaining",
       "time-to-full": "{time} until full",
-      "unknown-device": "Unknown device"
+      "unknown-device": "Unknown device",
+      "pages": {
+        "session": "Session Menu",
+        "idle": "Idle & Sleep"
+      }
     },
     "printers": {
       "cancel-jobs": "Cancel jobs",
@@ -1488,10 +1553,12 @@
     },
     "settings": {
       "configure": "Settings",
-      "search-placeholder": "Search pages and settings"
+      "search-placeholder": "Search pages and settings",
+      "done": "Done"
     },
     "shortcuts": {
       "ai": "AI",
+      "appearance": "Appearance",
       "audio": "Audio",
       "bluetooth": "Bluetooth",
       "caffeine": "Caffeine",
@@ -1510,7 +1577,7 @@
       "nightlight": "Night Light",
       "nightlight-states": {
         "forced": "Always On",
-        "off": "Night Light",
+        "off": "Off",
         "scheduled-day": "Scheduled",
         "scheduled-night": "Running"
       },
@@ -1578,6 +1645,10 @@
     },
     "system": {
       "copy-info": "Copy system info",
+      "pages": {
+        "battery": "Battery Alerts",
+        "monitoring": "Monitoring"
+      },
       "labels": {
         "load": "CPU Load",
         "ram": "RAM",
@@ -1611,7 +1682,7 @@
     "tabs": {
       "ai": "AI",
       "ai-usage": "AI",
-      "audio": "Audio",
+      "audio": "Sound",
       "bluetooth": "Bluetooth",
       "calendar": "Calendar",
       "camera": "Camera",
@@ -1623,7 +1694,7 @@
       "home": "Home",
       "localsend": "LocalSend",
       "media": "Media",
-      "monitor": "Monitor",
+      "monitor": "Displays",
       "network": "Network",
       "notifications": "Notifications",
       "packages": "Packages",
@@ -1631,6 +1702,7 @@
       "power": "Power",
       "printers": "Printers",
       "privacy": "Privacy",
+      "privacy-security": "Privacy & Security",
       "screen-record": "Screen Record",
       "screen-time": "Screen Time",
       "screenshot": "Screenshot",
@@ -1796,7 +1868,13 @@
       "spacing-description": "Gaps between tiled windows and extra outer padding on all four sides.",
       "spacing-title": "Spacing",
       "spacing-tooltip": "Gaps and outer padding"
-    }
+    },
+    "install-phone": "Install Helix Phone to open this application.",
+    "install-settings": "Install Helix Settings to open this application.",
+    "install-system-monitor": "Install Helix System Monitor to open this application.",
+    "open-phone": "Open Phone",
+    "open-system-monitor": "Open System Monitor",
+    "open-settings": "Open Settings"
   },
   "desktop-ai": {
     "busy": "LocalAI is already working on something.",
@@ -2054,6 +2132,34 @@
       "user": "User"
     },
     "providers": {
+      "actions": {
+        "bar-toggle": "Toggle bar",
+        "bar-toggle-sub": "Show or hide the bar",
+        "close-focused": "Close {name}",
+        "close-focused-sub": "Close the focused window",
+        "control-center": "Control Center",
+        "control-center-sub": "Open quick settings",
+        "dnd": "Do Not Disturb",
+        "dnd-sub": "Toggle notification quiet mode",
+        "monitor": "System Monitor",
+        "monitor-sub": "See processes and resource use",
+        "notifications": "Notification Center",
+        "notifications-sub": "Open notification history",
+        "settings": "Settings",
+        "settings-sub": "Open Helix Settings",
+        "software": "Helix Software",
+        "software-sub": "Browse and update applications",
+        "state-off": "Off",
+        "state-on": "On",
+        "switch-to": "Switch to {name}",
+        "title": "Actions",
+        "workspace-next": "Next workspace",
+        "workspace-next-from": "After {name}",
+        "workspace-next-sub": "Move to the next workspace",
+        "workspace-prev": "Previous workspace",
+        "workspace-prev-from": "Before {name}",
+        "workspace-prev-sub": "Move to the previous workspace"
+      },
       "applications": {
         "title": "Applications"
       },
@@ -2150,7 +2256,7 @@
       "calendar-google-connect-start-failed": "Could not start Google authorization. Check your network connection and try again.",
       "calendar-google-connect-start-http": "Could not start Google authorization. The OAuth broker returned HTTP {status}.",
       "calendar-google-connect-timeout": "Google authorization timed out. Start the connection again when you are ready to sign in.",
-      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run noctalia config validate to list every required change.",
+      "config-migration-body": "Update {path} in the source file. Helix is applying this replacement only temporarily. Run helix config validate to list every required change.",
       "config-migration-title": "Configuration update needed",
       "dbus-disabled": "DBus notifications disabled",
       "desktop-widgets-editor": "Widget editor",
@@ -2159,12 +2265,12 @@
       "greeter-sync-pending": "Syncing appearance to the greeter. If an administrator prompt appears, approve it; passwordless authorization follows system policy.",
       "greeter-sync-pending-console": "Syncing appearance to the greeter. If authorization is required, approve the polkit prompt in Helix, on a TTY, or on a console.",
       "greeter-sync-pending-legacy": "Syncing through the authenticated legacy helper. Administrator approval is required.",
-      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving NOCTALIA_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
-      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "greeter-sync-pending-manual": "Files are staged for authenticated legacy sync. Run the positional apply helper in a terminal, preserving HELIX_GREETER_STATE_DIR if you use a custom path, or configure shell.greeter_sync.privilege_command and sync again.",
+      "greeter-sync-pending-manual-pkexec": "Syncing appearance to the greeter. If administrator authorization is required and no prompt appears, run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "greeter-sync-success": "Appearance synced. Changes apply on the next login screen.",
       "greeter-sync-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "greeter-sync-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "greeter-sync-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "keybind-app": "Helix Shell",
       "keybind-invalid-modifier": "This shortcut accepts a single key without modifiers.",
       "keybind-invalid-printable": "Printable keys (letters, numbers, symbols) require a modifier such as Ctrl or Alt.",
@@ -2278,13 +2384,17 @@
     }
   },
   "quick-insert": {
+    "empty-actions": "No matching actions",
     "empty-clipboard": "No matching clipboard items",
     "empty-emoji": "No matching emoji",
     "empty-recents": "No recent screenshots",
+    "focused-window": "Focused · {name}",
+    "search-actions": "Search actions",
     "search-clipboard": "Search clipboard",
     "search-emoji": "Search emoji",
-    "search-placeholder": "Search emoji, screenshots, or clipboard",
+    "search-placeholder": "Search actions, emoji, screenshots, or clipboard",
     "search-recents": "Search screenshots",
+    "source-actions": "Actions",
     "source-clipboard": "Clipboard",
     "source-emoji": "Emoji",
     "source-recents": "Recents"
@@ -2557,10 +2667,10 @@
       "reset-page": "Failed to reset some settings.",
       "support-report": "Failed to save support report.",
       "sync-greeter": "Could not sync appearance to Helix Greeter.",
-      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\".",
+      "sync-greeter-auth": "Could not ask for administrator approval. Enable the polkit agent in Security settings, or run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\".",
       "sync-greeter-timeout": "Greeter sync is still waiting for authorization. Check a TTY or console for a polkit prompt, enable the polkit agent in Security settings, or run pkexec manually.",
-      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve NOCTALIA_GREETER_STATE_DIR if you use a custom path.",
-      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec noctalia-greeter-apply-appearance --sync \"/run/user/$(id -u)/noctalia-greeter-sync\"",
+      "sync-greeter-timeout-manual": "Authenticated legacy sync still needs administrator approval. Run the positional apply helper in a terminal and preserve HELIX_GREETER_STATE_DIR if you use a custom path.",
+      "sync-greeter-timeout-manual-pkexec": "Greeter sync still needs authorization. Run in a terminal: pkexec helix-greeter-apply-appearance --sync \"/run/user/$(id -u)/helix-greeter-sync\"",
       "widget": {
         "rename": "Could not rename named widget."
       },
@@ -2646,7 +2756,7 @@
         "hot-corners": "Hot Corners",
         "icons": "Icons",
         "idle": "Idle",
-        "in-noctalia": "In Helix Shell",
+        "in-helix": "In Helix Shell",
         "interface": "Interface",
         "keybinds": "Keybinds",
         "keyboard-layout": "Keyboard Layout",
@@ -2723,7 +2833,7 @@
         "chrome": "Chrome",
         "clock": "Clock",
         "control-center": "Control Center",
-        "desktop": "Desktop",
+        "desktop": "Desktop & Dock",
         "dock": "Dock",
         "effects": "Effects",
         "glass": "Glass",
@@ -3062,8 +3172,8 @@
         },
         "kind-label": "Kind",
         "location-label": "Location",
-        "location-placeholder-git": "https://github.com/me/noctalia-plugins",
-        "location-placeholder-path": "~/dev/noctalia-plugins",
+        "location-placeholder-git": "https://github.com/me/helix-plugins",
+        "location-placeholder-path": "~/dev/helix-plugins",
         "name-label": "Source ID",
         "name-placeholder": "my-plugins",
         "precedence-hint": "Lower sources override higher ones when they offer the same plugin.",
@@ -3085,7 +3195,7 @@
         "installed": "Installed",
         "loading": "Loading catalog…",
         "no-readme": "No description available.",
-        "open-page": "Open plugin page on noctalia.dev",
+        "open-page": "Open plugin page on helix.dev",
         "open-source": "Open plugin source repository",
         "results-count": "{count} plugins",
         "search-placeholder": "Search plugins…",
@@ -3217,7 +3327,7 @@
           "label": "Corner Roundness"
         },
         "custom-palette": {
-          "description": "Choose a palette from ~/.config/noctalia/palettes/",
+          "description": "Choose a palette from ~/.config/helix/palettes/",
           "label": "Custom Palette",
           "search-placeholder": "Search custom palettes…"
         },
@@ -3723,7 +3833,7 @@
             "label": "On Theme Mode Changed"
           },
           "wallpaper-changed": {
-            "description": "Command to run when the wallpaper changes; provides NOCTALIA_WALLPAPER_PATH and NOCTALIA_WALLPAPER_CONNECTOR",
+            "description": "Command to run when the wallpaper changes; provides HELIX_WALLPAPER_PATH and HELIX_WALLPAPER_CONNECTOR",
             "label": "On Wallpaper Changed"
           },
           "wifi-disabled": {
@@ -4209,10 +4319,6 @@
           "description": "Extra actions under the Home modules. Empty by default; add only what you use.",
           "label": "Home Pins"
         },
-        "home-shortcuts-show-labels": {
-          "description": "Display text labels under shortcut icons in the home tab",
-          "label": "Show Shortcut Labels"
-        },
         "launcher-app-actions": {
           "description": "Show application action entries alongside applications in results",
           "label": "Show App Actions"
@@ -4523,7 +4629,7 @@
           "placeholder": "City, Country"
         },
         "location-auto-locate": {
-          "description": "Detect your location automatically from your IP address via noctalia.dev",
+          "description": "Detect your location automatically from your IP address via helix.dev",
           "label": "Auto-Locate (IP)"
         },
         "longitude": {
@@ -4751,7 +4857,7 @@
           "label": "Date Format"
         },
         "external-ip": {
-          "description": "Resolve the connection's public WAN IP (via api.noctalia.dev) and show it in the Control Center network tab",
+          "description": "Resolve the connection's public WAN IP (via a public IP lookup) and show it in the Control Center network tab",
           "label": "Show WAN IP"
         },
         "greeter-sync-auto": {
@@ -5701,7 +5807,7 @@
             "label": "Open settings"
           },
           "settings-open-plugin": {
-            "description": "Open Control Center at a plugin's settings (e.g. noctalia/notes)",
+            "description": "Open Control Center at a plugin's settings (e.g. helix/notes)",
             "label": "Open plugin settings"
           },
           "settings-open-widget": {
@@ -6549,7 +6655,7 @@
       "export-config": "Export Config…",
       "export-config-saved": "Config export saved.",
       "filter-overridden": "Overridden",
-      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run noctalia config validate to list every required change.",
+      "legacy-config-warning": "Legacy setting: {issue}. Edit this source entry; Helix is applying the replacement only temporarily. Run helix config validate to list every required change.",
       "native-title": "Helix Shell Settings",
       "no-results": "No settings found",
       "no-results-hint": "Try a different setting name or config key.",

@@ -4,7 +4,7 @@
 #include <array>
 #include <cstring>
 
-namespace noctalia::fedora_upgrade {
+namespace helix::fedora_upgrade {
 
   namespace {
 
@@ -43,7 +43,9 @@ namespace noctalia::fedora_upgrade {
     std::size_t lineStart = 0;
     while (lineStart <= text.size()) {
       const auto lineEnd = text.find('\n', lineStart);
-      const auto line = trim(text.substr(lineStart, lineEnd == std::string_view::npos ? text.size() - lineStart : lineEnd - lineStart));
+      const auto line = trim(
+          text.substr(lineStart, lineEnd == std::string_view::npos ? text.size() - lineStart : lineEnd - lineStart)
+      );
       if (line.size() > key.size() && line[key.size()] == '=' && line.substr(0, key.size()) == key) {
         return std::string(unquote(line.substr(key.size() + 1)));
       }
@@ -121,4 +123,4 @@ namespace noctalia::fedora_upgrade {
     return plan;
   }
 
-} // namespace noctalia::fedora_upgrade
+} // namespace helix::fedora_upgrade

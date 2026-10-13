@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-theme_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/themes/noctalia.yaml"
+theme_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/themes/helix.yaml"
 db_file="${XDG_CONFIG_HOME:-$HOME/.config}/Cursor/User/globalStorage/state.vscdb"
 
 if [[ ! -f "$theme_file" ]]; then
@@ -27,7 +27,7 @@ import time
 
 theme_file = os.environ["THEME_FILE"]
 db_file = os.environ["DB_FILE"]
-theme_id = "noctalia"
+theme_id = "helix"
 
 def parse_flat_yaml(path: str) -> dict:
     data: dict = {}
@@ -88,7 +88,7 @@ try:
         for key, value in themes.items():
             if not isinstance(value, dict):
                 continue
-            if value.get("name") in {"Helix", "Noctalia"} or value.get("vscodeThemeSettingsId") in {"Helix", "Noctalia"}:
+            if value.get("name") in {"Helix", "Helix"} or value.get("vscodeThemeSettingsId") in {"Helix", "Helix"}:
                 existing_id = key
                 existing = value
                 break

@@ -95,18 +95,6 @@ public:
   virtual void bindExtWorkspace(ext_workspace_manager_v1* manager) = 0;
 };
 
-class DwlIpcWorkspaceProtocolBinder {
-public:
-  virtual ~DwlIpcWorkspaceProtocolBinder() = default;
-  virtual void bindDwlIpcWorkspace(zdwl_ipc_manager_v2* manager) = 0;
-};
-
-class KdeVirtualDesktopProtocolBinder {
-public:
-  virtual ~KdeVirtualDesktopProtocolBinder() = default;
-  virtual void bindKdeVirtualDesktop(org_kde_plasma_virtual_desktop_management* management) = 0;
-};
-
 class WorkspaceOutputNameResolver {
 public:
   using Resolver = std::function<std::string(wl_output*)>;

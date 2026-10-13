@@ -1,13 +1,13 @@
 #include "theme/fixed_palette.h"
 
-#include "render/core/color.h"
+#include "core/color.h"
 #include "theme/color.h"
 #include "theme/contrast.h"
 
 #include <algorithm>
 #include <tuple>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -421,4 +421,4 @@ namespace noctalia::theme {
     return terminal;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

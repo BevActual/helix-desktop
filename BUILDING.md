@@ -1,7 +1,14 @@
 # Building Helix Shell from source
 
-This guide covers source dependencies, distro-specific package installation, build modes, and install layouts.
-The installed command is still `noctalia`. For prebuilt packages and other installation methods, see
+Product layout (greeter / compositor / shell / services): [docs/design/product-structure.md](docs/design/product-structure.md).
+
+This guide covers **Meson/C++** dependencies, build modes, and install layouts for live desktop authority and helpers (`helix-service`, `helix-assistant`, `helix-inference`).
+
+The **live session shell and apps are Rust/Tauri** — see [docs/design/rust-workspace.md](docs/design/rust-workspace.md) and `tools/switch-shell.sh install`.
+Rust desktop scaffold: `cargo build -p helix-desktop` ([docs/design/cpp-to-rust.md](docs/design/cpp-to-rust.md)).
+The C++ session UI and GTK apps are removed; use `shell/` and `apps/`.
+
+For the older source-install path docs, see
 [docs/user/getting-started/installation.mdx](docs/user/getting-started/installation.mdx).
 
 ## Dependencies
@@ -18,7 +25,7 @@ sudo pacman -S meson gcc just \
   sdbus-cpp libpipewire wireplumber polkit cups \
   pam curl libwebp libjxl libsndfile librsvg \
   libqalculate libxml2 \
-  md4c tomlplusplus libical \
+  tomlplusplus libical \
   nlohmann-json stb \
   jemalloc
 ```
@@ -36,10 +43,12 @@ sudo dnf install meson gcc-c++ just \
   sdbus-cpp-devel pipewire-devel wireplumber-devel cups-devel \
   pam-devel polkit-devel libcurl-devel libwebp-devel libjxl-devel libsndfile-devel librsvg2-devel \
   libqalculate-devel libxml2-devel \
-  md4c-devel tomlplusplus-devel libical-devel \
+  tomlplusplus-devel libical-devel \
   json-devel stb_image_resize2-devel stb_image_write-devel \
   jemalloc-devel
 ```
+
+The Tauri bar registers a native Polkit agent after `restart-bar`. To use an external agent instead (KDE/GNOME): `sudo dnf install polkit-kde`, then `HELIX_EXTERNAL_POLKIT=1 tools/switch-shell.sh install`.
 
 ### openSUSE Tumbleweed / Slowroll
 
@@ -54,7 +63,7 @@ sudo zypper install meson gcc-c++ just \
   sdbus-cpp-devel pipewire-devel wireplumber-devel cups-devel \
   pam-devel polkit-devel libcurl-devel libwebp-devel libjxl-devel libsndfile-devel librsvg-devel \
   libqalculate-devel libxml2-devel \
-  md4c-devel tomlplusplus-devel libical-devel \
+  tomlplusplus-devel libical-devel \
   nlohmann_json-devel stb-devel \
   jemalloc-devel
 ```
@@ -73,7 +82,7 @@ sudo apt install meson g++ just \
   libpam0g-dev libpolkit-agent-1-dev libpolkit-gobject-1-dev \
   libcurl4-openssl-dev libwebp-dev libjxl-dev libsndfile1-dev librsvg2-dev \
   libqalculate-dev libxml2-dev \
-  libmd4c-dev libtomlplusplus-dev libical-dev \
+  libtomlplusplus-dev libical-dev \
   nlohmann-json3-dev libstb-dev \
   libjemalloc-dev
 ```
@@ -89,7 +98,7 @@ sudo xbps-install meson ninja pkg-config git \
   libsecret-devel libsodium-devel \
   libcurl-devel pam-devel libwebp-devel libjxl-devel libsndfile-devel \
   basu-devel sdbus-c++-devel \
-  libmd4c-devel tomlplusplus-devel libical-devel \
+  tomlplusplus-devel libical-devel \
   json-c++ stb \
   polkit-devel librsvg-devel libqalculate-devel libxml2-devel jemalloc-devel
 ```
@@ -106,13 +115,13 @@ sudo moss install meson gcc clang just \
   sdbus-cpp-devel pipewire-devel wireplumber-devel polkit-devel cups-devel \
   linux-pam-devel curl libwebp-devel libjxl-devel libsndfile-devel librsvg-devel \
   libqalculate-devel libxml2-devel \
-  md4c-devel tomlplusplus-devel libical-devel \
+  tomlplusplus-devel libical-devel \
   nlohmann-json stb \
   jemalloc-devel
 ```
 
 Vendored dependencies, with no system package needed: `Wuffs`,
-`Luau`, `fzy`, and Material Color Utilities.
+`fzy`, and Material Color Utilities.
 
 System packages required beyond the Wayland/GL stack: `libwebp` handles WebP decoding and thumbnail encoding,
 `libjxl` handles JPEG XL decoding, `libsndfile` decodes shell sound effects (WAV, FLAC, Ogg/Vorbis, Opus, MP3, and
@@ -150,6 +159,21 @@ Sanitizer runtime packages are only needed for ASan/UBSan builds configured with
 The sources are built as C++23, which requires GCC 13+ or Clang 16+. Current rolling and recent stable distros (Arch,
 Fedora 38+, Debian 13, Ubuntu 24.04+) ship a new enough compiler by default. On Debian 12 "bookworm" install `g++-13`
 and point Meson at it (e.g. `CXX=g++-13 just configure`).
+
+## Frontend (apps)
+
+The Tauri apps have a React + TypeScript frontend. It is optional for a Rust-only build (the hand-written pages are used), and needed for the
+React pages:
+
+```sh
+# Node 22+ and npm
+npm install                 # once, at the repo root
+npm run typecheck && npm run lint
+cargo build --release -p helix-settings   # builds the React bundle first when node_modules exists
+# HELIX_SKIP_FRONTEND=1 skips the frontend build
+```
+
+Design and rules: [docs/design/frontend-stack.md](docs/design/frontend-stack.md).
 
 ## Building and installing
 
@@ -195,36 +219,73 @@ just build
 just run
 ```
 
-Unit tests are not compiled by `just build`, which targets only the Helix executable. Build and run them explicitly
+Unit tests are not compiled by `just build`, which targets the Helix executable and its installed system-upgrade helper. Build and run them explicitly
 with `just test` (use `just test release` to force them on for a release build). Direct Meson users can control test
 target generation with the `-Dtests=enabled|disabled|auto` option.
+Run `just test-install` to stage the installation in a temporary directory and check its required files and CLI without changing the host installation.
 Production sources compile once into an internal static library shared by the shell and test executables.
 
 Meson installs the binary and shipped assets using the normal prefix layout:
 
 ```text
-/usr/local/bin/noctalia
-/usr/local/share/noctalia/assets/...
+/usr/local/bin/helix
+/usr/local/share/helix/assets/...
 ```
 
-Helix needs the shipped `assets/` tree at runtime. Copying only the `noctalia` binary is not enough.
+Helix needs the shipped `assets/` tree at runtime. Copying only the `helix-shell` binary is not enough.
 
 Firefox theming uses the built-in template `post_action = "firefox-theme"` (same pattern as
 `kde-color-scheme`) plus the [Pywalfox](https://addons.mozilla.org/en-US/firefox/addon/pywalfox/)
-browser extension. Manual host helpers: `noctalia firefox-theme --help`.
+browser extension. Manual host helpers: `helix firefox-theme --help`.
 
 Portable bundle layouts are also supported:
 
 ```text
 bundle/
-  noctalia
+  helix
   assets/
 ```
 
 ```text
 bundle/
-  bin/noctalia
-  share/noctalia/assets/
+  bin/helix
+  share/helix/assets/
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md#runtime-assets) for the full runtime asset lookup order.
+
+## Helix services and adaptive applications
+
+Install `gtk4-devel` and `libadwaita-devel` on Fedora to build Settings. GTK 4.12 and libadwaita
+1.7 or newer are required. GTK was only required for the retired desktop apps;
+and `disabled` builds only the shell and service. GTK is not a dependency of the shell executable.
+
+Build `helix-service`, `helix-settings` and `helix-system-monitor` with
+`meson compile -C build-debug helix-service helix-settings helix-system-monitor -j2`.
+For work on the running desktop, `just build-settings` compiles only Settings and
+its service at lower CPU and disk priority with two jobs. `just build-desktop`
+includes the shell, upgrade helper and System Monitor. Neither recipe builds test
+targets. Install the completed build with `sudo just install debug`; this uses
+`--no-rebuild` so installation does not start an unrelated parallel build.
+Installed sessions activate the service through D-Bus. For an uninstalled application, run
+`build-debug/helix-service` before `build-debug/helix-settings`. The development shell can launch the
+service executable next to itself. Do not run an old shell and the migrated service in the same
+session during development, because the old shell still owns the original device backends.
+
+The service does not require a display server. Run integration tests in an isolated D-Bus session;
+the test redirects both session and system buses and all configuration paths to temporary locations.
+
+System Monitor is the Tauri app `apps/helix-system-monitor` (`cargo build -p helix-system-monitor`).
+Use nested helpers under `tools/nested/` for isolated runs. Agent socket coverage:
+`HELIX_NESTED_SCRIPT=tools/nested/agent-ipc-test.sh tools/nested/run.sh agent-ipc tools/nested/tauri-fake-desktop.sh`.
+Launcher and `act` desktop actions: `HELIX_NESTED_SCRIPT=tools/nested/launcher-test.sh tools/nested/run.sh launcher tools/nested/tauri-shell.sh`.
+Nested runs use `HELIX_NESTED_HEADLESS=1` and the repo `compositor/target/debug/niri` when present (`cargo build` in `compositor/`). The agent-ipc script then checks helix capture IPC (`desktop-capture all` and a named output) and `helix-panel desktop-capture`.
+On the live desktop, after `tools/install-trusted-niri.sh apply`, run `tools/install-trusted-niri.sh status` to see whether the running compositor still needs a logout to pick up the new binary.
+Python agent policy: `tools/helix-agent/.venv/bin/python tests/helix_agent_policy_test.py .` (create the venv from `tools/helix-agent/requirements.txt` first).
+Rust shell core unit tests: `cargo test -p helix-shell-core --lib` (the package has no integration tests at the crate root).
+One-shot nested + policy bundle: `tools/verify-shell-integrations.sh` (needs `compositor/target/debug/niri` or installed niri for nested runs).
+
+Online Accounts support uses optional `goa-backend-1.0 >= 3.56`. On Fedora install
+`gnome-online-accounts` and `gnome-online-accounts-devel` for the activation daemon and
+provider dialogs. Builds without GOA retain an explanatory unavailable page. The account
+provider owns authentication, credentials and service permissions; Helix does not replicate them.

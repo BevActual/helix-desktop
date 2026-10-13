@@ -1,10 +1,12 @@
 # Build
-build*/
+build*
+!**/build.rs
 cmake-build-*/
 compile_commands.json
 
 # Python cache
 __pycache__
+tools/helix-agent/.venv/
 
 # Editor / IDE
 .vscode/
@@ -24,3 +26,42 @@ Thumbs.db
 result/
 result
 result-*
+
+# Inference engine: source, build tree and install prefix (see docs/design/agent-and-inference.md)
+/third_party/llama.cpp-*/
+/third_party/llama.cpp-*.tar.gz
+/third_party/.llama-build/
+/third_party/llama-install/
+/third_party/whisper.cpp-*/
+/third_party/whisper.cpp-*.tar.gz
+/third_party/whisper-install/
+
+# Shared UI is copied into each app's dist/ at build time
+apps/*/dist/style.css
+apps/*/dist/icons.js
+shell/*/dist/style.css
+shell/*/dist/icons.js
+greeter/*/dist/style.css
+greeter/*/dist/icons.js
+
+!core/shared-ui/
+!core/shared-ui/**
+
+# Cargo workspace target (repo root)
+/target/
+
+# compositor (nested Cargo workspace)
+/compositor/target/
+/compositor/result
+/compositor/result-*
+
+# stray rustc outputs
+rust_out
+
+# frontend workspace
+node_modules/
+apps/*/dist/react/
+shell/*/dist/react/
+greeter/*/dist/react/
+third_party/stable-diffusion.cpp-*/
+third_party/sd-install/

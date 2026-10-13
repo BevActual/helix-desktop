@@ -8,7 +8,7 @@ on:
 jobs:
   update:
     runs-on: ubuntu-latest
-    if: ${{ github.repository == 'noctalia-dev/noctalia' }}
+    if: ${{ github.repository == 'helix-dev/helix' }}
     permissions:
       contents: write
     steps:

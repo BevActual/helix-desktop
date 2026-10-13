@@ -7,20 +7,20 @@ sidebar:
 
 Helix can be configured in two ways: files you write yourself, and settings the app saves for you.
 
-For most people, the important rule is simple: put your own configuration in `~/.config/noctalia/`. If something changed in the GUI and now seems to ignore your file, check `~/.local/state/noctalia/settings.toml`.
+For most people, the important rule is simple: put your own configuration in `~/.config/helix/`. If something changed in the GUI and now seems to ignore your file, check `~/.local/state/helix/settings.toml`.
 
 ## The two layers
 
 Your hand-written config lives in:
 
-- `$NOCTALIA_CONFIG_HOME/noctalia/`
-- `$XDG_CONFIG_HOME/noctalia/`
-- or `~/.config/noctalia/`
+- `$HELIX_CONFIG_HOME/helix/`
+- `$XDG_CONFIG_HOME/helix/`
+- or `~/.config/helix/`
 
 Helix reads every `*.toml` file in that folder, sorts them alphabetically, and merges them into one config. A single `config.toml` is the easiest setup:
 
 ```toml
-# ~/.config/noctalia/config.toml
+# ~/.config/helix/config.toml
 [theme]
 mode = "dark"
 
@@ -31,7 +31,7 @@ position = "top"
 You can also split things up if you like tidy dotfiles:
 
 ```text
-~/.config/noctalia/
+~/.config/helix/
 ├── bar.toml
 ├── theme.toml
 └── widgets.toml
@@ -39,20 +39,20 @@ You can also split things up if you like tidy dotfiles:
 
 GUI-managed overrides live in:
 
-- `$NOCTALIA_STATE_HOME/noctalia/settings.toml`
-- `$XDG_STATE_HOME/noctalia/settings.toml`
-- or `~/.local/state/noctalia/settings.toml`
+- `$HELIX_STATE_HOME/helix/settings.toml`
+- `$XDG_STATE_HOME/helix/settings.toml`
+- or `~/.local/state/helix/settings.toml`
 
 Helix writes this file when you change settings through the UI, setup flows, IPC-backed controls, and other runtime actions that need to persist. If the file is a symbolic link, Helix writes through to the link target and keeps the link in place.
 
-`NOCTALIA_CONFIG_HOME` and `NOCTALIA_STATE_HOME` have the same "home root" shape as the XDG variables. For example, `NOCTALIA_CONFIG_HOME=/tmp/profile` reads `/tmp/profile/noctalia/`. Use these variables when you want a separate shell profile without changing the environment inherited by apps launched from Helix.
+`HELIX_CONFIG_HOME` and `HELIX_STATE_HOME` have the same "home root" shape as the XDG variables. For example, `HELIX_CONFIG_HOME=/tmp/profile` reads `/tmp/profile/helix/`. Use these variables when you want a separate shell profile without changing the environment inherited by apps launched from Helix.
 
 ## Including extra files
 
 Automatic loading only sees `*.toml` files sitting directly in the config folder. To pull in files from subdirectories, load a specific file, or control load order without renaming files, add an `[include]` table:
 
 ```toml
-# ~/.config/noctalia/config.toml
+# ~/.config/helix/config.toml
 [include]
 files = [
   "widgets/",                  # a directory: every *.toml inside it (sorted, non-recursive)
@@ -84,7 +84,7 @@ Includes can nest (an included file can include more files), and each file is lo
 By default, every `*.toml` in the config folder still loads automatically alongside your includes. If you keep alternative setups in the root that should not all load at once - say `profile_a.toml` and `profile_b.toml` - set `autoload = false` in your entry file. Then **only** the file(s) that set it (plus whatever they include) load, and the other root files are ignored:
 
 ```toml
-# ~/.config/noctalia/config.toml
+# ~/.config/helix/config.toml
 [include]
 autoload = false
 files = ["profiles/work.toml"]
@@ -110,9 +110,9 @@ If you are confused about why a hand-written value is not taking effect, inspect
 
 ## Where should I edit?
 
-Use `~/.config/noctalia/` for curated config: the things you want to keep in dotfiles, copy to another machine, or manage declaratively.
+Use `~/.config/helix/` for curated config: the things you want to keep in dotfiles, copy to another machine, or manage declaratively.
 
-Treat `~/.local/state/noctalia/settings.toml` as an app-managed override file. It is useful to inspect when debugging GUI changes, and safe to delete when you want to clear those overrides. Keeping it outside `~/.config` also lets the GUI save changes when your config directory is read-only, for example on NixOS. Support reports include config sources and `settings.toml`, but omit `state.toml` contents because they can contain private runtime data.
+Treat `~/.local/state/helix/settings.toml` as an app-managed override file. It is useful to inspect when debugging GUI changes, and safe to delete when you want to clear those overrides. Keeping it outside `~/.config` also lets the GUI save changes when your config directory is read-only, for example on NixOS. Support reports include config sources and `settings.toml`, but omit `state.toml` contents because they can contain private runtime data.
 
 Both layers are watched for changes and hot-reloaded. If neither layer exists, Helix uses its built-in defaults.
 
@@ -122,7 +122,7 @@ When a release changes the shape of a setting, Helix migrates old values before 
 keeps the intended behavior. The app-owned `settings.toml` is upgraded once and stamped with an internal
 `config_version`; Helix manages that marker and excludes it from exported user config.
 
-Files under `~/.config/noctalia/` are never rewritten. Values that need migration are normalized temporarily on every
+Files under `~/.config/helix/` are never rewritten. Values that need migration are normalized temporarily on every
 load, and Settings keeps a warning visible until you update the source TOML. The warning and notification identify the
 source file, line, column, and exact legacy key to edit. Helix sends the notification when it first finds an affected
 key, when a new affected key appears, and every three days while affected values remain.
@@ -130,7 +130,7 @@ key, when a new affected key appears, and every three days while affected values
 Run the validator to list every affected key, its source location, and its canonical replacement:
 
 ```sh
-noctalia config validate
+helix-shell config validate
 ```
 
 Helix can keep using normalized values while you update a file, but migration warnings are intentionally not
@@ -142,42 +142,42 @@ Where Helix keeps everything, by purpose:
 
 | What | Where | Purpose |
 |------|-------|---------|
-| Your config | `~/.config/noctalia/config.toml` | hand-written / declarative - the base layer |
-| GUI overrides | `~/.local/state/noctalia/settings.toml` | written by Settings; wins over your config |
-| Internal UI state | `~/.local/state/noctalia/state.toml` | app-managed non-secret state and last-used values |
+| Your config | `~/.config/helix/config.toml` | hand-written / declarative - the base layer |
+| GUI overrides | `~/.local/state/helix/settings.toml` | written by Settings; wins over your config |
+| Internal UI state | `~/.local/state/helix/state.toml` | app-managed non-secret state and last-used values |
 | Calendar credentials | Desktop Secret Service or an explicit CalDAV password file | CalDAV passwords and Google refresh tokens |
 | Encrypted storage key | Desktop Secret Service or an explicit key file | master key for encrypted clipboard history and calendar events |
-| Calendar event cache | `$XDG_CACHE_HOME/noctalia/calendar/events.enc` | encrypted last-known-good events |
-| Custom palettes | `~/.config/noctalia/palettes/` | your own color palette files |
-| Local plugins | `~/.local/share/noctalia/plugins/` | plugins you install or place by hand |
-| Plugin source repos | `~/.local/state/noctalia/plugins/sources/` | git-source repo caches, re-fetchable |
-| Exported plugin files | `~/.local/state/noctalia/plugins/materialized/` | runtime files exported from git sources |
-| Community palettes / templates | `~/.local/state/noctalia/community-*/` | downloaded catalogs, re-fetchable |
+| Calendar event cache | `$XDG_CACHE_HOME/helix/calendar/events.enc` | encrypted last-known-good events |
+| Custom palettes | `~/.config/helix/palettes/` | your own color palette files |
+| Local plugins | `~/.local/share/helix/plugins/` | plugins you install or place by hand |
+| Plugin source repos | `~/.local/state/helix/plugins/sources/` | git-source repo caches, re-fetchable |
+| Exported plugin files | `~/.local/state/helix/plugins/materialized/` | runtime files exported from git sources |
+| Community palettes / templates | `~/.local/state/helix/community-*/` | downloaded catalogs, re-fetchable |
 
 It comes down to **three storage owners**:
 
-- **Yours** - `~/.config/noctalia/` (settings you write) and `~/.local/share/noctalia/` (plugins you install).
-- **Helix's** - `~/.local/state/noctalia/` (GUI overrides, UI state, plugin repo caches, exported plugin files, and
+- **Yours** - `~/.config/helix/` (settings you write) and `~/.local/share/helix/` (plugins you install).
+- **Helix's** - `~/.local/state/helix/` (GUI overrides, UI state, plugin repo caches, exported plugin files, and
   downloaded catalogs).
 - **Credential provider's** - durable calendar credentials and the encrypted storage master key managed by Secret Service,
   or explicit credential/key files managed by an external provisioner such as agenix. Deleting Helix's state
   directory does not remove them.
 
 Every path honors the relevant standard `XDG_CONFIG_HOME` / `XDG_STATE_HOME` / `XDG_DATA_HOME` / `XDG_CACHE_HOME`
-variable (and the `NOCTALIA_CONFIG_HOME` / `NOCTALIA_STATE_HOME` / `NOCTALIA_DATA_HOME` overrides where applicable).
+variable (and the `HELIX_CONFIG_HOME` / `HELIX_STATE_HOME` / `HELIX_DATA_HOME` overrides where applicable).
 
 ## Exporting config
 
 Export the merged user config from the command line:
 
 ```sh
-noctalia config export > noctalia-config.toml
+helix-shell config export > helix-config.toml
 ```
 
 Export the full effective config, including built-in defaults:
 
 ```sh
-noctalia config export full > noctalia-full-config.toml
+helix-shell config export full > helix-full-config.toml
 ```
 
 Export stops with an error (and writes nothing) if a config file fails to parse or an `[include]` points at a file that does not exist, so a broken config never produces a misleading partial export. (The running shell is more forgiving: it loads what it can and surfaces the problem as a notification.)
@@ -186,15 +186,15 @@ Because export writes TOML to stdout, you can pipe it into TOML-aware query tool
 [`yq`](https://github.com/mikefarah/yq):
 
 ```sh
-noctalia config export full | yq -p toml -r '.theme.mode'
-noctalia config export full | yq -p toml -r '.shell.offline_mode'
-noctalia config export full | yq -p toml '.bar.default'
+helix-shell config export full | yq -p toml -r '.theme.mode'
+helix-shell config export full | yq -p toml -r '.shell.offline_mode'
+helix-shell config export full | yq -p toml '.bar.default'
 ```
 
 If you prefer normal `jq` filters, convert the TOML stream to JSON first:
 
 ```sh
-noctalia config export full | yq -p toml -o json '.' | jq -r '.theme.mode'
+helix-shell config export full | yq -p toml -o json '.' | jq -r '.theme.mode'
 ```
 
 The Settings actions menu includes **Export Config...**. It opens a chooser with two export modes:
@@ -207,26 +207,26 @@ The Settings actions menu includes **Export Config...**. It opens a chooser with
 Run the validator to catch problems before they silently take effect:
 
 ```sh
-noctalia config validate
+helix-shell config validate
 ```
 
-With no argument it checks the merged configuration exactly as the shell loads it: every `*.toml` in `~/.config/noctalia/` (or `$NOCTALIA_CONFIG_HOME`), then the `settings.toml` overrides in `~/.local/state/noctalia/`. Pass a directory to validate just that directory's `*.toml` files instead:
+With no argument it checks the merged configuration exactly as the shell loads it: every `*.toml` in `~/.config/helix/` (or `$HELIX_CONFIG_HOME`), then the `settings.toml` overrides in `~/.local/state/helix/`. Pass a directory to validate just that directory's `*.toml` files instead:
 
 ```sh
-noctalia config validate ./my-config-dir
+helix-shell config validate ./my-config-dir
 ```
 
 Pass a file to validate only that TOML file, without scanning default locations or merging `settings.toml`. This is useful for generated configs, including NixOS-managed config files:
 
 ```sh
-noctalia config validate ./config.toml
+helix-shell config validate ./config.toml
 ```
 
 Every diagnostic is prefixed with the file, line, and column it came from, followed by the dotted config path:
 
 ```
-WARN  /home/you/.config/noctalia/bar.toml:14:10: bar.main.foo: unknown setting
-ERROR /home/you/.config/noctalia/widgets.toml:22:12: widget.clock.timezone: unknown timezone "Europe/Berln"
+WARN  /home/you/.config/helix/bar.toml:14:10: bar.main.foo: unknown setting
+ERROR /home/you/.config/helix/widgets.toml:22:12: widget.clock.timezone: unknown timezone "Europe/Berln"
 ```
 
 With several config files in play (or `settings.toml` overriding one of them), the reported file is the one whose definition actually won the merge.
@@ -249,14 +249,14 @@ There the file is shown relative to your config directory (or as a bare file nam
 
 ## Where next?
 
-- [Shell](/noctalia/configuration/shell/) covers global behavior like fonts, scale, shadows, OSD, and keybinds.
-- [Hooks](/noctalia/automation/hooks/) covers advanced event-driven automation.
-- [Bars](/noctalia/bar/) and [Widgets](/noctalia/bar/widgets/) cover the top or side bar and everything inside it.
-- [Dock](/noctalia/dock/) covers the optional app dock.
-- [Theme](/noctalia/theming/) covers theme mode and palette source selection.
-- [Palette](/noctalia/theming/palette/) covers color roles, custom palette files, and terminal colors.
-- [App Theming](/noctalia/theming/app-theming/) covers generated themes for other apps.
-- [Template Reference](/noctalia/theming/templates/) covers template syntax, tokens, filters, and hooks.
-- [Wallpaper & backdrop](/noctalia/desktop/wallpaper/) covers wallpapers, per-monitor folders, automation, and overview backdrop.
-- Service pages cover [audio](/noctalia/services/audio/), [brightness](/noctalia/services/brightness/), [calendar](/noctalia/services/calendar/), [idle](/noctalia/services/idle/), [night light](/noctalia/services/night-light/), [notifications](/noctalia/services/notifications/), and [weather](/noctalia/services/weather/).
-- [IPC](/noctalia/ipc/) lists commands for keybinds, scripts, automation, and hooks.
+- [Shell](/helix/configuration/shell/) covers global behavior like fonts, scale, shadows, OSD, and keybinds.
+- [Hooks](/helix/automation/hooks/) covers advanced event-driven automation.
+- [Bars](/helix/bar/) and [Widgets](/helix/bar/widgets/) cover the top or side bar and everything inside it.
+- [Dock](/helix/dock/) covers the optional app dock.
+- [Theme](/helix/theming/) covers theme mode and palette source selection.
+- [Palette](/helix/theming/palette/) covers color roles, custom palette files, and terminal colors.
+- [App Theming](/helix/theming/app-theming/) covers generated themes for other apps.
+- [Template Reference](/helix/theming/templates/) covers template syntax, tokens, filters, and hooks.
+- [Wallpaper & backdrop](/helix/desktop/wallpaper/) covers wallpapers, per-monitor folders, automation, and overview backdrop.
+- Service pages cover [audio](/helix/services/audio/), [brightness](/helix/services/brightness/), [calendar](/helix/services/calendar/), [idle](/helix/services/idle/), [night light](/helix/services/night-light/), [notifications](/helix/services/notifications/), and [weather](/helix/services/weather/).
+- [IPC](/helix/ipc/) lists commands for keybinds, scripts, automation, and hooks.

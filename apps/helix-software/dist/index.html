@@ -1,0 +1,26 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css">
+<body class="settings">
+<div id="app" data-test="app">
+  <aside id="side">
+    <div id="titlebar" data-tauri-drag-region>
+      <button id="close" class="win-btn" data-test="close" title="Close" aria-label="Close"><i data-icon="x"></i></button>
+    </div>
+    <nav id="pages">
+      <button class="page-link current" data-page="explore" data-test="page-explore"><i data-icon="sparkle"></i><span>Explore</span></button>
+      <button class="page-link" data-page="library" data-test="page-library"><i data-icon="grid"></i><span>Library</span></button>
+      <button class="page-link" data-page="updates" data-test="page-updates"><i data-icon="sun"></i><span>Updates</span></button>
+      <button class="page-link" data-page="sources" data-test="page-sources"><i data-icon="wifi"></i><span>Sources</span></button>
+    </nav>
+  </aside>
+  <main id="content" data-test="content">
+    <header data-tauri-drag-region>
+      <h2 id="page-title">Explore</h2>
+      <input id="search" data-test="search" type="search" placeholder="Search" autocomplete="off">
+    </header>
+    <div id="confirm" hidden data-test="confirm-bar"></div>
+    <div id="list" data-test="list"></div>
+  </main>
+</div>
+<script src="icons.js"></script>
+<script src="react/helix-software.js"></script>
+<script src="software.js"></script>

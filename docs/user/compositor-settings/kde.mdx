@@ -1,11 +1,16 @@
 ---
 title: KDE Plasma
-description: What works on Plasma/KWin, and what is limited by missing Wayland protocols.
+description: Unsupported historical notes for KDE Plasma (not a Helix product surface).
 sidebar:
   order: 9
 ---
 
-Helix can run as a shell on **KDE Plasma (KWin)**, but Plasma is not a first-class compositor integration the way Niri or Hyprland are. Layer-shell bars and panels work; several features depend on **wlroots-style protocols** that stock KWin does not expose, or on Plasma-specific bridges that are less complete than the protocol path.
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
+
+This page is unsupported historical material. Plasma was never the Helix product surface; helix-niri is. Layer-shell bars may appear on KWin, but several features depend on **wlroots-style protocols** that stock KWin does not expose.
 
 This page lists the main gaps so you know what to expect before switching.
 
@@ -14,10 +19,10 @@ This page lists the main gaps so you know what to expect before switching.
 Start Helix from Plasma’s session autostart (System Settings → Autostart), or add it to your login script:
 
 ```bash
-noctalia
+helix
 ```
 
-Wire launcher / control center / settings the same way as on other compositors, using `noctalia msg ...` binds in Plasma’s Shortcuts settings or a custom script. See [Running Helix](/noctalia/getting-started/running-the-shell/) and [IPC](/noctalia/ipc/).
+Wire launcher / control center / settings the same way as on other compositors, using `helix-panel ...` binds in Plasma’s Shortcuts settings or a custom script. See [Running Helix](/helix/getting-started/running-the-shell/) and [IPC](/helix/ipc/).
 
 ## What generally works
 
@@ -27,7 +32,7 @@ Wire launcher / control center / settings the same way as on other compositors, 
 - **Window switcher pointer warp** moves the pointer to the selected window through KWin’s native `Move Mouse to Focus` action
 - **System tray** (Plasma StatusNotifier path)
 - **Notifications** via Plasma’s notification watcher (Helix does not own `org.freedesktop.Notifications` on Plasma)
-- **Theming** of KDE apps via KColorScheme; see [GTK / Qt / KDE theming](/noctalia/templates/official/gtk-qt/)
+- **Theming** of KDE apps via KColorScheme; see [GTK / Qt / KDE theming](/helix/templates/official/gtk-qt/)
 
 ## Limitations
 
@@ -45,11 +50,11 @@ The screenshot bar widget and `screenshot-region` / `screenshot-fullscreen` IPC 
 
 ### Lock screen desktop capture
 
-`[lockscreen]` desktop capture (blurred live desktop behind the lock) also needs screencopy. Without it, the lock screen uses the wallpaper / configured image only. See [Shell → Lock screen](/noctalia/configuration/shell/#lock-screen).
+`[lockscreen]` desktop capture (blurred live desktop behind the lock) also needs screencopy. Without it, the lock screen uses the wallpaper / configured image only. See [Shell → Lock screen](/helix/configuration/shell/#lock-screen).
 
 ### Night light
 
-Helix night light uses `zwlr-gamma-control-unstable-v1`. Stock KWin does not provide it, so Helix’s night light stays disabled. Use Plasma’s Night Color instead. See [Night Light](/noctalia/services/night-light/).
+Helix night light uses `zwlr-gamma-control-unstable-v1`. Stock KWin does not provide it, so Helix’s night light stays disabled. Use Plasma’s Night Color instead. See [Night Light](/helix/services/night-light/).
 
 ### Compositor blur and Better Blur
 
@@ -59,7 +64,7 @@ Third-party **Better Blur** (and similar KWin effects) can make blur visible, bu
 
 - Disable Better Blur for Helix / layer-shell windows in the effect’s rules, or
 - Avoid auto-hide while relying on Better Blur, or
-- Prefer compositors with native `ext-background-effect` support (see [Niri blur](/noctalia/compositor-settings/niri/?section=blur) / [Hyprland](/noctalia/compositor-settings/hyprland/))
+- Prefer helix-niri with native `ext-background-effect` support (see [Niri blur](/helix/compositor-settings/niri/?section=blur))
 
 ### Window tracking (taskbar, dock, screen time)
 
@@ -69,11 +74,11 @@ KWin does not expose `wlr-foreign-toplevel-management` / `ext-foreign-toplevel-l
 
 ### Keyboard layout widget
 
-There is no Plasma keyboard-layout compositor backend. The bar keyboard-layout widget has nothing to drive for layout detection/cycling unless you configure a custom cycle command. See [Keyboard layout widget](/noctalia/bar/widgets/keyboard-layout/).
+There is no Plasma keyboard-layout compositor backend. The bar keyboard-layout widget has nothing to drive for layout detection/cycling unless you configure a custom cycle command. See [Keyboard layout widget](/helix/bar/widgets/keyboard-layout/).
 
 ### Overview / wallpaper backdrop
 
-Overview-aware smart auto-hide and the Niri-style wallpaper overview backdrop are compositor-specific. They are not available on Plasma. See [Wallpaper](/noctalia/desktop/wallpaper/).
+Overview-aware smart auto-hide and the Niri-style wallpaper overview backdrop are compositor-specific. They are not available on Plasma. See [Wallpaper](/helix/desktop/wallpaper/).
 
 ### Session logout
 

@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   struct BuiltinTemplateInfo {
     std::string id;
@@ -65,4 +65,4 @@ namespace noctalia::theme {
     return tip;
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

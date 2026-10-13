@@ -1,9 +1,14 @@
 ---
 title: Labwc
-description: Configure Labwc for the best experience with Helix.
+description: Unsupported historical notes for Labwc (not a Helix product surface).
 sidebar:
   order: 8
 ---
+
+
+:::caution[Unsupported product surface]
+Helix’s sole supported session is **Fedora + helix-niri**. This page is historical reference only and is not a supported setup. Use [Niri](/helix/compositor-settings/niri/) instead.
+:::
 
 Add the following compositor settings inside your existing `<labwc_config>` element, located in your Labwc xml configuration file (found at `~/.config/labwc/rc.xml`)
 
@@ -26,10 +31,10 @@ Recommended compositor settings:
   </windowSwitcher>
 ```
 
-## Autostart noctalia
+## Autostart helix
 Add the following to the Labwc autostart file `~/.config/labwc/autostart`
 ```
-noctalia
+helix
 ```
 
 ## IPC Keybinds
@@ -40,16 +45,16 @@ Add these binds to your `rc.xml`
     <default />
 
     <!-- Core keys -->
-    <keybind key="W-space"><action name="Execute"><command>noctalia msg panel-toggle launcher</command></action></keybind>
-    <keybind key="W-s"><action name="Execute"><command>noctalia msg panel-toggle control-center</command></action></keybind>
-    <keybind key="W-,"><action name="Execute"><command>noctalia msg settings-toggle</command></action></keybind>
+    <keybind key="W-space"><action name="Execute"><command>helix-panel panel-toggle launcher</command></action></keybind>
+    <keybind key="W-s"><action name="Execute"><command>helix-panel panel-toggle control-center</command></action></keybind>
+    <keybind key="W-,"><action name="Execute"><command>helix-panel settings-toggle</command></action></keybind>
 
     <!-- Media keys -->
-    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>noctalia msg volume-up</command></action></keybind>
-    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>noctalia msg volume-down</command></action></keybind>
-    <keybind key="XF86AudioMute"><action name="Execute"><command>noctalia msg volume-mute</command></action></keybind>
-    <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>noctalia msg brightness-up</command></action></keybind>
-    <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>noctalia msg brightness-down</command></action></keybind>
+    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>helix-panel volume-up</command></action></keybind>
+    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>helix-panel volume-down</command></action></keybind>
+    <keybind key="XF86AudioMute"><action name="Execute"><command>helix-panel volume-mute</command></action></keybind>
+    <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>helix-panel brightness-up</command></action></keybind>
+    <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>helix-panel brightness-down</command></action></keybind>
   </keyboard>
 ```
 

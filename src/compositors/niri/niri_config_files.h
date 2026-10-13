@@ -22,9 +22,8 @@ namespace compositors::niri {
   [[nodiscard]] std::vector<std::filesystem::path>
   parseIncludes(std::string_view kdl, const std::filesystem::path& fromFile);
   [[nodiscard]] bool hasInclude(std::string_view kdl, std::string_view fileName);
-  [[nodiscard]] bool appendInclude(
-      const std::filesystem::path& configFile, std::string_view fileName, std::string& error
-  );
+  [[nodiscard]] bool
+  appendInclude(const std::filesystem::path& configFile, std::string_view fileName, std::string& error);
 
   // Concatenate config.kdl and followed includes (comments stripped) for detection.
   [[nodiscard]] std::string collectConfigText(const std::filesystem::path& path);

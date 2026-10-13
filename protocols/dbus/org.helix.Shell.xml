@@ -1,0 +1,30 @@
+<node>
+<!-- Served by the Helix shell (the Tauri one) at org.helix.Shell, /org/helix/Shell, on the session bus. This is how key bindings and other
+     programs open its panels. Panels are the ids the shell knows ("assistant", "launcher", "control-center", "agents", "notifications", "quick-insert"); anything else is refused.
+     Opening a panel only shows UI, so it needs no grant. Design: docs/design/tauri-rust-shell.md. -->
+<interface name="org.helix.Shell1">
+ <!-- Opens the panel, replacing any other that is open. Opening the one that is already open does nothing. -->
+ <method name="OpenPanel"><arg name="id" type="s" direction="in"/></method>
+ <!-- Opens the panel, or closes it if it is the one that is open. What a key binding wants. -->
+ <method name="TogglePanel"><arg name="id" type="s" direction="in"/></method>
+ <method name="ClosePanel"/>
+ <!-- Opens the assistant panel and submits a request (same path as typing there or Caps Lock act). Peer apps such as Mobius use this to hand off desktop actions; helix-assistant still holds Agent Surface. Empty or overlong requests are refused. -->
+ <method name="AssistantSubmit"><arg name="request" type="s" direction="in"/></method>
+ <!-- What key bindings for the matching quick settings want: flip the setting from its current state. -->
+ <method name="ToggleDoNotDisturb"/>
+ <method name="ToggleNightLight"/>
+ <method name="ToggleDarkTheme"/>
+ <!-- The volume and brightness keys: change by delta percentage points, or mute; the shell shows the indicator. -->
+ <method name="AdjustVolume"><arg name="delta" type="i" direction="in"/></method>
+ <method name="ToggleMute"/>
+ <method name="AdjustBrightness"><arg name="delta" type="i" direction="in"/></method>
+ <!-- Hide or show the painted bar and top compositor gap (bar process only). -->
+ <method name="BarShow"/>
+ <method name="BarHide"/>
+ <method name="BarToggle"/>
+ <!-- {panel: s}, empty when none is open -->
+ <method name="GetStatus"><arg type="a{sv}" direction="out"/></method>
+ <!-- Graphical administrator password for `sudo -A` via `helix-askpass` (SUDO_ASKPASS). Cancelled when the person dismisses the dialog. -->
+ <method name="PromptAdminPassword"><arg name="prompt" type="s" direction="in"/><arg type="s" direction="out"/></method>
+</interface>
+</node>

@@ -9,7 +9,7 @@
 
 namespace compositors::niri {
 
-  inline constexpr std::string_view kWindowRulesIncludeFileName = "noctalia-window-rules.kdl";
+  inline constexpr std::string_view kWindowRulesIncludeFileName = "helix-window-rules.kdl";
 
   struct WindowRulesSettings {
     std::optional<int> cornerRadius;
@@ -19,7 +19,7 @@ namespace compositors::niri {
   [[nodiscard]] std::filesystem::path windowRulesIncludePath();
   [[nodiscard]] std::string kdlForWindowRules(const WindowRulesSettings& settings);
   [[nodiscard]] std::string kdlForWindowCornerRadius(int radius);
-  // Reads back the value from Noctalia's own managed include file; nullopt if it hasn't been written yet.
+  // Reads back the value from Helix's own managed include file; nullopt if it hasn't been written yet.
   [[nodiscard]] std::optional<int> currentWindowCornerRadius();
   [[nodiscard]] std::optional<int> currentWindowCornerRadiusFrom(const std::filesystem::path& configFile);
 

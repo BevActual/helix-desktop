@@ -1,3 +1,3 @@
 #pragma once
 
-#define NOCTALIA_GIT_REVISION "@VCS_TAG@"
+#define HELIX_GIT_REVISION "@VCS_TAG@"

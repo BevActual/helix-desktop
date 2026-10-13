@@ -27,9 +27,9 @@ Anything after `<event>` is passed through as `[payload]` unchanged.
 Examples:
 
 ```sh
-noctalia msg plugin noctalia/screen_recorder:service all toggle
-noctalia msg plugin noctalia/screen_recorder:service all start focused
-noctalia msg plugin noctalia/example:hello focused set "New label"
+helix-panel plugin helix/screen_recorder:service all toggle
+helix-panel plugin helix/screen_recorder:service all start focused
+helix-panel plugin helix/example:hello focused set "New label"
 ```
 
 ## Manage Plugins
@@ -41,19 +41,19 @@ Use this family to list, enable, disable, update plugins, and manage plugin sour
 Common commands:
 
 ```sh
-noctalia msg plugins list
-noctalia msg plugins enable noctalia/screen_recorder
-noctalia msg plugins disable noctalia/screen_recorder
-noctalia msg plugins update official
+helix-panel plugins list
+helix-panel plugins enable helix/screen_recorder
+helix-panel plugins disable helix/screen_recorder
+helix-panel plugins update official
 ```
 
 Source management:
 
 ```sh
-noctalia msg plugins source list
-noctalia msg plugins source add my-repo git https://github.com/me/my-plugins
-noctalia msg plugins source add my-dev path ~/dev/my-plugins
-noctalia msg plugins source remove my-repo
+helix-panel plugins source list
+helix-panel plugins source add my-repo git https://github.com/me/my-plugins
+helix-panel plugins source add my-dev path ~/dev/my-plugins
+helix-panel plugins source remove my-repo
 ```
 
-See [Using Plugins](/noctalia/plugins/) for installing, enabling, and configuring plugins.
+See [Using Plugins](/helix/plugins/) for installing, enabling, and configuring plugins.

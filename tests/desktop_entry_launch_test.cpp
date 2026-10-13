@@ -42,7 +42,7 @@ namespace {
   }
 
   std::string makeExecutableFixture() {
-    char path[] = "/tmp/noctalia-terminal-fixture-XXXXXX";
+    char path[] = "/tmp/helix-terminal-fixture-XXXXXX";
     const int fd = mkstemp(path);
     if (fd >= 0) {
       close(fd);
@@ -52,7 +52,7 @@ namespace {
   }
 
   std::string makeExecutableFixtureNamed(const char* name) {
-    char dir[] = "/tmp/noctalia-terminal-fixture-dir-XXXXXX";
+    char dir[] = "/tmp/helix-terminal-fixture-dir-XXXXXX";
     if (mkdtemp(dir) == nullptr) {
       return {};
     }

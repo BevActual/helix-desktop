@@ -4,6 +4,7 @@
 #include "core/process/process.h"
 #include "system/fedora_upgrade.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cctype>
 #include <chrono>
@@ -15,7 +16,7 @@
 #include <unordered_set>
 #include <utility>
 
-namespace noctalia::packages {
+namespace helix::packages {
 
   namespace {
 
@@ -35,7 +36,9 @@ namespace noctalia::packages {
       RpmInstalled,
       FlatpakInstalled,
       FlatpakUpdates,
+      FlatpakCatalog,
       FlatpakSearch,
+      FlatpakRemotes,
       FwupdInstalled,
       FwupdUpdates,
       None,
@@ -64,17 +67,18 @@ namespace noctalia::packages {
       std::size_t start = 0;
       while (start <= text.size()) {
         const auto end = text.find('\n', start);
-        auto line = std::string_view(text).substr(
-            start, end == std::string::npos ? text.size() - start : end - start
-        );
+        auto line = std::string_view(text).substr(start, end == std::string::npos ? text.size() - start : end - start);
         while (!line.empty() && (line.back() == '\r' || std::isspace(static_cast<unsigned char>(line.back())) != 0)) {
           line.remove_suffix(1);
         }
         while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front())) != 0) {
           line.remove_prefix(1);
         }
-        if (!line.empty() && !line.starts_with("Transaction:") && !line.starts_with("Status:")
-            && !line.starts_with("Percentage:") && line != "Results:") {
+        if (!line.empty()
+            && !line.starts_with("Transaction:")
+            && !line.starts_with("Status:")
+            && !line.starts_with("Percentage:")
+            && line != "Results:") {
           last = std::string(line);
         }
         if (end == std::string::npos) {
@@ -95,16 +99,31 @@ namespace noctalia::packages {
       return last.substr(last.size() - kMax);
     }
 
-    void feedProgress(std::string& pending, std::string_view chunk, PkconProgress& progress, const ProgressCallback& onProgress) {
+    void feedProgress(
+        std::string& pending, std::string_view chunk, PkconProgress& progress, const ProgressCallback& onProgress
+    ) {
       pending.append(chunk);
       std::size_t start = 0;
       while (start < pending.size()) {
-        const auto end = pending.find('\n', start);
+        const auto endN = pending.find('\n', start);
+        const auto endR = pending.find('\r', start);
+        std::size_t end = std::string::npos;
+        if (endN == std::string::npos) {
+          end = endR;
+        } else if (endR == std::string::npos) {
+          end = endN;
+        } else {
+          end = std::min(endN, endR);
+        }
         if (end == std::string::npos) {
           break;
         }
-        const bool changed = applyPkconProgressLine(std::string_view(pending).substr(start, end - start), progress);
+        const auto line = std::string_view(pending).substr(start, end - start);
         start = end + 1;
+        if (line.empty()) {
+          continue;
+        }
+        const bool changed = applyPkconProgressLine(line, progress) || applyFlatpakProgressLine(line, progress);
         if (changed && onProgress) {
           onProgress(progress);
         }
@@ -121,9 +140,7 @@ namespace noctalia::packages {
       process::RunOptions rpmOptions;
       rpmOptions.timeout = std::chrono::seconds(8);
       rpmOptions.maxOutputBytes = 4U << 20;
-      const auto rpm = process::runSync(
-          {std::string("rpm"), "-qa", "--qf", "%{NAME}\t%{SUMMARY}\n"}, rpmOptions
-      );
+      const auto rpm = process::runSync({std::string("rpm"), "-qa", "--qf", "%{NAME}\t%{SUMMARY}\n"}, rpmOptions);
       if (rpm && !rpm.out.empty()) {
         applySummaryMap(hits, parseNameSummaryOutput(rpm.out, '\t'));
       }
@@ -143,9 +160,8 @@ namespace noctalia::packages {
       if (missing.empty() || !process::commandExists("dnf")) {
         return;
       }
-      std::vector<std::string> args = {
-          std::string("dnf"), "-C", "-q", "repoquery", "--queryformat", "%{name}|%{summary}\n"
-      };
+      std::vector<std::string> args = {std::string("dnf"),    "-C", "-q", "repoquery", "--queryformat",
+                                       "%{name}|%{summary}\n"};
       args.insert(args.end(), missing.begin(), missing.end());
       process::RunOptions dnfOptions;
       dnfOptions.timeout = std::chrono::seconds(12);
@@ -157,25 +173,119 @@ namespace noctalia::packages {
     }
 
     std::vector<PackageHit> parseHits(ParseMode parse, std::string_view text) {
+      std::vector<PackageHit> hits;
       switch (parse) {
       case ParseMode::Pkcon:
-        return parsePkconOutput(text);
+        hits = parsePkconOutput(text);
+        break;
       case ParseMode::RpmInstalled:
-        return parseRpmInstalledOutput(text);
+        hits = parseRpmInstalledOutput(text);
+        break;
       case ParseMode::FlatpakInstalled:
-        return parseFlatpakListOutput(text, FlatpakListKind::Installed);
+        hits = parseFlatpakListOutput(text, FlatpakListKind::Installed);
+        break;
       case ParseMode::FlatpakUpdates:
-        return parseFlatpakListOutput(text, FlatpakListKind::Updates);
+        hits = parseFlatpakListOutput(text, FlatpakListKind::Updates);
+        break;
+      case ParseMode::FlatpakCatalog:
+        hits = parseFlatpakListOutput(text, FlatpakListKind::Catalog);
+        break;
       case ParseMode::FlatpakSearch:
-        return parseFlatpakSearchJson(text);
+        hits = parseFlatpakSearchJson(text);
+        break;
+      case ParseMode::FlatpakRemotes:
+        break;
       case ParseMode::FwupdInstalled:
-        return parseFwupdDevicesJson(text, FwupdListKind::Installed);
+        hits = parseFwupdDevicesJson(text, FwupdListKind::Installed);
+        break;
       case ParseMode::FwupdUpdates:
-        return parseFwupdDevicesJson(text, FwupdListKind::Updates);
+        hits = parseFwupdDevicesJson(text, FwupdListKind::Updates);
+        break;
       case ParseMode::None:
-        return {};
+        break;
       }
-      return {};
+      if (parse == ParseMode::FlatpakInstalled
+          || parse == ParseMode::FlatpakUpdates
+          || parse == ParseMode::FlatpakCatalog
+          || parse == ParseMode::FlatpakSearch) {
+        attachFlatpakIcons(hits);
+      }
+      if (parse == ParseMode::FlatpakCatalog) {
+        std::ranges::stable_partition(hits, [](const PackageHit& hit) {
+          return hit.repo == "flathub" || preferredFlatpakRemote(hit.repo) == "flathub";
+        });
+        hits = dedupeByName(std::move(hits));
+      }
+      return hits;
+    }
+
+    void mergeDetails(PackageDetails& target, PackageDetails&& source) {
+      if (target.hit.title.empty()) {
+        target.hit.title = std::move(source.hit.title);
+      }
+      if (target.hit.summary.empty()) {
+        target.hit.summary = std::move(source.hit.summary);
+      }
+      if (target.hit.version.empty()) {
+        target.hit.version = std::move(source.hit.version);
+      }
+      if (target.hit.release.empty()) {
+        target.hit.release = std::move(source.hit.release);
+      }
+      if (target.hit.iconPath.empty()) {
+        target.hit.iconPath = std::move(source.hit.iconPath);
+      }
+      if (target.hit.iconName.empty()) {
+        target.hit.iconName = std::move(source.hit.iconName);
+      }
+      if (target.description.empty()) {
+        target.description = std::move(source.description);
+      }
+      if (target.developer.empty()) {
+        target.developer = std::move(source.developer);
+      }
+      if (target.license.empty()) {
+        target.license = std::move(source.license);
+      }
+      if (target.homepage.empty()) {
+        target.homepage = std::move(source.homepage);
+      }
+      if (target.bugtracker.empty()) {
+        target.bugtracker = std::move(source.bugtracker);
+      }
+      if (target.donation.empty()) {
+        target.donation = std::move(source.donation);
+      }
+      if (target.helpUrl.empty()) {
+        target.helpUrl = std::move(source.helpUrl);
+      }
+      if (target.contentRating.empty()) {
+        target.contentRating = std::move(source.contentRating);
+      }
+      if (target.releaseNotes.empty()) {
+        target.releaseNotes = std::move(source.releaseNotes);
+      }
+      if (target.verification.empty()) {
+        target.verification = std::move(source.verification);
+      }
+      if (target.downloadSize.empty()) {
+        target.downloadSize = std::move(source.downloadSize);
+      }
+      if (target.installedSize.empty()) {
+        target.installedSize = std::move(source.installedSize);
+      }
+      if (target.runtime.empty()) {
+        target.runtime = std::move(source.runtime);
+      }
+      if (target.permissions.empty()) {
+        target.permissions = std::move(source.permissions);
+      }
+      if (target.categories.empty()) {
+        target.categories = std::move(source.categories);
+      }
+      if (target.screenshotUrls.empty()) {
+        target.screenshotUrls = std::move(source.screenshotUrls);
+      }
     }
 
     bool launchTracked(
@@ -197,23 +307,25 @@ namespace noctalia::packages {
       const bool launched = process::runAsync(
           std::move(args),
           process::RunCallbacks{
-              .stdOut =
-                  [pendingOut, progress, progressCb](std::string_view chunk) {
-                    feedProgress(*pendingOut, chunk, *progress, *progressCb);
-                  },
-              .stdErr =
-                  [pendingErr, progress, progressCb](std::string_view chunk) {
-                    feedProgress(*pendingErr, chunk, *progress, *progressCb);
-                  },
+              .stdOut = [pendingOut, progress, progressCb](
+                            std::string_view chunk
+                        ) { feedProgress(*pendingOut, chunk, *progress, *progressCb); },
+              .stdErr = [pendingErr, progress, progressCb](
+                            std::string_view chunk
+                        ) { feedProgress(*pendingErr, chunk, *progress, *progressCb); },
               .onExit =
                   [completion, cancel, enrichSummaries, parse](process::RunResult result) {
                     const bool cancelled = cancel->load(std::memory_order_acquire);
                     CommandResult out;
                     out.cancelled = cancelled;
                     const bool pkcon = parse == ParseMode::Pkcon;
-                    out.success = !cancelled && !result.timedOut
+                    out.success = !cancelled
+                        && !result.timedOut
                         && (result.exitCode == 0 || (pkcon && result.exitCode == kPkconNothingUseful));
                     out.hits = parseHits(parse, result.out);
+                    if (parse == ParseMode::FlatpakRemotes) {
+                      out.remotes = parseFlatpakRemotesOutput(result.out);
+                    }
                     if (enrichSummaries && out.success && !cancelled && !out.hits.empty()) {
                       attachSummaries(out.hits);
                     }
@@ -353,9 +465,7 @@ namespace noctalia::packages {
     if (!backendAvailable()) {
       return false;
     }
-    const auto host = fedora_upgrade::classifyHost(
-        osReleaseText(), std::filesystem::exists("/run/ostree-booted")
-    );
+    const auto host = fedora_upgrade::classifyHost(osReleaseText(), std::filesystem::exists("/run/ostree-booted"));
     return host == fedora_upgrade::HostKind::Fedora;
   }
 
@@ -365,6 +475,16 @@ namespace noctalia::packages {
     return g_pendingRpmCount.load(std::memory_order_acquire)
         + g_pendingFlatpakCount.load(std::memory_order_acquire)
         + g_pendingFirmwareCount.load(std::memory_order_acquire);
+  }
+
+  std::size_t pendingUpdateCountFor(Kind kind) noexcept {
+    if (kind == Kind::Flatpak) {
+      return g_pendingFlatpakCount.load(std::memory_order_acquire);
+    }
+    if (kind == Kind::Firmware) {
+      return g_pendingFirmwareCount.load(std::memory_order_acquire);
+    }
+    return g_pendingRpmCount.load(std::memory_order_acquire);
   }
 
   void notePendingUpdates(Kind kind, std::size_t count) noexcept {
@@ -378,17 +498,14 @@ namespace noctalia::packages {
   }
 
   bool refreshPendingUpdateCount(std::function<void()> onComplete) {
-    if (!tabAvailable()) {
-      g_pendingRpmCount.store(0, std::memory_order_release);
-      g_pendingFlatpakCount.store(0, std::memory_order_release);
-      g_pendingFirmwareCount.store(0, std::memory_order_release);
-      if (onComplete) {
-        onComplete();
-      }
-      return false;
-    }
     if (busy()) {
       return false;
+    }
+    if (!tabAvailable()) {
+      g_pendingRpmCount.store(0, std::memory_order_release);
+      // Still count Flatpak/firmware updates even when PackageKit/Fedora is unavailable.
+      finishPendingRefresh(std::move(onComplete), true);
+      return true;
     }
     process::RunOptions options;
     options.timeout = std::chrono::seconds(60);
@@ -427,8 +544,8 @@ namespace noctalia::packages {
       options.timeout = std::chrono::seconds(90);
       options.maxOutputBytes = 2U << 20;
       return launchFlatpak(
-          {std::string(kFlatpak), "search", "--json", std::move(query)}, std::move(options), std::move(onComplete),
-          {}, ParseMode::FlatpakSearch
+          {std::string(kFlatpak), "search", "--json", std::move(query)}, std::move(options), std::move(onComplete), {},
+          ParseMode::FlatpakSearch
       );
     }
     if (!backendAvailable()) {
@@ -441,6 +558,214 @@ namespace noctalia::packages {
         {std::string(kPkcon), "--plain", "--noninteractive", "search", "details", std::move(query)}, std::move(options),
         std::move(onComplete), {}, true
     );
+  }
+
+  bool listCatalog(CommandCompletion onComplete, Kind kind) {
+    if (kind != Kind::Flatpak || !flatpakAvailable()) {
+      return false;
+    }
+    process::RunOptions options;
+    options.timeout = std::chrono::seconds(90);
+    options.maxOutputBytes = 8U << 20;
+    return launchFlatpak(
+        {std::string(kFlatpak), "remote-ls", "--app", "--columns",
+         "application:f,name:f,description:f,version:f,origin:f"},
+        std::move(options), std::move(onComplete), {}, ParseMode::FlatpakCatalog
+    );
+  }
+
+  bool getDetails(PackageHit hit, CommandCompletion onComplete, Kind kind) {
+    if (hit.name.empty()) {
+      return false;
+    }
+    if (kind == Kind::Flatpak && !isValidFlatpakAppId(hit.name)) {
+      return false;
+    }
+    if (kind == Kind::Fedora && !isValidRpmName(hit.name)) {
+      return false;
+    }
+    if (kind == Kind::Firmware && !isValidFwupdDeviceId(hit.name)) {
+      return false;
+    }
+    if (kind == Kind::Flatpak && !flatpakAvailable()) {
+      return false;
+    }
+    if (kind == Kind::Fedora && !process::commandExists("rpm") && !backendAvailable()) {
+      return false;
+    }
+    if (kind == Kind::Firmware && !firmwareAvailable()) {
+      return false;
+    }
+
+    bool expected = false;
+    if (!g_busy.compare_exchange_strong(expected, true, std::memory_order_acquire, std::memory_order_relaxed)) {
+      return false;
+    }
+    auto completion = std::make_shared<CommandCompletion>(std::move(onComplete));
+    auto cancel = std::make_shared<std::atomic<bool>>(false);
+    g_cancelFlag = cancel;
+    process::RunOptions options;
+    options.timeout = std::chrono::seconds(45);
+    options.maxOutputBytes = 2U << 20;
+    options.cancel = cancel;
+
+    // Seed the worker with a fast command; enrichment runs synchronously in onExit.
+    std::vector<std::string> seed = {"true"};
+    if (kind == Kind::Firmware) {
+      seed = {std::string(kFwupdmgr), "get-devices", "--json"};
+      options.timeout = std::chrono::seconds(30);
+      options.maxOutputBytes = 4U << 20;
+    } else if (kind == Kind::Fedora && process::commandExists("rpm")) {
+      seed = {
+          std::string("rpm"), "-q", "--qf",
+          "Name: %{NAME}\nSummary: %{SUMMARY}\nVersion: %{VERSION}\nRelease: %{RELEASE}\nArch: %{ARCH}\n"
+          "License: %{LICENSE}\nURL: %{URL}\nSize: %{SIZE}\nDescription:\n%{DESCRIPTION}\n",
+          hit.name
+      };
+    } else if (kind == Kind::Fedora) {
+      seed = {std::string(kPkcon), "--plain", "--noninteractive", "get-details", pkconPackageRef(hit)};
+    } else if (kind == Kind::Flatpak) {
+      const auto remote = preferredFlatpakRemote(hit.repo);
+      seed = {std::string(kFlatpak), "remote-info", "--cached"};
+      if (hit.installation == "system") {
+        seed.emplace_back("--system");
+      } else {
+        seed.emplace_back("--user");
+      }
+      if (!remote.empty()) {
+        seed.push_back(remote);
+      } else {
+        seed.emplace_back("flathub");
+      }
+      seed.push_back(hit.name);
+    }
+
+    const bool launched = process::runAsync(
+        std::move(seed),
+        process::RunCallbacks{
+            .onExit =
+                [completion, cancel, kind, hit = std::move(hit)](process::RunResult result) mutable {
+                  const bool cancelled = cancel->load(std::memory_order_acquire);
+                  CommandResult out;
+                  out.cancelled = cancelled;
+                  if (cancelled) {
+                    g_busy.store(false, std::memory_order_release);
+                    if (completion && *completion) {
+                      (*completion)(std::move(out));
+                    }
+                    return;
+                  }
+
+                  PackageDetails details;
+                  details.hit = hit;
+                  if (kind == Kind::Flatpak) {
+                    details = loadFlatpakAppstreamDetails(hit);
+                    auto info = parseFlatpakRemoteInfo(result.out, details.hit);
+                    mergeDetails(details, std::move(info));
+                    if ((result.exitCode != 0 || details.downloadSize.empty()) && !details.hit.name.empty()) {
+                      process::RunOptions retry;
+                      retry.timeout = std::chrono::seconds(30);
+                      retry.maxOutputBytes = 1U << 20;
+                      retry.cancel = cancel;
+                      const auto remote = preferredFlatpakRemote(details.hit.repo);
+                      for (const char* scope : {"--user", "--system"}) {
+                        if (cancel->load(std::memory_order_acquire)) {
+                          break;
+                        }
+                        std::vector<std::string> args = {std::string(kFlatpak), "remote-info", "--cached", scope};
+                        args.push_back(remote.empty() ? "flathub" : remote);
+                        args.push_back(details.hit.name);
+                        const auto again = process::runSync(args, retry);
+                        if (again.exitCode == 0 && !again.out.empty()) {
+                          mergeDetails(details, parseFlatpakRemoteInfo(again.out, details.hit));
+                          break;
+                        }
+                      }
+                    }
+                    {
+                      process::RunOptions permOptions;
+                      permOptions.timeout = std::chrono::seconds(20);
+                      permOptions.maxOutputBytes = 1U << 20;
+                      permOptions.cancel = cancel;
+                      const bool installed = details.hit.state == PackageState::Installed
+                          || details.hit.state == PackageState::Update
+                          || details.hit.installation == "user"
+                          || details.hit.installation == "system";
+                      if (installed) {
+                        std::vector<std::string> args = {std::string(kFlatpak), "info", "-M"};
+                        appendFlatpakScope(args, details.hit.installation);
+                        args.push_back(details.hit.name);
+                        const auto perms = process::runSync(args, permOptions);
+                        if (perms.exitCode == 0 && !perms.out.empty()) {
+                          details = parseFlatpakPermissions(perms.out, std::move(details));
+                        }
+                        process::RunOptions sizeOptions = permOptions;
+                        std::vector<std::string> sizeArgs = {std::string(kFlatpak), "info", "-s"};
+                        appendFlatpakScope(sizeArgs, details.hit.installation);
+                        sizeArgs.push_back(details.hit.name);
+                        const auto sizes = process::runSync(sizeArgs, sizeOptions);
+                        if (sizes.exitCode == 0 && !sizes.out.empty()) {
+                          mergeDetails(details, parseFlatpakRemoteInfo(sizes.out, details.hit));
+                        }
+                      }
+                      if (details.permissions.empty() && !cancel->load(std::memory_order_acquire)) {
+                        const auto remote = preferredFlatpakRemote(details.hit.repo);
+                        for (const char* scope : {"--user", "--system"}) {
+                          if (cancel->load(std::memory_order_acquire)) {
+                            break;
+                          }
+                          std::vector<std::string> args = {std::string(kFlatpak), "remote-info", "-m", scope};
+                          args.push_back(remote.empty() ? "flathub" : remote);
+                          args.push_back(details.hit.name);
+                          const auto perms = process::runSync(args, permOptions);
+                          if (perms.exitCode == 0 && !perms.out.empty()) {
+                            details = parseFlatpakPermissions(perms.out, std::move(details));
+                            break;
+                          }
+                        }
+                      }
+                    }
+                    out.success = true;
+                  } else if (kind == Kind::Fedora) {
+                    details = parseRpmInfoOutput(result.out, hit);
+                    if (details.description.empty() && process::commandExists("dnf")) {
+                      process::RunOptions dnfOptions;
+                      dnfOptions.timeout = std::chrono::seconds(20);
+                      dnfOptions.maxOutputBytes = 1U << 20;
+                      dnfOptions.cancel = cancel;
+                      const auto dnf = process::runSync({std::string("dnf"), "-C", "-q", "info", hit.name}, dnfOptions);
+                      if (dnf.exitCode == 0 && !dnf.out.empty()) {
+                        mergeDetails(details, parseRpmInfoOutput(dnf.out, hit));
+                      }
+                    }
+                    out.success = result.exitCode == 0 || !details.description.empty() || !details.hit.summary.empty();
+                  } else {
+                    details = enrichFromFwupdDeviceJson(result.out, hit);
+                    out.success = result.exitCode == 0 || !details.hit.title.empty() || !details.description.empty();
+                  }
+
+                  if (!out.success) {
+                    out.error = compactError(result.err.empty() ? result.out : result.err);
+                    if (result.timedOut) {
+                      out.error = "timed out";
+                    }
+                  }
+                  out.details = std::move(details);
+                  out.hits = {out.details.hit};
+                  g_busy.store(false, std::memory_order_release);
+                  if (completion && *completion) {
+                    (*completion)(std::move(out));
+                  }
+                },
+        },
+        std::move(options)
+    );
+    if (!launched) {
+      g_busy.store(false, std::memory_order_release);
+      g_cancelFlag.reset();
+      kLog.warn("failed to launch package details");
+    }
+    return launched;
   }
 
   bool listUpdates(CommandCompletion onComplete, Kind kind) {
@@ -476,7 +801,22 @@ namespace noctalia::packages {
     options.timeout = std::chrono::seconds(60);
     options.maxOutputBytes = 1U << 20;
     return launchPkcon(
-        {std::string(kPkcon), "--plain", "--noninteractive", "get-updates"}, std::move(options), std::move(onComplete),
+        {std::string(kPkcon), "--plain", "--noninteractive", "get-updates"}, std::move(options),
+        [onComplete = std::move(onComplete)](CommandResult result) {
+          // PackageKit severity labels (Available/Enhancement/…) are not install-state.
+          // Everything from get-updates is an update candidate.
+          if (result.success) {
+            for (auto& hit : result.hits) {
+              hit.state = PackageState::Update;
+              if (hit.info == "Available" || hit.info.empty()) {
+                hit.info = "Update";
+              }
+            }
+          }
+          if (onComplete) {
+            onComplete(std::move(result));
+          }
+        },
         {}, true
     );
   }
@@ -527,16 +867,14 @@ namespace noctalia::packages {
   }
 
   bool updatePackages(
-      std::vector<std::string> names, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind
+      std::vector<std::string> packageRefs, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind
   ) {
     if (kind == Kind::Firmware) {
       if (!firmwareAvailable()) {
         return false;
       }
-      std::vector<std::string> args = {
-          std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check"
-      };
-      for (auto& name : names) {
+      std::vector<std::string> args = {std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check"};
+      for (auto& name : packageRefs) {
         if (!isValidFwupdDeviceId(name)) {
           return false;
         }
@@ -553,74 +891,12 @@ namespace noctalia::packages {
       if (!flatpakAvailable()) {
         return false;
       }
-      std::vector<std::string> args = {
-          std::string(kFlatpak), "update", "-y", "--noninteractive", "--app"
-      };
-      for (auto& name : names) {
+      // Keep -y so installs are confirmed in-app; omit --noninteractive so Flatpak emits \r progress.
+      std::vector<std::string> args = {std::string(kFlatpak), "update", "-y", "--app"};
+      for (auto& name : packageRefs) {
         if (!isValidFlatpakAppId(name)) {
           return false;
         }
-        args.push_back(std::move(name));
-      }
-      process::RunOptions options;
-      options.timeout = std::chrono::minutes(15);
-      options.maxOutputBytes = 1U << 20;
-      return launchFlatpak(std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None);
-    }
-    if (!backendAvailable()) {
-      return false;
-    }
-    std::vector<std::string> args = {
-        std::string(kPkcon), "--plain", "--noninteractive", "-y", "update"
-    };
-    for (auto& name : names) {
-      if (!isValidRpmName(name)) {
-        return false;
-      }
-      args.push_back(std::move(name));
-    }
-    process::RunOptions options;
-    options.timeout = std::chrono::minutes(15);
-    options.maxOutputBytes = 1U << 20;
-    return launchPkcon(std::move(args), std::move(options), std::move(onComplete), std::move(onProgress));
-  }
-
-  bool mutate(
-      Action action, std::string name, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind,
-      std::string installation, std::string remotes
-  ) {
-    if (kind == Kind::Firmware) {
-      if (action != Action::Update || !isValidFwupdDeviceId(name) || !firmwareAvailable()) {
-        return false;
-      }
-      process::RunOptions options;
-      options.timeout = std::chrono::minutes(20);
-      options.maxOutputBytes = 1U << 20;
-      return launchFwupd(
-          {std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check", std::move(name)}, std::move(options),
-          std::move(onComplete), std::move(onProgress), ParseMode::None
-      );
-    }
-    if (kind == Kind::Flatpak) {
-      if (!isValidFlatpakAppId(name) || !flatpakAvailable()) {
-        return false;
-      }
-      std::vector<std::string> args = {std::string(kFlatpak)};
-      if (action == Action::Install) {
-        args.insert(args.end(), {"install", "-y", "--noninteractive", "--user", "--app"});
-        if (const auto remote = preferredFlatpakRemote(remotes); !remote.empty()) {
-          args.push_back(remote);
-        }
-        args.push_back(std::move(name));
-      } else if (action == Action::Remove) {
-        args.insert(args.end(), {"uninstall", "-y", "--noninteractive"});
-        appendFlatpakScope(args, installation);
-        args.emplace_back("--app");
-        args.push_back(std::move(name));
-      } else {
-        args.insert(args.end(), {"update", "-y", "--noninteractive"});
-        appendFlatpakScope(args, installation);
-        args.emplace_back("--app");
         args.push_back(std::move(name));
       }
       process::RunOptions options;
@@ -630,10 +906,76 @@ namespace noctalia::packages {
           std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
       );
     }
-    if (!isValidRpmName(name) || !backendAvailable()) {
+    if (!backendAvailable()) {
       return false;
     }
-    if (action == Action::Remove && isProtectedPackage(name)) {
+    std::vector<std::string> args = {std::string(kPkcon), "--plain", "--noninteractive", "-y", "update"};
+    for (auto& packageRef : packageRefs) {
+      if (!isValidPkconPackageRef(packageRef)) {
+        return false;
+      }
+      args.push_back(std::move(packageRef));
+    }
+    process::RunOptions options;
+    options.timeout = std::chrono::minutes(15);
+    options.maxOutputBytes = 1U << 20;
+    return launchPkcon(std::move(args), std::move(options), std::move(onComplete), std::move(onProgress));
+  }
+
+  bool mutate(
+      Action action, PackageHit hit, CommandCompletion onComplete, ProgressCallback onProgress, Kind kind,
+      bool deleteData
+  ) {
+    if (kind == Kind::Firmware) {
+      if (action != Action::Update || !isValidFwupdDeviceId(hit.name) || !firmwareAvailable()) {
+        return false;
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::minutes(20);
+      options.maxOutputBytes = 1U << 20;
+      return launchFwupd(
+          {std::string(kFwupdmgr), "update", "--assume-yes", "--no-reboot-check", std::move(hit.name)},
+          std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
+      );
+    }
+    if (kind == Kind::Flatpak) {
+      if (!isValidFlatpakAppId(hit.name) || !flatpakAvailable()) {
+        return false;
+      }
+      std::vector<std::string> args = {std::string(kFlatpak)};
+      if (action == Action::Install) {
+        // Keep -y so installs are confirmed in-app; omit --noninteractive so Flatpak emits \r progress.
+        args.insert(args.end(), {"install", "-y", "--user", "--app"});
+        if (const auto remote = preferredFlatpakRemote(hit.repo); !remote.empty()) {
+          args.push_back(remote);
+        }
+        args.push_back(std::move(hit.name));
+      } else if (action == Action::Remove) {
+        args.insert(args.end(), {"uninstall", "-y"});
+        if (deleteData) {
+          args.emplace_back("--delete-data");
+        }
+        appendFlatpakScope(args, hit.installation);
+        args.emplace_back("--app");
+        args.push_back(std::move(hit.name));
+      } else {
+        args.insert(args.end(), {"update", "-y"});
+        appendFlatpakScope(args, hit.installation);
+        args.emplace_back("--app");
+        args.push_back(std::move(hit.name));
+      }
+      process::RunOptions options;
+      options.timeout = std::chrono::minutes(15);
+      options.maxOutputBytes = 1U << 20;
+      return launchFlatpak(
+          std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
+      );
+    }
+    auto packageRef = pkconPackageRefForAction(hit, action == Action::Remove);
+    if (packageRef.empty() || !backendAvailable()) {
+      return false;
+    }
+    if (action == Action::Remove && isProtectedPackage(hit.name)) {
       return false;
     }
     const char* verb = "install";
@@ -646,9 +988,59 @@ namespace noctalia::packages {
     options.timeout = std::chrono::minutes(15);
     options.maxOutputBytes = 1U << 20;
     return launchPkcon(
-        {std::string(kPkcon), "--plain", "--noninteractive", "-y", verb, std::move(name)}, std::move(options),
+        {std::string(kPkcon), "--plain", "--noninteractive", "-y", verb, std::move(packageRef)}, std::move(options),
         std::move(onComplete), std::move(onProgress)
     );
   }
 
-} // namespace noctalia::packages
+  bool listFlatpakRemotes(CommandCompletion onComplete) {
+    if (!flatpakAvailable()) {
+      return false;
+    }
+    process::RunOptions options;
+    options.timeout = std::chrono::seconds(20);
+    options.maxOutputBytes = 1U << 20;
+    return launchFlatpak(
+        {std::string(kFlatpak), "remote-list", "--show-disabled", "--columns", "name,title,url,options,priority"},
+        std::move(options), std::move(onComplete), {}, ParseMode::FlatpakRemotes
+    );
+  }
+
+  bool mutateFlatpakRemote(
+      FlatpakRemoteAction action, FlatpakRemote remote, CommandCompletion onComplete, ProgressCallback onProgress
+  ) {
+    if (!flatpakAvailable()) {
+      return false;
+    }
+    std::vector<std::string> args = {std::string(kFlatpak)};
+    if (action == FlatpakRemoteAction::AddFlathub) {
+      args.insert(
+          args.end(),
+          {"remote-add", "--if-not-exists", "--user", "flathub", "https://dl.flathub.org/repo/flathub.flatpakrepo"}
+      );
+    } else {
+      if (!isValidFlatpakRemoteName(remote.name)) {
+        return false;
+      }
+      if (action == FlatpakRemoteAction::Delete) {
+        args.emplace_back("remote-delete");
+      } else {
+        args.emplace_back("remote-modify");
+        args.emplace_back(action == FlatpakRemoteAction::Enable ? "--enable" : "--disable");
+      }
+      if (remote.installation == "user") {
+        args.emplace_back("--user");
+      } else {
+        args.emplace_back("--system");
+      }
+      args.push_back(remote.name);
+    }
+    process::RunOptions options;
+    options.timeout = std::chrono::minutes(2);
+    options.maxOutputBytes = 1U << 20;
+    return launchFlatpak(
+        std::move(args), std::move(options), std::move(onComplete), std::move(onProgress), ParseMode::None
+    );
+  }
+
+} // namespace helix::packages

@@ -19,8 +19,8 @@ namespace compositors::niri {
     }
 
     void appendColoredNode(
-        std::string& out, std::string_view node, bool enabled, std::string_view activeHex,
-        std::string_view inactiveHex, std::string_view urgentHex
+        std::string& out, std::string_view node, bool enabled, std::string_view activeHex, std::string_view inactiveHex,
+        std::string_view urgentHex
     ) {
       out += "    ";
       out += node;

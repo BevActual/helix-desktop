@@ -388,8 +388,7 @@ namespace display_config {
   bool outputsOverlap(const Output& a, const Output& b) noexcept {
     const Size aSize = logicalSize(a);
     const Size bSize = logicalSize(b);
-    return rangesOverlap(a.x, aSize.width, b.x, bSize.width)
-        && rangesOverlap(a.y, aSize.height, b.y, bSize.height);
+    return rangesOverlap(a.x, aSize.width, b.x, bSize.width) && rangesOverlap(a.y, aSize.height, b.y, bSize.height);
   }
 
   bool isAdjacentOn(const Output& moving, const Output& reference, LayoutDirection direction) noexcept {
@@ -400,11 +399,9 @@ namespace display_config {
       return moving.x == reference.x + refSize.width
           && rangesOverlap(moving.y, size.height, reference.y, refSize.height);
     case LayoutDirection::Left:
-      return moving.x + size.width == reference.x
-          && rangesOverlap(moving.y, size.height, reference.y, refSize.height);
+      return moving.x + size.width == reference.x && rangesOverlap(moving.y, size.height, reference.y, refSize.height);
     case LayoutDirection::Top:
-      return moving.y + size.height == reference.y
-          && rangesOverlap(moving.x, size.width, reference.x, refSize.width);
+      return moving.y + size.height == reference.y && rangesOverlap(moving.x, size.width, reference.x, refSize.width);
     case LayoutDirection::Bottom:
       return moving.y == reference.y + refSize.height
           && rangesOverlap(moving.x, size.width, reference.x, refSize.width);
@@ -414,7 +411,10 @@ namespace display_config {
 
   std::optional<LayoutDirection> adjacency(const Output& moving, const Output& reference) noexcept {
     constexpr LayoutDirection kDirections[] = {
-        LayoutDirection::Left, LayoutDirection::Right, LayoutDirection::Top, LayoutDirection::Bottom,
+        LayoutDirection::Left,
+        LayoutDirection::Right,
+        LayoutDirection::Top,
+        LayoutDirection::Bottom,
     };
     for (const auto direction : kDirections) {
       if (isAdjacentOn(moving, reference, direction)) {
@@ -430,9 +430,8 @@ namespace display_config {
     return alignedOnEdge(moving, reference, direction, proposedX, proposedY, true);
   }
 
-  Point placeAgainst(
-      const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY
-  ) {
+  Point
+  placeAgainst(const Output& moving, const Output& reference, LayoutDirection direction, int proposedX, int proposedY) {
     return alignedOnEdge(moving, reference, direction, proposedX, proposedY, false);
   }
 
@@ -441,7 +440,10 @@ namespace display_config {
     std::optional<SnapResult> best;
     long long bestDist = std::numeric_limits<long long>::max();
     constexpr LayoutDirection kDirections[] = {
-        LayoutDirection::Left, LayoutDirection::Right, LayoutDirection::Top, LayoutDirection::Bottom,
+        LayoutDirection::Left,
+        LayoutDirection::Right,
+        LayoutDirection::Top,
+        LayoutDirection::Bottom,
     };
     const Size movingSize = logicalSize(moving);
     for (const auto& output : outputs) {
@@ -451,10 +453,9 @@ namespace display_config {
       const Size refSize = logicalSize(output);
       for (const auto direction : kDirections) {
         const bool staying = isAdjacentOn(moving, output, direction);
-        const int along =
-            (direction == LayoutDirection::Left || direction == LayoutDirection::Right)
-                ? std::min(movingSize.height, refSize.height)
-                : std::min(movingSize.width, refSize.width);
+        const int along = (direction == LayoutDirection::Left || direction == LayoutDirection::Right)
+            ? std::min(movingSize.height, refSize.height)
+            : std::min(movingSize.width, refSize.width);
         const int minShare = minSharedEdge(along, along);
         Point snapped = placeAdjacent(moving, output, direction, proposedX, proposedY);
         if (sharedEdgeLength(direction, snapped, movingSize, output, refSize) < minShare) {
@@ -620,8 +621,8 @@ namespace display_config {
       }
 
       const auto currentMode = raw.value("current_mode", nlohmann::json{});
-      if (const auto index = asInt(currentMode); index.has_value() && *index >= 0
-          && static_cast<std::size_t>(*index) < output.modes.size()) {
+      if (const auto index = asInt(currentMode);
+          index.has_value() && *index >= 0 && static_cast<std::size_t>(*index) < output.modes.size()) {
         output.current = output.modes[static_cast<std::size_t>(*index)];
       }
 

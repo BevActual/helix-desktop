@@ -7,7 +7,10 @@ sidebar:
 
 Shows the current media artwork and track title from MPRIS. On vertical bars (`left` / `right`), only the artwork is shown. On horizontal bars, enable `album_art_only` for the same compact look.
 
-Left-click opens the Media tab in the control center; right-click toggles play/pause. The mouse side buttons (back / forward) skip to the previous and next track. Every action targets the active player shown on the widget.
+Left-click opens Control Center (Quick Settings / Now Playing); right-click toggles play/pause. The
+mouse side buttons (back / forward) skip to the previous and next track. Every action targets the
+active player shown on the widget. On horizontal bars a thin progress hairline is shown when the
+track length is known.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
@@ -19,6 +22,7 @@ Left-click opens the Media tab in the control center; right-click toggles play/p
 | `max_length` | number | `220` | Maximum widget length in pixels (hidden when `album_art_only` is enabled) |
 | `art_size` | number | `16` | Artwork size in pixels before scale |
 | `title_scroll` | string | `"none"` | Media title scrolling mode: `"none"`, `"always"`, or `"on_hover"` (hidden when `album_art_only` is enabled) |
+| `show_progress` | bool | `true` | Thin progress hairline under the chip when MPRIS reports track length (horizontal bars) |
 | `hide_when_no_media` | bool | `false` | Hide the widget when no MPRIS player is active |
 
 ```toml

@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Noctalia Discord
-    url: https://discord.noctalia.dev
-    about: Join the community for support, discussions, and quick help.
-  - name: Noctalia Docs
-    url: https://docs.noctalia.dev
-    about: Browse the documentation, guides, and frequently asked questions.
+  - name: Helix docs (in-repo)
+    url: https://github.com/BevActual/helix-desktop/tree/main/docs/user
+    about: Guides and reference under docs/user/ in this repository.
+  - name: Helix README
+    url: https://github.com/BevActual/helix-desktop/blob/main/README.md
+    about: Product overview, build entry points, and links to HELIX.md.

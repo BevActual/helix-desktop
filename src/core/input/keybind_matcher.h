@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config/config_types.h"
+#include "core/input/keybind_action.h"
 
 #include <array>
 #include <cstdint>

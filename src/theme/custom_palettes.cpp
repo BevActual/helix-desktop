@@ -18,7 +18,7 @@
 #include <system_error>
 #include <utility>
 
-namespace noctalia::theme {
+namespace helix::theme {
 
   namespace {
 
@@ -386,4 +386,4 @@ namespace noctalia::theme {
     }
   }
 
-} // namespace noctalia::theme
+} // namespace helix::theme

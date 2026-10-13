@@ -7,7 +7,7 @@ sidebar:
 
 The calendar service syncs events from your online accounts or local calendar directories (such as vdirsyncer) and shows them in the control center calendar. CalDAV providers (Nextcloud, iCloud, Fastmail, Radicale, mailbox.org, …) are talked to directly; Google Calendar is connected through a browser authorization flow; local vdir directories are watched with inotify. Events are read-only.
 
-`[calendar]` covers account sync and shared event date and time formats. Calendar-tab-only presentation options, such as the ISO week number column, live under [`[control_center.calendar]`](/noctalia/control-center/#calendar). Extra IANA timezones live on the [Clock](/noctalia/control-center/#clock) tab.
+`[calendar]` covers account sync and shared event date and time formats. Calendar-tab-only presentation options, such as the ISO week number column, live under [`[control_center.calendar]`](/helix/control-center/#calendar). Extra IANA timezones live on the [Clock](/helix/control-center/#clock) tab.
 
 Clicking an event with an `http` or `https` link opens it in your default browser. Helix prefers a meeting link in
 the event location, then a provider-specific meeting link such as a Teams join link in the description, before a
@@ -30,7 +30,7 @@ storage master key configured by top-level `[storage]`.
 
 Account ids are local Helix identifiers. Use lowercase letters, digits, and underscores only. The GUI keeps an account id fixed after creation so existing config and credential keys are not removed or renamed.
 
-Existing accounts can be edited from the Calendar tab Accounts card (or Calendar gear settings). Google accounts expose the same name/color editor and include **Save** plus **Save and Connect** actions; both save the current editor values, and **Save and Connect** then opens browser authorization. The delete action is shown only for accounts created in `settings.toml`; accounts declared in `~/.config/noctalia/*.toml` are never removed by the GUI.
+Existing accounts can be edited from the Calendar tab Accounts card (or Calendar gear settings). Google accounts expose the same name/color editor and include **Save** plus **Save and Connect** actions; both save the current editor values, and **Save and Connect** then opens browser authorization. The delete action is shown only for accounts created in `settings.toml`; accounts declared in `~/.config/helix/*.toml` are never removed by the GUI.
 
 ## Manual setup
 
@@ -59,7 +59,7 @@ server_url = "https://cloud.example.com/remote.php/dav/"
 username   = "me"
 calendars  = ["personal"]   # optional discovered collection ids; empty = all
 credential_source = "file"
-password_file = "/run/agenix/noctalia-caldav"
+password_file = "/run/agenix/helix-caldav"
 
 # Google Calendar (authorized via Settings → Services → Calendar → Connect)
 [calendar.account.work_google]
@@ -96,7 +96,7 @@ The two CalDAV modes are strict. `password_file` is rejected unless `credential_
 
 CalDAV passwords and Google refresh tokens are written to the Secret Service `default` collection. That collection must
 be unlocked at login, which is the usual cause of credentials being locked after every reboot when multiple GNOME Keyring
-keyrings exist. See [Secret Service & keyrings](/noctalia/configuration/secret-service/) for how the `default` alias
+keyrings exist. See [Secret Service & keyrings](/helix/configuration/secret-service/) for how the `default` alias
 works, the multiple-keyrings fix, and automatic recovery.
 
 If Secret Service contains a matching credential but it remains locked after an unlock attempt, Helix sends one
@@ -108,7 +108,7 @@ credentials, so a cache-key warning does not by itself mean the Google authoriza
 ## Event cache encryption
 
 Calendar titles, locations, names, and times are written only to the encrypted
-`$XDG_CACHE_HOME/noctalia/calendar/events.enc` cache. Helix derives a calendar-specific key from the shared storage
+`$XDG_CACHE_HOME/helix/calendar/events.enc` cache. Helix derives a calendar-specific key from the shared storage
 master key, separate from the derived clipboard-history key.
 
 The default `[storage].key_source = "secret-service"` stores the master key in Secret Service. To use agenix, sops-nix,
@@ -117,11 +117,11 @@ or another provisioner without a keyring, configure one authoritative file:
 ```toml
 [storage]
 key_source = "file"
-key_file = "/run/agenix/noctalia-storage-key"
+key_file = "/run/agenix/helix-storage-key"
 ```
 
 The file format and generation instructions are documented under
-[Encrypted storage master key](/noctalia/configuration/shell/#encrypted-storage-master-key). When no storage key is available,
+[Encrypted storage master key](/helix/configuration/shell/#encrypted-storage-master-key). When no storage key is available,
 live calendar sync continues but events are not read from or written to disk. Missing or incorrect keys preserve the
 encrypted cache and surface a retry action in Settings.
 If the original key cannot be restored, or the cache is damaged, **Recover Private Storage** provides a confirmed
@@ -185,7 +185,7 @@ Common iCloud failures:
 
 ## Google setup
 
-In Settings, choose **Google**, then press **Save and Connect**. For manual TOML, add a named account table with `type = "google"`, enable the calendar service, then open **Settings → Services → Calendar**, edit the account, and press **Save and Connect**. A browser tab opens for Google's consent screen; approve it and the tab confirms completion. Tokens are obtained through the noctalia OAuth broker (`api.noctalia.dev`) - no Google Cloud project or client secret is required on your side. Access is `calendar.readonly`.
+In Settings, choose **Google**, then press **Save and Connect**. For manual TOML, add a named account table with `type = "google"`, enable the calendar service, then open **Settings → Services → Calendar**, edit the account, and press **Save and Connect**. A browser tab opens for Google's consent screen; approve it and the tab confirms completion. Tokens are obtained through the helix OAuth broker (`api.helix.dev`) - no Google Cloud project or client secret is required on your side. Access is `calendar.readonly`.
 
 :::note
 The account id is the last segment of the named table. For `[calendar.account.work_google]`, the id is `work_google`. It must **not** be your Google email address. The signed-in Google account is chosen during browser authorization, not from the table name.
@@ -193,7 +193,7 @@ The account id is the last segment of the named table. For `[calendar.account.wo
 
 If a Google account later shows as disconnected (revoked or expired), edit the account and press **Save and Connect** again to reauthorize.
 
-If Settings reports that Secret Service is unavailable, confirm that a compatible provider is running in the same login session, then use the retry action. Helix also reopens calendar credentials and encrypted storage on its own once the provider appears or its keyring unlocks; see [Secret Service & keyrings](/noctalia/configuration/secret-service/) for how automatic recovery works and the multiple-keyrings caveat. If access is locked or denied, unlock the provider and retry. A cancelled prompt is not treated as a missing credential; start the operation again when you are ready.
+If Settings reports that Secret Service is unavailable, confirm that a compatible provider is running in the same login session, then use the retry action. Helix also reopens calendar credentials and encrypted storage on its own once the provider appears or its keyring unlocks; see [Secret Service & keyrings](/helix/configuration/secret-service/) for how automatic recovery works and the multiple-keyrings caveat. If access is locked or denied, unlock the provider and retry. A cancelled prompt is not treated as a missing credential; start the operation again when you are ready.
 
 `[shell].offline_mode = true` disables all calendar network traffic; the last successfully synced events remain available from the encrypted on-disk cache when the storage key is available.
 

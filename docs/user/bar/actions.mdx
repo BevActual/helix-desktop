@@ -70,19 +70,19 @@ An action is one of three things:
 
 | Form | Meaning |
 |---|---|
-| `<command> [arguments]` | Run an IPC command, exactly as `noctalia msg` would |
+| `<command> [arguments]` | Run an IPC command, exactly as `helix-panel` would |
 | `exec <command line>` | Run a shell command |
 | `none` | Unbind the gesture |
 
 ```toml
 [widget.clock.actions]
-left = "panel-toggle control-center calendar"   # IPC command with arguments
+left = "panel-toggle control-center home"   # IPC command with arguments
 right = "exec gsimplecal"                       # shell command
 middle = "none"                                 # nothing happens
 ```
 
-The command vocabulary is the same one `noctalia msg` uses, so anything you can bind to a keyboard
-shortcut you can bind to a widget. Run `noctalia msg --help` for the full list. The settings editor
+The command vocabulary is the same one `helix-panel` uses, so anything you can bind to a keyboard
+shortcut you can bind to a widget. Run `helix-panel --help` for the full list. The settings editor
 offers the same commands in a searchable picker, with the argument hint shown in the field beside it.
 
 Reach for `exec` only when nothing in that list covers what you want. A built-in command is faster,
@@ -159,7 +159,7 @@ Give the clock a second panel on right click and a calendar app on the thumb but
 
 ```toml
 [widget.clock.actions]
-right = "panel-toggle control-center weather"
+right = "panel-toggle control-center home"
 forward = "exec gnome-calendar"
 ```
 

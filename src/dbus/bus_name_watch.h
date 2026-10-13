@@ -15,7 +15,8 @@ namespace dbus_watch {
   // one name it cares about. An unfiltered `uponSignal("NameOwnerChanged")` delivers every
   // connect and disconnect on the bus, and browsers open short-lived connections tens of
   // times a second. The returned Slot removes the match when dropped.
-  [[nodiscard]] sdbus::Slot watchBusName(sdbus::IConnection& connection, std::string_view name, NameOwnerHandler handler);
+  [[nodiscard]] sdbus::Slot
+  watchBusName(sdbus::IConnection& connection, std::string_view name, NameOwnerHandler handler);
 
   // Same, for a dotted namespace: matches `ns` itself and every `ns.<suffix>` (MPRIS players).
   [[nodiscard]] sdbus::Slot

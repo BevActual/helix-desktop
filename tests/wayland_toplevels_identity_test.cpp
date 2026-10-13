@@ -30,10 +30,7 @@ int main() {
   using wayland_protocol_policy::shouldBindExtForeignToplevelList;
 
   TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Niri));
-  TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Hyprland));
-  TEST_CHECK(shouldBindExtForeignToplevelList(CompositorKind::Kde));
   TEST_CHECK(!shouldBindExtForeignToplevelList(CompositorKind::Unknown));
-  TEST_CHECK(!shouldBindExtForeignToplevelList(CompositorKind::Sway));
 
   WaylandToplevels toplevels;
   auto* handle = reinterpret_cast<zwlr_foreign_toplevel_handle_v1*>(0x1);
@@ -80,7 +77,7 @@ int main() {
   TEST_CHECK(extInserted);
   extIt->second.order = extToplevels.m_nextOrder++;
 
-  extToplevels.onHandleTitle(extHandle, "noctalia");
+  extToplevels.onHandleTitle(extHandle, "helix");
   extToplevels.onHandleAppId(extHandle, "com.mitchellh.ghostty");
   extToplevels.onHandleIdentifier(extHandle, "49");
 
@@ -97,7 +94,7 @@ int main() {
   auto extWindows = extToplevels.windowsForApp("com.mitchellh.ghostty", "ghostty");
   TEST_CHECK(extWindows.size() == 1);
   TEST_CHECK(extWindows[0].identifier == "49");
-  TEST_CHECK(extWindows[0].title == "noctalia");
+  TEST_CHECK(extWindows[0].title == "helix");
   visited = 0;
   extToplevels.visitExtHandles([&](ext_foreign_toplevel_handle_v1* current) {
     TEST_CHECK(current == extHandle);
@@ -111,7 +108,7 @@ int main() {
   extWindows = extToplevels.windowsForApp("com.mitchellh.ghostty", "ghostty");
   TEST_CHECK(extWindows.size() == 1);
   TEST_CHECK(extWindows[0].identifier == "49");
-  TEST_CHECK(extWindows[0].title == "noctalia");
+  TEST_CHECK(extWindows[0].title == "helix");
 
   extToplevels.onHandleDone(extHandle);
   TEST_CHECK(changeCount == 2);

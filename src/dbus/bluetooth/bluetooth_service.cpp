@@ -3,6 +3,7 @@
 #include "core/log.h"
 #include "dbus/system_bus.h"
 #include "dbus/upower/upower_service.h"
+#include "desktop_api/client.h"
 #include "i18n/i18n.h"
 #include "ipc/ipc_service.h"
 #include "system/rfkill_helper.h"
@@ -458,8 +459,19 @@ struct BluetoothService::Impl {
   }
 };
 
-BluetoothService::BluetoothService(SystemBus& bus, UPowerService* upowerService)
-    : m_impl(std::make_unique<Impl>(*this, bus)), m_upowerService(upowerService) {
+BluetoothService::BluetoothService(SystemBus& bus, UPowerService* upowerService, bool remote)
+    : m_remote(remote), m_impl(std::make_unique<Impl>(*this, bus)), m_upowerService(upowerService) {
+  if (m_remote) {
+    refresh();
+    // The service announces changes; the timer only covers a signal that was missed.
+    m_remoteObserver =
+        helix::desktopClient().observe([this](std::string_view interface, std::string_view signal, const helix::Json&) {
+          if (interface == helix::bluetoothInterface && signal == "Changed")
+            refresh();
+        });
+    m_remoteRefresh.startRepeating(std::chrono::seconds(30), [this] { refresh(); });
+    return;
+  }
   m_impl->root = sdbus::createProxy(bus.connection(), kBluezBusName, kRootPath);
 
   m_impl->root->uponSignal("InterfacesAdded")
@@ -476,7 +488,10 @@ BluetoothService::BluetoothService(SystemBus& bus, UPowerService* upowerService)
   refresh();
 }
 
-BluetoothService::~BluetoothService() = default;
+BluetoothService::~BluetoothService() {
+  if (m_remoteObserver)
+    helix::desktopClient().unobserve(m_remoteObserver);
+}
 
 void BluetoothService::setStateCallback(StateCallback callback) { m_stateCallback = std::move(callback); }
 void BluetoothService::setDevicesCallback(DevicesCallback callback) { m_devicesCallback = std::move(callback); }
@@ -502,21 +517,21 @@ void BluetoothService::registerIpc(IpcService& ipc, StateFeedbackCallback stateF
     return "ok\n";
   };
 
-  ipc.bind(noctalia::cli::msg::bluetoothEnable, [setBluetooth](const std::string& args) -> std::string {
+  ipc.bind(helix::cli::msg::bluetoothEnable, [setBluetooth](const std::string& args) -> std::string {
     if (auto err = rejectArgs("bluetooth-enable", args); err.has_value()) {
       return *err;
     }
     return setBluetooth(true);
   });
 
-  ipc.bind(noctalia::cli::msg::bluetoothDisable, [setBluetooth](const std::string& args) -> std::string {
+  ipc.bind(helix::cli::msg::bluetoothDisable, [setBluetooth](const std::string& args) -> std::string {
     if (auto err = rejectArgs("bluetooth-disable", args); err.has_value()) {
       return *err;
     }
     return setBluetooth(false);
   });
 
-  ipc.bind(noctalia::cli::msg::bluetoothToggle, [this, setBluetooth](const std::string& args) -> std::string {
+  ipc.bind(helix::cli::msg::bluetoothToggle, [this, setBluetooth](const std::string& args) -> std::string {
     if (auto err = rejectArgs("bluetooth-toggle", args); err.has_value()) {
       return *err;
     }
@@ -527,7 +542,7 @@ void BluetoothService::registerIpc(IpcService& ipc, StateFeedbackCallback stateF
   });
 
   ipc.bind(
-      noctalia::cli::msg::bluetoothStatus,
+      helix::cli::msg::bluetoothStatus,
       [this](const std::string& args) -> std::string {
         if (auto err = rejectArgs("bluetooth-status", args); err.has_value()) {
           return *err;
@@ -541,7 +556,64 @@ void BluetoothService::registerIpc(IpcService& ipc, StateFeedbackCallback stateF
   );
 }
 
+bool BluetoothService::remoteAction(const char* action, const std::string& path, std::optional<bool> value) {
+  helix::Json args = helix::Json::object();
+  if (!path.empty())
+    args["path"] = path;
+  if (value)
+    args["value"] = *value;
+  try {
+    helix::desktopClient().call("bluetooth", "Action", g_variant_new("(s@a{sv})", action, helix::toVariant(args)));
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
 void BluetoothService::refresh() {
+  if (m_remote) {
+    const auto old = m_state;
+    const auto oldDevices = m_devices;
+    m_state = {};
+    m_devices.clear();
+    m_hasStateSnapshot = false;
+    try {
+      if (!helix::desktopClient().available())
+        throw std::runtime_error("Desktop service unavailable");
+      const auto snapshot = helix::desktopClient().call("bluetooth", "GetSnapshot");
+      m_hasStateSnapshot = snapshot.value("available", false);
+      m_state.adapterPresent = m_hasStateSnapshot;
+      if (m_hasStateSnapshot) {
+        m_state.powered = snapshot.value("enabled", false);
+        m_state.discovering = snapshot.value("scanning", false);
+        m_state.adapterName = snapshot.value("name", "");
+        m_state.discoverable = snapshot.value("discoverable", false);
+        m_state.pairable = snapshot.value("pairable", false);
+        m_state.rfkillSoftBlocked = snapshot.value("soft-blocked", false);
+        m_state.rfkillHardBlocked = snapshot.value("hard-blocked", false);
+        for (const auto& device : snapshot.at("devices"))
+          m_devices.push_back(
+              {.path = device.at("path"),
+               .address = device.at("address"),
+               .alias = device.at("name"),
+               .kind = BluetoothDeviceKind(device.at("kind").get<int>()),
+               .paired = device.at("paired"),
+               .trusted = device.at("trusted"),
+               .connected = device.at("connected"),
+               .connecting = device.at("connecting"),
+               .hasRssi = device.at("has-rssi"),
+               .rssi = device.at("rssi"),
+               .hasBattery = device.at("has-battery"),
+               .batteryPercent = device.at("battery")}
+          );
+      }
+    } catch (...) {
+    }
+    if (old != m_state)
+      emitState(BluetoothStateChangeOrigin::External);
+    if (oldDevices != m_devices)
+      emitDevices();
+    return;
+  }
   if (m_impl == nullptr || m_impl->root == nullptr) {
     return;
   }
@@ -571,6 +643,10 @@ void BluetoothService::refresh() {
 }
 
 void BluetoothService::setPowered(bool enabled) {
+  if (m_remote) {
+    remoteAction("enable", {}, enabled);
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -586,7 +662,7 @@ void BluetoothService::setPowered(bool enabled) {
     const bool wasSoftBlocked = m_state.rfkillSoftBlocked;
     applyRfkillState(m_state);
     if (wasSoftBlocked && !m_state.rfkillSoftBlocked) {
-      emitState(BluetoothStateChangeOrigin::Noctalia);
+      emitState(BluetoothStateChangeOrigin::Helix);
     }
   }
   if (enabled != m_state.powered) {
@@ -608,6 +684,10 @@ void BluetoothService::setPowered(bool enabled) {
 }
 
 void BluetoothService::setDiscoverable(bool enabled) {
+  if (m_remote) {
+    remoteAction("discoverable", {}, enabled);
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -619,6 +699,10 @@ void BluetoothService::setDiscoverable(bool enabled) {
 }
 
 void BluetoothService::setPairable(bool enabled) {
+  if (m_remote) {
+    remoteAction("pairable", {}, enabled);
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -630,6 +714,10 @@ void BluetoothService::setPairable(bool enabled) {
 }
 
 void BluetoothService::startDiscovery() {
+  if (m_remote) {
+    remoteAction("scan");
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -647,6 +735,10 @@ void BluetoothService::startDiscovery() {
 }
 
 void BluetoothService::stopDiscovery() {
+  if (m_remote) {
+    remoteAction("stop-scan");
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -664,6 +756,9 @@ void BluetoothService::stopDiscovery() {
 }
 
 bool BluetoothService::connect(const std::string& devicePath) {
+  if (m_remote) {
+    return remoteAction("connect", devicePath);
+  }
   auto* proxy = m_impl->deviceProxy(devicePath);
   if (proxy == nullptr) {
     return false;
@@ -696,6 +791,9 @@ bool BluetoothService::connect(const std::string& devicePath) {
 }
 
 bool BluetoothService::disconnectDevice(const std::string& devicePath) {
+  if (m_remote) {
+    return remoteAction("disconnect", devicePath);
+  }
   auto* proxy = m_impl->deviceProxy(devicePath);
   if (proxy == nullptr) {
     return false;
@@ -716,6 +814,9 @@ bool BluetoothService::disconnectDevice(const std::string& devicePath) {
 }
 
 bool BluetoothService::pair(const std::string& devicePath) {
+  if (m_remote) {
+    return remoteAction("pair", devicePath);
+  }
   auto* proxy = m_impl->deviceProxy(devicePath);
   if (proxy == nullptr) {
     return false;
@@ -748,6 +849,9 @@ bool BluetoothService::pair(const std::string& devicePath) {
 }
 
 bool BluetoothService::cancelPair(const std::string& devicePath) {
+  if (m_remote) {
+    return remoteAction("cancel-pair", devicePath);
+  }
   auto* proxy = m_impl->deviceProxy(devicePath);
   if (proxy == nullptr) {
     return false;
@@ -768,6 +872,10 @@ bool BluetoothService::cancelPair(const std::string& devicePath) {
 }
 
 void BluetoothService::setTrusted(const std::string& devicePath, bool trusted) {
+  if (m_remote) {
+    remoteAction("trust", devicePath, trusted);
+    return;
+  }
   auto* proxy = m_impl->deviceProxy(devicePath);
   if (proxy == nullptr) {
     return;
@@ -780,6 +888,10 @@ void BluetoothService::setTrusted(const std::string& devicePath, bool trusted) {
 }
 
 void BluetoothService::forget(const std::string& devicePath) {
+  if (m_remote) {
+    remoteAction("forget", devicePath);
+    return;
+  }
   if (m_impl->adapter == nullptr) {
     return;
   }
@@ -808,7 +920,7 @@ BluetoothStateChangeOrigin BluetoothService::consumePoweredChangeOrigin(bool pow
   }
   const bool matchesLocalRequest = *m_pendingLocalPowered == powered;
   m_pendingLocalPowered.reset();
-  return matchesLocalRequest ? BluetoothStateChangeOrigin::Noctalia : BluetoothStateChangeOrigin::External;
+  return matchesLocalRequest ? BluetoothStateChangeOrigin::Helix : BluetoothStateChangeOrigin::External;
 }
 
 void BluetoothService::scheduleAutoReconnect() {
@@ -871,6 +983,8 @@ void BluetoothService::emitDevices() {
 }
 
 void BluetoothService::refreshBatteryFromUPower() {
+  if (m_remote)
+    return;
   if (applyUPowerBattery() && m_devicesCallback) {
     m_devicesCallback(m_devices);
   }

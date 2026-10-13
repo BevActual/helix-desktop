@@ -34,7 +34,7 @@ No separate Python package. Helix is the native messaging host.
 
 3. **Apply a theme** (change wallpaper / palette, or re-apply templates) so Helix writes `colors.json` and runs
    `firefox-theme`. That installs the user-local native messaging manifest when needed:
-   `~/.mozilla/native-messaging-hosts/pywalfox.json` → your `noctalia` binary.
+   `~/.mozilla/native-messaging-hosts/pywalfox.json` → your `helix-shell` binary.
 
 4. **Restart Firefox** once after the manifest is first installed so it picks up the host.
 
@@ -46,10 +46,10 @@ process, and theme pushes fan out to all of them. The legacy Python host only re
 ### Manual helpers
 
 ```bash
-noctalia firefox-theme install    # write the native messaging manifest
-noctalia firefox-theme update     # push colors to all running profile hosts
-noctalia firefox-theme uninstall  # remove the noctalia-owned manifest
-noctalia firefox-theme --help
+helix firefox-theme install    # write the native messaging manifest
+helix firefox-theme update     # push colors to all running profile hosts
+helix firefox-theme uninstall  # remove the helix-owned manifest
+helix firefox-theme --help
 ```
 
 ### Migrating from the legacy Python host
@@ -87,12 +87,12 @@ palette changes as long as that host stays up.
 
 ## Troubleshooting
 
-- **Template not listed:** Community templates come from `https://api.noctalia.dev/templates`. Refresh / reopen
+- **Template not listed:** Community templates come from ``HELIX_COMMUNITY_TEMPLATE_CATALOG_URL``. Refresh / reopen
   Settings after the catalog publishes the entry. Offline mode blocks catalog downloads.
 - **Extension not connecting:** Confirm the extension is enabled, the manifest exists under
   `~/.mozilla/native-messaging-hosts/pywalfox.json`, and Firefox was restarted after install.
 - **Colors file updates but Firefox does not:** Confirm you enabled exactly one of **`pywalfox-beta4`+** or legacy
-  **`pywalfox`**, and that the manifest `path` matches the host you intend (noctalia vs Python).
+  **`pywalfox`**, and that the manifest `path` matches the host you intend (helix vs Python).
 - **Only one of several Firefox profiles refreshes:** Expected with the legacy Python host. With **`pywalfox-beta4`+**,
   restart each profile once after updating Helix so every profile is running the new host; then theme pushes should
   reach all open profiles.
