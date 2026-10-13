@@ -1,4 +1,5 @@
 pub mod activity;
+pub mod audit_log;
 pub mod agent_confirm;
 pub mod agent_msg;
 pub mod agent_status;

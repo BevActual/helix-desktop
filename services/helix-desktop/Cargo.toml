@@ -18,5 +18,6 @@ toml = "0.8"
 ureq = { version = "2", default-features = false, features = ["tls"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
+futures-util = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std", "env-filter"] }

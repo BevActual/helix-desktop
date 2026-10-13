@@ -80,3 +80,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Unit tests
         run: cargo test -p helix-shell-core --lib --quiet
+
+  helix-desktop-agent:
+    name: helix-desktop Agent Surface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install test deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dbus dbus-x11 python3-gi gir1.2-gio-2.0
+      - name: Agent integration (Rust desktop)
+        run: ./tools/nested/helix-desktop-agent-integration.sh

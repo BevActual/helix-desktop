@@ -132,7 +132,8 @@ a silent fallback.
 ## Implementation status
 
 `Agent Surface` is registered by `helix-service` (`agent_endpoint`, `agent_broker`, `agent_policy`) and covered by an
-end-to-end test (`tests/desktop_agent_integration.py`). It needs `msg-risk.toml` (installed to
+end-to-end test (`tests/desktop_agent_integration.py`). The Rust `helix-desktop` scaffold passes the same integration
+tests (`tools/nested/helix-desktop-agent-integration.sh`, CI job `helix-desktop-agent`). It needs `msg-risk.toml` (installed to
 `<datadir>/helix/`, or `HELIX_RISK_POLICY`); without it every method fails closed with the reason. Caller identity
 is the verified executable, plus the script path for interpreters, so two Python agents do not share grants.
 Known weak spot: an arbitrary binary named `helix-settings` could claim the manager role; sandboxing agent

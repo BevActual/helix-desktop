@@ -4,6 +4,7 @@
 
 mod agent;
 mod agent_activity;
+mod agent_support;
 mod appearance;
 mod audio;
 mod audio_backend;
@@ -24,6 +25,9 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::connection;
+use zbus::message::Type as MessageType;
+use zbus::MessageStream;
+use zbus::MatchRule;
 
 use crate::agent::Agent;
 use crate::agent_activity::AgentActivity;
@@ -69,9 +73,11 @@ async fn main() -> zbus::Result<()> {
     let displays = Displays {
         state: Arc::clone(&state),
     };
-    let appearance = Appearance { state };
+    let appearance = Appearance {
+        state: Arc::clone(&state),
+    };
 
-    let _connection = connection::Builder::session()?
+    let connection = connection::Builder::session()?
         .name(BUS_NAME)?
         .serve_at(OBJECT_PATH, configuration)?
         .serve_at(OBJECT_PATH, agent)?
@@ -83,6 +89,38 @@ async fn main() -> zbus::Result<()> {
         .serve_at(OBJECT_PATH, appearance)?
         .build()
         .await?;
+
+    {
+        let mut locked = state.lock().await;
+        locked.bus = Some(connection.clone());
+    }
+
+    let rule = MatchRule::builder()
+        .msg_type(MessageType::Signal)
+        .interface("org.freedesktop.DBus")?
+        .member("NameOwnerChanged")?
+        .build();
+    let mut stream = MessageStream::for_match_rule(rule, &connection, None).await?;
+    let watch_state = Arc::clone(&state);
+    tokio::spawn(async move {
+        use futures_util::StreamExt;
+        while let Some(message) = stream.next().await {
+            let Ok(message) = message else {
+                continue;
+            };
+            let Ok(body) = message.body().deserialize::<(String, String, String)>() else {
+                continue;
+            };
+            let (_name, old_owner, _new_owner) = body;
+            if old_owner.is_empty() {
+                continue;
+            }
+            let mut locked = watch_state.lock().await;
+            if locked.confirmer.as_deref() == Some(old_owner.as_str()) {
+                agent_support::confirmer_disconnected(&mut locked).await;
+            }
+        }
+    });
 
     tracing::info!(
         bus = BUS_NAME,

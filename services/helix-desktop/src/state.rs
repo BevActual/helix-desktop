@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use helix_shell_core::{ConfigStore, GrantStore, RiskPolicy, TaintTracker};
+use helix_shell_core::{AuditLog, ConfigStore, GrantStore, RiskPolicy, TaintTracker};
 use serde_json::Value;
+use zbus::Connection;
 
 use crate::audio_backend::AudioBackend;
 use crate::bluetooth_backend::BluetoothBackend;
@@ -19,6 +20,9 @@ pub struct ClientSession {
 
 #[derive(Clone, Debug)]
 pub struct PendingConfirm {
+    /// D-Bus unique name of the requester (for future targeted `Completed` delivery).
+    #[allow(dead_code)]
+    pub sender: String,
     pub client: String,
     pub kind: ConfirmKind,
     pub tool: String,
@@ -62,7 +66,8 @@ pub struct State {
     pub desktop: Option<String>,
     /// Agent Surface kill switch (`AgentSurfaceActivity1.SetEnabled`).
     pub agent_enabled: bool,
-    pub audit: Vec<Value>,
+    pub audit: AuditLog,
+    pub bus: Option<Connection>,
 }
 
 impl State {
@@ -78,7 +83,9 @@ impl State {
             .parent()
             .map(PathBuf::from)
             .unwrap_or_else(|| PathBuf::from("helix"));
-        let grants_path = state_dir.join("agent/grants.json");
+        let agent_dir = state_dir.join("agent");
+        let grants_path = agent_dir.join("grants.json");
+        let audit = AuditLog::new(agent_dir.join("audit.jsonl"));
         let mut grants = GrantStore::new(grants_path);
         if let Err(error) = grants.load() {
             tracing::warn!(%error, "grants load failed; starting empty");
@@ -87,7 +94,7 @@ impl State {
         let palette_previews =
             load_palette_previews(&config.paths().config_dir, &config.paths().settings_toml);
         Self {
-            risk: RiskPolicy::embedded(),
+            risk: RiskPolicy::from_env(),
             grants,
             taint: TaintTracker::default(),
             audio: AudioBackend::new(initial_volume),
@@ -105,7 +112,8 @@ impl State {
             manager: None,
             desktop: None,
             agent_enabled: true,
-            audit: Vec::new(),
+            audit,
+            bus: None,
         }
     }
 
