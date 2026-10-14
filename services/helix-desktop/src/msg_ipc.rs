@@ -99,6 +99,11 @@ fn serve_connection(mut stream: UnixStream, state: &mut State) {
 
 fn ipc_thread(state: Arc<Mutex<State>>) {
     let path = resolve_socket_path();
+    // The shell serves this socket for the Agent Surface; never take it from a live listener.
+    if UnixStream::connect(&path).is_ok() {
+        tracing::info!(path = %path.display(), "msg IPC: another process already serves the socket");
+        return;
+    }
     let _ = std::fs::remove_file(&path);
     let listener = match UnixListener::bind(&path) {
         Ok(listener) => listener,
