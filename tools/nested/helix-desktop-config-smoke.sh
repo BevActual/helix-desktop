@@ -62,6 +62,7 @@ for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
     "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
     "control_center.width", "osd.kinds.volume", "osd.position", "osd.kinds.wifi",
+    "dock.enabled", "dock.position", "dock.launcher_position",
 ]:
     assert want in ids, want
 print("catalog=OK")
