@@ -7,6 +7,7 @@ pub mod apply;
 pub mod color;
 pub mod contrast;
 pub mod custom;
+pub mod hct;
 pub mod palette;
 pub mod template;
 
