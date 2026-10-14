@@ -49,6 +49,27 @@ def wait_for_bus_name():
     probe.close_sync(None)
     raise AssertionError("desktop service did not claim org.helix.Desktop")
 
+def pw_dump_nodes(raw):
+    """Parse `pw-dump` output (single array or multiple JSON values)."""
+    raw = raw.strip()
+    if not raw:
+        return []
+    decoder = json.JSONDecoder()
+    nodes = []
+    index = 0
+    while index < len(raw):
+        while index < len(raw) and raw[index].isspace():
+            index += 1
+        if index >= len(raw):
+            break
+        value, end = decoder.raw_decode(raw, index)
+        if isinstance(value, list):
+            nodes.extend(value)
+        else:
+            nodes.append(value)
+        index += end
+    return nodes
+
 def until(predicate, seconds=8):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
@@ -87,8 +108,11 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
             def command(*args):
                 return subprocess.check_output(args, env=env, text=True)
             def capture_nodes():
-                return [node for node in json.loads(command("pw-dump"))
-                        if node.get("info", {}).get("props", {}).get("media.name") == "Helix microphone level"]
+                return [
+                    node
+                    for node in pw_dump_nodes(command("pw-dump"))
+                    if node.get("info", {}).get("props", {}).get("media.name") == "Helix microphone level"
+                ]
             until(capture_nodes)
             for node in capture_nodes():
                 command("pw-cli", "set-param", str(node["id"]), "PortConfig",
