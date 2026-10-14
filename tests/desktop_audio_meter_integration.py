@@ -108,11 +108,19 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
             def command(*args):
                 return subprocess.check_output(args, env=env, text=True)
             def capture_nodes():
-                return [
-                    node
-                    for node in pw_dump_nodes(command("pw-dump"))
-                    if node.get("info", {}).get("props", {}).get("media.name") == "Helix microphone level"
-                ]
+                out = []
+                for node in pw_dump_nodes(command("pw-dump")):
+                    if not isinstance(node, dict):
+                        continue
+                    info = node.get("info")
+                    if not isinstance(info, dict):
+                        continue
+                    props = info.get("props")
+                    if not isinstance(props, dict):
+                        continue
+                    if props.get("media.name") == "Helix microphone level":
+                        out.append(node)
+                return out
             until(capture_nodes)
             for node in capture_nodes():
                 command("pw-cli", "set-param", str(node["id"]), "PortConfig",
