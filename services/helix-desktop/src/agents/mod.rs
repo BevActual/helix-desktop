@@ -12,11 +12,13 @@ pub fn new_hub() -> Arc<AgentHub> {
     Arc::new(AgentHub::new())
 }
 
-pub fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
+pub async fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
     if !nm && !bluez {
         return;
     }
-    tokio::spawn(async move {
+    let mut shutdown_rx = hub.system_shutdown_rx();
+    let hub_task = Arc::clone(&hub);
+    let handle = tokio::spawn(async move {
         let system = match zbus::Connection::system().await {
             Ok(connection) => connection,
             Err(error) => {
@@ -28,7 +30,7 @@ pub fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
             if let Err(error) = system
                 .object_server()
                 .at(nm_secret_agent::OBJECT_PATH, nm_secret_agent::NmSecretAgent {
-                    hub: Arc::clone(&hub),
+                    hub: Arc::clone(&hub_task),
                 })
                 .await
             {
@@ -41,7 +43,7 @@ pub fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
             if let Err(error) = system
                 .object_server()
                 .at(bluez_agent::OBJECT_PATH, bluez_agent::BluezAgent {
-                    hub: Arc::clone(&hub),
+                    hub: Arc::clone(&hub_task),
                 })
                 .await
             {
@@ -50,25 +52,36 @@ pub fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
                 tracing::warn!(%error, "BlueZ agent registration failed");
             }
         }
-        std::future::pending::<()>().await;
+
+        while !*shutdown_rx.borrow_and_update() {
+            if shutdown_rx.changed().await.is_err() {
+                break;
+            }
+        }
+
+        if nm {
+            nm_secret_agent::unregister(&system).await;
+            let _ = system
+                .object_server()
+                .remove::<nm_secret_agent::NmSecretAgent, _>(nm_secret_agent::OBJECT_PATH)
+                .await;
+        }
+        if bluez {
+            bluez_agent::unregister(&system).await;
+            let _ = system
+                .object_server()
+                .remove::<bluez_agent::BluezAgent, _>(bluez_agent::OBJECT_PATH)
+                .await;
+        }
+        tracing::info!("system-bus agents unregistered");
     });
+    hub.set_system_task(handle).await;
 }
 
-pub async fn shutdown_system_agents(nm: bool, bluez: bool) {
+pub async fn shutdown_system_agents(hub: &AgentHub, nm: bool, bluez: bool) {
     if !nm && !bluez {
         return;
     }
-    let system = match zbus::Connection::system().await {
-        Ok(connection) => connection,
-        Err(error) => {
-            tracing::warn!(%error, "system bus unavailable during agent shutdown");
-            return;
-        }
-    };
-    if nm {
-        nm_secret_agent::unregister(&system).await;
-    }
-    if bluez {
-        bluez_agent::unregister(&system).await;
-    }
+    hub.signal_system_shutdown();
+    hub.join_system_task().await;
 }

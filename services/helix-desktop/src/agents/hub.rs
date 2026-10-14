@@ -66,6 +66,9 @@ struct NmPending {
 
 pub struct AgentHub {
     session: AsyncMutex<Option<Connection>>,
+    /// Wakes the system-bus agent task so it can unregister before exit (C++ agent destructors).
+    system_shutdown: tokio::sync::watch::Sender<bool>,
+    system_task: AsyncMutex<Option<tokio::task::JoinHandle<()>>>,
     network_owner: Mutex<Option<String>>,
     bluetooth_owner: Mutex<Option<String>>,
     nm_pending: Mutex<Option<NmPending>>,
@@ -74,8 +77,11 @@ pub struct AgentHub {
 
 impl AgentHub {
     pub fn new() -> Self {
+        let (system_shutdown, _) = tokio::sync::watch::channel(false);
         Self {
             session: AsyncMutex::new(None),
+            system_shutdown,
+            system_task: AsyncMutex::new(None),
             network_owner: Mutex::new(None),
             bluetooth_owner: Mutex::new(None),
             nm_pending: Mutex::new(None),
@@ -85,6 +91,24 @@ impl AgentHub {
 
     pub async fn set_session(&self, connection: Connection) {
         *self.session.lock().await = Some(connection);
+    }
+
+    pub fn system_shutdown_rx(&self) -> tokio::sync::watch::Receiver<bool> {
+        self.system_shutdown.subscribe()
+    }
+
+    pub fn signal_system_shutdown(&self) {
+        let _ = self.system_shutdown.send(true);
+    }
+
+    pub async fn set_system_task(&self, handle: tokio::task::JoinHandle<()>) {
+        *self.system_task.lock().await = Some(handle);
+    }
+
+    pub async fn join_system_task(&self) {
+        if let Some(handle) = self.system_task.lock().await.take() {
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(5), handle).await;
+        }
     }
 
     pub fn network_owner(&self) -> Option<String> {

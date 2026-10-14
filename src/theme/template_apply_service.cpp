@@ -20,6 +20,7 @@
 #include <iterator>
 #include <set>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -244,6 +245,20 @@ namespace helix::theme {
     if (queued) {
       m_cv.notify_one();
     }
+  }
+
+  void TemplateApplyService::waitUntilIdle() const {
+    using namespace std::chrono_literals;
+    for (;;) {
+      {
+        std::scoped_lock lock(m_mutex);
+        if (!m_pendingRequest && !m_inFlight) {
+          break;
+        }
+      }
+      std::this_thread::sleep_for(5ms);
+    }
+    m_hookRunner->waitIdle();
   }
 
   bool TemplateApplyService::reapplyLast() const {
