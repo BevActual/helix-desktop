@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use helix_theme::apply::{apply, build_user_template_root, ApplyInputs, CommunityTemplate, Outcome};
-use helix_theme::custom::{expand_fixed_palette, find_builtin_palette};
+use helix_theme::custom::{community_palette_cache_path, resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;
 use helix_theme::transform::apply_resolved_transforms;
 use toml::{Table, Value};
@@ -52,6 +52,9 @@ fn run_scenario(scenario: &Path, root: &Path) {
     if scenario.join("files").is_dir() {
         copy_tree(&scenario.join("files"), &root.join("cfg"));
     }
+    if scenario.join("statefiles").is_dir() {
+        copy_tree(&scenario.join("statefiles"), &root.join("state/helix"));
+    }
     if scenario.join("state.toml").is_file() {
         fs::copy(scenario.join("state.toml"), root.join("state/helix/state.toml")).unwrap();
     }
@@ -68,7 +71,22 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let builtin = theme.get("builtin").and_then(Value::as_str).unwrap_or("Helix");
     let mode = theme.get("mode").and_then(Value::as_str).unwrap_or("dark");
 
-    let mut generated = expand_fixed_palette(&find_builtin_palette(builtin).unwrap().palette);
+    let source = match theme.get("source").and_then(Value::as_str).unwrap_or("builtin") {
+        "builtin" => PaletteSource::Builtin,
+        "custom" => PaletteSource::Custom,
+        "community" => PaletteSource::Community,
+        other => panic!("{name}: unsupported source {other}"),
+    };
+    let community = theme.get("community_palette").and_then(Value::as_str).unwrap_or("Oxocarbon");
+    let selection = ThemeSelection {
+        source,
+        builtin: builtin.to_string(),
+        custom_palette: theme.get("custom_palette").and_then(Value::as_str).unwrap_or("").to_string(),
+        community_cache: (source == PaletteSource::Community && !community.is_empty())
+            .then(|| community_palette_cache_path(&root.join("state/helix"), community)),
+        shell_light: false,
+    };
+    let mut generated = resolve_palette(&root.join("cfg/helix/palettes"), &selection).unwrap();
     let high_contrast = config
         .get("accessibility")
         .and_then(Value::as_table)
@@ -185,5 +203,5 @@ fn matches_cpp_template_apply() {
         count += 1;
     }
     let _ = fs::remove_dir_all(&root);
-    assert_eq!(count, 12);
+    assert_eq!(count, 15);
 }

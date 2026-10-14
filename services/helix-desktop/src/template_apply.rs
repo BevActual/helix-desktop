@@ -26,7 +26,8 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let source = match text("theme.source").as_deref() {
         Some("builtin") | None => PaletteSource::Builtin,
         Some("custom") => PaletteSource::Custom,
-        _ => return None, // wallpaper / community palettes
+        Some("community") => PaletteSource::Community,
+        _ => return None, // wallpaper palettes
     };
     let mode = crate::day_night::resolve_mode(config, text("theme.mode").as_deref().unwrap_or("dark"))?;
 
@@ -34,11 +35,14 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let builtin_config = builtin_templates_root(&assets).join("builtin.toml");
     let paths = config.paths();
     let palettes_dir = paths.config_dir.join("palettes");
+    let state_dir = paths.settings_toml.parent()?.to_path_buf();
+    let community_name = text("theme.community_palette").unwrap_or_default();
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
-        community_cache: None,
+        community_cache: (source == PaletteSource::Community && !community_name.is_empty())
+            .then(|| helix_theme::custom::community_palette_cache_path(&state_dir, &community_name)),
         shell_light: false,
     };
     let mut generated = resolve_palette(&palettes_dir, &selection)?;
@@ -58,7 +62,6 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
             .map(|items| items.iter().filter_map(|i| i.as_str().map(str::to_string)).collect())
             .unwrap_or_default()
     };
-    let state_dir = paths.settings_toml.parent()?.to_path_buf();
 
     // User templates / custom colors, mapped exactly like C++ `buildUserTemplateRoot`.
     let mut templates_cfg = toml::Table::new();

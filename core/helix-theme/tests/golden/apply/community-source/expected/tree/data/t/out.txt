@@ -1,0 +1,1 @@
+primary=#ff8800 surface=#101018 dark=#e0e0f0 term=#ff0000

@@ -12,6 +12,7 @@ for scenario in "$dest"/*/; do
   mkdir -p "$root/cfg/helix" "$root/state/helix" "$root/data" "$root/cache"
   cp "$scenario/config.toml" "$root/cfg/helix/config.toml"
   [ -d "$scenario/files" ] && cp -a "$scenario/files/." "$root/cfg/"
+  [ -d "$scenario/statefiles" ] && cp -a "$scenario/statefiles/." "$root/state/helix/"
   [ -f "$scenario/state.toml" ] && cp "$scenario/state.toml" "$root/state/helix/state.toml"
 
   set +e
