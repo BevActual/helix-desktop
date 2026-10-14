@@ -1082,10 +1082,18 @@ if build_tests
     _have_config_smoke = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0 and run_command('test', '-x', _config_smoke, check: false).returncode() == 0 and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
     if _have_config_smoke
       _config_smoke_env = ['env', 'HELIX_SERVICE_BIN=' + _helix_desktop_rust, 'HELIX_ASSETS_DIR=' + (meson.project_source_root() / 'assets')]
-      _template_apply = meson.project_source_root() / '_build' / 'helix-template-apply'
-      if run_command('test', '-x', _template_apply, check: false).returncode() == 0
-        _config_smoke_env += ['HELIX_TEMPLATE_APPLY_BIN=' + _template_apply]
-      endif
+      foreach _helper : [
+        ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
+        ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
+      ]
+        foreach _build_dir : ['_build', 'build-debug']
+          _helper_bin = meson.project_source_root() / _build_dir / _helper[1]
+          if run_command('test', '-x', _helper_bin, check: false).returncode() == 0
+            _config_smoke_env += [_helper[0] + '=' + _helper_bin]
+            break
+          endif
+        endforeach
+      endforeach
       _config_smoke_env += [_config_smoke]
       test('helix_desktop_config_smoke', helix_dbus_session,
         args: _config_smoke_env, timeout: 120)

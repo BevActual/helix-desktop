@@ -29,10 +29,22 @@ enabled = true
 action = "lock"
 EOF
 HELIX_ASSETS_DIR="$ROOT/assets"
-if [[ -z "${HELIX_TEMPLATE_APPLY_BIN:-}" && -x "$ROOT/_build/helix-template-apply" ]]; then
-  HELIX_TEMPLATE_APPLY_BIN="$ROOT/_build/helix-template-apply"
-fi
+for _candidate in \
+  "$ROOT/_build/helix-template-apply" \
+  "$ROOT/build-debug/helix-template-apply"; do
+  if [[ -z "${HELIX_TEMPLATE_APPLY_BIN:-}" && -x "$_candidate" ]]; then
+    HELIX_TEMPLATE_APPLY_BIN="$_candidate"
+  fi
+done
 export HELIX_TEMPLATE_APPLY_BIN
+for _candidate in \
+  "$ROOT/_build/helix-theme-palette" \
+  "$ROOT/build-debug/helix-theme-palette"; do
+  if [[ -z "${HELIX_THEME_PALETTE_BIN:-}" && -x "$_candidate" ]]; then
+    HELIX_THEME_PALETTE_BIN="$_candidate"
+  fi
+done
+export HELIX_THEME_PALETTE_BIN
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT
@@ -57,6 +69,19 @@ def call(method, params=None, reply=GLib.VariantType("(a{sv})")):
         "org.helix.Desktop",
         "/org/helix/Desktop",
         "org.helix.Desktop.Configuration1",
+        method,
+        params,
+        reply,
+        Gio.DBusCallFlags.NONE,
+        -1,
+        None,
+    )
+
+def appearance_call(method, params=None, reply=GLib.VariantType("()")):
+    return bus.call_sync(
+        "org.helix.Desktop",
+        "/org/helix/Desktop",
+        "org.helix.Desktop.Appearance1",
         method,
         params,
         reply,
@@ -289,6 +314,13 @@ client.shutdown(pysocket.SHUT_WR)
 resp = client.recv(4096).decode()
 assert resp.strip() == "ok", resp
 print("templates_apply_ipc=OK")
+
+theme_palette_bin = os.environ.get("HELIX_THEME_PALETTE_BIN", "")
+if theme_palette_bin and os.path.isfile(theme_palette_bin):
+    appearance_call("SetAccent", GLib.Variant("(s)", ("#336699",)))
+    print("theme_palette=OK")
+else:
+    print("theme_palette=SKIP")
 
 print("CONFIG_SMOKE_OK")
 PY
