@@ -360,7 +360,8 @@ async fn main() -> zbus::Result<()> {
     let audio_poll_state = Arc::clone(&state);
     let audio_conn = connection.clone();
     tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(3));
+        // Cheap tick: the backend only re-reads PipeWire when its watcher flags a change.
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut last_available = {
             let locked = audio_poll_state.lock().await;

@@ -1,6 +1,8 @@
 //! PipeWire audio via WirePlumber's `wpctl` CLI (same stack as C++ `WirePlumberMixer`).
 
 use std::process::Command;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
 
@@ -13,7 +15,17 @@ pub struct WpctlBackend {
     pub programs: Vec<Node>,
     available: bool,
     last_snapshot: Value,
+    /// Raises a flag when PipeWire reports a change; see `watch.rs`.
+    watch: Arc<super::watch::Watch>,
+    last_refresh: Instant,
 }
+
+/// Safety net in case an event is missed.
+const SAFETY_REFRESH: Duration = Duration::from_secs(30);
+/// Event-driven refreshes are spaced at least this far apart (a burst becomes one read).
+const MIN_EVENT_INTERVAL: Duration = Duration::from_millis(750);
+/// While PipeWire is unreachable, probing happens at the old polling cadence.
+const UNAVAILABLE_RETRY: Duration = Duration::from_secs(3);
 
 pub fn probe() -> bool {
     wpctl_output(&["status"]).is_ok()
@@ -27,9 +39,24 @@ impl WpctlBackend {
             programs: Vec::new(),
             available: false,
             last_snapshot: json!({"available": false}),
+            watch: Arc::new(super::watch::Watch::start()),
+            last_refresh: Instant::now(),
         };
         backend.refresh();
         backend
+    }
+
+    /// Refresh only when PipeWire said something changed (or on the safety/retry timers).
+    pub fn refresh_if_needed(&mut self) -> bool {
+        let since = self.last_refresh.elapsed();
+        // Leave the flag set while rate limited so the change is read on a later tick.
+        let dirty = since >= MIN_EVENT_INTERVAL && self.watch.take_dirty();
+        let interval = if self.available { SAFETY_REFRESH } else { UNAVAILABLE_RETRY };
+        if dirty || since >= interval {
+            self.refresh()
+        } else {
+            false
+        }
     }
 
     pub fn is_available(&self) -> bool {
@@ -54,6 +81,7 @@ impl WpctlBackend {
     }
 
     pub fn refresh(&mut self) -> bool {
+        self.last_refresh = Instant::now();
         match refresh_from_wpctl() {
             Ok(next) => {
                 let snap = json!({

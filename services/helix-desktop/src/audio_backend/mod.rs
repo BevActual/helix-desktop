@@ -3,6 +3,7 @@
 //! Nested harnesses set `HELIX_DESKTOP_MOCK_AUDIO=1` so private-bus smoke tests stay deterministic.
 
 mod mock;
+mod watch;
 mod wpctl;
 
 use serde_json::{json, Value};
@@ -43,6 +44,8 @@ pub struct AudioBackend {
     inner: Inner,
     /// When true, `refresh` may promote from offline mock to `wpctl` once PipeWire is up.
     recover_pipewire: bool,
+    /// Last time PipeWire was probed for recovery (each probe spawns `wpctl`).
+    last_probe: std::time::Instant,
 }
 
 impl AudioBackend {
@@ -58,6 +61,7 @@ impl AudioBackend {
         Self {
             inner,
             recover_pipewire,
+            last_probe: std::time::Instant::now(),
         }
     }
 
@@ -70,14 +74,18 @@ impl AudioBackend {
 
     /// Re-read device state from PipeWire. Returns `true` when the public snapshot changed.
     pub fn refresh(&mut self) -> bool {
-        if self.recover_pipewire && wpctl::probe() {
-            self.inner = Inner::Wpctl(wpctl::WpctlBackend::new());
-            self.recover_pipewire = false;
-            return true;
+        if self.recover_pipewire && self.last_probe.elapsed() >= std::time::Duration::from_secs(3) {
+            self.last_probe = std::time::Instant::now();
+            if wpctl::probe() {
+                self.inner = Inner::Wpctl(wpctl::WpctlBackend::new());
+                self.recover_pipewire = false;
+                return true;
+            }
         }
         match &mut self.inner {
             Inner::Mock(_) => false,
-            Inner::Wpctl(backend) => backend.refresh(),
+            // Event driven: only re-reads the device list when PipeWire reported a change.
+            Inner::Wpctl(backend) => backend.refresh_if_needed(),
         }
     }
 
