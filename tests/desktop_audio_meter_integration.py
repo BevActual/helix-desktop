@@ -49,25 +49,49 @@ def wait_for_bus_name():
     probe.close_sync(None)
     raise AssertionError("desktop service did not claim org.helix.Desktop")
 
+def _append_pw_objects(nodes, value):
+    if isinstance(value, list):
+        for item in value:
+            _append_pw_objects(nodes, item)
+    elif isinstance(value, dict):
+        nodes.append(value)
+
+
 def pw_dump_nodes(raw):
-    """Parse `pw-dump` output (single array or multiple JSON values)."""
+    """Parse `pw-dump` output (array, NDJSON, or concatenated JSON values)."""
     raw = raw.strip()
     if not raw:
         return []
-    decoder = json.JSONDecoder()
     nodes = []
+    try:
+        _append_pw_objects(nodes, json.loads(raw))
+        if nodes:
+            return nodes
+    except json.JSONDecodeError:
+        pass
+    decoder = json.JSONDecoder()
     index = 0
     while index < len(raw):
         while index < len(raw) and raw[index].isspace():
             index += 1
         if index >= len(raw):
             break
-        value, end = decoder.raw_decode(raw, index)
-        if isinstance(value, list):
-            nodes.extend(value)
-        else:
-            nodes.append(value)
+        try:
+            value, end = decoder.raw_decode(raw, index)
+        except json.JSONDecodeError:
+            break
+        _append_pw_objects(nodes, value)
         index += end
+    if nodes:
+        return nodes
+    for line in raw.splitlines():
+        line = line.strip().rstrip(",")
+        if not line or line in ("[", "]", "{", "}"):
+            continue
+        try:
+            _append_pw_objects(nodes, json.loads(line))
+        except json.JSONDecodeError:
+            continue
     return nodes
 
 def until(predicate, seconds=8):
@@ -107,9 +131,16 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
             call("StartInputMeter", GLib.Variant("(u)", (source,)))
             def command(*args):
                 return subprocess.check_output(args, env=env, text=True)
+
+            def pw_dump_text():
+                try:
+                    return command("pw-dump")
+                except subprocess.CalledProcessError:
+                    return ""
+
             def capture_nodes():
                 out = []
-                for node in pw_dump_nodes(command("pw-dump")):
+                for node in pw_dump_nodes(pw_dump_text()):
                     if not isinstance(node, dict):
                         continue
                     info = node.get("info")
@@ -138,7 +169,7 @@ with tempfile.TemporaryDirectory(prefix="helix-meter-") as temporary:
             # No lease renewal: a hung client must release the microphone automatically.
             call("StartInputMeter", GLib.Variant("(u)", (source,)))
             until(capture_nodes)
-            until(lambda: not capture_nodes(), seconds=10)
+            until(lambda: not capture_nodes(), seconds=15)
             # A vanished client releases its own stream, without stopping other clients.
             peer = Gio.DBusConnection.new_for_address_sync(os.environ["DBUS_SESSION_BUS_ADDRESS"],
                     Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION,
