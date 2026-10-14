@@ -1,0 +1,11 @@
+[theme]
+builtin = "Dracula"
+mode = "light"
+wallpaper_scheme = "content"
+
+[theme.templates.custom_colors.pop]
+color = "#00b4d8"
+
+[theme.templates.user.cc]
+input_path = "./cc.tpl"
+output_path = "$XDG_DATA_HOME/cc/out.txt"

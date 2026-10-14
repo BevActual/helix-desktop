@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 use helix_theme::apply::{apply, build_user_template_root, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{expand_fixed_palette, find_builtin_palette};
 use helix_theme::template::make_theme_data;
+use helix_theme::transform::apply_resolved_transforms;
 use toml::{Table, Value};
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -67,7 +68,21 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let builtin = theme.get("builtin").and_then(Value::as_str).unwrap_or("Helix");
     let mode = theme.get("mode").and_then(Value::as_str).unwrap_or("dark");
 
-    let generated = expand_fixed_palette(&find_builtin_palette(builtin).unwrap().palette);
+    let mut generated = expand_fixed_palette(&find_builtin_palette(builtin).unwrap().palette);
+    let high_contrast = config
+        .get("accessibility")
+        .and_then(Value::as_table)
+        .and_then(|t| t.get("high_contrast"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    apply_resolved_transforms(
+        &mut generated.dark,
+        &mut generated.light,
+        theme.get("pure_black_dark").and_then(Value::as_bool).unwrap_or(false),
+        high_contrast,
+    );
+    let scheme = theme.get("wallpaper_scheme").and_then(Value::as_str).unwrap_or("m3-content");
+    let scheme_type = scheme.strip_prefix("m3-").unwrap_or(scheme).to_string();
     let state_path = root.join("state/helix/state.toml");
     let applied_before = fs::read_to_string(&state_path)
         .ok()
@@ -84,6 +99,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let inputs = ApplyInputs {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
+        scheme_type,
         image_path: Some(String::new()),
         config_table: None,
         icon_theme: String::new(),
@@ -169,5 +185,5 @@ fn matches_cpp_template_apply() {
         count += 1;
     }
     let _ = fs::remove_dir_all(&root);
-    assert_eq!(count, 5);
+    assert_eq!(count, 12);
 }

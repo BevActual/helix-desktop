@@ -8,6 +8,7 @@ use helix_shell_core::ConfigStore;
 use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;
+use helix_theme::transform::apply_resolved_transforms;
 
 use crate::assets_path::{builtin_templates_root, helix_assets_dir, helix_template_apply_bin};
 use crate::state::State;
@@ -27,9 +28,6 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         Some("custom") => PaletteSource::Custom,
         _ => return None, // wallpaper / community palettes
     };
-    if flag("theme.pure_black_dark") || flag("accessibility.high_contrast") {
-        return None; // HCT-based palette transforms are not ported
-    }
     let mode = match text("theme.mode").as_deref().unwrap_or("dark") {
         "dark" => "dark",
         "light" => "light",
@@ -47,7 +45,15 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         community_cache: None,
         shell_light: false,
     };
-    let generated = resolve_palette(&palettes_dir, &selection)?;
+    let mut generated = resolve_palette(&palettes_dir, &selection)?;
+    apply_resolved_transforms(
+        &mut generated.dark,
+        &mut generated.light,
+        flag("theme.pure_black_dark"),
+        flag("accessibility.high_contrast"),
+    );
+    let scheme = text("theme.wallpaper_scheme").unwrap_or_else(|| "m3-content".into());
+    let scheme_type = scheme.strip_prefix("m3-").unwrap_or(&scheme).to_string();
 
     let list = |id: &str| -> Vec<String> {
         config
@@ -79,6 +85,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let inputs = ApplyInputs {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
+        scheme_type,
         image_path: None,
         config_table: None,
         icon_theme: String::new(),

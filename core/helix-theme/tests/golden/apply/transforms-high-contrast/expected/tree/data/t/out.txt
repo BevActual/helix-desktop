@@ -1,0 +1,2 @@
+dark: bg=#000000 surface=#000000 high=#000000 outline=#c5c5d8 ov=#c7c5d4 term=#000000 sel=#002236 primary=#aaca9c onsurf=#fff8da
+light: bg=#ffffff surface=#ffffff outline=#383012 ov=#35301a primary=#a3bf7e onsurf=#272735

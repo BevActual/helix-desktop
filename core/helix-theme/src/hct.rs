@@ -114,7 +114,6 @@ struct ViewingConditions {
     c: f64,
     n_c: f64,
     fl: f64,
-    fl_root: f64,
     z: f64,
     rgb_d: [f64; 3],
 }
@@ -128,7 +127,6 @@ const DEFAULT_VIEWING: ViewingConditions = ViewingConditions {
     c: 0.689999998,
     n_c: 1.000000000,
     fl: 0.388481468,
-    fl_root: 0.789482653,
     z: 1.909169555,
     rgb_d: [1.021177769, 0.986307740, 0.933960497],
 };

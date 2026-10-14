@@ -41,6 +41,30 @@ camel=rgb203166247
 pascal=Rgb203166247
 snake=rgb_203_166_247
 kebab=rgb-203-166-247
+--- palettes
+tone40=#704f98 tone_u=rgb(255, 219, 200) neutral=1a1a2a
+variant=#838396 err=d5728e
+bad_family={{UNKNOWN:nope}}
+bad_shape={{palettes.primary.hex}}
+t0=#000000
+t1=#001411
+t2=#00201c
+t3=#002c27
+t4=#003731
+t5=#00443c
+t6=#005048
+t7=#005d54
+t8=#0e6a60
+t9=#338379
+t10=#509e92
+t11=#6bb9ad
+t12=#87d5c8
+t13=#a3f1e4
+t14=#b4fff2
+t15=#e4fff9
+t16=#f2fffb
+t17=#ffffff
+empty:
 --- errors
 badpath={{colors.primary.default}}
 unknowncolor={{UNKNOWN:nope.default}}

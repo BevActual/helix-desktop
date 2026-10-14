@@ -16,6 +16,7 @@ use serde_json::Value as Json;
 use toml::{Table, Value};
 
 use crate::color::Color;
+use crate::hct::{Hct, TonalPalette};
 use crate::template::{render, Options, ThemeData};
 
 /// `HookRunner::kDefaultMaxConcurrent`.
@@ -32,6 +33,8 @@ pub struct CommunityTemplate {
 pub struct ApplyInputs {
     pub theme_data: ThemeData,
     pub default_mode: String,
+    /// `[theme].wallpaper_scheme` minus any `m3-` prefix (`content`, `tonal-spot`, ...).
+    pub scheme_type: String,
     /// Wallpaper path for `{{ image }}`; when `None`, templates that read it are unsupported.
     pub image_path: Option<String>,
     /// `config.*` table; when `None`, templates that read it make the apply unsupported.
@@ -416,6 +419,93 @@ pub fn build_user_template_root(templates_cfg: &Table) -> Table {
     root
 }
 
+// ---- custom colors ------------------------------------------------------------------------
+
+fn harmonize_hex(src_hex: &str, target_hex: &str) -> Option<String> {
+    let src = Hct::from_argb(Color::from_hex(src_hex)?.to_argb());
+    let target = Hct::from_argb(Color::from_hex(target_hex)?.to_argb());
+    let mut diff = target.hue() - src.hue();
+    if diff > 180.0 {
+        diff -= 360.0;
+    } else if diff < -180.0 {
+        diff += 360.0;
+    }
+    let mut rotation = (diff.abs() * 0.5).min(15.0);
+    if diff < 0.0 {
+        rotation = -rotation;
+    }
+    let result = Hct::new((src.hue() + rotation + 360.0) % 360.0, src.chroma(), src.tone());
+    Some(Color::from_argb(result.to_argb()).to_hex())
+}
+
+fn scheme_primary_palette(scheme_type: &str, source: Hct) -> TonalPalette {
+    let hue = source.hue();
+    let sanitize = |d: f64| if d < 0.0 { (d % 360.0) + 360.0 } else if d >= 360.0 { d % 360.0 } else { d };
+    match scheme_type {
+        "tonal-spot" => TonalPalette::from_hue_chroma(hue, 36.0),
+        "fruit-salad" => TonalPalette::from_hue_chroma(sanitize(hue - 50.0), 48.0),
+        "rainbow" => TonalPalette::from_hue_chroma(hue, 48.0),
+        "monochrome" => TonalPalette::from_hue_chroma(hue, 0.0),
+        _ => TonalPalette::from_hue_chroma(hue, source.chroma()), // content
+    }
+}
+
+/// C++ `TemplateEngine::applyCustomColors`. `Err` when a colour is not a valid hex string
+/// (the C++ code throws there), so the caller falls back.
+fn apply_custom_colors(root: &Table, data: &mut ThemeData, default_mode: &str, scheme_type: &str) -> Result<(), String> {
+    let Some(custom) = root.get("config").and_then(Value::as_table).and_then(|c| c.get("custom_colors")).and_then(Value::as_table)
+    else {
+        return Ok(());
+    };
+    let source_hex = data
+        .get(default_mode)
+        .and_then(|m| m.get("primary").or_else(|| m.get("source_color")))
+        .cloned()
+        .unwrap_or_default();
+
+    for (name, node) in custom {
+        let (dark_hex, light_hex, blend) = match node {
+            Value::String(s) => (s.clone(), s.clone(), true),
+            Value::Table(t) => {
+                let get = |k: &str| t.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+                let (base, dark_o, light_o) = (get("color"), get("color_dark"), get("color_light"));
+                let pick = |cands: [&String; 3]| cands.into_iter().find(|c| !c.is_empty()).cloned().unwrap_or_default();
+                (
+                    pick([&dark_o, &base, &light_o]),
+                    pick([&light_o, &base, &dark_o]),
+                    t.get("blend").and_then(Value::as_bool).unwrap_or(true),
+                )
+            }
+            _ => continue,
+        };
+        if dark_hex.is_empty() {
+            continue;
+        }
+        for mode in ["dark", "light"] {
+            let color_hex = if mode == "dark" { &dark_hex } else { &light_hex };
+            let palette_hex = if blend && !source_hex.is_empty() {
+                harmonize_hex(color_hex, &source_hex).ok_or("invalid custom color")?
+            } else {
+                color_hex.clone()
+            };
+            let seed = Color::from_hex(&palette_hex).ok_or("invalid custom color")?;
+            let palette = scheme_primary_palette(scheme_type, Hct::from_argb(seed.to_argb()));
+            let at = |tone: f64| Color::from_argb(palette.get(tone)).to_hex();
+
+            let mode_data = data.entry(mode.to_string()).or_default();
+            mode_data.insert(format!("{name}_source"), color_hex.clone());
+            mode_data.insert(format!("{name}_value"), color_hex.clone());
+            let (base, on_base, container, on_container) =
+                if mode == "dark" { (80.0, 20.0, 30.0, 90.0) } else { (40.0, 100.0, 90.0, 10.0) };
+            mode_data.insert(name.clone(), at(base));
+            mode_data.insert(format!("on_{name}"), at(on_base));
+            mode_data.insert(format!("{name}_container"), at(container));
+            mode_data.insert(format!("on_{name}_container"), at(on_container));
+        }
+    }
+    Ok(())
+}
+
 // ---- planning ---------------------------------------------------------------------------
 
 struct OutputPlan {
@@ -439,6 +529,8 @@ struct EntryPlan {
 
 struct Planner<'a> {
     inputs: &'a ApplyInputs,
+    /// Theme data for the config root being planned (custom colors are per engine in C++).
+    data: ThemeData,
     unsupported: Option<String>,
 }
 
@@ -456,7 +548,7 @@ impl Planner<'_> {
     }
 
     fn render(&mut self, options: &Options, text: &str) -> crate::template::RenderResult {
-        let r = render(&self.inputs.theme_data, options, text);
+        let r = render(&self.data, options, text);
         if let Some(why) = r.unsupported {
             self.unsupported.get_or_insert_with(|| why.to_string());
         }
@@ -470,12 +562,10 @@ impl Planner<'_> {
     }
 
     fn plan_config(&mut self, root: &Table, config_path: &Path, enabled: Option<&HashSet<String>>) -> Vec<EntryPlan> {
-        if root
-            .get("config")
-            .and_then(Value::as_table)
-            .is_some_and(|c| c.contains_key("custom_colors"))
+        self.data = self.inputs.theme_data.clone();
+        if let Err(why) = apply_custom_colors(root, &mut self.data, &self.inputs.default_mode, &self.inputs.scheme_type)
         {
-            self.unsupported.get_or_insert_with(|| "config.custom_colors needs HCT schemes".to_string());
+            self.unsupported.get_or_insert(why);
         }
         let Some(templates) = root.get("templates").and_then(Value::as_table) else { return vec![] };
 
@@ -761,7 +851,7 @@ fn execute_entries(plans: Vec<EntryPlan>, hooks: &HookRunner, failures: &mut BTr
 /// One-shot application: undo hooks for built-ins that were turned off, then built-in,
 /// community and user templates, then wait for background hooks.
 pub fn apply(inputs: &ApplyInputs) -> Outcome {
-    let mut planner = Planner { inputs, unsupported: None };
+    let mut planner = Planner { inputs, data: inputs.theme_data.clone(), unsupported: None };
 
     let enabled: BTreeSet<String> = if inputs.enable_builtin {
         inputs.builtin_ids.iter().cloned().collect()

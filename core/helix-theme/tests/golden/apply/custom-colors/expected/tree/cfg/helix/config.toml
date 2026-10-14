@@ -1,0 +1,19 @@
+[theme]
+builtin = "Catppuccin"
+mode = "dark"
+wallpaper_scheme = "m3-tonal-spot"
+
+[theme.templates.custom_colors.brand]
+color = "#ff6a00"
+
+[theme.templates.custom_colors.sharp]
+color = "#2a9d8f"
+blend = false
+
+[theme.templates.custom_colors.split]
+color_dark = "#e63946"
+color_light = "#1d3557"
+
+[theme.templates.user.cc]
+input_path = "./cc.tpl"
+output_path = "$XDG_DATA_HOME/cc/out.txt"

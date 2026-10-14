@@ -10,5 +10,6 @@ pub mod custom;
 pub mod hct;
 pub mod palette;
 pub mod template;
+pub mod transform;
 
 pub use color::Color;

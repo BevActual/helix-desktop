@@ -1,0 +1,2 @@
+pop=#00658b on=#ffffff cont=#c4e7ff oncont=#001e2c
+primary=#8332f4
