@@ -6,8 +6,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use helix_theme::apply::{apply, build_user_template_root, ApplyInputs, CommunityTemplate, Outcome};
-use helix_theme::custom::{expand_fixed_palette, find_builtin_palette};
+use helix_theme::custom::{community_palette_cache_path, resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;
+use helix_theme::transform::apply_resolved_transforms;
 use toml::{Table, Value};
 
 fn copy_tree(from: &Path, to: &Path) {
@@ -51,6 +52,9 @@ fn run_scenario(scenario: &Path, root: &Path) {
     if scenario.join("files").is_dir() {
         copy_tree(&scenario.join("files"), &root.join("cfg"));
     }
+    if scenario.join("statefiles").is_dir() {
+        copy_tree(&scenario.join("statefiles"), &root.join("state/helix"));
+    }
     if scenario.join("state.toml").is_file() {
         fs::copy(scenario.join("state.toml"), root.join("state/helix/state.toml")).unwrap();
     }
@@ -67,7 +71,36 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let builtin = theme.get("builtin").and_then(Value::as_str).unwrap_or("Helix");
     let mode = theme.get("mode").and_then(Value::as_str).unwrap_or("dark");
 
-    let generated = expand_fixed_palette(&find_builtin_palette(builtin).unwrap().palette);
+    let source = match theme.get("source").and_then(Value::as_str).unwrap_or("builtin") {
+        "builtin" => PaletteSource::Builtin,
+        "custom" => PaletteSource::Custom,
+        "community" => PaletteSource::Community,
+        other => panic!("{name}: unsupported source {other}"),
+    };
+    let community = theme.get("community_palette").and_then(Value::as_str).unwrap_or("Oxocarbon");
+    let selection = ThemeSelection {
+        source,
+        builtin: builtin.to_string(),
+        custom_palette: theme.get("custom_palette").and_then(Value::as_str).unwrap_or("").to_string(),
+        community_cache: (source == PaletteSource::Community && !community.is_empty())
+            .then(|| community_palette_cache_path(&root.join("state/helix"), community)),
+        shell_light: false,
+    };
+    let mut generated = resolve_palette(&root.join("cfg/helix/palettes"), &selection).unwrap();
+    let high_contrast = config
+        .get("accessibility")
+        .and_then(Value::as_table)
+        .and_then(|t| t.get("high_contrast"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    apply_resolved_transforms(
+        &mut generated.dark,
+        &mut generated.light,
+        theme.get("pure_black_dark").and_then(Value::as_bool).unwrap_or(false),
+        high_contrast,
+    );
+    let scheme = theme.get("wallpaper_scheme").and_then(Value::as_str).unwrap_or("m3-content");
+    let scheme_type = scheme.strip_prefix("m3-").unwrap_or(scheme).to_string();
     let state_path = root.join("state/helix/state.toml");
     let applied_before = fs::read_to_string(&state_path)
         .ok()
@@ -84,6 +117,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let inputs = ApplyInputs {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
+        scheme_type,
         image_path: Some(String::new()),
         config_table: None,
         icon_theme: String::new(),
@@ -99,6 +133,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
             })
             .collect(),
         applied_before,
+        notify_kde: None,
         user_root: if user_root.is_empty() { None } else { Some((user_root, user_config)) },
     };
 
@@ -120,11 +155,14 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let want_exit: i32 = fs::read_to_string(expected.join("exit_code")).unwrap().trim().parse().unwrap();
     assert_eq!(i32::from(!report.failures.is_empty()) * 2, want_exit, "{name} exit status");
     let want_failures = fs::read_to_string(expected.join("failures.txt")).unwrap_or_default();
-    let got_failures: String = report
+    let root_str = root.to_string_lossy().to_string();
+    let mut got_lines: Vec<String> = report
         .failures
         .iter()
-        .map(|(id, msg)| format!("template failure: {id}: {msg}\n"))
+        .map(|(id, msg)| format!("template failure: {id}: {msg}").replace(&root_str, "@ROOT@"))
         .collect();
+    got_lines.sort();
+    let got_failures: String = got_lines.into_iter().map(|l| l + "\n").collect();
     assert_eq!(got_failures, want_failures, "{name} failures");
 
     let mut want_files = Vec::new();
@@ -135,7 +173,6 @@ fn run_scenario(scenario: &Path, root: &Path) {
     got_files.sort();
     assert_eq!(got_files, want_files, "{name} file tree");
 
-    let root_str = root.to_string_lossy().to_string();
     for rel in &want_files {
         if rel.ends_with("state.toml") {
             // C++ writes its own TOML layout; compare the persisted value instead.
@@ -169,5 +206,5 @@ fn matches_cpp_template_apply() {
         count += 1;
     }
     let _ = fs::remove_dir_all(&root);
-    assert_eq!(count, 5);
+    assert_eq!(count, 19);
 }

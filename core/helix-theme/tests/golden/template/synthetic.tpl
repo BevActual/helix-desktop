@@ -41,6 +41,15 @@ camel={{ colors.primary.default.rgb | camel_case }}
 pascal={{ colors.primary.default.rgb | pascal_case }}
 snake={{ colors.primary.default.rgb | snake_case }}
 kebab={{ colors.primary.default.rgb | kebab_case }}
+--- palettes
+tone40={{ palettes.primary.40.hex }} tone_u={{ palettes.secondary._90.rgb }} neutral={{ palettes.neutral.10.hex_stripped }}
+variant={{ palettes.neutral_variant.50.hex | lighten: 5 }} err={{ palettes.error.60.hex | replace: "#", "" }}
+bad_family={{ palettes.nope.40.hex }}
+bad_shape={{ palettes.primary.hex }}
+<* for t in palettes.tertiary *>
+t{{ loop.index }}={{ t.default }}
+<* endfor *>
+empty:<* for t in palettes.nope *>x<* endfor *>
 --- errors
 badpath={{ colors.primary.default }}
 unknowncolor={{ colors.nope.default.hex }}

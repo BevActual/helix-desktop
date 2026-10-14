@@ -1,0 +1,5 @@
+brand=#ffb4a6 on=#561e15 cont=#733429 oncont=#ffdad4
+brand_dark=#ffb4a6 brand_light=#904b3e src=#ff6a00 val=#ff6a00
+sharp=#82d5c8/#006a60 #2a9d8f
+split=#ffb1c2/#4f5b92 #e63946/#1d3557
+primary_untouched=#cba6f7

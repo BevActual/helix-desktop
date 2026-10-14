@@ -1,0 +1,8 @@
+[theme]
+source = "community"
+community_palette = "NotCached"
+mode = "dark"
+
+[theme.templates.user.t]
+input_path = "./t.tpl"
+output_path = "$XDG_DATA_HOME/t/out.txt"

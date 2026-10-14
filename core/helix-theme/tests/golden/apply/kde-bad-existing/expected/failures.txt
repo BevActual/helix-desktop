@@ -1,0 +1,2 @@
+template failure: builtin: failed to apply built-in templates
+template failure: kcolorscheme: duplicate or empty group at @ROOT@/cfg/kdeglobals:3

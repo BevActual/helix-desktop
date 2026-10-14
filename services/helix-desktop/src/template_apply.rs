@@ -8,12 +8,28 @@ use helix_shell_core::ConfigStore;
 use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
 use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
 use helix_theme::template::make_theme_data;
+use helix_theme::transform::apply_resolved_transforms;
 
 use crate::assets_path::{builtin_templates_root, helix_assets_dir, helix_template_apply_bin};
 use crate::state::State;
 
 const STATE_OWNER: &str = "theme_templates";
 const STATE_APPLIED_IDS: &str = "applied_builtin_ids";
+
+/// `org.kde.KGlobalSettings.notifyChange(0, 0)` on the session bus, like the C++ helper.
+fn notify_kde_scheme_changed() -> Option<String> {
+    let send = || -> zbus::Result<()> {
+        let connection = zbus::blocking::Connection::session()?;
+        connection.emit_signal(
+            None::<&str>,
+            "/KGlobalSettings",
+            "org.kde.KGlobalSettings",
+            "notifyChange",
+            &(0i32, 0i32),
+        )
+    };
+    send().err().map(|error| error.to_string())
+}
 
 /// Applies templates in-process when every input is something `helix-theme` reproduces
 /// exactly. `None` means "use the C++ helper"; nothing has been written or run in that case.
@@ -25,29 +41,34 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let source = match text("theme.source").as_deref() {
         Some("builtin") | None => PaletteSource::Builtin,
         Some("custom") => PaletteSource::Custom,
-        _ => return None, // wallpaper / community palettes
+        Some("community") => PaletteSource::Community,
+        _ => return None, // wallpaper palettes
     };
-    if flag("theme.pure_black_dark") || flag("accessibility.high_contrast") {
-        return None; // HCT-based palette transforms are not ported
-    }
-    let mode = match text("theme.mode").as_deref().unwrap_or("dark") {
-        "dark" => "dark",
-        "light" => "light",
-        _ => return None, // auto needs the day/night schedule
-    };
+    let mode = crate::day_night::resolve_mode(config, text("theme.mode").as_deref().unwrap_or("dark"))?;
 
     let assets = helix_assets_dir()?;
     let builtin_config = builtin_templates_root(&assets).join("builtin.toml");
     let paths = config.paths();
     let palettes_dir = paths.config_dir.join("palettes");
+    let state_dir = paths.settings_toml.parent()?.to_path_buf();
+    let community_name = text("theme.community_palette").unwrap_or_default();
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
-        community_cache: None,
+        community_cache: (source == PaletteSource::Community && !community_name.is_empty())
+            .then(|| helix_theme::custom::community_palette_cache_path(&state_dir, &community_name)),
         shell_light: false,
     };
-    let generated = resolve_palette(&palettes_dir, &selection)?;
+    let mut generated = resolve_palette(&palettes_dir, &selection)?;
+    apply_resolved_transforms(
+        &mut generated.dark,
+        &mut generated.light,
+        flag("theme.pure_black_dark"),
+        flag("accessibility.high_contrast"),
+    );
+    let scheme = text("theme.wallpaper_scheme").unwrap_or_else(|| "m3-content".into());
+    let scheme_type = scheme.strip_prefix("m3-").unwrap_or(&scheme).to_string();
 
     let list = |id: &str| -> Vec<String> {
         config
@@ -56,7 +77,6 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
             .map(|items| items.iter().filter_map(|i| i.as_str().map(str::to_string)).collect())
             .unwrap_or_default()
     };
-    let state_dir = paths.settings_toml.parent()?.to_path_buf();
 
     // User templates / custom colors, mapped exactly like C++ `buildUserTemplateRoot`.
     let mut templates_cfg = toml::Table::new();
@@ -79,6 +99,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
     let inputs = ApplyInputs {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
+        scheme_type,
         image_path: None,
         config_table: None,
         icon_theme: String::new(),
@@ -95,6 +116,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
             .collect(),
         applied_before,
         user_root,
+        notify_kde: Some(notify_kde_scheme_changed),
     };
 
     match apply::apply(&inputs) {

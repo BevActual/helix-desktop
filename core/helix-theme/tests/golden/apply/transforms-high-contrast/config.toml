@@ -1,0 +1,11 @@
+[theme]
+builtin = "Kanagawa"
+mode = "light"
+pure_black_dark = true
+
+[accessibility]
+high_contrast = true
+
+[theme.templates.user.t]
+input_path = "./t.tpl"
+output_path = "$XDG_DATA_HOME/t/out.txt"

@@ -1,0 +1,4 @@
+template failure: bad: failed to render template
+template failure: brokentoml: failed to apply community template
+template failure: mycomm: failed to apply community template
+template failure: unknown_action: unknown post action

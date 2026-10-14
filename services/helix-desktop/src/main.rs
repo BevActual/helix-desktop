@@ -27,6 +27,7 @@ mod network_support;
 mod palette_catalog;
 mod assets_path;
 mod template_apply;
+mod day_night;
 mod theme_palette;
 mod msg_ipc;
 mod palette_previews;

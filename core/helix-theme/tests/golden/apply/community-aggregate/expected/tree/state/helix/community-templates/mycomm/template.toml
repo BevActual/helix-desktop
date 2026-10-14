@@ -1,0 +1,14 @@
+[templates.good]
+input_path = "./good.tpl"
+output_path = "$XDG_DATA_HOME/comm/good.txt"
+post_hook = "touch '{{ config_dir }}/good-hook'"
+
+[templates.bad]
+input_path = "./missing.tpl"
+output_path = "$XDG_DATA_HOME/comm/bad.txt"
+post_hook = "touch '{{ config_dir }}/bad-hook'"
+
+[templates.unknown_action]
+input_path = "./good.tpl"
+output_path = "$XDG_DATA_HOME/comm/unk.txt"
+post_action = "mystery"

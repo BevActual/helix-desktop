@@ -1,0 +1,8 @@
+[theme]
+builtin = "Gruvbox"
+mode = "dark"
+pure_black_dark = true
+
+[theme.templates.user.t]
+input_path = "./t.tpl"
+output_path = "$XDG_DATA_HOME/t/out.txt"

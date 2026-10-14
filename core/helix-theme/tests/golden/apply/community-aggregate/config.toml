@@ -1,0 +1,5 @@
+[theme]
+builtin = "Helix"
+
+[theme.templates]
+community_ids = ["mycomm", "brokentoml"]

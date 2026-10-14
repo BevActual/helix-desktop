@@ -45,27 +45,35 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
     let source = match text("theme.source").as_deref() {
         Some("builtin") | None => PaletteSource::Builtin,
         Some("custom") => PaletteSource::Custom,
-        // wallpaper / community: not ported
+        Some("community") => PaletteSource::Community,
+        // wallpaper: not ported
         Some(_) => return None,
     };
     let mode = text("theme.mode").unwrap_or_else(|| "dark".into());
     let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
     let effective = if shell_mode == "follow" { mode } else { shell_mode };
-    let shell_light = match effective.as_str() {
-        "light" => true,
-        "dark" => false,
-        // auto needs the day/night schedule
-        _ => return None,
-    };
+    let shell_light = crate::day_night::resolve_mode(config, &effective)? == "light";
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
-        community_cache: None,
+        community_cache: community_cache(config, source),
         shell_light,
     };
     let dir = config.paths().config_dir.join("palettes");
     Some((selection, dir))
+}
+
+fn community_cache(config: &ConfigStore, source: PaletteSource) -> Option<PathBuf> {
+    if source != PaletteSource::Community {
+        return None;
+    }
+    let name = config.get("theme.community_palette").as_str().map(str::to_string).unwrap_or_default();
+    if name.is_empty() {
+        return None;
+    }
+    let state_dir = config.paths().settings_toml.parent()?.to_path_buf();
+    Some(helix_theme::custom::community_palette_cache_path(&state_dir, &name))
 }
 
 fn run_helper(args: &[&str]) -> Result<Option<String>, String> {

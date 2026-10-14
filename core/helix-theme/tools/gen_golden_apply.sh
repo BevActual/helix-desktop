@@ -12,6 +12,7 @@ for scenario in "$dest"/*/; do
   mkdir -p "$root/cfg/helix" "$root/state/helix" "$root/data" "$root/cache"
   cp "$scenario/config.toml" "$root/cfg/helix/config.toml"
   [ -d "$scenario/files" ] && cp -a "$scenario/files/." "$root/cfg/"
+  [ -d "$scenario/statefiles" ] && cp -a "$scenario/statefiles/." "$root/state/helix/"
   [ -f "$scenario/state.toml" ] && cp "$scenario/state.toml" "$root/state/helix/state.toml"
 
   set +e
@@ -25,7 +26,7 @@ for scenario in "$dest"/*/; do
   rm -rf "$out"
   mkdir -p "$out"
   echo "$code" >"$out/exit_code"
-  grep '^template failure: ' "$root/stderr" | sort >"$out/failures.txt" || true
+  grep '^template failure: ' "$root/stderr" | sed "s|$root|@ROOT@|g" | sort >"$out/failures.txt" || true
   # Snapshot every file the run left behind; the root path is normalised to @ROOT@.
   (cd "$root" && find . -type f ! -name stdout ! -name stderr | sed 's|^\./||' | sort) | while read -r rel; do
     mkdir -p "$out/tree/$(dirname "$rel")"

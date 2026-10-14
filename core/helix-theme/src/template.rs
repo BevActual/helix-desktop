@@ -13,6 +13,7 @@ use regex::Regex;
 use serde_json::Value;
 
 use crate::color::Color;
+use crate::hct::TonalPalette;
 
 /// mode name (`dark`/`light`/custom) → token name → `#rrggbb`.
 pub type ThemeData = HashMap<String, HashMap<String, String>>;
@@ -252,6 +253,7 @@ struct Regexes {
     for_cmd: Regex,
     range: Regex,
     color_expr: Regex,
+    palette_expr: Regex,
 }
 
 fn re() -> &'static Regexes {
@@ -267,6 +269,7 @@ fn re() -> &'static Regexes {
         for_cmd: Regex::new(r"^for[ \t\n\r\x0b\x0c]+(.+?)[ \t\n\r\x0b\x0c]+in[ \t\n\r\x0b\x0c]+(.+)$").unwrap(),
         range: Regex::new(r"^(-?\d+)\.\.(-?\d+)$").unwrap(),
         color_expr: Regex::new(r"^colors\.([a-z_0-9]+)\.([a-z_0-9]+)\.([a-z_0-9]+)$").unwrap(),
+        palette_expr: Regex::new(r"^palettes\.([a-z_]+)\.(_?\d+)\.([a-z_]+)$").unwrap(),
     })
 }
 
@@ -651,8 +654,7 @@ impl Engine<'_> {
                 } else if base.starts_with("colors.") {
                     return Scope::Str(self.process_color_expression(&base, &filters));
                 } else if base.starts_with("palettes.") {
-                    self.unsupported = Some("palettes.* tonal palette expressions");
-                    return Scope::Str(format!("{{{{{base}}}}}"));
+                    return Scope::Str(self.process_palette_expression(&base, &filters));
                 } else {
                     return Scope::Str(format!("{{{{{expr}}}}}"));
                 }
@@ -746,6 +748,58 @@ impl Engine<'_> {
         self.finish_color(RichColor { color, alpha: 1.0 }, &format_type, filters, base)
     }
 
+    fn palette_family_color(&self, family: &str) -> Option<Color> {
+        let token = match family {
+            "primary" => "primary",
+            "secondary" => "secondary",
+            "tertiary" => "tertiary",
+            "error" => "error",
+            "neutral" => "surface",
+            "neutral_variant" => "surface_variant",
+            _ => return None,
+        };
+        let hex = self.data.get(&self.options.default_mode)?.get(token)?;
+        Color::from_hex(hex)
+    }
+
+    fn palette_entries(&mut self, family: &str) -> Vec<Scope> {
+        const TONES: [i32; 18] = [0, 5, 10, 15, 20, 25, 30, 35, 40, 50, 60, 70, 80, 90, 95, 98, 99, 100];
+        let Some(color) = self.palette_family_color(family) else { return vec![] };
+        let palette = TonalPalette::from_argb(color.to_argb());
+        TONES
+            .iter()
+            .map(|tone| {
+                let hex = Color::from_argb(palette.get(f64::from(*tone))).to_hex();
+                Scope::Map(BTreeMap::from([
+                    ("default".to_string(), Scope::Str(hex.clone())),
+                    ("dark".to_string(), Scope::Str(hex.clone())),
+                    ("light".to_string(), Scope::Str(hex)),
+                ]))
+            })
+            .collect()
+    }
+
+    fn process_palette_expression(&mut self, base: &str, filters: &[String]) -> String {
+        let Some(m) = re().palette_expr.captures(base) else {
+            self.errors += 1;
+            return format!("{{{{{base}}}}}");
+        };
+        let family = m[1].to_string();
+        let tone_str = m[2].trim_start_matches('_').to_string();
+        let format_type = m[3].to_string();
+        let Some(color) = self.palette_family_color(&family) else {
+            self.errors += 1;
+            return format!("{{{{UNKNOWN:{family}}}}}");
+        };
+        let Ok(tone) = tone_str.parse::<i32>() else {
+            self.errors += 1;
+            return format!("{{{{{base}}}}}");
+        };
+        let palette = TonalPalette::from_argb(color.to_argb());
+        let tone_color = Color::from_argb(palette.get(f64::from(tone)));
+        self.finish_color(RichColor { color: tone_color, alpha: 1.0 }, &format_type, filters, base)
+    }
+
     fn resolve_text(&mut self, text: &str) -> String {
         let mut out = String::new();
         let mut last = 0;
@@ -773,9 +827,8 @@ impl Engine<'_> {
         if expr == "colors" {
             return self.colors_map().into_iter().map(|(k, v)| pair(&k, v)).collect();
         }
-        if expr.starts_with("palettes.") {
-            self.unsupported = Some("palettes.* iteration");
-            return vec![];
+        if let Some(name) = expr.strip_prefix("palettes.") {
+            return self.palette_entries(name);
         }
         match self.scope_get(expr) {
             Some(Scope::Array(a)) => a.clone(),

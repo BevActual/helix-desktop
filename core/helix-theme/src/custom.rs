@@ -428,12 +428,17 @@ fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPale
             let path = custom_palette_path(dir, &sel.custom_palette);
             path.exists().then(|| read_parsed(&path)).flatten().map(|p| expand_fixed_palette(&p))
         }
-        PaletteSource::Community => sel
-            .community_cache
-            .as_deref()
-            .filter(|p| p.exists())
-            .and_then(read_parsed)
-            .map(|p| expand_fixed_palette(&p)),
+        PaletteSource::Community => {
+            let path = sel.community_cache.as_deref().filter(|p| p.exists())?;
+            match read_parsed(path) {
+                Some(parsed) => Some(expand_fixed_palette(&parsed)),
+                None => {
+                    // C++ drops an unreadable cache entry so it gets fetched again.
+                    let _ = std::fs::remove_file(path);
+                    None
+                }
+            }
+        }
         PaletteSource::Builtin => Some(resolve_builtin(&sel.builtin)),
         _ => None,
     }
@@ -444,13 +449,30 @@ fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPale
 pub fn resolve_palette(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPalette> {
     match sel.source {
         PaletteSource::Wallpaper => None,
-        PaletteSource::Community => None,
         _ => Some(resolve(dir, sel)),
     }
 }
 
 fn resolve(dir: &Path, sel: &ThemeSelection) -> GeneratedPalette {
     resolve_from_source(dir, sel).unwrap_or_else(|| resolve_builtin(&sel.builtin))
+}
+
+/// `StringUtils::urlEncode`: everything but `[A-Za-z0-9-_.~]` becomes `%XX`.
+pub fn url_encode(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() * 3);
+    for b in text.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(char::from(b));
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
+/// `communityPaletteCachePath(name)` under the state dir (`<state>/community-palettes/`).
+pub fn community_palette_cache_path(state_dir: &Path, name: &str) -> PathBuf {
+    state_dir.join("community-palettes").join(format!("{}.json", url_encode(name)))
 }
 
 /// C++ `saveRoleColorAsCustom` (local path). Returns the palette name; the caller must

@@ -1,0 +1,6 @@
+[theme]
+builtin = "Dracula"
+mode = "dark"
+
+[theme.templates]
+builtin_ids = ["kcolorscheme"]

@@ -1,5 +1,5 @@
 icon_theme	Adwaita
-Ayu	dark	synthetic.tpl	5	3ca9d82d89114d87
+Ayu	dark	synthetic.tpl	7	45de61ff0207fe34
 Ayu	dark	t:alacritty/alacritty.toml	0	80f3826db51f5958
 Ayu	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Ayu	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -51,7 +51,7 @@ Ayu	dark	t:warp/warp.yaml	0	73d969b1d0d2afd8
 Ayu	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Ayu	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Ayu	dark	t:wezterm/wezterm.toml	0	07ee1d3a1230e814
-Ayu	light	synthetic.tpl	5	ae504e312b53e86a
+Ayu	light	synthetic.tpl	7	1ddb6e6b77c7cb5a
 Ayu	light	t:alacritty/alacritty.toml	0	2b648b6e2cfe286e
 Ayu	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Ayu	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -103,7 +103,7 @@ Ayu	light	t:warp/warp.yaml	0	970bd39fe3076135
 Ayu	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Ayu	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Ayu	light	t:wezterm/wezterm.toml	0	6f3366742fd90098
-Catppuccin	dark	synthetic.tpl	5	46c16816df6f8bda
+Catppuccin	dark	synthetic.tpl	7	85a49273394782e8
 Catppuccin	dark	t:alacritty/alacritty.toml	0	0bdb2a06b3d95fd6
 Catppuccin	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Catppuccin	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -155,7 +155,7 @@ Catppuccin	dark	t:warp/warp.yaml	0	114eb3329218bb2f
 Catppuccin	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Catppuccin	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Catppuccin	dark	t:wezterm/wezterm.toml	0	1f761a935a6a6c1d
-Catppuccin	light	synthetic.tpl	5	16276a93a02ac008
+Catppuccin	light	synthetic.tpl	7	2f9a4be156e76a1a
 Catppuccin	light	t:alacritty/alacritty.toml	0	f2cd5e28593b244e
 Catppuccin	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Catppuccin	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -207,7 +207,7 @@ Catppuccin	light	t:warp/warp.yaml	0	f4010262a4473eff
 Catppuccin	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Catppuccin	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Catppuccin	light	t:wezterm/wezterm.toml	0	dda0d97f17ba3e87
-Dracula	dark	synthetic.tpl	5	53056337cd625861
+Dracula	dark	synthetic.tpl	7	e6355b9d78c00964
 Dracula	dark	t:alacritty/alacritty.toml	0	20eadf1eb3f5e5cb
 Dracula	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Dracula	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -259,7 +259,7 @@ Dracula	dark	t:warp/warp.yaml	0	b0cd5d85f2dc47b7
 Dracula	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Dracula	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Dracula	dark	t:wezterm/wezterm.toml	0	21ca3d47bc1c2566
-Dracula	light	synthetic.tpl	5	0ef439333fe742b0
+Dracula	light	synthetic.tpl	7	4b4d12f8a6ca9f49
 Dracula	light	t:alacritty/alacritty.toml	0	2df069544e60500b
 Dracula	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Dracula	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -311,7 +311,7 @@ Dracula	light	t:warp/warp.yaml	0	d41de48b8d77d286
 Dracula	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Dracula	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Dracula	light	t:wezterm/wezterm.toml	0	d7ab093fb99d70f4
-Eldritch	dark	synthetic.tpl	5	c7219980ce82c81b
+Eldritch	dark	synthetic.tpl	7	eb2b9e55e408b1ad
 Eldritch	dark	t:alacritty/alacritty.toml	0	90c20d7df8aae0f6
 Eldritch	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Eldritch	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -363,7 +363,7 @@ Eldritch	dark	t:warp/warp.yaml	0	64cb27ed05e712cd
 Eldritch	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Eldritch	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Eldritch	dark	t:wezterm/wezterm.toml	0	7331def5a59100d2
-Eldritch	light	synthetic.tpl	5	1661d65fa040b795
+Eldritch	light	synthetic.tpl	7	dc5724668dea37e2
 Eldritch	light	t:alacritty/alacritty.toml	0	8a1bb77d01df29e4
 Eldritch	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Eldritch	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -415,7 +415,7 @@ Eldritch	light	t:warp/warp.yaml	0	2d5d7a98f58aba93
 Eldritch	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Eldritch	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Eldritch	light	t:wezterm/wezterm.toml	0	52a87d0cab948f1e
-Gruvbox	dark	synthetic.tpl	5	e81e91ebb7fed6bf
+Gruvbox	dark	synthetic.tpl	7	f9e1dd8e6586f7e1
 Gruvbox	dark	t:alacritty/alacritty.toml	0	11af8a8b22eac97b
 Gruvbox	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Gruvbox	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -467,7 +467,7 @@ Gruvbox	dark	t:warp/warp.yaml	0	6d0c18509531edc5
 Gruvbox	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Gruvbox	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Gruvbox	dark	t:wezterm/wezterm.toml	0	e909daa35178aafe
-Gruvbox	light	synthetic.tpl	5	72f6fa162af9c809
+Gruvbox	light	synthetic.tpl	7	2ae27684cc70061a
 Gruvbox	light	t:alacritty/alacritty.toml	0	a720c1de61f4ddb5
 Gruvbox	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Gruvbox	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -519,7 +519,7 @@ Gruvbox	light	t:warp/warp.yaml	0	3036cf4e56fbb47a
 Gruvbox	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Gruvbox	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Gruvbox	light	t:wezterm/wezterm.toml	0	18233c1d986fb8d4
-Kanagawa	dark	synthetic.tpl	5	11e410046491edc8
+Kanagawa	dark	synthetic.tpl	7	90d9d251d32b2ac1
 Kanagawa	dark	t:alacritty/alacritty.toml	0	dc0a010e8d7733bf
 Kanagawa	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Kanagawa	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -571,7 +571,7 @@ Kanagawa	dark	t:warp/warp.yaml	0	22e6cc9e1843102a
 Kanagawa	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Kanagawa	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Kanagawa	dark	t:wezterm/wezterm.toml	0	2e1257642825e38c
-Kanagawa	light	synthetic.tpl	5	521eec57d56f38a3
+Kanagawa	light	synthetic.tpl	7	d21f44f4a37c39dd
 Kanagawa	light	t:alacritty/alacritty.toml	0	5c26dca4dd4ef239
 Kanagawa	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Kanagawa	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -623,7 +623,7 @@ Kanagawa	light	t:warp/warp.yaml	0	ebf16dd5a339d70d
 Kanagawa	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Kanagawa	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Kanagawa	light	t:wezterm/wezterm.toml	0	bea18b21ab5de433
-Helix	dark	synthetic.tpl	5	360befa82764e289
+Helix	dark	synthetic.tpl	7	92975ed96c384c64
 Helix	dark	t:alacritty/alacritty.toml	0	0bf1ac8312a97164
 Helix	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Helix	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -675,7 +675,7 @@ Helix	dark	t:warp/warp.yaml	0	0834d08f5861b68b
 Helix	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Helix	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Helix	dark	t:wezterm/wezterm.toml	0	90056ee3cbbb7325
-Helix	light	synthetic.tpl	5	df8a5e42e42d10d8
+Helix	light	synthetic.tpl	7	74cd3b74889fac70
 Helix	light	t:alacritty/alacritty.toml	0	47d574a92a459b14
 Helix	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Helix	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -727,7 +727,7 @@ Helix	light	t:warp/warp.yaml	0	bee27544f111245a
 Helix	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Helix	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Helix	light	t:wezterm/wezterm.toml	0	d18d02417dffcb3c
-Nord	dark	synthetic.tpl	5	2f1f156b11ea3cb3
+Nord	dark	synthetic.tpl	7	5bad4bbbe268e7b0
 Nord	dark	t:alacritty/alacritty.toml	0	bcd0575dff4ca9b3
 Nord	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Nord	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -779,7 +779,7 @@ Nord	dark	t:warp/warp.yaml	0	66c70d812e2e95cf
 Nord	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Nord	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Nord	dark	t:wezterm/wezterm.toml	0	cb2bdd8491d55fcc
-Nord	light	synthetic.tpl	5	477cadbcee58844f
+Nord	light	synthetic.tpl	7	8206c492a161358b
 Nord	light	t:alacritty/alacritty.toml	0	37b559b83df861ba
 Nord	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Nord	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -831,7 +831,7 @@ Nord	light	t:warp/warp.yaml	0	3d7d7d849ae82c88
 Nord	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Nord	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Nord	light	t:wezterm/wezterm.toml	0	38c62b3ffb6850fa
-Rosé Pine	dark	synthetic.tpl	5	9d1704f7452ce8cb
+Rosé Pine	dark	synthetic.tpl	7	c0ee068d9af78520
 Rosé Pine	dark	t:alacritty/alacritty.toml	0	8fa584ad9fff8bf5
 Rosé Pine	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Rosé Pine	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -883,7 +883,7 @@ Rosé Pine	dark	t:warp/warp.yaml	0	86a2214aadaafcd4
 Rosé Pine	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Rosé Pine	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Rosé Pine	dark	t:wezterm/wezterm.toml	0	3dc77e80bd516d66
-Rosé Pine	light	synthetic.tpl	5	30d0fc2ee879b2dc
+Rosé Pine	light	synthetic.tpl	7	a6fb3358fe73cdec
 Rosé Pine	light	t:alacritty/alacritty.toml	0	d157d057cbdfe90b
 Rosé Pine	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Rosé Pine	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -935,7 +935,7 @@ Rosé Pine	light	t:warp/warp.yaml	0	84462ec65e4c4300
 Rosé Pine	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Rosé Pine	light	t:wezterm/undo.sh	0	38f1df4978a5248d
 Rosé Pine	light	t:wezterm/wezterm.toml	0	4e5dc89b6dafa465
-Tokyo-Night	dark	synthetic.tpl	5	6a34e7821c90282c
+Tokyo-Night	dark	synthetic.tpl	7	c499e88ceee00e01
 Tokyo-Night	dark	t:alacritty/alacritty.toml	0	9b1c5c4148ffbded
 Tokyo-Night	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
 Tokyo-Night	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
@@ -987,7 +987,7 @@ Tokyo-Night	dark	t:warp/warp.yaml	0	cb01f091d590257c
 Tokyo-Night	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
 Tokyo-Night	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
 Tokyo-Night	dark	t:wezterm/wezterm.toml	0	51ca3578b96f067e
-Tokyo-Night	light	synthetic.tpl	5	a7020717abecc780
+Tokyo-Night	light	synthetic.tpl	7	c3a8978d23deda85
 Tokyo-Night	light	t:alacritty/alacritty.toml	0	6ec7857bd64a488e
 Tokyo-Night	light	t:alacritty/apply.sh	0	289aa9b8394d7387
 Tokyo-Night	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
