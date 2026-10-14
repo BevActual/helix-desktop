@@ -16,6 +16,21 @@ use crate::state::State;
 const STATE_OWNER: &str = "theme_templates";
 const STATE_APPLIED_IDS: &str = "applied_builtin_ids";
 
+/// `org.kde.KGlobalSettings.notifyChange(0, 0)` on the session bus, like the C++ helper.
+fn notify_kde_scheme_changed() -> Option<String> {
+    let send = || -> zbus::Result<()> {
+        let connection = zbus::blocking::Connection::session()?;
+        connection.emit_signal(
+            None::<&str>,
+            "/KGlobalSettings",
+            "org.kde.KGlobalSettings",
+            "notifyChange",
+            &(0i32, 0i32),
+        )
+    };
+    send().err().map(|error| error.to_string())
+}
+
 /// Applies templates in-process when every input is something `helix-theme` reproduces
 /// exactly. `None` means "use the C++ helper"; nothing has been written or run in that case.
 fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
@@ -101,6 +116,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
             .collect(),
         applied_before,
         user_root,
+        notify_kde: Some(notify_kde_scheme_changed),
     };
 
     match apply::apply(&inputs) {

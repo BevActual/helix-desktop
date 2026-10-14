@@ -1,0 +1,6 @@
+[theme]
+builtin = "Gruvbox"
+mode = "light"
+
+[theme.templates]
+builtin_ids = ["kcolorscheme", "helix"]

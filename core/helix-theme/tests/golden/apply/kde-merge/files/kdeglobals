@@ -1,0 +1,12 @@
+# user comment
+[General]
+ColorScheme=BreezeDark
+Name=Custom
+
+[Colors:Window]
+BackgroundNormal=1,2,3
+# keep me
+ExtraKey=keep
+
+[KDE]
+LookAndFeelPackage=org.kde.breezedark.desktop

@@ -26,7 +26,7 @@ for scenario in "$dest"/*/; do
   rm -rf "$out"
   mkdir -p "$out"
   echo "$code" >"$out/exit_code"
-  grep '^template failure: ' "$root/stderr" | sort >"$out/failures.txt" || true
+  grep '^template failure: ' "$root/stderr" | sed "s|$root|@ROOT@|g" | sort >"$out/failures.txt" || true
   # Snapshot every file the run left behind; the root path is normalised to @ROOT@.
   (cd "$root" && find . -type f ! -name stdout ! -name stderr | sed 's|^\./||' | sort) | while read -r rel; do
     mkdir -p "$out/tree/$(dirname "$rel")"

@@ -50,6 +50,9 @@ pub struct ApplyInputs {
     pub applied_before: Vec<String>,
     /// Pre-built user template root (`[config]` / `[templates]`) and the config path it came from.
     pub user_root: Option<(Table, PathBuf)>,
+    /// Emits `org.kde.KGlobalSettings.notifyChange` after a KDE scheme merge; the returned
+    /// text is a (non-fatal) delivery error. `None` skips the notification.
+    pub notify_kde: Option<fn() -> Option<String>>,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -521,6 +524,8 @@ struct EntryPlan {
     has_outputs: bool,
     outputs: Vec<OutputPlan>,
     post_action: String,
+    /// Every effective output path (before client-root gating), as `effectiveOutputs`.
+    outputs_for_action: Vec<PathBuf>,
     post_hook: Option<String>,
     hook_async: bool,
     hook_render_failed: Vec<&'static str>,
@@ -589,9 +594,9 @@ impl Planner<'_> {
 
         let mut plans = Vec::new();
         for entry in &entries {
-            if !entry.post_action.is_empty() {
+            if entry.post_action == "firefox-theme" {
                 self.unsupported
-                    .get_or_insert_with(|| format!("post_action '{}' (template {})", entry.post_action, entry.name));
+                    .get_or_insert_with(|| format!("post_action 'firefox-theme' (template {})", entry.name));
             }
 
             let mut closest = String::new();
@@ -686,6 +691,7 @@ impl Planner<'_> {
                 has_outputs,
                 outputs: out_plans,
                 post_action: entry.post_action.clone(),
+                outputs_for_action: outputs.iter().map(PathBuf::from).collect(),
                 post_hook: post.clone().ok().flatten(),
                 hook_render_failed: if post.is_err() { vec!["failed to render hook"] } else { vec![] },
                 hook_async: entry.hook_async,
@@ -797,7 +803,14 @@ fn write_if_changed(path: &Path, text: &str) -> bool {
     std::fs::write(path, text).is_ok()
 }
 
-fn execute_entries(plans: Vec<EntryPlan>, hooks: &HookRunner, failures: &mut BTreeMap<String, String>) {
+/// Returns whether every entry succeeded (`processConfigTemplates`' bool).
+fn execute_entries(
+    plans: Vec<EntryPlan>,
+    hooks: &HookRunner,
+    failures: &mut BTreeMap<String, String>,
+    notify_kde: Option<fn() -> Option<String>>,
+) -> bool {
+    let mut ok = true;
     for plan in plans {
         let mut report = |id: &str, msg: &str| {
             failures.insert(id.to_string(), msg.to_string());
@@ -816,11 +829,13 @@ fn execute_entries(plans: Vec<EntryPlan>, hooks: &HookRunner, failures: &mut BTr
                 (Some(text), _) => {
                     if !write_if_changed(&out.path, text) {
                         outputs_ok = false;
+                        ok = false;
                         report(&plan.name, "failed to render template");
                     }
                 }
                 (None, err) => {
                     outputs_ok = false;
+                    ok = false;
                     report(&plan.name, err.unwrap_or("failed to render template"));
                 }
             }
@@ -829,7 +844,9 @@ fn execute_entries(plans: Vec<EntryPlan>, hooks: &HookRunner, failures: &mut BTr
         let wants_post = (plan.has_outputs && outputs_ok)
             || (!plan.has_outputs && (plan.post_hook.is_some() || !plan.post_action.is_empty()));
         if wants_post {
-            // post_action is rejected during planning; nothing to run here.
+            if !run_post_action(&plan, notify_kde, &mut report) {
+                ok = false;
+            }
             if !plan.hook_async && plan.post_hook.is_some() {
                 hooks.wait_idle();
             }
@@ -842,6 +859,42 @@ fn execute_entries(plans: Vec<EntryPlan>, hooks: &HookRunner, failures: &mut BTr
                     report(&plan.name, &msg);
                 }
             }
+        }
+    }
+    ok
+}
+
+/// `runPostAction`. KDE merges the single rendered output into `kdeglobals`.
+fn run_post_action(
+    plan: &EntryPlan,
+    notify_kde: Option<fn() -> Option<String>>,
+    report: &mut impl FnMut(&str, &str),
+) -> bool {
+    if plan.post_action.is_empty() {
+        return true;
+    }
+    if plan.post_action != "kde-color-scheme" {
+        report(&plan.name, "unknown post action");
+        return false;
+    }
+    let [output] = plan.outputs_for_action.as_slice() else {
+        return false; // requires exactly one effective output
+    };
+    let globals = expand_xdg_base_dir("$XDG_CONFIG_HOME/kdeglobals");
+    if !Path::new(&globals).is_absolute() {
+        report(&plan.name, "failed to resolve $XDG_CONFIG_HOME/kdeglobals");
+        return false;
+    }
+    match crate::kde::merge_color_scheme(output, Path::new(&globals)) {
+        Ok(()) => {
+            if let Some(notify) = notify_kde {
+                let _ = notify();
+            }
+            true
+        }
+        Err(message) => {
+            report(&plan.name, if message.is_empty() { "post action failed" } else { &message });
+            false
         }
     }
 }
@@ -896,15 +949,16 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
     }
 
     // Template plans.
-    let mut plans: Vec<(String, Vec<EntryPlan>)> = Vec::new();
+    // (label, plan, parsed): `parsed == false` mirrors `processConfigFile` returning false.
+    let mut plans: Vec<(String, Vec<EntryPlan>, bool)> = Vec::new();
     if inputs.enable_builtin && !inputs.builtin_ids.is_empty() {
         match &builtin_root {
             Some(root) => {
                 let enabled_set: HashSet<String> = inputs.builtin_ids.iter().cloned().collect();
                 let p = planner.plan_config(root, &inputs.builtin_config, Some(&enabled_set));
-                plans.push(("builtin".into(), p));
+                plans.push(("builtin".into(), p, true));
             }
-            None => plans.push(("builtin".into(), vec![])),
+            None => plans.push(("builtin".into(), vec![], false)),
         }
     }
     let mut missing_failures: BTreeMap<String, String> = BTreeMap::new();
@@ -920,7 +974,7 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
             match std::fs::read_to_string(&t.config_path).ok().and_then(|s| s.parse::<Table>().ok()) {
                 Some(root) => {
                     let p = planner.plan_config(&root, &t.config_path, None);
-                    plans.push((t.id.clone(), p));
+                    plans.push((t.id.clone(), p, true));
                 }
                 None => {
                     missing_failures.insert(t.id.clone(), "failed to apply community template".into());
@@ -930,7 +984,7 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
     }
     if let Some((root, path)) = &inputs.user_root {
         let p = planner.plan_config(root, path, None);
-        plans.push(("user".into(), p));
+        plans.push(("user".into(), p, true));
     }
 
     if let Some(why) = planner.unsupported {
@@ -957,8 +1011,20 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
     }
 
     let hooks = HookRunner::new();
-    for (_label, entry_plans) in plans {
-        execute_entries(entry_plans, &hooks, &mut failures);
+    for (label, entry_plans, parsed) in plans {
+        let ok = execute_entries(entry_plans, &hooks, &mut failures, inputs.notify_kde) && parsed;
+        if !ok {
+            // `TemplateApplyService` records one aggregate failure per failed config.
+            match label.as_str() {
+                "builtin" => {
+                    failures.insert("builtin".into(), "failed to apply built-in templates".into());
+                }
+                "user" => {}
+                id => {
+                    failures.insert(id.into(), "failed to apply community template".into());
+                }
+            }
+        }
     }
     hooks.wait_idle();
     failures.extend(hooks.take_failures());

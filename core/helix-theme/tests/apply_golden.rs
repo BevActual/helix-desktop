@@ -133,6 +133,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
             })
             .collect(),
         applied_before,
+        notify_kde: None,
         user_root: if user_root.is_empty() { None } else { Some((user_root, user_config)) },
     };
 
@@ -154,11 +155,14 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let want_exit: i32 = fs::read_to_string(expected.join("exit_code")).unwrap().trim().parse().unwrap();
     assert_eq!(i32::from(!report.failures.is_empty()) * 2, want_exit, "{name} exit status");
     let want_failures = fs::read_to_string(expected.join("failures.txt")).unwrap_or_default();
-    let got_failures: String = report
+    let root_str = root.to_string_lossy().to_string();
+    let mut got_lines: Vec<String> = report
         .failures
         .iter()
-        .map(|(id, msg)| format!("template failure: {id}: {msg}\n"))
+        .map(|(id, msg)| format!("template failure: {id}: {msg}").replace(&root_str, "@ROOT@"))
         .collect();
+    got_lines.sort();
+    let got_failures: String = got_lines.into_iter().map(|l| l + "\n").collect();
     assert_eq!(got_failures, want_failures, "{name} failures");
 
     let mut want_files = Vec::new();
@@ -169,7 +173,6 @@ fn run_scenario(scenario: &Path, root: &Path) {
     got_files.sort();
     assert_eq!(got_files, want_files, "{name} file tree");
 
-    let root_str = root.to_string_lossy().to_string();
     for rel in &want_files {
         if rel.ends_with("state.toml") {
             // C++ writes its own TOML layout; compare the persisted value instead.
@@ -203,5 +206,5 @@ fn matches_cpp_template_apply() {
         count += 1;
     }
     let _ = fs::remove_dir_all(&root);
-    assert_eq!(count, 15);
+    assert_eq!(count, 19);
 }

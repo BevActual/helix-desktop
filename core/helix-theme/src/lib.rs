@@ -8,6 +8,7 @@ pub mod color;
 pub mod contrast;
 pub mod custom;
 pub mod hct;
+pub mod kde;
 pub mod palette;
 pub mod schedule;
 pub mod template;
