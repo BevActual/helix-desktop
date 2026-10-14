@@ -171,7 +171,11 @@ fn tab_list_entry(store: &ConfigStore) -> Value {
 }
 
 /// Extra catalog rows merged after bootstrap `GetSettings` entries.
-pub fn extension_entries(store: &ConfigStore, include_desktop: bool) -> Vec<Value> {
+pub fn extension_entries(
+    store: &ConfigStore,
+    include_desktop: bool,
+    display_names: &[String],
+) -> Vec<Value> {
     let mut out = Vec::new();
     for (id, title) in KEY_CHORD_META {
         if KEYBIND_IDS.contains(id) {
@@ -181,7 +185,7 @@ pub fn extension_entries(store: &ConfigStore, include_desktop: bool) -> Vec<Valu
     out.push(tab_list_entry(store));
     out.push(super::control_center_shortcuts::catalog_entry(store));
     out.push(super::notification_rules::catalog_entry(store));
-    out.extend(super::ordered_catalog::entries(store, include_desktop));
+    out.extend(super::ordered_catalog::entries(store, include_desktop, display_names));
     out
 }
 
@@ -344,13 +348,13 @@ mod tests {
     #[test]
     fn wallpaper_transition_round_trip() {
         let store = temp_store();
-        let catalog = store.full_catalog(true);
+        let catalog = store.full_catalog(true, &[]);
         let value = json!(["fade", "wipe"]);
         let validated =
             validate_update(&catalog, "wallpaper.transition", &value).unwrap();
         let mut store = store;
         apply_update(&mut store, "wallpaper.transition", validated).unwrap();
-        let next = store.full_catalog(true);
+        let next = store.full_catalog(true, &[]);
         let current = current_value(&store, &next, "wallpaper.transition").unwrap();
         assert_eq!(current, value);
     }
@@ -358,13 +362,13 @@ mod tests {
     #[test]
     fn tab_visibility_round_trip() {
         let store = temp_store();
-        let catalog = store.full_catalog(true);
+        let catalog = store.full_catalog(true, &[]);
         let visible = json!(["network", "bluetooth"]);
         let validated =
             validate_update(&catalog, "control_center.visible_tabs", &visible).unwrap();
         let mut store = store;
         apply_update(&mut store, "control_center.visible_tabs", validated).unwrap();
-        let next = store.full_catalog(true);
+        let next = store.full_catalog(true, &[]);
         let current = current_value(&store, &next, "control_center.visible_tabs").unwrap();
         assert_eq!(current, visible);
         let hidden = store.get_raw_list("control_center.hidden_tabs").unwrap();

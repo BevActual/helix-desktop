@@ -23,6 +23,8 @@ struct ListMeta {
     title: &'static str,
     group: &'static str,
     list_type: &'static str,
+    /// Options come from live compositor output names when available.
+    monitor_picker: bool,
 }
 
 pub fn is_display_list_id(id: &str) -> bool {
@@ -36,6 +38,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Lock-screen displays",
         group: "Lock Screen",
         list_type: "display-list",
+        monitor_picker: true,
     },
     ListMeta {
         id: "notification.monitors",
@@ -43,6 +46,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Notification displays",
         group: "Displays",
         list_type: "display-list",
+        monitor_picker: true,
     },
     ListMeta {
         id: "osd.monitors",
@@ -50,6 +54,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Indicator displays",
         group: "On-Screen Indicators",
         list_type: "display-list",
+        monitor_picker: true,
     },
     ListMeta {
         id: "dock.monitors",
@@ -57,6 +62,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Dock displays",
         group: "Dock",
         list_type: "display-list",
+        monitor_picker: true,
     },
     ListMeta {
         id: "shell.mpris.blacklist",
@@ -64,6 +70,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Hidden media players",
         group: "Media",
         list_type: "display-list",
+        monitor_picker: false,
     },
     ListMeta {
         id: "brightness.ignore_mmids",
@@ -71,6 +78,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Ignored DDC monitor IDs",
         group: "Brightness",
         list_type: "display-list",
+        monitor_picker: false,
     },
     ListMeta {
         id: "control_center.network.hidden_ssids",
@@ -78,6 +86,7 @@ const DISPLAY_LISTS: &[ListMeta] = &[
         title: "Hidden networks",
         group: "Wi-Fi Preferences",
         list_type: "display-list",
+        monitor_picker: false,
     },
 ];
 
@@ -87,15 +96,34 @@ fn string_list_value(store: &ConfigStore, id: &str) -> Value {
         .unwrap_or_else(|| Value::Array(Vec::new()))
 }
 
-fn display_list_entry(store: &ConfigStore, meta: &ListMeta) -> Value {
+fn display_list_options(meta: &ListMeta, value: &Value, display_names: &[String]) -> Vec<Value> {
+    let mut options = BTreeSet::new();
+    if meta.monitor_picker {
+        for name in display_names {
+            options.insert(name.clone());
+        }
+    }
+    if let Some(items) = value.as_array() {
+        for item in items {
+            if let Some(text) = item.as_str() {
+                options.insert(text.to_string());
+            }
+        }
+    }
+    options.into_iter().map(Value::String).collect()
+}
+
+fn display_list_entry(store: &ConfigStore, meta: &ListMeta, display_names: &[String]) -> Value {
+    let value = string_list_value(store, meta.id);
+    let options = display_list_options(meta, &value, display_names);
     json!({
         "id": meta.id,
         "page": meta.page,
         "title": meta.title,
         "group": meta.group,
         "type": meta.list_type,
-        "value": string_list_value(store, meta.id),
-        "options": [],
+        "value": value,
+        "options": options,
         "minimum": 0,
         "maximum": 256,
         "overridden": store.overridden_path(meta.id),
@@ -276,11 +304,15 @@ fn bar_widget_entry(store: &ConfigStore, bar_name: &str, field: &str, title: &st
 }
 
 /// Static and config-backed ordered-list rows (display lists, templates, bar widgets).
-pub fn entries(store: &ConfigStore, include_desktop: bool) -> Vec<Value> {
+pub fn entries(
+    store: &ConfigStore,
+    include_desktop: bool,
+    display_names: &[String],
+) -> Vec<Value> {
     let mut out = Vec::new();
     if include_desktop {
         for meta in DISPLAY_LISTS {
-            out.push(display_list_entry(store, meta));
+            out.push(display_list_entry(store, meta, display_names));
         }
         out.push(transition_list_entry(store));
         out.push(template_list_entry(

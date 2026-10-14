@@ -153,14 +153,14 @@ mod tests {
     #[test]
     fn shortcut_round_trip() {
         let store = temp_store();
-        let catalog = store.full_catalog(true);
+        let catalog = store.full_catalog(true, &[]);
         let value = json!([{ "type": "wifi", "size": "wide" }]);
         let validated = validate(&catalog, &value).unwrap();
         let mut store = store;
         store
             .set_json_value("control_center.shortcuts", validated)
             .unwrap();
-        let next = store.full_catalog(true);
+        let next = store.full_catalog(true, &[]);
         let entry = next
             .iter()
             .find(|row| row.get("id").and_then(|id| id.as_str()) == Some("control_center.shortcuts"))

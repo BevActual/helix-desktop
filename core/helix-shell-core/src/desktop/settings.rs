@@ -1268,9 +1268,13 @@ impl ConfigStore {
     }
 
     /// Bootstrap catalog plus ordered-list extensions (key-chords, Control Center tabs, …).
-    pub fn full_catalog(&self, include_desktop: bool) -> Vec<Value> {
+    pub fn full_catalog(&self, include_desktop: bool, display_names: &[String]) -> Vec<Value> {
         let mut rows = self.catalog();
-        rows.extend(super::ordered_lists::extension_entries(self, include_desktop));
+        rows.extend(super::ordered_lists::extension_entries(
+            self,
+            include_desktop,
+            display_names,
+        ));
         rows
     }
 

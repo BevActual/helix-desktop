@@ -10,8 +10,16 @@ use zbus::zvariant::{OwnedValue, Value};
 use zbus::{interface, Connection};
 
 use crate::dbus_value::{json_to_owned, owned_bool, owned_str, owned_to_json};
+use crate::displays_support;
 use crate::peer::resolve_peer;
 use crate::state::State;
+
+fn display_output_names(state: &State, include_desktop: bool) -> Vec<String> {
+    if !include_desktop {
+        return Vec::new();
+    }
+    displays_support::output_names(&state.displays.snapshot(true))
+}
 
 pub struct Configuration {
     pub state: Arc<Mutex<State>>,
@@ -64,7 +72,8 @@ fn apply_ordered_list_update(
 ) -> fdo::Result<()> {
     use helix_shell_core::desktop::ordered_lists;
     require_desktop(state, sender)?;
-    let catalog = state.config.full_catalog(true);
+    let display_names = display_output_names(state, true);
+    let catalog = state.config.full_catalog(true, &display_names);
     let entry = ordered_lists::catalog_entry(&catalog, id).ok_or_else(|| {
         fdo::Error::InvalidArgs("Unknown ordered desktop list".into())
     })?;
@@ -130,9 +139,10 @@ impl Configuration {
     async fn get_settings(&self) -> Vec<OwnedValue> {
         let state = self.state.lock().await;
         let include_desktop = state.desktop.is_some();
+        let display_names = display_output_names(&state, include_desktop);
         state
             .config
-            .full_catalog(include_desktop)
+            .full_catalog(include_desktop, &display_names)
             .iter()
             .filter_map(json_to_owned)
             .collect()
