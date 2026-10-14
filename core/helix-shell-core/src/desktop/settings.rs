@@ -1,6 +1,9 @@
 //! Bootstrap Configuration1 catalog: definitions + TOML load/save for the settings the
 //! Tauri shell and Settings app need today. Full C++ catalog ports later.
 
+#[path = "settings_bootstrap_extra.rs"]
+mod settings_bootstrap_extra;
+
 use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -47,10 +50,25 @@ pub enum SettingKind {
     ShellMode,
     WallpaperScheme,
     NiriOverview,
+    Color,
+    Palette,
+    CommunityPalette,
+    CustomPalette,
+    Directory,
+    WeatherUnit,
+    ShadowDirection,
+    SidebarMode,
+    StorageKey,
+    WifiBand,
+    /// `bar-anchor` — bar names are filled in at catalog build time when config is loaded.
+    BarAnchor,
 }
 
 /// C++ `validateSettingValue` / Configuration1.Update messaging.
 pub const SETTING_UNAVAILABLE: &str = "Setting is unavailable on this device";
+
+/// Minimum separation between day and night Kelvin values (C++ `NightLightConfig::kTemperatureGap`).
+const NIGHTLIGHT_TEMPERATURE_GAP: f64 = 100.0;
 pub const MOBIUS_ROUTING_MESSAGE: &str =
     "Model routing is managed in Mobius (helix-mobius), not Helix Settings.";
 
@@ -114,6 +132,17 @@ impl SettingDef {
             SettingKind::ShellMode => "shell-mode",
             SettingKind::WallpaperScheme => "wallpaper-scheme",
             SettingKind::NiriOverview => "niri-overview",
+            SettingKind::Color => "color",
+            SettingKind::Palette => "palette",
+            SettingKind::CommunityPalette => "community",
+            SettingKind::CustomPalette => "custom",
+            SettingKind::Directory => "directory",
+            SettingKind::WeatherUnit => "weather-unit",
+            SettingKind::ShadowDirection => "shadow-direction",
+            SettingKind::SidebarMode => "sidebar-mode",
+            SettingKind::StorageKey => "storage-key",
+            SettingKind::WifiBand => "wifi-band",
+            SettingKind::BarAnchor => "bar-anchor",
         }
     }
 
@@ -217,9 +246,58 @@ impl SettingDef {
                 &["none", "backdrop", "stationary", "flat"],
                 &["None", "Backdrop", "Stationary wallpaper", "Flat color"],
             )),
+            SettingKind::WeatherUnit => Some((&["metric", "imperial"], &["Celsius", "Fahrenheit"])),
+            SettingKind::ShadowDirection => Some((
+                &[
+                    "center",
+                    "down",
+                    "up",
+                    "left",
+                    "right",
+                    "down_left",
+                    "down_right",
+                    "up_left",
+                    "up_right",
+                ],
+                &[
+                    "Center",
+                    "Down",
+                    "Up",
+                    "Left",
+                    "Right",
+                    "Down left",
+                    "Down right",
+                    "Up left",
+                    "Up right",
+                ],
+            )),
+            SettingKind::SidebarMode => Some((
+                &["full", "compact", "none"],
+                &["Full sidebar", "Compact sidebar", "No sidebar"],
+            )),
+            SettingKind::StorageKey => Some((
+                &["secret-service", "file"],
+                &["Secret Service", "Key file"],
+            )),
+            SettingKind::WifiBand => Some((
+                &["all", "2.4", "5", "6"],
+                &["All bands", "2.4 GHz", "5 GHz", "6 GHz"],
+            )),
+            SettingKind::BarAnchor => Some((&[""], &["Automatic"])),
+            SettingKind::Palette => Some((
+                super::palette_names::BUILTIN_PALETTE_NAMES,
+                super::palette_names::BUILTIN_PALETTE_NAMES,
+            )),
+            SettingKind::Color | SettingKind::Directory | SettingKind::CommunityPalette | SettingKind::CustomPalette => {
+                None
+            }
             _ => None,
         }
     }
+}
+
+fn bootstrap_defs() -> impl Iterator<Item = &'static SettingDef> {
+    BOOTSTRAP.iter().chain(settings_bootstrap_extra::BOOTSTRAP_EXTRA.iter())
 }
 
 /// Subset needed for shell volume + Settings appearance/accessibility pages.
@@ -394,7 +472,7 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         page: "appearance",
         title: "Palette",
         group: "Colors",
-        kind: SettingKind::String,
+        kind: SettingKind::Palette,
         desktop: false,
         minimum: 0.0,
         maximum: 0.0,
@@ -405,7 +483,7 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         page: "appearance",
         title: "Community palette",
         group: "Colors",
-        kind: SettingKind::String,
+        kind: SettingKind::CommunityPalette,
         desktop: false,
         minimum: 0.0,
         maximum: 0.0,
@@ -416,7 +494,7 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         page: "appearance",
         title: "Custom palette",
         group: "Colors",
-        kind: SettingKind::String,
+        kind: SettingKind::CustomPalette,
         desktop: false,
         minimum: 0.0,
         maximum: 0.0,
@@ -702,6 +780,39 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         page: "privacy-security",
         title: "Restrict shell network requests",
         group: "Network Privacy",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.external_ip_enabled",
+        page: "privacy-security",
+        title: "Look up public IP address",
+        group: "Network Privacy",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.telemetry_enabled",
+        page: "privacy-security",
+        title: "Anonymous startup ping",
+        group: "Network Privacy",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.screen_time_enabled",
+        page: "privacy-security",
+        title: "Record application screen time",
+        group: "Activity Privacy",
         kind: SettingKind::Boolean,
         desktop: true,
         minimum: 0.0,
@@ -1788,9 +1899,75 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Str("center"),
     },
     SettingDef {
+        id: "shell.panel.open_near_click_launcher",
+        page: "desktop-dock",
+        title: "Open near the pointer",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
         id: "shell.launcher.categories",
         page: "desktop-dock",
         title: "Show application categories",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.launcher.app_grid",
+        page: "desktop-dock",
+        title: "Show applications as a grid",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.launcher.show_app_actions",
+        page: "desktop-dock",
+        title: "Show application actions",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.launcher.show_app_origin_indicator",
+        page: "desktop-dock",
+        title: "Show application source",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.launcher.show_icons",
+        page: "desktop-dock",
+        title: "Show application icons",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.launcher.sort_by_usage",
+        page: "desktop-dock",
+        title: "Sort by usage",
         group: "Launcher",
         kind: SettingKind::Boolean,
         desktop: true,
@@ -1819,6 +1996,72 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
+        id: "shell.launcher.provider_prefix",
+        page: "desktop-dock",
+        title: "Provider prefix",
+        group: "Launcher",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("/"),
+    },
+    SettingDef {
+        id: "shell.launcher.fetch_exchange_rates",
+        page: "desktop-dock",
+        title: "Fetch currency exchange rates",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.window_switcher.mru",
+        page: "desktop-dock",
+        title: "Most recently used order",
+        group: "Window Switcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.session.grid",
+        page: "desktop-dock",
+        title: "Use a grid layout",
+        group: "Panels · Session",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.session.grid_columns",
+        page: "desktop-dock",
+        title: "Columns",
+        group: "Panels · Session",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 1.0,
+        maximum: 5.0,
+        default: DefaultValue::Number(3.0),
+    },
+    SettingDef {
+        id: "shell.session.show_shortcuts",
+        page: "desktop-dock",
+        title: "Show keyboard shortcuts",
+        group: "Panels · Session",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
     },
     SettingDef {
         id: "osd.enabled",
@@ -2351,7 +2594,7 @@ pub const BOOTSTRAP: &[SettingDef] = &[
 ];
 
 pub fn find_def(id: &str) -> Option<&'static SettingDef> {
-    BOOTSTRAP.iter().find(|setting| setting.id == id)
+    bootstrap_defs().find(|setting| setting.id == id)
 }
 
 /// Settings available without a registered Helix desktop (C++ `isPortableSetting`).
@@ -2452,9 +2695,158 @@ impl ConfigStore {
         if id.starts_with("ai.") {
             return Err(MOBIUS_ROUTING_MESSAGE.to_string());
         }
+        if id == "nightlight.temperature_day" || id == "nightlight.temperature_night" {
+            return self.set_nightlight_temperatures(id, value);
+        }
+        if id.starts_with("bar:") {
+            return self.set_bar_field(id, value);
+        }
+        if id.starts_with("idle:") {
+            return self.set_idle_field(id, value);
+        }
         let def = find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
         let validated = validate(def, id, value)?;
+        self.validate_dynamic_options(def, id, &validated)?;
         toml_set(&mut self.overrides, id, json_to_toml(&validated))?;
+        self.save_overrides()
+    }
+
+    fn set_nightlight_temperatures(&mut self, id: &str, value: Value) -> Result<(), String> {
+        let def = find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        let validated = validate(def, id, value)?;
+        let target = validated
+            .as_f64()
+            .ok_or_else(|| "This setting requires a number".to_string())?
+            .round();
+        let day = self
+            .get("nightlight.temperature_day")
+            .as_f64()
+            .unwrap_or(6500.0)
+            .round();
+        let night = self
+            .get("nightlight.temperature_night")
+            .as_f64()
+            .unwrap_or(4000.0)
+            .round();
+        let (day, night) = if id == "nightlight.temperature_day" {
+            let day = target;
+            let night = night.min(day - NIGHTLIGHT_TEMPERATURE_GAP);
+            (day, night)
+        } else {
+            let night = target;
+            let day = day.max(night + NIGHTLIGHT_TEMPERATURE_GAP);
+            (day, night)
+        };
+        let day_def = find_def("nightlight.temperature_day").expect("catalog");
+        let night_def = find_def("nightlight.temperature_night").expect("catalog");
+        if day < day_def.minimum || day > day_def.maximum {
+            return Err("Setting is outside its supported range".into());
+        }
+        if night < night_def.minimum || night > night_def.maximum {
+            return Err("Setting is outside its supported range".into());
+        }
+        toml_set(
+            &mut self.overrides,
+            "nightlight.temperature_day",
+            Toml::Integer(day as i64),
+        )?;
+        toml_set(
+            &mut self.overrides,
+            "nightlight.temperature_night",
+            Toml::Integer(night as i64),
+        )?;
+        self.save_overrides()
+    }
+
+    fn set_bar_field(&mut self, id: &str, value: Value) -> Result<(), String> {
+        let rest = id
+            .strip_prefix("bar:")
+            .ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        let (bar_name, field) = rest
+            .rsplit_once(':')
+            .ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        if bar_name.is_empty() || field.is_empty() {
+            return Err(SETTING_UNAVAILABLE.into());
+        }
+        let validated = super::dynamic_desktop_catalog::validate_bar_scalar(field, value)?;
+        self.set_json_value(id, validated)?;
+        Ok(())
+    }
+
+    fn set_idle_field(&mut self, id: &str, value: Value) -> Result<(), String> {
+        let rest = id
+            .strip_prefix("idle:")
+            .ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        let (name, field) = rest
+            .rsplit_once(':')
+            .ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        if name.is_empty() || field.is_empty() {
+            return Err(SETTING_UNAVAILABLE.into());
+        }
+        let validated = super::dynamic_desktop_catalog::validate_idle_field(field, value)?;
+        let mut behaviors = self
+            .merged_node("idle.behavior")
+            .and_then(|node| node.as_table().cloned())
+            .unwrap_or_default();
+        let row = behaviors
+            .entry(name.to_string())
+            .or_insert_with(|| Toml::Table(Default::default()));
+        let table = row
+            .as_table_mut()
+            .ok_or_else(|| "idle behavior row must be a table".to_string())?;
+        table.insert(field.to_string(), json_to_toml(&validated));
+        if field == "action" && validated.as_str() == Some("suspend") {
+            table.insert("lock_before_suspend".to_string(), Toml::Boolean(false));
+        }
+        toml_set(&mut self.overrides, "idle.behavior", Toml::Table(behaviors))?;
+        self.save_overrides()
+    }
+
+    fn validate_dynamic_options(
+        &self,
+        def: &SettingDef,
+        id: &str,
+        value: &Value,
+    ) -> Result<(), String> {
+        let text = value.as_str().unwrap_or("");
+        if text.is_empty() {
+            return Ok(());
+        }
+        match def.kind {
+            SettingKind::CommunityPalette => {
+                let names = super::palette_names::list_community_palette_names(
+                    self.paths
+                        .settings_toml
+                        .parent()
+                        .unwrap_or(&self.paths.config_dir),
+                );
+                let previous = self.get(id).as_str().map(str::to_string);
+                if names.iter().any(|name| name == text) || previous.as_deref() == Some(text) {
+                    Ok(())
+                } else {
+                    Err("Unknown setting option".into())
+                }
+            }
+            SettingKind::CustomPalette => {
+                let names = super::palette_names::list_custom_palette_names(&self.paths.config_dir);
+                let previous = self.get(id).as_str().map(str::to_string);
+                if names.iter().any(|name| name == text) || previous.as_deref() == Some(text) {
+                    Ok(())
+                } else {
+                    Err("Unknown setting option".into())
+                }
+            }
+            _ => Ok(()),
+        }
+    }
+
+    /// C++ `Appearance1.SetWallhavenApiKey` → `wallpaper.wallhaven.api_key` override (not a catalog row).
+    pub fn set_wallhaven_api_key(&mut self, key: &str) -> Result<(), String> {
+        toml_set(
+            &mut self.overrides,
+            "wallpaper.wallhaven.api_key",
+            Toml::String(key.to_string()),
+        )?;
         self.save_overrides()
     }
 
@@ -2462,8 +2854,24 @@ impl ConfigStore {
         if id.starts_with("ai.") {
             return Err(MOBIUS_ROUTING_MESSAGE.to_string());
         }
+        if id == "idle.behavior" {
+            if let Toml::Table(root) = &mut self.overrides {
+                if let Some(idle) = root.get_mut("idle").and_then(Toml::as_table_mut) {
+                    idle.remove("behavior");
+                    if idle.is_empty() {
+                        root.remove("idle");
+                    }
+                }
+            }
+            return self.save_overrides();
+        }
         find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
-        toml_remove(&mut self.overrides, id);
+        if id == "nightlight.temperature_day" || id == "nightlight.temperature_night" {
+            toml_remove(&mut self.overrides, "nightlight.temperature_day");
+            toml_remove(&mut self.overrides, "nightlight.temperature_night");
+        } else {
+            toml_remove(&mut self.overrides, id);
+        }
         self.save_overrides()
     }
 
@@ -2554,33 +2962,81 @@ impl ConfigStore {
             include_desktop,
             display_names,
         ));
+        rows.extend(super::dynamic_desktop_catalog::desktop_extension_entries(
+            self,
+            include_desktop,
+        ));
         rows
     }
 
     /// Catalog rows for `Configuration1.GetSettings`.
     pub fn catalog(&self) -> Vec<Value> {
-        BOOTSTRAP
-            .iter()
-            .map(|def| {
-                let mut entry = json!({
-                    "id": def.id,
-                    "page": def.page,
-                    "title": def.title,
-                    "group": def.group,
-                    "type": def.type_name(),
-                    "value": self.get(def.id),
-                    "minimum": def.minimum,
-                    "maximum": def.maximum,
-                    "overridden": self.overridden(def.id),
-                });
-                if let Some((options, labels)) = def.options() {
-                    entry["options"] = Value::Array(options.iter().map(|o| Value::String((*o).into())).collect());
-                    entry["option-labels"] =
-                        Value::Array(labels.iter().map(|o| Value::String((*o).into())).collect());
-                }
-                entry
-            })
+        bootstrap_defs()
+            .map(|def| self.catalog_entry(def))
             .collect()
+    }
+
+    fn catalog_entry(&self, def: &SettingDef) -> Value {
+        let mut entry = json!({
+            "id": def.id,
+            "page": def.page,
+            "title": def.title,
+            "group": def.group,
+            "type": def.type_name(),
+            "value": self.get(def.id),
+            "minimum": def.minimum,
+            "maximum": def.maximum,
+            "overridden": self.overridden(def.id),
+        });
+        if def.id == "theme.community_palette" {
+            let names = super::palette_names::list_community_palette_names(
+                self.paths.settings_toml.parent().unwrap_or(&self.paths.config_dir),
+            );
+            let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            let mut options: Vec<Value> = names.iter().map(|n| Value::String(n.clone())).collect();
+            let mut labels = options.clone();
+            if !current.is_empty() && !names.iter().any(|n| n == current) {
+                options.push(Value::String(current.to_string()));
+                labels.push(Value::String(current.to_string()));
+            }
+            entry["options"] = Value::Array(options);
+            entry["option-labels"] = Value::Array(labels);
+        } else if def.id == "theme.custom_palette" {
+            let names =
+                super::palette_names::list_custom_palette_names(&self.paths.config_dir);
+            let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            let mut options: Vec<Value> = names.iter().map(|n| Value::String(n.clone())).collect();
+            let mut labels = options.clone();
+            if !current.is_empty() && !names.iter().any(|n| n == current) {
+                options.push(Value::String(current.to_string()));
+                labels.push(Value::String(current.to_string()));
+            }
+            entry["options"] = Value::Array(options);
+            entry["option-labels"] = Value::Array(labels);
+        } else if def.kind == SettingKind::BarAnchor {
+            let mut options: Vec<Value> = vec![Value::String(String::new())];
+            let mut labels: Vec<Value> = vec![Value::String("Automatic".into())];
+            if let Some(node) = self.merged_node("bar") {
+                if let Toml::Table(table) = node {
+                    for key in table.keys() {
+                        options.push(Value::String(key.clone()));
+                        labels.push(Value::String(key.clone()));
+                    }
+                }
+            }
+            let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
+            if !current.is_empty() && !options.iter().any(|o| o.as_str() == Some(current)) {
+                options.push(Value::String(current.into()));
+                labels.push(Value::String(current.into()));
+            }
+            entry["options"] = Value::Array(options);
+            entry["option-labels"] = Value::Array(labels);
+        } else if let Some((options, labels)) = def.options() {
+            entry["options"] = Value::Array(options.iter().map(|o| Value::String((*o).into())).collect());
+            entry["option-labels"] =
+                Value::Array(labels.iter().map(|o| Value::String((*o).into())).collect());
+        }
+        entry
     }
 }
 
@@ -2643,18 +3099,60 @@ pub fn storage_path(id: &str) -> Cow<'_, str> {
     if id == "control_center.visible_tabs" {
         return Cow::Borrowed("control_center.hidden_tabs");
     }
+    if id == "idle.behavior" {
+        return Cow::Borrowed("idle.behavior");
+    }
+    if let Some(rest) = id.strip_prefix("idle:") {
+        if let Some((name, field)) = rest.rsplit_once(':') {
+            if matches!(
+                field,
+                "enabled"
+                    | "timeout"
+                    | "locked_timeout"
+                    | "action"
+                    | "lock_before_suspend"
+            ) {
+                return Cow::Owned(format!("idle.behavior.{name}.{field}"));
+            }
+        }
+    }
     if let Some(rest) = id.strip_prefix("bar:") {
         if let Some((bar_name, field)) = rest.rsplit_once(':') {
-            if matches!(field, "start" | "center" | "end") {
+            if matches!(
+                field,
+                "enabled"
+                    | "position"
+                    | "auto_hide"
+                    | "smart_auto_hide"
+                    | "reserve_space"
+                    | "show_on_workspace_switch"
+                    | "shadow"
+                    | "contact_shadow"
+                    | "thickness"
+                    | "layer"
+                    | "scale"
+                    | "font_scale"
+                    | "font_weight"
+                    | "font_family"
+                    | "panel_overlap"
+                    | "margin_ends"
+                    | "margin_edge"
+                    | "margin_opposite_edge"
+                    | "padding"
+                    | "background_opacity"
+                    | "radius"
+                    | "border_width"
+                    | "concave_edge_corners"
+                    | "widget_spacing"
+                    | "start"
+                    | "center"
+                    | "end"
+            ) {
                 return Cow::Owned(format!("bar.{bar_name}.{field}"));
             }
         }
     }
     Cow::Borrowed(id)
-}
-
-fn path_parts(id: &str) -> Vec<&str> {
-    id.split('.').collect()
 }
 
 fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
@@ -2669,14 +3167,15 @@ fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
 
 fn toml_get<'a>(root: &'a Toml, id: &str) -> Option<&'a Toml> {
     let mut node = root;
-    for part in path_parts(id) {
+    for part in storage_path(id).split('.') {
         node = node.as_table()?.get(part)?;
     }
     Some(node)
 }
 
 fn toml_set(root: &mut Toml, id: &str, value: Toml) -> Result<(), String> {
-    let parts = path_parts(id);
+    let path = storage_path(id);
+    let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
         return Err("empty setting id".into());
     }
@@ -2698,7 +3197,8 @@ fn toml_set(root: &mut Toml, id: &str, value: Toml) -> Result<(), String> {
 }
 
 fn toml_remove(root: &mut Toml, id: &str) {
-    let parts = path_parts(id);
+    let path = storage_path(id);
+    let parts: Vec<&str> = path.split('.').collect();
     if parts.is_empty() {
         return;
     }
@@ -2741,8 +3241,20 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
     match def.kind {
         SettingKind::Boolean => Value::Bool(value.as_bool().unwrap_or(false)),
         SettingKind::Number => Value::from(value.as_float().or_else(|| value.as_integer().map(|n| n as f64)).unwrap_or(0.0)),
-        SettingKind::Integer => Value::from(value.as_integer().unwrap_or(0) as f64),
+        SettingKind::Integer => {
+            let number = value
+                .as_integer()
+                .or_else(|| value.as_float().map(|n| n.round() as i64))
+                .unwrap_or(0);
+            Value::from(number as f64)
+        }
         SettingKind::String
+        | SettingKind::Color
+        | SettingKind::Directory
+        | SettingKind::Palette
+        | SettingKind::CommunityPalette
+        | SettingKind::CustomPalette
+        | SettingKind::BarAnchor
         | SettingKind::Mode
         | SettingKind::Material
         | SettingKind::ShellLayer
@@ -2762,7 +3274,12 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         | SettingKind::PanelPosition
         | SettingKind::ShellMode
         | SettingKind::WallpaperScheme
-        | SettingKind::NiriOverview => Value::String(value.as_str().unwrap_or("").to_string()),
+        | SettingKind::NiriOverview
+        | SettingKind::WeatherUnit
+        | SettingKind::ShadowDirection
+        | SettingKind::SidebarMode
+        | SettingKind::StorageKey
+        | SettingKind::WifiBand => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -2825,6 +3342,41 @@ pub(crate) fn validate_application_list(value: Value) -> Result<Value, String> {
     Ok(Value::Array(out))
 }
 
+fn validate_hook_command(text: &str) -> Result<(), String> {
+    if text.len() > 4096 {
+        return Err("Commands must be at most 4096 characters".into());
+    }
+    if text.bytes().any(|c| c == 0) {
+        return Err("Commands cannot contain null bytes".into());
+    }
+    Ok(())
+}
+
+fn validate_existing_file_path(text: &str, message: &str) -> Result<(), String> {
+    if text.len() > 4096 {
+        return Err(message.into());
+    }
+    if text.is_empty() {
+        return Ok(());
+    }
+    let path = Path::new(text);
+    if !path.is_absolute() || !path.is_file() {
+        return Err(message.into());
+    }
+    Ok(())
+}
+
+fn validate_existing_directory(text: &str) -> Result<(), String> {
+    if text.is_empty() {
+        return Ok(());
+    }
+    let path = Path::new(text);
+    if !path.is_absolute() || !path.is_dir() {
+        return Err("Choose an existing folder".into());
+    }
+    Ok(())
+}
+
 fn validate_hh_mm(text: &str) -> Result<(), String> {
     if text.is_empty() {
         return Ok(());
@@ -2867,11 +3419,55 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
             }
             Ok(Value::from(clamped))
         }
+        SettingKind::Color => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            super::color_spec::validate_color_config_string(text)?;
+            Ok(Value::String(text.to_string()))
+        }
+        SettingKind::Directory => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            validate_existing_directory(text)?;
+            Ok(Value::String(text.to_string()))
+        }
+        SettingKind::Palette | SettingKind::CommunityPalette | SettingKind::CustomPalette => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            if def.kind == SettingKind::Palette {
+                let (options, _) = def.options().unwrap();
+                if !options.contains(&text) {
+                    return Err("Unknown setting option".into());
+                }
+            }
+            Ok(Value::String(text.to_string()))
+        }
         SettingKind::String => {
             let text = value.as_str().ok_or("This setting requires text")?;
-            if id == "location.sunrise" || id == "location.sunset" {
+            if id.starts_with("hooks.") {
+                validate_hook_command(text)?;
+            } else if id == "location.sunrise" || id == "location.sunset" {
                 validate_hh_mm(text)?;
+            } else if id == "shell.launcher.provider_prefix" {
+                if text.len() > 16 {
+                    return Err("Provider prefixes must be at most 16 characters".into());
+                }
+                if text.bytes().any(|c| c < 32 || c == 127) {
+                    return Err("Provider prefixes cannot contain control characters".into());
+                }
+            } else if id == "dock.launcher_icon" {
+                if text.is_empty() || text.len() > 64 {
+                    return Err("Choose a short icon name".into());
+                }
+                if text.bytes().any(|c| c < 32 || c == 127 || c == b'/' || c == b'\\') {
+                    return Err("Icon names cannot contain path separators".into());
+                }
+            } else if id == "dock.launcher_custom_image" {
+                validate_existing_file_path(text, "Choose an existing image file")?;
+            } else if id == "lockscreen.wallpaper" {
+                validate_existing_file_path(text, "Choose an existing wallpaper image")?;
             }
+            Ok(Value::String(text.to_string()))
+        }
+        SettingKind::BarAnchor => {
+            let text = value.as_str().ok_or("This setting requires text")?;
             Ok(Value::String(text.to_string()))
         }
         SettingKind::Mode
@@ -2893,7 +3489,12 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
         | SettingKind::PanelPosition
         | SettingKind::ShellMode
         | SettingKind::WallpaperScheme
-        | SettingKind::NiriOverview => {
+        | SettingKind::NiriOverview
+        | SettingKind::WeatherUnit
+        | SettingKind::ShadowDirection
+        | SettingKind::SidebarMode
+        | SettingKind::StorageKey
+        | SettingKind::WifiBand => {
             let text = value.as_str().ok_or("This setting requires text")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {
@@ -2977,6 +3578,87 @@ mod tests {
         );
         assert!(reloaded
             .set("dock.pinned", json!(["bad/id.desktop"]))
+            .is_err());
+    }
+
+    #[test]
+    fn bootstrap_catalog_meets_desktop_smoke_minimum() {
+        let count = bootstrap_defs().count();
+        assert!(
+            count >= 300,
+            "expected at least 300 scalar catalog rows, got {count}"
+        );
+    }
+
+    #[test]
+    fn community_palette_rejects_unknown_option() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        assert!(store
+            .set("theme.community_palette", json!("not-a-real-palette"))
+            .is_err());
+    }
+
+    #[test]
+    fn mobius_routing_keys_reject_configuration_update() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        let err = store.set("ai.chat_model", json!("x")).unwrap_err();
+        assert_eq!(err, MOBIUS_ROUTING_MESSAGE);
+    }
+
+    #[test]
+    fn storage_path_maps_bar_and_hidden_tabs() {
+        assert_eq!(
+            storage_path("control_center.visible_tabs").as_ref(),
+            "control_center.hidden_tabs"
+        );
+        assert_eq!(storage_path("bar:top:enabled").as_ref(), "bar.top.enabled");
+        assert_eq!(storage_path("bar:top:start").as_ref(), "bar.top.start");
+    }
+
+    #[test]
+    fn nightlight_temperatures_stay_separated() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        let original_day = store.get("nightlight.temperature_day");
+        let original_night = store.get("nightlight.temperature_night");
+        store
+            .set("nightlight.temperature_night", json!(9000))
+            .unwrap();
+        assert_eq!(store.get("nightlight.temperature_night").as_f64(), Some(9000.0));
+        assert!(store.get("nightlight.temperature_day").as_f64().unwrap() >= 9100.0);
+        store
+            .set("nightlight.temperature_day", json!(2000))
+            .unwrap();
+        assert_eq!(store.get("nightlight.temperature_day").as_f64(), Some(2000.0));
+        assert!(store.get("nightlight.temperature_night").as_f64().unwrap() <= 1900.0);
+        assert!(store.set("nightlight.temperature_day", json!(1000)).is_err());
+        store.reset("nightlight.temperature_night").unwrap();
+        assert_eq!(store.get("nightlight.temperature_day"), original_day);
+        assert_eq!(store.get("nightlight.temperature_night"), original_night);
+    }
+
+    #[test]
+    fn hook_command_validation() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        store.set("hooks.started", json!("notify-send hi")).unwrap();
+        assert!(store.set("hooks.started", json!("\u{0000}")).is_err());
+    }
+
+    #[test]
+    fn launcher_provider_prefix_validation() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths);
+        store.set("shell.launcher.provider_prefix", json!(">")).unwrap();
+        assert_eq!(store.get("shell.launcher.provider_prefix"), json!(">"));
+        let too_long = "x".repeat(17);
+        assert!(store
+            .set("shell.launcher.provider_prefix", json!(too_long))
+            .is_err());
+        assert!(store
+            .set("shell.launcher.provider_prefix", json!("\u{0007}"))
             .is_err());
     }
 

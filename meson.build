@@ -826,6 +826,12 @@ helix_service = executable('helix-service',
   cpp_args: _helix_cpp_args,
   install: true,
 )
+executable('helix-template-apply',
+  sources: files('src/theme/template_apply_main.cpp'),
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
+  install: true,
+)
 helix_assistant_config = configuration_data()
 helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',
@@ -1058,6 +1064,25 @@ if build_tests
       test('desktop_audio_meter_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/desktop_audio_meter_integration.py',
           helix_service, meson.project_source_root() / 'tests/desktop_audio/pipewire.conf'], timeout: 60)
+    endif
+    _helix_desktop_rust_fast = meson.project_source_root() / 'target' / 'fast' / 'helix-desktop'
+    _helix_desktop_rust_debug = meson.project_source_root() / 'target' / 'debug' / 'helix-desktop'
+    if run_command('test', '-x', _helix_desktop_rust_fast, check: false).returncode() == 0
+      _helix_desktop_rust = _helix_desktop_rust_fast
+    else
+      _helix_desktop_rust = _helix_desktop_rust_debug
+    endif
+    _config_smoke = meson.project_source_root() / 'tools' / 'nested' / 'helix-desktop-config-smoke.sh'
+    _have_config_smoke = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0 and run_command('test', '-x', _config_smoke, check: false).returncode() == 0 and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+    if _have_config_smoke
+      _config_smoke_env = ['env', 'HELIX_SERVICE_BIN=' + _helix_desktop_rust, 'HELIX_ASSETS_DIR=' + (meson.project_source_root() / 'assets')]
+      _template_apply = meson.project_source_root() / '_build' / 'helix-template-apply'
+      if run_command('test', '-x', _template_apply, check: false).returncode() == 0
+        _config_smoke_env += ['HELIX_TEMPLATE_APPLY_BIN=' + _template_apply]
+      endif
+      _config_smoke_env += [_config_smoke]
+      test('helix_desktop_config_smoke', helix_dbus_session,
+        args: _config_smoke_env, timeout: 120)
     endif
   endif
   _agent_python = meson.project_source_root() / 'tools/helix-agent/.venv/bin/python'

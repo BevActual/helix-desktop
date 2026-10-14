@@ -14,9 +14,25 @@ if [[ -z "${HELIX_DESKTOP_CONFIG_SMOKE_INNER:-}" ]]; then
   exec dbus-run-session -- env HELIX_SERVICE_BIN="$BIN" "$0"
 fi
 
-export XDG_CONFIG_HOME XDG_STATE_HOME
+export XDG_CONFIG_HOME XDG_STATE_HOME HELIX_ASSETS_DIR
 XDG_CONFIG_HOME="$(mktemp -d)"
 XDG_STATE_HOME="$(mktemp -d)"
+mkdir -p "$XDG_CONFIG_HOME/helix"
+cat >"$XDG_CONFIG_HOME/helix/config.toml" <<'EOF'
+[bar.main]
+enabled = true
+thickness = 34
+
+[idle.behavior.lock]
+timeout = 420
+enabled = true
+action = "lock"
+EOF
+HELIX_ASSETS_DIR="$ROOT/assets"
+if [[ -z "${HELIX_TEMPLATE_APPLY_BIN:-}" && -x "$ROOT/_build/helix-template-apply" ]]; then
+  HELIX_TEMPLATE_APPLY_BIN="$ROOT/_build/helix-template-apply"
+fi
+export HELIX_TEMPLATE_APPLY_BIN
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT
@@ -57,7 +73,7 @@ raw = subprocess.check_output([
 ], text=True)
 ids = re.findall(r"'id': <'([^']+)'>", raw)
 print("setting_count=", len(ids))
-assert len(ids) >= 80, ids
+assert len(ids) >= 300, ids
 for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
     "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
@@ -66,6 +82,8 @@ for want in [
     "hot_corners.delay_ms", "wallpaper.fill_mode", "wallpaper.automation.enabled",
     "shell.clipboard_auto_paste", "lockscreen.blurred_desktop", "lockscreen.lock_before_suspend",
     "theme.shell_mode", "theme.niri_layout.overview", "location.latitude",
+    "shell.external_ip_enabled", "shell.launcher.provider_prefix",
+    "shell.window_switcher.mru", "shell.session.grid_columns",
 ]:
     assert want in ids, want
 print("catalog=OK")
@@ -90,6 +108,41 @@ assert fields["helix-desktop"] is True
 caps_out = dict(fields["desktop-capabilities"])
 assert caps_out["gamma-control"] is True
 print("capabilities=OK")
+
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+desktop_ids = re.findall(r"'id': <'([^']+)'>", raw)
+assert "bar:main:enabled" in desktop_ids, desktop_ids
+assert "idle:lock:timeout" in desktop_ids, desktop_ids
+assert len(desktop_ids) >= len(ids) + 20, (len(desktop_ids), len(ids))
+print("dynamic_desktop_catalog=OK")
+
+params = GLib.VariantBuilder.new(GLib.VariantType("(sv)"))
+params.add_value(GLib.Variant.new_string("idle:lock:timeout"))
+params.add_value(GLib.Variant.new_variant(GLib.Variant.new_double(500)))
+call("Update", params.end(), None)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "'id': <'idle:lock:timeout'>" in raw
+assert "500" in raw
+print("idle_update=OK")
+
+params = GLib.VariantBuilder.new(GLib.VariantType("(s)"))
+params.add_value(GLib.Variant.new_string("idle.behavior"))
+call("Reset", params.end(), None)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "420" in raw
+print("idle_reset=OK")
 
 params = GLib.VariantBuilder.new(GLib.VariantType("(ssv)"))
 params.add_value(GLib.Variant.new_string("shell"))
@@ -223,5 +276,19 @@ raw = subprocess.check_output([
 ], text=True)
 assert "firefox.desktop" in raw
 print("commit_overrides=OK")
+
+# templates-apply msg IPC (requires RegisterDesktop above)
+import socket as pysocket
+runtime = os.environ.get("XDG_RUNTIME_DIR") or "/tmp"
+display = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
+sock_path = f"{runtime}/helix-{display}.sock"
+client = pysocket.socket(pysocket.AF_UNIX, pysocket.SOCK_STREAM)
+client.connect(sock_path)
+client.sendall(b"templates-apply")
+client.shutdown(pysocket.SHUT_WR)
+resp = client.recv(4096).decode()
+assert resp.strip() == "ok", resp
+print("templates_apply_ipc=OK")
+
 print("CONFIG_SMOKE_OK")
 PY

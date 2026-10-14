@@ -31,7 +31,17 @@ impl Appearance {
             .as_str()
             .unwrap_or("dark")
             .to_string();
-        let shell_mode = "follow".to_string();
+        let shell_mode = state
+            .config
+            .get("theme.shell_mode")
+            .as_str()
+            .unwrap_or("follow")
+            .to_string();
+        let offline = state
+            .config
+            .get("shell.offline_mode")
+            .as_bool()
+            .unwrap_or(false);
         let desktop = state.desktop.is_some();
         let mut map = HashMap::new();
         map.insert("available".into(), owned_bool(true));
@@ -47,7 +57,10 @@ impl Appearance {
             previews_value(&state.palette_previews),
         );
         map.insert("wallhaven-key-available".into(), owned_bool(false));
-        map.insert("wallhaven-online".into(), owned_bool(false));
+        map.insert(
+            "wallhaven-online".into(),
+            owned_bool(desktop && !offline),
+        );
         map.insert("wallhaven-download-directory".into(), owned_str(""));
         map
     }
@@ -63,7 +76,24 @@ impl Appearance {
             ));
         }
         state.refresh_palette_previews();
+        let mode = state
+            .config
+            .get("theme.mode")
+            .as_str()
+            .unwrap_or("dark")
+            .to_string();
+        let apply = crate::template_apply::reapply_templates(&state.config);
         drop(state);
+        if let Err(message) = apply {
+            return Err(fdo::Error::Failed(
+                if message.is_empty() {
+                    "Appearance is not ready".into()
+                } else {
+                    message
+                },
+            ));
+        }
+        Self::applied(&emitter, &mode, true).await.ok();
         Self::changed(&emitter).await.ok();
         Ok(())
     }
@@ -118,11 +148,20 @@ impl Appearance {
 
     async fn set_accent(
         &self,
-        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
-        _color: &str,
+        #[zbus(signal_emitter)] _emitter: SignalEmitter<'_>,
+        color: &str,
     ) -> fdo::Result<()> {
-        Self::changed(&emitter).await.ok();
-        Ok(())
+        let state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Appearance exports require Helix desktop".into(),
+            ));
+        }
+        helix_shell_core::desktop::color_spec::validate_accent_hex(color)
+            .map_err(fdo::Error::InvalidArgs)?;
+        drop(state);
+        // Custom palette fork (`ThemeService::saveRoleColorAsCustom`) remains C++ until theme port.
+        Err(fdo::Error::Failed("Accent could not be saved".into()))
     }
 
     async fn set_wallpaper(
@@ -131,6 +170,16 @@ impl Appearance {
         path: &str,
     ) -> fdo::Result<()> {
         let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Wallpaper requires Helix desktop".into(),
+            ));
+        }
+        if !std::path::Path::new(path).is_file() {
+            return Err(fdo::Error::InvalidArgs(
+                "Choose an existing wallpaper file".into(),
+            ));
+        }
         state.wallpaper = path.to_string();
         drop(state);
         Self::changed(&emitter).await.ok();
@@ -153,7 +202,25 @@ impl Appearance {
         Ok(())
     }
 
-    async fn set_wallhaven_api_key(&self, _key: &str) -> fdo::Result<()> {
+    async fn set_wallhaven_api_key(&self, key: &str) -> fdo::Result<()> {
+        let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Wallhaven settings require a Helix desktop".into(),
+            ));
+        }
+        if key.is_empty()
+            || key.len() > 256
+            || !key.bytes().all(|byte| byte.is_ascii_alphanumeric())
+        {
+            return Err(fdo::Error::InvalidArgs(
+                "Enter a valid Wallhaven API key".into(),
+            ));
+        }
+        state
+            .config
+            .set_wallhaven_api_key(key)
+            .map_err(fdo::Error::Failed)?;
         Ok(())
     }
 

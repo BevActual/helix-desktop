@@ -44,6 +44,8 @@ namespace helix::theme {
     void setFailuresChangedCallback(std::function<void()> callback) const;
     void registerIpc(IpcService& ipc);
     [[nodiscard]] bool reapplyLast() const;
+    /// Blocks until the worker queue is drained and hook runners are idle (one-shot CLIs).
+    void waitUntilIdle() const;
     void setRemoteSource(bool remote) { m_remoteSource = remote; }
     [[nodiscard]] std::unordered_map<std::string, std::string> lastFailures() const;
 

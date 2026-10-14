@@ -25,6 +25,9 @@ mod network;
 mod network_backend;
 mod network_support;
 mod palette_catalog;
+mod assets_path;
+mod template_apply;
+mod msg_ipc;
 mod palette_previews;
 mod peer;
 mod runtime_state;
@@ -301,6 +304,8 @@ async fn main() -> zbus::Result<()> {
         }
     });
 
+    msg_ipc::start(Arc::clone(&state));
+
     tracing::info!(
         bus = BUS_NAME,
         path = OBJECT_PATH,
@@ -308,6 +313,7 @@ async fn main() -> zbus::Result<()> {
     );
 
     tokio::signal::ctrl_c().await.ok();
+    let _ = std::fs::remove_file(msg_ipc::resolve_socket_path());
     agents::shutdown_system_agents(use_nm, use_bluez).await;
     Ok(())
 }

@@ -315,7 +315,7 @@ fn template_list_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
     })
 }
 
-fn bar_table(store: &ConfigStore) -> Option<toml::map::Map<String, Toml>> {
+pub(crate) fn bar_table(store: &ConfigStore) -> Option<toml::map::Map<String, Toml>> {
     store
         .merged_node("bar")
         .and_then(|node| node.as_table().cloned())
@@ -351,7 +351,7 @@ fn widget_names(store: &ConfigStore) -> Vec<String> {
     names.into_iter().collect()
 }
 
-fn bar_names(store: &ConfigStore) -> Vec<String> {
+pub(crate) fn bar_names(store: &ConfigStore) -> Vec<String> {
     let Some(bars) = bar_table(store) else {
         return Vec::new();
     };
