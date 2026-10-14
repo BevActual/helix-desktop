@@ -64,6 +64,7 @@ for want in [
     "control_center.width", "osd.kinds.volume", "osd.position", "osd.kinds.wifi",
     "dock.enabled", "dock.position", "dock.launcher_position",
     "hot_corners.delay_ms", "wallpaper.fill_mode", "wallpaper.automation.enabled",
+    "shell.clipboard_auto_paste", "lockscreen.blurred_desktop", "lockscreen.lock_before_suspend",
 ]:
     assert want in ids, want
 print("catalog=OK")

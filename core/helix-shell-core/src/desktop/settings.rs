@@ -36,6 +36,10 @@ pub enum SettingKind {
     WallpaperOrder,
     DailyProvider,
     VideoPause,
+    /// Clipboard auto-paste mode (`shell.clipboard_auto_paste`).
+    ClipboardPaste,
+    /// Password masking style (`shell.password_style`).
+    PasswordMask,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -91,6 +95,8 @@ impl SettingDef {
             SettingKind::WallpaperOrder => "wallpaper-order",
             SettingKind::DailyProvider => "daily-provider",
             SettingKind::VideoPause => "video-pause",
+            SettingKind::ClipboardPaste => "clipboard-paste",
+            SettingKind::PasswordMask => "password-mask",
         }
     }
 
@@ -137,6 +143,14 @@ impl SettingDef {
             SettingKind::VideoPause => Some((
                 &["off", "max", "full"],
                 &["Never", "Maximized windows", "Fullscreen windows"],
+            )),
+            SettingKind::ClipboardPaste => Some((
+                &["off", "auto", "ctrl_v", "ctrl_shift_v", "shift_insert"],
+                &["Off", "Automatic", "Ctrl+V", "Ctrl+Shift+V", "Shift+Insert"],
+            )),
+            SettingKind::PasswordMask => Some((
+                &["default", "random"],
+                &["Filled circles", "Random icons"],
             )),
             _ => None,
         }
@@ -653,10 +667,164 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Bool(true),
     },
     SettingDef {
+        id: "shell.clipboard_keep_from_closed_apps",
+        page: "privacy-security",
+        title: "Keep copied items after apps close",
+        group: "Clipboard",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.clipboard_history_max_entries",
+        page: "privacy-security",
+        title: "History size",
+        group: "Clipboard",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 10.0,
+        maximum: 10000.0,
+        default: DefaultValue::Number(100.0),
+    },
+    SettingDef {
+        id: "shell.clipboard_confirm_clear_history",
+        page: "privacy-security",
+        title: "Confirm history deletion",
+        group: "Clipboard",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.clipboard_auto_paste",
+        page: "privacy-security",
+        title: "Paste selected items automatically",
+        group: "Clipboard",
+        kind: SettingKind::ClipboardPaste,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
+        id: "shell.clipboard_image_action_command",
+        page: "privacy-security",
+        title: "Image editor command",
+        group: "Clipboard",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "shell.password_style",
+        page: "privacy-security",
+        title: "Password masking",
+        group: "Authentication",
+        kind: SettingKind::PasswordMask,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("default"),
+    },
+    SettingDef {
         id: "lockscreen.enabled",
         page: "privacy-security",
         title: "Show lock screen",
         group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.fingerprint",
+        page: "privacy-security",
+        title: "Use fingerprint authentication",
+        group: "Authentication",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.allow_empty_password",
+        page: "privacy-security",
+        title: "Allow unlocking without a password",
+        group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "lockscreen.wallpaper",
+        page: "privacy-security",
+        title: "Lock-screen wallpaper",
+        group: "Lock Screen",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "lockscreen.blurred_desktop",
+        page: "privacy-security",
+        title: "Use blurred desktop background",
+        group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "lockscreen.blur_intensity",
+        page: "privacy-security",
+        title: "Background blur",
+        group: "Lock Screen",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.5),
+    },
+    SettingDef {
+        id: "lockscreen.tint_intensity",
+        page: "privacy-security",
+        title: "Background tint",
+        group: "Lock Screen",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.3),
+    },
+    SettingDef {
+        id: "lockscreen.lock_before_suspend",
+        page: "power",
+        title: "Lock before system suspend",
+        group: "Session",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.lid_close_keep_external_displays",
+        page: "power",
+        title: "Keep external displays active when closing the lid",
+        group: "Session",
         kind: SettingKind::Boolean,
         desktop: true,
         minimum: 0.0,
@@ -2027,7 +2195,9 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         | SettingKind::WallpaperSource
         | SettingKind::WallpaperOrder
         | SettingKind::DailyProvider
-        | SettingKind::VideoPause => Value::String(value.as_str().unwrap_or("").to_string()),
+        | SettingKind::VideoPause
+        | SettingKind::ClipboardPaste
+        | SettingKind::PasswordMask => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -2121,7 +2291,9 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
         | SettingKind::WallpaperSource
         | SettingKind::WallpaperOrder
         | SettingKind::DailyProvider
-        | SettingKind::VideoPause => {
+        | SettingKind::VideoPause
+        | SettingKind::ClipboardPaste
+        | SettingKind::PasswordMask => {
             let text = value.as_str().ok_or("expected string")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {
