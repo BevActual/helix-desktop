@@ -46,29 +46,10 @@ jobs:
     container:
       image: archlinux:latest
     steps:
-      - name: Install dependencies
-        run: |
-          packages=(
-            base-devel git meson ninja pkgconf
-            wayland wayland-protocols
-            libglvnd freetype2 fontconfig noto-fonts
-            cairo pango harfbuzz
-            libxkbcommon glib2
-            libsecret libsodium
-            sdbus-cpp libpipewire wireplumber polkit
-            pam curl libwebp libjxl libsndfile librsvg
-            libqalculate libxml2
-            tomlplusplus libical libcups
-            nlohmann-json stb
-            jemalloc just clang
-          )
-          for attempt in 1 2 3; do
-            pacman -Syu --noconfirm --needed "${packages[@]}" && break
-            echo "pacman failed (attempt ${attempt}), retrying..."
-            sleep 15
-          done
-
       - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: bash tools/ci/arch-helix-ci-deps.sh
 
       - name: Build
         run: just build
@@ -110,15 +91,23 @@ jobs:
   helix-desktop-config:
     name: helix-desktop Configuration1
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
       - uses: actions/checkout@v6
+      - name: Install dependencies
+        run: bash tools/ci/arch-helix-ci-deps.sh dbus python python-gobject
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install test deps
+      - name: Build Rust desktop and C++ appearance helpers
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq dbus dbus-x11 python3-gi gir1.2-gio-2.0 \
-            libpipewire-0.3-dev libspa-0.2-dev
+          cargo build --profile fast -p helix-desktop
+          just configure debug
+          meson compile -C build-debug helix-template-apply helix-theme-palette
       - name: Configuration smoke (Rust desktop)
+        env:
+          HELIX_TEMPLATE_APPLY_BIN: ${{ github.workspace }}/build-debug/helix-template-apply
+          HELIX_THEME_PALETTE_BIN: ${{ github.workspace }}/build-debug/helix-theme-palette
+          HELIX_ASSETS_DIR: ${{ github.workspace }}/assets
         run: ./tools/nested/helix-desktop-config-smoke.sh
 
   helix-desktop-audio-meter:
