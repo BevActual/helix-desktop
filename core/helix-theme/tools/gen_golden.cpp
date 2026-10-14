@@ -1,5 +1,5 @@
 // Emits core/helix-theme/tests/golden/color_contrast.tsv from the C++ reference.
-// Build: g++ -std=c++20 -I src core/helix-theme/tools/gen_golden.cpp src/theme/color.cpp src/theme/contrast.cpp
+// Build: g++ -std=c++23 -I src core/helix-theme/tools/gen_golden.cpp src/theme/color.cpp src/theme/contrast.cpp
 #include "theme/color.h"
 #include "theme/contrast.h"
 

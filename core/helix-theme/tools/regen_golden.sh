@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Regenerate golden files from the C++ reference (src/theme). Run from the repo root.
+set -euo pipefail
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+g="g++ -std=c++23 -O1 -I src"
+$g core/helix-theme/tools/gen_golden.cpp src/theme/color.cpp src/theme/contrast.cpp -o "$out/color"
+"$out/color" > core/helix-theme/tests/golden/color_contrast.tsv
+$g core/helix-theme/tools/gen_golden_palette.cpp src/theme/fixed_palette.cpp src/theme/color.cpp \
+  src/theme/contrast.cpp src/theme/color_roles.cpp -o "$out/palette"
+"$out/palette" > core/helix-theme/tests/golden/palette_expand.tsv
