@@ -73,6 +73,28 @@ pub fn requires_update_ordered_list(id: &str) -> bool {
     super::ordered_catalog::is_display_list_id(id)
 }
 
+pub fn update_ordered_list_message(id: &str) -> &'static str {
+    if id.starts_with("keybinds.") {
+        "Keyboard shortcuts require UpdateOrderedList"
+    } else if id == "control_center.shortcuts" {
+        "Quick shortcuts require UpdateOrderedList"
+    } else if id == "control_center.visible_tabs" {
+        "Control Center pages require UpdateOrderedList"
+    } else if id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids" {
+        "Template selections require UpdateOrderedList"
+    } else if id == "wallpaper.transition" {
+        "Wallpaper transitions require UpdateOrderedList"
+    } else if id == "notification.filter" {
+        "Notification rules require UpdateOrderedList"
+    } else if super::ordered_catalog::is_display_list_id(id) {
+        "Display lists require UpdateOrderedList"
+    } else if id.starts_with("bar:") {
+        "Bar widgets require UpdateOrderedList"
+    } else {
+        "This setting requires UpdateOrderedList"
+    }
+}
+
 pub fn supports_ordered_type(type_name: &str) -> bool {
     matches!(
         type_name,

@@ -1,7 +1,8 @@
 //! Ordered-list catalog rows from static metadata, config, and bar/widget tables.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 use toml::Value as Toml;
@@ -192,16 +193,110 @@ fn load_builtin_templates() -> Vec<(String, String)> {
     out
 }
 
-fn template_list_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
-    let templates = load_builtin_templates();
-    let options: Vec<Value> = templates
+fn community_templates_cache_dir(store: &ConfigStore) -> PathBuf {
+    store
+        .paths()
+        .settings_toml
+        .parent()
+        .map(|dir| dir.join("community-templates"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/helix/community-templates"))
+}
+
+fn parse_community_catalog_entry(item: &Value) -> Option<(String, String)> {
+    let id = item
+        .get("id")
+        .or_else(|| item.get("name"))
+        .and_then(Value::as_str)
+        .filter(|text| !text.is_empty())?;
+    let display = item
+        .get("display_name")
+        .or_else(|| item.get("displayName"))
+        .and_then(Value::as_str)
+        .filter(|text| !text.is_empty())
+        .unwrap_or(id);
+    Some((id.to_string(), display.to_string()))
+}
+
+fn load_community_templates(store: &ConfigStore) -> Vec<(String, String)> {
+    let cache_dir = community_templates_cache_dir(store);
+    let mut templates = BTreeSet::new();
+    let catalog_path = cache_dir.join("catalog.json");
+    if let Ok(text) = fs::read_to_string(&catalog_path) {
+        if let Ok(root) = serde_json::from_str::<Value>(&text) {
+            let entries = root
+                .as_array()
+                .or_else(|| root.get("templates").and_then(Value::as_array));
+            if let Some(items) = entries {
+                for item in items {
+                    if let Some(pair) = parse_community_catalog_entry(item) {
+                        templates.insert(pair);
+                    }
+                }
+            }
+        }
+    }
+    if let Ok(entries) = fs::read_dir(&cache_dir) {
+        for entry in entries.flatten() {
+            if !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
+                continue;
+            }
+            let id = entry.file_name().to_string_lossy().into_owned();
+            if id.starts_with('.') {
+                continue;
+            }
+            let toml_path = entry.path().join("template.toml");
+            if !toml_path.is_file() {
+                continue;
+            }
+            let name = read_community_template_name(&toml_path, &id);
+            templates.insert((id, name));
+        }
+    }
+    templates.into_iter().collect()
+}
+
+fn read_community_template_name(path: &Path, fallback: &str) -> String {
+    let Ok(text) = fs::read_to_string(path) else {
+        return fallback.to_string();
+    };
+    let Ok(root) = text.parse::<Toml>() else {
+        return fallback.to_string();
+    };
+    let Some(table) = root.as_table() else {
+        return fallback.to_string();
+    };
+    let Some(catalog) = table.get("catalog").and_then(Toml::as_table) else {
+        return fallback.to_string();
+    };
+    let Some(info) = catalog.get(fallback).and_then(Toml::as_table) else {
+        return fallback.to_string();
+    };
+    info.get("name")
+        .and_then(Toml::as_str)
+        .filter(|text| !text.is_empty())
+        .unwrap_or(fallback)
+        .to_string()
+}
+
+fn template_options(templates: &[(String, String)]) -> (Vec<Value>, Vec<Value>) {
+    let options = templates
         .iter()
         .map(|(template_id, _)| Value::String(template_id.clone()))
         .collect();
-    let labels: Vec<Value> = templates
+    let labels = templates
         .iter()
         .map(|(_, name)| Value::String(name.clone()))
         .collect();
+    (options, labels)
+}
+
+fn template_list_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
+    let templates = if id == "theme.templates.community_ids" {
+        load_community_templates(store)
+    } else {
+        load_builtin_templates()
+    };
+    let (options, labels) = template_options(&templates);
     let value = store
         .get_raw_list(id)
         .unwrap_or_else(|| Value::Array(Vec::new()));

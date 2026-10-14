@@ -21,6 +21,35 @@ fn display_output_names(state: &State, include_desktop: bool) -> Vec<String> {
     displays_support::output_names(&state.displays.snapshot(true))
 }
 
+fn gamma_available(state: &State) -> bool {
+    state
+        .desktop_capabilities
+        .get("gamma-control")
+        .copied()
+        .unwrap_or(false)
+}
+
+fn require_setting_access(state: &State, id: &str) -> fdo::Result<()> {
+    if id.starts_with("ai.") {
+        return Err(fdo::Error::InvalidArgs(
+            "Model routing is managed in Mobius (helix-mobius), not Helix Settings.".into(),
+        ));
+    }
+    if state.desktop.is_none()
+        && !helix_shell_core::desktop::settings::is_portable_setting(id)
+    {
+        return Err(fdo::Error::InvalidArgs(
+            "This setting requires Helix desktop".into(),
+        ));
+    }
+    if id.starts_with("nightlight.") && !gamma_available(state) {
+        return Err(fdo::Error::InvalidArgs(
+            "Night Light is unavailable on this desktop".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub struct Configuration {
     pub state: Arc<Mutex<State>>,
 }
@@ -157,22 +186,12 @@ impl Configuration {
         let json = value_from_zvariant(&value)
             .ok_or_else(|| fdo::Error::InvalidArgs("unsupported value type".into()))?;
         if helix_shell_core::desktop::ordered_lists::requires_update_ordered_list(id) {
-            let message = if id.starts_with("keybinds.") {
-                "Keyboard shortcuts require UpdateOrderedList"
-            } else if id == "control_center.shortcuts" {
-                "Quick shortcuts require UpdateOrderedList"
-            } else if id == "control_center.visible_tabs" {
-                "Control Center pages require UpdateOrderedList"
-            } else if id == "theme.templates.builtin_ids" || id == "theme.templates.community_ids" {
-                "Template selections require UpdateOrderedList"
-            } else if id == "wallpaper.transition" {
-                "Wallpaper transitions require UpdateOrderedList"
-            } else {
-                "This setting requires UpdateOrderedList"
-            };
+            let message = helix_shell_core::desktop::ordered_lists::update_ordered_list_message(id);
             return Err(fdo::Error::InvalidArgs(message.into()));
         }
         let mut state = self.state.lock().await;
+        require_setting_access(&state, id)?;
+        state.config.force_reload();
         state
             .config
             .set(id, json.clone())
@@ -241,6 +260,8 @@ impl Configuration {
         id: &str,
     ) -> fdo::Result<()> {
         let mut state = self.state.lock().await;
+        require_setting_access(&state, id)?;
+        state.config.force_reload();
         state.config.reset(id).map_err(fdo::Error::InvalidArgs)?;
         drop(state);
         Self::changed(&emitter).await.ok();

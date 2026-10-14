@@ -43,9 +43,9 @@ HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop tools/nested/…
 6. ~~Bluetooth1 in-memory mock~~ · **BlueZ** when present (`HELIX_DESKTOP_MOCK_BLUETOOTH=1` for nested); **Agent1** + `Prompt`/`Reply`; **trust**, **cancel-pair**
 7. ~~Displays1 GetSnapshot stub~~ · **niri** `msg --json outputs` when `NIRI_SOCKET` is set and desktop is registered (`HELIX_DESKTOP_MOCK_DISPLAYS=1` for nested)
 8. ~~Appearance1 builtin palette-previews + SetWallpaper path~~ (no Material expand / wallhaven / apply yet)
-9. ~~Configuration1 RegisterCapabilities + Get/Set/ClearState + catalog growth~~ · **`UpdateOrderedList`** + **`CommitOverrides`** with ordered-list catalog parity (**application-list**, **key-chords**, **tab-list**, **shortcut-list**, **notification-rules**, **display-list**, **template-list**, **transition-list**, **widget-list** / `bar:*`); full static C++ catalog (~hundreds of scalar rows) still grows incrementally
+9. ~~Configuration1 RegisterCapabilities + Get/Set/ClearState + catalog growth~~ · **`UpdateOrderedList`** + **`CommitOverrides`** with ordered-list catalog parity (**application-list**, **key-chords**, **tab-list**, **shortcut-list**, **notification-rules**, **display-list**, **template-list**, **transition-list**, **widget-list** / `bar:*`); monitor pickers take live compositor output names; community template list options read `state/community-templates/catalog.json` + cache dirs; bootstrap scalar catalog grows in slices (dock, hot corners, wallpaper, notifications, OSD, …) — still short of full C++ `settings_catalog`
 10. ~~AgentSurfaceActivity1~~ (desktop-only kill switch, pending, grants view)
 11. ~~Community/custom palette-previews~~ + ~~opt-in catalog HTTP sync~~ (`HELIX_COMMUNITY_PALETTE_CATALOG_URL`)
 12. ~~UpdateApplicationList for dock/launcher pins~~ (remaining ordered-list catalog rows still stub)
-13. Real backends (PW/NM/BlueZ/niri) · remaining ordered lists · theme apply
+13. Real backends (PW/NM/BlueZ/niri) · **Configuration1 `Update`/`Reset` guards** (portable vs desktop, Mobius `ai.*`, nightlight vs `gamma-control`) · theme apply · Meson/Rust nested parity for remaining domains
 14. Assistant, then inference

@@ -1626,6 +1626,11 @@ pub fn find_def(id: &str) -> Option<&'static SettingDef> {
     BOOTSTRAP.iter().find(|setting| setting.id == id)
 }
 
+/// Settings available without a registered Helix desktop (C++ `isPortableSetting`).
+pub fn is_portable_setting(id: &str) -> bool {
+    find_def(id).is_some_and(|def| !def.desktop)
+}
+
 #[derive(Clone, Debug)]
 pub struct ConfigPaths {
     pub config_dir: PathBuf,
