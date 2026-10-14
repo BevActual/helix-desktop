@@ -18,7 +18,7 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 ## Cutover rules
 
 1. **`protocols/` is authoritative.** D-Bus XML and IPC schemas stay the single source of truth. Rust checks or generates against them.
-2. **One bus owner.** Never run two `org.helix.Desktop` processes. Nested harness / install picks C++ or Rust via `HELIX_SERVICE_BIN` (default: meson `helix-service`).
+2. **One bus owner.** Never run two `org.helix.Desktop` processes. The installed unit and D-Bus activation run `helix-service-launch`, which `exec`s the **Rust `helix-desktop` by default** and falls back to the C++ `helix-service` when the Rust binary is not installed. `HELIX_SERVICE=cpp` forces C++; `HELIX_SERVICE_BIN` names an explicit binary (nested harnesses use it). `just install` also builds and installs `helix-desktop`.
 3. **Parity before delete.** Nested or unit tests that cover a domain must pass against the Rust binary before that C++ domain is removed.
 4. **Same change deletes C++.** When a domain cuts over, remove its C++ sources and meson bits in that change.
 

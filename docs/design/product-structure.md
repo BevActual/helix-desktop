@@ -47,7 +47,7 @@ Optional later: helix-assistant, helix-inference (still C++ under src/)
 Session helpers: helix-wallpaper, helix-idle (services/)
 ```
 
-**One bus owner.** Never run C++ and Rust `org.helix.Desktop` together. Nested / install pick via `HELIX_SERVICE_BIN` (default: meson `helix-service`).
+**One bus owner.** Never run C++ and Rust `org.helix.Desktop` together. The installed `helix-service-launch` picks Rust `helix-desktop` by default and the C++ `helix-service` as fallback (`HELIX_SERVICE=cpp` forces C++; nested harnesses use `HELIX_SERVICE_BIN`).
 
 ## Tree roles (intended)
 

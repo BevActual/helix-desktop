@@ -88,3 +88,17 @@ diff. When every box has passed on at least two machines (one with Bluetooth + e
 the default can flip: make `helix-desktop` the installed `helix-service` unit's `ExecStart`, keep
 the C++ service for one release behind `HELIX_SERVICE_BIN`, then delete `src/desktop/` per the
 cutover rules in `cpp-to-rust.md`.
+
+## After the flip
+
+`helix-service-launch` (installed next to `helix-service`) is what the unit and D-Bus activation
+run. With `helix-desktop` installed it starts the Rust service; otherwise, or with
+`HELIX_SERVICE=cpp`, the C++ one:
+
+```sh
+systemctl --user edit helix-service      # [Service]  Environment=HELIX_SERVICE=cpp
+systemctl --user restart helix-service
+```
+
+The soak drop-in from `tools/soak/rust-desktop.sh enable` is no longer needed once the installed
+launcher is in place; run `disable` to remove it.
