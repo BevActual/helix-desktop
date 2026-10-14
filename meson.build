@@ -832,6 +832,12 @@ executable('helix-template-apply',
   cpp_args: _helix_cpp_args,
   install: true,
 )
+executable('helix-theme-palette',
+  sources: files('src/theme/theme_palette_main.cpp'),
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
+  install: true,
+)
 helix_assistant_config = configuration_data()
 helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',

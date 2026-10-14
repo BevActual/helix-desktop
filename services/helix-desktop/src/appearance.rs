@@ -134,21 +134,64 @@ impl Appearance {
         Ok(())
     }
 
-    async fn save_palette(&self, _name: &str) -> fdo::Result<String> {
-        Err(fdo::Error::Failed(
-            "SavePalette not implemented in Rust helix-desktop yet".into(),
-        ))
+    async fn save_palette(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        name: &str,
+    ) -> fdo::Result<String> {
+        let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Appearance exports require Helix desktop".into(),
+            ));
+        }
+        drop(state);
+        let source = name.to_string();
+        let palette_name =
+            tokio::task::spawn_blocking(move || crate::theme_palette::save_palette(&source))
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?
+            .map_err(fdo::Error::Failed)?;
+        let mut state = self.state.lock().await;
+        state.config.force_reload();
+        state.refresh_palette_previews();
+        drop(state);
+        Self::changed(&emitter).await.ok();
+        Ok(palette_name)
     }
 
-    async fn set_role(&self, _role: u32, _value: &str) -> fdo::Result<String> {
-        Err(fdo::Error::Failed(
-            "SetRole not implemented in Rust helix-desktop yet".into(),
-        ))
+    async fn set_role(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+        role: u32,
+        value: &str,
+    ) -> fdo::Result<String> {
+        let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Appearance exports require Helix desktop".into(),
+            ));
+        }
+        helix_shell_core::desktop::color_spec::validate_accent_hex(value)
+            .map_err(fdo::Error::InvalidArgs)?;
+        drop(state);
+        let hex_color = value.to_string();
+        let palette_name =
+            tokio::task::spawn_blocking(move || crate::theme_palette::set_role(role, &hex_color))
+                .await
+                .map_err(|error| fdo::Error::Failed(error.to_string()))?
+                .map_err(fdo::Error::Failed)?;
+        let mut state = self.state.lock().await;
+        state.config.force_reload();
+        state.refresh_palette_previews();
+        drop(state);
+        Self::changed(&emitter).await.ok();
+        Ok(palette_name)
     }
 
     async fn set_accent(
         &self,
-        #[zbus(signal_emitter)] _emitter: SignalEmitter<'_>,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         color: &str,
     ) -> fdo::Result<()> {
         let state = self.state.lock().await;
@@ -160,8 +203,17 @@ impl Appearance {
         helix_shell_core::desktop::color_spec::validate_accent_hex(color)
             .map_err(fdo::Error::InvalidArgs)?;
         drop(state);
-        // Custom palette fork (`ThemeService::saveRoleColorAsCustom`) remains C++ until theme port.
-        Err(fdo::Error::Failed("Accent could not be saved".into()))
+        let hex_color = color.to_string();
+        tokio::task::spawn_blocking(move || crate::theme_palette::set_accent(&hex_color))
+            .await
+            .map_err(|error| fdo::Error::Failed(error.to_string()))?
+            .map_err(fdo::Error::Failed)?;
+        let mut state = self.state.lock().await;
+        state.config.force_reload();
+        state.refresh_palette_previews();
+        drop(state);
+        Self::changed(&emitter).await.ok();
+        Ok(())
     }
 
     async fn set_wallpaper(
