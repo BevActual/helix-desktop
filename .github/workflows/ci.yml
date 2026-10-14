@@ -90,6 +90,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Unit tests
         run: cargo test -p helix-shell-core --lib --quiet
+      - name: Settings bootstrap parity
+        run: python3 tools/gen-rust-settings-bootstrap.py --check
 
   helix-desktop-agent:
     name: helix-desktop Agent Surface

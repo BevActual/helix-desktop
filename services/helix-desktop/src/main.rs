@@ -120,7 +120,7 @@ async fn main() -> zbus::Result<()> {
                 locked.bluetooth.uses_bluez(),
             )
         };
-        agents::start_system_agents(hub, backends.0, backends.1);
+        agents::start_system_agents(hub, backends.0, backends.1).await;
         backends
     };
 
@@ -314,6 +314,10 @@ async fn main() -> zbus::Result<()> {
 
     tokio::signal::ctrl_c().await.ok();
     let _ = std::fs::remove_file(msg_ipc::resolve_socket_path());
-    agents::shutdown_system_agents(use_nm, use_bluez).await;
+    let hub = {
+        let locked = state.lock().await;
+        Arc::clone(&locked.agents)
+    };
+    agents::shutdown_system_agents(&hub, use_nm, use_bluez).await;
     Ok(())
 }
