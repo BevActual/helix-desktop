@@ -40,6 +40,10 @@ pub enum SettingKind {
     ClipboardPaste,
     /// Password masking style (`shell.password_style`).
     PasswordMask,
+    /// Attached vs floating panel (`shell.panel.*_placement`).
+    PanelPlacement,
+    /// Floating panel anchor (`shell.panel.*_position`).
+    PanelPosition,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -97,6 +101,8 @@ impl SettingDef {
             SettingKind::VideoPause => "video-pause",
             SettingKind::ClipboardPaste => "clipboard-paste",
             SettingKind::PasswordMask => "password-mask",
+            SettingKind::PanelPlacement => "panel-placement",
+            SettingKind::PanelPosition => "panel-position",
         }
     }
 
@@ -151,6 +157,36 @@ impl SettingDef {
             SettingKind::PasswordMask => Some((
                 &["default", "random"],
                 &["Filled circles", "Random icons"],
+            )),
+            SettingKind::PanelPlacement => Some((
+                &["attached", "floating"],
+                &["Attached to bar", "Floating"],
+            )),
+            SettingKind::PanelPosition => Some((
+                &[
+                    "auto",
+                    "center",
+                    "top_left",
+                    "top_center",
+                    "top_right",
+                    "center_left",
+                    "center_right",
+                    "bottom_left",
+                    "bottom_center",
+                    "bottom_right",
+                ],
+                &[
+                    "Automatic",
+                    "Center",
+                    "Top left",
+                    "Top center",
+                    "Top right",
+                    "Center left",
+                    "Center right",
+                    "Bottom left",
+                    "Bottom center",
+                    "Bottom right",
+                ],
             )),
             _ => None,
         }
@@ -1547,6 +1583,94 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::EmptyArray,
     },
     SettingDef {
+        id: "shell.panel.control_center_placement",
+        page: "desktop-dock",
+        title: "Panel placement",
+        group: "Control Center",
+        kind: SettingKind::PanelPlacement,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("floating"),
+    },
+    SettingDef {
+        id: "shell.panel.control_center_position",
+        page: "desktop-dock",
+        title: "Floating position",
+        group: "Control Center",
+        kind: SettingKind::PanelPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
+        id: "shell.panel.open_near_click_control_center",
+        page: "desktop-dock",
+        title: "Open near the pointer",
+        group: "Control Center",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.panel.launcher_placement",
+        page: "desktop-dock",
+        title: "Panel placement",
+        group: "Launcher",
+        kind: SettingKind::PanelPlacement,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("floating"),
+    },
+    SettingDef {
+        id: "shell.panel.launcher_position",
+        page: "desktop-dock",
+        title: "Floating position",
+        group: "Launcher",
+        kind: SettingKind::PanelPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("center"),
+    },
+    SettingDef {
+        id: "shell.launcher.categories",
+        page: "desktop-dock",
+        title: "Show application categories",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.launcher.compact",
+        page: "desktop-dock",
+        title: "Compact results",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.launcher.auto_paste",
+        page: "desktop-dock",
+        title: "Paste after copy actions",
+        group: "Launcher",
+        kind: SettingKind::ClipboardPaste,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
         id: "osd.enabled",
         page: "desktop-dock",
         title: "Show on-screen indicators",
@@ -1897,6 +2021,39 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.panel.floating_offset",
+        page: "appearance",
+        title: "Floating panel distance",
+        group: "Shell chrome",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(8.0),
+    },
+    SettingDef {
+        id: "shell.disable_mipmaps",
+        page: "appearance",
+        title: "Disable texture mipmaps",
+        group: "Rendering",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.shared_gl_context",
+        page: "appearance",
+        title: "Share OpenGL context",
+        group: "Rendering",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
     },
     SettingDef {
         id: "shell.corner_radius_scale",
@@ -2329,7 +2486,9 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         | SettingKind::DailyProvider
         | SettingKind::VideoPause
         | SettingKind::ClipboardPaste
-        | SettingKind::PasswordMask => Value::String(value.as_str().unwrap_or("").to_string()),
+        | SettingKind::PasswordMask
+        | SettingKind::PanelPlacement
+        | SettingKind::PanelPosition => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -2425,7 +2584,9 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
         | SettingKind::DailyProvider
         | SettingKind::VideoPause
         | SettingKind::ClipboardPaste
-        | SettingKind::PasswordMask => {
+        | SettingKind::PasswordMask
+        | SettingKind::PanelPlacement
+        | SettingKind::PanelPosition => {
             let text = value.as_str().ok_or("expected string")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {

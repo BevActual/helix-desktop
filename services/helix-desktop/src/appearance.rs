@@ -52,7 +52,19 @@ impl Appearance {
         map
     }
 
-    async fn reapply(&self) -> fdo::Result<()> {
+    async fn reapply(
+        &self,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        let mut state = self.state.lock().await;
+        if state.desktop.is_none() {
+            return Err(fdo::Error::InvalidArgs(
+                "Appearance exports require Helix desktop".into(),
+            ));
+        }
+        state.refresh_palette_previews();
+        drop(state);
+        Self::changed(&emitter).await.ok();
         Ok(())
     }
 
