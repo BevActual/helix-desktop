@@ -30,6 +30,7 @@ mod template_apply;
 mod blocking;
 mod day_night;
 mod theme_palette;
+mod wallhaven;
 mod msg_ipc;
 mod palette_previews;
 mod peer;
@@ -152,6 +153,7 @@ async fn main() -> zbus::Result<()> {
                 agent_support::confirmer_disconnected(&mut locked).await;
             }
             locked.agents.on_peer_disconnected(&old_owner);
+            locked.wallhaven.disconnect(&old_owner);
             locked.audio_meters.remove_owner(&old_owner);
             desktop_operations::clear_operations_for_peer(&mut locked, &old_owner);
         }
@@ -317,6 +319,23 @@ async fn main() -> zbus::Result<()> {
             interval.tick().await;
             let mut locked = operations_state.lock().await;
             desktop_operations::poll_operations(&mut locked, &operations_conn).await;
+            // Wallhaven: drop stale jobs and apply finished downloads as the wallpaper.
+            let context = locked.wallhaven_context();
+            locked.wallhaven.expire(context.desktop, context.offline);
+            let downloaded = locked.wallhaven.take_downloaded();
+            if let Some(path) = downloaded.last() {
+                locked.wallpaper = path.to_string_lossy().into_owned();
+                drop(locked);
+                let _ = operations_conn
+                    .emit_signal(
+                        None::<&str>,
+                        desktop_operations::OBJECT_PATH,
+                        "org.helix.Desktop.Appearance1",
+                        "Changed",
+                        &(),
+                    )
+                    .await;
+            }
         }
     });
 

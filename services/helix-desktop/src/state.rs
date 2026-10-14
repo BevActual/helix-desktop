@@ -63,6 +63,8 @@ pub struct State {
     pub displays: DisplaysBackend,
     /// Last wallpaper path from Appearance1.SetWallpaper (scaffold; not applied to compositor).
     pub wallpaper: String,
+    /// Wallhaven search/download jobs (`Appearance1.*Wallhaven`).
+    pub wallhaven: crate::wallhaven::Wallhaven,
     /// Cached Appearance1 `palette-previews` (builtins + community catalog + custom files).
     pub palette_previews: Vec<Value>,
     pub runtime: RuntimeState,
@@ -127,6 +129,7 @@ impl State {
             bluetooth: BluetoothBackend::new(),
             displays: DisplaysBackend::new(),
             wallpaper: String::new(),
+            wallhaven: crate::wallhaven::Wallhaven::new(),
             palette_previews,
             runtime,
             desktop_capabilities: HashMap::new(),
@@ -141,6 +144,33 @@ impl State {
             agent_enabled: true,
             audit,
             bus: None,
+        }
+    }
+
+    /// Inputs a Wallhaven request needs from config and the registered shell.
+    pub fn wallhaven_context(&self) -> crate::wallhaven::Context {
+        let text = |id: &str| self.config.get(id).as_str().unwrap_or("").to_string();
+        let api_key = self
+            .config
+            .get_json_value("wallpaper.wallhaven.api_key")
+            .and_then(|value| value.as_str().map(|key| key.trim().to_string()))
+            .unwrap_or_default();
+        let state_dir = self
+            .config
+            .paths()
+            .settings_toml
+            .parent()
+            .unwrap_or(&self.config.paths().config_dir)
+            .to_path_buf();
+        crate::wallhaven::Context {
+            desktop: self.desktop.is_some(),
+            offline: self.config.get("shell.offline_mode").as_bool().unwrap_or(false),
+            api_key,
+            download_dir: crate::wallhaven::resolve_download_dir(
+                &text("wallpaper.wallhaven.download_dir"),
+                &text("wallpaper.directory"),
+            ),
+            state_dir,
         }
     }
 
