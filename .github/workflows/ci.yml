@@ -96,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install dependencies
-        run: bash tools/ci/arch-helix-ci-deps.sh
+        run: bash tools/ci/arch-helix-ci-deps.sh dbus python python-gobject
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Rust desktop and C++ appearance helpers
         run: |
