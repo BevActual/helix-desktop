@@ -58,3 +58,30 @@ pub fn helix_template_apply_bin() -> Option<PathBuf> {
     }
     None
 }
+
+/// C++ `helix-theme-palette` helper for Rust `Appearance1` palette mutations.
+pub fn helix_theme_palette_bin() -> Option<PathBuf> {
+    if let Ok(path) = env::var("HELIX_THEME_PALETTE_BIN") {
+        if !path.is_empty() {
+            let candidate = PathBuf::from(path);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    if let Ok(exe) = env::current_exe() {
+        for name in ["helix-theme-palette", "helix-theme-palette.exe"] {
+            let sibling = exe.parent().map(|dir| dir.join(name));
+            if sibling.as_ref().is_some_and(|p| p.is_file()) {
+                return sibling;
+            }
+        }
+        for ancestor in exe.ancestors() {
+            let build = ancestor.join("helix-theme-palette");
+            if build.is_file() {
+                return Some(build);
+            }
+        }
+    }
+    None
+}
