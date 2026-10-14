@@ -100,17 +100,23 @@ jobs:
       - name: Install dependencies
         run: bash tools/ci/arch-helix-ci-deps.sh dbus python python-gobject
       - uses: dtolnay/rust-toolchain@stable
-      - name: Build Rust desktop and C++ appearance helpers
+      - name: Build Rust desktop, C++ appearance helpers and the service contract test
         run: |
           cargo build --profile fast -p helix-desktop
           just configure debug
-          meson compile -C build-debug helix-template-apply helix-theme-palette
+          meson compile -C build-debug helix-template-apply helix-theme-palette desktop_service_test
       - name: Configuration smoke (Rust desktop)
         env:
           HELIX_TEMPLATE_APPLY_BIN: ${{ github.workspace }}/build-debug/helix-template-apply
           HELIX_THEME_PALETTE_BIN: ${{ github.workspace }}/build-debug/helix-theme-palette
           HELIX_ASSETS_DIR: ${{ github.workspace }}/assets
         run: ./tools/nested/helix-desktop-config-smoke.sh
+      # tests/desktop_service_test.cpp is the C++ service's behavioural contract; it takes the
+      # service binary as an argument, so it checks the Rust service against the same assertions.
+      - name: C++ service contract (Rust desktop)
+        env:
+          CONTRACT_TIMEOUT: "240"
+        run: ./tools/nested/helix-desktop-cpp-contract.sh
 
   helix-desktop-audio-meter:
     name: helix-desktop Audio meter
