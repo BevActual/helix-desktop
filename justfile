@@ -22,7 +22,7 @@ configure m=mode install_prefix=prefix:
     ln -sfn "build-{{m}}/compile_commands.json" compile_commands.json
 
 build m=mode: (_ensure-configured m)
-    # Default targets needed for `meson install` (service, assistant, inference, upgrade helper).
+    # Default targets needed for `meson install` (service, template apply, assistant, inference, upgrade helper).
     meson compile -C build-{{m}} helix-service helix-template-apply helix-assistant helix-inference helix-system-upgrade
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
