@@ -57,7 +57,7 @@ TYPE_TO_KIND = {
     "sidebar-mode": "SidebarMode",
     "storage-key": "StorageKey",
     "wifi-band": "WifiBand",
-    "language": "String",
+    "language": "Language",
     "bar-anchor": "BarAnchor",
 }
 

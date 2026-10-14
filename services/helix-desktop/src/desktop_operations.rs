@@ -272,6 +272,38 @@ pub async fn poll_operations(state: &mut State, connection: &Connection) {
     }
 }
 
+/// Fails every pending operation of `interface` (`failOperations`): its backend daemon went away
+/// or was replaced, so none of them can complete.
+pub async fn fail_interface_operations(state: &mut State, connection: &Connection, interface: &str) {
+    let (failed, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut state.desktop_operations)
+        .into_iter()
+        .partition(|op| op.interface == interface);
+    state.desktop_operations = kept;
+    for op in failed {
+        if interface == NETWORK_INTERFACE
+            && state.agents.network_owner().as_deref() == Some(op.sender.as_str())
+        {
+            state.agents.cancel_nm_secret("service disconnected");
+            state.agents.clear_network_owner();
+        }
+        if interface == BLUETOOTH_INTERFACE
+            && state.agents.bluetooth_owner().as_deref() == Some(op.sender.as_str())
+        {
+            state.agents.cancel_bluetooth_pending();
+            state.agents.clear_bluetooth_owner();
+        }
+        let _ = connection
+            .emit_signal(
+                Some(op.sender.as_str()),
+                OBJECT_PATH,
+                op.interface,
+                "Completed",
+                &(op.id, false, "Device service disconnected"),
+            )
+            .await;
+    }
+}
+
 pub fn clear_operations_for_peer(state: &mut State, unique_name: &str) {
     state
         .desktop_operations

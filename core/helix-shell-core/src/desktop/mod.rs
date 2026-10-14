@@ -20,5 +20,6 @@ pub mod pairing;
 pub mod power;
 pub mod quick;
 pub mod settings;
+mod settings_defaults_generated;
 pub mod shortcuts;
 pub mod wallhaven;

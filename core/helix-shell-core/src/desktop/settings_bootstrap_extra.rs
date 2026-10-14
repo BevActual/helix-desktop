@@ -307,7 +307,7 @@ pub const BOOTSTRAP_EXTRA: &[SettingDef] = &[
         page: "system",
         title: "Language",
         group: "Language",
-        kind: SettingKind::String,
+        kind: SettingKind::Language,
         desktop: true,
         minimum: 0.0,
         maximum: 0.0,

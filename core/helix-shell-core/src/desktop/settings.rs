@@ -13,6 +13,8 @@ use toml::Value as Toml;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SettingKind {
+    Language,
+    Source,
     Boolean,
     Number,
     Integer,
@@ -104,6 +106,37 @@ pub struct SettingDef {
     pub default: DefaultValue,
 }
 
+/// `i18n::kSupportedLanguages` (code, display name).
+pub const SUPPORTED_LANGUAGES: &[(&str, &str)] = &[
+    ("ar", "العربية"),
+    ("be", "Беларуская"),
+    ("be-Latn", "Biełaruskaja (Łacinka)"),
+    ("ca", "Català"),
+    ("cs", "Čeština"),
+    ("de", "Deutsch"),
+    ("en", "English"),
+    ("es", "Español"),
+    ("fr", "Français"),
+    ("gl-ES", "Galego"),
+    ("he", "עברית"),
+    ("hu", "Magyar"),
+    ("it", "Italiano"),
+    ("ja", "日本語"),
+    ("ko", "한국어"),
+    ("ku", "Kurdî"),
+    ("nl", "Nederlands"),
+    ("nn", "Norsk nynorsk"),
+    ("pl", "Polski"),
+    ("pt-BR", "Português (Brasil)"),
+    ("ru", "Русский"),
+    ("sv", "Svenska"),
+    ("tr", "Türkçe"),
+    ("uk-UA", "Українська"),
+    ("vi", "Tiếng Việt"),
+    ("zh-Hans", "简体中文"),
+    ("zh-Hant", "繁體中文"),
+];
+
 impl SettingDef {
     pub fn type_name(&self) -> &'static str {
         match self.kind {
@@ -111,6 +144,8 @@ impl SettingDef {
             SettingKind::Number => "number",
             SettingKind::Integer => "integer",
             SettingKind::String => "string",
+            SettingKind::Language => "language",
+            SettingKind::Source => "source",
             SettingKind::Mode => "mode",
             SettingKind::Material => "material",
             SettingKind::ShellLayer => "shell-layer",
@@ -288,9 +323,19 @@ impl SettingDef {
                 super::palette_names::BUILTIN_PALETTE_NAMES,
                 super::palette_names::BUILTIN_PALETTE_NAMES,
             )),
-            SettingKind::Color | SettingKind::Directory | SettingKind::CommunityPalette | SettingKind::CustomPalette => {
-                None
-            }
+            SettingKind::Color => Some((
+                &[
+                    "", "primary", "on_primary", "secondary", "on_secondary", "tertiary", "on_tertiary", "error",
+                    "on_error", "surface", "on_surface", "surface_variant", "on_surface_variant", "outline",
+                    "shadow", "hover", "on_hover",
+                ],
+                &[
+                    "Default", "Primary", "On primary", "Secondary", "On secondary", "Tertiary", "On tertiary",
+                    "Error", "On error", "Surface", "On surface", "Surface variant", "On surface variant",
+                    "Outline", "Shadow", "Hover", "On hover",
+                ],
+            )),
+            SettingKind::Directory | SettingKind::CommunityPalette | SettingKind::CustomPalette => None,
             _ => None,
         }
     }
@@ -373,7 +418,7 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         page: "appearance",
         title: "Palette source",
         group: "Colors",
-        kind: SettingKind::String,
+        kind: SettingKind::Source,
         desktop: false,
         minimum: 0.0,
         maximum: 0.0,
@@ -2593,6 +2638,20 @@ pub const BOOTSTRAP: &[SettingDef] = &[
     },
 ];
 
+/// Integer settings report integral JSON numbers (C++ `is_number_integer`), never `34.0`.
+pub(crate) fn as_integer(value: Value) -> Value {
+    match value.as_f64() {
+        Some(number) if number.fract() == 0.0 && number.abs() < 9.0e15 => Value::from(number as i64),
+        _ => value,
+    }
+}
+
+/// Scalar default as the C++ config reports it (generated from its pristine catalog); the
+/// hand-written `SettingDef.default` is only a fallback for ids the golden does not cover.
+fn effective_default(def: &SettingDef) -> DefaultValue {
+    super::settings_defaults_generated::cpp_default(def.id).unwrap_or(def.default)
+}
+
 pub fn find_def(id: &str) -> Option<&'static SettingDef> {
     bootstrap_defs().find(|setting| setting.id == id)
 }
@@ -2620,9 +2679,10 @@ impl ConfigPaths {
 }
 
 fn named_dir(helix_env: &str, xdg_env: &str, home_suffix: &str, leaf: &str) -> PathBuf {
+    // Like C++ `FileUtils::resolveNamedDir`: the override names a home, `helix` lives inside it.
     if let Ok(value) = std::env::var(helix_env) {
         if !value.is_empty() {
-            return PathBuf::from(value);
+            return PathBuf::from(value).join(leaf);
         }
     }
     if let Ok(value) = std::env::var(xdg_env) {
@@ -2643,17 +2703,35 @@ pub struct ConfigStore {
     /// User overrides from state `settings.toml`.
     overrides: Toml,
     paths: ConfigPaths,
+    /// (file, modified, length) of every config file seen at the last load; see `reload_if_changed`.
+    signature: Vec<(PathBuf, Option<std::time::SystemTime>, u64)>,
 }
 
 impl ConfigStore {
     pub fn load(paths: ConfigPaths) -> Self {
         let base = load_merged_config(&paths.config_dir);
         let overrides = read_toml_file(&paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+        let signature = config_signature(&paths);
         Self {
             base,
             overrides,
             paths,
+            signature,
         }
+    }
+
+    /// Picks up external edits of `config.toml`, its includes and `settings.toml` (C++ config
+    /// file watch). Returns whether anything was reloaded.
+    pub fn reload_if_changed(&mut self) -> bool {
+        let signature = config_signature(&self.paths);
+        if signature == self.signature {
+            return false;
+        }
+        self.base = load_merged_config(&self.paths.config_dir);
+        self.overrides = read_toml_file(&self.paths.settings_toml)
+            .unwrap_or_else(|| Toml::Table(Default::default()));
+        self.signature = signature;
+        true
     }
 
     pub fn paths(&self) -> &ConfigPaths {
@@ -2672,7 +2750,7 @@ impl ConfigStore {
                 "ai.chat_model" => Value::String(mirror.chat_model),
                 "ai.lan_endpoint" => Value::String(mirror.lan_endpoint),
                 "ai.allow_remote_on_battery_saver" => Value::Bool(mirror.allow_remote_on_battery_saver),
-                _ => def.default.to_json(),
+                _ => effective_default(def).to_json(),
             };
         }
         if let Some(value) = toml_get(&self.overrides, id) {
@@ -2681,7 +2759,7 @@ impl ConfigStore {
         if let Some(value) = toml_get(&self.base, id) {
             return toml_to_json(value, def);
         }
-        def.default.to_json()
+        effective_default(def).to_json()
     }
 
     pub fn overridden(&self, id: &str) -> bool {
@@ -2865,6 +2943,30 @@ impl ConfigStore {
             }
             return self.save_overrides();
         }
+        // Dynamic desktop rows: `bar:<name>:<field>` and `idle:<behavior>:<field>`.
+        let dynamic_field_ok = |prefix: &str, known: fn(&str) -> bool| {
+            id.strip_prefix(prefix)
+                .and_then(|rest| rest.rsplit_once(':'))
+                .is_some_and(|(name, field)| !name.is_empty() && known(field))
+        };
+        if dynamic_field_ok("bar:", super::dynamic_desktop_catalog::is_bar_field)
+            || dynamic_field_ok("idle:", super::dynamic_desktop_catalog::is_idle_field)
+        {
+            toml_remove(&mut self.overrides, storage_path(id).as_ref());
+            return self.save_overrides();
+        }
+        // Ordered-list rows (key chords, tab/shortcut/application lists, bar widgets, ...) are
+        // extension rows, not bootstrap defs; resetting them drops their override.
+        if find_def(id).is_none()
+            && super::ordered_lists::catalog_entry(&self.full_catalog(true, &[]), id).is_some()
+        {
+            toml_remove(&mut self.overrides, storage_path(id).as_ref());
+            if id == "notification.filter" {
+                toml_remove(&mut self.overrides, "notification.filter_order");
+                toml_remove(&mut self.overrides, "notification.filter_replace");
+            }
+            return self.save_overrides();
+        }
         find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
         if id == "nightlight.temperature_day" || id == "nightlight.temperature_night" {
             toml_remove(&mut self.overrides, "nightlight.temperature_day");
@@ -2877,8 +2979,11 @@ impl ConfigStore {
 
     /// Re-read `settings.toml` from disk (C++ `ConfigService::forceReload` for overrides).
     pub fn force_reload(&mut self) {
+        // Mutations see the latest hand edits of config.toml too (C++ re-reads before writing).
+        self.base = load_merged_config(&self.paths.config_dir);
         self.overrides =
             read_toml_file(&self.paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+        self.signature = config_signature(&self.paths);
     }
 
     /// Optimistic concurrency for `Configuration1.CommitOverrides` (C++ `commitRemoteOverrides`).
@@ -2956,7 +3061,52 @@ impl ConfigStore {
 
     /// Bootstrap catalog plus ordered-list extensions (key-chords, Control Center tabs, …).
     pub fn full_catalog(&self, include_desktop: bool, display_names: &[String]) -> Vec<Value> {
-        let mut rows = self.catalog();
+        // Desktop-only settings (whole pages) exist only once a shell has registered.
+        let state_dir = self.paths.settings_toml.parent().unwrap_or(&self.paths.config_dir).to_path_buf();
+        let community = super::palette_names::list_community_palette_names(&state_dir);
+        let custom = super::palette_names::list_custom_palette_names(&self.paths.config_dir);
+        let mut rows: Vec<Value> = bootstrap_defs()
+            .filter(|def| include_desktop || !def.desktop)
+            // C++ omits the palette pickers until there is something to pick.
+            .filter(|def| match def.kind {
+                SettingKind::CommunityPalette => !community.is_empty(),
+                SettingKind::CustomPalette => !custom.is_empty(),
+                _ => true,
+            })
+            .map(|def| {
+                let mut entry = self.catalog_entry(def);
+                if def.kind == SettingKind::Language {
+                    let current = entry.get("value").and_then(Value::as_str).unwrap_or("").to_string();
+                    let mut options = vec![String::new()];
+                    let mut labels = vec!["Automatic".to_string()];
+                    for (code, name) in SUPPORTED_LANGUAGES {
+                        options.push((*code).to_string());
+                        labels.push((*name).to_string());
+                    }
+                    if !current.is_empty() && !options.contains(&current) {
+                        options.push(current.clone());
+                        labels.push(current);
+                    }
+                    entry["options"] = json!(options);
+                    entry["option-labels"] = json!(labels);
+                }
+                if def.kind == SettingKind::Source {
+                    let mut options = vec!["builtin"];
+                    if include_desktop {
+                        options.push("wallpaper");
+                    }
+                    if !community.is_empty() {
+                        options.push("community");
+                    }
+                    if !custom.is_empty() {
+                        options.push("custom");
+                    }
+                    entry["options"] = json!(options);
+                    entry["option-labels"] = json!(options);
+                }
+                entry
+            })
+            .collect();
         rows.extend(super::ordered_lists::extension_entries(
             self,
             include_desktop,
@@ -2983,7 +3133,7 @@ impl ConfigStore {
             "title": def.title,
             "group": def.group,
             "type": def.type_name(),
-            "value": self.get(def.id),
+            "value": if def.kind == SettingKind::Integer { as_integer(self.get(def.id)) } else { self.get(def.id) },
             "minimum": def.minimum,
             "maximum": def.maximum,
             "overridden": self.overridden(def.id),
@@ -3016,13 +3166,9 @@ impl ConfigStore {
         } else if def.kind == SettingKind::BarAnchor {
             let mut options: Vec<Value> = vec![Value::String(String::new())];
             let mut labels: Vec<Value> = vec![Value::String("Automatic".into())];
-            if let Some(node) = self.merged_node("bar") {
-                if let Toml::Table(table) = node {
-                    for key in table.keys() {
-                        options.push(Value::String(key.clone()));
-                        labels.push(Value::String(key.clone()));
-                    }
-                }
+            for name in super::ordered_catalog::bar_names(self) {
+                options.push(Value::String(name.clone()));
+                labels.push(Value::String(name));
             }
             let current = entry.get("value").and_then(|v| v.as_str()).unwrap_or("");
             if !current.is_empty() && !options.iter().any(|o| o.as_str() == Some(current)) {
@@ -3052,6 +3198,27 @@ pub fn shell_polkit_agent_enabled() -> bool {
         .get("shell.polkit_agent")
         .as_bool()
         .unwrap_or(false)
+}
+
+fn config_signature(paths: &ConfigPaths) -> Vec<(PathBuf, Option<std::time::SystemTime>, u64)> {
+    let mut files: Vec<PathBuf> = fs::read_dir(&paths.config_dir)
+        .map(|entries| {
+            entries
+                .filter_map(|entry| entry.ok().map(|e| e.path()))
+                .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("toml"))
+                .collect()
+        })
+        .unwrap_or_default();
+    files.push(paths.settings_toml.clone());
+    files.sort();
+    files
+        .into_iter()
+        .map(|path| {
+            let meta = fs::metadata(&path).ok();
+            let modified = meta.as_ref().and_then(|m| m.modified().ok());
+            (path, modified, meta.map_or(0, |m| m.len()))
+        })
+        .collect()
 }
 
 fn load_merged_config(config_dir: &Path) -> Toml {
@@ -3196,27 +3363,34 @@ fn toml_set(root: &mut Toml, id: &str, value: Toml) -> Result<(), String> {
     Ok(())
 }
 
+/// Removes the override at `id`'s storage path and prunes tables the removal leaves empty
+/// (the C++ override store never keeps empty groups).
 fn toml_remove(root: &mut Toml, id: &str) {
+    fn remove_path(table: &mut toml::map::Map<String, Toml>, parts: &[&str]) {
+        match parts {
+            [] => {}
+            [last] => {
+                table.remove(*last);
+            }
+            [head, rest @ ..] => {
+                let emptied = match table.get_mut(*head).and_then(Toml::as_table_mut) {
+                    Some(child) => {
+                        remove_path(child, rest);
+                        child.is_empty()
+                    }
+                    None => false,
+                };
+                if emptied {
+                    table.remove(*head);
+                }
+            }
+        }
+    }
     let path = storage_path(id);
     let parts: Vec<&str> = path.split('.').collect();
-    if parts.is_empty() {
-        return;
+    if let Some(table) = root.as_table_mut() {
+        remove_path(table, &parts);
     }
-    let Some(table) = root.as_table_mut() else {
-        return;
-    };
-    if parts.len() == 1 {
-        table.remove(parts[0]);
-        return;
-    }
-    let mut cursor = table;
-    for part in &parts[..parts.len() - 1] {
-        let Some(next) = cursor.get_mut(*part).and_then(Toml::as_table_mut) else {
-            return;
-        };
-        cursor = next;
-    }
-    cursor.remove(parts[parts.len() - 1]);
 }
 
 fn toml_to_json_value(value: &Toml) -> Value {
@@ -3246,9 +3420,11 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
                 .as_integer()
                 .or_else(|| value.as_float().map(|n| n.round() as i64))
                 .unwrap_or(0);
-            Value::from(number as f64)
+            Value::from(number)
         }
         SettingKind::String
+        | SettingKind::Language
+        | SettingKind::Source
         | SettingKind::Color
         | SettingKind::Directory
         | SettingKind::Palette
@@ -3417,7 +3593,7 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
             if clamped != number.round() {
                 return Err("Setting is outside its supported range".into());
             }
-            Ok(Value::from(clamped))
+            Ok(Value::from(clamped as i64))
         }
         SettingKind::Color => {
             let text = value.as_str().ok_or("This setting requires text")?;
@@ -3436,6 +3612,20 @@ fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
                 if !options.contains(&text) {
                     return Err("Unknown setting option".into());
                 }
+            }
+            Ok(Value::String(text.to_string()))
+        }
+        SettingKind::Language => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            if !text.is_empty() && !SUPPORTED_LANGUAGES.iter().any(|(code, _)| *code == text) {
+                return Err("Unknown setting option".into());
+            }
+            Ok(Value::String(text.to_string()))
+        }
+        SettingKind::Source => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            if !matches!(text, "builtin" | "wallpaper" | "community" | "custom") {
+                return Err("Unknown setting option".into());
             }
             Ok(Value::String(text.to_string()))
         }

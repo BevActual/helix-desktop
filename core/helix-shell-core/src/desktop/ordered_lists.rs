@@ -7,6 +7,8 @@ use super::settings::ConfigStore;
 
 const MAX_LIST: usize = 256;
 
+/// Control Center pages that still exist (the tabbed Control Center was retired; the rest
+/// live in Settings and apps), with the labels the C++ catalog reports.
 pub const CONTROL_CENTER_TABS: &[(&str, &str)] = &[
     ("network", "Network"),
     ("bluetooth", "Bluetooth"),
@@ -14,19 +16,11 @@ pub const CONTROL_CENTER_TABS: &[(&str, &str)] = &[
     ("notifications", "Notifications"),
     ("audio", "Sound"),
     ("screen-time", "Screen Time"),
-    ("theme", "Appearance"),
-    ("control-center", "Control Center"),
-    ("launcher", "Launcher"),
     ("privacy-security", "Privacy & Security"),
     ("system", "System Monitor"),
-    ("packages", "Software"),
     ("clock", "Clock"),
-    ("desktop", "Desktop & Dock"),
     ("monitor", "Displays"),
-    ("wallpaper", "Wallpaper"),
     ("power", "Power"),
-    ("keybinds", "Keyboard"),
-    ("shell", "Shell"),
     ("printers", "Printers"),
     ("camera", "Camera"),
     ("calendar", "Calendar"),
@@ -35,9 +29,6 @@ pub const CONTROL_CENTER_TABS: &[(&str, &str)] = &[
     ("capture", "Capture"),
     ("clipboard", "Clipboard"),
     ("ai", "AI Usage"),
-    ("templates", "Templates"),
-    ("hooks", "Automation"),
-    ("niri", "Niri"),
 ];
 
 const KEY_CHORD_META: &[(&str, &str)] = &[
@@ -132,8 +123,35 @@ fn overridden_list(store: &ConfigStore, toml_id: &str) -> bool {
     store.overridden_path(toml_id)
 }
 
+/// C++ defaults for the navigation key chords (a pristine config reports these).
+fn default_key_chords(id: &str) -> &'static [&'static str] {
+    match id {
+        "keybinds.validate" => &["Return", "KP_Enter", "space"],
+        "keybinds.cancel" => &["Escape"],
+        "keybinds.left" => &["Left"],
+        "keybinds.right" => &["Right"],
+        "keybinds.up" => &["Up"],
+        "keybinds.down" => &["Down"],
+        "keybinds.tab_next" => &["Tab"],
+        "keybinds.tab_previous" => &["Shift+ISO_Left_Tab"],
+        "keybinds.copy" => &["Ctrl+c"],
+        "keybinds.save" => &["Ctrl+s"],
+        "keybinds.delete" => &["Delete"],
+        _ => &[],
+    }
+}
+
+/// Control Center pages shown by default; everything else is hidden until enabled.
+const DEFAULT_VISIBLE_TABS: &[&str] = &[
+    "network", "bluetooth", "tailscale", "notifications", "audio", "screen-time", "privacy-security", "system",
+    "clock", "monitor", "power", "printers", "camera", "calendar", "weather", "media", "capture", "clipboard", "ai",
+];
+
 fn key_chord_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
-    let chords = read_string_list(store, id);
+    let chords = match store.get_raw_list(id).and_then(|value| string_array(&value)) {
+        Some(chords) => chords,
+        None => default_key_chords(id).iter().map(|c| (*c).to_string()).collect(),
+    };
     json!({
         "id": id,
         "page": "keyboard",
@@ -146,7 +164,17 @@ fn key_chord_entry(store: &ConfigStore, id: &str, title: &str) -> Value {
 }
 
 fn visible_control_center_tabs(store: &ConfigStore) -> Vec<String> {
-    let hidden = read_string_list(store, "control_center.hidden_tabs");
+    let hidden = match store
+        .get_raw_list("control_center.hidden_tabs")
+        .and_then(|value| string_array(&value))
+    {
+        Some(hidden) => hidden,
+        None => CONTROL_CENTER_TABS
+            .iter()
+            .filter(|(id, _)| !DEFAULT_VISIBLE_TABS.contains(id))
+            .map(|(id, _)| (*id).to_string())
+            .collect(),
+    };
     let mut visible = Vec::new();
     for (id, _) in CONTROL_CENTER_TABS {
         let mut shown = !hidden.iter().any(|tab| tab == id);
@@ -199,14 +227,17 @@ pub fn extension_entries(
     display_names: &[String],
 ) -> Vec<Value> {
     let mut out = Vec::new();
-    for (id, title) in KEY_CHORD_META {
-        if KEYBIND_IDS.contains(id) {
-            out.push(key_chord_entry(store, id, title));
+    // Keyboard, Control Center and notification rules are shell-only pages (C++ `desktop` rows).
+    if include_desktop {
+        for (id, title) in KEY_CHORD_META {
+            if KEYBIND_IDS.contains(id) {
+                out.push(key_chord_entry(store, id, title));
+            }
         }
+        out.push(tab_list_entry(store));
+        out.push(super::control_center_shortcuts::catalog_entry(store));
+        out.push(super::notification_rules::catalog_entry(store));
     }
-    out.push(tab_list_entry(store));
-    out.push(super::control_center_shortcuts::catalog_entry(store));
-    out.push(super::notification_rules::catalog_entry(store));
     out.extend(super::ordered_catalog::entries(store, include_desktop, display_names));
     out
 }
@@ -344,6 +375,16 @@ pub fn apply_update(store: &mut ConfigStore, id: &str, value: Value) -> Result<(
             hidden.into_iter().map(Value::String).collect(),
         ));
     }
+    if id == "notification.filter" {
+        // Persist in the C++ schema: `[notification.filter.<name>]` tables. An empty list is an
+        // empty table, which still masks rules coming from the base config.
+        store.set_json_value(
+            super::settings::storage_path(id).as_ref(),
+            super::notification_rules::to_named_tables(&value),
+        )?;
+        store.set_json_value("notification.filter_order", super::notification_rules::rule_names(&value))?;
+        return store.set_json_value("notification.filter_replace", Value::Bool(true));
+    }
     store.set_raw_list(super::settings::storage_path(id).as_ref(), value)
 }
 
@@ -398,6 +439,6 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .any(|tab| tab.as_str() == Some("theme")));
+            .any(|tab| tab.as_str() == Some("clock")));
     }
 }

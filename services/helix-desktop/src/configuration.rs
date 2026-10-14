@@ -92,6 +92,25 @@ fn json_array_from_owned(items: &[OwnedValue]) -> fdo::Result<JsonValue> {
     Ok(JsonValue::Array(out))
 }
 
+/// Structural equality where `1234` and `1234.0` match: D-Bus integers arrive as JSON floats
+/// while stored lists hold integers.
+fn json_equivalent(a: &JsonValue, b: &JsonValue) -> bool {
+    match (a, b) {
+        (JsonValue::Number(x), JsonValue::Number(y)) => match (x.as_f64(), y.as_f64()) {
+            (Some(x), Some(y)) => x == y,
+            _ => x == y,
+        },
+        (JsonValue::Array(x), JsonValue::Array(y)) => {
+            x.len() == y.len() && x.iter().zip(y).all(|(x, y)| json_equivalent(x, y))
+        }
+        (JsonValue::Object(x), JsonValue::Object(y)) => {
+            x.len() == y.len()
+                && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| json_equivalent(v, w)))
+        }
+        _ => a == b,
+    }
+}
+
 fn apply_ordered_list_update(
     state: &mut State,
     sender: &str,
@@ -118,7 +137,7 @@ fn apply_ordered_list_update(
     let expected_json = json_array_from_owned(expected)?;
     let value_json = json_array_from_owned(value)?;
     let current = ordered_lists::current_value(&state.config, &catalog, id).unwrap_or(JsonValue::Null);
-    if current != expected_json {
+    if !json_equivalent(&current, &expected_json) {
         return Err(fdo::Error::InvalidArgs(
             "The list changed. Refresh and try again".into(),
         ));
@@ -137,6 +156,33 @@ fn apply_ordered_list_update(
             .map_err(|message| fdo::Error::InvalidArgs(message))?;
     }
     Ok(())
+}
+
+/// `os` (os-release PRETTY_NAME), `kernel` and `architecture` (uname), as the C++ service reports.
+fn system_info() -> &'static serde_json::Value {
+    static INFO: std::sync::OnceLock<serde_json::Value> = std::sync::OnceLock::new();
+    INFO.get_or_init(|| {
+        let pretty = ["/etc/os-release", "/usr/lib/os-release"].iter().find_map(|path| {
+            std::fs::read_to_string(path).ok()?.lines().find_map(|line| {
+                let value = line.strip_prefix("PRETTY_NAME=")?;
+                Some(value.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+            })
+        });
+        let mut details = serde_json::Map::new();
+        details.insert("os".into(), serde_json::Value::String(pretty.unwrap_or_else(|| "Linux".into())));
+        // SAFETY: `uname` fills a plain-data struct; fields are NUL-terminated C strings.
+        unsafe {
+            let mut name: libc::utsname = std::mem::zeroed();
+            if libc::uname(&mut name) == 0 {
+                let text = |field: &[libc::c_char]| {
+                    std::ffi::CStr::from_ptr(field.as_ptr()).to_string_lossy().into_owned()
+                };
+                details.insert("kernel".into(), serde_json::Value::String(text(&name.release)));
+                details.insert("architecture".into(), serde_json::Value::String(text(&name.machine)));
+            }
+        }
+        serde_json::Value::Object(details)
+    })
 }
 
 #[interface(name = "org.helix.Desktop.Configuration1")]
@@ -162,6 +208,9 @@ impl Configuration {
         if let Some(owned) = json_to_owned(&serde_json::Value::Object(caps)) {
             map.insert("desktop-capabilities".into(), owned);
         }
+        if let Some(owned) = json_to_owned(system_info()) {
+            map.insert("system".into(), owned);
+        }
         map
     }
 
@@ -169,10 +218,19 @@ impl Configuration {
         let state = self.state.lock().await;
         let include_desktop = state.desktop.is_some();
         let display_names = display_output_names(&state, include_desktop);
+        let gamma = gamma_available(&state);
         state
             .config
             .full_catalog(include_desktop, &display_names)
             .iter()
+            .filter(|row| {
+                // Night Light rows exist only when the compositor offers gamma control.
+                gamma
+                    || !row
+                        .get("id")
+                        .and_then(|id| id.as_str())
+                        .is_some_and(|id| id.starts_with("nightlight."))
+            })
             .filter_map(json_to_owned)
             .collect()
     }

@@ -73,13 +73,15 @@ pub struct BluetoothBackend {
 
 impl BluetoothBackend {
     pub fn new() -> Self {
+        // Without BlueZ the real backend reports an unavailable snapshot and attaches on a
+        // later refresh; only `HELIX_DESKTOP_MOCK_BLUETOOTH` selects the in-memory mock.
         let inner = if mock::force_mock() {
             Inner::Mock(mock::MockBackend::new())
-        } else if bluez::probe() {
-            Inner::Bluez(bluez::BluezBackend::new())
         } else {
-            tracing::info!("BlueZ unavailable; using mock bluetooth backend");
-            Inner::Mock(mock::MockBackend::new())
+            if !bluez::probe() {
+                tracing::info!("BlueZ not on the system bus yet; bluetooth unavailable until it appears");
+            }
+            Inner::Bluez(bluez::BluezBackend::new())
         };
         Self { inner }
     }
@@ -88,6 +90,14 @@ impl BluetoothBackend {
         match &self.inner {
             Inner::Mock(backend) => backend.is_available(),
             Inner::Bluez(backend) => backend.is_available(),
+        }
+    }
+
+    /// Unique bus name of the BlueZ daemon (`None` when absent or mocked).
+    pub fn bus_owner(&self) -> Option<String> {
+        match &self.inner {
+            Inner::Mock(_) => None,
+            Inner::Bluez(_) => bluez::bus_owner(),
         }
     }
 

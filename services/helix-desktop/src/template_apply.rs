@@ -28,7 +28,7 @@ fn notify_kde_scheme_changed() -> Option<String> {
             &(0i32, 0i32),
         )
     };
-    send().err().map(|error| error.to_string())
+    crate::blocking::run(send).err().map(|error| error.to_string())
 }
 
 /// Applies templates in-process when every input is something `helix-theme` reproduces

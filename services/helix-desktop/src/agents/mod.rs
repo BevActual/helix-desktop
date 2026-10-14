@@ -26,30 +26,64 @@ pub async fn start_system_agents(hub: Arc<AgentHub>, nm: bool, bluez: bool) {
                 return;
             }
         };
-        if nm {
-            if let Err(error) = system
-                .object_server()
-                .at(nm_secret_agent::OBJECT_PATH, nm_secret_agent::NmSecretAgent {
-                    hub: Arc::clone(&hub_task),
-                })
-                .await
-            {
-                tracing::warn!(%error, "NM secret agent export failed");
-            } else if let Err(error) = nm_secret_agent::register(&system).await {
-                tracing::warn!(%error, "NM secret agent registration failed");
+        // The daemons may start after this service; keep trying until each agent is registered
+        // (or the service shuts down).
+        let mut nm_pending = nm;
+        let mut bluez_pending = bluez;
+        let mut nm_exported = false;
+        let mut bluez_exported = false;
+        while (nm_pending || bluez_pending) && !*shutdown_rx.borrow() {
+            if nm_pending {
+                if !nm_exported {
+                    match system
+                        .object_server()
+                        .at(nm_secret_agent::OBJECT_PATH, nm_secret_agent::NmSecretAgent {
+                            hub: Arc::clone(&hub_task),
+                        })
+                        .await
+                    {
+                        Ok(_) => nm_exported = true,
+                        Err(error) => {
+                            tracing::warn!(%error, "NM secret agent export failed");
+                            nm_pending = false;
+                        }
+                    }
+                }
+                if nm_exported {
+                    match nm_secret_agent::register(&system).await {
+                        Ok(_) => nm_pending = false,
+                        Err(error) => tracing::debug!(%error, "NM secret agent registration pending"),
+                    }
+                }
             }
-        }
-        if bluez {
-            if let Err(error) = system
-                .object_server()
-                .at(bluez_agent::OBJECT_PATH, bluez_agent::BluezAgent {
-                    hub: Arc::clone(&hub_task),
-                })
-                .await
-            {
-                tracing::warn!(%error, "BlueZ agent export failed");
-            } else if let Err(error) = bluez_agent::register(&system).await {
-                tracing::warn!(%error, "BlueZ agent registration failed");
+            if bluez_pending {
+                if !bluez_exported {
+                    match system
+                        .object_server()
+                        .at(bluez_agent::OBJECT_PATH, bluez_agent::BluezAgent {
+                            hub: Arc::clone(&hub_task),
+                        })
+                        .await
+                    {
+                        Ok(_) => bluez_exported = true,
+                        Err(error) => {
+                            tracing::warn!(%error, "BlueZ agent export failed");
+                            bluez_pending = false;
+                        }
+                    }
+                }
+                if bluez_exported {
+                    match bluez_agent::register(&system).await {
+                        Ok(_) => bluez_pending = false,
+                        Err(error) => tracing::debug!(%error, "BlueZ agent registration pending"),
+                    }
+                }
+            }
+            if nm_pending || bluez_pending {
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(3)) => {}
+                    _ = shutdown_rx.changed() => {}
+                }
             }
         }
 

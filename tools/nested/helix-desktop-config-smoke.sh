@@ -94,15 +94,42 @@ def appearance_call(method, params=None, reply=GLib.VariantType("()")):
         None,
     )
 
-# Catalog
-raw = subprocess.check_output([
-    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
-    "--object-path", "/org/helix/Desktop",
-    "--method", "org.helix.Desktop.Configuration1.GetSettings",
-], text=True)
-ids = re.findall(r"'id': <'([^']+)'>", raw)
+# Catalog before a shell registers: portable rows only (C++ contract).
+def settings_ids():
+    raw = subprocess.check_output([
+        "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+        "--object-path", "/org/helix/Desktop",
+        "--method", "org.helix.Desktop.Configuration1.GetSettings",
+    ], text=True)
+    return re.findall(r"'id': <'([^']+)'>", raw), raw
+
+portable_ids, portable_raw = settings_ids()
+print("portable_setting_count=", len(portable_ids))
+assert "theme.mode" in portable_ids and "dock.enabled" not in portable_ids, portable_ids
+for page in ("desktop-dock", "keyboard", "notifications", "power", "system", "accessibility"):
+    assert f"'page': <'{page}'>" not in portable_raw, page
+
+
+# One connection owns RegisterDesktop → capabilities → state
+call("RegisterDesktop", None, None)
+
+
+builder = GLib.VariantBuilder.new(GLib.VariantType("a{sv}"))
+builder.add_value(
+    GLib.Variant.new_dict_entry(
+        GLib.Variant.new_string("gamma-control"),
+        GLib.Variant.new_variant(GLib.Variant.new_boolean(True)),
+    )
+)
+caps = builder.end()
+params = GLib.VariantBuilder.new(GLib.VariantType("(a{sv})"))
+params.add_value(caps)
+call("RegisterCapabilities", params.end(), None)
+
+# Full catalog once a shell is registered and the compositor offers gamma control.
+ids, _raw = settings_ids()
 print("setting_count=", len(ids))
-assert len(ids) >= 300, ids
+assert len(ids) >= 300, len(ids)
 for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
     "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
@@ -116,21 +143,6 @@ for want in [
 ]:
     assert want in ids, want
 print("catalog=OK")
-
-# One connection owns RegisterDesktop → capabilities → state
-call("RegisterDesktop", None, None)
-builder = GLib.VariantBuilder.new(GLib.VariantType("a{sv}"))
-builder.add_value(
-    GLib.Variant.new_dict_entry(
-        GLib.Variant.new_string("gamma-control"),
-        GLib.Variant.new_variant(GLib.Variant.new_boolean(True)),
-    )
-)
-caps = builder.end()
-params = GLib.VariantBuilder.new(GLib.VariantType("(a{sv})"))
-params.add_value(caps)
-call("RegisterCapabilities", params.end(), None)
-
 snap = call("GetSnapshot")
 fields = dict(snap.unpack()[0])
 assert fields["helix-desktop"] is True
@@ -146,7 +158,7 @@ raw = subprocess.check_output([
 desktop_ids = re.findall(r"'id': <'([^']+)'>", raw)
 assert "bar:main:enabled" in desktop_ids, desktop_ids
 assert "idle:lock:timeout" in desktop_ids, desktop_ids
-assert len(desktop_ids) >= len(ids) + 20, (len(desktop_ids), len(ids))
+assert len(desktop_ids) >= len(portable_ids) + 20, (len(desktop_ids), len(portable_ids))
 print("dynamic_desktop_catalog=OK")
 
 params = GLib.VariantBuilder.new(GLib.VariantType("(sv)"))
