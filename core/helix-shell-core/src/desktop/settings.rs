@@ -44,7 +44,15 @@ pub enum SettingKind {
     PanelPlacement,
     /// Floating panel anchor (`shell.panel.*_position`).
     PanelPosition,
+    ShellMode,
+    WallpaperScheme,
+    NiriOverview,
 }
+
+/// C++ `validateSettingValue` / Configuration1.Update messaging.
+pub const SETTING_UNAVAILABLE: &str = "Setting is unavailable on this device";
+pub const MOBIUS_ROUTING_MESSAGE: &str =
+    "Model routing is managed in Mobius (helix-mobius), not Helix Settings.";
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum DefaultValue {
@@ -103,6 +111,9 @@ impl SettingDef {
             SettingKind::PasswordMask => "password-mask",
             SettingKind::PanelPlacement => "panel-placement",
             SettingKind::PanelPosition => "panel-position",
+            SettingKind::ShellMode => "shell-mode",
+            SettingKind::WallpaperScheme => "wallpaper-scheme",
+            SettingKind::NiriOverview => "niri-overview",
         }
     }
 
@@ -188,6 +199,24 @@ impl SettingDef {
                     "Bottom right",
                 ],
             )),
+            SettingKind::ShellMode => Some((
+                &["follow", "dark", "light", "auto"],
+                &["Follow appearance", "Dark", "Light", "Automatic"],
+            )),
+            SettingKind::WallpaperScheme => Some((
+                &[
+                    "m3-content",
+                    "m3-tonal-spot",
+                    "m3-fruit-salad",
+                    "m3-rainbow",
+                    "m3-monochrome",
+                ],
+                &["Content", "Tonal spot", "Fruit salad", "Rainbow", "Monochrome"],
+            )),
+            SettingKind::NiriOverview => Some((
+                &["none", "backdrop", "stationary", "flat"],
+                &["None", "Backdrop", "Stationary wallpaper", "Flat color"],
+            )),
             _ => None,
         }
     }
@@ -213,6 +242,50 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         group: "Colors",
         kind: SettingKind::Boolean,
         desktop: false,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "theme.shell_mode",
+        page: "appearance",
+        title: "Shell chrome appearance",
+        group: "Colors",
+        kind: SettingKind::ShellMode,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("follow"),
+    },
+    SettingDef {
+        id: "theme.wallpaper_scheme",
+        page: "appearance",
+        title: "Wallpaper palette scheme",
+        group: "Colors",
+        kind: SettingKind::WallpaperScheme,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("m3-content"),
+    },
+    SettingDef {
+        id: "theme.templates.enable_builtin_templates",
+        page: "appearance",
+        title: "Built-in templates",
+        group: "Templates",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "theme.templates.enable_community_templates",
+        page: "appearance",
+        title: "Community templates",
+        group: "Templates",
+        kind: SettingKind::Boolean,
+        desktop: true,
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(false),
@@ -2012,6 +2085,127 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Bool(true),
     },
     SettingDef {
+        id: "theme.niri_layout.gaps",
+        page: "desktop-dock",
+        title: "Window gaps",
+        group: "Niri Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 64.0,
+        default: DefaultValue::Number(8.0),
+    },
+    SettingDef {
+        id: "theme.niri_layout.struts",
+        page: "desktop-dock",
+        title: "Outer padding",
+        group: "Niri Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 64.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "theme.niri_layout.default_column_width",
+        page: "desktop-dock",
+        title: "Default column width",
+        group: "Niri Layout",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 100.0,
+        maximum: 2000.0,
+        default: DefaultValue::Number(500.0),
+    },
+    SettingDef {
+        id: "theme.niri_layout.overview",
+        page: "desktop-dock",
+        title: "Overview style",
+        group: "Niri Layout",
+        kind: SettingKind::NiriOverview,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "theme.niri_layout.focus_ring",
+        page: "desktop-dock",
+        title: "Focus ring",
+        group: "Niri Chrome",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "theme.niri_layout.border",
+        page: "desktop-dock",
+        title: "Window border",
+        group: "Niri Chrome",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "theme.niri_layout.draw_border_with_background",
+        page: "desktop-dock",
+        title: "Draw border with background",
+        group: "Niri Chrome",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "theme.niri_layout.blur",
+        page: "desktop-dock",
+        title: "Window blur",
+        group: "Niri Chrome",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "theme.niri_layout.blur_passes",
+        page: "desktop-dock",
+        title: "Blur passes",
+        group: "Niri Chrome",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 1.0,
+        maximum: 8.0,
+        default: DefaultValue::Number(2.0),
+    },
+    SettingDef {
+        id: "theme.niri_layout.blur_offset",
+        page: "desktop-dock",
+        title: "Blur offset",
+        group: "Niri Chrome",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.5,
+        maximum: 8.0,
+        default: DefaultValue::Number(3.0),
+    },
+    SettingDef {
+        id: "theme.niri_layout.blur_noise",
+        page: "desktop-dock",
+        title: "Blur noise",
+        group: "Niri Chrome",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.2,
+        default: DefaultValue::Number(0.03),
+    },
+    SettingDef {
         id: "accessibility.high_contrast",
         page: "accessibility",
         title: "High contrast",
@@ -2256,19 +2450,19 @@ impl ConfigStore {
 
     pub fn set(&mut self, id: &str, value: Value) -> Result<(), String> {
         if id.starts_with("ai.") {
-            return Err("Model routing is managed in Mobius, not Helix Settings.".into());
+            return Err(MOBIUS_ROUTING_MESSAGE.to_string());
         }
-        let def = find_def(id).ok_or_else(|| format!("unknown setting {id}"))?;
-        let validated = validate(def, value)?;
+        let def = find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
+        let validated = validate(def, id, value)?;
         toml_set(&mut self.overrides, id, json_to_toml(&validated))?;
         self.save_overrides()
     }
 
     pub fn reset(&mut self, id: &str) -> Result<(), String> {
         if id.starts_with("ai.") {
-            return Err("Model routing is managed in Mobius, not Helix Settings.".into());
+            return Err(MOBIUS_ROUTING_MESSAGE.to_string());
         }
-        find_def(id).ok_or_else(|| format!("unknown setting {id}"))?;
+        find_def(id).ok_or_else(|| SETTING_UNAVAILABLE.to_string())?;
         toml_remove(&mut self.overrides, id);
         self.save_overrides()
     }
@@ -2565,7 +2759,10 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         | SettingKind::ClipboardPaste
         | SettingKind::PasswordMask
         | SettingKind::PanelPlacement
-        | SettingKind::PanelPosition => Value::String(value.as_str().unwrap_or("").to_string()),
+        | SettingKind::PanelPosition
+        | SettingKind::ShellMode
+        | SettingKind::WallpaperScheme
+        | SettingKind::NiriOverview => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -2628,25 +2825,55 @@ pub(crate) fn validate_application_list(value: Value) -> Result<Value, String> {
     Ok(Value::Array(out))
 }
 
-fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
+fn validate_hh_mm(text: &str) -> Result<(), String> {
+    if text.is_empty() {
+        return Ok(());
+    }
+    if text.len() != 5 || text.as_bytes()[2] != b':' {
+        return Err("Use HH:MM time".into());
+    }
+    let digits = text
+        .chars()
+        .filter(|c| c.is_ascii_digit())
+        .collect::<String>();
+    if digits.len() != 4 {
+        return Err("Use HH:MM time".into());
+    }
+    Ok(())
+}
+
+fn validate(def: &SettingDef, id: &str, value: Value) -> Result<Value, String> {
     match def.kind {
         SettingKind::Boolean => value
             .as_bool()
             .map(Value::Bool)
-            .ok_or_else(|| "expected boolean".into()),
+            .ok_or_else(|| "This setting requires a boolean".into()),
         SettingKind::Number => {
-            let number = value.as_f64().ok_or("expected number")?;
-            Ok(Value::from(number.clamp(def.minimum, def.maximum)))
-        }
-        SettingKind::Integer => {
-            let number = value.as_f64().ok_or("expected integer")?;
-            let clamped = number.round().clamp(def.minimum, def.maximum);
+            let number = value.as_f64().ok_or("This setting requires a number")?;
+            let clamped = number.clamp(def.minimum, def.maximum);
+            if clamped != number {
+                return Err("Setting is outside its supported range".into());
+            }
             Ok(Value::from(clamped))
         }
-        SettingKind::String => value
-            .as_str()
-            .map(|text| Value::String(text.to_string()))
-            .ok_or_else(|| "expected string".into()),
+        SettingKind::Integer => {
+            let number = value.as_f64().ok_or("This setting requires a number")?;
+            if number.fract() != 0.0 {
+                return Err("This setting requires a number".into());
+            }
+            let clamped = number.round().clamp(def.minimum, def.maximum);
+            if clamped != number.round() {
+                return Err("Setting is outside its supported range".into());
+            }
+            Ok(Value::from(clamped))
+        }
+        SettingKind::String => {
+            let text = value.as_str().ok_or("This setting requires text")?;
+            if id == "location.sunrise" || id == "location.sunset" {
+                validate_hh_mm(text)?;
+            }
+            Ok(Value::String(text.to_string()))
+        }
         SettingKind::Mode
         | SettingKind::Material
         | SettingKind::ShellLayer
@@ -2663,13 +2890,16 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
         | SettingKind::ClipboardPaste
         | SettingKind::PasswordMask
         | SettingKind::PanelPlacement
-        | SettingKind::PanelPosition => {
-            let text = value.as_str().ok_or("expected string")?;
+        | SettingKind::PanelPosition
+        | SettingKind::ShellMode
+        | SettingKind::WallpaperScheme
+        | SettingKind::NiriOverview => {
+            let text = value.as_str().ok_or("This setting requires text")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {
                 Ok(Value::String(text.into()))
             } else {
-                Err(format!("not an option for {}", def.id))
+                Err("Unknown setting option".into())
             }
         }
         SettingKind::ApplicationList => validate_application_list(value),

@@ -65,6 +65,7 @@ for want in [
     "dock.enabled", "dock.position", "dock.launcher_position",
     "hot_corners.delay_ms", "wallpaper.fill_mode", "wallpaper.automation.enabled",
     "shell.clipboard_auto_paste", "lockscreen.blurred_desktop", "lockscreen.lock_before_suspend",
+    "theme.shell_mode", "theme.niri_layout.overview", "location.latitude",
 ]:
     assert want in ids, want
 print("catalog=OK")

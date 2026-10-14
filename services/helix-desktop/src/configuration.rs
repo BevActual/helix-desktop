@@ -32,7 +32,7 @@ fn gamma_available(state: &State) -> bool {
 fn require_setting_access(state: &State, id: &str) -> fdo::Result<()> {
     if id.starts_with("ai.") {
         return Err(fdo::Error::InvalidArgs(
-            "Model routing is managed in Mobius (helix-mobius), not Helix Settings.".into(),
+            helix_shell_core::desktop::settings::MOBIUS_ROUTING_MESSAGE.into(),
         ));
     }
     if state.desktop.is_none()
