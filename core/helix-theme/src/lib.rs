@@ -9,6 +9,7 @@ pub mod contrast;
 pub mod custom;
 pub mod hct;
 pub mod palette;
+pub mod schedule;
 pub mod template;
 pub mod transform;
 

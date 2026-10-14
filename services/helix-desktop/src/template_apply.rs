@@ -28,11 +28,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
         Some("custom") => PaletteSource::Custom,
         _ => return None, // wallpaper / community palettes
     };
-    let mode = match text("theme.mode").as_deref().unwrap_or("dark") {
-        "dark" => "dark",
-        "light" => "light",
-        _ => return None, // auto needs the day/night schedule
-    };
+    let mode = crate::day_night::resolve_mode(config, text("theme.mode").as_deref().unwrap_or("dark"))?;
 
     let assets = helix_assets_dir()?;
     let builtin_config = builtin_templates_root(&assets).join("builtin.toml");

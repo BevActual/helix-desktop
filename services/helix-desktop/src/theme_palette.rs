@@ -51,12 +51,7 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
     let mode = text("theme.mode").unwrap_or_else(|| "dark".into());
     let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
     let effective = if shell_mode == "follow" { mode } else { shell_mode };
-    let shell_light = match effective.as_str() {
-        "light" => true,
-        "dark" => false,
-        // auto needs the day/night schedule
-        _ => return None,
-    };
+    let shell_light = crate::day_night::resolve_mode(config, &effective)? == "light";
     let selection = ThemeSelection {
         source,
         builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
