@@ -3,11 +3,12 @@ use std::sync::Arc;
 
 use tokio::sync::Mutex;
 use zbus::fdo;
+use zbus::message::Header;
 use zbus::object_server::SignalEmitter;
 use zbus::zvariant::OwnedValue;
 use zbus::interface;
 
-use crate::dbus_value::{json_to_owned, owned_bool, owned_str};
+use crate::dbus_value::{json_to_owned, owned_bool, owned_str, owned_to_json};
 use crate::state::State;
 
 pub struct Appearance {
@@ -19,6 +20,21 @@ fn previews_value(previews: &[serde_json::Value]) -> OwnedValue {
         OwnedValue::try_from(zbus::zvariant::Value::from(Vec::<OwnedValue>::new()))
             .expect("empty array")
     })
+}
+
+fn sender_name(header: &Header<'_>) -> fdo::Result<String> {
+    Ok(header
+        .sender()
+        .ok_or_else(|| fdo::Error::Failed("missing sender".into()))?
+        .to_string())
+}
+
+fn wallhaven_error(error: crate::wallhaven::WhError) -> fdo::Error {
+    match error {
+        crate::wallhaven::WhError::Invalid(message) => fdo::Error::InvalidArgs(message),
+        // Like C++, runtime failures expose a fixed message, not backend detail.
+        crate::wallhaven::WhError::Failed(message) => fdo::Error::Failed(message),
+    }
 }
 
 /// Selects an in-process saved palette (the C++ helper does this itself) and reloads state.
@@ -90,7 +106,12 @@ impl Appearance {
             "wallhaven-online".into(),
             owned_bool(desktop && !offline),
         );
-        map.insert("wallhaven-download-directory".into(), owned_str(""));
+        let download_directory = if desktop {
+            state.wallhaven_context().download_dir.to_string_lossy().into_owned()
+        } else {
+            String::new()
+        };
+        map.insert("wallhaven-download-directory".into(), owned_str(&download_directory));
         map
     }
 
@@ -274,20 +295,68 @@ impl Appearance {
         Ok(())
     }
 
-    async fn search_wallhaven(&self, _args: HashMap<String, OwnedValue>) -> fdo::Result<u64> {
-        Err(fdo::Error::Failed("Wallhaven not implemented yet".into()))
+    async fn search_wallhaven(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        args: HashMap<String, OwnedValue>,
+    ) -> fdo::Result<u64> {
+        let sender = sender_name(&header)?;
+        let mut object = serde_json::Map::new();
+        for (key, value) in &args {
+            if let Some(json) = owned_to_json(value) {
+                object.insert(key.clone(), json);
+            }
+        }
+        let state = self.state.lock().await;
+        let context = state.wallhaven_context();
+        state
+            .wallhaven
+            .search(&context, &serde_json::Value::Object(object), &sender)
+            .map_err(wallhaven_error)
     }
 
-    async fn get_wallhaven(&self, _operation: u64) -> fdo::Result<HashMap<String, OwnedValue>> {
-        Err(fdo::Error::Failed("Wallhaven not implemented yet".into()))
+    async fn get_wallhaven(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        operation: u64,
+    ) -> fdo::Result<HashMap<String, OwnedValue>> {
+        let sender = sender_name(&header)?;
+        let state = self.state.lock().await;
+        let result = state.wallhaven.result(operation, &sender).map_err(wallhaven_error)?;
+        let mut map = HashMap::new();
+        if let Some(object) = result.as_object() {
+            for (key, value) in object {
+                if let Some(owned) = json_to_owned(value) {
+                    map.insert(key.clone(), owned);
+                }
+            }
+        }
+        Ok(map)
     }
 
-    async fn download_wallhaven(&self, _operation: u64, _id: &str) -> fdo::Result<u64> {
-        Err(fdo::Error::Failed("Wallhaven not implemented yet".into()))
+    async fn download_wallhaven(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        operation: u64,
+        id: &str,
+    ) -> fdo::Result<u64> {
+        let sender = sender_name(&header)?;
+        let state = self.state.lock().await;
+        let context = state.wallhaven_context();
+        state
+            .wallhaven
+            .download(&context, operation, id, &sender)
+            .map_err(wallhaven_error)
     }
 
-    async fn cancel_wallhaven(&self, _operation: u64) -> fdo::Result<()> {
-        Ok(())
+    async fn cancel_wallhaven(
+        &self,
+        #[zbus(header)] header: Header<'_>,
+        operation: u64,
+    ) -> fdo::Result<()> {
+        let sender = sender_name(&header)?;
+        let state = self.state.lock().await;
+        state.wallhaven.cancel(operation, &sender).map_err(wallhaven_error)
     }
 
     async fn set_wallhaven_api_key(&self, key: &str) -> fdo::Result<()> {
