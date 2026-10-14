@@ -84,12 +84,18 @@ impl Appearance {
             )
         };
         let sync_result = tokio::task::spawn_blocking(move || {
-            crate::palette_catalog::sync_community_catalog(&settings_toml, offline)
+            let palette = crate::palette_catalog::sync_community_catalog(&settings_toml, offline);
+            let templates =
+                crate::community_template_catalog::sync_community_template_catalog(&settings_toml, offline);
+            (palette, templates)
         })
         .await
         .map_err(|error| fdo::Error::Failed(error.to_string()))?;
-        if let Err(error) = sync_result {
+        if let Err(error) = sync_result.0 {
             tracing::warn!(%error, "community palette catalog sync failed; using cache");
+        }
+        if let Err(error) = sync_result.1 {
+            tracing::warn!(%error, "community template catalog sync failed; using cache");
         }
         let mut state = self.state.lock().await;
         state.refresh_palette_previews();

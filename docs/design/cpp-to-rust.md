@@ -33,6 +33,8 @@ cargo build -p helix-desktop
 HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop tools/nested/…
 ```
 
+**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration) against `cargo build` binaries. Meson still builds `helix-service` and `desktop_service_test` (C++); cutover adds Rust equivalents to `meson test` or gates C++ tests when `HELIX_SERVICE_BIN` points at `helix-desktop`.
+
 ## Order
 
 1. ~~Scaffold `helix-desktop` + risk policy in `helix-shell-core`~~
@@ -47,5 +49,5 @@ HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop tools/nested/…
 10. ~~AgentSurfaceActivity1~~ (desktop-only kill switch, pending, grants view)
 11. ~~Community/custom palette-previews~~ + ~~opt-in catalog HTTP sync~~ (`HELIX_COMMUNITY_PALETTE_CATALOG_URL`)
 12. ~~UpdateApplicationList for dock/launcher pins~~ (remaining ordered-list catalog rows still stub)
-13. Real backends (PW/NM/BlueZ/niri) · **Configuration1 `Update`/`Reset` guards** (portable vs desktop, Mobius `ai.*`, nightlight vs `gamma-control`) · theme apply · Meson/Rust nested parity for remaining domains
+13. Real backends (PW/NM/BlueZ/niri) · ~~Configuration1 `Update`/`Reset` guards~~ · **community template catalog sync** (`HELIX_COMMUNITY_TEMPLATE_CATALOG_URL` via `RefreshPalettes`) · full theme/compositor apply · Meson/Rust nested parity for remaining domains
 14. Assistant, then inference
