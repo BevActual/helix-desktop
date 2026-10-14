@@ -1618,6 +1618,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "helix-shell-core",
+ "helix-theme",
  "libc",
  "pipewire",
  "serde",

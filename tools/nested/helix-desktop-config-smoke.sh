@@ -315,12 +315,15 @@ resp = client.recv(4096).decode()
 assert resp.strip() == "ok", resp
 print("templates_apply_ipc=OK")
 
-theme_palette_bin = os.environ.get("HELIX_THEME_PALETTE_BIN", "")
-if theme_palette_bin and os.path.isfile(theme_palette_bin):
-    appearance_call("SetAccent", GLib.Variant("(s)", ("#336699",)))
-    print("theme_palette=OK")
-else:
-    print("theme_palette=SKIP")
+# SetAccent runs in-process for builtin/custom palettes in a concrete mode (no helper needed).
+import json
+appearance_call("SetAccent", GLib.Variant("(s)", ("#336699",)))
+palette_file = os.path.join(os.environ["XDG_CONFIG_HOME"], "helix", "palettes", "custom.json")
+saved = json.load(open(palette_file))
+assert saved["dark"]["mPrimary"] == "#336699", saved["dark"]["mPrimary"]
+overrides = open(os.path.join(os.environ["XDG_STATE_HOME"], "helix", "settings.toml")).read()
+assert 'source = "custom"' in overrides and 'custom_palette = "custom"' in overrides, overrides
+print("theme_palette=OK")
 
 print("CONFIG_SMOKE_OK")
 PY
