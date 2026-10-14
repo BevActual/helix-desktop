@@ -1618,6 +1618,7 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "helix-shell-core",
+ "helix-theme",
  "libc",
  "pipewire",
  "serde",
@@ -1773,6 +1774,13 @@ dependencies = [
  "tauri",
  "tauri-build",
  "tokio",
+]
+
+[[package]]
+name = "helix-theme"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]

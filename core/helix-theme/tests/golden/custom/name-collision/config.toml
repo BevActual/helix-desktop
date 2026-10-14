@@ -1,0 +1,4 @@
+[theme]
+source = "builtin"
+builtin = "Helix"
+mode = "dark"

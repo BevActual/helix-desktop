@@ -39,6 +39,8 @@ int main(int argc, char** argv) {
   ConfigService config;
   HttpClient http;
   helix::theme::ThemeService theme(config, http);
+  // Resolve first so the service knows the current light/dark mode; the save paths edit the active mode.
+  theme.apply();
 
   std::string paletteName;
   std::string error;

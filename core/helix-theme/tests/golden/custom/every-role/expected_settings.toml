@@ -1,0 +1,5 @@
+config_version = 18
+
+[theme]
+custom_palette = "custom"
+source = "custom"

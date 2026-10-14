@@ -1,10 +1,74 @@
-//! Custom palette mutations via C++ `helix-theme-palette` (ThemeService parity).
+//! Custom palette mutations (ThemeService `saveCurrentPaletteAsCustom` / `saveRoleColorAsCustom`).
+//!
+//! Builtin and custom palette sources with a concrete dark/light shell mode run in-process
+//! through `helix-theme`. Everything the crate does not cover yet (wallpaper and community
+//! sources, `auto` mode which needs the day/night schedule) falls back to the C++
+//! `helix-theme-palette` helper.
 
+use std::path::PathBuf;
 use std::process::Command;
+
+use helix_shell_core::desktop::settings::ConfigStore;
+use helix_theme::custom::{
+    save_current_as_custom, save_role_color_as_custom, ColorRole, PaletteSource, SaveError, ThemeSelection,
+    parse_hex,
+};
 
 use crate::assets_path::helix_theme_palette_bin;
 
-fn run(args: &[&str]) -> Result<Option<String>, String> {
+/// Selection state captured from config while the state lock is held.
+#[derive(Clone, Debug)]
+pub struct Inputs {
+    local: Option<(ThemeSelection, PathBuf)>,
+}
+
+#[derive(Debug)]
+pub enum Outcome {
+    /// The C++ helper wrote the palette and already selected it in settings.
+    Helper(Option<String>),
+    /// Written in-process; the caller must select it (`theme.source` / `theme.custom_palette`).
+    Local(String),
+}
+
+impl Inputs {
+    pub fn capture(config: &ConfigStore) -> Self {
+        Self { local: local_selection(config) }
+    }
+}
+
+fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
+    // The explicit command override is a test hook for the helper; honor it as before.
+    if std::env::var("HELIX_THEME_PALETTE_CMD").is_ok_and(|cmd| !cmd.trim().is_empty()) {
+        return None;
+    }
+    let text = |id: &str| config.get(id).as_str().map(str::to_string);
+    let source = match text("theme.source").as_deref() {
+        Some("builtin") | None => PaletteSource::Builtin,
+        Some("custom") => PaletteSource::Custom,
+        // wallpaper / community: not ported
+        Some(_) => return None,
+    };
+    let mode = text("theme.mode").unwrap_or_else(|| "dark".into());
+    let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
+    let effective = if shell_mode == "follow" { mode } else { shell_mode };
+    let shell_light = match effective.as_str() {
+        "light" => true,
+        "dark" => false,
+        // auto needs the day/night schedule
+        _ => return None,
+    };
+    let selection = ThemeSelection {
+        source,
+        builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
+        custom_palette: text("theme.custom_palette").unwrap_or_default(),
+        community_cache: None,
+        shell_light,
+    };
+    let dir = config.paths().config_dir.join("palettes");
+    Some((selection, dir))
+}
+
+fn run_helper(args: &[&str]) -> Result<Option<String>, String> {
     if let Ok(cmd) = std::env::var("HELIX_THEME_PALETTE_CMD") {
         if !cmd.trim().is_empty() {
             let status = Command::new("sh")
@@ -38,19 +102,45 @@ fn run(args: &[&str]) -> Result<Option<String>, String> {
     }
 }
 
-pub fn save_palette(source: &str) -> Result<String, String> {
+fn helper_named(args: &[&str]) -> Result<Outcome, String> {
+    run_helper(args)?
+        .map(|name| Outcome::Helper(Some(name)))
+        .ok_or_else(|| "Palette could not be saved".into())
+}
+
+fn local_result(result: Result<String, SaveError>, helper_args: &[&str]) -> Result<Outcome, String> {
+    match result {
+        Ok(name) => Ok(Outcome::Local(name)),
+        Err(SaveError::WallpaperSource) => helper_named(helper_args),
+        Err(SaveError::Message(message)) => Err(message),
+    }
+}
+
+pub fn save_palette(inputs: &Inputs, source: &str) -> Result<Outcome, String> {
     if source != "current" && source != "wallpaper" {
         return Err("Unknown palette source".into());
     }
-    run(&["save-palette", source])?
-        .ok_or_else(|| "Palette could not be saved".into())
+    let args = ["save-palette", source];
+    match (&inputs.local, source) {
+        (Some((selection, dir)), "current") => local_result(save_current_as_custom(dir, selection), &args),
+        _ => helper_named(&args),
+    }
 }
 
-pub fn set_role(role: u32, hex_color: &str) -> Result<String, String> {
-    run(&["set-role", &role.to_string(), hex_color])?
-        .ok_or_else(|| "Palette could not be saved".into())
+pub fn set_role(inputs: &Inputs, role: u32, hex_color: &str) -> Result<Outcome, String> {
+    let role_index = role.to_string();
+    let args = ["set-role", role_index.as_str(), hex_color];
+    let (Some((selection, dir)), Some(parsed)) = (&inputs.local, parse_hex(hex_color)) else {
+        return helper_named(&args);
+    };
+    let role = ColorRole::from_index(role).ok_or_else(|| "error: unknown color role".to_string())?;
+    local_result(save_role_color_as_custom(dir, selection, role, parsed), &args)
 }
 
-pub fn set_accent(hex_color: &str) -> Result<(), String> {
-    run(&["set-accent", hex_color]).map(|_| ())
+pub fn set_accent(inputs: &Inputs, hex_color: &str) -> Result<Outcome, String> {
+    let args = ["set-accent", hex_color];
+    let (Some((selection, dir)), Some(parsed)) = (&inputs.local, parse_hex(hex_color)) else {
+        return run_helper(&args).map(|name| Outcome::Helper(name));
+    };
+    local_result(save_role_color_as_custom(dir, selection, ColorRole::Primary, parsed), &args)
 }

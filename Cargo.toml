@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "core/helix-shell-core",
     "core/helix-desktop-api",
+    "core/helix-theme",
     "services/helix-wallpaper",
     "services/helix-idle",
     "services/helix-desktop",

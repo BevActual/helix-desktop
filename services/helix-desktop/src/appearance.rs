@@ -21,6 +21,29 @@ fn previews_value(previews: &[serde_json::Value]) -> OwnedValue {
     })
 }
 
+/// Selects an in-process saved palette (the C++ helper does this itself) and reloads state.
+fn finish_palette_save(
+    state: &mut crate::state::State,
+    outcome: crate::theme_palette::Outcome,
+) -> fdo::Result<String> {
+    use crate::theme_palette::Outcome;
+    let name = match outcome {
+        Outcome::Helper(name) => {
+            state.config.force_reload();
+            name.unwrap_or_default()
+        }
+        Outcome::Local(name) => {
+            state
+                .config
+                .set("theme.source", serde_json::json!("custom"))
+                .and_then(|()| state.config.set("theme.custom_palette", serde_json::json!(name)))
+                .map_err(fdo::Error::Failed)?;
+            name
+        }
+    };
+    Ok(name)
+}
+
 #[interface(name = "org.helix.Desktop.Appearance1")]
 impl Appearance {
     async fn get_snapshot(&self) -> HashMap<String, OwnedValue> {
@@ -139,21 +162,23 @@ impl Appearance {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
         name: &str,
     ) -> fdo::Result<String> {
-        let mut state = self.state.lock().await;
+        let state = self.state.lock().await;
         if state.desktop.is_none() {
             return Err(fdo::Error::InvalidArgs(
                 "Appearance exports require Helix desktop".into(),
             ));
         }
+        let inputs = crate::theme_palette::Inputs::capture(&state.config);
         drop(state);
         let source = name.to_string();
-        let palette_name =
-            tokio::task::spawn_blocking(move || crate::theme_palette::save_palette(&source))
-            .await
-            .map_err(|error| fdo::Error::Failed(error.to_string()))?
-            .map_err(fdo::Error::Failed)?;
+        let outcome = tokio::task::spawn_blocking(move || {
+            crate::theme_palette::save_palette(&inputs, &source)
+        })
+        .await
+        .map_err(|error| fdo::Error::Failed(error.to_string()))?
+        .map_err(fdo::Error::Failed)?;
         let mut state = self.state.lock().await;
-        state.config.force_reload();
+        let palette_name = finish_palette_save(&mut state, outcome)?;
         state.refresh_palette_previews();
         drop(state);
         Self::changed(&emitter).await.ok();
@@ -166,7 +191,7 @@ impl Appearance {
         role: u32,
         value: &str,
     ) -> fdo::Result<String> {
-        let mut state = self.state.lock().await;
+        let state = self.state.lock().await;
         if state.desktop.is_none() {
             return Err(fdo::Error::InvalidArgs(
                 "Appearance exports require Helix desktop".into(),
@@ -174,15 +199,17 @@ impl Appearance {
         }
         helix_shell_core::desktop::color_spec::validate_accent_hex(value)
             .map_err(fdo::Error::InvalidArgs)?;
+        let inputs = crate::theme_palette::Inputs::capture(&state.config);
         drop(state);
         let hex_color = value.to_string();
-        let palette_name =
-            tokio::task::spawn_blocking(move || crate::theme_palette::set_role(role, &hex_color))
-                .await
-                .map_err(|error| fdo::Error::Failed(error.to_string()))?
-                .map_err(fdo::Error::Failed)?;
+        let outcome = tokio::task::spawn_blocking(move || {
+            crate::theme_palette::set_role(&inputs, role, &hex_color)
+        })
+        .await
+        .map_err(|error| fdo::Error::Failed(error.to_string()))?
+        .map_err(fdo::Error::Failed)?;
         let mut state = self.state.lock().await;
-        state.config.force_reload();
+        let palette_name = finish_palette_save(&mut state, outcome)?;
         state.refresh_palette_previews();
         drop(state);
         Self::changed(&emitter).await.ok();
@@ -202,14 +229,17 @@ impl Appearance {
         }
         helix_shell_core::desktop::color_spec::validate_accent_hex(color)
             .map_err(fdo::Error::InvalidArgs)?;
+        let inputs = crate::theme_palette::Inputs::capture(&state.config);
         drop(state);
         let hex_color = color.to_string();
-        tokio::task::spawn_blocking(move || crate::theme_palette::set_accent(&hex_color))
-            .await
-            .map_err(|error| fdo::Error::Failed(error.to_string()))?
-            .map_err(fdo::Error::Failed)?;
+        let outcome = tokio::task::spawn_blocking(move || {
+            crate::theme_palette::set_accent(&inputs, &hex_color)
+        })
+        .await
+        .map_err(|error| fdo::Error::Failed(error.to_string()))?
+        .map_err(fdo::Error::Failed)?;
         let mut state = self.state.lock().await;
-        state.config.force_reload();
+        finish_palette_save(&mut state, outcome)?;
         state.refresh_palette_previews();
         drop(state);
         Self::changed(&emitter).await.ok();

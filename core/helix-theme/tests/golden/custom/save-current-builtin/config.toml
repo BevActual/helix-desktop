@@ -1,0 +1,4 @@
+[theme]
+source = "builtin"
+builtin = "Kanagawa"
+mode = "light"
