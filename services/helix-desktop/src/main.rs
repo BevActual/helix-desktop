@@ -27,6 +27,7 @@ mod network_support;
 mod palette_catalog;
 mod assets_path;
 mod template_apply;
+mod blocking;
 mod day_night;
 mod theme_palette;
 mod msg_ipc;
@@ -197,17 +198,35 @@ async fn main() -> zbus::Result<()> {
             let locked = bluetooth_poll_state.lock().await;
             locked.bluetooth.is_available()
         };
+        let mut last_owner: Option<String> = {
+            let poll_state = Arc::clone(&bluetooth_poll_state);
+            tokio::task::spawn_blocking(move || poll_state.blocking_lock().bluetooth.bus_owner())
+                .await
+                .unwrap_or(None)
+        };
         loop {
             interval.tick().await;
             let poll_state = Arc::clone(&bluetooth_poll_state);
-            let (changed, available) = tokio::task::spawn_blocking(move || {
+            let (changed, available, owner) = tokio::task::spawn_blocking(move || {
                 let mut locked = poll_state.blocking_lock();
                 let changed = locked.bluetooth.refresh();
                 let available = locked.bluetooth.is_available();
-                (changed, available)
+                let owner = locked.bluetooth.bus_owner();
+                (changed, available, owner)
             })
             .await
-            .unwrap_or((false, false));
+            .unwrap_or((false, false, None));
+            // The daemon vanished or was replaced: nothing pending can complete anymore.
+            if owner != last_owner && last_owner.is_some() {
+                let mut locked = bluetooth_poll_state.lock().await;
+                desktop_operations::fail_interface_operations(
+                    &mut locked,
+                    &bluetooth_conn,
+                    desktop_operations::BLUETOOTH_INTERFACE,
+                )
+                .await;
+            }
+            last_owner = owner;
             let config_changed = available != last_available;
             last_available = available;
             if changed {
@@ -228,17 +247,34 @@ async fn main() -> zbus::Result<()> {
             let locked = network_poll_state.lock().await;
             locked.network.is_available()
         };
+        let mut last_owner: Option<String> = {
+            let poll_state = Arc::clone(&network_poll_state);
+            tokio::task::spawn_blocking(move || poll_state.blocking_lock().network.bus_owner())
+                .await
+                .unwrap_or(None)
+        };
         loop {
             interval.tick().await;
             let poll_state = Arc::clone(&network_poll_state);
-            let (changed, available) = tokio::task::spawn_blocking(move || {
+            let (changed, available, owner) = tokio::task::spawn_blocking(move || {
                 let mut locked = poll_state.blocking_lock();
                 let changed = locked.network.refresh();
                 let available = locked.network.is_available();
-                (changed, available)
+                let owner = locked.network.bus_owner();
+                (changed, available, owner)
             })
             .await
-            .unwrap_or((false, false));
+            .unwrap_or((false, false, None));
+            if owner != last_owner && last_owner.is_some() {
+                let mut locked = network_poll_state.lock().await;
+                desktop_operations::fail_interface_operations(
+                    &mut locked,
+                    &network_conn,
+                    desktop_operations::NETWORK_INTERFACE,
+                )
+                .await;
+            }
+            last_owner = owner;
             let config_changed = available != last_available;
             last_available = available;
             if changed {
@@ -246,6 +282,28 @@ async fn main() -> zbus::Result<()> {
             }
             if config_changed {
                 network_support::emit_configuration_changed(&network_conn).await;
+            }
+        }
+    });
+
+    // External edits of config.toml / settings.toml (the C++ service watches these files).
+    let config_watch_state = Arc::clone(&state);
+    let config_watch_conn = connection.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(250));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            let changed = {
+                let mut locked = config_watch_state.lock().await;
+                let changed = locked.config.reload_if_changed();
+                if changed {
+                    locked.refresh_palette_previews();
+                }
+                changed
+            };
+            if changed {
+                network_support::emit_configuration_changed(&config_watch_conn).await;
             }
         }
     });

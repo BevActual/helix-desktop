@@ -79,7 +79,13 @@ impl Appearance {
             "palette-previews".into(),
             previews_value(&state.palette_previews),
         );
-        map.insert("wallhaven-key-available".into(), owned_bool(false));
+        let key_available = desktop
+            && state
+                .config
+                .get_json_value("wallpaper.wallhaven.api_key")
+                .and_then(|value| value.as_str().map(|key| !key.trim().is_empty()))
+                .unwrap_or(false);
+        map.insert("wallhaven-key-available".into(), owned_bool(key_available));
         map.insert(
             "wallhaven-online".into(),
             owned_bool(desktop && !offline),
@@ -105,7 +111,7 @@ impl Appearance {
             .as_str()
             .unwrap_or("dark")
             .to_string();
-        let apply = crate::template_apply::reapply_templates(&mut state);
+        let apply = crate::blocking::run(|| crate::template_apply::reapply_templates(&mut state));
         drop(state);
         if let Err(message) = apply {
             return Err(fdo::Error::Failed(

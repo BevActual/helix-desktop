@@ -321,8 +321,14 @@ pub(crate) fn bar_table(store: &ConfigStore) -> Option<toml::map::Map<String, To
         .and_then(|node| node.as_table().cloned())
 }
 
+/// Widget instances a pristine C++ config defines (`Config::widgets`).
+const DEFAULT_WIDGETS: [&str; 17] = [
+    "active_window", "clock", "cpu", "date", "group:status", "input_volume", "keyboard_layout", "lock_keys",
+    "media", "network_rx", "network_tx", "notifications", "output_volume", "ram", "spacer", "temp", "tray",
+];
+
 fn widget_names(store: &ConfigStore) -> Vec<String> {
-    let mut names = BTreeSet::new();
+    let mut names: BTreeSet<String> = DEFAULT_WIDGETS.iter().map(|w| (*w).to_string()).collect();
     if let Some(table) = store
         .merged_node("widget")
         .and_then(|node| node.as_table().cloned())
@@ -351,7 +357,15 @@ fn widget_names(store: &ConfigStore) -> Vec<String> {
     names.into_iter().collect()
 }
 
+/// Whether no bar is configured, i.e. the C++ default bar (`default`) is in effect.
+fn uses_default_bar(store: &ConfigStore) -> bool {
+    bar_table(store).map_or(true, |bars| bars.keys().all(|name| name == "order"))
+}
+
 pub(crate) fn bar_names(store: &ConfigStore) -> Vec<String> {
+    if uses_default_bar(store) {
+        return vec!["default".to_string()];
+    }
     let Some(bars) = bar_table(store) else {
         return Vec::new();
     };
@@ -381,9 +395,18 @@ fn bar_widget_entry(store: &ConfigStore, bar_name: &str, field: &str, title: &st
         .into_iter()
         .map(Value::String)
         .collect();
+    let default_widgets: &[&str] = if uses_default_bar(store) {
+        match field {
+            "start" => &["clock"],
+            "end" => &["media", "notifications", "tray", "group:status"],
+            _ => &[],
+        }
+    } else {
+        &[]
+    };
     let value = store
         .get_raw_list(storage.as_ref())
-        .unwrap_or_else(|| Value::Array(Vec::new()));
+        .unwrap_or_else(|| json!(default_widgets));
     json!({
         "id": id,
         "page": "desktop-dock",

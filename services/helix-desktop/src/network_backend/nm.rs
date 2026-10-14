@@ -472,17 +472,36 @@ struct EthernetDeviceState {
     ip4_path: String,
 }
 
+/// Unique bus name currently owning the daemon, `None` when it is not on the bus.
+pub fn bus_owner() -> Option<String> {
+    with_connection(|conn| {
+        let reply = conn
+            .call_method(
+                Some("org.freedesktop.DBus"),
+                "/org/freedesktop/DBus",
+                Some("org.freedesktop.DBus"),
+                "GetNameOwner",
+                &(NM_SERVICE,),
+            )
+            .map_err(|error| error.to_string())?;
+        reply.body().deserialize::<String>().map_err(|error| error.to_string())
+    })
+    .ok()
+}
+
 fn with_connection<R>(operation: impl FnOnce(&Connection) -> Result<R, String>) -> Result<R, String> {
-    let mut guard = SYSTEM_BUS
-        .lock()
-        .map_err(|_| "system bus mutex poisoned".to_string())?;
-    if guard.is_none() {
-        *guard = Some(Connection::system().map_err(|error| error.to_string())?);
-    }
-    let conn = guard
-        .as_ref()
-        .ok_or_else(|| "system bus unavailable".to_string())?;
-    operation(conn)
+    crate::blocking::run(|| {
+        let mut guard = SYSTEM_BUS
+            .lock()
+            .map_err(|_| "system bus mutex poisoned".to_string())?;
+        if guard.is_none() {
+            *guard = Some(Connection::system().map_err(|error| error.to_string())?);
+        }
+        let conn = guard
+            .as_ref()
+            .ok_or_else(|| "system bus unavailable".to_string())?;
+        operation(conn)
+    })
 }
 
 fn nm_call<B>(

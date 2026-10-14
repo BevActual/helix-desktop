@@ -1,4 +1,4 @@
-//! Network1 backend: NetworkManager on the system bus when available, otherwise in-memory mock.
+//! Network1 backend: NetworkManager on the system bus (unavailable snapshot until it appears).
 //!
 //! Nested harnesses set `HELIX_DESKTOP_MOCK_NETWORK=1` for deterministic smoke tests.
 
@@ -98,13 +98,15 @@ pub struct NetworkBackend {
 
 impl NetworkBackend {
     pub fn new() -> Self {
+        // Without NetworkManager the real backend reports an unavailable snapshot and attaches
+        // on a later refresh; only `HELIX_DESKTOP_MOCK_NETWORK` selects the in-memory mock.
         let inner = if mock::force_mock() {
             Inner::Mock(mock::MockBackend::new())
-        } else if nm::probe() {
-            Inner::Nm(nm::NmBackend::new())
         } else {
-            tracing::info!("NetworkManager unavailable; using mock network backend");
-            Inner::Mock(mock::MockBackend::new())
+            if !nm::probe() {
+                tracing::info!("NetworkManager not on the system bus yet; network unavailable until it appears");
+            }
+            Inner::Nm(nm::NmBackend::new())
         };
         Self { inner }
     }
@@ -113,6 +115,14 @@ impl NetworkBackend {
         match &self.inner {
             Inner::Mock(backend) => backend.is_available(),
             Inner::Nm(backend) => backend.is_available(),
+        }
+    }
+
+    /// Unique bus name of the NetworkManager daemon (`None` when absent or mocked).
+    pub fn bus_owner(&self) -> Option<String> {
+        match &self.inner {
+            Inner::Mock(_) => None,
+            Inner::Nm(_) => nm::bus_owner(),
         }
     }
 

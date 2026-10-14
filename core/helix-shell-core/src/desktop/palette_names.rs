@@ -13,7 +13,7 @@ pub const BUILTIN_PALETTE_NAMES: &[&str] = &[
     "Helix",
     "Nord",
     "Rosé Pine",
-    "Tokyo Night",
+    "Tokyo-Night",
 ];
 
 fn community_catalog_path(state_dir: &Path) -> PathBuf {
