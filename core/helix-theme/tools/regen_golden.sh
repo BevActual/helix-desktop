@@ -9,3 +9,6 @@ $g core/helix-theme/tools/gen_golden.cpp src/theme/color.cpp src/theme/contrast.
 $g core/helix-theme/tools/gen_golden_palette.cpp src/theme/fixed_palette.cpp src/theme/color.cpp \
   src/theme/contrast.cpp src/theme/color_roles.cpp -o "$out/palette"
 "$out/palette" > core/helix-theme/tests/golden/palette_expand.tsv
+$g core/helix-theme/tools/gen_builtin_palettes.cpp src/theme/builtin_palettes.cpp src/theme/fixed_palette.cpp \
+  src/theme/color.cpp src/theme/contrast.cpp src/theme/color_roles.cpp -o "$out/builtin"
+"$out/builtin" > core/helix-theme/data/builtin_palettes.json

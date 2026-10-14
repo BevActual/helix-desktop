@@ -6,3 +6,4 @@ publish = false
 description = "Palette math and custom-palette storage. Ports src/theme/ (C++ ThemeService) with output parity."
 
 [dependencies]
+serde_json = "1"
