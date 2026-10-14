@@ -39,6 +39,8 @@ HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
+**Soak before the flip:** `rust-desktop-soak.md` (`tools/soak/`) runs the live session on the Rust service and diffs snapshots against C++.
+
 ## Order
 
 1. ~~Scaffold `helix-desktop` + risk policy in `helix-shell-core`~~
