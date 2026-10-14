@@ -15,6 +15,7 @@ mod audio_support;
 mod bluetooth;
 mod bluetooth_backend;
 mod bluetooth_support;
+mod community_template_catalog;
 mod configuration;
 mod dbus_value;
 mod displays;
