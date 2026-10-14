@@ -7,5 +7,6 @@ pub mod color;
 pub mod contrast;
 pub mod custom;
 pub mod palette;
+pub mod template;
 
 pub use color::Color;

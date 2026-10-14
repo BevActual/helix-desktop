@@ -7,3 +7,4 @@ description = "Palette math and custom-palette storage. Ports src/theme/ (C++ Th
 
 [dependencies]
 serde_json = "1"
+regex = "1"
