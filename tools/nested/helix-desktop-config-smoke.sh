@@ -63,6 +63,7 @@ for want in [
     "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
     "control_center.width", "osd.kinds.volume", "osd.position", "osd.kinds.wifi",
     "dock.enabled", "dock.position", "dock.launcher_position",
+    "hot_corners.delay_ms", "wallpaper.fill_mode", "wallpaper.automation.enabled",
 ]:
     assert want in ids, want
 print("catalog=OK")

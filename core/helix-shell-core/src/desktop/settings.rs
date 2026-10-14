@@ -28,6 +28,14 @@ pub enum SettingKind {
     Position,
     /// Launcher button placement on the dock (`dock.launcher_position`).
     DockLauncher,
+    /// Hot corner trigger (`hot_corners.*.action`).
+    HotCornerAction,
+    /// Wallpaper image fit (`wallpaper.fill_mode`).
+    WallpaperFit,
+    WallpaperSource,
+    WallpaperOrder,
+    DailyProvider,
+    VideoPause,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -77,6 +85,12 @@ impl SettingDef {
             SettingKind::ApplicationList => "application-list",
             SettingKind::Position => "position",
             SettingKind::DockLauncher => "dock-launcher",
+            SettingKind::HotCornerAction => "hot-corner-action",
+            SettingKind::WallpaperFit => "wallpaper-fit",
+            SettingKind::WallpaperSource => "wallpaper-source",
+            SettingKind::WallpaperOrder => "wallpaper-order",
+            SettingKind::DailyProvider => "daily-provider",
+            SettingKind::VideoPause => "video-pause",
         }
     }
 
@@ -109,6 +123,21 @@ impl SettingDef {
                 &["Bottom", "Left", "Right", "Top"],
             )),
             SettingKind::DockLauncher => Some((&["none", "start", "end"], &["None", "Start", "End"])),
+            SettingKind::HotCornerAction => Some((
+                &["none", "launcher", "control_center", "window_switcher", "command"],
+                &["None", "Launcher", "Control Center", "Window switcher", "Custom command"],
+            )),
+            SettingKind::WallpaperFit => Some((
+                &["center", "crop", "fit", "stretch", "repeat", "span"],
+                &["Center", "Fill", "Fit", "Stretch", "Tile", "Span displays"],
+            )),
+            SettingKind::WallpaperSource => Some((&["folder", "daily"], &["Folder", "Daily image"])),
+            SettingKind::WallpaperOrder => Some((&["random", "alphabetical"], &["Random", "Alphabetical"])),
+            SettingKind::DailyProvider => Some((&["bing", "nasa"], &["Bing", "NASA"])),
+            SettingKind::VideoPause => Some((
+                &["off", "max", "full"],
+                &["Never", "Maximized windows", "Fullscreen windows"],
+            )),
             _ => None,
         }
     }
@@ -280,6 +309,171 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.fill_mode",
+        page: "appearance",
+        title: "Image fit",
+        group: "Wallpaper",
+        kind: SettingKind::WallpaperFit,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("crop"),
+    },
+    SettingDef {
+        id: "wallpaper.transition_duration",
+        page: "appearance",
+        title: "Transition duration (milliseconds)",
+        group: "Wallpaper",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 100.0,
+        maximum: 30000.0,
+        default: DefaultValue::Number(1500.0),
+    },
+    SettingDef {
+        id: "wallpaper.transition_on_startup",
+        page: "appearance",
+        title: "Animate wallpaper on startup",
+        group: "Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.edge_smoothness",
+        page: "appearance",
+        title: "Transition edge smoothness",
+        group: "Wallpaper",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.3),
+    },
+    SettingDef {
+        id: "wallpaper.automation.enabled",
+        page: "appearance",
+        title: "Automatically change wallpaper",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.automation.interval_seconds",
+        page: "appearance",
+        title: "Change interval (seconds)",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 1.0,
+        maximum: 86400.0,
+        default: DefaultValue::Number(1800.0),
+    },
+    SettingDef {
+        id: "wallpaper.automation.source",
+        page: "appearance",
+        title: "Wallpaper source",
+        group: "Wallpaper Automation",
+        kind: SettingKind::WallpaperSource,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("folder"),
+    },
+    SettingDef {
+        id: "wallpaper.automation.order",
+        page: "appearance",
+        title: "Folder order",
+        group: "Wallpaper Automation",
+        kind: SettingKind::WallpaperOrder,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("random"),
+    },
+    SettingDef {
+        id: "wallpaper.automation.recursive",
+        page: "appearance",
+        title: "Include subfolders",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.daily.provider",
+        page: "appearance",
+        title: "Daily image provider",
+        group: "Wallpaper Automation",
+        kind: SettingKind::DailyProvider,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("bing"),
+    },
+    SettingDef {
+        id: "wallpaper.daily.bing_market",
+        page: "appearance",
+        title: "Bing market code",
+        group: "Wallpaper Automation",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "wallpaper.video.mute",
+        page: "appearance",
+        title: "Mute video audio",
+        group: "Video Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.video.hardware_decode",
+        page: "appearance",
+        title: "Hardware decoding",
+        group: "Video Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.video.auto_pause",
+        page: "appearance",
+        title: "Pause video behind windows",
+        group: "Video Wallpaper",
+        kind: SettingKind::VideoPause,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("full"),
+    },
+    SettingDef {
+        id: "wallpaper.video.mpv_options",
+        page: "appearance",
+        title: "Extra mpv options",
+        group: "Video Wallpaper",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
     },
     SettingDef {
         id: "backdrop.enabled",
@@ -677,6 +871,105 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "hot_corners.delay_ms",
+        page: "desktop-dock",
+        title: "Hold delay (milliseconds)",
+        group: "Hot Corners",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 2000.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "hot_corners.top_left.action",
+        page: "desktop-dock",
+        title: "Top left action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.top_left.command",
+        page: "desktop-dock",
+        title: "Top left command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.top_right.action",
+        page: "desktop-dock",
+        title: "Top right action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.top_right.command",
+        page: "desktop-dock",
+        title: "Top right command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_left.action",
+        page: "desktop-dock",
+        title: "Bottom left action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_left.command",
+        page: "desktop-dock",
+        title: "Bottom left command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_right.action",
+        page: "desktop-dock",
+        title: "Bottom right action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_right.command",
+        page: "desktop-dock",
+        title: "Bottom right command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
     },
     SettingDef {
         id: "dock.enabled",
@@ -1723,7 +2016,13 @@ fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
         | SettingKind::ScreenPosition
         | SettingKind::Orientation
         | SettingKind::Position
-        | SettingKind::DockLauncher => Value::String(value.as_str().unwrap_or("").to_string()),
+        | SettingKind::DockLauncher
+        | SettingKind::HotCornerAction
+        | SettingKind::WallpaperFit
+        | SettingKind::WallpaperSource
+        | SettingKind::WallpaperOrder
+        | SettingKind::DailyProvider
+        | SettingKind::VideoPause => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -1811,7 +2110,13 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
         | SettingKind::ScreenPosition
         | SettingKind::Orientation
         | SettingKind::Position
-        | SettingKind::DockLauncher => {
+        | SettingKind::DockLauncher
+        | SettingKind::HotCornerAction
+        | SettingKind::WallpaperFit
+        | SettingKind::WallpaperSource
+        | SettingKind::WallpaperOrder
+        | SettingKind::DailyProvider
+        | SettingKind::VideoPause => {
             let text = value.as_str().ok_or("expected string")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {
