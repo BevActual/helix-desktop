@@ -1,0 +1,26 @@
+[theme]
+builtin = "Dracula"
+mode = "light"
+
+[theme.templates]
+builtin_ids = ["helix", "qt"]
+
+[theme.templates.user.mine]
+input_path = "./mine.tpl"
+output_path = ["$XDG_DATA_HOME/mine/out.txt", "$XDG_DATA_HOME/mine/second.txt"]
+post_hook = "echo {{ mode }} > '{{ config_dir }}/hook-ran.txt'"
+
+[theme.templates.user.modes]
+input_path_modes = { dark = "./dark.tpl", light = "./light.tpl" }
+output_path = "~/modes-out.txt"
+
+[theme.templates.user.gated]
+input_path = "./mine.tpl"
+output_path = "$XDG_DATA_HOME/gated/out.txt"
+requires_path = "$XDG_DATA_HOME/not-installed"
+post_hook = "touch '{{ config_dir }}/gated-hook.txt'"
+
+[theme.templates.user.disabled]
+enabled = false
+input_path = "./mine.tpl"
+output_path = "$XDG_DATA_HOME/disabled/out.txt"

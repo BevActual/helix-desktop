@@ -1,0 +1,5 @@
+[theme]
+builtin = "Helix"
+
+[theme.templates]
+builtin_ids = ["helix"]

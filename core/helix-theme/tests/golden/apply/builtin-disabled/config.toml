@@ -1,0 +1,3 @@
+[theme.templates]
+enable_builtin_templates = false
+builtin_ids = ["helix", "qt"]

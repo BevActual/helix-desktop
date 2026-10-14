@@ -51,6 +51,8 @@ pub struct RenderResult {
     /// Set when the template used a feature this renderer does not implement; `text` is
     /// then not trustworthy and the caller should use the C++ renderer.
     pub unsupported: Option<&'static str>,
+    /// The template read `config.*` / `icon_theme` while no config table was supplied.
+    pub needs_config: bool,
 }
 
 /// C++ `makeThemeData`: every token as `#rrggbb` for dark and light.
@@ -546,6 +548,7 @@ struct Engine<'a> {
     options: &'a Options,
     errors: u32,
     unsupported: Option<&'static str>,
+    needs_config: bool,
     scopes: Vec<BTreeMap<String, Scope>>,
 }
 
@@ -613,12 +616,20 @@ impl Engine<'_> {
         value
     }
 
+    fn note_config_use(&mut self, name: &str) {
+        let first = name.split('.').next().unwrap_or("");
+        if self.options.config_table.is_none() && (first == "config" || first == "icon_theme") {
+            self.needs_config = true;
+        }
+    }
+
     fn resolve_expression(&mut self, expr: &str) -> Scope {
         let parts = split_pipes(expr);
         if parts.is_empty() {
             return Scope::None;
         }
         let base = trim(&parts[0]).to_string();
+        self.note_config_use(&base);
         let filters: Vec<String> = parts[1..].iter().map(|f| trim(f).to_string()).collect();
 
         let mut resolved = match base.as_str() {
@@ -749,6 +760,7 @@ impl Engine<'_> {
             let (Ok(start), Ok(end)) = (m[1].parse::<i32>(), m[2].parse::<i32>()) else { return vec![] };
             return (start..end).map(|i| Scope::Num(f64::from(i))).collect();
         }
+        self.note_config_use(expr);
         let pair = |k: &str, v: Scope| {
             Scope::Map(BTreeMap::from([("key".to_string(), Scope::Str(k.to_string())), ("value".to_string(), v)]))
         };
@@ -842,7 +854,7 @@ pub fn render(data: &ThemeData, options: &Options, template: &str) -> RenderResu
     let nodes = parser.nodes(&[]);
     let parse_errors = parser.errors;
 
-    let mut engine = Engine { data, options, errors: parse_errors, unsupported: None, scopes: Vec::new() };
+    let mut engine = Engine { data, options, errors: parse_errors, unsupported: None, needs_config: false, scopes: Vec::new() };
     if let Some(table) = &options.config_table {
         let mut root = BTreeMap::new();
         root.insert("config".to_string(), from_json(table));
@@ -850,5 +862,10 @@ pub fn render(data: &ThemeData, options: &Options, template: &str) -> RenderResu
         engine.scopes.push(root);
     }
     let text = engine.eval_nodes(&nodes);
-    RenderResult { text, error_count: engine.errors, unsupported: engine.unsupported }
+    RenderResult {
+        text,
+        error_count: engine.errors,
+        unsupported: engine.unsupported,
+        needs_config: engine.needs_config,
+    }
 }
