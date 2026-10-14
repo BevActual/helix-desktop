@@ -1,0 +1,8 @@
+[package]
+name = "helix-theme"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Palette math and custom-palette storage. Ports src/theme/ (C++ ThemeService) with output parity."
+
+[dependencies]

@@ -1776,6 +1776,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-theme"
+version = "0.1.0"
+
+[[package]]
 name = "helix-wallpaper"
 version = "0.1.0"
 dependencies = [
