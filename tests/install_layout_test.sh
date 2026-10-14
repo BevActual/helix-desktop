@@ -24,6 +24,7 @@ helper=$(find "$stage" -type f -name helix-system-upgrade -print -quit)
 "$helper" --help > /dev/null 2>&1 || fail 'installed system-upgrade helper could not start'
 
 [ -x "$prefix/bin/helix-service" ] || fail 'desktop service is missing'
+[ -x "$prefix/bin/helix-template-apply" ] || fail 'template apply helper is missing'
 [ -f "$prefix/share/dbus-1/services/org.helix.Desktop.service" ] || fail 'D-Bus activation is missing'
 [ -f "$prefix/lib/systemd/user/helix-service.service" ] || fail 'systemd user unit is missing'
 [ -f "$prefix/share/helix/msg-risk.toml" ] || fail 'msg-risk protocol file is missing'
