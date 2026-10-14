@@ -1780,7 +1780,9 @@ dependencies = [
 name = "helix-theme"
 version = "0.1.0"
 dependencies = [
+ "regex",
  "serde_json",
+ "toml 0.8.2",
 ]
 
 [[package]]

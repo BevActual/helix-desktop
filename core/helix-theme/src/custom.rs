@@ -439,6 +439,16 @@ fn resolve_from_source(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPale
     }
 }
 
+/// The palette the C++ `resolveFromSource`/`resolveBuiltin` pair would produce for builtin and
+/// custom sources. `None` for wallpaper and community sources (not ported).
+pub fn resolve_palette(dir: &Path, sel: &ThemeSelection) -> Option<GeneratedPalette> {
+    match sel.source {
+        PaletteSource::Wallpaper => None,
+        PaletteSource::Community => None,
+        _ => Some(resolve(dir, sel)),
+    }
+}
+
 fn resolve(dir: &Path, sel: &ThemeSelection) -> GeneratedPalette {
     resolve_from_source(dir, sel).unwrap_or_else(|| resolve_builtin(&sel.builtin))
 }

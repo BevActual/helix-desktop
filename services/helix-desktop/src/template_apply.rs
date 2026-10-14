@@ -5,11 +5,121 @@ use std::process::Command;
 
 use helix_shell_core::desktop::compositor_ipc;
 use helix_shell_core::ConfigStore;
+use helix_theme::apply::{self, ApplyInputs, CommunityTemplate, Outcome};
+use helix_theme::custom::{resolve_palette, PaletteSource, ThemeSelection};
+use helix_theme::template::make_theme_data;
 
 use crate::assets_path::{builtin_templates_root, helix_assets_dir, helix_template_apply_bin};
+use crate::state::State;
+
+const STATE_OWNER: &str = "theme_templates";
+const STATE_APPLIED_IDS: &str = "applied_builtin_ids";
+
+/// Applies templates in-process when every input is something `helix-theme` reproduces
+/// exactly. `None` means "use the C++ helper"; nothing has been written or run in that case.
+fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
+    let config = &state.config;
+    let text = |id: &str| config.get(id).as_str().map(str::to_string);
+    let flag = |id: &str| config.get(id).as_bool().unwrap_or(false);
+
+    let source = match text("theme.source").as_deref() {
+        Some("builtin") | None => PaletteSource::Builtin,
+        Some("custom") => PaletteSource::Custom,
+        _ => return None, // wallpaper / community palettes
+    };
+    if flag("theme.pure_black_dark") || flag("accessibility.high_contrast") {
+        return None; // HCT-based palette transforms are not ported
+    }
+    let mode = match text("theme.mode").as_deref().unwrap_or("dark") {
+        "dark" => "dark",
+        "light" => "light",
+        _ => return None, // auto needs the day/night schedule
+    };
+
+    let assets = helix_assets_dir()?;
+    let builtin_config = builtin_templates_root(&assets).join("builtin.toml");
+    let paths = config.paths();
+    let palettes_dir = paths.config_dir.join("palettes");
+    let selection = ThemeSelection {
+        source,
+        builtin: text("theme.builtin").unwrap_or_else(|| "Helix".into()),
+        custom_palette: text("theme.custom_palette").unwrap_or_default(),
+        community_cache: None,
+        shell_light: false,
+    };
+    let generated = resolve_palette(&palettes_dir, &selection)?;
+
+    let list = |id: &str| -> Vec<String> {
+        config
+            .get_raw_list(id)
+            .and_then(|v| v.as_array().cloned())
+            .map(|items| items.iter().filter_map(|i| i.as_str().map(str::to_string)).collect())
+            .unwrap_or_default()
+    };
+    let state_dir = paths.settings_toml.parent()?.to_path_buf();
+
+    // User templates / custom colors, mapped exactly like C++ `buildUserTemplateRoot`.
+    let mut templates_cfg = toml::Table::new();
+    for key in ["user", "custom_colors"] {
+        if let Some(value) = config.get_json_value(&format!("theme.templates.{key}")) {
+            if let Ok(toml::Value::Table(table)) = toml::Value::try_from(&value) {
+                templates_cfg.insert(key.to_string(), toml::Value::Table(table));
+            }
+        }
+    }
+    let user_root = apply::build_user_template_root(&templates_cfg);
+    let user_root = (!user_root.is_empty()).then(|| (user_root, paths.config_dir.join("config.toml")));
+
+    let applied_before = state
+        .runtime
+        .get_string(STATE_OWNER, STATE_APPLIED_IDS)
+        .map(|s| s.split_whitespace().map(str::to_string).collect())
+        .unwrap_or_default();
+
+    let inputs = ApplyInputs {
+        theme_data: make_theme_data(&generated.dark, &generated.light),
+        default_mode: mode.to_string(),
+        image_path: None,
+        config_table: None,
+        icon_theme: String::new(),
+        builtin_config,
+        enable_builtin: config.get("theme.templates.enable_builtin_templates").as_bool().unwrap_or(true),
+        builtin_ids: list("theme.templates.builtin_ids"),
+        enable_community: config.get("theme.templates.enable_community_templates").as_bool().unwrap_or(true),
+        community: list("theme.templates.community_ids")
+            .into_iter()
+            .map(|id| CommunityTemplate {
+                config_path: state_dir.join("community-templates").join(&id).join("template.toml"),
+                id,
+            })
+            .collect(),
+        applied_before,
+        user_root,
+    };
+
+    match apply::apply(&inputs) {
+        Outcome::Unsupported(why) => {
+            tracing::debug!(%why, "in-process template apply unsupported; using helper");
+            None
+        }
+        Outcome::Applied(report) => {
+            if let Err(error) = state.runtime.set_string(
+                STATE_OWNER,
+                STATE_APPLIED_IDS,
+                &report.applied_builtin_ids.join(" "),
+            ) {
+                tracing::warn!(%error, "failed to persist applied built-in template ids");
+            }
+            if let Some((id, error)) = report.failures.iter().next_back() {
+                return Some(Err(format!("template failure: {id}: {error}")));
+            }
+            Some(Ok(()))
+        }
+    }
+}
 
 /// Shared path for `Appearance1.Reapply` and `templates-apply` msg IPC.
-pub fn reapply_templates(config: &ConfigStore) -> Result<(), String> {
+pub fn reapply_templates(state: &mut State) -> Result<(), String> {
     if let Ok(cmd) = std::env::var("HELIX_TEMPLATE_APPLY_CMD") {
         if !cmd.trim().is_empty() {
             let status = Command::new("sh")
@@ -24,7 +134,15 @@ pub fn reapply_templates(config: &ConfigStore) -> Result<(), String> {
         }
     }
 
+    // Like a successful helper run, an in-process apply does not reload niri itself; the
+    // templates' own hooks do that.
+    if let Some(result) = apply_in_process(state) {
+        return result;
+    }
+
+    let config = &state.config;
     if run_cpp_template_apply()? {
+        state.runtime.reload();
         return Ok(());
     }
 

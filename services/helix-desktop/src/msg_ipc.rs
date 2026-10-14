@@ -46,7 +46,7 @@ fn parse_command(line: &str) -> (&str, &str) {
     }
 }
 
-fn handle_line(state: &State, line: &str) -> String {
+fn handle_line(state: &mut State, line: &str) -> String {
     let mut command = line.to_string();
     strip_caller_cwd_prefix(&mut command);
     let (name, args) = parse_command(&command);
@@ -58,7 +58,7 @@ fn handle_line(state: &State, line: &str) -> String {
             if state.desktop.is_none() {
                 return "error: theme palette has not been resolved yet\n".to_string();
             }
-            match template_apply::reapply_templates(&state.config) {
+            match template_apply::reapply_templates(state) {
                 Ok(()) => "ok\n".to_string(),
                 Err(message) => format!("error: {message}\n"),
             }
@@ -71,7 +71,7 @@ fn handle_line(state: &State, line: &str) -> String {
     }
 }
 
-fn serve_connection(mut stream: UnixStream, state: &State) {
+fn serve_connection(mut stream: UnixStream, state: &mut State) {
     stream
         .set_read_timeout(Some(Duration::from_millis(100)))
         .ok();
@@ -116,8 +116,8 @@ fn ipc_thread(state: Arc<Mutex<State>>) {
     for connection in listener.incoming() {
         match connection {
             Ok(stream) => {
-                let locked = state.blocking_lock();
-                serve_connection(stream, &locked);
+                let mut locked = state.blocking_lock();
+                serve_connection(stream, &mut locked);
             }
             Err(error) => {
                 tracing::warn!(%error, "msg IPC accept failed");
@@ -136,15 +136,15 @@ mod tests {
 
     #[test]
     fn templates_apply_requires_desktop() {
-        let state = State::new(crate::agents::new_hub());
-        let out = handle_line(&state, "templates-apply");
+        let mut state = State::new(crate::agents::new_hub());
+        let out = handle_line(&mut state, "templates-apply");
         assert!(out.contains("not been resolved"));
     }
 
     #[test]
     fn rejects_extra_args() {
-        let state = State::new(crate::agents::new_hub());
-        let out = handle_line(&state, "templates-apply extra");
+        let mut state = State::new(crate::agents::new_hub());
+        let out = handle_line(&mut state, "templates-apply extra");
         assert!(out.contains("usage"));
     }
 
@@ -152,7 +152,7 @@ mod tests {
     fn templates_apply_ok_when_desktop_registered() {
         let mut state = State::new(crate::agents::new_hub());
         state.desktop = Some(":1.42".into());
-        let out = handle_line(&state, "templates-apply");
+        let out = handle_line(&mut state, "templates-apply");
         assert_eq!(out, "ok\n");
     }
 }

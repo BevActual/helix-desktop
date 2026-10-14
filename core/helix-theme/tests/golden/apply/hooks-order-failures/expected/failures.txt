@@ -1,0 +1,4 @@
+template failure: d_hook_fails: boom-message
+template failure: e_bad_render: failed to render template
+template failure: f_missing_input: failed to render template
+template failure: g_bad_hook: failed to render hook

@@ -27,6 +27,10 @@ thickness = 34
 timeout = 420
 enabled = true
 action = "lock"
+
+# Hook-free built-in templates: exercised in-process by templates-apply below.
+[theme.templates]
+builtin_ids = ["helix", "qt"]
 EOF
 HELIX_ASSETS_DIR="$ROOT/assets"
 for _candidate in \
@@ -313,6 +317,10 @@ client.sendall(b"templates-apply")
 client.shutdown(pysocket.SHUT_WR)
 resp = client.recv(4096).decode()
 assert resp.strip() == "ok", resp
+cfg_home = os.environ["XDG_CONFIG_HOME"]
+for rel in ("helix/themes/helix.toml", "qt5ct/colors/helix.conf", "qt6ct/colors/helix.conf"):
+    path = os.path.join(cfg_home, rel)
+    assert os.path.isfile(path) and os.path.getsize(path) > 0, path
 print("templates_apply_ipc=OK")
 
 # SetAccent runs in-process for builtin/custom palettes in a concrete mode (no helper needed).

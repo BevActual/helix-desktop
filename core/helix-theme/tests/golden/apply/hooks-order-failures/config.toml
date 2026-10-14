@@ -1,0 +1,56 @@
+[theme]
+builtin = "Gruvbox"
+
+[theme.templates.user.a_slow_async]
+index = 0
+input_path = "./a.tpl"
+output_path = "$XDG_DATA_HOME/o/a.txt"
+post_hook = "sleep 0.4; echo A >> '{{ config_dir }}/order.log'"
+
+[theme.templates.user.b_barrier]
+index = 1
+input_path = "./a.tpl"
+output_path = "$XDG_DATA_HOME/o/b.txt"
+post_hook = "echo B >> '{{ config_dir }}/order.log'"
+hook_async = false
+
+[theme.templates.user.c_pre]
+index = 2
+input_path = "./a.tpl"
+output_path = "$XDG_DATA_HOME/o/c.txt"
+pre_hook = "echo pre-{{ mode }} >> '{{ config_dir }}/order.log'"
+post_hook = "echo post >> '{{ config_dir }}/order.log'"
+hook_async = false
+
+[theme.templates.user.d_hook_fails]
+index = 3
+input_path = "./a.tpl"
+output_path = "$XDG_DATA_HOME/o/d.txt"
+post_hook = "echo boom-message >&2; exit 3"
+
+[theme.templates.user.e_bad_render]
+index = 4
+input_path = "./bad.tpl"
+output_path = "$XDG_DATA_HOME/o/e.txt"
+post_hook = "touch '{{ config_dir }}/e-should-not-run.txt'"
+
+[theme.templates.user.f_missing_input]
+index = 5
+input_path = "./nope.tpl"
+output_path = "$XDG_DATA_HOME/o/f.txt"
+
+[theme.templates.user.g_bad_hook]
+index = 6
+input_path = "./a.tpl"
+output_path = "$XDG_DATA_HOME/o/g.txt"
+post_hook = "echo {{ colors.nope.default.hex }}"
+
+[theme.templates.user.h_same_output_late]
+index = 9
+input_path = "./late.tpl"
+output_path = "$XDG_DATA_HOME/o/a.txt"
+
+[theme.templates.user.i_same_output_early]
+index = -1
+input_path = "./early.tpl"
+output_path = "$XDG_DATA_HOME/o/a.txt"

@@ -1,0 +1,18 @@
+[theme]
+builtin = "Catppuccin"
+mode = "dark"
+
+[theme.templates]
+community_ids = ["not-cached", "bad/id"]
+
+[theme.templates.user.dyn]
+input_path = "./closest.tpl"
+output_path = "$XDG_DATA_HOME/dyn/static.txt"
+output_path_dynamic = "printf '# comment\n\n  %s/dyn/one.txt  \n' \"$XDG_DATA_HOME\""
+compare_to = "{{ colors.primary.default.hex }}"
+colors_to_compare = [
+  { name = "red", color = "#ff0000" },
+  { name = "green", color = "#00ff00" },
+  { name = "blue", color = "#0000ff" },
+  { name = "pinkish", color = "#f5c2e7" },
+]

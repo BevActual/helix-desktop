@@ -1,0 +1,1041 @@
+icon_theme	Adwaita
+Ayu	dark	synthetic.tpl	5	3ca9d82d89114d87
+Ayu	dark	t:alacritty/alacritty.toml	0	80f3826db51f5958
+Ayu	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Ayu	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Ayu	dark	t:btop/apply.sh	0	cff0dca38442d812
+Ayu	dark	t:btop/btop.theme	0	5114e6b4d03100b7
+Ayu	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Ayu	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Ayu	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Ayu	dark	t:cava/cava.ini	0	1378e04ca11e8ea1
+Ayu	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Ayu	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Ayu	dark	t:cursor/cursor.yaml	0	4ea6ffe528363dae
+Ayu	dark	t:cursor/undo.sh	0	01078b19cba65543
+Ayu	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Ayu	dark	t:emacs/emacs.el	0	ca304b0720bb3e0b
+Ayu	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Ayu	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Ayu	dark	t:foot/apply.sh	0	3af32debc09faf68
+Ayu	dark	t:foot/foot	0	feaf1be46b3e18fc
+Ayu	dark	t:foot/undo.sh	0	70887b5b6415b345
+Ayu	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Ayu	dark	t:ghostty/ghostty	0	a9585aab0f82ce22
+Ayu	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Ayu	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Ayu	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Ayu	dark	t:gtk/gtk3.css	0	c7ffbd9db346f2d9
+Ayu	dark	t:gtk/gtk4.css	0	d48f6a1fc7e38da5
+Ayu	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Ayu	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Ayu	dark	t:helix/helix.toml	0	b7c2c0f163bb0512
+Ayu	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Ayu	dark	t:kde/kcolorscheme.colors	0	e4a90b2332f97829
+Ayu	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Ayu	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Ayu	dark	t:kitty/kitty.conf	0	48bbf9e79e9133b3
+Ayu	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Ayu	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Ayu	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Ayu	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Ayu	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Ayu	dark	t:qt/qtct.conf	0	6134a4cac7a02775
+Ayu	dark	t:qt/undo.sh	0	94ca2076914d2021
+Ayu	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Ayu	dark	t:starship/starship.toml	0	aaa7eeb98dff291c
+Ayu	dark	t:starship/undo.sh	0	c5f7781e77878644
+Ayu	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Ayu	dark	t:warp/undo.sh	0	b512e8d28284602b
+Ayu	dark	t:warp/warp.yaml	0	73d969b1d0d2afd8
+Ayu	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Ayu	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Ayu	dark	t:wezterm/wezterm.toml	0	07ee1d3a1230e814
+Ayu	light	synthetic.tpl	5	ae504e312b53e86a
+Ayu	light	t:alacritty/alacritty.toml	0	2b648b6e2cfe286e
+Ayu	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Ayu	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Ayu	light	t:btop/apply.sh	0	cff0dca38442d812
+Ayu	light	t:btop/btop.theme	0	f1489d5e406e6f7d
+Ayu	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Ayu	light	t:builtin.toml	0	5370fc3fbc3723d4
+Ayu	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Ayu	light	t:cava/cava.ini	0	9b1768b09502e63a
+Ayu	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Ayu	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Ayu	light	t:cursor/cursor.yaml	0	c32118c57359dfe9
+Ayu	light	t:cursor/undo.sh	0	01078b19cba65543
+Ayu	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Ayu	light	t:emacs/emacs.el	0	6571106be1731d69
+Ayu	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Ayu	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Ayu	light	t:foot/apply.sh	0	3af32debc09faf68
+Ayu	light	t:foot/foot	0	1de478f621b3c5ee
+Ayu	light	t:foot/undo.sh	0	70887b5b6415b345
+Ayu	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Ayu	light	t:ghostty/ghostty	0	f2c351cb69a5f280
+Ayu	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Ayu	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Ayu	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Ayu	light	t:gtk/gtk3.css	0	fcd9a628d810acbc
+Ayu	light	t:gtk/gtk4.css	0	81f6d97710f991ca
+Ayu	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Ayu	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Ayu	light	t:helix/helix.toml	0	8668dff2225d1224
+Ayu	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Ayu	light	t:kde/kcolorscheme.colors	0	dd84787e77f81f67
+Ayu	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Ayu	light	t:kitty/apply.sh	0	9e7184410726dad3
+Ayu	light	t:kitty/kitty.conf	0	4b6436a45bd659af
+Ayu	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Ayu	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Ayu	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Ayu	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Ayu	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Ayu	light	t:qt/qtct.conf	0	2ef55e9667a86726
+Ayu	light	t:qt/undo.sh	0	94ca2076914d2021
+Ayu	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Ayu	light	t:starship/starship.toml	0	66926cd47c1572ea
+Ayu	light	t:starship/undo.sh	0	c5f7781e77878644
+Ayu	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Ayu	light	t:warp/undo.sh	0	b512e8d28284602b
+Ayu	light	t:warp/warp.yaml	0	970bd39fe3076135
+Ayu	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Ayu	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Ayu	light	t:wezterm/wezterm.toml	0	6f3366742fd90098
+Catppuccin	dark	synthetic.tpl	5	46c16816df6f8bda
+Catppuccin	dark	t:alacritty/alacritty.toml	0	0bdb2a06b3d95fd6
+Catppuccin	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Catppuccin	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Catppuccin	dark	t:btop/apply.sh	0	cff0dca38442d812
+Catppuccin	dark	t:btop/btop.theme	0	d89edc6c7986a4cf
+Catppuccin	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Catppuccin	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Catppuccin	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Catppuccin	dark	t:cava/cava.ini	0	cc8161a99f28c863
+Catppuccin	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Catppuccin	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Catppuccin	dark	t:cursor/cursor.yaml	0	a50c41a1166402fe
+Catppuccin	dark	t:cursor/undo.sh	0	01078b19cba65543
+Catppuccin	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Catppuccin	dark	t:emacs/emacs.el	0	d08f8a3e51ad48fe
+Catppuccin	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Catppuccin	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Catppuccin	dark	t:foot/apply.sh	0	3af32debc09faf68
+Catppuccin	dark	t:foot/foot	0	d1a823ba798c9924
+Catppuccin	dark	t:foot/undo.sh	0	70887b5b6415b345
+Catppuccin	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Catppuccin	dark	t:ghostty/ghostty	0	a519879c8b72eaf2
+Catppuccin	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Catppuccin	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Catppuccin	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Catppuccin	dark	t:gtk/gtk3.css	0	2345725ac278146b
+Catppuccin	dark	t:gtk/gtk4.css	0	bdb200e23dce3d97
+Catppuccin	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Catppuccin	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Catppuccin	dark	t:helix/helix.toml	0	fdb07a134001342a
+Catppuccin	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Catppuccin	dark	t:kde/kcolorscheme.colors	0	88d90479c35c1876
+Catppuccin	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Catppuccin	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Catppuccin	dark	t:kitty/kitty.conf	0	4a58db4dfe90740b
+Catppuccin	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Catppuccin	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Catppuccin	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Catppuccin	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Catppuccin	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Catppuccin	dark	t:qt/qtct.conf	0	d8e64b48949e37d4
+Catppuccin	dark	t:qt/undo.sh	0	94ca2076914d2021
+Catppuccin	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Catppuccin	dark	t:starship/starship.toml	0	826f28ea21e230d3
+Catppuccin	dark	t:starship/undo.sh	0	c5f7781e77878644
+Catppuccin	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Catppuccin	dark	t:warp/undo.sh	0	b512e8d28284602b
+Catppuccin	dark	t:warp/warp.yaml	0	114eb3329218bb2f
+Catppuccin	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Catppuccin	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Catppuccin	dark	t:wezterm/wezterm.toml	0	1f761a935a6a6c1d
+Catppuccin	light	synthetic.tpl	5	16276a93a02ac008
+Catppuccin	light	t:alacritty/alacritty.toml	0	f2cd5e28593b244e
+Catppuccin	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Catppuccin	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Catppuccin	light	t:btop/apply.sh	0	cff0dca38442d812
+Catppuccin	light	t:btop/btop.theme	0	fbcda18d2be5866a
+Catppuccin	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Catppuccin	light	t:builtin.toml	0	5370fc3fbc3723d4
+Catppuccin	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Catppuccin	light	t:cava/cava.ini	0	7c2570451857a63b
+Catppuccin	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Catppuccin	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Catppuccin	light	t:cursor/cursor.yaml	0	15b1345acb5e444d
+Catppuccin	light	t:cursor/undo.sh	0	01078b19cba65543
+Catppuccin	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Catppuccin	light	t:emacs/emacs.el	0	58bc4835f94d9b26
+Catppuccin	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Catppuccin	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Catppuccin	light	t:foot/apply.sh	0	3af32debc09faf68
+Catppuccin	light	t:foot/foot	0	611bee9448e6d9b4
+Catppuccin	light	t:foot/undo.sh	0	70887b5b6415b345
+Catppuccin	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Catppuccin	light	t:ghostty/ghostty	0	f4fa4249f93e6ff6
+Catppuccin	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Catppuccin	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Catppuccin	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Catppuccin	light	t:gtk/gtk3.css	0	dfdcad71b1b0a372
+Catppuccin	light	t:gtk/gtk4.css	0	18307a852dc0b65b
+Catppuccin	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Catppuccin	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Catppuccin	light	t:helix/helix.toml	0	da30f4e8b45723ed
+Catppuccin	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Catppuccin	light	t:kde/kcolorscheme.colors	0	9324b60a5fefe6c6
+Catppuccin	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Catppuccin	light	t:kitty/apply.sh	0	9e7184410726dad3
+Catppuccin	light	t:kitty/kitty.conf	0	5cfd68a2b1cbe6f5
+Catppuccin	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Catppuccin	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Catppuccin	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Catppuccin	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Catppuccin	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Catppuccin	light	t:qt/qtct.conf	0	06f29c73741d065f
+Catppuccin	light	t:qt/undo.sh	0	94ca2076914d2021
+Catppuccin	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Catppuccin	light	t:starship/starship.toml	0	e172d30b097d9560
+Catppuccin	light	t:starship/undo.sh	0	c5f7781e77878644
+Catppuccin	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Catppuccin	light	t:warp/undo.sh	0	b512e8d28284602b
+Catppuccin	light	t:warp/warp.yaml	0	f4010262a4473eff
+Catppuccin	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Catppuccin	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Catppuccin	light	t:wezterm/wezterm.toml	0	dda0d97f17ba3e87
+Dracula	dark	synthetic.tpl	5	53056337cd625861
+Dracula	dark	t:alacritty/alacritty.toml	0	20eadf1eb3f5e5cb
+Dracula	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Dracula	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Dracula	dark	t:btop/apply.sh	0	cff0dca38442d812
+Dracula	dark	t:btop/btop.theme	0	ce39a7f3fbcfbcbf
+Dracula	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Dracula	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Dracula	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Dracula	dark	t:cava/cava.ini	0	5c89a04387e45601
+Dracula	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Dracula	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Dracula	dark	t:cursor/cursor.yaml	0	0a59552cee267169
+Dracula	dark	t:cursor/undo.sh	0	01078b19cba65543
+Dracula	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Dracula	dark	t:emacs/emacs.el	0	5906e59173f4ca4d
+Dracula	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Dracula	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Dracula	dark	t:foot/apply.sh	0	3af32debc09faf68
+Dracula	dark	t:foot/foot	0	e488641a101c8e5c
+Dracula	dark	t:foot/undo.sh	0	70887b5b6415b345
+Dracula	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Dracula	dark	t:ghostty/ghostty	0	65b895e6171edd2e
+Dracula	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Dracula	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Dracula	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Dracula	dark	t:gtk/gtk3.css	0	93889c716c2cb285
+Dracula	dark	t:gtk/gtk4.css	0	afdaf22ff28a2e68
+Dracula	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Dracula	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Dracula	dark	t:helix/helix.toml	0	67f05749a8671cee
+Dracula	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Dracula	dark	t:kde/kcolorscheme.colors	0	53136add0553d1b7
+Dracula	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Dracula	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Dracula	dark	t:kitty/kitty.conf	0	a1030d3cc6d93e6e
+Dracula	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Dracula	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Dracula	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Dracula	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Dracula	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Dracula	dark	t:qt/qtct.conf	0	a850bdc1ae9018bf
+Dracula	dark	t:qt/undo.sh	0	94ca2076914d2021
+Dracula	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Dracula	dark	t:starship/starship.toml	0	e5a648098fd1b02b
+Dracula	dark	t:starship/undo.sh	0	c5f7781e77878644
+Dracula	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Dracula	dark	t:warp/undo.sh	0	b512e8d28284602b
+Dracula	dark	t:warp/warp.yaml	0	b0cd5d85f2dc47b7
+Dracula	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Dracula	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Dracula	dark	t:wezterm/wezterm.toml	0	21ca3d47bc1c2566
+Dracula	light	synthetic.tpl	5	0ef439333fe742b0
+Dracula	light	t:alacritty/alacritty.toml	0	2df069544e60500b
+Dracula	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Dracula	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Dracula	light	t:btop/apply.sh	0	cff0dca38442d812
+Dracula	light	t:btop/btop.theme	0	5e49cc4d01dea8d2
+Dracula	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Dracula	light	t:builtin.toml	0	5370fc3fbc3723d4
+Dracula	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Dracula	light	t:cava/cava.ini	0	0ffd9f0bc1ebb7a3
+Dracula	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Dracula	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Dracula	light	t:cursor/cursor.yaml	0	d11dacab265a7d09
+Dracula	light	t:cursor/undo.sh	0	01078b19cba65543
+Dracula	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Dracula	light	t:emacs/emacs.el	0	8d2420332c85b120
+Dracula	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Dracula	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Dracula	light	t:foot/apply.sh	0	3af32debc09faf68
+Dracula	light	t:foot/foot	0	8b787dadc26bf523
+Dracula	light	t:foot/undo.sh	0	70887b5b6415b345
+Dracula	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Dracula	light	t:ghostty/ghostty	0	cd27c8143d4538f5
+Dracula	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Dracula	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Dracula	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Dracula	light	t:gtk/gtk3.css	0	90123a03b3c44f2e
+Dracula	light	t:gtk/gtk4.css	0	92a8108702757235
+Dracula	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Dracula	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Dracula	light	t:helix/helix.toml	0	b3c952599f4288b9
+Dracula	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Dracula	light	t:kde/kcolorscheme.colors	0	950de25ea8936173
+Dracula	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Dracula	light	t:kitty/apply.sh	0	9e7184410726dad3
+Dracula	light	t:kitty/kitty.conf	0	a1cb5ac9ca478332
+Dracula	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Dracula	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Dracula	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Dracula	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Dracula	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Dracula	light	t:qt/qtct.conf	0	aaccca58f8588985
+Dracula	light	t:qt/undo.sh	0	94ca2076914d2021
+Dracula	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Dracula	light	t:starship/starship.toml	0	09666305bc23db11
+Dracula	light	t:starship/undo.sh	0	c5f7781e77878644
+Dracula	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Dracula	light	t:warp/undo.sh	0	b512e8d28284602b
+Dracula	light	t:warp/warp.yaml	0	d41de48b8d77d286
+Dracula	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Dracula	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Dracula	light	t:wezterm/wezterm.toml	0	d7ab093fb99d70f4
+Eldritch	dark	synthetic.tpl	5	c7219980ce82c81b
+Eldritch	dark	t:alacritty/alacritty.toml	0	90c20d7df8aae0f6
+Eldritch	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Eldritch	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Eldritch	dark	t:btop/apply.sh	0	cff0dca38442d812
+Eldritch	dark	t:btop/btop.theme	0	f39b3d7243fc51cd
+Eldritch	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Eldritch	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Eldritch	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Eldritch	dark	t:cava/cava.ini	0	ecf105e02bd63c1a
+Eldritch	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Eldritch	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Eldritch	dark	t:cursor/cursor.yaml	0	e7765d2358808105
+Eldritch	dark	t:cursor/undo.sh	0	01078b19cba65543
+Eldritch	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Eldritch	dark	t:emacs/emacs.el	0	4b08820218ee6d41
+Eldritch	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Eldritch	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Eldritch	dark	t:foot/apply.sh	0	3af32debc09faf68
+Eldritch	dark	t:foot/foot	0	00095dd3083c0aac
+Eldritch	dark	t:foot/undo.sh	0	70887b5b6415b345
+Eldritch	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Eldritch	dark	t:ghostty/ghostty	0	387dcc33a9b2d6e0
+Eldritch	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Eldritch	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Eldritch	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Eldritch	dark	t:gtk/gtk3.css	0	ebcfc76e48ec8f77
+Eldritch	dark	t:gtk/gtk4.css	0	9bf114610915cce3
+Eldritch	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Eldritch	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Eldritch	dark	t:helix/helix.toml	0	08ba3b125012b8ed
+Eldritch	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Eldritch	dark	t:kde/kcolorscheme.colors	0	459a451e95e6497d
+Eldritch	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Eldritch	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Eldritch	dark	t:kitty/kitty.conf	0	f00d81f28d5abab3
+Eldritch	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Eldritch	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Eldritch	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Eldritch	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Eldritch	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Eldritch	dark	t:qt/qtct.conf	0	9cda2bfeaec065e0
+Eldritch	dark	t:qt/undo.sh	0	94ca2076914d2021
+Eldritch	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Eldritch	dark	t:starship/starship.toml	0	87421e932f49f5a6
+Eldritch	dark	t:starship/undo.sh	0	c5f7781e77878644
+Eldritch	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Eldritch	dark	t:warp/undo.sh	0	b512e8d28284602b
+Eldritch	dark	t:warp/warp.yaml	0	64cb27ed05e712cd
+Eldritch	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Eldritch	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Eldritch	dark	t:wezterm/wezterm.toml	0	7331def5a59100d2
+Eldritch	light	synthetic.tpl	5	1661d65fa040b795
+Eldritch	light	t:alacritty/alacritty.toml	0	8a1bb77d01df29e4
+Eldritch	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Eldritch	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Eldritch	light	t:btop/apply.sh	0	cff0dca38442d812
+Eldritch	light	t:btop/btop.theme	0	45dc850943dadeaf
+Eldritch	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Eldritch	light	t:builtin.toml	0	5370fc3fbc3723d4
+Eldritch	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Eldritch	light	t:cava/cava.ini	0	2b78495bc2351456
+Eldritch	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Eldritch	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Eldritch	light	t:cursor/cursor.yaml	0	8146dc46f59a4ff9
+Eldritch	light	t:cursor/undo.sh	0	01078b19cba65543
+Eldritch	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Eldritch	light	t:emacs/emacs.el	0	be6f7c569ec8bee8
+Eldritch	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Eldritch	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Eldritch	light	t:foot/apply.sh	0	3af32debc09faf68
+Eldritch	light	t:foot/foot	0	5046cb0ea4e63c12
+Eldritch	light	t:foot/undo.sh	0	70887b5b6415b345
+Eldritch	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Eldritch	light	t:ghostty/ghostty	0	17cec0f056370ff2
+Eldritch	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Eldritch	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Eldritch	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Eldritch	light	t:gtk/gtk3.css	0	b9fc94efd08dbf6e
+Eldritch	light	t:gtk/gtk4.css	0	449bb61921efd0bc
+Eldritch	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Eldritch	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Eldritch	light	t:helix/helix.toml	0	4c39cf2a19a5e213
+Eldritch	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Eldritch	light	t:kde/kcolorscheme.colors	0	72581a3d21ee3a9b
+Eldritch	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Eldritch	light	t:kitty/apply.sh	0	9e7184410726dad3
+Eldritch	light	t:kitty/kitty.conf	0	ca6a915befa450d7
+Eldritch	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Eldritch	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Eldritch	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Eldritch	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Eldritch	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Eldritch	light	t:qt/qtct.conf	0	b4b104ff6d323bce
+Eldritch	light	t:qt/undo.sh	0	94ca2076914d2021
+Eldritch	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Eldritch	light	t:starship/starship.toml	0	9d8dbc494c496df4
+Eldritch	light	t:starship/undo.sh	0	c5f7781e77878644
+Eldritch	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Eldritch	light	t:warp/undo.sh	0	b512e8d28284602b
+Eldritch	light	t:warp/warp.yaml	0	2d5d7a98f58aba93
+Eldritch	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Eldritch	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Eldritch	light	t:wezterm/wezterm.toml	0	52a87d0cab948f1e
+Gruvbox	dark	synthetic.tpl	5	e81e91ebb7fed6bf
+Gruvbox	dark	t:alacritty/alacritty.toml	0	11af8a8b22eac97b
+Gruvbox	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Gruvbox	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Gruvbox	dark	t:btop/apply.sh	0	cff0dca38442d812
+Gruvbox	dark	t:btop/btop.theme	0	e76f61570c8c7ebe
+Gruvbox	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Gruvbox	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Gruvbox	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Gruvbox	dark	t:cava/cava.ini	0	f5f4649ae96cd173
+Gruvbox	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Gruvbox	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Gruvbox	dark	t:cursor/cursor.yaml	0	7a016641686db6fa
+Gruvbox	dark	t:cursor/undo.sh	0	01078b19cba65543
+Gruvbox	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Gruvbox	dark	t:emacs/emacs.el	0	60ffbcfdd730298f
+Gruvbox	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Gruvbox	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Gruvbox	dark	t:foot/apply.sh	0	3af32debc09faf68
+Gruvbox	dark	t:foot/foot	0	c4b7092b2f4c0ace
+Gruvbox	dark	t:foot/undo.sh	0	70887b5b6415b345
+Gruvbox	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Gruvbox	dark	t:ghostty/ghostty	0	1191e89ae72f3388
+Gruvbox	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Gruvbox	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Gruvbox	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Gruvbox	dark	t:gtk/gtk3.css	0	030e663229e22ea3
+Gruvbox	dark	t:gtk/gtk4.css	0	e5b6372513a87082
+Gruvbox	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Gruvbox	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Gruvbox	dark	t:helix/helix.toml	0	186bb0fef6f2bdf6
+Gruvbox	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Gruvbox	dark	t:kde/kcolorscheme.colors	0	3df5ac9dbc7c9003
+Gruvbox	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Gruvbox	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Gruvbox	dark	t:kitty/kitty.conf	0	9f7cdeaed65d96e1
+Gruvbox	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Gruvbox	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Gruvbox	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Gruvbox	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Gruvbox	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Gruvbox	dark	t:qt/qtct.conf	0	39c13d2c2c2c2b15
+Gruvbox	dark	t:qt/undo.sh	0	94ca2076914d2021
+Gruvbox	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Gruvbox	dark	t:starship/starship.toml	0	220ccbae424e12dd
+Gruvbox	dark	t:starship/undo.sh	0	c5f7781e77878644
+Gruvbox	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Gruvbox	dark	t:warp/undo.sh	0	b512e8d28284602b
+Gruvbox	dark	t:warp/warp.yaml	0	6d0c18509531edc5
+Gruvbox	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Gruvbox	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Gruvbox	dark	t:wezterm/wezterm.toml	0	e909daa35178aafe
+Gruvbox	light	synthetic.tpl	5	72f6fa162af9c809
+Gruvbox	light	t:alacritty/alacritty.toml	0	a720c1de61f4ddb5
+Gruvbox	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Gruvbox	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Gruvbox	light	t:btop/apply.sh	0	cff0dca38442d812
+Gruvbox	light	t:btop/btop.theme	0	d744ef7953cadb1c
+Gruvbox	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Gruvbox	light	t:builtin.toml	0	5370fc3fbc3723d4
+Gruvbox	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Gruvbox	light	t:cava/cava.ini	0	fdb19b8b0de948df
+Gruvbox	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Gruvbox	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Gruvbox	light	t:cursor/cursor.yaml	0	6fb6e5360f7a61f4
+Gruvbox	light	t:cursor/undo.sh	0	01078b19cba65543
+Gruvbox	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Gruvbox	light	t:emacs/emacs.el	0	9f861f1187729c26
+Gruvbox	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Gruvbox	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Gruvbox	light	t:foot/apply.sh	0	3af32debc09faf68
+Gruvbox	light	t:foot/foot	0	8989b689ea5ad1a1
+Gruvbox	light	t:foot/undo.sh	0	70887b5b6415b345
+Gruvbox	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Gruvbox	light	t:ghostty/ghostty	0	dccbf0342814ae19
+Gruvbox	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Gruvbox	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Gruvbox	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Gruvbox	light	t:gtk/gtk3.css	0	9683b3cb0fdb50f2
+Gruvbox	light	t:gtk/gtk4.css	0	a9a3b0dcda9b6422
+Gruvbox	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Gruvbox	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Gruvbox	light	t:helix/helix.toml	0	f78bfc0db4e04744
+Gruvbox	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Gruvbox	light	t:kde/kcolorscheme.colors	0	e1076bfa1dd2ff03
+Gruvbox	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Gruvbox	light	t:kitty/apply.sh	0	9e7184410726dad3
+Gruvbox	light	t:kitty/kitty.conf	0	5a56f9d993bdbb2a
+Gruvbox	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Gruvbox	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Gruvbox	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Gruvbox	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Gruvbox	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Gruvbox	light	t:qt/qtct.conf	0	49c0242e22272098
+Gruvbox	light	t:qt/undo.sh	0	94ca2076914d2021
+Gruvbox	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Gruvbox	light	t:starship/starship.toml	0	e23062793cbcdf84
+Gruvbox	light	t:starship/undo.sh	0	c5f7781e77878644
+Gruvbox	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Gruvbox	light	t:warp/undo.sh	0	b512e8d28284602b
+Gruvbox	light	t:warp/warp.yaml	0	3036cf4e56fbb47a
+Gruvbox	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Gruvbox	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Gruvbox	light	t:wezterm/wezterm.toml	0	18233c1d986fb8d4
+Kanagawa	dark	synthetic.tpl	5	11e410046491edc8
+Kanagawa	dark	t:alacritty/alacritty.toml	0	dc0a010e8d7733bf
+Kanagawa	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Kanagawa	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Kanagawa	dark	t:btop/apply.sh	0	cff0dca38442d812
+Kanagawa	dark	t:btop/btop.theme	0	1a4715d5e181dfa5
+Kanagawa	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Kanagawa	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Kanagawa	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Kanagawa	dark	t:cava/cava.ini	0	64fb95bc12838a5d
+Kanagawa	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Kanagawa	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Kanagawa	dark	t:cursor/cursor.yaml	0	65d431a58d96dffa
+Kanagawa	dark	t:cursor/undo.sh	0	01078b19cba65543
+Kanagawa	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Kanagawa	dark	t:emacs/emacs.el	0	8895459284ada36d
+Kanagawa	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Kanagawa	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Kanagawa	dark	t:foot/apply.sh	0	3af32debc09faf68
+Kanagawa	dark	t:foot/foot	0	e2804cc7958b02cd
+Kanagawa	dark	t:foot/undo.sh	0	70887b5b6415b345
+Kanagawa	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Kanagawa	dark	t:ghostty/ghostty	0	296170a24392d65b
+Kanagawa	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Kanagawa	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Kanagawa	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Kanagawa	dark	t:gtk/gtk3.css	0	6822c89b5a14a13a
+Kanagawa	dark	t:gtk/gtk4.css	0	481fd83b3d4651c6
+Kanagawa	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Kanagawa	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Kanagawa	dark	t:helix/helix.toml	0	55bf8109ad1ef7dd
+Kanagawa	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Kanagawa	dark	t:kde/kcolorscheme.colors	0	80b7c8d1c6ce1858
+Kanagawa	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Kanagawa	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Kanagawa	dark	t:kitty/kitty.conf	0	b54f83d7a9b4b2cd
+Kanagawa	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Kanagawa	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Kanagawa	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Kanagawa	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Kanagawa	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Kanagawa	dark	t:qt/qtct.conf	0	aee0da06329721dd
+Kanagawa	dark	t:qt/undo.sh	0	94ca2076914d2021
+Kanagawa	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Kanagawa	dark	t:starship/starship.toml	0	9961bbe5a9f3d7e1
+Kanagawa	dark	t:starship/undo.sh	0	c5f7781e77878644
+Kanagawa	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Kanagawa	dark	t:warp/undo.sh	0	b512e8d28284602b
+Kanagawa	dark	t:warp/warp.yaml	0	22e6cc9e1843102a
+Kanagawa	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Kanagawa	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Kanagawa	dark	t:wezterm/wezterm.toml	0	2e1257642825e38c
+Kanagawa	light	synthetic.tpl	5	521eec57d56f38a3
+Kanagawa	light	t:alacritty/alacritty.toml	0	5c26dca4dd4ef239
+Kanagawa	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Kanagawa	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Kanagawa	light	t:btop/apply.sh	0	cff0dca38442d812
+Kanagawa	light	t:btop/btop.theme	0	060d008d4d04d122
+Kanagawa	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Kanagawa	light	t:builtin.toml	0	5370fc3fbc3723d4
+Kanagawa	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Kanagawa	light	t:cava/cava.ini	0	83255f6446d30c38
+Kanagawa	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Kanagawa	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Kanagawa	light	t:cursor/cursor.yaml	0	cf60f2669b8c1bb8
+Kanagawa	light	t:cursor/undo.sh	0	01078b19cba65543
+Kanagawa	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Kanagawa	light	t:emacs/emacs.el	0	c790b5cb091e4884
+Kanagawa	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Kanagawa	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Kanagawa	light	t:foot/apply.sh	0	3af32debc09faf68
+Kanagawa	light	t:foot/foot	0	9c7edfe3adb86718
+Kanagawa	light	t:foot/undo.sh	0	70887b5b6415b345
+Kanagawa	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Kanagawa	light	t:ghostty/ghostty	0	484ce64114864438
+Kanagawa	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Kanagawa	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Kanagawa	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Kanagawa	light	t:gtk/gtk3.css	0	f738c0a9eec8e107
+Kanagawa	light	t:gtk/gtk4.css	0	94393492e66de363
+Kanagawa	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Kanagawa	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Kanagawa	light	t:helix/helix.toml	0	2541f3a8b9069891
+Kanagawa	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Kanagawa	light	t:kde/kcolorscheme.colors	0	a175f9de30d6358e
+Kanagawa	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Kanagawa	light	t:kitty/apply.sh	0	9e7184410726dad3
+Kanagawa	light	t:kitty/kitty.conf	0	dee32530f6724204
+Kanagawa	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Kanagawa	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Kanagawa	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Kanagawa	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Kanagawa	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Kanagawa	light	t:qt/qtct.conf	0	c9aa352d42eaddd2
+Kanagawa	light	t:qt/undo.sh	0	94ca2076914d2021
+Kanagawa	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Kanagawa	light	t:starship/starship.toml	0	3b58d721232e6010
+Kanagawa	light	t:starship/undo.sh	0	c5f7781e77878644
+Kanagawa	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Kanagawa	light	t:warp/undo.sh	0	b512e8d28284602b
+Kanagawa	light	t:warp/warp.yaml	0	ebf16dd5a339d70d
+Kanagawa	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Kanagawa	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Kanagawa	light	t:wezterm/wezterm.toml	0	bea18b21ab5de433
+Helix	dark	synthetic.tpl	5	360befa82764e289
+Helix	dark	t:alacritty/alacritty.toml	0	0bf1ac8312a97164
+Helix	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Helix	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Helix	dark	t:btop/apply.sh	0	cff0dca38442d812
+Helix	dark	t:btop/btop.theme	0	7bc41e7fcebf6d08
+Helix	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Helix	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Helix	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Helix	dark	t:cava/cava.ini	0	214a1ee43a5bfd54
+Helix	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Helix	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Helix	dark	t:cursor/cursor.yaml	0	b136fa10c6c0209e
+Helix	dark	t:cursor/undo.sh	0	01078b19cba65543
+Helix	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Helix	dark	t:emacs/emacs.el	0	bcdf589c794be893
+Helix	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Helix	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Helix	dark	t:foot/apply.sh	0	3af32debc09faf68
+Helix	dark	t:foot/foot	0	bc0dbb573ade5031
+Helix	dark	t:foot/undo.sh	0	70887b5b6415b345
+Helix	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Helix	dark	t:ghostty/ghostty	0	5e429d15051bf899
+Helix	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Helix	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Helix	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Helix	dark	t:gtk/gtk3.css	0	f30d29094e9fb7ba
+Helix	dark	t:gtk/gtk4.css	0	78e38760befc3612
+Helix	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Helix	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Helix	dark	t:helix/helix.toml	0	2961d45b816864d3
+Helix	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Helix	dark	t:kde/kcolorscheme.colors	0	de5333efc56ceba0
+Helix	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Helix	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Helix	dark	t:kitty/kitty.conf	0	0dc3ed5d8c0be17d
+Helix	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Helix	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Helix	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Helix	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Helix	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Helix	dark	t:qt/qtct.conf	0	a37906ce50056f77
+Helix	dark	t:qt/undo.sh	0	94ca2076914d2021
+Helix	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Helix	dark	t:starship/starship.toml	0	e9a3bc92384ff160
+Helix	dark	t:starship/undo.sh	0	c5f7781e77878644
+Helix	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Helix	dark	t:warp/undo.sh	0	b512e8d28284602b
+Helix	dark	t:warp/warp.yaml	0	0834d08f5861b68b
+Helix	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Helix	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Helix	dark	t:wezterm/wezterm.toml	0	90056ee3cbbb7325
+Helix	light	synthetic.tpl	5	df8a5e42e42d10d8
+Helix	light	t:alacritty/alacritty.toml	0	47d574a92a459b14
+Helix	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Helix	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Helix	light	t:btop/apply.sh	0	cff0dca38442d812
+Helix	light	t:btop/btop.theme	0	db2c47630b611b56
+Helix	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Helix	light	t:builtin.toml	0	5370fc3fbc3723d4
+Helix	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Helix	light	t:cava/cava.ini	0	89e4a09df68d33c6
+Helix	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Helix	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Helix	light	t:cursor/cursor.yaml	0	73a7962f6c6fdb0d
+Helix	light	t:cursor/undo.sh	0	01078b19cba65543
+Helix	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Helix	light	t:emacs/emacs.el	0	fcb79b913a7a54e0
+Helix	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Helix	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Helix	light	t:foot/apply.sh	0	3af32debc09faf68
+Helix	light	t:foot/foot	0	5c3aebc92c8d0425
+Helix	light	t:foot/undo.sh	0	70887b5b6415b345
+Helix	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Helix	light	t:ghostty/ghostty	0	8aa3e2ef7089d48b
+Helix	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Helix	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Helix	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Helix	light	t:gtk/gtk3.css	0	19e42e8d4dfe2eac
+Helix	light	t:gtk/gtk4.css	0	d6102a2ce22224de
+Helix	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Helix	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Helix	light	t:helix/helix.toml	0	20b94b8b39f7054f
+Helix	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Helix	light	t:kde/kcolorscheme.colors	0	e808aadb70136ef7
+Helix	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Helix	light	t:kitty/apply.sh	0	9e7184410726dad3
+Helix	light	t:kitty/kitty.conf	0	d20c5d828efef447
+Helix	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Helix	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Helix	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Helix	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Helix	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Helix	light	t:qt/qtct.conf	0	ef91255f9851c55c
+Helix	light	t:qt/undo.sh	0	94ca2076914d2021
+Helix	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Helix	light	t:starship/starship.toml	0	23ef96988e3b7a77
+Helix	light	t:starship/undo.sh	0	c5f7781e77878644
+Helix	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Helix	light	t:warp/undo.sh	0	b512e8d28284602b
+Helix	light	t:warp/warp.yaml	0	bee27544f111245a
+Helix	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Helix	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Helix	light	t:wezterm/wezterm.toml	0	d18d02417dffcb3c
+Nord	dark	synthetic.tpl	5	2f1f156b11ea3cb3
+Nord	dark	t:alacritty/alacritty.toml	0	bcd0575dff4ca9b3
+Nord	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Nord	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Nord	dark	t:btop/apply.sh	0	cff0dca38442d812
+Nord	dark	t:btop/btop.theme	0	85314871c4335a9a
+Nord	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Nord	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Nord	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Nord	dark	t:cava/cava.ini	0	ef9e74e9d21602d4
+Nord	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Nord	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Nord	dark	t:cursor/cursor.yaml	0	0e999ae437c16faa
+Nord	dark	t:cursor/undo.sh	0	01078b19cba65543
+Nord	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Nord	dark	t:emacs/emacs.el	0	a1cad398eba8b51f
+Nord	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Nord	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Nord	dark	t:foot/apply.sh	0	3af32debc09faf68
+Nord	dark	t:foot/foot	0	3d0c8df53e096b57
+Nord	dark	t:foot/undo.sh	0	70887b5b6415b345
+Nord	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Nord	dark	t:ghostty/ghostty	0	7d027c8288329ca9
+Nord	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Nord	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Nord	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Nord	dark	t:gtk/gtk3.css	0	4f14b63d48fe7d3f
+Nord	dark	t:gtk/gtk4.css	0	a3b90f746b2c2c98
+Nord	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Nord	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Nord	dark	t:helix/helix.toml	0	9ee24536f4f2ab21
+Nord	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Nord	dark	t:kde/kcolorscheme.colors	0	49515976a385a8b1
+Nord	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Nord	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Nord	dark	t:kitty/kitty.conf	0	022f7c31be72ee29
+Nord	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Nord	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Nord	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Nord	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Nord	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Nord	dark	t:qt/qtct.conf	0	f71ffffc376f3eb1
+Nord	dark	t:qt/undo.sh	0	94ca2076914d2021
+Nord	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Nord	dark	t:starship/starship.toml	0	bd5f22f1b0357f46
+Nord	dark	t:starship/undo.sh	0	c5f7781e77878644
+Nord	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Nord	dark	t:warp/undo.sh	0	b512e8d28284602b
+Nord	dark	t:warp/warp.yaml	0	66c70d812e2e95cf
+Nord	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Nord	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Nord	dark	t:wezterm/wezterm.toml	0	cb2bdd8491d55fcc
+Nord	light	synthetic.tpl	5	477cadbcee58844f
+Nord	light	t:alacritty/alacritty.toml	0	37b559b83df861ba
+Nord	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Nord	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Nord	light	t:btop/apply.sh	0	cff0dca38442d812
+Nord	light	t:btop/btop.theme	0	4500ffb038ee87fa
+Nord	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Nord	light	t:builtin.toml	0	5370fc3fbc3723d4
+Nord	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Nord	light	t:cava/cava.ini	0	942330b1c859d593
+Nord	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Nord	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Nord	light	t:cursor/cursor.yaml	0	376df4e0ed240058
+Nord	light	t:cursor/undo.sh	0	01078b19cba65543
+Nord	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Nord	light	t:emacs/emacs.el	0	4ace10fd4e426585
+Nord	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Nord	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Nord	light	t:foot/apply.sh	0	3af32debc09faf68
+Nord	light	t:foot/foot	0	7c1d47d325ed776f
+Nord	light	t:foot/undo.sh	0	70887b5b6415b345
+Nord	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Nord	light	t:ghostty/ghostty	0	e657214b20f000ad
+Nord	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Nord	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Nord	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Nord	light	t:gtk/gtk3.css	0	88acfd23d1897f83
+Nord	light	t:gtk/gtk4.css	0	7e532337fdac5f6b
+Nord	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Nord	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Nord	light	t:helix/helix.toml	0	aeb6d6fd63fca121
+Nord	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Nord	light	t:kde/kcolorscheme.colors	0	b9e01f672f2e343a
+Nord	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Nord	light	t:kitty/apply.sh	0	9e7184410726dad3
+Nord	light	t:kitty/kitty.conf	0	f9c0c8357b71d374
+Nord	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Nord	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Nord	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Nord	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Nord	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Nord	light	t:qt/qtct.conf	0	ca152c5cf636b79d
+Nord	light	t:qt/undo.sh	0	94ca2076914d2021
+Nord	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Nord	light	t:starship/starship.toml	0	40195cb4a7663899
+Nord	light	t:starship/undo.sh	0	c5f7781e77878644
+Nord	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Nord	light	t:warp/undo.sh	0	b512e8d28284602b
+Nord	light	t:warp/warp.yaml	0	3d7d7d849ae82c88
+Nord	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Nord	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Nord	light	t:wezterm/wezterm.toml	0	38c62b3ffb6850fa
+Rosé Pine	dark	synthetic.tpl	5	9d1704f7452ce8cb
+Rosé Pine	dark	t:alacritty/alacritty.toml	0	8fa584ad9fff8bf5
+Rosé Pine	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Rosé Pine	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Rosé Pine	dark	t:btop/apply.sh	0	cff0dca38442d812
+Rosé Pine	dark	t:btop/btop.theme	0	0591c77801b8e64a
+Rosé Pine	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Rosé Pine	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Rosé Pine	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Rosé Pine	dark	t:cava/cava.ini	0	a96932d174b63ec6
+Rosé Pine	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Rosé Pine	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Rosé Pine	dark	t:cursor/cursor.yaml	0	8eac883b81139b98
+Rosé Pine	dark	t:cursor/undo.sh	0	01078b19cba65543
+Rosé Pine	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Rosé Pine	dark	t:emacs/emacs.el	0	be09dddbe53e6b14
+Rosé Pine	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Rosé Pine	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Rosé Pine	dark	t:foot/apply.sh	0	3af32debc09faf68
+Rosé Pine	dark	t:foot/foot	0	5b788ce2a16390b8
+Rosé Pine	dark	t:foot/undo.sh	0	70887b5b6415b345
+Rosé Pine	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Rosé Pine	dark	t:ghostty/ghostty	0	f11e216486b447b2
+Rosé Pine	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Rosé Pine	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Rosé Pine	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Rosé Pine	dark	t:gtk/gtk3.css	0	0ddced571543671f
+Rosé Pine	dark	t:gtk/gtk4.css	0	d6da195b8934a225
+Rosé Pine	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Rosé Pine	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Rosé Pine	dark	t:helix/helix.toml	0	0da6f3c28a246290
+Rosé Pine	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Rosé Pine	dark	t:kde/kcolorscheme.colors	0	e82278b3dd986536
+Rosé Pine	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Rosé Pine	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Rosé Pine	dark	t:kitty/kitty.conf	0	4886a323fc78704c
+Rosé Pine	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Rosé Pine	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Rosé Pine	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Rosé Pine	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Rosé Pine	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Rosé Pine	dark	t:qt/qtct.conf	0	a4fa009acaf521d7
+Rosé Pine	dark	t:qt/undo.sh	0	94ca2076914d2021
+Rosé Pine	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Rosé Pine	dark	t:starship/starship.toml	0	643bffff227b79e5
+Rosé Pine	dark	t:starship/undo.sh	0	c5f7781e77878644
+Rosé Pine	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Rosé Pine	dark	t:warp/undo.sh	0	b512e8d28284602b
+Rosé Pine	dark	t:warp/warp.yaml	0	86a2214aadaafcd4
+Rosé Pine	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Rosé Pine	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Rosé Pine	dark	t:wezterm/wezterm.toml	0	3dc77e80bd516d66
+Rosé Pine	light	synthetic.tpl	5	30d0fc2ee879b2dc
+Rosé Pine	light	t:alacritty/alacritty.toml	0	d157d057cbdfe90b
+Rosé Pine	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Rosé Pine	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Rosé Pine	light	t:btop/apply.sh	0	cff0dca38442d812
+Rosé Pine	light	t:btop/btop.theme	0	36041c36f24e0e38
+Rosé Pine	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Rosé Pine	light	t:builtin.toml	0	5370fc3fbc3723d4
+Rosé Pine	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Rosé Pine	light	t:cava/cava.ini	0	1fb30135cc1e0cd2
+Rosé Pine	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Rosé Pine	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Rosé Pine	light	t:cursor/cursor.yaml	0	89a6673a8959d26f
+Rosé Pine	light	t:cursor/undo.sh	0	01078b19cba65543
+Rosé Pine	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Rosé Pine	light	t:emacs/emacs.el	0	55956e82d39a25d7
+Rosé Pine	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Rosé Pine	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Rosé Pine	light	t:foot/apply.sh	0	3af32debc09faf68
+Rosé Pine	light	t:foot/foot	0	79e7a74d4336b659
+Rosé Pine	light	t:foot/undo.sh	0	70887b5b6415b345
+Rosé Pine	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Rosé Pine	light	t:ghostty/ghostty	0	417315be7d94984b
+Rosé Pine	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Rosé Pine	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Rosé Pine	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Rosé Pine	light	t:gtk/gtk3.css	0	f6db98bf5ba8b48f
+Rosé Pine	light	t:gtk/gtk4.css	0	b8210832717ea7b6
+Rosé Pine	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Rosé Pine	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Rosé Pine	light	t:helix/helix.toml	0	76a59951037380fd
+Rosé Pine	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Rosé Pine	light	t:kde/kcolorscheme.colors	0	299ecd875befbbca
+Rosé Pine	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Rosé Pine	light	t:kitty/apply.sh	0	9e7184410726dad3
+Rosé Pine	light	t:kitty/kitty.conf	0	a540868e1af32f43
+Rosé Pine	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Rosé Pine	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Rosé Pine	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Rosé Pine	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Rosé Pine	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Rosé Pine	light	t:qt/qtct.conf	0	fee52f0cd37e5aa3
+Rosé Pine	light	t:qt/undo.sh	0	94ca2076914d2021
+Rosé Pine	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Rosé Pine	light	t:starship/starship.toml	0	ec00a8bb4769f7d1
+Rosé Pine	light	t:starship/undo.sh	0	c5f7781e77878644
+Rosé Pine	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Rosé Pine	light	t:warp/undo.sh	0	b512e8d28284602b
+Rosé Pine	light	t:warp/warp.yaml	0	84462ec65e4c4300
+Rosé Pine	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Rosé Pine	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Rosé Pine	light	t:wezterm/wezterm.toml	0	4e5dc89b6dafa465
+Tokyo-Night	dark	synthetic.tpl	5	6a34e7821c90282c
+Tokyo-Night	dark	t:alacritty/alacritty.toml	0	9b1c5c4148ffbded
+Tokyo-Night	dark	t:alacritty/apply.sh	0	289aa9b8394d7387
+Tokyo-Night	dark	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Tokyo-Night	dark	t:btop/apply.sh	0	cff0dca38442d812
+Tokyo-Night	dark	t:btop/btop.theme	0	3f9ea7064fbe9427
+Tokyo-Night	dark	t:btop/undo.sh	0	ba85a3b8a19d579c
+Tokyo-Night	dark	t:builtin.toml	0	bebcdd34adabc4e2
+Tokyo-Night	dark	t:cava/apply.sh	0	3bc382d3b0470a32
+Tokyo-Night	dark	t:cava/cava.ini	0	fbe2dcaf47dce027
+Tokyo-Night	dark	t:cava/undo.sh	0	d250dbbb816b4d0e
+Tokyo-Night	dark	t:cursor/apply.sh	0	02a7d24e64b088cb
+Tokyo-Night	dark	t:cursor/cursor.yaml	0	45f90b966642022b
+Tokyo-Night	dark	t:cursor/undo.sh	0	01078b19cba65543
+Tokyo-Night	dark	t:emacs/apply.sh	0	eeb8b64653075f4a
+Tokyo-Night	dark	t:emacs/emacs.el	0	12c4e25a16978ff2
+Tokyo-Night	dark	t:emacs/output-path.sh	0	88006eb7b1974b77
+Tokyo-Night	dark	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Tokyo-Night	dark	t:foot/apply.sh	0	3af32debc09faf68
+Tokyo-Night	dark	t:foot/foot	0	b5dab2b5b76a0af5
+Tokyo-Night	dark	t:foot/undo.sh	0	70887b5b6415b345
+Tokyo-Night	dark	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Tokyo-Night	dark	t:ghostty/ghostty	0	92309fc92bc26b59
+Tokyo-Night	dark	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Tokyo-Night	dark	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Tokyo-Night	dark	t:gtk/apply.sh	0	8ddd44df829201f2
+Tokyo-Night	dark	t:gtk/gtk3.css	0	01cf3b35630f520b
+Tokyo-Night	dark	t:gtk/gtk4.css	0	70f0aeec105e5db9
+Tokyo-Night	dark	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Tokyo-Night	dark	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Tokyo-Night	dark	t:helix/helix.toml	0	597f4a349406dcee
+Tokyo-Night	dark	t:helix/undo.sh	0	3de9b3db1387ebd0
+Tokyo-Night	dark	t:kde/kcolorscheme.colors	0	e21a57383863b415
+Tokyo-Night	dark	t:kde/undo.sh	0	6e3bc9890f533c8c
+Tokyo-Night	dark	t:kitty/apply.sh	0	9e7184410726dad3
+Tokyo-Night	dark	t:kitty/kitty.conf	0	8e78e08f94a1a9a4
+Tokyo-Night	dark	t:kitty/undo.sh	0	dd1d30b9434ef966
+Tokyo-Night	dark	t:niri/apply.sh	0	03ceced9dc4135ce
+Tokyo-Night	dark	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Tokyo-Night	dark	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Tokyo-Night	dark	t:niri/undo.sh	0	e114b823dc9d39bb
+Tokyo-Night	dark	t:qt/qtct.conf	0	c6873cedc8c30b32
+Tokyo-Night	dark	t:qt/undo.sh	0	94ca2076914d2021
+Tokyo-Night	dark	t:starship/apply.sh	0	10250e1f1f9d9752
+Tokyo-Night	dark	t:starship/starship.toml	0	096b9a00209c6174
+Tokyo-Night	dark	t:starship/undo.sh	0	c5f7781e77878644
+Tokyo-Night	dark	t:warp/apply.sh	0	22b0e5b3a26467d9
+Tokyo-Night	dark	t:warp/undo.sh	0	b512e8d28284602b
+Tokyo-Night	dark	t:warp/warp.yaml	0	cb01f091d590257c
+Tokyo-Night	dark	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Tokyo-Night	dark	t:wezterm/undo.sh	0	38f1df4978a5248d
+Tokyo-Night	dark	t:wezterm/wezterm.toml	0	51ca3578b96f067e
+Tokyo-Night	light	synthetic.tpl	5	a7020717abecc780
+Tokyo-Night	light	t:alacritty/alacritty.toml	0	6ec7857bd64a488e
+Tokyo-Night	light	t:alacritty/apply.sh	0	289aa9b8394d7387
+Tokyo-Night	light	t:alacritty/undo.sh	0	6cc9c916827eda4a
+Tokyo-Night	light	t:btop/apply.sh	0	cff0dca38442d812
+Tokyo-Night	light	t:btop/btop.theme	0	93c76ca3bb74cad0
+Tokyo-Night	light	t:btop/undo.sh	0	ba85a3b8a19d579c
+Tokyo-Night	light	t:builtin.toml	0	5370fc3fbc3723d4
+Tokyo-Night	light	t:cava/apply.sh	0	3bc382d3b0470a32
+Tokyo-Night	light	t:cava/cava.ini	0	ec159f658061d282
+Tokyo-Night	light	t:cava/undo.sh	0	d250dbbb816b4d0e
+Tokyo-Night	light	t:cursor/apply.sh	0	02a7d24e64b088cb
+Tokyo-Night	light	t:cursor/cursor.yaml	0	6795bde7d6ca600f
+Tokyo-Night	light	t:cursor/undo.sh	0	01078b19cba65543
+Tokyo-Night	light	t:emacs/apply.sh	0	eeb8b64653075f4a
+Tokyo-Night	light	t:emacs/emacs.el	0	32204e1a633a2fb2
+Tokyo-Night	light	t:emacs/output-path.sh	0	88006eb7b1974b77
+Tokyo-Night	light	t:emacs/undo.sh	0	7c0b87f2a234cdb3
+Tokyo-Night	light	t:foot/apply.sh	0	3af32debc09faf68
+Tokyo-Night	light	t:foot/foot	0	fa993623e905025d
+Tokyo-Night	light	t:foot/undo.sh	0	70887b5b6415b345
+Tokyo-Night	light	t:ghostty/apply.sh	0	ac0b0b4a8e020f35
+Tokyo-Night	light	t:ghostty/ghostty	0	b670728d28810829
+Tokyo-Night	light	t:ghostty/reload.sh	0	70f44a26d4bfe0be
+Tokyo-Night	light	t:ghostty/undo.sh	0	7dccb8d3693e93fe
+Tokyo-Night	light	t:gtk/apply.sh	0	8ddd44df829201f2
+Tokyo-Night	light	t:gtk/gtk3.css	0	50098267fdf37620
+Tokyo-Night	light	t:gtk/gtk4.css	0	f307c3d90890cdbe
+Tokyo-Night	light	t:gtk/undo-gtk3.sh	0	03e4ec13bec5793f
+Tokyo-Night	light	t:gtk/undo-gtk4.sh	0	ff712153560de982
+Tokyo-Night	light	t:helix/helix.toml	0	d433001eed14993d
+Tokyo-Night	light	t:helix/undo.sh	0	3de9b3db1387ebd0
+Tokyo-Night	light	t:kde/kcolorscheme.colors	0	a4d700da481170fd
+Tokyo-Night	light	t:kde/undo.sh	0	6e3bc9890f533c8c
+Tokyo-Night	light	t:kitty/apply.sh	0	9e7184410726dad3
+Tokyo-Night	light	t:kitty/kitty.conf	0	7620cf1d2221fc3b
+Tokyo-Night	light	t:kitty/undo.sh	0	dd1d30b9434ef966
+Tokyo-Night	light	t:niri/apply.sh	0	03ceced9dc4135ce
+Tokyo-Night	light	t:niri/helix-setup.kdl	0	bbbd365dd95c5432
+Tokyo-Night	light	t:niri/niri.kdl	0	8b9aba8fd0c790c2
+Tokyo-Night	light	t:niri/undo.sh	0	e114b823dc9d39bb
+Tokyo-Night	light	t:qt/qtct.conf	0	4ff0a78f84ba6065
+Tokyo-Night	light	t:qt/undo.sh	0	94ca2076914d2021
+Tokyo-Night	light	t:starship/apply.sh	0	10250e1f1f9d9752
+Tokyo-Night	light	t:starship/starship.toml	0	68e2e9d60e55fa5a
+Tokyo-Night	light	t:starship/undo.sh	0	c5f7781e77878644
+Tokyo-Night	light	t:warp/apply.sh	0	22b0e5b3a26467d9
+Tokyo-Night	light	t:warp/undo.sh	0	b512e8d28284602b
+Tokyo-Night	light	t:warp/warp.yaml	0	6c60004de9cfa793
+Tokyo-Night	light	t:wezterm/apply.sh	0	79b4ca69a8db8248
+Tokyo-Night	light	t:wezterm/undo.sh	0	38f1df4978a5248d
+Tokyo-Night	light	t:wezterm/wezterm.toml	0	5b376c2e8ec69f0c
