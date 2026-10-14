@@ -53,6 +53,8 @@ pub struct RenderResult {
     pub unsupported: Option<&'static str>,
     /// The template read `config.*` / `icon_theme` while no config table was supplied.
     pub needs_config: bool,
+    /// The template read `image` (the wallpaper path).
+    pub needs_image: bool,
 }
 
 /// C++ `makeThemeData`: every token as `#rrggbb` for dark and light.
@@ -549,6 +551,7 @@ struct Engine<'a> {
     errors: u32,
     unsupported: Option<&'static str>,
     needs_config: bool,
+    needs_image: bool,
     scopes: Vec<BTreeMap<String, Scope>>,
 }
 
@@ -630,6 +633,9 @@ impl Engine<'_> {
         }
         let base = trim(&parts[0]).to_string();
         self.note_config_use(&base);
+        if base == "image" {
+            self.needs_image = true;
+        }
         let filters: Vec<String> = parts[1..].iter().map(|f| trim(f).to_string()).collect();
 
         let mut resolved = match base.as_str() {
@@ -854,7 +860,7 @@ pub fn render(data: &ThemeData, options: &Options, template: &str) -> RenderResu
     let nodes = parser.nodes(&[]);
     let parse_errors = parser.errors;
 
-    let mut engine = Engine { data, options, errors: parse_errors, unsupported: None, needs_config: false, scopes: Vec::new() };
+    let mut engine = Engine { data, options, errors: parse_errors, unsupported: None, needs_config: false, needs_image: false, scopes: Vec::new() };
     if let Some(table) = &options.config_table {
         let mut root = BTreeMap::new();
         root.insert("config".to_string(), from_json(table));
@@ -867,5 +873,6 @@ pub fn render(data: &ThemeData, options: &Options, template: &str) -> RenderResu
         error_count: engine.errors,
         unsupported: engine.unsupported,
         needs_config: engine.needs_config,
+        needs_image: engine.needs_image,
     }
 }

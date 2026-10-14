@@ -105,7 +105,7 @@ impl Appearance {
             .as_str()
             .unwrap_or("dark")
             .to_string();
-        let apply = crate::template_apply::reapply_templates(&state.config);
+        let apply = crate::template_apply::reapply_templates(&mut state);
         drop(state);
         if let Err(message) = apply {
             return Err(fdo::Error::Failed(

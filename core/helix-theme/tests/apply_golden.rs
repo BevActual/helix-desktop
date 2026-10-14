@@ -84,7 +84,7 @@ fn run_scenario(scenario: &Path, root: &Path) {
     let inputs = ApplyInputs {
         theme_data: make_theme_data(&generated.dark, &generated.light),
         default_mode: mode.to_string(),
-        image_path: String::new(),
+        image_path: Some(String::new()),
         config_table: None,
         icon_theme: String::new(),
         builtin_config: Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets/templates/builtin.toml"),

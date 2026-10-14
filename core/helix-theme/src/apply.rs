@@ -32,7 +32,8 @@ pub struct CommunityTemplate {
 pub struct ApplyInputs {
     pub theme_data: ThemeData,
     pub default_mode: String,
-    pub image_path: String,
+    /// Wallpaper path for `{{ image }}`; when `None`, templates that read it are unsupported.
+    pub image_path: Option<String>,
     /// `config.*` table; when `None`, templates that read it make the apply unsupported.
     pub config_table: Option<Json>,
     pub icon_theme: String,
@@ -445,7 +446,7 @@ impl Planner<'_> {
     fn options(&self, config_path: &Path, closest: &str) -> Options {
         Options {
             default_mode: self.inputs.default_mode.clone(),
-            image_path: self.inputs.image_path.clone(),
+            image_path: self.inputs.image_path.clone().unwrap_or_default(),
             closest_color: closest.to_string(),
             config_dir: parent_string(config_path),
             config_file: config_path.to_string_lossy().into_owned(),
@@ -461,6 +462,9 @@ impl Planner<'_> {
         }
         if r.needs_config {
             self.unsupported.get_or_insert_with(|| "template reads config.* / icon_theme".to_string());
+        }
+        if r.needs_image && self.inputs.image_path.is_none() {
+            self.unsupported.get_or_insert_with(|| "template reads the wallpaper path".to_string());
         }
         r
     }
@@ -774,7 +778,7 @@ pub fn apply(inputs: &ApplyInputs) -> Outcome {
     if !owed.is_empty() {
         let hook_options = Options {
             default_mode: inputs.default_mode.clone(),
-            image_path: inputs.image_path.clone(),
+            image_path: inputs.image_path.clone().unwrap_or_default(),
             closest_color: String::new(),
             config_dir: parent_string(&inputs.builtin_config),
             config_file: inputs.builtin_config.to_string_lossy().into_owned(),
