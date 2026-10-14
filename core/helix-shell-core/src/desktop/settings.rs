@@ -1,6 +1,7 @@
 //! Bootstrap Configuration1 catalog: definitions + TOML load/save for the settings the
 //! Tauri shell and Settings app need today. Full C++ catalog ports later.
 
+use std::borrow::Cow;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -15,8 +16,34 @@ pub enum SettingKind {
     String,
     Mode,
     Material,
+    /// `shell-layer` (notification popups, etc.).
+    ShellLayer,
+    /// `screen-position` (notification/OSD anchors).
+    ScreenPosition,
+    /// `orientation` (OSD layout).
+    Orientation,
     /// Desktop-entry id list (`dock.pinned`, launcher pins).
     ApplicationList,
+    /// Dock edge (`dock.position`).
+    Position,
+    /// Launcher button placement on the dock (`dock.launcher_position`).
+    DockLauncher,
+    /// Hot corner trigger (`hot_corners.*.action`).
+    HotCornerAction,
+    /// Wallpaper image fit (`wallpaper.fill_mode`).
+    WallpaperFit,
+    WallpaperSource,
+    WallpaperOrder,
+    DailyProvider,
+    VideoPause,
+    /// Clipboard auto-paste mode (`shell.clipboard_auto_paste`).
+    ClipboardPaste,
+    /// Password masking style (`shell.password_style`).
+    PasswordMask,
+    /// Attached vs floating panel (`shell.panel.*_placement`).
+    PanelPlacement,
+    /// Floating panel anchor (`shell.panel.*_position`).
+    PanelPosition,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -60,7 +87,22 @@ impl SettingDef {
             SettingKind::String => "string",
             SettingKind::Mode => "mode",
             SettingKind::Material => "material",
+            SettingKind::ShellLayer => "shell-layer",
+            SettingKind::ScreenPosition => "screen-position",
+            SettingKind::Orientation => "orientation",
             SettingKind::ApplicationList => "application-list",
+            SettingKind::Position => "position",
+            SettingKind::DockLauncher => "dock-launcher",
+            SettingKind::HotCornerAction => "hot-corner-action",
+            SettingKind::WallpaperFit => "wallpaper-fit",
+            SettingKind::WallpaperSource => "wallpaper-source",
+            SettingKind::WallpaperOrder => "wallpaper-order",
+            SettingKind::DailyProvider => "daily-provider",
+            SettingKind::VideoPause => "video-pause",
+            SettingKind::ClipboardPaste => "clipboard-paste",
+            SettingKind::PasswordMask => "password-mask",
+            SettingKind::PanelPlacement => "panel-placement",
+            SettingKind::PanelPosition => "panel-position",
         }
     }
 
@@ -68,6 +110,84 @@ impl SettingDef {
         match self.kind {
             SettingKind::Mode => Some((&["dark", "light", "auto"], &["Dark", "Light", "Automatic"])),
             SettingKind::Material => Some((&["solid", "soft", "glass"], &["Solid", "Soft", "Glass"])),
+            SettingKind::ShellLayer => Some((&["top", "overlay"], &["Normal", "Above fullscreen windows"])),
+            SettingKind::ScreenPosition => Some((
+                &[
+                    "top_left",
+                    "top_center",
+                    "top_right",
+                    "bottom_left",
+                    "bottom_center",
+                    "bottom_right",
+                ],
+                &[
+                    "Top left",
+                    "Top center",
+                    "Top right",
+                    "Bottom left",
+                    "Bottom center",
+                    "Bottom right",
+                ],
+            )),
+            SettingKind::Orientation => Some((&["horizontal", "vertical"], &["Horizontal", "Vertical"])),
+            SettingKind::Position => Some((
+                &["bottom", "left", "right", "top"],
+                &["Bottom", "Left", "Right", "Top"],
+            )),
+            SettingKind::DockLauncher => Some((&["none", "start", "end"], &["None", "Start", "End"])),
+            SettingKind::HotCornerAction => Some((
+                &["none", "launcher", "control_center", "window_switcher", "command"],
+                &["None", "Launcher", "Control Center", "Window switcher", "Custom command"],
+            )),
+            SettingKind::WallpaperFit => Some((
+                &["center", "crop", "fit", "stretch", "repeat", "span"],
+                &["Center", "Fill", "Fit", "Stretch", "Tile", "Span displays"],
+            )),
+            SettingKind::WallpaperSource => Some((&["folder", "daily"], &["Folder", "Daily image"])),
+            SettingKind::WallpaperOrder => Some((&["random", "alphabetical"], &["Random", "Alphabetical"])),
+            SettingKind::DailyProvider => Some((&["bing", "nasa"], &["Bing", "NASA"])),
+            SettingKind::VideoPause => Some((
+                &["off", "max", "full"],
+                &["Never", "Maximized windows", "Fullscreen windows"],
+            )),
+            SettingKind::ClipboardPaste => Some((
+                &["off", "auto", "ctrl_v", "ctrl_shift_v", "shift_insert"],
+                &["Off", "Automatic", "Ctrl+V", "Ctrl+Shift+V", "Shift+Insert"],
+            )),
+            SettingKind::PasswordMask => Some((
+                &["default", "random"],
+                &["Filled circles", "Random icons"],
+            )),
+            SettingKind::PanelPlacement => Some((
+                &["attached", "floating"],
+                &["Attached to bar", "Floating"],
+            )),
+            SettingKind::PanelPosition => Some((
+                &[
+                    "auto",
+                    "center",
+                    "top_left",
+                    "top_center",
+                    "top_right",
+                    "center_left",
+                    "center_right",
+                    "bottom_left",
+                    "bottom_center",
+                    "bottom_right",
+                ],
+                &[
+                    "Automatic",
+                    "Center",
+                    "Top left",
+                    "Top center",
+                    "Top right",
+                    "Center left",
+                    "Center right",
+                    "Bottom left",
+                    "Bottom center",
+                    "Bottom right",
+                ],
+            )),
             _ => None,
         }
     }
@@ -239,6 +359,171 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.fill_mode",
+        page: "appearance",
+        title: "Image fit",
+        group: "Wallpaper",
+        kind: SettingKind::WallpaperFit,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("crop"),
+    },
+    SettingDef {
+        id: "wallpaper.transition_duration",
+        page: "appearance",
+        title: "Transition duration (milliseconds)",
+        group: "Wallpaper",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 100.0,
+        maximum: 30000.0,
+        default: DefaultValue::Number(1500.0),
+    },
+    SettingDef {
+        id: "wallpaper.transition_on_startup",
+        page: "appearance",
+        title: "Animate wallpaper on startup",
+        group: "Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.edge_smoothness",
+        page: "appearance",
+        title: "Transition edge smoothness",
+        group: "Wallpaper",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.3),
+    },
+    SettingDef {
+        id: "wallpaper.automation.enabled",
+        page: "appearance",
+        title: "Automatically change wallpaper",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.automation.interval_seconds",
+        page: "appearance",
+        title: "Change interval (seconds)",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 1.0,
+        maximum: 86400.0,
+        default: DefaultValue::Number(1800.0),
+    },
+    SettingDef {
+        id: "wallpaper.automation.source",
+        page: "appearance",
+        title: "Wallpaper source",
+        group: "Wallpaper Automation",
+        kind: SettingKind::WallpaperSource,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("folder"),
+    },
+    SettingDef {
+        id: "wallpaper.automation.order",
+        page: "appearance",
+        title: "Folder order",
+        group: "Wallpaper Automation",
+        kind: SettingKind::WallpaperOrder,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("random"),
+    },
+    SettingDef {
+        id: "wallpaper.automation.recursive",
+        page: "appearance",
+        title: "Include subfolders",
+        group: "Wallpaper Automation",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "wallpaper.daily.provider",
+        page: "appearance",
+        title: "Daily image provider",
+        group: "Wallpaper Automation",
+        kind: SettingKind::DailyProvider,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("bing"),
+    },
+    SettingDef {
+        id: "wallpaper.daily.bing_market",
+        page: "appearance",
+        title: "Bing market code",
+        group: "Wallpaper Automation",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "wallpaper.video.mute",
+        page: "appearance",
+        title: "Mute video audio",
+        group: "Video Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.video.hardware_decode",
+        page: "appearance",
+        title: "Hardware decoding",
+        group: "Video Wallpaper",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "wallpaper.video.auto_pause",
+        page: "appearance",
+        title: "Pause video behind windows",
+        group: "Video Wallpaper",
+        kind: SettingKind::VideoPause,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("full"),
+    },
+    SettingDef {
+        id: "wallpaper.video.mpv_options",
+        page: "appearance",
+        title: "Extra mpv options",
+        group: "Video Wallpaper",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
     },
     SettingDef {
         id: "backdrop.enabled",
@@ -418,10 +703,164 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Bool(true),
     },
     SettingDef {
+        id: "shell.clipboard_keep_from_closed_apps",
+        page: "privacy-security",
+        title: "Keep copied items after apps close",
+        group: "Clipboard",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.clipboard_history_max_entries",
+        page: "privacy-security",
+        title: "History size",
+        group: "Clipboard",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 10.0,
+        maximum: 10000.0,
+        default: DefaultValue::Number(100.0),
+    },
+    SettingDef {
+        id: "shell.clipboard_confirm_clear_history",
+        page: "privacy-security",
+        title: "Confirm history deletion",
+        group: "Clipboard",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.clipboard_auto_paste",
+        page: "privacy-security",
+        title: "Paste selected items automatically",
+        group: "Clipboard",
+        kind: SettingKind::ClipboardPaste,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
+        id: "shell.clipboard_image_action_command",
+        page: "privacy-security",
+        title: "Image editor command",
+        group: "Clipboard",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "shell.password_style",
+        page: "privacy-security",
+        title: "Password masking",
+        group: "Authentication",
+        kind: SettingKind::PasswordMask,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("default"),
+    },
+    SettingDef {
         id: "lockscreen.enabled",
         page: "privacy-security",
         title: "Show lock screen",
         group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.fingerprint",
+        page: "privacy-security",
+        title: "Use fingerprint authentication",
+        group: "Authentication",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.allow_empty_password",
+        page: "privacy-security",
+        title: "Allow unlocking without a password",
+        group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "lockscreen.wallpaper",
+        page: "privacy-security",
+        title: "Lock-screen wallpaper",
+        group: "Lock Screen",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "lockscreen.blurred_desktop",
+        page: "privacy-security",
+        title: "Use blurred desktop background",
+        group: "Lock Screen",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "lockscreen.blur_intensity",
+        page: "privacy-security",
+        title: "Background blur",
+        group: "Lock Screen",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.5),
+    },
+    SettingDef {
+        id: "lockscreen.tint_intensity",
+        page: "privacy-security",
+        title: "Background tint",
+        group: "Lock Screen",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.3),
+    },
+    SettingDef {
+        id: "lockscreen.lock_before_suspend",
+        page: "power",
+        title: "Lock before system suspend",
+        group: "Session",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "lockscreen.lid_close_keep_external_displays",
+        page: "power",
+        title: "Keep external displays active when closing the lid",
+        group: "Session",
         kind: SettingKind::Boolean,
         desktop: true,
         minimum: 0.0,
@@ -473,6 +912,127 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Number(3.0),
     },
     SettingDef {
+        id: "notification.show_actions",
+        page: "notifications",
+        title: "Show notification actions",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.position",
+        page: "notifications",
+        title: "Popup position",
+        group: "Popups",
+        kind: SettingKind::ScreenPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top_right"),
+    },
+    SettingDef {
+        id: "notification.scale",
+        page: "notifications",
+        title: "Popup scale",
+        group: "Popups",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.5,
+        maximum: 2.5,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "notification.offset_x",
+        page: "notifications",
+        title: "Horizontal margin",
+        group: "Popups",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "notification.offset_y",
+        page: "notifications",
+        title: "Vertical margin",
+        group: "Popups",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "notification.layer",
+        page: "notifications",
+        title: "Popup layer",
+        group: "Popups",
+        kind: SettingKind::ShellLayer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top"),
+    },
+    SettingDef {
+        id: "notification.background_opacity",
+        page: "notifications",
+        title: "Popup opacity",
+        group: "Popups",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "notification.border",
+        page: "notifications",
+        title: "Show popup outline",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.collapse_on_dismiss",
+        page: "notifications",
+        title: "Collapse dismissed popups",
+        group: "Popups",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "notification.keep_dismissed_in_history",
+        page: "notifications",
+        title: "Keep dismissed notifications",
+        group: "History",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "notification.history_retention_hours",
+        page: "notifications",
+        title: "History retention (hours)",
+        group: "History",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 8760.0,
+        default: DefaultValue::Number(168.0),
+    },
+    SettingDef {
         id: "control_center.width",
         page: "desktop-dock",
         title: "Window width",
@@ -517,6 +1077,127 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Bool(false),
     },
     SettingDef {
+        id: "hot_corners.delay_ms",
+        page: "desktop-dock",
+        title: "Hold delay (milliseconds)",
+        group: "Hot Corners",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 2000.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "hot_corners.top_left.action",
+        page: "desktop-dock",
+        title: "Top left action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.top_left.command",
+        page: "desktop-dock",
+        title: "Top left command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.top_right.action",
+        page: "desktop-dock",
+        title: "Top right action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.top_right.command",
+        page: "desktop-dock",
+        title: "Top right command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_left.action",
+        page: "desktop-dock",
+        title: "Bottom left action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_left.command",
+        page: "desktop-dock",
+        title: "Bottom left command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_right.action",
+        page: "desktop-dock",
+        title: "Bottom right action",
+        group: "Hot Corners",
+        kind: SettingKind::HotCornerAction,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("none"),
+    },
+    SettingDef {
+        id: "hot_corners.bottom_right.command",
+        page: "desktop-dock",
+        title: "Bottom right command",
+        group: "Hot Corner Commands",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "dock.enabled",
+        page: "desktop-dock",
+        title: "Show dock",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.position",
+        page: "desktop-dock",
+        title: "Position",
+        group: "Dock",
+        kind: SettingKind::Position,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("bottom"),
+    },
+    SettingDef {
         id: "dock.auto_hide",
         page: "desktop-dock",
         title: "Automatically hide",
@@ -526,6 +1207,358 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.0,
         maximum: 0.0,
         default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "dock.smart_auto_hide",
+        page: "desktop-dock",
+        title: "Hide behind windows",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "dock.icon_size",
+        page: "desktop-dock",
+        title: "Icon size",
+        group: "Dock",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 16.0,
+        maximum: 128.0,
+        default: DefaultValue::Number(48.0),
+    },
+    SettingDef {
+        id: "dock.magnification",
+        page: "desktop-dock",
+        title: "Magnify icons",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.magnification_scale",
+        page: "desktop-dock",
+        title: "Magnification amount",
+        group: "Dock",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 1.0,
+        maximum: 2.0,
+        default: DefaultValue::Number(1.45),
+    },
+    SettingDef {
+        id: "dock.active_monitor_only",
+        page: "desktop-dock",
+        title: "Show on active display only",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "dock.show_running",
+        page: "desktop-dock",
+        title: "Show running applications",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.show_dots",
+        page: "desktop-dock",
+        title: "Show running indicators",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.show_instance_count",
+        page: "desktop-dock",
+        title: "Show window count badges",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.reserve_space",
+        page: "desktop-dock",
+        title: "Reserve space for the dock",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.launcher_position",
+        page: "desktop-dock",
+        title: "Launcher button",
+        group: "Dock",
+        kind: SettingKind::DockLauncher,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("start"),
+    },
+    SettingDef {
+        id: "dock.launcher_icon",
+        page: "desktop-dock",
+        title: "Launcher icon name",
+        group: "Dock Launcher",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("grid-dots"),
+    },
+    SettingDef {
+        id: "dock.launcher_custom_image",
+        page: "desktop-dock",
+        title: "Custom launcher image",
+        group: "Dock Launcher",
+        kind: SettingKind::String,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str(""),
+    },
+    SettingDef {
+        id: "dock.launcher_custom_image_colorize",
+        page: "desktop-dock",
+        title: "Tint custom launcher image",
+        group: "Dock Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "dock.main_axis_padding",
+        page: "desktop-dock",
+        title: "Padding along the dock",
+        group: "Dock Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 100.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.cross_axis_padding",
+        page: "desktop-dock",
+        title: "Padding across the dock",
+        group: "Dock Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 100.0,
+        default: DefaultValue::Number(8.0),
+    },
+    SettingDef {
+        id: "dock.item_spacing",
+        page: "desktop-dock",
+        title: "Space between icons",
+        group: "Dock Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 100.0,
+        default: DefaultValue::Number(6.0),
+    },
+    SettingDef {
+        id: "dock.margin_ends",
+        page: "desktop-dock",
+        title: "Inset from display ends",
+        group: "Dock Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 500.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "dock.margin_edge",
+        page: "desktop-dock",
+        title: "Distance from display edge",
+        group: "Dock Layout",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 100.0,
+        default: DefaultValue::Number(10.0),
+    },
+    SettingDef {
+        id: "dock.layer",
+        page: "desktop-dock",
+        title: "Layer",
+        group: "Dock",
+        kind: SettingKind::ShellLayer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top"),
+    },
+    SettingDef {
+        id: "dock.shadow",
+        page: "desktop-dock",
+        title: "Show shadow",
+        group: "Dock",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.background_opacity",
+        page: "desktop-dock",
+        title: "Background opacity",
+        group: "Dock Effects",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.88),
+    },
+    SettingDef {
+        id: "dock.radius",
+        page: "desktop-dock",
+        title: "Corner radius",
+        group: "Dock Shape",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 80.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.border_width",
+        page: "desktop-dock",
+        title: "Border width",
+        group: "Dock Shape",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 20.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "dock.radius_top_left",
+        page: "desktop-dock",
+        title: "Top-left radius",
+        group: "Dock Shape",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 80.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.radius_top_right",
+        page: "desktop-dock",
+        title: "Top-right radius",
+        group: "Dock Shape",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 80.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.radius_bottom_left",
+        page: "desktop-dock",
+        title: "Bottom-left radius",
+        group: "Dock Shape",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 80.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.radius_bottom_right",
+        page: "desktop-dock",
+        title: "Bottom-right radius",
+        group: "Dock Shape",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 80.0,
+        default: DefaultValue::Number(16.0),
+    },
+    SettingDef {
+        id: "dock.concave_edge_corners",
+        page: "desktop-dock",
+        title: "Concave edge corners",
+        group: "Dock Shape",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "dock.active_scale",
+        page: "desktop-dock",
+        title: "Active icon scale",
+        group: "Dock Focus",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.1,
+        maximum: 1.75,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "dock.inactive_scale",
+        page: "desktop-dock",
+        title: "Inactive icon scale",
+        group: "Dock Focus",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.1,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.85),
+    },
+    SettingDef {
+        id: "dock.active_opacity",
+        page: "desktop-dock",
+        title: "Active icon opacity",
+        group: "Dock Focus",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "dock.inactive_opacity",
+        page: "desktop-dock",
+        title: "Inactive icon opacity",
+        group: "Dock Focus",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(0.85),
     },
     SettingDef {
         id: "dock.pinned",
@@ -550,6 +1583,94 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::EmptyArray,
     },
     SettingDef {
+        id: "shell.panel.control_center_placement",
+        page: "desktop-dock",
+        title: "Panel placement",
+        group: "Control Center",
+        kind: SettingKind::PanelPlacement,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("floating"),
+    },
+    SettingDef {
+        id: "shell.panel.control_center_position",
+        page: "desktop-dock",
+        title: "Floating position",
+        group: "Control Center",
+        kind: SettingKind::PanelPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
+        id: "shell.panel.open_near_click_control_center",
+        page: "desktop-dock",
+        title: "Open near the pointer",
+        group: "Control Center",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.panel.launcher_placement",
+        page: "desktop-dock",
+        title: "Panel placement",
+        group: "Launcher",
+        kind: SettingKind::PanelPlacement,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("floating"),
+    },
+    SettingDef {
+        id: "shell.panel.launcher_position",
+        page: "desktop-dock",
+        title: "Floating position",
+        group: "Launcher",
+        kind: SettingKind::PanelPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("center"),
+    },
+    SettingDef {
+        id: "shell.launcher.categories",
+        page: "desktop-dock",
+        title: "Show application categories",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "shell.launcher.compact",
+        page: "desktop-dock",
+        title: "Compact results",
+        group: "Launcher",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.launcher.auto_paste",
+        page: "desktop-dock",
+        title: "Paste after copy actions",
+        group: "Launcher",
+        kind: SettingKind::ClipboardPaste,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("auto"),
+    },
+    SettingDef {
         id: "osd.enabled",
         page: "desktop-dock",
         title: "Show on-screen indicators",
@@ -570,6 +1691,83 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         minimum: 0.5,
         maximum: 2.5,
         default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "osd.position",
+        page: "desktop-dock",
+        title: "Indicator position",
+        group: "On-Screen Indicators",
+        kind: SettingKind::ScreenPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top_right"),
+    },
+    SettingDef {
+        id: "osd.position_vertical",
+        page: "desktop-dock",
+        title: "Vertical indicator position",
+        group: "On-Screen Indicators",
+        kind: SettingKind::ScreenPosition,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("top_center"),
+    },
+    SettingDef {
+        id: "osd.orientation",
+        page: "desktop-dock",
+        title: "Indicator orientation",
+        group: "On-Screen Indicators",
+        kind: SettingKind::Orientation,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Str("horizontal"),
+    },
+    SettingDef {
+        id: "osd.background_opacity",
+        page: "desktop-dock",
+        title: "Background opacity",
+        group: "On-Screen Indicators",
+        kind: SettingKind::Number,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 1.0,
+        default: DefaultValue::Number(1.0),
+    },
+    SettingDef {
+        id: "osd.border",
+        page: "desktop-dock",
+        title: "Show outline",
+        group: "On-Screen Indicators",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.offset_x",
+        page: "desktop-dock",
+        title: "Horizontal margin",
+        group: "On-Screen Indicators",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
+    },
+    SettingDef {
+        id: "osd.offset_y",
+        page: "desktop-dock",
+        title: "Vertical margin",
+        group: "On-Screen Indicators",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(0.0),
     },
     SettingDef {
         id: "osd.kinds.volume",
@@ -597,6 +1795,138 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         id: "osd.kinds.nightlight",
         page: "desktop-dock",
         title: "Night Light",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.volume_output",
+        page: "desktop-dock",
+        title: "Output volume",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.volume_input",
+        page: "desktop-dock",
+        title: "Microphone volume",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.keyboard_backlight",
+        page: "desktop-dock",
+        title: "Keyboard backlight",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.wifi",
+        page: "desktop-dock",
+        title: "Wi-Fi",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.bluetooth",
+        page: "desktop-dock",
+        title: "Bluetooth",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.power_profile",
+        page: "desktop-dock",
+        title: "Power profile",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.caffeine",
+        page: "desktop-dock",
+        title: "Keep awake",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.dnd",
+        page: "desktop-dock",
+        title: "Do Not Disturb",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.keyboard_layout",
+        page: "desktop-dock",
+        title: "Keyboard layout",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.lock_keys",
+        page: "desktop-dock",
+        title: "Caps Lock and Num Lock",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.media",
+        page: "desktop-dock",
+        title: "Media",
+        group: "Indicator Events",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
+        id: "osd.kinds.privacy",
+        page: "desktop-dock",
+        title: "Privacy",
         group: "Indicator Events",
         kind: SettingKind::Boolean,
         desktop: true,
@@ -693,6 +2023,39 @@ pub const BOOTSTRAP: &[SettingDef] = &[
         default: DefaultValue::Bool(false),
     },
     SettingDef {
+        id: "shell.panel.floating_offset",
+        page: "appearance",
+        title: "Floating panel distance",
+        group: "Shell chrome",
+        kind: SettingKind::Integer,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 200.0,
+        default: DefaultValue::Number(8.0),
+    },
+    SettingDef {
+        id: "shell.disable_mipmaps",
+        page: "appearance",
+        title: "Disable texture mipmaps",
+        group: "Rendering",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(false),
+    },
+    SettingDef {
+        id: "shell.shared_gl_context",
+        page: "appearance",
+        title: "Share OpenGL context",
+        group: "Rendering",
+        kind: SettingKind::Boolean,
+        desktop: true,
+        minimum: 0.0,
+        maximum: 0.0,
+        default: DefaultValue::Bool(true),
+    },
+    SettingDef {
         id: "shell.corner_radius_scale",
         page: "appearance",
         title: "Corner roundness",
@@ -718,6 +2081,11 @@ pub const BOOTSTRAP: &[SettingDef] = &[
 
 pub fn find_def(id: &str) -> Option<&'static SettingDef> {
     BOOTSTRAP.iter().find(|setting| setting.id == id)
+}
+
+/// Settings available without a registered Helix desktop (C++ `isPortableSetting`).
+pub fn is_portable_setting(id: &str) -> bool {
+    find_def(id).is_some_and(|def| !def.desktop)
 }
 
 #[derive(Clone, Debug)]
@@ -828,6 +2196,29 @@ impl ConfigStore {
         self.save_overrides()
     }
 
+    /// Re-read `settings.toml` from disk (C++ `ConfigService::forceReload` for overrides).
+    pub fn force_reload(&mut self) {
+        self.overrides =
+            read_toml_file(&self.paths.settings_toml).unwrap_or_else(|| Toml::Table(Default::default()));
+    }
+
+    /// Optimistic concurrency for `Configuration1.CommitOverrides` (C++ `commitRemoteOverrides`).
+    pub fn commit_remote_overrides(&mut self, baseline: &str, candidate: &str) -> Result<(), String> {
+        self.force_reload();
+        let baseline_table = toml::from_str::<Toml>(baseline)
+            .map_err(|_| "Invalid settings document".to_string())?;
+        if baseline_table != self.overrides {
+            return Err("Settings changed in another client. Refresh and try again.".into());
+        }
+        let candidate_table = toml::from_str::<Toml>(candidate)
+            .map_err(|_| "Invalid settings document".to_string())?;
+        if candidate_table == self.overrides {
+            return Ok(());
+        }
+        self.overrides = candidate_table;
+        self.save_overrides()
+    }
+
     fn save_overrides(&self) -> Result<(), String> {
         if let Some(parent) = self.paths.settings_toml.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -838,6 +2229,61 @@ impl ConfigStore {
             String::new()
         };
         fs::write(&self.paths.settings_toml, text).map_err(|error| error.to_string())
+    }
+
+    pub fn overridden_path(&self, id: &str) -> bool {
+        let path = storage_path(id);
+        toml_get(&self.overrides, path.as_ref()).is_some()
+    }
+
+    pub fn get_json_value(&self, id: &str) -> Option<Value> {
+        let path = storage_path(id);
+        let toml = toml_get(&self.overrides, path.as_ref())
+            .or_else(|| toml_get(&self.base, path.as_ref()))?;
+        Some(toml_to_json_value(toml))
+    }
+
+    pub fn set_json_value(&mut self, id: &str, value: Value) -> Result<(), String> {
+        let path = storage_path(id);
+        toml_set(&mut self.overrides, path.as_ref(), json_to_toml(&value))?;
+        self.save_overrides()
+    }
+
+    pub(crate) fn merged_node(&self, id: &str) -> Option<Toml> {
+        let base = toml_get(&self.base, id).cloned();
+        let overrides = toml_get(&self.overrides, id).cloned();
+        match (base, overrides) {
+            (None, None) => None,
+            (Some(node), None) => Some(node),
+            (None, Some(node)) => Some(node),
+            (Some(left), Some(right)) => Some(merge_toml_values(left, right)),
+        }
+    }
+
+    pub fn get_raw_list(&self, id: &str) -> Option<Value> {
+        self.get_json_value(id).and_then(|value| value.as_array().cloned().map(Value::Array))
+    }
+
+    pub fn set_raw_list(&mut self, id: &str, value: Value) -> Result<(), String> {
+        value
+            .as_array()
+            .ok_or_else(|| "expected list value".to_string())?;
+        self.set_json_value(id, value)
+    }
+
+    pub fn apply_ordered_list(&mut self, id: &str, value: Value) -> Result<(), String> {
+        super::ordered_lists::apply_update(self, id, value)
+    }
+
+    /// Bootstrap catalog plus ordered-list extensions (key-chords, Control Center tabs, …).
+    pub fn full_catalog(&self, include_desktop: bool, display_names: &[String]) -> Vec<Value> {
+        let mut rows = self.catalog();
+        rows.extend(super::ordered_lists::extension_entries(
+            self,
+            include_desktop,
+            display_names,
+        ));
+        rows
     }
 
     /// Catalog rows for `Configuration1.GetSettings`.
@@ -921,8 +2367,33 @@ fn deep_merge(into: &mut toml::map::Map<String, Toml>, from: toml::map::Map<Stri
     }
 }
 
+/// Maps catalog ids to TOML override paths (C++ `settingPath`).
+pub fn storage_path(id: &str) -> Cow<'_, str> {
+    if id == "control_center.visible_tabs" {
+        return Cow::Borrowed("control_center.hidden_tabs");
+    }
+    if let Some(rest) = id.strip_prefix("bar:") {
+        if let Some((bar_name, field)) = rest.rsplit_once(':') {
+            if matches!(field, "start" | "center" | "end") {
+                return Cow::Owned(format!("bar.{bar_name}.{field}"));
+            }
+        }
+    }
+    Cow::Borrowed(id)
+}
+
 fn path_parts(id: &str) -> Vec<&str> {
     id.split('.').collect()
+}
+
+fn merge_toml_values(base: Toml, overrides: Toml) -> Toml {
+    match (base, overrides) {
+        (Toml::Table(mut left), Toml::Table(right)) => {
+            deep_merge(&mut left, right);
+            Toml::Table(left)
+        }
+        (_, value) => value,
+    }
 }
 
 fn toml_get<'a>(root: &'a Toml, id: &str) -> Option<&'a Toml> {
@@ -977,14 +2448,47 @@ fn toml_remove(root: &mut Toml, id: &str) {
     cursor.remove(parts[parts.len() - 1]);
 }
 
+fn toml_to_json_value(value: &Toml) -> Value {
+    match value {
+        Toml::Boolean(flag) => Value::Bool(*flag),
+        Toml::Integer(number) => Value::from(*number),
+        Toml::Float(number) => Value::from(*number),
+        Toml::String(text) => Value::String(text.clone()),
+        Toml::Array(items) => Value::Array(items.iter().map(toml_to_json_value).collect()),
+        Toml::Table(table) => {
+            let mut object = serde_json::Map::new();
+            for (key, item) in table {
+                object.insert(key.clone(), toml_to_json_value(item));
+            }
+            Value::Object(object)
+        }
+        Toml::Datetime(datetime) => Value::String(datetime.to_string()),
+    }
+}
+
 fn toml_to_json(value: &Toml, def: &SettingDef) -> Value {
     match def.kind {
         SettingKind::Boolean => Value::Bool(value.as_bool().unwrap_or(false)),
         SettingKind::Number => Value::from(value.as_float().or_else(|| value.as_integer().map(|n| n as f64)).unwrap_or(0.0)),
         SettingKind::Integer => Value::from(value.as_integer().unwrap_or(0) as f64),
-        SettingKind::String | SettingKind::Mode | SettingKind::Material => {
-            Value::String(value.as_str().unwrap_or("").to_string())
-        }
+        SettingKind::String
+        | SettingKind::Mode
+        | SettingKind::Material
+        | SettingKind::ShellLayer
+        | SettingKind::ScreenPosition
+        | SettingKind::Orientation
+        | SettingKind::Position
+        | SettingKind::DockLauncher
+        | SettingKind::HotCornerAction
+        | SettingKind::WallpaperFit
+        | SettingKind::WallpaperSource
+        | SettingKind::WallpaperOrder
+        | SettingKind::DailyProvider
+        | SettingKind::VideoPause
+        | SettingKind::ClipboardPaste
+        | SettingKind::PasswordMask
+        | SettingKind::PanelPlacement
+        | SettingKind::PanelPosition => Value::String(value.as_str().unwrap_or("").to_string()),
         SettingKind::ApplicationList => {
             let Some(items) = value.as_array() else {
                 return Value::Array(Vec::new());
@@ -1003,28 +2507,28 @@ fn json_to_toml(value: &Value) -> Toml {
     match value {
         Value::Bool(flag) => Toml::Boolean(*flag),
         Value::Number(number) => {
-            if let Some(float) = number.as_f64() {
-                if float.fract() == 0.0 && float.abs() < i64::MAX as f64 {
-                    Toml::Integer(float as i64)
-                } else {
-                    Toml::Float(float)
-                }
+            if let Some(integer) = number.as_i64() {
+                Toml::Integer(integer)
+            } else if let Some(float) = number.as_f64() {
+                Toml::Float(float)
             } else {
                 Toml::Float(0.0)
             }
         }
         Value::String(text) => Toml::String(text.clone()),
-        Value::Array(items) => Toml::Array(
-            items
-                .iter()
-                .filter_map(|item| item.as_str().map(|text| Toml::String(text.to_string())))
-                .collect(),
-        ),
-        _ => Toml::String(String::new()),
+        Value::Array(items) => Toml::Array(items.iter().map(json_to_toml).collect()),
+        Value::Object(map) => {
+            let mut table = toml::map::Map::new();
+            for (key, item) in map {
+                table.insert(key.clone(), json_to_toml(item));
+            }
+            Toml::Table(table)
+        }
+        Value::Null => Toml::String(String::new()),
     }
 }
 
-fn validate_application_list(value: Value) -> Result<Value, String> {
+pub(crate) fn validate_application_list(value: Value) -> Result<Value, String> {
     let items = value.as_array().ok_or("expected application list")?;
     if items.len() > 256 {
         return Err("Expected at most 256 application IDs".into());
@@ -1066,7 +2570,23 @@ fn validate(def: &SettingDef, value: Value) -> Result<Value, String> {
             .as_str()
             .map(|text| Value::String(text.to_string()))
             .ok_or_else(|| "expected string".into()),
-        SettingKind::Mode | SettingKind::Material => {
+        SettingKind::Mode
+        | SettingKind::Material
+        | SettingKind::ShellLayer
+        | SettingKind::ScreenPosition
+        | SettingKind::Orientation
+        | SettingKind::Position
+        | SettingKind::DockLauncher
+        | SettingKind::HotCornerAction
+        | SettingKind::WallpaperFit
+        | SettingKind::WallpaperSource
+        | SettingKind::WallpaperOrder
+        | SettingKind::DailyProvider
+        | SettingKind::VideoPause
+        | SettingKind::ClipboardPaste
+        | SettingKind::PasswordMask
+        | SettingKind::PanelPlacement
+        | SettingKind::PanelPosition => {
             let text = value.as_str().ok_or("expected string")?;
             let (options, _) = def.options().unwrap();
             if options.contains(&text) {
@@ -1151,5 +2671,24 @@ mod tests {
         assert!(reloaded
             .set("dock.pinned", json!(["bad/id.desktop"]))
             .is_err());
+    }
+
+    #[test]
+    fn commit_remote_overrides_checks_baseline() {
+        let paths = temp_paths();
+        let mut store = ConfigStore::load(paths.clone());
+        store.set("theme.mode", json!("light")).unwrap();
+        let stale = std::fs::read_to_string(&paths.settings_toml).unwrap();
+        store.set("theme.mode", json!("dark")).unwrap();
+        assert_eq!(
+            store.commit_remote_overrides(&stale, "[theme]\nmode = \"light\"\n"),
+            Err("Settings changed in another client. Refresh and try again.".into())
+        );
+        store.force_reload();
+        let baseline = std::fs::read_to_string(&paths.settings_toml).unwrap();
+        store
+            .commit_remote_overrides(&baseline, "[theme]\nmode = \"light\"\n")
+            .unwrap();
+        assert_eq!(store.get("theme.mode"), json!("light"));
     }
 }

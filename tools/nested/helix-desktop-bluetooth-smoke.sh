@@ -6,6 +6,7 @@ BIN="${HELIX_SERVICE_BIN:-$ROOT/target/debug/helix-desktop}"
 export XDG_CONFIG_HOME XDG_STATE_HOME
 XDG_CONFIG_HOME="$(mktemp -d)"
 XDG_STATE_HOME="$(mktemp -d)"
+export HELIX_DESKTOP_MOCK_BLUETOOTH=1
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT

@@ -2,7 +2,18 @@
 # Private-bus smoke for Rust helix-desktop Configuration1 catalog + runtime state.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-BIN="${HELIX_SERVICE_BIN:-$ROOT/target/debug/helix-desktop}"
+BIN="${HELIX_SERVICE_BIN:-$ROOT/target/fast/helix-desktop}"
+
+if [[ -z "${HELIX_DESKTOP_CONFIG_SMOKE_INNER:-}" ]]; then
+  cargo build --profile fast -p helix-desktop --quiet
+  command -v dbus-run-session >/dev/null || {
+    echo "dbus-run-session required" >&2
+    exit 1
+  }
+  export HELIX_DESKTOP_CONFIG_SMOKE_INNER=1
+  exec dbus-run-session -- env HELIX_SERVICE_BIN="$BIN" "$0"
+fi
+
 export XDG_CONFIG_HOME XDG_STATE_HOME
 XDG_CONFIG_HOME="$(mktemp -d)"
 XDG_STATE_HOME="$(mktemp -d)"
@@ -16,8 +27,11 @@ for _ in $(seq 1 40); do
 done
 
 python3 - <<'PY'
+import os
 import re
 import subprocess
+from pathlib import Path
+
 from gi.repository import Gio, GLib
 
 bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
@@ -43,10 +57,14 @@ raw = subprocess.check_output([
 ], text=True)
 ids = re.findall(r"'id': <'([^']+)'>", raw)
 print("setting_count=", len(ids))
-assert len(ids) >= 40, ids
+assert len(ids) >= 80, ids
 for want in [
     "nightlight.force", "nightlight.temperature_day", "theme.builtin", "wallpaper.enabled",
-    "shell.offline_mode", "notification.enable_daemon", "control_center.width", "osd.kinds.volume",
+    "shell.offline_mode", "notification.enable_daemon", "notification.position", "notification.layer",
+    "control_center.width", "osd.kinds.volume", "osd.position", "osd.kinds.wifi",
+    "dock.enabled", "dock.position", "dock.launcher_position",
+    "hot_corners.delay_ms", "wallpaper.fill_mode", "wallpaper.automation.enabled",
+    "shell.clipboard_auto_paste", "lockscreen.blurred_desktop", "lockscreen.lock_before_suspend",
 ]:
     assert want in ids, want
 print("catalog=OK")
@@ -123,5 +141,86 @@ raw = subprocess.check_output([
 ], text=True)
 assert "firefox.desktop" in raw and "org.gnome.Nautilus.desktop" in raw
 print("application_list=OK")
+
+params = GLib.VariantBuilder.new(GLib.VariantType("(savav)"))
+params.add_value(GLib.Variant.new_string("dock.pinned"))
+expected = GLib.VariantBuilder.new(GLib.VariantType("av"))
+expected.add_value(GLib.Variant.new_variant(GLib.Variant.new_string("firefox.desktop")))
+expected.add_value(GLib.Variant.new_variant(GLib.Variant.new_string("org.gnome.Nautilus.desktop")))
+params.add_value(expected.end())
+value = GLib.VariantBuilder.new(GLib.VariantType("av"))
+value.add_value(GLib.Variant.new_variant(GLib.Variant.new_string("org.gnome.Nautilus.desktop")))
+params.add_value(value.end())
+call("UpdateOrderedList", params.end(), None)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "firefox.desktop" not in raw
+print("ordered_list=OK")
+
+params = GLib.VariantBuilder.new(GLib.VariantType("(savav)"))
+params.add_value(GLib.Variant.new_string("control_center.shortcuts"))
+expected = GLib.VariantBuilder.new(GLib.VariantType("av"))
+params.add_value(expected.end())
+value = GLib.VariantBuilder.new(GLib.VariantType("av"))
+tile = GLib.VariantBuilder.new(GLib.VariantType("a{sv}"))
+tile.add_value(
+    GLib.Variant.new_dict_entry(
+        GLib.Variant.new_string("type"),
+        GLib.Variant.new_variant(GLib.Variant.new_string("wifi")),
+    )
+)
+tile.add_value(
+    GLib.Variant.new_dict_entry(
+        GLib.Variant.new_string("size"),
+        GLib.Variant.new_variant(GLib.Variant.new_string("small")),
+    )
+)
+value.add_value(GLib.Variant.new_variant(tile.end()))
+params.add_value(value.end())
+call("UpdateOrderedList", params.end(), None)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "'wifi'" in raw and "'small'" in raw
+print("shortcut_list=OK")
+
+params = GLib.VariantBuilder.new(GLib.VariantType("(savav)"))
+params.add_value(GLib.Variant.new_string("wallpaper.transition"))
+expected = GLib.VariantBuilder.new(GLib.VariantType("av"))
+for style in ["fade", "wipe", "disc", "stripes", "zoom", "honeycomb"]:
+    expected.add_value(GLib.Variant.new_variant(GLib.Variant.new_string(style)))
+params.add_value(expected.end())
+value = GLib.VariantBuilder.new(GLib.VariantType("av"))
+value.add_value(GLib.Variant.new_variant(GLib.Variant.new_string("fade")))
+value.add_value(GLib.Variant.new_variant(GLib.Variant.new_string("wipe")))
+params.add_value(value.end())
+call("UpdateOrderedList", params.end(), None)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "'fade'" in raw and "'wipe'" in raw
+print("transition_list=OK")
+
+baseline_path = Path(os.environ["XDG_STATE_HOME"]) / "helix" / "settings.toml"
+baseline = baseline_path.read_text()
+call(
+    "CommitOverrides",
+    GLib.Variant("(ss)", (baseline, '[dock]\npinned = ["firefox.desktop"]\n')),
+    None,
+)
+raw = subprocess.check_output([
+    "gdbus", "call", "--session", "--dest", "org.helix.Desktop",
+    "--object-path", "/org/helix/Desktop",
+    "--method", "org.helix.Desktop.Configuration1.GetSettings",
+], text=True)
+assert "firefox.desktop" in raw
+print("commit_overrides=OK")
 print("CONFIG_SMOKE_OK")
 PY
