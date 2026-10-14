@@ -812,20 +812,7 @@ if run_command('test', '-e', llama_prefix / 'lib64/libllama.so', check: false).r
   )
 endif
 
-# Independent desktop service and adaptive applications. GTK never enters shell dependencies.
-# D-Bus contract: protocols/dbus/*.xml is the single source of truth for interface shapes.
-helix_desktop_introspection_h = custom_target('helix-desktop-introspection',
-  input: 'protocols/dbus/org.helix.Desktop.xml',
-  output: 'helix_desktop_introspection.h',
-  command: [find_program('python3'), files('tools/scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'desktopIntrospectionXml'],
-)
-
-helix_service = executable('helix-service',
-  sources: [files('src/desktop/service_main.cpp', 'src/desktop/settings_catalog.cpp', 'src/desktop/input_meter.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_endpoint.cpp', 'src/desktop/shell_tools.cpp', 'src/inference/routing.cpp'), helix_desktop_introspection_h],
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-  install: true,
-)
+# Helpers and adaptive applications. The org.helix.Desktop service itself is Rust (services/helix-desktop).
 executable('helix-template-apply',
   sources: files('src/theme/template_apply_main.cpp'),
   dependencies: helix_core_dep,
@@ -860,8 +847,6 @@ install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') /
 install_data('protocols/ipc/tool-hints.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
 helix_service_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
-# Picks the Rust helix-desktop when installed, else the C++ helix-service (see the script).
-install_data('assets/services/helix-service-launch', install_dir: get_option('bindir'), install_mode: 'rwxr-xr-x')
 configure_file(input: 'assets/services/org.helix.Desktop.service.in',
   output: 'org.helix.Desktop.service', configuration: helix_service_config,
   install_dir: get_option('datadir') / 'dbus-1' / 'services')
@@ -935,20 +920,6 @@ configure_file(input: 'assets/services/helix-inference.service.in',
 # GTK desktop apps retired; Tauri apps under apps/.
 
 if build_tests
-  helix_wallhaven_test = executable('desktop_wallhaven_test',
-    sources: files('tests/desktop_wallhaven_test.cpp'), dependencies: helix_core_dep,
-    override_options: ['b_ndebug=false'])
-  test('desktop_wallhaven', helix_wallhaven_test)
-  helix_dns_test = executable('desktop_dns_validation_test',
-    sources: files('tests/desktop_dns_validation_test.cpp'),
-    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
-    override_options: ['b_ndebug=false'])
-  test('desktop_dns_validation', helix_dns_test)
-  helix_meter_test = executable('desktop_input_meter_test',
-    sources: files('tests/desktop_input_meter_test.cpp', 'src/desktop/input_meter.cpp'),
-    include_directories: include_directories('src'), dependencies: [pipewire_dep],
-    override_options: ['b_ndebug=false'])
-  test('desktop_input_meter', helix_meter_test)
   helix_protocol_test = executable('desktop_protocol_test',
     sources: files('tests/desktop_protocol_test.cpp', 'src/desktop_api/protocol.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
@@ -960,12 +931,6 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('desktop_agent_policy', helix_agent_policy_unit, args: [meson.project_source_root()])
-  helix_agent_broker_unit = executable('desktop_agent_broker_test',
-    sources: files('tests/desktop_agent_broker_test.cpp', 'src/desktop/agent_broker.cpp', 'src/desktop/agent_policy.cpp'),
-    dependencies: helix_core_dep,
-    override_options: ['b_ndebug=false'],
-  )
-  test('desktop_agent_broker', helix_agent_broker_unit)
   helix_tool_schema_unit = executable('desktop_tool_schema_test',
     sources: files('tests/desktop_tool_schema_test.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
     dependencies: helix_core_dep,
@@ -1029,35 +994,42 @@ if build_tests
     override_options: ['b_ndebug=false'],
   )
   test('agent_confirmation_queue', helix_confirmation_queue_unit)
-  helix_displays_test = executable('desktop_displays_test',
-    sources: files('tests/desktop_displays_test.cpp', 'src/system/display_config.cpp', 'src/desktop_api/protocol.cpp'),
-    include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
-    override_options: ['b_ndebug=false'])
-  test('desktop_displays', helix_displays_test, timeout: 30)
-
   helix_service_test = executable('desktop_service_test',
     sources: files('tests/desktop_service_test.cpp', 'src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp'),
     include_directories: include_directories('src'), dependencies: [gio_dep, nlohmann_dep],
     override_options: ['b_ndebug=false'])
   helix_dbus_session = find_program('dbus-run-session', required: false)
   if helix_dbus_session.found()
-    test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
+    _helix_desktop_rust_fast = meson.project_source_root() / 'target' / 'fast' / 'helix-desktop'
+    _helix_desktop_rust_debug = meson.project_source_root() / 'target' / 'debug' / 'helix-desktop'
+    if run_command('test', '-x', _helix_desktop_rust_fast, check: false).returncode() == 0
+      _helix_desktop_rust = _helix_desktop_rust_fast
+    else
+      _helix_desktop_rust = _helix_desktop_rust_debug
+    endif
+    helix_service = _helix_desktop_rust  # Rust org.helix.Desktop (cargo build -p helix-desktop [--profile fast])
+    _have_rust_desktop = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0
+    if _have_rust_desktop
+      test('desktop_service', helix_dbus_session, args: [helix_service_test, helix_service], timeout: 60)
+    endif
     meter_python = find_program('python3')
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
       test('inference_service_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', helix_inference], timeout: 120)
-      test('assistant_integration', helix_dbus_session,
-        args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', helix_assistant, helix_service, helix_inference,
-          meson.project_source_root()], timeout: 120)
-      test('desktop_agent_manager_integration', helix_dbus_session,
-        args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
-          helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
-      test('desktop_agent_integration', helix_dbus_session,
-        args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_integration.py',
-          helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
+      if _have_rust_desktop
+        test('assistant_integration', helix_dbus_session,
+          args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', helix_assistant, helix_service, helix_inference,
+            meson.project_source_root()], timeout: 120)
+        test('desktop_agent_manager_integration', helix_dbus_session,
+          args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
+            helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
+        test('desktop_agent_integration', helix_dbus_session,
+          args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_integration.py',
+            helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
+      endif
     endif
     _adapter_python = meson.project_source_root() / 'tools/helix-agent/.venv/bin/python'
-    if run_command('test', '-x', _adapter_python, check: false).returncode() == 0 and run_command(_adapter_python, '-c', 'import gi, mcp', check: false).returncode() == 0
+    if _have_rust_desktop and run_command('test', '-x', _adapter_python, check: false).returncode() == 0 and run_command(_adapter_python, '-c', 'import gi, mcp', check: false).returncode() == 0
       test('helix_agent_adapter_integration', helix_dbus_session,
         args: [_adapter_python, meson.project_source_root() / 'tests/helix_agent_adapter_integration.py',
           meson.project_source_root(), helix_service], timeout: 120)
@@ -1068,17 +1040,10 @@ if build_tests
     foreach tool : meter_tools
       have_meter_tools = have_meter_tools and tool.found()
     endforeach
-    if have_meter_tools and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
+    if _have_rust_desktop and have_meter_tools and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
       test('desktop_audio_meter_integration', helix_dbus_session,
         args: [meter_python, meson.project_source_root() / 'tests/desktop_audio_meter_integration.py',
           helix_service, meson.project_source_root() / 'tests/desktop_audio/pipewire.conf'], timeout: 60)
-    endif
-    _helix_desktop_rust_fast = meson.project_source_root() / 'target' / 'fast' / 'helix-desktop'
-    _helix_desktop_rust_debug = meson.project_source_root() / 'target' / 'debug' / 'helix-desktop'
-    if run_command('test', '-x', _helix_desktop_rust_fast, check: false).returncode() == 0
-      _helix_desktop_rust = _helix_desktop_rust_fast
-    else
-      _helix_desktop_rust = _helix_desktop_rust_debug
     endif
     _config_smoke = meson.project_source_root() / 'tools' / 'nested' / 'helix-desktop-config-smoke.sh'
     _have_config_smoke = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0 and run_command('test', '-x', _config_smoke, check: false).returncode() == 0 and run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0

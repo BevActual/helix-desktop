@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=org.helix.Desktop
-Exec=@HELIX_BINDIR@/helix-service-launch
+Exec=@HELIX_BINDIR@/helix-desktop
 SystemdService=helix-service.service

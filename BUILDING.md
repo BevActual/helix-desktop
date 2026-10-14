@@ -260,15 +260,15 @@ Install `gtk4-devel` and `libadwaita-devel` on Fedora to build Settings. GTK 4.1
 1.7 or newer are required. GTK was only required for the retired desktop apps;
 and `disabled` builds only the shell and service. GTK is not a dependency of the shell executable.
 
-Build `helix-service`, `helix-settings` and `helix-system-monitor` with
-`meson compile -C build-debug helix-service helix-settings helix-system-monitor -j2`.
+Build `helix-settings` and `helix-system-monitor` with
+`meson compile -C build-debug helix-settings helix-system-monitor -j2`.
 For work on the running desktop, `just build-settings` compiles only Settings and
 its service at lower CPU and disk priority with two jobs. `just build-desktop`
 includes the shell, upgrade helper and System Monitor. Neither recipe builds test
 targets. Install the completed build with `sudo just install debug`; this uses
 `--no-rebuild` so installation does not start an unrelated parallel build.
 Installed sessions activate the service through D-Bus. For an uninstalled application, run
-`build-debug/helix-service` before `build-debug/helix-settings`. The development shell can launch the
+`target/fast/helix-desktop` (`cargo build --profile fast -p helix-desktop`) before `build-debug/helix-settings`. The development shell can launch the
 service executable next to itself. Do not run an old shell and the migrated service in the same
 session during development, because the old shell still owns the original device backends.
 

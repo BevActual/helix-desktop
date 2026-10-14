@@ -6,7 +6,7 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 
 | C++ today | Rust home | Status |
 |---|---|---|
-| `helix-service` | `services/helix-desktop` (bin `helix-desktop`) | Scaffold; C++ still owns the live bus name |
+| `helix-service` | `services/helix-desktop` (bin `helix-desktop`) | **Done.** Rust owns `org.helix.Desktop`; the C++ service was removed. Only `agent_policy`, `agent_confirmation_queue`, `notification_rules`, `shell_tools`, `tool_schema` remain in `src/desktop/` (shared with assistant/inference and the contract test) |
 | `src/desktop/agent_*`, `tool_schema` | `helix-shell-core::agent` (+ service) | Risk policy, GrantStore, peer identity, Agent Surface Hello/Action/Confirm/manager |
 | `src/config/`, theme, dbus adapters | service / shared crates | Port with each domain |
 | `helix-assistant` | `services/helix-assistant` | After Agent Surface on Rust Desktop; keep separate from shell |
@@ -18,24 +18,20 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 ## Cutover rules
 
 1. **`protocols/` is authoritative.** D-Bus XML and IPC schemas stay the single source of truth. Rust checks or generates against them.
-2. **One bus owner.** Never run two `org.helix.Desktop` processes. The installed unit and D-Bus activation run `helix-service-launch`, which `exec`s the **Rust `helix-desktop` by default** and falls back to the C++ `helix-service` when the Rust binary is not installed. `HELIX_SERVICE=cpp` forces C++; `HELIX_SERVICE_BIN` names an explicit binary (nested harnesses use it). `just install` also builds and installs `helix-desktop`.
+2. **One bus owner.** Never run two `org.helix.Desktop` processes. The installed unit (`helix-service.service`, name kept) and D-Bus activation run `helix-desktop` directly. `HELIX_SERVICE_BIN` names an explicit binary (nested harnesses use it). `just install` builds and installs `helix-desktop`.
 3. **Parity before delete.** Nested or unit tests that cover a domain must pass against the Rust binary before that C++ domain is removed.
 4. **Same change deletes C++.** When a domain cuts over, remove its C++ sources and meson bits in that change.
 
 ## Dev selection
 
 ```sh
-# C++ (default today)
-meson compile -C build helix-service
-
-# Rust scaffold
 cargo build --profile fast -p helix-desktop
 HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 ```
 
-**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job builds `helix-desktop` plus **`helix-template-apply`** / **`helix-theme-palette`** on Arch and runs `tools/nested/helix-desktop-config-smoke.sh` with `HELIX_*_BIN` set so `templates-apply` and **`Appearance1.SetAccent`** are exercised (not skipped). **Build (debug)** still runs full `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson also builds `helix-service` and `desktop_service_test` (C++). C++ integration tests still use meson `helix-service` unless a gate keys off `HELIX_SERVICE_BIN`.
+**CI vs Meson:** GitHub Actions runs Rust nested smokes (`helix-desktop-config`, `helix-desktop-audio-meter`, agent integration). The **helix-desktop Configuration1** job builds `helix-desktop` plus **`helix-template-apply`** / **`helix-theme-palette`** on Arch and runs `tools/nested/helix-desktop-config-smoke.sh` with `HELIX_*_BIN` set so `templates-apply` and **`Appearance1.SetAccent`** are exercised (not skipped). **Build (debug)** still runs full `just build`, install layout, and `meson test` (including `helix_desktop_config_smoke` when `target/fast/helix-desktop` exists). Meson builds `desktop_service_test` (C++, the behavioural contract) and runs it, plus the assistant/agent integration tests, against `target/fast|debug/helix-desktop` when that binary exists.
 
-**Scalar catalog:** C++ `settings_catalog.cpp` rows that are not ordered-list types are mirrored in Rust via hand-maintained `BOOTSTRAP` plus generated `settings_bootstrap_extra.rs` (`python3 tools/gen-rust-settings-bootstrap.py` after C++ catalog edits). Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
+**Scalar catalog:** The C++ `settings_catalog.cpp` was removed; its rows live in Rust as hand-maintained `BOOTSTRAP` plus `settings_bootstrap_extra.rs`, checked against the frozen golden `core/helix-shell-core/tests/golden/settings_catalog_defaults.json`. Ordered types (key-chords, shortcuts, tabs, display lists, templates, transitions, notification rules, bar widget rows) stay in `ordered_lists.rs` / `ordered_catalog.rs`.
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 

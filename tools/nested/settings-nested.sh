@@ -23,7 +23,7 @@ def png(path, rgb, w=320, h=200):
     open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
 png(sys.argv[1] + "/alpha-red.png", (200, 40, 40)); png(sys.argv[1] + "/beta-green.png", (40, 160, 70)); png(sys.argv[1] + "/gamma-blue.png", (50, 80, 210))
 PY
-SERVICE="${HELIX_SERVICE_BIN:-$BUILD/helix-service}"
+SERVICE="${HELIX_SERVICE_BIN:-$ROOT/target/fast/helix-desktop}"
 "$SERVICE" > "$XDG_STATE_HOME/helix-service.log" 2>&1 &
 echo $! > "$XDG_STATE_HOME/helix-service.pid"
 # With a desktop registered the service offers the whole catalog (without one only the portable settings), so every Settings page has its rows.

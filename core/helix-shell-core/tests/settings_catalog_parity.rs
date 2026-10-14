@@ -1,5 +1,5 @@
 //! The Rust bootstrap catalog must match the C++ catalog for a pristine config
-//! (`tools/regen-settings-defaults.sh` regenerates the golden).
+//! (the golden is frozen; the C++ catalog it came from was removed).
 
 use helix_shell_core::desktop::settings::{ConfigPaths, ConfigStore};
 use serde_json::Value;
