@@ -45,7 +45,7 @@ case "${1:-}" in
     cat >"$DROPIN" <<CONF
 [Service]
 ExecStart=
-ExecStart=$(realpath "$bin")
+ExecStart="$(realpath "$bin")"
 Environment=RUST_LOG=helix_desktop=info
 CONF
     systemctl --user daemon-reload
