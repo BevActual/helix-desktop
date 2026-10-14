@@ -80,6 +80,22 @@ install m:
         exit 1
     fi
     meson install --no-rebuild -C build-{{m}}
+    # The Rust desktop service is the default org.helix.Desktop owner; helix-service-launch falls
+    # back to the C++ helix-service when it is missing (HELIX_SERVICE=cpp forces C++).
+    just install-rust-desktop {{m}}
+
+# Build and install the Rust org.helix.Desktop service next to the meson-installed binaries.
+install-rust-desktop m:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v cargo >/dev/null; then
+        echo "warning: cargo not found; helix-desktop not installed, helix-service-launch will use the C++ service" >&2
+        exit 0
+    fi
+    cargo build --release -p helix-desktop
+    prefix=$(meson introspect "build-{{m}}" --buildoptions | python3 -c 'import json,sys; o={x["name"]:x["value"] for x in json.load(sys.stdin)}; print(o["prefix"] + "/" + o["bindir"])')
+    install -Dm755 target/release/helix-desktop "${DESTDIR:-}${prefix}/helix-desktop"
+    echo "installed ${DESTDIR:-}${prefix}/helix-desktop"
 
 uninstall m:
     #!/usr/bin/env bash

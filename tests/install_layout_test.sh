@@ -26,8 +26,24 @@ helper=$(find "$stage" -type f -name helix-system-upgrade -print -quit)
 [ -x "$prefix/bin/helix-service" ] || fail 'desktop service is missing'
 [ -x "$prefix/bin/helix-template-apply" ] || fail 'template apply helper is missing'
 [ -x "$prefix/bin/helix-theme-palette" ] || fail 'theme palette helper is missing'
+[ -x "$prefix/bin/helix-service-launch" ] || fail 'desktop service launcher is missing'
+grep -q 'helix-service-launch' "$prefix/lib/systemd/user/helix-service.service" || fail 'unit does not use the launcher'
+grep -q 'helix-service-launch' "$prefix/share/dbus-1/services/org.helix.Desktop.service" || fail 'activation does not use the launcher'
 [ -f "$prefix/share/dbus-1/services/org.helix.Desktop.service" ] || fail 'D-Bus activation is missing'
 [ -f "$prefix/lib/systemd/user/helix-service.service" ] || fail 'systemd user unit is missing'
+# The launcher picks the Rust service when present and falls back to C++ (or HELIX_SERVICE=cpp).
+launch_dir=$(mktemp -d)
+cp "$prefix/bin/helix-service-launch" "$launch_dir/"
+printf '#!/bin/sh\necho cpp\n' >"$launch_dir/helix-service"
+chmod +x "$launch_dir/helix-service"
+[ "$("$launch_dir/helix-service-launch")" = cpp ] || fail 'launcher must fall back to C++ without helix-desktop'
+printf '#!/bin/sh\necho rust\n' >"$launch_dir/helix-desktop"
+chmod +x "$launch_dir/helix-desktop"
+[ "$("$launch_dir/helix-service-launch")" = rust ] || fail 'launcher must prefer the Rust service'
+[ "$(HELIX_SERVICE=cpp "$launch_dir/helix-service-launch")" = cpp ] || fail 'HELIX_SERVICE=cpp must force C++'
+[ "$(HELIX_SERVICE_BIN="$launch_dir/helix-desktop" "$launch_dir/helix-service-launch")" = rust ] || fail 'HELIX_SERVICE_BIN must win'
+rm -rf "$launch_dir"
+
 [ -f "$prefix/share/helix/msg-risk.toml" ] || fail 'msg-risk protocol file is missing'
 [ -f "$prefix/share/helix/tool-hints.toml" ] || fail 'tool-hints protocol file is missing'
 

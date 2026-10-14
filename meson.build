@@ -860,6 +860,8 @@ install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') /
 install_data('protocols/ipc/tool-hints.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
 helix_service_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
+# Picks the Rust helix-desktop when installed, else the C++ helix-service (see the script).
+install_data('assets/services/helix-service-launch', install_dir: get_option('bindir'), install_mode: 'rwxr-xr-x')
 configure_file(input: 'assets/services/org.helix.Desktop.service.in',
   output: 'org.helix.Desktop.service', configuration: helix_service_config,
   install_dir: get_option('datadir') / 'dbus-1' / 'services')

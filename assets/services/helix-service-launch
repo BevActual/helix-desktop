@@ -1,0 +1,22 @@
+#!/bin/sh
+# Starts the org.helix.Desktop service.
+#
+# The Rust helix-desktop is the default; the C++ helix-service is used when the Rust binary is
+# not installed, or when HELIX_SERVICE=cpp. HELIX_SERVICE_BIN names an explicit binary instead.
+# Exactly one of them runs: this script exec()s it, so the unit supervises the real service.
+#
+# Opt out without a rebuild:  systemctl --user edit helix-service   →   [Service]
+#                                                                       Environment=HELIX_SERVICE=cpp
+set -eu
+
+bindir=$(dirname "$0")
+
+if [ -n "${HELIX_SERVICE_BIN:-}" ]; then
+  exec "$HELIX_SERVICE_BIN" "$@"
+fi
+
+if [ "${HELIX_SERVICE:-rust}" != cpp ] && [ -x "$bindir/helix-desktop" ]; then
+  exec "$bindir/helix-desktop" "$@"
+fi
+
+exec "$bindir/helix-service" "$@"
