@@ -32,22 +32,20 @@ Fedora + helix-niri are the sole shell target. Everything else is a helper or co
 └─────────────┬───────────────────────────────────────────────┘
               │ D-Bus org.helix.Desktop  (protocols/)
 ┌─────────────▼───────────────────────────────────────────────┐
-│  Desktop authority                                          │
-│    LIVE: C++ helix-service (src/desktop/)                   │
-│    TARGET: Rust helix-desktop (services/helix-desktop)      │
-│    domains: Configuration, Appearance, Audio, Network,      │
-│             Bluetooth, Displays, AgentSurface, Activity     │
+│  helix-desktop (services/helix-desktop)                     │
+│    org.helix.Desktop — Configuration, Appearance, Audio,    │
+│    Network, Bluetooth, Displays, AgentSurface, Activity     │
 └─────┬───────────────┬───────────────┬───────────────────────┘
       │               │               │
       ▼               ▼               ▼
  helix-settings   helix-software   Mobius / …
  (apps/)          (apps/)          (apps/)
 
-Optional later: helix-assistant, helix-inference (still C++ under src/)
+helix-assistant, helix-inference, helix-system-upgrade (services/)
 Session helpers: helix-wallpaper, helix-idle (services/)
 ```
 
-**One bus owner.** Never run C++ and Rust `org.helix.Desktop` together. The installed `helix-service-launch` picks Rust `helix-desktop` by default and the C++ `helix-service` as fallback (`HELIX_SERVICE=cpp` forces C++; nested harnesses use `HELIX_SERVICE_BIN`).
+**One bus owner.** The user unit `helix-service.service` (name kept) runs `helix-desktop` on the session bus. Nested harnesses set `HELIX_SERVICE_BIN` to an explicit binary when they need a non-installed build.
 
 ## Tree roles (intended)
 
@@ -59,12 +57,13 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `core/shared-ui` | Shared CSS tokens, icons, and `react/` (`@helix/ui` components, generated TS bindings) | Session policy |
 | `shell/` | Live session UI (layer-shell) | Device backends |
 | `apps/` | Standalone Helix apps (Settings, …): Tauri host + React/TypeScript frontend (`frontend-stack.md`) | Claiming the Desktop bus |
-| `services/helix-desktop` | Rust desktop authority (migration target) | Compositor |
+| `services/helix-desktop` | `org.helix.Desktop` authority | Compositor |
+| `services/helix-assistant`, `helix-inference`, `helix-system-upgrade` | Agent client, inference fabric, pkexec upgrade helper | Desktop bus name (assistant/inference use their own names) |
 | `services/helix-wallpaper`, `helix-idle` | Small session helpers | Desktop bus name |
 | `greeter/` | Login only | Session shell surfaces |
 | `compositor/` | Display server (separate workspace) | Shell chrome |
-| `src/desktop/` | Live C++ `helix-service` until cutover | New UI |
-| `src/` (platform) | C++ config/theme/dbus/… migrating domain-by-domain | New session UI |
+| `src/desktop/` | Agent/policy fixtures for contract tests (not a shipped service) | New UI |
+| `src/` (platform) | C++ theme helpers, inference engine glue, golden generators | New session UI |
 | `tools/` | Install, nested e2e, layering checks | Product runtime |
 | `docs/design/` | Architecture + HIG | Generated dumps (`archive/`) |
 
@@ -86,12 +85,13 @@ Session helpers: helix-wallpaper, helix-idle (services/)
 | `helix-greeter` | greetd session | `greeter/` |
 | `helix-niri` | compositor | `compositor/` |
 | `helix-shell-tauri` | session UI; Desktop registrant | `shell/` |
-| `helix-desktop` | `org.helix.Desktop` owner | `services/helix-desktop` (scaffold) ← replaces `src/desktop/` / `helix-service` |
+| `helix-desktop` | `org.helix.Desktop` owner | `services/helix-desktop` |
 | `helix-settings` etc. | Desktop clients | `apps/` |
 | **Mobius** (`helix-mobius`) | AI hub (talk, personas, routing); never Agent Surface grants | `apps/helix-mobius/` |
 | `helix-wallpaper`, `helix-idle` | helpers | `services/` |
-| `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` (ported from `src/assistant/`) |
-| `helix-inference` | `org.helix.Inference` fabric | `src/inference/` → **`services/helix-inference`** |
+| `helix-assistant` | Agent Surface client; never in the shell | `services/helix-assistant` |
+| `helix-inference` | `org.helix.Inference` fabric | `services/helix-inference` (llama glue + workers still partly C++ under `src/inference/`) |
+| `helix-system-upgrade` | polkit-gated `dnf` plan helper | `services/helix-system-upgrade` |
 | Helix MCP server | MCP → Agent Surface for MCP-capable apps/agents | `tools/helix-agent/` |
 
 Rules that stay true after cutover:
@@ -106,11 +106,11 @@ Rules that stay true after cutover:
 
 | Tension | Today | Target |
 |---|---|---|
-| Two desktop implementations | C++ live + Rust scaffold | Rust owns the bus; C++ `src/desktop/` gone |
-| Stale narrative in older design pages | Entry + compositor user docs marked; `archive/` ignored | Ignore `archive/`; leave protocol-level “if available” wording where accurate |
-| C++ platform blob | `src/config`, `theme`, `dbus`, … | Move with each domain into Rust crates / thin helpers |
-| Assistant / inference location | `src/assistant`, `src/inference` | `services/helix-assistant`, `services/helix-inference` after Agent Surface on Rust Desktop |
-| Doc drift | Entry docs disagree on `services/` | This file is the structure SoT; others link here |
+| C++ theme / template helpers | Meson builds `helix-template-apply`, `helix-theme-palette`; goldens in `core/helix-theme` | In-process only in `helix-theme`; delete `src/theme/` apply paths |
+| Inference workers | `helix-transcribe`, `helix-image`, llama shim in `src/inference/` | Rust or isolated crates; service shell already Rust |
+| Contract-test C++ | `desktop_service_test`, agent policy units in `src/desktop/` | Keep until fully duplicated in Rust, or freeze goldens and delete |
+| Greeter | Tauri scaffold | Full greetd product surface |
+| Doc drift | Soak + entry docs still mention C++ desktop | This file is the structure SoT; others link here |
 
 ## Reading order
 

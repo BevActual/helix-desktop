@@ -1,5 +1,4 @@
-//! Rust desktop authority for `org.helix.Desktop`.
-//! Live sessions still use C++ `helix-service` until cutover — see `docs/design/cpp-to-rust.md`.
+//! Rust desktop authority for `org.helix.Desktop` (installed as `helix-desktop`, unit `helix-service.service`).
 //! Nested harness: `HELIX_SERVICE_BIN=$PWD/target/debug/helix-desktop`.
 
 mod agents;

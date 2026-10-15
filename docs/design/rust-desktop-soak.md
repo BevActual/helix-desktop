@@ -1,34 +1,38 @@
-# Rust `helix-desktop` soak
+# `helix-desktop` session soak
 
-Goal: prove the Rust `org.helix.Desktop` service is a drop-in for C++ `helix-service` on real
-hardware before the default bus owner is flipped (`cpp-to-rust.md`, "One bus owner").
+Goal: exercise the **installed** Rust `org.helix.Desktop` service on real hardware with the live
+shell — NetworkManager, BlueZ, PipeWire, niri, Settings, and Agent Surface flows that nested tests
+only fake.
 
-What is already covered without hardware: every method exists; the C++ service contract test
-(`tests/desktop_service_test.cpp`, run in CI against the Rust binary); the Rust catalog matches
-the C++ pristine catalog; theme/template/Wallhaven behaviour has C++ goldens. What a soak adds is
-the parts those fake: NetworkManager, BlueZ, PipeWire, niri and the live shell.
+What CI already covers without hardware: the C++ behavioural contract test
+(`tests/desktop_service_test.cpp`, run against `target/*/helix-desktop`); frozen settings catalog
+goldens; theme/template/Wallhaven parity via C++ reference generators in `core/helix-theme`.
 
 ## Run it
 
 ```sh
 cargo build --release -p helix-desktop
-tools/soak/rust-desktop.sh capture /tmp/cpp.json          # C++ service, current session
-tools/soak/rust-desktop.sh enable                         # drop-in override + restart the unit
-tools/soak/rust-desktop.sh capture /tmp/rust.json
-tools/soak/snapshot.py diff /tmp/cpp.json /tmp/rust.json  # structural diff, exit 1 on differences
-journalctl --user -u helix-service -f                     # watch warnings while you use the desktop
-tools/soak/rust-desktop.sh disable                        # back to C++ (always safe)
+tools/soak/rust-desktop.sh status
+tools/soak/rust-desktop.sh capture /tmp/before.json   # snapshot while on the installed binary
+tools/soak/rust-desktop.sh enable                       # optional: user drop-in → local build
+tools/soak/rust-desktop.sh capture /tmp/dev.json
+tools/soak/snapshot.py diff /tmp/before.json /tmp/dev.json
+journalctl --user -u helix-service -f
+tools/soak/rust-desktop.sh disable                      # remove drop-in, back to install
 ```
 
-`enable` only adds `~/.config/systemd/user/helix-service.service.d/rust-desktop.conf`; the install
-is untouched and `disable` removes it. Restarting the unit makes shell clients reconnect; if the
-bar does not recover, `disable` first and report what the journal said.
+`enable` adds `~/.config/systemd/user/helix-service.service.d/rust-desktop.conf` so you can soak a
+**local** `helix-desktop` without touching `/usr`. `disable` removes it. Restarting the unit makes
+shell clients reconnect; if the bar does not recover, run `disable` and check the journal.
+
+When you are already running a dev build via the drop-in, `capture` is enough — skip the C++/Rust
+A/B flow; the C++ `helix-service` binary no longer exists.
 
 ## Expected `diff` output
 
-`implementation` differs by design. Volatile values (signal strength, levels) are compared by type
-only. Anything else is a bug to report: the structure of every domain snapshot and every settings
-row (ids, types, pages, groups, options) should be identical. Known and accepted:
+When comparing two captures from the **same** implementation (install vs drop-in dev build),
+snapshots should match structurally. Volatile values (signal strength, levels) are compared by type
+only. Known environment differences:
 
 - `shell.polkit_agent` defaults to `true` (the Tauri shell registers the native agent).
 - `theme.templates.*` option lists depend on the installed template assets.
@@ -64,12 +68,12 @@ Use the real shell for each item and note pass/fail plus the journal line if it 
 - [ ] Change settings from Settings (toggle, slider, list reorder); values persist across a service restart
 - [ ] Edit `config.toml` by hand: change shows up within a second without restarting anything
 - [ ] Reset an overridden setting; ordered lists (dock pins, bar widgets, shortcuts, notification rules) round-trip
-- [ ] `HELIX_CONFIG_HOME` / `XDG_*` overrides resolve to the same files as C++
+- [ ] `HELIX_CONFIG_HOME` / `XDG_*` overrides resolve to the same files as before
 
 **Appearance**
 - [ ] Switch builtin/custom/community palette; Reapply; template outputs written (kitty, gtk, qt, …)
 - [ ] Save palette / set accent (light and dark mode)
-- [ ] Wallpaper palette source, `auto` mode, `firefox-theme`: still handled (via the C++ helpers), no errors
+- [ ] Wallpaper palette source, `auto` mode, `firefox-theme`: no errors (C++ helpers may still run for edge cases)
 - [ ] **Wallhaven**: search, thumbnails appear, download sets the wallpaper, cancel works, offline mode blocks it
 
 **Agent surface / assistant**
@@ -77,20 +81,11 @@ Use the real shell for each item and note pass/fail plus the journal line if it 
 - [ ] Kill switch and activity view behave as before
 
 **Lifecycle**
-- [ ] Log out/in and a cold boot with the override enabled
+- [ ] Log out/in and a cold boot
 - [ ] `kill -9` the service: systemd restarts it and the shell reconnects
 - [ ] One full day of normal use; `journalctl --user -u helix-service -p warning` is quiet
 
 ## Recording results
 
 Open an issue per failure with: the checklist item, `journalctl` excerpt, and the `capture`
-diff. When every box has passed on at least two machines (one with Bluetooth + enterprise Wi-Fi),
-the default can flip: make `helix-desktop` the installed `helix-service` unit's `ExecStart`, keep
-the C++ service for one release behind `HELIX_SERVICE_BIN`, then delete `src/desktop/` per the
-cutover rules in `cpp-to-rust.md`.
-
-## After the flip
-
-The unit and D-Bus activation run `helix-desktop` directly; the C++ service and the
-`helix-service-launch` fallback script were removed. The soak drop-in from
-`tools/soak/rust-desktop.sh enable` is no longer needed; run `disable` to remove it.
+diff when you used a dev drop-in.

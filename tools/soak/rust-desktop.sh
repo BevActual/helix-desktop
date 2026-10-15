@@ -7,7 +7,7 @@
 #   tools/soak/rust-desktop.sh capture OUT.json                 read-only snapshot for `snapshot.py diff`
 #
 # Only the user unit's ExecStart is overridden; nothing in /usr or the install is touched, and
-# `disable` restores the C++ service. Never run both services: the unit restart replaces the owner.
+# `disable` restores the installed `helix-desktop`. The unit restart replaces the bus owner.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 UNIT=helix-service.service
@@ -32,7 +32,7 @@ wait_for_owner() {
     fi
     sleep 0.2
   done
-  echo "org.helix.Desktop did not come back; run '$0 disable' to restore the C++ service" >&2
+  echo "org.helix.Desktop did not come back; run '$0 disable' to restore the installed binary" >&2
   return 1
 }
 
@@ -64,7 +64,7 @@ CONF
     ;;
   status)
     systemctl --user --no-pager status "$UNIT" | sed -n 1,12p || true
-    [[ -f "$DROPIN" ]] && echo "override: $DROPIN" || echo "override: none (C++ helix-service)"
+    [[ -f "$DROPIN" ]] && echo "override: $DROPIN" || echo "override: none (installed helix-desktop)"
     echo "implementation: $(implementation)"
     ;;
   capture)

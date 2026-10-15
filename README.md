@@ -6,7 +6,7 @@
 
 Product structure and runtime roles: [docs/design/product-structure.md](docs/design/product-structure.md). Design index: [docs/design/README.md](docs/design/README.md).
 
-The **live session shell is the Tauri/Rust build** (`shell/helix-shell-tauri`, installed with `tools/switch-shell.sh install`). The C++ session UI is removed; see [docs/design/session-shell.md](docs/design/session-shell.md). Desktop authority is `org.helix.Desktop` (live C++ `helix-service`, Rust target `services/helix-desktop`); contracts under `protocols/` are the shared boundary.
+The **live session shell is the Tauri/Rust build** (`shell/helix-shell-tauri`, installed with `tools/switch-shell.sh install`). The C++ session UI is removed; see [docs/design/session-shell.md](docs/design/session-shell.md). Desktop authority is **`helix-desktop`** (`services/helix-desktop`, bus name `org.helix.Desktop`, unit `helix-service.service`); contracts under `protocols/` are the shared boundary.
 
 The compositor lives in-tree at [`compositor/`](compositor/) (helix-niri fork; own Cargo workspace). Login is the Tauri greeter at [`greeter/`](greeter/) (`helix-greeter`). **Fedora + helix-niri are the sole shell target**; other compositors are not a supported product surface.
 
