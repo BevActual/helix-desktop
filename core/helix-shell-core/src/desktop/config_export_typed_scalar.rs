@@ -6,8 +6,9 @@ use super::config_export_defaults::{
     write_audio_defaults, write_backdrop_defaults, write_brightness_defaults,
     write_calendar_defaults, write_hooks_defaults, write_hot_corners_defaults,
     write_idle_defaults, write_location_defaults, write_nightlight_defaults,
-    write_notification_defaults, write_osd_defaults, write_tailscale_defaults,
-    write_weather_defaults, HOOK_EVENT_KEYS,
+    write_control_center_defaults, write_lockscreen_defaults, write_notification_defaults,
+    write_osd_defaults, write_system_defaults, write_tailscale_defaults, write_weather_defaults,
+    HOOK_EVENT_KEYS,
 };
 use super::config_export_serialize::f32_bits;
 
@@ -801,6 +802,45 @@ pub(crate) fn export_idle_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| IdleExport::export_defaults().write_export_table())
 }
 
+/// Overlay merged leaves onto `defaults` when the key exists in defaults (one table level).
+fn overlay_known_leaves(defaults: &Toml, merged: &Toml) -> Toml {
+    let default_table = match defaults.as_table() {
+        Some(table) => table,
+        None => return defaults.clone(),
+    };
+    let merged_table = match merged.as_table() {
+        Some(table) => table,
+        None => return defaults.clone(),
+    };
+    let mut out = default_table.clone();
+    for (key, merged_value) in merged_table {
+        let default_value = match default_table.get(key) {
+            Some(value) => value,
+            None => continue,
+        };
+        let merged_leaf = match (default_value, merged_value) {
+            (Toml::Table(_), Toml::Table(_)) => overlay_known_leaves(default_value, merged_value),
+            (Toml::Float(_), Toml::Float(value)) => Toml::Float(f32_bits(*value)),
+            (Toml::Float(_), Toml::Integer(value)) => Toml::Float(f32_bits(*value as f64)),
+            _ => merged_value.clone(),
+        };
+        out.insert(key.clone(), merged_leaf);
+    }
+    Toml::Table(out)
+}
+
+fn export_overlay_section_from_merged(
+    section: &str,
+    merged: &Toml,
+    write_defaults: fn() -> Toml,
+) -> Toml {
+    let defaults = write_defaults();
+    match merged.get(section) {
+        Some(merged_section) => overlay_known_leaves(&defaults, merged_section),
+        None => defaults,
+    }
+}
+
 fn overlay_bool_subtable_from_merged(
     defaults: &toml::map::Map<String, Toml>,
     merged: Option<&Toml>,
@@ -1160,6 +1200,161 @@ pub(crate) fn export_osd_section_from_merged(merged: &Toml) -> Toml {
         .unwrap_or_else(|| OsdExport::export_defaults().write_export_table())
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LockscreenExport {
+    allow_empty_password: bool,
+    blur_intensity: f64,
+    blurred_desktop: bool,
+    enabled: bool,
+    fingerprint: bool,
+    lid_close_keep_external_displays: bool,
+    lock_before_suspend: bool,
+    monitors: Vec<String>,
+    tint_intensity: f64,
+    wallpaper: String,
+}
+
+impl LockscreenExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(&write_lockscreen_defaults())
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("lockscreen export table");
+        Self {
+            allow_empty_password: table
+                .get("allow_empty_password")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
+            blur_intensity: table
+                .get("blur_intensity")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(0.5),
+            blurred_desktop: table
+                .get("blurred_desktop")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
+            enabled: table.get("enabled").and_then(Toml::as_bool).unwrap_or(true),
+            fingerprint: table
+                .get("fingerprint")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            lid_close_keep_external_displays: table
+                .get("lid_close_keep_external_displays")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            lock_before_suspend: table
+                .get("lock_before_suspend")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            monitors: string_array(table.get("monitors")),
+            tint_intensity: table
+                .get("tint_intensity")
+                .and_then(|v| v.as_float())
+                .map(f32_bits)
+                .unwrap_or(0.3),
+            wallpaper: table
+                .get("wallpaper")
+                .and_then(Toml::as_str)
+                .unwrap_or("")
+                .to_string(),
+        }
+    }
+
+    fn from_merged_section(merged_section: &Toml) -> Self {
+        let mut out = Self::export_defaults();
+        let table = match merged_section.as_table() {
+            Some(table) => table,
+            None => return out,
+        };
+        if let Some(value) = table.get("allow_empty_password").and_then(Toml::as_bool) {
+            out.allow_empty_password = value;
+        }
+        if let Some(value) = table.get("blur_intensity").and_then(|v| v.as_float()) {
+            out.blur_intensity = f32_bits(value);
+        }
+        if let Some(value) = table.get("blurred_desktop").and_then(Toml::as_bool) {
+            out.blurred_desktop = value;
+        }
+        if let Some(value) = table.get("enabled").and_then(Toml::as_bool) {
+            out.enabled = value;
+        }
+        if let Some(value) = table.get("fingerprint").and_then(Toml::as_bool) {
+            out.fingerprint = value;
+        }
+        if let Some(value) = table
+            .get("lid_close_keep_external_displays")
+            .and_then(Toml::as_bool)
+        {
+            out.lid_close_keep_external_displays = value;
+        }
+        if let Some(value) = table.get("lock_before_suspend").and_then(Toml::as_bool) {
+            out.lock_before_suspend = value;
+        }
+        if table.contains_key("monitors") {
+            out.monitors = string_array(table.get("monitors"));
+        }
+        if let Some(value) = table.get("tint_intensity").and_then(|v| v.as_float()) {
+            out.tint_intensity = f32_bits(value);
+        }
+        if let Some(value) = table.get("wallpaper").and_then(Toml::as_str) {
+            out.wallpaper = value.to_string();
+        }
+        out
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert(
+            "allow_empty_password".to_string(),
+            Toml::Boolean(self.allow_empty_password),
+        );
+        table.insert("blur_intensity".to_string(), Toml::Float(self.blur_intensity));
+        table.insert(
+            "blurred_desktop".to_string(),
+            Toml::Boolean(self.blurred_desktop),
+        );
+        table.insert("enabled".to_string(), Toml::Boolean(self.enabled));
+        table.insert("fingerprint".to_string(), Toml::Boolean(self.fingerprint));
+        table.insert(
+            "lid_close_keep_external_displays".to_string(),
+            Toml::Boolean(self.lid_close_keep_external_displays),
+        );
+        table.insert(
+            "lock_before_suspend".to_string(),
+            Toml::Boolean(self.lock_before_suspend),
+        );
+        table.insert(
+            "monitors".to_string(),
+            Toml::Array(
+                self.monitors
+                    .iter()
+                    .map(|name| Toml::String(name.clone()))
+                    .collect(),
+            ),
+        );
+        table.insert("tint_intensity".to_string(), Toml::Float(self.tint_intensity));
+        table.insert("wallpaper".to_string(), Toml::String(self.wallpaper.clone()));
+        Toml::Table(table)
+    }
+}
+
+pub(crate) fn export_lockscreen_section_from_merged(merged: &Toml) -> Toml {
+    merged
+        .get("lockscreen")
+        .map(|section| LockscreenExport::from_merged_section(section).write_export_table())
+        .unwrap_or_else(|| LockscreenExport::export_defaults().write_export_table())
+}
+
+pub(crate) fn export_system_section_from_merged(merged: &Toml) -> Toml {
+    export_overlay_section_from_merged("system", merged, write_system_defaults)
+}
+
+pub(crate) fn export_control_center_section_from_merged(merged: &Toml) -> Toml {
+    export_overlay_section_from_merged("control_center", merged, write_control_center_defaults)
+}
+
 pub(crate) fn export_hooks_section_from_merged(merged: &Toml) -> Toml {
     let mut out = write_hooks_defaults();
     let out_table = out.as_table_mut().expect("hooks export table");
@@ -1222,6 +1417,50 @@ mod tests {
         assert_eq!(
             OsdExport::export_defaults().write_export_table(),
             write_osd_defaults()
+        );
+        assert_eq!(
+            LockscreenExport::export_defaults().write_export_table(),
+            write_lockscreen_defaults()
+        );
+        assert_eq!(
+            export_system_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_system_defaults()
+        );
+        assert_eq!(
+            export_control_center_section_from_merged(&Toml::Table(toml::map::Map::new())),
+            write_control_center_defaults()
+        );
+    }
+
+    #[test]
+    fn overlay_sections_match_filtered_merge() {
+        let default = serialize_default_config();
+        let merged: Toml = toml::from_str(
+            r#"
+[system.monitor]
+cpu_poll_seconds = 5.0
+enabled = false
+
+[control_center]
+height = 800
+
+[control_center.network]
+wifi_band = "5ghz"
+"#,
+        )
+        .unwrap();
+        let system_filtered =
+            export_filtered_schema_section("system", &merged, &default, write_system_defaults);
+        assert_eq!(export_system_section_from_merged(&merged), system_filtered);
+        let cc_filtered = export_filtered_schema_section(
+            "control_center",
+            &merged,
+            &default,
+            write_control_center_defaults,
+        );
+        assert_eq!(
+            export_control_center_section_from_merged(&merged),
+            cc_filtered
         );
     }
 
