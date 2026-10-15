@@ -130,26 +130,30 @@ key_file = "/etc/helix.key"
         );
     }
 
+    fn assert_typed_section_matches_writer(
+        section: &str,
+        writer: fn() -> Toml,
+        default: &Toml,
+        empty: &Toml,
+    ) {
+        let got = export_typed_schema_section(section, empty, default)
+            .unwrap_or_else(|| panic!("section {section} should be typed"));
+        assert_eq!(got, writer(), "section {section}");
+    }
+
     #[test]
     fn flat_typed_sections_match_default_writers_without_merged_overlay() {
         let default = serialize_default_config();
         let empty = Toml::Table(toml::map::Map::new());
-        let cases: [(&str, fn() -> Toml)] = [
-            ("accessibility", write_accessibility_defaults),
-            ("audio", write_audio_defaults),
-            ("backdrop", write_backdrop_defaults),
-            ("battery", write_battery_defaults),
-            ("brightness", write_brightness_defaults),
-            ("location", write_location_defaults),
-            ("nightlight", write_nightlight_defaults),
-            ("storage", write_storage_defaults),
-            ("tailscale", write_tailscale_defaults),
-            ("weather", write_weather_defaults),
-        ];
-        for (section, writer) in cases {
-            let got = export_typed_schema_section(section, &empty, &default)
-                .unwrap_or_else(|| panic!("section {section} should be typed"));
-            assert_eq!(got, writer(), "section {section}");
-        }
+        assert_typed_section_matches_writer("accessibility", write_accessibility_defaults, &default, &empty);
+        assert_typed_section_matches_writer("audio", write_audio_defaults, &default, &empty);
+        assert_typed_section_matches_writer("backdrop", write_backdrop_defaults, &default, &empty);
+        assert_typed_section_matches_writer("battery", write_battery_defaults, &default, &empty);
+        assert_typed_section_matches_writer("brightness", write_brightness_defaults, &default, &empty);
+        assert_typed_section_matches_writer("location", write_location_defaults, &default, &empty);
+        assert_typed_section_matches_writer("nightlight", write_nightlight_defaults, &default, &empty);
+        assert_typed_section_matches_writer("storage", write_storage_defaults, &default, &empty);
+        assert_typed_section_matches_writer("tailscale", write_tailscale_defaults, &default, &empty);
+        assert_typed_section_matches_writer("weather", write_weather_defaults, &default, &empty);
     }
 }
