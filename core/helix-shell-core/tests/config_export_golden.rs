@@ -224,6 +224,32 @@ fn rust_export_matches_cpp_for_lockscreen_widget_placement() {
 }
 
 #[test]
+fn rust_export_matches_cpp_for_bar_monitor_match_override() {
+    assert_rust_export_matches_cpp(
+        "[bar.default.monitor.DP-1]\nmatch = \"DP-1\"\nthickness = 28\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_two_desktop_widget_placements() {
+    assert_rust_export_matches_cpp(
+        "[desktop_widgets]\nwidget_order = [\"a\", \"b\"]\n\n[desktop_widgets.widget.a]\ntype = \"clock\"\n\n[desktop_widgets.widget.b]\ntype = \"date\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_idle_lock_behavior_only() {
+    assert_rust_export_matches_cpp(
+        "[idle.behavior.lock]\ntimeout = 300\nenabled = true\naction = \"lock\"\n",
+    );
+}
+
+#[test]
+fn rust_export_matches_cpp_for_nightlight_enabled() {
+    assert_rust_export_matches_cpp("[nightlight]\nenabled = true\n");
+}
+
+#[test]
 fn rust_export_matches_cpp_for_bar_thickness_float_literal() {
     assert_rust_export_matches_cpp("[bar.default]\nthickness = 40.0\n");
 }

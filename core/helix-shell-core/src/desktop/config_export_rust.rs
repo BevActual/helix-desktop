@@ -250,6 +250,8 @@ fn default_placement_widget_table(type_name: &str) -> toml::map::Map<String, Tom
     table.insert("placement_width".to_string(), Toml::Float(0.0));
     table.insert("rotation".to_string(), Toml::Float(0.0));
     table.insert("type".to_string(), Toml::String(type_name.to_string()));
+    // C++ `widgetsPlacementTable` always emits a `settings` subtable (even when empty).
+    table.insert("settings".to_string(), Toml::Table(toml::map::Map::new()));
     table
 }
 
