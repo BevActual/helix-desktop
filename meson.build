@@ -349,7 +349,6 @@ _helix_sources = files(
   'src/config/widget_gesture.cpp',
   'src/system/freedesktop_key_file.cpp',
   'src/system/distro_info.cpp',
-  'src/system/fedora_upgrade.cpp',
   'src/system/package_spec.cpp',
   'src/system/disk_mounts.cpp',
   'src/system/format_units.cpp',
@@ -495,17 +494,8 @@ install_data(
   install_mode: 'rwxr-xr-x',
 )
 
-executable('helix-system-upgrade',
-  sources: files(
-    'src/system/fedora_upgrade.cpp',
-    'src/system/fedora_upgrade_main.cpp',
-  ),
-  include_directories: include_directories('src'),
-  cpp_args: ['-Wall', '-Wextra', '-Wno-missing-field-initializers', '-Wpedantic', '-Wconversion', '-Wshadow'],
-  install: true,
-  install_dir: get_option('libexecdir'),
-)
-
+# helix-system-upgrade (the pkexec helper the polkit policy below points at) is Rust: services/helix-system-upgrade;
+# `just install` puts it in libexecdir.
 helix_upgrade_policy_conf = configuration_data()
 helix_upgrade_policy_conf.set('HELPER_PATH', helix_system_upgrade_path)
 configure_file(
@@ -529,7 +519,6 @@ if build_tests
     'config_widget',
     'disk_mounts',
     'enterprise_credentials',
-    'fedora_upgrade',
     'freedesktop_key_file',
     'i18n_language_tag',
     'i18n_supported_languages',
@@ -793,7 +782,7 @@ if build_tests
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
       if _have_rust_inference
         test('inference_service_integration', helix_dbus_session,
-          args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', _helix_inference_rust], timeout: 120)
+          args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', _helix_inference_rust], timeout: 300, is_parallel: false)
       endif
       if _have_rust_desktop
         if _have_rust_assistant and _have_rust_inference

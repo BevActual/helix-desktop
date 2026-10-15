@@ -1930,6 +1930,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "helix-system-upgrade"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "helix-theme"
 version = "0.1.0"
 dependencies = [

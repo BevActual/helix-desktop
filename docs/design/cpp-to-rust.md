@@ -11,7 +11,7 @@ Helix’s session UI is already Rust (Tauri). Remaining C++ owns desktop authori
 | `src/config/`, theme, dbus adapters | service / shared crates | Port with each domain |
 | `helix-assistant` | `services/helix-assistant` | **Done.** Rust; reply/step logic and the tool schema live in `helix-shell-core::agent` (`assistant_core`, `tool_schema`), checked against C++ goldens. `just install` installs the binary |
 | `helix-inference` | `services/helix-inference` | **Service done.** The D-Bus service, queue, limits, routing, picture decode and worker wrappers are Rust. The llama.cpp engine glue (`src/inference/llama_backend.cpp`, `schema_grammar.cpp`) stays C++ and is linked through a C shim by the crate's `build.rs` when `third_party/llama-install` exists; the speech/image workers (`helix-transcribe`, `helix-image`) stay C++ processes |
-| `helix-system-upgrade` | small helper or stay C++ | Low priority |
+| `helix-system-upgrade` | `services/helix-system-upgrade` | **Done.** Same plan logic and tests; `just install` puts it in libexecdir where the polkit policy points |
 | `compositor/` | already Rust (own workspace) | Done |
 | `greeter/` | Tauri scaffold | In progress |
 

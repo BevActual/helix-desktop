@@ -23,7 +23,7 @@ configure m=mode install_prefix=prefix:
 
 build m=mode: (_ensure-configured m)
     # Default targets needed for `meson install` (template apply, assistant, inference, upgrade helper).
-    meson compile -C build-{{m}} helix-template-apply helix-theme-palette helix-system-upgrade
+    meson compile -C build-{{m}} helix-template-apply helix-theme-palette
 
 # Desktop service (+ optional legacy C++ shell for local experiments). Live session/apps are Tauri.
 build-desktop m=mode jobs="2": (_ensure-configured m)
@@ -91,12 +91,14 @@ install-rust-desktop m:
         echo "error: cargo not found; helix-desktop (org.helix.Desktop) cannot be installed" >&2
         exit 1
     fi
-    cargo build --release -p helix-desktop -p helix-assistant -p helix-inference
+    cargo build --release -p helix-desktop -p helix-assistant -p helix-inference -p helix-system-upgrade
     prefix=$(meson introspect "build-{{m}}" --buildoptions | python3 -c 'import json,sys; o={x["name"]:x["value"] for x in json.load(sys.stdin)}; print(o["prefix"] + "/" + o["bindir"])')
     install -Dm755 target/release/helix-desktop "${DESTDIR:-}${prefix}/helix-desktop"
     install -Dm755 target/release/helix-assistant "${DESTDIR:-}${prefix}/helix-assistant"
     install -Dm755 target/release/helix-inference "${DESTDIR:-}${prefix}/helix-inference"
-    echo "installed ${DESTDIR:-}${prefix}/helix-desktop, helix-assistant and helix-inference"
+    libexec=$(meson introspect "build-{{m}}" --buildoptions | python3 -c 'import json,sys; o={x["name"]:x["value"] for x in json.load(sys.stdin)}; print(o["prefix"] + "/" + o["libexecdir"])')
+    install -Dm755 target/release/helix-system-upgrade "${DESTDIR:-}${libexec}/helix-system-upgrade"
+    echo "installed ${DESTDIR:-}${prefix}/{helix-desktop,helix-assistant,helix-inference} and ${DESTDIR:-}${libexec}/helix-system-upgrade"
 
 uninstall m:
     #!/usr/bin/env bash

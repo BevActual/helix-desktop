@@ -1,0 +1,13 @@
+[package]
+name = "helix-system-upgrade"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Privileged helper run through pkexec: upgrades the hardcoded Helix Fedora packages with dnf. Port of C++ src/system/fedora_upgrade*."
+
+[[bin]]
+name = "helix-system-upgrade"
+path = "src/main.rs"
+
+[dependencies]
+libc = "0.2"
