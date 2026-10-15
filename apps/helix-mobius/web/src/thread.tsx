@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { invoke, listen } from "@helix/ui";
+import { Icon, invoke, listen } from "@helix/ui";
+import { afterDone } from "./acttask";
 import type { ContextInfo } from "./context";
 
 export type Span = { kind: "text" | "code" | "bold" | "italic"; text: string };
@@ -13,6 +14,8 @@ export type Block =
   | { kind: "list"; ordered: boolean; items: Span[][] }
   | { kind: "code"; language: string; text: string };
 interface Source { provider?: string; title: string; url: string; kind: string; fetched: number }
+/** A desktop task handed over from this chat (Act) and how it ended. Shown after `after` messages; never part of what a model is sent. */
+export interface DesktopTask { id: number; after: number; request: string; outcome: string; summary: string; detail: string; at: number }
 interface Activity { id: string; tool: string; input: string; state: string; output: string }
 export interface Message { activities?: Activity[]; sources?: Source[]; role: string; text: string; blocks: Block[]; images?: string[]; }
 
@@ -60,7 +63,7 @@ export interface ThreadHooks {
 }
 export interface ThreadHandle {
   /** The whole chat, drawn now (synchronously) so the page can scroll and find in it straight away. */
-  set: (messages: Message[], streaming: boolean, context?: ContextInfo) => void;
+  set: (messages: Message[], streaming: boolean, context?: ContextInfo, tasks?: DesktopTask[]) => void;
   /** The live reply's blocks while it streams. */
   stream: (blocks: Block[]) => void;
   /** The text to highlight (empty clears it). */
@@ -191,6 +194,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
   const [save, setSave] = useState<ReplySaveState | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [context, setContext] = useState<ContextInfo | null>(null);
+  const [tasks, setTasks] = useState<DesktopTask[]>([]);
   const [live, setLive] = useState<Block[] | null>(null);
   const [needle, setNeedle] = useState("");
   const [progress, setProgress] = useState({ fraction: 0, stage: "Queued for local image generation" });
@@ -198,7 +202,7 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
 
   useEffect(() => {
     register({
-      set: (next, isStreaming, info) => flushSync(() => { setMessages(next); setStreaming(isStreaming); setLive(null); setContext(info || null); }),
+      set: (next, isStreaming, info, noted) => flushSync(() => { setMessages(next); setStreaming(isStreaming); setLive(null); setContext(info || null); setTasks(noted || []); }),
       stream: (blocks) => flushSync(() => setLive(blocks)),
       find: (value) => flushSync(() => setNeedle(value)),
     });
@@ -234,9 +238,24 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
     }
   };
 
+  // What was done on the desktop from this chat, in the place it happened (never past the last message).
+  const taskNotes = (at: number) => tasks.map((task, i) => ({ task, i })).filter(({ task }) => Math.min(task.after, messages.length) === at).map(({ task, i }) => {
+    const title = task.outcome === "done" ? "Done" : task.outcome === "failed" ? "That didn’t work" : "Stopped";
+    const rest = task.outcome === "done" ? afterDone(task.detail) : task.detail;
+    return (
+      <div className={`task-note ${task.outcome}`} key={`task-${i}`} data-test={`task-note-${i}`} data-outcome={task.outcome} role="note">
+        <span className="task-note-mark" aria-hidden="true"><Icon name={task.outcome === "done" ? "check" : task.outcome === "failed" ? "alert" : "stop"} /></span>
+        <div className="task-note-text">
+          <div className="task-note-request" data-test={`task-note-request-${i}`}>{task.request}</div>
+          <div className="task-note-result" data-test={`task-note-result-${i}`}>{rest ? `${title}: ${rest}` : title}</div>
+        </div>
+      </div>
+    );
+  });
+
   return (
     <>
-      {messages.map((message, index) => {
+      {messages.map((message, index) => (<Fragment key={`m${index}`}>{taskNotes(index)}{(() => {
         const last = index === messages.length - 1;
         const boundary = context && context.omitted_messages > 0 && index === context.first_message
           ? <div className="context-boundary" data-test="context-boundary" role="note"><strong>Recent context starts here</strong><span>Earlier messages stay saved. Use Chat context to keep important details in a brief.</span></div> : null;
@@ -289,7 +308,8 @@ export function Thread({ register, hooks }: { register: (handle: ThreadHandle) =
             </div>
           </div></Fragment>
         );
-      })}
+      })()}</Fragment>))}
+      {taskNotes(messages.length)}
       <dialog ref={saveDialog} className="sheet" data-test="save-reply-panel" aria-labelledby="save-reply-title" onClose={() => setSave(null)}>
         <div className="sheet-body">
           <header className="sheet-head">

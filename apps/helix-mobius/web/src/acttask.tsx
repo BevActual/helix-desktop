@@ -26,7 +26,7 @@ export interface ActHandle {
 }
 
 /** "Done. The screen is dimmer." under a "Done" title says it twice: keep what follows. */
-function afterDone(text: string): string {
+export function afterDone(text: string): string {
   const rest = text.replace(/^done[.!:\s-]*/i, "").trim();
   return rest;
 }
@@ -52,7 +52,8 @@ function words(state: ActState): { title: string; detail: string; tone: "work" |
 export function ActTask({ register, hooks }: { register: (handle: ActHandle) => void; hooks: ActHooks }) {
   const [state, setState] = useState<ActState | null>(null);
   useEffect(() => { register({ set: setState }); }, [register]);
-  if (!state || state.phase === "idle") return null;
+  // Idle shows nothing, and so does an outcome: once a task ends the host writes it into the conversation, where it stays.
+  if (!state || state.phase === "idle" || state.phase === "result") return null;
   const { title, detail, tone } = words(state);
   const working = state.phase === "thinking" || state.phase === "acting";
   const open = state.phase === "thinking" || state.phase === "confirm" || state.phase === "acting";

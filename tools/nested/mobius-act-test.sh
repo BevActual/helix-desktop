@@ -1,6 +1,6 @@
 #!/bin/bash
-# Mobius's task card: a request handed to the desktop assistant is shown where it was asked, step by step, and the person can stop it,
-# review it, and see how it ended. Approving is not something Mobius can do: the test stands in for the shell by creating a file.
+# Mobius's desktop tasks: a request handed to the desktop assistant is shown where it was asked, step by step, the person can stop it
+# or review it, and how it ended is written into the conversation and saved with it. Approving is not something Mobius can do: the test stands in for the shell by creating a file.
 #   HELIX_NESTED_SCRIPT=tools/nested/mobius-act-test.sh tools/nested/run.sh mobius-act tools/nested/mobius-act-nested.sh "HELIX_NESTED_KDL=layout { gaps 0; }"
 SCRATCH=$1; ROOT=$(cd "$(dirname "$0")/../.." && pwd); LOG=$SCRATCH/program.log; FAILED=0
 FAKE=$SCRATCH/state/fake-shell-act.log
@@ -35,24 +35,41 @@ echo "--- 3. Review brings the shell's approval surface back; Mobius cannot appr
 click_id act-task-review; sleep 0.8
 grep -q '^OPEN assistant' "$FAKE" && echo "ok: the assistant panel was asked for" || fail "review did nothing: $(cat "$FAKE")"
 grep -q APPROVED "$FAKE" && fail "something approved without the person" || echo "ok: nothing was approved by Mobius"
-echo "--- 4. approval in the shell moves it on to done"
+echo "--- 4. approval in the shell finishes it: the card goes and the outcome is written into the conversation"
 touch "$SCRATCH/state/approve"
-wait_id act-task-dismiss && echo "ok: it finished" || fail "never finished"
-has_id act-task-failed && fail "a success was shown as a failure" || echo "ok: a success is not shown as a failure"
-shot act-done
+wait_id task-note-0 && echo "ok: the finished task is in the thread" || fail "no task note in the thread"
+gone_id act-task && echo "ok: the progress card is gone" || fail "the card stayed after the task ended"
 grep -q APPROVED "$FAKE" && echo "ok: approved in the shell" || fail "not approved"
-echo "--- 5. dismiss clears the card"
-click_id act-task-dismiss; gone_id act-task && echo "ok: the card is gone" || fail "the card stayed"
-echo "--- 6. Stop cancels a task in progress"
+shot act-done
+echo "--- 5. it is in the saved chat, with the request and the outcome"
+CHATS=$SCRATCH/data/helix/mobius/chats
+for _ in $(seq 1 20); do ls "$CHATS"/*.json >/dev/null 2>&1 && break; sleep 0.25; done
+F=$(ls "$CHATS"/*.json 2>/dev/null | head -1)
+tasks() { python3 - "$F" <<'PY'
+import json, sys
+try: d = json.load(open(sys.argv[1]))
+except Exception: sys.exit(0)
+print(",".join(f"{t['outcome']}:{t['request']}" for t in d.get("tasks", [])))
+PY
+}
+[ "$(tasks)" = "done:Make the screen dimmer" ] && echo "ok: saved: done, with the request" || fail "saved tasks: $(tasks)"
+[ "$(stat -c %a "$F" 2>/dev/null)" = 600 ] && echo "ok: the file is owner only" || fail "file mode: $(stat -c %a "$F" 2>/dev/null)"
+python3 - "$F" <<'PY' && echo "ok: the model is not sent the task text (no message was created for it)" || fail "a message was created"
+import json, sys
+d = json.load(open(sys.argv[1]))
+sys.exit(0 if d.get("messages") == [] else 1)
+PY
+echo "--- 6. Stop cancels a task in progress and is recorded as stopped"
 say "Dim it again"
 wait_id act-task-stop && click_id act-task-stop; gone_id act-task && echo "ok: stopped, the card went away" || fail "did not stop"
 grep -q '^STOP' "$FAKE" && echo "ok: the shell was told to stop" || fail "no stop sent"
-echo "--- 7. a failure says so in plain words"
+wait_id task-note-1 && echo "ok: the stop is in the thread" || fail "no note for the stopped task"
+echo "--- 7. a failure is recorded as failed, in plain words"
 say "Please fail this one"
 wait_id act-task-review && touch "$SCRATCH/state/approve"
-wait_id act-task-dismiss && echo "ok: it ended" || fail "never ended"
+wait_id task-note-2 && echo "ok: the failure is in the thread" || fail "no note for the failed task"
 sleep 0.5; shot act-failed
-has_id act-task-failed && echo "ok: the card says it did not work" || fail "the card does not show a failure"
+[ "$(tasks)" = "done:Make the screen dimmer,stopped:Dim it again,failed:Please fail this one" ] && echo "ok: all three saved, in order, with their outcomes" || fail "saved tasks: $(tasks)"
 EXPECTED='SUBMIT "Make the screen dimmer"
 SUBMIT "Dim it again"
 SUBMIT "Please fail this one"'

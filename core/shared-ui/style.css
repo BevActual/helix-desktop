@@ -775,6 +775,16 @@ body.chat .model-option.active { background: color-mix(in srgb, var(--accent) 16
 .act-task-detail { color: var(--label-2); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act-task-actions { flex: none; display: flex; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .act-task { animation: none; } .act-task-spin { animation-duration: 3s; } }
+/* A desktop task, written into the conversation where it happened. Quiet: a note, not a message bubble. */
+.task-note { display: flex; align-items: flex-start; align-self: stretch; gap: 10px; margin: 0; padding: 8px 12px; border-radius: var(--r-ctl); background: var(--fill-1); color: var(--label-2); font-size: 13px; }
+.task-note.done { --tone: var(--ok, #30d158); }
+.task-note.failed { --tone: var(--danger, #ff453a); }
+.task-note.stopped { --tone: var(--label-2); }
+.task-note-mark { flex: none; width: 20px; height: 20px; display: grid; place-items: center; color: var(--tone, var(--label-2)); }
+.task-note-mark svg { width: 15px; height: 15px; }
+.task-note-text { min-width: 0; }
+.task-note-request { color: var(--label); font-weight: 600; overflow-wrap: anywhere; }
+.task-note-result { overflow-wrap: anywhere; }
 #scroller { flex: 1; min-height: 0; overflow-y: auto; padding: 0 24px; scroll-behavior: auto; }
 #scroller::-webkit-scrollbar { width: 0; }
 #messages { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; padding: 8px 0 28px; }

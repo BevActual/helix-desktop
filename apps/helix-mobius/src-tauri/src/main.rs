@@ -141,7 +141,7 @@ fn apply_bar_handoff(app: &AppHandle) -> bool {
     if state.chat.is_streaming() {
         return false;
     }
-    if !state.chat.temporary && !state.chat.conversation.messages.is_empty() {
+    if !state.chat.temporary && state.chat.conversation.has_content() {
         save(&state.chat.conversation);
     }
     let mut conversation = Conversation::new(&new_id(), now()).expect("fresh id");
@@ -154,7 +154,7 @@ fn apply_bar_handoff(app: &AppHandle) -> bool {
 fn save(conversation: &Conversation) -> bool {
     use std::io::Write;
     use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-    if conversation.messages.is_empty() && conversation.brief.is_empty() {
+    if !conversation.has_content() {
         return match std::fs::remove_file(data_dir().join(format!("{}.json", conversation.id))) {
             Ok(()) => true,
             Err(error) => error.kind() == std::io::ErrorKind::NotFound,
@@ -207,7 +207,7 @@ fn summaries() -> Vec<Summary> {
                 continue;
             }
             if let Some(c) = load(id) {
-                if !c.messages.is_empty() || !c.brief.is_empty() {
+                if c.has_content() {
                     let preview = c.preview();
                     all.push(Summary {
                         id: c.id,
@@ -355,6 +355,35 @@ fn emit_personas(app: &AppHandle) {
 
 fn emit_routing(app: &AppHandle) {
     let _ = app.emit("routing-view", inference_routing::load());
+}
+
+/// Writes a finished desktop task into the chat it was asked in. If that chat is the open one it is updated in place (and saved,
+/// unless a reply is streaming: the turn's own save follows); if another chat is open now, the saved file is updated. A temporary
+/// chat keeps it in memory like everything else in it.
+pub(crate) fn record_desktop_task(app: &AppHandle, chat_id: &str, task: helix_chat::chat::DesktopTask) {
+    let task = helix_chat::chat::DesktopTask { at: now(), ..task };
+    let open = {
+        let shared = shared(app);
+        let mut state = shared.lock().expect("state");
+        if state.chat.conversation.id == chat_id {
+            state.chat.conversation.record_task(task.clone(), now());
+            if !state.chat.temporary && !state.chat.is_streaming() {
+                save(&state.chat.conversation);
+            }
+            true
+        } else {
+            false
+        }
+    };
+    if open {
+        emit_view(app);
+        emit_list(app);
+    } else if let Some(mut conversation) = load(chat_id) {
+        if conversation.record_task(task, now()) {
+            save(&conversation);
+            emit_list(app);
+        }
+    }
 }
 
 fn persist(app: &AppHandle) {
@@ -1341,7 +1370,7 @@ fn agent_desk_focus() -> Result<(), String> {
 
 /// Hands `text` to the bar Assistant (Agent Surface path). Does not call the model.
 #[tauri::command]
-async fn chat_act_on_desktop(text: String) -> Result<(), String> {
+async fn chat_act_on_desktop(app: AppHandle, text: String) -> Result<(), String> {
     let trimmed = text.trim_matches(|c: char| c.is_ascii_whitespace());
     if trimmed.is_empty() {
         return Err("Write something to act on.".into());
@@ -1353,8 +1382,14 @@ async fn chat_act_on_desktop(text: String) -> Result<(), String> {
     }
     let connection = connection().await.map_err(|_| shell_offline())?;
     let proxy = shell_proxy(&connection).await.map_err(|_| shell_offline())?;
-    // Remembered before the hand-over, so the first state the shell reports is already known to be this task.
-    act::remember(trimmed);
+    // Remembered before the hand-over, so the first state the shell reports is already known to be this task, and so the
+    // finished task is written to the chat it was asked in, after the messages it already had.
+    let (chat, after) = {
+        let shared = shared(&app);
+        let state = shared.lock().expect("state");
+        (state.chat.conversation.id.clone(), state.chat.conversation.messages.len())
+    };
+    act::remember(trimmed, &chat, after);
     proxy
         .call_method("AssistantSubmit", &(trimmed,))
         .await
@@ -1448,7 +1483,7 @@ fn chat_new(app: AppHandle) -> Result<(), String> {
     let empty = {
         let shared = shared(&app);
         let state = shared.lock().expect("state");
-        state.chat.conversation.messages.is_empty() && state.chat.conversation.brief.is_empty() && !state.chat.temporary
+        !state.chat.conversation.has_content() && !state.chat.temporary
     };
     if empty {
         return Ok(());

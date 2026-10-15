@@ -77,7 +77,7 @@ acts on it, and a nested test asserts the exact requests sent.
 
 | Item | Size | Needs | Evidence |
 |---|---|---|---|
-| Act loop, next step: keep the finished task in the conversation, show the resulting state, and offer undo where the action can be undone | M | The task card (landed) | `mobius-product.md` priority 5. Today the card is above the composer and is not saved with the chat |
+| Act loop, next step: show the resulting state (what changed, not only the shell's sentence) and offer undo where an action can be undone | M | Tasks in the conversation (landed): `DesktopTask` has `summary` and `detail` but no before and after | `mobius-product.md` priority 5 |
 | Threat model for tier 3 (synthetic input) before any implementation | S | None | `agentic-os.md` marks it phase 2; `trusted-surface.md` |
 | Project knowledge: explicit notes and selected files reused across chats, with visible sources | L | Retrieval measured first | `mobius-product.md` priority 4 |
 | Read-aloud replies with playback and cancel | M | TTS engine choice | `mobius-product.md` |

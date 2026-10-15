@@ -15,11 +15,80 @@ const BUS: &str = "org.helix.Shell.Act";
 const PATH: &str = "/org/helix/Shell/Act";
 const IFACE: &str = "org.helix.Shell.Act1";
 
-/// The request this window handed over last. Only that task is shown here: another door (Caps Lock) has its own surface.
-static MINE: Mutex<String> = Mutex::new(String::new());
+/// The request this window handed over last, and where in which chat it was asked. Only that task is followed here: another door
+/// (Caps Lock) has its own surface.
+#[derive(Clone, Default)]
+struct Handoff {
+    request: String,
+    chat: String,
+    /// How many messages the chat had at the time; the finished task is shown after that many.
+    after: usize,
+}
 
-pub fn remember(request: &str) {
-    *MINE.lock().expect("act request") = request.to_string();
+static MINE: Mutex<Handoff> = Mutex::new(Handoff { request: String::new(), chat: String::new(), after: 0 });
+static TRACK: Mutex<Track> = Mutex::new(Track { task: 0, recorded: 0, in_progress: false, description: String::new() });
+
+pub fn remember(request: &str, chat: &str, after: usize) {
+    *MINE.lock().expect("act request") = Handoff { request: request.to_string(), chat: chat.to_string(), after };
+    *TRACK.lock().expect("act track") = Track::default();
+}
+
+/// What has been seen of the task being followed, to tell when it ended and how.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Track {
+    task: u64,
+    /// The task number already written to the chat, so one task is recorded once.
+    recorded: u64,
+    in_progress: bool,
+    /// The last "what will be done" the shell reported, kept for a task that is stopped before it finishes.
+    description: String,
+}
+
+/// A task that has ended.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Finished {
+    pub task: u64,
+    /// `done`, `failed` or `stopped`.
+    pub outcome: &'static str,
+    pub summary: String,
+    pub detail: String,
+}
+
+/// Feeds one reported state in. Returns the task when this state is the moment it ended: the shell reached a result, or went back
+/// to idle (Stop) while the task was in progress. Anything else, and a task already recorded, returns `None`.
+pub fn advance(track: &mut Track, view: &ActView) -> Option<Finished> {
+    if !view.mine {
+        return None;
+    }
+    match view.phase.as_str() {
+        "thinking" | "confirm" | "acting" => {
+            if track.task != view.task {
+                track.description.clear();
+            }
+            track.task = view.task;
+            track.in_progress = true;
+            if !view.description.is_empty() {
+                track.description = view.description.clone();
+            }
+            None
+        }
+        "result" => {
+            if track.recorded == view.task && view.task != 0 {
+                return None;
+            }
+            track.recorded = view.task;
+            track.in_progress = false;
+            let summary = if !view.description.is_empty() { view.description.clone() } else { track.description.clone() };
+            let detail = if !view.text.is_empty() { view.text.clone() } else { view.reason.clone() };
+            Some(Finished { task: view.task, outcome: if view.failed { "failed" } else { "done" }, summary, detail })
+        }
+        "idle" if track.in_progress && track.recorded != track.task => {
+            track.recorded = track.task;
+            track.in_progress = false;
+            Some(Finished { task: track.task, outcome: "stopped", summary: track.description.clone(), detail: String::new() })
+        }
+        _ => None,
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
@@ -74,7 +143,7 @@ async fn read() -> ActView {
     };
     let state: zbus::Result<HashMap<String, OwnedValue>> = proxy.call("GetState", &()).await;
     match state {
-        Ok(map) => view_from(&map, &MINE.lock().expect("act request")),
+        Ok(map) => view_from(&map, &MINE.lock().expect("act request").request),
         Err(_) => ActView::default(),
     }
 }
@@ -86,7 +155,25 @@ pub fn watch(app: AppHandle) {
             if let Ok(proxy) = proxy().await {
                 if let Ok(mut changes) = proxy.receive_signal("Changed").await {
                     while changes.next().await.is_some() {
-                        let _ = app.emit("act-state", read().await);
+                        let view = read().await;
+                        let finished = advance(&mut TRACK.lock().expect("act track"), &view);
+                        let _ = app.emit("act-state", &view);
+                        if let Some(done) = finished {
+                            let handoff = MINE.lock().expect("act request").clone();
+                            crate::record_desktop_task(
+                                &app,
+                                &handoff.chat,
+                                helix_chat::chat::DesktopTask {
+                                    id: done.task,
+                                    after: handoff.after,
+                                    request: handoff.request,
+                                    outcome: done.outcome.to_string(),
+                                    summary: done.summary,
+                                    detail: done.detail,
+                                    at: 0,
+                                },
+                            );
+                        }
                     }
                 }
             }
@@ -165,5 +252,71 @@ mod tests {
         let view = view_from(&state, "x");
         assert!(view.failed && view.mine);
         assert_eq!(view.text, "Could not reach the service");
+    }
+
+    fn state(phase: &str, task: u64) -> ActView {
+        ActView { mine: true, task, phase: phase.into(), request: "Dim the screen".into(), ..ActView::default() }
+    }
+
+    #[test]
+    fn a_task_is_recorded_once_when_it_reaches_a_result() {
+        let mut track = Track::default();
+        assert_eq!(advance(&mut track, &state("thinking", 1)), None);
+        let mut confirm = state("confirm", 1);
+        confirm.description = "Make the screen dimmer".into();
+        assert_eq!(advance(&mut track, &confirm), None);
+        assert_eq!(advance(&mut track, &state("acting", 1)), None);
+        let mut result = state("result", 1);
+        result.text = "Done. The screen is dimmer.".into();
+        let done = advance(&mut track, &result).expect("finished");
+        assert_eq!((done.task, done.outcome), (1, "done"));
+        assert_eq!(done.summary, "Make the screen dimmer", "what was confirmed, though the result has no description");
+        assert_eq!(done.detail, "Done. The screen is dimmer.");
+        assert_eq!(advance(&mut track, &result), None, "the same result again records nothing");
+        assert_eq!(advance(&mut track, &state("idle", 1)), None, "dismissing it afterwards records nothing");
+    }
+
+    #[test]
+    fn a_failure_carries_the_reason() {
+        let mut track = Track::default();
+        advance(&mut track, &state("acting", 4));
+        let mut failed = state("result", 4);
+        failed.failed = true;
+        failed.reason = "no such setting".into();
+        let done = advance(&mut track, &failed).unwrap();
+        assert_eq!((done.outcome, done.detail.as_str()), ("failed", "no such setting"));
+    }
+
+    #[test]
+    fn stopping_a_task_in_progress_is_recorded_as_stopped() {
+        let mut track = Track::default();
+        let mut confirm = state("confirm", 2);
+        confirm.description = "Make the screen dimmer".into();
+        advance(&mut track, &confirm);
+        let done = advance(&mut track, &state("idle", 2)).expect("stopped");
+        assert_eq!((done.outcome, done.summary.as_str(), done.detail.as_str()), ("stopped", "Make the screen dimmer", ""));
+        assert_eq!(advance(&mut track, &state("idle", 2)), None);
+    }
+
+    #[test]
+    fn nothing_is_recorded_for_a_task_this_window_did_not_hand_over() {
+        let mut track = Track::default();
+        let mut other = state("result", 9);
+        other.mine = false;
+        assert_eq!(advance(&mut track, &other), None);
+        let mut idle = state("idle", 0);
+        idle.mine = false;
+        assert_eq!(advance(&mut track, &idle), None);
+    }
+
+    #[test]
+    fn a_new_hand_over_starts_clean_even_if_the_shell_restarted_its_counter() {
+        let mut track = Track::default();
+        advance(&mut track, &state("acting", 1));
+        advance(&mut track, &state("result", 1));
+        // The shell restarted: its counter is 1 again for the next request, which remember() resets for.
+        track = Track::default();
+        advance(&mut track, &state("acting", 1));
+        assert!(advance(&mut track, &state("result", 1)).is_some());
     }
 }

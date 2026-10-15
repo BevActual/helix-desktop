@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { ChatList, type ChatItem, type ChatListHandle, type ChatListHooks } from "./chatlist";
 import { AttachChips, SlashMenu, type Attachment, type ChipsHandle, type SlashHandle, type SlashItem } from "./composer";
 import { Dialogs, type DialogHandle, type DialogHooks } from "./dialogs";
-import { Thread, type Block, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
+import { Thread, type Block, type DesktopTask, type Message, type ThreadHandle, type ThreadHooks } from "./thread";
 import { ModelsPage, type ModelsHandle, type ModelsHooks } from "./models";
 import { Analysis, type AnalysisHandle } from "./analysis";
 import { OnlineResearch, type WebHandle } from "./web";
@@ -68,7 +68,7 @@ function handled<H extends object>(host: HTMLElement, render: (register: (handle
   thread: (host: HTMLElement, hooks: ThreadHooks) => {
     const run = handled<ThreadHandle>(host, (register) => <Thread register={register} hooks={hooks} />);
     return {
-      set: (messages: Message[], streaming: boolean, context?: ContextInfo) => run((h) => h.set(messages, streaming, context)),
+      set: (messages: Message[], streaming: boolean, context?: ContextInfo, tasks?: DesktopTask[]) => run((h) => h.set(messages, streaming, context, tasks)),
       stream: (blocks: Block[]) => run((h) => h.stream(blocks)),
       find: (needle: string) => run((h) => h.find(needle)),
     };

@@ -906,13 +906,13 @@ function drawChat() {
   $("chat-title").textContent = view.temporary ? "Temporary chat" : (view.title || "New chat");
   drawComposerMeta();
   if (reactThread) {
-    reactThread.set(view.messages, view.streaming, view.context);
+    reactThread.set(view.messages, view.streaming, view.context, view.tasks || []);
   } else {
     const host = $("messages");
     host.replaceChildren();
     view.messages.forEach((message, index) => host.append(messageNode(message, index, index === view.messages.length - 1)));
   }
-  $("empty").hidden = view.messages.length > 0;
+  $("empty").hidden = view.messages.length > 0 || (view.tasks || []).length > 0;
   $("send").hidden = view.streaming;
   $("stop").hidden = !view.streaming;
   $("input").disabled = false;
