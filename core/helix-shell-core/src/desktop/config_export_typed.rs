@@ -12,6 +12,11 @@ use super::config_export_defaults::{
 };
 use super::config_export_rust::export_filtered_schema_section;
 use super::config_export_serialize::f32_bits;
+use super::config_export_typed_scalar::{
+    export_calendar_section_from_merged, export_hooks_section_from_merged,
+    export_location_section_from_merged, export_nightlight_section_from_merged,
+    export_tailscale_section_from_merged, export_weather_section_from_merged,
+};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct StorageExport {
@@ -509,6 +514,12 @@ pub(crate) fn export_typed_schema_section(
         "accessibility" => Some(export_accessibility_section_from_merged(merged)),
         "battery" => Some(export_battery_section_from_merged(merged)),
         "theme" => Some(export_theme_section_from_merged(merged)),
+        "calendar" => Some(export_calendar_section_from_merged(merged)),
+        "nightlight" => Some(export_nightlight_section_from_merged(merged)),
+        "weather" => Some(export_weather_section_from_merged(merged)),
+        "tailscale" => Some(export_tailscale_section_from_merged(merged)),
+        "location" => Some(export_location_section_from_merged(merged)),
+        "hooks" => Some(export_hooks_section_from_merged(merged)),
         _ => None,
     };
     if let Some(table) = struct_export {

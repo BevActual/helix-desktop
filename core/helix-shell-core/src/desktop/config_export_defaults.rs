@@ -181,7 +181,7 @@ pub fn write_notification_defaults() -> Toml {
     Toml::Table(table)
 }
 
-const HOOK_EVENT_KEYS: &[&str] = &[
+pub(crate) const HOOK_EVENT_KEYS: &[&str] = &[
     "battery_charging",
     "battery_discharging",
     "battery_percentage_changed",
