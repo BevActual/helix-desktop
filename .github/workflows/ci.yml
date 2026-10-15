@@ -19,32 +19,6 @@ jobs:
       - name: Check English catalog references
         run: python3 tools/i18n-check.py
 
-  format:
-    name: clang-format
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-    steps:
-      - name: Install tools
-        run: |
-          for attempt in 1 2 3; do
-            pacman -Syu --noconfirm --needed git clang && break
-            echo "pacman failed (attempt ${attempt}), retrying..."
-            sleep 15
-          done
-
-      - uses: actions/checkout@v6
-
-      - name: Check formatting
-        # The only C++ left is the engine shims; clang-format is informational until they are formatted.
-        run: |
-          mapfile -d '' files < <(find services -path '*/native/*' \( -name '*.cpp' -o -name '*.h' \) -print0)
-          if ((${#files[@]} == 0)); then
-            echo "no C++ sources"
-            exit 0
-          fi
-          clang-format --dry-run "${files[@]}" || true
-
   build:
     name: Build (debug)
     runs-on: ubuntu-latest
