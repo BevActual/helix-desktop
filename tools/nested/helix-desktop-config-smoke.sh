@@ -52,6 +52,14 @@ for _candidate in \
   fi
 done
 export HELIX_THEME_PALETTE_BIN
+for _candidate in \
+  "$ROOT/_build/helix-config-export" \
+  "$ROOT/build-debug/helix-config-export"; do
+  if [[ -z "${HELIX_CONFIG_EXPORT_BIN:-}" && -x "$_candidate" ]]; then
+    HELIX_CONFIG_EXPORT_BIN="$_candidate"
+  fi
+done
+export HELIX_CONFIG_EXPORT_BIN
 "$BIN" &
 PID=$!
 trap 'kill "$PID" 2>/dev/null || true' EXIT

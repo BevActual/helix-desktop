@@ -25,6 +25,7 @@ mod network_backend;
 mod network_support;
 mod palette_catalog;
 mod assets_path;
+mod config_export;
 mod template_apply;
 mod blocking;
 mod day_night;

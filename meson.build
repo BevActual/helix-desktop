@@ -614,6 +614,12 @@ executable('helix-theme-palette',
   cpp_args: _helix_cpp_args,
   install: true,
 )
+executable('helix-config-export',
+  sources: files('src/config/config_export_main.cpp'),
+  dependencies: helix_core_dep,
+  cpp_args: _helix_cpp_args,
+  install: true,
+)
 helix_assistant_config = configuration_data()
 helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bindir'))
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',
@@ -822,6 +828,7 @@ if build_tests
       foreach _helper : [
         ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
         ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
+        ['HELIX_CONFIG_EXPORT_BIN', 'helix-config-export'],
       ]
         foreach _build_dir : ['build-debug']
           _helper_bin = meson.project_source_root() / _build_dir / _helper[1]

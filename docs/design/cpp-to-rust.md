@@ -36,8 +36,8 @@ HELIX_SERVICE_BIN=$PWD/target/fast/helix-desktop tools/nested/…
 **Wallpaper palette source:** `helix-theme::wallpaper` generates palettes from the wallpaper in Rust (112x112 resize, quantize and
 score, the five Material schemes through the vendored `third_party/material-colors`, the five custom HSL schemes), checked against
 60 palettes and 8 resized buffers from the C++ generator and 4 end-to-end template-apply scenarios. The service uses it for template
-apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers when in-process apply declines: exotic
-`config_export` shapes for `config.*`, unreadable wallpaper images, or missing community palette when fetch is blocked (offline / no URL base).
+apply and the save-palette / set-role / set-accent paths. Still on the C++ helpers when in-process apply declines: unreadable
+wallpaper images, missing community palette when fetch is blocked (offline / no URL base), or `helix-config-export` / merged-config gaps for `config.*`.
 
 **Desktop-only catalog:** After `RegisterDesktop`, `GetSettings` also includes live `bar:<name>:<field>` scalars and `idle:<behavior>:<field>` rows from `config.toml` (`dynamic_desktop_catalog.rs`), matching C++ `settingsCatalog(helixDesktop=true)`. Override paths use `storage_path()` (`bar:*` → `bar.<name>.<field>`, `idle:*` → `idle.behavior.<name>.<field>`). `tools/nested/helix-desktop-config-smoke.sh` seeds a minimal bar + idle config and checks post-desktop rows plus `idle:*` `Update`.
 
@@ -62,7 +62,7 @@ apply and the save-palette / set-role / set-accent paths. Still on the C++ helpe
 
 ## Next (C++ tail)
 
-1. **Theme helpers** — in-process apply has merged config, icon theme, Firefox post-action, session/settings/config wallpaper paths (`wallpaper_source`), blocking community palette fetch/refresh when `HELIX_COMMUNITY_PALETTE_URL_BASE` is set (catalog `md5` stale detection in `palette_catalog::ensure_community_palette_cached`), and structured `info`/`warn` when falling back to C++ helpers. Remaining gap: exotic `config_export` shapes — then drop `helix-template-apply` / `helix-theme-palette` from Meson.
+1. **Theme helpers** — in-process apply uses `helix-config-export` for `config.*` when the binary is present (`config_export.rs`), plus icon theme, Firefox post-action, wallpaper paths, and community palette fetch/refresh. Remaining: pure-Rust `config_export` (drop `helix-config-export`), then remove `helix-template-apply` / `helix-theme-palette` from Meson when CI no longer needs them.
 2. **Inference** — Port or isolate `helix-transcribe`, `helix-image`, and the llama C++ shim; keep the D-Bus service Rust-only.
 3. **`src/desktop/` contract fixtures** — Keep `desktop_service_test` until Rust-native contract tests replace it, or freeze behaviour and delete duplicate C++ policy/schema units already covered in `helix-shell-core`.
 4. **Greeter** — Finish Tauri greeter per `greeter/HELIX.md`.

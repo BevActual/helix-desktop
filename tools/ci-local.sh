@@ -38,6 +38,7 @@ job_agent()  { WAYLAND_DISPLAY="wayland-ci-$$" ./tools/nested/helix-desktop-agen
 job_config() {
   WAYLAND_DISPLAY="wayland-ci-$$" \
   HELIX_TEMPLATE_APPLY_BIN="$ROOT/build-debug/helix-template-apply" HELIX_THEME_PALETTE_BIN="$ROOT/build-debug/helix-theme-palette" \
+  HELIX_CONFIG_EXPORT_BIN="$ROOT/build-debug/helix-config-export" \
   HELIX_ASSETS_DIR="$ROOT/assets" ./tools/nested/helix-desktop-config-smoke.sh \
     && WAYLAND_DISPLAY="wayland-ci-$$" CONTRACT_TIMEOUT=240 ./tools/nested/helix-desktop-cpp-contract.sh
 }

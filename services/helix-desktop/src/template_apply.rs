@@ -120,7 +120,7 @@ fn apply_in_process(state: &mut State) -> Option<Result<(), String>> {
             let path = crate::wallpaper_source::palette_wallpaper_path(config, &session_wallpaper);
             if path.is_empty() { None } else { Some(path) }
         },
-        config_table: Some(config.template_config_table()),
+        config_table: Some(crate::config_export::template_config_json(config)),
         icon_theme: active_icon_theme_name(),
         builtin_config,
         enable_builtin: config.get("theme.templates.enable_builtin_templates").as_bool().unwrap_or(true),

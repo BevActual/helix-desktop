@@ -85,3 +85,30 @@ pub fn helix_theme_palette_bin() -> Option<PathBuf> {
     }
     None
 }
+
+/// C++ `config_export::serialize` helper for in-process template apply.
+pub fn helix_config_export_bin() -> Option<PathBuf> {
+    if let Ok(path) = env::var("HELIX_CONFIG_EXPORT_BIN") {
+        if !path.is_empty() {
+            let candidate = PathBuf::from(path);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
+    }
+    if let Ok(exe) = env::current_exe() {
+        for name in ["helix-config-export", "helix-config-export.exe"] {
+            let sibling = exe.parent().map(|dir| dir.join(name));
+            if sibling.as_ref().is_some_and(|p| p.is_file()) {
+                return sibling;
+            }
+        }
+        for ancestor in exe.ancestors() {
+            let build = ancestor.join("helix-config-export");
+            if build.is_file() {
+                return Some(build);
+            }
+        }
+    }
+    None
+}
