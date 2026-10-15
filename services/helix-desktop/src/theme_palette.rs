@@ -46,8 +46,14 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
         Some("builtin") | None => PaletteSource::Builtin,
         Some("custom") => PaletteSource::Custom,
         Some("community") => PaletteSource::Community,
-        // wallpaper: not ported
+        Some("wallpaper") => PaletteSource::Wallpaper,
         Some(_) => return None,
+    };
+    // A wallpaper that cannot be turned into a palette is the helper's to handle.
+    let wallpaper = if source == PaletteSource::Wallpaper {
+        Some(crate::wallpaper_source::wallpaper_palette(config)?)
+    } else {
+        None
     };
     let mode = text("theme.mode").unwrap_or_else(|| "dark".into());
     let shell_mode = text("theme.shell_mode").unwrap_or_else(|| "follow".into());
@@ -59,6 +65,7 @@ fn local_selection(config: &ConfigStore) -> Option<(ThemeSelection, PathBuf)> {
         custom_palette: text("theme.custom_palette").unwrap_or_default(),
         community_cache: community_cache(config, source),
         shell_light,
+        wallpaper,
     };
     let dir = config.paths().config_dir.join("palettes");
     Some((selection, dir))

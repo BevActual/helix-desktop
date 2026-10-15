@@ -31,6 +31,7 @@ mod blocking;
 mod day_night;
 mod theme_palette;
 mod wallhaven;
+mod wallpaper_source;
 mod msg_ipc;
 mod palette_previews;
 mod peer;

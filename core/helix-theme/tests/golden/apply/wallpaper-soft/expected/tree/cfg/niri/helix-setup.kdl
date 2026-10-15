@@ -1,0 +1,4 @@
+// Helix Settings may rewrite this file. Agent desk and other Helix-only compositor options live here.
+helix {
+    agent-desk-name "Helix Agent"
+}

@@ -67,36 +67,17 @@ wayland_client_dep  = dependency('wayland-client')
 wayland_protos_dep  = dependency('wayland-protocols')
 #egl_dep             = dependency('egl')
 #glesv2_dep          = dependency('glesv2')
-wayland_egl_dep     = dependency('wayland-egl')
-freetype2_dep       = dependency('freetype2')
-fontconfig_dep      = dependency('fontconfig')
-cairo_dep           = dependency('cairo')
-cairo_ft_dep        = dependency('cairo-ft')
-pango_dep           = dependency('pango')
-pangocairo_dep      = dependency('pangocairo')
-pangoft2_dep        = dependency('pangoft2')
-harfbuzz_dep        = dependency('harfbuzz')
-librsvg_dep         = dependency('librsvg-2.0')
 xkbcommon_dep       = dependency('xkbcommon')
 glib_dep            = dependency('glib-2.0')
 gobject_dep         = dependency('gobject-2.0')
 gio_dep             = dependency('gio-2.0')
-libsecret_dep       = dependency('libsecret-1', version: '>=0.20')
-libsodium_dep       = dependency('libsodium', version: '>=1.0.18')
-polkit_agent_dep    = dependency('polkit-agent-1')
-polkit_gobject_dep  = dependency('polkit-gobject-1')
 # PipeWire/SPA headers use GCC extensions that trigger -Wpedantic/-Wconversion;
 # mark as system so the compiler suppresses those warnings.
 pipewire_dep        = dependency('libpipewire-0.3', include_type: 'system')
-wireplumber_dep     = dependency('wireplumber-0.5', include_type: 'system')
 curl_dep            = dependency('libcurl')
 libqalculate_dep    = dependency('libqalculate')
-libxml2_dep         = dependency('libxml-2.0')
 nlohmann_dep        = dependency('nlohmann_json')
 tomlplusplus_dep    = dependency('tomlplusplus')
-libical_dep         = dependency('libical')
-cups_dep            = dependency('cups')
-pam_dep             = cc.find_library('pam')
 dl_dep              = cpp.find_library('dl', required: false)
 
 jemalloc_option = get_option('jemalloc')
@@ -116,21 +97,7 @@ if is_glibc
   endif
 endif
 
-egl_dep = dependency('egl', required: false)
-gles2_dep = dependency('glesv2', required: false)
 
-
-if not egl_dep.found()
-  egl_dep = dependency('wayland-egl', required: false)
-endif
-
-if not egl_dep.found()
-  egl_dep = dependency('epoxy')
-endif
-
-if not gles2_dep.found()
-  gles2_dep = dependency('epoxy')
-endif
 
 
 # ── Vendored: fzy matcher (C fuzzy scoring) ──────────────────────────────────
@@ -338,8 +305,6 @@ alias_target('wayland-protocol-headers', _protocol_headers)
 
 # ── Main sources ──────────────────────────────────────────────────────────────
 _helix_sources = files(
-  'src/auth/fingerprint_authenticator.cpp',
-  'src/auth/pam_authenticator.cpp',
   'src/config/atomic_file.cpp',
   'src/config/config_export.cpp',
   'src/config/config_merge.cpp',
@@ -353,151 +318,47 @@ _helix_sources = files(
   'src/config/schema/config_schema.cpp',
   'src/config/schema/config_sections.cpp',
   'src/config/state_store.cpp',
-  'src/config/cli.cpp',
   'src/core/build_info.cpp',
   'src/core/deferred_call.cpp',
-  'src/core/process/process_fds.cpp',
-  'src/core/files/file_watcher.cpp',
   'src/core/input/key_chord.cpp',
   'src/core/log.cpp',
   'src/core/process/process.cpp',
   'src/core/files/resource_paths.cpp',
   'src/core/inotify/inotify.cpp',
   'src/core/timer_manager.cpp',
-  'src/core/ui_phase.cpp',
-  'src/dbus/accounts/accounts_service.cpp',
-  'src/dbus/bluetooth/bluetooth_agent.cpp',
-  'src/dbus/bluetooth/bluetooth_service.cpp',
-  'src/dbus/idle/screensaver_service.cpp',
-  'src/dbus/logind/logind_service.cpp',
-  'src/dbus/mpris/mpris_art.cpp',
-  'src/dbus/mpris/mpris_service.cpp',
-  'src/dbus/network/inetwork_service.cpp',
-  'src/dbus/network/iwd_secret_agent.cpp',
-  'src/dbus/network/iwd_service.cpp',
-  'src/dbus/network/network_display.cpp',
-  'src/dbus/network/network_manager_service.cpp',
-  'src/dbus/network/network_secret_agent.cpp',
-  'src/dbus/network/wpa_supplicant_service.cpp',
-  'src/dbus/polkit/polkit_agent.cpp',
-  'src/dbus/polkit/polkit_session_support.cpp',
-  'src/dbus/notification/notification_poll_source.cpp',
-  'src/dbus/notification/notification_service.cpp',
-  'src/dbus/power/power_profiles_service.cpp',
   'src/dbus/bus_name_watch.cpp',
-  'src/dbus/session_bus.cpp',
-  'src/dbus/system_bus.cpp',
-  'src/dbus/tray/fcitx_status.cpp',
   'src/dbus/tray/tray_service.cpp',
   'src/dbus/upower/upower_charge_limit_support.cpp',
-  'src/dbus/upower/upower_service.cpp',
-  'src/debug/debug_service.cpp',
   'src/i18n/i18n.cpp',
   'src/i18n/language_tag.cpp',
   'src/i18n/i18n_service.cpp',
-  'src/hooks/battery_hook_state.cpp',
-  'src/hooks/hook_manager.cpp',
-  'src/idle/idle_inhibitor.cpp',
-  'src/idle/idle_manager.cpp',
-  'src/ipc/ipc_client.cpp',
   'src/ipc/ipc_service.cpp',
   'src/net/http_client.cpp',
-  'src/net/uri.cpp',
-  'src/net/url_open.cpp',
   'src/notification/notification_manager.cpp',
   'src/notification/notification_filter.cpp',
-  'src/notification/notification_semantics.cpp',
-  'src/notification/notification_display_name.cpp',
   'src/notification/notification_history_store.cpp',
-  'src/pipewire/pipewire_service.cpp',
-  'src/pipewire/audio_glyphs.cpp',
-  'src/pipewire/audio_route_selection.cpp',
-  'src/pipewire/wireplumber_mixer.cpp',
-  'src/pipewire/privacy_filter.cpp',
-  'src/pipewire/pipewire_spectrum.cpp',
   'src/pipewire/sound_player.cpp',
   'src/core/color.cpp',
   'src/core/image_decoder.cpp',
   'src/core/image_orientation.cpp',
-  'src/security/encrypted_file_store.cpp',
-  'src/security/secret_store.cpp',
-  'src/security/secure_buffer.cpp',
-  'src/security/storage_key_provider.cpp',
-  'src/system/battery_warning_monitor.cpp',
   'src/config/widgets/desktop_widget_settings_registry.cpp',
-  'src/core/files/directory_scanner.cpp',
   'src/desktop_api/display_text.cpp',
   'src/desktop/agent_confirmation_queue.cpp',
-  'src/assistant/assistant_session.cpp',
   'src/config/widgets/widget_settings_registry.cpp',
-  'src/system/app_identity.cpp',
-  'src/net/wallhaven_client.cpp',
   'src/config/widget_action.cpp',
   'src/config/widget_gesture.cpp',
-  'src/system/dependency_service.cpp',
-  'src/system/desktop_entry.cpp',
   'src/system/freedesktop_key_file.cpp',
-  'src/system/desktop_entry_launch.cpp',
-  'src/system/terminal_launch.cpp',
-  'src/system/brightness_service.cpp',
-  'src/system/display_config.cpp',
-  'src/system/display_config_service.cpp',
-  'src/system/keyboard_backlight_service.cpp',
-  'src/system/lock_keys_service.cpp',
   'src/system/distro_info.cpp',
-  'src/system/fedora_upgrade.cpp',
-  'src/system/package_kit_service.cpp',
   'src/system/package_spec.cpp',
   'src/system/disk_mounts.cpp',
   'src/system/format_units.cpp',
   'src/system/hardware_info.cpp',
   'src/system/icon_resolver.cpp',
-  'src/system/internal_app_metadata.cpp',
   'src/system/day_night_schedule.cpp',
-  'src/system/gamma_service.cpp',
-  'src/system/rfkill_helper.cpp',
-  'src/system/cpu_stat.cpp',
-  'src/system/cpu_freq.cpp',
-  'src/system/cpu_temp_sensor.cpp',
-  'src/system/intel_gpu.cpp',
-  'src/system/system_monitor_service.cpp',
   'src/time/time_format.cpp',
-  'src/time/time_service.cpp',
-  'src/core/input/keybind_matcher.cpp',
   'src/theme/color_roles.cpp',
   'src/util/checksum.cpp',
-  'src/util/clamp.cpp',
-  'src/util/fuzzy_match.cpp',
-  'src/util/qr_code.cpp',
-  'src/wayland/clipboard_service.cpp',
-  'src/wayland/text_input_service.cpp',
-  'src/wayland/virtual_keyboard_service.cpp',
-  'src/compositors/compositor_platform.cpp',
-  'src/compositors/workspace_alert_service.cpp',
   'src/compositors/compositor_detect.cpp',
-  'src/compositors/compositor_runtime.cpp',
-  'src/compositors/ext_workspace/ext_workspace_output_backend.cpp',
-  'src/compositors/ext_workspace/ext_workspace_backend.cpp',
-  'src/compositors/niri/niri_runtime.cpp',
-  'src/compositors/niri/niri_event_handler.cpp',
-  'src/compositors/niri/niri_output_backend.cpp',
-  'src/compositors/niri/niri_keyboard_backend.cpp',
-  'src/compositors/niri/niri_workspace_backend.cpp',
-  'src/compositors/niri/niri_config_files.cpp',
-  'src/compositors/niri/niri_config_binds.cpp',
-  'src/compositors/niri/niri_config_keyboard.cpp',
-  'src/compositors/niri/niri_config_outputs.cpp',
-  'src/compositors/niri/niri_window_rules.cpp',
-  'src/compositors/niri/niri_layout_theme.cpp',
-  'src/compositors/niri/niri_config_blur.cpp',
-  'src/compositors/niri/niri_config_overview.cpp',
-  'src/compositors/niri/niri_config_setup.cpp',
-  'src/wayland/output_probe.cpp',
-  'src/wayland/wayland_connection.cpp',
-  'src/wayland/wayland_seat.cpp',
-  'src/wayland/wayland_toplevels.cpp',
-  'src/wayland/ext_foreign_toplevels.cpp',
-  'src/wayland/wayland_workspaces.cpp',
   'src/theme/scheme.cpp',
   'src/theme/color.cpp',
   'src/theme/contrast.cpp',
@@ -507,8 +368,6 @@ _helix_sources = files(
   'src/theme/m3_schemes.cpp',
   'src/theme/custom_schemes.cpp',
   'src/theme/builtin_palettes.cpp',
-  'src/theme/builtin_templates.cpp',
-  'src/theme/adw_gtk3.cpp',
   'src/theme/community_palettes.cpp',
   'src/theme/community_templates.cpp',
   'src/theme/custom_palettes.cpp',
@@ -516,7 +375,6 @@ _helix_sources = files(
   'src/theme/template_apply_service.cpp',
   'src/theme/runtime_palette.cpp',
   'src/theme/theme_service.cpp',
-  'src/theme/json_output.cpp',
   'src/theme/kde_color_scheme.cpp',
   'src/theme/firefox_theme/css.cpp',
   'src/theme/firefox_theme/firefox_theme.cpp',
@@ -524,12 +382,9 @@ _helix_sources = files(
   'src/theme/firefox_theme/settings.cpp',
   'src/theme/hook_runner.cpp',
   'src/theme/template_engine.cpp',
-  'src/cli/completions.cpp',
-  'src/cli/schema_json.cpp',
   'src/cli/parse.cpp',
   'src/cli/help.cpp',
-  'src/theme/cli.cpp',
-  'src/ipc/cli.cpp',)
+  )
 
 _helix_sources += files('src/desktop_api/protocol.cpp', 'src/desktop_api/client.cpp', 'src/desktop_api/remote_network.cpp', 'src/desktop_api/peer_identity.cpp')
 
@@ -568,35 +423,14 @@ _helix_inc = [
 _helix_system_dependencies = [
   sdbus_cpp_dep,
   wayland_client_dep,
-  egl_dep,
-  gles2_dep,
-  wayland_egl_dep,
-  freetype2_dep,
-  fontconfig_dep,
-  cairo_dep,
-  cairo_ft_dep,
-  pango_dep,
-  pangocairo_dep,
-  pangoft2_dep,
-  harfbuzz_dep,
-  librsvg_dep,
   xkbcommon_dep,
   glib_dep,
   gobject_dep,
   gio_dep,
-  libsecret_dep,
-  libsodium_dep,
-  polkit_agent_dep,
-  polkit_gobject_dep,
   pipewire_dep,
-  wireplumber_dep,
   curl_dep,
   libqalculate_dep,
-  pam_dep,
   nlohmann_dep,
-  libxml2_dep,
-  libical_dep,
-  cups_dep,
   tomlplusplus_dep,
   libwebp_dep,
   libwebpdemux_dep,
@@ -606,9 +440,7 @@ _helix_system_dependencies = [
 ] + jemalloc_deps + (dl_dep.found() ? [dl_dep] : [])
 
 _helix_dependencies = _helix_system_dependencies + [
-  fzy_dep,
   mcu_dep,
-  qrcodegen_dep,
 ]
 
 _helix_test_dependencies = _helix_system_dependencies + [
@@ -676,12 +508,6 @@ configure_file(
 
 if build_tests
   _cpp_test_names = [
-    'adw_gtk3',
-    'app_identity',
-    'audio_glyphs',
-    'audio_route_selection',
-    'battery_health',
-    'battery_hook_state',
     'cli_help',
     'cli_parse',
     'cli_schema',
@@ -691,64 +517,38 @@ if build_tests
     'config_schema_roundtrip',
     'config_wallpaper_precedence',
     'config_widget',
-    'cpu_freq',
-    'cpu_stat',
-    'cpu_temp_sensor',
-    'desktop_entry_launch',
     'disk_mounts',
-    'display_config',
     'enterprise_credentials',
-    'fcitx_status',
     'freedesktop_key_file',
-    'hook_manager',
     'i18n_language_tag',
     'i18n_supported_languages',
     'inotify',
     'ipc_service',
     'kde_color_scheme',
     'log',
-    'network_display',
     'network_manager_security',
-    'niri_config_binds',
-    'niri_config_outputs',
-    'niri_config_blur',
-    'niri_config_overview',
-    'niri_layout_theme',
-    'niri_window_rules',
-    'niri_config_setup',
-    'niri_workspace_backend',
     'notification_dnd',
     'notification_filter',
     'notification_history_dismiss',
     'notification_history_utf8',
-    'notification_live_activity',
     'package_spec',
     'process',
     'scheme',
-    'secret_store',
-    'security_primitives',
     'state_store',
     'string_utils',
-    'system_monitor_service',
     'template_apply_notify',
     'template_hook_async',
     'template_hook_runner',
     'theme_shell_mode',
     'time_format',
-    'upower_device_catalog',
-    'wallhaven_client',
-    'workspace_alert_service',
     'capsule_group_lane_override',
     'capsule_group_reconcile',
-    'clipboard_service',
-    'clipboard_storage_permissions',
     'ico_decoder',
     'icon_resolver',
     'jxl_decoder',
     'monitor_selector',
     'popup_dismiss_order',
     'wayland_output_scale',
-    'wayland_toplevels_identity',
     'webp_decoder',
   ]
 
@@ -819,19 +619,7 @@ helix_assistant_config.set('HELIX_BINDIR', get_option('prefix') / get_option('bi
 configure_file(input: 'assets/services/helix-assistant-warm.service.in',
   output: 'helix-assistant-warm.service', configuration: helix_assistant_config,
   install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user')
-helix_assistant = executable('helix-assistant',
-  sources: files('src/assistant/assistant_main.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp', 'src/desktop/shell_tools.cpp',
-    'src/inference/routing.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-  install: true,
-)
-helix_assistant_unit = executable('assistant_core_test',
-  sources: files('tests/assistant_core_test.cpp', 'src/assistant/assistant_core.cpp', 'src/desktop/tool_schema.cpp', 'src/desktop/agent_policy.cpp'),
-  dependencies: helix_core_dep,
-  cpp_args: _helix_cpp_args,
-)
-test('assistant_core', helix_assistant_unit, args: [meson.project_source_root()])
+# helix-assistant is Rust (services/helix-assistant); `just install` installs it next to these units.
 install_data('protocols/ipc/msg-risk.toml', install_dir: get_option('datadir') / 'helix')
 install_data('protocols/ipc/tool-hints.toml', install_dir: get_option('datadir') / 'helix')
 helix_service_config = configuration_data()
@@ -846,23 +634,8 @@ configure_file(input: 'assets/services/helix-service.service.in',
 # The model runtime: its own process, its own bus name (org.helix.Inference), sandboxed by its unit.
 image_worker_sources = files('src/inference/image_generator.cpp', 'src/inference/image_input.cpp')
 image_png_dep = dependency('libpng')
-helix_inference_introspection_h = custom_target('helix-inference-introspection',
-  input: 'protocols/dbus/org.helix.Inference.xml',
-  output: 'helix_inference_introspection.h',
-  command: [find_program('python3'), files('tools/scripts/embed_text.py'), '@INPUT@', '@OUTPUT@', 'inferenceIntrospectionXml'],
-)
-helix_inference = executable('helix-inference',
-  sources: [files('src/inference/service_main.cpp', 'src/inference/inference_service.cpp', 'src/inference/inference_queue.cpp',
-    'src/inference/schema_grammar.cpp', 'src/inference/routing.cpp', 'src/inference/image_input.cpp',
-    'src/inference/transcriber.cpp', 'src/inference/image_generator.cpp'), helix_inference_introspection_h]
-    + (llama_dep.found() ? files('src/inference/llama_backend.cpp') : []),
-  dependencies: [helix_core_dep, dependency('threads'), image_png_dep] + (llama_dep.found() ? [llama_dep] : []),
-  build_rpath: llama_prefix / 'lib64',  # development: the engine is built into third_party/
-  install_rpath: get_option('prefix') / 'lib64' / 'helix',  # installed: the private copy made below
-  cpp_args: _helix_cpp_args,
-  install: true,
-  install_tag: 'inference',
-)
+# helix-inference (the D-Bus service) is Rust: services/helix-inference. The engine glue it links (llama_backend.cpp,
+# schema_grammar.cpp) is compiled by that crate's build.rs; the C++ files below remain for their unit tests.
 if llama_dep.found()
   meson.add_install_script(find_program('python3'), files('tools/scripts/install_engine.py'), llama_prefix / 'lib64', 'lib64/helix', install_tag: 'inference')
 endif
@@ -971,12 +744,6 @@ if build_tests
     _model_path_7b = run_command('sh', '-c', 'echo "$HOME/.local/share/helix/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf"', check: false).stdout().strip()
     test('inference_llama_7b', helix_llama_test, is_parallel: false, timeout: 900, args: [meson.project_source_root(), _model_path_7b])
   endif
-  helix_assistant_session_unit = executable('assistant_session_test',
-    sources: files('tests/assistant_session_test.cpp', 'src/assistant/assistant_session.cpp', 'src/desktop_api/display_text.cpp'),
-    dependencies: helix_core_dep,
-    cpp_args: _helix_cpp_args,
-  )
-  test('assistant_session', helix_assistant_session_unit)
   helix_confirmation_queue_unit = executable('agent_confirmation_queue_test',
     sources: files('tests/agent_confirmation_queue_test.cpp', 'src/desktop/agent_confirmation_queue.cpp', 'src/desktop_api/display_text.cpp'),
     dependencies: helix_core_dep,
@@ -996,6 +763,16 @@ if build_tests
     else
       _helix_desktop_rust = _helix_desktop_rust_debug
     endif
+    _helix_assistant_rust = meson.project_source_root() / 'target' / 'fast' / 'helix-assistant'
+    if run_command('test', '-x', _helix_assistant_rust, check: false).returncode() != 0
+      _helix_assistant_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-assistant'
+    endif
+    _have_rust_assistant = run_command('test', '-x', _helix_assistant_rust, check: false).returncode() == 0
+    _helix_inference_rust = meson.project_source_root() / 'target' / 'fast' / 'helix-inference'
+    if run_command('test', '-x', _helix_inference_rust, check: false).returncode() != 0
+      _helix_inference_rust = meson.project_source_root() / 'target' / 'debug' / 'helix-inference'
+    endif
+    _have_rust_inference = run_command('test', '-x', _helix_inference_rust, check: false).returncode() == 0
     helix_service = _helix_desktop_rust  # Rust org.helix.Desktop (cargo build -p helix-desktop [--profile fast])
     _have_rust_desktop = run_command('test', '-x', _helix_desktop_rust, check: false).returncode() == 0
     if _have_rust_desktop
@@ -1003,12 +780,16 @@ if build_tests
     endif
     meter_python = find_program('python3')
     if run_command(meter_python, '-c', 'from gi.repository import Gio, GLib', check: false).returncode() == 0
-      test('inference_service_integration', helix_dbus_session,
-        args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', helix_inference], timeout: 120)
+      if _have_rust_inference
+        test('inference_service_integration', helix_dbus_session,
+          args: [meter_python, meson.project_source_root() / 'tests/inference_service_integration.py', _helix_inference_rust], timeout: 300, is_parallel: false)
+      endif
       if _have_rust_desktop
-        test('assistant_integration', helix_dbus_session,
-          args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', helix_assistant, helix_service, helix_inference,
-            meson.project_source_root()], timeout: 120)
+        if _have_rust_assistant and _have_rust_inference
+          test('assistant_integration', helix_dbus_session,
+            args: [meter_python, meson.project_source_root() / 'tests/assistant_integration.py', _helix_assistant_rust, helix_service, _helix_inference_rust,
+              meson.project_source_root()], timeout: 120)
+        endif
         test('desktop_agent_manager_integration', helix_dbus_session,
           args: [meter_python, meson.project_source_root() / 'tests/desktop_agent_manager_integration.py',
             helix_service, meson.project_source_root() / 'protocols/ipc/msg-risk.toml'], timeout: 90)
@@ -1042,7 +823,7 @@ if build_tests
         ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
         ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
       ]
-        foreach _build_dir : ['_build', 'build-debug']
+        foreach _build_dir : ['build-debug']
           _helper_bin = meson.project_source_root() / _build_dir / _helper[1]
           if run_command('test', '-x', _helper_bin, check: false).returncode() == 0
             _config_smoke_env += [_helper[0] + '=' + _helper_bin]

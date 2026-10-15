@@ -8,6 +8,8 @@ members = [
     "services/helix-wallpaper",
     "services/helix-idle",
     "services/helix-desktop",
+    "services/helix-assistant",
+    "services/helix-inference",
     "services/helix-system-upgrade",
     "shell/helix-shell-tauri/src-tauri",
     "shell/helix-shell-strut",
