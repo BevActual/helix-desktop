@@ -7,7 +7,7 @@ use super::config_export_rust::{coerce_patch_value, merge_export_subtree, merged
 use super::config_export_serialize::f32_bits;
 use super::config_export_typed_scalar::overlay_known_leaves;
 
-const MERGE_SUBTREE_KEYS: &[&str] = &["keyboard_layout", "launcher", "session"];
+const MERGE_SUBTREE_KEYS: &[&str] = &["keyboard_layout", "session"];
 
 const OVERLAY_SUBTREE_KEYS: &[&str] = &[
     "animation",
@@ -243,6 +243,154 @@ impl ShellScreenshotExport {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct ShellLauncherExport {
+    app_grid: bool,
+    auto_paste: String,
+    categories: bool,
+    compact: bool,
+    fetch_exchange_rates: bool,
+    pinned: Vec<String>,
+    provider_prefix: String,
+    show_app_actions: bool,
+    show_app_origin_indicator: bool,
+    show_icons: bool,
+    sort_by_usage: bool,
+    dmenu: Toml,
+    panels: Toml,
+}
+
+impl ShellLauncherExport {
+    fn export_defaults() -> Self {
+        Self::from_export_table(
+            write_shell_defaults()
+                .get("launcher")
+                .expect("shell.launcher defaults"),
+        )
+    }
+
+    fn from_export_table(table: &Toml) -> Self {
+        let table = table.as_table().expect("launcher table");
+        Self {
+            app_grid: table.get("app_grid").and_then(Toml::as_bool).unwrap_or(false),
+            auto_paste: table
+                .get("auto_paste")
+                .and_then(Toml::as_str)
+                .unwrap_or("auto")
+                .to_string(),
+            categories: table.get("categories").and_then(Toml::as_bool).unwrap_or(true),
+            compact: table.get("compact").and_then(Toml::as_bool).unwrap_or(false),
+            fetch_exchange_rates: table
+                .get("fetch_exchange_rates")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            pinned: table
+                .get("pinned")
+                .and_then(Toml::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            provider_prefix: table
+                .get("provider_prefix")
+                .and_then(Toml::as_str)
+                .unwrap_or("/")
+                .to_string(),
+            show_app_actions: table
+                .get("show_app_actions")
+                .and_then(Toml::as_bool)
+                .unwrap_or(false),
+            show_app_origin_indicator: table
+                .get("show_app_origin_indicator")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            show_icons: table.get("show_icons").and_then(Toml::as_bool).unwrap_or(true),
+            sort_by_usage: table
+                .get("sort_by_usage")
+                .and_then(Toml::as_bool)
+                .unwrap_or(true),
+            dmenu: table.get("dmenu").cloned().unwrap_or_else(empty_table),
+            panels: table.get("panels").cloned().unwrap_or_else(empty_table),
+        }
+    }
+
+    fn from_merged(merged: &Toml, default: &Toml, shell_overlay: &Toml) -> Self {
+        let defaults = write_shell_defaults();
+        let launcher_defaults = defaults.get("launcher").expect("launcher");
+        let patch = shell_overlay
+            .get("launcher")
+            .cloned()
+            .unwrap_or_else(empty_table);
+        let empty = empty_table();
+        let mut patch_scalars = patch.as_table().cloned().unwrap_or_default();
+        patch_scalars.remove("dmenu");
+        patch_scalars.remove("panels");
+        let mut table = overlay_known_leaves(launcher_defaults, &Toml::Table(patch_scalars));
+        let out_table = table.as_table_mut().expect("launcher export table");
+        let def_dmenu = launcher_defaults.get("dmenu").unwrap_or(&empty);
+        let patch_dmenu = patch.get("dmenu").unwrap_or(&empty);
+        out_table.insert(
+            "dmenu".to_string(),
+            merge_export_subtree(def_dmenu, patch_dmenu, merged, default, "shell.launcher.dmenu"),
+        );
+        let def_panels = launcher_defaults.get("panels").unwrap_or(&empty);
+        let patch_panels = patch.get("panels").unwrap_or(&empty);
+        out_table.insert(
+            "panels".to_string(),
+            merge_export_subtree(
+                def_panels,
+                patch_panels,
+                merged,
+                default,
+                "shell.launcher.panels",
+            ),
+        );
+        Self::from_export_table(&table)
+    }
+
+    fn write_export_table(&self) -> Toml {
+        let mut table = toml::map::Map::new();
+        table.insert("app_grid".to_string(), Toml::Boolean(self.app_grid));
+        table.insert("auto_paste".to_string(), Toml::String(self.auto_paste.clone()));
+        table.insert("categories".to_string(), Toml::Boolean(self.categories));
+        table.insert("compact".to_string(), Toml::Boolean(self.compact));
+        table.insert(
+            "fetch_exchange_rates".to_string(),
+            Toml::Boolean(self.fetch_exchange_rates),
+        );
+        table.insert(
+            "pinned".to_string(),
+            Toml::Array(
+                self.pinned
+                    .iter()
+                    .map(|item| Toml::String(item.clone()))
+                    .collect(),
+            ),
+        );
+        table.insert(
+            "provider_prefix".to_string(),
+            Toml::String(self.provider_prefix.clone()),
+        );
+        table.insert("show_app_actions".to_string(), Toml::Boolean(self.show_app_actions));
+        table.insert(
+            "show_app_origin_indicator".to_string(),
+            Toml::Boolean(self.show_app_origin_indicator),
+        );
+        table.insert("show_icons".to_string(), Toml::Boolean(self.show_icons));
+        table.insert("sort_by_usage".to_string(), Toml::Boolean(self.sort_by_usage));
+        table.insert("dmenu".to_string(), self.dmenu.clone());
+        table.insert("panels".to_string(), self.panels.clone());
+        Toml::Table(table)
+    }
+}
+
+fn empty_table() -> Toml {
+    Toml::Table(toml::map::Map::new())
+}
+
 fn overlay_subtree(defaults: &Toml, merged_shell: Option<&Toml>, key: &str) -> Toml {
     let default_sub = defaults.get(key).expect("shell subtree default");
     let merged_sub = merged_shell.and_then(|shell| shell.get(key));
@@ -294,6 +442,11 @@ pub(crate) fn export_shell_section_from_merged(merged: &Toml, default: &Toml) ->
         out.insert((*key).to_string(), value);
     }
 
+    out.insert(
+        "launcher".to_string(),
+        ShellLauncherExport::from_merged(merged, default, &overlay).write_export_table(),
+    );
+
     for key in MERGE_SUBTREE_KEYS {
         let default_sub = default_table.get(*key).expect("shell subtree default");
         let patch = overlay
@@ -314,6 +467,43 @@ mod tests {
     use super::*;
     use super::super::config_export_rust::export_filtered_schema_section;
     use super::super::config_export_serialize::serialize_default_config;
+
+    #[test]
+    fn launcher_export_matches_defaults_and_full_merge() {
+        let default = serialize_default_config();
+        let shell_defaults = write_shell_defaults();
+        assert_eq!(
+            ShellLauncherExport::export_defaults().write_export_table(),
+            shell_defaults.get("launcher").expect("launcher").clone(),
+        );
+        let merged: Toml = toml::from_str(
+            r#"
+[shell.launcher]
+compact = true
+pinned = ["firefox.desktop"]
+
+[shell.launcher.dmenu]
+width = 400
+"#,
+        )
+        .unwrap();
+        let merged_shell = merged.get("shell");
+        let shell_overlay = merged_shell
+            .map(|section| merged_overlay_for_parsed_section("shell", section))
+            .expect("shell overlay");
+        let launcher_defaults = shell_defaults.get("launcher").unwrap();
+        let patch = shell_overlay.get("launcher").unwrap();
+        let via_merge = merge_export_subtree(
+            launcher_defaults,
+            patch,
+            &merged,
+            &default,
+            "shell.launcher",
+        );
+        let via_typed = ShellLauncherExport::from_merged(&merged, &default, &shell_overlay)
+            .write_export_table();
+        assert_eq!(via_typed, via_merge);
+    }
 
     #[test]
     fn screenshot_and_screen_record_exports_match_defaults() {
@@ -401,37 +591,6 @@ audio = false
         .unwrap();
         assert_subtree_overlay_matches_merge("screenshot", &merged, &default);
         assert_subtree_overlay_matches_merge("screen_record", &merged, &default);
-    }
-
-    #[test]
-    fn launcher_subtree_needs_merge_for_dmenu_extras() {
-        let default = serialize_default_config();
-        let merged: Toml = toml::from_str(
-            r#"
-[shell.launcher]
-compact = true
-
-[shell.launcher.dmenu]
-width = 400
-"#,
-        )
-        .unwrap();
-        let defaults = write_shell_defaults();
-        let default_sub = defaults.get("launcher").unwrap();
-        let merged_shell = merged.get("shell");
-        let overlay_section = merged_shell
-            .map(|section| merged_overlay_for_parsed_section("shell", section))
-            .unwrap();
-        let patch = overlay_section.get("launcher").unwrap();
-        let via_merge = merge_export_subtree(
-            default_sub,
-            patch,
-            &merged,
-            &default,
-            "shell.launcher",
-        );
-        let via_overlay = overlay_subtree(&defaults, merged_shell, "launcher");
-        assert_ne!(via_overlay, via_merge);
     }
 
     #[test]
