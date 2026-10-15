@@ -1053,7 +1053,7 @@ if build_tests
         ['HELIX_TEMPLATE_APPLY_BIN', 'helix-template-apply'],
         ['HELIX_THEME_PALETTE_BIN', 'helix-theme-palette'],
       ]
-        foreach _build_dir : ['_build', 'build-debug']
+        foreach _build_dir : ['build-debug']
           _helper_bin = meson.project_source_root() / _build_dir / _helper[1]
           if run_command('test', '-x', _helper_bin, check: false).returncode() == 0
             _config_smoke_env += [_helper[0] + '=' + _helper_bin]
